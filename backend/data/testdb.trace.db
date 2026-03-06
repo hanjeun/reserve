@@ -1,0 +1,12 @@
+2026-01-04 05:03:50.270307+09:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "REFRESH_TOKEN" not found (this database is empty); SQL statement:
+select rt1_0.id,rt1_0.refresh_token,rt1_0.user_id from refresh_token rt1_0 where rt1_0.refresh_token=? [42104-232]
+2026-01-04 05:03:51.676244+09:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "REFRESH_TOKEN" not found (this database is empty); SQL statement:
+select rt1_0.id,rt1_0.refresh_token,rt1_0.user_id from refresh_token rt1_0 where rt1_0.refresh_token=? [42104-232]
+2026-01-04 05:03:52.596018+09:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "REFRESH_TOKEN" not found (this database is empty); SQL statement:
+select rt1_0.id,rt1_0.refresh_token,rt1_0.user_id from refresh_token rt1_0 where rt1_0.refresh_token=? [42104-232]
+2026-01-04 05:03:55.147319+09:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "REFRESH_TOKEN" not found (this database is empty); SQL statement:
+select rt1_0.id,rt1_0.refresh_token,rt1_0.user_id from refresh_token rt1_0 where rt1_0.refresh_token=? [42104-232]

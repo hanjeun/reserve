@@ -1,0 +1,34 @@
+version: '3.8'
+services:
+  blue:
+    container_name: blue
+    image: ${DOCKERHUB_USERNAME}/reserve:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=blue
+      - SERVER_ENV=blue
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - NAVER_CLIENT_ID=${NAVER_CLIENT_ID}
+      - NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET}
+      - KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
+      - KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - PORTONE_IMP_KEY=${PORTONE_IMP_KEY}
+      - PORTONE_IMP_SECRET=${PORTONE_IMP_SECRET}
+      - PORTONE_IMP_CODE=${PORTONE_IMP_CODE}
+      - PORTONE_V2_SECRET=${PORTONE_V2_SECRET}
+      - PORTONE_STORE_ID=${PORTONE_STORE_ID}
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    volumes:
+      - /home/ubuntu/uploads:/uploads
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    external: true

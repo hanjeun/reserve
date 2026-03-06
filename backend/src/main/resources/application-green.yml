@@ -1,0 +1,14 @@
+# ============================================
+# Green 서버 전용 설정
+# ============================================
+
+spring:
+  config:
+    activate:
+      on-profile: green
+
+server:
+  port: 8081
+  env: green
+
+serverName: green_server

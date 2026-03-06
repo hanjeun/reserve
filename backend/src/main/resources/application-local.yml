@@ -1,0 +1,44 @@
+# ============================================
+# 로컬 개발 환경 전용 설정
+# ============================================
+
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  # 로컬 MySQL 연결
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: 1234
+
+  # OAuth2 Redirect URI (localhost)
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            redirect-uri: http://localhost:8080/login/oauth2/code/google
+          naver:
+            redirect-uri: http://localhost:8080/login/oauth2/code/naver
+          kakao:
+            redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+
+# 서버 설정
+server:
+  port: 8080
+  serverAddress: localhost
+  env: local
+
+serverName: local_server
+
+# 파일 업로드 경로 (로컬 전용 절대경로)
+file:
+  upload-dir: C:/Users/USER/Downloads/RESERVE/backend/uploads
+
+# 로컬 추가 로깅
+logging:
+  level:
+    org.hibernate.SQL: DEBUG

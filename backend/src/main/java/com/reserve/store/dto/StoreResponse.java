@@ -1,0 +1,88 @@
+package com.reserve.store.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.reserve.store.entity.Store;
+import jakarta.validation.constraints.Min;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
+
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class StoreResponse {
+    
+    private Long id;
+    private String name;
+    private String description;
+    private String address;
+    private String phone;
+    private String category;
+    private String mainImageUrl;
+    private List<String> detailImageUrls;
+    private List<String> keywords;
+    
+    @JsonFormat(pattern = "HH:mm")
+    private LocalTime openTime;
+    
+    @JsonFormat(pattern = "HH:mm")
+    private LocalTime closeTime;
+    
+    private Double rating;
+    private Integer reviewCount;
+
+    @Min(value = 0, message = "노쇼 금액은 0원 이상이어야 합니다.")
+    private Integer noShowDeposit;  // 노쇼 방지금
+    
+    // ========== 환불 정책 ==========
+    private Integer fullRefundDays;     // 전액 환불 가능 일수
+    private Integer partialRefundDays;  // 부분 환불 가능 일수
+    private Integer partialRefundRate;  // 부분 환불 비율 (%)
+
+    // 예약 슬롯 정책
+    private Integer maxCapacityPerSlot;
+    private Boolean autoApprovalEnabled;
+    private Integer bookingDeadlineHours;
+    private Integer paymentTimeoutMinutes;
+    private Integer reservationSlotMinutes;
+    private Boolean allowLatePayment;
+    private Boolean allowDuplicateReservation;
+
+    private LocalDateTime createdAt;
+
+    public static StoreResponse fromEntity(Store store) {
+        return StoreResponse.builder()
+                .id(store.getId())
+                .name(store.getName())
+                .description(store.getDescription())
+                .address(store.getAddress())
+                .phone(store.getPhone())
+                .category(store.getCategory())
+                .mainImageUrl(store.getMainImageUrl())
+                .detailImageUrls(store.getDetailImageList())
+                .keywords(store.getKeywordList())
+                .openTime(store.getOpenTime())
+                .closeTime(store.getCloseTime())
+                .rating(store.getRating())
+                .reviewCount(store.getReviewCount())
+                .noShowDeposit(store.getNoShowDeposit())
+                .fullRefundDays(store.getFullRefundDays())
+                .partialRefundDays(store.getPartialRefundDays())
+                .partialRefundRate(store.getPartialRefundRate())
+                .maxCapacityPerSlot(store.getMaxCapacityPerSlot())
+                .autoApprovalEnabled(store.getAutoApprovalEnabled())
+                .bookingDeadlineHours(store.getBookingDeadlineHours())
+                .paymentTimeoutMinutes(store.getPaymentTimeoutMinutes())
+                .reservationSlotMinutes(store.getReservationSlotMinutes())
+                .allowLatePayment(store.getAllowLatePayment())
+                .allowDuplicateReservation(store.getAllowDuplicateReservation())
+                .createdAt(store.getCreatedAt())
+                .build();
+    }
+}

@@ -1,0 +1,14 @@
+# ============================================
+# Blue 서버 전용 설정
+# ============================================
+
+spring:
+  config:
+    activate:
+      on-profile: blue
+
+server:
+  port: 8080
+  env: blue
+
+serverName: blue_server

@@ -1,0 +1,18 @@
+# ============================================
+# 프로필 설정
+# ============================================
+# local  : 로컬 개발 환경 (localhost MySQL)
+# blue   : 배포 환경 (Blue 서버)
+# green  : 배포 환경 (Green 서버)
+# ============================================
+
+spring:
+  application:
+    name: reserve
+    
+  profiles:
+    active: local
+    group:
+      local: common, secret
+      blue: common, prod, secret
+      green: common, prod, secret

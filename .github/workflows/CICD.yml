@@ -150,6 +150,15 @@ jobs:
             echo "TARGET_UPSTREAM=blue" >> $GITHUB_ENV
           fi
 
+      - name: Deploy docker-compose files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose-blue.yml,docker-compose-green.yml"
+          target: "/home/ubuntu/"
+
       - name: Docker compose up (target)
         uses: appleboy/ssh-action@master
         with:
@@ -158,7 +167,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
-            sudo docker compose -f docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
+            sudo docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)
         uses: jtalk/url-health-check-action@v3

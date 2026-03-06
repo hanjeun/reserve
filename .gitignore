@@ -1,6 +1,10 @@
 HELP.md
 .gradle
 build/
+cookies.txt
+backend/data/
+*.deprecated.jsx
+*.unused
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

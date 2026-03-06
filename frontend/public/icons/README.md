@@ -1,7 +1,7 @@
-# PWA 아이콘 안내
+# PWA 아이콘
 
-이 폴더에 아래 두 파일을 넣어주세요:
-- `icon-192.png` — 192×192px (홈 화면 아이콘)
-- `icon-512.png` — 512×512px (스플래시 스크린)
+PWA 지원 추가 시 아래 파일을 이 폴더에 추가하세요:
+- `icon-192.png` (192×192px)
+- `icon-512.png` (512×512px)
 
-빠른 방법: https://realfavicongenerator.net 에서 RESERVE 로고 업로드 후 PWA용 자동 생성
+현재 PWA는 비활성화 상태입니다 (vite-plugin-pwa + Vite 7 호환성 문제).

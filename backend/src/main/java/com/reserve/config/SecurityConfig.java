@@ -50,6 +50,7 @@ public class SecurityConfig {
                         
                         // Health Check & Environment
                         .requestMatchers("/hc", "/env").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
                         
                         // 인증 관련 API
                         .requestMatchers("/api/auth/**", "/api/email/**", "/api/token").permitAll()

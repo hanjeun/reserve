@@ -123,10 +123,10 @@ jobs:
 
       - name: Set target IP
         run: |
-          STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 "http://${{ secrets.RESERVE_SERVER_IP }}:8080/env" || echo "000")
+          STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 "http://${{ secrets.RESERVE_SERVER_IP }}:8080/actuator/health" || echo "000")
           echo "Blue status: $STATUS_BLUE"
 
-          STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 "http://${{ secrets.RESERVE_SERVER_IP }}:8081/env" || echo "000")
+          STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 "http://${{ secrets.RESERVE_SERVER_IP }}:8081/actuator/health" || echo "000")
           echo "Green status: $STATUS_GREEN"
 
           if [ "$STATUS_BLUE" = "200" ]; then
@@ -165,14 +165,31 @@ jobs:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,MAIL_USERNAME,MAIL_PASSWORD,PORTONE_IMP_KEY,PORTONE_IMP_SECRET,PORTONE_IMP_CODE,PORTONE_V2_SECRET,PORTONE_STORE_ID,DB_PASSWORD
           script: |
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
-            sudo docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            export GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            export GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            export NAVER_CLIENT_ID=${{ secrets.NAVER_CLIENT_ID }}
+            export NAVER_CLIENT_SECRET=${{ secrets.NAVER_CLIENT_SECRET }}
+            export KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            export KAKAO_CLIENT_SECRET=${{ secrets.KAKAO_CLIENT_SECRET }}
+            export MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+            export MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            export PORTONE_IMP_KEY=${{ secrets.PORTONE_IMP_KEY }}
+            export PORTONE_IMP_SECRET=${{ secrets.PORTONE_IMP_SECRET }}
+            export PORTONE_IMP_CODE=${{ secrets.PORTONE_IMP_CODE }}
+            export PORTONE_V2_SECRET=${{ secrets.PORTONE_V2_SECRET }}
+            export PORTONE_STORE_ID=${{ secrets.PORTONE_STORE_ID }}
+            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)
         uses: jtalk/url-health-check-action@v3
         with:
-          url: http://${{ secrets.RESERVE_SERVER_IP }}:${{ env.STOPPED_PORT }}/env
+          url: http://${{ secrets.RESERVE_SERVER_IP }}:${{ env.STOPPED_PORT }}/actuator/health
           max-attempts: 10
           retry-delay: 15s
 

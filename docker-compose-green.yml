@@ -23,6 +23,7 @@ services:
       - PORTONE_V2_SECRET=${PORTONE_V2_SECRET}
       - PORTONE_STORE_ID=${PORTONE_STORE_ID}
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - /home/ubuntu/uploads:/uploads
     networks:

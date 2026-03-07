@@ -7,6 +7,8 @@ import com.reserve.config.service.TokenService;
 import com.reserve.config.util.CookieUtil;
 import com.reserve.global.common.ApiResponse;
 import com.reserve.global.error.AuthException;
+import com.reserve.global.ratelimit.IpExtractor;
+import com.reserve.global.ratelimit.RateLimiter;
 import com.reserve.member.dto.MemberDto;
 import com.reserve.member.dto.MemberResponse;
 import com.reserve.member.entity.Member;
@@ -14,6 +16,7 @@ import com.reserve.member.service.MemberService;
 import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,9 +38,16 @@ public class AuthApiController {
     private final JwtProperties jwtProperties;
     private final RefreshTokenRepository refreshTokenRepository;
     private final TokenService tokenService;
+    private final RateLimiter rateLimiter;
 
     @PostMapping("/login")
-    public ApiResponse<MemberResponse> login(@RequestBody Map<String, String> loginRequest, HttpServletResponse response) {
+    public ApiResponse<MemberResponse> login(@RequestBody Map<String, String> loginRequest,
+                                             HttpServletRequest request, HttpServletResponse response) {
+        String ip = IpExtractor.extract(request);
+        if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.LOGIN)) {
+            throw new AuthException("로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
         Member member = memberService.findByEmail(loginRequest.get("email"));
 
         if (member.isOAuthUser()) {

@@ -10,9 +10,9 @@ spring:
   # Docker MySQL 연결
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root
-    password: 1234
+    url: jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
 
   # OAuth2 Redirect URI (배포 도메인)
   security:

@@ -15,9 +15,10 @@
 
 ### 백엔드
 
+`backend/src/main/resources/application-local.yml`에 DB 접속 정보 설정 후:
+
 ```bash
 cd backend
-# application-local.yml에 DB 접속 정보 설정 후
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
@@ -25,8 +26,8 @@ cd backend
 
 ```bash
 cd frontend
+cp .env.example .env.local   # VITE_API_BASE_URL 등 설정
 npm install
-cp .env.example .env.local   # VITE_API_BASE_URL 설정
 npm run dev
 ```
 
@@ -34,7 +35,7 @@ npm run dev
 
 - 소셜 로그인 (Google / Naver / Kakao)
 - 가게 검색 · 정렬 · 즐겨찾기
-- 실시간 예약 및 노쇼 예약금 결제 (카카오페이)
+- 예약 및 노쇼 예약금 결제 (카카오페이)
 - 사업자 패널 — 예약 승인/거절/완료/노쇼 처리
 - 관리자 패널 — 사업자 인증 심사, 전체 예약 조회
 - 리뷰 작성 · 수정 · 삭제
@@ -44,9 +45,9 @@ npm run dev
 
 | 문서 | 내용 |
 |---|---|
-| [docs/deployment.md](docs/deployment.md) | EC2 · Docker · Nginx · GitHub Secrets · OAuth 설정 |
+| [docs/deployment.md](docs/deployment.md) | 배포 · 인프라 · GitHub Secrets · OAuth 설정 · 트러블슈팅 |
 | [docs/design-system.md](docs/design-system.md) | 디자인 토큰 · 공통 컴포넌트 · Import 패턴 |
-| [docs/structure.md](docs/structure.md) | 폴더 구조 · 라우트 목록 |
+| [docs/structure.md](docs/structure.md) | 폴더 구조 · 환경변수 · 라우트 목록 |
 
 ## 배포
 
@@ -55,4 +56,3 @@ https://reserve.hktech.kr
 ```
 
 `main` 브랜치 push 시 GitHub Actions가 자동으로 Blue/Green 배포를 수행합니다.
-배포 전 체크리스트는 [docs/deployment.md](docs/deployment.md)를 참고하세요.

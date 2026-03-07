@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
@@ -21,14 +22,22 @@ public class RefreshToken {
     @Column(name = "refresh_token", nullable = false, columnDefinition = "TEXT")
     private String refreshToken;
 
-    public RefreshToken(Long memberId, String refreshToken) {
+    @Column(name = "expires_at", nullable = false)
+    private LocalDateTime expiresAt;
+
+    public RefreshToken(Long memberId, String refreshToken, LocalDateTime expiresAt) {
         this.memberId = memberId;
         this.refreshToken = refreshToken;
+        this.expiresAt = expiresAt;
     }
 
-    public RefreshToken update(String refreshToken) {
-        this.refreshToken = refreshToken;
+    public RefreshToken update(String newToken, LocalDateTime newExpiresAt) {
+        this.refreshToken = newToken;
+        this.expiresAt = newExpiresAt;
         return this;
     }
 
+    public boolean isExpired() {
+        return LocalDateTime.now().isAfter(this.expiresAt);
+    }
 }

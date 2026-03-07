@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 
@@ -42,16 +43,22 @@ public class TokenProvider {
     }
 
     public String generateRefreshToken(Member member) {
-        String token = generateToken(member, jwtProperties.getRefreshTokenExpiration());
+        Duration expiration = jwtProperties.getRefreshTokenExpiration();
+        String token = generateToken(member, expiration);
+        LocalDateTime expiresAt = LocalDateTime.now().plus(expiration);
 
-        // 기존 토큰 삭제 (단일 기기 로그인 유지 정책)
+        // upsert: 기존 레코드가 있으면 토큰값만 갱신, 없으면 새로 생성
         List<RefreshToken> existingTokens = refreshTokenRepository.findByMemberId(member.getId());
         if (!existingTokens.isEmpty()) {
-            refreshTokenRepository.deleteAll(existingTokens);
+            existingTokens.get(0).update(token, expiresAt);
+            // 혹시 중복 레코드가 있으면 나머지 삭제
+            if (existingTokens.size() > 1) {
+                refreshTokenRepository.deleteAll(existingTokens.subList(1, existingTokens.size()));
+            }
+            refreshTokenRepository.save(existingTokens.get(0));
+        } else {
+            refreshTokenRepository.save(new RefreshToken(member.getId(), token, expiresAt));
         }
-
-        RefreshToken refreshToken = new RefreshToken(member.getId(), token);
-        refreshTokenRepository.save(refreshToken);
 
         return token;
     }

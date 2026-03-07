@@ -26,8 +26,12 @@ public class TokenService {
             throw new AuthException("유효하지 않은 리프레시 토큰입니다.");
         }
 
-        // 2. 사용자 조회
-        Long userId = refreshTokenService.findByRefreshToken(refreshToken).getMemberId();
+        // 2. DB 레코드 조회 및 만료 확인
+        var savedToken = refreshTokenService.findByRefreshToken(refreshToken);
+        if (savedToken.isExpired()) {
+            throw new AuthException("만료된 리프레시 토큰입니다. 다시 로그인해주세요.");
+        }
+        Long userId = savedToken.getMemberId();
         Member member = memberService.findById(userId);
 
         log.info("✅ 사용자 확인: {}", member.getEmail());

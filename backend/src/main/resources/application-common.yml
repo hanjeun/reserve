@@ -97,3 +97,13 @@ mail:
 # 포트원 설정
 portone:
   pg-provider: kakaopay
+
+# Actuator (헬스체크)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never   # 운영 환경에서 내부 정보 비노출

@@ -2,6 +2,9 @@ package com.reserve.email.controller;
 
 import com.reserve.email.service.EmailVerificationService;
 import com.reserve.global.error.EmailException;
+import com.reserve.global.ratelimit.IpExtractor;
+import com.reserve.global.ratelimit.RateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -17,12 +20,19 @@ import java.util.Map;
 public class EmailApiController {
 
     private final EmailVerificationService verificationService;
+    private final RateLimiter rateLimiter;
 
     /**
      * 인증 코드 발송
      */
     @PostMapping("/send-code")
-    public ResponseEntity<Map<String, Object>> sendVerificationCode(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Map<String, Object>> sendVerificationCode(@RequestBody Map<String, String> request,
+                                                                    HttpServletRequest httpRequest) {
+        String ip = IpExtractor.extract(httpRequest);
+        if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.EMAIL_SEND)) {
+            throw new EmailException("이메일 발송 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
         String email = request.get("email");
 
         if (email == null || email.isBlank()) {

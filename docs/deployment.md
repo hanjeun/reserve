@@ -55,7 +55,7 @@ EC2 Ubuntu
 배포 중:
   1. docker-compose 파일 EC2로 전송
   2. green 컨테이너 새로 띄움 (8081)
-  3. green 헬스체크 통과 (/env 엔드포인트)
+  3. green 헬스체크 통과 (/actuator/health)
   4. service-env.inc → "set $service_url green;"
   5. nginx reload (무중단)
   6. blue 컨테이너 종료
@@ -102,6 +102,7 @@ Repository → Settings → Secrets and variables → Actions
 | Secret | 설명 |
 |---|---|
 | `RESERVE_SERVER_IP` | EC2 퍼블릭 IP |
+| `DB_PASSWORD` | MySQL root 비밀번호 (EC2 컨테이너와 동일하게 설정) |
 | `EC2_SSH_KEY` | EC2 SSH 프라이빗 키 (PEM) |
 | `DOCKERHUB_USERNAME` | DockerHub 계정명 |
 | `DOCKERHUB_TOKEN` | DockerHub Access Token |
@@ -152,17 +153,18 @@ mkdir -p /home/ubuntu/uploads
 sudo docker network create app-network
 
 # MySQL 컨테이너 실행
+# DB_PASSWORD는 GitHub Secrets에 등록한 값과 동일하게 설정하세요
 sudo docker run -d \
   --name mysql \
   --network app-network \
-  -e MYSQL_ROOT_PASSWORD=1234 \
+  -e MYSQL_ROOT_PASSWORD=${DB_PASSWORD} \
   -e MYSQL_DATABASE=reserve \
   -v mysql-data:/var/lib/mysql \
   --restart unless-stopped \
   mysql:8.0
 
-# 관리자 계정 role 설정 (최초 1회)
-sudo docker exec -it mysql mysql -u root -p1234 -e \
+# 관리자 계정 role 설정 (최초 1회, 비밀번호는 프롬프트에서 입력)
+sudo docker exec -it mysql mysql -u root -p -e \
   "UPDATE reserve.member SET role='ADMIN' WHERE email='your@email.com';"
 ```
 

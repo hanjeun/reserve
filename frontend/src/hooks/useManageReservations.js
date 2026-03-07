@@ -11,7 +11,8 @@ const useManageReservations = () => {
     const { data, isLoading } = useQuery({
         queryKey: reservationKeys.manage(),
         queryFn:  () => reservationService.getStoreReservations(),
-        select:   (d) => (Array.isArray(d) ? d : []),
+        // 백엔드가 Page 객체({ content: [], totalElements, ... })를 반환
+        select:   (d) => (Array.isArray(d) ? d : (d?.content ?? [])),
         staleTime: 1000 * 60,  // 1분 — 예약 관리는 실시간성 중요
     });
 

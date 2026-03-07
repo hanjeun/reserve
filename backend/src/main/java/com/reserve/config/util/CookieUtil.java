@@ -3,10 +3,20 @@ package com.reserve.config.util;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 
+@Component
 public class CookieUtil {
+
+    private static boolean secureCookie = false;
+
+    @Value("${server.env:prod}")
+    public void setServerEnv(String env) {
+        secureCookie = !"local".equals(env);  // local이 아니면 Secure=true
+    }
 
     public static String getCookie(HttpServletRequest request, String name) {
         Cookie[] cookies = request.getCookies();
@@ -24,8 +34,8 @@ public class CookieUtil {
 
     public static void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
         Cookie cookie = new Cookie(name, value);
-        cookie.setHttpOnly(true);  // ✅ JavaScript 접근 차단 (XSS 방어)
-        cookie.setSecure(false);   // ⚠️ 개발 환경에서는 false (배포 시 true로 변경)
+        cookie.setHttpOnly(true);  // JavaScript 접근 차단 (XSS 방어)
+        cookie.setSecure(secureCookie);  // 배포(HTTPS)에서는 true, 로컬(HTTP)에서는 false
         cookie.setPath("/");
         cookie.setMaxAge(maxAge);
         // cookie.setSameSite("Lax");  // Spring Boot 3.x에서는 자동 설정됨

@@ -29,3 +29,4 @@ spring:
 # 서버 공통 설정 (포트는 blue/green에서 개별 설정)
 server:
   serverAddress: reserve.hktech.kr
+  env: prod

@@ -22,7 +22,7 @@ public class RefreshToken {
     @Column(name = "refresh_token", nullable = false, columnDefinition = "TEXT")
     private String refreshToken;
 
-    @Column(name = "expires_at", nullable = false)
+    @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
     public RefreshToken(Long memberId, String refreshToken, LocalDateTime expiresAt) {

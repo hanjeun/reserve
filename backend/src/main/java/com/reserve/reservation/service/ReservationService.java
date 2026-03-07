@@ -193,7 +193,7 @@ public class ReservationService {
             throw new ReservationException("수정하려는 날짜가 이미 지났습니다.", HttpStatus.BAD_REQUEST);
         }
 
-        return ReservationResponse.fromEntity(reservation);
+        return ReservationResponse.fromEntity(reservationRepository.save(reservation));
     }
 
     /**
@@ -350,23 +350,20 @@ public class ReservationService {
 
     /**
      * 사업자/관리자 - 가게 예약 목록 조회 (최신순)
-     * - ADMIN: 최근 500건 (fetch join, 페이지네이션으로 N+1 + 성능 문제 방지)
+     * - ADMIN: 페이지네이션 지원 (기본 100건/페이지)
      * - BUSINESS: 본인 소유 가게 예약 (fetch join + 단일 쿼리)
      */
     @Transactional(readOnly = true)
-    public List<ReservationResponse> getStoreReservations(Member owner) {
+    public Page<ReservationResponse> getStoreReservations(Member owner, int page, int size) {
+        int safeSize = Math.min(size, 100); // 최대 100건으로 고정
+        Pageable pageable = PageRequest.of(page, safeSize);
         if (owner.isAdmin()) {
-            // ADMIN: 최근 500건 제한 (전체 로드 시 성능 저하 방지)
-            Pageable top500 = PageRequest.of(0, 500);
-            return reservationRepository.findAllWithStoreAndMemberPaged(top500)
-                    .stream()
-                    .map(ReservationResponse::fromEntity)
-                    .collect(Collectors.toList());
+            return reservationRepository.findAllWithStoreAndMemberPaged(pageable)
+                    .map(ReservationResponse::fromEntity);
         }
         // BUSINESS: owner 기준으로 가게-예약 한 번에 조회
-        return reservationRepository.findByStoreOwnerOrderByCreatedAtDesc(owner).stream()
-                .map(ReservationResponse::fromEntity)
-                .collect(Collectors.toList());
+        return reservationRepository.findByStoreOwnerOrderByCreatedAtDesc(owner, pageable)
+                .map(ReservationResponse::fromEntity);
     }
 
     // ========== 내부 도우미 메서드 ==========

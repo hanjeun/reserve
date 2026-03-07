@@ -64,9 +64,11 @@ public class Member {
     }
 
     // OAuth 정보 업데이트
+    // 주의: 사용자가 직접 업로드한 이미지(/uploads/...)는 소셜 로그인 시 덮어쓰지 않음
     public Member updateOAuth(String name, String profileImage) {
         if (name != null) this.name = name;
-        if (profileImage != null) this.profileImage = profileImage;
+        boolean hasCustomImage = this.profileImage != null && this.profileImage.startsWith("/uploads/");
+        if (!hasCustomImage && profileImage != null) this.profileImage = profileImage;
         return this;
     }
 }

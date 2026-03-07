@@ -11,8 +11,9 @@ import { colors, fontSize, fontWeight } from '../../../styles/tokens';
 
 const { Text } = Typography;
 
-// Form.Item marginBottom 통일 (Ant 기본 24px → 18px, 모바일 간격 타이트하게)
-const MB = { marginBottom: 18 };
+// Form.Item marginBottom: PC에서는 오른쪽 컬럼과 간격 맞추기 위해 12px, 모바일은 18px
+const MB     = { marginBottom: 18 }; // 모바일/기본
+const MB_PC  = { marginBottom: 12 }; // PC 왼쪽 컬럼 (오른쪽 기준 맞춤)
 
 // 섹션 헤더
 const SectionLabel = ({ children }) => (
@@ -55,44 +56,47 @@ const FieldRow = ({ children, style }) => (
 );
 
 // 기본 정보 (왼쪽 컬럼)
-const BasicSection = () => (
-    <>
-        <Form.Item label="가게 이름" name="name" rules={VALIDATION_RULES.storeName} style={MB}>
-            <FormInput placeholder="식당 명칭" />
-        </Form.Item>
-
-        <FieldRow>
-            <Form.Item
-                label="카테고리" name="category" rules={VALIDATION_RULES.category}
-            >
-                <FormSelect placeholder="선택" options={STORE_CATEGORIES} />
+const BasicSection = ({ isMobile = true }) => {
+    const mb = isMobile ? MB : MB_PC;
+    return (
+        <>
+            <Form.Item label="가게 이름" name="name" rules={VALIDATION_RULES.storeName} style={mb}>
+                <FormInput placeholder="식당 명칭" />
             </Form.Item>
-            <Form.Item
-                label="예약 단위" name="reservationSlotMinutes"
-                rules={[{ required: true, message: '예약 단위를 선택해주세요.' }]}
-                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>시간 선택 시 간격 단위</Text>}
-            >
-                <FormSelect options={RESERVATION_SLOT_OPTIONS} placeholder="선택" />
+
+            <FieldRow style={isMobile ? {} : { marginBottom: 12 }}>
+                <Form.Item
+                    label="카테고리" name="category" rules={VALIDATION_RULES.category}
+                >
+                    <FormSelect placeholder="선택" options={STORE_CATEGORIES} />
+                </Form.Item>
+                <Form.Item
+                    label="예약 단위" name="reservationSlotMinutes"
+                    rules={[{ required: true, message: '예약 단위를 선택해주세요.' }]}
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>시간 선택 시 간격 단위</Text>}
+                >
+                    <FormSelect options={RESERVATION_SLOT_OPTIONS} placeholder="선택" />
+                </Form.Item>
+            </FieldRow>
+
+            <Form.Item label="연락처" name="phone" rules={VALIDATION_RULES.phone} style={mb}>
+                <FormInput placeholder="02-000-0000" />
             </Form.Item>
-        </FieldRow>
 
-        <Form.Item label="연락처" name="phone" rules={VALIDATION_RULES.phone} style={MB}>
-            <FormInput placeholder="02-000-0000" />
-        </Form.Item>
+            <Form.Item label="영업 시간" name="times" rules={VALIDATION_RULES.businessHours} style={mb}>
+                <FormTimePicker.RangePicker />
+            </Form.Item>
 
-        <Form.Item label="영업 시간" name="times" rules={VALIDATION_RULES.businessHours} style={MB}>
-            <FormTimePicker.RangePicker />
-        </Form.Item>
+            <Form.Item label="주소" name="address" rules={VALIDATION_RULES.address} style={mb}>
+                <FormInput placeholder="상세 주소" />
+            </Form.Item>
 
-        <Form.Item label="주소" name="address" rules={VALIDATION_RULES.address} style={MB}>
-            <FormInput placeholder="상세 주소" />
-        </Form.Item>
-
-        <Form.Item label="가게 소개" name="description" rules={VALIDATION_RULES.description} style={{ marginBottom: 0 }}>
-            <FormTextArea rows={4} placeholder="가게를 소개해주세요" />
-        </Form.Item>
-    </>
-);
+            <Form.Item label="가게 소개" name="description" rules={VALIDATION_RULES.description} style={{ marginBottom: 0 }}>
+                <FormTextArea rows={4} placeholder="가게를 소개해주세요" />
+            </Form.Item>
+        </>
+    );
+};
 
 // 운영 설정 (오른쪽 컬럼)
 const SettingsSection = () => (
@@ -155,7 +159,7 @@ const StoreBasicInfo = ({ isMobile = true }) => {
     if (!isMobile) {
         return (
             <div style={pcStyles.grid}>
-                <div style={pcStyles.col}><BasicSection /></div>
+                <div style={pcStyles.col}><BasicSection isMobile={false} /></div>
                 <div style={pcStyles.dividerVertical} />
                 <div style={pcStyles.col}><SettingsSection /></div>
             </div>

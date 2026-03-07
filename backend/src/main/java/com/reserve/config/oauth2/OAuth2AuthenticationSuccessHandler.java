@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     private final TokenProvider tokenProvider;
     private final JwtProperties jwtProperties;
+
+    @Value("${server.env:prod}")
+    private String serverEnv;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -51,10 +55,11 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         clearSessionAndCookies(request, response);
 
         // 4. 리액트 앱으로 리다이렉트
-        // 프론트엔드에서 쿠키의 토큰을 자동으로 읽어서 사용
-        String redirectUrl = request.getHeader("Origin") != null && request.getHeader("Origin").contains("localhost")
+        // Origin 헤더는 구글 리다이렉트 요청에서 null이므로 server.env로 환경 판단
+        String redirectUrl = "local".equals(serverEnv)
                 ? "http://localhost:5173/oauth2/callback"
                 : "https://reserve.hktech.kr/oauth2/callback";
+        log.info("OAuth2 리다이렉트: {} (env={})", redirectUrl, serverEnv);
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 

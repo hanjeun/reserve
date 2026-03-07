@@ -31,6 +31,14 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findByStoreOwnerOrderByCreatedAtDesc(@Param("owner") Member owner);
 
     /**
+     * BUSINESS 전용: 본인 가게 예약 목록 조회 (최신순, 페이지네이션)
+     * countQuery 분리로 fetch join + Page 조합 시 발생하는 count 쿼리 오류 방지
+     */
+    @Query(value = "SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member WHERE s.owner = :owner ORDER BY r.createdAt DESC",
+           countQuery = "SELECT COUNT(r) FROM Reservation r JOIN r.store s WHERE s.owner = :owner")
+    Page<Reservation> findByStoreOwnerOrderByCreatedAtDesc(@Param("owner") Member owner, Pageable pageable);
+
+    /**
      * ADMIN 전용: 전체 예약 목록 조회 (최신순, 페이지네이션) - store, member fetch join으로 N+1 방지
      */
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member ORDER BY r.createdAt DESC")

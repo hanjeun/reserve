@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -59,10 +60,12 @@ public class ReservationApiController {
      * 사업자가 소유한 모든 가게의 예약을 최신순으로 반환
      */
     @GetMapping("/store")
-    public ResponseEntity<ApiResponse<List<ReservationResponse>>> getStoreReservations() {
+    public ResponseEntity<ApiResponse<Page<ReservationResponse>>> getStoreReservations(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "100") int size) {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
-        List<ReservationResponse> reservations = reservationService.getStoreReservations(member);
+        Page<ReservationResponse> reservations = reservationService.getStoreReservations(member, page, size);
         return ResponseEntity.ok(ApiResponse.success(reservations, "가게 예약 목록 조회 성공"));
     }
 

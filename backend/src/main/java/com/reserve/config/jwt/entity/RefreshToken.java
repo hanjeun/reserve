@@ -38,6 +38,7 @@ public class RefreshToken {
     }
 
     public boolean isExpired() {
+        if (this.expiresAt == null) return true; // null이면 만료된 것으로 처리
         return LocalDateTime.now().isAfter(this.expiresAt);
     }
 }

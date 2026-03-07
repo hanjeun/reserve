@@ -61,28 +61,34 @@ public class FileStorageService {
 
     /**
      * 파일 삭제
+     * storeFile()과 동일한 기준 경로(uploadPath)를 사용해야 경로 불일치 버그를 막을 수 있음
      */
     public void deleteFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isEmpty()) {
             return;
         }
 
+        // 외부 URL(소셜 프로필 이미지 등)은 삭제 대상 아님
+        if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+            return;
+        }
+
         try {
-            // URL에서 파일명 추출 (예: /uploads/abc.jpg -> abc.jpg)
+            // URL에서 파일명 추출 (예: /uploads/abc.jpg → abc.jpg)
             String filename = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            Path filePath = Paths.get(uploadDir).resolve(filename).toAbsolutePath().normalize();
+
+            // storeFile()과 동일하게 절대경로로 정규화하여 경로 불일치 방지
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path filePath = uploadPath.resolve(filename).normalize();
 
             if (Files.exists(filePath)) {
                 Files.delete(filePath);
                 log.info("✅ 파일 삭제 성공: {}", filename);
             } else {
-                log.warn("⚠️ 삭제할 파일이 존재하지 않습니다: {}", fileUrl);
+                log.warn("⚠️ 삭제할 파일이 존재하지 않습니다: {} (경로: {})", fileUrl, filePath);
             }
         } catch (IOException e) {
             log.error("❌ 파일 삭제 실패: {}", fileUrl, e);
-            // 삭제 실패는 비즈니스 로직을 중단시킬 만큼 치명적이지 않은 경우가 많으므로
-            // 예외를 던지기보다 로그를 남기는 현재 방식이 실무에서 자주 쓰입니다.
-            // 필요하다면 여기서도 FileException을 던질 수 있습니다.
         }
     }
 }

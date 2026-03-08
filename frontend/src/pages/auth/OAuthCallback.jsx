@@ -17,8 +17,9 @@ const OAuthCallback = () => {
         const finalizeLogin = async () => {
             try {
                 const user = await checkAuth(true);
-                if (user && user.name) {
-                    message.success(`${user.name}님, 반갑습니다!`);
+                if (user && user.email) {
+                    const greeting = user.name ? `${user.name}님, 반갑습니다!` : '로그인되었습니다.';
+                    message.success(greeting);
                     navigate('/', { replace: true });
                 } else {
                     throw new Error("유저 정보가 올바르지 않습니다.");

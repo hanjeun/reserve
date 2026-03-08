@@ -100,7 +100,7 @@ const MyReservations = () => {
                                 <div style={styles.info} onClick={() => navigate(`/store/${res.storeId}`)}>
                                     <Text strong style={styles.storeName}>{res.storeName}</Text>
                                     <div style={styles.meta}>
-                                        <span style={styles.metaItem}>
+                                        <span style={{...styles.metaItem, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80}}>
                                             <UserOutlined style={styles.metaIcon} />{res.memberName}
                                         </span>
                                         <span style={styles.dot}>·</span>
@@ -182,8 +182,8 @@ const styles = {
     img:      { width: '100%', height: '100%', objectFit: 'cover' },
     info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
     storeName:{ fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2 },
-    metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary },
+    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap', marginTop: 2, overflow: 'hidden' },
+    metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary, whiteSpace: 'nowrap' },
     metaIcon: { fontSize: 11, color: colors.text.tertiary },
     dot:      { color: colors.text.tertiary, fontSize: fontSize.xs },
     guest:    { fontSize: fontSize.xs, color: colors.text.secondary, display: 'inline-flex', alignItems: 'center' },

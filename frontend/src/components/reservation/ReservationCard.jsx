@@ -40,11 +40,13 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                 <div style={styles.info}>
                     <Text strong style={styles.storeName}>{storeName}</Text>
                     <div style={styles.meta}>
-                        <span style={{...styles.metaItem, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80}}><UserOutlined style={styles.metaIcon} />{memberName}</span>
+                        <span style={styles.metaItem}><UserOutlined style={styles.metaIcon} />{memberName}</span>
                         <span style={styles.dot}>·</span>
-                        <span style={{...styles.metaItem, whiteSpace: 'nowrap'}}><CalendarOutlined style={styles.metaIcon} />{reservationDate}</span>
-                        <span style={styles.dot}>·</span>
-                        <span style={{...styles.metaItem, whiteSpace: 'nowrap'}}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(reservationTime)}</span>
+                        <span style={styles.metaDatetime}>
+                            <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{reservationDate}</span>
+                            <span style={styles.dot}>·</span>
+                            <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(reservationTime)}</span>
+                        </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                         <span style={styles.guest}><TeamOutlined style={{ marginRight: 3, fontSize: 11 }} />{guestCount}명</span>
@@ -130,8 +132,9 @@ const styles = {
     img:      { width: '100%', height: '100%', objectFit: 'cover' },
     info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
     storeName:{ fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap', marginTop: 2, overflow: 'hidden' },
-    metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary, whiteSpace: 'nowrap' },
+    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2 },
+    metaDatetime: { display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
+    metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary },
     metaIcon: { fontSize: 11, color: colors.text.tertiary },
     dot:      { color: colors.text.tertiary, fontSize: fontSize.xs },
     guest:    { fontSize: fontSize.xs, color: colors.text.secondary, display: 'inline-flex', alignItems: 'center' },

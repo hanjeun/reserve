@@ -22,11 +22,11 @@ const OAuthCallback = () => {
                     message.success(greeting);
                     navigate('/', { replace: true });
                 } else {
-                    throw new Error("유저 정보가 올바르지 않습니다.");
+                    throw new Error('유저 정보가 올바르지 않습니다.');
                 }
             } catch (err) {
-                console.error("인증 실패:", err);
-                message.error("로그인 정보를 가져오는데 실패했습니다.");
+                console.error('OAuth 인증 실패:', err);
+                message.error('로그인 정보를 가져오는데 실패했습니다.');
                 navigate('/login', { replace: true });
             }
         };

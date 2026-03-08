@@ -128,6 +128,7 @@ const styles = {
     logo: {
         fontSize: 22,
         fontWeight: fontWeight.heavy,
+        fontFamily: '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif',
         color: colors.primary.main,
         letterSpacing: '-0.8px',
         textDecoration: 'none',

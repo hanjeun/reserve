@@ -1,10 +1,10 @@
-# 프론트엔드 디자인 시스템
+# 디자인 시스템
 
-RESERVE 프론트엔드는 Ant Design 기반의 통합 디자인 토큰 시스템을 사용합니다.
+Ant Design 기반 디자인 토큰 시스템입니다.
 
 ---
 
-## 1. 디자인 토큰 (`frontend/src/styles/tokens/`)
+## 디자인 토큰 (`frontend/src/styles/tokens/`)
 
 ### Colors
 
@@ -37,12 +37,12 @@ fontWeight.semibold  // 600
 fontWeight.bold      // 700
 fontWeight.extrabold // 800
 
-fontSize.xs   // 12px
-fontSize.sm   // 13px
-fontSize.md   // 14px
-fontSize.base // 15px
-fontSize.lg   // 16px
-fontSize.xl   // 17px
+fontSize.xs    // 12px
+fontSize.sm    // 13px
+fontSize.md    // 14px
+fontSize.base  // 15px
+fontSize.lg    // 16px
+fontSize.xl    // 17px
 fontSize['2xl'] // 18px
 fontSize['3xl'] // 20px
 fontSize['4xl'] // 24px
@@ -54,13 +54,13 @@ fontSize['5xl'] // 32px
 ```js
 import { radius, heights, maxWidth, shadows } from '../styles/tokens';
 
-radius.sm   // 4px
-radius.md   // 10px
-radius.lg   // 14px   — Input
-radius.xl   // 16px   — Button, Card
+radius.sm    // 4px
+radius.md    // 10px
+radius.lg    // 14px   — Input
+radius.xl    // 16px   — Button, Card
 radius['2xl'] // 20px
-radius.full   // 50%
-radius.pill   // 100px
+radius.full  // 50%
+radius.pill  // 100px
 
 heights.input      // 54px
 heights.buttonLg   // 56px
@@ -69,7 +69,7 @@ heights.buttonSm   // 36px
 heights.buttonMd   // 44px
 heights.header     // 64px
 
-maxWidth.sm  // 420px  — 로그인, 회원가입, 가게 등록
+maxWidth.sm  // 420px  — 로그인, 회원가입
 maxWidth.md  // 700px  — 상세 페이지
 maxWidth.lg  // 1000px — 관리 페이지
 maxWidth.xl  // 1200px — 목록 페이지
@@ -80,21 +80,25 @@ shadows.cardHover // 0 4px 20px rgba(0,0,0,0.08)
 
 ---
 
-## 2. 공통 컴포넌트 (`frontend/src/components/common/`)
+## 공통 컴포넌트 (`frontend/src/components/common/`)
 
 ### Button
 
 ```jsx
 import { Button } from '../components/common';
 
-<Button variant="primary" block>로그인</Button>
+<Button variant="primary">로그인</Button>
 <Button variant="secondary">취소</Button>
 <Button variant="hero">시작하기</Button>
 <Button variant="ghost">← 뒤로가기</Button>
+<Button variant="danger">삭제</Button>
 <Button variant="link">회원가입</Button>
-<Button variant="ghost-sm-danger" loading={false}>삭제</Button>
 <Button variant="ghost-sm-primary">결제하기</Button>
+<Button variant="ghost-sm-danger">취소</Button>
+<Button variant="ghost-sm-success">리뷰 보기</Button>
 ```
+
+active 시 scale 애니메이션: primary/secondary/danger/hero → `scale(0.96)`, ghost → `scale(0.94)`, ghost-sm → `scale(0.95)`
 
 ### Form 컴포넌트
 
@@ -106,20 +110,22 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 <FormInput.WithButton buttonText="인증코드 전송" onButtonClick={fn} />
 <FormTextArea rows={4} maxLength={1000} showCount />
 <FormSelect options={STORE_CATEGORIES} />
-<FormDatePicker placeholder="날짜 선택" />
-<FormTimePicker placeholder="시간 선택" />
+<FormDatePicker />
+<FormTimePicker />
 <FormTimePicker.RangePicker />   // 영업시간 설정용
 ```
+
+모든 입력 필드: `variant="filled"`, `border: none`, `backgroundColor: colors.gray[50]`, `borderRadius: radius.lg`, `height: heights.input`
 
 ### PageContainer
 
 ```jsx
 import { PageContainer } from '../components/common';
 
-<PageContainer size="sm">폼 페이지 (420px)</PageContainer>
-<PageContainer size="md">상세 페이지 (700px)</PageContainer>
-<PageContainer size="lg">관리 페이지 (1000px)</PageContainer>
-<PageContainer size="xl">목록 페이지 (1200px)</PageContainer>
+<PageContainer size="sm" />   // 420px — 폼 페이지
+<PageContainer size="md" />   // 700px — 상세 페이지
+<PageContainer size="lg" />   // 1000px — 관리 페이지
+<PageContainer size="xl" />   // 1200px — 목록 페이지
 ```
 
 ### Card
@@ -129,7 +135,7 @@ import { Card } from '../components/common';
 
 <Card hoverable onClick={fn}>
     <Card.Cover src={imageUrl} />
-    <div style={{ padding: '16px' }}>내용</div>
+    내용
 </Card>
 <Card.Add onClick={fn}>새 가게 등록</Card.Add>
 ```
@@ -137,76 +143,33 @@ import { Card } from '../components/common';
 ### Skeleton
 
 ```jsx
-import {
-    StoreCardSkeleton, ReservationCardSkeleton,
-    MyReservationCardSkeleton, ReviewCardSkeleton,
-    StoreDetailSkeleton, FavoriteCardSkeleton,
-    AdminTableSkeleton
-} from '../components/common';
+import { StoreCardSkeleton, MyReservationCardSkeleton, ... } from '../components/common';
 
-// 로딩 상태에서 카드 구조와 1:1 대응
 if (isLoading) return <StoreCardSkeleton count={6} />;
 ```
+
+`StoreCardSkeleton`, `ReservationCardSkeleton`, `MyReservationCardSkeleton`, `ReviewCardSkeleton`, `StoreDetailSkeleton`, `FavoriteCardSkeleton`, `AdminTableSkeleton`
 
 ### FavoriteButton
 
 ```jsx
-import { FavoriteButton } from '../components/common';
-
-<FavoriteButton storeId={id} size="sm" />             // 초기 상태 자동 조회
-<FavoriteButton storeId={id} initialStatus={true} />  // 초기 상태 명시
+<FavoriteButton storeId={id} />                    // 초기 상태 자동 조회
+<FavoriteButton storeId={id} initialStatus={true} /> // 초기 상태 명시
 ```
 
 ---
 
-## 3. 스타일 규칙
-
-### Input
+## Import 패턴
 
 ```js
-// 모든 입력 필드 통일 규칙
-variant="filled"
-border: 'none'
-backgroundColor: colors.gray[50]
-borderRadius: radius.lg   // 14px
-height: heights.input     // 54px
-```
-
-### 카드
-
-```js
-// StoreCard, ReservationCard 등 공통
-borderRadius: radius['2xl']          // 20px
-border: `1px solid ${colors.border.light}`
-boxShadow: shadows.card
-```
-
-### 버튼 애니메이션
-
-```css
-/* 각 variant의 :active 상태 */
-.reserve-btn--primary:active:not(:disabled)   { transform: scale(0.97); }
-.reserve-btn--secondary:active:not(:disabled) { transform: scale(0.97); }
-.reserve-btn--hero:active:not(:disabled)      { transform: scale(0.98); }
-```
-
----
-
-## 4. Import 패턴
-
-```js
-// 컴포넌트
 import { Button, FormInput, PageContainer, Card, Loading } from '../components/common';
-
-// 훅
 import { useMessage, useStoreData, useReservations } from '../hooks';
-
-// 상수
 import { API_ENDPOINTS, STORE_CATEGORIES, RESERVATION_STATUS_LABELS } from '../constants';
-
-// 유틸
 import { getThumbnailUrl, formatDate, formatCurrency } from '../utils';
-
-// 토큰
 import { colors, radius, fontWeight, fontSize, heights } from '../styles/tokens';
 ```
+
+## 규칙
+
+- UI에 텍스트 이모지 사용 금지 — Ant Design 아이콘만 사용
+- 색상/크기는 반드시 토큰 사용 (하드코딩 금지)

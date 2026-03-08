@@ -44,6 +44,12 @@ public class Member {
     @Column(name = "profile_image")
     private String profileImage;  // 프로필 이미지 URL
 
+    // 사용자가 직접 이미지를 변경(업로드 or 기본이미지로 삭제)한 경우 true
+    // true면 소셜 재로그인 시 소셜 프로필 이미지로 덮어쓰지 않음
+    @Builder.Default
+    @Column(name = "profile_image_locked", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private boolean profileImageLocked = false;
+
     @Column(name = "oauth_access_token", length = 2048)
     private String oauthAccessToken;  // OAuth Access Token (연동 해제용)
 
@@ -64,11 +70,13 @@ public class Member {
     }
 
     // OAuth 정보 업데이트
-    // 주의: 사용자가 직접 업로드한 이미지(/uploads/...)는 소셜 로그인 시 덮어쓰지 않음
+    // profileImageLocked = true : 유저가 직접 이미지 조작 → 소셜 이미지로 덮어쓰지 않음
+    // profileImageLocked = false : 최초 가입 상태 → 소셜 프로필 이미지 적용
     public Member updateOAuth(String name, String profileImage) {
         if (name != null) this.name = name;
-        boolean hasCustomImage = this.profileImage != null && this.profileImage.startsWith("/uploads/");
-        if (!hasCustomImage && profileImage != null) this.profileImage = profileImage;
+        if (!this.profileImageLocked && profileImage != null) {
+            this.profileImage = profileImage;
+        }
         return this;
     }
 }

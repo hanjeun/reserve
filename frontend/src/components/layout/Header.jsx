@@ -131,7 +131,6 @@ const styles = {
         color: colors.primary.main,
         letterSpacing: '-0.8px',
         textDecoration: 'none',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         cursor: 'pointer',
     },
     myPageTrigger: { cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: radius.full, transition: 'opacity 0.2s' },

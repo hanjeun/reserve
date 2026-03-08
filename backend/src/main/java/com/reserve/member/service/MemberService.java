@@ -149,6 +149,7 @@ public class MemberService {
         }
 
         member.setProfileImage(null);
+        member.setProfileImageLocked(true);  // 유저가 직접 기본이미지로 설정 → 소셜 재로그인시도 유지
         Member updated = memberRepository.save(member);
         log.info("프로필 이미지 삭제 완료: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);
@@ -166,6 +167,7 @@ public class MemberService {
 
         String imageUrl = fileStorageService.storeFile(image);
         member.setProfileImage(imageUrl);
+        member.setProfileImageLocked(true);  // 유저가 직접 이미지 업로드 → 소셜 재로그인시도 유지
         Member updated = memberRepository.save(member);
         log.info("프로필 이미지 수정 완료: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);

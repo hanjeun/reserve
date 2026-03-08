@@ -29,6 +29,7 @@ export const buildStoreFormData = (values) => {
     formData.append('autoApprovalEnabled',       values.autoApprovalEnabled       === true ? 'true' : 'false');
     formData.append('allowLatePayment',           values.allowLatePayment           === true ? 'true' : 'false');
     formData.append('allowDuplicateReservation',  values.allowDuplicateReservation  === true ? 'true' : 'false');
+    formData.append('emailNotificationEnabled',   values.emailNotificationEnabled   === false ? 'false' : 'true');
 
     // 예약 마감 시간 (비워두면 전송 안 함 → 백엔드 null = 제한 없음)
     if (values.bookingDeadlineHours != null && values.bookingDeadlineHours !== '') {

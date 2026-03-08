@@ -136,6 +136,11 @@ public class Store {
     @Builder.Default
     private Boolean allowDuplicateReservation = false;
 
+    // 이메일 알림 수신 여부 (true = 새 예약 시 사장님에게 이메일 발송)
+    @Column(name = "email_notification_enabled", nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private Boolean emailNotificationEnabled = true;
+
     // 키워드 편의 메서드
     public List<String> getKeywordList() {
         if (keywords == null || keywords.trim().isEmpty()) {

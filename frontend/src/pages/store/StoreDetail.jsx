@@ -136,9 +136,13 @@ const StoreInfoSection = ({ store, description }) => {
         });
     }
     if (store.noShowDeposit > 0 && store.paymentTimeoutMinutes > 0) {
+        const ptMin = store.paymentTimeoutMinutes;
+        const ptLabel = ptMin < 60 ? `${ptMin}분`
+            : ptMin % 60 === 0 ? `${ptMin / 60}시간`
+            : `${Math.floor(ptMin / 60)}시간 ${ptMin % 60}분`;
         rows.push({
             Icon: ThunderboltOutlined, label: '결제 마감',
-            value: `예약 후 ${store.paymentTimeoutMinutes}분 이내 미결제 시 자동 취소`,
+            value: `예약 후 ${ptLabel} 이내 미결제 시 자동 취소`,
         });
     }
     const slotMin = store.reservationSlotMinutes ?? 30;

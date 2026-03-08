@@ -30,3 +30,7 @@ spring:
 server:
   serverAddress: reserve.hktech.kr
   env: prod
+
+# 프론트엔드 URL (모바일 결제 리다이렉트 등에 사용)
+app:
+  frontend-url: https://reserve.hktech.kr

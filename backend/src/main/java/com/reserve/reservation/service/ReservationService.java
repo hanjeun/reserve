@@ -143,19 +143,23 @@ public class ReservationService {
 
         ReservationResponse response = ReservationResponse.fromEntity(reservationRepository.save(reservation));
 
-        // 사장님에게 새 예약 알림 (비동기)
-        try {
-            String ownerEmail = store.getOwner().getEmail();
-            String ownerName  = store.getOwner().getName();
-            emailService.sendNewReservationAlertToOwner(
-                    ownerEmail, ownerName, store.getName(),
-                    member.getName(),
-                    request.getReservationDate().toString(),
-                    request.getReservationTime().toString().substring(0, 5),
-                    request.getGuestCount()
-            );
-        } catch (Exception e) {
-            log.warn("사장님 예약 알림 이메일 발송 실패 (서비스 계속): {}", e.getMessage());
+        // 사장님에게 새 예약 알림 (비동기) — 이메일 알림 설정 ON일 때만
+        if (Boolean.TRUE.equals(store.getEmailNotificationEnabled())) {
+            try {
+                String ownerEmail = store.getOwner().getEmail();
+                String ownerName  = store.getOwner().getName();
+                emailService.sendNewReservationAlertToOwner(
+                        ownerEmail, ownerName, store.getName(),
+                        member.getName() != null ? member.getName() : "이름 없음",
+                        request.getReservationDate().toString(),
+                        request.getReservationTime().toString().substring(0, 5),
+                        request.getGuestCount()
+                );
+            } catch (Exception e) {
+                log.warn("사장님 예약 알림 이메일 발송 실패 (서비스 계속): {}", e.getMessage());
+            }
+        } else {
+            log.debug("사장님 이메일 알림 비활성화 상태 — 발송 건너뜀님");
         }
 
         return response;

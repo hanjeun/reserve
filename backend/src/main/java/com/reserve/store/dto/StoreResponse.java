@@ -53,6 +53,7 @@ public class StoreResponse {
     private Integer reservationSlotMinutes;
     private Boolean allowLatePayment;
     private Boolean allowDuplicateReservation;
+    private Boolean emailNotificationEnabled;
 
     private LocalDateTime createdAt;
 
@@ -82,6 +83,7 @@ public class StoreResponse {
                 .reservationSlotMinutes(store.getReservationSlotMinutes())
                 .allowLatePayment(store.getAllowLatePayment())
                 .allowDuplicateReservation(store.getAllowDuplicateReservation())
+                .emailNotificationEnabled(store.getEmailNotificationEnabled())
                 .createdAt(store.getCreatedAt())
                 .build();
     }

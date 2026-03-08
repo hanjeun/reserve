@@ -97,6 +97,7 @@ export const useStoreForm = ({
             autoApprovalEnabled:       initialData.autoApprovalEnabled       ?? false,
             allowLatePayment:          initialData.allowLatePayment          ?? false,
             allowDuplicateReservation: initialData.allowDuplicateReservation ?? false,
+            emailNotificationEnabled:  initialData.emailNotificationEnabled  ?? true,
             fullRefundDays:            initialData.fullRefundDays            ?? 3,
             partialRefundDays:         initialData.partialRefundDays         ?? 1,
             partialRefundRate:         initialData.partialRefundRate         ?? 50,

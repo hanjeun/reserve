@@ -72,6 +72,9 @@ public class StoreCreateRequest {
     // 중복 예약 허용 (기본 false - 1인 1일 1예약 제한)
     private Boolean allowDuplicateReservation = false;
 
+    // 이메일 알림 수신 여부 (기본 true)
+    private Boolean emailNotificationEnabled = true;
+
     public Integer getMaxCapacityPerSlot() {
         if (maxCapacityPerSlotRaw == null || maxCapacityPerSlotRaw.isBlank()) return null;
         try { return Integer.parseInt(maxCapacityPerSlotRaw.trim()); }

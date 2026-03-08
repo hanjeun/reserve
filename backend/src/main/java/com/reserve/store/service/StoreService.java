@@ -81,6 +81,7 @@ public class StoreService {
                 .reservationSlotMinutes(request.getReservationSlotMinutes() != null ? request.getReservationSlotMinutes() : 30)
                 .allowLatePayment(request.getAllowLatePayment() != null ? request.getAllowLatePayment() : false)
                 .allowDuplicateReservation(request.getAllowDuplicateReservation() != null ? request.getAllowDuplicateReservation() : false)
+                .emailNotificationEnabled(request.getEmailNotificationEnabled() != null ? request.getEmailNotificationEnabled() : true)
                 .build();
 
         if (request.getKeywords() != null && !request.getKeywords().isEmpty()) {
@@ -158,6 +159,8 @@ public class StoreService {
             if (request.getAllowLatePayment() != null) store.setAllowLatePayment(request.getAllowLatePayment());
             // allowDuplicateReservation: 항상 업데이트 (null-safe, 기본 false)
             store.setAllowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()));
+            // emailNotificationEnabled: null이면 변경 안 함
+            if (request.getEmailNotificationEnabled() != null) store.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
             if (request.getOpenTime() != null) store.setOpenTime(request.getOpenTime());
             if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
 

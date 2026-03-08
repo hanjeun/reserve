@@ -104,11 +104,9 @@ const MyReservations = () => {
                                             <UserOutlined style={styles.metaIcon} />{res.memberName}
                                         </span>
                                         <span style={styles.dot}>·</span>
-                                        <span style={styles.metaDatetime}>
-                                            <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{res.reservationDate}</span>
-                                            <span style={styles.dot}>·</span>
-                                            <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(res.reservationTime)}</span>
-                                        </span>
+                                        <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{res.reservationDate}</span>
+                                        <span style={styles.dot}>·</span>
+                                        <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(res.reservationTime)}</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                                         <span style={styles.guest}>
@@ -180,8 +178,7 @@ const styles = {
     img:      { width: '100%', height: '100%', objectFit: 'cover' },
     info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
     storeName:{ fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2 },
-    metaDatetime: { display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' },
+    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap', overflow: 'hidden', marginTop: 2 },
     metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary },
     metaIcon: { fontSize: 11, color: colors.text.tertiary },
     dot:      { color: colors.text.tertiary, fontSize: fontSize.xs },

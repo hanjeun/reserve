@@ -19,9 +19,16 @@ const useManageReservations = () => {
     const optimisticPatch = async (id, newStatus) => {
         await queryClient.cancelQueries({ queryKey: reservationKeys.manage() });
         const prev = queryClient.getQueryData(reservationKeys.manage());
-        queryClient.setQueryData(reservationKeys.manage(), (old) =>
-            (old || []).map(r => r.id === id ? { ...r, status: newStatus } : r)
-        );
+        queryClient.setQueryData(reservationKeys.manage(), (old) => {
+            // old는 서버 원본(Page 객체) 또는 배열일 수 있음
+            if (Array.isArray(old)) {
+                return old.map(r => r.id === id ? { ...r, status: newStatus } : r);
+            }
+            if (old?.content) {
+                return { ...old, content: old.content.map(r => r.id === id ? { ...r, status: newStatus } : r) };
+            }
+            return old;
+        });
         return { prev };
     };
 

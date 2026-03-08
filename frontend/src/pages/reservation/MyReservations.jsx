@@ -178,7 +178,7 @@ const styles = {
     img:      { width: '100%', height: '100%', objectFit: 'cover' },
     info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
     storeName:{ fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap', overflow: 'hidden', marginTop: 2 },
+    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2 },
     metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary },
     metaIcon: { fontSize: 11, color: colors.text.tertiary },
     dot:      { color: colors.text.tertiary, fontSize: fontSize.xs },

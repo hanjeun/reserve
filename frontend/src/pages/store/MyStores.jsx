@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Tag, Empty, Modal } from 'antd';
+import { Typography, Tag, Empty, Modal, Flex } from 'antd';
 import { StarFilled, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { PageContainer, Card, StoreCardSkeleton } from '../../components/common';

@@ -24,11 +24,10 @@ const MyStores = () => {
 
     const handleDeleteConfirm = async () => {
         setDeleteModalOpen(false);
-        const result = await deleteStore(targetStoreId);
-        if (result.success) {
-            message.success('가게가 삭제되었습니다.');
-        } else {
-            message.error(result.error);
+        try {
+            await deleteStore(targetStoreId);
+        } catch {
+            // 에러 메시지는 useMyStores onError에서 처리
         }
         setTargetStoreId(null);
     };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Typography, Divider, Form, Tabs } from 'antd';
+import { Typography, Divider, Form, Tabs, Switch } from 'antd';
 import {
     LockOutlined,
     ExclamationCircleOutlined,
@@ -470,12 +470,69 @@ const bizStyles = {
     },
 };
 
+// ─── 알림 설정 섹션 ──────────────────────────────────────────────────────────
+
+const NotificationSection = ({ user }) => {
+    const { message } = useMessage();
+    // user.emailNotificationEnabled: undefined(구 캐시) → true로 fallback되는 걸 막기 위해
+    // boolean 타입인지 명시적으로 체크
+    const [enabled, setEnabled] = useState(
+        typeof user?.emailNotificationEnabled === 'boolean'
+            ? user.emailNotificationEnabled
+            : true
+    );
+    const [loading, setLoading] = useState(false);
+
+    // checkAuth 이후 user가 업데이트되면 동기화
+    useEffect(() => {
+        if (typeof user?.emailNotificationEnabled === 'boolean') {
+            setEnabled(user.emailNotificationEnabled);
+        }
+    }, [user?.emailNotificationEnabled]);
+
+    const handleToggle = async (checked) => {
+        setLoading(true);
+        try {
+            await memberService.updateMember({ emailNotificationEnabled: checked });
+            setEnabled(checked);
+            // authStore의 user도 최신화
+            useAuthStore.getState().login({ ...user, emailNotificationEnabled: checked });
+            message.success(checked ? '예약 알림 메일을 켜습니다' : '예약 알림 메일을 끄습니다');
+        } catch (err) {
+            handleApiError(err, message, '설정 변경에 실패했습니다');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div style={styles.notificationSection}>
+            <Text strong style={styles.sectionTitle}>알림 설정</Text>
+            <div style={styles.notifRow}>
+                <div>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>예약 알림 메일</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>예약 승인/거절 시 이메일로 알림 받기</Text>
+                </div>
+                <Switch
+                    size="small"
+                    checked={enabled}
+                    loading={loading}
+                    onChange={handleToggle}
+                />
+            </div>
+        </div>
+    );
+};
+
 // ─── MyPage 메인 ─────────────────────────────────────────────────────────────
 
 const MyPage = () => {
     const navigate = useNavigate();
-    const { user, logout } = useAuthStore();
+    const { user, logout, checkAuth } = useAuthStore();
     const { message, confirm } = useMessage();
+
+    // 마이페이지 진입 시 항상 최신 user 정보를 서버에서 재조회 (localStorage 캐시 신뢰하지 않음)
+    useEffect(() => { checkAuth(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleDeleteAccount = () => {
         confirm({
@@ -549,6 +606,11 @@ const MyPage = () => {
 
             <Divider />
 
+            {/* 알림 설정 */}
+            <NotificationSection user={user} />
+
+            <Divider />
+
             {/* 회원 탈퇴 */}
             <div style={styles.deleteSection}>
                 <div>
@@ -614,6 +676,18 @@ const styles = {
         borderRadius: radius['2xl'],
         border: `1px solid ${colors.error.light}`,
         boxShadow: shadows.card,
+    },
+    notificationSection: {
+        backgroundColor: colors.background.paper,
+        border: `1px solid ${colors.border.light}`,
+        borderRadius: radius['2xl'],
+        padding: '20px 24px',
+        boxShadow: shadows.card,
+    },
+    notifRow: {
+        display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', gap: 16,
+        padding: '8px 0',
     },
 };
 

@@ -15,4 +15,5 @@ public class MemberUpdateRequest {
     private String password;
     private String passwordConfirm;
     private String role;
+    private Boolean emailNotificationEnabled;
 }

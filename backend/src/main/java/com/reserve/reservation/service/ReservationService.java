@@ -233,18 +233,20 @@ public class ReservationService {
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
 
-        // 유저에게 승인 알림 (비동기)
-        try {
-            emailService.sendReservationConfirmedEmail(
-                    reservation.getMember().getEmail(),
-                    reservation.getMember().getName(),
-                    reservation.getStore().getName(),
-                    reservation.getReservationDate().toString(),
-                    reservation.getReservationTime().toString().substring(0, 5),
-                    reservation.getGuestCount()
-            );
-        } catch (Exception e) {
-            log.warn("예약 승인 알림 이메일 발송 실패: {}", e.getMessage());
+        // 유저에게 승인 알림 (비동기) — 개인 알림 설정 ON일 때만
+        if (reservation.getMember().isEmailNotificationEnabled()) {
+            try {
+                emailService.sendReservationConfirmedEmail(
+                        reservation.getMember().getEmail(),
+                        reservation.getMember().getName(),
+                        reservation.getStore().getName(),
+                        reservation.getReservationDate().toString(),
+                        reservation.getReservationTime().toString().substring(0, 5),
+                        reservation.getGuestCount()
+                );
+            } catch (Exception e) {
+                log.warn("예약 승인 알림 이메일 발송 실패: {}", e.getMessage());
+            }
         }
     }
 
@@ -263,19 +265,21 @@ public class ReservationService {
         reservation.setStatus(Reservation.ReservationStatus.REJECTED);
         reservation.setRejectionReason(reason != null ? reason : "가게 사정으로 인한 거절");
 
-        // 유저에게 거절 알림 (비동기)
-        try {
-            emailService.sendReservationRejectedEmail(
-                    reservation.getMember().getEmail(),
-                    reservation.getMember().getName(),
-                    reservation.getStore().getName(),
-                    reservation.getReservationDate().toString(),
-                    reservation.getReservationTime().toString().substring(0, 5),
-                    reservation.getGuestCount(),
-                    reservation.getRejectionReason()
-            );
-        } catch (Exception e) {
-            log.warn("예약 거절 알림 이메일 발송 실패: {}", e.getMessage());
+        // 유저에게 거절 알림 (비동기) — 개인 알림 설정 ON일 때만
+        if (reservation.getMember().isEmailNotificationEnabled()) {
+            try {
+                emailService.sendReservationRejectedEmail(
+                        reservation.getMember().getEmail(),
+                        reservation.getMember().getName(),
+                        reservation.getStore().getName(),
+                        reservation.getReservationDate().toString(),
+                        reservation.getReservationTime().toString().substring(0, 5),
+                        reservation.getGuestCount(),
+                        reservation.getRejectionReason()
+                );
+            } catch (Exception e) {
+                log.warn("예약 거절 알림 이메일 발송 실패: {}", e.getMessage());
+            }
         }
     }
 

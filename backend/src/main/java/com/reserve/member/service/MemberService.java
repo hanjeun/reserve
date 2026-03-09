@@ -132,6 +132,10 @@ public class MemberService {
             }
         }
 
+        if (request.getEmailNotificationEnabled() != null) {
+            member.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
+        }
+
         Member updated = memberRepository.save(member);
         log.info("회원 정보 수정 완료: memberId={}", memberId);
 

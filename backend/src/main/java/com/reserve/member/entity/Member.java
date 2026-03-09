@@ -53,6 +53,11 @@ public class Member {
     @Column(name = "oauth_access_token", length = 2048)
     private String oauthAccessToken;  // OAuth Access Token (연동 해제용)
 
+    // 개인 이메일 알림 수신 여부 (예약 승인/거절 등)
+    @Builder.Default
+    @Column(name = "email_notification_enabled", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 1")
+    private boolean emailNotificationEnabled = true;
+
     // 권한 체크 헬퍼 메서드
     public boolean isUser() {
         return this.role == Role.USER;

@@ -34,6 +34,7 @@ const StoreForm = ({
     onPreview,
     onCancel,
     formRef,
+    initialValues: externalInitialValues,
 }) => {
     const isMobile  = useIsMobile();
     const title     = mode === 'create' ? '가게 등록' : '가게 정보 수정';
@@ -63,7 +64,7 @@ const StoreForm = ({
                     allowDuplicateReservation: false,
                     emailNotificationEnabled: true,
                     noShowDeposit: 0,
-                } : {}}
+                } : (externalInitialValues ?? {})}
             >
                 <StoreBasicInfo isMobile={isMobile} />
                 <StoreImages

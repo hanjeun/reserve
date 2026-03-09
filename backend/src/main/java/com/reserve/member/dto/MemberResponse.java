@@ -15,6 +15,7 @@ public class MemberResponse {
     private Role role;
     private AuthProvider provider;   // LOCAL / GOOGLE / NAVER / KAKAO
     private String profileImage;
+    private boolean emailNotificationEnabled;
 
     public static MemberResponse fromEntity(Member member) {
         return new MemberResponse(
@@ -23,7 +24,8 @@ public class MemberResponse {
                 member.getEmail(),
                 member.getRole(),
                 member.getProvider(),
-                member.getProfileImage()
+                member.getProfileImage(),
+                member.isEmailNotificationEnabled()
         );
     }
 }

@@ -72,8 +72,9 @@ const StoreEdit = () => {
         navigate('/my-stores');
     };
 
-    // 가게 데이터 로딩 중 — 전체화면 스피너 (수정 버튼 누른 직후 자연스럽게 표시)
-    if (loading) {
+    // 가게 데이터 로딩 중 또는 아직 store가 없으면 스피너 유지
+    // (initialValues는 Form 최초 마운트 시 1회만 읽히므로 store가 준비된 후 렌더해야 함)
+    if (loading || !store) {
         return <Loading fullPage />;
     }
 
@@ -91,6 +92,7 @@ const StoreEdit = () => {
                 onDetailImagesChange={handleDetailImagesChange}
                 onPreview={handlePreview}
                 onCancel={handleCancel}
+                initialValues={store ? getInitialValues() : undefined}
             />
             
             {/* 이미지 미리보기 모달 */}

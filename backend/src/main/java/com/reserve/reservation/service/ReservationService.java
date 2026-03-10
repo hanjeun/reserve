@@ -147,10 +147,10 @@ public class ReservationService {
         if (Boolean.TRUE.equals(store.getEmailNotificationEnabled())) {
             try {
                 String ownerEmail = store.getOwner().getEmail();
-                String ownerName  = store.getOwner().getName();
+                String ownerName  = store.getOwner().getName() != null ? store.getOwner().getName() : "사장님";
                 emailService.sendNewReservationAlertToOwner(
                         ownerEmail, ownerName, store.getName(),
-                        member.getName() != null ? member.getName() : "이름 없음",
+                        member.getName() != null ? member.getName() : member.getEmail(),
                         request.getReservationDate().toString(),
                         request.getReservationTime().toString().substring(0, 5),
                         request.getGuestCount()
@@ -236,9 +236,11 @@ public class ReservationService {
         // 유저에게 승인 알림 (비동기) — 개인 알림 설정 ON일 때만
         if (reservation.getMember().isEmailNotificationEnabled()) {
             try {
+                String memberName = reservation.getMember().getName() != null
+                        ? reservation.getMember().getName() : reservation.getMember().getEmail();
                 emailService.sendReservationConfirmedEmail(
                         reservation.getMember().getEmail(),
-                        reservation.getMember().getName(),
+                        memberName,
                         reservation.getStore().getName(),
                         reservation.getReservationDate().toString(),
                         reservation.getReservationTime().toString().substring(0, 5),
@@ -268,9 +270,11 @@ public class ReservationService {
         // 유저에게 거절 알림 (비동기) — 개인 알림 설정 ON일 때만
         if (reservation.getMember().isEmailNotificationEnabled()) {
             try {
+                String memberName = reservation.getMember().getName() != null
+                        ? reservation.getMember().getName() : reservation.getMember().getEmail();
                 emailService.sendReservationRejectedEmail(
                         reservation.getMember().getEmail(),
-                        reservation.getMember().getName(),
+                        memberName,
                         reservation.getStore().getName(),
                         reservation.getReservationDate().toString(),
                         reservation.getReservationTime().toString().substring(0, 5),

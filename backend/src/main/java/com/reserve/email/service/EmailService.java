@@ -17,8 +17,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class EmailService {
 
-    private static final String FONT_FAMILY = "'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif";
-    private static final String FONT_IMPORT = "<style>@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');</style>";
+    // Gmail은 @import CSS를 차단하므로 웹폰트 대신 시스템 폰트 스택 사용
+    private static final String FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
+    private static final String FONT_IMPORT = ""; // Gmail은 @import 차단, 사용 안 함
 
     private final JavaMailSender mailSender;
 

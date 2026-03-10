@@ -196,10 +196,24 @@ public class StoreService {
     }
 
     /**
+     * 가게 삭제 전 활성 예약 수 조회 (삭제 확인 모달용)
+     */
+    @Transactional(readOnly = true)
+    public int countActiveReservations(Long id, Member member) {
+        Store store = storeRepository.findById(id)
+                .orElseThrow(StoreException::notFound);
+        if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
+            throw StoreException.forbidden("가게를 조회할 권한이 없습니다.");
+        }
+        return reservationRepository.countActiveReservationsByStoreId(id);
+    }
+
+    /**
      * 가게 삭제
+     * @param force true면 활성 예약이 있어도 강제 삭제
      */
     @Transactional
-    public void deleteStore(Long id, Member member) {
+    public void deleteStore(Long id, Member member, boolean force) {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
 
@@ -207,7 +221,19 @@ public class StoreService {
             throw StoreException.forbidden("가게를 삭제할 권한이 없습니다.");
         }
 
-        log.info("가게 삭제 시작: storeId={}", id);
+        // force=false면 활성 예약 있을 때 차단
+        if (!force) {
+            int activeCount = reservationRepository.countActiveReservationsByStoreId(id);
+            if (activeCount > 0) {
+                throw new StoreException(
+                    "현재 진행 중인 예약이 " + activeCount + "건 있습니다. " +
+                    "예약 내역을 함께 삭제하려면 '예약 포함 삭제'를 선택해주세요.",
+                    HttpStatus.CONFLICT
+                );
+            }
+        }
+
+        log.info("가게 삭제 시작: storeId={}, force={}", id, force);
 
         // 관련 데이터 삭제
         reviewRepository.deleteByStoreId(id);

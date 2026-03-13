@@ -16,6 +16,14 @@ server:
 
 # Spring 공통 설정
 spring:
+  # favicon 비활성화
+  web:
+    resources:
+      add-mappings: true
+  mvc:
+    favicon:
+      enabled: false
+
   # 개발 도구
   devtools:
     livereload:

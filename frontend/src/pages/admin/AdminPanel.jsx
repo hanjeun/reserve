@@ -393,7 +393,7 @@ const AdminPanel = () => {
                 open={detailOpen}
                 onCancel={() => setDetailOpen(false)}
                 footer={
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20 }}>
                         {detailItem?.status === 'PENDING' ? (
                             <>
                                 <Button variant="ghost-sm-danger" onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>거절</Button>

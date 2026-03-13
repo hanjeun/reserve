@@ -224,9 +224,9 @@ const AdminPanel = () => {
             },
         },
         {
-            title: '처리', key: 'actions', fixed: 'right',
+            title: '처리', key: 'actions', fixed: 'right', width: 1,
             render: (_, r) => (
-                <Space size={8} wrap>
+                <div style={{ display: 'flex', gap: 10, whiteSpace: 'nowrap' }}>
                     {r.status === 'PENDING' && (
                         <>
                             <Button variant="ghost-sm-success" loading={actionLoading} onClick={() => handleApprove(r)}>승인</Button>
@@ -237,7 +237,7 @@ const AdminPanel = () => {
                         <Button variant="ghost-sm-danger" loading={actionLoading} onClick={() => handleRevoke(r)}>자격취소</Button>
                     )}
                     <Button variant="ghost-sm-primary" onClick={() => openDetail(r)}>상세보기</Button>
-                </Space>
+                </div>
             ),
         },
     ];
@@ -393,14 +393,14 @@ const AdminPanel = () => {
                 open={detailOpen}
                 onCancel={() => setDetailOpen(false)}
                 footer={
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                         {detailItem?.status === 'PENDING' ? (
                             <>
                                 <Button variant="ghost-sm-danger" onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>거절</Button>
-                                <Button variant="primary" size="sm" loading={actionLoading} onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>승인</Button>
+                                <Button variant="ghost-sm-success" loading={actionLoading} onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>승인</Button>
                             </>
                         ) : (
-                            <Button variant="secondary" size="sm" onClick={() => setDetailOpen(false)}>닫기</Button>
+                            <Button variant="ghost-sm" onClick={() => setDetailOpen(false)}>닫기</Button>
                         )}
                     </div>
                 }

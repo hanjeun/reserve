@@ -491,11 +491,7 @@ const DetailRow = ({ label, children }) => (
 );
 
 const tabLabelStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, lineHeight: 1 };
-const tabBadgeStyle = {
-    background: '#ff4d4f', color: '#fff', borderRadius: 10,
-    padding: '1px 6px', fontSize: 11, fontWeight: 700,
-    lineHeight: '16px', minWidth: 18, textAlign: 'center',
-};
+const tabBadgeStyle = { display: 'none' };
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
 };

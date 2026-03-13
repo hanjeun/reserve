@@ -9,7 +9,11 @@
 spring:
   application:
     name: reserve
-    
+
+  mvc:
+    favicon:
+      enabled: false
+
   profiles:
     active: local
     group:

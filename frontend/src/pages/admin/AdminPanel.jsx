@@ -4,8 +4,7 @@ import {
     Select,
 } from 'antd';
 import {
-    CheckOutlined, CloseOutlined, EyeOutlined,
-    SearchOutlined, UserDeleteOutlined, CalendarOutlined,
+    SearchOutlined, CalendarOutlined,
     SafetyCertificateOutlined, IdcardOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import { PageContainer, Button, AdminTableSkeleton } from '../../components/common';
@@ -33,9 +32,6 @@ const RES_STATUS_CONFIG = {
     NO_SHOW:   { color: 'purple',  label: '노쇼' },
 };
 
-// ── BizSearchBar: 컴포넌트 외부에 선언 ──────────────────────────────────────
-// 렌더 함수 내부 선언 시 매 렌더마다 새 컴포넌트 타입 → unmount/remount →
-// 입력 포커스 유실 버그 발생. 반드시 외부에 선언해야 함.
 const BizSearchBar = ({ value, onChange }) => (
     <Input
         prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
@@ -64,12 +60,10 @@ const AdminPanel = () => {
     const [rejectOpen, setRejectOpen]       = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
-    // ── 탭별 독립 검색 상태 ──────────────────────────────────
     const [bizSearch, setBizSearch]             = useState('');
     const [resSearch, setResSearch]             = useState('');
     const [resStatusFilter, setResStatusFilter] = useState('ALL');
 
-    // ── 전체 예약 탭 상태 ───────────────────────────────────
     const [allReservations, setAllReservations] = useState([]);
     const [resLoading, setResLoading]           = useState(false);
     const [resLoaded, setResLoaded]             = useState(false);
@@ -111,7 +105,6 @@ const AdminPanel = () => {
         if (activeTab === 'reservations') loadReservations();
     }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── 승인 ────────────────────────────────────────────────
     const handleApprove = (record) => {
         confirm({
             title: '사업자 인증 승인',
@@ -129,7 +122,6 @@ const AdminPanel = () => {
         });
     };
 
-    // ── 거절 ────────────────────────────────────────────────
     const openRejectModal = (record) => { setRejectTarget(record); setRejectReason(''); setRejectOpen(true); };
     const handleReject = async () => {
         if (!rejectReason.trim()) { message.warning('거절 사유를 입력해주세요.'); return; }
@@ -143,7 +135,6 @@ const AdminPanel = () => {
         finally { setActionLoading(false); }
     };
 
-    // ── 자격 취소 ───────────────────────────────────────────
     const handleRevoke = (record) => {
         confirm({
             title: '사업자 자격 취소',
@@ -161,7 +152,6 @@ const AdminPanel = () => {
         });
     };
 
-    // ── 상세 보기 ───────────────────────────────────────────
     const openDetail = async (record) => {
         try {
             const detail = await api.get(API_ENDPOINTS.BUSINESS.ADMIN_DETAIL(record.id));
@@ -170,7 +160,6 @@ const AdminPanel = () => {
         } catch { message.error('상세 정보를 불러오지 못했습니다.'); }
     };
 
-    // ── 사업자 인증 필터 ────────────────────────────────────
     const filterBiz = (list) => {
         if (!bizSearch.trim()) return list;
         const kw = bizSearch.toLowerCase();
@@ -182,7 +171,6 @@ const AdminPanel = () => {
         );
     };
 
-    // ── 예약 필터 ───────────────────────────────────────────
     const filteredReservations = React.useMemo(() => {
         let list = resStatusFilter === 'ALL'
             ? allReservations
@@ -236,29 +224,19 @@ const AdminPanel = () => {
             },
         },
         {
-            title: '처리', key: 'actions', width: 180, fixed: 'right',
+            title: '처리', key: 'actions', fixed: 'right',
             render: (_, r) => (
-                <Space size={4} wrap>
-                    <Tooltip title="상세">
-                        <Button variant="ghost-sm" onClick={() => openDetail(r)}>
-                            <EyeOutlined />
-                        </Button>
-                    </Tooltip>
+                <Space size={8} wrap>
                     {r.status === 'PENDING' && (
                         <>
-                            <Button variant="ghost-sm-success" loading={actionLoading} onClick={() => handleApprove(r)}>
-                                <CheckOutlined /> 승인
-                            </Button>
-                            <Button variant="ghost-sm-danger" onClick={() => openRejectModal(r)}>
-                                <CloseOutlined /> 거절
-                            </Button>
+                            <Button variant="ghost-sm-success" loading={actionLoading} onClick={() => handleApprove(r)}>승인</Button>
+                            <Button variant="ghost-sm-danger" onClick={() => openRejectModal(r)}>거절</Button>
                         </>
                     )}
                     {r.status === 'APPROVED' && (
-                        <Button variant="ghost-sm-danger" loading={actionLoading} onClick={() => handleRevoke(r)}>
-                            <UserDeleteOutlined /> 취소
-                        </Button>
+                        <Button variant="ghost-sm-danger" loading={actionLoading} onClick={() => handleRevoke(r)}>자격취소</Button>
                     )}
+                    <Button variant="ghost-sm-primary" onClick={() => openDetail(r)}>상세보기</Button>
                 </Space>
             ),
         },
@@ -292,7 +270,7 @@ const AdminPanel = () => {
         columns,
         rowKey: 'id',
         size: 'middle',
-        scroll: { x: 800 },
+        scroll: { x: 'max-content' },
         pagination: { pageSize: 15, showSizeChanger: false },
     };
 
@@ -307,10 +285,7 @@ const AdminPanel = () => {
             ),
             children: (
                 <>
-                    <BizSearchBar
-                        value={bizSearch}
-                        onChange={(e) => setBizSearch(e.target.value)}
-                    />
+                    <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
                     {loading
                         ? <AdminTableSkeleton rows={8} />
                         : <Table {...tableProps} dataSource={filterBiz(pendingList)} locale={{ emptyText: '대기 중인 신청이 없습니다.' }} />}
@@ -326,10 +301,7 @@ const AdminPanel = () => {
             ),
             children: (
                 <>
-                    <BizSearchBar
-                        value={bizSearch}
-                        onChange={(e) => setBizSearch(e.target.value)}
-                    />
+                    <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
                     {loading
                         ? <AdminTableSkeleton rows={8} />
                         : <Table {...tableProps} dataSource={filterBiz(allList)} locale={{ emptyText: '신청 내역이 없습니다.' }} />}
@@ -391,7 +363,7 @@ const AdminPanel = () => {
                             dataSource={filteredReservations}
                             rowKey="id"
                             size="middle"
-                            scroll={{ x: 700 }}
+                            scroll={{ x: 'max-content' }}
                             pagination={{ pageSize: 20, showSizeChanger: false }}
                             locale={{ emptyText: '예약 내역이 없습니다.' }}
                         />}
@@ -423,14 +395,10 @@ const AdminPanel = () => {
                 footer={
                     detailItem?.status === 'PENDING'
                         ? [
-                            <Button key="reject" variant="ghost-sm-danger" onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>
-                                <CloseOutlined /> 거절
-                            </Button>,
-                            <Button key="approve" variant="primary" loading={actionLoading} onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>
-                                <CheckOutlined /> 승인
-                            </Button>,
+                            <Button key="reject" variant="ghost-sm-danger" onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>거절</Button>,
+                            <Button key="approve" variant="primary" loading={actionLoading} onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>승인</Button>,
                         ]
-                        : [<Button key="close" onClick={() => setDetailOpen(false)}>닫기</Button>]
+                        : [<Button key="close" variant="secondary" onClick={() => setDetailOpen(false)}>닫기</Button>]
                 }
                 width={560}
                 centered
@@ -460,7 +428,9 @@ const AdminPanel = () => {
                         {detailItem.licenseImageUrl && (
                             <DetailRow label="사업자등록증">
                                 <Image
-                                    src={detailItem.licenseImageUrl}
+                                    src={detailItem.licenseImageUrl.startsWith('http')
+                                        ? detailItem.licenseImageUrl
+                                        : `${window.location.protocol}//${window.location.hostname}:8080${detailItem.licenseImageUrl}`}
                                     alt="사업자등록증"
                                     style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }}
                                 />
@@ -517,11 +487,7 @@ const DetailRow = ({ label, children }) => (
 );
 
 const tabLabelStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, lineHeight: 1 };
-const tabBadgeStyle = {
-    background: '#ff4d4f', color: '#fff', borderRadius: 10,
-    padding: '1px 6px', fontSize: 11, fontWeight: 700,
-    lineHeight: '16px', minWidth: 18, textAlign: 'center', display: 'inline-block',
-};
+const tabBadgeStyle = { display: 'none' };
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
 };

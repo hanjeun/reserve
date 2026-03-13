@@ -53,7 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         
                         // 인증 관련 API
-                        .requestMatchers("/api/auth/**", "/api/email/**", "/api/token").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/email/**", "/api/password-reset/**", "/api/token").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
 
                         // 공개 API (인증 불필요) - GET만 허용, CUD는 인증 필요

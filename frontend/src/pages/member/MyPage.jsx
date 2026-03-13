@@ -152,7 +152,7 @@ const ProfileImageTab = ({ user }) => {
 
     const handleCancel = () => {
         if (pending?.previewUrl) URL.revokeObjectURL(pending.previewUrl);
-        setPending('reset');
+        setPending(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -162,9 +162,6 @@ const ProfileImageTab = ({ user }) => {
             if (pending?.file) {
                 await memberService.uploadProfileImage(pending.file);
                 message.success('프로필 사진이 변경되었습니다');
-            } else if (pending === 'reset') {
-                await memberService.deleteProfileImage();
-                message.success('기본 이미지로 변경되었습니다');
             }
             await useAuthStore.getState().checkAuth(true);
             setPending(null);
@@ -176,7 +173,20 @@ const ProfileImageTab = ({ user }) => {
         }
     };
 
-    const previewSrc = pending?.previewUrl ?? (pending === 'reset' ? null : user?.profileImage);
+    const handleResetToDefault = async () => {
+        setLoading(true);
+        try {
+            await memberService.deleteProfileImage();
+            message.success('기본 이미지로 변경되었습니다');
+            await useAuthStore.getState().checkAuth(true);
+        } catch (err) {
+            handleApiError(err, message, '프로필 사진 변경에 실패했습니다');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const previewSrc = pending?.previewUrl ?? user?.profileImage;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
@@ -186,7 +196,6 @@ const ProfileImageTab = ({ user }) => {
                 style={{ cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}
                 onClick={() => !loading && fileInputRef.current?.click()}
             >
-                {/* key로 Avatar 완전 리마운트 → imgError 초기화 보장 */}
                 <Avatar
                     key={previewSrc ?? 'default'}
                     src={previewSrc}
@@ -203,22 +212,40 @@ const ProfileImageTab = ({ user }) => {
                 onChange={handleFileChange}
             />
 
-            {!pending && (
-                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, animation: animation.fadeIn }}>
-                    클릭하여 사진 선택
-                </Text>
-            )}
+            <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                클릭하여 사진 변경
+            </Text>
 
-            {pending && (
-                <div style={{ display: 'flex', gap: 8, width: '100%', animation: animation.slideUpIn }}>
-                    <Button variant="secondary" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
-                        취소
-                    </Button>
-                    <Button variant="primary" onClick={handleSave} loading={loading} style={{ flex: 1 }}>
-                        저장
-                    </Button>
-                </div>
-            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                {pending?.file ? (
+                    <div style={{ display: 'flex', gap: 8, animation: animation.slideUpIn }}>
+                        <Button variant="secondary" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
+                            취소
+                        </Button>
+                        <Button variant="primary" onClick={handleSave} loading={loading} style={{ flex: 1 }}>
+                            저장
+                        </Button>
+                    </div>
+                ) : (
+                    <button
+                        onClick={handleResetToDefault}
+                        disabled={loading}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            fontSize: fontSize.sm,
+                            color: colors.text.tertiary,
+                            textDecoration: 'underline',
+                            textUnderlineOffset: '3px',
+                            padding: '4px 0',
+                            opacity: loading ? 0.5 : 1,
+                        }}
+                    >
+                        기본 이미지로 변경
+                    </button>
+                )}
+            </div>
         </div>
     );
 };

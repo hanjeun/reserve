@@ -86,13 +86,25 @@ public class StoreApiController {
         return ApiResponse.success(store, "자동 승인 설정이 변경되었습니다.");
     }
 
+    // 가게 삭제 전 활성 예약 수 조회 (모달 표시용)
+    @GetMapping("/{id}/active-reservations-count")
+    public ApiResponse<Integer> getActiveReservationsCount(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        validateBusinessAuth(member);
+        int count = storeService.countActiveReservations(id, member);
+        return ApiResponse.success(count, "활성 예약 수 조회 성공");
+    }
+
     // 가게 삭제
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteStore(@PathVariable Long id) {
+    public ApiResponse<Void> deleteStore(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean force
+    ) {
         Member member = SecurityUtil.getCurrentMember("가게 삭제를 위해 로그인이 필요합니다.");
         validateBusinessAuth(member);
 
-        storeService.deleteStore(id, member);
+        storeService.deleteStore(id, member, force);
         return ApiResponse.success(null, "가게가 삭제되었습니다.");
     }
 

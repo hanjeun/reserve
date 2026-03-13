@@ -15,9 +15,9 @@ const useMyStores = () => {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (storeId) => storeService.deleteStore(storeId),
+        mutationFn: ({ storeId, force }) => storeService.deleteStore(storeId, force),
         // 낙관적 업데이트 — 실패 시 원복
-        onMutate: async (storeId) => {
+        onMutate: async ({ storeId }) => {
             await queryClient.cancelQueries({ queryKey: storeKeys.my() });
             const prev = queryClient.getQueryData(storeKeys.my());
             queryClient.setQueryData(storeKeys.my(), (old) =>
@@ -36,7 +36,7 @@ const useMyStores = () => {
         stores:      data || [],
         loading:     isLoading,
         error:       error?.message || null,
-        deleteStore: (id) => deleteMutation.mutateAsync(id),
+        deleteStore: (id, force = false) => deleteMutation.mutateAsync({ storeId: id, force }),
         refetch:     () => queryClient.invalidateQueries({ queryKey: storeKeys.my() }),
     };
 };

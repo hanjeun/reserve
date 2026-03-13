@@ -70,6 +70,13 @@ const VARIANTS = {
         boxShadow: shadows.buttonHover,
         padding: '0 40px',
     },
+    outline: {
+        background: 'transparent',
+        color: colors.text.tertiary,
+        border: `1px solid ${colors.border.default}`,
+        borderRadius: radius.xl,
+        boxShadow: 'none',
+    },
     ghost: {
         background: 'transparent',
         color: colors.text.secondary,
@@ -200,6 +207,8 @@ const Button = ({
                 .reserve-btn--ghost-sm-danger:active:not(:disabled) { opacity: 0.5; transform: scale(0.95); }
 
                 /* ghost / link */
+                .reserve-btn--outline:hover:not(:disabled) { border-color: #adb5bd; color: #6c757d; }
+                .reserve-btn--outline:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
                 .reserve-btn--ghost:hover:not(:disabled) { opacity: 0.7; }
                 .reserve-btn--ghost:active:not(:disabled) { opacity: 0.5; transform: scale(0.94); }
                 .reserve-btn--link:hover:not(:disabled) { opacity: 0.75; }

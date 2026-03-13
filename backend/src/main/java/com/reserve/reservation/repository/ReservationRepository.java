@@ -154,6 +154,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     );
 
     /**
+     * 가게 삭제 전 활성 예약(PENDING/CONFIRMED) 건수 조회
+     */
+    @Query("SELECT COUNT(r) FROM Reservation r WHERE r.store.id = :storeId AND r.status IN ('PENDING', 'CONFIRMED')")
+    int countActiveReservationsByStoreId(@Param("storeId") Long storeId);
+
+    /**
      * 미결제 만료 대상 예약 조회
      * - PENDING 상태
      * - depositAmount > 0 (예약금 있는 가게)

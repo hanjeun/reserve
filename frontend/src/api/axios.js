@@ -14,11 +14,8 @@ let failedQueue = [];
 
 const processQueue = (error, token = null) => {
     failedQueue.forEach(prom => {
-        if (error) {
-            prom.reject(error);
-        } else {
-            prom.resolve(token);
-        }
+        if (error) prom.reject(error);
+        else prom.resolve(token);
     });
     failedQueue = [];
 };
@@ -45,62 +42,62 @@ instance.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // 401 에러이고, 재시도하지 않은 요청이며, refresh 요청이 아닌 경우
+        // 401: 토큰 만료 → refresh 시도
         if (
             error.response?.status === 401 &&
             !originalRequest._retry &&
             !originalRequest.url?.includes('/api/auth/refresh')
         ) {
-            // 이미 재발급 중이면 대기열에 추가
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
-                }).then(() => {
-                    return instance(originalRequest);
-                }).catch(err => {
-                    return Promise.reject(err);
-                });
+                }).then(() => instance(originalRequest))
+                  .catch(err => Promise.reject(err));
             }
 
             originalRequest._retry = true;
             isRefreshing = true;
 
             try {
-                // refresh_token으로 새 access_token 발급 시도
                 await instance.post('/api/auth/refresh');
-                
                 processQueue(null);
-                
-                // 원래 요청 재시도
                 return instance(originalRequest);
             } catch (refreshError) {
                 processQueue(refreshError);
 
                 const isInitCall = originalRequest.url?.includes('/api/member/me');
-
-                if (isInitCall) {
-                    // 앱 초기화 시 refresh 실패 = 단순 비로그인 상태
-                    // localStorage 유지, 리다이렉트 없음
-                } else {
-                    // 세션 진행 중 만료
+                if (!isInitCall) {
                     localStorage.removeItem('auth-storage');
                     if (!window.location.pathname.includes('/login')) {
                         window.location.href = '/login';
                     }
                 }
 
-                return Promise.reject('세션이 만료되었습니다. 다시 로그인해주세요.');
+                return Promise.reject({ message: '다시 로그인해주세요.', isSessionExpired: true });
             } finally {
                 isRefreshing = false;
             }
         }
 
-        // 401이 아닌 다른 에러
+        // 그 외 에러
         if (error.response) {
-            return Promise.reject(error.response.data?.message || '서버 에러가 발생했습니다.');
+            const serverMsg = error.response.data?.message;
+            const status = error.response.status;
+
+            // 서버가 직접 메시지를 내려주면 그대로 사용
+            if (serverMsg) return Promise.reject(serverMsg);
+
+            // 서버 메시지 없을 때 상태 코드별 기본 메시지
+            if (status === 403) return Promise.reject('권한이 없습니다.');
+            if (status === 404) return Promise.reject('정보를 찾을 수 없습니다.');
+            if (status === 409) return Promise.reject('이미 사용 중입니다.');
+            if (status === 429) return Promise.reject('잠시 후 다시 시도해주세요.');
+            if (status >= 500) return Promise.reject('서버 오류가 발생했습니다.');
+            return Promise.reject('요청에 실패했습니다.');
         }
-        
-        return Promise.reject(error.message || '네트워크 에러가 발생했습니다.');
+
+        // 네트워크 오류
+        return Promise.reject('네트워크를 확인해주세요.');
     }
 );
 

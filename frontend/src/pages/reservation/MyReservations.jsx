@@ -26,17 +26,14 @@ const MyReservations = () => {
         if (location.state?.warnMsg) {
             message.warning({ content: location.state.warnMsg, key: 'review_warn' });
         }
-        // 결제 완료 후 네비게이트 시 refetch 플래그
         if (location.state?.refetch) {
             refetch();
         }
-        // state 정리 (다시 마운트 시 중복 실행 방지)
         if (location.state) {
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // 결제하기 (PENDING + 미결제)
     const handlePay = async (res) => {
         await pay(
             { id: res.id, storeName: res.storeName, depositAmount: res.depositAmount },
@@ -44,11 +41,9 @@ const MyReservations = () => {
         );
     };
 
-    // 취소 (depositPaid 여부에 따라 환불 안내 포함)
     const handleCancel = async (res) => {
         let content = '예약을 취소하시겠습니까? 취소 후 되돌릴 수 없습니다.';
 
-        // 예약금 결제 완료된 경우 환불 예상액 조회
         if (res.depositPaid) {
             try {
                 const preview = await paymentService.getRefundPreview(res.id);
@@ -99,33 +94,44 @@ const MyReservations = () => {
                                 {/* 정보 */}
                                 <div style={styles.info} onClick={() => navigate(`/store/${res.storeId}`)}>
                                     <Text strong style={styles.storeName}>{res.storeName}</Text>
-                                    <div style={styles.meta}>
+
+                                    {/* 1행: 이름 · 명수 */}
+                                    <div style={styles.metaRow}>
                                         <span style={styles.metaItem}>
                                             <UserOutlined style={styles.metaIcon} />{res.memberName}
                                         </span>
                                         <span style={styles.dot}>·</span>
-                                        <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{res.reservationDate}</span>
-                                        <span style={styles.dot}>·</span>
-                                        <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(res.reservationTime)}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                                        <span style={styles.guest}>
-                                            <TeamOutlined style={{ marginRight: 3, fontSize: 11 }} />{res.guestCount}명
+                                        <span style={styles.metaItem}>
+                                            <TeamOutlined style={styles.metaIcon} />{res.guestCount}명
                                         </span>
-                                        {res.specialRequest && (
+                                    </div>
+
+                                    {/* 2행: 날짜 · 시간 */}
+                                    <div style={styles.metaRow}>
+                                        <span style={styles.metaItem}>
+                                            <CalendarOutlined style={styles.metaIcon} />{res.reservationDate}
+                                        </span>
+                                        <span style={styles.dot}>·</span>
+                                        <span style={styles.metaItem}>
+                                            <ClockCircleOutlined style={styles.metaIcon} />{formatTime(res.reservationTime)}
+                                        </span>
+                                    </div>
+
+                                    {/* 3행: 설명 (있을 때만) */}
+                                    {res.specialRequest && (
+                                        <div style={styles.metaRow}>
                                             <Text type="secondary" style={styles.special} ellipsis={{ tooltip: res.specialRequest }}>
                                                 &quot;{res.specialRequest}&quot;
                                             </Text>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* 우측: 상태 + 금액 + ghost-sm 버튼 */}
+                                {/* 우측: 상태 + 금액 + 버튼 */}
                                 <div style={styles.right}>
                                     <ReservationStatusBadge status={res.status} />
                                     <Text strong style={styles.price}>{formatCurrency(res.depositAmount)}</Text>
 
-                                    {/* PENDING + 미결제 → 결제하기 버튼 */}
                                     {res.status === 'PENDING' && res.depositAmount > 0 && !res.depositPaid && (
                                         <Button
                                             variant="ghost-sm-primary"
@@ -159,6 +165,13 @@ const MyReservations = () => {
                                                 리뷰 쓰기
                                               </Button>
                                     )}
+
+                                    {/* 거절 사유 */}
+                                    {res.status === 'REJECTED' && res.rejectionReason && (
+                                        <Text type="secondary" style={styles.rejection}>
+                                            사유: {res.rejectionReason}
+                                        </Text>
+                                    )}
                                 </div>
                             </div>
                             {i < reservations.length - 1 && <div style={styles.divider} />}
@@ -171,21 +184,21 @@ const MyReservations = () => {
 };
 
 const styles = {
-    title:    { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
-    row:      { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0', cursor: 'pointer' },
-    divider:  { height: 1, background: colors.border?.light || '#f0f0f0' },
-    imgWrap:  { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
-    img:      { width: '100%', height: '100%', objectFit: 'cover' },
-    info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
-    storeName:{ fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2 },
-    metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary },
-    metaIcon: { fontSize: 11, color: colors.text.tertiary },
-    dot:      { color: colors.text.tertiary, fontSize: fontSize.xs },
-    guest:    { fontSize: fontSize.xs, color: colors.text.secondary, display: 'inline-flex', alignItems: 'center' },
-    special:  { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 180 },
-    right:    { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
-    price:    { fontSize: fontSize.base, color: colors.text.primary },
+    title:     { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
+    row:       { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0', cursor: 'pointer' },
+    divider:   { height: 1, background: colors.border?.light || '#f0f0f0' },
+    imgWrap:   { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
+    img:       { width: '100%', height: '100%', objectFit: 'cover' },
+    info:      { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
+    storeName: { fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
+    metaRow:   { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' },
+    metaItem:  { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary, whiteSpace: 'nowrap' },
+    metaIcon:  { fontSize: 11, color: colors.text.tertiary },
+    dot:       { color: colors.text.tertiary, fontSize: fontSize.xs },
+    special:   { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 200 },
+    right:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
+    price:     { fontSize: fontSize.base, color: colors.text.primary },
+    rejection: { fontSize: fontSize.xs, maxWidth: 100, textAlign: 'right' },
 };
 
 export default MyReservations;

@@ -9,6 +9,7 @@ import { colors, animationKeyframes } from './styles/tokens';
 import Home from './pages/Home';
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
+import ForgotPassword from './pages/auth/ForgotPassword';
 import OAuthCallback from './pages/auth/OAuthCallback';
 import StoreList from './pages/store/StoreList';
 import StoreDetail from './pages/store/StoreDetail';
@@ -57,15 +58,11 @@ const themeConfig = {
             colorBgContainer: colors.gray[50],
         },
         Tabs: {
-            // ink bar 두께와 모양
             inkBarColor: colors.primary.main,
-            // 탭 사이 간격 (tabBarGutter prop이 없는 경우 기본값)
             horizontalItemGutter: 24,
-            // 탭 텍스트 코로
             itemColor: colors.text.tertiary,
             itemHoverColor: colors.text.primary,
             itemSelectedColor: colors.primary.main,
-            // 탭 바 아래 구분선 색상
             colorBorderSecondary: colors.border.light,
         },
     },
@@ -101,34 +98,35 @@ function AppRoutes() {
             <Header />
             <Content>
                 <Routes>
-                        {/* 공용 페이지 */}
-                        <Route path="/" element={<Home />} />
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/signup" element={<Signup />} />
-                        <Route path="/oauth2/callback" element={<OAuthCallback />} />
-                        <Route path="/stores" element={<StoreList />} />
-                        <Route path="/store/:id" element={<StoreDetail />} />
+                    {/* 공용 페이지 */}
+                    <Route path="/" element={<Home />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/signup" element={<Signup />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/oauth2/callback" element={<OAuthCallback />} />
+                    <Route path="/stores" element={<StoreList />} />
+                    <Route path="/store/:id" element={<StoreDetail />} />
 
-                        {/* OWNER / ADMIN 전용 */}
-                        <Route element={<PrivateRoute allowedRoles={['ADMIN', 'BUSINESS']} />}>
-                            <Route path="/my-stores" element={<MyStores />} />
-                            <Route path="/store/register" element={<StoreRegister />} />
-                            <Route path="/store/:id/edit" element={<StoreEdit />} />
-                            <Route path="/business" element={<BusinessPanel />} />
-                        </Route>
+                    {/* OWNER / ADMIN 전용 */}
+                    <Route element={<PrivateRoute allowedRoles={['ADMIN', 'BUSINESS']} />}>
+                        <Route path="/my-stores" element={<MyStores />} />
+                        <Route path="/store/register" element={<StoreRegister />} />
+                        <Route path="/store/:id/edit" element={<StoreEdit />} />
+                        <Route path="/business" element={<BusinessPanel />} />
+                    </Route>
 
-                        {/* ADMIN 전용 */}
-                        <Route element={<PrivateRoute allowedRoles={['ADMIN']} />}>
-                            <Route path="/admin" element={<AdminPanel />} />
-                        </Route>
+                    {/* ADMIN 전용 */}
+                    <Route element={<PrivateRoute allowedRoles={['ADMIN']} />}>
+                        <Route path="/admin" element={<AdminPanel />} />
+                    </Route>
 
-                        {/* 로그인 유저 공통 */}
-                        <Route element={<PrivateRoute />}>
-                            <Route path="/my-reservations" element={<MyReservations />} />
-                            <Route path="/my-favorites" element={<MyFavorites />} />
-                            <Route path="/payment/result" element={<PaymentResult />} />
-                            <Route path="/my-page" element={<MyPage />} />
-                        </Route>
+                    {/* 로그인 유저 공통 */}
+                    <Route element={<PrivateRoute />}>
+                        <Route path="/my-reservations" element={<MyReservations />} />
+                        <Route path="/my-favorites" element={<MyFavorites />} />
+                        <Route path="/payment/result" element={<PaymentResult />} />
+                        <Route path="/my-page" element={<MyPage />} />
+                    </Route>
                 </Routes>
             </Content>
 
@@ -144,14 +142,13 @@ function AppRoutes() {
     );
 }
 
-// React Query 전역 설정
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            staleTime: 1000 * 60 * 3,      // 3분: 캐시 유효 기간 (재요청 안 함)
-            gcTime: 1000 * 60 * 10,        // 10분: 메모리 보관 기간
-            retry: 1,                       // 실패 시 1회 재시도
-            refetchOnWindowFocus: false,    // 탭 포커스 시 자동 refetch 끄기
+            staleTime: 1000 * 60 * 3,
+            gcTime: 1000 * 60 * 10,
+            retry: 1,
+            refetchOnWindowFocus: false,
         },
     },
 });
@@ -159,23 +156,22 @@ const queryClient = new QueryClient({
 function App() {
     return (
         <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-            <style>{animationKeyframes}{`
-            @keyframes reserve-spin { to { transform: rotate(360deg); } }
-        `}</style>
-            <ConfigProvider
-                locale={koKR}
-                theme={themeConfig}
-                form={{ validateMessages }}
-            >
-                <AntApp>
-                    <AppContent />
-                </AntApp>
-            </ConfigProvider>
-        </BrowserRouter>
+            <BrowserRouter>
+                <style>{animationKeyframes}{`
+                    @keyframes reserve-spin { to { transform: rotate(360deg); } }
+                `}</style>
+                <ConfigProvider
+                    locale={koKR}
+                    theme={themeConfig}
+                    form={{ validateMessages }}
+                >
+                    <AntApp>
+                        <AppContent />
+                    </AntApp>
+                </ConfigProvider>
+            </BrowserRouter>
         </QueryClientProvider>
     );
 }
 
 export default App;
-

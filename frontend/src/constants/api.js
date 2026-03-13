@@ -75,6 +75,11 @@ export const API_ENDPOINTS = {
         MY_PAYMENTS:    '/api/payment/my-payments',
         REFUND_PREVIEW: (id) => `/api/payment/refund-preview/${id}`,
     },
+    PASSWORD_RESET: {
+        SEND_CODE:   '/api/password-reset/send-code',
+        VERIFY_CODE: '/api/password-reset/verify-code',
+        RESET:       '/api/password-reset/reset',
+    },
     FAVORITE: {
         TOGGLE: (storeId) => `/api/favorites/toggle/${storeId}`,
         STATUS: (storeId) => `/api/favorites/status/${storeId}`,

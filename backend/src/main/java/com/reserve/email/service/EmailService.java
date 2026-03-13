@@ -146,6 +146,43 @@ public class EmailService {
             + "</div></body></html>";
     }
 
+    @Async
+    public void sendPasswordResetEmail(String toEmail, String code) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject("[RESERVE] 비밀번호 재설정 코드");
+            helper.setText(buildPasswordResetEmailContent(code), true);
+            mailSender.send(message);
+            log.info("비밀번호 재설정 이메일 발송 완료: {}", toEmail);
+        } catch (MessagingException e) {
+            log.error("비밀번호 재설정 이메일 발송 실패: {}", e.getMessage());
+        }
+    }
+
+    private String buildPasswordResetEmailContent(String code) {
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
+            + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
+            + "  <div style=\"width:100%;background-color:#f9fafb;padding:40px 0;\">"
+            + "    <div style=\"max-width:500px;margin:0 auto;background-color:#ffffff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
+            + "      <div style=\"margin-bottom:32px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;letter-spacing:-0.5px;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
+            + "      <h1 style=\"font-size:24px;font-weight:700;color:#191f28;line-height:1.4;margin:0 0 12px 0;font-family:" + FONT_FAMILY + ";\">비밀번호를<br/>재설정해주세요.</h1>"
+            + "      <p style=\"font-size:16px;color:#4e5968;line-height:1.6;margin:0 0 32px 0;\">아래 인증 코드를 입력해 비밀번호를 재설정하세요.<br/>코드는 5분간 유효합니다.</p>"
+            + "      <div style=\"background-color:#f2f4f6;border-radius:16px;padding:32px;text-align:center;margin-bottom:32px;\">"
+            + "        <span style=\"display:block;font-size:14px;color:#8b95a1;margin-bottom:8px;\">인증번호</span>"
+            + "        <span style=\"font-size:36px;font-weight:800;color:#3182f6;letter-spacing:8px;font-family:" + FONT_FAMILY + ";\">" + code + "</span>"
+            + "      </div>"
+            + "      <div style=\"font-size:13px;color:#b0b8c1;line-height:1.6;border-top:1px solid #f2f4f6;padding-top:24px;\">"
+            + "        본인이 요청하지 않은 경우 이 이메일을 무시하세요.<br/>"
+            + "        © 2026 RESERVE. All rights reserved."
+            + "      </div>"
+            + "    </div>"
+            + "  </div>"
+            + "</body></html>";
+    }
+
     private String buildVerificationEmailContent(String code) {
         return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
@@ -160,7 +197,7 @@ public class EmailService {
             + "      </div>"
             + "      <div style=\"font-size:13px;color:#b0b8c1;line-height:1.6;border-top:1px solid #f2f4f6;padding-top:24px;\">"
             + "        본 메일은 회원가입을 위한 본인 확인 메일입니다.<br/>"
-            + "        인증 코드는 <span style=\"color:#8b95a1;font-weight:600;\">5분간</span> 유효합니다.<br/><br/>"
+            + "        인증 코드는 <span style=\"color:#8b95a1;\">5분간</span> 유효합니다.<br/><br/>"
             + "        © 2026 RESERVE. All rights reserved."
             + "      </div>"
             + "    </div>"

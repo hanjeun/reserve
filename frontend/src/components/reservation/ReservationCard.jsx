@@ -39,21 +39,37 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                 {/* 정보 */}
                 <div style={styles.info}>
                     <Text strong style={styles.storeName}>{storeName}</Text>
-                    <div style={styles.meta}>
-                        <span style={styles.metaItem}><UserOutlined style={styles.metaIcon} />{memberName}</span>
+
+                    {/* 1행: 이름 · 명수 */}
+                    <div style={styles.metaRow}>
+                        <span style={styles.metaItem}>
+                            <UserOutlined style={styles.metaIcon} />{memberName}
+                        </span>
                         <span style={styles.dot}>·</span>
-                        <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{reservationDate}</span>
-                        <span style={styles.dot}>·</span>
-                        <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(reservationTime)}</span>
+                        <span style={styles.metaItem}>
+                            <TeamOutlined style={styles.metaIcon} />{guestCount}명
+                        </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                        <span style={styles.guest}><TeamOutlined style={{ marginRight: 3, fontSize: 11 }} />{guestCount}명</span>
-                        {specialRequest && (
+
+                    {/* 2행: 날짜 · 시간 */}
+                    <div style={styles.metaRow}>
+                        <span style={styles.metaItem}>
+                            <CalendarOutlined style={styles.metaIcon} />{reservationDate}
+                        </span>
+                        <span style={styles.dot}>·</span>
+                        <span style={styles.metaItem}>
+                            <ClockCircleOutlined style={styles.metaIcon} />{formatTime(reservationTime)}
+                        </span>
+                    </div>
+
+                    {/* 3행: 설명 (있을 때만) */}
+                    {specialRequest && (
+                        <div style={styles.metaRow}>
                             <Text type="secondary" style={styles.special} ellipsis={{ tooltip: specialRequest }}>
                                 &quot;{specialRequest}&quot;
                             </Text>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* 우측: 상태 + 금액 + 액션버튼 */}
@@ -125,19 +141,18 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
 };
 
 const styles = {
-    row:      { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0' },
-    imgWrap:  { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
-    img:      { width: '100%', height: '100%', objectFit: 'cover' },
-    info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
-    storeName:{ fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    meta:     { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2 },
-    metaItem: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary },
-    metaIcon: { fontSize: 11, color: colors.text.tertiary },
-    dot:      { color: colors.text.tertiary, fontSize: fontSize.xs },
-    guest:    { fontSize: fontSize.xs, color: colors.text.secondary, display: 'inline-flex', alignItems: 'center' },
-    special:  { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 180 },
-    right:    { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
-    price:    { fontSize: fontSize.base, color: colors.text.primary },
+    row:       { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0' },
+    imgWrap:   { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
+    img:       { width: '100%', height: '100%', objectFit: 'cover' },
+    info:      { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
+    storeName: { fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
+    metaRow:   { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' },
+    metaItem:  { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary, whiteSpace: 'nowrap' },
+    metaIcon:  { fontSize: 11, color: colors.text.tertiary },
+    dot:       { color: colors.text.tertiary, fontSize: fontSize.xs },
+    special:   { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 200 },
+    right:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
+    price:     { fontSize: fontSize.base, color: colors.text.primary },
     actionGroup: { display: 'flex', gap: 10 },
 };
 

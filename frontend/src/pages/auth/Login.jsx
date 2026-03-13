@@ -62,7 +62,9 @@ const Login = () => {
                 navigate(from, { replace: true });
             }
         } catch (err) {
-            message.error(err || "이메일 또는 비밀번호를 확인해주세요.");
+            const msg = typeof err === 'string' ? err : err?.message;
+            if (error?.isSessionExpired) return;
+            message.error(msg || '이메일 또는 비밀번호를 확인해주세요.');
         } finally {
             setLoading(false);
         }
@@ -85,11 +87,17 @@ const Login = () => {
                     <Form.Item name="password" rules={VALIDATION_RULES.loginPassword}>
                         <FormInput type="password" placeholder="비밀번호" />
                     </Form.Item>
-                    <div style={{ marginTop: '32px' }}>
-                        <Button variant="primary" htmlType="submit" loading={loading} block>
-                            로그인
+
+                    {/* 비밀번호 찾기 */}
+                    <Flex justify="flex-end" style={{ marginTop: -8, marginBottom: 16 }}>
+                        <Button variant="link" onClick={() => navigate('/forgot-password')} style={{ padding: 0, fontSize: fontSize.sm }}>
+                            비밀번호를 잊으셨나요?
                         </Button>
-                    </div>
+                    </Flex>
+
+                    <Button variant="primary" htmlType="submit" loading={loading} block>
+                        로그인
+                    </Button>
                 </Form>
 
                 <Divider plain style={{ margin: '32px 0' }}>
@@ -118,27 +126,27 @@ const Login = () => {
 };
 
 const styles = {
-    title: { 
-        marginBottom: '12px', 
-        fontWeight: fontWeight.extrabold, 
-        letterSpacing: '-1.2px', 
-        color: colors.text.primary 
+    title: {
+        marginBottom: '12px',
+        fontWeight: fontWeight.extrabold,
+        letterSpacing: '-1.2px',
+        color: colors.text.primary
     },
-    subtitle: { 
-        display: 'block', 
-        marginBottom: '48px', 
-        color: colors.text.tertiary, 
-        fontSize: fontSize.lg 
+    subtitle: {
+        display: 'block',
+        marginBottom: '48px',
+        color: colors.text.tertiary,
+        fontSize: fontSize.lg
     },
-    socialCircle: { 
-        width: heights.socialBtn, 
-        height: heights.socialBtn, 
-        borderRadius: radius.full, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        cursor: 'pointer', 
-        border: 'none' 
+    socialCircle: {
+        width: heights.socialBtn,
+        height: heights.socialBtn,
+        borderRadius: radius.full,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        border: 'none'
     },
 };
 

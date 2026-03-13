@@ -14,7 +14,7 @@ import java.time.Duration;
 @Setter
 @Component
 @ConfigurationProperties("jwt")
-public class JwtProperties {
+public class    JwtProperties {
 
     private String issuer;
     private String secretKey;

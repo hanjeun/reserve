@@ -12,4 +12,5 @@ export { default as useFormReady } from './useFormReady';
 export { default as useImagePreview } from './useImagePreview.jsx';
 export { useStoreForm } from './useStoreForm';
 export { default as usePayment } from './usePayment';
+export { default as useEmailVerification } from './useEmailVerification';
 export { storeKeys, reservationKeys, memberKeys } from './queryKeys';

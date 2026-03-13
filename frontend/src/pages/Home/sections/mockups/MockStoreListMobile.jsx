@@ -1,6 +1,6 @@
 import { Typography, Flex } from 'antd';
 import { StarFilled } from '@ant-design/icons';
-import { colors, radius, shadows, fontSize, fontWeight } from '../../../../styles/tokens';
+import { colors, radius, shadows, fontWeight } from '../../../../styles/tokens';
 import { STORE_DATA } from '../../Home.data';
 
 const { Text } = Typography;

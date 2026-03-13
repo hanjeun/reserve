@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Flex } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
-import { colors, radius, fontSize, fontWeight, heights } from '../../../../styles/tokens';
+import { colors, radius, fontWeight } from '../../../../styles/tokens';
 import { mockInputBase, mockFormLabel } from '../../Home.styles';
 
 export default function MockBookingForm() {
@@ -32,10 +32,10 @@ export default function MockBookingForm() {
                         {[
                             { Icon: MinusOutlined, fn: () => setCount(c => Math.max(1, c - 1)), disabled: count <= 1 },
                             { Icon: PlusOutlined,  fn: () => setCount(c => c + 1),               disabled: false },
-                        ].map(({ Icon, fn, disabled }, k) => (
-                            <button key={k} type="button" onClick={!disabled ? fn : undefined}
-                                style={{ width: 30, height: 30, borderRadius: radius.md, background: colors.gray[100], border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.35 : 1, color: colors.text.secondary }}>
-                                <Icon style={{ fontSize: 11 }} />
+                        ].map((item, k) => (
+                            <button key={k} type="button" onClick={!item.disabled ? item.fn : undefined}
+                                style={{ width: 30, height: 30, borderRadius: radius.md, background: colors.gray[100], border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: item.disabled ? 'not-allowed' : 'pointer', opacity: item.disabled ? 0.35 : 1, color: colors.text.secondary }}>
+                                <item.Icon style={{ fontSize: 11 }} />
                             </button>
                         ))}
                     </Flex>

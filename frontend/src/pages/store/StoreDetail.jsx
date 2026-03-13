@@ -263,7 +263,6 @@ const StoreDetail = () => {
     const [favoriteStatus, setFavoriteStatus] = React.useState(false);
     const stateOpenWrite    = location.state?.openWrite    ?? false;
     const stateOpenReviewId = location.state?.openReviewId ?? null;
-    const selectedDateRef   = React.useRef(null);
     const reviewSectionRef  = React.useRef(null);
 
     React.useEffect(() => {
@@ -293,32 +292,6 @@ const StoreDetail = () => {
             return () => clearTimeout(t);
         }
     }, [stateOpenWrite, stateOpenReviewId]); // eslint-disable-line
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const disabledTime = React.useCallback(() => {
-        if (!store?.openTime || !store?.closeTime) return {};
-        const [oH, oM] = store.openTime.split(':').map(Number);
-        const [cH, cM] = store.closeTime.split(':').map(Number);
-        const now = dayjs();
-        const isToday = selectedDateRef.current && dayjs(selectedDateRef.current).isSame(now, 'day');
-        return {
-            disabledHours: () => {
-                const hrs = [];
-                for (let h = 0; h < 24; h++) {
-                    if (h < oH || h > cH) hrs.push(h);
-                    else if (isToday && h < now.hour()) hrs.push(h);
-                }
-                return hrs;
-            },
-            disabledMinutes: (sh) => {
-                const mins = [];
-                if (sh === oH) for (let m = 0; m < oM; m++) mins.push(m);
-                if (sh === cH) for (let m = cM + 1; m < 60; m++) mins.push(m);
-                if (isToday && sh === now.hour()) for (let m = 0; m <= now.minute(); m++) mins.push(m);
-                return mins;
-            },
-        };
-    }, []);
 
     const onFinish = async (values) => {
         if (!isLoggedIn) { message.warning('로그인이 필요한 서비스입니다.'); navigate('/login'); return; }

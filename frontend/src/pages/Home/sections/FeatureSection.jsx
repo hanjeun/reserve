@@ -1,6 +1,6 @@
 import { Typography } from 'antd';
 import { CheckCircleFilled } from '@ant-design/icons';
-import { colors, fontSize } from '../../../styles/tokens';
+import { colors } from '../../../styles/tokens';
 import { SECTION_IDS } from '../Home.constants';
 import { styles } from '../Home.styles';
 import BounceArrow from './BounceArrow';

@@ -19,7 +19,7 @@ const StoreList = () => {
     const sentinelRef = React.useRef(null);
 
     useEffect(() => {
-        setDisplayCount(PAGE_SIZE);
+        setDisplayCount(PAGE_SIZE); // eslint-disable-line react-hooks/set-state-in-effect
     }, [searchParams.keyword, searchParams.sort]);
 
     useEffect(() => {

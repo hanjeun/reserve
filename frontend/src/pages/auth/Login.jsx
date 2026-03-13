@@ -63,7 +63,7 @@ const Login = () => {
             }
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
-            if (error?.isSessionExpired) return;
+            if (err?.isSessionExpired) return;
             message.error(msg || '이메일 또는 비밀번호를 확인해주세요.');
         } finally {
             setLoading(false);

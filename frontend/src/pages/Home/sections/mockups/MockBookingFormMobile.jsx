@@ -33,10 +33,10 @@ export default function MockBookingFormMobile() {
                         {[
                             { Icon: MinusOutlined, fn: () => setCount(c => Math.max(1, c - 1)), disabled: count <= 1 },
                             { Icon: PlusOutlined,  fn: () => setCount(c => c + 1),               disabled: false },
-                        ].map(({ Icon, fn, disabled }, k) => (
-                            <button key={k} type="button" onClick={!disabled ? fn : undefined}
-                                style={{ width: 26, height: 26, borderRadius: radius.md, background: colors.gray[100], border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.35 : 1, color: colors.text.secondary }}>
-                                <Icon style={{ fontSize: 10 }} />
+                        ].map((item, k) => (
+                            <button key={k} type="button" onClick={!item.disabled ? item.fn : undefined}
+                                style={{ width: 26, height: 26, borderRadius: radius.md, background: colors.gray[100], border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: item.disabled ? 'not-allowed' : 'pointer', opacity: item.disabled ? 0.35 : 1, color: colors.text.secondary }}>
+                                <item.Icon style={{ fontSize: 10 }} />
                             </button>
                         ))}
                     </Flex>

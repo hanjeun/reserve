@@ -5,18 +5,18 @@
  * - src 변경 시 imgError 자동 초기화
  * - 레이어 방식: 아이콘이 항상 뒤에, 이미지가 위에 덮음
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserOutlined } from '@ant-design/icons';
 import { getImageUrl } from '../../utils/image';
 import { colors } from '../../styles/tokens';
 
 const Avatar = ({ src, size = 36, style }) => {
     const [imgError, setImgError] = useState(false);
-    const prevSrc = useRef(src);
-    if (prevSrc.current !== src) {
-        prevSrc.current = src;
-        if (imgError) setImgError(false);
-    }
+
+    // src 변경 시 에러 상태 초기화 — 일반적인 패턴으로 안전함
+    useEffect(() => {
+        if (imgError) setImgError(false); // eslint-disable-line react-hooks/set-state-in-effect
+    }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // blob: / data: URL은 그대로, 서버 상대경로만 절대경로로 변환
     const imgUrl = (src?.startsWith('blob:') || src?.startsWith('data:')) ? src : getImageUrl(src, null);

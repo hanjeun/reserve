@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Typography, Tabs, Table, Tag, Modal, Input, Space, Image, Tooltip,
+    Typography, Tabs, Table, Tag, Modal, Input, Image, Tooltip,
     Select,
 } from 'antd';
 import {
@@ -224,9 +224,9 @@ const AdminPanel = () => {
             },
         },
         {
-            title: '처리', key: 'actions', fixed: 'right', width: 1,
+            title: '처리', key: 'actions',
             render: (_, r) => (
-                <div style={{ display: 'flex', gap: 10, whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
                     {r.status === 'PENDING' && (
                         <>
                             <Button variant="ghost-sm-success" loading={actionLoading} onClick={() => handleApprove(r)}>승인</Button>
@@ -279,8 +279,8 @@ const AdminPanel = () => {
             key: 'pending',
             label: (
                 <span style={tabLabelStyle}>
-                    <IdcardOutlined /> 대기 중
-                    {pendingCount > 0 && <span style={tabBadgeStyle}>{pendingCount}</span>}
+                    <IdcardOutlined />
+                    <span>대기 중</span>
                 </span>
             ),
             children: (
@@ -491,7 +491,7 @@ const DetailRow = ({ label, children }) => (
 );
 
 const tabLabelStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, lineHeight: 1 };
-const tabBadgeStyle = { display: 'none' };
+const tabBadgeStyle = {}; // 미사용
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
 };

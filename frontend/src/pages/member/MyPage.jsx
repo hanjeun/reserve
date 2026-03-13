@@ -420,6 +420,7 @@ const BusinessTab = ({ user }) => {
     );
 };
 
+// eslint-disable-next-line no-unused-vars
 const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, onFileChange, onSubmit, loading }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={bizStyles.infoNotice}>

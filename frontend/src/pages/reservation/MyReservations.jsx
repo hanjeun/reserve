@@ -13,6 +13,16 @@ import { colors, radius, fontWeight, fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 
+const useIsWide = () => {
+    const [wide, setWide] = React.useState(() => window.innerWidth >= 576);
+    React.useEffect(() => {
+        const handler = () => setWide(window.innerWidth >= 576);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+    }, []);
+    return wide;
+};
+
 const MyReservations = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -20,6 +30,7 @@ const MyReservations = () => {
     const { reservations, loading, cancelReservation, refetch } = useReservations();
     const { user } = useAuthStore();
     const { pay, paying } = usePayment();
+    const isWide = useIsWide();
 
     useEffect(() => {
         refetch();
@@ -87,40 +98,49 @@ const MyReservations = () => {
                         <React.Fragment key={res.id}>
                             <div style={styles.row}>
                                 {/* 이미지 */}
-                                <div style={styles.imgWrap} onClick={() => navigate(`/store/${res.storeId}`)}>
+                                <div
+                                    style={isWide ? styles.imgWrapWide : styles.imgWrap}
+                                    onClick={() => navigate(`/store/${res.storeId}`)}
+                                >
                                     <img src={getThumbnailUrl(res.storeMainImageUrl)} alt={res.storeName} style={styles.img} />
                                 </div>
 
                                 {/* 정보 */}
                                 <div style={styles.info} onClick={() => navigate(`/store/${res.storeId}`)}>
-                                    <Text strong style={styles.storeName}>{res.storeName}</Text>
+                                    <Text strong style={isWide ? styles.storeNameWide : styles.storeName}>
+                                        {res.storeName}
+                                    </Text>
 
-                                    {/* 1행: 이름 · 명수 */}
-                                    <div style={styles.metaRow}>
-                                        <span style={styles.metaItem}>
-                                            <UserOutlined style={styles.metaIcon} />{res.memberName}
-                                        </span>
-                                        <span style={styles.dot}>·</span>
-                                        <span style={styles.metaItem}>
-                                            <TeamOutlined style={styles.metaIcon} />{res.guestCount}명
-                                        </span>
-                                    </div>
+                                    {isWide ? (
+                                        /* PC: 한 줄 */
+                                        <div style={styles.metaRowFlat}>
+                                            <span style={styles.metaItem}><UserOutlined style={styles.metaIcon} />{res.memberName}</span>
+                                            <span style={styles.dot}>·</span>
+                                            <span style={styles.metaItem}><TeamOutlined style={styles.metaIcon} />{res.guestCount}명</span>
+                                            <span style={styles.dot}>·</span>
+                                            <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{res.reservationDate}</span>
+                                            <span style={styles.dot}>·</span>
+                                            <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(res.reservationTime)}</span>
+                                        </div>
+                                    ) : (
+                                        /* 모바일: 2줄 */
+                                        <>
+                                            <div style={styles.metaRow}>
+                                                <span style={styles.metaItem}><UserOutlined style={styles.metaIcon} />{res.memberName}</span>
+                                                <span style={styles.dot}>·</span>
+                                                <span style={styles.metaItem}><TeamOutlined style={styles.metaIcon} />{res.guestCount}명</span>
+                                            </div>
+                                            <div style={styles.metaRow}>
+                                                <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{res.reservationDate}</span>
+                                                <span style={styles.dot}>·</span>
+                                                <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(res.reservationTime)}</span>
+                                            </div>
+                                        </>
+                                    )}
 
-                                    {/* 2행: 날짜 · 시간 */}
-                                    <div style={styles.metaRow}>
-                                        <span style={styles.metaItem}>
-                                            <CalendarOutlined style={styles.metaIcon} />{res.reservationDate}
-                                        </span>
-                                        <span style={styles.dot}>·</span>
-                                        <span style={styles.metaItem}>
-                                            <ClockCircleOutlined style={styles.metaIcon} />{formatTime(res.reservationTime)}
-                                        </span>
-                                    </div>
-
-                                    {/* 3행: 설명 (있을 때만) */}
                                     {res.specialRequest && (
                                         <div style={styles.metaRow}>
-                                            <Text type="secondary" style={styles.special} ellipsis={{ tooltip: res.specialRequest }}>
+                                            <Text type="secondary" style={{ ...styles.special, maxWidth: isWide ? 400 : 200 }} ellipsis={{ tooltip: res.specialRequest }}>
                                                 &quot;{res.specialRequest}&quot;
                                             </Text>
                                         </div>
@@ -166,7 +186,6 @@ const MyReservations = () => {
                                               </Button>
                                     )}
 
-                                    {/* 거절 사유 */}
                                     {res.status === 'REJECTED' && res.rejectionReason && (
                                         <Text type="secondary" style={styles.rejection}>
                                             사유: {res.rejectionReason}
@@ -184,21 +203,24 @@ const MyReservations = () => {
 };
 
 const styles = {
-    title:     { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
-    row:       { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0', cursor: 'pointer' },
-    divider:   { height: 1, background: colors.border?.light || '#f0f0f0' },
-    imgWrap:   { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
-    img:       { width: '100%', height: '100%', objectFit: 'cover' },
-    info:      { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
-    storeName: { fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    metaRow:   { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' },
-    metaItem:  { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary, whiteSpace: 'nowrap' },
-    metaIcon:  { fontSize: 11, color: colors.text.tertiary },
-    dot:       { color: colors.text.tertiary, fontSize: fontSize.xs },
-    special:   { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 200 },
-    right:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
-    price:     { fontSize: fontSize.base, color: colors.text.primary },
-    rejection: { fontSize: fontSize.xs, textAlign: 'left', width: '100%' },
+    title:         { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
+    row:           { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0', cursor: 'pointer' },
+    divider:       { height: 1, background: colors.border?.light || '#f0f0f0' },
+    imgWrap:       { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
+    imgWrapWide:   { width: 72, height: 72, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
+    img:           { width: '100%', height: '100%', objectFit: 'cover' },
+    info:          { flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 },
+    storeName:     { fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
+    storeNameWide: { fontSize: fontSize.lg, color: colors.text.primary, display: 'block', lineHeight: 1.3, fontWeight: fontWeight.semibold },
+    metaRow:       { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' },
+    metaRowFlat:   { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    metaItem:      { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.sm, color: colors.text.secondary, whiteSpace: 'nowrap' },
+    metaIcon:      { fontSize: 12, color: colors.text.tertiary },
+    dot:           { color: colors.text.tertiary, fontSize: fontSize.xs },
+    special:       { fontSize: fontSize.xs, color: colors.text.secondary },
+    right:         { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
+    price:         { fontSize: fontSize.base, color: colors.text.primary },
+    rejection:     { fontSize: fontSize.xs, textAlign: 'left', width: '100%' },
 };
 
 export default MyReservations;

@@ -393,12 +393,16 @@ const AdminPanel = () => {
                 open={detailOpen}
                 onCancel={() => setDetailOpen(false)}
                 footer={
-                    detailItem?.status === 'PENDING'
-                        ? [
-                            <Button key="reject" variant="ghost-sm-danger" onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>거절</Button>,
-                            <Button key="approve" variant="primary" loading={actionLoading} onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>승인</Button>,
-                        ]
-                        : [<Button key="close" variant="secondary" onClick={() => setDetailOpen(false)}>닫기</Button>]
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                        {detailItem?.status === 'PENDING' ? (
+                            <>
+                                <Button variant="ghost-sm-danger" onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>거절</Button>
+                                <Button variant="primary" size="sm" loading={actionLoading} onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>승인</Button>
+                            </>
+                        ) : (
+                            <Button variant="secondary" size="sm" onClick={() => setDetailOpen(false)}>닫기</Button>
+                        )}
+                    </div>
                 }
                 width={560}
                 centered
@@ -487,7 +491,11 @@ const DetailRow = ({ label, children }) => (
 );
 
 const tabLabelStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, lineHeight: 1 };
-const tabBadgeStyle = { display: 'none' };
+const tabBadgeStyle = {
+    background: '#ff4d4f', color: '#fff', borderRadius: 10,
+    padding: '1px 6px', fontSize: 11, fontWeight: 700,
+    lineHeight: '16px', minWidth: 18, textAlign: 'center',
+};
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
 };

@@ -189,7 +189,7 @@ const AdminPanel = () => {
     // ── 사업자 인증 컬럼 ────────────────────────────────────
     const columns = [
         {
-            title: '신청자', key: 'member', width: 160,
+            title: '신청자', key: 'member', width: 180,
             render: (_, r) => (
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm }}>{r.memberName}</Text>
@@ -198,7 +198,7 @@ const AdminPanel = () => {
             ),
         },
         {
-            title: '상호명', dataIndex: 'businessName', key: 'businessName', width: 140,
+            title: '상호명', dataIndex: 'businessName', key: 'businessName', width: 160,
             ellipsis: { showTitle: false },
             render: (v) => (
                 <Tooltip title={v} placement="topLeft">
@@ -207,26 +207,26 @@ const AdminPanel = () => {
             ),
         },
         {
-            title: '사업자번호', dataIndex: 'businessNumber', key: 'businessNumber', width: 130,
+            title: '사업자번호', dataIndex: 'businessNumber', key: 'businessNumber', width: 120,
             render: (v) => v
                 ? <Text code style={{ fontSize: fontSize.xs }}>{v}</Text>
                 : <Text type="secondary" style={{ fontSize: fontSize.xs }}>-</Text>,
         },
         {
-            title: '신청일', dataIndex: 'createdAt', key: 'createdAt', width: 100,
+            title: '신청일', dataIndex: 'createdAt', key: 'createdAt', width: 110,
             render: (v) => v ? v.substring(0, 10) : '-',
         },
         {
-            title: '상태', dataIndex: 'status', key: 'status', width: 90,
+            title: '상태', dataIndex: 'status', key: 'status', width: 80,
             render: (status) => {
                 const cfg = STATUS_CONFIG[status] || { color: 'default', label: status };
                 return <Tag color={cfg.color}>{cfg.label}</Tag>;
             },
         },
         {
-            title: '처리', key: 'actions',
+            title: '처리', key: 'actions', fixed: 'right', width: 140,
             render: (_, r) => (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
                     {r.status === 'PENDING' && (
                         <>
                             <Button variant="ghost-sm-success" loading={actionLoading} onClick={() => handleApprove(r)}>승인</Button>
@@ -270,7 +270,7 @@ const AdminPanel = () => {
         columns,
         rowKey: 'id',
         size: 'middle',
-        scroll: { x: 'max-content' },
+        scroll: { x: 790 }, // 180+160+120+110+80+140 = 790
         pagination: { pageSize: 15, showSizeChanger: false },
     };
 

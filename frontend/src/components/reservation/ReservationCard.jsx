@@ -13,9 +13,21 @@ import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
 const { TextArea } = Input;
 const { Text } = Typography;
 
+// 576px 기준으로 PC/모바일 분기
+const useIsWide = () => {
+    const [wide, setWide] = React.useState(() => window.innerWidth >= 576);
+    React.useEffect(() => {
+        const handler = () => setWide(window.innerWidth >= 576);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+    }, []);
+    return wide;
+};
+
 const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow }) => {
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
+    const isWide = useIsWide();
 
     const { id, memberName, storeName, storeMainImageUrl, reservationDate, reservationTime, guestCount, depositAmount, status, specialRequest } = reservation;
 
@@ -28,41 +40,47 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
         setRejectReason('');
     };
 
+    // PC: 메타 정보를 한 줄로 — 이름 · 명수 · 날짜 · 시간
+    const metaItemsFlat = (
+        <div style={styles.metaRowFlat}>
+            <span style={styles.metaItem}><UserOutlined style={styles.metaIcon} />{memberName}</span>
+            <span style={styles.dot}>·</span>
+            <span style={styles.metaItem}><TeamOutlined style={styles.metaIcon} />{guestCount}명</span>
+            <span style={styles.dot}>·</span>
+            <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{reservationDate}</span>
+            <span style={styles.dot}>·</span>
+            <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(reservationTime)}</span>
+        </div>
+    );
+
+    // 모바일: 기존 2줄 레이아웃
+    const metaItemsStacked = (
+        <>
+            <div style={styles.metaRow}>
+                <span style={styles.metaItem}><UserOutlined style={styles.metaIcon} />{memberName}</span>
+                <span style={styles.dot}>·</span>
+                <span style={styles.metaItem}><TeamOutlined style={styles.metaIcon} />{guestCount}명</span>
+            </div>
+            <div style={styles.metaRow}>
+                <span style={styles.metaItem}><CalendarOutlined style={styles.metaIcon} />{reservationDate}</span>
+                <span style={styles.dot}>·</span>
+                <span style={styles.metaItem}><ClockCircleOutlined style={styles.metaIcon} />{formatTime(reservationTime)}</span>
+            </div>
+        </>
+    );
+
     return (
         <>
             <div style={styles.row}>
                 {/* 이미지 */}
-                <div style={styles.imgWrap}>
+                <div style={isWide ? styles.imgWrapWide : styles.imgWrap}>
                     <img src={getThumbnailUrl(storeMainImageUrl)} alt={storeName} style={styles.img} />
                 </div>
 
                 {/* 정보 */}
                 <div style={styles.info}>
-                    <Text strong style={styles.storeName}>{storeName}</Text>
-
-                    {/* 1행: 이름 · 명수 */}
-                    <div style={styles.metaRow}>
-                        <span style={styles.metaItem}>
-                            <UserOutlined style={styles.metaIcon} />{memberName}
-                        </span>
-                        <span style={styles.dot}>·</span>
-                        <span style={styles.metaItem}>
-                            <TeamOutlined style={styles.metaIcon} />{guestCount}명
-                        </span>
-                    </div>
-
-                    {/* 2행: 날짜 · 시간 */}
-                    <div style={styles.metaRow}>
-                        <span style={styles.metaItem}>
-                            <CalendarOutlined style={styles.metaIcon} />{reservationDate}
-                        </span>
-                        <span style={styles.dot}>·</span>
-                        <span style={styles.metaItem}>
-                            <ClockCircleOutlined style={styles.metaIcon} />{formatTime(reservationTime)}
-                        </span>
-                    </div>
-
-                    {/* 3행: 설명 (있을 때만) */}
+                    <Text strong style={isWide ? styles.storeNameWide : styles.storeName}>{storeName}</Text>
+                    {isWide ? metaItemsFlat : metaItemsStacked}
                     {specialRequest && (
                         <div style={styles.metaRow}>
                             <Text type="secondary" style={styles.special} ellipsis={{ tooltip: specialRequest }}>
@@ -82,7 +100,6 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                                 <>
                                     <Button
                                         variant="ghost-sm-primary"
-                                        icon={<CheckOutlined style={{ fontSize: 11 }} />}
                                         loading={isActing('approve')}
                                         onClick={() => onApprove(id)}
                                     >
@@ -90,7 +107,6 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                                     </Button>
                                     <Button
                                         variant="ghost-sm-danger"
-                                        icon={<CloseOutlined style={{ fontSize: 11 }} />}
                                         loading={isActing('reject')}
                                         onClick={() => setRejectModalOpen(true)}
                                     >
@@ -102,7 +118,6 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                                 <>
                                     <Button
                                         variant="ghost-sm-success"
-                                        icon={<CheckCircleOutlined style={{ fontSize: 11 }} />}
                                         loading={isActing('complete')}
                                         onClick={() => onComplete(id)}
                                     >
@@ -110,7 +125,6 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                                     </Button>
                                     <Button
                                         variant="ghost-sm-danger"
-                                        icon={<WarningOutlined style={{ fontSize: 11 }} />}
                                         loading={isActing('noshow')}
                                         onClick={() => onNoShow(id)}
                                     >
@@ -141,19 +155,22 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
 };
 
 const styles = {
-    row:       { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0' },
-    imgWrap:   { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
-    img:       { width: '100%', height: '100%', objectFit: 'cover' },
-    info:      { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
-    storeName: { fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
-    metaRow:   { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' },
-    metaItem:  { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.xs, color: colors.text.secondary, whiteSpace: 'nowrap' },
-    metaIcon:  { fontSize: 11, color: colors.text.tertiary },
-    dot:       { color: colors.text.tertiary, fontSize: fontSize.xs },
-    special:   { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 200 },
-    right:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
-    price:     { fontSize: fontSize.base, color: colors.text.primary },
-    actionGroup: { display: 'flex', gap: 10 },
+    row:          { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0' },
+    imgWrap:      { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
+    imgWrapWide:  { width: 72, height: 72, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
+    img:          { width: '100%', height: '100%', objectFit: 'cover' },
+    info:         { flex: 1, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 },
+    storeName:    { fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
+    storeNameWide:{ fontSize: fontSize.lg, color: colors.text.primary, display: 'block', lineHeight: 1.3, fontWeight: fontWeight.semibold },
+    metaRow:      { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' },
+    metaRowFlat:  { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    metaItem:     { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.sm, color: colors.text.secondary, whiteSpace: 'nowrap' },
+    metaIcon:     { fontSize: 12, color: colors.text.tertiary },
+    dot:          { color: colors.text.tertiary, fontSize: fontSize.xs },
+    special:      { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 400 },
+    right:        { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
+    price:        { fontSize: fontSize.base, color: colors.text.primary },
+    actionGroup:  { display: 'flex', gap: 10 },
 };
 
 export default ReservationCard;

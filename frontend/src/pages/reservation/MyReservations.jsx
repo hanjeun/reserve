@@ -198,7 +198,7 @@ const styles = {
     special:   { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 200 },
     right:     { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
     price:     { fontSize: fontSize.base, color: colors.text.primary },
-    rejection: { fontSize: fontSize.xs, maxWidth: 100, textAlign: 'right' },
+    rejection: { fontSize: fontSize.xs, textAlign: 'left', width: '100%' },
 };
 
 export default MyReservations;

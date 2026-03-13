@@ -258,13 +258,21 @@ const ForgotPassword = () => {
                 </Form>
 
                 <Flex justify="center" style={{ marginTop: 20 }}>
-                    <Button
-                        variant="link"
+                    <button
                         onClick={() => navigate('/login')}
-                        style={{ fontSize: fontSize.sm, color: colors.text?.tertiary }}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: fontSize.sm,
+                            color: colors.text?.tertiary,
+                            textDecoration: 'underline',
+                            textUnderlineOffset: '3px',
+                            padding: '2px 0',
+                        }}
                     >
                         로그인으로 돌아가기
-                    </Button>
+                    </button>
                 </Flex>
             </div>
         </PageContainer>

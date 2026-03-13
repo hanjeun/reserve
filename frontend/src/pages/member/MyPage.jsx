@@ -189,7 +189,7 @@ const ProfileImageTab = ({ user }) => {
     const previewSrc = pending?.previewUrl ?? user?.profileImage;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
 
             {/* 원형 미리보기 — 클릭 시 파일 선택 */}
             <div
@@ -199,7 +199,7 @@ const ProfileImageTab = ({ user }) => {
                 <Avatar
                     key={previewSrc ?? 'default'}
                     src={previewSrc}
-                    size={110}
+                    size={80}
                     style={pending?.previewUrl ? { animation: animation.scaleSpringIn } : undefined}
                 />
             </div>
@@ -216,7 +216,7 @@ const ProfileImageTab = ({ user }) => {
                 클릭하여 사진 변경
             </Text>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 4 }}>
                 {pending?.file ? (
                     <div style={{ display: 'flex', gap: 8, animation: animation.slideUpIn }}>
                         <Button variant="secondary" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
@@ -238,7 +238,8 @@ const ProfileImageTab = ({ user }) => {
                             color: colors.text.tertiary,
                             textDecoration: 'underline',
                             textUnderlineOffset: '3px',
-                            padding: '4px 0',
+                            padding: '2px 0',
+                            marginTop: -2,
                             opacity: loading ? 0.5 : 1,
                         }}
                     >

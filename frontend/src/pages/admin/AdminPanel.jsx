@@ -236,7 +236,9 @@ const AdminPanel = () => {
                     {r.status === 'APPROVED' && (
                         <Button variant="ghost-sm-danger" loading={actionLoading} onClick={() => handleRevoke(r)}>자격취소</Button>
                     )}
-                    <Button variant="ghost-sm-primary" onClick={() => openDetail(r)}>상세보기</Button>
+                    <span style={{ marginLeft: 6 }}>
+                        <Button variant="ghost-sm-primary" onClick={() => openDetail(r)}>상세보기</Button>
+                    </span>
                 </div>
             ),
         },
@@ -278,10 +280,7 @@ const AdminPanel = () => {
         {
             key: 'pending',
             label: (
-                <span style={tabLabelStyle}>
-                    <IdcardOutlined />
-                    <span>대기 중</span>
-                </span>
+                <span style={tabLabelStyle}><IdcardOutlined /><span>대기 중</span></span>
             ),
             children: (
                 <>

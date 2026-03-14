@@ -20,18 +20,17 @@ const useAuthStore = create(
             },
 
             /**
-             * ?�증 ?�태 ?�인
-             * @param {boolean} force - true�?isLoggedIn ?�태?� 관계없???�버???�청
-             * 
-             * ?�나리오:
-             * 1. ???�작 ??force=true�??�출 ???�버??무조�??�청
-             * 2. access_token 만료 ??401 발생 ??axios ?�터?�터가 /refresh ?�출
-             * 3. refresh_token?�로 ??access_token 발급 ???�래 ?�청 ?�시??
-             * 4. refresh_token??만료 ??로그?�웃 처리
+             * 인증 상태 확인
+             * @param {boolean} force - true면 isLoggedIn 상태에 관계없이 서버에 요청
+             *
+             * 시나리오:
+             * 1. 앱 시작 시 force=true로 호출 → 서버에 무조건 요청
+             * 2. access_token 만료 시 401 발생 → axios 인터셉터가 /refresh 호출
+             * 3. refresh_token으로 새 access_token 발급 → 원래 요청 재시도
+             * 4. refresh_token도 만료 → 로그아웃 처리
              */
             checkAuth: async (force = false) => {
-                // localStorage??로그???�태가 ?�고, 강제 ?�행???�니�??�킵
-                // ?? ???�작 ?�에??force=true�??�출?�여 refresh_token?�로 복구 ?�도
+                // localStorage에 로그인 상태가 없고, 강제 실행이 아니면 스킵
                 if (!get().isLoggedIn && !force) {
                     return null;
                 }
@@ -47,16 +46,16 @@ const useAuthStore = create(
                     set({ user: null, isLoggedIn: false });
                     return null;
                 } catch {
-                    // 401 ?�러 ??axios ?�터?�터가 refresh�??�도?�고,
-                    // 그것???�패?�면 ?�기�???
+                    // 401 에러 시 axios 인터셉터가 refresh를 시도하고,
+                    // 그것도 실패하면 여기로 옴
                     set({ user: null, isLoggedIn: false });
                     return null;
                 }
             },
 
             /**
-             * ??초기?????�증 ?�태 복구 ?�도
-             * refresh_token??쿠키???�으�??�동 로그??
+             * 앱 초기화 시 인증 상태 복구 시도
+             * refresh_token이 쿠키에 있으면 자동 로그인
              */
             initializeAuth: async () => {
                 try {
@@ -68,8 +67,8 @@ const useAuthStore = create(
                     set({ user: null, isLoggedIn: false });
                     return null;
                 } catch {
-                    // 비로그인 ?�태 (refresh ?�패 ?�함)
-                    // localStorage??interceptor?�서 ?��??��?�??�기?�는 Zustand ?�태�??�리
+                    // 비로그인 상태 (refresh 실패 포함)
+                    // localStorage는 interceptor에서 정리하고, Zustand 상태만 정리
                     set({ user: null, isLoggedIn: false });
                     return null;
                 }
@@ -77,8 +76,13 @@ const useAuthStore = create(
         }),
         {
             name: 'auth-storage',
+            // 이슈3: UI 표시용 최소 정보만 localStorage에 저장
+            // 실제 인증/권한 검증은 100% 쿠키 토큰에 위임
             partialize: (state) => ({
-                user: state.user,
+                user: state.user ? {
+                    name: state.user.name,
+                    role: state.user.role,
+                } : null,
                 isLoggedIn: state.isLoggedIn,
             }),
         }

@@ -270,7 +270,7 @@ const AdminPanel = () => {
         columns,
         rowKey: 'id',
         size: 'middle',
-        scroll: { x: 790 }, // 180+160+120+110+80+140 = 790
+        scroll: { x: 'max-content' },
         pagination: { pageSize: 15, showSizeChanger: false },
     };
 
@@ -278,10 +278,7 @@ const AdminPanel = () => {
         {
             key: 'pending',
             label: (
-                <span style={tabLabelStyle}>
-                    <IdcardOutlined />
-                    <span>대기 중</span>
-                </span>
+                <span style={tabLabelStyle}><IdcardOutlined /><span>대기 중</span></span>
             ),
             children: (
                 <>

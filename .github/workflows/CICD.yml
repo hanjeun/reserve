@@ -67,7 +67,7 @@ jobs:
         working-directory: frontend
         run: |
           cat > .env.production << EOF
-          VITE_API_BASE_URL=https://reserve.hktech.kr
+          VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
           VITE_PORTONE_CHANNEL_KEY=${{ secrets.VITE_PORTONE_CHANNEL_KEY }}
           VITE_SKELETON_DELAY=0
           EOF

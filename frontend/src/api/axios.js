@@ -2,7 +2,7 @@ import axios from 'axios';
 import { skeletonDelayInterceptor } from '../utils/skeletonDelay';
 
 const instance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+    baseURL: import.meta.env.VITE_API_BASE_URL,
     withCredentials: true,  // 쿠키 자동 전송 (access_token, refresh_token)
     timeout: 10000,
 });

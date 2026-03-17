@@ -3,13 +3,10 @@ import { Typography, Divider, Form, Tabs, Switch } from 'antd';
 import {
     LockOutlined,
     ExclamationCircleOutlined,
-    SafetyOutlined,
     CameraOutlined,
     UserOutlined,
     ShopOutlined,
     ClockCircleOutlined,
-    CheckCircleOutlined,
-    CloseCircleOutlined,
     UploadOutlined,
 } from '@ant-design/icons';
 import { PageContainer, Button, FormInput, Avatar, Bone } from '../../components/common';
@@ -80,7 +77,6 @@ const PasswordTab = () => {
     return (
         <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
             <div style={styles.securityNotice}>
-                <SafetyOutlined style={{ color: colors.primary.main, fontSize: 13, flexShrink: 0 }} />
                 <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
                     영문+숫자 조합 8자 이상을 권장해요
                 </Text>
@@ -355,7 +351,6 @@ const BusinessTab = ({ user }) => {
     if (isBusiness) return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={bizStyles.statusCard('success')}>
-                <CheckCircleOutlined style={{ fontSize: 20, color: colors.success.main }} />
                 <div>
                     <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>파트너 사장님으로 활동 중이에요</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>가게 등록 및 예약 관리 기능을 이용할 수 있습니다</Text>
@@ -394,7 +389,6 @@ const BusinessTab = ({ user }) => {
     if (status === 'REJECTED') return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={bizStyles.statusCard('error')}>
-                <CloseCircleOutlined style={{ fontSize: 20, color: colors.error.main }} />
                 <div>
                     <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>인증이 거절되었습니다</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>내용을 수정하여 다시 신청할 수 있습니다</Text>
@@ -424,7 +418,6 @@ const BusinessTab = ({ user }) => {
 const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, onFileChange, onSubmit, loading }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={bizStyles.infoNotice}>
-            <SafetyOutlined style={{ color: colors.primary.main, fontSize: 13, flexShrink: 0 }} />
             <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
                 사업자 등록증으로 간단히 인증하고 가게를 등록해보세요
             </Text>

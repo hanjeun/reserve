@@ -61,7 +61,6 @@ export const API_ENDPOINTS = {
         // 관리자 전용
         ADMIN_PENDING:       '/api/business-verification/admin/pending',
         ADMIN_LIST:          '/api/business-verification/admin/list',
-        ADMIN_PENDING_COUNT: '/api/business-verification/admin/pending-count',
         ADMIN_DETAIL:        (id) => `/api/business-verification/admin/${id}`,
         ADMIN_APPROVE:       (id) => `/api/business-verification/admin/${id}/approve`,
         ADMIN_REJECT:        (id) => `/api/business-verification/admin/${id}/reject`,

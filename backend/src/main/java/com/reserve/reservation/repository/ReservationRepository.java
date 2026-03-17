@@ -45,13 +45,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     Page<Reservation> findAllWithStoreAndMemberPaged(Pageable pageable);
 
     /**
-     * ADMIN 전용: 전체 예약 목록 조회 (최신순) - store, member fetch join으로 N+1 방지
-     * @deprecated 데이터 많을 때 성능 저하 우려. 가능하면 findAllWithStoreAndMemberPaged 사용.
-     */
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member ORDER BY r.createdAt DESC")
-    List<Reservation> findAllWithStoreAndMember();
-
-    /**
      * 특정 가게의 예약 내역 조회 (최신순) - member fetch join으로 N+1 방지
      */
     @Query("SELECT r FROM Reservation r JOIN FETCH r.member WHERE r.store = :store ORDER BY r.createdAt DESC")

@@ -49,7 +49,7 @@ const AdminPanel = () => {
     const [activeTab, setActiveTab]       = useState('pending');
     const [pendingList, setPendingList]   = useState([]);
     const [allList, setAllList]           = useState([]);
-    const [pendingCount, setPendingCount] = useState(0);
+
     const [loading, setLoading]           = useState(true);
 
     const [detailItem, setDetailItem] = useState(null);
@@ -85,14 +85,13 @@ const AdminPanel = () => {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [pending, all, count] = await Promise.all([
+            const [pending, all] = await Promise.all([
                 api.get(API_ENDPOINTS.BUSINESS.ADMIN_PENDING, { params: { page: 0, size: 100 } }),
                 api.get(API_ENDPOINTS.BUSINESS.ADMIN_LIST,    { params: { page: 0, size: 100 } }),
-                api.get(API_ENDPOINTS.BUSINESS.ADMIN_PENDING_COUNT),
             ]);
             setPendingList(pending?.content || []);
             setAllList(all?.content || []);
-            setPendingCount(typeof count === 'number' ? count : 0);
+
         } catch {
             message.error('목록을 불러오는데 실패했습니다.');
         } finally {
@@ -270,7 +269,7 @@ const AdminPanel = () => {
         columns,
         rowKey: 'id',
         size: 'middle',
-        scroll: { x: 'max-content' },
+        scroll: { x: 790 },
         pagination: { pageSize: 15, showSizeChanger: false },
     };
 
@@ -278,7 +277,7 @@ const AdminPanel = () => {
         {
             key: 'pending',
             label: (
-                <span style={tabLabelStyle}><IdcardOutlined /><span>대기 중</span></span>
+                <span><IdcardOutlined style={{ marginRight: 6 }} />대기 중</span>
             ),
             children: (
                 <>
@@ -292,9 +291,7 @@ const AdminPanel = () => {
         {
             key: 'all',
             label: (
-                <span style={tabLabelStyle}>
-                    <SafetyCertificateOutlined /> 전체 목록
-                </span>
+                <span><SafetyCertificateOutlined style={{ marginRight: 6 }} />전체 목록</span>
             ),
             children: (
                 <>
@@ -308,9 +305,7 @@ const AdminPanel = () => {
         {
             key: 'reservations',
             label: (
-                <span style={tabLabelStyle}>
-                    <CalendarOutlined /> 전체 예약
-                </span>
+                <span><CalendarOutlined style={{ marginRight: 6 }} />전체 예약</span>
             ),
             children: (
                 <>
@@ -487,8 +482,7 @@ const DetailRow = ({ label, children }) => (
     </div>
 );
 
-const tabLabelStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, lineHeight: 1 };
-const tabBadgeStyle = {}; // 미사용
+
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
 };

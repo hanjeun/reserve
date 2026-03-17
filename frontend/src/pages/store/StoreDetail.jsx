@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Image, Typography, Form, Carousel, Divider } from 'antd';
@@ -20,7 +20,7 @@ import { VALIDATION_RULES } from '../../utils/validation';
 
 const { Title, Text } = Typography;
 
-// ??? 諛섏쓳??釉뚮젅?댄겕?ъ씤??????????????????
+// 반응형 브레이크포인트
 const BREAKPOINT = 900;
 const useIsPC = () => {
     const [isPC, setIsPC] = React.useState(
@@ -68,13 +68,13 @@ const customStyles = `
   .slick-slide[aria-hidden="true"] * { pointer-events: none; }
 `;
 
-// ??? ?몄썝 ???ㅽ뀦????????????????????????
+// 인원 수 입력 스텝퍼
 const GuestCountInput = ({ value = 1, onChange }) => {
     const dec = () => { if (value > 1) onChange?.(value - 1); };
     const inc = () => { if (value < 99) onChange?.(value + 1); };
     return (
         <div style={inputStyles.wrapper}>
-            <span style={inputStyles.count}>{value}紐?/span>
+            <span style={inputStyles.count}>{value}명</span>
             <div style={inputStyles.btnGroup}>
                 <button type="button" onClick={dec} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : 1 }}>
                     <MinusOutlined style={{ fontSize: 12 }} />
@@ -103,55 +103,55 @@ const inputStyles = {
     },
 };
 
-// ??? 媛寃??댁쁺 ?뺣낫 ?뱀뀡 ??????????????????
+// 가게 상세 정보 섹션
 const StoreInfoSection = ({ store, description }) => {
     const rows = [];
 
     if (store.openTime && store.closeTime) {
         rows.push({
-            Icon: ClockCircleOutlined, label: '?곸뾽 ?쒓컙',
+            Icon: ClockCircleOutlined, label: '영업 시간',
             value: `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}`,
         });
     }
     if (store.noShowDeposit > 0) {
         rows.push({
-            Icon: CreditCardOutlined, label: '?몄눥 ?덉빟湲?,
-            value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}??(?덉빟 ??寃곗젣)`,
+            Icon: CreditCardOutlined, label: '노쇼 예약금',
+            value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}원 (예약 후 결제)`,
             highlight: true,
         });
     }
     const hasRefundPolicy = store.fullRefundDays > 0 || store.partialRefundDays > 0;
     if (store.noShowDeposit > 0 && hasRefundPolicy) {
         const parts = [];
-        if (store.fullRefundDays > 0) parts.push(`諛⑸Ц ${store.fullRefundDays}???꾧퉴吏 ?꾩븸 ?섎텋`);
+        if (store.fullRefundDays > 0) parts.push(`방문 ${store.fullRefundDays}일 전까지 전액 환불`);
         if (store.partialRefundDays > 0 && store.partialRefundRate > 0)
-            parts.push(`諛⑸Ц ${store.partialRefundDays}???꾧퉴吏 ${store.partialRefundRate}% ?섎텋`);
-        parts.push('?댄썑 ?섎텋 遺덇?');
-        rows.push({ Icon: RollbackOutlined, label: '?섎텋 ?뺤콉', value: parts, isMultiLine: true });
+            parts.push(`방문 ${store.partialRefundDays}일 전까지 ${store.partialRefundRate}% 환불`);
+        parts.push('이후 환불 불가');
+        rows.push({ Icon: RollbackOutlined, label: '환불 정책', value: parts, isMultiLine: true });
     }
     if (store.bookingDeadlineHours > 0) {
         rows.push({
-            Icon: FieldTimeOutlined, label: '?덉빟 留덇컧',
-            value: `諛⑸Ц ${store.bookingDeadlineHours}?쒓컙 ?꾧퉴吏 ?덉빟 媛??,
+            Icon: FieldTimeOutlined, label: '예약 마감',
+            value: `방문 ${store.bookingDeadlineHours}시간 전까지 예약 가능`,
         });
     }
     if (store.noShowDeposit > 0 && store.paymentTimeoutMinutes > 0) {
         const ptMin = store.paymentTimeoutMinutes;
-        const ptLabel = ptMin < 60 ? `${ptMin}遺?
-            : ptMin % 60 === 0 ? `${ptMin / 60}?쒓컙`
-            : `${Math.floor(ptMin / 60)}?쒓컙 ${ptMin % 60}遺?;
+        const ptLabel = ptMin < 60 ? `${ptMin}분`
+            : ptMin % 60 === 0 ? `${ptMin / 60}시간`
+            : `${Math.floor(ptMin / 60)}시간 ${ptMin % 60}분`;
         rows.push({
-            Icon: ThunderboltOutlined, label: '寃곗젣 留덇컧',
-            value: `?덉빟 ??${ptLabel} ?대궡 誘멸껐?????먮룞 痍⑥냼`,
+            Icon: ThunderboltOutlined, label: '결제 마감',
+            value: `예약 후 ${ptLabel} 이내 미결제 시 자동 취소`,
         });
     }
     const slotMin = store.reservationSlotMinutes ?? 30;
-    const slotLabel = slotMin < 60 ? `${slotMin}遺?
-        : slotMin % 60 === 0 ? `${slotMin / 60}?쒓컙`
-        : `${Math.floor(slotMin / 60)}?쒓컙 ${slotMin % 60}遺?;
-    rows.push({ Icon: HourglassOutlined, label: '?덉빟 ?⑥쐞', value: `${slotLabel} ?⑥쐞濡??덉빟 媛?? });
+    const slotLabel = slotMin < 60 ? `${slotMin}분`
+        : slotMin % 60 === 0 ? `${slotMin / 60}시간`
+        : `${Math.floor(slotMin / 60)}시간 ${slotMin % 60}분`;
+    rows.push({ Icon: HourglassOutlined, label: '예약 단위', value: `${slotLabel} 단위로 예약 가능` });
     if (store.maxCapacityPerSlot > 0) {
-        rows.push({ Icon: TeamOutlined, label: '?숈떆媛꾨? 理쒕?', value: `${store.maxCapacityPerSlot}紐? });
+        rows.push({ Icon: TeamOutlined, label: '최대 인원', value: `${store.maxCapacityPerSlot}명` });
     }
 
     if (rows.length === 0 && !description) return null;
@@ -162,7 +162,7 @@ const StoreInfoSection = ({ store, description }) => {
                 <>
                     <div style={infoStyles.row}>
                         <FileTextOutlined style={infoStyles.icon} />
-                        <span style={infoStyles.label}>?뚭컻</span>
+                        <span style={infoStyles.label}>소개</span>
                         <div style={infoStyles.value}>{description}</div>
                     </div>
                     {rows.length > 0 && <div style={infoStyles.divider} />}
@@ -198,37 +198,37 @@ const infoStyles = {
     divider: { height: 1, background: colors.border.light },
 };
 
-// ??? ?덉빟 ???⑤꼸 (PC??sticky ?ъ씠?쒕컮 / 紐⑤컮?쇱슜 ?섎떒 ?뱀뀡) ??
+// 예약 폼 패널 (PC: sticky 사이드바 / 모바일용 하단 섹션)
 const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => (
     <div style={isPC ? pcFormStyles.panel : {}}>
         <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
-            ?ㅼ떆媛??덉빟?섍린
+            예약하기
         </Title>
         <Form form={form} layout="vertical" onFinish={onFinish}
             initialValues={{ guestCount: 1 }} requiredMark={false}
             style={{ fontWeight: fontWeight.medium }}>
-            <Form.Item label="?덉빟 ?좎쭨" name="reservationDate"
-                rules={[{ required: true, message: '?좎쭨瑜??좏깮?댁＜?몄슂.' }]}>
-                <FormDatePicker placeholder="?좎쭨 ?좏깮"
+            <Form.Item label="예약 날짜" name="reservationDate"
+                rules={[{ required: true, message: '날짜를 선택해주세요.' }]}>
+                <FormDatePicker placeholder="날짜 선택"
                     disabledDate={(d) => d && d.isBefore(dayjs().startOf('day'))} />
             </Form.Item>
-            <Form.Item label="?덉빟 ?쒓컙" name="reservationTime"
-                rules={[{ required: true, message: '?쒓컙???좏깮?댁＜?몄슂.' }]}>
+            <Form.Item label="예약 시간" name="reservationTime"
+                rules={[{ required: true, message: '시간을 선택해주세요.' }]}>
                 <FormTimePicker
                     placeholder={store?.openTime && store?.closeTime
-                        ? `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}` : '?쒓컙 ?좏깮'}
+                        ? `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}` : '시간 선택'}
                     hideDisabledOptions
                     minuteStep={store?.reservationSlotMinutes ?? 30} />
             </Form.Item>
-            <Form.Item label="?몄썝 ?? name="guestCount" rules={VALIDATION_RULES.guestCount}>
+            <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
                 <GuestCountInput />
             </Form.Item>
-            <Form.Item label="?붿껌 ?ы빆" name="specialRequest">
-                <FormTextArea rows={3} placeholder="?붿껌 ?ы빆???낅젰?섏꽭??" />
+            <Form.Item label="요청 사항" name="specialRequest">
+                <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." />
             </Form.Item>
             <div style={{ marginTop: 24 }}>
                 <Button variant="primary" htmlType="submit" block loading={paying}>
-                    {paying ? '寃곗젣 吏꾪뻾 以?..' : '?덉빟 ?좎껌?섍린'}
+                    {paying ? '결제 진행 중...' : '예약 신청하기'}
                 </Button>
             </div>
         </Form>
@@ -247,7 +247,7 @@ const pcFormStyles = {
     },
 };
 
-// ??? 硫붿씤 而댄룷?뚰듃 ????????????????????????
+// 메인 컴포넌트
 const StoreDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -269,7 +269,7 @@ const StoreDetail = () => {
         if (error) message.error(error);
     }, [error]); // eslint-disable-line
 
-    // 李?珥덇린 ?곹깭 濡쒕뵫 (濡쒓렇???щ? 臾닿??섍쾶 ?뺤씤 媛??
+    // 찜 초기 상태 로딩 (비로그인 상태에서도 확인 가능)
     React.useEffect(() => {
         favoriteService.getStatus(Number(id))
             .then(res => setFavoriteStatus(res?.isFavorite ?? false))
@@ -294,16 +294,20 @@ const StoreDetail = () => {
     }, [stateOpenWrite, stateOpenReviewId]); // eslint-disable-line
 
     const onFinish = async (values) => {
-        if (!isLoggedIn) { message.warning('濡쒓렇?몄씠 ?꾩슂???쒕퉬?ㅼ엯?덈떎.'); navigate('/login'); return; }
+        if (!isLoggedIn) {
+            message.warning('로그인이 필요한 서비스입니다.');
+            navigate('/login', { state: { from: { pathname: `/store/${id}` } } });
+            return;
+        }
         const dt = values.reservationDate
             .hour(values.reservationTime.hour()).minute(values.reservationTime.minute()).second(0).millisecond(0);
         if (dt.isBefore(dayjs())) {
-            form.setFields([{ name: 'reservationTime', errors: ['?대? 吏?섍컙 ?쒓컙?낅땲??'] }]); return;
+            form.setFields([{ name: 'reservationTime', errors: ['이미 지난 시간입니다.'] }]); return;
         }
         if (store?.openTime && store?.closeTime) {
             const t = values.reservationTime.format('HH:mm');
             if (t < store.openTime.substring(0, 5) || t > store.closeTime.substring(0, 5)) {
-                form.setFields([{ name: 'reservationTime', errors: [`?곸뾽?쒓컙(${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}) ?댁뿉???좏깮?댁＜?몄슂.`] }]); return;
+                form.setFields([{ name: 'reservationTime', errors: [`영업시간(${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}) 내에서 선택해주세요.`] }]); return;
             }
         }
         try {
@@ -317,10 +321,10 @@ const StoreDetail = () => {
             });
             if (reservation?.depositAmount > 0) {
                 if (store?.allowLatePayment) {
-                    message.success({ content: `?덉빟???꾨즺?섏뿀?듬땲?? ?덉빟湲?${Number(reservation.depositAmount).toLocaleString('ko-KR')}??? ?섏쨷??寃곗젣?댁＜?몄슂.`, duration: 4 });
+                    message.success({ content: `예약이 완료되었습니다. 예약금 ${Number(reservation.depositAmount).toLocaleString('ko-KR')}원을 나중에 결제해주세요.`, duration: 4 });
                     navigate('/my-reservations');
                 } else {
-                    message.info({ content: '?덉빟???묒닔?섏뿀?듬땲?? ?몄눥 ?덉빟湲덉쓣 寃곗젣?댁＜?몄슂.', duration: 3 });
+                    message.info({ content: '예약이 접수되었습니다. 노쇼 예약금을 결제해주세요.', duration: 3 });
                     await pay(
                         { id: reservation.id, storeName: store?.name, depositAmount: reservation.depositAmount },
                         { name: user?.name, email: user?.email, phone: user?.phone }
@@ -328,10 +332,10 @@ const StoreDetail = () => {
                 }
                 return;
             }
-            message.success('?덉빟???꾨즺?섏뿀?듬땲??');
+            message.success('예약이 완료되었습니다.');
             navigate('/my-reservations');
         } catch (err) {
-            message.error({ content: typeof err === 'string' ? err : '?덉빟???ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄?댁＜?몄슂.', duration: 5 });
+            message.error({ content: typeof err === 'string' ? err : '예약에 실패했습니다. 다시 시도해주세요.', duration: 5 });
         }
     };
 
@@ -340,7 +344,7 @@ const StoreDetail = () => {
             <StoreDetailSkeleton />
         </PageContainer>
     );
-    if (!store) return <div style={{ textAlign: 'center', marginTop: 100 }}>?곗씠?곌? ?놁뒿?덈떎.</div>;
+    if (!store) return <div style={{ textAlign: 'center', marginTop: 100 }}>데이터가 없습니다.</div>;
 
     const sliderImages = store.detailImageUrls?.length > 0 ? store.detailImageUrls : [store.mainImageUrl];
     const containerSize = isPC ? 'xl' : 'md';
@@ -349,16 +353,17 @@ const StoreDetail = () => {
         <PageContainer size={containerSize} paddingTop={isPC ? '32px' : '20px'}>
             <style>{customStyles}</style>
 
-            {/* ?ㅻ줈媛湲?*/}
+            {/* 뒤로가기 */}
             <Button variant="ghost" onClick={() => navigate(-1)} style={styles.backBtn}>
-                <ArrowLeftOutlined style={{ fontSize: 14 }} /> ?ㅻ줈媛湲?            </Button>
+                <ArrowLeftOutlined style={{ fontSize: 14 }} /> 뒤로가기
+            </Button>
 
             {isPC ? (
-                /* ?먥븧?먥븧 PC: ?쇱そ 肄섑뀗痢?/ ?ㅻⅨ履??덉빟???먥븧?먥븧 */
+                /* PC: 좌측 콘텐츠 / 우측 예약폼 */
                 <div style={styles.pcGrid}>
-                    {/* ?쇱そ */}
+                    {/* 좌측 */}
                     <div style={styles.pcLeft}>
-                        {/* ?대?吏 罹먮윭? + 李?踰꾪듉 */}
+                        {/* 이미지 슬라이더 + 찜 버튼 */}
                         <div style={{ position: 'relative' }}>
                             <div style={styles.pcImageWrapper}>
                                 <Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
@@ -366,7 +371,7 @@ const StoreDetail = () => {
                                         <div key={i}>
                                             <Image src={getDetailImageUrl(img)} alt={`${store.name}-${i}`}
                                                 width="100%" style={styles.pcMainImg}
-                                                preview={{ mask: '?대┃?댁꽌 ?뺣?' }} />
+                                                preview={{ mask: '크게 보기' }} />
                                         </div>
                                     ))}
                                 </Carousel>
@@ -376,17 +381,17 @@ const StoreDetail = () => {
                             </div>
                         </div>
 
-                        {/* 媛寃뚮챸 */}
+                        {/* 가게명 */}
                         <Title level={1} style={styles.storeTitle}>{store.name}</Title>
 
-                        {/* ?댁쁺 ?뺣낫 */}
+                        {/* 상세 정보 */}
                         <StoreInfoSection store={store} description={store.description} />
 
                         <Divider style={styles.divider} />
 
-                        {/* 由щ럭 */}
+                        {/* 리뷰 */}
                         <section ref={reviewSectionRef} style={{ maxWidth: 540 }}>
-                            <Title level={3} style={styles.sectionTitle}>由щ럭</Title>
+                            <Title level={3} style={styles.sectionTitle}>리뷰</Title>
                             <ReviewList
                                 storeId={Number(id)}
                                 completedReservation={completedReservation}
@@ -396,7 +401,7 @@ const StoreDetail = () => {
                         </section>
                     </div>
 
-                    {/* ?ㅻⅨ履? sticky ?덉빟??*/}
+                    {/* 우측 sticky 예약폼 */}
                     <div style={styles.pcRight}>
                         <ReservationPanel
                             store={store} form={form} onFinish={onFinish}
@@ -404,7 +409,7 @@ const StoreDetail = () => {
                     </div>
                 </div>
             ) : (
-                /* ?먥븧?먥븧 紐⑤컮?? ?⑥씪 而щ읆 ?먥븧?먥븧 */
+                /* 모바일: 일렬 배치 */
                 <>
                     <section style={{ padding: 0 }}>
                         <div style={{ position: 'relative' }}>
@@ -414,7 +419,7 @@ const StoreDetail = () => {
                                         <div key={i}>
                                             <Image src={getDetailImageUrl(img)} alt={`${store.name}-${i}`}
                                                 width="100%" style={styles.mainImg}
-                                                preview={{ mask: '?대┃?댁꽌 ?뺣?' }} />
+                                                preview={{ mask: '크게 보기' }} />
                                         </div>
                                     ))}
                                 </Carousel>
@@ -443,7 +448,7 @@ const StoreDetail = () => {
                     <Divider style={styles.divider} />
 
                     <section ref={reviewSectionRef} style={{ padding: '0 16px' }}>
-                        <Title level={3} style={styles.sectionTitle}>由щ럭</Title>
+                        <Title level={3} style={styles.sectionTitle}>리뷰</Title>
                         <ReviewList
                             storeId={Number(id)}
                             completedReservation={completedReservation}
@@ -464,7 +469,7 @@ const styles = {
     sectionTitle: { marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold },
     mainImg: { width: '100%', height: 'auto', display: 'block' },
 
-    // PC ?꾩슜
+    // PC 전용
     pcGrid: {
         display: 'flex',
         gap: 36,
@@ -495,7 +500,7 @@ const styles = {
         display: 'block',
     },
 
-    // 紐⑤컮???꾩슜
+    // 모바일 전용
     mobileImageWrapper: {
         width: '100%',
         overflow: 'hidden',

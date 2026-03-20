@@ -14,6 +14,16 @@ const OAuthCallback = () => {
         if (hasCalled.current) return;
         hasCalled.current = true;
 
+        // OAuth2 실패 콜백 체크 (FailureHandler가 ?error=oauth2&message=... 형식으로 보냄)
+        const params = new URLSearchParams(window.location.search);
+        const oauthError = params.get('error');
+        const oauthMessage = params.get('message');
+        if (oauthError === 'oauth2' && oauthMessage) {
+            message.error(decodeURIComponent(oauthMessage));
+            navigate('/login', { replace: true });
+            return;
+        }
+
         const finalizeLogin = async () => {
             try {
                 const user = await checkAuth(true);
@@ -31,7 +41,7 @@ const OAuthCallback = () => {
             }
         };
         finalizeLogin();
-    }, [checkAuth, navigate]);
+    }, [checkAuth, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return <Loading fullPage />;
 };

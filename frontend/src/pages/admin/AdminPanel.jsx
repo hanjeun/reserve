@@ -72,8 +72,10 @@ const AdminPanel = () => {
         if (!force && resLoaded) return;
         setResLoading(true);
         try {
-            const data = await api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS);
-            setAllReservations(Array.isArray(data) ? data : []);
+            const data = await api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, { params: { page: 0, size: 100 } });
+            // Page 객체로 오는 경우 content 추출, 배열로 오는 경우 그대로 사용
+            const list = Array.isArray(data) ? data : (data?.content ?? []);
+            setAllReservations(list);
             setResLoaded(true);
         } catch {
             message.error('예약 목록을 불러오지 못했습니다.');

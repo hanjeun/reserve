@@ -59,6 +59,7 @@ public class SecurityConfig {
                         // 공개 API (인증 불필요) - GET만 허용, CUD는 인증 필요
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/stores/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/favorites/status/**").permitAll()
 
                         // 예약 - 공개 조회만 허용, 나머지는 인증 필요
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/{id}").authenticated()

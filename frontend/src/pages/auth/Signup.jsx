@@ -45,8 +45,7 @@ const Signup = () => {
                 email:    values.email.trim(),
                 password: values.password,
             });
-            message.success("회원가입 완료!");
-            navigate('/login');
+            navigate('/login', { state: { signupSuccess: true } });
         } catch (err) {
             if (err?.isSessionExpired) return;
             const msg = typeof err === 'string' ? err : err?.message;

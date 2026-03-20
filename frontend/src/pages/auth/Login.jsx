@@ -45,12 +45,30 @@ const Login = () => {
         if (hasHandledRef.current) return;
         if (isLoggedIn) { navigate('/', { replace: true }); return; }
 
+        if (location.state?.signupSuccess) {
+            hasHandledRef.current = true;
+            message.success('회원가입이 완료되었습니다! 로그인해주세요.');
+            navigate('/login', { replace: true, state: {} });
+            return;
+        }
+
         if (location.state?.prevented) {
             hasHandledRef.current = true;
-            message.warning("로그인이 필요한 서비스입니다.");
+            message.warning('로그인이 필요한 서비스입니다.');
             navigate('/login', { replace: true, state: {} });
+            return;
         }
-    }, [isLoggedIn, location.state, navigate, message]);
+
+        // OAuth2 에러 메시지 처리
+        const params = new URLSearchParams(location.search);
+        const oauthError = params.get('error');
+        const oauthMessage = params.get('message');
+        if (oauthError === 'oauth2' && oauthMessage) {
+            hasHandledRef.current = true;
+            message.error(decodeURIComponent(oauthMessage));
+            navigate('/login', { replace: true });
+        }
+    }, [isLoggedIn, location.state, location.search, navigate, message]);
 
     const onLoginSubmit = async (values) => {
         setLoading(true);

@@ -76,12 +76,16 @@ const useAuthStore = create(
         }),
         {
             name: 'auth-storage',
-            // 이슈3: UI 표시용 최소 정보만 localStorage에 저장
+            // localStorage에는 UI 표시용 데이터만 저장 (password 제외)
             // 실제 인증/권한 검증은 100% 쿠키 토큰에 위임
             partialize: (state) => ({
                 user: state.user ? {
-                    name: state.user.name,
-                    role: state.user.role,
+                    name:  state.user.name,
+                    email: state.user.email,
+                    role:  state.user.role,
+                    profileImage: state.user.profileImage,
+                    emailNotificationEnabled: state.user.emailNotificationEnabled,
+                    phone: state.user.phone,
                 } : null,
                 isLoggedIn: state.isLoggedIn,
             }),

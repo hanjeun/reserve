@@ -1,18 +1,15 @@
 import api from '../api/axios';
 import { API_ENDPOINTS } from '../constants';
 
-class StoreService {
-    async createStore(formData)              { return await api.post(API_ENDPOINTS.STORE.CREATE, formData); }
-    async updateStore(storeId, formData)     { return await api.put(API_ENDPOINTS.STORE.UPDATE(storeId), formData); }
-    async deleteStore(storeId, force = false) { await api.delete(API_ENDPOINTS.STORE.DELETE(storeId), { params: { force } }); }
-    async getActiveReservationsCount(storeId)  { return await api.get(`/api/stores/${storeId}/active-reservations-count`); }
-    async getStores(params = {})             { return await api.get(API_ENDPOINTS.STORE.LIST, { params }); }
-    async getStoreById(storeId)              { return await api.get(API_ENDPOINTS.STORE.DETAIL(storeId)); }
-    async getMyStores()                      { return await api.get(API_ENDPOINTS.STORE.MY_STORES); }
+const storeService = {
+    createStore:              (formData)          => api.post(API_ENDPOINTS.STORE.CREATE, formData),
+    updateStore:              (storeId, formData) => api.put(API_ENDPOINTS.STORE.UPDATE(storeId), formData),
+    deleteStore:              (storeId, force = false) => api.delete(API_ENDPOINTS.STORE.DELETE(storeId), { params: { force } }),
+    getActiveReservationsCount:(storeId)          => api.get(`/api/stores/${storeId}/active-reservations-count`),
+    getStores:                (params = {})       => api.get(API_ENDPOINTS.STORE.LIST, { params }),
+    getStoreById:             (storeId)           => api.get(API_ENDPOINTS.STORE.DETAIL(storeId)),
+    getMyStores:              ()                  => api.get(API_ENDPOINTS.STORE.MY_STORES),
+    toggleAutoApproval:       (storeId, enabled)  => api.patch(API_ENDPOINTS.STORE.AUTO_APPROVAL(storeId), null, { params: { enabled } }),
+};
 
-    async toggleAutoApproval(storeId, enabled) {
-        return await api.patch(API_ENDPOINTS.STORE.AUTO_APPROVAL(storeId), null, { params: { enabled } });
-    }
-}
-
-export default new StoreService();
+export default storeService;

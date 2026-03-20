@@ -37,15 +37,23 @@ const Signup = () => {
     }, [isLoggedIn, navigate]);
 
     const onSignupSubmit = async (values) => {
-        if (!isVerified) return message.error("이메일 인증을 먼저 완료해주세요.");
+        if (!isVerified) return message.error('이메일 인증을 먼저 완료해주세요.');
         setSubmitLoading(true);
         try {
-            await api.post(API_ENDPOINTS.AUTH.SIGNUP, {
+            const res = await api.post(API_ENDPOINTS.AUTH.SIGNUP, {
                 name:     values.name.trim(),
                 email:    values.email.trim(),
                 password: values.password,
             });
-            navigate('/login', { state: { signupSuccess: true } });
+            // 백엔드가 가입과 동시에 쿠키를 발급하므로 자동 로그인 처리
+            if (res) {
+                const { login } = useAuthStore.getState();
+                login(res);
+                message.success(`${res.name || ''}님, 환영합니다!`);
+                navigate('/', { replace: true });
+            } else {
+                navigate('/login', { state: { signupSuccess: true } });
+            }
         } catch (err) {
             if (err?.isSessionExpired) return;
             const msg = typeof err === 'string' ? err : err?.message;

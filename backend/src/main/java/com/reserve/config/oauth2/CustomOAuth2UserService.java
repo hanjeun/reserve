@@ -90,17 +90,19 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 if (member.getProvider() != null && member.getProvider() != AuthProvider.LOCAL) {
                     log.warn("⚠️ 이미 다른 OAuth 제공자로 가입된 이메일: {} (기존: {}, 시도: {})",
                             email, member.getProvider(), provider);
+                    String msg = "이미 " + member.getProvider().name() + " 계정으로 가입된 이메일입니다. "
+                            + member.getProvider().name() + " 로그인을 이용해주세요.";
                     throw new OAuth2AuthenticationException(
-                            "이미 " + member.getProvider().name() + " 계정으로 가입된 이메일입니다. " +
-                            member.getProvider().name() + " 로그인을 이용해주세요."
+                            new org.springframework.security.oauth2.core.OAuth2Error("email_conflict"), msg
                     );
                 }
 
                 // LOCAL 회원인 경우 → 에러 (자동 연결 안 함)
                 if (member.getProvider() == null || member.getProvider() == AuthProvider.LOCAL) {
                     log.warn("⚠️ 이미 이메일로 가입된 계정: {} (시도: {})", email, provider);
+                    String msg = "이미 이메일로 가입된 계정이 있습니다. 기존 계정으로 로그인해주세요.";
                     throw new OAuth2AuthenticationException(
-                            "이미 이메일로 가입된 계정이 있습니다. 기존 계정으로 로그인해주세요."
+                            new org.springframework.security.oauth2.core.OAuth2Error("email_conflict"), msg
                     );
                 }
             }

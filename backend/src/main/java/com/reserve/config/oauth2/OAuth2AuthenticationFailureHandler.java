@@ -29,7 +29,11 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
 
         log.error("❌ OAuth2 로그인 실패: {}", exception.getMessage());
 
-        String errorMessage = URLEncoder.encode(exception.getMessage(), StandardCharsets.UTF_8);
+        String rawMessage = exception.getMessage();
+        if (rawMessage == null || rawMessage.isBlank()) {
+            rawMessage = "소셜 로그인에 실패했습니다. 다시 시도해주세요.";
+        }
+        String errorMessage = URLEncoder.encode(rawMessage, StandardCharsets.UTF_8);
         String baseUrl = "local".equals(serverEnv)
                 ? "http://localhost:5173"
                 : "https://reserve.hktech.kr";

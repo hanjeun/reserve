@@ -43,10 +43,17 @@ instance.interceptors.response.use(
         const originalRequest = error.config;
 
         // 401: 토큰 만료 → refresh 시도
+        // 단, 인증 관련 엔드포인트(로그인/회원가입/비밀번호 리셋)는 refresh 시도하지 않음
+        const isAuthEndpoint = originalRequest.url?.includes('/api/auth/login') ||
+            originalRequest.url?.includes('/api/auth/signup') ||
+            originalRequest.url?.includes('/api/password-reset') ||
+            originalRequest.url?.includes('/api/email');
+
         if (
             error.response?.status === 401 &&
             !originalRequest._retry &&
-            !originalRequest.url?.includes('/api/auth/refresh')
+            !originalRequest.url?.includes('/api/auth/refresh') &&
+            !isAuthEndpoint
         ) {
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {

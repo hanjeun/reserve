@@ -3,6 +3,7 @@ package com.reserve.email.service;
 import com.reserve.global.error.EmailException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import java.io.UnsupportedEncodingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,18 +27,21 @@ public class EmailService {
     @Value("${mail.username}")
     private String fromEmail;
 
+    @Value("${mail.from.name:RESERVE}")
+    private String fromName;
+
     @Async
     public void sendVerificationEmail(String toEmail, String verificationCode) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromEmail);
+            helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 이메일 인증 코드");
             helper.setText(buildVerificationEmailContent(verificationCode), true);
             mailSender.send(message);
             log.info("인증 이메일 발송 완료: {}", toEmail);
-        } catch (MessagingException e) {
+        } catch (MessagingException | UnsupportedEncodingException e) {
             log.error("이메일 발송 실패: {}", e.getMessage());
             throw new EmailException("인증 이메일 발송 중 서버 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -82,13 +86,13 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromEmail);
+            helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
             mailSender.send(message);
             log.info("예약 알림 이메일 발송: {}", toEmail);
-        } catch (MessagingException e) {
+        } catch (MessagingException | UnsupportedEncodingException e) {
             log.error("예약 알림 이메일 발송 실패 ({}): {}", toEmail, e.getMessage());
         }
     }
@@ -151,13 +155,13 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(fromEmail);
+            helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 비밀번호 재설정 코드");
             helper.setText(buildPasswordResetEmailContent(code), true);
             mailSender.send(message);
             log.info("비밀번호 재설정 이메일 발송 완료: {}", toEmail);
-        } catch (MessagingException e) {
+        } catch (MessagingException | UnsupportedEncodingException e) {
             log.error("비밀번호 재설정 이메일 발송 실패: {}", e.getMessage());
         }
     }

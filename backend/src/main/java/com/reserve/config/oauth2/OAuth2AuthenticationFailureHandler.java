@@ -41,17 +41,27 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     }
 
     private String resolveMessage(AuthenticationException exception) {
+        log.debug("OAuth2 실패 예외 타입: {}, 메시지: {}", exception.getClass().getName(), exception.getMessage());
+
         // 우리가 직접 throw한 경우 — getMessage()에 한국어 메시지가 있음
+        // (단, errorCode 형식인 "[xxx] yyy" 는 Spring이 자동 생성한 것이므로 제외)
         String msg = exception.getMessage();
-        if (msg != null && !msg.isBlank()) {
+        if (msg != null && !msg.isBlank() && !msg.startsWith("[")) {
             return msg;
         }
 
         // Spring Security가 자동으로 throw한 경우 — errorCode로 분기
         String errorCode = "";
-        if (exception instanceof OAuth2AuthenticationException oaEx) {
-            errorCode = oaEx.getError() != null ? oaEx.getError().getErrorCode() : "";
+        if (exception instanceof OAuth2AuthenticationException oaEx && oaEx.getError() != null) {
+            errorCode = oaEx.getError().getErrorCode();
         }
+        // 메시지에서 errorCode 추출 시도 ([errorCode] message 형식)
+        if (errorCode.isBlank() && msg != null && msg.startsWith("[")) {
+            int end = msg.indexOf("]");
+            if (end > 0) errorCode = msg.substring(1, end);
+        }
+
+        log.debug("OAuth2 errorCode: {}", errorCode);
 
         return switch (errorCode) {
             case "access_denied"                   -> "소셜 로그인을 취소했습니다.";

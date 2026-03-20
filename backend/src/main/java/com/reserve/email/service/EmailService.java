@@ -24,7 +24,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${mail.username}")
+    @Value("${mail.from:${mail.username}}")
     private String fromEmail;
 
     @Value("${mail.from.name:RESERVE}")

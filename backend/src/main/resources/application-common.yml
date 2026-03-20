@@ -85,7 +85,7 @@ mail:
   host: smtp.gmail.com
   port: 587
   from:
-    name: RESERVE 예약 서비스
+    name: RESERVE
   properties:
     mail:
       smtp:

@@ -212,3 +212,13 @@ jobs:
           script: |
             sudo docker stop ${{ env.CURRENT_UPSTREAM }} || true
             sudo docker rm   ${{ env.CURRENT_UPSTREAM }} || true
+
+      - name: Cleanup Docker resources
+        uses: appleboy/ssh-action@master
+        with:
+          username: ubuntu
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo docker image prune -af --filter "until=24h" || true
+            sudo docker system prune -f || true

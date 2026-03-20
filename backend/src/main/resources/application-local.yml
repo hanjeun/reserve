@@ -7,6 +7,13 @@ spring:
     activate:
       on-profile: local
 
+  # 개발 도구 (로컬 전용)
+  devtools:
+    livereload:
+      enabled: true
+    restart:
+      enabled: true
+
   # 로컬 MySQL 연결
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver

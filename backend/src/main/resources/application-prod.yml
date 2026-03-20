@@ -34,3 +34,12 @@ server:
 # 프론트엔드 URL (모바일 결제 리다이렉트 등에 사용)
 app:
   frontend-url: https://reserve.hktech.kr
+
+# 운영 환경 로깅 — DEBUG 로그 비활성화
+logging:
+  level:
+    root: WARN
+    com.reserve: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN

@@ -59,16 +59,16 @@ const Login = () => {
             return;
         }
 
-        // OAuth2 에러 메시지 처리
-        const params = new URLSearchParams(location.search);
+        // OAuth2 에러 메시지 처리 (URL 파라미터)
+        const params = new URLSearchParams(window.location.search);
         const oauthError = params.get('error');
         const oauthMessage = params.get('message');
         if (oauthError === 'oauth2' && oauthMessage) {
             hasHandledRef.current = true;
             message.error(decodeURIComponent(oauthMessage));
-            navigate('/login', { replace: true });
+            window.history.replaceState({}, '', '/login');
         }
-    }, [isLoggedIn, location.state, location.search, navigate, message]);
+    }, [isLoggedIn, location.state, navigate, message]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const onLoginSubmit = async (values) => {
         setLoading(true);

@@ -27,7 +27,7 @@ public class EmailService {
     @Value("${mail.from:${mail.username}}")
     private String fromEmail;
 
-    @Value("${mail.from.name:RESERVE}")
+    @Value("${mail.from-name:RESERVE}")
     private String fromName;
 
     @Async

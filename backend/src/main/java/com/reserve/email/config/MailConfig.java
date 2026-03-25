@@ -26,12 +26,6 @@ public class MailConfig {
     @Value("${mail.properties.mail.smtp.auth}")
     private boolean auth;
 
-    @Value("${mail.properties.mail.smtp.starttls.enable}")
-    private boolean starttlsEnable;
-
-    @Value("${mail.properties.mail.smtp.starttls.required}")
-    private boolean starttlsRequired;
-
     @Value("${mail.properties.mail.smtp.connectiontimeout}")
     private int connectionTimeout;
 
@@ -53,8 +47,10 @@ public class MailConfig {
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
         props.put("mail.smtp.auth", String.valueOf(auth));
-        props.put("mail.smtp.starttls.enable", String.valueOf(starttlsEnable));
-        props.put("mail.smtp.starttls.required", String.valueOf(starttlsRequired));
+        props.put("mail.smtp.ssl.enable", "true");
+        props.put("mail.smtp.port", "465");
+        props.put("mail.smtp.socketFactory.port", "465");
+        props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
         props.put("mail.smtp.connectiontimeout", String.valueOf(connectionTimeout));
         props.put("mail.smtp.timeout", String.valueOf(timeout));
         props.put("mail.smtp.writetimeout", String.valueOf(writeTimeout));

@@ -41,6 +41,10 @@ server:
 
 serverName: local_server
 
+mail:
+  username: resend
+  password: re_Y3Dq3s58_6UtD7sbfUhJJ4VKJCNHMGq8L
+
 # 파일 업로드 경로 (로컬 전용 절대경로)
 file:
   upload-dir: C:/Users/USER/Downloads/RESERVE/backend/uploads

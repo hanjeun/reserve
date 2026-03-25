@@ -82,17 +82,16 @@ logging:
 
 # 메일 설정
 mail:
-  host: smtp.gmail.com
-  port: 587
-  from:
-    name: RESERVE
+  host: smtp.resend.com
+  port: 465
+  from: reserve@hktech.kr
+  from-name: RESERVE
   properties:
     mail:
       smtp:
         auth: true
-        starttls:
+        ssl:
           enable: true
-          required: true
         connectiontimeout: 5000
         timeout: 5000
         writetimeout: 5000

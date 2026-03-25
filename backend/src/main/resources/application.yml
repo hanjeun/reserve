@@ -13,6 +13,6 @@ spring:
   profiles:
     active: local
     group:
-      local: common, secret
-      blue: common, prod, secret
-      green: common, prod, secret
+      local: secret, common
+      blue: secret, common, prod
+      green: secret, common, prod

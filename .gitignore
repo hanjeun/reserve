@@ -63,6 +63,7 @@ frontend/.env
 frontend/.env.local
 frontend/.env.production
 backend/src/main/resources/application-secret.yml
+backend/src/main/resources/application-local.yml
 
 # ========================
 # 업로드 파일

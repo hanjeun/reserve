@@ -20,9 +20,6 @@ spring:
   web:
     resources:
       add-mappings: true
-  mvc:
-    favicon:
-      enabled: false
 
   # 파일 업로드
   servlet:

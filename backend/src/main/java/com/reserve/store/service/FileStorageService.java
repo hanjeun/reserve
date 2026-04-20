@@ -48,13 +48,13 @@ public class FileStorageService {
             Path targetLocation = uploadPath.resolve(filename);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
-            log.info("✅ 파일 저장 성공: {}", filename);
+            log.info("파일 저장 성공: {}", filename);
 
             // 웹에서 접근 가능한 URL 반환
             return "/uploads/" + filename;
 
         } catch (IOException e) {
-            log.error("❌ 파일 저장 중 IO 에러 발생", e);
+            log.error("파일 저장 중 IO 에러 발생", e);
             throw new FileException("파일을 저장하는 중 서버에 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -83,12 +83,12 @@ public class FileStorageService {
 
             if (Files.exists(filePath)) {
                 Files.delete(filePath);
-                log.info("✅ 파일 삭제 성공: {}", filename);
+                log.info("파일 삭제 성공: {}", filename);
             } else {
                 log.warn("⚠️ 삭제할 파일이 존재하지 않습니다: {} (경로: {})", fileUrl, filePath);
             }
         } catch (IOException e) {
-            log.error("❌ 파일 삭제 실패: {}", fileUrl, e);
+            log.error("파일 삭제 실패: {}", fileUrl, e);
         }
     }
 }

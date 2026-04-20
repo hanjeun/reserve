@@ -18,7 +18,7 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
         // 500대 에러는 ERROR, 400대는 WARN으로 로그 레벨 차등 적용
         if (e.getStatus().is5xxServerError()) {
-            log.error("🔥 Server Business Error [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+            log.error(" Server Business Error [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         } else {
             log.warn("⚠️ Client Business Warning [{}]: {}", e.getClass().getSimpleName(), e.getMessage());
         }
@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     protected ResponseEntity<ApiResponse<Void>> handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {
-        log.warn("🔐 Access Denied: {}", e.getMessage());
+        log.warn("Access Denied: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("해당 리소스에 대한 접근 권한이 없습니다."));
     }
@@ -44,7 +44,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     protected ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
-        log.error("🚨 Unhandled Exception 발생!", e);
+        log.error("Unhandled Exception 발생!", e);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요."));

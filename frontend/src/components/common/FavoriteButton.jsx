@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { HeartOutlined, HeartFilled } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import favoriteService from '../../services/favoriteService';
 import useAuthStore from '../../store/useAuthStore';
 import { useMessage } from '../../hooks';
@@ -8,8 +7,12 @@ import { colors } from '../../styles/tokens';
 
 const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => {
     const { isLoggedIn } = useAuthStore();
-    const navigate = useNavigate();
     const { message } = useMessage();
+
+    // 로그인하지 않은 사용자에게는 버튼을 보여주지 않음
+    if (!isLoggedIn) {
+        return null;
+    }
 
     // initialStatus가 명시적으로 넘어오면 그걸 쓰고,
     // 없으면(undefined) API로 실제 상태 조회
@@ -20,23 +23,18 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
     const btnSize  = size === 'sm' ? 36 : 44;
 
     // initialStatus가 없을 때만 서버에서 실제 상태 조회
+    // 이미 로그인 체크를 컴포넌트 최상단에서 했으므로 여기서는 불필요
     useEffect(() => {
         if (initialStatus !== undefined) return; // 부모가 명시적으로 넘겨줬으면 스킵
-        if (!isLoggedIn) return;                 // 비로그인은 항상 false
         favoriteService.getStatus(storeId)
             .then(res => setIsFavorite(res?.isFavorite ?? res?.favorite ?? false))
             .catch(() => {});
-    }, [storeId, isLoggedIn]); // eslint-disable-line
+    }, [storeId]); // eslint-disable-line
 
     const handleToggle = useCallback(async (e) => {
         e.stopPropagation();
         e.preventDefault();
 
-        if (!isLoggedIn) {
-            message.warning('로그인이 필요한 서비스입니다.');
-            navigate('/login');
-            return;
-        }
         if (loading) return;
 
         setLoading(true);
@@ -55,7 +53,7 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
         } finally {
             setLoading(false);
         }
-    }, [storeId, isLoggedIn, loading, navigate, message]);
+    }, [storeId, loading, message]);
 
     return (
         <button

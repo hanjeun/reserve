@@ -18,7 +18,7 @@ public class TokenService {
     private final MemberService memberService;
 
     public String createNewAccessToken(String refreshToken) {
-        log.info("========== 🔄 Access Token 재발급 시작 ==========");
+        log.info("========== Access Token 재발급 시작 ==========");
 
         // 1. 토큰 유효성 검사 (서명 검증)
         if (!tokenProvider.validToken(refreshToken)) {
@@ -36,11 +36,11 @@ public class TokenService {
         Long userId = savedToken.getMemberId();
         Member member = memberService.findById(userId);
 
-        log.info("✅ 사용자 확인: {}", member.getEmail());
+        log.info("사용자 확인: {}", member.getEmail());
 
         // 3. 신규 토큰 생성
         String newAccessToken = tokenProvider.generateAccessToken(member);
-        log.info("========== ✅ Access Token 재발급 완료 ==========");
+        log.info("========== Access Token 재발급 완료 ==========");
 
         return newAccessToken;
     }

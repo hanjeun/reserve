@@ -50,7 +50,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 oAuth2User.getAttributes()
         );
 
-        log.info("🔐 OAuth2 로그인 - Provider: {}, ProviderId: {}, Email: {}, Name: {}",
+        log.info("OAuth2 로그인 - Provider: {}, ProviderId: {}, Email: {}, Name: {}",
                 provider, userInfo.getProviderId(), userInfo.getEmail(), userInfo.getName());
 
         // 4. 회원 조회 또는 생성 (Access Token도 함께 저장)
@@ -74,7 +74,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         if (existingMember.isPresent()) {
             // 기존 OAuth 회원: 정보 업데이트
-            log.info("✅ 기존 OAuth2 회원 로그인: {} ({})", userInfo.getEmail(), provider);
+            log.info("기존 OAuth2 회원 로그인: {} ({})", userInfo.getEmail(), provider);
             return updateExistingMember(existingMember.get(), userInfo, accessToken);
         }
 
@@ -109,7 +109,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // 3순위: 신규 회원 생성
-        log.info("🆕 새로운 OAuth2 회원 가입: {} ({})", email, provider);
+        log.info("새로운 OAuth2 회원 가입: {} ({})", email, provider);
         return createNewMember(provider, userInfo, accessToken);
     }
 

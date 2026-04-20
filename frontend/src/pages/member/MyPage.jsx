@@ -519,7 +519,7 @@ const NotificationSection = ({ user }) => {
             setEnabled(checked);
             // authStore의 user도 최신화
             useAuthStore.getState().login({ ...user, emailNotificationEnabled: checked });
-            message.success(checked ? '예약 알림 메일을 켜습니다' : '예약 알림 메일을 끄습니다');
+            message.success(checked ? '예약 알림 메일을 켰습니다' : '예약 알림 메일을 껐습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');
         } finally {

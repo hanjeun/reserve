@@ -20,20 +20,20 @@ spring:
       client:
         registration:
           google:
-            redirect-uri: https://reserve.hktech.kr/login/oauth2/code/google
+            redirect-uri: https://reserve.it.kr/login/oauth2/code/google
           naver:
-            redirect-uri: https://reserve.hktech.kr/login/oauth2/code/naver
+            redirect-uri: https://reserve.it.kr/login/oauth2/code/naver
           kakao:
-            redirect-uri: https://reserve.hktech.kr/login/oauth2/code/kakao
+            redirect-uri: https://reserve.it.kr/login/oauth2/code/kakao
 
 # 서버 공통 설정 (포트는 blue/green에서 개별 설정)
 server:
-  serverAddress: reserve.hktech.kr
+  serverAddress: reserve.it.kr
   env: prod
 
-# 프론트엔드 URL (모바일 결제 리다이렉트 등에 사용)
+# 프론트엔드 URL
 app:
-  frontend-url: https://reserve.hktech.kr
+  frontend-url: https://reserve.it.kr
 
 # 운영 환경 로깅 — DEBUG 로그 비활성화
 logging:

@@ -165,7 +165,7 @@ jobs:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_IMP_KEY,PORTONE_IMP_SECRET,PORTONE_IMP_CODE,PORTONE_V2_SECRET,PORTONE_STORE_ID,DB_PASSWORD
+          envs: DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_IMP_KEY,PORTONE_IMP_SECRET,PORTONE_IMP_CODE,PORTONE_V2_SECRET,PORTONE_STORE_ID,DB_PASSWORD,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN
           script: |
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
@@ -183,6 +183,10 @@ jobs:
             export PORTONE_V2_SECRET=${{ secrets.PORTONE_V2_SECRET }}
             export PORTONE_STORE_ID=${{ secrets.PORTONE_STORE_ID }}
             export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            export S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+            export CLOUDFRONT_DOMAIN=${{ secrets.CLOUDFRONT_DOMAIN }}
             sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)

@@ -35,7 +35,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
         String errorMessage = URLEncoder.encode(rawMessage, StandardCharsets.UTF_8);
         String baseUrl = "local".equals(serverEnv)
                 ? "http://localhost:5173"
-                : "https://reserve.hktech.kr";
+                : "https://reserve.it.kr";
 
         getRedirectStrategy().sendRedirect(request, response, baseUrl + "/login?error=oauth2&message=" + errorMessage);
     }

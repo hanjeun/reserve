@@ -81,7 +81,7 @@ logging:
 mail:
   host: smtp.resend.com
   port: 465
-  from: reserve@hktech.kr
+  from: reserve@reserve.it.kr
   from-name: RESERVE
   properties:
     mail:

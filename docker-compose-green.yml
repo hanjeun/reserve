@@ -4,10 +4,11 @@ services:
     container_name: green
     image: ${DOCKERHUB_USERNAME}/reserve:latest
     ports:
-      - "8081:8081"
+      - "8081:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=green
       - SERVER_ENV=green
+      - JAVA_OPTS=-Xmx512m -Xms256m
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
@@ -23,8 +24,10 @@ services:
       - PORTONE_STORE_ID=${PORTONE_STORE_ID}
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       - DB_PASSWORD=${DB_PASSWORD}
-    volumes:
-      - /home/ubuntu/uploads:/uploads
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}
     networks:
       - app-network
     restart: unless-stopped

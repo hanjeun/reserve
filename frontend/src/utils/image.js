@@ -6,9 +6,9 @@ import { API_BASE_URL } from '../constants/api';
 
 /**
  * 이미지 URL을 전체 경로로 변환
- * @param {string} url - 이미지 경로
- * @param {string} fallback - 기본 이미지 URL
- * @returns {string} 전체 이미지 URL
+ * - https://... 로 시작하면 그대로 반환 (S3/CloudFront URL, 소셜 로그인 이미지)
+ * - /uploads/... 로 시작하면 API_BASE_URL 붙여서 반환 (로컬 개발용 fallback)
+ * - null/undefined면 fallback 반환
  */
 const FALLBACKS = {
     thumbnail:  'https://placehold.co/300x200?text=No+Image',
@@ -18,7 +18,10 @@ const FALLBACKS = {
 
 export const getImageUrl = (url, fallback = FALLBACKS.thumbnail) => {
     if (!url) return fallback;
-    return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+    // CloudFront URL, 소셜 로그인 이미지 등 절대 URL은 그대로
+    if (url.startsWith('http')) return url;
+    // 로컬 개발 환경 fallback (/uploads/xxx.jpg → API 서버에서 직접 서빙)
+    return `${API_BASE_URL}${url}`;
 };
 
 /** 상세 이미지 (큰 크기) */

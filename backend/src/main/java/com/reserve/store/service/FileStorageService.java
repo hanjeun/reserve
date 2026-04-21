@@ -1,94 +1,114 @@
 package com.reserve.store.service;
 
-import com.reserve.global.error.FileException; // 새로 만드신 FileException 임포트
+import com.reserve.global.error.FileException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Slf4j
 @Service
 public class FileStorageService {
 
-    @Value("${file.upload-dir:uploads}")
-    private String uploadDir;
+    @Value("${cloud.aws.s3.bucket}")
+    private String bucket;
+
+    @Value("${cloud.aws.cloudfront.domain}")
+    private String cloudfrontDomain;
+
+    @Value("${cloud.aws.region.static}")
+    private String region;
+
+    @Value("${cloud.aws.credentials.access-key}")
+    private String accessKey;
+
+    @Value("${cloud.aws.credentials.secret-key}")
+    private String secretKey;
+
+    private S3Client s3Client;
+
+    @PostConstruct
+    public void init() {
+        this.s3Client = S3Client.builder()
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(accessKey, secretKey)))
+                .build();
+    }
 
     /**
-     * 파일 저장 및 URL 반환
+     * S3에 파일 업로드 후 CloudFront URL 반환
      */
     public String storeFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            return null;
-        }
+        if (file == null || file.isEmpty()) return null;
 
         try {
-            // 1. 업로드 디렉토리 생성 및 확인
-            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
+            String ext = "";
+            String original = file.getOriginalFilename();
+            if (original != null && original.contains(".")) {
+                ext = original.substring(original.lastIndexOf("."));
             }
+            String key = "uploads/" + UUID.randomUUID() + ext;
 
-            // 2. 파일명 생성 (UUID + 원본 확장자)
-            String originalFilename = file.getOriginalFilename();
-            String extension = "";
-            if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-            String filename = UUID.randomUUID() + extension;
+            PutObjectRequest request = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .contentType(file.getContentType())
+                    .contentLength(file.getSize())
+                    .build();
 
-            // 3. 파일 저장 (보안을 위해 파일명 검증 추가 권장)
-            Path targetLocation = uploadPath.resolve(filename);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            log.info("S3 업로드 성공: {}", key);
 
-            log.info("파일 저장 성공: {}", filename);
-
-            // 웹에서 접근 가능한 URL 반환
-            return "/uploads/" + filename;
+            // CloudFront URL 반환
+            return "https://" + cloudfrontDomain + "/" + key;
 
         } catch (IOException e) {
-            log.error("파일 저장 중 IO 에러 발생", e);
+            log.error("S3 업로드 실패", e);
             throw new FileException("파일을 저장하는 중 서버에 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * 파일 삭제
-     * storeFile()과 동일한 기준 경로(uploadPath)를 사용해야 경로 불일치 버그를 막을 수 있음
+     * S3에서 파일 삭제
      */
     public void deleteFile(String fileUrl) {
-        if (fileUrl == null || fileUrl.isEmpty()) {
-            return;
-        }
+        if (fileUrl == null || fileUrl.isEmpty()) return;
 
-        // 외부 URL(소셜 프로필 이미지 등)은 삭제 대상 아님
-        if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
-            return;
-        }
+        // 소셜 로그인 이미지 등 외부 URL은 삭제하지 않음
+        if (!fileUrl.contains(cloudfrontDomain) && !fileUrl.startsWith("/uploads/")) return;
 
         try {
-            // URL에서 파일명 추출 (예: /uploads/abc.jpg → abc.jpg)
-            String filename = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-
-            // storeFile()과 동일하게 절대경로로 정규화하여 경로 불일치 방지
-            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-            Path filePath = uploadPath.resolve(filename).normalize();
-
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                log.info("파일 삭제 성공: {}", filename);
+            // CloudFront URL → S3 key 추출
+            // ex) https://cdn.reserve.it.kr/uploads/xxx.jpg → uploads/xxx.jpg
+            String key;
+            if (fileUrl.startsWith("https://")) {
+                key = fileUrl.substring(fileUrl.indexOf("/", 8) + 1);
             } else {
-                log.warn("⚠️ 삭제할 파일이 존재하지 않습니다: {} (경로: {})", fileUrl, filePath);
+                // 레거시 로컬 경로 (/uploads/xxx.jpg) 대응
+                key = "uploads/" + fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
             }
-        } catch (IOException e) {
-            log.error("파일 삭제 실패: {}", fileUrl, e);
+
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .build());
+            log.info("S3 삭제 성공: {}", key);
+
+        } catch (Exception e) {
+            log.error("S3 삭제 실패: {}", fileUrl, e);
         }
     }
 }

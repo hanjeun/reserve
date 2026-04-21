@@ -58,7 +58,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         // Origin 헤더는 구글 리다이렉트 요청에서 null이므로 server.env로 환경 판단
         String redirectUrl = "local".equals(serverEnv)
                 ? "http://localhost:5173/oauth2/callback"
-                : "https://reserve.hktech.kr/oauth2/callback";
+                : "https://reserve.it.kr/oauth2/callback";
         log.info("OAuth2 리다이렉트: {} (env={})", redirectUrl, serverEnv);
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }

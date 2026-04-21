@@ -190,11 +190,23 @@ jobs:
             sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)
-        uses: jtalk/url-health-check-action@v3
+        uses: appleboy/ssh-action@master
         with:
-          url: http://${{ secrets.RESERVE_SERVER_IP }}:${{ env.STOPPED_PORT }}/actuator/health
-          max-attempts: 10
-          retry-delay: 15s
+          username: ubuntu
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            for i in $(seq 1 10); do
+              STATUS=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 http://localhost:${{ env.STOPPED_PORT }}/actuator/health || echo "000")
+              echo "Attempt $i: $STATUS"
+              if [ "$STATUS" = "200" ]; then
+                echo "Health check passed!"
+                exit 0
+              fi
+              sleep 15
+            done
+            echo "Health check failed after 10 attempts"
+            exit 1
 
       - name: Switch Nginx upstream
         uses: appleboy/ssh-action@master

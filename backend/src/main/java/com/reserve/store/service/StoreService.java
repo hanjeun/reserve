@@ -47,7 +47,7 @@ public class StoreService {
         // 메인 이미지 저장
         String mainImageUrl = null;
         if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
-            mainImageUrl = fileStorageService.storeFile(request.getMainImage());
+            mainImageUrl = fileStorageService.storeFile(request.getMainImage(), "stores/thumbnails");
         }
 
         // 상세 이미지들 저장
@@ -55,7 +55,7 @@ public class StoreService {
         if (request.getDetailImages() != null && !request.getDetailImages().isEmpty()) {
             for (MultipartFile file : request.getDetailImages()) {
                 if (file != null && !file.isEmpty()) {
-                    detailImageUrls.add(fileStorageService.storeFile(file));
+                    detailImageUrls.add(fileStorageService.storeFile(file, "stores/images"));
                 }
             }
         }
@@ -259,7 +259,7 @@ public class StoreService {
             if (store.getMainImageUrl() != null) {
                 fileStorageService.deleteFile(store.getMainImageUrl());
             }
-            store.setMainImageUrl(fileStorageService.storeFile(request.getMainImage()));
+            store.setMainImageUrl(fileStorageService.storeFile(request.getMainImage(), "stores/thumbnails"));
         } else if (request.getExistingMainImageUrl() != null) {
             store.setMainImageUrl(request.getExistingMainImageUrl());
         }
@@ -272,7 +272,7 @@ public class StoreService {
         if (request.getDetailImages() != null) {
             for (MultipartFile file : request.getDetailImages()) {
                 if (file != null && !file.isEmpty()) {
-                    finalDetailImages.add(fileStorageService.storeFile(file));
+                    finalDetailImages.add(fileStorageService.storeFile(file, "stores/images"));
                 }
             }
         }

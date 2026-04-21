@@ -50,8 +50,9 @@ public class FileStorageService {
 
     /**
      * S3에 파일 업로드 후 CloudFront URL 반환
+     * @param folder S3 저장 경로 (예: "profiles", "stores/thumbnails", "stores/images", "businesses")
      */
-    public String storeFile(MultipartFile file) {
+    public String storeFile(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) return null;
 
         try {
@@ -60,7 +61,7 @@ public class FileStorageService {
             if (original != null && original.contains(".")) {
                 ext = original.substring(original.lastIndexOf("."));
             }
-            String key = "uploads/" + UUID.randomUUID() + ext;
+            String key = folder + "/" + UUID.randomUUID() + ext;
 
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucket)
@@ -87,19 +88,13 @@ public class FileStorageService {
     public void deleteFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isEmpty()) return;
 
-        // 소셜 로그인 이미지 등 외부 URL은 삭제하지 않음
-        if (!fileUrl.contains(cloudfrontDomain) && !fileUrl.startsWith("/uploads/")) return;
+        // CloudFront URL이 아닌 경우 스킵 (소셜 로그인 이미지 등 외부 URL)
+        if (!fileUrl.contains(cloudfrontDomain)) return;
 
         try {
             // CloudFront URL → S3 key 추출
-            // ex) https://cdn.reserve.it.kr/uploads/xxx.jpg → uploads/xxx.jpg
-            String key;
-            if (fileUrl.startsWith("https://")) {
-                key = fileUrl.substring(fileUrl.indexOf("/", 8) + 1);
-            } else {
-                // 레거시 로컬 경로 (/uploads/xxx.jpg) 대응
-                key = "uploads/" + fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            }
+            // ex) https://cdn.reserve.it.kr/stores/thumbnails/xxx.jpg → stores/thumbnails/xxx.jpg
+            String key = fileUrl.substring(fileUrl.indexOf("/", 8) + 1);
 
             s3Client.deleteObject(DeleteObjectRequest.builder()
                     .bucket(bucket)

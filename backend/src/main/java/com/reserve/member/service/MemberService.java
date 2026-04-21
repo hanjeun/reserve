@@ -147,10 +147,8 @@ public class MemberService {
         log.info("프로필 이미지 삭제: memberId={}", memberId);
         Member member = findById(memberId);
 
-        // 로컬 업로드 이미지만 삭제 (소셜 로그인 이미지 URL은 파일 없음)
-        if (member.getProfileImage() != null && member.getProfileImage().startsWith("/uploads/")) {
-            fileStorageService.deleteFile(member.getProfileImage());
-        }
+        // 로컬 업로드 이미지만 삭제 (소셜 로그인 이미지 URL은 파일 없음 - deleteFile 내부에서 처리)
+        fileStorageService.deleteFile(member.getProfileImage());
 
         member.setProfileImage(null);
         member.setProfileImageLocked(true);  // 유저가 직접 기본이미지로 설정 → 소셜 재로그인시도 유지
@@ -164,12 +162,10 @@ public class MemberService {
         log.info("프로필 이미지 수정: memberId={}", memberId);
         Member member = findById(memberId);
 
-        // 기존 이미지 삭제 (소셜 로그인 이미지 URL 제외)
-        if (member.getProfileImage() != null && member.getProfileImage().startsWith("/uploads/")) {
-            fileStorageService.deleteFile(member.getProfileImage());
-        }
+        // 기존 이미지 삭제 (소셜 로그인 이미지 URL 제외 - deleteFile 내부에서 처리)
+        fileStorageService.deleteFile(member.getProfileImage());
 
-        String imageUrl = fileStorageService.storeFile(image);
+        String imageUrl = fileStorageService.storeFile(image, "profiles");
         member.setProfileImage(imageUrl);
         member.setProfileImageLocked(true);  // 유저가 직접 이미지 업로드 → 소셜 재로그인시도 유지
         Member updated = memberRepository.save(member);

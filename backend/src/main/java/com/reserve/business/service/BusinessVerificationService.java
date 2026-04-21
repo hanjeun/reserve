@@ -49,7 +49,7 @@ public class BusinessVerificationService {
         validateSubmitRequest(request);
 
         // 4. 이미지 저장
-        String imageUrl = fileStorageService.storeFile(request.getLicenseImage());
+        String imageUrl = fileStorageService.storeFile(request.getLicenseImage(), "businesses");
 
         // 5. 인증 요청 생성
         BusinessVerification verification = BusinessVerification.builder()

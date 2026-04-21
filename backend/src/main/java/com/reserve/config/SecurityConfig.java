@@ -47,9 +47,6 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // 업로드 파일 접근 허용
-                        .requestMatchers("/uploads/**").permitAll()
-                        
                         // Health Check & Environment
                         .requestMatchers("/hc", "/env").permitAll()
                         .requestMatchers("/actuator/health").permitAll()

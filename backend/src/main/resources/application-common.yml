@@ -65,10 +65,6 @@ jwt:
   refresh-token:
     expiration-days: 14
 
-# 파일 업로드 경로 (기본값 - 프로덕션/기타 환경)
-file:
-  upload-dir: uploads
-
 # 로깅 설정
 logging:
   level:

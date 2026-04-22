@@ -72,7 +72,9 @@ portone:
   imp-secret: test-imp-secret
   imp-code: test-imp-code
 
-# 파일 업로드 경로
-file:
-  upload:
-    path: ./test-uploads
+# S3 테스트 설정
+S3_BUCKET_NAME: test-bucket
+CLOUDFRONT_DOMAIN: test.cloudfront.net
+AWS_REGION: ap-northeast-2
+AWS_ACCESS_KEY_ID: test-access-key
+AWS_SECRET_ACCESS_KEY: test-secret-key

@@ -37,12 +37,12 @@ fontWeight.semibold  // 600
 fontWeight.bold      // 700
 fontWeight.extrabold // 800
 
-fontSize.xs    // 12px
-fontSize.sm    // 13px
-fontSize.md    // 14px
-fontSize.base  // 15px
-fontSize.lg    // 16px
-fontSize.xl    // 17px
+fontSize.xs     // 12px
+fontSize.sm     // 13px
+fontSize.md     // 14px
+fontSize.base   // 15px
+fontSize.lg     // 16px
+fontSize.xl     // 17px
 fontSize['2xl'] // 18px
 fontSize['3xl'] // 20px
 fontSize['4xl'] // 24px
@@ -54,13 +54,13 @@ fontSize['5xl'] // 32px
 ```js
 import { radius, heights, maxWidth, shadows } from '../styles/tokens';
 
-radius.sm    // 4px
-radius.md    // 10px
-radius.lg    // 14px   — Input
-radius.xl    // 16px   — Button, Card
+radius.sm     // 4px
+radius.md     // 10px
+radius.lg     // 14px   — Input
+radius.xl     // 16px   — Button, Card
 radius['2xl'] // 20px
-radius.full  // 50%
-radius.pill  // 100px
+radius.full   // 50%
+radius.pill   // 100px
 
 heights.input      // 54px
 heights.buttonLg   // 56px
@@ -97,8 +97,6 @@ import { Button } from '../components/common';
 <Button variant="ghost-sm-danger">취소</Button>
 <Button variant="ghost-sm-success">리뷰 보기</Button>
 ```
-
-active 시 scale 애니메이션: primary/secondary/danger/hero → `scale(0.96)`, ghost → `scale(0.94)`, ghost-sm → `scale(0.95)`
 
 ### Form 컴포넌트
 
@@ -140,21 +138,29 @@ import { Card } from '../components/common';
 <Card.Add onClick={fn}>새 가게 등록</Card.Add>
 ```
 
+### Avatar
+
+```jsx
+import { Avatar } from '../components/common';
+
+<Avatar src={profileImage} size={56} />
+```
+
 ### Skeleton
 
 ```jsx
-import { StoreCardSkeleton, MyReservationCardSkeleton, ... } from '../components/common';
+import { StoreCardSkeleton, MyReservationCardSkeleton } from '../components/common';
 
 if (isLoading) return <StoreCardSkeleton count={6} />;
 ```
 
-`StoreCardSkeleton`, `ReservationCardSkeleton`, `MyReservationCardSkeleton`, `ReviewCardSkeleton`, `StoreDetailSkeleton`, `FavoriteCardSkeleton`, `AdminTableSkeleton`
+사용 가능한 Skeleton: `StoreCardSkeleton`, `ReservationCardSkeleton`, `MyReservationCardSkeleton`, `ReviewCardSkeleton`, `StoreDetailSkeleton`, `FavoriteCardSkeleton`, `AdminTableSkeleton`
 
 ### FavoriteButton
 
 ```jsx
-<FavoriteButton storeId={id} />                    // 초기 상태 자동 조회
-<FavoriteButton storeId={id} initialStatus={true} /> // 초기 상태 명시
+<FavoriteButton storeId={id} />
+<FavoriteButton storeId={id} initialStatus={true} />
 ```
 
 ---
@@ -165,11 +171,15 @@ if (isLoading) return <StoreCardSkeleton count={6} />;
 import { Button, FormInput, PageContainer, Card, Loading } from '../components/common';
 import { useMessage, useStoreData, useReservations } from '../hooks';
 import { API_ENDPOINTS, STORE_CATEGORIES, RESERVATION_STATUS_LABELS } from '../constants';
-import { getThumbnailUrl, formatDate, formatCurrency } from '../utils';
+import { getImageUrl, getThumbnailUrl, formatDate, formatCurrency } from '../utils';
 import { colors, radius, fontWeight, fontSize, heights } from '../styles/tokens';
 ```
+
+---
 
 ## 규칙
 
 - UI에 텍스트 이모지 사용 금지 — Ant Design 아이콘만 사용
 - 색상/크기는 반드시 토큰 사용 (하드코딩 금지)
+- 인라인 스타일로 토큰 적용 (`style={{ color: colors.text.primary }}`)
+- 이미지 URL은 항상 `getImageUrl()` 유틸 사용 (CloudFront URL 처리)

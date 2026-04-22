@@ -31,15 +31,24 @@ spring:
 
   # JPA 공통 설정
   jpa:
-    open-in-view: false   # OSIV 비활성화 — 서비스 레이어 밖 LazyLoading 방지 (N+1 원인 차단)
+    open-in-view: false
     hibernate:
       ddl-auto: update
       naming:
         physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
-    show-sql: false  # 프로덕션에서는 false (로그 폭발 방지)
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
+
+  # HikariCP 커넥션 풀 설정 (죽은 커넥션 빠르게 감지/교체)
+  datasource:
+    hikari:
+      connection-test-query: SELECT 1
+      validation-timeout: 3000
+      connection-timeout: 10000
+      max-lifetime: 580000       # MySQL wait_timeout(600s)보다 짧게
+      keepalive-time: 60000      # 60초마다 커넥션 유지 쿼리
 
   # OAuth2 Provider 설정 (공통)
   security:

@@ -41,10 +41,6 @@ server:
 
 serverName: local_server
 
-mail:
-  username: resend
-  password: re_Y3Dq3s58_6UtD7sbfUhJJ4VKJCNHMGq8L
-
 # 로컬 추가 로깅
 logging:
   level:

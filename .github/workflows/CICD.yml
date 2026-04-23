@@ -45,8 +45,10 @@ jobs:
 
   # ─────────────────────────────────────────────────────────
   # 2. 프론트엔드 빌드 + EC2 Nginx로 정적 파일 배포
+  # build-backend 완료 후 실행 → deploy-backend와 Nginx reload 충돌 방지
   # ─────────────────────────────────────────────────────────
   build-frontend:
+    needs: build-backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -99,6 +101,7 @@ jobs:
           strip_components: 1
 
       # Nginx가 서빙하는 폴더로 이동 + 권한 설정
+      # PRIVATE_IP 플레이스홀더를 서버 사설 IP로 치환 후 Nginx에 적용
       - name: Reload Nginx static files
         uses: appleboy/ssh-action@master
         with:
@@ -109,6 +112,8 @@ jobs:
             sudo rm -rf /usr/share/nginx/html/*
             sudo cp -r /home/ubuntu/reserve-frontend/* /usr/share/nginx/html/
             sudo chown -R nginx:nginx /usr/share/nginx/html/ 2>/dev/null || true
+            PRIVATE_IP=$(hostname -I | awk '{print $1}')
+            sed -i "s/PRIVATE_IP/${PRIVATE_IP}/g" /home/ubuntu/default.conf
             sudo docker cp /home/ubuntu/default.conf nginxserver:/etc/nginx/conf.d/default.conf
             sudo docker exec nginxserver nginx -s reload
 
@@ -165,7 +170,6 @@ jobs:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_IMP_KEY,PORTONE_IMP_SECRET,PORTONE_IMP_CODE,PORTONE_V2_SECRET,PORTONE_STORE_ID,DB_PASSWORD,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN
           script: |
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}

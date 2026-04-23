@@ -22,19 +22,19 @@ import java.util.UUID;
 @Service
 public class FileStorageService {
 
-    @Value("${S3_BUCKET_NAME}")
+    @Value("${s3.bucket}")
     private String bucket;
 
-    @Value("${CLOUDFRONT_DOMAIN}")
+    @Value("${s3.cloudfront}")
     private String cloudfrontDomain;
 
-    @Value("${AWS_REGION:ap-northeast-2}")
+    @Value("${s3.region}")
     private String region;
 
-    @Value("${AWS_ACCESS_KEY_ID}")
+    @Value("${s3.access-key}")
     private String accessKey;
 
-    @Value("${AWS_SECRET_ACCESS_KEY}")
+    @Value("${s3.secret-key}")
     private String secretKey;
 
     private S3Client s3Client;

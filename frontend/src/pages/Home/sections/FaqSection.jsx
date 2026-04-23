@@ -21,12 +21,17 @@ export default function FaqSection({ isMobile }) {
                     padding: '36px 20px 0',
                     boxSizing: 'border-box',
                 } : {
-                    padding: '100px 24px 60px',
+                    minHeight: `calc(100dvh - ${heights.header})`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    padding: '72px 24px 80px',
+                    boxSizing: 'border-box',
                 }),
             }}
         >
             <div style={{ maxWidth: 1000, margin: '0 auto', width: '100%' }}>
-                <div className="reveal" style={{ marginBottom: isMobile ? 24 : 56 }}>
+                <div className="reveal" style={{ marginBottom: isMobile ? 24 : 40 }}>
                     <Title style={{ fontSize: 'clamp(22px, 4vw, 40px)', fontWeight: fontWeight.extrabold, color: colors.text.primary, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
                         자주 묻는 질문
                     </Title>
@@ -49,7 +54,7 @@ export default function FaqSection({ isMobile }) {
                     <p style={{ color: colors.text.tertiary, fontSize: 13, margin: 0 }}>RESERVE &copy; 2026</p>
                 </div>
             ) : (
-                <div style={{ background: colors.background.default, borderTop: `1px solid ${colors.border.light}`, padding: '28px 24px', textAlign: 'center', marginTop: 60, marginLeft: -24, marginRight: -24, marginBottom: -60 }}>
+                <div style={{ textAlign: 'center', paddingTop: 48 }}>
                     <p style={{ color: colors.text.tertiary, fontSize: 13, margin: 0 }}>RESERVE &copy; 2026</p>
                 </div>
             )}

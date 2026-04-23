@@ -187,6 +187,7 @@ jobs:
             export PORTONE_V2_SECRET=${{ secrets.PORTONE_V2_SECRET }}
             export PORTONE_STORE_ID=${{ secrets.PORTONE_STORE_ID }}
             export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            export MAIL_FROM=${{ secrets.MAIL_FROM }}
             export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             export S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}

@@ -63,7 +63,7 @@ frontend/.env
 frontend/.env.local
 frontend/.env.production
 backend/src/main/resources/application-secret.yml
-backend/src/main/resources/application-local.yml
+# application-local.yml은 민감 정보 없음 → git 포함
 
 # ========================
 # 로그

@@ -19,7 +19,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
-    password: 1234
+    password: ${DB_PASSWORD_LOCAL:1234}
 
   # OAuth2 Redirect URI (localhost)
   security:

@@ -1,29 +1,99 @@
-import { Typography, Flex } from 'antd';
-import { StarFilled } from '@ant-design/icons';
-import { colors, radius, shadows, fontWeight } from '../../../../styles/tokens';
+import { useState } from 'react';
+import { Flex } from 'antd';
+import { StarFilled, HeartOutlined, HeartFilled } from '@ant-design/icons';
+import { colors, shadows, fontSize, fontWeight, radius } from '../../../../styles/tokens';
 import { STORE_DATA } from '../../Home.data';
 
-const { Text } = Typography;
-
 export default function MockStoreListMobile() {
+    const [liked, setLiked] = useState({});
+
     return (
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {STORE_DATA.map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: radius.lg, padding: '10px', boxShadow: shadows.card, border: `1px solid ${colors.border.light}` }}>
-                    <div style={{ width: 52, height: 52, borderRadius: radius.md, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 }}>
-                        <img src={s.img} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <>
+            <div style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {STORE_DATA.map((s, i) => (
+                    <div
+                        key={i}
+                        className="mock-card-m"
+                        style={{
+                            borderRadius: 0,
+                            overflow: 'hidden',
+                            border: `1px solid ${colors.border.light}`,
+                            boxShadow: shadows.card,
+                            background: '#fff',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        <div style={{ position: 'relative' }}>
+                            <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
+                                <img
+                                    src={s.img}
+                                    alt={s.name}
+                                    className="card-image"
+                                    style={{
+                                        width: '100%',
+                                        height: 'auto',
+                                        objectFit: 'cover',
+                                        transition: 'transform 0.3s',
+                                        display: 'block',
+                                    }}
+                                />
+                            </div>
+                            <div
+                                style={{ position: 'absolute', top: 6, right: 6, zIndex: 1 }}
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    setLiked(l => ({ ...l, [i]: !l[i] }));
+                                }}
+                            >
+                                <div style={{
+                                    width: 24, height: 24,
+                                    borderRadius: '50%',
+                                    background: 'rgba(255,255,255,0.88)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                                }}>
+                                    {liked[i]
+                                        ? <HeartFilled style={{ fontSize: 10, color: colors.error?.main || '#f04452' }} />
+                                        : <HeartOutlined style={{ fontSize: 10, color: colors.text.secondary }} />
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ padding: '8px 8px 10px' }}>
+                            <span style={{
+                                display: 'inline-block',
+                                background: colors.primary.light,
+                                color: colors.primary.main,
+                                borderRadius: radius.sm,
+                                fontSize: 10,
+                                fontWeight: fontWeight.medium,
+                                padding: '1px 5px',
+                                marginBottom: 3,
+                            }}>{s.category}</span>
+                            <div style={{
+                                fontWeight: fontWeight.bold,
+                                fontSize: fontSize.xs,
+                                color: colors.text.primary,
+                                margin: '0 0 3px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }}>{s.name}</div>
+                            <Flex align="center" gap={2}>
+                                <StarFilled style={{ color: '#fadb14', fontSize: 10 }} />
+                                <span style={{ fontSize: 10, fontWeight: fontWeight.bold, color: colors.text.primary }}>{s.rating.toFixed(1)}</span>
+                                <span style={{ fontSize: 10, color: colors.text.secondary }}>({s.reviewCount})</span>
+                            </Flex>
+                        </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: 'inline-block', background: colors.primary.light, color: colors.primary.main, borderRadius: radius.sm, fontSize: 10, fontWeight: fontWeight.medium, padding: '1px 5px', marginBottom: 3 }}>{s.category}</span>
-                        <div style={{ fontWeight: fontWeight.bold, fontSize: 13, color: colors.text.primary, lineHeight: 1.3, marginBottom: 3 }}>{s.name}</div>
-                        <Flex align="center" gap={3}>
-                            <StarFilled style={{ color: '#fadb14', fontSize: 10 }} />
-                            <Text strong style={{ fontSize: 11 }}>{s.rating.toFixed(1)}</Text>
-                            <Text type="secondary" style={{ fontSize: 11 }}>({s.reviewCount})</Text>
-                        </Flex>
-                    </div>
-                </div>
-            ))}
-        </div>
+                ))}
+            </div>
+            <style>{`
+                .mock-card-m:hover .card-image {
+                    transform: scale(1.05);
+                }
+            `}</style>
+        </>
     );
 }

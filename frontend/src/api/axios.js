@@ -4,7 +4,7 @@ import { skeletonDelayInterceptor } from '../utils/skeletonDelay';
 const instance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL,
     withCredentials: true,  // 쿠키 자동 전송 (access_token, refresh_token)
-    timeout: 10000,
+    timeout: 30000,         // 30초 (이미지 업로드 등 대용량 요청 대비)
 });
 
 // 토큰 재발급 중인지 추적

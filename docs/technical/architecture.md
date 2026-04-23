@@ -33,14 +33,14 @@ AWS S3 (reserve-it-kr-bucket)
 
 ## AWS 서비스 구성
 
-| 서비스 | 용도 |
-|---|---|
-| **Lightsail** | 애플리케이션 서버 ($10/월, 2GB RAM, 서울) |
-| **Route 53** | DNS 호스팅 (reserve.it.kr) |
-| **S3** | 이미지 스토리지 (reserve-it-kr-bucket) |
-| **CloudFront** | 이미지 CDN (cdn.reserve.it.kr) |
-| **ACM** | SSL 인증서 (CloudFront용, us-east-1) |
-| **IAM** | S3 접근 제어 (reserve-s3-user) |
+| 서비스 | 용도 | 세부 |
+|---|---|---|
+| **Lightsail** | 애플리케이션 서버 | $10/월, 2GB RAM, 서울(ap-northeast-2) |
+| **Route 53** | DNS 호스팅 | reserve.it.kr 호스팅 영역 |
+| **S3** | 이미지 스토리지 | reserve-it-kr-bucket, 서울 |
+| **CloudFront** | 이미지 CDN | cdn.reserve.it.kr (E1VOAW2W8K0VA4) |
+| **ACM** | SSL 인증서 | CloudFront용, us-east-1 리전 필수 |
+| **IAM** | S3 접근 제어 | reserve-s3-user (AmazonS3FullAccess) |
 
 ---
 

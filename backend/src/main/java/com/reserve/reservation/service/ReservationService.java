@@ -159,7 +159,7 @@ public class ReservationService {
                 log.warn("사장님 예약 알림 이메일 발송 실패 (서비스 계속): {}", e.getMessage());
             }
         } else {
-            log.debug("사장님 이메일 알림 비활성화 상태 — 발송 건너뜀님");
+            log.debug("사장님 이메일 알림 비활성화 상태 — 발송 건너뜀");
         }
 
         return response;

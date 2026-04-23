@@ -35,7 +35,6 @@ dependencies {
     // AWS S3 (이미지 업로드)
     implementation platform('software.amazon.awssdk:bom:2.25.28')
     implementation 'software.amazon.awssdk:s3'
-    implementation 'software.amazon.awssdk:sts'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

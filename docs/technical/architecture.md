@@ -84,15 +84,31 @@ app-network (bridge)
 2. GitHub Actions 시작
    ├── build-backend
    │     └── Gradle 빌드 → Docker 이미지 → DockerHub push
-   ├── build-frontend
-   │     └── npm build → SCP로 서버 전송 → Nginx 정적 파일 갱신
-   └── deploy-backend
+   ├── build-frontend (needs: build-backend)
+   │     └── npm build → SCP로 서버 전송 → PRIVATE_IP 자동 치환 → Nginx 정적 파일 갱신
+   └── deploy-backend (needs: build-backend)
          ├── 현재 활성 컨테이너 확인 (Blue or Green)
          ├── 반대 컨테이너 새로 기동
          ├── SSH 내부 헬스체크 (localhost:port/actuator/health)
          ├── Nginx upstream 전환 (service-env.inc 수정 후 reload)
          └── 구 컨테이너 종료
 ```
+
+---
+
+## Git 브랜치 전략
+
+```
+main          ← 배포 브랜치 (CI/CD 트리거)
+  ↑
+dev           ← 개발 통합 브랜치 (기본 브랜치)
+  ↑
+feature/*     ← 기능별 작업
+```
+
+- `feature/*` 완료 → `dev` PR 머지 (배포 없음)
+- `dev` 안정화 → `main` PR 머지 → CI/CD 자동 실행
+- 긴급 수정: `hotfix/*` → `main` 직접 PR
 
 ---
 

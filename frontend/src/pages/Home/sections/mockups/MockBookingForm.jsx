@@ -17,9 +17,10 @@ export default function MockBookingForm() {
             width: '100%', maxWidth: 360,
             background: '#fff',
             borderRadius: radius['2xl'],
-            padding: '28px 24px',
+            padding: 'clamp(18px, 4vw, 28px) clamp(16px, 4vw, 24px)',
             boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
             border: `1px solid ${colors.border.light}`,
+            boxSizing: 'border-box',
         }}>
             {/* 예약 날짜 — 표시만 */}
             <div style={{ marginBottom: 16 }}>
@@ -126,6 +127,8 @@ export default function MockBookingForm() {
                 onMouseDown={() => setPressed(true)}
                 onMouseUp={() => setPressed(false)}
                 onMouseLeave={() => setPressed(false)}
+                onTouchStart={() => setPressed(true)}
+                onTouchEnd={() => setPressed(false)}
                 style={{
                     borderRadius: radius.lg,
                     transform: pressed ? 'scale(0.97)' : 'scale(1)',

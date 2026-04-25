@@ -6,7 +6,7 @@ import { RESERVATION_DATA } from '../../Home.data';
 // 실제 MyReservations 페이지와 동일한 레이아웃
 export default function MockMyReservations() {
     return (
-        <div style={{ width: '100%', maxWidth: 400, background: '#fff', borderRadius: radius['2xl'], padding: '20px 24px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: `1px solid ${colors.border.light}` }}>
+        <div style={{ width: '100%', maxWidth: 400, background: '#fff', borderRadius: radius['2xl'], padding: 'clamp(14px, 3vw, 20px) clamp(16px, 3vw, 24px)', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: `1px solid ${colors.border.light}`, boxSizing: 'border-box' }}>
             {/* 페이지 타이틀 */}
             <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${colors.border.light}` }}>
                 <div style={{ fontSize: fontSize.lg, fontWeight: fontWeight.extrabold, color: colors.text.primary, letterSpacing: '-0.3px' }}>내 예약 확인</div>

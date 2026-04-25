@@ -96,7 +96,7 @@ export const styles = {
     sectionMobile: {
         minHeight: `calc(100dvh - ${heights.header})`,
         scrollMarginTop: heights.header,
-        padding: '20px 20px',
+        padding: '32px 20px 32px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -106,8 +106,7 @@ export const styles = {
     sectionBodyMobile: {
         display: 'flex',
         flexDirection: 'column',
-        gap: 20,
-        paddingBottom: 52,
+        gap: 28,
     },
     sectionTextMobile: { width: '100%' },
     sectionTitleMobile: {

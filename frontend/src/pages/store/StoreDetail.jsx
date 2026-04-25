@@ -2,7 +2,6 @@ import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Image, Typography, Form, Carousel, Divider } from 'antd';
-import { StarFilled } from '@ant-design/icons';
 import {
     PlusOutlined, MinusOutlined, ArrowLeftOutlined,
     ClockCircleOutlined, CreditCardOutlined, FieldTimeOutlined,
@@ -199,32 +198,7 @@ const infoStyles = {
     divider: { height: 1, background: colors.border.light },
 };
 
-// 가게 헤더 (카테고리 배지, 가게명, 별점/리뷰) 공통 컴포넌트
-const StoreHeader = ({ store }) => (
-    <>
-        <div style={{ marginTop: 20, marginBottom: 4 }}>
-            {store.category && (
-                <span style={headerStyles.categoryBadge}>{store.category}</span>
-            )}
-            {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
-                <span key={i} style={headerStyles.keywordBadge}>{kw}</span>
-            ))}
-        </div>
-        <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
-        {/* StoreCard와 동일한 방식: StarFilled + 별점값 + (리뷰수) */}
-        <div style={headerStyles.metaRow}>
-            <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
-            <Text strong style={{ fontSize: fontSize.sm }}>
-                {store.rating?.toFixed(1) || '0.0'}
-            </Text>
-            <Text type="secondary" style={{ fontSize: fontSize.xs }}>
-                ({store.reviewCount || 0})
-            </Text>
-        </div>
-    </>
-);
-
-// 예약 폼 패널
+// 예약 폼 패널 (PC: sticky 사이드바 / 모바일용 하단 섹션)
 const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => (
     <div style={isPC ? pcFormStyles.panel : {}}>
         <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
@@ -295,6 +269,7 @@ const StoreDetail = () => {
         if (error) message.error(error);
     }, [error]); // eslint-disable-line
 
+    // 찜 초기 상태 로딩 (비로그인 상태에서도 확인 가능)
     React.useEffect(() => {
         favoriteService.getStatus(Number(id))
             .then(res => setFavoriteStatus(res?.isFavorite ?? false))
@@ -378,13 +353,17 @@ const StoreDetail = () => {
         <PageContainer size={containerSize} paddingTop={isPC ? '32px' : '20px'}>
             <style>{customStyles}</style>
 
+            {/* 뒤로가기 */}
             <Button variant="ghost" onClick={() => navigate(-1)} style={styles.backBtn}>
                 <ArrowLeftOutlined style={{ fontSize: 14 }} /> 뒤로가기
             </Button>
 
             {isPC ? (
+                /* PC: 좌측 콘텐츠 / 우측 예약폼 */
                 <div style={styles.pcGrid}>
+                    {/* 좌측 */}
                     <div style={styles.pcLeft}>
+                        {/* 이미지 슬라이더 + 찜 버튼 */}
                         <div style={{ position: 'relative' }}>
                             <div style={styles.pcImageWrapper}>
                                 <Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
@@ -402,11 +381,43 @@ const StoreDetail = () => {
                             </div>
                         </div>
 
-                        <StoreHeader store={store} />
+                        {/* 가게명 + 서브 정보 */}
+                        <div style={{ marginTop: 20, marginBottom: 4 }}>
+                            {/* 카테고리 배지 */}
+                            {store.category && (
+                                <span style={headerStyles.categoryBadge}>{store.category}</span>
+                            )}
+                            {/* 키워드 배지 */}
+                            {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
+                                <span key={i} style={headerStyles.keywordBadge}>{kw}</span>
+                            ))}
+                        </div>
+                        <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
+                        {/* 별점 · 리뷰 수 · 가격대 */}
+                        <div style={headerStyles.metaRow}>
+                            {store.rating > 0 && (
+                                <span style={headerStyles.rating}>
+                                    ★ {store.rating.toFixed(1)}
+                                </span>
+                            )}
+                            {store.reviewCount > 0 && (
+                                <span style={headerStyles.metaText}>
+                                    · 리뷰 {store.reviewCount.toLocaleString()}개
+                                </span>
+                            )}
+                            {store.noShowDeposit > 0 && (
+                                <span style={headerStyles.metaText}>
+                                    · 1인 ~{Number(store.noShowDeposit).toLocaleString()}원
+                                </span>
+                            )}
+                        </div>
+
+                        {/* 상세 정보 */}
                         <StoreInfoSection store={store} description={store.description} />
 
                         <Divider style={styles.divider} />
 
+                        {/* 리뷰 */}
                         <section ref={reviewSectionRef} style={{ maxWidth: 540 }}>
                             <Title level={3} style={styles.sectionTitle}>리뷰</Title>
                             <ReviewList
@@ -418,6 +429,7 @@ const StoreDetail = () => {
                         </section>
                     </div>
 
+                    {/* 우측 sticky 예약폼 */}
                     <div style={styles.pcRight}>
                         <ReservationPanel
                             store={store} form={form} onFinish={onFinish}
@@ -425,6 +437,7 @@ const StoreDetail = () => {
                     </div>
                 </div>
             ) : (
+                /* 모바일: 일렬 배치 */
                 <>
                     <section style={{ padding: 0 }}>
                         <div style={{ position: 'relative' }}>
@@ -444,7 +457,34 @@ const StoreDetail = () => {
                             </div>
                         </div>
                         <div style={{ padding: '0 16px' }}>
-                            <StoreHeader store={store} />
+                            {/* 카테고리 + 키워드 배지 */}
+                            <div style={{ marginTop: 20, marginBottom: 4 }}>
+                                {store.category && (
+                                    <span style={headerStyles.categoryBadge}>{store.category}</span>
+                                )}
+                                {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
+                                    <span key={i} style={headerStyles.keywordBadge}>{kw}</span>
+                                ))}
+                            </div>
+                            <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
+                            {/* 별점 · 리뷰 수 · 가격대 */}
+                            <div style={headerStyles.metaRow}>
+                                {store.rating > 0 && (
+                                    <span style={headerStyles.rating}>
+                                        ★ {store.rating.toFixed(1)}
+                                    </span>
+                                )}
+                                {store.reviewCount > 0 && (
+                                    <span style={headerStyles.metaText}>
+                                        · 리뷰 {store.reviewCount.toLocaleString()}개
+                                    </span>
+                                )}
+                                {store.noShowDeposit > 0 && (
+                                    <span style={headerStyles.metaText}>
+                                        · 1인 ~{Number(store.noShowDeposit).toLocaleString()}원
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </section>
 
@@ -477,20 +517,17 @@ const StoreDetail = () => {
     );
 };
 
-// StoreCard <Tag color="blue"> + radius.sm(4px)과 완전히 동일한 네모 스타일
 const headerStyles = {
     categoryBadge: {
         display: 'inline-block',
-        background: '#e6f4ff',
-        color: '#1677ff',
+        background: colors.primary.light,
+        color: colors.primary.main,
         fontSize: fontSize.xs,
         fontWeight: fontWeight.medium,
-        padding: '2px 8px',
-        borderRadius: radius.sm,
-        border: 'none',
+        padding: '3px 10px',
+        borderRadius: radius.full ?? 100,
         marginRight: 6,
         marginBottom: 4,
-        lineHeight: '20px',
     },
     keywordBadge: {
         display: 'inline-block',
@@ -498,35 +535,85 @@ const headerStyles = {
         color: colors.text.secondary,
         fontSize: fontSize.xs,
         fontWeight: fontWeight.medium,
-        padding: '2px 8px',
-        borderRadius: radius.sm,
-        border: 'none',
+        padding: '3px 10px',
+        borderRadius: radius.full ?? 100,
         marginRight: 6,
         marginBottom: 4,
-        lineHeight: '20px',
     },
     metaRow: {
         display: 'flex',
         alignItems: 'center',
-        gap: 4,
+        gap: 8,
         flexWrap: 'wrap',
         marginBottom: 16,
+    },
+    rating: {
+        fontSize: fontSize.sm,
+        color: '#f5a623',
+        fontWeight: fontWeight.semibold,
+    },
+    metaText: {
+        fontSize: fontSize.sm,
+        color: colors.text.secondary,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        '&::before': { content: '"·"' },
     },
 };
 
 const styles = {
     backBtn: { marginBottom: 12, padding: '4px 8px', fontSize: fontSize.sm, color: colors.text.secondary },
-    storeTitle: { fontSize: fontSize['5xl'], fontWeight: fontWeight.extrabold, marginBottom: 8, marginTop: 20 },
+    storeTitle: { fontSize: fontSize['5xl'], fontWeight: fontWeight.extrabold, marginBottom: 12, marginTop: 20 },
     divider: { margin: '24px 0' },
     sectionTitle: { marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold },
     mainImg: { width: '100%', height: 'auto', display: 'block' },
-    pcGrid: { display: 'flex', gap: 36, alignItems: 'flex-start' },
-    pcLeft: { flex: '0 0 50%', minWidth: 0, maxWidth: 560 },
-    pcRight: { flex: 1, minWidth: 320, maxWidth: 440, position: 'sticky', top: 80, alignSelf: 'flex-start' },
-    pcImageWrapper: { width: '100%', overflow: 'hidden', borderRadius: radius.xl, lineHeight: 0 },
-    pcMainImg: { width: '100%', height: 'auto', display: 'block' },
-    mobileImageWrapper: { width: '100%', overflow: 'hidden', marginBottom: 0, lineHeight: 0, borderRadius: radius.xl },
-    imgFavBtn: { position: 'absolute', top: 12, right: 12, zIndex: 5 },
+
+    // PC 전용
+    pcGrid: {
+        display: 'flex',
+        gap: 36,
+        alignItems: 'flex-start',
+    },
+    pcLeft: {
+        flex: '0 0 50%',
+        minWidth: 0,
+        maxWidth: 560,
+    },
+    pcRight: {
+        flex: 1,
+        minWidth: 320,
+        maxWidth: 440,
+        position: 'sticky',
+        top: 80,
+        alignSelf: 'flex-start',
+    },
+    pcImageWrapper: {
+        width: '100%',
+        overflow: 'hidden',
+        borderRadius: radius.xl,
+        lineHeight: 0,
+    },
+    pcMainImg: {
+        width: '100%',
+        height: 'auto',
+        display: 'block',
+    },
+
+    // 모바일 전용
+    mobileImageWrapper: {
+        width: '100%',
+        overflow: 'hidden',
+        marginBottom: 0,
+        lineHeight: 0,
+        borderRadius: radius.xl,
+    },
+    imgFavBtn: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        zIndex: 5,
+    },
 };
 
 export default StoreDetail;

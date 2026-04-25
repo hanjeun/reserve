@@ -23,7 +23,7 @@ function renderParts(current, line) {
     );
 }
 
-export default function HeroSection({ isMobile }) {
+export default function HeroSection() {
     const navigate = useNavigate();
     const { current, lineIdx } = useLineLoop();
 
@@ -61,7 +61,7 @@ export default function HeroSection({ isMobile }) {
                 style={{
                     position: 'absolute', bottom: 0, left: 0, right: 0,
                     opacity: 0,
-                    animation: `bounceAppear 0.75s cubic-bezier(0.22,1,0.36,1) ${isMobile ? '0.8s' : '0.6s'} forwards, bounceY 1.6s ease-in-out 1.5s infinite`,
+                    animation: `bounceAppear 0.75s cubic-bezier(0.22,1,0.36,1) 0.6s forwards, bounceY 1.6s ease-in-out 1.5s infinite`,
                 }}
             />
         </div>

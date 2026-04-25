@@ -183,6 +183,7 @@ const Button = ({
                 .reserve-btn {
                     -webkit-appearance: none;
                     appearance: none;
+                    -webkit-tap-highlight-color: transparent;
                 }
                 /* primary / secondary / danger / hero: scale + opacity */
                 .reserve-btn--primary:active:not(:disabled),

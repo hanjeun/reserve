@@ -9,20 +9,19 @@ import FaqSection from './sections/FaqSection';
 
 export default function Home() {
     const isMobile = useWindowWidth() <= 768;
-    useScrollReveal(isMobile); // isMobile 의존성 → 흰 화면 버그 수정
-
+    useScrollReveal(isMobile);
     useEffect(() => { window.scrollTo(0, 0); }, []);
 
     return (
         <div style={{ backgroundColor: colors.background.default, overflowX: 'hidden' }}>
 
-            <HeroSection isMobile={isMobile} />
+            <HeroSection />
 
             {SECTIONS.map((sec, i) => (
                 <FeatureSection key={sec.id} sec={sec} index={i} isMobile={isMobile} />
             ))}
 
-            <FaqSection isMobile={isMobile} />
+            <FaqSection />
 
             <style>{`
                 .slide-up {

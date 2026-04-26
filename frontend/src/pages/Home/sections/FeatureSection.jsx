@@ -1,9 +1,7 @@
 import { Typography } from 'antd';
 import { CheckCircleFilled } from '@ant-design/icons';
 import { colors } from '../../../styles/tokens';
-import { SECTION_IDS } from '../Home.constants';
 import { styles } from '../Home.styles';
-import BounceArrow from './BounceArrow';
 
 const { Title, Text } = Typography;
 
@@ -28,11 +26,22 @@ function SectionTitle({ title, blue, style }) {
 export default function FeatureSection({ sec, index, isMobile }) {
     const { id, tag, title, blue, desc, points, Ui, UiMobile, reverse } = sec;
     const bgColor = index % 2 === 1 ? colors.background.subtle : '#fff';
-    const nextId = SECTION_IDS[index + 1] || 'section-faq';
 
     if (isMobile) {
         return (
-            <div id={id} style={{ ...styles.sectionMobile, background: bgColor }}>
+            <div 
+                id={id} 
+                style={{ 
+                    ...styles.sectionMobile, 
+                    background: bgColor,
+                    ...((index === 1 || index === 2) && { 
+                    paddingTop: '80px', 
+                    paddingBottom: '80px',
+                    paddingLeft: '20px',
+                    paddingRight: '20px'
+                })
+                }}
+            >
                 <div style={styles.sectionBodyMobile}>
                     <div className="reveal" style={styles.sectionTextMobile}>
                         <div style={styles.sectionTag}>{tag}</div>
@@ -51,13 +60,9 @@ export default function FeatureSection({ sec, index, isMobile }) {
                             ))}
                         </div>
                     </div>
-                    {/* 컴포넌트 참조 → 렌더 시 동적 생성 (useState 버그 수정) */}
-                    <div className="reveal reveal-delayed">
-                        <UiMobile />
+                    <div className="reveal reveal-delayed" style={{ width: '100%' }}>
+                        <Ui />
                     </div>
-                </div>
-                <div style={styles.sectionArrow}>
-                    <BounceArrow targetId={nextId} />
                 </div>
             </div>
         );
@@ -88,9 +93,6 @@ export default function FeatureSection({ sec, index, isMobile }) {
                         <Ui />
                     </div>
                 </div>
-            </div>
-            <div style={styles.sectionArrow}>
-                <BounceArrow targetId={nextId} />
             </div>
         </div>
     );

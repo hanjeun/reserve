@@ -381,8 +381,36 @@ const StoreDetail = () => {
                             </div>
                         </div>
 
-                        {/* 가게명 */}
-                        <Title level={1} style={styles.storeTitle}>{store.name}</Title>
+                        {/* 가게명 + 서브 정보 */}
+                        <div style={{ marginTop: 20, marginBottom: 4 }}>
+                            {/* 카테고리 배지 */}
+                            {store.category && (
+                                <span style={headerStyles.categoryBadge}>{store.category}</span>
+                            )}
+                            {/* 키워드 배지 */}
+                            {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
+                                <span key={i} style={headerStyles.keywordBadge}>{kw}</span>
+                            ))}
+                        </div>
+                        <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
+                        {/* 별점 · 리뷰 수 · 가격대 */}
+                        <div style={headerStyles.metaRow}>
+                            {store.rating > 0 && (
+                                <span style={headerStyles.rating}>
+                                    ★ {store.rating.toFixed(1)}
+                                </span>
+                            )}
+                            {store.reviewCount > 0 && (
+                                <span style={headerStyles.metaText}>
+                                    · 리뷰 {store.reviewCount.toLocaleString()}개
+                                </span>
+                            )}
+                            {store.noShowDeposit > 0 && (
+                                <span style={headerStyles.metaText}>
+                                    · 1인 ~{Number(store.noShowDeposit).toLocaleString()}원
+                                </span>
+                            )}
+                        </div>
 
                         {/* 상세 정보 */}
                         <StoreInfoSection store={store} description={store.description} />
@@ -429,7 +457,34 @@ const StoreDetail = () => {
                             </div>
                         </div>
                         <div style={{ padding: '0 16px' }}>
-                            <Title level={1} style={styles.storeTitle}>{store.name}</Title>
+                            {/* 카테고리 + 키워드 배지 */}
+                            <div style={{ marginTop: 20, marginBottom: 4 }}>
+                                {store.category && (
+                                    <span style={headerStyles.categoryBadge}>{store.category}</span>
+                                )}
+                                {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
+                                    <span key={i} style={headerStyles.keywordBadge}>{kw}</span>
+                                ))}
+                            </div>
+                            <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
+                            {/* 별점 · 리뷰 수 · 가격대 */}
+                            <div style={headerStyles.metaRow}>
+                                {store.rating > 0 && (
+                                    <span style={headerStyles.rating}>
+                                        ★ {store.rating.toFixed(1)}
+                                    </span>
+                                )}
+                                {store.reviewCount > 0 && (
+                                    <span style={headerStyles.metaText}>
+                                        · 리뷰 {store.reviewCount.toLocaleString()}개
+                                    </span>
+                                )}
+                                {store.noShowDeposit > 0 && (
+                                    <span style={headerStyles.metaText}>
+                                        · 1인 ~{Number(store.noShowDeposit).toLocaleString()}원
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </section>
 
@@ -460,6 +515,51 @@ const StoreDetail = () => {
             )}
         </PageContainer>
     );
+};
+
+const headerStyles = {
+    categoryBadge: {
+        display: 'inline-block',
+        background: colors.primary.light,
+        color: colors.primary.main,
+        fontSize: fontSize.xs,
+        fontWeight: fontWeight.medium,
+        padding: '3px 10px',
+        borderRadius: radius.full ?? 100,
+        marginRight: 6,
+        marginBottom: 4,
+    },
+    keywordBadge: {
+        display: 'inline-block',
+        background: colors.gray[100],
+        color: colors.text.secondary,
+        fontSize: fontSize.xs,
+        fontWeight: fontWeight.medium,
+        padding: '3px 10px',
+        borderRadius: radius.full ?? 100,
+        marginRight: 6,
+        marginBottom: 4,
+    },
+    metaRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+        marginBottom: 16,
+    },
+    rating: {
+        fontSize: fontSize.sm,
+        color: '#f5a623',
+        fontWeight: fontWeight.semibold,
+    },
+    metaText: {
+        fontSize: fontSize.sm,
+        color: colors.text.secondary,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        '&::before': { content: '"·"' },
+    },
 };
 
 const styles = {

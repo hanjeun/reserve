@@ -69,41 +69,11 @@ RESERVE는 음식점 예약을 더 쉽고 빠르게 만들기 위한 풀스택 �
 |---|---|
 | [손님 가이드](docs/guide/user-guide.md) | 회원가입부터 예약·결제까지 |
 | [사장님 가이드](docs/guide/owner-guide.md) | 가게 등록부터 예약 관리까지 |
-| [아키텍처](docs/technical/architecture.md) | 인프라 구조 · 배포 방식 |
+| [아키텍처](docs/technical/architecture.md) | 인프라 구조 · 배포 방식 · Git 브랜치 전략 |
 | [코드 구조](docs/technical/structure.md) | 폴더 구조 · 라우트 · 환경변수 |
 | [디자인 시스템](docs/technical/design-system.md) | 디자인 토큰 · 공통 컴포넌트 |
+| [코드 컨벤션](docs/rules/code-conventions.md) | 네이밍 규칙 · 패키지 구조 |
+| [Git 워크플로우](docs/rules/git-workflow.md) | 브랜치 전략 · PR 방법 · 커밋 메시지 |
 
 ---
 
-## 브랜치 전략
-
-```
-main          ← 배포 브랜치 (CI/CD 트리거, reserve.it.kr 자동 반영)
-  ↑
-dev           ← 개발 통합 브랜치 (기본 브랜치, PR 받는 곳)
-  ↑
-feature/기능명  ← 기능별 작업 브랜치
-```
-
-| 브랜치 | 역할 |
-|---|---|
-| `main` | 운영 배포. push 시 CI/CD 자동 실행 |
-| `dev` | 개발 중인 작업 통합. 배포 준비가 된 후 `main`으로 PR |
-| `feature/*` | 기능별 작업. 완료 후 `dev`로 PR |
-| `hotfix/*` | 긴급 수정. `main`에 직접 PR |
-
-**일반 작업 흐름:**
-```bash
-git checkout dev && git pull origin dev
-git checkout -b feature/기능명
-# ... 작업 ...
-git add . && git commit -m "feat: 설명"
-git push origin feature/기능명
-# GitHub에서 feature/기능명 → dev PR 머지
-```
-
-**배포 흐름:**
-```bash
-# GitHub에서 dev → main PR 머지
-# → GitHub Actions 자동 실행 → reserve.it.kr 반영
-```

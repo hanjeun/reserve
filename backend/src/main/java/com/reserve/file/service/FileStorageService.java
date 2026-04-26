@@ -1,9 +1,8 @@
-package com.reserve.store.service;
+package com.reserve.file.service;
 
 import com.reserve.global.error.FileException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -50,9 +49,13 @@ public class FileStorageService {
 
     /**
      * S3에 파일 업로드 후 CloudFront URL 반환
-     * @param folder S3 저장 경로 (예: "profiles", "stores/thumbnails", "stores/images", "businesses")
+     *
+     * @param file       업로드할 파일
+     * @param prefixPath S3 저장 경로 prefix — FileStoragePaths 유틸로 조합해서 전달
+     *                   예: "users/1/profiles", "users/1/stores/5/thumbnails", "notices/3/images"
+     * @return CloudFront URL, 파일이 없으면 null
      */
-    public String storeFile(MultipartFile file, String folder) {
+    public String storeFile(MultipartFile file, String prefixPath) {
         if (file == null || file.isEmpty()) return null;
 
         try {
@@ -61,7 +64,7 @@ public class FileStorageService {
             if (original != null && original.contains(".")) {
                 ext = original.substring(original.lastIndexOf("."));
             }
-            String key = folder + "/" + UUID.randomUUID() + ext;
+            String key = prefixPath + "/" + UUID.randomUUID() + ext;
 
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucket)
@@ -73,27 +76,24 @@ public class FileStorageService {
             s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
             log.info("S3 업로드 성공: {}", key);
 
-            // CloudFront URL 반환
             return "https://" + cloudfrontDomain + "/" + key;
 
         } catch (IOException e) {
             log.error("S3 업로드 실패", e);
-            throw new FileException("파일을 저장하는 중 서버에 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw FileException.uploadFailed();
         }
     }
 
     /**
      * S3에서 파일 삭제
+     * CloudFront URL이 아닌 외부 URL(소셜 로그인 이미지 등)은 자동으로 스킵
      */
     public void deleteFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isEmpty()) return;
-
-        // CloudFront URL이 아닌 경우 스킵 (소셜 로그인 이미지 등 외부 URL)
         if (!fileUrl.contains(cloudfrontDomain)) return;
 
         try {
-            // CloudFront URL → S3 key 추출
-            // ex) https://cdn.reserve.it.kr/stores/thumbnails/xxx.jpg → stores/thumbnails/xxx.jpg
+            // https://cdn.reserve.it.kr/users/1/profiles/xxx.jpg → users/1/profiles/xxx.jpg
             String key = fileUrl.substring(fileUrl.indexOf("/", 8) + 1);
 
             s3Client.deleteObject(DeleteObjectRequest.builder()

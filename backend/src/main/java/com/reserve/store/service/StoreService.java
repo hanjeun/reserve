@@ -1,6 +1,8 @@
 package com.reserve.store.service;
 
 import com.reserve.favorite.repository.FavoriteRepository;
+import com.reserve.file.service.FileStorageService;
+import com.reserve.file.util.FileStoragePaths;
 import com.reserve.global.error.StoreException;
 import com.reserve.member.entity.Member;
 import com.reserve.promotion.repository.PromotionRepository;
@@ -36,6 +38,7 @@ public class StoreService {
 
     /**
      * 가게 등록
+     * 순서: Store 먼저 저장(ID 획득) → 이미지 업로드(storeId 경로 사용) → 이미지 URL 업데이트
      */
     @Transactional
     public StoreResponse createStore(StoreCreateRequest request, Member owner) {
@@ -44,22 +47,7 @@ public class StoreService {
             throw new StoreException("가게 이름은 필수입니다.", HttpStatus.BAD_REQUEST);
         }
 
-        // 메인 이미지 저장
-        String mainImageUrl = null;
-        if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
-            mainImageUrl = fileStorageService.storeFile(request.getMainImage(), "stores/thumbnails");
-        }
-
-        // 상세 이미지들 저장
-        List<String> detailImageUrls = new ArrayList<>();
-        if (request.getDetailImages() != null && !request.getDetailImages().isEmpty()) {
-            for (MultipartFile file : request.getDetailImages()) {
-                if (file != null && !file.isEmpty()) {
-                    detailImageUrls.add(fileStorageService.storeFile(file, "stores/images"));
-                }
-            }
-        }
-
+        // 1단계: 이미지 없이 Store 먼저 저장 → storeId 확보
         Store store = Store.builder()
                 .owner(owner)
                 .name(request.getName().trim())
@@ -67,14 +55,13 @@ public class StoreService {
                 .address(request.getAddress())
                 .phone(request.getPhone())
                 .category(request.getCategory())
-                .mainImageUrl(mainImageUrl)
                 .rating(0.0)
                 .reviewCount(0)
                 .noShowDeposit(request.getNoShowDeposit() != null ? request.getNoShowDeposit() : 0)
                 .fullRefundDays(request.getFullRefundDays() != null ? request.getFullRefundDays() : 3)
                 .partialRefundDays(request.getPartialRefundDays() != null ? request.getPartialRefundDays() : 1)
                 .partialRefundRate(request.getPartialRefundRate() != null ? request.getPartialRefundRate() : 50)
-                .maxCapacityPerSlot(request.getMaxCapacityPerSlot())  // null = 무제한
+                .maxCapacityPerSlot(request.getMaxCapacityPerSlot())
                 .autoApprovalEnabled(request.getAutoApprovalEnabled() != null ? request.getAutoApprovalEnabled() : false)
                 .bookingDeadlineHours(request.getBookingDeadlineHours())
                 .paymentTimeoutMinutes(request.getPaymentTimeoutMinutes() != null ? request.getPaymentTimeoutMinutes() : 30)
@@ -88,18 +75,37 @@ public class StoreService {
             store.setKeywordList(request.getKeywords());
         }
 
-        if (!detailImageUrls.isEmpty()) {
-            store.setDetailImageList(detailImageUrls);
-        }
-
         if (request.getOpenTime() != null && request.getCloseTime() != null) {
             store.setOpenTime(request.getOpenTime());
             store.setCloseTime(request.getCloseTime());
         }
 
         Store savedStore = storeRepository.save(store);
-        log.info("가게 등록 완료: ID={}", savedStore.getId());
+        Long storeId = savedStore.getId();
+        Long memberId = owner.getId();
 
+        // 2단계: storeId 확보 후 이미지 업로드
+        if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
+            String mainImageUrl = fileStorageService.storeFile(
+                    request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId));
+            savedStore.setMainImageUrl(mainImageUrl);
+        }
+
+        List<String> detailImageUrls = new ArrayList<>();
+        if (request.getDetailImages() != null && !request.getDetailImages().isEmpty()) {
+            for (MultipartFile file : request.getDetailImages()) {
+                if (file != null && !file.isEmpty()) {
+                    detailImageUrls.add(fileStorageService.storeFile(
+                            file, FileStoragePaths.storeImage(memberId, storeId)));
+                }
+            }
+        }
+
+        if (!detailImageUrls.isEmpty()) {
+            savedStore.setDetailImageList(detailImageUrls);
+        }
+
+        log.info("가게 등록 완료: ID={}", storeId);
         return StoreResponse.fromEntity(savedStore);
     }
 
@@ -255,11 +261,15 @@ public class StoreService {
      * 이미지 업데이트 보조 메서드 (가독성을 위해 분리)
      */
     private void updateStoreImages(Store store, StoreUpdateRequest request) {
+        Long memberId = store.getOwner().getId();
+        Long storeId = store.getId();
+
         if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
             if (store.getMainImageUrl() != null) {
                 fileStorageService.deleteFile(store.getMainImageUrl());
             }
-            store.setMainImageUrl(fileStorageService.storeFile(request.getMainImage(), "stores/thumbnails"));
+            store.setMainImageUrl(fileStorageService.storeFile(
+                    request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId)));
         } else if (request.getExistingMainImageUrl() != null) {
             store.setMainImageUrl(request.getExistingMainImageUrl());
         }
@@ -272,7 +282,8 @@ public class StoreService {
         if (request.getDetailImages() != null) {
             for (MultipartFile file : request.getDetailImages()) {
                 if (file != null && !file.isEmpty()) {
-                    finalDetailImages.add(fileStorageService.storeFile(file, "stores/images"));
+                    finalDetailImages.add(fileStorageService.storeFile(
+                            file, FileStoragePaths.storeImage(memberId, storeId)));
                 }
             }
         }

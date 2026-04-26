@@ -24,7 +24,8 @@ import com.reserve.reservation.repository.ReservationRepository;
 import com.reserve.review.repository.ReviewRepository;
 import com.reserve.store.entity.Store;
 import com.reserve.store.repository.StoreRepository;
-import com.reserve.store.service.FileStorageService;
+import com.reserve.file.service.FileStorageService;
+import com.reserve.file.util.FileStoragePaths;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -165,7 +166,7 @@ public class MemberService {
         // 기존 이미지 삭제 (소셜 로그인 이미지 URL 제외 - deleteFile 내부에서 처리)
         fileStorageService.deleteFile(member.getProfileImage());
 
-        String imageUrl = fileStorageService.storeFile(image, "profiles");
+        String imageUrl = fileStorageService.storeFile(image, FileStoragePaths.userProfile(memberId));
         member.setProfileImage(imageUrl);
         member.setProfileImageLocked(true);  // 유저가 직접 이미지 업로드 → 소셜 재로그인시도 유지
         Member updated = memberRepository.save(member);

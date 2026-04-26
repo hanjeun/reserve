@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { storeService } from '../services';
 import useMessage from './useMessage';
 import { buildStoreFormData } from '../utils/form';
 import { handleApiError } from '../utils/errorHandler';
 import { getDetailImageUrl } from '../utils/image';
+import { storeKeys } from './queryKeys';
 import dayjs from 'dayjs';
 
 /** StoreRegister, StoreEdit에서 공유하는 폼 공통 로직 */
@@ -14,6 +16,7 @@ export const useStoreForm = ({
     storeId = null,
 }) => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const { message } = useMessage();
     const [loading, setLoading] = useState(false);
     const [mainImage, setMainImage] = useState([]);
@@ -74,6 +77,9 @@ export const useStoreForm = ({
             mode === 'create'
                 ? await storeService.createStore(formData)
                 : await storeService.updateStore(storeId, formData);
+
+            // 내 가게 목록 + 공개 가게 목록 캐시 무효화 (storeKeys.all = ['stores'] prefix 전체)
+            await queryClient.invalidateQueries({ queryKey: storeKeys.all() });
 
             message.success(mode === 'create' ? '가게가 등록되었습니다' : '가게 정보가 수정되었습니다');
             navigate('/my-stores');

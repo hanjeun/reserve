@@ -9,7 +9,8 @@ import com.reserve.global.error.BizVerificationException;
 import com.reserve.member.entity.Member;
 import com.reserve.member.entity.Role;
 import com.reserve.member.repository.MemberRepository;
-import com.reserve.store.service.FileStorageService;
+import com.reserve.file.service.FileStorageService;
+import com.reserve.file.util.FileStoragePaths;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -49,7 +50,7 @@ public class BusinessVerificationService {
         validateSubmitRequest(request);
 
         // 4. 이미지 저장
-        String imageUrl = fileStorageService.storeFile(request.getLicenseImage(), "businesses");
+        String imageUrl = fileStorageService.storeFile(request.getLicenseImage(), FileStoragePaths.business(member.getId()));
 
         // 5. 인증 요청 생성
         BusinessVerification verification = BusinessVerification.builder()

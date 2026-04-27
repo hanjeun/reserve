@@ -19,7 +19,8 @@ public class BusinessVerificationResponse {
     private Long memberId;
     private String memberName;
     private String memberEmail;
-    private String licenseImageUrl;
+    private String licenseImageKey;  // S3 key (관리자 상세 조회 시 Pre-signed URL로 변환됨)
+    private String licenseImageUrl;  // Pre-signed URL (관리자 상세 조회 시에만 값 있음, 목록에선 null)
     private String businessName;
     private String businessNumber;
     private String memo;
@@ -36,7 +37,7 @@ public class BusinessVerificationResponse {
                 .memberId(verification.getMember().getId())
                 .memberName(verification.getMember().getName())
                 .memberEmail(verification.getMember().getEmail())
-                .licenseImageUrl(verification.getLicenseImageUrl())
+                .licenseImageKey(verification.getLicenseImageKey())
                 .businessName(verification.getBusinessName())
                 .businessNumber(verification.getBusinessNumber())
                 .memo(verification.getMemo())
@@ -45,7 +46,30 @@ public class BusinessVerificationResponse {
                 .rejectionReason(verification.getRejectionReason())
                 .createdAt(verification.getCreatedAt())
                 .processedAt(verification.getProcessedAt())
-                .processedByName(verification.getProcessedBy() != null ? 
+                .processedByName(verification.getProcessedBy() != null ?
+                        verification.getProcessedBy().getName() : null)
+                .build();
+    }
+
+    /** 관리자 상세 조회 시 Pre-signed URL 포함 버전 */
+    public static BusinessVerificationResponse fromEntityWithPresignedUrl(
+            BusinessVerification verification, String presignedUrl) {
+        return BusinessVerificationResponse.builder()
+                .id(verification.getId())
+                .memberId(verification.getMember().getId())
+                .memberName(verification.getMember().getName())
+                .memberEmail(verification.getMember().getEmail())
+                .licenseImageKey(verification.getLicenseImageKey())
+                .licenseImageUrl(presignedUrl)  // 5분짜리 임시 URL
+                .businessName(verification.getBusinessName())
+                .businessNumber(verification.getBusinessNumber())
+                .memo(verification.getMemo())
+                .status(verification.getStatus())
+                .statusDisplayName(verification.getStatus().getDisplayName())
+                .rejectionReason(verification.getRejectionReason())
+                .createdAt(verification.getCreatedAt())
+                .processedAt(verification.getProcessedAt())
+                .processedByName(verification.getProcessedBy() != null ?
                         verification.getProcessedBy().getName() : null)
                 .build();
     }

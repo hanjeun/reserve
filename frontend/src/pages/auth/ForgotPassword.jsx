@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Form, Typography, Flex } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
@@ -54,6 +55,7 @@ const ForgotPassword = () => {
     const navigate = useNavigate();
     const [form] = Form.useForm();
     const { message } = useMessage();
+    useDocumentTitle('비밀번호 찾기');
 
     const [email, setEmail]             = useState('');
     const [isCodeSent, setIsCodeSent]   = useState(false);

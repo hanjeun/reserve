@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Typography, Divider, Form, Tabs, Switch } from 'antd';
+import { Typography, Divider, Form, Tabs, Switch, Image } from 'antd';
 import {
     LockOutlined,
     ExclamationCircleOutlined,
@@ -12,6 +12,7 @@ import {
 import { PageContainer, Button, FormInput, Avatar, Bone } from '../../components/common';
 import { useMessage } from '../../hooks';
 import { memberService, businessService } from '../../services';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { hasAdminAccess } from '../../constants/roles';
 import { handleApiError } from '../../utils/errorHandler';
 import useAuthStore from '../../store/useAuthStore';
@@ -252,13 +253,16 @@ const ProfileImageTab = ({ user }) => {
 const BusinessTab = ({ user }) => {
     const { message, confirm } = useMessage();
     const [status, setStatus]     = useState(null);
+    const [rejectionReason, setRejectionReason] = useState(null);
     const [statusLoading, setStatusLoading] = useState(true);
     const [form, setForm]         = useState({ businessName: '', businessNumber: '', memo: '' });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
     const [submitLoading, setSubmitLoading] = useState(false);
+    const [updateLoading, setUpdateLoading] = useState(false);
     const [cancelLoading, setCancelLoading] = useState(false);
     const [resignLoading, setResignLoading] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
     const fileInputRef = useRef(null);
 
     const isBusiness = user?.role === 'BUSINESS';
@@ -266,7 +270,10 @@ const BusinessTab = ({ user }) => {
     useEffect(() => {
         if (isBusiness) { setStatusLoading(false); return; }
         businessService.getMyStatus()
-            .then(res => setStatus(res?.status ?? null))
+            .then(res => {
+                setStatus(res?.status ?? null);
+                setRejectionReason(res?.rejectionReason ?? null);
+            })
             .catch(() => setStatus(null))
             .finally(() => setStatusLoading(false));
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -278,6 +285,37 @@ const BusinessTab = ({ user }) => {
         if (file.size > 5 * 1024 * 1024) return message.error('5MB 이하 파일만 가능합니다');
         setImageFile(file);
         setImagePreview(URL.createObjectURL(file));
+    };
+
+    const handleUpdate = async () => {
+        if (!form.businessName.trim()) return message.warning('상호명을 입력해주세요');
+        setUpdateLoading(true);
+        try {
+            await businessService.update({ ...form, licenseImage: imageFile || undefined });
+            message.success('수정되었습니다.');
+            setIsEditing(false);
+            setImageFile(null);
+            setImagePreview(null);
+        } catch (err) {
+            handleApiError(err, message, '수정에 실패했습니다');
+        } finally {
+            setUpdateLoading(false);
+        }
+    };
+
+    // 수정 모드 진입 시 기존 데이터 자동 체우기
+    const handleStartEdit = async () => {
+        try {
+            const current = await businessService.getMyStatus();
+            setForm({
+                businessName: current?.businessName || '',
+                businessNumber: current?.businessNumber || '',
+                memo: current?.memo || '',
+            });
+        } catch {
+            // 실패 시 빈 폼으로 시작
+        }
+        setIsEditing(true);
     };
 
     const handleSubmit = async () => {
@@ -372,18 +410,44 @@ const BusinessTab = ({ user }) => {
     );
 
     // ── 심사 대기중 ──
-    if (status === 'PENDING') return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={bizStyles.statusCard('warning')}>
-                <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
-                <div>
-                    <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>심사 중이에요</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>관리자 검토 후 승인 여부를 알려드립니다</Text>
+    if (status === 'PENDING') {
+        // 수정 모드일 때는 폼 표시
+        if (isEditing) return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={bizStyles.statusCard('warning')}>
+                    <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
+                    <div>
+                        <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>신청 내용 수정</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>수정 후 저장하면 기존 신청이 업데이트됩니다</Text>
+                    </div>
+                </div>
+                <BusinessForm
+                    form={form} setForm={setForm}
+                    imageFile={imageFile} imagePreview={imagePreview}
+                    fileInputRef={fileInputRef} onFileChange={handleFileChange}
+                    onSubmit={handleUpdate} loading={updateLoading}
+                    submitLabel="수정 저장"
+                />
+                <Button variant="secondary" onClick={() => setIsEditing(false)} block>취소</Button>
+            </div>
+        );
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={bizStyles.statusCard('warning')}>
+                    <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
+                    <div>
+                        <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>심사 중이에요</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>관리자 검토 후 승인 여부를 알려드립니다</Text>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <Button variant="secondary" loading={cancelLoading} onClick={handleCancel} style={{ flex: 1 }}>신청 취소</Button>
+                    <Button variant="primary" onClick={handleStartEdit} style={{ flex: 1 }}>수정하기</Button>
                 </div>
             </div>
-            <Button variant="secondary" loading={cancelLoading} onClick={handleCancel} block>신청 취소</Button>
-        </div>
-    );
+        );
+    }
 
     // ── 거절됨 ──
     if (status === 'REJECTED') return (
@@ -394,6 +458,15 @@ const BusinessTab = ({ user }) => {
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>내용을 수정하여 다시 신청할 수 있습니다</Text>
                 </div>
             </div>
+            {status === 'REJECTED' && rejectionReason && (
+                <div style={{
+                    background: '#fff2f0', border: '1px solid #ffccc7',
+                    borderRadius: radius.lg, padding: '12px 14px'
+                }}>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block', marginBottom: 4 }}>거절 사유</Text>
+                    <Text style={{ fontSize: fontSize.sm, color: colors.error.main }}>{rejectionReason}</Text>
+                </div>
+            )}
             <BusinessForm
                 form={form} setForm={setForm}
                 imageFile={imageFile} imagePreview={imagePreview}
@@ -415,7 +488,7 @@ const BusinessTab = ({ user }) => {
 };
 
 // eslint-disable-next-line no-unused-vars
-const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, onFileChange, onSubmit, loading }) => (
+const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, onFileChange, onSubmit, loading, submitLabel = '사업자 인증 신청' }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={bizStyles.infoNotice}>
             <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
@@ -439,15 +512,20 @@ const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, on
             onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
         />
 
-        {/* 이미지 업로드 */}
-        <div
-            style={bizStyles.imageUpload(!!imagePreview)}
-            onClick={() => fileInputRef.current?.click()}
-        >
+        {/* 이미지 업로드 — 선택 후 Ant Design Image로 클릭 시 전체화면 프리뷰 */}
+        <div style={bizStyles.imageUpload(!!imagePreview)}>
             {imagePreview ? (
-                <img src={imagePreview} alt="사업자 등록증" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: radius.lg }} />
+                <Image
+                    src={imagePreview}
+                    alt="사업자 등록증"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: radius.lg }}
+                    preview={{ mask: '크게 보기' }}
+                />
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <div
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%', height: '100%', justifyContent: 'center' }}
+                    onClick={() => fileInputRef.current?.click()}
+                >
                     <UploadOutlined style={{ fontSize: 22, color: colors.text.tertiary }} />
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>사업자 등록증 이미지 업로드 *</Text>
                 </div>
@@ -455,7 +533,7 @@ const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, on
         </div>
         <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
 
-        <Button variant="primary" loading={loading} onClick={onSubmit} block>사업자 인증 신청</Button>
+        <Button variant="primary" loading={loading} onClick={onSubmit} block>{submitLabel}</Button>
     </div>
 );
 
@@ -552,6 +630,7 @@ const MyPage = () => {
     const navigate = useNavigate();
     const { user, logout, checkAuth } = useAuthStore();
     const { message, confirm } = useMessage();
+    useDocumentTitle('마이페이지');
 
     // 마이페이지 진입 시 항상 최신 user 정보를 서버에서 재조회 (localStorage 캐시 신뢰하지 않음)
     useEffect(() => { checkAuth(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps

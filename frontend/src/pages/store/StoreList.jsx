@@ -3,6 +3,7 @@ import { Empty } from 'antd';
 import { PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
 import { useStoreList } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { SORT_OPTIONS } from '../../constants';
 import { fontWeight, fontSize, colors } from '../../styles/tokens';
 import { Input, Select, Typography } from 'antd';
@@ -14,6 +15,7 @@ const PAGE_SIZE = 12;
 
 const StoreList = () => {
     const { stores, loading, fetching, searchParams, setSearchParams } = useStoreList();
+    useDocumentTitle('가게 목록');
 
     const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
     const sentinelRef = React.useRef(null);

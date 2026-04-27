@@ -3,6 +3,7 @@ import { Empty, Typography } from 'antd';
 import { PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
 import { useMessage } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import favoriteService from '../../services/favoriteService';
 import { fontWeight, fontSize } from '../../styles/tokens';
 
@@ -10,6 +11,7 @@ const { Title, Text } = Typography;
 
 const MyFavorites = () => {
     const { message } = useMessage();
+    useDocumentTitle('즐겨찾기');
     const [favorites, setFavorites] = useState([]);
     const [loading, setLoading]     = useState(true);
     const fetchedRef = React.useRef(false);

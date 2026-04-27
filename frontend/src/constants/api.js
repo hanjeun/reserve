@@ -56,6 +56,7 @@ export const API_ENDPOINTS = {
     BUSINESS: {
         SUBMIT:         '/api/business-verification/submit',
         MY_STATUS:      '/api/business-verification/my-status',
+        UPDATE:         '/api/business-verification/update',
         CANCEL:         '/api/business-verification/cancel',
         RESIGN:         '/api/business-verification/resign',
         // 관리자 전용

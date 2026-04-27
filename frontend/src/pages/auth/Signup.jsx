@@ -5,6 +5,7 @@ import useAuthStore from "../../store/useAuthStore";
 import { Form, Typography, Flex } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage, useEmailVerification } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { colors, fontWeight, fontSize, animation } from '../../styles/tokens';
@@ -16,6 +17,7 @@ const Signup = () => {
     const [form] = Form.useForm();
     const { message } = useMessage();
     const { isLoggedIn } = useAuthStore();
+    useDocumentTitle('회원가입');
 
     const {
         isCodeSent, isVerified,

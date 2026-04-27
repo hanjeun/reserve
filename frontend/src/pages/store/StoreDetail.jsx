@@ -13,6 +13,7 @@ import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, Fa
 import { ReviewList } from '../../components/review';
 import { StoreDetailSkeleton } from '../../components/common';
 import { useStoreData, useMessage, usePayment } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { getDetailImageUrl, formatTimeForApi, formatDate } from '../../utils';
 import { colors, radius, fontWeight, fontSize, heights } from '../../styles/tokens';
 import { reservationService, favoriteService } from '../../services';
@@ -258,6 +259,7 @@ const StoreDetail = () => {
     const { store, loading, error } = useStoreData(id);
     const [form] = Form.useForm();
     const isPC = useIsPC();
+    useDocumentTitle(store?.name ?? null);
 
     const [completedReservation, setCompletedReservation] = React.useState(null);
     const [favoriteStatus, setFavoriteStatus] = React.useState(false);

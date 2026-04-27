@@ -166,8 +166,8 @@ public class MemberService {
         // 기존 이미지 삭제 (소셜 로그인 이미지 URL 제외 - deleteFile 내부에서 처리)
         fileStorageService.deleteFile(member.getProfileImage());
 
-        String imageUrl = fileStorageService.storeFile(image, FileStoragePaths.userProfile(memberId));
-        member.setProfileImage(imageUrl);
+        String key = fileStorageService.storeFile(image, FileStoragePaths.userProfile(memberId));
+        member.setProfileImage(fileStorageService.getPublicUrl(key));
         member.setProfileImageLocked(true);  // 유저가 직접 이미지 업로드 → 소셜 재로그인시도 유지
         Member updated = memberRepository.save(member);
         log.info("프로필 이미지 수정 완료: memberId={}", memberId);

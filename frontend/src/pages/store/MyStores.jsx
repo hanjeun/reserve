@@ -4,6 +4,7 @@ import { StarFilled, EditOutlined, DeleteOutlined, ExclamationCircleFilled, Warn
 import { useNavigate } from 'react-router-dom';
 import { PageContainer, Card, StoreCardSkeleton } from '../../components/common';
 import { useMyStores } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { getThumbnailUrl } from '../../utils';
 import { colors, radius, fontWeight, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
@@ -172,6 +173,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
 const MyStores = () => {
     const navigate = useNavigate();
     const { stores, loading, deleteStore } = useMyStores();
+    useDocumentTitle('내 가게');
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [targetStore, setTargetStore] = useState(null); // { id, name }
 

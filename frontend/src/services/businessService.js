@@ -18,6 +18,16 @@ const businessService = {
     /** 신청 취소 (PENDING 상태일 때) */
     cancel: () => api.delete(API_ENDPOINTS.BUSINESS.CANCEL),
 
+    /** 신청 수정 (PENDING 상태일 때) */
+    update: ({ licenseImage, businessName, businessNumber, memo }) => {
+        const formData = new FormData();
+        if (businessName) formData.append('businessName', businessName);
+        if (businessNumber) formData.append('businessNumber', businessNumber);
+        if (memo !== undefined) formData.append('memo', memo);
+        if (licenseImage) formData.append('licenseImage', licenseImage);
+        return api.patch(API_ENDPOINTS.BUSINESS.UPDATE, formData);
+    },
+
     /** 사업자 자격 포기 (BUSINESS 상태일 때) */
     resign: () => api.post(API_ENDPOINTS.BUSINESS.RESIGN),
 };

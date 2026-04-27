@@ -3,39 +3,38 @@ import { Empty, Select, Tabs, Typography, Input } from 'antd';
 import {
     CalendarOutlined,
     ClockCircleOutlined,
-    CheckCircleOutlined,
-    CloseCircleOutlined,
-    TrophyOutlined,
-    StopOutlined,
-    WarningOutlined,
     PartitionOutlined,
-    ShopOutlined,
+    ReloadOutlined,
+    SearchOutlined,
 } from '@ant-design/icons';
-import { PageContainer, ReservationCardSkeleton } from '../../components/common';
+import { PageContainer, Button, ReservationCardSkeleton } from '../../components/common';
 import ReservationCard from '../../components/reservation/ReservationCard';
 import useManageReservations from '../../hooks/useManageReservations';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useDebounce from '../../hooks/useDebounce';
 import storeService from '../../services/storeService';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
-const { Search } = Input;
 
+// AdminPanel과 동일한 단순 텍스트 옵션 (아이콘/숫자 없음)
 const STATUS_OPTIONS = [
-    { value: 'ALL',       icon: <CalendarOutlined />,    label: '전체' },
-    { value: 'PENDING',   icon: <ClockCircleOutlined />, label: '승인 대기' },
-    { value: 'CONFIRMED', icon: <CheckCircleOutlined />, label: '확정' },
-    { value: 'COMPLETED', icon: <TrophyOutlined />,      label: '완료' },
-    { value: 'REJECTED',  icon: <CloseCircleOutlined />, label: '거절' },
-    { value: 'CANCELLED', icon: <StopOutlined />,        label: '취소' },
-    { value: 'NO_SHOW',   icon: <WarningOutlined />,     label: '노쇼' },
+    { value: 'ALL',       label: '전체 상태' },
+    { value: 'PENDING',   label: '승인 대기' },
+    { value: 'CONFIRMED', label: '확정' },
+    { value: 'COMPLETED', label: '완료' },
+    { value: 'REJECTED',  label: '거절' },
+    { value: 'CANCELLED', label: '취소' },
+    { value: 'NO_SHOW',   label: '노쇼' },
 ];
 
 const ReservationTab = () => {
     const [statusFilter, setStatusFilter] = useState('ALL');
-    const [keyword, setKeyword]           = useState('');
+    const [keyword, setKeyword] = useState('');
+    const debouncedKeyword = useDebounce(keyword, 300);
     const [storeFilter, setStoreFilter]   = useState('ALL');
     const [myStores, setMyStores]         = useState([]);
-    const { reservations, loading, actionLoading, approve, reject, complete, noShow } = useManageReservations();
+    const { reservations, loading, actionLoading, approve, reject, complete, noShow, refetch } = useManageReservations();
 
     useEffect(() => {
         storeService.getMyStores()
@@ -43,17 +42,13 @@ const ReservationTab = () => {
             .catch(() => {});
     }, []);
 
-    const countOf = (key) => key === 'ALL'
-        ? reservations.length
-        : reservations.filter(r => r.status === key).length;
-
     const filtered = useMemo(() => {
         let list = storeFilter !== 'ALL'
             ? reservations.filter(r => r.storeId === Number(storeFilter))
             : reservations;
         if (statusFilter !== 'ALL') list = list.filter(r => r.status === statusFilter);
-        if (keyword.trim()) {
-            const kw = keyword.toLowerCase();
+        if (debouncedKeyword.trim()) {
+            const kw = debouncedKeyword.toLowerCase();
             list = list.filter(r =>
                 r.storeName?.toLowerCase().includes(kw) ||
                 r.memberName?.toLowerCase().includes(kw) ||
@@ -61,46 +56,23 @@ const ReservationTab = () => {
             );
         }
         return list;
-    }, [reservations, statusFilter, storeFilter, keyword]);
+    }, [reservations, statusFilter, storeFilter, debouncedKeyword]);
 
-    const selectOptions = STATUS_OPTIONS.map(opt => ({
-        value: opt.value,
-        label: (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: statusFilter === opt.value ? colors.primary.main : colors.text.tertiary }}>
-                    {opt.icon}
-                </span>
-                {opt.label}
-                {/* 로딩 중엔 카운트 숨김 */}
-                {!loading && (
-                    <span style={{
-                        fontSize: fontSize.xs,
-                        fontWeight: fontWeight.semibold,
-                        color: statusFilter === opt.value ? colors.primary.main : colors.text.tertiary,
-                    }}>
-                        {countOf(opt.value)}
-                    </span>
-                )}
-            </span>
-        ),
-    }));
-
-    const pendingCount = !loading ? countOf('PENDING') : 0;
-    const currentLabel = STATUS_OPTIONS.find(o => o.value === statusFilter)?.label || '전체';
+    const pendingCount = !loading ? reservations.filter(r => r.status === 'PENDING').length : 0;
 
     return (
         <>
-            {/* 필터 바 — 항상 표시 */}
+            {/* 필터 바 */}
             <div style={styles.filterBar}>
                 {myStores.length > 1 && (
                     <Select
                         value={storeFilter}
                         onChange={setStoreFilter}
-                        style={{ minWidth: 160 }}
+                        style={{ minWidth: 140 }}
                         size="large"
                         disabled={loading}
                         options={[
-                            { value: 'ALL', label: <span><ShopOutlined /> 전체 가게</span> },
+                            { value: 'ALL', label: '전체 가게' },
                             ...myStores.map(s => ({ value: String(s.id), label: s.name }))
                         ]}
                     />
@@ -108,47 +80,48 @@ const ReservationTab = () => {
                 <Select
                     value={statusFilter}
                     onChange={setStatusFilter}
-                    options={selectOptions}
-                    style={{ width: 180 }}
-                    size="large"
-                    popupMatchSelectWidth={false}
-                    disabled={loading}
-                />
-                <Search
-                    placeholder="가게명, 예약자로 검색"
-                    allowClear
-                    value={keyword}
-                    onChange={e => setKeyword(e.target.value)}
-                    style={{ maxWidth: 240 }}
+                    options={STATUS_OPTIONS}
+                    style={{ width: 140 }}
                     size="large"
                     disabled={loading}
                 />
-                <div style={styles.countWrap}>
-                    {!loading && (
-                        <>
-                            <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>
-                                {currentLabel}{' '}
-                                <strong style={{ color: colors.text.primary }}>{filtered.length}건</strong>
-                            </Text>
-                            {pendingCount > 0 && statusFilter !== 'PENDING' && (
-                                <span style={styles.pendingBadge}>
-                                    <ClockCircleOutlined style={{ fontSize: 11 }} />
-                                    {' '}승인 대기 {pendingCount}건
-                                </span>
-                            )}
-                        </>
-                    )}
+                {/* 건수 — AdminPanel과 동일하게 셀렉터 옆에 표시 */}
+                {!loading && (
+                    <Text type="secondary" style={{ fontSize: fontSize.sm, alignSelf: 'center', whiteSpace: 'nowrap' }}>
+                        {filtered.length}건
+                    </Text>
+                )}
+                {/* 승인 대기 뱃지 */}
+                {pendingCount > 0 && statusFilter !== 'PENDING' && (
+                    <span style={styles.pendingBadge}>
+                        <ClockCircleOutlined style={{ fontSize: 11 }} />
+                        {' '}승인 대기 {pendingCount}건
+                    </span>
+                )}
+                <div style={{ display: 'flex', flex: 1, gap: 10, minWidth: 260 }}>
+                    <Input
+                        prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
+                        placeholder="가게명, 예약자로 검색"
+                        allowClear
+                        value={keyword}
+                        onChange={e => setKeyword(e.target.value)}
+                        style={{ flex: 1 }}
+                        size="large"
+                        disabled={loading}
+                    />
+                    <Button variant="ghost-sm" size="md" loading={loading} onClick={refetch} style={{ flexShrink: 0 }}>
+                        <ReloadOutlined /> 새로고침
+                    </Button>
                 </div>
             </div>
 
-            {/* 리스트 영역만 스켈레톤 */}
             {loading ? (
                 <ReservationCardSkeleton count={5} />
             ) : filtered.length === 0 ? (
                 <div style={{ marginTop: 80 }}>
                     <Empty description={
                         <span style={{ color: colors.text.tertiary }}>
-                            {statusFilter === 'ALL' && !keyword.trim()
+                            {statusFilter === 'ALL' && !debouncedKeyword.trim()
                                 ? '예약 내역이 없습니다.'
                                 : '조건에 맞는 예약이 없습니다.'}
                         </span>
@@ -190,6 +163,7 @@ const ComingSoonTab = ({ label }) => (
 
 const BusinessPanel = () => {
     const [activeTab, setActiveTab] = useState('reservations');
+    useDocumentTitle('파트너 패널');
 
     const tabItems = [
         {
@@ -214,15 +188,12 @@ const BusinessPanel = () => {
 
     return (
         <PageContainer size="xl" paddingTop="40px">
-            {/* 헤더 — 항상 표시 */}
             <div style={{ marginBottom: 40 }}>
                 <Title level={2} style={styles.title}>사업자 파트너 패널</Title>
                 <Text type="secondary" style={{ fontSize: fontSize.base }}>
                     예약 현황을 실시간으로 확인하고 승인·거절하세요.
                 </Text>
             </div>
-
-            {/* 탭바 — 항상 표시, 내부 데이터만 스켈레톤 */}
             <Tabs
                 activeKey={activeTab}
                 onChange={setActiveTab}
@@ -243,7 +214,6 @@ const styles = {
         marginBottom: 20,
         paddingTop: 8,
     },
-    countWrap: { display: 'flex', alignItems: 'center', gap: 10, marginLeft: 4 },
     pendingBadge: {
         display: 'inline-flex',
         alignItems: 'center',

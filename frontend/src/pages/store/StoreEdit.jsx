@@ -4,6 +4,7 @@ import { Form } from 'antd';
 import Loading from "../../components/common/Loading";
 import StoreForm from "../../components/store/StoreForm";
 import { useStoreData, useMessage, useFormReady, useImagePreview, useStoreForm } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 
 /**
  * 가게 수정 페이지
@@ -24,6 +25,7 @@ const StoreEdit = () => {
     const { message } = useMessage();
     const { formReady, formRef } = useFormReady();
     const { handlePreview, PreviewModal } = useImagePreview();
+    useDocumentTitle('가게 수정');
     
     // 가게 데이터 로딩
     const { store, loading, error } = useStoreData(id);

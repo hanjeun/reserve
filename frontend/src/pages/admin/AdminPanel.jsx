@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { PageContainer, Button, AdminTableSkeleton } from '../../components/common';
 import { useMessage } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
@@ -39,12 +40,14 @@ const BizSearchBar = ({ value, onChange }) => (
         value={value}
         onChange={onChange}
         allowClear
-        style={{ maxWidth: 320, marginBottom: 16 }}
+        size="large"
+        style={{ maxWidth: 320 }}
     />
 );
 
 const AdminPanel = () => {
     const { message, confirm } = useMessage();
+    useDocumentTitle('관리자 패널');
 
     const [activeTab, setActiveTab]       = useState('pending');
     const [pendingList, setPendingList]   = useState([]);
@@ -283,7 +286,12 @@ const AdminPanel = () => {
             ),
             children: (
                 <>
-                    <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, gap: 8 }}>
+                        <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
+                        <Button variant="ghost-sm" size="md" loading={loading} onClick={loadData} style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                            <ReloadOutlined /> 새로고침
+                        </Button>
+                    </div>
                     {loading
                         ? <AdminTableSkeleton rows={8} />
                         : <Table {...tableProps} dataSource={filterBiz(pendingList)} locale={{ emptyText: '대기 중인 신청이 없습니다.' }} />}
@@ -297,7 +305,12 @@ const AdminPanel = () => {
             ),
             children: (
                 <>
-                    <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, gap: 8 }}>
+                        <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
+                        <Button variant="ghost-sm" size="md" loading={loading} onClick={loadData} style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                            <ReloadOutlined /> 새로고침
+                        </Button>
+                    </div>
                     {loading
                         ? <AdminTableSkeleton rows={8} />
                         : <Table {...tableProps} dataSource={filterBiz(allList)} locale={{ emptyText: '신청 내역이 없습니다.' }} />}
@@ -318,12 +331,14 @@ const AdminPanel = () => {
                             value={resSearch}
                             onChange={(e) => setResSearch(e.target.value)}
                             allowClear
+                            size="large"
                             style={{ maxWidth: 260 }}
                             disabled={resLoading}
                         />
                         <Select
                             value={resStatusFilter}
                             onChange={setResStatusFilter}
+                            size="large"
                             style={{ width: 140 }}
                             disabled={resLoading}
                             options={[
@@ -343,6 +358,7 @@ const AdminPanel = () => {
                         )}
                         <Button
                             variant="ghost-sm"
+                            size="md"
                             loading={resLoading}
                             onClick={() => loadReservations(true)}
                             style={{ marginLeft: 'auto' }}

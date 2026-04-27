@@ -2,6 +2,7 @@ import React from 'react';
 import { Form } from 'antd';
 import StoreForm from '../../components/store/StoreForm';
 import { useStoreForm, useImagePreview } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 
 /**
  * 가게 등록 페이지
@@ -16,6 +17,7 @@ import { useStoreForm, useImagePreview } from '../../hooks';
  * @auth OWNER, ADMIN
  */
 const StoreRegister = () => {
+    useDocumentTitle('가게 등록');
     const [form] = Form.useForm();
     const { handlePreview, PreviewModal } = useImagePreview();
     

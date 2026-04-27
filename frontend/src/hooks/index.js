@@ -3,6 +3,8 @@
  */
 
 export { default as useMessage } from './useMessage';
+export { default as useDocumentTitle } from './useDocumentTitle';
+export { default as useDebounce } from './useDebounce';
 export { default as useStoreData } from './useStoreData';
 export { default as useMyStores } from './useMyStores';
 export { default as useStoreList } from './useStoreList';

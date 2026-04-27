@@ -27,9 +27,10 @@ public class BusinessVerification {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    // 사업자 등록증 이미지 URL
+    // 사업자 등록증 S3 key (URL이 아닌 key 저장 → 조회 시 Pre-signed URL 생성)
+    // 예: users/1/businesses/uuid.jpg  또는  local/users/1/businesses/uuid.jpg
     @Column(name = "license_image_url", nullable = false)
-    private String licenseImageUrl;
+    private String licenseImageKey;
 
     // 상호명
     @Column(name = "business_name", nullable = false)

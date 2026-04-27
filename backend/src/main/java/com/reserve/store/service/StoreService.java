@@ -84,19 +84,20 @@ public class StoreService {
         Long storeId = savedStore.getId();
         Long memberId = owner.getId();
 
-        // 2단계: storeId 확보 후 이미지 업로드
+        // 2단계: storeId 확보 후 이미지 업로드 → getPublicUrl로 CloudFront URL 변환
         if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
-            String mainImageUrl = fileStorageService.storeFile(
+            String key = fileStorageService.storeFile(
                     request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId));
-            savedStore.setMainImageUrl(mainImageUrl);
+            savedStore.setMainImageUrl(fileStorageService.getPublicUrl(key));
         }
 
         List<String> detailImageUrls = new ArrayList<>();
         if (request.getDetailImages() != null && !request.getDetailImages().isEmpty()) {
             for (MultipartFile file : request.getDetailImages()) {
                 if (file != null && !file.isEmpty()) {
-                    detailImageUrls.add(fileStorageService.storeFile(
-                            file, FileStoragePaths.storeImage(memberId, storeId)));
+                    String key = fileStorageService.storeFile(
+                            file, FileStoragePaths.storeImage(memberId, storeId));
+                    detailImageUrls.add(fileStorageService.getPublicUrl(key));
                 }
             }
         }
@@ -268,8 +269,9 @@ public class StoreService {
             if (store.getMainImageUrl() != null) {
                 fileStorageService.deleteFile(store.getMainImageUrl());
             }
-            store.setMainImageUrl(fileStorageService.storeFile(
-                    request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId)));
+            String key = fileStorageService.storeFile(
+                    request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId));
+            store.setMainImageUrl(fileStorageService.getPublicUrl(key));
         } else if (request.getExistingMainImageUrl() != null) {
             store.setMainImageUrl(request.getExistingMainImageUrl());
         }
@@ -282,8 +284,9 @@ public class StoreService {
         if (request.getDetailImages() != null) {
             for (MultipartFile file : request.getDetailImages()) {
                 if (file != null && !file.isEmpty()) {
-                    finalDetailImages.add(fileStorageService.storeFile(
-                            file, FileStoragePaths.storeImage(memberId, storeId)));
+                    String key = fileStorageService.storeFile(
+                            file, FileStoragePaths.storeImage(memberId, storeId));
+                    finalDetailImages.add(fileStorageService.getPublicUrl(key));
                 }
             }
         }

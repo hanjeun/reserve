@@ -47,6 +47,8 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+                        // 정적 리소스 (랜딩페이지, favicon)
+                        .requestMatchers("/", "/index.html", "/favicon.svg").permitAll()
                         // Health Check & Environment
                         .requestMatchers("/hc", "/env").permitAll()
                         .requestMatchers("/actuator/health").permitAll()

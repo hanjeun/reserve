@@ -16,7 +16,6 @@ server:
 
 # Spring 공통 설정
 spring:
-  # favicon 비활성화
   web:
     resources:
       add-mappings: true

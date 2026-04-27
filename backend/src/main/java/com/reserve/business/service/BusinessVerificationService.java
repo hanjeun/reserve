@@ -49,13 +49,13 @@ public class BusinessVerificationService {
         // 3. 파일 유효성 검사
         validateSubmitRequest(request);
 
-        // 4. 이미지 저장
-        String imageUrl = fileStorageService.storeFile(request.getLicenseImage(), FileStoragePaths.business(member.getId()));
+        // 4. 이미지 저장 (파일이 아닌 key를 DB에 저장 → 조회 시 Pre-signed URL 생성)
+        String licenseImageKey = fileStorageService.storeFile(request.getLicenseImage(), FileStoragePaths.business(member.getId()));
 
         // 5. 인증 요청 생성
         BusinessVerification verification = BusinessVerification.builder()
                 .member(member)
-                .licenseImageUrl(imageUrl)
+                .licenseImageKey(licenseImageKey)
                 .businessName(request.getBusinessName().trim())
                 .businessNumber(request.getBusinessNumber())
                 .memo(request.getMemo())
@@ -154,17 +154,54 @@ public class BusinessVerificationService {
     }
 
     /**
+     * 사업자 인증 신청 수정 (PENDING 상태일 때만 가능)
+     */
+    @Transactional
+    public BusinessVerificationResponse updateVerification(Member member, BusinessVerificationRequest request) {
+        BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(member.getId())
+                .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
+
+        if (verification.getStatus() != VerificationStatus.PENDING) {
+            throw new BizVerificationException("심사 대기 중인 신청만 수정할 수 있습니다.");
+        }
+
+        // 텍스트 필드 업데이트
+        if (request.getBusinessName() != null && !request.getBusinessName().isBlank()) {
+            verification.setBusinessName(request.getBusinessName().trim());
+        }
+        if (request.getBusinessNumber() != null) {
+            verification.setBusinessNumber(request.getBusinessNumber());
+        }
+        if (request.getMemo() != null) {
+            verification.setMemo(request.getMemo());
+        }
+
+        // 이미지 변경 시 기존 S3 파일 삭제 후 새 파일 업로드
+        if (request.getLicenseImage() != null && !request.getLicenseImage().isEmpty()) {
+            fileStorageService.deleteFile(verification.getLicenseImageKey());
+            String newKey = fileStorageService.storeFile(
+                    request.getLicenseImage(), FileStoragePaths.business(member.getId()));
+            verification.setLicenseImageKey(newKey);
+        }
+
+        log.info("사업자 인증 수정: memberId={}", member.getId());
+        return BusinessVerificationResponse.fromEntity(verificationRepository.save(verification));
+    }
+
+    /**
      * 사업자 인증 신청 취소 (사용자 본인)
      */
     @Transactional
     public void cancelVerification(Member member) {
-        // member.id만 사용하는 쿼리로 교체 (thin Member 안전하게 처리)
         BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(member.getId())
                 .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
 
         if (verification.getStatus() != VerificationStatus.PENDING) {
             throw new BizVerificationException("이미 처리가 완료된 신청은 취소할 수 없습니다.");
         }
+
+        // S3 이미지 삭제 (취소 시 불필요한 파일 정리)
+        fileStorageService.deleteFile(verification.getLicenseImageKey());
 
         verificationRepository.delete(verification);
         log.info("사업자 인증 신청 취소: memberId={}", member.getId());
@@ -193,7 +230,10 @@ public class BusinessVerificationService {
     }
 
     public BusinessVerificationResponse getVerificationDetail(Long id) {
-        return BusinessVerificationResponse.fromEntity(findVerificationOrThrow(id));
+        BusinessVerification verification = findVerificationOrThrow(id);
+        // 사업자 등록증 이미지: S3 key → 5분짜리 Pre-signed URL 발급
+        String presignedUrl = fileStorageService.getPresignedUrl(verification.getLicenseImageKey(), 5);
+        return BusinessVerificationResponse.fromEntityWithPresignedUrl(verification, presignedUrl);
     }
 
     public long getPendingCount() {

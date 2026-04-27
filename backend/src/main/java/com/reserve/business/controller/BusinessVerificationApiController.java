@@ -128,6 +128,15 @@ public class BusinessVerificationApiController {
     }
 
     /**
+     * 사업자 인증 신청 수정 (PENDING 상태일 때만)
+     */
+    @PatchMapping("/update")
+    public ApiResponse<BusinessVerificationResponse> updateVerification(@ModelAttribute BusinessVerificationRequest request) {
+        Member member = SecurityUtil.getCurrentMember();
+        return ApiResponse.success(verificationService.updateVerification(member, request), "수정되었습니다.");
+    }
+
+    /**
      * 사업자 인증 신청 취소 (사용자)
      */
     @DeleteMapping("/cancel")

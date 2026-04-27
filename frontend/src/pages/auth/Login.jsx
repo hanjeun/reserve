@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Form, Typography, Divider, Flex } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage } from '../../hooks';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS, API_BASE_URL } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { colors, radius, heights, fontWeight, fontSize } from '../../styles/tokens';
@@ -34,6 +35,7 @@ const KakaoIcon = () => (
 
 const Login = () => {
     const { login, isLoggedIn } = useAuthStore();
+    useDocumentTitle('로그인');
     const navigate = useNavigate();
     const location = useLocation();
     const { message } = useMessage();

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { reservationKeys } from '../../hooks/queryKeys';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { Typography } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { PageContainer, Button } from '../../components/common';
@@ -14,6 +15,7 @@ const { Text } = Typography;
 const PaymentResult = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    useDocumentTitle('결제 결과');
 
     const success       = searchParams.get('success') === 'true';
     const merchantUid   = searchParams.get('merchant_uid');

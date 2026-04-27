@@ -6,10 +6,12 @@ import { SECTIONS } from './Home.constants';
 import HeroSection from './sections/HeroSection';
 import FeatureSection from './sections/FeatureSection';
 import FaqSection from './sections/FaqSection';
+import useDocumentTitle from '../../hooks/useDocumentTitle';
 
 export default function Home() {
     const isMobile = useWindowWidth() <= 768;
     useScrollReveal(isMobile);
+    useDocumentTitle(null); // 홈은 'RESERVE'만 표시
     useEffect(() => { window.scrollTo(0, 0); }, []);
 
     return (

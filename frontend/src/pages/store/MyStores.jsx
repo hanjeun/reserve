@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Typography, Tag, Empty, Modal, Flex, Radio, Spin, Alert } from 'antd';
+import { Typography, Empty, Modal, Flex, Radio, Spin, Alert } from 'antd';
 import { StarFilled, EditOutlined, DeleteOutlined, ExclamationCircleFilled, WarningFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { PageContainer, Card, StoreCardSkeleton } from '../../components/common';
+import { PageContainer, Card, StoreCardSkeleton, Badge } from '../../components/common';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { getThumbnailUrl } from '../../utils';
@@ -96,7 +96,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                             <Alert
                                 type="success"
                                 showIcon
-                                message="진행 중인 예약이 없습니다"
+                                title="진행 중인 예약이 없습니다"
                                 description="가게를 안전하게 삭제할 수 있습니다."
                                 style={{ borderRadius: radius.md }}
                             />
@@ -109,7 +109,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                                     type="warning"
                                     showIcon
                                     icon={<WarningFilled />}
-                                    message={`진행 중인 예약 ${activeCount}건이 있습니다`}
+                                    title={`진행 중인 예약 ${activeCount}건이 있습니다`}
                                     description="삭제 방식을 선택해주세요."
                                     style={{ borderRadius: radius.md, marginBottom: 16 }}
                                 />
@@ -237,9 +237,9 @@ const MyStores = () => {
                             >
                                 <Card.Cover src={getThumbnailUrl(store.mainImageUrl)} alt={store.name} />
                                 <div style={{ padding: '16px 16px 20px 16px' }}>
-                                    <Tag color="blue" style={{ marginBottom: '6px', borderRadius: radius.sm, fontSize: fontSize.xs }}>
+                                    <Badge variant="category" style={{ marginBottom: 6 }}>
                                         {store.category || '기타'}
-                                    </Tag>
+                                    </Badge>
                                     <Title level={5} style={{ margin: '0 0 2px 0', fontSize: fontSize.xl }}>
                                         {store.name}
                                     </Title>

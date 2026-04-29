@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, Typography, Flex } from 'antd';
+import { Typography, Flex } from 'antd';
 import { StarFilled } from '@ant-design/icons';
-import { Card, FavoriteButton } from '../common';
+import { Card, FavoriteButton, Badge } from '../common';
 import { getThumbnailUrl } from '../../utils';
 import { radius, fontSize } from '../../styles/tokens';
 
@@ -36,12 +36,9 @@ const StoreCard = ({ store }) => {
             </div>
 
             <div style={{ padding: '16px 16px 20px' }}>
-                <Tag
-                    color="blue"
-                    style={{ marginBottom: 6, borderRadius: radius.sm, fontSize: fontSize.xs }}
-                >
+                <Badge variant="category" style={{ marginBottom: 6 }}>
                     {category || '기타'}
-                </Tag>
+                </Badge>
                 <Title level={5} style={{ margin: '0 0 4px', fontSize: fontSize.xl }}>
                     {name}
                 </Title>

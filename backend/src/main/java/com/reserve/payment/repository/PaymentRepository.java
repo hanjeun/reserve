@@ -2,6 +2,7 @@ package com.reserve.payment.repository;
 
 import com.reserve.payment.entity.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -41,4 +42,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     // 가게 ID로 결제 목록 조회 (사업자용)
     @Query("SELECT p FROM Payment p JOIN p.reservation r WHERE r.store.id = :storeId ORDER BY p.createdAt DESC")
     List<Payment> findByStoreId(@Param("storeId") Long storeId);
+
+    // 가게 ID로 결제 전체 삭제 (가게 삭제 시 사용)
+    @Modifying
+    @Query("DELETE FROM Payment p WHERE p.reservation.id IN (SELECT r.id FROM Reservation r WHERE r.store.id = :storeId)")
+    void deleteByStoreId(@Param("storeId") Long storeId);
 }

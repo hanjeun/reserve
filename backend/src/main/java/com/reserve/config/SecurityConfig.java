@@ -9,7 +9,6 @@ import com.reserve.global.common.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -32,9 +31,12 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // CORS 허용 출처 — yml에서 주입 (common.yml: 운영, local.yml: 로컬 추가)
-    @Value("${cors.allowed-origins}")
-    private List<String> allowedOrigins;
+    // CORS 허용 출처
+    // 운영: reserve.it.kr, 로컬: localhost:5173
+    private static final List<String> ALLOWED_ORIGINS = List.of(
+            "http://localhost:5173",
+            "https://reserve.it.kr"
+    );
 
     private final TokenProvider tokenProvider;
     private final CustomOAuth2UserService customOAuth2UserService;
@@ -106,7 +108,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // yml에서 주입 (common.yml: 운영 도메인, local.yml: localhost 추가)
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOrigins(ALLOWED_ORIGINS);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

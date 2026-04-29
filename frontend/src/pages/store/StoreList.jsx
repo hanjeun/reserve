@@ -15,7 +15,7 @@ const PAGE_SIZE = 12;
 
 const StoreList = () => {
     const { stores, loading, fetching, searchParams, setSearchParams } = useStoreList();
-    useDocumentTitle('가게 목록');
+    useDocumentTitle('가게 목록', '원하는 조건으로 최고의 식당을 찾아보세요. RESERVE에서 전국 맛집을 간편하게 예약할 수 있습니다.');
 
     const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
     const sentinelRef = React.useRef(null);

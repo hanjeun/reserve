@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -26,8 +27,16 @@ import java.util.List;
 
 @RequiredArgsConstructor
 @Configuration
+@EnableMethodSecurity  // @PreAuthorize, @PostAuthorize 등 메서드 수준 보안 활성화
 @EnableWebSecurity
 public class SecurityConfig {
+
+    // CORS 허용 출처
+    // 운영: reserve.it.kr, 로컬: localhost:5173
+    private static final List<String> ALLOWED_ORIGINS = List.of(
+            "http://localhost:5173",
+            "https://reserve.it.kr"
+    );
 
     private final TokenProvider tokenProvider;
     private final CustomOAuth2UserService customOAuth2UserService;
@@ -98,10 +107,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",  // 로컬 개발
-                "https://reserve.it.kr"  // 배포 도메인
-        ));
+        // yml에서 주입 (common.yml: 운영 도메인, local.yml: localhost 추가)
+        configuration.setAllowedOrigins(ALLOWED_ORIGINS);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

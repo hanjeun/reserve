@@ -30,9 +30,15 @@ public class StoreResponse {
     
     @JsonFormat(pattern = "HH:mm")
     private LocalTime openTime;
-    
+
     @JsonFormat(pattern = "HH:mm")
     private LocalTime closeTime;
+
+    @JsonFormat(pattern = "HH:mm")
+    private LocalTime breakStartTime;
+
+    @JsonFormat(pattern = "HH:mm")
+    private LocalTime breakEndTime;
     
     private Double rating;
     private Integer reviewCount;
@@ -70,6 +76,8 @@ public class StoreResponse {
                 .keywords(store.getKeywordList())
                 .openTime(store.getOpenTime())
                 .closeTime(store.getCloseTime())
+                .breakStartTime(store.getBreakStartTime())
+                .breakEndTime(store.getBreakEndTime())
                 .rating(store.getRating())
                 .reviewCount(store.getReviewCount())
                 .noShowDeposit(store.getNoShowDeposit())

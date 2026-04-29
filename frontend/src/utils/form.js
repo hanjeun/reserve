@@ -47,5 +47,11 @@ export const buildStoreFormData = (values) => {
         formData.append('closeTime', values.times[1].format('HH:mm'));
     }
 
+    // 브레이크 타임 (선택, 비워두면 서버에 null 전송 → DB null = 없음)
+    if (values.breakTimes?.[0] && values.breakTimes?.[1]) {
+        formData.append('breakStartTime', values.breakTimes[0].format('HH:mm'));
+        formData.append('breakEndTime',   values.breakTimes[1].format('HH:mm'));
+    }
+
     return formData;
 };

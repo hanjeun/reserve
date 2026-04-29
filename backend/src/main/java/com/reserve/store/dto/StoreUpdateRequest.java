@@ -38,6 +38,13 @@ public class StoreUpdateRequest {
     @DateTimeFormat(pattern = "HH:mm")
     private LocalTime closeTime;
 
+    // 브레이크 타임 (선택, null = 없음)
+    @DateTimeFormat(pattern = "HH:mm")
+    private LocalTime breakStartTime;
+
+    @DateTimeFormat(pattern = "HH:mm")
+    private LocalTime breakEndTime;
+
     // 노쇼 방지금 (0원이면 무료)
     private Integer noShowDeposit;
 

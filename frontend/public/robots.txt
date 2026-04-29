@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /my-page
+Disallow: /my-reservations
+Disallow: /my-favorites
+Disallow: /my-stores
+Disallow: /store/register
+Disallow: /business
+Disallow: /admin
+Disallow: /payment/
+Disallow: /oauth2/
+
+Sitemap: https://reserve.it.kr/sitemap.xml

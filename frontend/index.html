@@ -2,11 +2,75 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />    
-    <title>RESERVE</title>
-    <!-- 포트원 결제 SDK -->
-    <script src="https://cdn.iamport.kr/v1/iamport.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+
+    <!-- ─── 기본 SEO ──────────────────────────────────────── -->
+    <title>RESERVE | 전국 맛집 예약 플랫폼</title>
+    <meta name="description" content="기다림 없는 완벽한 하루를 위해, 전국 맛집 예약을 가장 빠르게 도와드립니다. RESERVE에서 원하는 가게를 찾고 간편하게 예약하세요." />
+    <meta name="keywords" content="맛집 예약, 식당 예약, 레스토랑 예약, 온라인 예약, RESERVE" />
+    <meta name="author" content="RESERVE" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://reserve.it.kr" />
+
+    <!-- ─── Open Graph (카카오, 슬랙, 페이스북 공유 미리보기) ── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RESERVE" />
+    <meta property="og:title" content="RESERVE | 전국 맛집 예약 플랫폼" />
+    <meta property="og:description" content="기다림 없는 완벽한 하루를 위해, 전국 맛집 예약을 가장 빠르게 도와드립니다." />
+    <meta property="og:image" content="https://reserve.it.kr/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="RESERVE - 전국 맛집 예약 플랫폼" />
+    <meta property="og:url" content="https://reserve.it.kr" />
+    <meta property="og:locale" content="ko_KR" />
+
+    <!-- ─── Twitter Card ─────────────────────────────────── -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="RESERVE | 전국 맛집 예약 플랫폼" />
+    <meta name="twitter:description" content="기다림 없는 완벽한 하루를 위해, 전국 맛집 예약을 가장 빠르게 도와드립니다." />
+    <meta name="twitter:image" content="https://reserve.it.kr/og-image.png" />
+
+    <!-- ─── 모바일 / PWA ──────────────────────────────────── -->
+    <meta name="theme-color" content="#3182F6" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="RESERVE" />
+
+    <!-- ─── 아이콘 ────────────────────────────────────────── -->
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/favicon.svg" />
+
+    <!-- ─── JSON-LD 구조화 데이터 (구글 리치 결과) ───────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "RESERVE",
+      "description": "전국 맛집 예약 플랫폼",
+      "url": "https://reserve.it.kr",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://reserve.it.kr/stores?keyword={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "RESERVE",
+        "url": "https://reserve.it.kr",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://reserve.it.kr/icons/favicon.svg"
+        }
+      }
+    }
+    </script>
+
+    <!-- ─── 포트원 결제 SDK ────────────────────────────────── -->
+    <script src="https://cdn.iamport.kr/v1/iamport.js"></script>
   </head>
   <body>
     <div id="root"></div>

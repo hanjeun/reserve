@@ -9,6 +9,7 @@ import com.reserve.global.error.BizVerificationException;
 import com.reserve.member.entity.Member;
 import com.reserve.member.entity.Role;
 import com.reserve.member.repository.MemberRepository;
+import com.reserve.email.service.EmailService;
 import com.reserve.file.service.FileStorageService;
 import com.reserve.file.util.FileStoragePaths;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class BusinessVerificationService {
     private final BusinessVerificationRepository verificationRepository;
     private final MemberRepository memberRepository;
     private final FileStorageService fileStorageService;
+    private final EmailService emailService;
 
     /**
      * 사업자 인증 신청
@@ -85,6 +87,13 @@ public class BusinessVerificationService {
         member.setRole(Role.BUSINESS);
         memberRepository.save(member);
 
+        // 승인 이메일 발송 (비동기)
+        emailService.sendBusinessApprovedEmail(
+            member.getEmail(),
+            member.getName(),
+            verification.getBusinessName()
+        );
+
         log.info("사업자 인증 승인: verificationId={}, memberId={}", verificationId, member.getId());
         return BusinessVerificationResponse.fromEntity(verification);
     }
@@ -106,6 +115,15 @@ public class BusinessVerificationService {
 
         // 인증 거절 처리 (엔티티 메서드 활용)
         verification.reject(admin, reason.trim());
+
+        // 거절 이메일 발송 (비동기)
+        Member member = verification.getMember();
+        emailService.sendBusinessRejectedEmail(
+            member.getEmail(),
+            member.getName(),
+            verification.getBusinessName(),
+            reason.trim()
+        );
 
         log.info("사업자 인증 거절: verificationId={}, reason={}", verificationId, reason);
         return BusinessVerificationResponse.fromEntity(verification);

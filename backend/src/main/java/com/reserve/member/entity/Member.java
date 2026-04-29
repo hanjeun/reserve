@@ -78,7 +78,12 @@ public class Member {
     // profileImageLocked = true : 유저가 직접 이미지 조작 → 소셜 이미지로 덮어쓰지 않음
     // profileImageLocked = false : 최초 가입 상태 → 소셜 프로필 이미지 적용
     public Member updateOAuth(String name, String profileImage) {
-        if (name != null) this.name = name;
+        // name이 null이면 기존 name 유지, 기존도 null이면 "사용자"로 설정
+        if (name != null) {
+            this.name = name;
+        } else if (this.name == null) {
+            this.name = "사용자";
+        }
         if (!this.profileImageLocked && profileImage != null) {
             this.profileImage = profileImage;
         }

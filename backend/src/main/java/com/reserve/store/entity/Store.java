@@ -68,9 +68,16 @@ public class Store {
     // 영업 시간
     @Column(name = "open_time")
     private LocalTime openTime;
-    
+
     @Column(name = "close_time")
     private LocalTime closeTime;
+
+    // 브레이크 타임 (선택, null = 없음)
+    @Column(name = "break_start_time")
+    private LocalTime breakStartTime;
+
+    @Column(name = "break_end_time")
+    private LocalTime breakEndTime;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

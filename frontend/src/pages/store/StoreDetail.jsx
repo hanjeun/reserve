@@ -6,10 +6,10 @@ import {
     PlusOutlined, MinusOutlined, ArrowLeftOutlined,
     ClockCircleOutlined, CreditCardOutlined, FieldTimeOutlined,
     ThunderboltOutlined, RollbackOutlined, HourglassOutlined, TeamOutlined,
-    FileTextOutlined,
+    FileTextOutlined, StarFilled,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton } from '../../components/common';
+import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton, Badge } from '../../components/common';
 import { ReviewList } from '../../components/review';
 import { StoreDetailSkeleton } from '../../components/common';
 import { useStoreData, useMessage, usePayment } from '../../hooks';
@@ -111,7 +111,9 @@ const StoreInfoSection = ({ store, description }) => {
     if (store.openTime && store.closeTime) {
         rows.push({
             Icon: ClockCircleOutlined, label: '영업 시간',
-            value: `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}`,
+            value: store.breakStartTime && store.breakEndTime
+                ? `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}  (브레이크 ${store.breakStartTime.substring(0, 5)} ~ ${store.breakEndTime.substring(0, 5)})`
+                : `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}`,
         });
     }
     if (store.noShowDeposit > 0) {
@@ -199,8 +201,61 @@ const infoStyles = {
     divider: { height: 1, background: colors.border.light },
 };
 
+/**
+ * 예약 시간 픽커 비활성화 함수
+ * 영업시간 외 + 브레이크 타임을 통합해서 처리
+ * hideDisabledOptions 사용 시 비활성화된 시간은 목록에서 아예 사라짐
+ */
+const buildDisabledTime = (store) => {
+    if (!store?.openTime || !store?.closeTime) return undefined;
+
+    const toMins = (timeStr) => {
+        const [h, m] = timeStr.substring(0, 5).split(':').map(Number);
+        return h * 60 + m;
+    };
+
+    const openMins  = toMins(store.openTime);
+    const closeMins = toMins(store.closeTime);
+    const slotMin   = store.reservationSlotMinutes ?? 30;
+    const bStartMins = store.breakStartTime ? toMins(store.breakStartTime) : -1;
+    const bEndMins   = store.breakEndTime   ? toMins(store.breakEndTime)   : -1;
+    const hasBreak   = bStartMins >= 0 && bEndMins >= 0;
+
+    // 특정 시각(분 단위)이 예약 가능한 슬롯인지 판단
+    const isValidSlot = (totalMins) => {
+        if (totalMins < openMins || totalMins > closeMins) return false;
+        if (hasBreak && totalMins >= bStartMins && totalMins < bEndMins) return false;
+        return true;
+    };
+
+    return () => ({
+        // 시(hour) 단위: 해당 시간에 유효한 슬롯이 하나도 없으면 비활성화
+        disabledHours: () => {
+            const disabled = [];
+            for (let h = 0; h < 24; h++) {
+                let hasValid = false;
+                for (let m = 0; m < 60; m += slotMin) {
+                    if (isValidSlot(h * 60 + m)) { hasValid = true; break; }
+                }
+                if (!hasValid) disabled.push(h);
+            }
+            return disabled;
+        },
+        // 분(minute) 단위: 해당 분이 유효하지 않으면 비활성화
+        disabledMinutes: (hour) => {
+            const disabled = [];
+            for (let m = 0; m < 60; m++) {
+                if (!isValidSlot(hour * 60 + m)) disabled.push(m);
+            }
+            return disabled;
+        },
+    });
+};
+
 // 예약 폼 패널 (PC: sticky 사이드바 / 모바일용 하단 섹션)
-const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => (
+const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => {
+    const disabledTime = buildDisabledTime(store);
+    return (
     <div style={isPC ? pcFormStyles.panel : {}}>
         <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
             예약하기
@@ -219,7 +274,9 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => (
                     placeholder={store?.openTime && store?.closeTime
                         ? `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}` : '시간 선택'}
                     hideDisabledOptions
-                    minuteStep={store?.reservationSlotMinutes ?? 30} />
+                    minuteStep={store?.reservationSlotMinutes ?? 30}
+                    disabledTime={disabledTime}
+                />
             </Form.Item>
             <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
                 <GuestCountInput />
@@ -234,7 +291,8 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => (
             </div>
         </Form>
     </div>
-);
+    );
+};
 
 const pcFormStyles = {
     panel: {
@@ -259,7 +317,12 @@ const StoreDetail = () => {
     const { store, loading, error } = useStoreData(id);
     const [form] = Form.useForm();
     const isPC = useIsPC();
-    useDocumentTitle(store?.name ?? null);
+    useDocumentTitle(
+        store?.name ?? null,
+        store
+            ? `${store.name} 예약 | ${store.category ? store.category + ' ' : ''}${store.address ? store.address + '. ' : ''}RESERVE에서 간편하게 예약하세요.`
+            : undefined
+    );
 
     const [completedReservation, setCompletedReservation] = React.useState(null);
     const [favoriteStatus, setFavoriteStatus] = React.useState(false);
@@ -306,12 +369,9 @@ const StoreDetail = () => {
         if (dt.isBefore(dayjs())) {
             form.setFields([{ name: 'reservationTime', errors: ['이미 지난 시간입니다.'] }]); return;
         }
-        if (store?.openTime && store?.closeTime) {
-            const t = values.reservationTime.format('HH:mm');
-            if (t < store.openTime.substring(0, 5) || t > store.closeTime.substring(0, 5)) {
-                form.setFields([{ name: 'reservationTime', errors: [`영업시간(${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}) 내에서 선택해주세요.`] }]); return;
-            }
-        }
+        // 영업시간/브레이크 타임 검증은 disabledTime + hideDisabledOptions로
+        // 픽커 자체에서 선택 자체를 막았으므로 여기서는 검증 안 함
+        // (백엔드 검증은 안전망으로 유지)
         try {
             const hasDeposit  = store?.noShowDeposit > 0;
             const skipPayment = hasDeposit && store?.allowLatePayment === true;
@@ -387,31 +447,23 @@ const StoreDetail = () => {
                         <div style={{ marginTop: 20, marginBottom: 4 }}>
                             {/* 카테고리 배지 */}
                             {store.category && (
-                                <span style={headerStyles.categoryBadge}>{store.category}</span>
+                            <Badge variant="category">{store.category}</Badge>
                             )}
                             {/* 키워드 배지 */}
                             {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
-                                <span key={i} style={headerStyles.keywordBadge}>{kw}</span>
+                            <Badge key={i} variant="keyword">{kw}</Badge>
                             ))}
                         </div>
                         <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
-                        {/* 별점 · 리뷰 수 · 가격대 */}
+                        {/* 별점 · 리뷰 수 (StoreCard와 동일한 방식) */}
                         <div style={headerStyles.metaRow}>
-                            {store.rating > 0 && (
-                                <span style={headerStyles.rating}>
-                                    ★ {store.rating.toFixed(1)}
-                                </span>
-                            )}
-                            {store.reviewCount > 0 && (
-                                <span style={headerStyles.metaText}>
-                                    · 리뷰 {store.reviewCount.toLocaleString()}개
-                                </span>
-                            )}
-                            {store.noShowDeposit > 0 && (
-                                <span style={headerStyles.metaText}>
-                                    · 1인 ~{Number(store.noShowDeposit).toLocaleString()}원
-                                </span>
-                            )}
+                            <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
+                            <Text strong style={{ fontSize: fontSize.sm }}>
+                                {store.rating?.toFixed(1) || '0.0'}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: fontSize.xs }}>
+                                ({store.reviewCount || 0})
+                            </Text>
                         </div>
 
                         {/* 상세 정보 */}
@@ -462,30 +514,22 @@ const StoreDetail = () => {
                             {/* 카테고리 + 키워드 배지 */}
                             <div style={{ marginTop: 20, marginBottom: 4 }}>
                                 {store.category && (
-                                    <span style={headerStyles.categoryBadge}>{store.category}</span>
+                                    <Badge variant="category">{store.category}</Badge>
                                 )}
                                 {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
-                                    <span key={i} style={headerStyles.keywordBadge}>{kw}</span>
+                                    <Badge key={i} variant="keyword">{kw}</Badge>
                                 ))}
                             </div>
                             <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
-                            {/* 별점 · 리뷰 수 · 가격대 */}
+                            {/* 별점 · 리뷰 수 (StoreCard와 동일한 방식) */}
                             <div style={headerStyles.metaRow}>
-                                {store.rating > 0 && (
-                                    <span style={headerStyles.rating}>
-                                        ★ {store.rating.toFixed(1)}
-                                    </span>
-                                )}
-                                {store.reviewCount > 0 && (
-                                    <span style={headerStyles.metaText}>
-                                        · 리뷰 {store.reviewCount.toLocaleString()}개
-                                    </span>
-                                )}
-                                {store.noShowDeposit > 0 && (
-                                    <span style={headerStyles.metaText}>
-                                        · 1인 ~{Number(store.noShowDeposit).toLocaleString()}원
-                                    </span>
-                                )}
+                                <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
+                                <Text strong style={{ fontSize: fontSize.sm }}>
+                                    {store.rating?.toFixed(1) || '0.0'}
+                                </Text>
+                                <Text type="secondary" style={{ fontSize: fontSize.xs }}>
+                                    ({store.reviewCount || 0})
+                                </Text>
                             </div>
                         </div>
                     </section>
@@ -519,17 +563,22 @@ const StoreDetail = () => {
     );
 };
 
+// StoreCard <Tag color="blue"> + radius.sm(4px)와 동일한 모양
+// → 이제 Badge 컴포넌트로 이전하여 코드에서 제거
+//   src/components/common/Badge.jsx 참조
 const headerStyles = {
     categoryBadge: {
         display: 'inline-block',
-        background: colors.primary.light,
-        color: colors.primary.main,
+        background: '#e6f4ff',
+        color: '#1677ff',
         fontSize: fontSize.xs,
         fontWeight: fontWeight.medium,
-        padding: '3px 10px',
-        borderRadius: radius.full ?? 100,
+        padding: '2px 8px',
+        borderRadius: radius.sm,
+        border: 'none',
         marginRight: 6,
         marginBottom: 4,
+        lineHeight: '20px',
     },
     keywordBadge: {
         display: 'inline-block',
@@ -537,30 +586,19 @@ const headerStyles = {
         color: colors.text.secondary,
         fontSize: fontSize.xs,
         fontWeight: fontWeight.medium,
-        padding: '3px 10px',
-        borderRadius: radius.full ?? 100,
+        padding: '2px 8px',
+        borderRadius: radius.sm,
+        border: 'none',
         marginRight: 6,
         marginBottom: 4,
+        lineHeight: '20px',
     },
     metaRow: {
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 4,
         flexWrap: 'wrap',
         marginBottom: 16,
-    },
-    rating: {
-        fontSize: fontSize.sm,
-        color: '#f5a623',
-        fontWeight: fontWeight.semibold,
-    },
-    metaText: {
-        fontSize: fontSize.sm,
-        color: colors.text.secondary,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-        '&::before': { content: '"·"' },
     },
 };
 

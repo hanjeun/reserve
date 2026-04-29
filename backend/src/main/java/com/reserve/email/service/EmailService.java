@@ -150,6 +150,86 @@ public class EmailService {
             + "</div></body></html>";
     }
 
+    // ─────────────────────────────────────────────────
+    //  사업자 인증 알림 이메일
+    // ─────────────────────────────────────────────────
+
+    /** 사업자 인증 승인 알림 → 신청자 */
+    @Async
+    public void sendBusinessApprovedEmail(String toEmail, String memberName, String businessName) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject("[RESERVE] 사업자 인증이 승인되었습니다");
+            helper.setText(buildBusinessStatusContent(
+                memberName, businessName,
+                "승인", "#1db954",
+                "사업자 인증이 완료되었습니다!",
+                "이제 RESERVE에서 가게를 등록하고 예약을 받아보세요.",
+                null
+            ), true);
+            mailSender.send(message);
+            log.info("사업자 인증 승인 이메일 발송: {}", toEmail);
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            log.error("사업자 승인 이메일 발송 실패 ({}): {}", toEmail, e.getMessage());
+        }
+    }
+
+    /** 사업자 인증 거절 알림 → 신청자 */
+    @Async
+    public void sendBusinessRejectedEmail(String toEmail, String memberName, String businessName, String rejectionReason) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject("[RESERVE] 사업자 인증이 반려되었습니다");
+            helper.setText(buildBusinessStatusContent(
+                memberName, businessName,
+                "반려", "#ff4d4f",
+                "아쉽게도 사업자 인증이 반려되었습니다.",
+                "반려 사유를 확인하신 후 서류를 수정하여 다시 신청해주세요.",
+                rejectionReason
+            ), true);
+            mailSender.send(message);
+            log.info("사업자 인증 거절 이메일 발송: {}", toEmail);
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            log.error("사업자 거절 이메일 발송 실패 ({}): {}", toEmail, e.getMessage());
+        }
+    }
+
+    private String buildBusinessStatusContent(String memberName, String businessName,
+                                               String statusLabel, String statusColor,
+                                               String title, String subtitle,
+                                               String rejectionReason) {
+        String reasonBlock = rejectionReason != null
+            ? "<div style=\"background:#fff3f3;border-radius:12px;padding:16px 20px;margin-bottom:20px;border-left:3px solid #ff4d4f;\">"
+              + "<span style=\"font-size:13px;color:#ff4d4f;font-weight:700;\">반려 사유</span>"
+              + "<p style=\"font-size:14px;color:#4e5968;margin:6px 0 0;line-height:1.6;\">" + rejectionReason + "</p>"
+              + "</div>"
+            : "";
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head>"
+            + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
+            + "<div style=\"width:100%;background:#f9fafb;padding:40px 0;\">"
+            + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
+            + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;\">" + fromName + "</span></div>"
+            + "    <div style=\"display:inline-block;background:" + statusColor + ";color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">" + statusLabel + "</div>"
+            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;\">" + memberName + "님, " + title + "</h1>"
+            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + subtitle + "</p>"
+            + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:20px;\">"
+            + "      <table style=\"width:100%;border-collapse:collapse;\">"
+            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;font-size:14px;\">상호명</td>"
+            + "            <td style=\"color:#191f28;font-weight:600;font-size:14px;\">" + businessName + "</td></tr>"
+            + "      </table>"
+            + "    </div>"
+            + reasonBlock
+            + "    <div style=\"font-size:13px;color:#b0b8c1;border-top:1px solid #f2f4f6;padding-top:20px;\">© 2026 RESERVE. All rights reserved.</div>"
+            + "  </div>"
+            + "</div></body></html>";
+    }
+
     @Async
     public void sendPasswordResetEmail(String toEmail, String code) {
         try {

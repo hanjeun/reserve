@@ -49,3 +49,9 @@ logging:
 # S3 로컬 환경 prefix (운영 데이터와 분리)
 s3:
   env-prefix: local
+
+# CORS 로컬 허용 출처 추가 (common.yml의 운영 도메인에 덮어쓰기가 아닌 추가)
+cors:
+  allowed-origins:
+    - https://reserve.it.kr
+    - http://localhost:5173

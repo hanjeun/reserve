@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -69,6 +70,19 @@ public class ReservationService {
             if (now.isAfter(deadline)) {
                 throw new ReservationException(
                     "예약 마감 시간이 지났습니다. 예약 시간 " + store.getBookingDeadlineHours() + "시간 전까지만 예약 가능합니다.",
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
+        // 브레이크 타임 검증 (breakStartTime 이상, breakEndTime 미만은 예약 불가)
+        if (store.getBreakStartTime() != null && store.getBreakEndTime() != null) {
+            LocalTime resTime = request.getReservationTime();
+            if (!resTime.isBefore(store.getBreakStartTime()) && resTime.isBefore(store.getBreakEndTime())) {
+                String breakStr = store.getBreakStartTime().toString().substring(0, 5)
+                    + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
+                throw new ReservationException(
+                    "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
                     HttpStatus.BAD_REQUEST
                 );
             }
@@ -150,7 +164,7 @@ public class ReservationService {
                 String ownerName  = store.getOwner().getName() != null ? store.getOwner().getName() : "사장님";
                 emailService.sendNewReservationAlertToOwner(
                         ownerEmail, ownerName, store.getName(),
-                        member.getName() != null ? member.getName() : member.getEmail(),
+                        member.getName() != null ? member.getName() : "고객",
                         request.getReservationDate().toString(),
                         request.getReservationTime().toString().substring(0, 5),
                         request.getGuestCount()
@@ -237,7 +251,7 @@ public class ReservationService {
         if (reservation.getMember().isEmailNotificationEnabled()) {
             try {
                 String memberName = reservation.getMember().getName() != null
-                        ? reservation.getMember().getName() : reservation.getMember().getEmail();
+                        ? reservation.getMember().getName() : "고객";
                 emailService.sendReservationConfirmedEmail(
                         reservation.getMember().getEmail(),
                         memberName,
@@ -271,7 +285,7 @@ public class ReservationService {
         if (reservation.getMember().isEmailNotificationEnabled()) {
             try {
                 String memberName = reservation.getMember().getName() != null
-                        ? reservation.getMember().getName() : reservation.getMember().getEmail();
+                        ? reservation.getMember().getName() : "고객";
                 emailService.sendReservationRejectedEmail(
                         reservation.getMember().getEmail(),
                         memberName,

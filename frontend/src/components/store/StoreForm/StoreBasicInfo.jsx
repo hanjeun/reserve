@@ -83,9 +83,22 @@ const BasicSection = ({ isMobile = true }) => {
                 <FormInput placeholder="02-000-0000" />
             </Form.Item>
 
-            <Form.Item label="영업 시간" name="times" rules={VALIDATION_RULES.businessHours} style={mb}>
-                <FormTimePicker.RangePicker />
-            </Form.Item>
+            <FieldRow style={isMobile ? {} : { marginBottom: 12 }}>
+                <Form.Item label="영업 시간" name="times" rules={VALIDATION_RULES.businessHours}>
+                    <FormTimePicker.RangePicker
+                        placeholder={['시작 시간', '종료 시간']}
+                    />
+                </Form.Item>
+                <Form.Item
+                    label="브레이크 타임"
+                    name="breakTimes"
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>브레이크 없으면 비워두세요</Text>}
+                >
+                    <FormTimePicker.RangePicker
+                        placeholder={['시작', '종료']}
+                    />
+                </Form.Item>
+            </FieldRow>
 
             <Form.Item label="주소" name="address" rules={VALIDATION_RULES.address} style={mb}>
                 <FormInput placeholder="상세 주소" />

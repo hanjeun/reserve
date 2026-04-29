@@ -31,6 +31,13 @@ public class StoreCreateRequest {
     @DateTimeFormat(pattern = "HH:mm")
     private LocalTime closeTime;
 
+    // 브레이크 타임 (선택, null = 없음)
+    @DateTimeFormat(pattern = "HH:mm")
+    private LocalTime breakStartTime;
+
+    @DateTimeFormat(pattern = "HH:mm")
+    private LocalTime breakEndTime;
+
     // 메인 이미지 파일
     private MultipartFile mainImage;
     

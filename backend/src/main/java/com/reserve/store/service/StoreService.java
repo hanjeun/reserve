@@ -5,6 +5,7 @@ import com.reserve.file.service.FileStorageService;
 import com.reserve.file.util.FileStoragePaths;
 import com.reserve.global.error.StoreException;
 import com.reserve.member.entity.Member;
+import com.reserve.payment.repository.PaymentRepository;
 import com.reserve.promotion.repository.PromotionRepository;
 import com.reserve.reservation.repository.ReservationRepository;
 import com.reserve.review.repository.ReviewRepository;
@@ -35,6 +36,7 @@ public class StoreService {
     private final FavoriteRepository favoriteRepository;
     private final PromotionRepository promotionRepository;
     private final ReviewRepository reviewRepository;
+    private final PaymentRepository paymentRepository;
 
     /**
      * 가게 등록
@@ -78,6 +80,8 @@ public class StoreService {
         if (request.getOpenTime() != null && request.getCloseTime() != null) {
             store.setOpenTime(request.getOpenTime());
             store.setCloseTime(request.getCloseTime());
+            store.setBreakStartTime(request.getBreakStartTime());
+            store.setBreakEndTime(request.getBreakEndTime());
         }
 
         Store savedStore = storeRepository.save(store);
@@ -170,6 +174,10 @@ public class StoreService {
             if (request.getEmailNotificationEnabled() != null) store.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
             if (request.getOpenTime() != null) store.setOpenTime(request.getOpenTime());
             if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
+            // 브레이크 타임: null 전송 시 삭제, 값 있으면 업데이트
+            store.setBreakStartTime(request.getBreakStartTime());
+            store.setBreakEndTime(request.getBreakEndTime());
+            if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
 
             if (request.getKeywords() != null) {
                 store.setKeywordList(request.getKeywords());
@@ -242,7 +250,9 @@ public class StoreService {
 
         log.info("가게 삭제 시작: storeId={}, force={}", id, force);
 
-        // 관련 데이터 삭제
+        // 삭제 순서: Payment → Review → Reservation → Favorite → Promotion → Store
+        // (Payment가 Reservation을 FK 참조하므로 Payment 먼저 삭제)
+        paymentRepository.deleteByStoreId(id);
         reviewRepository.deleteByStoreId(id);
         reservationRepository.deleteByStoreId(id);
         favoriteRepository.deleteByStoreId(id);

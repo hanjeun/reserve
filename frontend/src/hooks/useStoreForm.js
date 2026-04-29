@@ -113,6 +113,9 @@ export const useStoreForm = ({
             times: initialData.openTime && initialData.closeTime
                 ? [dayjs(initialData.openTime, 'HH:mm'), dayjs(initialData.closeTime, 'HH:mm')]
                 : null,
+            breakTimes: initialData.breakStartTime && initialData.breakEndTime
+                ? [dayjs(initialData.breakStartTime, 'HH:mm'), dayjs(initialData.breakEndTime, 'HH:mm')]
+                : null,
         };
     };
 

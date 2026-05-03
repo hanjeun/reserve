@@ -28,7 +28,7 @@ export const API_ENDPOINTS = {
     RESERVATION: {
         LIST:                '/api/reservations',
         MY_RESERVATIONS:     '/api/reservations/my',
-        STORE_RESERVATIONS:  '/api/reservations/store',  // OWNER/ADMIN 전용
+        STORE_RESERVATIONS:  '/api/reservations/store',
         CREATE:              '/api/reservations',
         DETAIL:              (id) => `/api/reservations/${id}`,
         CANCEL:              (id) => `/api/reservations/${id}/cancel`,
@@ -59,13 +59,12 @@ export const API_ENDPOINTS = {
         UPDATE:         '/api/business-verification/update',
         CANCEL:         '/api/business-verification/cancel',
         RESIGN:         '/api/business-verification/resign',
-        // 관리자 전용
-        ADMIN_PENDING:       '/api/business-verification/admin/pending',
-        ADMIN_LIST:          '/api/business-verification/admin/list',
-        ADMIN_DETAIL:        (id) => `/api/business-verification/admin/${id}`,
-        ADMIN_APPROVE:       (id) => `/api/business-verification/admin/${id}/approve`,
-        ADMIN_REJECT:        (id) => `/api/business-verification/admin/${id}/reject`,
-        ADMIN_REVOKE:        (memberId) => `/api/business-verification/admin/${memberId}/revoke`,
+        ADMIN_PENDING:  '/api/business-verification/admin/pending',
+        ADMIN_LIST:     '/api/business-verification/admin/list',
+        ADMIN_DETAIL:   (id) => `/api/business-verification/admin/${id}`,
+        ADMIN_APPROVE:  (id) => `/api/business-verification/admin/${id}/approve`,
+        ADMIN_REJECT:   (id) => `/api/business-verification/admin/${id}/reject`,
+        ADMIN_REVOKE:   (memberId) => `/api/business-verification/admin/${memberId}/revoke`,
     },
     PAYMENT: {
         CONFIG:         '/api/payment/config',
@@ -83,12 +82,20 @@ export const API_ENDPOINTS = {
     FAVORITE: {
         TOGGLE: (storeId) => `/api/favorites/toggle/${storeId}`,
         STATUS: (storeId) => `/api/favorites/status/${storeId}`,
-        MY: '/api/favorites/my',
+        MY:     '/api/favorites/my',
     },
     OAUTH: {
         GOOGLE: '/oauth2/authorization/google',
         NAVER:  '/oauth2/authorization/naver',
         KAKAO:  '/oauth2/authorization/kakao',
+    },
+    MAIL: {
+        LIST:         '/api/admin/mail',
+        DETAIL:       (id) => `/api/admin/mail/${id}`,
+        REPLY:        (id) => `/api/admin/mail/${id}/reply`,
+        UNREAD_COUNT: '/api/admin/mail/unread-count',
+        COMPOSE:      '/api/admin/mail/compose',
+        SENT:         '/api/admin/mail/sent',
     },
 };
 

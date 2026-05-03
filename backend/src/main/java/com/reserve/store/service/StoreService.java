@@ -24,6 +24,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -316,6 +320,35 @@ public class StoreService {
     /**
      * 키워드로 가게 검색 및 정렬 (기존 유지)
      */
+    /** 가게 목록 조회 — 페이지네이션 지원 */
+    @Transactional(readOnly = true)
+    public Page<StoreResponse> searchStoresPaged(String keyword, String sort, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        if (keyword == null || keyword.trim().isEmpty()) {
+            Page<Store> storePage = getAllStoresSortedPaged(sort, pageable);
+            return storePage.map(StoreResponse::fromEntity);
+        } else {
+            Page<Store> storePage = storeRepository.searchStoresPaged(keyword.trim(), pageable);
+            // 인메모리 정렬 (키워드 검색 + 정렬 조합)
+            List<Store> sorted = sortStores(storePage.getContent(), sort);
+            return new PageImpl<>(
+                sorted.stream().map(StoreResponse::fromEntity).collect(Collectors.toList()),
+                pageable,
+                storePage.getTotalElements()
+            );
+        }
+    }
+
+    private Page<Store> getAllStoresSortedPaged(String sort, Pageable pageable) {
+        if (sort == null) sort = "rating";
+        return switch (sort) {
+            case "recent"  -> storeRepository.findAllByOrderByCreatedAtDesc(pageable);
+            case "reviews" -> storeRepository.findAllByOrderByReviewCountDesc(pageable);
+            default        -> storeRepository.findAllByOrderByRatingDesc(pageable);
+        };
+    }
+
+    /** 하위 호환용 — 기존 전체 조회 (내부 로직용) */
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort) {
         List<Store> stores;

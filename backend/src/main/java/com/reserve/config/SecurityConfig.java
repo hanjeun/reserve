@@ -75,8 +75,11 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/{id}").authenticated()
                         .requestMatchers("/api/reservations/**").authenticated()
 
+                        // 웹훅 — ImprovMX 호출, JWT 인증 없음 (Secret 헤더로 검증)
+                        .requestMatchers("/api/admin/mail/webhook").permitAll()
+
                         // 관리자 전용
-                        .requestMatchers("/admin/**", "/api/business-verification/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/**", "/api/business-verification/admin/**", "/api/admin/**").hasRole("ADMIN")
                         
                         // 나머지는 인증 필요
                         .anyRequest().authenticated())

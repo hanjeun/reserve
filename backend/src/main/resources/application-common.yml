@@ -87,6 +87,7 @@ mail:
   port: 465
   from: ${MAIL_FROM:reserve@reserve.it.kr}
   from-name: ${MAIL_FROM_NAME:RESERVE}
+  webhook-secret: ${MAIL_WEBHOOK_SECRET:}
   properties:
     mail:
       smtp:

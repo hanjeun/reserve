@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Typography, Tabs, Table, Tag, Modal, Input, Image, Tooltip,
     Select,
 } from 'antd';
 import {
     SearchOutlined, CalendarOutlined,
-    SafetyCertificateOutlined, IdcardOutlined, ReloadOutlined,
+    SafetyCertificateOutlined, IdcardOutlined, ReloadOutlined, MailOutlined,
 } from '@ant-design/icons';
+import MailboxTab from '../../components/admin/MailboxTab';
 import { PageContainer, Button, AdminTableSkeleton } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -49,7 +51,18 @@ const AdminPanel = () => {
     const { message, confirm } = useMessage();
     useDocumentTitle('관리자 패널');
 
-    const [activeTab, setActiveTab]       = useState('pending');
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // URL을 단일 진실 공급원으로 사용 — 뒤로가기/앞으로가기 시 자동 동기화
+    const activeTab = new URLSearchParams(location.search).get('tab') || 'pending';
+    const [mailUnread, setMailUnread] = useState(0);
+
+    const handleTabChange = (key) => {
+        setBizSearch('');
+        setResSearch('');
+        navigate(`?tab=${key}`, { replace: true });
+    };
     const [pendingList, setPendingList]   = useState([]);
     const [allList, setAllList]           = useState([]);
 
@@ -318,6 +331,29 @@ const AdminPanel = () => {
             ),
         },
         {
+            key: 'mailbox',
+            label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <MailOutlined />
+                    메일함
+                    {mailUnread > 0 && (
+                        <span style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            minWidth: 18, height: 18, borderRadius: 9,
+                            background: '#f04452', color: '#fff',
+                            fontSize: 11, fontWeight: 700, padding: '0 4px',
+                            lineHeight: 1,
+                        }}>
+                            {mailUnread > 99 ? '99+' : mailUnread}
+                        </span>
+                    )}
+                </span>
+            ),
+            children: (
+                <MailboxTab onUnreadCountChange={setMailUnread} />
+            ),
+        },
+        {
             key: 'reservations',
             label: (
                 <span><CalendarOutlined style={{ marginRight: 6 }} />전체 예약</span>
@@ -393,7 +429,7 @@ const AdminPanel = () => {
 
             <Tabs
                 activeKey={activeTab}
-                onChange={(k) => { setActiveTab(k); setBizSearch(''); setResSearch(''); }}
+                onChange={handleTabChange}
                 items={tabItems}
             />
 

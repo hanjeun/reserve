@@ -144,8 +144,7 @@ release: home page mobile/PC layout improvements
 
 | 옵션 | 설명 | 권장 |
 |---|---|---|
-| Create a merge commit | feature 커밋 그대로 + 머지 커밋 추가 | feature → dev |
-| Squash and merge | 모든 커밋을 1개로 압축 | dev → main |
+| Create a merge commit | feature 커밋 그대로 + 머지 커밋 추가 | feature → dev, dev → main |
 
 ---
 

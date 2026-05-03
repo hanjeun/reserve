@@ -10,6 +10,7 @@ import com.reserve.store.dto.StoreUpdateRequest;
 import com.reserve.store.service.StoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,12 +45,20 @@ public class StoreApiController {
         return ApiResponse.success(stores, "내 가게 목록 조회 성공");
     }
 
-    // 전체 가게 조회 (검색 및 정렬)
+    // 전체 가게 조회 — 페이지네이션 지원
+    // page, size 파라미터 있으면 Page 반환, 없으면 기존 List 반환 (하위 호환)
     @GetMapping
-    public ApiResponse<List<StoreResponse>> getAllStores(
+    public ApiResponse<?> getAllStores(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false, defaultValue = "rating") String sort
+            @RequestParam(required = false, defaultValue = "rating") String sort,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false, defaultValue = "20") int size
     ) {
+        if (page != null) {
+            Page<StoreResponse> storePage = storeService.searchStoresPaged(keyword, sort, page, size);
+            return ApiResponse.success(storePage, "가게 목록 조회 성공");
+        }
+        // 기존 클라이언트 하위 호환
         List<StoreResponse> stores = storeService.searchStores(keyword, sort);
         return ApiResponse.success(stores, "가게 목록 조회 성공");
     }

@@ -11,7 +11,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 export default function Home() {
     const isMobile = useWindowWidth() <= 768;
     useScrollReveal(isMobile);
-    useDocumentTitle(null); // 홈은 'RESERVE'만 표시
+    useDocumentTitle(null);  // 홈 — 기본 타이틀 사용 // 홈은 'RESERVE'만 표시
     useEffect(() => { window.scrollTo(0, 0); }, []);
 
     return (

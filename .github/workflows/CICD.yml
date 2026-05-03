@@ -155,6 +155,7 @@ jobs:
             echo "TARGET_UPSTREAM=blue" >> $GITHUB_ENV
           fi
 
+  # SSH 접속 정보 (AWS Lightsail — 변수명은 EC2 시절 레거시, 실제론 Lightsail)
       - name: Deploy docker-compose files to EC2
         uses: appleboy/scp-action@master
         with:
@@ -192,6 +193,7 @@ jobs:
             export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             export S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
             export CLOUDFRONT_DOMAIN=${{ secrets.CLOUDFRONT_DOMAIN }}
+            export MAIL_WEBHOOK_SECRET=${{ secrets.MAIL_WEBHOOK_SECRET }}
             sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)

@@ -86,6 +86,17 @@ public class Reservation {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
     public enum ReservationStatus {
         PENDING,    // 대기중 (사용자가 예약 신청)
         CONFIRMED,  // 승인됨 (사업자가 승인)

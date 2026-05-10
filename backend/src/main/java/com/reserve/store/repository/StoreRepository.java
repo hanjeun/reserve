@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.jpa.repository.Modifying;
+
 import java.util.List;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
@@ -48,4 +50,12 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
            "LOWER(s.category) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(s.keywords) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     Page<Store> searchStoresPaged(@Param("keyword") String keyword, Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE Store s SET s.deletedAt = NULL WHERE s.id = :id")
+    void restoreById(Long id);
+
+    @Modifying
+    @Query("DELETE FROM Store s WHERE s.deletedAt IS NOT NULL AND s.deletedAt < :cutoff")
+    int hardDeleteByDeletedAtBefore(java.time.LocalDateTime cutoff);
 }

@@ -47,7 +47,18 @@ public class AdminMail {
     @Builder.Default
     private List<AdminMailReply> replies = new ArrayList<>();
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     public void markAsRead() {
         this.isRead = true;
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
     }
 }

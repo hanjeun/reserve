@@ -55,9 +55,9 @@ public class AdminMailService {
         log.info("Mail received and saved: from={}, subject={}", mail.getFromEmail(), mail.getSubject());
     }
 
-    /* ── 목록 조회 ──────────────────────────────────────── */
+    /* ── 목록 조회 (삭제된 것 제외) ────────────────────────── */
     public List<AdminMailListResponse> getMailList() {
-        return mailRepository.findAllByOrderByReceivedAtDesc()
+        return mailRepository.findByDeletedAtIsNullOrderByReceivedAtDesc()
                 .stream()
                 .map(AdminMailListResponse::from)
                 .toList();
@@ -76,7 +76,7 @@ public class AdminMailService {
 
     /* ── 읽지 않은 메일 개수 ────────────────────────────── */
     public long getUnreadCount() {
-        return mailRepository.countByIsReadFalse();
+        return mailRepository.countByIsReadFalseAndDeletedAtIsNull();
     }
 
     /* ── 답장 발송 + 저장 ───────────────────────────────── */
@@ -120,7 +120,7 @@ public class AdminMailService {
 
     /* ── 보낸 메일 목록 ─────────────────────────────────── */
     public List<AdminSentMailResponse> getSentMailList() {
-        return sentMailRepository.findAllByOrderBySentAtDesc()
+        return sentMailRepository.findByDeletedAtIsNullOrderBySentAtDesc()
                 .stream()
                 .map(AdminSentMailResponse::from)
                 .toList();

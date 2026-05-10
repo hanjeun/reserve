@@ -4,7 +4,7 @@ import { Typography, Flex } from 'antd';
 import { StarFilled } from '@ant-design/icons';
 import { Card, FavoriteButton, Badge } from '../common';
 import { getThumbnailUrl } from '../../utils';
-import { radius, fontSize } from '../../styles/tokens';
+import { fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 

@@ -6,6 +6,7 @@ import { useMessage } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
+import { ENTITY_LABELS, ENTITY_TYPE_OPTIONS } from './adminConstants';
 
 const { Text } = Typography;
 
@@ -15,24 +16,7 @@ const ACTION_CONFIG = {
     HARD_DELETE:  { label: '영구 삭제',   color: 'red'     },
 };
 
-const ENTITY_LABELS = {
-    MAIL:        { label: '수신 메일',  color: 'blue'    },
-    SENT_MAIL:   { label: '발송 메일',  color: 'cyan'    },
-    MEMBER:      { label: '회원',       color: 'purple'  },
-    STORE:       { label: '가게',       color: 'green'   },
-    RESERVATION: { label: '예약',       color: 'orange'  },
-    REVIEW:      { label: '리뷰',       color: 'volcano' },
-};
-
-const TYPE_OPTIONS = [
-    { value: '',            label: '전체 유형' },
-    { value: 'MAIL',        label: '수신 메일' },
-    { value: 'SENT_MAIL',   label: '발송 메일' },
-    { value: 'MEMBER',      label: '회원' },
-    { value: 'STORE',       label: '가게' },
-    { value: 'RESERVATION', label: '예약' },
-    { value: 'REVIEW',      label: '리뷰' },
-];
+const TYPE_OPTIONS = ENTITY_TYPE_OPTIONS;
 
 const AuditLogTab = () => {
     const { message } = useMessage();

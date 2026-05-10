@@ -160,3 +160,36 @@ git stash pop                 # 꺼내기
 git diff --staged             # 스테이징 내용 확인
 git push origin --delete feature/기능명  # 원격 브랜치 삭제
 ```
+
+---
+
+## 트러블슈팅
+
+### GitHub Actions — bash 특수문자 오류
+
+**증상:**
+```
+bash: -c: line N: syntax error near unexpected token `X'
+Process exited with status 2
+```
+
+**원인:** GitHub Secrets 값에 `()`, `!`, `$` 등 특수문자가 포함된 경우
+`export VAR=${{ secrets.VAR }}` 형식에서 bash 파싱 오류 발생
+
+**해결 방법 1 (권장):** Secret 값 자체를 영문+숫자만으로 재설정
+```
+GitHub → Settings → Secrets and variables → Actions
+→ 해당 Secret 삭제 후 New repository secret으로 재생성
+값: 영문+숫자 32자 이상 (예: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6)
+```
+
+**해결 방법 2:** CICD.yml에서 따옴표로 감싸기
+```yaml
+export VAR="${{ secrets.VAR }}"
+```
+
+**코드 변경 없이 재실행:**
+```
+GitHub → Actions 탭 → 실패한 워크플로우 클릭
+→ Re-run jobs → Re-run failed jobs
+```

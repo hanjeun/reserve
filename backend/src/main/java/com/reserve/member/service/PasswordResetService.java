@@ -36,13 +36,13 @@ public class PasswordResetService {
     public boolean sendResetCode(String email) {
         var memberOpt = memberRepository.findByEmail(email);
         if (memberOpt.isEmpty()) {
-            log.info("비밀번호 재설정 요청: 미가입 이메일 {}", email);
+            log.info("Password reset requested: unregistered email={}", email);
             return false;
         }
         var member = memberOpt.get();
         if (member.getPassword() == null) {
             // OAuth 전용 계정 (Google/Naver/Kakao) → 로컬 비밀번호 없음
-            log.info("비밀번호 재설정 요청: OAuth 전용 계정 {}", email);
+            log.info("Password reset requested: OAuth-only account={}", email);
             return false;
         }
 
@@ -55,7 +55,7 @@ public class PasswordResetService {
                 .build();
         tokenRepository.save(token);
         emailService.sendPasswordResetEmail(email, code);
-        log.info("비밀번호 재설정 코드 발송: {}", email);
+        log.info("Password reset code sent: email={}", email);
         return true;
     }
 
@@ -99,7 +99,7 @@ public class PasswordResetService {
 
         member.setPassword(passwordEncoder.encode(newPassword));
         tokenRepository.deleteByEmail(email);
-        log.info("비밀번호 재설정 완료: {}", email);
+        log.info("Password reset completed: email={}", email);
     }
 
     private String generateCode() {

@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="frontend/public/icons/RESERVE_logo.png" alt="RESERVE" width="340" />
+
 **식당 예약 플랫폼** — 가게를 찾고, 예약하고, 결제까지 한번에
 
 🌐 **[reserve.it.kr](https://reserve.it.kr)**

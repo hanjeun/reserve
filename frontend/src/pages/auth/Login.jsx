@@ -70,7 +70,7 @@ const Login = () => {
             message.error(decodeURIComponent(oauthMessage));
             window.history.replaceState({}, '', '/login');
         }
-    }, [isLoggedIn, location.state, navigate, message]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isLoggedIn, location.state, navigate, message]);
 
     const onLoginSubmit = async (values) => {
         setLoading(true);

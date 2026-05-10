@@ -44,9 +44,9 @@ public class JwtAuthenticationFilter implements Filter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (AuthException e) {
-            log.warn("인증 실패: {}", e.getMessage());
+            log.warn("Authentication failed: {}", e.getMessage());
         } catch (Exception e) {
-            log.error("JWT 필터 내부 오류: {}", e.getMessage());
+            log.error("JWT filter internal error: {}", e.getMessage());
         }
 
         chain.doFilter(request, response);

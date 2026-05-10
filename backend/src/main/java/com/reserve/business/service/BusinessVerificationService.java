@@ -64,7 +64,7 @@ public class BusinessVerificationService {
                 .status(VerificationStatus.PENDING)
                 .build();
 
-        log.info("사업자 인증 신청: memberId={}", member.getId());
+        log.info("Business verification submitted: memberId={}", member.getId());
         return BusinessVerificationResponse.fromEntity(verificationRepository.save(verification));
     }
 
@@ -94,7 +94,7 @@ public class BusinessVerificationService {
             verification.getBusinessName()
         );
 
-        log.info("사업자 인증 승인: verificationId={}, memberId={}", verificationId, member.getId());
+        log.info("Business verification approved: verificationId={}, memberId={}", verificationId, member.getId());
         return BusinessVerificationResponse.fromEntity(verification);
     }
 
@@ -125,7 +125,7 @@ public class BusinessVerificationService {
             reason.trim()
         );
 
-        log.info("사업자 인증 거절: verificationId={}, reason={}", verificationId, reason);
+        log.info("Business verification rejected: verificationId={}, reason={}", verificationId, reason);
         return BusinessVerificationResponse.fromEntity(verification);
     }
 
@@ -149,7 +149,7 @@ public class BusinessVerificationService {
         verificationRepository.findTopByMemberAndStatusOrderByCreatedAtDesc(targetMember, VerificationStatus.APPROVED)
                 .ifPresent(v -> v.reject(admin, "관리자에 의해 사업자 자격이 취소되었습니다."));
 
-        log.info("사업자 자격 취소: memberId={}, adminId={}", memberId, admin.getId());
+        log.info("Business role revoked: memberId={}, adminId={}", memberId, admin.getId());
     }
 
     /**
@@ -168,7 +168,7 @@ public class BusinessVerificationService {
         freshMember.setRole(Role.USER);
         memberRepository.save(freshMember);
 
-        log.info("사업자 자격 포기 완료: memberId={}", freshMember.getId());
+        log.info("Business role surrendered: memberId={}", freshMember.getId());
     }
 
     /**
@@ -202,7 +202,7 @@ public class BusinessVerificationService {
             verification.setLicenseImageKey(newKey);
         }
 
-        log.info("사업자 인증 수정: memberId={}", member.getId());
+        log.info("Business verification updated: memberId={}", member.getId());
         return BusinessVerificationResponse.fromEntity(verificationRepository.save(verification));
     }
 
@@ -222,7 +222,7 @@ public class BusinessVerificationService {
         fileStorageService.deleteFile(verification.getLicenseImageKey());
 
         verificationRepository.delete(verification);
-        log.info("사업자 인증 신청 취소: memberId={}", member.getId());
+        log.info("Business verification cancelled: memberId={}", member.getId());
     }
 
     // --- 단순 조회 메서드 ---

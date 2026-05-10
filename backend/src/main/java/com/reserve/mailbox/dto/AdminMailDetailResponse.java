@@ -21,7 +21,7 @@ public class AdminMailDetailResponse {
     private String fromName;
     private String subject;
     private String body;
-    private Boolean isRead;   // Boolean 래퍼 → getIsRead() → "isRead" 직렬화
+    private Boolean isRead;
     private LocalDateTime receivedAt;
     private List<ReplyResponse> replies;
 

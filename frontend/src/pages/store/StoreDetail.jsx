@@ -332,14 +332,14 @@ const StoreDetail = () => {
 
     React.useEffect(() => {
         if (error) message.error(error);
-    }, [error]); // eslint-disable-line
+    }, [error, message]);
 
     // 찜 초기 상태 로딩 (비로그인 상태에서도 확인 가능)
     React.useEffect(() => {
         favoriteService.getStatus(Number(id))
             .then(res => setFavoriteStatus(res?.isFavorite ?? false))
             .catch(() => {});
-    }, [id]); // eslint-disable-line
+    }, [id]);
 
     React.useEffect(() => {
         if (!isLoggedIn) return;
@@ -349,14 +349,14 @@ const StoreDetail = () => {
             const completed = sorted.find(r => r.status === 'COMPLETED') ?? null;
             if (completed) setCompletedReservation({ reservationId: completed.id, reviewId: completed.reviewId ?? null });
         }).catch(() => {});
-    }, [id, isLoggedIn]); // eslint-disable-line
+    }, [id, isLoggedIn]);
 
     React.useEffect(() => {
         if ((stateOpenWrite || stateOpenReviewId) && reviewSectionRef.current) {
             const t = setTimeout(() => reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
             return () => clearTimeout(t);
         }
-    }, [stateOpenWrite, stateOpenReviewId]); // eslint-disable-line
+    }, [stateOpenWrite, stateOpenReviewId]);
 
     const onFinish = async (values) => {
         if (!isLoggedIn) {

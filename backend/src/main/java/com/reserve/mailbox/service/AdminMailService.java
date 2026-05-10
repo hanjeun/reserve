@@ -52,7 +52,7 @@ public class AdminMailService {
                 .body(payload.getText())   // plain text만 저장 (XSS 방지)
                 .build();
         mailRepository.save(mail);
-        log.info("관리자 메일 수신 저장 완료: from={}, subject={}", mail.getFromEmail(), mail.getSubject());
+        log.info("Mail received and saved: from={}, subject={}", mail.getFromEmail(), mail.getSubject());
     }
 
     /* ── 목록 조회 ──────────────────────────────────────── */
@@ -100,7 +100,7 @@ public class AdminMailService {
                 .build();
         replyRepository.save(replyEntity);
 
-        log.info("관리자 답장 발송 완료: to={}, subject={}", toEmail, replySubject);
+        log.info("Reply sent: to={}, subject={}", toEmail, replySubject);
     }
 
     /* ── 새 메일 작성 발송 + DB 저장 ───────────────────── */
@@ -115,7 +115,7 @@ public class AdminMailService {
                 .build();
         sentMailRepository.save(sent);
 
-        log.info("관리자 발신 메일 발송+저장 완료: to={}", request.getToEmail());
+        log.info("Mail composed and saved: to={}", request.getToEmail());
     }
 
     /* ── 보낸 메일 목록 ─────────────────────────────────── */
@@ -137,7 +137,7 @@ public class AdminMailService {
             helper.setText(buildReplyHtml(body), true);
             mailSender.send(message);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("관리자 답장 이메일 발송 실패 ({}): {}", toEmail, e.getMessage());
+            log.error("Reply email failed ({}): {}", toEmail, e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "답장 발송 중 오류가 발생했습니다.");
         }
     }

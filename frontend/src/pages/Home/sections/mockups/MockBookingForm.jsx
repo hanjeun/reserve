@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Flex } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
-import { colors, radius, fontWeight, heights, fontSize } from '../../../../styles/tokens';
+import { colors, radius, fontWeight, fontSize } from '../../../../styles/tokens';
 import { Button } from '../../../../components/common';
 import { mockInputBase, mockFormLabel } from '../../Home.styles';
 

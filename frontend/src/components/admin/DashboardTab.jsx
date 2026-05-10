@@ -83,15 +83,6 @@ const ChartCard = ({ title, children, height = 260 }) => (
     </div>
 );
 
-// 최근 N개월 레이블 생성
-const getMonthLabels = (n = 6) => {
-    const now = new Date();
-    return Array.from({ length: n }, (_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
-        return `${d.getMonth() + 1}월`;
-    });
-};
-
 const DashboardTab = () => {
     const { message } = useMessage();
     const [loading, setLoading]   = useState(false);

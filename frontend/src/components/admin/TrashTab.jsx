@@ -5,7 +5,7 @@ import { Button } from '../common';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
-import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
+import { colors, fontSize, radius } from '../../styles/tokens';
 
 const { Text } = Typography;
 

@@ -42,6 +42,58 @@ com.reserve
 - DTO: 요청은 `~Request`, 응답은 `~Response`
 - 예외: `CustomException` + `ErrorCode` enum 사용
 
+### 로그 컨벤션
+
+**언어: 영어** (서버 로그는 영어, 사용자 메시지는 한국어)
+
+**레벨 기준:**
+
+| 레벨 | 사용 상황 | 예시 |
+|---|---|---|
+| `INFO` | 정상 비즈니스 흐름 | 가입, 예약 생성, 결제 완료 |
+| `WARN` | 예상 가능한 이상 상황 | 인증 실패, 권한 없음, 이메일 발송 실패 |
+| `ERROR` | 예상치 못한 오류 | 외부 API 통신 오류, 서버 내부 오류 |
+| `DEBUG` | 개발 중 디버깅 (운영 미출력) | 쿼리 파라미터, 중간 계산값 |
+
+**형식:**
+```java
+// ✅ 정석 — 동사+목적어, 주요 식별자 포함
+log.info("Reservation created: storeId={}, memberId={}", storeId, memberId);
+log.warn("Authentication failed: {}", e.getMessage());
+log.error("Payment cancellation failed: paymentId={}", paymentId, e);
+
+// ❌ 지양 — 모호하거나 한국어
+log.info("완료");
+log.info("처리됨: " + id);  // 문자열 연결 금지, 파라미터 사용
+```
+
+### 주석 컨벤션
+
+```java
+// 한 줄 설명 (why, not what)
+
+/**
+ * Javadoc: public Service 메서드에만
+ * 구현 세부사항 X, 의도/계약만 작성
+ */
+
+// ── 섹션 구분 ─────────────────────────────
+
+// TODO: 나중에 할 것
+// FIXME: 알려진 버그
+// NOTE: 중요한 맥락 설명
+```
+
+**Javadoc 작성 대상:**
+- Service public 메서드
+- 복잡한 비즈니스 로직
+- 외부에서 사용되는 유틸 메서드
+
+**Javadoc 미작성 대상:**
+- Repository (메서드명이 충분히 설명적)
+- Controller (Swagger로 대체)
+- 단순 getter/setter
+
 ---
 
 ## 프론트엔드 (React / JavaScript)

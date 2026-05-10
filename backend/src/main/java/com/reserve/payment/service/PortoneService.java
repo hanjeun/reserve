@@ -51,24 +51,24 @@ public class PortoneService {
                 throw new PaymentException("포트원 결제 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
             }
 
-            log.info("포트원 V2 결제 조회 성공: paymentId={}, status={}", merchantUid, response.getBody().getStatus());
+            log.info("Portone V2 payment retrieved: paymentId={}, status={}", merchantUid, response.getBody().getStatus());
             return response.getBody();
 
         } catch (PaymentException e) {
             throw e;
         } catch (HttpClientErrorException e) {
-            log.error("포트원 V2 결제 조회 실패: paymentId={}, status={}, body={}",
+            log.error("Portone V2 payment retrieval failed: paymentId={}, status={}, body={}",
                     merchantUid, e.getStatusCode(), e.getResponseBodyAsString());
             if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
                 throw new PaymentException("결제 정보 조회 실패 (404 NOT_FOUND)", HttpStatus.NOT_FOUND);
             }
             throw new PaymentException("결제 정보 조회 실패 (" + e.getStatusCode() + ")", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (HttpServerErrorException e) {
-            log.error("포트원 V2 서버 오류: paymentId={}, status={}, body={}",
+            log.error("Portone V2 server error: paymentId={}, status={}, body={}",
                     merchantUid, e.getStatusCode(), e.getResponseBodyAsString());
             throw new PaymentException("포트원 서버 오류 (" + e.getStatusCode() + ")", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            log.error("포트원 V2 결제 조회 통신 오류: paymentId={}, error={}", merchantUid, e.getMessage(), e);
+            log.error("Portone V2 payment retrieval network error: paymentId={}, error={}", merchantUid, e.getMessage(), e);
             throw new PaymentException("결제 정보 조회 중 통신 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -94,16 +94,16 @@ public class PortoneService {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
             restTemplate.postForEntity(url, entity, Void.class);
-            log.info("포트원 V2 결제 취소 성공: paymentId={}, amount={}", merchantUid, amount);
+            log.info("Portone V2 payment cancelled: paymentId={}, amount={}", merchantUid, amount);
 
         } catch (PaymentException e) {
             throw e;
         } catch (HttpClientErrorException | HttpServerErrorException e) {
-            log.error("포트원 V2 결제 취소 실패: paymentId={}, status={}, body={}",
+            log.error("Portone V2 payment cancellation failed: paymentId={}, status={}, body={}",
                     merchantUid, e.getStatusCode(), e.getResponseBodyAsString());
             throw new PaymentException("환불 처리 실패 (" + e.getStatusCode() + ")", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            log.error("포트원 V2 결제 취소 통신 오류: paymentId={}, error={}", merchantUid, e.getMessage(), e);
+            log.error("Portone V2 payment cancellation network error: paymentId={}, error={}", merchantUid, e.getMessage(), e);
             throw new PaymentException("환불 처리 중 통신 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

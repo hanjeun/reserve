@@ -36,7 +36,7 @@ public class OAuthUnlinkService {
 
         String accessToken = member.getOauthAccessToken();
         if (accessToken == null) {
-            log.warn("⚠️ 연동 해제 실패: 액세스 토큰이 없습니다. memberId={}", member.getId());
+            log.warn("OAuth unlink failed: no access token. memberId={}", member.getId());
             return true; // 혹은 필요에 따라 throw new AuthException
         }
 
@@ -48,7 +48,7 @@ public class OAuthUnlinkService {
                 default -> true;
             };
         } catch (Exception e) {
-            log.error("OAuth 연동 해제 중 오류 발생: {}", e.getMessage());
+            log.error("OAuth unlink error: {}", e.getMessage());
             // 탈퇴가 중단되면 안 되므로 로그만 남기고 true 반환하는 정책 유지
             return true;
         }
@@ -74,11 +74,11 @@ public class OAuthUnlinkService {
                     String.class
             );
 
-            log.info("Google 연동 해제 응답: status={}", response.getStatusCode());
+            log.info("Google unlink response: status={}", response.getStatusCode());
             return response.getStatusCode().is2xxSuccessful();
 
         } catch (Exception e) {
-            log.error("Google 연동 해제 실패: {}", e.getMessage());
+            log.error("Google unlink failed: {}", e.getMessage());
             // 토큰이 이미 만료되었거나 해제된 경우에도 탈퇴는 진행
             return true;
         }
@@ -97,11 +97,11 @@ public class OAuthUnlinkService {
         try {
             ResponseEntity<String> response = restTemplate.getForEntity(unlinkUrl, String.class);
 
-            log.info("Naver 연동 해제 응답: status={}, body={}", response.getStatusCode(), response.getBody());
+            log.info("Naver unlink response: status={}, body={}", response.getStatusCode(), response.getBody());
             return response.getStatusCode().is2xxSuccessful();
 
         } catch (Exception e) {
-            log.error("Naver 연동 해제 실패: {}", e.getMessage());
+            log.error("Naver unlink failed: {}", e.getMessage());
             // 토큰이 이미 만료되었거나 해제된 경우에도 탈퇴는 진행
             return true;
         }
@@ -128,11 +128,11 @@ public class OAuthUnlinkService {
                     String.class
             );
 
-            log.info("Kakao 연동 해제 응답: status={}, body={}", response.getStatusCode(), response.getBody());
+            log.info("Kakao unlink response: status={}, body={}", response.getStatusCode(), response.getBody());
             return response.getStatusCode().is2xxSuccessful();
 
         } catch (Exception e) {
-            log.error("Kakao 연동 해제 실패: {}", e.getMessage());
+            log.error("Kakao unlink failed: {}", e.getMessage());
             // 토큰이 이미 만료되었거나 해제된 경우에도 탈퇴는 진행
             return true;
         }

@@ -54,7 +54,7 @@ public class PaymentService {
         Payment existingReady = readyPayments.isEmpty() ? null : readyPayments.get(0);
 
         if (existingReady != null) {
-            log.info("기존 READY Payment 재사용: paymentId={}, merchantUid={}",
+            log.info("Reusing existing READY payment: paymentId={}, merchantUid={}",
                     existingReady.getId(), existingReady.getMerchantUid());
             return PaymentPrepareDto.builder()
                     .merchantUid(existingReady.getMerchantUid())
@@ -129,10 +129,10 @@ public class PaymentService {
         if (Boolean.TRUE.equals(store.getAutoApprovalEnabled())
                 && reservation.getStatus() == Reservation.ReservationStatus.PENDING) {
             reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
-            log.info("자동 승인 처리: reservationId={}", reservation.getId());
+            log.info("Auto-approve processed: reservationId={}", reservation.getId());
         }
 
-        log.info("결제 검증 성공: {}", payment.getMerchantUid());
+        log.info("Payment verified: {}", payment.getMerchantUid());
         return PaymentResponseDto.fromEntity(payment);
     }
 
@@ -168,7 +168,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findPaidByReservationId(reservationId).orElse(null);
 
         if (payment == null) {
-            log.info("환불할 결제 내역이 없거나 이미 처리되었습니다. (예약ID: {})", reservationId);
+            log.info("No refundable payment found or already processed: reservationId={}", reservationId);
             return;
         }
 
@@ -183,7 +183,7 @@ public class PaymentService {
 
             refundPayment(refundDto);
         } else {
-            log.info("환불 정책에 의해 환불 금액이 0원입니다. (사유: {})", calculation.getReason());
+            log.info("Refund amount is 0 by policy: reason={}", calculation.getReason());
         }
     }
 

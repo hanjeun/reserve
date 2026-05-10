@@ -29,7 +29,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException, ServletException {
 
-        log.error("OAuth2 로그인 실패: {}", exception.getMessage());
+        log.error("OAuth2 login failed: {}", exception.getMessage());
 
         String rawMessage = resolveMessage(exception);
         String errorMessage = URLEncoder.encode(rawMessage, StandardCharsets.UTF_8);

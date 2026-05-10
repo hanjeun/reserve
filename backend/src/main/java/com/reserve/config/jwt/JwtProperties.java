@@ -31,7 +31,7 @@ public class    JwtProperties {
             throw new IllegalStateException("JWT Secret Key는 최소 64자 이상이어야 합니다.");
         }
 
-        log.info("JWT 설정 로드 완료 (Issuer: {}, AT: {}m, RT: {}d)",
+        log.info("JWT config loaded: issuer={}, accessTokenExpiry={}m, refreshTokenExpiry={}d",
                 issuer, accessToken.expirationMinutes, refreshToken.expirationDays);
     }
 

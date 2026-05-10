@@ -42,7 +42,7 @@ public class AdminMailController {
 
         // Secret 설정된 경우에만 검증
         if (!webhookSecret.isBlank() && !webhookSecret.equals(secret)) {
-            log.warn("웹훅 시크릿 불일치 — 요청 거부");
+            log.warn("Webhook secret mismatch - request rejected");
             return ResponseEntity.status(401).build();
         }
 

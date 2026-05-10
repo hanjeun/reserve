@@ -64,6 +64,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Run ESLint
+        working-directory: frontend
+        run: npx eslint src --max-warnings 0
+
       # .env.production 파일을 GitHub Secrets로 생성
       - name: Create .env.production
         working-directory: frontend
@@ -72,6 +76,7 @@ jobs:
           VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
           VITE_PORTONE_CHANNEL_KEY=${{ secrets.VITE_PORTONE_CHANNEL_KEY }}
           VITE_SKELETON_DELAY=0
+          VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
           EOF
 
       - name: Build React app
@@ -194,6 +199,7 @@ jobs:
             export S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
             export CLOUDFRONT_DOMAIN=${{ secrets.CLOUDFRONT_DOMAIN }}
             export MAIL_WEBHOOK_SECRET=${{ secrets.MAIL_WEBHOOK_SECRET }}
+            export SENTRY_DSN=${{ secrets.SENTRY_DSN }}
             sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)
@@ -215,7 +221,21 @@ jobs:
             echo "Health check failed after 10 attempts"
             exit 1
 
+      - name: Rollback on health check failure
+        if: failure()
+        uses: appleboy/ssh-action@master
+        with:
+          username: ubuntu
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "Health check failed. Rolling back..."
+            sudo docker stop ${{ env.TARGET_UPSTREAM }} || true
+            sudo docker rm ${{ env.TARGET_UPSTREAM }} || true
+            echo "Rollback complete. Keeping ${{ env.CURRENT_UPSTREAM }}"
+
       - name: Switch Nginx upstream
+        if: success()
         uses: appleboy/ssh-action@master
         with:
           username: ubuntu

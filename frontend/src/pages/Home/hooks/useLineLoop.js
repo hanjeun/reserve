@@ -26,6 +26,9 @@ export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, s
     const [current, setCurrent] = useState(fullText(LINES[0]));
     const idxRef = useRef(0);
     const timerRef = useRef(null);
+    // NOTE: props를 ref로 유지 — 마운트 시 1회만 실행되는 루프이므로 deps 배열에 넣지 않음
+    const speedRef = useRef({ typeSpeed, eraseSpeed, pauseMs, startDelay });
+    useEffect(() => { speedRef.current = { typeSpeed, eraseSpeed, pauseMs, startDelay }; });
 
     useEffect(() => {
         let cancelled = false;
@@ -36,8 +39,8 @@ export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, s
             const seq = buildErasingSeq(fullText(LINES[idxRef.current % LINES.length]));
             let j = 0;
             const step = () => {
-                if (j < seq.length) { setCurrent(seq[j++]); schedule(step, eraseSpeed); }
-                else { idxRef.current++; setLineIdx(idxRef.current % LINES.length); schedule(type, eraseSpeed * 4); }
+                if (j < seq.length) { setCurrent(seq[j++]); schedule(step, speedRef.current.eraseSpeed); }
+                else { idxRef.current++; setLineIdx(idxRef.current % LINES.length); schedule(type, speedRef.current.eraseSpeed * 4); }
             };
             step();
         };
@@ -45,12 +48,12 @@ export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, s
             const seq = buildTypingSeq(fullText(LINES[idxRef.current % LINES.length]));
             let i = 0;
             const step = () => {
-                if (i < seq.length) { setCurrent(seq[i++]); schedule(step, typeSpeed); }
-                else { schedule(erase, pauseMs); }
+                if (i < seq.length) { setCurrent(seq[i++]); schedule(step, speedRef.current.typeSpeed); }
+                else { schedule(erase, speedRef.current.pauseMs); }
             };
             step();
         };
-        schedule(erase, startDelay);
+        schedule(erase, speedRef.current.startDelay);
         return () => { cancelled = true; clearTimeout(timerRef.current); };
     }, []);
 

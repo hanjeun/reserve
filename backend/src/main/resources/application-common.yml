@@ -116,3 +116,10 @@ management:
   endpoint:
     health:
       show-details: never   # 운영 환경에서 내부 정보 비노출
+
+# Sentry 에러 모니터링
+sentry:
+  dsn: ${SENTRY_DSN:}
+  send-default-pii: false
+  traces-sample-rate: 0.1
+  environment: ${SPRING_PROFILES_ACTIVE:local}

@@ -96,6 +96,16 @@ export const API_ENDPOINTS = {
         UNREAD_COUNT: '/api/admin/mail/unread-count',
         COMPOSE:      '/api/admin/mail/compose',
         SENT:         '/api/admin/mail/sent',
+        DELETE:       (id) => `/api/admin/mail/${id}`,
+        DELETE_SENT:  (id) => `/api/admin/mail/sent/${id}`,
+    },
+    TRASH: {
+        LIST:    '/api/admin/trash',
+        RESTORE: (type, id) => `/api/admin/trash/${type}/${id}/restore`,
+        DELETE:  (type, id) => `/api/admin/trash/${type}/${id}`,
+    },
+    AUDIT_LOG: {
+        LIST: '/api/admin/audit-logs',
     },
 };
 

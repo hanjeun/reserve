@@ -24,8 +24,8 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 10MB
-      max-request-size: 50MB
+      max-file-size: 8MB      # SonarCloud: 8MB 이하 권장 (DoS 방지)
+      max-request-size: 8MB   # SonarCloud: 8MB 이하 권장 (DoS 방지)
       file-size-threshold: 2MB
 
   # JPA 공통 설정

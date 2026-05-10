@@ -1,7 +1,11 @@
 FROM amazoncorretto:21-alpine-jdk
 
-# Security: 비 root 유저로 실행 (컴테이너 권한 최소화)
+# Security: run as non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Create log directory with proper permissions before switching user
+RUN mkdir -p /var/log/reserve && chown -R appuser:appgroup /var/log/reserve
+
 USER appuser
 
 ARG JAR_FILE=build/libs/*.jar

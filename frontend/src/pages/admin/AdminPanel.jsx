@@ -7,8 +7,12 @@ import {
 import {
     SearchOutlined, CalendarOutlined,
     SafetyCertificateOutlined, IdcardOutlined, ReloadOutlined, MailOutlined,
+    DeleteOutlined, FileTextOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import MailboxTab from '../../components/admin/MailboxTab';
+import TrashTab from '../../components/admin/TrashTab';
+import AuditLogTab from '../../components/admin/AuditLogTab';
+import DashboardTab from '../../components/admin/DashboardTab';
 import { PageContainer, Button, AdminTableSkeleton } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -352,6 +356,27 @@ const AdminPanel = () => {
             children: (
                 <MailboxTab onUnreadCountChange={setMailUnread} />
             ),
+        },
+        {
+            key: 'trash',
+            label: (
+                <span><DeleteOutlined style={{ marginRight: 6 }} />휴지통</span>
+            ),
+            children: <TrashTab />,
+        },
+        {
+            key: 'audit-logs',
+            label: (
+                <span><FileTextOutlined style={{ marginRight: 6 }} />시스템 로그</span>
+            ),
+            children: <AuditLogTab />,
+        },
+        {
+            key: 'dashboard',
+            label: (
+                <span><BarChartOutlined style={{ marginRight: 6 }} />대시보드</span>
+            ),
+            children: <DashboardTab />,
         },
         {
             key: 'reservations',

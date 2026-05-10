@@ -1,5 +1,6 @@
 package com.reserve.member.entity;
 
+import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -58,6 +59,9 @@ public class Member {
     @Column(name = "email_notification_enabled", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 1")
     private boolean emailNotificationEnabled = true;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     // 권한 체크 헬퍼 메서드
     public boolean isUser() {
         return this.role == Role.USER;
@@ -72,6 +76,14 @@ public class Member {
     // OAuth 사용자인지 확인
     public boolean isOAuthUser() {
         return this.provider != null && this.provider != AuthProvider.LOCAL;
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
     }
 
     // OAuth 정보 업데이트

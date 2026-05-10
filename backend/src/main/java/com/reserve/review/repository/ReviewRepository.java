@@ -52,4 +52,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Modifying
     @Query("DELETE FROM Review r WHERE r.member.id = :memberId")
     void deleteByMemberId(@Param("memberId") Long memberId);
+
+    @Modifying
+    @Query("UPDATE Review r SET r.deletedAt = NULL WHERE r.id = :id")
+    void restoreById(Long id);
+
+    @Modifying
+    @Query("DELETE FROM Review r WHERE r.deletedAt IS NOT NULL AND r.deletedAt < :cutoff")
+    int hardDeleteByDeletedAtBefore(java.time.LocalDateTime cutoff);
 }

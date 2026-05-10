@@ -29,4 +29,15 @@ public class AdminSentMail {
     @Column(name = "sent_at", nullable = false)
     @Builder.Default
     private LocalDateTime sentAt = LocalDateTime.now();
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
 }

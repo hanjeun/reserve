@@ -38,7 +38,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
         Member member = oAuth2User.getMember();
 
-        log.info("OAuth2 로그인 성공: {}", member.getEmail());
+        log.info("OAuth2 login success: email={}", member.getEmail());
 
         // 1. 토큰 생성
         String accessToken = tokenProvider.generateAccessToken(member);
@@ -59,7 +59,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String redirectUrl = "local".equals(serverEnv)
                 ? "http://localhost:5173/oauth2/callback"
                 : "https://reserve.it.kr/oauth2/callback";
-        log.info("OAuth2 리다이렉트: {} (env={})", redirectUrl, serverEnv);
+        log.info("OAuth2 redirect: url={}, env={}", redirectUrl, serverEnv);
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 

@@ -114,7 +114,7 @@ public class StoreService {
             savedStore.setDetailImageList(detailImageUrls);
         }
 
-        log.info("가게 등록 완료: ID={}", storeId);
+        log.info("Store registered: storeId={}", storeId);
         return StoreResponse.fromEntity(savedStore);
     }
 
@@ -144,13 +144,13 @@ public class StoreService {
      */
     @Transactional
     public StoreResponse updateStore(Long id, StoreUpdateRequest request, Member member) {
-        log.info("StoreService.updateStore 시작: storeId={}", id);
+        log.info("Store update started: storeId={}", id);
 
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
 
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            log.error("권한 없음: storeOwnerId={}, requestMemberId={}", store.getOwner().getId(), member.getId());
+            log.error("Unauthorized store access: storeOwnerId={}, requestMemberId={}", store.getOwner().getId(), member.getId());
             throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
         }
 
@@ -191,11 +191,11 @@ public class StoreService {
             updateStoreImages(store, request);
 
             Store savedStore = storeRepository.save(store);
-            log.info("가게 수정 완료: storeId={}", savedStore.getId());
+            log.info("Store updated: storeId={}", savedStore.getId());
 
             return StoreResponse.fromEntity(savedStore);
         } catch (Exception e) {
-            log.error("가게 수정 중 예외 발생: storeId={}", id, e);
+            log.error("Store update failed: storeId={}", id, e);
             throw e;
         }
     }
@@ -252,7 +252,7 @@ public class StoreService {
             }
         }
 
-        log.info("가게 삭제 시작: storeId={}, force={}", id, force);
+        log.info("Store deletion started: storeId={}, force={}", id, force);
 
         // 삭제 순서: Payment → Review → Reservation → Favorite → Promotion → Store
         // (Payment가 Reservation을 FK 참조하므로 Payment 먼저 삭제)
@@ -269,7 +269,7 @@ public class StoreService {
         store.getDetailImageList().forEach(fileStorageService::deleteFile);
 
         storeRepository.delete(store);
-        log.info("가게 삭제 완료: storeId={}", id);
+        log.info("Store deleted: storeId={}", id);
     }
 
     /**

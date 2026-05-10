@@ -74,7 +74,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         if (existingMember.isPresent()) {
             // 기존 OAuth 회원: 정보 업데이트
-            log.info("기존 OAuth2 회원 로그인: {} ({})", userInfo.getEmail(), provider);
+            log.info("Existing OAuth2 member login: email={}, provider={}", userInfo.getEmail(), provider);
             return updateExistingMember(existingMember.get(), userInfo, accessToken);
         }
 
@@ -88,7 +88,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
                 // 이미 다른 OAuth 제공자로 가입한 경우 → 에러
                 if (member.getProvider() != null && member.getProvider() != AuthProvider.LOCAL) {
-                    log.warn("⚠️ 이미 다른 OAuth 제공자로 가입된 이메일: {} (기존: {}, 시도: {})",
+                    log.warn("Email already registered with different OAuth provider: email={}, existing={}, attempted={}",
                             email, member.getProvider(), provider);
                     String msg = "이미 " + member.getProvider().name() + " 계정으로 가입된 이메일입니다. "
                             + member.getProvider().name() + " 로그인을 이용해주세요.";
@@ -99,7 +99,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
                 // LOCAL 회원인 경우 → 에러 (자동 연결 안 함)
                 if (member.getProvider() == null || member.getProvider() == AuthProvider.LOCAL) {
-                    log.warn("⚠️ 이미 이메일로 가입된 계정: {} (시도: {})", email, provider);
+                    log.warn("Email already registered: email={}, attempted provider={}", email, provider);
                     String msg = "이미 이메일로 가입된 계정이 있습니다. 기존 계정으로 로그인해주세요.";
                     throw new OAuth2AuthenticationException(
                             new org.springframework.security.oauth2.core.OAuth2Error("email_conflict"), msg
@@ -109,7 +109,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // 3순위: 신규 회원 생성
-        log.info("새로운 OAuth2 회원 가입: {} ({})", email, provider);
+        log.info("New OAuth2 member registered: email={}, provider={}", email, provider);
         return createNewMember(provider, userInfo, accessToken);
     }
 

@@ -18,13 +18,13 @@ public class TokenService {
     private final MemberService memberService;
 
     public String createNewAccessToken(String refreshToken) {
-        log.info("========== Access Token 재발급 시작 ==========");
+        log.info("========== Access Token refresh started ==========");
 
         // 1. 토큰 유효성 검사 (서명 검증)
         if (!tokenProvider.validToken(refreshToken)) {
             // JWT 서명 검증 실패 = 키가 다르거나 토큰이 변조됨
             // 쿠키 자체는 있지만 현재 서버 키로 검증 불가 (재배포 후 키 변경 등)
-            log.warn("⚠️ Refresh Token JWT 서명 검증 실패 (키 불일치 또는 만료된 서명)");
+            log.warn("Refresh token signature verification failed");
             throw new AuthException("리프레시 토큰이 유효하지 않습니다. 다시 로그인해주세요.");
         }
 
@@ -36,11 +36,11 @@ public class TokenService {
         Long userId = savedToken.getMemberId();
         Member member = memberService.findById(userId);
 
-        log.info("사용자 확인: {}", member.getEmail());
+        log.info("Member verified: {}", member.getEmail());
 
         // 3. 신규 토큰 생성
         String newAccessToken = tokenProvider.generateAccessToken(member);
-        log.info("========== Access Token 재발급 완료 ==========");
+        log.info("========== Access Token refresh completed ==========");
 
         return newAccessToken;
     }

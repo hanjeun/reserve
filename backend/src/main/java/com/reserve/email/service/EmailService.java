@@ -40,9 +40,9 @@ public class EmailService {
             helper.setSubject("[RESERVE] 이메일 인증 코드");
             helper.setText(buildVerificationEmailContent(verificationCode), true);
             mailSender.send(message);
-            log.info("인증 이메일 발송 완료: {}", toEmail);
+            log.info("Verification email sent: email={}", toEmail);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("이메일 발송 실패: {}", e.getMessage());
+            log.error("Email send failed: {}", e.getMessage());
             throw new EmailException("인증 이메일 발송 중 서버 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -91,9 +91,9 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
             mailSender.send(message);
-            log.info("예약 알림 이메일 발송: {}", toEmail);
+            log.info("Reservation notification email sent: email={}", toEmail);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("예약 알림 이메일 발송 실패 ({}): {}", toEmail, e.getMessage());
+            log.error("Reservation notification email failed ({}): {}", toEmail, e.getMessage());
         }
     }
 
@@ -171,9 +171,9 @@ public class EmailService {
                 null
             ), true);
             mailSender.send(message);
-            log.info("사업자 인증 승인 이메일 발송: {}", toEmail);
+            log.info("Business approval email sent: email={}", toEmail);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("사업자 승인 이메일 발송 실패 ({}): {}", toEmail, e.getMessage());
+            log.error("Business approval email failed ({}): {}", toEmail, e.getMessage());
         }
     }
 
@@ -194,9 +194,9 @@ public class EmailService {
                 rejectionReason
             ), true);
             mailSender.send(message);
-            log.info("사업자 인증 거절 이메일 발송: {}", toEmail);
+            log.info("Business rejection email sent: email={}", toEmail);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("사업자 거절 이메일 발송 실패 ({}): {}", toEmail, e.getMessage());
+            log.error("Business rejection email failed ({}): {}", toEmail, e.getMessage());
         }
     }
 
@@ -240,9 +240,9 @@ public class EmailService {
             helper.setSubject("[RESERVE] 비밀번호 재설정 코드");
             helper.setText(buildPasswordResetEmailContent(code), true);
             mailSender.send(message);
-            log.info("비밀번호 재설정 이메일 발송 완료: {}", toEmail);
+            log.info("Password reset email sent: email={}", toEmail);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("비밀번호 재설정 이메일 발송 실패: {}", e.getMessage());
+            log.error("Password reset email failed: {}", e.getMessage());
         }
     }
 

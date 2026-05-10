@@ -33,7 +33,7 @@ public class FavoriteService {
         return favoriteRepository.findByMemberAndStore(member, store)
                 .map(favorite -> {
                     favoriteRepository.delete(favorite);
-                    log.info("찜 삭제: 회원={}, 가게={}", member.getEmail(), store.getName());
+                    log.info("Favorite removed: memberId={}, storeId={}", member.getEmail(), store.getName());
                     return createToggleResponse(false, store);
                 })
                 .orElseGet(() -> {
@@ -42,7 +42,7 @@ public class FavoriteService {
                             .store(store)
                             .build();
                     favoriteRepository.save(favorite);
-                    log.info("찜 추가: 회원={}, 가게={}", member.getEmail(), store.getName());
+                    log.info("Favorite added: memberId={}, storeId={}", member.getEmail(), store.getName());
                     return createToggleResponse(true, store);
                 });
     }

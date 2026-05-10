@@ -40,7 +40,7 @@ public class PaymentApiController {
             @RequestParam(value = "imp_success", required = false) String impSuccess,
             @RequestParam(value = "error_msg", required = false) String errorMsg) {
 
-        log.info("모바일 결제 리다이렉트 수신: merchant_uid={}", merchantUid);
+        log.info("Mobile payment redirect received: merchant_uid={}", merchantUid);
         boolean isSuccess = "true".equalsIgnoreCase(impSuccess);
         String redirectBase = "redirect:" + frontendUrl + "/payment/result";
 
@@ -61,7 +61,7 @@ public class PaymentApiController {
             paymentService.verifyAndCompletePayment(verifyDto);
             return redirectBase + "?success=true&merchant_uid=" + merchantUid;
         } catch (Exception e) {
-            log.error("모바일 리다이렉트 처리 중 예외 발생: {}", e.getMessage());
+            log.error("Mobile redirect processing error: {}", e.getMessage());
             return redirectBase + "?success=false&message=" + e.getMessage();
         }
     }

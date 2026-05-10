@@ -52,7 +52,7 @@ public class ReservationService {
      */
     @Transactional
     public ReservationResponse createReservation(ReservationCreateRequest request, Member member) {
-        log.info("예약 생성 시작: storeId={}, memberId={}", request.getStoreId(), member.getId());
+        log.info("Reservation created: storeId={}, memberId={}", request.getStoreId(), member.getId());
 
         Store store = storeRepository.findById(request.getStoreId())
                 .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -170,7 +170,7 @@ public class ReservationService {
                         request.getGuestCount()
                 );
             } catch (Exception e) {
-                log.warn("사장님 예약 알림 이메일 발송 실패 (서비스 계속): {}", e.getMessage());
+                log.warn("Owner reservation notification email failed (service continues): {}", e.getMessage());
             }
         } else {
             log.debug("사장님 이메일 알림 비활성화 상태 — 발송 건너뜀");
@@ -296,7 +296,7 @@ public class ReservationService {
                         reservation.getRejectionReason()
                 );
             } catch (Exception e) {
-                log.warn("예약 거절 알림 이메일 발송 실패: {}", e.getMessage());
+                log.warn("Reservation rejection email failed: {}", e.getMessage());
             }
         }
     }

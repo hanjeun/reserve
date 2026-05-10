@@ -47,7 +47,7 @@ public class EmailVerificationService {
 
         emailService.sendVerificationEmail(email, code);
 
-        log.info("인증 코드 발송: email={}", email);
+        log.info("Verification code sent: email={}", email);
     }
 
     @Transactional
@@ -69,7 +69,7 @@ public class EmailVerificationService {
         verification.setVerified(true);
         verificationRepository.save(verification);
 
-        log.info("이메일 인증 완료: email={}", email);
+        log.info("Email verification completed: email={}", email);
         return true;
     }
 

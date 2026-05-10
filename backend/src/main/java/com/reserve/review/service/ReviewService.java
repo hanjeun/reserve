@@ -34,7 +34,7 @@ public class ReviewService {
      */
     @Transactional
     public ReviewResponse createReview(ReviewCreateRequest request, Member member) {
-        log.info("리뷰 작성 시작: reservationId={}, memberId={}", request.getReservationId(), member.getId());
+        log.info("Review created: reservationId={}, memberId={}", request.getReservationId(), member.getId());
 
         Reservation reservation = reservationRepository.findById(request.getReservationId())
                 .orElseThrow(() -> new ReviewException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -52,7 +52,7 @@ public class ReviewService {
                 .build();
 
         Review savedReview = reviewRepository.save(review);
-        log.info("리뷰 작성 완료: reviewId={}", savedReview.getId());
+        log.info("Review created: reviewId={}", savedReview.getId());
 
         updateStoreRating(reservation.getStore());
 
@@ -69,7 +69,7 @@ public class ReviewService {
 
         Store store = review.getStore();
         reviewRepository.delete(review);
-        log.info("리뷰 삭제 완료: reviewId={}", reviewId);
+        log.info("Review deleted: reviewId={}", reviewId);
 
         updateStoreRating(store);
     }
@@ -83,7 +83,7 @@ public class ReviewService {
         validateReviewOwnership(review, member);
 
         review.update(request.getRating(), request.getTitle(), request.getContent());
-        log.info("리뷰 수정 완료: reviewId={}", reviewId);
+        log.info("Review updated: reviewId={}", reviewId);
 
         updateStoreRating(review.getStore());
 
@@ -152,7 +152,7 @@ public class ReviewService {
         managed.setRating(avg != null ? Math.round(avg * 10) / 10.0 : null);
         managed.setReviewCount((int) count);
         storeRepository.save(managed);
-        log.info("가게 평점 갱신: storeId={}, rating={}, reviewCount={}", storeId, managed.getRating(), managed.getReviewCount());
+        log.info("Store rating updated: storeId={}, rating={}, reviewCount={}", storeId, managed.getRating(), managed.getReviewCount());
     }
 
     private Review findReviewByIdOrThrow(Long id) {

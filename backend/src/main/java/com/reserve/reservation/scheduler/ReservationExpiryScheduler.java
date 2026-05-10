@@ -48,7 +48,7 @@ public class ReservationExpiryScheduler {
             LocalDateTime expireAt = reservation.getCreatedAt().plusMinutes(timeoutMinutes);
 
             if (now.isAfter(expireAt)) {
-                log.info("[만료 스케줄러] 미결제 예약 자동 취소: reservationId={}, storeId={}, memberId={}, createdAt={}, expireAt={}",
+                log.info("[ExpiryScheduler] Unpaid reservation auto-cancelled: reservationId={}, storeId={}, memberId={}, createdAt={}, expireAt={}",
                         reservation.getId(),
                         reservation.getStore().getId(),
                         reservation.getMember().getId(),
@@ -61,7 +61,7 @@ public class ReservationExpiryScheduler {
         }
 
         if (expiredCount > 0) {
-            log.info("[만료 스케줄러] 총 {}건 미결제 예약 자동 취소 완료", expiredCount);
+            log.info("[ExpiryScheduler] Auto-cancelled {} unpaid reservations", expiredCount);
         }
     }
 

@@ -165,4 +165,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
          + "WHERE r.status = 'PENDING' AND r.depositAmount > 0 AND r.depositPaid = false "
          + "AND r.createdAt < :cutoff")
     List<Reservation> findExpiredUnpaidReservations(@Param("cutoff") LocalDateTime cutoff);
+
+    @Modifying
+    @Query("UPDATE Reservation r SET r.deletedAt = NULL WHERE r.id = :id")
+    void restoreById(Long id);
+
+    @Modifying
+    @Query("DELETE FROM Reservation r WHERE r.deletedAt IS NOT NULL AND r.deletedAt < :cutoff")
+    int hardDeleteByDeletedAtBefore(LocalDateTime cutoff);
 }

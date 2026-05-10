@@ -148,6 +148,17 @@ public class Store {
     @Builder.Default
     private Boolean emailNotificationEnabled = true;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
     // 키워드 편의 메서드
     public List<String> getKeywordList() {
         if (keywords == null || keywords.trim().isEmpty()) {

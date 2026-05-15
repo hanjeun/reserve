@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Typography, Table, Tag, Select, Modal, Skeleton } from 'antd';
-import { DeleteOutlined, ReloadOutlined, UndoOutlined } from '@ant-design/icons';
+import { DeleteOutlined, SyncOutlined, UndoOutlined } from '@ant-design/icons';
 import { Button } from '../common';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
@@ -172,11 +172,11 @@ const TrashTab = () => {
                 <Button
                     variant="ghost-sm"
                     size="md"
-                    loading={loading}
                     onClick={load}
+                    disabled={loading}
                     style={{ marginLeft: 'auto' }}
                 >
-                    <ReloadOutlined /> 새로고침
+                    <SyncOutlined spin={loading} /> 새로고침
                 </Button>
             </div>
 

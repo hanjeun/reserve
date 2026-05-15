@@ -1,13 +1,12 @@
 /**
  * RESERVE - 관리자 메일함 탭
- *
  * 서브탭: 받은 메일함 / 보낸 메일함
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Typography, Input, Divider, Skeleton, Modal } from 'antd';
 import {
-    MailOutlined, SearchOutlined, ReloadOutlined,
-    SendOutlined, CloseOutlined, InboxOutlined, ArrowLeftOutlined,
+    MailOutlined, SearchOutlined,
+    SendOutlined, CloseOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import { Button } from '../common';
 import { useMessage } from '../../hooks';
@@ -62,9 +61,9 @@ const SubTabBar = ({ active, onChangeTab }) => (
                 onClick={() => onChangeTab(key)}
                 style={{
                     ...S.subTabBtn,
-                    color:       active === key ? colors.primary.main      : colors.text.tertiary,
+                    color:        active === key ? colors.primary.main : colors.text.tertiary,
                     borderBottom: active === key ? `2px solid ${colors.primary.main}` : '2px solid transparent',
-                    fontWeight:  active === key ? fontWeight.semibold : fontWeight.medium,
+                    fontWeight:   active === key ? fontWeight.semibold : fontWeight.medium,
                 }}
             >
                 {label}
@@ -73,27 +72,53 @@ const SubTabBar = ({ active, onChangeTab }) => (
     </div>
 );
 
-// ── 검색 + 새로고침 + 새 메일 바 ─────────────────────────
-const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => (
-    <div style={S.searchBar}>
-        <Input
-            prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
-            placeholder="발신자, 제목 검색"
-            value={value}
-            onChange={onChange}
-            allowClear
-            size="large"
-            style={{ flex: 1 }}
-        />
-        <button onClick={onReload} disabled={loading} style={S.reloadBtn} title="새로고침">
-            <ReloadOutlined spin={loading} style={{ color: colors.text.tertiary, fontSize: 15 }} />
-        </button>
-        <Button variant="primary" size="sm" onClick={onCompose}
-            style={{ borderRadius: radius.xl, paddingLeft: 20, paddingRight: 20, height: 40, flexShrink: 0 }}>
-            새 메일
-        </Button>
-    </div>
-);
+// ── 새 메일 + 검색 + 새로고침 바 ─────────────────────────
+// 시스템 로그 툴바(FilterToolbar)와 동일한 한 줄 구조:
+//   PC:     [새 메일] [검색창──────────────────] [새로고침]
+//   Mobile: [새 메일] [검색창──────] [새로고침]  (flex-wrap)
+const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
+    const [cooldown, setCooldown] = useState(false);
+    const handleReload = () => {
+        if (cooldown || loading) return;
+        setCooldown(true);
+        onReload();
+        setTimeout(() => setCooldown(false), 3000);
+    };
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+            {/* 행1: 새 메일 + 새로고침(오른쪽 끝) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 40 }}>
+                <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={onCompose}
+                    style={{ height: 40, borderRadius: 20, paddingLeft: 20, paddingRight: 20, flexShrink: 0, gap: 6 }}
+                >
+                    <SendOutlined /> 새 메일
+                </Button>
+                <Button
+                    variant="ghost-sm"
+                    size="md"
+                    onClick={handleReload}
+                    disabled={loading || cooldown}
+                    style={{ flexShrink: 0, marginLeft: 'auto' }}
+                >
+                    <SyncOutlined spin={loading} /> 새로고침
+                </Button>
+            </div>
+            {/* 행2: 검색창 */}
+            <Input
+                prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
+                placeholder="발신자, 제목 검색"
+                value={value}
+                onChange={onChange}
+                allowClear
+                size="large"
+                style={{ maxWidth: 480 }}
+            />
+        </div>
+    );
+};
 
 // ── 받은 메일 목록 아이템 ─────────────────────────────────
 const MailItem = ({ mail, isSelected, onClick }) => {
@@ -255,8 +280,7 @@ const InboxDetailContent = ({
                     <TextArea ref={replyRef} rows={isMobile ? 4 : 6}
                         placeholder="답장 내용을 입력하세요..."
                         value={replyBody} onChange={(e) => setReplyBody(e.target.value)}
-                        maxLength={2000}
-                        style={{ resize: 'none', fontSize: fontSize.base }}
+                        maxLength={2000} style={{ resize: 'none', fontSize: fontSize.base }}
                     />
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
                         <Button variant="ghost" size="sm" onClick={() => { setReplyOpen(false); setReplyBody(''); }} disabled={sending}>취소</Button>
@@ -299,28 +323,22 @@ const MailboxTab = ({ onUnreadCountChange }) => {
     const { message } = useMessage();
     const isMobile = useIsMobile();
 
-    const [subTab,          setSubTab]          = useState('inbox'); // 'inbox' | 'sent'
-
-    // 받은 메일함
-    const [mails,           setMails]           = useState([]);
-    const [selectedMail,    setSelectedMail]    = useState(null);
-    const [loading,         setLoading]         = useState(true);
-    const [detailLoading,   setDetailLoading]   = useState(false);
-    const [search,          setSearch]          = useState('');
-    const [replyOpen,       setReplyOpen]       = useState(false);
-    const [replyBody,       setReplyBody]       = useState('');
-    const [sending,         setSending]         = useState(false);
-
-    // 보낸 메일함
-    const [sentMails,       setSentMails]       = useState([]);
-    const [selectedSent,    setSelectedSent]    = useState(null);
-    const [sentLoading,     setSentLoading]     = useState(false);
-    const [sentLoaded,      setSentLoaded]      = useState(false);  // 한 번 로드 후 재요청 방지
-
-    // 새 메일 작성
-    const [composing,       setComposing]       = useState(false);
-    const [composeForm,     setComposeForm]     = useState({ toEmail: '', subject: '', body: '' });
-    const [composeSending,  setComposeSending]  = useState(false);
+    const [subTab,         setSubTab]         = useState('inbox');
+    const [mails,          setMails]          = useState([]);
+    const [selectedMail,   setSelectedMail]   = useState(null);
+    const [loading,        setLoading]        = useState(true);
+    const [detailLoading,  setDetailLoading]  = useState(false);
+    const [search,         setSearch]         = useState('');
+    const [replyOpen,      setReplyOpen]      = useState(false);
+    const [replyBody,      setReplyBody]      = useState('');
+    const [sending,        setSending]        = useState(false);
+    const [sentMails,      setSentMails]      = useState([]);
+    const [selectedSent,   setSelectedSent]   = useState(null);
+    const [sentLoading,    setSentLoading]    = useState(false);
+    const [sentLoaded,     setSentLoaded]     = useState(false);
+    const [composing,      setComposing]      = useState(false);
+    const [composeForm,    setComposeForm]    = useState({ toEmail: '', subject: '', body: '' });
+    const [composeSending, setComposeSending] = useState(false);
 
     const replyRef = useRef(null);
 
@@ -339,7 +357,7 @@ const MailboxTab = ({ onUnreadCountChange }) => {
     }, [message, onUnreadCountChange]);
 
     const loadSentMails = useCallback(async (force = false) => {
-        if (!force && sentLoaded) return;  // 이미 로드됐으면 재요청 안 함
+        if (!force && sentLoaded) return;
         setSentLoading(true);
         try {
             const data = await api.get(API_ENDPOINTS.MAIL.SENT);
@@ -354,7 +372,7 @@ const MailboxTab = ({ onUnreadCountChange }) => {
 
     useEffect(() => { loadMails(); }, [loadMails]);
     useEffect(() => {
-            if (subTab === 'sent') loadSentMails();  // force=false → 이미 로드됐으면 스킵
+        if (subTab === 'sent') loadSentMails();
     }, [subTab, loadSentMails]);
 
     const handleSelect = useCallback(async (mail) => {
@@ -405,8 +423,8 @@ const MailboxTab = ({ onUnreadCountChange }) => {
             message.success('메일을 보냈습니다.');
             setComposing(false);
             setComposeForm({ toEmail: '', subject: '', body: '' });
-            if (subTab === 'sent') loadSentMails(true);  // 보낸 메일함 강제 새로고침
-            else setSentLoaded(false);  // 다음 번 보낸 메일함 열면 새로 로드
+            if (subTab === 'sent') loadSentMails(true);
+            else setSentLoaded(false);
         } catch {
             message.error('메일 발송에 실패했습니다.');
         } finally {
@@ -452,8 +470,14 @@ const MailboxTab = ({ onUnreadCountChange }) => {
         : sentMails;
 
     const unreadCount = mails.filter(m => !m.isRead).length;
+    const isInbox = subTab === 'inbox';
+    const currentList    = isInbox ? filteredMails : filteredSent;
+    const currentLoading = isInbox ? loading : sentLoading;
+    const currentEmpty   = isInbox
+        ? (loading ? false : mails.length === 0)
+        : (sentLoading ? false : sentMails.length === 0);
+    const mobileDetailOpen = isMobile && (isInbox ? !!selectedMail : !!selectedSent);
 
-    // ── 새 메일 작성 모달 ─────────────────────────────────
     const ComposeModal = (
         <Modal
             title={<Text style={{ fontSize: fontSize.base, fontWeight: fontWeight.bold }}>새 메일 작성</Text>}
@@ -461,17 +485,14 @@ const MailboxTab = ({ onUnreadCountChange }) => {
             onCancel={() => { setComposing(false); setComposeForm({ toEmail: '', subject: '', body: '' }); }}
             footer={
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-                    <Button variant="ghost" size="sm" onClick={() => setComposing(false)} disabled={composeSending}>
-                        취소
-                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setComposing(false)} disabled={composeSending}>취소</Button>
                     <Button variant="primary" size="sm" loading={composeSending} onClick={handleComposeSend}
                         style={{ borderRadius: radius.xl, paddingLeft: 24, paddingRight: 24 }}>
                         보내기
                     </Button>
                 </div>
             }
-            width={560}
-            centered
+            width={560} centered
         >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
                 <div>
@@ -492,8 +513,7 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                     <TextArea rows={8} placeholder="메일 내용을 입력하세요..."
                         value={composeForm.body}
                         onChange={(e) => setComposeForm(f => ({ ...f, body: e.target.value }))}
-                        maxLength={5000}
-                        style={{ resize: 'none', fontSize: fontSize.base }} />
+                        maxLength={5000} style={{ resize: 'none', fontSize: fontSize.base }} />
                     <div style={{ textAlign: 'right', marginTop: 4 }}>
                         <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
                             {composeForm.body.length} / 5000
@@ -504,23 +524,6 @@ const MailboxTab = ({ onUnreadCountChange }) => {
         </Modal>
     );
 
-    // ── 현재 서브탭 데이터 ────────────────────────────────
-    const isInbox = subTab === 'inbox';
-    const currentList    = isInbox ? filteredMails : filteredSent;
-    const currentLoading = isInbox ? loading : sentLoading;
-    const currentEmpty   = isInbox
-        ? (loading ? false : mails.length === 0)
-        : (sentLoading ? false : sentMails.length === 0);
-
-    const emptyText    = isInbox ? '받은 메일이 없습니다'   : '보낸 메일이 없습니다';
-    const emptySubText = isInbox
-        ? 'reserve@reserve.it.kr로 보낸 메일이 여기에 표시됩니다.'
-        : '"새 메일" 버튼으로 메일을 보낼 수 있습니다.';
-
-    // 모바일 상세 화면
-    const mobileDetailOpen = isMobile && (isInbox ? !!selectedMail : !!selectedSent);
-
-    // ── 렌더 ──────────────────────────────────────────────
     return (
         <div>
             <SearchBar
@@ -532,7 +535,6 @@ const MailboxTab = ({ onUnreadCountChange }) => {
             />
             <SubTabBar active={subTab} onChangeTab={handleTabChange} />
 
-            {/* 로딩 */}
             {currentLoading && (
                 <div style={S.singlePanel}>
                     {[...Array(4)].map((_, i) => (
@@ -543,18 +545,20 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                 </div>
             )}
 
-            {/* 빈 상태 */}
             {!currentLoading && currentEmpty && (
                 <div style={S.emptyPanel}>
                     <InboxOutlined style={{ fontSize: 56, color: colors.border.default, marginBottom: 16 }} />
                     <Text style={{ fontSize: fontSize.lg, fontWeight: fontWeight.semibold, color: colors.text.secondary, display: 'block', marginBottom: 6 }}>
-                        {emptyText}
+                        {isInbox ? '받은 메일이 없습니다' : '보낸 메일이 없습니다'}
                     </Text>
-                    <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>{emptySubText}</Text>
+                    <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>
+                        {isInbox
+                            ? 'reserve@reserve.it.kr로 보낸 메일이 여기에 표시됩니다.'
+                            : '"새 메일" 버튼으로 메일을 보낼 수 있습니다.'}
+                    </Text>
                 </div>
             )}
 
-            {/* 모바일: 상세 화면 */}
             {!currentLoading && !currentEmpty && isMobile && mobileDetailOpen && (
                 <div style={S.mobileDetail}>
                     <button onClick={handleBack} style={S.backBtn}>
@@ -565,18 +569,16 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                         detailLoading
                             ? <Skeleton active paragraph={{ rows: 6 }} />
                             : <InboxDetailContent
-                                mail={selectedMail}
-                                replyOpen={replyOpen} replyBody={replyBody}
-                                setReplyBody={setReplyBody} sending={sending}
-                                openReply={openReply} handleSendReply={handleSendReply}
-                                setReplyOpen={setReplyOpen} replyRef={replyRef} isMobile={true}
+                                mail={selectedMail} replyOpen={replyOpen} replyBody={replyBody}
+                                setReplyBody={setReplyBody} sending={sending} openReply={openReply}
+                                handleSendReply={handleSendReply} setReplyOpen={setReplyOpen}
+                                replyRef={replyRef} isMobile={true}
                               />
                     )}
                     {!isInbox && selectedSent && <SentDetailContent mail={selectedSent} />}
                 </div>
             )}
 
-            {/* 모바일: 목록 */}
             {!currentLoading && !currentEmpty && isMobile && !mobileDetailOpen && (
                 <div style={S.singlePanel}>
                     <div style={{ padding: '6px 18px', borderBottom: `1px solid ${colors.border.light}` }}>
@@ -585,9 +587,7 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                         </Text>
                     </div>
                     {currentList.length === 0
-                        ? <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                            <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
-                          </div>
+                        ? <div style={{ padding: '40px 20px', textAlign: 'center' }}><Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text></div>
                         : isInbox
                             ? currentList.map(m => <MailItem key={m.id} mail={m} isSelected={false} onClick={handleSelect} />)
                             : currentList.map(m => <SentMailItem key={m.id} mail={m} isSelected={false} onClick={setSelectedSent} />)
@@ -595,10 +595,8 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                 </div>
             )}
 
-            {/* PC: split-pane */}
             {!currentLoading && !currentEmpty && !isMobile && (
                 <div style={S.splitPane}>
-                    {/* 좌측 목록 */}
                     <div style={S.listPanel}>
                         <div style={{ padding: '6px 18px', borderBottom: `1px solid ${colors.border.light}` }}>
                             <Text style={{ fontSize: fontSize.sm, color: unreadCount > 0 && isInbox ? colors.primary.main : colors.text.tertiary, fontWeight: unreadCount > 0 && isInbox ? fontWeight.semibold : undefined }}>
@@ -607,35 +605,28 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                         </div>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
                             {currentList.length === 0
-                                ? <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                                    <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
-                                  </div>
+                                ? <div style={{ padding: '40px 20px', textAlign: 'center' }}><Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text></div>
                                 : isInbox
                                     ? currentList.map(m => <MailItem key={m.id} mail={m} isSelected={selectedMail?.id === m.id} onClick={handleSelect} />)
                                     : currentList.map(m => <SentMailItem key={m.id} mail={m} isSelected={selectedSent?.id === m.id} onClick={setSelectedSent} />)
                             }
                         </div>
                     </div>
-
-                    {/* 우측 상세 */}
                     <div style={S.detailPanel}>
                         {(isInbox ? !selectedMail : !selectedSent) ? (
                             <div style={S.emptyDetail}>
                                 <MailOutlined style={{ fontSize: 48, color: colors.border.default, marginBottom: 12 }} />
-                                <Text style={{ fontSize: fontSize.base, color: colors.text.tertiary }}>
-                                    메일을 선택하면 내용이 표시됩니다.
-                                </Text>
+                                <Text style={{ fontSize: fontSize.base, color: colors.text.tertiary }}>메일을 선택하면 내용이 표시됩니다.</Text>
                             </div>
                         ) : isInbox ? (
                             detailLoading
                                 ? <div style={{ padding: 32 }}><Skeleton active paragraph={{ rows: 8 }} /></div>
                                 : <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column' }}>
                                     <InboxDetailContent
-                                        mail={selectedMail}
-                                        replyOpen={replyOpen} replyBody={replyBody}
-                                        setReplyBody={setReplyBody} sending={sending}
-                                        openReply={openReply} handleSendReply={handleSendReply}
-                                        setReplyOpen={setReplyOpen} replyRef={replyRef} isMobile={false}
+                                        mail={selectedMail} replyOpen={replyOpen} replyBody={replyBody}
+                                        setReplyBody={setReplyBody} sending={sending} openReply={openReply}
+                                        handleSendReply={handleSendReply} setReplyOpen={setReplyOpen}
+                                        replyRef={replyRef} isMobile={false}
                                     />
                                   </div>
                         ) : (
@@ -656,18 +647,12 @@ const MailboxTab = ({ onUnreadCountChange }) => {
 const S = {
     searchBar: {
         display: 'flex', alignItems: 'center', gap: 8,
-        padding: '0 0 12px 0',
-    },
-    reloadBtn: {
-        background: 'none', border: 'none', cursor: 'pointer',
-        padding: '6px 8px', borderRadius: radius.md,
-        display: 'flex', alignItems: 'center', flexShrink: 0,
+        padding: '0 0 12px 0', flexWrap: 'wrap',
     },
     subTabBar: {
         display: 'flex',
         borderBottom: `1px solid ${colors.border.light}`,
-        marginBottom: 12,
-        gap: 0,
+        marginBottom: 12, gap: 0,
     },
     subTabBtn: {
         background: 'none', border: 'none', borderBottom: '2px solid transparent',
@@ -676,23 +661,18 @@ const S = {
     },
     singlePanel: {
         border: `1px solid ${colors.border.default}`,
-        borderRadius: radius.lg,
-        overflow: 'hidden',
+        borderRadius: radius.lg, overflow: 'hidden',
         background: colors.background.paper,
     },
     emptyPanel: {
         border: `1px solid ${colors.border.default}`,
-        borderRadius: radius.lg,
-        padding: '64px 20px',
-        textAlign: 'center',
-        background: colors.background.paper,
+        borderRadius: radius.lg, padding: '64px 20px',
+        textAlign: 'center', background: colors.background.paper,
     },
     splitPane: {
-        display: 'flex',
-        height: 500,
+        display: 'flex', height: 500,
         border: `1px solid ${colors.border.default}`,
-        borderRadius: radius.lg,
-        overflow: 'hidden',
+        borderRadius: radius.lg, overflow: 'hidden',
         background: colors.background.paper,
     },
     listPanel: {
@@ -717,14 +697,8 @@ const S = {
         transition: 'background 0.15s',
         borderBottom: `1px solid ${colors.border.light}`,
     },
-    dotWrapper: {
-        width: 8, paddingTop: 5, flexShrink: 0,
-        display: 'flex', justifyContent: 'center',
-    },
-    unreadDot: {
-        display: 'block', width: 7, height: 7,
-        borderRadius: '50%', background: colors.primary.main,
-    },
+    dotWrapper: { width: 8, paddingTop: 5, flexShrink: 0, display: 'flex', justifyContent: 'center' },
+    unreadDot:  { display: 'block', width: 7, height: 7, borderRadius: '50%', background: colors.primary.main },
     replyItem: {
         background: colors.primary.light, borderRadius: radius.md,
         padding: '14px 16px', border: `1px solid ${colors.border.light}`,

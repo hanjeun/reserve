@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Typography, Table, Tag, Select, Skeleton } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { SyncOutlined } from '@ant-design/icons';
 import { Button } from '../common';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
@@ -107,7 +107,7 @@ const AuditLogTab = () => {
                     onChange={(v) => { setTypeFilter(v); }}
                     options={TYPE_OPTIONS}
                     size="large"
-                    style={{ width: 160 }}
+                    style={{ width: 140 }}
                 />
                 {!loading && (
                     <Text type="secondary" style={{ fontSize: fontSize.sm }}>
@@ -117,11 +117,11 @@ const AuditLogTab = () => {
                 <Button
                     variant="ghost-sm"
                     size="md"
-                    loading={loading}
                     onClick={() => load(0)}
+                    disabled={loading}
                     style={{ marginLeft: 'auto' }}
                 >
-                    <ReloadOutlined /> 새로고침
+                    <SyncOutlined spin={loading} /> 새로고침
                 </Button>
             </div>
 

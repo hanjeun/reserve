@@ -8,7 +8,7 @@ const useManageReservations = () => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
 
-    const { data, isLoading } = useQuery({
+    const { data, isLoading, isFetching } = useQuery({
         queryKey: reservationKeys.manage(),
         queryFn:  () => reservationService.getStoreReservations(),
         // 백엔드가 Page 객체({ content: [], totalElements, ... })를 반환
@@ -76,7 +76,7 @@ const useManageReservations = () => {
 
     return {
         reservations:  data || [],
-        loading:       isLoading,
+        loading:       isLoading || isFetching,
         actionLoading: getActionLoading(),
         approve:  (id) => approveMutation.mutateAsync(id),
         reject:   (id, reason = '') => rejectMutation.mutateAsync({ id, reason }),

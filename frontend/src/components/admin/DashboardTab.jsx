@@ -1,109 +1,52 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Typography, Skeleton } from 'antd';
+import { Card, Col, Row, Statistic, Typography, Alert, Divider } from 'antd';
 import {
     BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { ReloadOutlined, ShopOutlined, CalendarOutlined, DeleteOutlined, TeamOutlined } from '@ant-design/icons';
+import {
+    SyncOutlined, ShopOutlined, CalendarOutlined,
+    DeleteOutlined, AuditOutlined,
+} from '@ant-design/icons';
 import { Button } from '../common';
+import { FilterToolbar } from '../common';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
-import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
+import { colors, fontWeight } from '../../styles/tokens';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
-// 색상 팔레트 — 디자인 시스템 기반
-const CHART_COLORS = {
-    primary:  '#3182f6',
-    success:  '#22c55e',
-    warning:  '#f59e0b',
-    danger:   '#ef4444',
-    purple:   '#8b5cf6',
-    cyan:     '#06b6d4',
-};
-
-const PIE_COLORS = [
-    CHART_COLORS.primary,
-    CHART_COLORS.success,
-    CHART_COLORS.warning,
-    CHART_COLORS.danger,
-    CHART_COLORS.purple,
-    CHART_COLORS.cyan,
-];
-
-// ── 요약 카드 ──────────────────────────────────────────────
-const StatCard = ({ icon, title, value, sub, color }) => (
-    <div style={{
-        background: colors.background.paper,
-        border: `1px solid ${colors.border.light}`,
-        borderRadius: radius.lg,
-        padding: '20px 24px',
-        display: 'flex', alignItems: 'center', gap: 16,
-        flex: 1, minWidth: 160,
-    }}>
-        <div style={{
-            width: 48, height: 48, borderRadius: radius.lg,
-            background: `${color}18`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, color,
-        }}>
-            {icon}
-        </div>
-        <div>
-            <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, display: 'block', marginBottom: 2 }}>
-                {title}
-            </Text>
-            <Text style={{ fontSize: 24, fontWeight: fontWeight.bold, color: colors.text.primary, display: 'block', lineHeight: 1.2 }}>
-                {value ?? '-'}
-            </Text>
-            {sub && (
-                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                    {sub}
-                </Text>
-            )}
-        </div>
-    </div>
-);
+const PIE_COLORS = ['#3182f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const CHART_COLORS = { warning: '#f59e0b' };
 
 const ChartCard = ({ title, children, height = 260 }) => (
-    <div style={{
-        background: colors.background.paper,
-        border: `1px solid ${colors.border.light}`,
-        borderRadius: radius.lg,
-        padding: '20px 20px 12px',
-        flex: 1, minWidth: 280,
-    }}>
-        <Text style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, display: 'block', marginBottom: 16 }}>
-            {title}
-        </Text>
+    <Card size="small" title={title} style={{ flex: 1, minWidth: 260 }}>
         <div style={{ height }}>
             {children}
         </div>
-    </div>
+    </Card>
 );
 
 const DashboardTab = () => {
     const { message } = useMessage();
-    const [loading, setLoading]   = useState(false);
-    const [stats, setStats]       = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [stats, setStats]     = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            // 여러 API를 병렬로 호출해 통계 구성
             const [bizAll, reservations, trash, auditLogs] = await Promise.allSettled([
-                api.get(API_ENDPOINTS.BUSINESS.ADMIN_LIST,      { params: { page: 0, size: 1 } }),
-                api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, { params: { page: 0, size: 100 } }),
-                api.get(API_ENDPOINTS.TRASH.LIST,               { params: { page: 0, size: 50 } }),
-                api.get(API_ENDPOINTS.AUDIT_LOG.LIST,           { params: { page: 0, size: 50 } }),
+                api.get(API_ENDPOINTS.BUSINESS.ADMIN_LIST,           { params: { page: 0, size: 1 } }),
+                api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS,{ params: { page: 0, size: 100 } }),
+                api.get(API_ENDPOINTS.TRASH.LIST,                    { params: { page: 0, size: 50 } }),
+                api.get(API_ENDPOINTS.AUDIT_LOG.LIST,                { params: { page: 0, size: 50 } }),
             ]);
 
             const resList  = reservations.status === 'fulfilled' ? (reservations.value?.content ?? []) : [];
-            const trashList  = trash.status === 'fulfilled'  ? (trash.value?.content ?? [])   : [];
+            const trashList = trash.status === 'fulfilled'  ? (trash.value?.content ?? [])   : [];
             const logList  = auditLogs.status === 'fulfilled'  ? (auditLogs.value?.content ?? []) : [];
 
-            // 예약 상태별 분포
             const statusCount = resList.reduce((acc, r) => {
                 acc[r.status] = (acc[r.status] || 0) + 1;
                 return acc;
@@ -120,10 +63,9 @@ const DashboardTab = () => {
                 .map(([k, label]) => ({ name: label, value: statusCount[k] || 0 }))
                 .filter(d => d.value > 0);
 
-            // 삭제 통계 — 엔티티 유형별
             const entityCount = trashList.reduce((acc, r) => {
                 const label = {
-                    MAIL: '수신 메일', SENT_MAIL: '발송 메일',
+                    MAIL: '수신메일', SENT_MAIL: '발송메일',
                     MEMBER: '회원', STORE: '가게',
                     RESERVATION: '예약', REVIEW: '리뷰',
                 }[r.entityType] || r.entityType;
@@ -132,17 +74,16 @@ const DashboardTab = () => {
             }, {});
             const trashBarData = Object.entries(entityCount).map(([name, count]) => ({ name, count }));
 
-            // 최근 감사 로그 행위별
             const actionCount = logList.reduce((acc, l) => {
                 acc[l.action] = (acc[l.action] || 0) + 1;
                 return acc;
             }, {});
 
             setStats({
-                totalBiz:     bizAll.status === 'fulfilled' ? (bizAll.value?.totalElements ?? 0) : '-',
-                totalRes:     resList.length,
-                trashCount:   trashList.length,
-                logCount:     auditLogs.status === 'fulfilled' ? (auditLogs.value?.totalElements ?? 0) : '-',
+                totalBiz:  bizAll.status === 'fulfilled' ? (bizAll.value?.totalElements ?? 0) : '-',
+                totalRes:  resList.length,
+                trashCount: trashList.length,
+                logCount:  auditLogs.status === 'fulfilled' ? (auditLogs.value?.totalElements ?? 0) : '-',
                 reservationPieData,
                 trashBarData,
                 actionCount,
@@ -156,135 +97,141 @@ const DashboardTab = () => {
 
     useEffect(() => { load(); }, [load]);
 
-    if (loading) return <Skeleton active paragraph={{ rows: 10 }} />;
-
     const s = stats;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* 툴바 */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button variant="ghost-sm" size="md" loading={loading} onClick={load}>
-                    <ReloadOutlined /> 새로고침
-                </Button>
-            </div>
+            {/* 툴바 — 다른 탭과 동일한 FilterToolbar */}
+            <FilterToolbar onReload={load} loading={loading} />
 
-            {/* 요약 카드 */}
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <StatCard
-                    icon={<ShopOutlined />}
-                    title="사업자 인증 신청"
-                    value={s?.totalBiz}
-                    sub="전체 누적"
-                    color={CHART_COLORS.primary}
-                />
-                <StatCard
-                    icon={<CalendarOutlined />}
-                    title="조회된 예약"
-                    value={s?.totalRes}
-                    sub="최근 100건 기준"
-                    color={CHART_COLORS.success}
-                />
-                <StatCard
-                    icon={<DeleteOutlined />}
-                    title="휴지통 항목"
-                    value={s?.trashCount}
-                    sub="복구 가능"
-                    color={CHART_COLORS.warning}
-                />
-                <StatCard
-                    icon={<TeamOutlined />}
-                    title="시스템 로그"
-                    value={s?.logCount}
-                    sub="전체 감사 기록"
-                    color={CHART_COLORS.purple}
-                />
-            </div>
+            {/* 요약 카드 — Ant Design Statistic */}
+            <Row gutter={[16, 16]}>
+                <Col xs={12} sm={12} md={6}>
+                    <Card loading={loading} size="small">
+                        <Statistic
+                            title="사업자 신청"
+                            value={s?.totalBiz ?? '-'}
+                            prefix={<ShopOutlined style={{ color: colors.primary?.main ?? '#3182f6' }} />}
+                            suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
+                            valueStyle={{ fontWeight: fontWeight.bold }}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={12} sm={12} md={6}>
+                    <Card loading={loading} size="small">
+                        <Statistic
+                            title="조회된 예약"
+                            value={s?.totalRes ?? '-'}
+                            prefix={<CalendarOutlined style={{ color: '#22c55e' }} />}
+                            suffix={<Text type="secondary" style={{ fontSize: 12 }}>최근 100건</Text>}
+                            valueStyle={{ fontWeight: fontWeight.bold }}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={12} sm={12} md={6}>
+                    <Card loading={loading} size="small">
+                        <Statistic
+                            title="휴지통"
+                            value={s?.trashCount ?? '-'}
+                            prefix={<DeleteOutlined style={{ color: '#f59e0b' }} />}
+                            suffix={<Text type="secondary" style={{ fontSize: 12 }}>복구 가능</Text>}
+                            valueStyle={{ fontWeight: fontWeight.bold }}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={12} sm={12} md={6}>
+                    <Card loading={loading} size="small">
+                        <Statistic
+                            title="감사 로그"
+                            value={s?.logCount ?? '-'}
+                            prefix={<AuditOutlined style={{ color: '#8b5cf6' }} />}
+                            suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
+                            valueStyle={{ fontWeight: fontWeight.bold }}
+                        />
+                    </Card>
+                </Col>
+            </Row>
 
-            {/* 차트 영역 */}
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                {/* 예약 상태 분포 — Pie */}
-                <ChartCard title="예약 상태 분포" height={240}>
-                    {!s?.reservationPieData?.length ? (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ color: colors.text.tertiary }}>데이터가 없습니다.</Text>
-                        </div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={s.reservationPieData}
-                                    cx="50%" cy="50%"
-                                    innerRadius={55} outerRadius={90}
-                                    paddingAngle={3}
-                                    dataKey="value"
-                                    label={({ name, percent }) =>
-                                        `${name} ${(percent * 100).toFixed(0)}%`
-                                    }
-                                    labelLine={false}
-                                >
-                                    {s.reservationPieData.map((_, i) => (
-                                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(v) => `${v}건`} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    )}
-                </ChartCard>
-
-                {/* 휴지통 항목 유형별 — Bar */}
-                <ChartCard title="휴지통 유형별 현황" height={240}>
-                    {!s?.trashBarData?.length ? (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ color: colors.text.tertiary }}>휴지통이 비어있습니다.</Text>
-                        </div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={s.trashBarData} margin={{ top: 4, right: 8, bottom: 4, left: -20 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke={colors.border.light} />
-                                <XAxis dataKey="name" tick={{ fontSize: 12, fill: colors.text.tertiary }} />
-                                <YAxis tick={{ fontSize: 11, fill: colors.text.tertiary }} allowDecimals={false} />
-                                <Tooltip formatter={(v) => [`${v}건`, '항목 수']} />
-                                <Bar dataKey="count" fill={CHART_COLORS.warning} radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </ChartCard>
-            </div>
-
-            {/* 감사 로그 행위별 요약 */}
-            {s?.actionCount && Object.keys(s.actionCount).length > 0 && (
-                <div style={{
-                    background: colors.background.paper,
-                    border: `1px solid ${colors.border.light}`,
-                    borderRadius: radius.lg,
-                    padding: '20px 24px',
-                }}>
-                    <Text style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, display: 'block', marginBottom: 14 }}>
-                        최근 감사 로그 요약
-                    </Text>
-                    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                        {Object.entries({
-                            SOFT_DELETE: { label: '소프트 삭제', color: CHART_COLORS.warning },
-                            RESTORE:     { label: '복구',        color: CHART_COLORS.success },
-                            HARD_DELETE: { label: '영구 삭제',   color: CHART_COLORS.danger  },
-                        }).map(([key, cfg]) => (
-                            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{
-                                    width: 10, height: 10, borderRadius: '50%',
-                                    background: cfg.color, display: 'inline-block',
-                                }} />
-                                <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>
-                                    {cfg.label}
-                                </Text>
-                                <Text style={{ fontSize: fontSize.base, fontWeight: fontWeight.bold, color: colors.text.primary }}>
-                                    {s.actionCount[key] || 0}건
-                                </Text>
+            {/* 차트 */}
+            {!loading && s && (
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <ChartCard title="예약 상태 분포" height={240}>
+                        {!s.reservationPieData?.length ? (
+                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text type="secondary">데이터가 없습니다.</Text>
                             </div>
-                        ))}
-                    </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={s.reservationPieData}
+                                        cx="50%" cy="50%"
+                                        innerRadius={55} outerRadius={90}
+                                        paddingAngle={3} dataKey="value"
+                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                        labelLine={false}
+                                    >
+                                        {s.reservationPieData.map((_, i) => (
+                                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip formatter={(v) => `${v}건`} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
+                    </ChartCard>
+
+                    <ChartCard title="휴지통 유형별 현황" height={240}>
+                        {!s.trashBarData?.length ? (
+                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text type="secondary">휴지통이 비어있습니다.</Text>
+                            </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={s.trashBarData} margin={{ top: 4, right: 8, bottom: 4, left: -20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                                    <Tooltip formatter={(v) => [`${v}건`, '항목 수']} />
+                                    <Bar dataKey="count" fill={CHART_COLORS.warning} radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </ChartCard>
                 </div>
+            )}
+
+            {/* 감사 로그 요약 */}
+            {!loading && s?.actionCount && Object.keys(s.actionCount).length > 0 && (
+                <Card size="small" title="최근 감사 로그 요약">
+                    <Row gutter={[24, 8]}>
+                        {[
+                            { key: 'SOFT_DELETE', label: '소프트 삭제', color: '#f59e0b' },
+                            { key: 'RESTORE',     label: '복구',        color: '#22c55e' },
+                            { key: 'HARD_DELETE', label: '영구 삭제',   color: '#ef4444' },
+                        ].map(({ key, label, color }) => (
+                            <Col key={key} xs={8}>
+                                <Statistic
+                                    title={<span style={{ color }}>{label}</span>}
+                                    value={s.actionCount[key] || 0}
+                                    suffix="건"
+                                    valueStyle={{ fontSize: 20, fontWeight: fontWeight.bold, color }}
+                                />
+                            </Col>
+                        ))}
+                    </Row>
+                </Card>
+            )}
+
+            {/* 스켈레톤 대체 */}
+            {loading && !s && (
+                <Row gutter={[16, 16]}>
+                    {[...Array(2)].map((_, i) => (
+                        <Col key={i} xs={24} md={12}>
+                            <Card loading size="small" style={{ height: 280 }} />
+                        </Col>
+                    ))}
+                </Row>
             )}
         </div>
     );

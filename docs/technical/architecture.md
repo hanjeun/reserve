@@ -4,30 +4,33 @@
 
 ## 인프라 구성
 
-```
-사용자
-  │
-  ▼
-Route 53 (reserve.it.kr)
-  │
-  ▼
-AWS Lightsail (52.78.162.89, 서울)
-  │
-  ├── Nginx (80/443)
-  │     ├── HTTP → HTTPS 리다이렉트
-  │     ├── /api/*        → Spring Boot (Blue or Green)
-  │     ├── /oauth2/*     → Spring Boot
-  │     └── /*            → React SPA (정적 파일)
-  │
-  ├── Spring Boot Blue  (8080) ─┐
-  ├── Spring Boot Green (8081) ─┘ 둘 중 하나만 활성
-  │
-  └── MySQL 8.0 (내부 네트워크)
+```mermaid
+graph TD
+    User["사용자"] --> R53["Route 53\nreserve.it.kr"]
+    R53 --> LS
 
-AWS S3 (reserve-it-kr-bucket)
-  └── CloudFront (cdn.reserve.it.kr)
-        └── 이미지 CDN
+    subgraph LS["AWS Lightsail · 서울"]
+        Nginx["Nginx :80/:443\nSSL · 정적 파일 서빙"]
+        Blue["Spring Boot Blue\n:8080"]
+        Green["Spring Boot Green\n:8081"]
+        MySQL["MySQL 8.0"]
+        Monitor["Grafana + Loki\ngrafana.reserve.it.kr"]
+
+        Nginx -->|"/api/* /oauth2/*"| Blue
+        Nginx -->|"/api/* /oauth2/*"| Green
+        Nginx -->|"/*"| Static["React SPA\n정적 파일"]
+        Blue --> MySQL
+        Green --> MySQL
+        Monitor -.->|"로그 수집"| Blue
+    end
+
+    Blue --> S3["AWS S3\nreserve-it-kr-bucket"]
+    S3 --> CF["CloudFront\ncdn.reserve.it.kr"]
+    Portone["포트원 V2"] -.-> Blue
+    OAuth["Google / Naver / Kakao"] -.-> Blue
 ```
+
+
 
 ---
 

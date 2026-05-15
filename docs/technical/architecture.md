@@ -9,7 +9,7 @@ graph TD
     User["사용자"] --> R53["Route 53\nreserve.it.kr"]
     R53 --> LS
 
-    subgraph LS["AWS Lightsail · 서울 (52.78.162.89)"]
+    subgraph LS["AWS Lightsail · 서울"]
         Nginx["Nginx :80/:443\nSSL · 정적 파일 서빙"]
         Blue["Spring Boot Blue\n:8080"]
         Green["Spring Boot Green\n:8081"]
@@ -134,5 +134,3 @@ feature/*     ← 기능별 작업
 | **ImprovMX** | 이메일 수신 포워딩 (→ hanjeun111@gmail.com) |
 | **Portone V2** | 카카오페이 결제 |
 | **Google/Naver/Kakao** | OAuth2 소셜 로그인 |
-
-> 모니터링 도구(Grafana, Loki, Sentry, UptimeRobot, SonarCloud)는 [monitoring.md](monitoring.md)에서 별도 관리합니다.

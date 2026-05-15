@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Typography, Tabs, Table, Tag, Modal, Input, Image, Tooltip,
-    Select,
 } from 'antd';
 import {
     SearchOutlined, CalendarOutlined,
@@ -13,9 +12,10 @@ import MailboxTab from '../../components/admin/MailboxTab';
 import TrashTab from '../../components/admin/TrashTab';
 import AuditLogTab from '../../components/admin/AuditLogTab';
 import DashboardTab from '../../components/admin/DashboardTab';
-import { PageContainer, Button, AdminTableSkeleton } from '../../components/common';
+import { PageContainer, Button, AdminTableSkeleton, FilterToolbar } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useDebounce from '../../hooks/useDebounce';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
@@ -83,6 +83,9 @@ const AdminPanel = () => {
     const [bizSearch, setBizSearch]             = useState('');
     const [resSearch, setResSearch]             = useState('');
     const [resStatusFilter, setResStatusFilter] = useState('ALL');
+
+    const debouncedBizSearch = useDebounce(bizSearch, 300);
+    const debouncedResSearch = useDebounce(resSearch, 300);
 
     const [allReservations, setAllReservations] = useState([]);
     const [resLoading, setResLoading]           = useState(false);
@@ -182,8 +185,8 @@ const AdminPanel = () => {
     };
 
     const filterBiz = (list) => {
-        if (!bizSearch.trim()) return list;
-        const kw = bizSearch.toLowerCase();
+        if (!debouncedBizSearch.trim()) return list;
+        const kw = debouncedBizSearch.toLowerCase();
         return list.filter(r =>
             r.memberName?.toLowerCase().includes(kw) ||
             r.memberEmail?.toLowerCase().includes(kw) ||
@@ -196,8 +199,8 @@ const AdminPanel = () => {
         let list = resStatusFilter === 'ALL'
             ? allReservations
             : allReservations.filter(r => r.status === resStatusFilter);
-        if (resSearch.trim()) {
-            const kw = resSearch.toLowerCase();
+        if (debouncedResSearch.trim()) {
+            const kw = debouncedResSearch.toLowerCase();
             list = list.filter(r =>
                 r.storeName?.toLowerCase().includes(kw) ||
                 r.memberName?.toLowerCase().includes(kw) ||
@@ -205,12 +208,12 @@ const AdminPanel = () => {
             );
         }
         return list;
-    }, [allReservations, resStatusFilter, resSearch]);
+    }, [allReservations, resStatusFilter, debouncedResSearch]);
 
     // ── 사업자 인증 컬럼 ────────────────────────────────────
     const columns = [
         {
-            title: '신청자', key: 'member', width: 180,
+            title: '신청자', key: 'member', width: 150,
             render: (_, r) => (
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm }}>{r.memberName}</Text>
@@ -219,7 +222,7 @@ const AdminPanel = () => {
             ),
         },
         {
-            title: '상호명', dataIndex: 'businessName', key: 'businessName', width: 160,
+            title: '상호명', dataIndex: 'businessName', key: 'businessName', width: 130,
             ellipsis: { showTitle: false },
             render: (v) => (
                 <Tooltip title={v} placement="topLeft">
@@ -228,13 +231,13 @@ const AdminPanel = () => {
             ),
         },
         {
-            title: '사업자번호', dataIndex: 'businessNumber', key: 'businessNumber', width: 120,
+            title: '사업자번호', dataIndex: 'businessNumber', key: 'businessNumber', width: 110,
             render: (v) => v
                 ? <Text code style={{ fontSize: fontSize.xs }}>{v}</Text>
                 : <Text type="secondary" style={{ fontSize: fontSize.xs }}>-</Text>,
         },
         {
-            title: '신청일', dataIndex: 'createdAt', key: 'createdAt', width: 110,
+            title: '신청일', dataIndex: 'createdAt', key: 'createdAt', width: 100,
             render: (v) => v ? v.substring(0, 10) : '-',
         },
         {
@@ -245,7 +248,7 @@ const AdminPanel = () => {
             },
         },
         {
-            title: '처리', key: 'actions', fixed: 'right', width: 140,
+            title: '처리', key: 'actions',
             render: (_, r) => (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
                     {r.status === 'PENDING' && (
@@ -291,7 +294,6 @@ const AdminPanel = () => {
         columns,
         rowKey: 'id',
         size: 'middle',
-        scroll: { x: 790 },
         pagination: { pageSize: 15, showSizeChanger: false },
     };
 
@@ -303,12 +305,11 @@ const AdminPanel = () => {
             ),
             children: (
                 <>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, gap: 8 }}>
-                        <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
-                        <Button variant="ghost-sm" size="md" loading={loading} onClick={loadData} style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                            <ReloadOutlined /> 새로고침
-                        </Button>
-                    </div>
+                    <FilterToolbar
+                        search={{ value: bizSearch, onChange: e => setBizSearch(e.target.value), placeholder: '이름, 이메일, 상호명으로 검색' }}
+                        onReload={loadData}
+                        loading={loading}
+                    />
                     {loading
                         ? <AdminTableSkeleton rows={8} />
                         : <Table {...tableProps} dataSource={filterBiz(pendingList)} locale={{ emptyText: '대기 중인 신청이 없습니다.' }} />}
@@ -322,12 +323,11 @@ const AdminPanel = () => {
             ),
             children: (
                 <>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16, gap: 8 }}>
-                        <BizSearchBar value={bizSearch} onChange={(e) => setBizSearch(e.target.value)} />
-                        <Button variant="ghost-sm" size="md" loading={loading} onClick={loadData} style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                            <ReloadOutlined /> 새로고침
-                        </Button>
-                    </div>
+                    <FilterToolbar
+                        search={{ value: bizSearch, onChange: e => setBizSearch(e.target.value), placeholder: '이름, 이메일, 상호명으로 검색' }}
+                        onReload={loadData}
+                        loading={loading}
+                    />
                     {loading
                         ? <AdminTableSkeleton rows={8} />
                         : <Table {...tableProps} dataSource={filterBiz(allList)} locale={{ emptyText: '신청 내역이 없습니다.' }} />}
@@ -385,24 +385,11 @@ const AdminPanel = () => {
             ),
             children: (
                 <>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
-                        <Input
-                            prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
-                            placeholder="가게명, 예약자로 검색"
-                            value={resSearch}
-                            onChange={(e) => setResSearch(e.target.value)}
-                            allowClear
-                            size="large"
-                            style={{ maxWidth: 260 }}
-                            disabled={resLoading}
-                        />
-                        <Select
-                            value={resStatusFilter}
-                            onChange={setResStatusFilter}
-                            size="large"
-                            style={{ width: 140 }}
-                            disabled={resLoading}
-                            options={[
+                    <FilterToolbar
+                        selects={[{
+                            value: resStatusFilter,
+                            onChange: setResStatusFilter,
+                            options: [
                                 { value: 'ALL',       label: '전체 상태' },
                                 { value: 'PENDING',   label: '대기 중' },
                                 { value: 'CONFIRMED', label: '승인됨' },
@@ -410,23 +397,13 @@ const AdminPanel = () => {
                                 { value: 'COMPLETED', label: '이용완료' },
                                 { value: 'REJECTED',  label: '거절됨' },
                                 { value: 'NO_SHOW',   label: '노쇼' },
-                            ]}
-                        />
-                        {!resLoading && (
-                            <Text type="secondary" style={{ fontSize: fontSize.sm, alignSelf: 'center' }}>
-                                총 {filteredReservations.length}건
-                            </Text>
-                        )}
-                        <Button
-                            variant="ghost-sm"
-                            size="md"
-                            loading={resLoading}
-                            onClick={() => loadReservations(true)}
-                            style={{ marginLeft: 'auto' }}
-                        >
-                            <ReloadOutlined /> 새로고침
-                        </Button>
-                    </div>
+                            ],
+                        }]}
+                        count={filteredReservations.length}
+                        search={{ value: resSearch, onChange: e => setResSearch(e.target.value), placeholder: '가게명, 예약자로 검색', disabled: resLoading }}
+                        onReload={() => loadReservations(true)}
+                        loading={resLoading}
+                    />
                     {resLoading
                         ? <AdminTableSkeleton rows={8} cols={[130, 100, 110, 80, 60, 90, 90]} />
                         : <Table

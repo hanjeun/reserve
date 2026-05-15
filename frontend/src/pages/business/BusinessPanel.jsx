@@ -1,13 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Empty, Select, Tabs, Typography, Input } from 'antd';
+import { Empty, Tabs, Typography } from 'antd';
 import {
     CalendarOutlined,
     ClockCircleOutlined,
     PartitionOutlined,
-    ReloadOutlined,
-    SearchOutlined,
 } from '@ant-design/icons';
-import { PageContainer, Button, ReservationCardSkeleton } from '../../components/common';
+import { PageContainer, ReservationCardSkeleton, FilterToolbar } from '../../components/common';
 import ReservationCard from '../../components/reservation/ReservationCard';
 import useManageReservations from '../../hooks/useManageReservations';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -17,7 +15,6 @@ import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 
-// AdminPanel과 동일한 단순 텍스트 옵션 (아이콘/숫자 없음)
 const STATUS_OPTIONS = [
     { value: 'ALL',       label: '전체 상태' },
     { value: 'PENDING',   label: '승인 대기' },
@@ -62,58 +59,39 @@ const ReservationTab = () => {
 
     return (
         <>
-            {/* 필터 바 */}
-            <div style={styles.filterBar}>
-                {myStores.length > 1 && (
-                    <Select
-                        value={storeFilter}
-                        onChange={setStoreFilter}
-                        style={{ minWidth: 140 }}
-                        size="large"
-                        disabled={loading}
-                        options={[
+            <FilterToolbar
+                selects={[
+                    ...(myStores.length > 1 ? [{
+                        value: storeFilter,
+                        onChange: setStoreFilter,
+                        width: 140,
+                        disabled: loading,
+                        options: [
                             { value: 'ALL', label: '전체 가게' },
                             ...myStores.map(s => ({ value: String(s.id), label: s.name }))
-                        ]}
-                    />
-                )}
-                <Select
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={STATUS_OPTIONS}
-                    style={{ width: 140 }}
-                    size="large"
-                    disabled={loading}
-                />
-                {/* 건수 — AdminPanel과 동일하게 셀렉터 옆에 표시 */}
-                {!loading && (
-                    <Text type="secondary" style={{ fontSize: fontSize.sm, alignSelf: 'center', whiteSpace: 'nowrap' }}>
-                        {filtered.length}건
-                    </Text>
-                )}
-                {/* 승인 대기 뱃지 */}
-                {pendingCount > 0 && statusFilter !== 'PENDING' && (
-                    <span style={styles.pendingBadge}>
-                        <ClockCircleOutlined style={{ fontSize: 11 }} />
-                        {' '}승인 대기 {pendingCount}건
-                    </span>
-                )}
-                <div style={{ display: 'flex', flex: 1, gap: 10, minWidth: 260 }}>
-                    <Input
-                        prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
-                        placeholder="가게명, 예약자로 검색"
-                        allowClear
-                        value={keyword}
-                        onChange={e => setKeyword(e.target.value)}
-                        style={{ flex: 1 }}
-                        size="large"
-                        disabled={loading}
-                    />
-                    <Button variant="ghost-sm" size="md" loading={loading} onClick={refetch} style={{ flexShrink: 0 }}>
-                        <ReloadOutlined /> 새로고침
-                    </Button>
-                </div>
-            </div>
+                        ],
+                    }] : []),
+                    {
+                        value: statusFilter,
+                        onChange: setStatusFilter,
+                        options: STATUS_OPTIONS,
+                        width: 140,
+                        disabled: loading,
+                    },
+                ]}
+                count={filtered.length}
+                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약자로 검색', disabled: loading }}
+                onReload={refetch}
+                loading={loading}
+                extra={
+                    pendingCount > 0 && statusFilter !== 'PENDING' ? (
+                        <span style={styles.pendingBadge}>
+                            <ClockCircleOutlined style={{ fontSize: 11 }} />
+                            {' '}승인 대기 {pendingCount}건
+                        </span>
+                    ) : null
+                }
+            />
 
             {loading ? (
                 <ReservationCardSkeleton count={5} />
@@ -206,14 +184,6 @@ const BusinessPanel = () => {
 
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
-    filterBar: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        flexWrap: 'wrap',
-        marginBottom: 20,
-        paddingTop: 8,
-    },
     pendingBadge: {
         display: 'inline-flex',
         alignItems: 'center',

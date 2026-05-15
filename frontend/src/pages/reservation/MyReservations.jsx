@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Empty, Typography, Select, Input } from 'antd';
+import { Empty, Typography } from 'antd';
 import {
     CalendarOutlined, ClockCircleOutlined, TeamOutlined, UserOutlined,
-    CreditCardOutlined, ReloadOutlined, SearchOutlined,
+    CreditCardOutlined,
 } from '@ant-design/icons';
-import { PageContainer, Button } from '../../components/common';
+import { PageContainer, Button, FilterToolbar } from '../../components/common';
 import { MyReservationCardSkeleton } from '../../components/common';
 import ReservationStatusBadge from '../../components/reservation/ReservationStatusBadge';
 import { useReservations, useMessage, usePayment } from '../../hooks';
@@ -114,15 +114,19 @@ const MyReservations = () => {
             </div>
 
             {/* 필터 바 — AdminPanel과 동일한 구조 */}
-            <div style={styles.filterBar}>
-                <Select
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={STATUS_OPTIONS}
-                    style={{ width: 140 }}
-                    size="large"
-                    disabled={loading}
-                />
+            <FilterToolbar
+                selects={[{
+                    value: statusFilter,
+                    onChange: setStatusFilter,
+                    options: STATUS_OPTIONS,
+                    width: 140,
+                    disabled: loading,
+                }]}
+                count={filtered.length}
+                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명으로 검색', disabled: loading }}
+                onReload={refetch}
+                loading={loading}
+            />
                 {/* 건수 — 셀렉터 옆에 표시 */}
                 {!loading && (
                     <Text type="secondary" style={{ fontSize: fontSize.sm, alignSelf: 'center', whiteSpace: 'nowrap' }}>
@@ -130,22 +134,7 @@ const MyReservations = () => {
                     </Text>
                 )}
                 {/* 검색+새로고침 그룹 — 모바일에서 줄바꿈 강제 */}
-                <div style={{ display: 'flex', flex: 1, gap: 10, minWidth: 260 }}>
-                    <Input
-                        prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
-                        placeholder="가게명으로 검색"
-                        allowClear
-                        value={keyword}
-                        onChange={e => setKeyword(e.target.value)}
-                        style={{ flex: 1 }}
-                        size="large"
-                        disabled={loading}
-                    />
-                    <Button variant="ghost-sm" size="md" loading={loading} onClick={refetch} style={{ flexShrink: 0 }}>
-                        <ReloadOutlined /> 새로고침
-                    </Button>
-                </div>
-            </div>
+
 
             {/* 리스트 */}
             {loading ? (
@@ -249,13 +238,6 @@ const MyReservations = () => {
 
 const styles = {
     title:         { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
-    filterBar: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        flexWrap: 'wrap',
-        marginBottom: 20,
-    },
     row:           { display: 'flex', alignItems: 'center', gap: 16, padding: '18px 0', cursor: 'pointer' },
     divider:       { height: 1, background: colors.border?.light || '#f0f0f0' },
     imgWrap:       { width: 60, height: 60, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },

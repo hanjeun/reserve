@@ -9,7 +9,7 @@ const useReservations = () => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
 
-    const { data, isLoading, refetch, error } = useQuery({
+    const { data, isLoading, isFetching, refetch, error } = useQuery({
         queryKey: reservationKeys.my(),
         queryFn: () => reservationService.getMyReservations(),
         select: (data) => (Array.isArray(data) ? data : []),
@@ -39,7 +39,7 @@ const useReservations = () => {
 
     return {
         reservations: data || [],
-        loading: isLoading,
+        loading: isLoading || isFetching,
         cancelReservation: cancelMutation.mutateAsync,
         refetch,
     };

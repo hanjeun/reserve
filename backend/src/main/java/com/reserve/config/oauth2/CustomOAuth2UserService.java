@@ -54,9 +54,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 provider, userInfo.getProviderId(), userInfo.getEmail(), userInfo.getName());
 
         // 4. 회원 조회 또는 생성 (Access Token도 함께 저장)
+        boolean isNewUser = false;
         Member member = processOAuth2User(provider, userInfo, accessToken);
+        // 약관 미동의 신규 유저 체크
+        if (!member.isTermsAgreed()) isNewUser = true;
 
-        return new CustomOAuth2User(member, oAuth2User.getAttributes(), userNameAttributeName);
+        return new CustomOAuth2User(member, oAuth2User.getAttributes(), userNameAttributeName, isNewUser);
     }
 
     /**

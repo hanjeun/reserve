@@ -1,6 +1,7 @@
 import React from 'react';
 import { Form, Flex, Switch, Typography } from 'antd';
 import { FormInput, FormTextArea, FormSelect, FormTimePicker } from '../../common';
+import AddressSearch from './AddressSearch';
 import {
     STORE_CATEGORIES, RESERVATION_SLOT_OPTIONS,
     FULL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_RATE_OPTIONS,
@@ -56,7 +57,7 @@ const FieldRow = ({ children, style }) => (
 );
 
 // 기본 정보 (왼쪽 컬럼)
-const BasicSection = ({ isMobile = true }) => {
+const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' }) => {
     const mb = isMobile ? MB : MB_PC;
     return (
         <>
@@ -101,8 +102,17 @@ const BasicSection = ({ isMobile = true }) => {
             </FieldRow>
 
             <Form.Item label="주소" name="address" rules={VALIDATION_RULES.address} style={mb}>
-                <FormInput placeholder="상세 주소" />
+                <AddressSearch
+                    placeholder="도로명 또는 지번 주소 입력"
+                    zipCode={zipCode}
+                    addressDetail={addressDetail}
+                    onMeta={(meta) => form?.setFieldsValue(meta)}
+                />
             </Form.Item>
+            <Form.Item name="latitude" hidden><input /></Form.Item>
+            <Form.Item name="longitude" hidden><input /></Form.Item>
+            <Form.Item name="zipCode" hidden><input /></Form.Item>
+            <Form.Item name="addressDetail" hidden><input /></Form.Item>
 
             <Form.Item label="가게 소개" name="description" rules={VALIDATION_RULES.description} style={{ marginBottom: 0 }}>
                 <FormTextArea rows={4} placeholder="가게를 소개해주세요" />
@@ -169,11 +179,11 @@ const SettingsSection = () => (
  * 가게 기본 정보 입력 섹션
  * @param {boolean} isMobile - PC: 2컬럼 / 모바일: 단일 컬럼
  */
-const StoreBasicInfo = ({ isMobile = true }) => {
+const StoreBasicInfo = ({ isMobile = true, form, zipCode = '', addressDetail = '' }) => {
     if (!isMobile) {
         return (
             <div style={pcStyles.grid}>
-                <div style={pcStyles.col}><BasicSection isMobile={false} /></div>
+                <div style={pcStyles.col}><BasicSection isMobile={false} form={form} zipCode={zipCode} addressDetail={addressDetail} /></div>
                 <div style={pcStyles.dividerVertical} />
                 <div style={pcStyles.col}><SettingsSection /></div>
             </div>
@@ -181,7 +191,7 @@ const StoreBasicInfo = ({ isMobile = true }) => {
     }
     return (
         <>
-            <BasicSection />
+            <BasicSection form={form} zipCode={zipCode} addressDetail={addressDetail} />
             <Divider top={8} bottom={16} />
             <SettingsSection />
         </>

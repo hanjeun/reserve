@@ -41,6 +41,18 @@ public class Store {
     @Column(name = "address")
     private String address;
 
+    @Column(name = "zip_code", length = 10)
+    private String zipCode;
+
+    @Column(name = "address_detail")
+    private String addressDetail;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     @Column(name = "phone")
     private String phone;
 

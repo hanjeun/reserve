@@ -11,29 +11,62 @@ import { ENTITY_LABELS, ENTITY_TYPE_OPTIONS } from './adminConstants';
 const { Text } = Typography;
 
 const ACTION_CONFIG = {
-    SOFT_DELETE:  { label: '소프트 삭제', color: 'orange'  },
-    RESTORE:      { label: '복구',        color: 'green'   },
-    HARD_DELETE:  { label: '영구 삭제',   color: 'red'     },
+    SOFT_DELETE: { label: '소프트 삭제', color: 'orange' },
+    RESTORE:     { label: '복구',        color: 'green'  },
+    HARD_DELETE: { label: '영구 삭제',   color: 'red'    },
+    SUSPEND:     { label: '정지',         color: 'gold'   },
+    BAN:         { label: '영구 정지',    color: 'volcano'},
+    UNBAN:       { label: '정지 해제',    color: 'cyan'   },
+    APPROVED:    { label: '인증 승인',    color: 'green'  },
+    REJECTED:    { label: '인증 거절',    color: 'red'    },
 };
 
-const TYPE_OPTIONS = ENTITY_TYPE_OPTIONS;
+// 로그 내용 한 줄 생성
+const makeLogMessage = (action, entityType, entityId, snapshot) => {
+    const entity = ENTITY_LABELS[entityType]?.label || entityType;
+    let detail = '';
+    try {
+        const obj = JSON.parse(snapshot || '{}');
+        detail = obj['사유'] || obj['상호명'] || '';
+    } catch { /* ignore */ }
+    switch (action) {
+        case 'SOFT_DELETE': return `${entity} #${entityId} 소프트 삭제 처리됨`;
+        case 'RESTORE':     return `${entity} #${entityId} 복구 완료`;
+        case 'HARD_DELETE': return `${entity} #${entityId} 영구 삭제 실행됨`;
+        case 'SUSPEND':     return `회원 #${entityId} 제재 처리${detail ? ' — ' + detail : ''}`;
+        case 'BAN':         return `회원 #${entityId} 영구 정지${detail ? ' — ' + detail : ''}`;
+        case 'UNBAN':       return `회원 #${entityId} 정지 해제`;
+        case 'APPROVED':    return `회원 #${entityId} 사업자 인증 승인${detail ? ' — ' + detail : ''}`;
+        case 'REJECTED':    return `회원 #${entityId} 사업자 인증 거절${detail ? ' — ' + detail : ''}`;
+        default:            return `${entity} #${entityId} ${action}`;
+    }
+};
+
+// 처리자 표시 — 이메일이면 사용자/관리자, system이면 스케줄러명
+const formatActor = (actorEmail) => {
+    if (!actorEmail || actorEmail === 'system') return 'TrashCleanupScheduler';
+    if (actorEmail.includes('@')) return actorEmail;
+    return actorEmail;
+};
 
 const AuditLogTab = () => {
     const { message } = useMessage();
-    const [logs, setLogs]         = useState([]);
-    const [loading, setLoading]   = useState(false);
-    const [typeFilter, setTypeFilter] = useState('');
-    const [page, setPage]         = useState(0);
+    const [logs, setLogs]               = useState([]);
+    const [loading, setLoading]         = useState(false);
+    const [typeFilter, setTypeFilter]   = useState('');
+    const [page, setPage]               = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
     const load = useCallback(async (p = 0) => {
         setLoading(true);
+        setLogs([]);
         try {
             const params = { page: p, size: 30 };
             if (typeFilter) params.type = typeFilter;
             const data = await api.get(API_ENDPOINTS.AUDIT_LOG.LIST, { params });
             setLogs(data?.content ?? []);
-            setTotalElements(data?.totalElements ?? 0);
+            const total = data?.totalElements ?? data?.page?.totalElements ?? 0;
+            setTotalElements(total);
             setPage(p);
         } catch {
             message.error('시스템 로그를 불러오지 못했습니다.');
@@ -44,55 +77,47 @@ const AuditLogTab = () => {
 
     useEffect(() => { load(0); }, [load]);
 
-    const formatSnapshot = (snapshot) => {
-        if (!snapshot) return '-';
-        try {
-            const obj = JSON.parse(snapshot);
-            return Object.entries(obj)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(' / ');
-        } catch {
-            return snapshot;
-        }
-    };
-
     const columns = [
         {
-            title: '행위', dataIndex: 'action', key: 'action', width: 110,
+            title: '일시', dataIndex: 'createdAt', key: 'createdAt', width: 155,
+            render: (v) => (
+                <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, whiteSpace: 'nowrap' }}>
+                    {v ? v.substring(0, 16).replace('T', ' ') : '-'}
+                </Text>
+            ),
+        },
+        {
+            title: '행위', dataIndex: 'action', key: 'action', width: 115,
             render: (v) => {
                 const cfg = ACTION_CONFIG[v] || { label: v, color: 'default' };
                 return <Tag color={cfg.color}>{cfg.label}</Tag>;
             },
         },
         {
-            title: '대상 유형', dataIndex: 'entityType', key: 'entityType', width: 110,
-            render: (v) => {
-                const cfg = ENTITY_LABELS[v] || { label: v, color: 'default' };
-                return <Tag color={cfg.color}>{cfg.label}</Tag>;
+            title: '대상', key: 'target', width: 120,
+            render: (_, r) => {
+                const cfg = ENTITY_LABELS[r.entityType] || { label: r.entityType, color: 'default' };
+                return (
+                    <span style={{ whiteSpace: 'nowrap' }}>
+                        <Tag color={cfg.color} style={{ marginRight: 4 }}>{cfg.label}</Tag>
+                        <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>#{r.entityId}</Text>
+                    </span>
+                );
             },
         },
         {
-            title: 'ID', dataIndex: 'entityId', key: 'entityId', width: 70,
-            render: (v) => <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>{v}</Text>,
-        },
-        {
-            title: '스냅샷', dataIndex: 'snapshot', key: 'snapshot',
-            ellipsis: true,
-            render: (v) => (
+            title: '로그 내용', key: 'logMessage',
+            render: (_, r) => (
                 <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>
-                    {formatSnapshot(v)}
+                    {makeLogMessage(r.action, r.entityType, r.entityId, r.snapshot)}
                 </Text>
             ),
         },
         {
             title: '처리자', dataIndex: 'actorEmail', key: 'actorEmail', width: 200,
-            render: (v) => <Text style={{ fontSize: fontSize.sm }}>{v || 'system'}</Text>,
-        },
-        {
-            title: '일시', dataIndex: 'createdAt', key: 'createdAt', width: 170,
             render: (v) => (
-                <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>
-                    {v ? v.substring(0, 16).replace('T', ' ') : '-'}
+                <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>
+                    {formatActor(v)}
                 </Text>
             ),
         },
@@ -100,34 +125,24 @@ const AuditLogTab = () => {
 
     return (
         <div>
-            {/* 툴바 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <Select
                     value={typeFilter}
-                    onChange={(v) => { setTypeFilter(v); }}
-                    options={TYPE_OPTIONS}
+                    onChange={(v) => { setTypeFilter(v); setPage(0); }}
+                    options={ENTITY_TYPE_OPTIONS}
                     size="large"
                     style={{ width: 140 }}
                 />
                 {!loading && (
-                    <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                        총 {totalElements}건
-                    </Text>
+                    <Text type="secondary" style={{ fontSize: fontSize.sm }}>총 {totalElements}건</Text>
                 )}
-                <Button
-                    variant="ghost-sm"
-                    size="md"
-                    onClick={() => load(0)}
-                    disabled={loading}
-                    style={{ marginLeft: 'auto' }}
-                >
+                <Button variant="ghost-sm" size="md" onClick={() => load(0)} disabled={loading} style={{ marginLeft: 'auto' }}>
                     <SyncOutlined spin={loading} /> 새로고침
                 </Button>
             </div>
 
-            {/* 안내 */}
             <div style={{
-                background: colors.background.subtle,
+                background: colors.gray[50],
                 border: `1px solid ${colors.border.light}`,
                 borderRadius: radius.md,
                 padding: '10px 16px',
@@ -138,7 +153,6 @@ const AuditLogTab = () => {
                 소프트 삭제, 복구, 영구 삭제 등 관리자 행위가 기록됩니다. 로그는 90일 후 자동 삭제됩니다.
             </div>
 
-            {/* 테이블 */}
             {loading
                 ? <Skeleton active paragraph={{ rows: 8 }} />
                 : (
@@ -147,7 +161,7 @@ const AuditLogTab = () => {
                         dataSource={logs}
                         rowKey="id"
                         size="middle"
-                        scroll={{ x: 'max-content' }}
+                        scroll={{ x: 800 }}
                         pagination={{
                             current: page + 1,
                             pageSize: 30,

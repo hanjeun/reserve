@@ -28,9 +28,16 @@ public class EmailVerificationService {
     @Transactional
     public void sendVerificationCode(String email) {
         if (memberRepository.findByEmail(email).isPresent()) {
-            // [수정] 이미 존재하는 계정이므로 409 Conflict
             throw new EmailException("이미 가입된 이메일입니다.", HttpStatus.CONFLICT);
         }
+
+        // 연속 안전장치: 1분 이내 재발송 차단
+        verificationRepository.findTopByEmailOrderByCreatedAtDesc(email).ifPresent(existing -> {
+            if (existing.getCreatedAt() != null &&
+                existing.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(1))) {
+                throw new EmailException("인증 코드를 이미 발송했습니다. 1분 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            }
+        });
 
         verificationRepository.deleteByEmail(email);
 

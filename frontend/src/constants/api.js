@@ -6,11 +6,12 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const API_ENDPOINTS = {
     AUTH: {
-        LOGIN:   '/api/auth/login',
-        LOGOUT:  '/api/auth/logout',
-        SIGNUP:  '/api/auth/signup',
-        REFRESH: '/api/auth/refresh',
-        ME:      '/api/member/me',
+        LOGIN:       '/api/auth/login',
+        LOGOUT:      '/api/auth/logout',
+        SIGNUP:      '/api/auth/signup',
+        REFRESH:     '/api/auth/refresh',
+        ME:          '/api/member/me',
+        AGREE_TERMS: '/api/auth/agree-terms',
     },
     EMAIL: {
         SEND_CODE:   '/api/email/send-code',
@@ -32,6 +33,7 @@ export const API_ENDPOINTS = {
         CREATE:              '/api/reservations',
         DETAIL:              (id) => `/api/reservations/${id}`,
         CANCEL:              (id) => `/api/reservations/${id}/cancel`,
+        REMOVE:              (id) => `/api/reservations/${id}/remove`,
         APPROVE:             (id) => `/api/reservations/${id}/approve`,
         REJECT:              (id) => `/api/reservations/${id}/reject`,
         COMPLETE:            (id) => `/api/reservations/${id}/complete`,
@@ -106,6 +108,16 @@ export const API_ENDPOINTS = {
     },
     AUDIT_LOG: {
         LIST: '/api/admin/audit-logs',
+    },
+    ADMIN_MANAGE: {
+        MEMBERS:              '/api/admin/manage/members',
+        MEMBER_DELETE:        (id) => `/api/admin/manage/members/${id}`,
+        MEMBER_SUSPEND:       (id) => `/api/admin/manage/members/${id}/suspend`,
+        MEMBER_BAN:           (id) => `/api/admin/manage/members/${id}/ban`,
+        MEMBER_UNBAN:         (id) => `/api/admin/manage/members/${id}/unban`,
+        STORES:               '/api/admin/manage/stores',
+        STORE_DELETE:         (id) => `/api/admin/manage/stores/${id}`,
+        RESERVATION_DELETE:   (id) => `/api/admin/manage/reservations/${id}`,
     },
 };
 

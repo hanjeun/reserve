@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Empty, Typography } from 'antd';
 import {
     CalendarOutlined, ClockCircleOutlined, TeamOutlined, UserOutlined,
-    CreditCardOutlined,
+    CreditCardOutlined, DeleteOutlined,
 } from '@ant-design/icons';
 import { PageContainer, Button, FilterToolbar } from '../../components/common';
 import { MyReservationCardSkeleton } from '../../components/common';
@@ -13,12 +13,13 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
 import paymentService from '../../services/paymentService';
+import api from '../../api/axios';
 import { formatTime, formatCurrency, getThumbnailUrl } from '../../utils';
+import { API_ENDPOINTS } from '../../constants';
 import { colors, radius, fontWeight, fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 
-// AdminPanel과 동일한 단순 텍스트 옵션 (아이콘/숫자 없음)
 const STATUS_OPTIONS = [
     { value: 'ALL',       label: '전체 상태' },
     { value: 'PENDING',   label: '승인 대기' },
@@ -83,6 +84,22 @@ const MyReservations = () => {
         );
     };
 
+    const handleRemove = (res) => {
+        confirm({
+            title: '예약 삭제',
+            content: '이 예약을 목록에서 삭제합니다. 되돌릴 수 없습니다.',
+            okText: '삭제', cancelText: '취소',
+            okButtonProps: { danger: true }, centered: true,
+            onOk: async () => {
+                try {
+                    await api.delete(API_ENDPOINTS.RESERVATION.REMOVE(res.id));
+                    message.success('목록에서 제거되었습니다.');
+                    refetch();
+                } catch { message.error('제거에 실패했습니다.'); }
+            },
+        });
+    };
+
     const handleCancel = async (res) => {
         let content = '예약을 취소하시겠습니까? 취소 후 되돌릴 수 없습니다.';
         if (res.depositPaid) {
@@ -105,7 +122,6 @@ const MyReservations = () => {
 
     return (
         <PageContainer size="xl" paddingTop="40px">
-            {/* 헤더 */}
             <div style={{ marginBottom: 32 }}>
                 <Title level={2} style={styles.title}>내 예약 확인</Title>
                 <Text type="secondary" style={{ fontSize: fontSize.lg }}>
@@ -113,7 +129,6 @@ const MyReservations = () => {
                 </Text>
             </div>
 
-            {/* 필터 바 — AdminPanel과 동일한 구조 */}
             <FilterToolbar
                 selects={[{
                     value: statusFilter,
@@ -127,16 +142,7 @@ const MyReservations = () => {
                 onReload={refetch}
                 loading={loading}
             />
-                {/* 건수 — 셀렉터 옆에 표시 */}
-                {!loading && (
-                    <Text type="secondary" style={{ fontSize: fontSize.sm, alignSelf: 'center', whiteSpace: 'nowrap' }}>
-                        {filtered.length}건
-                    </Text>
-                )}
-                {/* 검색+새로고침 그룹 — 모바일에서 줄바꿈 강제 */}
 
-
-            {/* 리스트 */}
             {loading ? (
                 <MyReservationCardSkeleton count={4} />
             ) : filtered.length === 0 ? (
@@ -210,20 +216,35 @@ const MyReservations = () => {
                                         </Button>
                                     )}
                                     {res.status === 'COMPLETED' && (
-                                        res.reviewId
-                                            ? <Button variant="ghost-sm-success"
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/store/${res.storeId}`, { state: { openReviewId: res.reviewId } }); }}>
-                                                리뷰 보기
-                                              </Button>
-                                            : <Button variant="ghost-sm-primary"
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/store/${res.storeId}`, { state: { openWrite: true } }); }}>
-                                                리뷰 쓰기
-                                              </Button>
+                                        <>
+                                            {res.reviewId
+                                                ? <Button variant="ghost-sm-success"
+                                                    onClick={(e) => { e.stopPropagation(); navigate(`/store/${res.storeId}`, { state: { openReviewId: res.reviewId } }); }}>
+                                                    리뷰 보기
+                                                  </Button>
+                                                : <Button variant="ghost-sm-primary"
+                                                    onClick={(e) => { e.stopPropagation(); navigate(`/store/${res.storeId}`, { state: { openWrite: true } }); }}>
+                                                    리뷰 쓰기
+                                                  </Button>
+                                            }
+                                            <Button variant="ghost-sm" size="sm"
+                                                onClick={(e) => { e.stopPropagation(); handleRemove(res); }}
+                                                style={{ color: colors.text.tertiary }}>
+                                                <DeleteOutlined /> 삭제
+                                            </Button>
+                                        </>
                                     )}
                                     {res.status === 'REJECTED' && res.rejectionReason && (
                                         <Text type="secondary" style={styles.rejection}>
                                             사유: {res.rejectionReason}
                                         </Text>
+                                    )}
+                                    {['CANCELLED', 'REJECTED', 'NO_SHOW'].includes(res.status) && (
+                                        <Button variant="ghost-sm" size="sm"
+                                            onClick={(e) => { e.stopPropagation(); handleRemove(res); }}
+                                            style={{ color: colors.text.tertiary }}>
+                                            <DeleteOutlined /> 삭제
+                                        </Button>
                                     )}
                                 </div>
                             </div>

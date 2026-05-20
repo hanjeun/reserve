@@ -5,6 +5,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { Layout, Button, Space, Dropdown, Typography } from 'antd';
 import {
     CalendarOutlined,
+    ExclamationCircleOutlined,
     LogoutOutlined,
     ShopOutlined,
     PlusOutlined,
@@ -15,7 +16,7 @@ import {
 import { useMessage } from '../../hooks';
 import { API_ENDPOINTS } from '../../constants';
 import { USER_ROLE_LABELS, hasOwnerAccess } from '../../constants/roles';
-import { colors, radius, shadows, heights, fontWeight } from '../../styles/tokens';
+import { colors, radius, shadows, heights, fontWeight, suspendBanner as SB } from '../../styles/tokens';
 import Avatar from '../common/Avatar';
 
 const { Header: AntHeader } = Layout;
@@ -30,6 +31,7 @@ const Header = () => {
     // RESERVE 로고 클릭: 홈이면 맨 위로 스크롤, 아니면 홈으로 이동
     const handleLogoClick = (e) => {
         e.preventDefault();
+        
         if (location.pathname === '/') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
@@ -50,6 +52,15 @@ const Header = () => {
     };
 
     const getMenuItems = () => {
+        // 약관 미동의 유저 — 로그아웃만 표시
+        if (user?.termsAgreed === false) {
+            return [
+                { key: 'terms-notice', icon: <ExclamationCircleOutlined style={{ color: colors.warning?.main || '#faad14' }} />, label: '서비스 이용 동의 필요', onClick: () => navigate('/signup/social') },
+                { type: 'divider' },
+                { key: 'logout', icon: <LogoutOutlined />, label: '로그아웃', danger: true, onClick: handleLogout },
+            ];
+        }
+
         const items = [
             {
                 key: 'profile-info',
@@ -86,28 +97,42 @@ const Header = () => {
     };
 
     return (
-        <AntHeader style={styles.header}>
-            <a href="/" onClick={handleLogoClick} style={styles.logo}>RESERVE</a>
-            <Space size="middle">
-                {isLoggedIn ? (
-                    <Dropdown
-                        menu={{ items: getMenuItems() }}
-                        placement="bottomRight"
-                        arrow={{ pointAtCenter: true }}
-                        trigger={['click']}
-                    >
-                        <div style={styles.myPageTrigger}>
-                            <Avatar src={user?.profileImage} size={36} />
-                        </div>
-                    </Dropdown>
-                ) : (
-                    <Space size={8}>
-                        <Button type="text" onClick={() => navigate('/login')} style={styles.navBtn}>로그인</Button>
-                        <Button type="primary" onClick={() => navigate('/signup')} style={styles.actionBtn}>시작하기</Button>
-                    </Space>
-                )}
-            </Space>
-        </AntHeader>
+        <>
+            <AntHeader style={styles.header}>
+                <a href="/" onClick={handleLogoClick} style={styles.logo}>RESERVE</a>
+                <Space size="middle">
+                    {isLoggedIn ? (
+                        <Dropdown
+                            menu={{ items: getMenuItems() }}
+                            placement="bottomRight"
+                            arrow={{ pointAtCenter: true }}
+                            trigger={['click']}
+                        >
+                            <div style={styles.myPageTrigger}>
+                                <Avatar src={user?.profileImage} size={36} />
+                            </div>
+                        </Dropdown>
+                    ) : (
+                        <Space size={8}>
+                            <Button type="text" onClick={() => navigate('/login')} style={styles.navBtn}>로그인</Button>
+                            <Button type="primary" onClick={() => navigate('/signup')} style={styles.actionBtn}>시작하기</Button>
+                        </Space>
+                    )}
+                </Space>
+            </AntHeader>
+            {isLoggedIn && user?.status === 'SUSPENDED' && (
+                <div style={{ ...SB.base, ...SB.suspended }}>
+                    {user?.suspendedUntil?.substring(0, 10)}까지 이용 제한된 계정입니다.
+                    {user?.suspendReason ? ` 사유: ${user.suspendReason}` : ''}
+                </div>
+            )}
+            {isLoggedIn && user?.status === 'BANNED' && (
+                <div style={{ ...SB.base, ...SB.banned }}>
+                    영구 이용 제한된 계정입니다.
+                    {user?.suspendReason ? ` 사유: ${user.suspendReason}` : ''}
+                </div>
+            )}
+        </>
     );
 };
 

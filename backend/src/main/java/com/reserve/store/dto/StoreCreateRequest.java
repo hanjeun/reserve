@@ -18,6 +18,10 @@ public class StoreCreateRequest {
     private String name;
     private String description;
     private String address;
+    private String zipCode;
+    private String addressDetail;
+    private Double latitude;
+    private Double longitude;
     private String phone;
     private String category;
     

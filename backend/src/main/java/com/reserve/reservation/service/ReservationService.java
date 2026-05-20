@@ -1,8 +1,10 @@
 package com.reserve.reservation.service;
 
+import com.reserve.audit.service.AuditLogService;
 import com.reserve.email.service.EmailService;
 import com.reserve.global.error.ReservationException;
 import com.reserve.member.entity.Member;
+import com.reserve.member.repository.MemberRepository;
 import com.reserve.payment.service.PaymentService;
 import com.reserve.reservation.dto.ReservationCreateRequest;
 import com.reserve.reservation.dto.ReservationResponse;
@@ -35,16 +37,22 @@ public class ReservationService {
     private final StoreRepository storeRepository;
     private final PaymentService paymentService;
     private final EmailService emailService;
+    private final MemberRepository memberRepository;
+    private final AuditLogService auditLogService;
 
     public ReservationService(
             ReservationRepository reservationRepository,
             StoreRepository storeRepository,
             @Lazy PaymentService paymentService,
-            EmailService emailService) {
+            EmailService emailService,
+            MemberRepository memberRepository,
+            @Lazy AuditLogService auditLogService) {
         this.reservationRepository = reservationRepository;
         this.storeRepository = storeRepository;
         this.paymentService = paymentService;
         this.emailService = emailService;
+        this.memberRepository = memberRepository;
+        this.auditLogService = auditLogService;
     }
 
     /**
@@ -54,8 +62,23 @@ public class ReservationService {
     public ReservationResponse createReservation(ReservationCreateRequest request, Member member) {
         log.info("Reservation created: storeId={}, memberId={}", request.getStoreId(), member.getId());
 
+        // 정지 체크 — JWT 크레임에는 status가 없으므로 DB에서 fresh 조회
+        Member freshMember = memberRepository.findById(member.getId())
+                .orElseThrow(() -> new ReservationException("회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        if (freshMember.isSuspended()) {
+            throw new ReservationException("계정이 정지된 상태입니다. 예약을 진행할 수 없습니다.", HttpStatus.FORBIDDEN);
+        }
+        if (!freshMember.isTermsAgreed()) {
+            throw new ReservationException("서비스 이용 약관에 동의해야 예약할 수 있습니다.", HttpStatus.FORBIDDEN);
+        }
+
         Store store = storeRepository.findById(request.getStoreId())
                 .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        // 가게 주인이 정지된 경우 신규 예약 차단
+        if (store.getOwner() != null && store.getOwner().isSuspended()) {
+            throw new ReservationException("현재 운영이 중단된 가게입니다. 신규 예약을 받지 않습니다.", HttpStatus.BAD_REQUEST);
+        }
 
         LocalDateTime reservationDateTime = LocalDateTime.of(request.getReservationDate(), request.getReservationTime());
         LocalDateTime now = LocalDateTime.now();
@@ -164,7 +187,7 @@ public class ReservationService {
                 String ownerName  = store.getOwner().getName() != null ? store.getOwner().getName() : "사장님";
                 emailService.sendNewReservationAlertToOwner(
                         ownerEmail, ownerName, store.getName(),
-                        member.getName() != null ? member.getName() : "고객",
+                        freshMember.getName(), freshMember.getEmail(),
                         request.getReservationDate().toString(),
                         request.getReservationTime().toString().substring(0, 5),
                         request.getGuestCount()
@@ -390,6 +413,37 @@ public class ReservationService {
         // BUSINESS: owner 기준으로 가게-예약 한 번에 조회
         return reservationRepository.findByStoreOwnerOrderByCreatedAtDesc(owner, pageable)
                 .map(ReservationResponse::fromEntity);
+    }
+
+    /**
+     * 예약 목록에서 숨기기 (소프트 삭제)
+     * 사용자/사업자가 완료·취소·거절·노쇼 예약을 목록에서 제거
+     */
+    @Transactional
+    public void removeReservation(Long id, Member member) {
+        Reservation reservation = findByIdOrThrow(id);
+
+        // 사용자 본인 또는 가게 사장님만 가능
+        boolean isOwner = reservation.getMember().getId().equals(member.getId());
+        boolean isStoreOwner = reservation.getStore().getOwner().getId().equals(member.getId());
+        if (!isOwner && !isStoreOwner && !member.isAdmin()) {
+            throw new ReservationException("해당 예약에 대한 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        }
+
+        // 진행 중인 예약은 삭제 불가
+        Reservation.ReservationStatus status = reservation.getStatus();
+        boolean isDeletable = status == Reservation.ReservationStatus.CANCELLED
+                || status == Reservation.ReservationStatus.REJECTED
+                || status == Reservation.ReservationStatus.COMPLETED
+                || status == Reservation.ReservationStatus.NO_SHOW;
+
+        if (!isDeletable) {
+            throw new ReservationException("완료·취소·거절·노쇼 상태의 예약만 삭제할 수 있습니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        reservation.softDelete();
+        auditLogService.logReservationDelete(reservation);  // 관리자 휴지통에 기록 (삭제 주체 = 현재 로그인 유저)
+        log.info("Reservation removed: id={}, memberId={}", id, member.getId());
     }
 
     // ========== 내부 도우미 메서드 ==========

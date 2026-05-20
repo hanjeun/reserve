@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Layout, Divider, ConfigProvider, App as AntApp } from 'antd';
+import { Layout, ConfigProvider, App as AntApp } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore.js';
 import { colors, animationKeyframes } from './styles/tokens';
@@ -23,11 +23,15 @@ import MyFavorites from './pages/favorite/MyFavorites';
 import PaymentResult from './pages/payment/PaymentResult';
 import AdminPanel from './pages/admin/AdminPanel';
 import Header from './components/layout/Header';
+import AppFooter from './components/layout/Footer';
+import Terms from './pages/legal/Terms';
+import SocialAgreement from './pages/auth/SocialAgreement';
+import Privacy from './pages/legal/Privacy';
 import Loading from './components/common/Loading';
 import PrivateRoute from './components/PrivateRoute';
 import ScrollToTop from './components/ScrollToTop';
 
-const { Content, Footer } = Layout;
+const { Content } = Layout;
 
 const validateMessages = {
     required: '${label}을(를) 입력해주세요.',
@@ -89,9 +93,6 @@ function AppContent() {
 }
 
 function AppRoutes() {
-    const location = useLocation();
-    const isHome = location.pathname === '/';
-
     return (
         <Layout style={{ minHeight: '100vh', backgroundColor: colors.background.default }}>
             <ScrollToTop />
@@ -104,8 +105,11 @@ function AppRoutes() {
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/oauth2/callback" element={<OAuthCallback />} />
+                    <Route path="/signup/social" element={<SocialAgreement />} />
                     <Route path="/stores" element={<StoreList />} />
                     <Route path="/store/:id" element={<StoreDetail />} />
+                    <Route path="/terms" element={<Terms />} />
+                    <Route path="/privacy" element={<Privacy />} />
 
                     {/* OWNER / ADMIN 전용 */}
                     <Route element={<PrivateRoute allowedRoles={['ADMIN', 'BUSINESS']} />}>
@@ -130,14 +134,7 @@ function AppRoutes() {
                 </Routes>
             </Content>
 
-            {!isHome && (
-                <Footer style={{ backgroundColor: colors.background.default, padding: '60px 20px 40px' }}>
-                    <Divider />
-                    <div style={{ textAlign: 'center', color: colors.text.tertiary, fontSize: '13px' }}>
-                        <p>RESERVE © 2026</p>
-                    </div>
-                </Footer>
-            )}
+            <AppFooter />
         </Layout>
     );
 }

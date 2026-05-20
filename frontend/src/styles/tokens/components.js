@@ -222,6 +222,129 @@ export const avatar = {
 };
 
 // ============================================
+// Suspend Banner Styles — Header 제재 배너
+// ============================================
+export const suspendBanner = {
+  base: {
+    color: '#fff',
+    textAlign: 'center',
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: 500,
+    position: 'sticky',
+    top: heights.header,
+    zIndex: 999,
+    lineHeight: 1.5,
+  },
+  suspended: {
+    backgroundColor: '#fa8c16', // 주황 — 기간 정지
+  },
+  banned: {
+    backgroundColor: '#ff4d4f', // 빨강 — 영구 정지
+  },
+};
+
+// ============================================
+// Agreement (약관 동의) Styles — Signup 전용
+// Toss/Kakao 스타일: 박스 없이 체크박스 + 텍스트 태그
+// ============================================
+export const agreement = {
+  section: {
+    marginTop: 32,
+  },
+  divider: {
+    height: 1,
+    background: '#f0f0f0',
+    marginBottom: 20,
+  },
+  allRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    cursor: 'pointer',
+    marginBottom: 16,
+    userSelect: 'none',
+  },
+  allText: {
+    fontWeight: '600',
+    fontSize: '15px',
+    color: '#111',
+    cursor: 'pointer',
+    lineHeight: 1,
+  },
+  itemRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '3px 0',
+  },
+  itemLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    cursor: 'pointer',
+    userSelect: 'none',
+    flex: 1,
+  },
+  itemText: {
+    fontSize: '13px',
+    color: '#555',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  requiredTag: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: colors.primary.main,
+    letterSpacing: '-0.2px',
+  },
+  optionalTag: {
+    fontSize: '11px',
+    fontWeight: '500',
+    color: '#aaa',
+    letterSpacing: '-0.2px',
+  },
+  viewLink: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '12px',
+    color: '#aaa',
+    padding: '2px 0 2px 8px',
+    flexShrink: 0,
+    textDecoration: 'underline',
+    textUnderlineOffset: '2px',
+    transition: 'color 0.15s',
+  },
+};
+
+// ============================================
+// Footer Legal Styles
+// ============================================
+export const footerLegal = {
+  wrapper: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  leftBlock: {
+    fontSize: '12px',
+    color: '#aaa',
+    lineHeight: 1.8,
+  },
+  rightBlock: {
+    fontSize: '12px',
+    color: '#aaa',
+    textAlign: 'right',
+    lineHeight: 1.8,
+  },
+};
+
+// ============================================
 // Form Section Styles
 // ============================================
 export const formSection = {

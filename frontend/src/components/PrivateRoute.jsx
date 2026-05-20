@@ -1,34 +1,46 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
+import { useMessage } from '../hooks';
 
 /**
  * 인증 및 역할 기반 라우트 가드
- *
- * @param {string[]} [allowedRoles] - 허용할 역할 목록 (없으면 로그인만 체크)
- *
- * 사용 예:
- *   <PrivateRoute />                              → 로그인 유저만
- *   <PrivateRoute allowedRoles={['BUSINESS','ADMIN']} /> → 사업자/관리자만
+ * - 비로그인 → /login 리다이렉트
+ * - 약관 미동의 → /signup/social 강제 이동
+ * - 역할 불일치 → / 리다이렉트 + 메시지 1회
  */
 const PrivateRoute = ({ allowedRoles }) => {
     const { isLoggedIn, user, isLoggingOut } = useAuthStore();
     const location = useLocation();
+    const { message } = useMessage();
+    const notifiedRef = useRef(false);
 
-    // 로그아웃 처리 중
-    if (isLoggingOut) {
-        return <Navigate to="/" replace />;
-    }
+    const roleBlocked = isLoggedIn
+        && allowedRoles?.length > 0
+        && !allowedRoles.includes(user?.role);
 
-    // 비로그인
+    // 소셜 로그인 약관 미동의 체크
+    const termsNotAgreed = isLoggedIn && user?.termsAgreed === false;
+
+    useEffect(() => {
+        if (roleBlocked && !notifiedRef.current) {
+            notifiedRef.current = true;
+            message.error('접근 권한이 없습니다.');
+        }
+    }, [roleBlocked, message]);
+
+    if (isLoggingOut) return <Navigate to="/" replace />;
+
     if (!isLoggedIn) {
         return <Navigate to="/login" replace state={{ from: location, prevented: true }} />;
     }
 
-    // 역할 제한이 있고, 현재 유저 역할이 허용 목록에 없으면
-    if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
-        return <Navigate to="/" replace />;
+    // 약관 미동의 유저 — 소셜 동의 페이지로 강제 이동
+    if (termsNotAgreed) {
+        return <Navigate to="/signup/social" replace />;
     }
+
+    if (roleBlocked) return <Navigate to="/" replace />;
 
     return <Outlet />;
 };

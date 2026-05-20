@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
@@ -20,6 +21,13 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
     @Query("SELECT a FROM AuditLog a WHERE a.action = 'SOFT_DELETE' AND a.entityType = :entityType AND a.expiresAt > :now ORDER BY a.createdAt DESC")
     Page<AuditLog> findRestorableByType(String entityType, LocalDateTime now, Pageable pageable);
+
+    @Query("SELECT a FROM AuditLog a WHERE a.action = 'SOFT_DELETE' AND a.expiresAt <= :now")
+    List<AuditLog> findExpiredSoftDeletes(LocalDateTime now);
+
+    @Modifying
+    @Query("DELETE FROM AuditLog a WHERE a.entityType = :entityType AND a.entityId = :entityId AND a.action = 'SOFT_DELETE'")
+    void deleteSoftDeleteLog(String entityType, Long entityId);
 
     @Modifying
     @Query("DELETE FROM AuditLog a WHERE a.expiresAt < :now")

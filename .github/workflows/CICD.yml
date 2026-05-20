@@ -213,6 +213,7 @@ jobs:
             export CLOUDFRONT_DOMAIN=${{ secrets.CLOUDFRONT_DOMAIN }}
             export MAIL_WEBHOOK_SECRET=${{ secrets.MAIL_WEBHOOK_SECRET }}
             export SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+            export KAKAO_REST_API_KEY=${{ secrets.KAKAO_REST_API_KEY }}
             sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)

@@ -31,12 +31,12 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
 
     // visible 될 때 한 번만 지도 초기화
     useEffect(() => {
-        if (!visible || !mapRef.current || !window.kakao) return;
+        if (!visible || !mapRef.current || !globalThis.kakao) return;
 
         const initMap = (lat, lng) => {
             if (!mapRef.current) return;
-            const center = new window.kakao.maps.LatLng(lat, lng);
-            const map = new window.kakao.maps.Map(mapRef.current, {
+            const center = new globalThis.kakao.maps.LatLng(lat, lng);
+            const map = new globalThis.kakao.maps.Map(mapRef.current, {
                 center,
                 level: 4,
                 draggable: true,
@@ -60,7 +60,7 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
                         white-space: nowrap;
                         cursor: pointer;
                         border: 1px solid rgba(0,0,0,0.08);
-                    " onclick="window.open('${kakaoMapUrl}', '_blank')">
+                    " onclick="globalThis.open('${kakaoMapUrl}', '_blank')">
                         ${storeName}
                         <div style="
                             position: absolute;
@@ -75,27 +75,29 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
                         "></div>
                     </div>
                 `;
-                new window.kakao.maps.CustomOverlay({
+                const overlay = new globalThis.kakao.maps.CustomOverlay({
                     map, position: center, content, yAnchor: 1.4,
                 });
+                overlay.setMap(map);
             } else {
-                new window.kakao.maps.Marker({ position: center, map });
+                const marker = new globalThis.kakao.maps.Marker({ position: center, map });
+                marker.setMap(map);
             }
 
             mapInstance.current = map;
             setTimeout(() => { map.relayout(); map.setCenter(center); }, 100);
         };
 
-        window.kakao.maps.load(() => {
-            const lat = parseFloat(latitude);
-            const lng = parseFloat(longitude);
-            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        globalThis.kakao.maps.load(() => {
+            const lat = Number.parseFloat(latitude);
+            const lng = Number.parseFloat(longitude);
+            if (!Number.isNaN(lat) && !Number.isNaN(lng) && lat !== 0 && lng !== 0) {
                 initMap(lat, lng);
             } else if (address) {
-                const geocoder = new window.kakao.maps.services.Geocoder();
+                const geocoder = new globalThis.kakao.maps.services.Geocoder();
                 geocoder.addressSearch(address, (result, status) => {
-                    if (status === window.kakao.maps.services.Status.OK && result.length > 0) {
-                        initMap(parseFloat(result[0].y), parseFloat(result[0].x));
+                    if (status === globalThis.kakao.maps.services.Status.OK && result.length > 0) {
+                        initMap(Number.parseFloat(result[0].y), Number.parseFloat(result[0].x));
                     }
                 });
             }

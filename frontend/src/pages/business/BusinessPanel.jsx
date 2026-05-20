@@ -10,6 +10,9 @@ import ReservationCard from '../../components/reservation/ReservationCard';
 import useManageReservations from '../../hooks/useManageReservations';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
+import useMessage from '../../hooks/useMessage';
+import api from '../../api/axios';
+import { API_ENDPOINTS } from '../../constants';
 import storeService from '../../services/storeService';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
@@ -32,6 +35,23 @@ const ReservationTab = () => {
     const [storeFilter, setStoreFilter]   = useState('ALL');
     const [myStores, setMyStores]         = useState([]);
     const { reservations, loading, actionLoading, approve, reject, complete, noShow, refetch } = useManageReservations();
+    const { message, confirm } = useMessage();
+
+    const handleRemove = (id) => {
+        confirm({
+            title: '예약 목록에서 제거',
+            content: '이 예약을 목록에서 숨기시겠습니까?',
+            okText: '제거', cancelText: '취소',
+            okButtonProps: { danger: true }, centered: true,
+            onOk: async () => {
+                try {
+                    await api.delete(API_ENDPOINTS.RESERVATION.REMOVE(id));
+                    message.success('목록에서 제거되었습니다.');
+                    refetch();
+                } catch { message.error('제거에 실패했습니다.'); }
+            },
+        });
+    };
 
     useEffect(() => {
         storeService.getMyStores()
@@ -116,6 +136,7 @@ const ReservationTab = () => {
                                 onReject={reject}
                                 onComplete={complete}
                                 onNoShow={noShow}
+                                onRemove={handleRemove}
                             />
                             {i < filtered.length - 1 && <div style={styles.divider} />}
                         </React.Fragment>

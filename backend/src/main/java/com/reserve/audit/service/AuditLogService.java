@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -71,8 +72,12 @@ public class AuditLogService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("Member not found: " + memberId));
         member.softDelete();
-        saveAuditLog("MEMBER", memberId, "SOFT_DELETE",
-                Map.of("email", member.getEmail(), "name", nullSafe(member.getName()), "role", member.getRole().name()));
+        saveAuditLog("MEMBER", memberId, "SOFT_DELETE", Map.of(
+                "이름",   nullSafe(member.getName()),
+                "이메일", member.getEmail(),
+                "권한",   member.getRole().name(),
+                "로그인", member.getProvider() != null ? member.getProvider().name() : "LOCAL"
+        ));
         log.info("Member soft-deleted: id={}", memberId);
     }
 
@@ -81,9 +86,29 @@ public class AuditLogService {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new IllegalArgumentException("Store not found: " + storeId));
         store.softDelete();
-        saveAuditLog("STORE", storeId, "SOFT_DELETE",
-                Map.of("name", store.getName(), "ownerEmail", store.getOwner().getEmail(), "category", nullSafe(store.getCategory())));
+        // PENDING 예약 자동 취소
+        int cancelled = reservationRepository.cancelPendingReservationsByStoreId(storeId);
+        if (cancelled > 0) log.info("Auto-cancelled {} pending reservations for soft-deleted store: id={}", cancelled, storeId);
+        saveAuditLog("STORE", storeId, "SOFT_DELETE", Map.of(
+                "가게명",   store.getName(),
+                "카테고리", nullSafe(store.getCategory()),
+                "주소",   nullSafe(store.getAddress()),
+                "대표자", store.getOwner().getName() != null ? store.getOwner().getName() : store.getOwner().getEmail()
+        ));
         log.info("Store soft-deleted: id={}", storeId);
+    }
+
+    /**
+     * 예약 소프트 삭제 로그만 기록 (entity는 호출측에서 이미 softDelete 호출한 후)
+     * 사용자/사업자가 내 예약에서 삭제 시 호출
+     */
+    public void logReservationDelete(Reservation reservation) {
+        saveAuditLog("RESERVATION", reservation.getId(), "SOFT_DELETE", Map.of(
+                "가게",   reservation.getStore().getName(),
+                "예약자", nullSafe(reservation.getMember().getName()),
+                "날짜",   reservation.getReservationDate().toString(),
+                "상태",   reservation.getStatus().name()
+        ));
     }
 
     @Transactional
@@ -91,8 +116,12 @@ public class AuditLogService {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found: " + reservationId));
         reservation.softDelete();
-        saveAuditLog("RESERVATION", reservationId, "SOFT_DELETE",
-                Map.of("memberEmail", reservation.getMember().getEmail(), "storeId", reservation.getStore().getId().toString()));
+        saveAuditLog("RESERVATION", reservationId, "SOFT_DELETE", Map.of(
+                "가게",   reservation.getStore().getName(),
+                "예약자", nullSafe(reservation.getMember().getName()),
+                "날짜",   reservation.getReservationDate().toString(),
+                "상태",   reservation.getStatus().name()
+        ));
         log.info("Reservation soft-deleted: id={}", reservationId);
     }
 
@@ -101,8 +130,12 @@ public class AuditLogService {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new IllegalArgumentException("Review not found: " + reviewId));
         review.softDelete();
-        saveAuditLog("REVIEW", reviewId, "SOFT_DELETE",
-                Map.of("memberEmail", review.getMember().getEmail(), "storeId", review.getStore().getId().toString(), "rating", review.getRating().toString()));
+        saveAuditLog("REVIEW", reviewId, "SOFT_DELETE", Map.of(
+                "가게",   review.getStore().getName(),
+                "작성자", nullSafe(review.getMember().getName()),
+                "별점",   review.getRating().toString() + "점",
+                "내용",   review.getContent() != null ? review.getContent().substring(0, Math.min(20, review.getContent().length())) + "..." : ""
+        ));
         log.info("Review soft-deleted: id={}", reviewId);
     }
 
@@ -119,23 +152,81 @@ public class AuditLogService {
             case "REVIEW"      -> reviewRepository.restoreById(entityId);
             default -> throw new IllegalArgumentException("Unknown entity type: " + entityType);
         }
+        // 휴지통에서 제거 (SOFT_DELETE 로그 삭제)
+        auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);
         saveAuditLog(entityType, entityId, "RESTORE", Map.of());
         log.info("Entity restored: type={}, id={}", entityType, entityId);
+    }
+
+    // ── 제재 / 인증 로그 ────────────────────────────────────────
+
+    /**
+     * 회원 제재 로그 (정지/영구정지/해제)
+     * action: SUSPEND | BAN | UNBAN
+     */
+    @Transactional
+    public void logMemberSanction(Long memberId, String memberEmail, String action, String detail) {
+        saveAuditLogWithActor("MEMBER", memberId, action,
+                Map.of("이메일", memberEmail, "사유", detail),
+                getCurrentUserEmail());
+        log.info("Member sanction logged: id={}, action={}", memberId, action);
+    }
+
+    /**
+     * 사업자 인증 처리 로그 (승인/거절)
+     * action: APPROVED | REJECTED
+     */
+    @Transactional
+    public void logBusinessVerification(Long memberId, String memberEmail, String action, String detail) {
+        saveAuditLogWithActor("MEMBER", memberId, action,
+                Map.of("이메일", memberEmail, "사유", detail),
+                getCurrentUserEmail());
+        log.info("Business verification logged: memberId={}, action={}", memberId, action);
+    }
+
+    // ── 스케줄러 전용 자동 정리 ────────────────────────────────
+
+    /**
+     * 만료된 소프트 삭제 항목 자동 영구 삭제 + AuditLog 기록
+     * TrashCleanupScheduler에서 호출
+     */
+    @Transactional
+    public void performScheduledCleanup() {
+        LocalDateTime now = LocalDateTime.now();
+        List<AuditLog> expired = auditLogRepository.findExpiredSoftDeletes(now);
+        log.info("Scheduled cleanup started: {} items to hard-delete", expired.size());
+
+        int success = 0;
+        for (AuditLog item : expired) {
+            try {
+                // 하나씩 별도 트랜잭션으로 실행 — 한 항목 실패해도 나머지 진행
+                deleteOneItem(item);
+                success++;
+            } catch (Exception e) {
+                log.warn("Auto hard-delete failed: type={}, id={}, error={}",
+                        item.getEntityType(), item.getEntityId(), e.getMessage());
+            }
+        }
+
+        int auditDeleted = auditLogRepository.deleteExpired(now.minusDays(AUDIT_LOG_RETENTION_DAYS));
+        log.info("Scheduled cleanup complete: success={}/{}, auditLogDeleted={}",
+                success, expired.size(), auditDeleted);
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void deleteOneItem(AuditLog item) {
+        hardDeleteEntity(item.getEntityType(), item.getEntityId());
+        auditLogRepository.deleteSoftDeleteLog(item.getEntityType(), item.getEntityId());
+        saveAuditLogWithActor(item.getEntityType(), item.getEntityId(),
+                "HARD_DELETE", Map.of(), "TrashCleanupScheduler");
     }
 
     // ── 영구 삭제 ──────────────────────────────────────────────
 
     @Transactional
     public void hardDelete(String entityType, Long entityId) {
-        switch (entityType.toUpperCase()) {
-            case "MAIL"        -> adminMailRepository.deleteById(entityId);
-            case "SENT_MAIL"   -> adminSentMailRepository.deleteById(entityId);
-            case "MEMBER"      -> memberRepository.deleteById(entityId);
-            case "STORE"       -> storeRepository.deleteById(entityId);
-            case "RESERVATION" -> reservationRepository.deleteById(entityId);
-            case "REVIEW"      -> reviewRepository.deleteById(entityId);
-            default -> throw new IllegalArgumentException("Unknown entity type: " + entityType);
-        }
+        hardDeleteEntity(entityType, entityId);
+        auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);
         saveAuditLog(entityType, entityId, "HARD_DELETE", Map.of());
         log.info("Entity hard-deleted: type={}, id={}", entityType, entityId);
     }
@@ -161,6 +252,32 @@ public class AuditLogService {
 
     // ── 내부 유틸 ──────────────────────────────────────────────
 
+    private void hardDeleteEntity(String entityType, Long entityId) {
+        switch (entityType.toUpperCase()) {
+            case "MAIL"        -> adminMailRepository.deleteById(entityId);
+            case "SENT_MAIL"   -> adminSentMailRepository.deleteById(entityId);
+            case "MEMBER"      -> memberRepository.deleteById(entityId);
+            case "STORE"       -> storeRepository.deleteById(entityId);
+            case "RESERVATION" -> reservationRepository.deleteById(entityId);
+            case "REVIEW"      -> reviewRepository.deleteById(entityId);
+            default -> throw new IllegalArgumentException("Unknown entity type: " + entityType);
+        }
+    }
+
+    private void saveAuditLogWithActor(String entityType, Long entityId, String action,
+                                       Map<String, String> snapshotData, String actorEmail) {
+        String snapshot = toJson(snapshotData);
+        LocalDateTime expiresAt = LocalDateTime.now().plusDays(AUDIT_LOG_RETENTION_DAYS);
+        auditLogRepository.save(AuditLog.builder()
+                .entityType(entityType)
+                .entityId(entityId)
+                .action(action)
+                .actorEmail(actorEmail)
+                .snapshot(snapshot)
+                .expiresAt(expiresAt)
+                .build());
+    }
+
     private void saveAuditLog(String entityType, Long entityId, String action, Map<String, String> snapshotData) {
         String actorEmail = getCurrentUserEmail();
         String snapshot = toJson(snapshotData);
@@ -179,7 +296,14 @@ public class AuditLogService {
 
     private String getCurrentUserEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return (auth != null) ? auth.getName() : "system";
+        if (auth == null) return "system";
+        Object principal = auth.getPrincipal();
+        if (principal instanceof Member m) {
+            return m.getEmail();
+        }
+        String name = auth.getName();
+        // Member@... 같은 toString 값이 오면 "system" 으로 대체
+        return (name != null && !name.contains("@") && name.contains(".")) ? "system" : name;
     }
 
     private String toJson(Map<String, String> data) {

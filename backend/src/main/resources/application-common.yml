@@ -16,6 +16,10 @@ server:
 
 # Spring 공통 설정
 spring:
+  data:
+    web:
+      pageable:
+        serialization-mode: VIA_DTO  # PageImpl JSON 직렬화 경고 제거
   web:
     resources:
       add-mappings: true

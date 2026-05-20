@@ -59,8 +59,24 @@ public class Member {
     @Column(name = "email_notification_enabled", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 1")
     private boolean emailNotificationEnabled = true;
 
+    // 서비스 이용약관 동의 여부 (소셜 로그인 신규 가입 시 별도 동의)
+    @Builder.Default
+    @Column(name = "terms_agreed", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private boolean termsAgreed = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private MemberStatus status = MemberStatus.ACTIVE;
+
+    @Column(name = "suspended_until")
+    private LocalDateTime suspendedUntil;
+
+    @Column(name = "suspend_reason")
+    private String suspendReason;
 
     // 권한 체크 헬퍼 메서드
     public boolean isUser() {
@@ -84,6 +100,45 @@ public class Member {
 
     public boolean isDeleted() {
         return this.deletedAt != null;
+    }
+
+    // 제재 상태 체크
+    // 주의: DB 반영은 하지 않음. 호출측에서 @Transactional 필요
+    public boolean isSuspended() {
+        if (this.status == MemberStatus.BANNED) return true;
+        if (this.status == MemberStatus.SUSPENDED) {
+            // 정지 기간이 지났으면 자동 해제 (DB 반영은 호출측에서 unban() 호출 필요)
+            if (this.suspendedUntil != null && LocalDateTime.now().isAfter(this.suspendedUntil)) {
+                return false;  // 기간 만료 → 정지 해제됨
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // 정지 기간이 만료되었는지 체크
+    public boolean isSuspensionExpired() {
+        return this.status == MemberStatus.SUSPENDED
+            && this.suspendedUntil != null
+            && LocalDateTime.now().isAfter(this.suspendedUntil);
+    }
+
+    public void suspend(LocalDateTime until, String reason) {
+        this.status = MemberStatus.SUSPENDED;
+        this.suspendedUntil = until;
+        this.suspendReason = reason;
+    }
+
+    public void ban(String reason) {
+        this.status = MemberStatus.BANNED;
+        this.suspendedUntil = null;
+        this.suspendReason = reason;
+    }
+
+    public void unban() {
+        this.status = MemberStatus.ACTIVE;
+        this.suspendedUntil = null;
+        this.suspendReason = null;
     }
 
     // OAuth 정보 업데이트

@@ -63,10 +63,6 @@ export default function FaqSection() {
                     ))}
                 </div>
             </div>
-            
-            <div style={{ textAlign: 'center', paddingTop: isMobile ? 32 : 48 }}>
-                <p style={{ color: colors.text.tertiary, fontSize: 13, margin: 0 }}>RESERVE &copy; 2026</p>
-            </div>
         </div>
     );
 }

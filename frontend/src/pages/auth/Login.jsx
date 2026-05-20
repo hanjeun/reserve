@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Form, Typography, Divider, Flex } from 'antd';
+import { Form, Typography, Divider, Flex, Space } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -136,10 +136,19 @@ const Login = () => {
                     </div>
                 </Flex>
 
-                <Flex align="center" justify="center" gap={2} style={{ marginTop: '48px' }}>
-                    <Text type="secondary" style={{ fontSize: fontSize.base }}>계정이 없으신가요?</Text>
-                    <Button variant="link" onClick={() => navigate('/signup')}>회원가입</Button>
-                </Flex>
+                <Space direction="vertical" size={20} style={{ width: '100%', marginTop: '32px' }} align="center">
+                    {/* 회원가입 라인 */}
+                    <Flex align="center" justify="center" gap={4}>
+                        <Text type="secondary" style={{ fontSize: fontSize.base }}>계정이 없으신가요?</Text>
+                        <Button variant="link" onClick={() => navigate('/signup')} style={{ padding: 0 }}>회원가입</Button>
+                    </Flex>
+
+                    {/* 법적 고지 라인 */}
+                    <Text type="secondary" style={{ fontSize: fontSize.xs, color: colors.text.tertiary, textAlign: 'center' }}>
+                        로그인 시 <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/terms')}>이용약관</span> ·{' '}
+                        <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/privacy')}>개인정보처리방침</span>에 동의합니다.
+                    </Text>
+                </Space>
             </div>
         </PageContainer>
     );

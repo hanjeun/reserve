@@ -2,13 +2,13 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
 import useAuthStore from "../../store/useAuthStore";
-import { Form, Typography, Flex } from 'antd';
+import { Form, Typography, Flex, Checkbox } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage, useEmailVerification } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
-import { colors, fontWeight, fontSize, animation } from '../../styles/tokens';
+import { colors, fontWeight, fontSize, animation, agreement as A } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 
@@ -33,6 +33,12 @@ const Signup = () => {
     });
 
     const [submitLoading, setSubmitLoading] = React.useState(false);
+    const [agreements, setAgreements] = React.useState({ terms: false, privacy: false, marketing: false });
+    const allRequired = agreements.terms && agreements.privacy;
+    const allChecked = agreements.terms && agreements.privacy && agreements.marketing;
+
+    const toggleAll = (checked) => setAgreements({ terms: checked, privacy: checked, marketing: checked });
+    const toggle = (key) => setAgreements(prev => ({ ...prev, [key]: !prev[key] }));
 
     useEffect(() => {
         if (isLoggedIn) navigate('/', { replace: true });
@@ -40,6 +46,7 @@ const Signup = () => {
 
     const onSignupSubmit = async (values) => {
         if (!isVerified) return message.error('이메일 인증을 먼저 완료해주세요.');
+        if (!allRequired) return message.error('필수 약관에 동의해주세요.');
         setSubmitLoading(true);
         try {
             const res = await api.post(API_ENDPOINTS.AUTH.SIGNUP, {
@@ -136,7 +143,43 @@ const Signup = () => {
                         <FormInput type="password" placeholder="비밀번호 확인" />
                     </Form.Item>
 
-                    <div style={{ marginTop: '32px' }}>
+                    {/* 약관 동의 — 디자인 시스템 agreement 토큰 사용 */}
+                    <div style={A.section}>
+                        <div style={A.divider} />
+
+                        <div style={A.allRow} onClick={() => toggleAll(!allChecked)}>
+                            <Checkbox checked={allChecked} onChange={e => toggleAll(e.target.checked)} onClick={e => e.stopPropagation()} />
+                            <span style={A.allText}>전체 동의하기</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {[
+                                { key: 'terms',     label: '서비스 이용약관', required: true,  path: '/terms' },
+                                { key: 'privacy',   label: '개인정보 처리방침', required: true,  path: '/privacy' },
+                                { key: 'marketing', label: '이메일 마케팅 수신',   required: false, path: null },
+                            ].map(({ key, label, required, path }) => (
+                                <div key={key} style={A.itemRow}>
+                                    <div style={A.itemLeft} onClick={() => toggle(key)}>
+                                        <Checkbox checked={agreements[key]} onChange={() => toggle(key)} onClick={e => e.stopPropagation()} />
+                                        <span style={A.itemText}>
+                                            <span style={required ? A.requiredTag : A.optionalTag}>
+                                                {required ? '필수' : '선택'}
+                                            </span>
+                                            {label}
+                                        </span>
+                                    </div>
+                                    {path && (
+                                        <button type="button" style={A.viewLink}
+                                            onClick={e => { e.stopPropagation(); window.open(path, '_blank'); }}>
+                                            보기
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div style={{ marginTop: '20px' }}>
                         <Button
                             variant="primary"
                             htmlType="submit"
@@ -170,6 +213,82 @@ const styles = {
         marginBottom: '40px',
         color: colors.text.tertiary,
         fontSize: fontSize.lg,
+    },
+    // Toss 스타일 동의 영역 — 박스/배경 없이 미니멀
+    agreementSection: {
+        marginTop: 32,
+    },
+    dividerLine: {
+        height: 1,
+        background: colors.border.light,
+        marginBottom: 20,
+    },
+    agreeAllRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        cursor: 'pointer',
+        marginBottom: 14,
+        userSelect: 'none',
+    },
+    checkbox: {
+        flexShrink: 0,
+    },
+    agreeAllText: {
+        fontSize: fontSize.base,
+        fontWeight: fontWeight.semibold,
+        color: colors.text.primary,
+        cursor: 'pointer',
+    },
+    agreeItems: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        paddingLeft: 2,
+    },
+    agreeRow: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    agreeRowLeft: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        cursor: 'pointer',
+        userSelect: 'none',
+        flex: 1,
+    },
+    agreeLabel: {
+        fontSize: fontSize.sm,
+        color: colors.text.secondary,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 5,
+    },
+    requiredDot: {
+        fontSize: 7,
+        color: colors.primary.main,
+        verticalAlign: 'middle',
+        flexShrink: 0,
+    },
+    optionalDot: {
+        fontSize: 7,
+        color: colors.text.tertiary,
+        verticalAlign: 'middle',
+        flexShrink: 0,
+    },
+    viewBtn: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: fontSize.xs,
+        color: colors.text.tertiary,
+        padding: '0 0 0 8px',
+        flexShrink: 0,
+        letterSpacing: '-0.2px',
+        transition: 'color 0.15s',
     },
 };
 

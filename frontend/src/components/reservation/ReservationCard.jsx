@@ -4,6 +4,7 @@ import {
     CheckOutlined, CloseOutlined,
     CheckCircleOutlined, WarningOutlined,
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined,
+    DeleteOutlined,
 } from '@ant-design/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import { Button } from '../common';
@@ -24,7 +25,7 @@ const useIsWide = () => {
     return wide;
 };
 
-const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow }) => {
+const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow, onRemove }) => {
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const isWide = useIsWide();
@@ -133,6 +134,13 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                                 </>
                             )}
                         </div>
+                    )}
+                    {!hasAction && onRemove && (
+                        <Button variant="ghost-sm" size="sm"
+                            onClick={() => onRemove(id)}
+                            style={{ color: colors.text.tertiary }}>
+                            <DeleteOutlined /> 숨기기
+                        </Button>
                     )}
                 </div>
             </div>

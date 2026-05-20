@@ -13,6 +13,10 @@ export const buildStoreFormData = (values) => {
     formData.append('name',          values.name);
     formData.append('category',      values.category);
     formData.append('address',       values.address);
+    if (values.zipCode)       formData.append('zipCode',       values.zipCode);
+    if (values.addressDetail) formData.append('addressDetail', values.addressDetail);
+    if (values.latitude  != null) formData.append('latitude',  values.latitude);
+    if (values.longitude != null) formData.append('longitude', values.longitude);
     formData.append('phone',         values.phone);
     formData.append('description',   values.description || '');
     formData.append('noShowDeposit', values.noShowDeposit || 0);

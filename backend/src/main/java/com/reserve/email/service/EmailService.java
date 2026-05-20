@@ -56,8 +56,9 @@ public class EmailService {
     public void sendReservationConfirmedEmail(String toEmail, String memberName,
                                               String storeName, String reservationDate,
                                               String reservationTime, int guestCount) {
+        String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 승인되었습니다",
-                buildReservationStatusContent(memberName, storeName, reservationDate, reservationTime,
+                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
                         guestCount, "승인", "#1db954", "예약이 확정되었습니다! 방문 당일 즐거운 시간 되세요.", null));
     }
 
@@ -67,19 +68,22 @@ public class EmailService {
                                              String storeName, String reservationDate,
                                              String reservationTime, int guestCount,
                                              String rejectionReason) {
+        String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 거절되었습니다",
-                buildReservationStatusContent(memberName, storeName, reservationDate, reservationTime,
+                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
                         guestCount, "거절", "#ff4d4f", "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.", rejectionReason));
     }
 
     /** 신규 예약 알림 → 사장님 */
     @Async
     public void sendNewReservationAlertToOwner(String ownerEmail, String ownerName,
-                                               String storeName, String memberName,
+                                               String storeName, String memberName, String memberEmail,
                                                String reservationDate, String reservationTime,
                                                int guestCount) {
+        String oName = resolveName(ownerName, ownerEmail);
+        String mName = resolveName(memberName, memberEmail);
         sendReservationStatusEmail(ownerEmail, "[RESERVE] 새로운 예약이 접수되었습니다",
-                buildOwnerAlertContent(ownerName, storeName, memberName, reservationDate, reservationTime, guestCount));
+                buildOwnerAlertContent(oName, storeName, mName, reservationDate, reservationTime, guestCount));
     }
 
     private void sendReservationStatusEmail(String toEmail, String subject, String htmlContent) {
@@ -112,7 +116,7 @@ public class EmailService {
             + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
             + "    <div style=\"display:inline-block;background:" + statusColor + ";color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">" + statusLabel + "</div>"
             + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;font-family:" + FONT_FAMILY + ";\">" + memberName + "님, " + statusMessage + "</h1>"
-            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + statusMessage + "</p>"
+            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">예약 정보를 확인해주세요.</p>"
             + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:28px;\">"
             + "      <table style=\"width:100%;border-collapse:collapse;font-family:" + FONT_FAMILY + ";\">"
             + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">가게</td><td style=\"color:#191f28;font-weight:600;\">" + storeName + "</td></tr>"
@@ -157,6 +161,7 @@ public class EmailService {
     /** 사업자 인증 승인 알림 → 신청자 */
     @Async
     public void sendBusinessApprovedEmail(String toEmail, String memberName, String businessName) {
+        String name = resolveName(memberName, toEmail);
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -164,7 +169,7 @@ public class EmailService {
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 사업자 인증이 승인되었습니다");
             helper.setText(buildBusinessStatusContent(
-                memberName, businessName,
+                name, businessName,
                 "승인", "#1db954",
                 "사업자 인증이 완료되었습니다!",
                 "이제 RESERVE에서 가게를 등록하고 예약을 받아보세요.",
@@ -177,9 +182,9 @@ public class EmailService {
         }
     }
 
-    /** 사업자 인증 거절 알림 → 신청자 */
     @Async
     public void sendBusinessRejectedEmail(String toEmail, String memberName, String businessName, String rejectionReason) {
+        String name = resolveName(memberName, toEmail);
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -187,7 +192,7 @@ public class EmailService {
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 사업자 인증이 반려되었습니다");
             helper.setText(buildBusinessStatusContent(
-                memberName, businessName,
+                name, businessName,
                 "반려", "#ff4d4f",
                 "아쉽게도 사업자 인증이 반려되었습니다.",
                 "반려 사유를 확인하신 후 서류를 수정하여 다시 신청해주세요.",
@@ -198,6 +203,15 @@ public class EmailService {
         } catch (MessagingException | UnsupportedEncodingException e) {
             log.error("Business rejection email failed ({}): {}", toEmail, e.getMessage());
         }
+    }
+
+    /**
+     * 이름 정리 — null/빈/기본값("사용자") 인 경우 이메일 앞부분으로 폴백
+     */
+    private String resolveName(String name, String email) {
+        if (name == null || name.isBlank() || name.equals("사용자") || name.equals("고객"))
+            return email != null ? email.split("@")[0] : "고객";
+        return name;
     }
 
     private String buildBusinessStatusContent(String memberName, String businessName,

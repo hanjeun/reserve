@@ -6,10 +6,10 @@ import {
     PlusOutlined, MinusOutlined, ArrowLeftOutlined,
     ClockCircleOutlined, CreditCardOutlined, FieldTimeOutlined,
     ThunderboltOutlined, RollbackOutlined, HourglassOutlined, TeamOutlined,
-    FileTextOutlined, StarFilled,
+    FileTextOutlined, StarFilled, EnvironmentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton, Badge } from '../../components/common';
+import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton, Badge, KakaoMap } from '../../components/common';
 import { ReviewList } from '../../components/review';
 import { StoreDetailSkeleton } from '../../components/common';
 import { useStoreData, useMessage, usePayment } from '../../hooks';
@@ -108,6 +108,18 @@ const inputStyles = {
 const StoreInfoSection = ({ store, description }) => {
     const rows = [];
 
+    if (store.address) {
+        const fullAddress = store.addressDetail
+            ? `${store.address} ${store.addressDetail}`
+            : store.address;
+        const kakaoMapUrl = `https://map.kakao.com/link/search/${encodeURIComponent(fullAddress)}`;
+        rows.push({
+            Icon: EnvironmentOutlined, label: '주소',
+            value: fullAddress,
+            link: kakaoMapUrl,
+        });
+    }
+
     if (store.openTime && store.closeTime) {
         rows.push({
             Icon: ClockCircleOutlined, label: '영업 시간',
@@ -181,7 +193,15 @@ const StoreInfoSection = ({ store, description }) => {
                                 ? row.value.map((v, vi) => (
                                     <div key={vi} style={vi === row.value.length - 1 ? { color: colors.error?.main || '#ff4d4f' } : {}}>{v}</div>
                                 ))
-                                : row.value}
+                                : row.link
+                                    ? <a href={row.link} target="_blank" rel="noopener noreferrer"
+                                        style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}
+                                        onMouseEnter={e => e.target.style.color = colors.primary.main}
+                                        onMouseLeave={e => e.target.style.color = colors.text.secondary}>
+                                        {row.value}
+                                      </a>
+                                    : row.value
+                            }
                         </div>
                     </div>
                     {i < rows.length - 1 && <div style={infoStyles.divider} />}
@@ -469,6 +489,17 @@ const StoreDetail = () => {
                         {/* 상세 정보 */}
                         <StoreInfoSection store={store} description={store.description} />
 
+            {/* 지도 */}
+            <div style={{ marginTop: 20, marginBottom: 8 }}>
+                <KakaoMap
+                    latitude={store.latitude}
+                    longitude={store.longitude}
+                    address={store.address}
+                    storeName={store.name}
+                    height={220}
+                />
+            </div>
+
                         <Divider style={styles.divider} />
 
                         {/* 리뷰 */}
@@ -536,6 +567,16 @@ const StoreDetail = () => {
 
                     <div style={{ padding: '0 16px' }}>
                         <StoreInfoSection store={store} description={store.description} />
+                        {/* 지도 */}
+                        <div style={{ marginTop: 16, marginBottom: 8 }}>
+                            <KakaoMap
+                                latitude={store.latitude}
+                                longitude={store.longitude}
+                                address={store.address}
+                                storeName={store.name}
+                                height={200}
+                            />
+                        </div>
                     </div>
 
                     <Divider style={styles.divider} />

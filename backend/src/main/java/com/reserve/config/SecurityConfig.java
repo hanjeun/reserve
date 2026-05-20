@@ -78,6 +78,9 @@ public class SecurityConfig {
                         // 웹훅 — ImprovMX 호출, JWT 인증 없음 (Secret 헤더로 검증)
                         .requestMatchers("/api/admin/mail/webhook").permitAll()
 
+                        // 주소 검색 — 가게 등록/수정 시 비로그인도 검색 가능
+                        .requestMatchers("/api/address/**").authenticated()
+
                         // 관리자 전용
                         .requestMatchers("/admin/**", "/api/business-verification/admin/**", "/api/admin/**").hasRole("ADMIN")
                         

@@ -20,28 +20,29 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     /**
      * 특정 회원의 예약 내역 조회 (최신순) - store, member fetch join으로 N+1 방지
      */
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member WHERE r.member = :member ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member WHERE r.member = :member AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")
     List<Reservation> findByMemberOrderByCreatedAtDesc(@Param("member") Member member);
 
     /**
      * 특정 가게 소유자의 전체 예약 목록 조회 (최신순) - store, member fetch join으로 N+1 방지
      * ADMIN: 전체 예약, BUSINESS: 본인 가게 예약
      */
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member WHERE s.owner = :owner ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member WHERE s.owner = :owner AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")
     List<Reservation> findByStoreOwnerOrderByCreatedAtDesc(@Param("owner") Member owner);
 
     /**
      * BUSINESS 전용: 본인 가게 예약 목록 조회 (최신순, 페이지네이션)
      * countQuery 분리로 fetch join + Page 조합 시 발생하는 count 쿼리 오류 방지
      */
-    @Query(value = "SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member WHERE s.owner = :owner ORDER BY r.createdAt DESC",
-           countQuery = "SELECT COUNT(r) FROM Reservation r JOIN r.store s WHERE s.owner = :owner")
+    @Query(value = "SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member WHERE s.owner = :owner AND r.deletedAt IS NULL ORDER BY r.createdAt DESC",
+           countQuery = "SELECT COUNT(r) FROM Reservation r JOIN r.store s WHERE s.owner = :owner AND r.deletedAt IS NULL")
     Page<Reservation> findByStoreOwnerOrderByCreatedAtDesc(@Param("owner") Member owner, Pageable pageable);
 
     /**
      * ADMIN 전용: 전체 예약 목록 조회 (최신순, 페이지네이션) - store, member fetch join으로 N+1 방지
+     * 소프트 삭제된 예약은 휴지통 탭에서 관리
      */
-    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member WHERE r.deletedAt IS NULL ORDER BY r.createdAt DESC")
     Page<Reservation> findAllWithStoreAndMemberPaged(Pageable pageable);
 
     /**
@@ -165,6 +166,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
          + "WHERE r.status = 'PENDING' AND r.depositAmount > 0 AND r.depositPaid = false "
          + "AND r.createdAt < :cutoff")
     List<Reservation> findExpiredUnpaidReservations(@Param("cutoff") LocalDateTime cutoff);
+
+    /**
+     * 가게 소프트 삭제 시 PENDING 예약 자동 취소
+     */
+    @Modifying
+    @Query("UPDATE Reservation r SET r.status = 'CANCELLED', r.rejectionReason = '가게 폐업으로 인한 자동 취소' WHERE r.store.id = :storeId AND r.status = 'PENDING' AND r.deletedAt IS NULL")
+    int cancelPendingReservationsByStoreId(@Param("storeId") Long storeId);
 
     @Modifying
     @Query("UPDATE Reservation r SET r.deletedAt = NULL WHERE r.id = :id")

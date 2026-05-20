@@ -175,6 +175,13 @@ public class MemberService {
     }
 
     @Transactional
+    public void agreeTerms(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+        member.setTermsAgreed(true);
+    }
+
+    @Transactional
     public void deleteMember(Long memberId) {
         log.info("Member deletion started: memberId={}", memberId);
         Member member = findById(memberId);

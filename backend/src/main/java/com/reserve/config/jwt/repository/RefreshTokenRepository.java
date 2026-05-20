@@ -21,4 +21,10 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     // 리프레쉬 토큰 삭제
     @Transactional
     void deleteByRefreshToken(String refreshToken);
+
+    // 만료된 토큰 일괄 삭제 (scheduler)
+    @Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM RefreshToken r WHERE r.expiresAt < :now")
+    int deleteByExpiresAtBefore(@org.springframework.data.repository.query.Param("now") java.time.LocalDateTime now);
 }

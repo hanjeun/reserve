@@ -31,6 +31,7 @@ services:
       - CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}
       - MAIL_WEBHOOK_SECRET=${MAIL_WEBHOOK_SECRET}
       - SENTRY_DSN=${SENTRY_DSN}
+      - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
     volumes:
       - /var/log/reserve:/var/log/reserve
     networks:

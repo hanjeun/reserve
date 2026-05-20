@@ -17,5 +17,6 @@ export { default as PageContainer } from './PageContainer';
 export { default as Card } from './Card';
 export { default as Avatar } from './Avatar';
 export { StoreCardSkeleton, ReservationCardSkeleton, MyReservationCardSkeleton, FavoriteCardSkeleton, AdminTableSkeleton, ReviewCardSkeleton, StoreDetailSkeleton, Bone } from './Skeletons';
+export { default as KakaoMap } from './KakaoMap';
 export { default as FavoriteButton } from './FavoriteButton';
 export { default as FilterToolbar } from './FilterToolbar';

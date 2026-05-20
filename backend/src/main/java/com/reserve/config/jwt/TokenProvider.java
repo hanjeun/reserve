@@ -18,6 +18,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -42,24 +43,31 @@ public class TokenProvider {
         return generateToken(member, jwtProperties.getAccessTokenExpiration());
     }
 
+    /**
+     * Refresh Token 발급 — 기기당 저장 방식
+     * - 한 계정당 최대 5개 유지, 초과 시 가장 오래된 것부터 삭제
+     * - @Transactional로 race condition 방지
+     */
+    @org.springframework.transaction.annotation.Transactional
     public String generateRefreshToken(Member member) {
         Duration expiration = jwtProperties.getRefreshTokenExpiration();
         String token = generateToken(member, expiration);
         LocalDateTime expiresAt = LocalDateTime.now().plus(expiration);
 
-        // upsert: 기존 레코드가 있으면 토큰값만 갱신, 없으면 새로 생성
-        List<RefreshToken> existingTokens = refreshTokenRepository.findByMemberId(member.getId());
-        if (!existingTokens.isEmpty()) {
-            existingTokens.get(0).update(token, expiresAt);
-            // 혹시 중복 레코드가 있으면 나머지 삭제
-            if (existingTokens.size() > 1) {
-                refreshTokenRepository.deleteAll(existingTokens.subList(1, existingTokens.size()));
-            }
-            refreshTokenRepository.save(existingTokens.get(0));
-        } else {
-            refreshTokenRepository.save(new RefreshToken(member.getId(), token, expiresAt));
+        // 새 토큰 저장
+        refreshTokenRepository.save(new RefreshToken(member.getId(), token, expiresAt));
+
+        // 한 계정당 최대 5개 유지 — 트랜잭션 내에서 한 번에 체크
+        List<RefreshToken> tokens = refreshTokenRepository.findByMemberId(member.getId());
+        if (tokens.size() > 5) {
+            tokens.stream()
+                    .sorted(Comparator.comparing(RefreshToken::getExpiresAt))
+                    .limit(tokens.size() - 5)
+                    .forEach(refreshTokenRepository::delete);
+            refreshTokenRepository.flush(); // 즉시 반영
         }
 
+        log.info("Refresh token issued: memberId={}, totalTokens={}", member.getId(), Math.min(tokens.size(), 5));
         return token;
     }
 
@@ -101,7 +109,7 @@ public class TokenProvider {
 
     /**
      * JWT 클레임만으로 Member 객체 생성 (DB 조회 없음)
-     * 필터에서 사용 - id, role만 필요하므로 DB 조회 불필요
+     * 필터에서 사용 — id, role만 필요하므로 DB 조회 불필요
      */
     public Member getMemberFromTokenWithoutDB(String token) {
         Claims claims = getClaims(token);

@@ -2,9 +2,12 @@ package com.reserve.member.dto;
 
 import com.reserve.member.entity.AuthProvider;
 import com.reserve.member.entity.Member;
+import com.reserve.member.entity.MemberStatus;
 import com.reserve.member.entity.Role;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+
+import java.time.LocalDateTime;
 
 @Getter
 @AllArgsConstructor
@@ -13,9 +16,13 @@ public class MemberResponse {
     private String name;
     private String email;
     private Role role;
-    private AuthProvider provider;   // LOCAL / GOOGLE / NAVER / KAKAO
+    private AuthProvider provider;
     private String profileImage;
     private boolean emailNotificationEnabled;
+    private boolean termsAgreed;
+    private MemberStatus status;
+    private LocalDateTime suspendedUntil;
+    private String suspendReason;
 
     public static MemberResponse fromEntity(Member member) {
         return new MemberResponse(
@@ -25,7 +32,11 @@ public class MemberResponse {
                 member.getRole(),
                 member.getProvider(),
                 member.getProfileImage(),
-                member.isEmailNotificationEnabled()
+                member.isEmailNotificationEnabled(),
+                member.isTermsAgreed(),
+                member.getStatus(),
+                member.getSuspendedUntil(),
+                member.getSuspendReason()
         );
     }
 }

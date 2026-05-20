@@ -40,6 +40,18 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         log.info("OAuth2 login success: email={}", member.getEmail());
 
+        // 정지 상태 체크
+        if (member.isSuspended()) {
+            String msg = member.getStatus().name().equals("BANNED")
+                ? "영구 정지된 계정입니다."
+                : "계정이 " + member.getSuspendedUntil().toLocalDate() + "까지 정지되었습니다.";
+            String redirectUrl = "local".equals(serverEnv)
+                ? "http://localhost:5173/login?error=" + java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8)
+                : "https://reserve.it.kr/login?error=" + java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8);
+            getRedirectStrategy().sendRedirect(request, response, redirectUrl);
+            return;
+        }
+
         // 1. 토큰 생성
         String accessToken = tokenProvider.generateAccessToken(member);
         String refreshToken = tokenProvider.generateRefreshToken(member);
@@ -55,11 +67,12 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         clearSessionAndCookies(request, response);
 
         // 4. 리액트 앱으로 리다이렉트
-        // Origin 헤더는 구글 리다이렉트 요청에서 null이므로 server.env로 환경 판단
-        String redirectUrl = "local".equals(serverEnv)
+        // 신규 유저(약관 미동의)면 newUser=true 파라미터 추가
+        String baseUrl = "local".equals(serverEnv)
                 ? "http://localhost:5173/oauth2/callback"
                 : "https://reserve.it.kr/oauth2/callback";
-        log.info("OAuth2 redirect: url={}, env={}", redirectUrl, serverEnv);
+        String redirectUrl = oAuth2User.isNewUser() ? baseUrl + "?newUser=true" : baseUrl;
+        log.info("OAuth2 redirect: url={}, env={}, newUser={}", redirectUrl, serverEnv, oAuth2User.isNewUser());
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 

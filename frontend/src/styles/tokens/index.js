@@ -7,3 +7,4 @@ export * from './typography';
 export * from './spacing';
 export * from './components';
 export * from './animations';
+export { agreement } from './agreement';

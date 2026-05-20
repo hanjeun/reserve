@@ -19,7 +19,10 @@ public class RateLimiter {
 
     public enum Policy {
         LOGIN(10, Duration.ofMinutes(10)),
-        EMAIL_SEND(5, Duration.ofMinutes(10));
+        EMAIL_SEND(5, Duration.ofMinutes(10)),
+        RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
+        SIGNUP(5, Duration.ofMinutes(10)),              // 10분에 5회 회원가입
+        PASSWORD_RESET(3, Duration.ofMinutes(10));       // 10분에 3회 비말번호 리셋
 
         final int capacity;
         final Duration refillDuration;

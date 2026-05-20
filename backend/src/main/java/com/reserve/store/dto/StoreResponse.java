@@ -22,6 +22,10 @@ public class StoreResponse {
     private String name;
     private String description;
     private String address;
+    private String zipCode;
+    private String addressDetail;
+    private Double latitude;
+    private Double longitude;
     private String phone;
     private String category;
     private String mainImageUrl;
@@ -62,6 +66,7 @@ public class StoreResponse {
     private Boolean emailNotificationEnabled;
 
     private LocalDateTime createdAt;
+    private Long ownerId;  // 소유자 ID (프론트 권한 검증용)
 
     public static StoreResponse fromEntity(Store store) {
         return StoreResponse.builder()
@@ -69,6 +74,10 @@ public class StoreResponse {
                 .name(store.getName())
                 .description(store.getDescription())
                 .address(store.getAddress())
+                .zipCode(store.getZipCode())
+                .addressDetail(store.getAddressDetail())
+                .latitude(store.getLatitude())
+                .longitude(store.getLongitude())
                 .phone(store.getPhone())
                 .category(store.getCategory())
                 .mainImageUrl(store.getMainImageUrl())
@@ -93,6 +102,7 @@ public class StoreResponse {
                 .allowDuplicateReservation(store.getAllowDuplicateReservation())
                 .emailNotificationEnabled(store.getEmailNotificationEnabled())
                 .createdAt(store.getCreatedAt())
+                .ownerId(store.getOwner() != null ? store.getOwner().getId() : null)
                 .build();
     }
 }

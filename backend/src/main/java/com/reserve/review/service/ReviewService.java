@@ -36,6 +36,10 @@ public class ReviewService {
     public ReviewResponse createReview(ReviewCreateRequest request, Member member) {
         log.info("Review created: reservationId={}, memberId={}", request.getReservationId(), member.getId());
 
+        if (!member.isTermsAgreed()) {
+            throw new ReviewException("서비스 이용 약관에 동의해야 리뷰를 작성할 수 있습니다.", HttpStatus.FORBIDDEN);
+        }
+
         Reservation reservation = reservationRepository.findById(request.getReservationId())
                 .orElseThrow(() -> new ReviewException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 

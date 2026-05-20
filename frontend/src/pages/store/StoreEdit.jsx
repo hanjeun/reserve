@@ -5,6 +5,7 @@ import Loading from "../../components/common/Loading";
 import StoreForm from "../../components/store/StoreForm";
 import { useStoreData, useMessage, useFormReady, useImagePreview, useStoreForm } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useAuthStore from '../../store/useAuthStore';
 
 /**
  * 가게 수정 페이지
@@ -27,8 +28,21 @@ const StoreEdit = () => {
     const { handlePreview, PreviewModal } = useImagePreview();
     useDocumentTitle('가게 수정');
     
+    const { user } = useAuthStore();
+
     // 가게 데이터 로딩
     const { store, loading, error } = useStoreData(id);
+
+    // 소유자 검증 — store 로딩 후 본인 가게가 아니면 리다이렉트
+    useEffect(() => {
+        if (!store || !user) return;
+        const isAdmin = user?.role === 'ADMIN';
+        const isOwner = store.ownerId && user?.id === store.ownerId;
+        if (!isAdmin && !isOwner) {
+            message.error('접근 권한이 없습니다.');
+            navigate('/', { replace: true });
+        }
+    }, [store, user, message, navigate]);
     
     // 비즈니스 로직을 useStoreForm hook에 위임
     const {

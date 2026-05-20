@@ -3,10 +3,13 @@ package com.reserve.reservation.controller;
 import com.reserve.config.util.SecurityUtil;
 import com.reserve.global.common.ApiResponse;
 import com.reserve.global.error.ReservationException;
+import com.reserve.global.ratelimit.IpExtractor;
+import com.reserve.global.ratelimit.RateLimiter;
 import com.reserve.member.entity.Member;
 import com.reserve.reservation.dto.ReservationCreateRequest;
 import com.reserve.reservation.dto.ReservationResponse;
 import com.reserve.reservation.service.ReservationService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,11 +28,18 @@ import org.springframework.data.domain.Page;
 public class ReservationApiController {
 
     private final ReservationService reservationService;
+    private final RateLimiter rateLimiter;
 
     // --- 일반 사용자 API ---
 
     @PostMapping
-    public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(@Valid @RequestBody ReservationCreateRequest request) {
+    public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(
+            @Valid @RequestBody ReservationCreateRequest request,
+            HttpServletRequest httpRequest) {
+        String ip = IpExtractor.extract(httpRequest);
+        if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.RESERVATION_CREATE)) {
+            throw new ReservationException("예약 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
         ReservationResponse reservation = reservationService.createReservation(request, SecurityUtil.getCurrentMember());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(reservation, "예약이 신청되었습니다."));
@@ -53,12 +63,14 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(null, "예약이 취소되었습니다."));
     }
 
+    @DeleteMapping("/{id}/remove")
+    public ResponseEntity<ApiResponse<Void>> removeReservation(@PathVariable Long id) {
+        reservationService.removeReservation(id, SecurityUtil.getCurrentMember());
+        return ResponseEntity.ok(ApiResponse.success(null, "예약이 목록에서 제거되었습니다."));
+    }
+
     // --- 사업자용 API ---
 
-    /**
-     * 내 가게 예약 목록 전체 조회 (사장님 전용)
-     * 사업자가 소유한 모든 가게의 예약을 최신순으로 반환
-     */
     @GetMapping("/store")
     public ResponseEntity<ApiResponse<Page<ReservationResponse>>> getStoreReservations(
             @RequestParam(defaultValue = "0")  int page,
@@ -101,8 +113,6 @@ public class ReservationApiController {
         reservationService.markNoShow(id, member);
         return ResponseEntity.ok(ApiResponse.success(null, "노쇼 처리되었습니다."));
     }
-
-    // --- 공통 유틸리티 메서드 ---
 
     private void validateBusinessAuth(Member member) {
         if (!member.isBusiness() && !member.isAdmin()) {

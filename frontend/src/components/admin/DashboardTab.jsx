@@ -111,7 +111,7 @@ const DashboardTab = () => {
                         <Statistic
                             title="사업자 신청"
                             value={s?.totalBiz ?? '-'}
-                            prefix={<ShopOutlined style={{ color: colors.primary?.main ?? '#3182f6' }} />}
+                            prefix={<ShopOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
                             valueStyle={{ fontWeight: fontWeight.bold }}
                         />
@@ -122,7 +122,7 @@ const DashboardTab = () => {
                         <Statistic
                             title="조회된 예약"
                             value={s?.totalRes ?? '-'}
-                            prefix={<CalendarOutlined style={{ color: '#22c55e' }} />}
+                            prefix={<CalendarOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>최근 100건</Text>}
                             valueStyle={{ fontWeight: fontWeight.bold }}
                         />
@@ -133,7 +133,7 @@ const DashboardTab = () => {
                         <Statistic
                             title="휴지통"
                             value={s?.trashCount ?? '-'}
-                            prefix={<DeleteOutlined style={{ color: '#f59e0b' }} />}
+                            prefix={<DeleteOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>복구 가능</Text>}
                             valueStyle={{ fontWeight: fontWeight.bold }}
                         />
@@ -144,7 +144,7 @@ const DashboardTab = () => {
                         <Statistic
                             title="감사 로그"
                             value={s?.logCount ?? '-'}
-                            prefix={<AuditOutlined style={{ color: '#8b5cf6' }} />}
+                            prefix={<AuditOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
                             valueStyle={{ fontWeight: fontWeight.bold }}
                         />

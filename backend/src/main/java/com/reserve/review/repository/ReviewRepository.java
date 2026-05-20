@@ -19,12 +19,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // 가게의 리뷰 목록 조회 (최신순)
     List<Review> findByStoreOrderByCreatedAtDesc(Store store);
 
-    // 가게의 리뷰 목록 조회 - store, member fetch join으로 N+1 방지
-    @Query("SELECT r FROM Review r JOIN FETCH r.member WHERE r.store.id = :storeId ORDER BY r.createdAt DESC")
+    // 가게의 리뷰 목록 조회 - store, member fetch join으로 N+1 방지 (소프트 삭제된 리뷰 제외)
+    @Query("SELECT r FROM Review r JOIN FETCH r.member WHERE r.store.id = :storeId AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")
     List<Review> findByStoreIdOrderByCreatedAtDesc(@Param("storeId") Long storeId);
 
-    // 회원의 리뷰 목록 조회 - store fetch join으로 N+1 방지
-    @Query("SELECT r FROM Review r JOIN FETCH r.store WHERE r.member = :member ORDER BY r.createdAt DESC")
+    // 회원의 리뷰 목록 조회 - store fetch join으로 N+1 방지 (소프트 삭제된 리뷰 제외)
+    @Query("SELECT r FROM Review r JOIN FETCH r.store WHERE r.member = :member AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")
     List<Review> findByMemberOrderByCreatedAtDesc(@Param("member") Member member);
 
     // 예약에 대한 리뷰 조회

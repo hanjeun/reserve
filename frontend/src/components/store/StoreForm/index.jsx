@@ -55,6 +55,7 @@ const StoreForm = ({
                 ref={formRef}
                 form={form}
                 onFinish={onSubmit}
+                onKeyDown={(e) => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault(); }}
                 layout="vertical"
                 size="large"
                 requiredMark={false}
@@ -66,7 +67,10 @@ const StoreForm = ({
                     noShowDeposit: 0,
                 } : (externalInitialValues ?? {})}
             >
-                <StoreBasicInfo isMobile={isMobile} />
+                <StoreBasicInfo isMobile={isMobile} form={form}
+                    zipCode={externalInitialValues?.zipCode || ''}
+                    addressDetail={externalInitialValues?.addressDetail || ''}
+                />
                 <StoreImages
                     mainImage={mainImage}
                     detailImages={detailImages}

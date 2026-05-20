@@ -16,9 +16,10 @@ import com.reserve.member.service.MemberService;
 import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,15 +59,20 @@ public class AuthApiController {
             throw new AuthException("비밀번호가 일치하지 않습니다.");
         }
 
+        // 정지 상태는 로그인은 허용하되 MemberResponse에 status 포함하여 프론트에서 배너 표시
         handleTokenIssue(response, member);
         return ApiResponse.success(MemberResponse.fromEntity(member), "로그인 성공");
     }
 
     @PostMapping("/signup")
-    public ApiResponse<MemberResponse> signup(@RequestBody MemberDto memberDto, HttpServletResponse response) {
+    public ApiResponse<MemberResponse> signup(@RequestBody MemberDto memberDto,
+                                              HttpServletRequest request, HttpServletResponse response) {
+        String ip = IpExtractor.extract(request);
+        if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.SIGNUP)) {
+            throw new AuthException("회원가입 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
         Long memberId = memberService.join(memberDto);
         Member newMember = memberService.findById(memberId);
-
         handleTokenIssue(response, newMember);
         return ApiResponse.success(MemberResponse.fromEntity(newMember), "회원가입 완료");
     }
@@ -87,6 +93,12 @@ public class AuthApiController {
                 (int) jwtProperties.getAccessTokenExpiration().toSeconds());
 
         return ApiResponse.success(newAccessToken, "토큰 재발급 성공");
+    }
+
+    @PostMapping("/agree-terms")
+    public ApiResponse<Void> agreeTerms(@AuthenticationPrincipal Member member) {
+        memberService.agreeTerms(member.getId());
+        return ApiResponse.success(null, "약관 동의 완료");
     }
 
     @PostMapping("/logout")

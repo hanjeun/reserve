@@ -21,11 +21,20 @@ public class CustomOAuth2User implements OAuth2User {
     private final Member member;
     private final Map<String, Object> attributes;
     private final String nameAttributeKey;
+    private final boolean newUser;
 
     public CustomOAuth2User(Member member, Map<String, Object> attributes, String nameAttributeKey) {
         this.member = member;
         this.attributes = attributes;
         this.nameAttributeKey = nameAttributeKey;
+        this.newUser = false;
+    }
+
+    public CustomOAuth2User(Member member, Map<String, Object> attributes, String nameAttributeKey, boolean newUser) {
+        this.member = member;
+        this.attributes = attributes;
+        this.nameAttributeKey = nameAttributeKey;
+        this.newUser = newUser;
     }
 
     @Override

@@ -14,10 +14,19 @@ import java.util.List;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
 
-    List<Store> findByOwnerOrderByCreatedAtDesc(Member owner);
+    // 사업자 — 본인 가게 목록 (소프트 삭제된 가게 제외)
+    List<Store> findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(Member owner);
+    List<Store> findByOwnerOrderByCreatedAtDesc(Member owner); // 내부 로직용
     List<Store> findByOwnerId(Long ownerId);
+
+    // 관리자용 — 삭제되지 않은 전체 가게 목록
+    Page<Store> findByDeletedAtIsNullOrderByCreatedAtDesc(Pageable pageable);
     List<Store> findByNameContainingIgnoreCase(String keyword);
     List<Store> findByCategory(String category);
+
+    // 공개 가게 목록 — 소프트 삭제된 가게 제외 (정렬별)
+    Page<Store> findByDeletedAtIsNullOrderByRatingDesc(Pageable pageable);
+    Page<Store> findByDeletedAtIsNullOrderByReviewCountDesc(Pageable pageable);
 
     @Query("SELECT s FROM Store s WHERE " +
            "LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

@@ -28,9 +28,14 @@ const OAuthCallback = () => {
             try {
                 const user = await checkAuth(true);
                 if (user && user.email) {
-                    const greeting = user.name ? `${user.name}님, 반갑습니다!` : '로그인되었습니다.';
-                    message.success(greeting);
-                    navigate('/', { replace: true });
+                    const isNewUser = params.get('newUser') === 'true';
+                    if (isNewUser) {
+                        navigate('/signup/social', { replace: true });
+                    } else {
+                        const greeting = user.name ? `${user.name}님, 반갑습니다!` : '로그인되었습니다.';
+                        message.success(greeting);
+                        navigate('/', { replace: true });
+                    }
                 } else {
                     throw new Error('유저 정보가 올바르지 않습니다.');
                 }

@@ -1,5 +1,6 @@
 package com.reserve.business.service;
 
+import com.reserve.audit.service.AuditLogService;
 import com.reserve.business.dto.BusinessVerificationRequest;
 import com.reserve.business.dto.BusinessVerificationResponse;
 import com.reserve.business.entity.BusinessVerification;
@@ -32,6 +33,7 @@ public class BusinessVerificationService {
     private final MemberRepository memberRepository;
     private final FileStorageService fileStorageService;
     private final EmailService emailService;
+    private final AuditLogService auditLogService;
 
     /**
      * 사업자 인증 신청
@@ -95,6 +97,7 @@ public class BusinessVerificationService {
         );
 
         log.info("Business verification approved: verificationId={}, memberId={}", verificationId, member.getId());
+        auditLogService.logBusinessVerification(member.getId(), member.getEmail(), "APPROVED", verification.getBusinessName());
         return BusinessVerificationResponse.fromEntity(verification);
     }
 
@@ -126,6 +129,7 @@ public class BusinessVerificationService {
         );
 
         log.info("Business verification rejected: verificationId={}, reason={}", verificationId, reason);
+        auditLogService.logBusinessVerification(member.getId(), member.getEmail(), "REJECTED", reason.trim());
         return BusinessVerificationResponse.fromEntity(verification);
     }
 

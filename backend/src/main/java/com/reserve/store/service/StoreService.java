@@ -59,6 +59,10 @@ public class StoreService {
                 .name(request.getName().trim())
                 .description(request.getDescription())
                 .address(request.getAddress())
+                .zipCode(request.getZipCode())
+                .addressDetail(request.getAddressDetail())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
                 .phone(request.getPhone())
                 .category(request.getCategory())
                 .rating(0.0)
@@ -123,7 +127,7 @@ public class StoreService {
      */
     @Transactional(readOnly = true)
     public List<StoreResponse> getMyStores(Member member) {
-        List<Store> stores = storeRepository.findByOwnerOrderByCreatedAtDesc(member);
+        List<Store> stores = storeRepository.findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(member);
         return stores.stream()
                 .map(StoreResponse::fromEntity)
                 .collect(Collectors.toList());
@@ -136,6 +140,9 @@ public class StoreService {
     public StoreResponse getStore(Long id) {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
+        if (store.getDeletedAt() != null) {
+            throw StoreException.notFound();
+        }
         return StoreResponse.fromEntity(store);
     }
 
@@ -158,6 +165,10 @@ public class StoreService {
             if (request.getName() != null) store.setName(request.getName());
             if (request.getDescription() != null) store.setDescription(request.getDescription());
             if (request.getAddress() != null) store.setAddress(request.getAddress());
+            if (request.getZipCode() != null) store.setZipCode(request.getZipCode());
+            if (request.getAddressDetail() != null) store.setAddressDetail(request.getAddressDetail());
+            if (request.getLatitude() != null) store.setLatitude(request.getLatitude());
+            if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
             if (request.getPhone() != null) store.setPhone(request.getPhone());
             if (request.getCategory() != null) store.setCategory(request.getCategory());
             if (request.getNoShowDeposit() != null) store.setNoShowDeposit(request.getNoShowDeposit());
@@ -342,9 +353,9 @@ public class StoreService {
     private Page<Store> getAllStoresSortedPaged(String sort, Pageable pageable) {
         if (sort == null) sort = "rating";
         return switch (sort) {
-            case "recent"  -> storeRepository.findAllByOrderByCreatedAtDesc(pageable);
-            case "reviews" -> storeRepository.findAllByOrderByReviewCountDesc(pageable);
-            default        -> storeRepository.findAllByOrderByRatingDesc(pageable);
+            case "recent"  -> storeRepository.findByDeletedAtIsNullOrderByCreatedAtDesc(pageable);
+            case "reviews" -> storeRepository.findByDeletedAtIsNullOrderByReviewCountDesc(pageable);
+            default        -> storeRepository.findByDeletedAtIsNullOrderByRatingDesc(pageable);
         };
     }
 

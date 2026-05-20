@@ -38,12 +38,14 @@ const SocialBtn = ({ href, icon, label }) => (
 );
 
 const FooterLink = ({ label, onClick }) => (
-    <span onClick={onClick}
-        style={{ fontSize: fontSize.sm, color: colors.text.tertiary, cursor: 'pointer', transition: 'color 0.15s', whiteSpace: 'nowrap' }}
-        onMouseEnter={e => e.currentTarget.style.color = colors.text.primary}
-        onMouseLeave={e => e.currentTarget.style.color = colors.text.tertiary}>
+    <button
+        type="button"
+        onClick={onClick}
+        style={{ fontSize: fontSize.sm, color: colors.text.tertiary, cursor: 'pointer', transition: 'color 0.15s', whiteSpace: 'nowrap', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' }}
+        onMouseEnter={e => { e.currentTarget.style.color = colors.text.primary; }}
+        onMouseLeave={e => { e.currentTarget.style.color = colors.text.tertiary; }}>
         {label}
-    </span>
+    </button>
 );
 
 const ExternalLink = ({ href, label }) => (

@@ -88,8 +88,8 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
         const road     = doc.road_address?.address_name || doc.address?.address_name || doc.address_name;
         const zone     = doc.road_address?.zone_no || '';
         const building = doc.road_address?.building_name || '';
-        const lat      = parseFloat(doc.y);
-        const lng      = parseFloat(doc.x);
+        const lat      = Number.parseFloat(doc.y);
+        const lng      = Number.parseFloat(doc.x);
         setQuery(road);
         setZipCode(zone);
         setDetail(building);
@@ -179,6 +179,7 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                 {/* 드롭다운 */}
                 {open && results.length > 0 && (
                     <div
+                        role="listbox"
                         onMouseDown={() => { skipBlurRef.current = true; }}
                         style={{
                             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
@@ -192,11 +193,15 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                     >
                         {results.map((doc, i) => {
                             const road  = doc.road_address?.address_name;
-                            const jibun = doc.address?.address_name || doc.address_name;
+                            const jibun = doc.address?.address_name ?? doc.address_name;
                             const zone  = doc.road_address?.zone_no;
+                            const uniqueKey = doc.road_address?.address_name ?? doc.address_name ?? String(i);
                             return (
                                 <div
-                                    key={i}
+                                    key={uniqueKey}
+                                    role="option"
+                                    aria-selected={i === activeIdx}
+                                    tabIndex={-1}
                                     onMouseDown={() => handleSelect(doc)}
                                     onMouseEnter={() => setActiveIdx(i)}
                                     style={{

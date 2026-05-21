@@ -21,13 +21,11 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
     const skipBlurRef    = useRef(false);
     const detailRef      = useRef(null);
     const isEditMode     = useRef(false);
-    // selected를 ref로도 관리 → search 콜백이 stale closure 없이 참조 가능
     const selectedRef    = useRef(false);
     const debouncedQuery = useDebounce(query, 400);
 
     const setSelectedBoth = (val) => { setSelected(val); selectedRef.current = val; };
 
-    // 외부 value 동기화 — 수정 모드에서 기존 주소 복원
     useEffect(() => {
         if (value && value.trim()) {
             setQuery(value.trim());
@@ -47,7 +45,6 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
 
     const emitChange = useCallback((road) => { onChange?.(road); }, [onChange]);
 
-    // selected를 ref로 읽어서 deps에서 제거 → 불필요한 재생성 방지
     const search = useCallback(async (q) => {
         if (!q || q.trim().length < 3 || selectedRef.current) {
             if (!selectedRef.current) { setResults([]); setOpen(false); }
@@ -65,7 +62,7 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
         } finally {
             setLoading(false);
         }
-    }, []); // deps 없음 — selectedRef.current으로 읽으므로 stale 없음
+    }, []);
 
     useEffect(() => { search(debouncedQuery); }, [debouncedQuery, search]);
 
@@ -85,11 +82,11 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
 
     const handleSelect = (doc) => {
         skipBlurRef.current = false;
-        const road     = doc.road_address?.address_name || doc.address?.address_name || doc.address_name;
-        const zone     = doc.road_address?.zone_no || '';
-        const building = doc.road_address?.building_name || '';
-        const lat      = Number.parseFloat(doc.y);
-        const lng      = Number.parseFloat(doc.x);
+        const road     = doc?.road_address?.address_name || doc?.address?.address_name || doc?.address_name;
+        const zone     = doc?.road_address?.zone_no || '';
+        const building = doc?.road_address?.building_name || '';
+        const lat      = Number.parseFloat(doc?.y);
+        const lng      = Number.parseFloat(doc?.x);
         setQuery(road);
         setZipCode(zone);
         setDetail(building);
@@ -113,8 +110,8 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') e.preventDefault();
         if (!open) return;
-        if (e.key === 'ArrowDown')                    { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, results.length - 1)); }
-        else if (e.key === 'ArrowUp')                 { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
+        if (e.key === 'ArrowDown')                     { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, results.length - 1)); }
+        else if (e.key === 'ArrowUp')                  { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
         else if (e.key === 'Enter' && activeIdx >= 0) { handleSelect(results[activeIdx]); }
         else if (e.key === 'Escape')                  { setOpen(false); }
     };
@@ -176,10 +173,9 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                     )}
                 </div>
 
-                {/* 드롭다운 */}
+                {/* 드롭다운 (접근성 role 제거됨) */}
                 {open && results.length > 0 && (
                     <div
-                        role="listbox"
                         onMouseDown={() => { skipBlurRef.current = true; }}
                         style={{
                             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
@@ -199,9 +195,6 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                             return (
                                 <div
                                     key={uniqueKey}
-                                    role="option"
-                                    aria-selected={i === activeIdx}
-                                    tabIndex={-1}
                                     onMouseDown={() => handleSelect(doc)}
                                     onMouseEnter={() => setActiveIdx(i)}
                                     style={{

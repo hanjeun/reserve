@@ -18,7 +18,7 @@ Sentry.init({
   tracesSampleRate: 0.1,
   tracePropagationTargets: ["localhost", /^https:\/\/reserve\.it\.kr\/api/],
   replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
+  replaysOnErrorSampleRate: 1,
 })
 
 createRoot(document.getElementById('root')).render(

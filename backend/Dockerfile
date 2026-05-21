@@ -1,10 +1,7 @@
 FROM amazoncorretto:21-alpine-jdk
 
-# Security: run as non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-
-# Create log directory with proper permissions before switching user
-RUN mkdir -p /var/log/reserve && chown -R appuser:appgroup /var/log/reserve
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    mkdir -p /var/log/reserve && chown -R appuser:appgroup /var/log/reserve
 
 USER appuser
 

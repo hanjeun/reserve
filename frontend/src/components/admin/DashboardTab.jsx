@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Col, Row, Statistic, Typography, Alert, Divider } from 'antd';
+import { Card, Col, Row, Statistic, Typography } from 'antd';
 import {
     BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
-    SyncOutlined, ShopOutlined, CalendarOutlined,
+    ShopOutlined, CalendarOutlined,
     DeleteOutlined, AuditOutlined,
 } from '@ant-design/icons';
-import { Button } from '../common';
 import { FilterToolbar } from '../common';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';

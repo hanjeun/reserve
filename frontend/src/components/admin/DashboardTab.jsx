@@ -112,7 +112,7 @@ const DashboardTab = () => {
                             value={s?.totalBiz ?? '-'}
                             prefix={<ShopOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
@@ -123,7 +123,7 @@ const DashboardTab = () => {
                             value={s?.totalRes ?? '-'}
                             prefix={<CalendarOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>최근 100건</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
@@ -134,7 +134,7 @@ const DashboardTab = () => {
                             value={s?.trashCount ?? '-'}
                             prefix={<DeleteOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>복구 가능</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
@@ -145,7 +145,7 @@ const DashboardTab = () => {
                             value={s?.logCount ?? '-'}
                             prefix={<AuditOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
@@ -160,7 +160,7 @@ const DashboardTab = () => {
                                 <Text type="secondary">데이터가 없습니다.</Text>
                             </div>
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height={240}>
                                 <PieChart>
                                     <Pie
                                         data={s.reservationPieData}
@@ -186,7 +186,7 @@ const DashboardTab = () => {
                                 <Text type="secondary">휴지통이 비어있습니다.</Text>
                             </div>
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height={240}>
                                 <BarChart data={s.trashBarData} margin={{ top: 4, right: 8, bottom: 4, left: -20 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
@@ -214,7 +214,7 @@ const DashboardTab = () => {
                                     title={<span style={{ color }}>{label}</span>}
                                     value={s.actionCount[key] || 0}
                                     suffix="건"
-                                    valueStyle={{ fontSize: 20, fontWeight: fontWeight.bold, color }}
+                                    styles={{ content: { fontSize: 20, fontWeight: fontWeight.bold, color } }}
                                 />
                             </Col>
                         ))}

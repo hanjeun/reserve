@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Flex, Switch, Typography } from 'antd';
+import { Form, Flex, Input, Switch, Typography } from 'antd';
 import { FormInput, FormTextArea, FormSelect, FormTimePicker } from '../../common';
 import AddressSearch from './AddressSearch';
 import {
@@ -109,10 +109,10 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                     onMeta={(meta) => form?.setFieldsValue(meta)}
                 />
             </Form.Item>
-            <Form.Item name="latitude" hidden><input /></Form.Item>
-            <Form.Item name="longitude" hidden><input /></Form.Item>
-            <Form.Item name="zipCode" hidden><input /></Form.Item>
-            <Form.Item name="addressDetail" hidden><input /></Form.Item>
+            <Form.Item name="latitude" hidden><Input /></Form.Item>
+            <Form.Item name="longitude" hidden><Input /></Form.Item>
+            <Form.Item name="zipCode" hidden><Input /></Form.Item>
+            <Form.Item name="addressDetail" hidden><Input /></Form.Item>
 
             <Form.Item label="가게 소개" name="description" rules={VALIDATION_RULES.description} style={{ marginBottom: 0 }}>
                 <FormTextArea rows={4} placeholder="가게를 소개해주세요" />

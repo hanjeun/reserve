@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Typography, Tabs, Table, Tag, Modal, Input, Image, Tooltip, InputNumber,
@@ -63,6 +63,9 @@ const AdminPanel = () => {
     const handleTabChange = (key) => {
         setBizSearch('');
         setResSearch('');
+        setResStatusFilter('ALL');
+        setMemberSearch('');
+        setStoreSearch('');
         navigate(`?tab=${key}`, { replace: true });
     };
 
@@ -163,6 +166,16 @@ const AdminPanel = () => {
         if (activeTab === 'members') loadMembers();
         if (activeTab === 'stores-admin') loadStores();
     }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // 탭 전환 시 활성 탭이 보이도록 스크롤
+    const tabsContainerRef = useRef(null);
+    useEffect(() => {
+        requestAnimationFrame(() => {
+            if (!tabsContainerRef.current) return;
+            const el = tabsContainerRef.current.querySelector('.ant-tabs-tab-active');
+            el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        });
+    }, [activeTab]);
 
     const handleApprove = (record) => {
         confirm({
@@ -396,9 +409,10 @@ const AdminPanel = () => {
                 <Title level={2} style={styles.title}>관리자 패널</Title>
                 <Text type="secondary" style={{ fontSize: fontSize.base }}>사업자 인증 신청을 검토하고, 전체 예약 현황을 모니터링하세요.</Text>
             </div>
-            <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems}
-                tabBarStyle={{ overflowX: 'auto', flexWrap: 'nowrap' }}
-                destroyOnHidden />
+            <div ref={tabsContainerRef}>
+                <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems}
+                    animated={{ inkBar: true, tabPane: false }} />
+            </div>
 
             <Modal title="사업자 인증 상세" open={detailOpen} onCancel={() => setDetailOpen(false)}
                 footer={<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20 }}>

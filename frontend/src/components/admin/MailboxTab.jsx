@@ -2,13 +2,14 @@
  * RESERVE - 관리자 메일함 탭
  * 서브탭: 받은 메일함 / 보낸 메일함
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Typography, Input, Divider, Skeleton, Modal } from 'antd';
 import {
     MailOutlined, SearchOutlined,
     SendOutlined, CloseOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import { Button } from '../common';
+import useDebounce from '../../hooks/useDebounce';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -262,6 +263,7 @@ const MailboxTab = ({ onUnreadCountChange }) => {
     const [selectedSent,   setSelectedSent]   = useState(null);
     const [sentLoading,    setSentLoading]    = useState(false);
     const [sentLoaded,     setSentLoaded]     = useState(false);
+    const debouncedSearch = useDebounce(search, 300);
     const [composing,      setComposing]      = useState(false);
     const [composeForm,    setComposeForm]    = useState({ toEmail: '', subject: '', body: '' });
     const [composeSending, setComposeSending] = useState(false);
@@ -339,14 +341,20 @@ const MailboxTab = ({ onUnreadCountChange }) => {
     const handleBack = () => { setSelectedMail(null); setSelectedSent(null); setReplyOpen(false); setReplyBody(''); };
     const handleTabChange = (key) => { setSubTab(key); setSelectedMail(null); setSelectedSent(null); setSearch(''); setReplyOpen(false); };
 
-    const filteredMails = search.trim()
-        ? mails.filter(m => { const kw = search.toLowerCase(); return m.fromEmail?.toLowerCase().includes(kw) || m.fromName?.toLowerCase().includes(kw) || m.subject?.toLowerCase().includes(kw); })
-        : mails;
-    const filteredSent = search.trim()
-        ? sentMails.filter(m => { const kw = search.toLowerCase(); return m.toEmail?.toLowerCase().includes(kw) || m.subject?.toLowerCase().includes(kw); })
-        : sentMails;
+    const filteredMails = useMemo(() =>
+        debouncedSearch.trim()
+            ? mails.filter(m => { const kw = debouncedSearch.toLowerCase(); return m.fromEmail?.toLowerCase().includes(kw) || m.fromName?.toLowerCase().includes(kw) || m.subject?.toLowerCase().includes(kw); })
+            : mails,
+        [mails, debouncedSearch]
+    );
+    const filteredSent = useMemo(() =>
+        debouncedSearch.trim()
+            ? sentMails.filter(m => { const kw = debouncedSearch.toLowerCase(); return m.toEmail?.toLowerCase().includes(kw) || m.subject?.toLowerCase().includes(kw); })
+            : sentMails,
+        [sentMails, debouncedSearch]
+    );
+    const unreadCount = useMemo(() => mails.filter(m => !m.isRead).length, [mails]);
 
-    const unreadCount = mails.filter(m => !m.isRead).length;
     const isInbox = subTab === 'inbox';
     const currentList    = isInbox ? filteredMails : filteredSent;
     const currentLoading = isInbox ? loading : sentLoading;

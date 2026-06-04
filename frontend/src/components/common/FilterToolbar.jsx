@@ -48,7 +48,8 @@ const FilterToolbar = ({
         /* selects 있음 — 2줄 구조 */
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, ...style }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', height: 40 }}>
+                {/* height → minHeight: 모바일에서 wrap 시 잘리지 않도록 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minHeight: 40 }}>
                     {selects.map((s, i) => (
                         <Select
                             key={i}
@@ -87,7 +88,8 @@ const FilterToolbar = ({
     /* selects 없음 — 1줄 구조 (검색 + 새로고침 같은 행) */
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, ...style }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 40 }}>
+            {/* height → minHeight: 모바일에서 wrap 시 잘리지 않도록 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 40 }}>
                 {extra}
                 {search && (
                     <Input

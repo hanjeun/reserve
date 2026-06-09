@@ -50,9 +50,9 @@ const FilterToolbar = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, ...style }}>
                 {/* height → minHeight: 모바일에서 wrap 시 잘리지 않도록 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minHeight: 40 }}>
-                    {selects.map((s, i) => (
+                    {selects.map((s) => (
                         <Select
-                            key={i}
+                            key={s.placeholder ?? s.options?.[0]?.label}
                             value={s.value}
                             onChange={s.onChange}
                             options={s.options}

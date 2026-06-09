@@ -125,15 +125,15 @@ const Login = () => {
                 </Divider>
 
                 <Flex justify="center" gap={20}>
-                    <div onClick={() => handleSocialLogin('kakao')} style={{ ...styles.socialCircle, backgroundColor: '#FEE500' }}>
+                    <button type="button" onClick={() => handleSocialLogin('kakao')} style={{ ...styles.socialCircle, backgroundColor: '#FEE500' }}>
                         <KakaoIcon />
-                    </div>
-                    <div onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
+                    </button>
+                    <button type="button" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
                         <NaverIcon />
-                    </div>
-                    <div onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: colors.background.default, border: `1px solid ${colors.border.light}` }}>
+                    </button>
+                    <button type="button" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: colors.background.default, border: `1px solid ${colors.border.light}` }}>
                         <GoogleIcon />
-                    </div>
+                    </button>
                 </Flex>
 
                 <Space direction="vertical" size={20} style={{ width: '100%', marginTop: '32px' }} align="center">
@@ -145,8 +145,11 @@ const Login = () => {
 
                     {/* 법적 고지 라인 */}
                     <Text type="secondary" style={{ fontSize: fontSize.xs, color: colors.text.tertiary, textAlign: 'center' }}>
-                        로그인 시 <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/terms')}>이용약관</span> ·{' '}
-                        <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/privacy')}>개인정보처리방침</span>에 동의합니다.
+                        로그인 시{' '}
+                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/terms')}>이용약관</button>
+                        {' '}·{' '}
+                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>
+                        에 동의합니다.
                     </Text>
                 </Space>
             </div>
@@ -175,7 +178,18 @@ const styles = {
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
-        border: 'none'
+        border: 'none',
+        padding: 0,
+    },
+    linkBtn: {
+        background: 'none',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        textDecoration: 'underline',
+        fontSize: 'inherit',
+        color: 'inherit',
+        fontFamily: 'inherit',
     },
 };
 

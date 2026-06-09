@@ -28,7 +28,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const setSelectedBoth = (val) => { setSelected(val); selectedRef.current = val; };
 
     useEffect(() => {
-        if (value && value.trim()) {
+        if (value?.trim()) {
             setQuery(value.trim());
             setSelectedBoth(true);
             isEditMode.current = true;
@@ -180,6 +180,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                 {/* 드롭다운 */}
                 {open && results.length > 0 && (
                     <div
+                        role="listbox"
+                        aria-label="주소 검색 결과"
                         onMouseDown={() => { skipBlurRef.current = true; }}
                         style={{
                             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
@@ -199,7 +201,11 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             return (
                                 <div
                                     key={uniqueKey}
+                                    role="option"
+                                    aria-selected={i === activeIdx}
+                                    tabIndex={-1}
                                     onMouseDown={() => handleSelect(doc)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(doc); }}
                                     onMouseEnter={() => setActiveIdx(i)}
                                     style={{
                                         display: 'flex', alignItems: 'flex-start', gap: 10,

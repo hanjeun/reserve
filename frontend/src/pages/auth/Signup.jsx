@@ -147,7 +147,9 @@ const Signup = () => {
                     <div style={A.section}>
                         <div style={A.divider} />
 
-                        <div style={A.allRow} onClick={() => toggleAll(!allChecked)}>
+                        <div role="button" tabIndex={0} style={A.allRow}
+                            onClick={() => toggleAll(!allChecked)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleAll(!allChecked); }}>
                             <Checkbox checked={allChecked} onChange={e => toggleAll(e.target.checked)} onClick={e => e.stopPropagation()} />
                             <span style={A.allText}>전체 동의하기</span>
                         </div>
@@ -159,7 +161,9 @@ const Signup = () => {
                                 { key: 'marketing', label: '이메일 마케팅 수신',   required: false, path: null },
                             ].map(({ key, label, required, path }) => (
                                 <div key={key} style={A.itemRow}>
-                                    <div style={A.itemLeft} onClick={() => toggle(key)}>
+                                    <div role="button" tabIndex={0} style={A.itemLeft}
+                                        onClick={() => toggle(key)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggle(key); }}>
                                         <Checkbox checked={agreements[key]} onChange={() => toggle(key)} onClick={e => e.stopPropagation()} />
                                         <span style={A.itemText}>
                                             <span style={required ? A.requiredTag : A.optionalTag}>

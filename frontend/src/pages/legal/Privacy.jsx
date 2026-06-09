@@ -35,8 +35,8 @@ const Privacy = () => {
 
             <Section title="2. 개인정보 수집 및 이용 목적">
                 <ul style={{ paddingLeft: 20 }}>
-                    {['회원 가입 및 서비스 이용 관리', '예약 서비스 제공 및 예약 확인 안내', '결제 처리 및 환불', '서비스 이용 관련 공지 및 고객 문의 응대', '서비스 개선을 위한 통계 분석'].map((t, i) => (
-                        <li key={i} style={{ marginBottom: 6 }}>{t}</li>
+                    {['회원 가입 및 서비스 이용 관리', '예약 서비스 제공 및 예약 확인 안내', '결제 처리 및 환불', '서비스 이용 관련 공지 및 고객 문의 응대', '서비스 개선을 위한 통계 분석'].map((t) => (
+                        <li key={t} style={{ marginBottom: 6 }}>{t}</li>
                     ))}
                 </ul>
             </Section>
@@ -87,8 +87,8 @@ const Privacy = () => {
                         {[
                             ['AWS (Amazon Web Services)', '서버 인프라 운영 및 데이터 저장 (Lightsail, S3)'],
                             ['주식회사 카카오페이', '결제 처리 및 인증'],
-                        ].map(([company, task], i) => (
-                            <tr key={i} style={{ borderBottom: `1px solid ${colors.border.light}` }}>
+                        ].map(([company, task]) => (
+                            <tr key={company} style={{ borderBottom: `1px solid ${colors.border.light}` }}>
                                 <td style={{ padding: '10px 14px', color: colors.text.primary }}>{company}</td>
                                 <td style={{ padding: '10px 14px', color: colors.text.secondary }}>{task}</td>
                             </tr>

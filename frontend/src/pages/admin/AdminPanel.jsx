@@ -426,7 +426,7 @@ const AdminPanel = () => {
                         <DetailRow label="상태"><Tag color={STATUS_CONFIG[detailItem.status]?.color}>{STATUS_CONFIG[detailItem.status]?.label || detailItem.status}</Tag></DetailRow>
                         {detailItem.memo && <DetailRow label="메모"><Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', color: colors.text.secondary }}>{detailItem.memo}</Paragraph></DetailRow>}
                         {detailItem.rejectionReason && <DetailRow label="거절 사유"><Text type="danger">{detailItem.rejectionReason}</Text></DetailRow>}
-                        {detailItem.licenseImageUrl && <DetailRow label="사업자등록증"><Image src={detailItem.licenseImageUrl.startsWith('http') ? detailItem.licenseImageUrl : `${window.location.protocol}//${window.location.hostname}:8080${detailItem.licenseImageUrl}`} alt="사업자등록증" style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }} /></DetailRow>}
+                        {detailItem.licenseImageUrl && <DetailRow label="사업자등록증"><Image src={detailItem.licenseImageUrl.startsWith('http') ? detailItem.licenseImageUrl : `${globalThis.location.protocol}//${globalThis.location.hostname}:8080${detailItem.licenseImageUrl}`} alt="사업자등록증" style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }} /></DetailRow>}
                         <DetailRow label="신청일">{detailItem.createdAt?.substring(0, 10)}</DetailRow>
                         {detailItem.processedAt && <DetailRow label="처리일">{detailItem.processedAt?.substring(0, 10)} ({detailItem.processedByName})</DetailRow>}
                     </div>

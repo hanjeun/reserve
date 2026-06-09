@@ -39,9 +39,9 @@ const ReservationTab = () => {
 
     const handleRemove = (id) => {
         confirm({
-            title: '예약 목록에서 제거',
-            content: '이 예약을 목록에서 숨기시겠습니까?',
-            okText: '제거', cancelText: '취소',
+            title: '예약 삭제',
+            content: '이 예약을 목록에서 삭제합니다. 되돌릴 수 없습니다.',
+            okText: '삭제', cancelText: '취소',
             okButtonProps: { danger: true }, centered: true,
             onOk: async () => {
                 try {
@@ -197,6 +197,7 @@ const BusinessPanel = () => {
                 activeKey={activeTab}
                 onChange={setActiveTab}
                 items={tabItems}
+                animated={{ inkBar: true, tabPane: false }}
                 style={{ marginBottom: 8 }}
             />
         </PageContainer>

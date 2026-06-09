@@ -1,19 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Divider, Typography } from 'antd';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
 const { Text } = Typography;
 
-const useIsMobile = () => {
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-    useEffect(() => {
-        const handler = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', handler);
-        return () => window.removeEventListener('resize', handler);
-    }, []);
-    return isMobile;
-};
+/* ─────────────────────────────────────────────────────────────
+   CSS media query — isMobile JS 훅 없이 순수 CSS로 반응형 처리
+   - PC  : copyright(left) | 대표자(right, text-align:right)
+   - 모바일: 대표자(위, text-align:left) → copyright(아래)
+             CSS order 속성으로 DOM 순서 변경 없이 시각 순서만 교체
+───────────────────────────────────────────────────────────────*/
+const FOOTER_STYLES = `
+.footer-copyright {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.footer-copyright-left {
+    order: 1;
+    font-size: 12px;
+    line-height: 1.8;
+}
+.footer-copyright-right {
+    order: 2;
+    font-size: 12px;
+    line-height: 1.8;
+    text-align: right;
+}
+@media (max-width: 767px) {
+    .footer-copyright {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .footer-copyright-left {
+        order: 2;
+    }
+    .footer-copyright-right {
+        order: 1;
+        text-align: left;
+    }
+}
+`;
 
 const GithubIcon = () => (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
@@ -41,7 +72,19 @@ const FooterLink = ({ label, onClick }) => (
     <button
         type="button"
         onClick={onClick}
-        style={{ fontSize: fontSize.sm, color: colors.text.tertiary, cursor: 'pointer', transition: 'color 0.15s', whiteSpace: 'nowrap', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' }}
+        style={{ 
+            display: 'block',          // 블록화하여 링크들과 정렬 기준 통일
+            textAlign: 'left',         // 브라우저 기본 가운데 정렬 버그 방지
+            fontSize: fontSize.sm, 
+            color: colors.text.tertiary, 
+            cursor: 'pointer', 
+            transition: 'color 0.15s', 
+            whiteSpace: 'nowrap', 
+            background: 'none', 
+            border: 'none', 
+            padding: 0, 
+            fontFamily: 'inherit' 
+        }}
         onMouseEnter={e => { e.currentTarget.style.color = colors.text.primary; }}
         onMouseLeave={e => { e.currentTarget.style.color = colors.text.tertiary; }}>
         {label}
@@ -50,7 +93,15 @@ const FooterLink = ({ label, onClick }) => (
 
 const ExternalLink = ({ href, label }) => (
     <a href={href} target="_blank" rel="noopener noreferrer"
-        style={{ fontSize: fontSize.sm, color: colors.text.tertiary, textDecoration: 'none', whiteSpace: 'nowrap', transition: 'color 0.15s' }}
+        style={{ 
+            display: 'block',          // 블록화하여 버튼들과 정렬 기준 통일
+            textAlign: 'left',         // 왼쪽 밀착 강제
+            fontSize: fontSize.sm, 
+            color: colors.text.tertiary, 
+            textDecoration: 'none', 
+            whiteSpace: 'nowrap', 
+            transition: 'color 0.15s' 
+        }}
         onMouseEnter={e => e.currentTarget.style.color = colors.text.primary}
         onMouseLeave={e => e.currentTarget.style.color = colors.text.tertiary}>
         {label}
@@ -59,79 +110,76 @@ const ExternalLink = ({ href, label }) => (
 
 const AppFooter = () => {
     const navigate = useNavigate();
-    const isMobile = useIsMobile();
 
-    const LeftBlock = (
-        <div style={{ fontSize: 12, color: colors.text.tertiary, lineHeight: 1.8 }}>
-            © 2026 RESERVE &middot; 본 서비스는 포트폴리오 목적으로 제작되었습니다.<br />
-            호스팅 서비스 제공자: Amazon Web Services (AWS)
-        </div>
-    );
-
-    const RightBlock = (
-        <div style={{ fontSize: 12, color: colors.text.tertiary, textAlign: isMobile ? 'left' : 'right', lineHeight: 1.8 }}>
-            대표자 한재은 &middot; 개인정보 보호책임자 한재은<br />
-            <a href="mailto:hanjeun111@gmail.com"
-                style={{ color: 'inherit', textDecoration: 'none' }}
-                onMouseEnter={e => e.currentTarget.style.color = colors.text.primary}
-                onMouseLeave={e => e.currentTarget.style.color = colors.text.tertiary}>
-                hanjeun111@gmail.com
-            </a>
-        </div>
-    );
     return (
-        <footer style={{ backgroundColor: colors.background.surface, borderTop: `1px solid ${colors.border.light}`, padding: '0 24px 36px' }}>
-            <div style={{ maxWidth: 1100, margin: '0 auto', paddingTop: 48 }}>
+        <>
+            <style>{FOOTER_STYLES}</style>
 
-                {/* 상단 */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap', marginBottom: 28 }}>
+            <footer style={{ backgroundColor: colors.background.surface, borderTop: `1px solid ${colors.border.light}`, padding: '0 24px 36px' }}>
+                <div style={{ maxWidth: 1100, margin: '0 auto', paddingTop: 48 }}>
 
-                    {/* 브랜드 */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280 }}>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: colors.primary.main, letterSpacing: '-0.5px' }}>RESERVE</div>
-                        <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, lineHeight: 1.7 }}>
-                            전국 맛집 예약 플랫폼.<br />
-                            식당 예약부터 결제까지 한 번에.
-                        </Text>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                            <SocialBtn href="https://github.com/hanjeun/reserve" icon={<GithubIcon />} label="GitHub" />
-                            <SocialBtn href="https://velog.io/@hanjeun/series/RESERVE" icon={<VelogIcon />} label="Velog" />
+                    {/* 상단 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap', marginBottom: 28 }}>
+
+                        {/* 브랜드 */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280 }}>
+                            <div style={{ fontSize: 20, fontWeight: 800, color: colors.primary.main, letterSpacing: '-0.5px' }}>RESERVE</div>
+                            <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, lineHeight: 1.7 }}>
+                                다양한 업종을 위한 범용 예약 플랫폼.<br />
+                                예약부터 결제까지 한 번에.
+                            </Text>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                                <SocialBtn href="https://github.com/hanjeun/reserve" icon={<GithubIcon />} label="GitHub" />
+                                <SocialBtn href="https://velog.io/@hanjeun/series/RESERVE" icon={<VelogIcon />} label="Velog" />
+                            </div>
+                        </div>
+
+                        {/* 링크 */}
+                        <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap' }}>
+                            {/* 서비스 */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+                                <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>서비스</Text>
+                                <FooterLink label="식당 탐색" onClick={() => navigate('/stores')} />
+                                <FooterLink label="예약 확인" onClick={() => navigate('/my-reservations')} />
+                            </div>
+                            
+                            {/* 법적 고지 */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+                                <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>법적 고지</Text>
+                                <FooterLink label="서비스 이용약관" onClick={() => navigate('/terms')} />                                
+                                <FooterLink label="개인정보 처리방침" onClick={() => navigate('/privacy')} />
+                            </div>
+                            
+                            {/* 개발자 */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+                                <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>개발자</Text>
+                                <ExternalLink href="https://velog.io/@hanjeun/series/RESERVE" label="개발 블로그 →" />
+                                <ExternalLink href="https://github.com/hanjeun/reserve" label="GitHub 저장소 →" />
+                                <ExternalLink href="mailto:reserve@reserve.it.kr" label="문의하기" />
+                            </div>
                         </div>
                     </div>
 
-                    {/* 링크 */}
-                    <div style={{ display: 'flex', gap: 48, flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>서비스</Text>
-                            <FooterLink label="식당 탐색" onClick={() => navigate('/stores')} />
-                            <FooterLink label="예약 확인" onClick={() => navigate('/my-reservations')} />
+                    <Divider style={{ margin: '0 0 16px' }} />
+                    <div className="footer-copyright">
+                        <div className="footer-copyright-left" style={{ color: colors.text.tertiary }}>
+                            © 2026 RESERVE &middot; 본 서비스는 포트폴리오 목적으로 제작되었습니다.<br />
+                            호스팅 서비스 제공자: Amazon Web Services (AWS)
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>법적 고지</Text>
-                            <FooterLink label="서비스 이용약관" onClick={() => navigate('/terms')} />
-                            <FooterLink label="개인정보 처리방침" onClick={() => navigate('/privacy')} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>개발자</Text>
-                            <ExternalLink href="https://velog.io/@hanjeun/series/RESERVE" label="개발 블로그 →" />
-                            <ExternalLink href="https://github.com/hanjeun/reserve" label="GitHub 저장소 →" />
-                            <a href="mailto:reserve@reserve.it.kr"
-                                style={{ fontSize: fontSize.sm, color: colors.text.tertiary, textDecoration: 'none', whiteSpace: 'nowrap', transition: 'color 0.15s' }}
+                        <div className="footer-copyright-right" style={{ color: colors.text.tertiary }}>
+                            대표자 한재은 &middot; 개인정보 보호책임자 한재은<br />
+                            <a href="mailto:hanjeun111@gmail.com"
+                                style={{ color: 'inherit', textDecoration: 'none' }}
                                 onMouseEnter={e => e.currentTarget.style.color = colors.text.primary}
                                 onMouseLeave={e => e.currentTarget.style.color = colors.text.tertiary}>
-                                문의하기
+                                hanjeun111@gmail.com
                             </a>
                         </div>
                     </div>
-                </div>
 
-                {/* 하단 카피라이트 — 모바일: 대표자 위, 호스팅 아래 / PC: 좌우 분리 */}
-                <Divider style={{ margin: '0 0 16px' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    {isMobile ? <>{RightBlock}{LeftBlock}</> : <>{LeftBlock}{RightBlock}</>}
                 </div>
-            </div>
-        </footer>
+            </footer>
+        </>
     );
 };
 

@@ -162,7 +162,7 @@ function App() {
                     theme={themeConfig}
                     form={{ validateMessages }}
                 >
-                    <AntApp>
+                    <AntApp message={{ maxCount: 3 }}>
                         <AppContent />
                     </AntApp>
                 </ConfigProvider>

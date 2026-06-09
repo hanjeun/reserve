@@ -147,7 +147,9 @@ const Signup = () => {
                     <div style={A.section}>
                         <div style={A.divider} />
 
-                        <div style={A.allRow} onClick={() => toggleAll(!allChecked)}>
+                        <div role="button" tabIndex={0} style={A.allRow}
+                            onClick={() => toggleAll(!allChecked)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleAll(!allChecked); }}>
                             <Checkbox checked={allChecked} onChange={e => toggleAll(e.target.checked)} onClick={e => e.stopPropagation()} />
                             <span style={A.allText}>전체 동의하기</span>
                         </div>
@@ -159,7 +161,9 @@ const Signup = () => {
                                 { key: 'marketing', label: '이메일 마케팅 수신',   required: false, path: null },
                             ].map(({ key, label, required, path }) => (
                                 <div key={key} style={A.itemRow}>
-                                    <div style={A.itemLeft} onClick={() => toggle(key)}>
+                                    <div role="button" tabIndex={0} style={A.itemLeft}
+                                        onClick={() => toggle(key)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggle(key); }}>
                                         <Checkbox checked={agreements[key]} onChange={() => toggle(key)} onClick={e => e.stopPropagation()} />
                                         <span style={A.itemText}>
                                             <span style={required ? A.requiredTag : A.optionalTag}>
@@ -213,82 +217,6 @@ const styles = {
         marginBottom: '40px',
         color: colors.text.tertiary,
         fontSize: fontSize.lg,
-    },
-    // Toss 스타일 동의 영역 — 박스/배경 없이 미니멀
-    agreementSection: {
-        marginTop: 32,
-    },
-    dividerLine: {
-        height: 1,
-        background: colors.border.light,
-        marginBottom: 20,
-    },
-    agreeAllRow: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        cursor: 'pointer',
-        marginBottom: 14,
-        userSelect: 'none',
-    },
-    checkbox: {
-        flexShrink: 0,
-    },
-    agreeAllText: {
-        fontSize: fontSize.base,
-        fontWeight: fontWeight.semibold,
-        color: colors.text.primary,
-        cursor: 'pointer',
-    },
-    agreeItems: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        paddingLeft: 2,
-    },
-    agreeRow: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    agreeRowLeft: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        cursor: 'pointer',
-        userSelect: 'none',
-        flex: 1,
-    },
-    agreeLabel: {
-        fontSize: fontSize.sm,
-        color: colors.text.secondary,
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 5,
-    },
-    requiredDot: {
-        fontSize: 7,
-        color: colors.primary.main,
-        verticalAlign: 'middle',
-        flexShrink: 0,
-    },
-    optionalDot: {
-        fontSize: 7,
-        color: colors.text.tertiary,
-        verticalAlign: 'middle',
-        flexShrink: 0,
-    },
-    viewBtn: {
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        fontSize: fontSize.xs,
-        color: colors.text.tertiary,
-        padding: '0 0 0 8px',
-        flexShrink: 0,
-        letterSpacing: '-0.2px',
-        transition: 'color 0.15s',
     },
 };
 

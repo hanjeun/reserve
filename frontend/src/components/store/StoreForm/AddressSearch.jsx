@@ -5,7 +5,8 @@ import useDebounce from '../../../hooks/useDebounce';
 import { colors, fontSize, radius } from '../../../styles/tokens';
 import { animation } from '../../../styles/tokens/animations';
 
-const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: addressDetailProp = '', onChange, onMeta, placeholder = '도로명 또는 지번 주소를 검색하세요' }) => {
+// id prop: Form.Item이 label for 연결을 위해 주입 — 메인 input에 전달
+const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetail: addressDetailProp = '', onChange, onMeta, placeholder = '도로명 또는 지번 주소를 검색하세요' }) => {
     const [query, setQuery]         = useState('');
     const [detail, setDetail]       = useState('');
     const [zipCode, setZipCode]     = useState('');
@@ -27,7 +28,7 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
     const setSelectedBoth = (val) => { setSelected(val); selectedRef.current = val; };
 
     useEffect(() => {
-        if (value && value.trim()) {
+        if (value?.trim()) {
             setQuery(value.trim());
             setSelectedBoth(true);
             isEditMode.current = true;
@@ -121,19 +122,22 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
         background: colors.gray[50],
         border: `1px solid ${isFocused ? colors.primary.main : colors.border.default}`,
         borderRadius: radius.lg,
+        boxSizing: 'border-box',
         padding: '0 12px', height: 44,
         transition: 'border-color 0.2s, box-shadow 0.2s',
         boxShadow: isFocused ? `0 0 0 2px ${colors.primary.main}18` : 'none',
     });
 
     return (
-        <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
 
             {/* ① 도로명 주소 검색창 */}
             <div style={{ position: 'relative' }}>
                 <div style={boxStyle(focused)}>
                     <EnvironmentOutlined style={{ color: colors.text.tertiary, fontSize: 14, marginRight: 8, flexShrink: 0 }} />
+                    {/* id: Form.Item label for 연결 */}
                     <input
+                        id={id}
                         autoComplete="off"
                         value={query}
                         onChange={handleQueryChange}
@@ -173,9 +177,11 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                     )}
                 </div>
 
-                {/* 드롭다운 (접근성 role 제거됨) */}
+                {/* 드롭다운 */}
                 {open && results.length > 0 && (
                     <div
+                        role="listbox"
+                        aria-label="주소 검색 결과"
                         onMouseDown={() => { skipBlurRef.current = true; }}
                         style={{
                             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
@@ -195,7 +201,11 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                             return (
                                 <div
                                     key={uniqueKey}
+                                    role="option"
+                                    aria-selected={i === activeIdx}
+                                    tabIndex={-1}
                                     onMouseDown={() => handleSelect(doc)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(doc); }}
                                     onMouseEnter={() => setActiveIdx(i)}
                                     style={{
                                         display: 'flex', alignItems: 'flex-start', gap: 10,
@@ -230,10 +240,11 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
             </div>
 
             {/* ② 선택 후 — 우편번호 + 상세주소 */}
+            {/* minWidth: 0 — 긴 건물명이 있어도 부모 박스 밖으로 넘치지 않도록 */}
             {(selected || zipCode) && (
-                <div style={{ display: 'flex', gap: 8, animation: animation.slideUpIn }}>
+                <div style={{ display: 'flex', gap: 8, minWidth: 0, width: '100%', animation: animation.slideUpIn }}>
                     {zipCode && (
-                        <div style={{ ...boxStyle(false), width: 84, flexShrink: 0, cursor: 'default' }}>
+                        <div style={{ ...boxStyle(false), width: 76, flexShrink: 0, cursor: 'default' }}>
                             <input
                                 readOnly tabIndex={-1} value={zipCode}
                                 style={{
@@ -244,7 +255,8 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                             />
                         </div>
                     )}
-                    <div style={{ ...boxStyle(detailFocused), flex: 1 }}>
+                    {/* flex: 1, minWidth: 0 — 모바일에서 상세주소 잘림 방지 */}
+                    <div style={{ ...boxStyle(detailFocused), flex: 1, minWidth: 0, overflow: 'hidden' }}>
                         <input
                             ref={detailRef}
                             autoComplete="off"
@@ -255,7 +267,7 @@ const AddressSearch = ({ value = '', zipCode: zipCodeProp = '', addressDetail: a
                             onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                             placeholder="상세주소 (동, 호수 등)"
                             style={{
-                                flex: 1, border: 'none', outline: 'none', background: 'transparent',
+                                flex: 1, minWidth: 0, width: '100%', border: 'none', outline: 'none', background: 'transparent',
                                 fontSize: fontSize.base, color: colors.text.primary, fontFamily: 'inherit',
                             }}
                         />

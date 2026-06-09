@@ -139,7 +139,7 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                         <Button variant="ghost-sm" size="sm"
                             onClick={() => onRemove(id)}
                             style={{ color: colors.text.tertiary }}>
-                            <DeleteOutlined /> 숨기기
+                            <DeleteOutlined /> 삭제
                         </Button>
                     )}
                 </div>

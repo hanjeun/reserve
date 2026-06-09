@@ -37,7 +37,7 @@ const Terms = () => {
                         '다른 이용자에 대한 비방, 명예훼손 행위',
                         '관련 법령에 위반되는 행위',
                         '허위 사업자등록증 제출 등 부적절한 사업자 인증 신청',
-                    ].map((t, i) => <li key={i} style={{ marginBottom: 6 }}>{t}</li>)}
+                    ].map((t) => <li key={t} style={{ marginBottom: 6 }}>{t}</li>)}
                 </ul>
             </Section>
 
@@ -60,7 +60,7 @@ const Terms = () => {
                         '허위 사업자 인증 신청(허위 사업자등록증 제출 등)이 적발된 경우',
                         '다른 이용자 또는 가게 사업자에게 피해를 주는 행위',
                         '관련 법령에 위반되는 행위',
-                    ].map((t, i) => <li key={i} style={{ marginBottom: 6 }}>{t}</li>)}
+                    ].map((t) => <li key={t} style={{ marginBottom: 6 }}>{t}</li>)}
                 </ul>
                 <Paragraph style={{ marginTop: 12 }}>기간제 정지의 경우 정지 기간이 만료되면 자동으로 이용이 재개됩니다. 영구 정지는 관리자에 의해 해제될 수 있습니다.</Paragraph>
             </Section>

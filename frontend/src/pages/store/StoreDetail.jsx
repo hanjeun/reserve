@@ -9,9 +9,8 @@ import {
     FileTextOutlined, StarFilled, EnvironmentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton, Badge, KakaoMap } from '../../components/common';
+import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
 import { ReviewList } from '../../components/review';
-import { StoreDetailSkeleton } from '../../components/common';
 import { useStoreData, useMessage, usePayment } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { getDetailImageUrl, formatTimeForApi, formatDate } from '../../utils';
@@ -189,19 +188,20 @@ const StoreInfoSection = ({ store, description }) => {
                         <row.Icon style={infoStyles.icon} />
                         <span style={infoStyles.label}>{row.label}</span>
                         <div style={{ ...infoStyles.value, ...(row.highlight ? infoStyles.highlight : {}) }}>
-                            {row.isMultiLine
-                                ? row.value.map((v, vi) => (
-                                    <div key={vi} style={vi === row.value.length - 1 ? { color: colors.error?.main || '#ff4d4f' } : {}}>{v}</div>
-                                ))
-                                : row.link
-                                    ? <a href={row.link} target="_blank" rel="noopener noreferrer"
+                            {(() => {
+                                if (row.isMultiLine) return row.value.map((v) => (
+                                    <div key={v} style={v === row.value[row.value.length - 1] ? { color: colors.error?.main || '#ff4d4f' } : {}}>{v}</div>
+                                ));
+                                if (row.link) return (
+                                    <a href={row.link} target="_blank" rel="noopener noreferrer"
                                         style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}
                                         onMouseEnter={e => e.target.style.color = colors.primary.main}
                                         onMouseLeave={e => e.target.style.color = colors.text.secondary}>
                                         {row.value}
-                                      </a>
-                                    : row.value
-                            }
+                                    </a>
+                                );
+                                return row.value;
+                            })()}
                         </div>
                     </div>
                     {i < rows.length - 1 && <div style={infoStyles.divider} />}
@@ -221,58 +221,46 @@ const infoStyles = {
     divider: { height: 1, background: colors.border.light },
 };
 
-/**
- * 예약 시간 픽커 비활성화 함수
- * 영업시간 외 + 브레이크 타임을 통합해서 처리
- * hideDisabledOptions 사용 시 비활성화된 시간은 목록에서 아예 사라짐
- */
+// buildDisabledTime 헬퍼: 모듈 레벨에 두어 중첩 깊이 감소
+const toMins = (timeStr) => {
+    const [h, m] = timeStr.substring(0, 5).split(':').map(Number);
+    return h * 60 + m;
+};
+
+const getDisabledHours = (slotMin, isValidSlot) => {
+    const disabled = [];
+    for (let h = 0; h < 24; h++) {
+        const hasValid = Array.from({ length: Math.ceil(60 / slotMin) }, (_, i) => i * slotMin)
+            .some(m => isValidSlot(h * 60 + m));
+        if (!hasValid) disabled.push(h);
+    }
+    return disabled;
+};
+
+const getDisabledMinutes = (hour, isValidSlot) =>
+    Array.from({ length: 60 }, (_, m) => m).filter(m => !isValidSlot(hour * 60 + m));
+
 const buildDisabledTime = (store) => {
     if (!store?.openTime || !store?.closeTime) return undefined;
 
-    const toMins = (timeStr) => {
-        const [h, m] = timeStr.substring(0, 5).split(':').map(Number);
-        return h * 60 + m;
-    };
-
-    const openMins  = toMins(store.openTime);
-    const closeMins = toMins(store.closeTime);
-    const slotMin   = store.reservationSlotMinutes ?? 30;
+    const openMins   = toMins(store.openTime);
+    const closeMins  = toMins(store.closeTime);
+    const slotMin    = store.reservationSlotMinutes ?? 30;
     const bStartMins = store.breakStartTime ? toMins(store.breakStartTime) : -1;
     const bEndMins   = store.breakEndTime   ? toMins(store.breakEndTime)   : -1;
     const hasBreak   = bStartMins >= 0 && bEndMins >= 0;
 
-    // 특정 시각(분 단위)이 예약 가능한 슬롯인지 판단
-    const isValidSlot = (totalMins) => {
-        if (totalMins < openMins || totalMins > closeMins) return false;
-        if (hasBreak && totalMins >= bStartMins && totalMins < bEndMins) return false;
-        return true;
-    };
+    const isValidSlot = (totalMins) =>
+        totalMins >= openMins &&
+        totalMins <= closeMins &&
+        (!hasBreak || totalMins < bStartMins || totalMins >= bEndMins);
 
     return () => ({
-        // 시(hour) 단위: 해당 시간에 유효한 슬롯이 하나도 없으면 비활성화
-        disabledHours: () => {
-            const disabled = [];
-            for (let h = 0; h < 24; h++) {
-                let hasValid = false;
-                for (let m = 0; m < 60; m += slotMin) {
-                    if (isValidSlot(h * 60 + m)) { hasValid = true; break; }
-                }
-                if (!hasValid) disabled.push(h);
-            }
-            return disabled;
-        },
-        // 분(minute) 단위: 해당 분이 유효하지 않으면 비활성화
-        disabledMinutes: (hour) => {
-            const disabled = [];
-            for (let m = 0; m < 60; m++) {
-                if (!isValidSlot(hour * 60 + m)) disabled.push(m);
-            }
-            return disabled;
-        },
+        disabledHours:   () => getDisabledHours(slotMin, isValidSlot),
+        disabledMinutes: (hour) => getDisabledMinutes(hour, isValidSlot),
     });
 };
 
-// 예약 폼 패널 (PC: sticky 사이드바 / 모바일용 하단 섹션)
 const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => {
     const disabledTime = buildDisabledTime(store);
     return (
@@ -326,7 +314,6 @@ const pcFormStyles = {
     },
 };
 
-// 메인 컴포넌트
 const StoreDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -354,7 +341,6 @@ const StoreDetail = () => {
         if (error) message.error(error);
     }, [error, message]);
 
-    // 찜 초기 상태 로딩 (비로그인 상태에서도 확인 가능)
     React.useEffect(() => {
         favoriteService.getStatus(Number(id))
             .then(res => setFavoriteStatus(res?.isFavorite ?? false))
@@ -389,9 +375,6 @@ const StoreDetail = () => {
         if (dt.isBefore(dayjs())) {
             form.setFields([{ name: 'reservationTime', errors: ['이미 지난 시간입니다.'] }]); return;
         }
-        // 영업시간/브레이크 타임 검증은 disabledTime + hideDisabledOptions로
-        // 픽커 자체에서 선택 자체를 막았으므로 여기서는 검증 안 함
-        // (백엔드 검증은 안전망으로 유지)
         try {
             const hasDeposit  = store?.noShowDeposit > 0;
             const skipPayment = hasDeposit && store?.allowLatePayment === true;
@@ -417,7 +400,9 @@ const StoreDetail = () => {
             message.success('예약이 완료되었습니다.');
             navigate('/my-reservations');
         } catch (err) {
-            message.error({ content: typeof err === 'string' ? err : '예약에 실패했습니다. 다시 시도해주세요.', duration: 5 });
+            // Error 객체(axios new Error) 또는 legacy 문자열 모두 처리
+            const errMsg = err instanceof Error ? err.message : typeof err === 'string' ? err : null;
+            message.error({ content: errMsg || '예약에 실패했습니다. 다시 시도해주세요.', duration: 5 });
         }
     };
 
@@ -435,23 +420,19 @@ const StoreDetail = () => {
         <PageContainer size={containerSize} paddingTop={isPC ? '32px' : '20px'}>
             <style>{customStyles}</style>
 
-            {/* 뒤로가기 */}
             <Button variant="ghost" onClick={() => navigate(-1)} style={styles.backBtn}>
                 <ArrowLeftOutlined style={{ fontSize: 14 }} /> 뒤로가기
             </Button>
 
             {isPC ? (
-                /* PC: 좌측 콘텐츠 / 우측 예약폼 */
                 <div style={styles.pcGrid}>
-                    {/* 좌측 */}
                     <div style={styles.pcLeft}>
-                        {/* 이미지 슬라이더 + 찜 버튼 */}
                         <div style={{ position: 'relative' }}>
                             <div style={styles.pcImageWrapper}>
                                 <Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
-                                    {sliderImages.map((img, i) => (
-                                        <div key={i}>
-                                            <Image src={getDetailImageUrl(img)} alt={`${store.name}-${i}`}
+                                    {sliderImages.map((img, sliderIdx) => (
+                                        <div key={img}>
+                                            <Image src={getDetailImageUrl(img)} alt={`${store.name}-${sliderIdx}`}
                                                 width="100%" style={styles.pcMainImg}
                                                 preview={{ mask: '크게 보기' }} />
                                         </div>
@@ -462,75 +443,41 @@ const StoreDetail = () => {
                                 <FavoriteButton storeId={Number(id)} initialStatus={favoriteStatus} size="sm" />
                             </div>
                         </div>
-
-                        {/* 가게명 + 서브 정보 */}
                         <div style={{ marginTop: 20, marginBottom: 4 }}>
-                            {/* 카테고리 배지 */}
-                            {store.category && (
-                            <Badge variant="category">{store.category}</Badge>
-                            )}
-                            {/* 키워드 배지 */}
-                            {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
-                            <Badge key={i} variant="keyword">{kw}</Badge>
-                            ))}
+                            {store.category && <Badge variant="category">{store.category}</Badge>}
+                            {store.keywords?.map((kw) => <Badge key={kw} variant="keyword">{kw}</Badge>)}
                         </div>
                         <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
-                        {/* 별점 · 리뷰 수 (StoreCard와 동일한 방식) */}
                         <div style={headerStyles.metaRow}>
                             <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
-                            <Text strong style={{ fontSize: fontSize.sm }}>
-                                {store.rating?.toFixed(1) || '0.0'}
-                            </Text>
-                            <Text type="secondary" style={{ fontSize: fontSize.xs }}>
-                                ({store.reviewCount || 0})
-                            </Text>
+                            <Text strong style={{ fontSize: fontSize.sm }}>{store.rating?.toFixed(1) || '0.0'}</Text>
+                            <Text type="secondary" style={{ fontSize: fontSize.xs }}>({store.reviewCount || 0})</Text>
                         </div>
-
-                        {/* 상세 정보 */}
                         <StoreInfoSection store={store} description={store.description} />
-
-            {/* 지도 */}
-            <div style={{ marginTop: 20, marginBottom: 8 }}>
-                <KakaoMap
-                    latitude={store.latitude}
-                    longitude={store.longitude}
-                    address={store.address}
-                    storeName={store.name}
-                    height={220}
-                />
-            </div>
-
+                        <div style={{ marginTop: 20, marginBottom: 8 }}>
+                            <KakaoMap latitude={store.latitude} longitude={store.longitude}
+                                address={store.address} storeName={store.name} height={220} />
+                        </div>
                         <Divider style={styles.divider} />
-
-                        {/* 리뷰 */}
                         <section ref={reviewSectionRef} style={{ maxWidth: 540 }}>
                             <Title level={3} style={styles.sectionTitle}>리뷰</Title>
-                            <ReviewList
-                                storeId={Number(id)}
-                                completedReservation={completedReservation}
-                                autoOpenWrite={stateOpenWrite}
-                                focusReviewId={stateOpenReviewId}
-                            />
+                            <ReviewList storeId={Number(id)} completedReservation={completedReservation}
+                                autoOpenWrite={stateOpenWrite} focusReviewId={stateOpenReviewId} />
                         </section>
                     </div>
-
-                    {/* 우측 sticky 예약폼 */}
                     <div style={styles.pcRight}>
-                        <ReservationPanel
-                            store={store} form={form} onFinish={onFinish}
-                            paying={paying} isPC={true} />
+                        <ReservationPanel store={store} form={form} onFinish={onFinish} paying={paying} isPC={true} />
                     </div>
                 </div>
             ) : (
-                /* 모바일: 일렬 배치 */
                 <>
                     <section style={{ padding: 0 }}>
                         <div style={{ position: 'relative' }}>
                             <div style={styles.mobileImageWrapper}>
                                 <Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
-                                    {sliderImages.map((img, i) => (
-                                        <div key={i}>
-                                            <Image src={getDetailImageUrl(img)} alt={`${store.name}-${i}`}
+                                    {sliderImages.map((img, sliderIdx) => (
+                                        <div key={img}>
+                                            <Image src={getDetailImageUrl(img)} alt={`${store.name}-${sliderIdx}`}
                                                 width="100%" style={styles.mainImg}
                                                 preview={{ mask: '크게 보기' }} />
                                         </div>
@@ -542,61 +489,34 @@ const StoreDetail = () => {
                             </div>
                         </div>
                         <div style={{ padding: '0 16px' }}>
-                            {/* 카테고리 + 키워드 배지 */}
                             <div style={{ marginTop: 20, marginBottom: 4 }}>
-                                {store.category && (
-                                    <Badge variant="category">{store.category}</Badge>
-                                )}
-                                {store.keywords?.length > 0 && store.keywords.map((kw, i) => (
-                                    <Badge key={i} variant="keyword">{kw}</Badge>
-                                ))}
+                                {store.category && <Badge variant="category">{store.category}</Badge>}
+                                {store.keywords?.map((kw) => <Badge key={kw} variant="keyword">{kw}</Badge>)}
                             </div>
                             <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
-                            {/* 별점 · 리뷰 수 (StoreCard와 동일한 방식) */}
                             <div style={headerStyles.metaRow}>
                                 <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
-                                <Text strong style={{ fontSize: fontSize.sm }}>
-                                    {store.rating?.toFixed(1) || '0.0'}
-                                </Text>
-                                <Text type="secondary" style={{ fontSize: fontSize.xs }}>
-                                    ({store.reviewCount || 0})
-                                </Text>
+                                <Text strong style={{ fontSize: fontSize.sm }}>{store.rating?.toFixed(1) || '0.0'}</Text>
+                                <Text type="secondary" style={{ fontSize: fontSize.xs }}>({store.reviewCount || 0})</Text>
                             </div>
                         </div>
                     </section>
-
                     <div style={{ padding: '0 16px' }}>
                         <StoreInfoSection store={store} description={store.description} />
-                        {/* 지도 */}
                         <div style={{ marginTop: 16, marginBottom: 8 }}>
-                            <KakaoMap
-                                latitude={store.latitude}
-                                longitude={store.longitude}
-                                address={store.address}
-                                storeName={store.name}
-                                height={200}
-                            />
+                            <KakaoMap latitude={store.latitude} longitude={store.longitude}
+                                address={store.address} storeName={store.name} height={200} />
                         </div>
                     </div>
-
                     <Divider style={styles.divider} />
-
                     <section style={{ padding: '0 16px' }}>
-                        <ReservationPanel
-                            store={store} form={form} onFinish={onFinish}
-                            paying={paying} isPC={false} />
+                        <ReservationPanel store={store} form={form} onFinish={onFinish} paying={paying} isPC={false} />
                     </section>
-
                     <Divider style={styles.divider} />
-
                     <section ref={reviewSectionRef} style={{ padding: '0 16px' }}>
                         <Title level={3} style={styles.sectionTitle}>리뷰</Title>
-                        <ReviewList
-                            storeId={Number(id)}
-                            completedReservation={completedReservation}
-                            autoOpenWrite={stateOpenWrite}
-                            focusReviewId={stateOpenReviewId}
-                        />
+                        <ReviewList storeId={Number(id)} completedReservation={completedReservation}
+                            autoOpenWrite={stateOpenWrite} focusReviewId={stateOpenReviewId} />
                     </section>
                 </>
             )}
@@ -604,36 +524,7 @@ const StoreDetail = () => {
     );
 };
 
-// StoreCard <Tag color="blue"> + radius.sm(4px)와 동일한 모양
-// → 이제 Badge 컴포넌트로 이전하여 코드에서 제거
-//   src/components/common/Badge.jsx 참조
 const headerStyles = {
-    categoryBadge: {
-        display: 'inline-block',
-        background: '#e6f4ff',
-        color: '#1677ff',
-        fontSize: fontSize.xs,
-        fontWeight: fontWeight.medium,
-        padding: '2px 8px',
-        borderRadius: radius.sm,
-        border: 'none',
-        marginRight: 6,
-        marginBottom: 4,
-        lineHeight: '20px',
-    },
-    keywordBadge: {
-        display: 'inline-block',
-        background: colors.gray[100],
-        color: colors.text.secondary,
-        fontSize: fontSize.xs,
-        fontWeight: fontWeight.medium,
-        padding: '2px 8px',
-        borderRadius: radius.sm,
-        border: 'none',
-        marginRight: 6,
-        marginBottom: 4,
-        lineHeight: '20px',
-    },
     metaRow: {
         display: 'flex',
         alignItems: 'center',
@@ -644,57 +535,18 @@ const headerStyles = {
 };
 
 const styles = {
-    backBtn: { marginBottom: 12, padding: '4px 8px', fontSize: fontSize.sm, color: colors.text.secondary },
-    storeTitle: { fontSize: fontSize['5xl'], fontWeight: fontWeight.extrabold, marginBottom: 12, marginTop: 20 },
-    divider: { margin: '24px 0' },
-    sectionTitle: { marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold },
-    mainImg: { width: '100%', height: 'auto', display: 'block' },
-
-    // PC 전용
-    pcGrid: {
-        display: 'flex',
-        gap: 36,
-        alignItems: 'flex-start',
-    },
-    pcLeft: {
-        flex: '0 0 50%',
-        minWidth: 0,
-        maxWidth: 560,
-    },
-    pcRight: {
-        flex: 1,
-        minWidth: 320,
-        maxWidth: 440,
-        position: 'sticky',
-        top: 80,
-        alignSelf: 'flex-start',
-    },
-    pcImageWrapper: {
-        width: '100%',
-        overflow: 'hidden',
-        borderRadius: radius.xl,
-        lineHeight: 0,
-    },
-    pcMainImg: {
-        width: '100%',
-        height: 'auto',
-        display: 'block',
-    },
-
-    // 모바일 전용
-    mobileImageWrapper: {
-        width: '100%',
-        overflow: 'hidden',
-        marginBottom: 0,
-        lineHeight: 0,
-        borderRadius: radius.xl,
-    },
-    imgFavBtn: {
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        zIndex: 5,
-    },
+    backBtn:          { marginBottom: 12, padding: '4px 8px', fontSize: fontSize.sm, color: colors.text.secondary },
+    storeTitle:       { fontSize: fontSize['5xl'], fontWeight: fontWeight.extrabold, marginBottom: 12, marginTop: 20 },
+    divider:          { margin: '24px 0' },
+    sectionTitle:     { marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold },
+    mainImg:          { width: '100%', height: 'auto', display: 'block' },
+    pcGrid:           { display: 'flex', gap: 36, alignItems: 'flex-start' },
+    pcLeft:           { flex: '0 0 50%', minWidth: 0, maxWidth: 560 },
+    pcRight:          { flex: 1, minWidth: 320, maxWidth: 440, position: 'sticky', top: 80, alignSelf: 'flex-start' },
+    pcImageWrapper:   { width: '100%', overflow: 'hidden', borderRadius: radius.xl, lineHeight: 0 },
+    pcMainImg:        { width: '100%', height: 'auto', display: 'block' },
+    mobileImageWrapper: { width: '100%', overflow: 'hidden', marginBottom: 0, lineHeight: 0, borderRadius: radius.xl },
+    imgFavBtn:        { position: 'absolute', top: 12, right: 12, zIndex: 5 },
 };
 
 export default StoreDetail;

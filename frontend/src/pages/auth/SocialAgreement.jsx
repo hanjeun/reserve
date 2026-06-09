@@ -55,7 +55,9 @@ const SocialAgreement = () => {
                 </Text>
 
                 <div style={A.section}>
-                    <div style={A.allRow} onClick={() => handleAll(!allChecked)}>
+                    <div role="button" tabIndex={0} style={A.allRow}
+                        onClick={() => handleAll(!allChecked)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleAll(!allChecked); }}>
                         <Checkbox style={{ flexShrink: 0 }} checked={allChecked} onChange={e => handleAll(e.target.checked)} />
                         <Text style={A.allText}>RESERVE 서비스 이용에 모두 동의합니다</Text>
                     </div>
@@ -63,21 +65,27 @@ const SocialAgreement = () => {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div style={A.itemRow}>
-                            <div style={A.itemLeft} onClick={() => setAgreements(p => ({ ...p, terms: !p.terms }))}>
+                            <div role="button" tabIndex={0} style={A.itemLeft}
+                                onClick={() => setAgreements(p => ({ ...p, terms: !p.terms }))}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setAgreements(p => ({ ...p, terms: !p.terms })); }}>
                                 <Checkbox checked={agreements.terms} onChange={e => setAgreements(p => ({ ...p, terms: e.target.checked }))} />
                                 <Text style={A.itemText}><span style={A.requiredTag}>필수</span> 서비스 이용약관</Text>
                             </div>
                             <button style={A.viewLink} onClick={() => window.open('/terms', '_blank')}>보기</button>
                         </div>
                         <div style={A.itemRow}>
-                            <div style={A.itemLeft} onClick={() => setAgreements(p => ({ ...p, privacy: !p.privacy }))}>
+                            <div role="button" tabIndex={0} style={A.itemLeft}
+                                onClick={() => setAgreements(p => ({ ...p, privacy: !p.privacy }))}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setAgreements(p => ({ ...p, privacy: !p.privacy })); }}>
                                 <Checkbox checked={agreements.privacy} onChange={e => setAgreements(p => ({ ...p, privacy: e.target.checked }))} />
                                 <Text style={A.itemText}><span style={A.requiredTag}>필수</span> 개인정보 처리방침</Text>
                             </div>
                             <button style={A.viewLink} onClick={() => window.open('/privacy', '_blank')}>보기</button>
                         </div>
                         <div style={A.itemRow}>
-                            <div style={A.itemLeft} onClick={() => setAgreements(p => ({ ...p, marketing: !p.marketing }))}>
+                            <div role="button" tabIndex={0} style={A.itemLeft}
+                                onClick={() => setAgreements(p => ({ ...p, marketing: !p.marketing }))}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setAgreements(p => ({ ...p, marketing: !p.marketing })); }}>
                                 <Checkbox checked={agreements.marketing} onChange={e => setAgreements(p => ({ ...p, marketing: e.target.checked }))} />
                                 <Text style={A.itemText}><span style={A.optionalTag}>선택</span> 이메일 마케팅 수신 동의</Text>
                             </div>

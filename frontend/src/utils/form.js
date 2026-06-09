@@ -2,60 +2,65 @@
  * RESERVE - 폼 유틸리티
  */
 
+// null/undefined/빈 문자열이 아닐 때만 append
+const appendOptional = (fd, key, val) => {
+    if (val != null && val !== '') fd.append(key, val);
+};
+
 /**
  * 가게 등록/수정용 FormData 생성
  * @param {Object} values - 폼 값
  * @returns {FormData}
  */
 export const buildStoreFormData = (values) => {
-    const formData = new FormData();
+    const fd = new FormData();
 
-    formData.append('name',          values.name);
-    formData.append('category',      values.category);
-    formData.append('address',       values.address);
-    if (values.zipCode)       formData.append('zipCode',       values.zipCode);
-    if (values.addressDetail) formData.append('addressDetail', values.addressDetail);
-    if (values.latitude  != null) formData.append('latitude',  values.latitude);
-    if (values.longitude != null) formData.append('longitude', values.longitude);
-    formData.append('phone',         values.phone);
-    formData.append('description',   values.description || '');
-    formData.append('noShowDeposit', values.noShowDeposit || 0);
+    // 필수 필드
+    fd.append('name',        values.name);
+    fd.append('category',    values.category);
+    fd.append('address',     values.address);
+    fd.append('phone',       values.phone);
+    fd.append('description', values.description || '');
+    fd.append('noShowDeposit', values.noShowDeposit || 0);
 
-    // 환불 정책
-    formData.append('fullRefundDays',    values.fullRefundDays    != null ? values.fullRefundDays    : 3);
-    formData.append('partialRefundDays', values.partialRefundDays != null ? values.partialRefundDays : 1);
-    formData.append('partialRefundRate', values.partialRefundRate != null ? values.partialRefundRate : 50);
+    // 선택적 위치 정보
+    appendOptional(fd, 'zipCode',       values.zipCode);
+    appendOptional(fd, 'addressDetail', values.addressDetail);
+    appendOptional(fd, 'latitude',      values.latitude);
+    appendOptional(fd, 'longitude',     values.longitude);
+
+    // 환불 정책 (기본값 포함)
+    fd.append('fullRefundDays',    values.fullRefundDays    ?? 3);
+    fd.append('partialRefundDays', values.partialRefundDays ?? 1);
+    fd.append('partialRefundRate', values.partialRefundRate ?? 50);
 
     // 예약 슬롯 정책
-    formData.append('maxCapacityPerSlot',
-        (values.maxCapacityPerSlot != null && values.maxCapacityPerSlot !== '') ? String(values.maxCapacityPerSlot) : ''
+    fd.append('maxCapacityPerSlot',
+        (values.maxCapacityPerSlot != null && values.maxCapacityPerSlot !== '')
+            ? String(values.maxCapacityPerSlot) : ''
     );
-    formData.append('autoApprovalEnabled',       values.autoApprovalEnabled       ? 'true' : 'false');
-    formData.append('allowLatePayment',           values.allowLatePayment           ? 'true' : 'false');
-    formData.append('allowDuplicateReservation',  values.allowDuplicateReservation  ? 'true' : 'false');
-    formData.append('emailNotificationEnabled',   values.emailNotificationEnabled   ? 'true' : 'false');
+    fd.append('autoApprovalEnabled',      values.autoApprovalEnabled      ? 'true' : 'false');
+    fd.append('allowLatePayment',          values.allowLatePayment          ? 'true' : 'false');
+    fd.append('allowDuplicateReservation', values.allowDuplicateReservation ? 'true' : 'false');
+    fd.append('emailNotificationEnabled',  values.emailNotificationEnabled  ? 'true' : 'false');
 
-    // 예약 마감 시간 (비워두면 전송 안 함 → 백엔드 null = 제한 없음)
-    if (values.bookingDeadlineHours != null && values.bookingDeadlineHours !== '') {
-        formData.append('bookingDeadlineHours', values.bookingDeadlineHours);
-    }
+    // 예약 마감 시간 (없으면 미전송 → 백엔드 null = 제한 없음)
+    appendOptional(fd, 'bookingDeadlineHours', values.bookingDeadlineHours);
 
-    // 결제 대기 만료 시간 (기본 30분)
-    formData.append('paymentTimeoutMinutes', values.paymentTimeoutMinutes != null ? values.paymentTimeoutMinutes : 30);
+    fd.append('paymentTimeoutMinutes',  values.paymentTimeoutMinutes  ?? 30);
+    fd.append('reservationSlotMinutes', values.reservationSlotMinutes ?? 30);
 
-    // 예약 단위 시간 (기본 30분)
-    formData.append('reservationSlotMinutes', values.reservationSlotMinutes != null ? values.reservationSlotMinutes : 30);
-
+    // 영업 시간
     if (values.times) {
-        formData.append('openTime',  values.times[0].format('HH:mm'));
-        formData.append('closeTime', values.times[1].format('HH:mm'));
+        fd.append('openTime',  values.times[0].format('HH:mm'));
+        fd.append('closeTime', values.times[1].format('HH:mm'));
     }
 
-    // 브레이크 타임 (선택, 비워두면 서버에 null 전송 → DB null = 없음)
+    // 브레이크 타임 (선택)
     if (values.breakTimes?.[0] && values.breakTimes?.[1]) {
-        formData.append('breakStartTime', values.breakTimes[0].format('HH:mm'));
-        formData.append('breakEndTime',   values.breakTimes[1].format('HH:mm'));
+        fd.append('breakStartTime', values.breakTimes[0].format('HH:mm'));
+        fd.append('breakEndTime',   values.breakTimes[1].format('HH:mm'));
     }
 
-    return formData;
+    return fd;
 };

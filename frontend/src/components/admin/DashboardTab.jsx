@@ -96,8 +96,6 @@ const DashboardTab = () => {
 
     useEffect(() => { load(); }, [load]);
 
-    const s = stats;
-
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* 툴바 — 다른 탭과 동일한 FilterToolbar */}
@@ -109,10 +107,10 @@ const DashboardTab = () => {
                     <Card loading={loading} size="small">
                         <Statistic
                             title="사업자 신청"
-                            value={s?.totalBiz ?? '-'}
+                            value={stats?.totalBiz ?? '-'}
                             prefix={<ShopOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
@@ -120,10 +118,10 @@ const DashboardTab = () => {
                     <Card loading={loading} size="small">
                         <Statistic
                             title="조회된 예약"
-                            value={s?.totalRes ?? '-'}
+                            value={stats?.totalRes ?? '-'}
                             prefix={<CalendarOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>최근 100건</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
@@ -131,10 +129,10 @@ const DashboardTab = () => {
                     <Card loading={loading} size="small">
                         <Statistic
                             title="휴지통"
-                            value={s?.trashCount ?? '-'}
+                            value={stats?.trashCount ?? '-'}
                             prefix={<DeleteOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>복구 가능</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
@@ -142,52 +140,48 @@ const DashboardTab = () => {
                     <Card loading={loading} size="small">
                         <Statistic
                             title="감사 로그"
-                            value={s?.logCount ?? '-'}
+                            value={stats?.logCount ?? '-'}
                             prefix={<AuditOutlined style={{ color: colors.text.secondary }} />}
                             suffix={<Text type="secondary" style={{ fontSize: 12 }}>전체 누적</Text>}
-                            valueStyle={{ fontWeight: fontWeight.bold }}
+                            styles={{ content: { fontWeight: fontWeight.bold } }}
                         />
                     </Card>
                 </Col>
             </Row>
 
             {/* 차트 */}
-            {!loading && s && (
+            {!loading && stats && (
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <ChartCard title="예약 상태 분포" height={240}>
-                        {!s.reservationPieData?.length ? (
-                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Text type="secondary">데이터가 없습니다.</Text>
-                            </div>
-                        ) : (
-                            <ResponsiveContainer width="100%" height="100%">
+                        {stats.reservationPieData?.length ? (
+                            <ResponsiveContainer width="100%" height={240}>
                                 <PieChart>
                                     <Pie
-                                        data={s.reservationPieData}
+                                        data={stats.reservationPieData}
                                         cx="50%" cy="50%"
                                         innerRadius={55} outerRadius={90}
                                         paddingAngle={3} dataKey="value"
                                         label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                                         labelLine={false}
                                     >
-                                        {s.reservationPieData.map((_, i) => (
-                                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                                        {stats.reservationPieData.map((entry, i) => (
+                                            <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                                         ))}
                                     </Pie>
                                     <Tooltip formatter={(v) => `${v}건`} />
                                 </PieChart>
                             </ResponsiveContainer>
+                        ) : (
+                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text type="secondary">데이터가 없습니다.</Text>
+                            </div>
                         )}
                     </ChartCard>
 
                     <ChartCard title="휴지통 유형별 현황" height={240}>
-                        {!s.trashBarData?.length ? (
-                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Text type="secondary">휴지통이 비어있습니다.</Text>
-                            </div>
-                        ) : (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={s.trashBarData} margin={{ top: 4, right: 8, bottom: 4, left: -20 }}>
+                        {stats.trashBarData?.length ? (
+                            <ResponsiveContainer width="100%" height={240}>
+                                <BarChart data={stats.trashBarData} margin={{ top: 4, right: 8, bottom: 4, left: -20 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                                     <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -195,13 +189,17 @@ const DashboardTab = () => {
                                     <Bar dataKey="count" fill={CHART_COLORS.warning} radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
+                        ) : (
+                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text type="secondary">휴지통이 비어있습니다.</Text>
+                            </div>
                         )}
                     </ChartCard>
                 </div>
             )}
 
             {/* 감사 로그 요약 */}
-            {!loading && s?.actionCount && Object.keys(s.actionCount).length > 0 && (
+            {!loading && stats?.actionCount && Object.keys(stats.actionCount).length > 0 && (
                 <Card size="small" title="최근 감사 로그 요약">
                     <Row gutter={[24, 8]}>
                         {[
@@ -212,9 +210,9 @@ const DashboardTab = () => {
                             <Col key={key} xs={8}>
                                 <Statistic
                                     title={<span style={{ color }}>{label}</span>}
-                                    value={s.actionCount[key] || 0}
+                                    value={stats.actionCount[key] || 0}
                                     suffix="건"
-                                    valueStyle={{ fontSize: 20, fontWeight: fontWeight.bold, color }}
+                                    styles={{ content: { fontSize: 20, fontWeight: fontWeight.bold, color } }}
                                 />
                             </Col>
                         ))}
@@ -223,10 +221,10 @@ const DashboardTab = () => {
             )}
 
             {/* 스켈레톤 대체 */}
-            {loading && !s && (
+            {loading && !stats && (
                 <Row gutter={[16, 16]}>
-                    {[...Array(2)].map((_, i) => (
-                        <Col key={i} xs={24} md={12}>
+                    {(['chart-pie', 'chart-bar']).map((key) => (
+                        <Col key={key} xs={24} md={12}>
                             <Card loading size="small" style={{ height: 280 }} />
                         </Col>
                     ))}

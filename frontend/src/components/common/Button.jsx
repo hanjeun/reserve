@@ -1,6 +1,6 @@
 /**
  * RESERVE Design System - Button Component
- * 
+ *
  * variants:
  *   primary   - 파란 배경 (폼 제출)
  *   secondary - 회색 배경 (보조)
@@ -29,7 +29,6 @@ const VARIANTS = {
         borderRadius: radius.xl,
         boxShadow: 'none',
     },
-    // 테두리 없는 텍스트형 (취소, 리뷰쓰기, 리뷰보기 등)
     'ghost-sm': {
         background: 'transparent',
         color: colors.text.secondary,
@@ -101,10 +100,10 @@ const VARIANTS = {
 };
 
 const SIZE_HEIGHT = {
-    sm:   heights.buttonSm,   // 36px
-    md:   heights.buttonMd,   // 44px
-    lg:   heights.buttonLg,   // 56px
-    hero: heights.buttonHero, // 64px
+    sm:   heights.buttonSm,
+    md:   heights.buttonMd,
+    lg:   heights.buttonLg,
+    hero: heights.buttonHero,
 };
 
 const SIZE_FONT = {
@@ -133,6 +132,17 @@ const Button = ({
 
     const v = VARIANTS[variant] || VARIANTS.primary;
 
+    // 중첩 삼항 대신 if/else로 추출 (SonarCloud: no nested ternary)
+    let buttonHeight;
+    if (isGhostSm || isLink) buttonHeight = 'auto';
+    else if (isHero)          buttonHeight = heights.buttonHero;
+    else                      buttonHeight = SIZE_HEIGHT[size];
+
+    let buttonFontSize;
+    if (isGhostSm)   buttonFontSize = fontSize.sm;
+    else if (isHero) buttonFontSize = '19px';
+    else             buttonFontSize = SIZE_FONT[size];
+
     const baseStyle = {
         display: 'inline-flex',
         alignItems: 'center',
@@ -141,13 +151,12 @@ const Button = ({
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.45 : 1,
         fontWeight: isGhostSm ? fontWeight.medium : fontWeight.bold,
-        fontSize: isGhostSm ? fontSize.sm : isHero ? '19px' : SIZE_FONT[size],
-        height: isGhostSm || isLink ? 'auto' : isHero ? heights.buttonHero : SIZE_HEIGHT[size],
+        fontSize: buttonFontSize,
+        height: buttonHeight,
         width: block ? '100%' : undefined,
         transition: `all ${transitions.fast} ${transitions.easing}`,
         userSelect: 'none',
         outline: 'none',
-        // ghost-sm은 패딩 최소화
         padding: isGhostSm ? '2px 0' : undefined,
         ...v,
         ...style,
@@ -185,7 +194,6 @@ const Button = ({
                     appearance: none;
                     -webkit-tap-highlight-color: transparent;
                 }
-                /* primary / secondary / danger / hero: scale + opacity */
                 .reserve-btn--primary:active:not(:disabled),
                 .reserve-btn--secondary:active:not(:disabled),
                 .reserve-btn--danger:active:not(:disabled),
@@ -193,11 +201,10 @@ const Button = ({
                     transform: scale(0.96);
                     opacity: 0.88;
                 }
-                .reserve-btn--primary:hover:not(:disabled) { opacity: 0.9; }
-                .reserve-btn--secondary:hover:not(:disabled) { opacity: 0.85; }
-                .reserve-btn--hero:hover:not(:disabled) { opacity: 0.92; box-shadow: 0 12px 24px rgba(49,130,246,0.28); }
+                .reserve-btn--primary:hover:not(:disabled)  { opacity: 0.9; }
+                .reserve-btn--secondary:hover:not(:disabled){ opacity: 0.85; }
+                .reserve-btn--hero:hover:not(:disabled)     { opacity: 0.92; box-shadow: 0 12px 24px rgba(49,130,246,0.28); }
 
-                /* ghost-sm: 텍스트 색 살짝 어두워지며 눌리는 느낌 */
                 .reserve-btn--ghost-sm:hover:not(:disabled)         { opacity: 0.7; }
                 .reserve-btn--ghost-sm:active:not(:disabled)        { opacity: 0.5; transform: scale(0.95); }
                 .reserve-btn--ghost-sm-primary:hover:not(:disabled) { opacity: 0.7; }
@@ -207,14 +214,12 @@ const Button = ({
                 .reserve-btn--ghost-sm-danger:hover:not(:disabled)  { opacity: 0.7; }
                 .reserve-btn--ghost-sm-danger:active:not(:disabled) { opacity: 0.5; transform: scale(0.95); }
 
-                /* ghost / link */
-                .reserve-btn--outline:hover:not(:disabled) { border-color: #adb5bd; color: #6c757d; }
+                .reserve-btn--outline:hover:not(:disabled)  { border-color: #adb5bd; color: #6c757d; }
                 .reserve-btn--outline:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
-                .reserve-btn--ghost:hover:not(:disabled) { opacity: 0.7; }
-                .reserve-btn--ghost:active:not(:disabled) { opacity: 0.5; transform: scale(0.94); }
-                .reserve-btn--link:hover:not(:disabled) { opacity: 0.75; }
+                .reserve-btn--ghost:hover:not(:disabled)    { opacity: 0.7; }
+                .reserve-btn--ghost:active:not(:disabled)   { opacity: 0.5; transform: scale(0.94); }
+                .reserve-btn--link:hover:not(:disabled)     { opacity: 0.75; }
 
-                /* 스피너 */
                 .reserve-btn-spin {
                     display: inline-block;
                     width: 14px; height: 14px;

@@ -1,23 +1,23 @@
 import { useEffect, useRef } from 'react';
 
+// 중첩 방지: IntersectionObserver 콜백을 모듈 레벨로 분리
+const handleIntersection = (entries) => {
+    entries.forEach(e => {
+        if (e.isIntersecting) e.target.classList.add('rv');
+    });
+};
+
 export function useScrollReveal(isMobile) {
     const observerRef = useRef(null);
 
     useEffect(() => {
-        // 이전 observer 정리
         if (observerRef.current) {
             observerRef.current.disconnect();
             observerRef.current = null;
         }
 
-        // React가 새 DOM을 그린 뒤 observe하도록 딜레이
         const timer = setTimeout(() => {
-            const observer = new IntersectionObserver(
-                entries => entries.forEach(e => {
-                    if (e.isIntersecting) e.target.classList.add('rv');
-                }),
-                { threshold: 0.1 }
-            );
+            const observer = new IntersectionObserver(handleIntersection, { threshold: 0.1 });
             document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
             observerRef.current = observer;
         }, 50);

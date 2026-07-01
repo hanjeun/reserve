@@ -27,12 +27,15 @@ class SessionExpiredError extends Error {
     }
 }
 
-// 인증 관련 엔드포인트 여부 (refresh 재시도 제외 대상)
-const isAuthEndpoint = (url) =>
-    url?.includes('/api/auth/login')     ||
-    url?.includes('/api/auth/signup')    ||
-    url?.includes('/api/password-reset') ||
-    url?.includes('/api/email');
+// 인증 관련 엔드포인트 목록 (refresh 재시도 제외 대상)
+const AUTH_BYPASS_ROUTES = [
+    '/api/auth/login',
+    '/api/auth/signup',
+    '/api/password-reset',
+    '/api/email',
+];
+
+const isAuthEndpoint = (url) => AUTH_BYPASS_ROUTES.some(route => url?.includes(route));
 
 // 상태 코드별 기본 에러 메시지
 const getStatusMessage = (status) => {
@@ -66,8 +69,8 @@ const handle401 = async (originalRequest) => {
         const isInitCall = originalRequest.url?.includes('/api/member/me');
         if (!isInitCall) {
             localStorage.removeItem('auth-storage');
-            if (!window.location.pathname.includes('/login')) {
-                window.location.href = '/login';
+            if (!globalThis.location.pathname.includes('/login')) {
+                globalThis.location.href = '/login';
             }
         }
         throw new SessionExpiredError();
@@ -109,7 +112,12 @@ instance.interceptors.response.use(
 
         if (error.response) {
             const msg = error.response.data?.message || getStatusMessage(error.response.status);
-            throw new Error(msg);
+            const err = new Error(msg);
+            // 구조화된 에러 데이터(예: 정지 status/until/reason)를 손실 없이 동행
+            // 호출측에서 err.data로 접근 가능 (e.g. err.data?.reason)
+            err.data = error.response.data?.data;
+            err.status = error.response.status;
+            throw err;
         }
 
         throw new Error('네트워크를 확인해주세요.');

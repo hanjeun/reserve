@@ -27,11 +27,11 @@ spring:
       client:
         registration:
           google:
-            redirect-uri: http://localhost:8080/login/oauth2/code/google
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
           naver:
-            redirect-uri: http://localhost:8080/login/oauth2/code/naver
+            redirect-uri: "{baseUrl}/login/oauth2/code/naver"
           kakao:
-            redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
 
 # 서버 설정
 server:
@@ -53,5 +53,6 @@ s3:
 # CORS 로컬 허용 출처 추가 (common.yml의 운영 도메인에 덮어쓰기가 아닌 추가)
 cors:
   allowed-origins:
-    - https://reserve.it.kr
-    - http://localhost:5173
+    - "http://localhost:5173"
+    - "https://reserve.it.kr"
+    - "https://slouching-blubber-worst.ngrok-free.dev"

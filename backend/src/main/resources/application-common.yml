@@ -106,10 +106,9 @@ mail:
 portone:
   pg-provider: ${PORTONE_PG_PROVIDER:kakaopay}
 
-# CORS 허용 출처
+# CORS 허용 출처 (쉼표 구분 — @Value List<String> 바인딩)
 cors:
-  allowed-origins:
-    - https://reserve.it.kr
+  allowed-origins: "https://reserve.it.kr"
 
 # Actuator (헬스체크)
 management:

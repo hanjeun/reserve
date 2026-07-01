@@ -4,7 +4,7 @@
 
 <img src="frontend/public/icons/RESERVE_logo.png" alt="RESERVE" width="340" />
 
-**범용 예약 플랫폼** — 가게를 찾고, 예약하고, 결제까지 한번에
+**미식 예약 플랫폼** — 식당을 찾고, 예약하고, 결제까지 한번에
 
 🌐 **[reserve.it.kr](https://reserve.it.kr)**
 
@@ -22,7 +22,7 @@
 
 ## 소개
 
-RESERVE는 예약 경험을 더 쉽고 빠르게 만들기 위한 범용 풀스택 예약 플랫폼입니다.
+RESERVE는 미식의 즐거움을 더 쉽고 빠르게 만들기 위한 식당 예약 플랫폼입니다.
 
 손님은 원하는 가게를 검색하고 간편하게 예약할 수 있으며, 사장님은 예약 관리와 승인/거절을 한 곳에서 처리할 수 있습니다. 노쇼 방지를 위한 예약금 결제 기능도 제공합니다.
 
@@ -32,15 +32,15 @@ RESERVE는 예약 경험을 더 쉽고 빠르게 만들기 위한 범용 풀스�
 
 | 홈 | 가게 목록 |
 |---|---|
-| ![홈](docs/screenshots/home.png) | ![가게 목록](docs/screenshots/stores.png) |
+| ![홈](docs/images/home.png) | ![가게 목록](docs/images/stores.png) |
 
 | 가게 상세 · 예약 | 관리자 패널 |
 |---|---|
-| ![가게 상세](docs/screenshots/store-detail.png) | ![관리자 패널](docs/screenshots/admin.png) |
+| ![가게 상세](docs/images/store-detail.png) | ![관리자 패널](docs/images/admin.png) |
 
 | 사업자 패널 | 모니터링 |
 |---|---|
-| ![사업자 패널](docs/screenshots/business.png) | ![Grafana](docs/screenshots/grafana.png) |
+| ![사업자 패널](docs/images/business.png) | ![Grafana](docs/images/grafana.png) |
 
 ---
 
@@ -89,31 +89,7 @@ RESERVE는 예약 경험을 더 쉽고 빠르게 만들기 위한 범용 풀스�
 
 ## 아키텍처
 
-```mermaid
-graph TD
-    User["사용자"] --> R53["Route 53\nreserve.it.kr"]
-    R53 --> LS
-
-    subgraph LS["AWS Lightsail · 서울"]
-        Nginx["Nginx :80/:443"]
-        Blue["Spring Boot Blue :8080"]
-        Green["Spring Boot Green :8081"]
-        MySQL["MySQL 8.0"]
-        Monitor["Grafana + Loki\ngrafana.reserve.it.kr"]
-
-        Nginx -->|"/api/*"| Blue
-        Nginx -->|"/api/*"| Green
-        Nginx -->|"/*"| Static["React SPA"]
-        Blue --> MySQL
-        Green --> MySQL
-        Monitor --> Blue
-    end
-
-    Blue --> S3["AWS S3"]
-    S3 --> CF["CloudFront\ncdn.reserve.it.kr"]
-    Portone["포트원 V2"] -.-> Blue
-    OAuth["Google / Naver / Kakao"] -.-> Blue
-```
+![RESERVE 아키텍처](docs/images/RESERVE_Architecture.png)
 
 **배포 흐름** — main 브랜치에 push되면 GitHub Actions가 자동으로 실행됩니다
 

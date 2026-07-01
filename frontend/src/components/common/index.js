@@ -20,3 +20,4 @@ export { StoreCardSkeleton, ReservationCardSkeleton, MyReservationCardSkeleton, 
 export { default as KakaoMap } from './KakaoMap';
 export { default as FavoriteButton } from './FavoriteButton';
 export { default as FilterToolbar } from './FilterToolbar';
+export { default as CustomPagination } from './CustomPagination';

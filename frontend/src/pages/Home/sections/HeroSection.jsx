@@ -23,14 +23,34 @@ function renderParts(current, line) {
     );
 }
 
-export default function HeroSection() {
+const ANIMATION = `bounceAppear 0.75s cubic-bezier(0.22,1,0.36,1) 0.6s forwards, bounceY 1.6s ease-in-out 1.5s infinite`;
+
+export default function HeroSection({ isMobile }) {
     const navigate = useNavigate();
     const { current, lineIdx } = useLineLoop();
 
     return (
-        <div style={{ ...styles.contentArea, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            {/* 다른 섹션들과 동일한 maxWidth 1000 박스 */}
-            <div style={{ width: '100%', maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{
+            ...styles.contentArea,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            padding: isMobile ? '0 20px' : '0 24px',
+        }}>
+
+            {/* ── 상단 spacer: 콘텐츠를 세로 중앙으로 밀어올림 ── */}
+            <div style={{ flex: 1 }} />
+
+            {/* ── 메인 콘텐츠 ── */}
+            <div style={{
+                width: '100%',
+                maxWidth: 1000,
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+            }}>
                 <div className="slide-up" style={{ ...styles.badge, animationDelay: '0.05s' }}>
                     가장 쉬운 예약 경험
                 </div>
@@ -56,14 +76,25 @@ export default function HeroSection() {
                     </Button>
                 </div>
             </div>
+
+            {/* ── 하단 spacer: 콘텐츠를 세로 중앙으로 밀어내림 ── */}
+            <div style={{ flex: 1 }} />
+
+            {/* ── BounceArrow ──
+              * 모바일: flex 마지막 자식 → spacer 아래, 컨테이너 하단에 자연스럽게 붙음
+              * PC:     absolute bottom:0 유지 (콘텐츠 흐름 밖)
+              */}
             <BounceArrow
                 targetId="section-0"
                 style={{
-                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    position: 'absolute',
+                    bottom: isMobile ? 10 : 0,  // ✨ 핵심: 모바일은 띄우고, PC는 바닥에 붙임
+                    left: 0,
+                    right: 0,
                     opacity: 0,
-                    animation: `bounceAppear 0.75s cubic-bezier(0.22,1,0.36,1) 0.6s forwards, bounceY 1.6s ease-in-out 1.5s infinite`,
+                    animation: ANIMATION,
                 }}
-            />
+                />
         </div>
     );
 }

@@ -16,7 +16,7 @@ import {
 import { useMessage } from '../../hooks';
 import { API_ENDPOINTS } from '../../constants';
 import { USER_ROLE_LABELS, hasOwnerAccess } from '../../constants/roles';
-import { colors, radius, shadows, heights, fontWeight, suspendBanner as SB } from '../../styles/tokens';
+import { colors, radius, shadows, heights, fontWeight } from '../../styles/tokens';
 import Avatar from '../common/Avatar';
 
 const { Header: AntHeader } = Layout;
@@ -31,7 +31,7 @@ const Header = () => {
     // RESERVE 로고 클릭: 홈이면 맨 위로 스크롤, 아니면 홈으로 이동
     const handleLogoClick = (e) => {
         e.preventDefault();
-        
+
         if (location.pathname === '/') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
@@ -96,43 +96,32 @@ const Header = () => {
         return items;
     };
 
+    // 주의: 정지/영구정지 회원은 이제 로그인 자체가 차단되므로(이메일/소셜 공통)
+    // 로그인된 상태에서 배너를 띄우는 분기는 더 이상 필요하지 않음 — 완전히 제거됨
     return (
-        <>
-            <AntHeader style={styles.header}>
-                <a href="/" onClick={handleLogoClick} style={styles.logo}>RESERVE</a>
-                <Space size="middle">
-                    {isLoggedIn ? (
-                        <Dropdown
-                            menu={{ items: getMenuItems() }}
-                            placement="bottomRight"
-                            arrow={{ pointAtCenter: true }}
-                            trigger={['click']}
-                        >
-                            <div style={styles.myPageTrigger}>
-                                <Avatar src={user?.profileImage} size={36} />
-                            </div>
-                        </Dropdown>
-                    ) : (
-                        <Space size={8}>
-                            <Button type="text" onClick={() => navigate('/login')} style={styles.navBtn}>로그인</Button>
-                            <Button type="primary" onClick={() => navigate('/signup')} style={styles.actionBtn}>시작하기</Button>
-                        </Space>
-                    )}
-                </Space>
-            </AntHeader>
-            {isLoggedIn && user?.status === 'SUSPENDED' && (
-                <div style={{ ...SB.base, ...SB.suspended }}>
-                    {user?.suspendedUntil?.substring(0, 10)}까지 이용 제한된 계정입니다.
-                    {user?.suspendReason ? ` 사유: ${user.suspendReason}` : ''}
-                </div>
-            )}
-            {isLoggedIn && user?.status === 'BANNED' && (
-                <div style={{ ...SB.base, ...SB.banned }}>
-                    영구 이용 제한된 계정입니다.
-                    {user?.suspendReason ? ` 사유: ${user.suspendReason}` : ''}
-                </div>
-            )}
-        </>
+        <AntHeader style={styles.header}>
+            <a href="/" onClick={handleLogoClick} style={styles.logo}>RESERVE</a>
+            <Space size="middle">
+                {isLoggedIn ? (
+                    <Dropdown
+                        menu={{ items: getMenuItems() }}
+                        placement="bottomRight"
+                        arrow={{ pointAtCenter: true }}
+                        trigger={['click']}
+                        getPopupContainer={(trigger) => trigger.parentElement ?? document.body}
+                    >
+                        <div style={styles.myPageTrigger}>
+                            <Avatar src={user?.profileImageUrl || user?.profileImage} size={36} />
+                        </div>
+                    </Dropdown>
+                ) : (
+                    <Space size={8}>
+                        <Button type="text" onClick={() => navigate('/login')} style={styles.navBtn}>로그인</Button>
+                        <Button type="primary" onClick={() => navigate('/signup')} style={styles.actionBtn}>시작하기</Button>
+                    </Space>
+                )}
+            </Space>
+        </AntHeader>
     );
 };
 

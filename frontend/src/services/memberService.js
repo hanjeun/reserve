@@ -29,6 +29,10 @@ const memberService = {
 
     /** 회원 탈퇴 */
     deleteMember: () => api.delete(API_ENDPOINTS.MEMBER.DELETE),
+
+    /** 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경) */
+    updateMarketingConsent: (marketingAgreed) =>
+        api.patch(API_ENDPOINTS.MEMBER.MARKETING_CONSENT, { marketingAgreed }),
 };
 
 export default memberService;

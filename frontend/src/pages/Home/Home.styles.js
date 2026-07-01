@@ -94,9 +94,11 @@ export const styles = {
 
     // ── 모바일 섹션 ──
     sectionMobile: {
+        // minHeight 복원: 모바일에서도 섹션이 화면을 꽉 채워야 V버튼 클릭 시 다음 섹션 침범 없이 깔끔함
+        // overscroll-behavior-y: none은 이미 제거했으므로 스크롤 고정 느낙 없음
         minHeight: `calc(100dvh - ${heights.header})`,
         scrollMarginTop: heights.header,
-        padding: '32px 20px 32px',
+        padding: '60px 20px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',

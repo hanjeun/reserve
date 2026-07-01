@@ -7,14 +7,10 @@ import com.reserve.mailbox.entity.AdminMail;
 import com.reserve.mailbox.entity.AdminSentMail;
 import com.reserve.mailbox.repository.AdminMailRepository;
 import com.reserve.mailbox.repository.AdminSentMailRepository;
-import com.reserve.member.entity.Member;
-import com.reserve.member.repository.MemberRepository;
 import com.reserve.reservation.entity.Reservation;
 import com.reserve.reservation.repository.ReservationRepository;
 import com.reserve.review.entity.Review;
 import com.reserve.review.repository.ReviewRepository;
-import com.reserve.store.entity.Store;
-import com.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,6 +24,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 감사 로그(AuditLog) + 휴지통(Trash) 서비스.
+ *
+ * 설계 메모: 휴지통(소프트 삭제 + 복구)은 "실수로 지워도 되돌릴 수 있어야 하는" 콘텐츠 —
+ * 예약(RESERVATION), 리뷰(REVIEW), 메일(MAIL/SENT_MAIL) — 에만 적용한다.
+ * 회원(MEMBER)/가게(STORE)는 운영 정책 위반에 대한 제재이므로 정지/영구정지로 처리하며
+ * (AdminManagementController 참고) 더 이상 이 서비스에서 소프트 삭제하지 않는다.
+ * logMemberSanction/logStoreSanction은 제재 행위를 감사 로그로만 남기고
+ * 실제 soft-delete 엔트리(휴지통 표시 대상)를 만들지 않는다.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -39,13 +45,11 @@ public class AuditLogService {
     private final AuditLogRepository auditLogRepository;
     private final AdminMailRepository adminMailRepository;
     private final AdminSentMailRepository adminSentMailRepository;
-    private final MemberRepository memberRepository;
-    private final StoreRepository storeRepository;
     private final ReservationRepository reservationRepository;
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
 
-    // ── 소프트 삭제 + 스냅샷 저장 ──────────────────────────────
+    // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
 
     @Transactional
     public void softDeleteMail(Long mailId) {
@@ -65,37 +69,6 @@ public class AuditLogService {
         saveAuditLog("SENT_MAIL", mailId, "SOFT_DELETE",
                 Map.of("toEmail", mail.getToEmail(), "subject", nullSafe(mail.getSubject())));
         log.info("SentMail soft-deleted: id={}", mailId);
-    }
-
-    @Transactional
-    public void softDeleteMember(Long memberId) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new IllegalArgumentException("Member not found: " + memberId));
-        member.softDelete();
-        saveAuditLog("MEMBER", memberId, "SOFT_DELETE", Map.of(
-                "이름",   nullSafe(member.getName()),
-                "이메일", member.getEmail(),
-                "권한",   member.getRole().name(),
-                "로그인", member.getProvider() != null ? member.getProvider().name() : "LOCAL"
-        ));
-        log.info("Member soft-deleted: id={}", memberId);
-    }
-
-    @Transactional
-    public void softDeleteStore(Long storeId) {
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Store not found: " + storeId));
-        store.softDelete();
-        // PENDING 예약 자동 취소
-        int cancelled = reservationRepository.cancelPendingReservationsByStoreId(storeId);
-        if (cancelled > 0) log.info("Auto-cancelled {} pending reservations for soft-deleted store: id={}", cancelled, storeId);
-        saveAuditLog("STORE", storeId, "SOFT_DELETE", Map.of(
-                "가게명",   store.getName(),
-                "카테고리", nullSafe(store.getCategory()),
-                "주소",   nullSafe(store.getAddress()),
-                "대표자", store.getOwner().getName() != null ? store.getOwner().getName() : store.getOwner().getEmail()
-        ));
-        log.info("Store soft-deleted: id={}", storeId);
     }
 
     /**
@@ -139,18 +112,16 @@ public class AuditLogService {
         log.info("Review soft-deleted: id={}", reviewId);
     }
 
-    // ── 복구 ──────────────────────────────────────────────────
+    // ── 복구 (예약/리뷰/메일만 해당) ──────────────────────────────
 
     @Transactional
     public void restore(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
             case "MAIL"        -> adminMailRepository.restoreById(entityId);
             case "SENT_MAIL"   -> adminSentMailRepository.restoreById(entityId);
-            case "MEMBER"      -> memberRepository.restoreById(entityId);
-            case "STORE"       -> storeRepository.restoreById(entityId);
             case "RESERVATION" -> reservationRepository.restoreById(entityId);
             case "REVIEW"      -> reviewRepository.restoreById(entityId);
-            default -> throw new IllegalArgumentException("Unknown entity type: " + entityType);
+            default -> throw new IllegalArgumentException("휴지통 복구가 지원되지 않는 항목입니다: " + entityType);
         }
         // 휴지통에서 제거 (SOFT_DELETE 로그 삭제)
         auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);
@@ -158,7 +129,7 @@ public class AuditLogService {
         log.info("Entity restored: type={}, id={}", entityType, entityId);
     }
 
-    // ── 제재 / 인증 로그 ────────────────────────────────────────
+    // ── 제재 / 인증 로그 (회원/가게 — 휴지통 미사용, 감사 로그만 기록) ──────
 
     /**
      * 회원 제재 로그 (정지/영구정지/해제)
@@ -170,6 +141,18 @@ public class AuditLogService {
                 Map.of("이메일", memberEmail, "사유", detail),
                 getCurrentUserEmail());
         log.info("Member sanction logged: id={}, action={}", memberId, action);
+    }
+
+    /**
+     * 가게 제재 로그 (영업정지/영구폐업/해제)
+     * action: SUSPEND | BAN | UNBAN
+     */
+    @Transactional
+    public void logStoreSanction(Long storeId, String storeName, String action, String detail) {
+        saveAuditLogWithActor("STORE", storeId, action,
+                Map.of("가게명", storeName, "사유", detail),
+                getCurrentUserEmail());
+        log.info("Store sanction logged: id={}, action={}", storeId, action);
     }
 
     /**
@@ -221,7 +204,7 @@ public class AuditLogService {
                 "HARD_DELETE", Map.of(), "TrashCleanupScheduler");
     }
 
-    // ── 영구 삭제 ──────────────────────────────────────────────
+    // ── 영구 삭제 (예약/리뷰/메일만 해당) ──────────────────────────
 
     @Transactional
     public void hardDelete(String entityType, Long entityId) {
@@ -256,11 +239,9 @@ public class AuditLogService {
         switch (entityType.toUpperCase()) {
             case "MAIL"        -> adminMailRepository.deleteById(entityId);
             case "SENT_MAIL"   -> adminSentMailRepository.deleteById(entityId);
-            case "MEMBER"      -> memberRepository.deleteById(entityId);
-            case "STORE"       -> storeRepository.deleteById(entityId);
             case "RESERVATION" -> reservationRepository.deleteById(entityId);
             case "REVIEW"      -> reviewRepository.deleteById(entityId);
-            default -> throw new IllegalArgumentException("Unknown entity type: " + entityType);
+            default -> throw new IllegalArgumentException("휴지통 영구삭제가 지원되지 않는 항목입니다: " + entityType);
         }
     }
 
@@ -298,7 +279,7 @@ public class AuditLogService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return "system";
         Object principal = auth.getPrincipal();
-        if (principal instanceof Member m) {
+        if (principal instanceof com.reserve.member.entity.Member m) {
             return m.getEmail();
         }
         String name = auth.getName();

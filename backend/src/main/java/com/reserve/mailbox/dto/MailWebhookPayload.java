@@ -4,47 +4,60 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * ImprovMX 웹훅 수신 페이로드
- * ImprovMX가 POST로 전달하는 JSON 구조
+ *
+ * ImprovMX 실제 전송 형식 (from/to 모두 객체):
+ * {
+ *   "from": { "name": "홍길동", "email": "user@example.com" },
+ *   "to":   [{ "name": "RESERVE", "email": "reserve@reserve.it.kr" }],
+ *   "subject": "문의사항",
+ *   "text": "본문",
+ *   "html": "<p>본문</p>"
+ * }
+ *
+ * 주의: from이 flat string("홍길동 <email>")이 아닌 객체임.
+ * 이전 파싱 방식(indexOf('<')) 제거.
  */
 @Getter
 @NoArgsConstructor
 public class MailWebhookPayload {
 
     @JsonProperty("from")
-    private String from;         // "홍길동 <user@example.com>" 또는 "user@example.com"
+    private EmailAddress from;
 
     @JsonProperty("to")
-    private String to;
+    private List<EmailAddress> to;
 
     @JsonProperty("subject")
     private String subject;
 
     @JsonProperty("text")
-    private String text;         // 본문 (plain text) — 저장용
+    private String text;       // plain text 저장용 (XSS 방지)
 
     @JsonProperty("html")
-    private String html;         // 본문 (HTML) — 사용하지 않음 (XSS 방지)
+    private String html;       // 사용하지 않음
 
-    /** "홍길동 <user@example.com>" 형식에서 이메일만 추출 */
+    /** 발신자 이메일 */
     public String parseEmail() {
-        if (from == null) return null;
-        int start = from.indexOf('<');
-        int end   = from.indexOf('>');
-        if (start != -1 && end != -1 && end > start) {
-            return from.substring(start + 1, end).trim();
-        }
-        return from.trim();
+        return from != null ? from.getEmail() : null;
     }
 
-    /** "홍길동 <user@example.com>" 형식에서 이름만 추출 */
+    /** 발신자 이름 (없으면 null) */
     public String parseName() {
-        if (from == null) return null;
-        int start = from.indexOf('<');
-        if (start > 0) {
-            return from.substring(0, start).trim();
-        }
-        return null;
+        return from != null ? from.getName() : null;
+    }
+
+    // ── 중첩 DTO ─────────────────────────────────────────────────────────
+    @Getter
+    @NoArgsConstructor
+    public static class EmailAddress {
+        @JsonProperty("name")
+        private String name;
+
+        @JsonProperty("email")
+        private String email;
     }
 }

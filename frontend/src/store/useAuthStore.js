@@ -33,8 +33,12 @@ const useAuthStore = create(
                     }
                     set({ user: null, isLoggedIn: false });
                     return null;
-                } catch {
-                    set({ user: null, isLoggedIn: false });
+                } catch (err) {
+                    // 인증 만료(401/403) 또는 세션 만료가 확정된 경우에만 로그아웃 처리
+                    // 네트워크 오류 등 일시적인 문제로는 기존 로그인 상태를 유지
+                    if (err?.status === 401 || err?.status === 403 || err?.isSessionExpired) {
+                        set({ user: null, isLoggedIn: false });
+                    }
                     return null;
                 }
             },
@@ -51,8 +55,10 @@ const useAuthStore = create(
                     }
                     set({ user: null, isLoggedIn: false });
                     return null;
-                } catch {
-                    set({ user: null, isLoggedIn: false });
+                } catch (err) {
+                    if (err?.status === 401 || err?.status === 403 || err?.isSessionExpired) {
+                        set({ user: null, isLoggedIn: false });
+                    }
                     return null;
                 }
             },

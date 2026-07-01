@@ -50,10 +50,11 @@ export const API_ENDPOINTS = {
         DELETE:          (id) => `/api/reviews/${id}`,
     },
     MEMBER: {
-        ME:            '/api/member/me',
-        UPDATE:        '/api/member/update',
-        DELETE:        '/api/member/delete',
-        PROFILE_IMAGE: '/api/member/profile-image',
+        ME:                '/api/member/me',
+        UPDATE:            '/api/member/update',
+        PROFILE_IMAGE:     '/api/member/profile-image',
+        DELETE:            '/api/member/delete',
+        MARKETING_CONSENT: '/api/member/me/marketing-consent',
     },
     BUSINESS: {
         SUBMIT:         '/api/business-verification/submit',
@@ -111,12 +112,13 @@ export const API_ENDPOINTS = {
     },
     ADMIN_MANAGE: {
         MEMBERS:              '/api/admin/manage/members',
-        MEMBER_DELETE:        (id) => `/api/admin/manage/members/${id}`,
         MEMBER_SUSPEND:       (id) => `/api/admin/manage/members/${id}/suspend`,
         MEMBER_BAN:           (id) => `/api/admin/manage/members/${id}/ban`,
         MEMBER_UNBAN:         (id) => `/api/admin/manage/members/${id}/unban`,
         STORES:               '/api/admin/manage/stores',
-        STORE_DELETE:         (id) => `/api/admin/manage/stores/${id}`,
+        STORE_SUSPEND:        (id) => `/api/admin/manage/stores/${id}/suspend`,
+        STORE_BAN:            (id) => `/api/admin/manage/stores/${id}/ban`,
+        STORE_UNBAN:          (id) => `/api/admin/manage/stores/${id}/unban`,
         RESERVATION_DELETE:   (id) => `/api/admin/manage/reservations/${id}`,
     },
 };

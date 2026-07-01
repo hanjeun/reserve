@@ -10,25 +10,15 @@ import ReservationStatusBadge from './ReservationStatusBadge';
 import { Button } from '../common';
 import { formatTime, formatCurrency, getThumbnailUrl } from '../../utils';
 import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
+import { useWindowWidth } from '../../hooks';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 
-// 576px 기준으로 PC/모바일 분기
-const useIsWide = () => {
-    const [wide, setWide] = React.useState(() => window.innerWidth >= 576);
-    React.useEffect(() => {
-        const handler = () => setWide(window.innerWidth >= 576);
-        window.addEventListener('resize', handler);
-        return () => window.removeEventListener('resize', handler);
-    }, []);
-    return wide;
-};
-
 const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow, onRemove }) => {
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
-    const isWide = useIsWide();
+    const isWide = useWindowWidth() >= 576;
 
     const { id, memberName, storeName, storeMainImageUrl, reservationDate, reservationTime, guestCount, depositAmount, status, specialRequest } = reservation;
 

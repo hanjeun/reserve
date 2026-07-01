@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import api from '../../../api/axios';
 import useDebounce from '../../../hooks/useDebounce';
@@ -23,6 +24,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const detailRef      = useRef(null);
     const isEditMode     = useRef(false);
     const selectedRef    = useRef(false);
+    const touchState     = useRef({ startX: 0, scrollStart: 0 });
     const debouncedQuery = useDebounce(query, 400);
 
     const setSelectedBoth = (val) => { setSelected(val); selectedRef.current = val; };
@@ -111,8 +113,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') e.preventDefault();
         if (!open) return;
-        if (e.key === 'ArrowDown')                     { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, results.length - 1)); }
-        else if (e.key === 'ArrowUp')                  { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
+        if (e.key === 'ArrowDown')                     { e.preventDefault(); setActiveIdx(i => (i < results.length - 1 ? i + 1 : i)); }
+        else if (e.key === 'ArrowUp')                  { e.preventDefault(); setActiveIdx(i => (i > 0 ? i - 1 : -1)); }
         else if (e.key === 'Enter' && activeIdx >= 0) { handleSelect(results[activeIdx]); }
         else if (e.key === 'Escape')                  { setOpen(false); }
     };
@@ -134,10 +136,11 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
             {/* ① 도로명 주소 검색창 */}
             <div style={{ position: 'relative' }}>
                 <div style={boxStyle(focused)}>
-                    <EnvironmentOutlined style={{ color: colors.text.tertiary, fontSize: 14, marginRight: 8, flexShrink: 0 }} />
-                    {/* id: Form.Item label for 연결 */}
+                    <EnvironmentOutlined style={{ color: selected ? colors.primary.main : colors.text.tertiary, fontSize: 14, marginRight: 8, flexShrink: 0, transition: 'color 0.2s' }} />
+                    {/* id: Form.Item label for 연결 / name: 브라우저 자동완성 식별 */}
                     <input
                         id={id}
+                        name={id || 'address'}
                         autoComplete="off"
                         value={query}
                         onChange={handleQueryChange}
@@ -181,6 +184,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                 {open && results.length > 0 && (
                     <div
                         role="listbox"
+                        tabIndex={-1}
                         aria-label="주소 검색 결과"
                         onMouseDown={() => { skipBlurRef.current = true; }}
                         style={{
@@ -207,6 +211,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                                     onMouseDown={() => handleSelect(doc)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(doc); }}
                                     onMouseEnter={() => setActiveIdx(i)}
+                                    onMouseLeave={() => setActiveIdx(-1)}
                                     style={{
                                         display: 'flex', alignItems: 'flex-start', gap: 10,
                                         padding: '10px 14px', cursor: 'pointer',
@@ -240,23 +245,36 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
             </div>
 
             {/* ② 선택 후 — 우편번호 + 상세주소 */}
-            {/* minWidth: 0 — 긴 건물명이 있어도 부모 박스 밖으로 넘치지 않도록 */}
             {(selected || zipCode) && (
                 <div style={{ display: 'flex', gap: 8, minWidth: 0, width: '100%', animation: animation.slideUpIn }}>
                     {zipCode && (
-                        <div style={{ ...boxStyle(false), width: 76, flexShrink: 0, cursor: 'default' }}>
-                            <input
-                                readOnly tabIndex={-1} value={zipCode}
-                                style={{
-                                    width: '100%', border: 'none', outline: 'none', background: 'transparent',
-                                    fontSize: fontSize.sm, color: colors.text.tertiary,
-                                    fontFamily: 'inherit', cursor: 'default', textAlign: 'center',
-                                }}
-                            />
+                        // 우편번호: readOnly → div 기반 터치 스크롤 컨테이너
+                        <div style={{ ...boxStyle(false), width: 76, flexShrink: 0, cursor: 'default', overflow: 'hidden' }}>
+                            <div style={{
+                                width: '100%',
+                                overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none',
+                                msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch',
+                                fontSize: fontSize.base,
+                                color: colors.text.primary,
+                                fontFamily: 'inherit', userSelect: 'none', textAlign: 'center',
+                            }}>
+                                {zipCode}
+                            </div>
                         </div>
                     )}
-                    {/* flex: 1, minWidth: 0 — 모바일에서 상세주소 잘림 방지 */}
-                    <div style={{ ...boxStyle(detailFocused), flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    {/* 상세주소: 터치 드래그로 스크롤 — onTouchStart/Move로 scrollLeft 조작 */}
+                    <div
+                        style={{ ...boxStyle(detailFocused), flex: 1, minWidth: 0, overflow: 'hidden', touchAction: 'pan-y' }}
+                        onTouchStart={(e) => {
+                            touchState.current.startX = e.touches[0].clientX;
+                            touchState.current.scrollStart = detailRef.current?.scrollLeft || 0;
+                        }}
+                        onTouchMove={(e) => {
+                            if (!detailRef.current || touchState.current.startX == null) return;
+                            const dx = touchState.current.startX - e.touches[0].clientX;
+                            detailRef.current.scrollLeft = (touchState.current.scrollStart ?? 0) + dx;
+                        }}
+                    >
                         <input
                             ref={detailRef}
                             autoComplete="off"
@@ -269,6 +287,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             style={{
                                 flex: 1, minWidth: 0, width: '100%', border: 'none', outline: 'none', background: 'transparent',
                                 fontSize: fontSize.base, color: colors.text.primary, fontFamily: 'inherit',
+                                overflowX: 'auto', whiteSpace: 'nowrap',
                             }}
                         />
                     </div>
@@ -276,6 +295,16 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
             )}
         </div>
     );
+};
+
+AddressSearch.propTypes = {
+    id:            PropTypes.string,
+    value:         PropTypes.string,
+    zipCode:       PropTypes.string,
+    addressDetail: PropTypes.string,
+    onChange:      PropTypes.func,
+    onMeta:        PropTypes.func,
+    placeholder:   PropTypes.string,
 };
 
 export default AddressSearch;

@@ -125,7 +125,7 @@ const AppFooter = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280 }}>
                             <div style={{ fontSize: 20, fontWeight: 800, color: colors.primary.main, letterSpacing: '-0.5px' }}>RESERVE</div>
                             <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, lineHeight: 1.7 }}>
-                                다양한 업종을 위한 범용 예약 플랫폼.<br />
+                                미식의 즐거움 버튼 클릭 한 번으로,<br />
                                 예약부터 결제까지 한 번에.
                             </Text>
                             <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>

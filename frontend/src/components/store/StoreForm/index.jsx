@@ -2,25 +2,12 @@ import React from 'react';
 import { Form, Typography } from 'antd';
 import { PageContainer } from '../../common';
 import { fontWeight, fontSize } from '../../../styles/tokens';
+import { useWindowWidth } from '../../../hooks';
 import StoreBasicInfo from './StoreBasicInfo';
 import StoreImages from './StoreImages';
 import StoreFormActions from './StoreFormActions';
 
 const { Title, Text } = Typography;
-
-const BREAKPOINT = 768;
-
-const useIsMobile = () => {
-    const [isMobile, setIsMobile] = React.useState(
-        typeof window !== 'undefined' ? window.innerWidth < BREAKPOINT : true
-    );
-    React.useEffect(() => {
-        const handler = () => setIsMobile(window.innerWidth < BREAKPOINT);
-        window.addEventListener('resize', handler);
-        return () => window.removeEventListener('resize', handler);
-    }, []);
-    return isMobile;
-};
 
 const StoreForm = ({
     mode = 'create',
@@ -36,7 +23,7 @@ const StoreForm = ({
     formRef,
     initialValues: externalInitialValues,
 }) => {
-    const isMobile  = useIsMobile();
+    const isMobile  = useWindowWidth() < 768;
     const title     = mode === 'create' ? '가게 등록' : '가게 정보 수정';
     const subtitle  = mode === 'create'
         ? '가게 정보를 입력하고 예약을 받아보세요.'
@@ -58,6 +45,7 @@ const StoreForm = ({
                 onKeyDown={(e) => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault(); }}
                 layout="vertical"
                 size="large"
+                validateTrigger="onBlur"
                 requiredMark={false}
                 initialValues={mode === 'create' ? {
                     autoApprovalEnabled: false,

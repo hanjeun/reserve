@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons';
 import { PageContainer, Button, FilterToolbar, MyReservationCardSkeleton } from '../../components/common';
 import ReservationStatusBadge from '../../components/reservation/ReservationStatusBadge';
-import { useReservations, useMessage, usePayment } from '../../hooks';
+import { useReservations, useMessage, usePayment, useWindowWidth } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
@@ -29,16 +29,6 @@ const STATUS_OPTIONS = [
     { value: 'NO_SHOW',   label: '노쇼' },
 ];
 
-const useIsWide = () => {
-    const [wide, setWide] = React.useState(() => window.innerWidth >= 576);
-    React.useEffect(() => {
-        const handler = () => setWide(window.innerWidth >= 576);
-        window.addEventListener('resize', handler);
-        return () => window.removeEventListener('resize', handler);
-    }, []);
-    return wide;
-};
-
 const MyReservations = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -46,7 +36,7 @@ const MyReservations = () => {
     const { reservations, loading, cancelReservation, refetch } = useReservations();
     const { user } = useAuthStore();
     const { pay, paying } = usePayment();
-    const isWide = useIsWide();
+    const isWide = useWindowWidth() >= 576;
     useDocumentTitle('내 예약');
 
     const [statusFilter, setStatusFilter] = useState('ALL');

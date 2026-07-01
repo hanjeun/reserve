@@ -5,11 +5,20 @@
   font-family: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
 }
 
+html {
+  /* iOS WebKit(Safari/Chrome) 수평 viewport 밀림 원천 차단 */
+  /* overflow-x: hidden; */
+  max-width: 100%;
+}
+
 body {
   margin: 0;
   display: block;
   background-color: #f8f9fa;
   color: #333;
+  /* iOS WebKit 수평 밀림 방지 — html과 함께 양쪽에 걸어야 확실히 막힘 */
+  /* overflow-x: hidden; */
+  max-width: 100%;
 }
 
 #root {
@@ -33,10 +42,157 @@ a {
 .ant-tabs-nav-operations {
     display: none !important;
 }
+
+/* 모바일 input 자동 확대 방지 (iOS Safari: font-size < 16px 시 자동 줌) */
+@media (max-width: 768px) {
+    input, textarea, select {
+        font-size: 16px !important;
+    }
+}
+/*
 .ant-tabs-nav-wrap {
     overflow-x: auto !important;
     scrollbar-width: none;
 }
 .ant-tabs-nav-wrap::-webkit-scrollbar {
     display: none;
+}
+*/
+
+/* ── Toss 스타일 페이지네이션 글로벌 적용 ────────────────────────────────────────── */
+.ant-pagination {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important; /* 모바일에서 여러 줄로 꺾여 깨지는 레이아웃 방지 */
+    padding: 4px 0 !important;
+}
+
+/* ── 번호 아이템 ── */
+.ant-pagination .ant-pagination-item {
+    min-width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    background: transparent !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background-color 0.15s ease, transform 0.15s ease !important;
+}
+.ant-pagination .ant-pagination-item a {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #4e5968 !important;
+    padding: 0 !important;
+    line-height: 32px !important;
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+}
+.ant-pagination .ant-pagination-item:hover {
+    background-color: #f2f4f6 !important;
+}
+.ant-pagination .ant-pagination-item:hover a {
+    color: #1a1f27 !important;
+}
+
+/* ── 선택된 번호 — 얕은 회색 배경 + 스프링 스케일 애니메이션 ── */
+.ant-pagination .ant-pagination-item-active {
+    background-color: #e5e8eb !important; /* 토스 스타일 연한 회색 배경 */
+    border: none !important;
+    transform: scale(1.04) !important;
+    transition: background-color 0.2s ease,
+                transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+.ant-pagination .ant-pagination-item-active a {
+    color: #1a1f27 !important;
+    font-weight: 600 !important;
+}
+.ant-pagination .ant-pagination-item-active:hover {
+    background-color: #e5e8eb !important;
+    opacity: 0.95 !important;
+}
+
+/* ── 이전 / 다음 버튼 ── */
+.ant-pagination .ant-pagination-prev,
+.ant-pagination .ant-pagination-next {
+    min-width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next .ant-pagination-item-link {
+    border-radius: 8px !important;
+    border: none !important;
+    background: transparent !important;
+    color: #4e5968 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    transition: background-color 0.15s ease !important;
+}
+.ant-pagination .ant-pagination-prev:hover .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next:hover .ant-pagination-item-link {
+    background-color: #f2f4f6 !important;
+    color: #1a1f27 !important;
+}
+.ant-pagination .ant-pagination-disabled .ant-pagination-item-link {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    background: transparent !important;
+}
+
+/* ── 줄임표 (…) ── */
+.ant-pagination .ant-pagination-jump-prev,
+.ant-pagination .ant-pagination-jump-next {
+    min-width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    margin: 0 !important;
+    color: #4e5968 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.ant-pagination .ant-pagination-jump-prev .ant-pagination-item-container,
+.ant-pagination .ant-pagination-jump-next .ant-pagination-item-container {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* ── 모바일: 버튼 크기 30px (모바일 화면 내에서 꺾임 없이 세련되고 콤팩트하게) ── */
+@media (max-width: 768px) {
+    .ant-pagination {
+        gap: 2px !important;
+    }
+    .ant-pagination .ant-pagination-item {
+        min-width: 30px !important;
+        height: 30px !important;
+        line-height: 30px !important;
+        border-radius: 6px !important;
+    }
+    .ant-pagination .ant-pagination-item a {
+        font-size: 13px !important;
+        line-height: 30px !important;
+    }
+    .ant-pagination .ant-pagination-prev,
+    .ant-pagination .ant-pagination-next,
+    .ant-pagination .ant-pagination-jump-prev,
+    .ant-pagination .ant-pagination-jump-next {
+        min-width: 30px !important;
+        height: 30px !important;
+    }
 }

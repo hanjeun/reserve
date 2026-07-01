@@ -13,12 +13,13 @@ import { colors } from '../../styles/tokens';
 const Avatar = ({ src, size = 36, style }) => {
     const [imgError, setImgError] = useState(false);
 
-    // src 변경 시 에러 상태 초기화 — 일반적인 패턴으로 안전함
+    // src 변경 시 에러 상태 초기화
     useEffect(() => {
         if (imgError) setImgError(false); // eslint-disable-line react-hooks/set-state-in-effect
     }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // blob: / data: URL은 그대로, 서버 상대경로만 절대경로로 변환
+    // 소셜 로그인 시 https:// 시작하는 외부 URL이 올 수 있음 → getImageUrl이 그대로 반환
     const imgUrl = (src?.startsWith('blob:') || src?.startsWith('data:')) ? src : getImageUrl(src, null);
     const showImg = imgUrl && !imgError;
 

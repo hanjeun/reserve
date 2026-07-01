@@ -17,13 +17,13 @@ export default function Home() {
     return (
         <div style={{ backgroundColor: colors.background.default, overflowX: 'hidden' }}>
 
-            <HeroSection />
+            <HeroSection isMobile={isMobile} />
 
             {SECTIONS.map((sec, i) => (
                 <FeatureSection key={sec.id} sec={sec} index={i} isMobile={isMobile} />
             ))}
 
-            <FaqSection />
+            <FaqSection isMobile={isMobile} />
 
             <style>{`
                 .slide-up {

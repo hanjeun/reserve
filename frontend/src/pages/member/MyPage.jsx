@@ -183,7 +183,7 @@ const ProfileImageTab = ({ user }) => {
         }
     };
 
-    const previewSrc = pending?.previewUrl ?? user?.profileImage;
+    const previewSrc = pending?.previewUrl ?? (user?.profileImageUrl || user?.profileImage);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -570,55 +570,81 @@ const bizStyles = {
     },
 };
 
-// ─── 알림 설정 섹션 ──────────────────────────────────────────────────────────
+// ─── 알림 설정 + 마케팅 수신 동의 (하나의 카드로 통합) ────────────────────────
 
 const NotificationSection = ({ user }) => {
     const { message } = useMessage();
-    // user.emailNotificationEnabled: undefined(구 캐시) → true로 fallback되는 걸 막기 위해
-    // boolean 타입인지 명시적으로 체크
-    const [enabled, setEnabled] = useState(
-        typeof user?.emailNotificationEnabled === 'boolean'
-            ? user.emailNotificationEnabled
-            : true
-    );
-    const [loading, setLoading] = useState(false);
 
-    // checkAuth 이후 user가 업데이트되면 동기화
+    // ── 예약 알림 ──
+    const [notiEnabled, setNotiEnabled] = useState(
+        typeof user?.emailNotificationEnabled === 'boolean' ? user.emailNotificationEnabled : true
+    );
+    const [notiLoading, setNotiLoading] = useState(false);
+
+    // ── 마케팅 수신 ──
+    const [marketingAgreed, setMarketingAgreed] = useState(user?.marketingAgreed ?? false);
+    const [marketingLoading, setMarketingLoading] = useState(false);
+
+    // user 갱신(checkAuth) 시 동기화
     useEffect(() => {
-        if (typeof user?.emailNotificationEnabled === 'boolean') {
-            setEnabled(user.emailNotificationEnabled);
-        }
+        if (typeof user?.emailNotificationEnabled === 'boolean') setNotiEnabled(user.emailNotificationEnabled);
     }, [user?.emailNotificationEnabled]);
 
-    const handleToggle = async (checked) => {
-        setLoading(true);
+    useEffect(() => {
+        if (typeof user?.marketingAgreed === 'boolean') setMarketingAgreed(user.marketingAgreed);
+    }, [user?.marketingAgreed]);
+
+    const handleNotiToggle = async (checked) => {
+        setNotiLoading(true);
         try {
             await memberService.updateMember({ emailNotificationEnabled: checked });
-            setEnabled(checked);
-            // authStore의 user도 최신화
+            setNotiEnabled(checked);
             useAuthStore.getState().login({ ...user, emailNotificationEnabled: checked });
-            message.success(checked ? '예약 알림 메일을 켰습니다' : '예약 알림 메일을 껐습니다');
+            message.success(checked ? '메일 알림에 동의했습니다' : '메일 알림 동의를 철회했습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');
         } finally {
-            setLoading(false);
+            setNotiLoading(false);
+        }
+    };
+
+    const handleMarketingToggle = async (checked) => {
+        setMarketingLoading(true);
+        try {
+            await memberService.updateMarketingConsent(checked);
+            setMarketingAgreed(checked);
+            useAuthStore.getState().login({ ...user, marketingAgreed: checked });
+            message.success(checked ? '마케팅 수신에 동의했습니다' : '마케팅 수신 동의를 철회했습니다');
+        } catch (err) {
+            handleApiError(err, message, '설정 변경에 실패했습니다');
+        } finally {
+            setMarketingLoading(false);
         }
     };
 
     return (
         <div style={styles.notificationSection}>
             <Text strong style={styles.sectionTitle}>알림 설정</Text>
+
+            {/* 예약 알림 */}
             <div style={styles.notifRow}>
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>예약 알림 메일</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>예약 승인/거절 시 이메일로 알림 받기</Text>
                 </div>
-                <Switch
-                    size="small"
-                    checked={enabled}
-                    loading={loading}
-                    onChange={handleToggle}
-                />
+                <Switch size="small" checked={notiEnabled} loading={notiLoading} onChange={handleNotiToggle} />
+            </div>
+
+            {/* 구분선 */}
+            <div style={{ borderTop: `1px solid ${colors.border.light}`, margin: '4px 0' }} />
+
+            {/* 마케팅 수신 */}
+            <div style={styles.notifRow}>
+                <div>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>이메일 마케팅 수신</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>프로모션·신기능 안내 메일 받기 (선택 동의)</Text>
+                </div>
+                <Switch size="small" checked={marketingAgreed} loading={marketingLoading} onChange={handleMarketingToggle} />
             </div>
         </div>
     );
@@ -687,7 +713,7 @@ const MyPage = () => {
 
             {/* 프로필 헤더 */}
             <div style={styles.profileHeader}>
-                <Avatar src={user?.profileImage} size={56} />
+                <Avatar src={user?.profileImageUrl || user?.profileImage} size={56} />
                 <div>
                     <Text strong style={styles.userName}>{user?.name}</Text>
                     <Text style={styles.userEmail}>{user?.email}</Text>
@@ -707,7 +733,7 @@ const MyPage = () => {
 
             <Divider />
 
-            {/* 알림 설정 */}
+            {/* 알림 설정 + 마케팅 수신 동의 (통합 카드) */}
             <NotificationSection user={user} />
 
             <Divider />

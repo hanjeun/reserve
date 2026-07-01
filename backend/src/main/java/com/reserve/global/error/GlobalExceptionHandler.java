@@ -7,9 +7,36 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * 회원 정지/영구정지 로그인 차단
+     * 구조화된 정지 정보(status/until/reason)를 ApiResponse.data로 포함하여 프론트엔드에 전달.
+     * 이메일 로그인은 URL 리다이렉션이 아닌 일반 JSON 응답이므로
+     * 메시지 인코딩/길이 제한 없이 사유 등 정보를 온전히 담을 수 있음.
+     */
+    @ExceptionHandler(MemberSuspendedException.class)
+    protected ResponseEntity<ApiResponse<Map<String, String>>> handleMemberSuspended(MemberSuspendedException e) {
+        log.warn("Login blocked (suspended): status={}, until={}", e.getSuspendStatus(), e.getSuspendedUntil());
+
+        Map<String, String> data = new HashMap<>();
+        data.put("status", e.getSuspendStatus());
+        if (e.getSuspendedUntil() != null) data.put("until", e.getSuspendedUntil());
+        if (e.getReason() != null) data.put("reason", e.getReason());
+
+        return ResponseEntity
+                .status(e.getStatus())
+                .body(ApiResponse.<Map<String, String>>builder()
+                        .success(false)
+                        .message(e.getMessage())
+                        .data(data)
+                        .build());
+    }
 
     /**
      * 비즈니스 예외 통합 처리 (도메인별 Custom Exception들)
@@ -20,7 +47,7 @@ public class GlobalExceptionHandler {
         if (e.getStatus().is5xxServerError()) {
             log.error(" Server Business Error [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         } else {
-            log.warn("⚠️ Client Business Warning [{}]: {}", e.getClass().getSimpleName(), e.getMessage());
+            log.warn("Client Business Warning [{}]: {}", e.getClass().getSimpleName(), e.getMessage());
         }
 
         return ResponseEntity

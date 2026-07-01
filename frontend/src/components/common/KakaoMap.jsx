@@ -7,6 +7,17 @@ import { colors, fontSize, radius } from '../../styles/tokens';
  * - IntersectionObserver로 뷰포트 진입 시에만 초기화 (Lazy Load)
  * - 좌표 있으면 바로, 없으면 주소 Geocoding (저장된 좌표 없는 기존 가게 폴백)
  */
+// XSS 방지: storeName 등 외부 입력값을 HTML에 삽입 전 이스케이프
+const escapeHtml = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
+
 const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => {
     const containerRef = useRef(null);
     const mapRef       = useRef(null);
@@ -44,6 +55,8 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
             });
 
             if (storeName) {
+                const safeStoreName = escapeHtml(storeName);
+                const safeMapUrl = encodeURI(kakaoMapUrl ?? '');
                 const content = `
                     <div style="
                         position: relative;
@@ -60,8 +73,8 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
                         white-space: nowrap;
                         cursor: pointer;
                         border: 1px solid rgba(0,0,0,0.08);
-                    " onclick="globalThis.open('${kakaoMapUrl}', '_blank')">
-                        ${storeName}
+                    " onclick="globalThis.open('${safeMapUrl}', '_blank')">
+                        ${safeStoreName}
                         <div style="
                             position: absolute;
                             bottom: -6px;

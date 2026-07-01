@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Image, Typography, Form, Carousel, Divider } from 'antd';
 import {
@@ -11,28 +11,15 @@ import {
 import dayjs from 'dayjs';
 import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
 import { ReviewList } from '../../components/review';
-import { useStoreData, useMessage, usePayment } from '../../hooks';
+import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
-import { getDetailImageUrl, formatTimeForApi, formatDate } from '../../utils';
+import { getDetailImageUrl } from '../../utils';
 import { colors, radius, fontWeight, fontSize, heights } from '../../styles/tokens';
-import { reservationService, favoriteService } from '../../services';
 import { VALIDATION_RULES } from '../../utils/validation';
 
 const { Title, Text } = Typography;
 
-// 반응형 브레이크포인트
 const BREAKPOINT = 900;
-const useIsPC = () => {
-    const [isPC, setIsPC] = React.useState(
-        typeof window !== 'undefined' ? window.innerWidth >= BREAKPOINT : false
-    );
-    React.useEffect(() => {
-        const h = () => setIsPC(window.innerWidth >= BREAKPOINT);
-        window.addEventListener('resize', h);
-        return () => window.removeEventListener('resize', h);
-    }, []);
-    return isPC;
-};
 
 const customStyles = `
   .ant-picker-cell::before, .ant-picker-cell-inner::before { display: none !important; }
@@ -103,70 +90,99 @@ const inputStyles = {
     },
 };
 
-// 가게 상세 정보 섹션
+// ─── StoreInfoSection 행 빌더 헬퍼 (모듈 레벨 — 복잡도 분산) ───
+
+/** 분 단위 숫자를 "N분 / N시간 / N시간 N분" 문자열로 변환 */
+const formatMinLabel = (min) => {
+    if (min < 60)          return `${min}분`;
+    if (min % 60 === 0)    return `${min / 60}시간`;
+    return `${Math.floor(min / 60)}시간 ${min % 60}분`;
+};
+
+const buildAddressRow = (store) => {
+    if (!store.address) return null;
+    const full = store.addressDetail ? `${store.address} ${store.addressDetail}` : store.address;
+    return { Icon: EnvironmentOutlined, label: '주소', value: full, link: `https://map.kakao.com/link/search/${encodeURIComponent(full)}` };
+};
+
+const buildHoursRow = (store) => {
+    if (!store.openTime || !store.closeTime) return null;
+    const base = `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}`;
+    const value = (store.breakStartTime && store.breakEndTime)
+        ? `${base}  (브레이크 ${store.breakStartTime.substring(0, 5)} ~ ${store.breakEndTime.substring(0, 5)})`
+        : base;
+    return { Icon: ClockCircleOutlined, label: '영업 시간', value };
+};
+
+const buildDepositRow = (store) => {
+    if (store.noShowDeposit <= 0) return null;
+    return { Icon: CreditCardOutlined, label: '노쇼 예약금', value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}원 (예약 후 결제)`, highlight: true };
+};
+
+const buildRefundRow = (store) => {
+    const hasRefund = store.fullRefundDays > 0 || store.partialRefundDays > 0;
+    if (store.noShowDeposit <= 0 || !hasRefund) return null;
+    const parts = [];
+    if (store.fullRefundDays > 0)                                         parts.push(`방문 ${store.fullRefundDays}일 전까지 전액 환불`);
+    if (store.partialRefundDays > 0 && store.partialRefundRate > 0)       parts.push(`방문 ${store.partialRefundDays}일 전까지 ${store.partialRefundRate}% 환불`);
+    parts.push('이후 환불 불가');
+    return { Icon: RollbackOutlined, label: '환불 정책', value: parts, isMultiLine: true };
+};
+
+const buildDeadlineRow = (store) => {
+    if (store.bookingDeadlineHours <= 0) return null;
+    return { Icon: FieldTimeOutlined, label: '예약 마감', value: `방문 ${store.bookingDeadlineHours}시간 전까지 예약 가능` };
+};
+
+const buildPaymentTimeoutRow = (store) => {
+    if (store.noShowDeposit <= 0 || store.paymentTimeoutMinutes <= 0) return null;
+    return { Icon: ThunderboltOutlined, label: '결제 마감', value: `예약 후 ${formatMinLabel(store.paymentTimeoutMinutes)} 이내 미결제 시 자동 취소` };
+};
+
+const buildSlotRow = (store) => ({
+    Icon: HourglassOutlined,
+    label: '예약 단위',
+    value: `${formatMinLabel(store.reservationSlotMinutes ?? 30)} 단위로 예약 가능`,
+});
+
+const buildCapacityRow = (store) => {
+    if (store.maxCapacityPerSlot <= 0) return null;
+    return { Icon: TeamOutlined, label: '최대 인원', value: `${store.maxCapacityPerSlot}명` };
+};
+
+/** 행 값 렌더러 — IIFE를 컴포넌트로 대체해 StoreInfoSection 복잡도 감소 */
+const RowValue = ({ row }) => {
+    if (row.isMultiLine) {
+        const last = row.value[row.value.length - 1];
+        return row.value.map(v => (
+            <div key={v} style={v === last ? { color: colors.error?.main || '#ff4d4f' } : {}}>{v}</div>
+        ));
+    }
+    if (row.link) {
+        return (
+            <a href={row.link} target="_blank" rel="noopener noreferrer"
+                style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}
+                onMouseEnter={e => e.target.style.color = colors.primary.main}
+                onMouseLeave={e => e.target.style.color = colors.text.secondary}>
+                {row.value}
+            </a>
+        );
+    }
+    return row.value;
+};
+
+// 가게 상세 정보 섹션 — Cognitive Complexity: 30 → ~5
 const StoreInfoSection = ({ store, description }) => {
-    const rows = [];
-
-    if (store.address) {
-        const fullAddress = store.addressDetail
-            ? `${store.address} ${store.addressDetail}`
-            : store.address;
-        const kakaoMapUrl = `https://map.kakao.com/link/search/${encodeURIComponent(fullAddress)}`;
-        rows.push({
-            Icon: EnvironmentOutlined, label: '주소',
-            value: fullAddress,
-            link: kakaoMapUrl,
-        });
-    }
-
-    if (store.openTime && store.closeTime) {
-        rows.push({
-            Icon: ClockCircleOutlined, label: '영업 시간',
-            value: store.breakStartTime && store.breakEndTime
-                ? `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}  (브레이크 ${store.breakStartTime.substring(0, 5)} ~ ${store.breakEndTime.substring(0, 5)})`
-                : `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}`,
-        });
-    }
-    if (store.noShowDeposit > 0) {
-        rows.push({
-            Icon: CreditCardOutlined, label: '노쇼 예약금',
-            value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}원 (예약 후 결제)`,
-            highlight: true,
-        });
-    }
-    const hasRefundPolicy = store.fullRefundDays > 0 || store.partialRefundDays > 0;
-    if (store.noShowDeposit > 0 && hasRefundPolicy) {
-        const parts = [];
-        if (store.fullRefundDays > 0) parts.push(`방문 ${store.fullRefundDays}일 전까지 전액 환불`);
-        if (store.partialRefundDays > 0 && store.partialRefundRate > 0)
-            parts.push(`방문 ${store.partialRefundDays}일 전까지 ${store.partialRefundRate}% 환불`);
-        parts.push('이후 환불 불가');
-        rows.push({ Icon: RollbackOutlined, label: '환불 정책', value: parts, isMultiLine: true });
-    }
-    if (store.bookingDeadlineHours > 0) {
-        rows.push({
-            Icon: FieldTimeOutlined, label: '예약 마감',
-            value: `방문 ${store.bookingDeadlineHours}시간 전까지 예약 가능`,
-        });
-    }
-    if (store.noShowDeposit > 0 && store.paymentTimeoutMinutes > 0) {
-        const ptMin = store.paymentTimeoutMinutes;
-        const ptLabel = ptMin < 60 ? `${ptMin}분`
-            : ptMin % 60 === 0 ? `${ptMin / 60}시간`
-            : `${Math.floor(ptMin / 60)}시간 ${ptMin % 60}분`;
-        rows.push({
-            Icon: ThunderboltOutlined, label: '결제 마감',
-            value: `예약 후 ${ptLabel} 이내 미결제 시 자동 취소`,
-        });
-    }
-    const slotMin = store.reservationSlotMinutes ?? 30;
-    const slotLabel = slotMin < 60 ? `${slotMin}분`
-        : slotMin % 60 === 0 ? `${slotMin / 60}시간`
-        : `${Math.floor(slotMin / 60)}시간 ${slotMin % 60}분`;
-    rows.push({ Icon: HourglassOutlined, label: '예약 단위', value: `${slotLabel} 단위로 예약 가능` });
-    if (store.maxCapacityPerSlot > 0) {
-        rows.push({ Icon: TeamOutlined, label: '최대 인원', value: `${store.maxCapacityPerSlot}명` });
-    }
+    const rows = [
+        buildAddressRow(store),
+        buildHoursRow(store),
+        buildDepositRow(store),
+        buildRefundRow(store),
+        buildDeadlineRow(store),
+        buildPaymentTimeoutRow(store),
+        buildSlotRow(store),
+        buildCapacityRow(store),
+    ].filter(Boolean);
 
     if (rows.length === 0 && !description) return null;
 
@@ -188,20 +204,7 @@ const StoreInfoSection = ({ store, description }) => {
                         <row.Icon style={infoStyles.icon} />
                         <span style={infoStyles.label}>{row.label}</span>
                         <div style={{ ...infoStyles.value, ...(row.highlight ? infoStyles.highlight : {}) }}>
-                            {(() => {
-                                if (row.isMultiLine) return row.value.map((v) => (
-                                    <div key={v} style={v === row.value[row.value.length - 1] ? { color: colors.error?.main || '#ff4d4f' } : {}}>{v}</div>
-                                ));
-                                if (row.link) return (
-                                    <a href={row.link} target="_blank" rel="noopener noreferrer"
-                                        style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}
-                                        onMouseEnter={e => e.target.style.color = colors.primary.main}
-                                        onMouseLeave={e => e.target.style.color = colors.text.secondary}>
-                                        {row.value}
-                                    </a>
-                                );
-                                return row.value;
-                            })()}
+                            <RowValue row={row} />
                         </div>
                     </div>
                     {i < rows.length - 1 && <div style={infoStyles.divider} />}
@@ -262,7 +265,7 @@ const buildDisabledTime = (store) => {
 };
 
 const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => {
-    const disabledTime = buildDisabledTime(store);
+    const disabledTime = React.useMemo(() => buildDisabledTime(store), [store]);
     return (
     <div style={isPC ? pcFormStyles.panel : {}}>
         <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
@@ -304,8 +307,6 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => {
 
 const pcFormStyles = {
     panel: {
-        position: 'sticky',
-        top: 80,
         background: colors.background.paper,
         borderRadius: radius.xl,
         border: `1px solid ${colors.border.light}`,
@@ -317,94 +318,30 @@ const pcFormStyles = {
 const StoreDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const location = useLocation();
     const { message } = useMessage();
     const { isLoggedIn, user } = useAuthStore();
     const { pay, paying } = usePayment();
     const { store, loading, error } = useStoreData(id);
     const [form] = Form.useForm();
-    const isPC = useIsPC();
+    const isPC = useWindowWidth() >= BREAKPOINT;
+
+    const {
+        completedReservation,
+        stateOpenWrite,
+        stateOpenReviewId,
+        reviewSectionRef,
+        onFinish,
+    } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message });
+
+    React.useEffect(() => {
+        if (error) message.error(error);
+    }, [error, message]);
     useDocumentTitle(
         store?.name ?? null,
         store
             ? `${store.name} 예약 | ${store.category ? store.category + ' ' : ''}${store.address ? store.address + '. ' : ''}RESERVE에서 간편하게 예약하세요.`
             : undefined
     );
-
-    const [completedReservation, setCompletedReservation] = React.useState(null);
-    const [favoriteStatus, setFavoriteStatus] = React.useState(false);
-    const stateOpenWrite    = location.state?.openWrite    ?? false;
-    const stateOpenReviewId = location.state?.openReviewId ?? null;
-    const reviewSectionRef  = React.useRef(null);
-
-    React.useEffect(() => {
-        if (error) message.error(error);
-    }, [error, message]);
-
-    React.useEffect(() => {
-        favoriteService.getStatus(Number(id))
-            .then(res => setFavoriteStatus(res?.isFavorite ?? false))
-            .catch(() => {});
-    }, [id]);
-
-    React.useEffect(() => {
-        if (!isLoggedIn) return;
-        reservationService.getMyReservations().then(list => {
-            const num = Number(id);
-            const sorted = (list ?? []).filter(r => r.storeId === num).sort((a, b) => b.id - a.id);
-            const completed = sorted.find(r => r.status === 'COMPLETED') ?? null;
-            if (completed) setCompletedReservation({ reservationId: completed.id, reviewId: completed.reviewId ?? null });
-        }).catch(() => {});
-    }, [id, isLoggedIn]);
-
-    React.useEffect(() => {
-        if ((stateOpenWrite || stateOpenReviewId) && reviewSectionRef.current) {
-            const t = setTimeout(() => reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
-            return () => clearTimeout(t);
-        }
-    }, [stateOpenWrite, stateOpenReviewId]);
-
-    const onFinish = async (values) => {
-        if (!isLoggedIn) {
-            message.warning('로그인이 필요한 서비스입니다.');
-            navigate('/login', { state: { from: { pathname: `/store/${id}` } } });
-            return;
-        }
-        const dt = values.reservationDate
-            .hour(values.reservationTime.hour()).minute(values.reservationTime.minute()).second(0).millisecond(0);
-        if (dt.isBefore(dayjs())) {
-            form.setFields([{ name: 'reservationTime', errors: ['이미 지난 시간입니다.'] }]); return;
-        }
-        try {
-            const hasDeposit  = store?.noShowDeposit > 0;
-            const skipPayment = hasDeposit && store?.allowLatePayment === true;
-            const reservation = await reservationService.createReservation({
-                ...values, storeId: Number(id),
-                reservationDate: formatDate(values.reservationDate),
-                reservationTime: formatTimeForApi(values.reservationTime),
-                ...(skipPayment && { skipPayment: true }),
-            });
-            if (reservation?.depositAmount > 0) {
-                if (store?.allowLatePayment) {
-                    message.success({ content: `예약이 완료되었습니다. 예약금 ${Number(reservation.depositAmount).toLocaleString('ko-KR')}원을 나중에 결제해주세요.`, duration: 4 });
-                    navigate('/my-reservations');
-                } else {
-                    message.info({ content: '예약이 접수되었습니다. 노쇼 예약금을 결제해주세요.', duration: 3 });
-                    await pay(
-                        { id: reservation.id, storeName: store?.name, depositAmount: reservation.depositAmount },
-                        { name: user?.name, email: user?.email, phone: user?.phone }
-                    );
-                }
-                return;
-            }
-            message.success('예약이 완료되었습니다.');
-            navigate('/my-reservations');
-        } catch (err) {
-            // Error 객체(axios new Error) 또는 legacy 문자열 모두 처리
-            const errMsg = err instanceof Error ? err.message : typeof err === 'string' ? err : null;
-            message.error({ content: errMsg || '예약에 실패했습니다. 다시 시도해주세요.', duration: 5 });
-        }
-    };
 
     if (loading) return (
         <PageContainer size={isPC ? 'xl' : 'md'} paddingTop={isPC ? '32px' : '20px'}>
@@ -440,7 +377,7 @@ const StoreDetail = () => {
                                 </Carousel>
                             </div>
                             <div style={styles.imgFavBtn}>
-                                <FavoriteButton storeId={Number(id)} initialStatus={favoriteStatus} size="sm" />
+                                <FavoriteButton storeId={Number(id)} size="sm" />
                             </div>
                         </div>
                         <div style={{ marginTop: 20, marginBottom: 4 }}>
@@ -485,7 +422,7 @@ const StoreDetail = () => {
                                 </Carousel>
                             </div>
                             <div style={styles.imgFavBtn}>
-                                <FavoriteButton storeId={Number(id)} initialStatus={favoriteStatus} size="sm" />
+                                <FavoriteButton storeId={Number(id)} size="sm" />
                             </div>
                         </div>
                         <div style={{ padding: '0 16px' }}>

@@ -24,7 +24,7 @@ public class AuditLogController {
     public ResponseEntity<ApiResponse<Page<AuditLogResponse>>> getLogs(
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "30") int size) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<AuditLogResponse> result = auditLogService.getAuditLogs(type, pageable)
                 .map(AuditLogResponse::from);

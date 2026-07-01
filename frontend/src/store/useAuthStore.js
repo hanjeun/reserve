@@ -33,8 +33,12 @@ const useAuthStore = create(
                     }
                     set({ user: null, isLoggedIn: false });
                     return null;
-                } catch {
-                    set({ user: null, isLoggedIn: false });
+                } catch (err) {
+                    // 인증 만료(401/403) 또는 세션 만료가 확정된 경우에만 로그아웃 처리
+                    // 네트워크 오류 등 일시적인 문제로는 기존 로그인 상태를 유지
+                    if (err?.status === 401 || err?.status === 403 || err?.isSessionExpired) {
+                        set({ user: null, isLoggedIn: false });
+                    }
                     return null;
                 }
             },
@@ -51,8 +55,10 @@ const useAuthStore = create(
                     }
                     set({ user: null, isLoggedIn: false });
                     return null;
-                } catch {
-                    set({ user: null, isLoggedIn: false });
+                } catch (err) {
+                    if (err?.status === 401 || err?.status === 403 || err?.isSessionExpired) {
+                        set({ user: null, isLoggedIn: false });
+                    }
                     return null;
                 }
             },
@@ -63,16 +69,17 @@ const useAuthStore = create(
             // 실제 인증/권한 검증은 100% 쿠키 토큰에 위임
             partialize: (state) => ({
                 user: state.user ? {
-                    name:                    state.user.name,
-                    email:                   state.user.email,
-                    role:                    state.user.role,
-                    profileImage:            state.user.profileImage,
+                    name:                     state.user.name,
+                    email:                    state.user.email,
+                    role:                     state.user.role,
+                    profileImage:             state.user.profileImage,
+                    profileImageUrl:          state.user.profileImageUrl,   // 소셜 로그인 프로필 URL 없는 필드에 대비
                     emailNotificationEnabled: state.user.emailNotificationEnabled,
-                    termsAgreed:             state.user.termsAgreed,
-                    phone:                   state.user.phone,
-                    status:                  state.user.status,
-                    suspendedUntil:          state.user.suspendedUntil,
-                    suspendReason:           state.user.suspendReason,
+                    termsAgreed:              state.user.termsAgreed,
+                    phone:                    state.user.phone,
+                    status:                   state.user.status,
+                    suspendedUntil:           state.user.suspendedUntil,
+                    suspendReason:            state.user.suspendReason,
                 } : null,
                 isLoggedIn: state.isLoggedIn,
             }),

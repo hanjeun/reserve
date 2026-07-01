@@ -20,6 +20,7 @@ public class MemberResponse {
     private String profileImage;
     private boolean emailNotificationEnabled;
     private boolean termsAgreed;
+    private boolean marketingAgreed;
     private MemberStatus status;
     private LocalDateTime suspendedUntil;
     private String suspendReason;
@@ -34,6 +35,7 @@ public class MemberResponse {
                 member.getProfileImage(),
                 member.isEmailNotificationEnabled(),
                 member.isTermsAgreed(),
+                member.isMarketingAgreed(),
                 member.getStatus(),
                 member.getSuspendedUntil(),
                 member.getSuspendReason()

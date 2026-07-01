@@ -14,6 +14,7 @@ import com.reserve.store.dto.StoreCreateRequest;
 import com.reserve.store.dto.StoreResponse;
 import com.reserve.store.dto.StoreUpdateRequest;
 import com.reserve.store.entity.Store;
+import com.reserve.store.entity.StoreStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -134,13 +135,34 @@ public class StoreService {
     }
 
     /**
+     * 가게 수정용 데이터 조회 (소유자/관리자만 접근 가능)
+     * 공개 API와 달리 소유자 본인 검증 후 전체 설정을 반환
+     */
+    @Transactional(readOnly = true)
+    public StoreResponse getStoreForEdit(Long id, Member member) {
+        Store store = storeRepository.findById(id)
+                .orElseThrow(StoreException::notFound);
+        if (store.getDeletedAt() != null) {
+            throw StoreException.notFound();
+        }
+        // 관리자는 모든 가게 수정 가능, 소유자는 본인 가게만
+        boolean isAdmin = member.isAdmin();
+        boolean isOwner = store.getOwner() != null && store.getOwner().getId().equals(member.getId());
+        if (!isAdmin && !isOwner) {
+            throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
+        }
+        return StoreResponse.fromEntity(store);
+    }
+
+    /**
      * 가게 상세 조회
+     * 제재(정지/영구정지) 가게는 일반 사용자에게는 조회 불가 — 소프트 삭제와 동일하게 처리
      */
     @Transactional(readOnly = true)
     public StoreResponse getStore(Long id) {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
-        if (store.getDeletedAt() != null) {
+        if (store.getDeletedAt() != null || store.isSuspended()) {
             throw StoreException.notFound();
         }
         return StoreResponse.fromEntity(store);
@@ -352,10 +374,11 @@ public class StoreService {
 
     private Page<Store> getAllStoresSortedPaged(String sort, Pageable pageable) {
         if (sort == null) sort = "rating";
+        // 공개 목록에서는 소프트 삭제 + 제재(정지/영구정지) 가게를 제외
         return switch (sort) {
-            case "recent"  -> storeRepository.findByDeletedAtIsNullOrderByCreatedAtDesc(pageable);
-            case "reviews" -> storeRepository.findByDeletedAtIsNullOrderByReviewCountDesc(pageable);
-            default        -> storeRepository.findByDeletedAtIsNullOrderByRatingDesc(pageable);
+            case "recent"  -> storeRepository.findByDeletedAtIsNullAndStatusOrderByCreatedAtDesc(StoreStatus.ACTIVE, pageable);
+            case "reviews" -> storeRepository.findByDeletedAtIsNullAndStatusOrderByReviewCountDesc(StoreStatus.ACTIVE, pageable);
+            default        -> storeRepository.findByDeletedAtIsNullAndStatusOrderByRatingDesc(StoreStatus.ACTIVE, pageable);
         };
     }
 

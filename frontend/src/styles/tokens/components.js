@@ -221,28 +221,9 @@ export const avatar = {
   },
 };
 
-// ============================================
-// Suspend Banner Styles — Header 제재 배너
-// ============================================
-export const suspendBanner = {
-  base: {
-    color: '#fff',
-    textAlign: 'center',
-    padding: '8px 16px',
-    fontSize: '13px',
-    fontWeight: 500,
-    position: 'sticky',
-    top: heights.header,
-    zIndex: 999,
-    lineHeight: 1.5,
-  },
-  suspended: {
-    backgroundColor: '#fa8c16', // 주황 — 기간 정지
-  },
-  banned: {
-    backgroundColor: '#ff4d4f', // 빨강 — 영구 정지
-  },
-};
+// 주의: suspendBanner 토큰은 제거됨.
+// 정지/영구정지 회원은 이제 로그인 자체가 차단되므로(이메일·소셜 공통)
+// 로그인 후 빨간/주황 배너를 보여줄 필요가 없어졌음.
 
 // ============================================
 // Agreement (약관 동의) Styles — Signup 전용

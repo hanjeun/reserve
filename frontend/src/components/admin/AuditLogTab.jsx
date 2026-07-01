@@ -1,12 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Typography, Table, Tag, Select, Skeleton } from 'antd';
-import { SyncOutlined } from '@ant-design/icons';
-import { Button } from '../common';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Typography, Table, Tag } from 'antd';
+import { FilterToolbar, AdminTableSkeleton } from '../common';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
-import { ENTITY_LABELS, ENTITY_TYPE_OPTIONS } from './adminConstants';
+import { ENTITY_LABELS, AUDIT_TYPE_OPTIONS } from './adminConstants';
 
 const { Text } = Typography;
 
@@ -45,9 +44,11 @@ const makeLogMessage = (action, entityType, entityId, snapshot) => {
 // 처리자 표시 — 이메일이면 사용자/관리자, system이면 스케줄러명
 const formatActor = (actorEmail) => {
     if (!actorEmail || actorEmail === 'system') return 'TrashCleanupScheduler';
-    if (actorEmail.includes('@')) return actorEmail;
     return actorEmail;
 };
+
+// 최초 로딩 전용 스켈레톤 — AdminTableSkeleton과 동일한 톤 유지
+const SkeletonRows = () => <AdminTableSkeleton rows={8} cols={[155, 115, 120, 300, 200]} />;
 
 const AuditLogTab = () => {
     const { message } = useMessage();
@@ -57,11 +58,14 @@ const AuditLogTab = () => {
     const [page, setPage]               = useState(0);
     const [totalElements, setTotalElements] = useState(0);
 
+    // 첫 마운트 때만 스켈레톤 — 이후 새로고침/페이지전환은 Table을 그대로 유지한 채 데이터만 교체
+    // (Table을 언마운트하면 헤더/페이지네이션까지 같이 사라졌다 나타나며 깜빡임 발생)
+    const hasLoadedOnceRef = useRef(false);
+
     const load = useCallback(async (p = 0) => {
         setLoading(true);
-        setLogs([]);
         try {
-            const params = { page: p, size: 30 };
+            const params = { page: p, size: 10 };
             if (typeFilter) params.type = typeFilter;
             const data = await api.get(API_ENDPOINTS.AUDIT_LOG.LIST, { params });
             setLogs(data?.content ?? []);
@@ -72,6 +76,7 @@ const AuditLogTab = () => {
             message.error('시스템 로그를 불러오지 못했습니다.');
         } finally {
             setLoading(false);
+            hasLoadedOnceRef.current = true;
         }
     }, [message, typeFilter]);
 
@@ -125,21 +130,18 @@ const AuditLogTab = () => {
 
     return (
         <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <Select
-                    value={typeFilter}
-                    onChange={(v) => { setTypeFilter(v); setPage(0); }}
-                    options={ENTITY_TYPE_OPTIONS}
-                    size="large"
-                    style={{ width: 140 }}
-                />
-                {!loading && (
-                    <Text type="secondary" style={{ fontSize: fontSize.sm }}>총 {totalElements}건</Text>
-                )}
-                <Button variant="ghost-sm" size="md" onClick={() => load(0)} disabled={loading} style={{ marginLeft: 'auto' }}>
-                    <SyncOutlined spin={loading} /> 새로고침
-                </Button>
-            </div>
+            {/* 다른 관리자 탭과 동일한 FilterToolbar 패턴: 필터 Select + 건수 + 새로고침(3초 쿨다운) 한 줄 */}
+            <FilterToolbar
+                selects={[{
+                    value: typeFilter,
+                    onChange: (v) => { setTypeFilter(v); load(0); },
+                    options: AUDIT_TYPE_OPTIONS,
+                    width: 140,
+                }]}
+                count={totalElements}
+                onReload={() => load(page)}
+                loading={loading}
+            />
 
             <div style={{
                 background: colors.gray[50],
@@ -153,26 +155,27 @@ const AuditLogTab = () => {
                 소프트 삭제, 복구, 영구 삭제 등 관리자 행위가 기록됩니다. 로그는 90일 후 자동 삭제됩니다.
             </div>
 
-            {loading
-                ? <Skeleton active paragraph={{ rows: 8 }} />
-                : (
-                    <Table
-                        columns={columns}
-                        dataSource={logs}
-                        rowKey="id"
-                        size="middle"
-                        scroll={{ x: 800 }}
-                        pagination={{
-                            current: page + 1,
-                            pageSize: 30,
-                            total: totalElements,
-                            showSizeChanger: false,
-                            onChange: (p) => load(p - 1),
-                        }}
-                        locale={{ emptyText: '시스템 로그가 없습니다.' }}
-                    />
-                )
-            }
+            {/* 첫 로딩에만 스켈레톤. 이후로는 Table을 절대 언마운트하지 않음
+              * → 새로고침/페이지전환 시 헤더·페이지네이션이 그대로 유지되고 데이터만 교체됨 (깜빡임 없음) */}
+            {!hasLoadedOnceRef.current && loading ? (
+                <SkeletonRows />
+            ) : (
+                <Table
+                    columns={columns}
+                    dataSource={logs}
+                    rowKey="id"
+                    size="middle"
+                    scroll={{ x: 800 }}
+                    pagination={{
+                        current: page + 1,
+                        pageSize: 10,
+                        total: totalElements,
+                        showSizeChanger: false,
+                        onChange: (p) => load(p - 1),
+                    }}
+                    locale={{ emptyText: '시스템 로그가 없습니다.' }}
+                />
+            )}
         </div>
     );
 };

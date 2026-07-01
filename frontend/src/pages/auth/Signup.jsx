@@ -35,26 +35,29 @@ const Signup = () => {
     const [submitLoading, setSubmitLoading] = React.useState(false);
     const [agreements, setAgreements] = React.useState({ terms: false, privacy: false, marketing: false });
     const allRequired = agreements.terms && agreements.privacy;
-    const allChecked = agreements.terms && agreements.privacy && agreements.marketing;
+    const allChecked  = agreements.terms && agreements.privacy && agreements.marketing;
 
     const toggleAll = (checked) => setAgreements({ terms: checked, privacy: checked, marketing: checked });
-    const toggle = (key) => setAgreements(prev => ({ ...prev, [key]: !prev[key] }));
+    const toggle    = (key) => setAgreements(prev => ({ ...prev, [key]: !prev[key] }));
 
     useEffect(() => {
         if (isLoggedIn) navigate('/', { replace: true });
     }, [isLoggedIn, navigate]);
 
     const onSignupSubmit = async (values) => {
-        if (!isVerified) return message.error('이메일 인증을 먼저 완료해주세요.');
-        if (!allRequired) return message.error('필수 약관에 동의해주세요.');
+        if (!isVerified)   return message.error('이메일 인증을 먼저 완료해주세요.');
+        if (!allRequired)  return message.error('필수 약관에 동의해주세요.');
+
         setSubmitLoading(true);
         try {
             const res = await api.post(API_ENDPOINTS.AUTH.SIGNUP, {
-                name:     values.name.trim(),
-                email:    values.email.trim(),
-                password: values.password,
+                name:            values.name.trim(),
+                email:           values.email.trim(),
+                password:        values.password,
+                passwordConfirm: values.confirmPassword,
+                termsAgreed:     true,                    // UI에서 이미 필수 체크 강제
+                marketingAgreed: agreements.marketing,    // 선택 동의 여부 전달
             });
-            // 백엔드가 가입과 동시에 쿠키를 발급하므로 자동 로그인 처리
             if (res) {
                 const { login } = useAuthStore.getState();
                 login(res);
@@ -85,7 +88,7 @@ const Signup = () => {
                         <FormInput placeholder="이름" />
                     </Form.Item>
 
-                    {/* 이메일 + 코드발송 버튼 */}
+                    {/* 이메일 + 코드발송 */}
                     <Form.Item name="email" rules={VALIDATION_RULES.email}>
                         <FormInput.WithButton
                             placeholder="이메일 주소"
@@ -143,27 +146,25 @@ const Signup = () => {
                         <FormInput type="password" placeholder="비밀번호 확인" />
                     </Form.Item>
 
-                    {/* 약관 동의 — 디자인 시스템 agreement 토큰 사용 */}
+                    {/* 약관 동의 */}
                     <div style={A.section}>
                         <div style={A.divider} />
 
-                        <div role="button" tabIndex={0} style={A.allRow}
-                            onClick={() => toggleAll(!allChecked)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleAll(!allChecked); }}>
+                        <button type="button" style={{ ...A.allRow, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', width: '100%' }}
+                            onClick={() => toggleAll(!allChecked)}>
                             <Checkbox checked={allChecked} onChange={e => toggleAll(e.target.checked)} onClick={e => e.stopPropagation()} />
                             <span style={A.allText}>전체 동의하기</span>
-                        </div>
+                        </button>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {[
-                                { key: 'terms',     label: '서비스 이용약관', required: true,  path: '/terms' },
-                                { key: 'privacy',   label: '개인정보 처리방침', required: true,  path: '/privacy' },
-                                { key: 'marketing', label: '이메일 마케팅 수신',   required: false, path: null },
+                                { key: 'terms',     label: '서비스 이용약관',    required: true,  path: '/terms' },
+                                { key: 'privacy',   label: '개인정보 처리방침',   required: true,  path: '/privacy' },
+                                { key: 'marketing', label: '이메일 마케팅 수신',  required: false, path: null },
                             ].map(({ key, label, required, path }) => (
                                 <div key={key} style={A.itemRow}>
-                                    <div role="button" tabIndex={0} style={A.itemLeft}
-                                        onClick={() => toggle(key)}
-                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggle(key); }}>
+                                    <button type="button" style={{ ...A.itemLeft, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+                                        onClick={() => toggle(key)}>
                                         <Checkbox checked={agreements[key]} onChange={() => toggle(key)} onClick={e => e.stopPropagation()} />
                                         <span style={A.itemText}>
                                             <span style={required ? A.requiredTag : A.optionalTag}>
@@ -171,7 +172,7 @@ const Signup = () => {
                                             </span>
                                             {label}
                                         </span>
-                                    </div>
+                                    </button>
                                     {path && (
                                         <button type="button" style={A.viewLink}
                                             onClick={e => { e.stopPropagation(); window.open(path, '_blank'); }}>

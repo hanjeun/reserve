@@ -35,7 +35,8 @@ public class SecurityConfig {
     // 운영: reserve.it.kr, 로컬: localhost:5173
     private static final List<String> ALLOWED_ORIGINS = List.of(
             "http://localhost:5173",
-            "https://reserve.it.kr"
+            "https://reserve.it.kr",
+            "https://slouching-blubber-worst.ngrok-free.dev"
     );
 
     private final TokenProvider tokenProvider;
@@ -61,7 +62,7 @@ public class SecurityConfig {
                         // Health Check & Environment
                         .requestMatchers("/hc", "/env").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        
+
                         // 인증 관련 API
                         .requestMatchers("/api/auth/**", "/api/email/**", "/api/password-reset/**", "/api/token").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/login/**").permitAll()
@@ -83,7 +84,7 @@ public class SecurityConfig {
 
                         // 관리자 전용
                         .requestMatchers("/admin/**", "/api/business-verification/admin/**", "/api/admin/**").hasRole("ADMIN")
-                        
+
                         // 나머지는 인증 필요
                         .anyRequest().authenticated())
 

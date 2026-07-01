@@ -30,8 +30,10 @@ const StoreEdit = () => {
     
     const { user } = useAuthStore();
 
-    // 가게 데이터 로딩
-    const { store, loading, error } = useStoreData(id);
+    // 가게 수정용 데이터 로딩 — /api/stores/{id}/edit (인증 + 소유자 검증)
+    // 공개 GET /api/stores/{id} 대신 인증된 엔드포인트를 주으로서
+    // URL 조작시 다른 사람의 가게 운영 설정이 노출되지 않도록 차단
+    const { store, loading, error } = useStoreData(id, { forEdit: true });
 
     // 소유자 검증 — store 로딩 후 본인 가게가 아니면 리다이렉트
     useEffect(() => {

@@ -3,6 +3,7 @@
  * 서브탭: 받은 메일함 / 보낸 메일함
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { Typography, Input, Divider, Skeleton, Modal } from 'antd';
 import {
     MailOutlined, SearchOutlined,
@@ -10,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import { Button } from '../common';
 import useDebounce from '../../hooks/useDebounce';
-import { useMessage } from '../../hooks';
+import { useMessage, useWindowWidth } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
@@ -21,16 +22,6 @@ const { TextArea } = Input;
 // ─────────────────────────────────────────────────────────────
 // 유틸
 // ─────────────────────────────────────────────────────────────
-
-const useIsMobile = () => {
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-    useEffect(() => {
-        const handler = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', handler);
-        return () => window.removeEventListener('resize', handler);
-    }, []);
-    return isMobile;
-};
 
 const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -53,6 +44,8 @@ const formatFullDate = (dateStr) => {
     return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. `
          + `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─────────────────────────────────────────────────────────────
 // 커스텀 훅 1: 메일 데이터 로딩 & 선택
@@ -150,7 +143,9 @@ const useMailSend = ({ message, selectedMail, setSelectedMail, subTab, loadSentM
     };
 
     const handleComposeSend = async () => {
-        if (!composeForm.toEmail.trim()) { message.warning('받는 사람 이메일을 입력해주세요.'); return; }
+        const trimmedEmail = composeForm.toEmail.trim();
+        if (!trimmedEmail)                   { message.warning('받는 사람 이메일을 입력해주세요.'); return; }
+        if (!EMAIL_REGEX.test(trimmedEmail)) { message.warning('올바른 이메일 형식을 입력해주세요.'); return; }
         if (!composeForm.subject.trim()) { message.warning('제목을 입력해주세요.'); return; }
         if (!composeForm.body.trim())    { message.warning('내용을 입력해주세요.'); return; }
         setComposeSending(true);
@@ -228,8 +223,9 @@ const MailItem = ({ mail, isSelected, onClick }) => {
                 <Text style={{ display: 'block', fontSize: fontSize.sm, marginTop: 2, fontWeight: isUnread ? fontWeight.semibold : fontWeight.medium, color: isUnread ? colors.text.primary : colors.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {mail.subject || '(제목 없음)'}
                 </Text>
+                {/* replaceAll: SonarCloud prefer String#replaceAll over String#replace */}
                 <Text style={{ display: 'block', fontSize: fontSize.xs, color: colors.text.tertiary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {mail.body?.replace(/\n/g, ' ') || ''}
+                    {mail.body?.slice(0, 100).replaceAll('\n', ' ') || ''}
                 </Text>
             </div>
         </button>
@@ -254,6 +250,32 @@ const SentMailItem = ({ mail, isSelected, onClick }) => (
         </div>
     </button>
 );
+
+MailItem.propTypes = {
+    mail: PropTypes.shape({
+        id:         PropTypes.number,
+        isRead:     PropTypes.bool,
+        fromName:   PropTypes.string,
+        fromEmail:  PropTypes.string,
+        receivedAt: PropTypes.string,
+        subject:    PropTypes.string,
+        body:       PropTypes.string,
+    }).isRequired,
+    isSelected: PropTypes.bool,
+    onClick:    PropTypes.func.isRequired,
+};
+
+SentMailItem.propTypes = {
+    mail: PropTypes.shape({
+        id:          PropTypes.number,
+        toEmail:     PropTypes.string,
+        sentAt:      PropTypes.string,
+        subject:     PropTypes.string,
+        bodyPreview: PropTypes.string,
+    }).isRequired,
+    isSelected: PropTypes.bool,
+    onClick:    PropTypes.func.isRequired,
+};
 
 const ReplyItem = ({ reply }) => (
     <div style={styles.replyItem}>
@@ -305,12 +327,8 @@ const InboxDetailContent = ({ mail, replyOpen, replyBody, setReplyBody, sending,
             </>
         )}
         <div style={{ marginTop: 28, paddingTop: 20, borderTop: `1px solid ${colors.border.light}` }}>
-            {!replyOpen ? (
-                <Button variant="primary" size="sm" icon={<SendOutlined />} onClick={openReply}
-                    style={{ borderRadius: radius.xl, paddingLeft: 20, paddingRight: 20 }}>
-                    답장하기
-                </Button>
-            ) : (
+            {/* 부정 조건 제거: replyOpen 기준으로 정방향 분기 (SonarCloud: no negated condition) */}
+            {replyOpen ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: colors.background.subtle, borderRadius: radius.lg, padding: 16, border: `1px solid ${colors.border.default}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <Text style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.text.primary }}>답장</Text>
@@ -331,10 +349,41 @@ const InboxDetailContent = ({ mail, replyOpen, replyBody, setReplyBody, sending,
                             style={{ borderRadius: radius.xl, paddingLeft: 20, paddingRight: 20 }}>보내기</Button>
                     </div>
                 </div>
+            ) : (
+                <Button variant="primary" size="sm" icon={<SendOutlined />} onClick={openReply}
+                    style={{ borderRadius: radius.xl, paddingLeft: 20, paddingRight: 20 }}>
+                    답장하기
+                </Button>
             )}
         </div>
     </>
 );
+
+InboxDetailContent.propTypes = {
+    mail: PropTypes.shape({
+        id:         PropTypes.number,
+        subject:    PropTypes.string,
+        fromName:   PropTypes.string,
+        fromEmail:  PropTypes.string,
+        receivedAt: PropTypes.string,
+        body:       PropTypes.string,
+        replies:    PropTypes.arrayOf(PropTypes.shape({
+            id:      PropTypes.number,
+            toEmail: PropTypes.string,
+            sentAt:  PropTypes.string,
+            body:    PropTypes.string,
+        })),
+    }).isRequired,
+    replyOpen:       PropTypes.bool.isRequired,
+    replyBody:       PropTypes.string.isRequired,
+    setReplyBody:    PropTypes.func.isRequired,
+    sending:         PropTypes.bool.isRequired,
+    openReply:       PropTypes.func.isRequired,
+    handleSendReply: PropTypes.func.isRequired,
+    setReplyOpen:    PropTypes.func.isRequired,
+    replyRef:        PropTypes.object.isRequired,
+    isMobile:        PropTypes.bool,
+};
 
 const SentDetailContent = ({ mail }) => (
     <>
@@ -359,12 +408,76 @@ const SentDetailContent = ({ mail }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
+// 모듈 레벨 렌더 컴포넌트
+// (MailboxTab 내부 함수로 두면 Cognitive Complexity에 가산되므로
+//  모듈 레벨로 분리 — SonarCloud: Cognitive Complexity 21 → 15 이하)
+// ─────────────────────────────────────────────────────────────
+
+/** 메일 목록 렌더 */
+const MailList = ({ list, isInbox, selectedMailId, selectedSentId, onSelect, onSelectSent }) => {
+    if (list.length === 0) {
+        return (
+            <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
+            </div>
+        );
+    }
+    if (isInbox) {
+        return list.map(m => (
+            <MailItem key={m.id} mail={m} isSelected={m.id === selectedMailId} onClick={onSelect} />
+        ));
+    }
+    return list.map(m => (
+        <SentMailItem key={m.id} mail={m} isSelected={m.id === selectedSentId} onClick={onSelectSent} />
+    ));
+};
+
+/** 데스크탑 우측 디테일 패널 */
+const DetailPane = ({ isInbox, selectedMail, selectedSent, detailLoading, inboxDetailProps }) => {
+    const nothingSelected = isInbox ? !selectedMail : !selectedSent;
+    if (nothingSelected) {
+        return (
+            <div style={styles.emptyDetail}>
+                <MailOutlined style={{ fontSize: 48, color: colors.border.default, marginBottom: 12 }} />
+                <Text style={{ fontSize: fontSize.base, color: colors.text.tertiary }}>메일을 선택하면 내용이 표시됩니다.</Text>
+            </div>
+        );
+    }
+    if (isInbox) {
+        if (detailLoading) {
+            return <div style={{ padding: 32 }}><Skeleton active paragraph={{ rows: 8 }} /></div>;
+        }
+        return (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column' }}>
+                <InboxDetailContent {...inboxDetailProps} isMobile={false} />
+            </div>
+        );
+    }
+    return (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column' }}>
+            <SentDetailContent mail={selectedSent} />
+        </div>
+    );
+};
+
+/** 모바일 디테일 콘텐츠 */
+const MobileDetailContent = ({ isInbox, selectedMail, selectedSent, detailLoading, inboxDetailProps }) => {
+    if (isInbox) {
+        if (!selectedMail) return null;
+        if (detailLoading) return <Skeleton active paragraph={{ rows: 6 }} />;
+        return <InboxDetailContent {...inboxDetailProps} isMobile={true} />;
+    }
+    if (!selectedSent) return null;
+    return <SentDetailContent mail={selectedSent} />;
+};
+
+// ─────────────────────────────────────────────────────────────
 // 메인 컴포넌트
 // ─────────────────────────────────────────────────────────────
 
 const MailboxTab = ({ onUnreadCountChange }) => {
     const { message } = useMessage();
-    const isMobile    = useIsMobile();
+    const isMobile = useWindowWidth() < 768;
     const replyRef    = useRef(null);
 
     const [subTab, setSubTab] = useState('inbox');
@@ -397,28 +510,48 @@ const MailboxTab = ({ onUnreadCountChange }) => {
         send.setReplyBody('');
     };
 
-    const filteredMails = useMemo(() =>
-        debouncedSearch.trim()
-            ? mail.mails.filter(m => { const kw = debouncedSearch.toLowerCase(); return m.fromEmail?.toLowerCase().includes(kw) || m.fromName?.toLowerCase().includes(kw) || m.subject?.toLowerCase().includes(kw); })
-            : mail.mails,
-        [mail.mails, debouncedSearch]
-    );
+    const filteredMails = useMemo(() => {
+        if (!debouncedSearch.trim()) return mail.mails;
+        const kw = debouncedSearch.toLowerCase();
+        return mail.mails.filter(m =>
+            m.fromEmail?.toLowerCase().includes(kw) ||
+            m.fromName?.toLowerCase().includes(kw)  ||
+            m.subject?.toLowerCase().includes(kw)
+        );
+    }, [mail.mails, debouncedSearch]);
 
-    const filteredSent = useMemo(() =>
-        debouncedSearch.trim()
-            ? mail.sentMails.filter(m => { const kw = debouncedSearch.toLowerCase(); return m.toEmail?.toLowerCase().includes(kw) || m.subject?.toLowerCase().includes(kw); })
-            : mail.sentMails,
-        [mail.sentMails, debouncedSearch]
-    );
+    const filteredSent = useMemo(() => {
+        if (!debouncedSearch.trim()) return mail.sentMails;
+        const kw = debouncedSearch.toLowerCase();
+        return mail.sentMails.filter(m =>
+            m.toEmail?.toLowerCase().includes(kw) ||
+            m.subject?.toLowerCase().includes(kw)
+        );
+    }, [mail.sentMails, debouncedSearch]);
 
-    const unreadCount    = useMemo(() => mail.mails.filter(m => !m.isRead).length, [mail.mails]);
-    const isInbox        = subTab === 'inbox';
-    const currentList    = isInbox ? filteredMails : filteredSent;
-    const currentLoading = isInbox ? mail.loading  : mail.sentLoading;
-    const currentEmpty   = isInbox
-        ? (!mail.loading && mail.mails.length === 0)
-        : (!mail.sentLoading && mail.sentMails.length === 0);
-    const mobileDetailOpen = isMobile && (isInbox ? !!mail.selectedMail : !!mail.selectedSent);
+    const isInbox     = subTab === 'inbox';
+    const currentList = isInbox ? filteredMails : filteredSent;
+
+    // 복잡도 감소: && 체인 대신 단순 변수로 추출
+    const inboxEmpty      = !mail.loading    && mail.mails.length === 0;
+    const sentEmpty       = !mail.sentLoading && mail.sentMails.length === 0;
+    const currentLoading  = isInbox ? mail.loading     : mail.sentLoading;
+    const currentEmpty    = isInbox ? inboxEmpty       : sentEmpty;
+    const hasSelection    = isInbox ? !!mail.selectedMail : !!mail.selectedSent;
+    const showLoading     = currentLoading;
+    const showEmpty       = !currentLoading && currentEmpty;
+    const showMobDetail   = !currentLoading && !currentEmpty && isMobile && hasSelection;
+    const showMobList     = !currentLoading && !currentEmpty && isMobile && !hasSelection;
+    const showDesktop     = !currentLoading && !currentEmpty && !isMobile;
+
+    const unreadCount = useMemo(() => mail.mails.filter(m => !m.isRead).length, [mail.mails]);
+    const hasUnread   = unreadCount > 0 && isInbox;
+    const countLabel  = hasUnread ? `읽지 않은 메일 ${unreadCount}개` : `전체 ${currentList.length}개`;
+    const unreadLabel = (
+        <Text style={{ fontSize: fontSize.sm, color: hasUnread ? colors.primary.main : colors.text.tertiary, fontWeight: hasUnread ? fontWeight.semibold : undefined }}>
+            {countLabel}
+        </Text>
+    );
 
     const inboxDetailProps = {
         mail: mail.selectedMail, replyOpen: send.replyOpen, replyBody: send.replyBody,
@@ -426,72 +559,16 @@ const MailboxTab = ({ onUnreadCountChange }) => {
         handleSendReply: send.handleSendReply, setReplyOpen: send.setReplyOpen, replyRef,
     };
 
-    const unreadLabelColor  = unreadCount > 0 && isInbox ? colors.primary.main : colors.text.tertiary;
-    const unreadLabelWeight = unreadCount > 0 && isInbox ? fontWeight.semibold : undefined;
-    const unreadLabelText   = isInbox && unreadCount > 0
-        ? `읽지 않은 메일 ${unreadCount}개`
-        : `전체 ${currentList.length}개`;
-
-    const unreadLabel = (
-        <Text style={{ fontSize: fontSize.sm, color: unreadLabelColor, fontWeight: unreadLabelWeight }}>
-            {unreadLabelText}
-        </Text>
-    );
-
-    const renderMailList = (selected) => {
-        if (currentList.length === 0) {
-            return (
-                <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                    <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
-                </div>
-            );
-        }
-        if (isInbox) {
-            return currentList.map(m => (
-                <MailItem key={m.id} mail={m} isSelected={selected && mail.selectedMail?.id === m.id} onClick={mail.handleSelect} />
-            ));
-        }
-        return currentList.map(m => (
-            <SentMailItem key={m.id} mail={m} isSelected={selected && mail.selectedSent?.id === m.id} onClick={mail.setSelectedSent} />
-        ));
-    };
-
-    // 데스크탑 우측 디테일 패널 — 중첩 삼항 대신 함수로 추출
-    const renderDetailPane = () => {
-        const nothingSelected = isInbox ? !mail.selectedMail : !mail.selectedSent;
-        if (nothingSelected) {
-            return (
-                <div style={styles.emptyDetail}>
-                    <MailOutlined style={{ fontSize: 48, color: colors.border.default, marginBottom: 12 }} />
-                    <Text style={{ fontSize: fontSize.base, color: colors.text.tertiary }}>메일을 선택하면 내용이 표시됩니다.</Text>
-                </div>
-            );
-        }
-        if (isInbox) {
-            if (mail.detailLoading) {
-                return <div style={{ padding: 32 }}><Skeleton active paragraph={{ rows: 8 }} /></div>;
-            }
-            return (
-                <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column' }}>
-                    <InboxDetailContent {...inboxDetailProps} isMobile={false} />
-                </div>
-            );
-        }
-        return (
-            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column' }}>
-                <SentDetailContent mail={mail.selectedSent} />
-            </div>
-        );
-    };
+    const reloadHandler = isInbox ? mail.loadMails : () => mail.loadSentMails(true);
 
     return (
         <div>
             <SearchBar value={search} onChange={(e) => setSearch(e.target.value)}
-                onReload={isInbox ? mail.loadMails : () => mail.loadSentMails(true)}
-                loading={currentLoading} onCompose={() => send.setComposing(true)} />
+                onReload={reloadHandler} loading={currentLoading}
+                onCompose={() => send.setComposing(true)} />
             <SubTabBar active={subTab} onChangeTab={handleTabChange} />
 
-            {currentLoading && (
+            {showLoading && (
                 <div style={styles.singlePanel}>
                     {['sk-0', 'sk-1', 'sk-2', 'sk-3'].map((key) => (
                         <div key={key} style={{ padding: '16px 20px', borderBottom: `1px solid ${colors.border.light}` }}>
@@ -501,7 +578,7 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                 </div>
             )}
 
-            {!currentLoading && currentEmpty && (
+            {showEmpty && (
                 <div style={styles.emptyPanel}>
                     <InboxOutlined style={{ fontSize: 56, color: colors.border.default, marginBottom: 16 }} />
                     <Text style={{ fontSize: fontSize.lg, fontWeight: fontWeight.semibold, color: colors.text.secondary, display: 'block', marginBottom: 6 }}>
@@ -513,36 +590,57 @@ const MailboxTab = ({ onUnreadCountChange }) => {
                 </div>
             )}
 
-            {!currentLoading && !currentEmpty && isMobile && mobileDetailOpen && (
+            {showMobDetail && (
                 <div style={styles.mobileDetail}>
                     <button onClick={handleBack} style={styles.backBtn}>
                         <ArrowLeftOutlined style={{ fontSize: 14, marginRight: 6, color: colors.text.secondary }} />
                         <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>목록으로</Text>
                     </button>
-                    {isInbox && mail.selectedMail && (
-                        mail.detailLoading
-                            ? <Skeleton active paragraph={{ rows: 6 }} />
-                            : <InboxDetailContent {...inboxDetailProps} isMobile={true} />
-                    )}
-                    {!isInbox && mail.selectedSent && <SentDetailContent mail={mail.selectedSent} />}
+                    <MobileDetailContent
+                        isInbox={isInbox}
+                        selectedMail={mail.selectedMail}
+                        selectedSent={mail.selectedSent}
+                        detailLoading={mail.detailLoading}
+                        inboxDetailProps={inboxDetailProps}
+                    />
                 </div>
             )}
 
-            {!currentLoading && !currentEmpty && isMobile && !mobileDetailOpen && (
+            {showMobList && (
                 <div style={styles.singlePanel}>
                     <div style={{ padding: '6px 18px', borderBottom: `1px solid ${colors.border.light}` }}>{unreadLabel}</div>
-                    {renderMailList(false)}
+                    <MailList
+                        list={currentList} isInbox={isInbox}
+                        selectedMailId={mail.selectedMail?.id}
+                        selectedSentId={mail.selectedSent?.id}
+                        onSelect={mail.handleSelect}
+                        onSelectSent={mail.setSelectedSent}
+                    />
                 </div>
             )}
 
-            {!currentLoading && !currentEmpty && !isMobile && (
+            {showDesktop && (
                 <div style={styles.splitPane}>
                     <div style={styles.listPanel}>
                         <div style={{ padding: '6px 18px', borderBottom: `1px solid ${colors.border.light}` }}>{unreadLabel}</div>
-                        <div style={{ flex: 1, overflowY: 'auto' }}>{renderMailList(true)}</div>
+                        <div style={{ flex: 1, overflowY: 'auto' }}>
+                            <MailList
+                                list={currentList} isInbox={isInbox}
+                                selectedMailId={mail.selectedMail?.id}
+                                selectedSentId={mail.selectedSent?.id}
+                                onSelect={mail.handleSelect}
+                                onSelectSent={mail.setSelectedSent}
+                            />
+                        </div>
                     </div>
                     <div style={styles.detailPanel}>
-                        {renderDetailPane()}
+                        <DetailPane
+                            isInbox={isInbox}
+                            selectedMail={mail.selectedMail}
+                            selectedSent={mail.selectedSent}
+                            detailLoading={mail.detailLoading}
+                            inboxDetailProps={inboxDetailProps}
+                        />
                     </div>
                 </div>
             )}

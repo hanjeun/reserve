@@ -16,6 +16,12 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
     const iconSize = size === 'sm' ? 18 : 22;
     const btnSize  = size === 'sm' ? 36 : 44;
 
+    // initialStatus가 변경되면(부모가 비동기로 상태를 가져와 prop 업데이트) 내부 상태 동기화
+    useEffect(() => {
+        if (initialStatus !== undefined) setIsFavorite(initialStatus);
+    }, [initialStatus]);
+
+    // initialStatus가 없을 때만 자체 조회 (StoreCard처럼 props 없이 쓸 때)
     useEffect(() => {
         if (!isLoggedIn) return;
         if (initialStatus !== undefined) return;

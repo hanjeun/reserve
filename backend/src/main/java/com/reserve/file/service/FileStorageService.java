@@ -59,6 +59,35 @@ public class FileStorageService {
         this.s3Presigner = S3Presigner.builder().region(awsRegion).credentialsProvider(credentials).build();
     }
 
+    // ─── 허용 파일 타입 화이트리스트 ────────────────────────────────────────────
+    private static final java.util.Set<String> ALLOWED_TYPES = java.util.Set.of(
+            "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"
+    );
+    private static final java.util.Set<String> ALLOWED_EXTS = java.util.Set.of(
+            ".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"
+    );
+    private static final long MAX_FILE_BYTES = 10L * 1024 * 1024; // 10 MB
+
+    private void validateFile(MultipartFile file) {
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new FileException("파일 크기는 10MB를 초과할 수 없습니다.",
+                    org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE);
+        }
+        String ct = file.getContentType();
+        if (ct == null || !ALLOWED_TYPES.contains(ct.toLowerCase())) {
+            throw new FileException("허용되지 않는 파일 형식입니다. (jpg/png/webp/gif/avif 만 허용)",
+                    org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        }
+        String original = file.getOriginalFilename();
+        if (original != null && original.contains(".")) {
+            String ext = original.substring(original.lastIndexOf(".")).toLowerCase();
+            if (!ALLOWED_EXTS.contains(ext)) {
+                throw new FileException("허용되지 않는 파일 확장자입니다.",
+                        org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+            }
+        }
+    }
+
     /**
      * S3에 파일 업로드 후 S3 key 반환 (URL이 아닌 key)
      * - Public 파일: getPublicUrl(key) 로 CloudFront URL 생성
@@ -66,6 +95,7 @@ public class FileStorageService {
      */
     public String storeFile(MultipartFile file, String prefixPath) {
         if (file == null || file.isEmpty()) return null;
+        validateFile(file); // 파일 타입 · 확장자 · 크기 검증
         try {
             String ext = "";
             String original = file.getOriginalFilename();

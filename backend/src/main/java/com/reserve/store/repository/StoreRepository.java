@@ -2,6 +2,7 @@ package com.reserve.store.repository;
 
 import com.reserve.member.entity.Member;
 import com.reserve.store.entity.Store;
+import com.reserve.store.entity.StoreStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,9 +25,10 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     List<Store> findByNameContainingIgnoreCase(String keyword);
     List<Store> findByCategory(String category);
 
-    // 공개 가게 목록 — 소프트 삭제된 가게 제외 (정렬별)
-    Page<Store> findByDeletedAtIsNullOrderByRatingDesc(Pageable pageable);
-    Page<Store> findByDeletedAtIsNullOrderByReviewCountDesc(Pageable pageable);
+    // 공개 가게 목록 — 소프트 삭제 + 제재(정지/영구정지) 가게 제외 (정렬별)
+    Page<Store> findByDeletedAtIsNullAndStatusOrderByRatingDesc(StoreStatus status, Pageable pageable);
+    Page<Store> findByDeletedAtIsNullAndStatusOrderByReviewCountDesc(StoreStatus status, Pageable pageable);
+    Page<Store> findByDeletedAtIsNullAndStatusOrderByCreatedAtDesc(StoreStatus status, Pageable pageable);
 
     @Query("SELECT s FROM Store s WHERE " +
            "LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

@@ -36,11 +36,12 @@ public class StoreApiController {
     }
 
     // 내 가게 목록 조회
+    // - validateBusinessAuth 없음: 기존 소유 가게는 역할 무관하게 볼 수 있어야 함
+    //   (사업자 취소 후에도 자기 가게 확인 + 기존 예약 처리 가능해야 하므로)
+    // - 가게 생성/수정은 여전히 BUSINESS 역할 필요 (validateBusinessAuth 유지)
     @GetMapping("/my")
     public ApiResponse<List<StoreResponse>> getMyStores() {
         Member member = SecurityUtil.getCurrentMember("내 가게 조회를 위해 로그인이 필요합니다.");
-        validateBusinessAuth(member);
-
         List<StoreResponse> stores = storeService.getMyStores(member);
         return ApiResponse.success(stores, "내 가게 목록 조회 성공");
     }
@@ -63,11 +64,21 @@ public class StoreApiController {
         return ApiResponse.success(stores, "가게 목록 조회 성공");
     }
 
-    // 가게 상세 조회
+    // 가게 상세 조회 (공개 API — 공개 정보만 반환)
     @GetMapping("/{id}")
     public ApiResponse<StoreResponse> getStore(@PathVariable Long id) {
         StoreResponse store = storeService.getStore(id);
         return ApiResponse.success(store, "가게 상세 조회 성공");
+    }
+
+    // 가게 수정용 데이터 조회 (인증 + 소유자 본인만 — 내부 운영 설정 포함)
+    // 미인증 사용자가 URL을 조작해 다른 가게의 수정 데이터를 추적하는 것을 원천 차단
+    @GetMapping("/{id}/edit")
+    public ApiResponse<StoreResponse> getStoreForEdit(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember("가게 수정을 위해 로그인이 필요합니다.");
+        validateBusinessAuth(member);
+        StoreResponse store = storeService.getStoreForEdit(id, member);
+        return ApiResponse.success(store, "가게 수정 정보 조회 성공");
     }
 
     // 가게 수정

@@ -68,6 +68,11 @@ public class StoreResponse {
     private LocalDateTime createdAt;
     private Long ownerId;  // 소유자 ID (프론트 권한 검증용)
 
+    // ── 제재 상태 (관리자 목록/소유자 화면용) ──
+    private String status;            // ACTIVE | SUSPENDED | BANNED
+    private String suspendedUntil;    // SUSPENDED일 때만 값 존재, BANNED/ACTIVE는 null
+    private String suspendReason;
+
     public static StoreResponse fromEntity(Store store) {
         return StoreResponse.builder()
                 .id(store.getId())
@@ -103,6 +108,9 @@ public class StoreResponse {
                 .emailNotificationEnabled(store.getEmailNotificationEnabled())
                 .createdAt(store.getCreatedAt())
                 .ownerId(store.getOwner() != null ? store.getOwner().getId() : null)
+                .status(store.getStatus() != null ? store.getStatus().name() : "ACTIVE")
+                .suspendedUntil(store.getSuspendedUntil() != null ? store.getSuspendedUntil().toLocalDate().toString() : null)
+                .suspendReason(store.getSuspendReason())
                 .build();
     }
 }

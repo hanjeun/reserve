@@ -163,12 +163,54 @@ public class Store {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    // ── 영업 제재 상태 (Member의 status 패턴과 동일) ──
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private StoreStatus status = StoreStatus.ACTIVE;
+
+    @Column(name = "suspended_until")
+    private LocalDateTime suspendedUntil;
+
+    @Column(name = "suspend_reason")
+    private String suspendReason;
+
     public void softDelete() {
         this.deletedAt = LocalDateTime.now();
     }
 
     public boolean isDeleted() {
         return this.deletedAt != null;
+    }
+
+    // 제재 상태 체크 — Member.isSuspended()와 동일한 로직
+    public boolean isSuspended() {
+        if (this.status == StoreStatus.BANNED) return true;
+        if (this.status == StoreStatus.SUSPENDED) {
+            if (this.suspendedUntil != null && LocalDateTime.now().isAfter(this.suspendedUntil)) {
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public void suspend(LocalDateTime until, String reason) {
+        this.status = StoreStatus.SUSPENDED;
+        this.suspendedUntil = until;
+        this.suspendReason = reason;
+    }
+
+    public void ban(String reason) {
+        this.status = StoreStatus.BANNED;
+        this.suspendedUntil = null;
+        this.suspendReason = reason;
+    }
+
+    public void unban() {
+        this.status = StoreStatus.ACTIVE;
+        this.suspendedUntil = null;
+        this.suspendReason = null;
     }
 
     // 키워드 편의 메서드

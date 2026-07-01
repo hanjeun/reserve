@@ -63,16 +63,17 @@ const useAuthStore = create(
             // 실제 인증/권한 검증은 100% 쿠키 토큰에 위임
             partialize: (state) => ({
                 user: state.user ? {
-                    name:                    state.user.name,
-                    email:                   state.user.email,
-                    role:                    state.user.role,
-                    profileImage:            state.user.profileImage,
+                    name:                     state.user.name,
+                    email:                    state.user.email,
+                    role:                     state.user.role,
+                    profileImage:             state.user.profileImage,
+                    profileImageUrl:          state.user.profileImageUrl,   // 소셜 로그인 프로필 URL 없는 필드에 대비
                     emailNotificationEnabled: state.user.emailNotificationEnabled,
-                    termsAgreed:             state.user.termsAgreed,
-                    phone:                   state.user.phone,
-                    status:                  state.user.status,
-                    suspendedUntil:          state.user.suspendedUntil,
-                    suspendReason:           state.user.suspendReason,
+                    termsAgreed:              state.user.termsAgreed,
+                    phone:                    state.user.phone,
+                    status:                   state.user.status,
+                    suspendedUntil:           state.user.suspendedUntil,
+                    suspendReason:            state.user.suspendReason,
                 } : null,
                 isLoggedIn: state.isLoggedIn,
             }),

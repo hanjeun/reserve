@@ -41,13 +41,26 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         log.info("OAuth2 login success: email={}", member.getEmail());
 
         // 정지 상태 체크
+        // URL에 한국어 메시지를 인코딩하면 이상한 URL이 되므로
+        // 상태 코드 + 정지 해제일만 전달 → 프론트에서 디코딩하여 UI 표시
         if (member.isSuspended()) {
-            String msg = member.getStatus().name().equals("BANNED")
-                ? "영구 정지된 계정입니다."
-                : "계정이 " + member.getSuspendedUntil().toLocalDate() + "까지 정지되었습니다.";
-            String redirectUrl = "local".equals(serverEnv)
-                ? "http://localhost:5173/login?error=" + java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8)
-                : "https://reserve.it.kr/login?error=" + java.net.URLEncoder.encode(msg, java.nio.charset.StandardCharsets.UTF_8);
+            boolean isBanned = "BANNED".equals(member.getStatus().name());
+            String status = isBanned ? "BANNED" : "SUSPENDED";
+            String until = (!isBanned && member.getSuspendedUntil() != null)
+                ? member.getSuspendedUntil().toLocalDate().toString()
+                : "";
+
+            String baseErrorUrl = "local".equals(serverEnv)
+                ? "http://localhost:5173/login"
+                : "https://reserve.it.kr/login";
+
+            // 깨끗한 URL: /login?suspended=true&status=SUSPENDED&until=2026-08-15
+            String redirectUrl = baseErrorUrl
+                + "?suspended=true"
+                + "&status=" + status
+                + (until.isEmpty() ? "" : "&until=" + until);
+
+            log.warn("OAuth2 login blocked: email={}, status={}, until={}", member.getEmail(), status, until);
             getRedirectStrategy().sendRedirect(request, response, redirectUrl);
             return;
         }

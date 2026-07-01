@@ -64,6 +64,11 @@ public class Member {
     @Column(name = "terms_agreed", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
     private boolean termsAgreed = false;
 
+    // 이메일 마케팅 수신 동의 여부 (선택 동의)
+    @Builder.Default
+    @Column(name = "marketing_agreed", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private boolean marketingAgreed = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -107,16 +112,14 @@ public class Member {
     public boolean isSuspended() {
         if (this.status == MemberStatus.BANNED) return true;
         if (this.status == MemberStatus.SUSPENDED) {
-            // 정지 기간이 지났으면 자동 해제 (DB 반영은 호출측에서 unban() 호출 필요)
             if (this.suspendedUntil != null && LocalDateTime.now().isAfter(this.suspendedUntil)) {
-                return false;  // 기간 만료 → 정지 해제됨
+                return false;
             }
             return true;
         }
         return false;
     }
 
-    // 정지 기간이 만료되었는지 체크
     public boolean isSuspensionExpired() {
         return this.status == MemberStatus.SUSPENDED
             && this.suspendedUntil != null
@@ -141,11 +144,7 @@ public class Member {
         this.suspendReason = null;
     }
 
-    // OAuth 정보 업데이트
-    // profileImageLocked = true : 유저가 직접 이미지 조작 → 소셜 이미지로 덮어쓰지 않음
-    // profileImageLocked = false : 최초 가입 상태 → 소셜 프로필 이미지 적용
     public Member updateOAuth(String name, String profileImage) {
-        // name이 null이면 기존 name 유지, 기존도 null이면 "사용자"로 설정
         if (name != null) {
             this.name = name;
         } else if (this.name == null) {

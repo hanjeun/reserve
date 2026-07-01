@@ -62,6 +62,11 @@ public class MemberService {
 
     @Transactional
     public Long join(MemberDto memberDto) {
+        // 서버 측 필수 약관 동의 검증 (프론트 우회 방어)
+        if (!memberDto.isTermsAgreed()) {
+            throw new MemberException("필수 약관에 동의해주세요.", HttpStatus.BAD_REQUEST);
+        }
+
         if (memberRepository.findByEmail(memberDto.getEmail()).isPresent()) {
             throw MemberException.conflict("이미 사용 중인 이메일입니다.");
         }
@@ -76,6 +81,8 @@ public class MemberService {
                 .password(bCryptPasswordEncoder.encode(memberDto.getPassword()))
                 .role(memberDto.getRole())
                 .provider(AuthProvider.LOCAL)
+                .termsAgreed(true)
+                .marketingAgreed(memberDto.isMarketingAgreed())
                 .build()).getId();
     }
 
@@ -148,11 +155,10 @@ public class MemberService {
         log.info("Profile image deleted: memberId={}", memberId);
         Member member = findById(memberId);
 
-        // 로컬 업로드 이미지만 삭제 (소셜 로그인 이미지 URL은 파일 없음 - deleteFile 내부에서 처리)
         fileStorageService.deleteFile(member.getProfileImage());
 
         member.setProfileImage(null);
-        member.setProfileImageLocked(true);  // 유저가 직접 기본이미지로 설정 → 소셜 재로그인시도 유지
+        member.setProfileImageLocked(true);
         Member updated = memberRepository.save(member);
         log.info("Profile image delete completed: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);
@@ -163,22 +169,39 @@ public class MemberService {
         log.info("Profile image updated: memberId={}", memberId);
         Member member = findById(memberId);
 
-        // 기존 이미지 삭제 (소셜 로그인 이미지 URL 제외 - deleteFile 내부에서 처리)
         fileStorageService.deleteFile(member.getProfileImage());
 
         String key = fileStorageService.storeFile(image, FileStoragePaths.userProfile(memberId));
         member.setProfileImage(fileStorageService.getPublicUrl(key));
-        member.setProfileImageLocked(true);  // 유저가 직접 이미지 업로드 → 소셜 재로그인시도 유지
+        member.setProfileImageLocked(true);
         Member updated = memberRepository.save(member);
         log.info("Profile image update completed: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);
     }
 
+    /**
+     * 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경 가능).
+     * PIPA 준수: 동의/철회 시각을 별도 로그 테이블에 남겨야 하지만
+     * 현재는 단순 플래그 업데이트. 필요 시 AuditLog와 연동 예정.
+     */
     @Transactional
-    public void agreeTerms(Long memberId) {
+    public MemberResponse updateMarketingConsent(Long memberId, boolean marketingAgreed) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(MemberException::notFound);
+        member.setMarketingAgreed(marketingAgreed);
+        return MemberResponse.fromEntity(memberRepository.save(member));
+    }
+
+    /**
+     * 소셜 로그인 신규 가입 시 약관 동의 처리.
+     * termsAgreed(필수)는 항상 true로 세팅, marketingAgreed(선택)는 사용자 선택값 반영.
+     */
+    @Transactional
+    public void agreeTerms(Long memberId, boolean marketingAgreed) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         member.setTermsAgreed(true);
+        member.setMarketingAgreed(marketingAgreed);
     }
 
     @Transactional

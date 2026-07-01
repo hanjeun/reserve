@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Typography, Tabs, Table, Tag, Modal, Input, Image, Tooltip, InputNumber,
@@ -18,12 +18,12 @@ import useDebounce from '../../hooks/useDebounce';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
-import { formatTime, formatCurrency } from '../../utils';
+import { formatTime, formatCurrency, getDetailImageUrl } from '../../utils';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-// 탭 라벨 공통 스타일 — 사업자 패널과 동일하게 맞춤
+// 탭 라벨 공통 스타일
 const tabLabel = (icon, text) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         {icon}{text}
@@ -60,18 +60,27 @@ const AdminPanel = () => {
     const activeTab = new URLSearchParams(location.search).get('tab') || 'pending';
     const [mailUnread, setMailUnread] = useState(0);
 
-    const handleTabChange = (key) => {
+    // 탭 클릭 시 URL만 변경 — 필터 리셋은 아래 useEffect가 담당
+    const handleTabChange = (key) => navigate(`?tab=${key}`, { replace: true });
+
+    // activeTab 변경(버튼 클릭 + 브라우저 뒤로가기 공통) 시 필터 상태 초기화
+    useEffect(() => {
         setBizSearch('');
         setResSearch('');
         setResStatusFilter('ALL');
         setMemberSearch('');
         setStoreSearch('');
-        navigate(`?tab=${key}`, { replace: true });
-    };
+    }, [activeTab]);
 
     const [pendingList, setPendingList]     = useState([]);
     const [allList, setAllList]             = useState([]);
     const [loading, setLoading]             = useState(true);
+    // 각 섹션별 "최초 1회 로딩 완료" 추적용 ref — 액션 후 강제 재조회(xLoaded=false)와 무관하게 적용되어
+    // Table을 한번이라도 렌더한 적 있으면 다시는 절대 스켈레톤으로 돌아가지 않음 (페이지네이션 깜빡임 방지)
+    const pendingAllLoadedRef = useRef(false);
+    const memberFirstLoadRef  = useRef(false);
+    const storeFirstLoadRef   = useRef(false);
+    const resFirstLoadRef     = useRef(false);
     const [detailItem, setDetailItem]       = useState(null);
     const [detailOpen, setDetailOpen]       = useState(false);
     const [rejectTarget, setRejectTarget]   = useState(null);
@@ -109,6 +118,11 @@ const AdminPanel = () => {
         return stores.filter(s => s.name?.toLowerCase().includes(kw) || s.address?.toLowerCase().includes(kw));
     }, [stores, debouncedStoreSearch]);
 
+    const [storeSanctionTarget, setStoreSanctionTarget] = useState(null);
+    const [storeSuspendOpen, setStoreSuspendOpen]       = useState(false);
+    const [storeBanOpen, setStoreBanOpen]               = useState(false);
+    const [storeSanctionLoading, setStoreSanctionLoading] = useState(false);
+
     const [sanctionTarget, setSanctionTarget]   = useState(null);
     const [suspendOpen, setSuspendOpen]         = useState(false);
     const [banOpen, setBanOpen]                 = useState(false);
@@ -122,7 +136,7 @@ const AdminPanel = () => {
             setAllReservations(Array.isArray(data) ? data : (data?.content ?? []));
             setResLoaded(true);
         } catch { message.error('예약 목록을 불러오지 못했습니다.'); }
-        finally { setResLoading(false); }
+        finally { setResLoading(false); resFirstLoadRef.current = true; }
     }, [message, resLoaded]);
 
     const loadMembers = useCallback(async (force = false) => {
@@ -133,7 +147,7 @@ const AdminPanel = () => {
             setMembers(data?.content ?? []);
             setMemberLoaded(true);
         } catch { message.error('회원 목록을 불러오지 못했습니다.'); }
-        finally { setMemberLoading(false); }
+        finally { setMemberLoading(false); memberFirstLoadRef.current = true; }
     }, [message, memberLoaded]);
 
     const loadStores = useCallback(async (force = false) => {
@@ -144,7 +158,7 @@ const AdminPanel = () => {
             setStores(data?.content ?? []);
             setStoreLoaded(true);
         } catch { message.error('가게 목록을 불러오지 못했습니다.'); }
-        finally { setStoreLoading(false); }
+        finally { setStoreLoading(false); storeFirstLoadRef.current = true; }
     }, [message, storeLoaded]);
 
     const loadData = useCallback(async () => {
@@ -157,7 +171,7 @@ const AdminPanel = () => {
             setPendingList(pending?.content || []);
             setAllList(all?.content || []);
         } catch { message.error('목록을 불러오는데 실패했습니다.'); }
-        finally { setLoading(false); }
+        finally { setLoading(false); pendingAllLoadedRef.current = true; }
     }, [message]);
 
     useEffect(() => { loadData(); }, [loadData]);
@@ -167,15 +181,8 @@ const AdminPanel = () => {
         if (activeTab === 'stores-admin') loadStores();
     }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // 탭 전환 시 활성 탭이 보이도록 스크롤
-    const tabsContainerRef = useRef(null);
-    useEffect(() => {
-        requestAnimationFrame(() => {
-            if (!tabsContainerRef.current) return;
-            const el = tabsContainerRef.current.querySelector('.ant-tabs-tab-active');
-            el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-        });
-    }, [activeTab]);
+    // NOTE: scrollIntoView 제거 — iOS WebKit(Safari/Chrome)에서 viewport 전체를 수평으로
+    // 밀어버리는 버그 원인. Ant Design Tabs는 모바일에서 자체적으로 탭 스크롤을 처리함.
 
     const handleApprove = (record) => {
         confirm({
@@ -185,7 +192,7 @@ const AdminPanel = () => {
             onOk: async () => {
                 setActionLoading(true);
                 try { await api.post(API_ENDPOINTS.BUSINESS.ADMIN_APPROVE(record.id)); message.success('승인되었습니다.'); await loadData(); }
-                catch (err) { message.error(err || '승인에 실패했습니다.'); }
+                catch (err) { message.error(err instanceof Error ? err.message : '승인에 실패했습니다.'); }
                 finally { setActionLoading(false); }
             },
         });
@@ -196,7 +203,7 @@ const AdminPanel = () => {
         if (!reason.trim()) { message.warning('거절 사유를 입력해주세요.'); return; }
         setActionLoading(true);
         try { await api.post(API_ENDPOINTS.BUSINESS.ADMIN_REJECT(rejectTarget.id), { reason }); message.success('거절 처리되었습니다.'); setRejectOpen(false); await loadData(); }
-        catch (err) { message.error(err || '거절 처리에 실패했습니다.'); }
+        catch (err) { message.error(err instanceof Error ? err.message : '거절 처리에 실패했습니다.'); }
         finally { setActionLoading(false); }
     };
 
@@ -207,7 +214,7 @@ const AdminPanel = () => {
             onOk: async () => {
                 setActionLoading(true);
                 try { await api.post(API_ENDPOINTS.BUSINESS.ADMIN_REVOKE(record.memberId)); message.success('사업자 자격이 취소되었습니다.'); await loadData(); }
-                catch (err) { message.error(err || '처리에 실패했습니다.'); }
+                catch (err) { message.error(err instanceof Error ? err.message : '처리에 실패했습니다.'); }
                 finally { setActionLoading(false); }
             },
         });
@@ -225,15 +232,41 @@ const AdminPanel = () => {
         catch { message.error('삭제에 실패했습니다.'); }
     });
 
-    const handleSoftDeleteMember = (r) => softDeleteConfirm('회원 휴지통으로 이동', `'${r.name || r.email}'님을 휴지통으로 이동하시겠습니까?`, async () => {
-        try { await api.delete(API_ENDPOINTS.ADMIN_MANAGE.MEMBER_DELETE(r.id)); message.success('휴지통으로 이동되었습니다.'); await loadMembers(true); }
-        catch { message.error('삭제에 실패했습니다.'); }
-    });
+    // 가게 제재 핸들러
+    const handleStoreSuspend = async (days, reason) => {
+        if (!storeSanctionTarget) return;
+        setStoreSanctionLoading(true);
+        try {
+            await api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_SUSPEND(storeSanctionTarget.id), { days: String(days), reason: reason || '' });
+            message.success(`${days}일간 영업정지 처리되었습니다.`);
+            setStoreSuspendOpen(false);
+            setStoreLoaded(false);
+            await loadStores(true);
+        } catch { message.error('영업정지 처리에 실패했습니다.'); }
+        finally { setStoreSanctionLoading(false); }
+    };
 
-    const handleSoftDeleteStore = (r) => softDeleteConfirm('가게 휴지통으로 이동', `'${r.name}'을(를) 휴지통으로 이동하시겠습니까?`, async () => {
-        try { await api.delete(API_ENDPOINTS.ADMIN_MANAGE.STORE_DELETE(r.id)); message.success('휴지통으로 이동되었습니다.'); await loadStores(true); }
-        catch { message.error('삭제에 실패했습니다.'); }
-    });
+    const handleStoreBan = async (reason) => {
+        if (!storeSanctionTarget) return;
+        setStoreSanctionLoading(true);
+        try {
+            await api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_BAN(storeSanctionTarget.id), { reason: reason || '' });
+            message.success('영구 폐업 처리되었습니다.');
+            setStoreBanOpen(false);
+            setStoreLoaded(false);
+            await loadStores(true);
+        } catch { message.error('영구 폐업 처리에 실패했습니다.'); }
+        finally { setStoreSanctionLoading(false); }
+    };
+
+    const handleStoreUnban = async (storeId) => {
+        try {
+            await api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_UNBAN(storeId));
+            message.success('영업정지가 해제되었습니다.');
+            setStoreLoaded(false);
+            await loadStores(true);
+        } catch { message.error('해제에 실패했습니다.'); }
+    };
 
     const handleSuspend = async (days, reason) => {
         if (!sanctionTarget) return;
@@ -297,6 +330,13 @@ const AdminPanel = () => {
         { title: '처리', key: 'actions', width: 80, render: (_, r) => <Button variant="ghost-sm-danger" onClick={() => handleSoftDeleteReservation(r)}><DeleteOutlined /> 삭제</Button> },
     ];
 
+    // SonarCloud: 중첩 삼항 + 중첩 템플릿 리터럴 해소 — 헬퍼 함수로 추출
+    const getSuspendTooltip = (r) => {
+        if (!r.suspendReason) return '';
+        const until = r.suspendedUntil ? ` (~${r.suspendedUntil})` : '';
+        return `사유: ${r.suspendReason}${until}`;
+    };
+
     const memberColumns = [
         { title: 'ID', dataIndex: 'id', key: 'id', width: 60, render: v => <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>{v}</Text> },
         { title: '이름', dataIndex: 'name', key: 'name', width: 100, render: v => <Text style={{ fontSize: fontSize.sm }}>{v || '-'}</Text> },
@@ -305,9 +345,11 @@ const AdminPanel = () => {
         { title: '로그인', dataIndex: 'provider', key: 'provider', width: 90, render: v => <Tag>{v}</Tag> },
         { title: '상태', dataIndex: 'status', key: 'status', width: 90, render: (v, r) => {
             const cfg = MEMBER_STATUS_CONFIG[v] || MEMBER_STATUS_CONFIG.ACTIVE;
-            return <Tooltip title={r.suspendReason ? `사유: ${r.suspendReason}${r.suspendedUntil ? ` (~${r.suspendedUntil})` : ''}` : ''}><Tag color={cfg.color}>{cfg.label}</Tag></Tooltip>;
+            return <Tooltip title={getSuspendTooltip(r)}><Tag color={cfg.color}>{cfg.label}</Tag></Tooltip>;
         }},
-        { title: '처리', key: 'actions', width: 220, render: (_, r) => (
+        { title: '처리', key: 'actions', width: 200, render: (_, r) => (
+            // 회원은 휴지통 미사용 — 정지/영구정지/해제만 존재
+            // 회원 탈퇴는 본인만 가능 (MemberApiController), 관리자가 회원을 삭제하는 인터페이스는 제공하지 않음
             <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', alignItems: 'center', whiteSpace: 'nowrap' }}>
                 {r.role !== 'ADMIN' && (<>
                     {(!r.status || r.status === 'ACTIVE') && (<>
@@ -321,10 +363,15 @@ const AdminPanel = () => {
                         }}>정지해제</Button>
                     )}
                 </>)}
-                <Button variant="ghost-sm-danger" onClick={() => handleSoftDeleteMember(r)} style={{ padding: '0 8px' }}><DeleteOutlined /></Button>
             </div>
         )},
     ];
+
+    const STORE_STATUS_CONFIG = {
+        ACTIVE:    { color: 'green',  label: '정상' },
+        SUSPENDED: { color: 'orange', label: '영업정지' },
+        BANNED:    { color: 'red',    label: '영구폐업' },
+    };
 
     const storeAdminColumns = [
         { title: 'ID', dataIndex: 'id', key: 'id', width: 60, render: v => <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>{v}</Text> },
@@ -332,7 +379,24 @@ const AdminPanel = () => {
         { title: '카테고리', dataIndex: 'category', key: 'category', width: 100, render: v => <Tag>{v || '-'}</Tag> },
         { title: '주소', dataIndex: 'address', key: 'address', ellipsis: true, render: v => <Text style={{ fontSize: fontSize.sm }}>{v || '-'}</Text> },
         { title: '평점', dataIndex: 'rating', key: 'rating', width: 70, render: v => <Text style={{ fontSize: fontSize.sm }}>{v?.toFixed(1) || '0.0'}</Text> },
-        { title: '처리', key: 'actions', width: 80, render: (_, r) => <Button variant="ghost-sm-danger" onClick={() => handleSoftDeleteStore(r)} style={{ padding: '0 8px' }}><DeleteOutlined /></Button> },
+        { title: '상태', dataIndex: 'status', key: 'status', width: 90, render: (v, r) => {
+            const cfg = STORE_STATUS_CONFIG[v] || STORE_STATUS_CONFIG.ACTIVE;
+            const tooltip = r.suspendReason ? `사유: ${r.suspendReason}${r.suspendedUntil ? ` (~${r.suspendedUntil})` : ''}` : '';
+            return <Tooltip title={tooltip}><Tag color={cfg.color}>{cfg.label}</Tag></Tooltip>;
+        }},
+        { title: '처리', key: 'actions', width: 230, render: (_, r) => (
+            // 가게도 휴지통 미사용 — 영업정지/영구폐업/해제만 존재
+            // 가게 삭제는 사업자 본인만 가능 (StoreApiController)
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                {(!r.status || r.status === 'ACTIVE') && (<>
+                    <Button variant="ghost-sm" onClick={() => { setStoreSanctionTarget(r); setStoreSuspendOpen(true); }} style={{ color: '#fa8c16', borderColor: '#fa8c16' }}>영업정지</Button>
+                    <Button variant="ghost-sm-danger" onClick={() => { setStoreSanctionTarget(r); setStoreBanOpen(true); }}>영구폐업</Button>
+                </>)}
+                {(r.status === 'SUSPENDED' || r.status === 'BANNED') && (
+                    <Button variant="ghost-sm-success" onClick={() => handleStoreUnban(r.id)}>정지해제</Button>
+                )}
+            </div>
+        )},
     ];
 
     const tableProps = { columns, rowKey: 'id', size: 'middle', scroll: { x: 'max-content' }, tableLayout: 'auto', pagination: { pageSize: 15, showSizeChanger: false } };
@@ -349,7 +413,7 @@ const AdminPanel = () => {
             label: tabLabel(<IdcardOutlined />, '대기 중'),
             children: (<>
                 <FilterToolbar search={{ value: bizSearch, onChange: e => setBizSearch(e.target.value), placeholder: '이름, 이메일, 상호명으로 검색' }} onReload={loadData} loading={loading} />
-                {loading ? <AdminTableSkeleton rows={8} /> : <Table {...tableProps} dataSource={filterBiz(pendingList)} locale={{ emptyText: '대기 중인 신청이 없습니다.' }} />}
+                {!pendingAllLoadedRef.current && loading ? <AdminTableSkeleton rows={8} /> : <Table {...tableProps} dataSource={filterBiz(pendingList)} locale={{ emptyText: '대기 중인 신청이 없습니다.' }} />}
             </>),
         },
         {
@@ -357,7 +421,7 @@ const AdminPanel = () => {
             label: tabLabel(<SafetyCertificateOutlined />, '전체 목록'),
             children: (<>
                 <FilterToolbar search={{ value: bizSearch, onChange: e => setBizSearch(e.target.value), placeholder: '이름, 이메일, 상호명으로 검색' }} onReload={loadData} loading={loading} />
-                {loading ? <AdminTableSkeleton rows={8} /> : <Table {...tableProps} dataSource={filterBiz(allList)} locale={{ emptyText: '신청 내역이 없습니다.' }} />}
+                {!pendingAllLoadedRef.current && loading ? <AdminTableSkeleton rows={8} /> : <Table {...tableProps} dataSource={filterBiz(allList)} locale={{ emptyText: '신청 내역이 없습니다.' }} />}
             </>),
         },
         {
@@ -382,7 +446,7 @@ const AdminPanel = () => {
             label: tabLabel(<TeamOutlined />, '회원 관리'),
             children: (<>
                 <FilterToolbar count={filteredMembers.length} search={{ value: memberSearch, onChange: e => setMemberSearch(e.target.value), placeholder: '이름, 이메일로 검색' }} onReload={() => { setMemberLoaded(false); loadMembers(true); }} loading={memberLoading} />
-                {memberLoading ? <AdminTableSkeleton rows={8} /> : <Table columns={memberColumns} dataSource={filteredMembers} rowKey="id" size="middle" scroll={{ x: 'max-content' }} pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: '회원이 없습니다.' }} />}
+                {!memberFirstLoadRef.current && memberLoading ? <AdminTableSkeleton rows={8} /> : <Table columns={memberColumns} dataSource={filteredMembers} rowKey="id" size="middle" scroll={{ x: 'max-content' }} pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: '회원이 없습니다.' }} />}
             </>),
         },
         {
@@ -390,7 +454,7 @@ const AdminPanel = () => {
             label: tabLabel(<ShopOutlined />, '가게 관리'),
             children: (<>
                 <FilterToolbar count={filteredStores.length} search={{ value: storeSearch, onChange: e => setStoreSearch(e.target.value), placeholder: '가게명, 주소로 검색' }} onReload={() => { setStoreLoaded(false); loadStores(true); }} loading={storeLoading} />
-                {storeLoading ? <AdminTableSkeleton rows={8} /> : <Table columns={storeAdminColumns} dataSource={filteredStores} rowKey="id" size="middle" scroll={{ x: 'max-content' }} pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: '가게가 없습니다.' }} />}
+                {!storeFirstLoadRef.current && storeLoading ? <AdminTableSkeleton rows={8} /> : <Table columns={storeAdminColumns} dataSource={filteredStores} rowKey="id" size="middle" scroll={{ x: 'max-content' }} pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: '가게가 없습니다.' }} />}
             </>),
         },
         {
@@ -398,7 +462,7 @@ const AdminPanel = () => {
             label: tabLabel(<CalendarOutlined />, '전체 예약'),
             children: (<>
                 <FilterToolbar selects={[{ value: resStatusFilter, onChange: setResStatusFilter, options: RES_STATUS_OPTIONS }]} count={filteredReservations.length} search={{ value: resSearch, onChange: e => setResSearch(e.target.value), placeholder: '가게명, 예약자로 검색', disabled: resLoading }} onReload={() => loadReservations(true)} loading={resLoading} />
-                {resLoading ? <AdminTableSkeleton rows={8} cols={[130, 100, 110, 80, 60, 90, 90]} /> : <Table columns={reservationColumns} dataSource={filteredReservations} rowKey="id" size="middle" scroll={{ x: 'max-content' }} pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: '예약 내역이 없습니다.' }} />}
+                {!resFirstLoadRef.current && resLoading ? <AdminTableSkeleton rows={8} cols={[130, 100, 110, 80, 60, 90, 90]} /> : <Table columns={reservationColumns} dataSource={filteredReservations} rowKey="id" size="middle" scroll={{ x: 'max-content' }} pagination={{ pageSize: 20, showSizeChanger: false }} locale={{ emptyText: '예약 내역이 없습니다.' }} />}
             </>),
         },
     ];
@@ -409,10 +473,9 @@ const AdminPanel = () => {
                 <Title level={2} style={styles.title}>관리자 패널</Title>
                 <Text type="secondary" style={{ fontSize: fontSize.base }}>사업자 인증 신청을 검토하고, 전체 예약 현황을 모니터링하세요.</Text>
             </div>
-            <div ref={tabsContainerRef}>
-                <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems}
-                    animated={{ inkBar: true, tabPane: false }} />
-            </div>
+            {/* ref 및 scrollIntoView 제거 — iOS WebKit 수평 viewport 밀림 버그 방지 */}
+            <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems}
+                animated={{ inkBar: true, tabPane: false }} />
 
             <Modal title="사업자 인증 상세" open={detailOpen} onCancel={() => setDetailOpen(false)}
                 footer={<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20 }}>
@@ -426,7 +489,7 @@ const AdminPanel = () => {
                         <DetailRow label="상태"><Tag color={STATUS_CONFIG[detailItem.status]?.color}>{STATUS_CONFIG[detailItem.status]?.label || detailItem.status}</Tag></DetailRow>
                         {detailItem.memo && <DetailRow label="메모"><Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', color: colors.text.secondary }}>{detailItem.memo}</Paragraph></DetailRow>}
                         {detailItem.rejectionReason && <DetailRow label="거절 사유"><Text type="danger">{detailItem.rejectionReason}</Text></DetailRow>}
-                        {detailItem.licenseImageUrl && <DetailRow label="사업자등록증"><Image src={detailItem.licenseImageUrl.startsWith('http') ? detailItem.licenseImageUrl : `${globalThis.location.protocol}//${globalThis.location.hostname}:8080${detailItem.licenseImageUrl}`} alt="사업자등록증" style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }} /></DetailRow>}
+                        {detailItem.licenseImageUrl && <DetailRow label="사업자등록증"><Image src={getDetailImageUrl(detailItem.licenseImageUrl)} alt="사업자등록증" style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }} /></DetailRow>}
                         <DetailRow label="신청일">{detailItem.createdAt?.substring(0, 10)}</DetailRow>
                         {detailItem.processedAt && <DetailRow label="처리일">{detailItem.processedAt?.substring(0, 10)} ({detailItem.processedByName})</DetailRow>}
                     </div>
@@ -444,6 +507,13 @@ const AdminPanel = () => {
             <BanModal key={banOpen ? 'ban-open' : 'ban-closed'} open={banOpen} target={sanctionTarget}
                 onCancel={() => setBanOpen(false)}
                 onOk={handleBan} loading={sanctionLoading} />
+            <StoreSuspendModal key={storeSuspendOpen ? 'store-suspend-open' : 'store-suspend-closed'} open={storeSuspendOpen} target={storeSanctionTarget}
+                onCancel={() => setStoreSuspendOpen(false)}
+                onOk={handleStoreSuspend} loading={storeSanctionLoading} />
+
+            <StoreBanModal key={storeBanOpen ? 'store-ban-open' : 'store-ban-closed'} open={storeBanOpen} target={storeSanctionTarget}
+                onCancel={() => setStoreBanOpen(false)}
+                onOk={handleStoreBan} loading={storeSanctionLoading} />
         </PageContainer>
     );
 };
@@ -457,7 +527,6 @@ const DetailRow = ({ label, children }) => (
 
 const styles = { title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary } };
 
-// ── 제재 모달 — 상위 state 변경에 리렌더링되지 않도록 memo 분리
 const SuspendModal = memo(({ open, target, onCancel, onOk, loading }) => {
     const [days, setDays] = useState(7);
     const [reason, setReason] = useState('');
@@ -494,6 +563,48 @@ const BanModal = memo(({ open, target, onCancel, onOk, loading }) => {
                 </Text>
                 <Text style={{ display: 'block', marginBottom: 6 }}>정지 사유 (선택)</Text>
                 <TextArea rows={3} placeholder="예: 반복적인 허위 예약" value={reason}
+                    onChange={e => setReason(e.target.value)} maxLength={200} showCount />
+            </div>
+        </Modal>
+    );
+});
+
+const StoreSuspendModal = memo(({ open, target, onCancel, onOk, loading }) => {
+    const [days, setDays] = useState(7);
+    const [reason, setReason] = useState('');
+    return (
+        <Modal title={`영업정지 — ${target?.name || ''}`}
+            open={open} onCancel={onCancel}
+            onOk={() => onOk(days, reason)} okText="영업정지 적용" cancelText="취소"
+            okButtonProps={{ loading, style: { backgroundColor: '#fa8c16', borderColor: '#fa8c16' } }} centered>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
+                <div>
+                    <Text style={{ display: 'block', marginBottom: 6 }}>영업정지 기간 (일)</Text>
+                    <InputNumber min={1} max={365} value={days} onChange={v => setDays(v || 7)} style={{ width: '100%' }} />
+                </div>
+                <div>
+                    <Text style={{ display: 'block', marginBottom: 6 }}>정지 사유 (선택)</Text>
+                    <TextArea rows={3} placeholder="예: 위생 법규 위반 등" value={reason}
+                        onChange={e => setReason(e.target.value)} maxLength={200} showCount />
+                </div>
+            </div>
+        </Modal>
+    );
+});
+
+const StoreBanModal = memo(({ open, target, onCancel, onOk, loading }) => {
+    const [reason, setReason] = useState('');
+    return (
+        <Modal title={`영구 폐업 — ${target?.name || ''}`}
+            open={open} onCancel={onCancel}
+            onOk={() => onOk(reason)} okText="영구 폐업" cancelText="취소"
+            okButtonProps={{ danger: true, loading }} centered>
+            <div style={{ paddingTop: 8 }}>
+                <Text type="danger" style={{ display: 'block', marginBottom: 10 }}>
+                    가게를 영구 폐업 처리합니다. 정지 해제 버튼으로 언제든지 원상복구 가능합니다.
+                </Text>
+                <Text style={{ display: 'block', marginBottom: 6 }}>폐업 사유 (선택)</Text>
+                <TextArea rows={3} placeholder="예: 반복적인 서비스 이용규정 위반" value={reason}
                     onChange={e => setReason(e.target.value)} maxLength={200} showCount />
             </div>
         </Modal>

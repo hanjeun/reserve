@@ -49,6 +49,15 @@ public class MemberApiController {
         return ApiResponse.success(updated, "프로필 이미지가 초기화되었습니다.");
     }
 
+    // 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경 가능)
+    @PatchMapping("/me/marketing-consent")
+    public ApiResponse<MemberResponse> updateMarketingConsent(@RequestBody java.util.Map<String, Boolean> body) {
+        Member member = SecurityUtil.getCurrentMember("인증된 사용자 정보를 찾을 수 없습니다.");
+        boolean agreed = Boolean.TRUE.equals(body.get("marketingAgreed"));
+        MemberResponse updated = memberService.updateMarketingConsent(member.getId(), agreed);
+        return ApiResponse.success(updated, agreed ? "마케팅 수신에 동의했습니다." : "마케팅 수신 동의를 철회했습니다.");
+    }
+
     // 회원 탈퇴
     @DeleteMapping("/delete")
     public ApiResponse<Void> deleteMember() {

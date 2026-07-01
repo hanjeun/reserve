@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Typography, Table, Tag, Select, Skeleton } from 'antd';
-import { DeleteOutlined, SyncOutlined, UndoOutlined } from '@ant-design/icons';
-import { Button } from '../common';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Typography, Table, Tag } from 'antd';
+import { DeleteOutlined, UndoOutlined } from '@ant-design/icons';
+import { Button, FilterToolbar, AdminTableSkeleton } from '../common';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -40,9 +40,12 @@ const TrashTab = () => {
     const [typeFilter, setTypeFilter] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
 
+    // 최초 1회 로딩 완료 추적 — 이후로는 Table을 절대 언마운트하지 않음 (페이지네이션 깜빡임 방지)
+    const hasLoadedOnceRef = useRef(false);
+
     const load = useCallback(async () => {
         setLoading(true);
-        setItems([]);
+        // setItems([]) 제거 — 로딩 중에도 기존 데이터/페이지네이션 유지
         try {
             const params = { page: 0, size: 50 };
             if (typeFilter) params.type = typeFilter;
@@ -52,6 +55,7 @@ const TrashTab = () => {
             message.error('휴지통 목록을 불러오지 못했습니다.');
         } finally {
             setLoading(false);
+            hasLoadedOnceRef.current = true;
         }
     }, [message, typeFilter]);
 
@@ -132,23 +136,18 @@ const TrashTab = () => {
 
     return (
         <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <Select
-                    value={typeFilter}
-                    onChange={setTypeFilter}
-                    options={ENTITY_TYPE_OPTIONS}
-                    size="large"
-                    style={{ width: 140 }}
-                />
-                {!loading && (
-                    <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                        복구 가능한 항목 {items.length}개
-                    </Text>
-                )}
-                <Button variant="ghost-sm" size="md" onClick={load} disabled={loading} style={{ marginLeft: 'auto' }}>
-                    <SyncOutlined spin={loading} /> 새로고침
-                </Button>
-            </div>
+            {/* 다른 관리자 탭과 동일한 FilterToolbar 패턴: 3초 쿨다운(rate limit) 내장 */}
+            <FilterToolbar
+                selects={[{
+                    value: typeFilter,
+                    onChange: setTypeFilter,
+                    options: ENTITY_TYPE_OPTIONS,
+                    width: 140,
+                }]}
+                count={items.length}
+                onReload={load}
+                loading={loading}
+            />
 
             <div style={{
                 background: colors.gray[50],
@@ -162,20 +161,20 @@ const TrashTab = () => {
                 소프트 삭제된 항목은 30일 후 자동으로 영구 삭제됩니다. 복구가 필요한 항목은 기간 내에 복구하세요.
             </div>
 
-            {loading
-                ? <Skeleton active paragraph={{ rows: 6 }} />
-                : (
-                    <Table
-                        columns={columns}
-                        dataSource={items}
-                        rowKey="id"
-                        size="middle"
-                        scroll={{ x: 800 }}
-                        pagination={{ pageSize: 20, showSizeChanger: false }}
-                        locale={{ emptyText: '휴지통에 항목이 없습니다.' }}
-                    />
-                )
-            }
+            {/* 첫 로딩에만 스켈레톤. 이후로는 Table을 절대 언마운트하지 않음 (페이지네이션 깜빡임 방지) */}
+            {!hasLoadedOnceRef.current && loading ? (
+                <AdminTableSkeleton rows={6} />
+            ) : (
+                <Table
+                    columns={columns}
+                    dataSource={items}
+                    rowKey="id"
+                    size="middle"
+                    scroll={{ x: 800 }}
+                    pagination={{ pageSize: 20, showSizeChanger: false }}
+                    locale={{ emptyText: '휴지통에 항목이 없습니다.' }}
+                />
+            )}
         </div>
     );
 };

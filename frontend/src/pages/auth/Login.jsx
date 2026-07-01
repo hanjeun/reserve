@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Form, Typography, Divider, Flex, Space } from 'antd';
+import { Form, Typography, Divider, Flex } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -38,10 +38,33 @@ const Login = () => {
     useDocumentTitle('로그인');
     const navigate = useNavigate();
     const location = useLocation();
-    const { message } = useMessage();
+    const { message, modal } = useMessage();
     const from = location.state?.from?.pathname || "/";
     const hasHandledRef = useRef(false);
     const [loading, setLoading] = useState(false);
+
+    // 정지/영구정지 안내 모달 — 소셜·이메일 로그인 공통 포맷 (배너 차별 없이 동일한 UX)
+    const showSuspendModal = (status, until, reason) => {
+        const isBanned = status === 'BANNED';
+        modal.error({
+            title: isBanned ? '영구 정지된 계정입니다' : '이용이 제한된 계정입니다',
+            content: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {!isBanned && until && (
+                        <Text>정지 기간: <Text strong>{until}까지</Text></Text>
+                    )}
+                    {reason && (
+                        <Text>사유: {reason}</Text>
+                    )}
+                    <Text type="secondary" style={{ marginTop: 4 }}>
+                        문의사항은 관리자에게 문의해주세요.
+                    </Text>
+                </div>
+            ),
+            okText: '확인',
+            centered: true,
+        });
+    };
 
     useEffect(() => {
         if (hasHandledRef.current) return;
@@ -61,8 +84,21 @@ const Login = () => {
             return;
         }
 
-        // OAuth2 에러 메시지 처리 (URL 파라미터)
+        // OAuth2 소셜 로그인 시 정지 처리 (URL 파라미터)
+        // 소셜 로그인은 브라우저가 따라가는 리다이렉트 흐름이라 URL 파라미터로 정보 전달
+        // 구조: ?suspended=true&status=SUSPENDED&until=2026-08-15
         const params = new URLSearchParams(window.location.search);
+        const isSuspended = params.get('suspended') === 'true';
+        const suspendStatus = params.get('status');    // 'SUSPENDED' | 'BANNED'
+        const suspendUntil  = params.get('until');      // '2026-08-15' | null
+
+        if (isSuspended && suspendStatus) {
+            hasHandledRef.current = true;
+            showSuspendModal(suspendStatus, suspendUntil, null);
+            window.history.replaceState({}, '', '/login');
+        }
+
+        // 구 오류 파라미터 하위 호환 (oauthError='oauth2', message=...)
         const oauthError = params.get('error');
         const oauthMessage = params.get('message');
         if (oauthError === 'oauth2' && oauthMessage) {
@@ -70,6 +106,7 @@ const Login = () => {
             message.error(decodeURIComponent(oauthMessage));
             window.history.replaceState({}, '', '/login');
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoggedIn, location.state, navigate, message]);
 
     const onLoginSubmit = async (values) => {
@@ -82,8 +119,15 @@ const Login = () => {
                 navigate(from, { replace: true });
             }
         } catch (err) {
-            const msg = typeof err === 'string' ? err : err?.message;
             if (err?.isSessionExpired) return;
+            // err.data에 구조화된 정지 정보(status/until/reason)가 있으면 모달로 처리
+            // 이메일 로그인은 URL이 아닌 JSON 응답이므로 사유 길이 제한 없이 전달됨
+            const suspendData = err?.data;
+            if (suspendData?.status) {
+                showSuspendModal(suspendData.status, suspendData.until, suspendData.reason);
+                return;
+            }
+            const msg = typeof err === 'string' ? err : err?.message;
             message.error(msg || '이메일 또는 비밀번호를 확인해주세요.');
         } finally {
             setLoading(false);
@@ -136,7 +180,7 @@ const Login = () => {
                     </button>
                 </Flex>
 
-                <Space direction="vertical" size={20} style={{ width: '100%', marginTop: '32px' }} align="center">
+                <Flex vertical gap={20} style={{ width: '100%', marginTop: '32px' }} align="center">
                     {/* 회원가입 라인 */}
                     <Flex align="center" justify="center" gap={4}>
                         <Text type="secondary" style={{ fontSize: fontSize.base }}>계정이 없으신가요?</Text>
@@ -147,11 +191,11 @@ const Login = () => {
                     <Text type="secondary" style={{ fontSize: fontSize.xs, color: colors.text.tertiary, textAlign: 'center' }}>
                         로그인 시{' '}
                         <button type="button" style={styles.linkBtn} onClick={() => navigate('/terms')}>이용약관</button>
-                        {' '}·{' '}
+                        {' · '}
                         <button type="button" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>
                         에 동의합니다.
                     </Text>
-                </Space>
+                </Flex>
             </div>
         </PageContainer>
     );

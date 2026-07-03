@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Typography, Empty, Modal, Flex, Radio, Spin, Alert } from 'antd';
-import { StarFilled, EditOutlined, DeleteOutlined, ExclamationCircleFilled, WarningFilled } from '@ant-design/icons';
+import { Typography, Empty, Modal, Flex, Radio, Spin } from 'antd';
+import { StarFilled, EditOutlined, DeleteOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { PageContainer, Card, StoreCardSkeleton, Badge } from '../../components/common';
 import { useMyStores } from '../../hooks';
@@ -60,8 +60,8 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
         <Modal
             title={
                 <Flex align="center" gap={8}>
-                    <ExclamationCircleFilled style={{ color: colors.error.main, fontSize: 18 }} />
-                    <span style={{ fontWeight: fontWeight.bold }}>가게 삭제</span>
+                    <ExclamationCircleFilled style={{ color: colors.warning.main, fontSize: 18 }} />
+                    <span>가게 삭제</span>
                 </Flex>
             }
             open={open}
@@ -93,26 +93,23 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                     <div style={{ marginTop: 16 }}>
                         {/* 예약 없음 */}
                         {!hasActiveReservations && (
-                            <Alert
-                                type="success"
-                                showIcon
-                                title="진행 중인 예약이 없습니다"
-                                description="가게를 안전하게 삭제할 수 있습니다."
-                                style={{ borderRadius: radius.md }}
-                            />
+                            <div style={{ background: colors.success.light, borderRadius: radius.md, padding: '12px 14px' }}>
+                                <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
+                                    진행 중인 예약이 없습니다
+                                </Text>
+                                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>가게를 안전하게 삭제할 수 있습니다.</Text>
+                            </div>
                         )}
 
                         {/* 예약 있음 → 옵션 선택 */}
                         {hasActiveReservations && (
                             <>
-                                <Alert
-                                    type="warning"
-                                    showIcon
-                                    icon={<WarningFilled />}
-                                    title={`진행 중인 예약 ${activeCount}건이 있습니다`}
-                                    description="삭제 방식을 선택해주세요."
-                                    style={{ borderRadius: radius.md, marginBottom: 16 }}
-                                />
+                                <div style={{ background: colors.warning.light, borderRadius: radius.md, padding: '12px 14px', marginBottom: 16 }}>
+                                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
+                                        진행 중인 예약 {activeCount}건이 있습니다
+                                    </Text>
+                                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>삭제 방식을 선택해주세요.</Text>
+                                </div>
                                 <Radio.Group
                                     value={deleteOption}
                                     onChange={e => setDeleteOption(e.target.value)}
@@ -161,7 +158,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                     border: `1px solid ${colors.border.default}`,
                 }}>
                     <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                        ⚠️ 삭제 후에는 가게 정보, 리뷰, 즐겨찾기 등 모든 데이터가 영구 삭제되며 복구할 수 없습니다.
+                        삭제 후에는 가게 정보, 리뷰, 즐겨찾기 등 모든 데이터가 영구 삭제되며 복구할 수 없습니다.
                     </Text>
                 </div>
             </div>

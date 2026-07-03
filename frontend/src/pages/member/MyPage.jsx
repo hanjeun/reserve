@@ -120,7 +120,7 @@ const PasswordTab = () => {
 // 저장 → File이면 업로드, 'reset'이면 서버 삭제, null이면 no-op
 
 const ProfileImageTab = ({ user }) => {
-    const { message } = useMessage();
+    const { message, confirm } = useMessage();
     const [loading, setLoading] = useState(false);
     // pending: null | 'reset' | { file: File, previewUrl: string }
     const [pending, setPending] = useState(null);
@@ -170,17 +170,24 @@ const ProfileImageTab = ({ user }) => {
         }
     };
 
-    const handleResetToDefault = async () => {
-        setLoading(true);
-        try {
-            await memberService.deleteProfileImage();
-            message.success('기본 이미지로 변경되었습니다');
-            await useAuthStore.getState().checkAuth(true);
-        } catch (err) {
-            handleApiError(err, message, '프로필 사진 변경에 실패했습니다');
-        } finally {
-            setLoading(false);
-        }
+    const handleResetToDefault = () => {
+        confirm({
+            title: '기본 이미지로 변경',
+            content: '현재 프로필 사진을 삭제하고 기본 이미지로 되돌립니다. 계속하시겠습니까?',
+            okText: '변경', cancelText: '취소', centered: true,
+            onOk: async () => {
+                setLoading(true);
+                try {
+                    await memberService.deleteProfileImage();
+                    message.success('기본 이미지로 변경되었습니다');
+                    await useAuthStore.getState().checkAuth(true);
+                } catch (err) {
+                    handleApiError(err, message, '프로필 사진 변경에 실패했습니다');
+                } finally {
+                    setLoading(false);
+                }
+            },
+        });
     };
 
     const previewSrc = pending?.previewUrl ?? (user?.profileImageUrl || user?.profileImage);

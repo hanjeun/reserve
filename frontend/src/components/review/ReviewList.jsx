@@ -58,7 +58,7 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                 <FormTextArea
                     value={form.content}
                     onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-                    placeholder="음식 맛, 서비스, 분위기 등 솔직한 경험을 공유해주세요 (10자 이상)"
+                    placeholder="서비스, 분위기 등 솔직한 경험을 공유해주세요 (10자 이상)"
                     rows={4}
                     maxLength={1000}
                     showCount

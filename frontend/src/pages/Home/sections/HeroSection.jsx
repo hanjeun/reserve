@@ -56,7 +56,7 @@ export default function HeroSection({ isMobile }) {
                 </div>
                 <div className="slide-up" style={{ ...styles.titleContainer, animationDelay: '0.18s' }}>
                     <Title style={styles.mainTitle}>
-                        <div style={styles.lineWrapper}>미식의 즐거움,</div>
+                        <div style={styles.lineWrapper}>예약이 필요한 순간,</div>
                         <div style={styles.lineWrapper}>
                             {renderParts(current, LINES[lineIdx])}
                             <span className="cursor" />
@@ -66,12 +66,12 @@ export default function HeroSection({ isMobile }) {
                 <div className="slide-up" style={{ animationDelay: '0.28s', textAlign: 'center' }}>
                     <Text style={styles.subTitle}>
                         기다림 없는 완벽한 하루를 위해,<br />
-                        전국 맛집 예약을 가장 빠르게 도와드립니다.
+                        원하는 예약을 가장 빠르게 도와드립니다.
                     </Text>
                 </div>
                 <div className="slide-up" style={{ animationDelay: '0.36s', marginTop: 32 }}>
                     <Button variant="hero" onClick={() => navigate('/stores')} style={styles.heroBtn}>
-                        지금 식당 둘러보기
+                        지금 둘러보기
                         <ArrowRightOutlined style={{ marginLeft: 8, fontSize: 17 }} />
                     </Button>
                 </div>

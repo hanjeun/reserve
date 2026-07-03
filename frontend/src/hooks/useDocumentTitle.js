@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 const SITE_NAME = 'RESERVE';
-const DEFAULT_DESCRIPTION = '기다림 없는 완벽한 하루를 위해, 전국 맛집 예약을 가장 빠르게 도와드립니다.';
+const DEFAULT_DESCRIPTION = '예약이 필요한 순간, 원하는 가게를 찾고 가장 빠르게 예약하세요.';
 
 /**
  * 페이지별 document title + meta description 동기화 훅
@@ -9,14 +9,14 @@ const DEFAULT_DESCRIPTION = '기다림 없는 완벽한 하루를 위해, 전국
  * 사용법:
  *   useDocumentTitle('가게 목록');
  *   useDocumentTitle('스타벅스 강남점', '스타벅스 강남점 예약 페이지입니다.');
- *   useDocumentTitle(null); // 홈 — "RESERVE | 전국 맛집 예약 플랫폼"
+ *   useDocumentTitle(null); // 홈 — "RESERVE | 예약이 필요한 순간"
  */
 const useDocumentTitle = (pageTitle, description) => {
     useEffect(() => {
         // ── title ──────────────────────────────────────────
         const title = pageTitle
             ? `${pageTitle} | ${SITE_NAME}`
-            : `${SITE_NAME} | 전국 맛집 예약 플랫폼`;
+            : `${SITE_NAME} | 예약이 필요한 순간`;
 
         document.title = title;
 
@@ -40,11 +40,11 @@ const useDocumentTitle = (pageTitle, description) => {
 
         // ── 페이지 이탈 시 기본값으로 복원 ─────────────────
         return () => {
-            document.title = `${SITE_NAME} | 전국 맛집 예약 플랫폼`;
+            document.title = `${SITE_NAME} | 예약이 필요한 순간`;
             setMeta('meta[name="description"]', DEFAULT_DESCRIPTION);
-            setMeta('meta[property="og:title"]', `${SITE_NAME} | 전국 맛집 예약 플랫폼`);
+            setMeta('meta[property="og:title"]', `${SITE_NAME} | 예약이 필요한 순간`);
             setMeta('meta[property="og:description"]', DEFAULT_DESCRIPTION);
-            setMeta('meta[name="twitter:title"]', `${SITE_NAME} | 전국 맛집 예약 플랫폼`);
+            setMeta('meta[name="twitter:title"]', `${SITE_NAME} | 예약이 필요한 순간`);
             setMeta('meta[name="twitter:description"]', DEFAULT_DESCRIPTION);
         };
     }, [pageTitle, description]);

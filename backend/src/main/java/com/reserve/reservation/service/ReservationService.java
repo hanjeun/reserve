@@ -398,6 +398,22 @@ public class ReservationService {
     }
 
     /**
+     * 가게 상세 페이지 진입 시 호출: 이 회원이 해당 가게에서 리뷰 작성 가능한(가장 최근 COMPLETED) 예약이 있는지 조회
+     * 서버에서 바로 필터링된 1건만 내려보내므로 클라이언트가 내 전체 예약 목록을 불러올 필요가 없음
+     */
+    @Transactional(readOnly = true)
+    public ReservationResponse getLatestCompletedReservationForStore(Member member, Long storeId) {
+        return reservationRepository
+                .findFirstByMemberIdAndStoreIdAndStatusOrderByIdDesc(member.getId(), storeId, Reservation.ReservationStatus.COMPLETED)
+                .map(r -> {
+                    Long reviewId = reservationRepository.findReviewIdsByReservationIds(List.of(r.getId())).stream()
+                            .findFirst().map(row -> (Long) row[1]).orElse(null);
+                    return reviewId != null ? ReservationResponse.fromEntityWithReviewId(r, reviewId) : ReservationResponse.fromEntity(r);
+                })
+                .orElse(null);
+    }
+
+    /**
      * 사업자/관리자 - 가게 예약 목록 조회 (최신순)
      * - ADMIN: 페이지네이션 지원 (기본 100건/페이지)
      * - BUSINESS: 본인 소유 가게 예약 (fetch join + 단일 쿼리)

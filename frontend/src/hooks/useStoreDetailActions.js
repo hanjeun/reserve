@@ -21,13 +21,11 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const [completedReservation, setCompletedReservation] = useState(null);
 
     // 이 가게에서 완료된 예약이 있는지 조회 (리뷰 작성 가능 여부 판단용)
+    // 서버에서 바로 필터링된 1건만 받아옴 — 이전에는 내 전체 예약을 불러와 클라이언트에서 storeId로 필터링했음
     useEffect(() => {
         if (!isLoggedIn) return;
-        reservationService.getMyReservations().then(list => {
-            const num     = Number(id);
-            const sorted  = (list ?? []).filter(r => r.storeId === num).sort((a, b) => b.id - a.id);
-            const done    = sorted.find(r => r.status === 'COMPLETED') ?? null;
-            if (done) setCompletedReservation({ reservationId: done.id, reviewId: done.reviewId ?? null });
+        reservationService.getMyCompletedForStore(Number(id)).then(res => {
+            if (res) setCompletedReservation({ reservationId: res.id, reviewId: res.reviewId ?? null });
         }).catch(() => {});
     }, [id, isLoggedIn]);
 

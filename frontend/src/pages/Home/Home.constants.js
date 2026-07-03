@@ -12,9 +12,9 @@ export const SECTION_IDS = ['section-0', 'section-1', 'section-2', 'section-faq'
 // JSX 대신 컴포넌트 참조 저장 → 렌더 시 동적 생성으로 useState 버그 해결
 export const SECTIONS = [
     {
-        id: 'section-0', tag: '식당 탐색',
-        title: ['원하는 식당을', '한눈에 찾아보세요'], blue: '한눈에',
-        desc: ['카테고리, 위치, 날짜별로 검색해', '내 상황에 딱 맞는 식당을 찾아보세요.'],
+        id: 'section-0', tag: '가게 탐색',
+        title: ['원하는 가게를', '한눈에 찾아보세요'], blue: '한눈에',
+        desc: ['카테고리, 위치, 날짜별로 검색해', '내 상황에 딱 맞는 가게를 찾아보세요.'],
         points: ['실시간 잔여석 확인', '카테고리 · 별점 필터', '리뷰 기반 추천'],
         Ui: MockStoreList, UiMobile: MockStoreListMobile, reverse: false,
     },

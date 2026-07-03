@@ -51,6 +51,12 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(reservations, "내 예약 목록 조회 성공"));
     }
 
+    @GetMapping("/my/store/{storeId}/completed")
+    public ResponseEntity<ApiResponse<ReservationResponse>> getMyLatestCompletedForStore(@PathVariable Long storeId) {
+        ReservationResponse reservation = reservationService.getLatestCompletedReservationForStore(SecurityUtil.getCurrentMember(), storeId);
+        return ResponseEntity.ok(ApiResponse.success(reservation, "조회 성공"));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ReservationResponse>> getReservation(@PathVariable Long id) {
         ReservationResponse reservation = reservationService.getReservation(id, SecurityUtil.getCurrentMember());

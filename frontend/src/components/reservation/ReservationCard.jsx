@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Modal, Input, Typography } from 'antd';
+import { Modal, Input, Typography, Flex } from 'antd';
 import {
     CheckOutlined, CloseOutlined,
     CheckCircleOutlined, WarningOutlined,
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined,
-    DeleteOutlined,
+    DeleteOutlined, ExclamationCircleFilled,
 } from '@ant-design/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import { Button } from '../common';
@@ -136,7 +136,12 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
             </div>
 
             <Modal
-                title="예약 거절"
+                title={
+                    <Flex align="center" gap={8}>
+                        <ExclamationCircleFilled style={{ color: colors.error.main, fontSize: 18 }} />
+                        <span>예약 거절</span>
+                    </Flex>
+                }
                 open={rejectModalOpen}
                 onOk={handleRejectConfirm}
                 onCancel={() => { setRejectModalOpen(false); setRejectReason(''); }}

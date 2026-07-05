@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '../constants';
 
 const reservationService = {
     getMyReservations:   ()             => api.get(API_ENDPOINTS.RESERVATION.MY_RESERVATIONS),
+    getMyCompletedForStore: (storeId)   => api.get(API_ENDPOINTS.RESERVATION.MY_COMPLETED_FOR_STORE(storeId)),
     getStoreReservations:()             => api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS),
     getReservation:      (id)           => api.get(API_ENDPOINTS.RESERVATION.DETAIL(id)),
     createReservation:   (data)         => api.post(API_ENDPOINTS.RESERVATION.CREATE, data),

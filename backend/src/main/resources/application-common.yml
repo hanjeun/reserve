@@ -91,7 +91,7 @@ mail:
   port: 465
   from: ${MAIL_FROM:reserve@reserve.it.kr}
   from-name: ${MAIL_FROM_NAME:RESERVE}
-  webhook-secret: ${MAIL_WEBHOOK_SECRET:}
+  admin-notify: ${MAIL_ADMIN_NOTIFY:hanjeun111@gmail.com}
   properties:
     mail:
       smtp:

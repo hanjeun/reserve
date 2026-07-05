@@ -21,7 +21,7 @@ const StoreList = () => {
         searchParams, setSearchParams,
     } = useStoreList();
 
-    useDocumentTitle('가게 목록', '원하는 조건으로 최고의 식당을 찾아보세요. RESERVE에서 전국 맛집을 간편하게 예약할 수 있습니다.');
+    useDocumentTitle('가게 목록', '원하는 조건으로 최고의 가게를 찾아보세요. RESERVE에서 다양한 업종을 간편하게 예약할 수 있습니다.');
 
     const sentinelRef = React.useRef(null);
     const fetchNextRef = React.useRef(fetchNextPage);
@@ -52,14 +52,14 @@ const StoreList = () => {
             {/* 헤더 */}
             <div style={styles.header}>
                 <div style={styles.headerLeft}>
-                    <Title level={2} style={styles.title}>맛집 둘러보기</Title>
+                    <Title level={2} style={styles.title}>가게 둘러보기</Title>
                     <Text type="secondary" style={{ fontSize: fontSize.lg }}>
-                        원하는 조건으로 최고의 식당을 찾아보세요
+                        원하는 조건으로 최고의 가게를 찾아보세요
                     </Text>
                 </div>
                 <div style={styles.searchWrap}>
                     <Search
-                        placeholder="식당 이름 또는 카테고리"
+                        placeholder="가게 이름 또는 카테고리"
                         defaultValue={searchParams.keyword}
                         key={searchParams.keyword}
                         onSearch={handleSearch}
@@ -89,7 +89,7 @@ const StoreList = () => {
                     <div style={styles.fadeOut} />
                 </div>
             ) : stores.length === 0 ? (
-                <Empty description="조건에 맞는 식당이 없습니다." style={{ marginTop: 100 }} />
+                <Empty description="조건에 맞는 가게가 없습니다." style={{ marginTop: 100 }} />
             ) : (
                 <>
                     <div style={styles.grid}>

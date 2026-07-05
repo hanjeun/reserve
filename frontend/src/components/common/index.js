@@ -21,3 +21,5 @@ export { default as KakaoMap } from './KakaoMap';
 export { default as FavoriteButton } from './FavoriteButton';
 export { default as FilterToolbar } from './FilterToolbar';
 export { default as CustomPagination } from './CustomPagination';
+export { default as InquiryModal } from './InquiryModal';
+export { default as FormModal, FormField } from './FormModal';

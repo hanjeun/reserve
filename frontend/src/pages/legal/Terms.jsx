@@ -23,7 +23,7 @@ const Terms = () => {
             </div>
 
             <Section title="제1조 (목적)">
-                <Paragraph>본 약관은 RESERVE(이하 "서비스")가 제공하는 식당 예약 플랫폼 서비스의 이용과 관련하여 서비스와 이용자 간의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</Paragraph>
+                <Paragraph>본 약관은 RESERVE(이하 "서비스")가 제공하는 가게 예약 플랫폼 서비스의 이용과 관련하여 서비스와 이용자 간의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</Paragraph>
                 <Paragraph>본 서비스는 포트폴리오 목적으로 제작된 서비스로, 실제 상업적 운영이 아님을 명시합니다.</Paragraph>
             </Section>
 

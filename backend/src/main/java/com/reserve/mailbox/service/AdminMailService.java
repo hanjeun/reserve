@@ -1,12 +1,9 @@
 package com.reserve.mailbox.service;
 
-import com.reserve.mailbox.dto.*;
-import com.reserve.mailbox.entity.AdminMail;
-import com.reserve.mailbox.entity.AdminMailReply;
+import com.reserve.mailbox.dto.AdminSentMailResponse;
+import com.reserve.mailbox.dto.ComposeMailRequest;
 import com.reserve.mailbox.entity.AdminSentMail;
 import com.reserve.mailbox.repository.AdminSentMailRepository;
-import com.reserve.mailbox.repository.AdminMailRepository;
-import com.reserve.mailbox.repository.AdminMailReplyRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +19,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 
+/**
+ * 관리자 메일 발송 — 발송 전용 서비스.
+ * (수신 웹훅 처리는 제거됨 — 문의는 Inquiry 도메인이 대신 담당)
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,8 +32,6 @@ public class AdminMailService {
     private static final String FONT_FAMILY =
             "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
 
-    private final AdminMailRepository mailRepository;
-    private final AdminMailReplyRepository replyRepository;
     private final AdminSentMailRepository sentMailRepository;
     private final JavaMailSender mailSender;
 
@@ -41,67 +40,6 @@ public class AdminMailService {
 
     @Value("${mail.from-name:RESERVE}")
     private String fromName;
-
-    /* ── 웹훅 수신 저장 ─────────────────────────────────── */
-    @Transactional
-    public void receiveWebhook(MailWebhookPayload payload) {
-        AdminMail mail = AdminMail.builder()
-                .fromEmail(payload.parseEmail())
-                .fromName(payload.parseName())
-                .subject(payload.getSubject())
-                .body(payload.getText())   // plain text만 저장 (XSS 방지)
-                .build();
-        mailRepository.save(mail);
-        log.info("Mail received and saved: from={}, subject={}", mail.getFromEmail(), mail.getSubject());
-    }
-
-    /* ── 목록 조회 (삭제된 것 제외) ────────────────────────── */
-    public List<AdminMailListResponse> getMailList() {
-        return mailRepository.findByDeletedAtIsNullOrderByReceivedAtDesc()
-                .stream()
-                .map(AdminMailListResponse::from)
-                .toList();
-    }
-
-    /* ── 상세 조회 + 읽음 처리 ──────────────────────────── */
-    @Transactional
-    public AdminMailDetailResponse getMailDetail(Long id) {
-        AdminMail mail = mailRepository.findByIdWithReplies(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "메일을 찾을 수 없습니다."));
-        if (!mail.isRead()) {
-            mail.markAsRead();
-        }
-        return AdminMailDetailResponse.from(mail);
-    }
-
-    /* ── 읽지 않은 메일 개수 ────────────────────────────── */
-    public long getUnreadCount() {
-        return mailRepository.countByIsReadFalseAndDeletedAtIsNull();
-    }
-
-    /* ── 답장 발송 + 저장 ───────────────────────────────── */
-    @Transactional
-    public void reply(Long mailId, MailReplyRequest request) {
-        AdminMail mail = mailRepository.findByIdWithReplies(mailId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "메일을 찾을 수 없습니다."));
-
-        String replySubject = "Re: " + (mail.getSubject() != null ? mail.getSubject() : "");
-        String toEmail = mail.getFromEmail();
-
-        // Resend(JavaMailSender)로 이메일 발송
-        sendReplyEmail(toEmail, replySubject, request.getBody());
-
-        // 답장 히스토리 저장
-        AdminMailReply replyEntity = AdminMailReply.builder()
-                .adminMail(mail)
-                .toEmail(toEmail)
-                .subject(replySubject)
-                .body(request.getBody())
-                .build();
-        replyRepository.save(replyEntity);
-
-        log.info("Reply sent: to={}, subject={}", toEmail, replySubject);
-    }
 
     /* ── 새 메일 작성 발송 + DB 저장 ───────────────────── */
     @Transactional
@@ -137,8 +75,8 @@ public class AdminMailService {
             helper.setText(buildReplyHtml(body), true);
             mailSender.send(message);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("Reply email failed ({}): {}", toEmail, e.getMessage());
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "답장 발송 중 오류가 발생했습니다.");
+            log.error("Mail send failed ({}): {}", toEmail, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "메일 발송 중 오류가 발생했습니다.");
         }
     }
 

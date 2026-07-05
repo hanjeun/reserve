@@ -1,26 +1,26 @@
 import React, { useState } from 'react';
-import { Modal, Input, Typography } from 'antd';
+import { Modal, Typography, Flex, Divider } from 'antd';
 import {
     CheckOutlined, CloseOutlined,
     CheckCircleOutlined, WarningOutlined,
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined,
-    DeleteOutlined,
+    DeleteOutlined, ExclamationCircleFilled, MailOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
-import { Button } from '../common';
+import { Button, FormTextArea } from '../common';
 import { formatTime, formatCurrency, getThumbnailUrl } from '../../utils';
 import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
 import { useWindowWidth } from '../../hooks';
 
-const { TextArea } = Input;
 const { Text } = Typography;
 
 const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow, onRemove }) => {
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
+    const [detailOpen, setDetailOpen] = useState(false);
     const isWide = useWindowWidth() >= 576;
 
-    const { id, memberName, storeName, storeMainImageUrl, reservationDate, reservationTime, guestCount, depositAmount, status, specialRequest } = reservation;
+    const { id, memberName, memberEmail, storeName, storeMainImageUrl, reservationDate, reservationTime, guestCount, depositAmount, status, specialRequest, rejectionReason } = reservation;
 
     const isActing = (key) => actionLoading === `${key}-${id}`;
     const hasAction = status === 'PENDING' || status === 'CONFIRMED';
@@ -63,13 +63,13 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
     return (
         <>
             <div style={styles.row}>
-                {/* 이미지 */}
-                <div style={isWide ? styles.imgWrapWide : styles.imgWrap}>
+                {/* 이미지 - 클릭하면 상세 모달 */}
+                <div style={{ ...(isWide ? styles.imgWrapWide : styles.imgWrap), cursor: 'pointer' }} onClick={() => setDetailOpen(true)}>
                     <img src={getThumbnailUrl(storeMainImageUrl)} alt={storeName} style={styles.img} />
                 </div>
 
-                {/* 정보 */}
-                <div style={styles.info}>
+                {/* 정보 - 클릭하면 상세 모달 */}
+                <div style={{ ...styles.info, cursor: 'pointer' }} onClick={() => setDetailOpen(true)}>
                     <Text strong style={isWide ? styles.storeNameWide : styles.storeName}>{storeName}</Text>
                     {isWide ? metaItemsFlat : metaItemsStacked}
                     {specialRequest && (
@@ -136,7 +136,78 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
             </div>
 
             <Modal
-                title="예약 거절"
+                title={
+                    <Flex align="center" gap={8}>
+                        <FileTextOutlined style={{ color: colors.primary.main, fontSize: 18 }} />
+                        <span>예약 상세</span>
+                    </Flex>
+                }
+                open={detailOpen}
+                onCancel={() => setDetailOpen(false)}
+                footer={null}
+                centered
+            >
+                <Flex align="center" justify="space-between" style={{ marginBottom: 4 }}>
+                    <Text strong style={{ fontSize: fontSize.lg }}>{storeName}</Text>
+                    <ReservationStatusBadge status={status} />
+                </Flex>
+                <Divider style={{ margin: '12px 0' }} />
+                <div style={styles.detailRow}>
+                    <UserOutlined style={styles.detailIcon} />
+                    <Text style={styles.detailLabel}>예약자</Text>
+                    <Text style={styles.detailValue}>{memberName}</Text>
+                </div>
+                {memberEmail && (
+                    <div style={styles.detailRow}>
+                        <MailOutlined style={styles.detailIcon} />
+                        <Text style={styles.detailLabel}>이메일</Text>
+                        <Text style={styles.detailValue} copyable={{ text: memberEmail }}>{memberEmail}</Text>
+                    </div>
+                )}
+                <div style={styles.detailRow}>
+                    <CalendarOutlined style={styles.detailIcon} />
+                    <Text style={styles.detailLabel}>날짜</Text>
+                    <Text style={styles.detailValue}>{reservationDate}</Text>
+                </div>
+                <div style={styles.detailRow}>
+                    <ClockCircleOutlined style={styles.detailIcon} />
+                    <Text style={styles.detailLabel}>시간</Text>
+                    <Text style={styles.detailValue}>{formatTime(reservationTime)}</Text>
+                </div>
+                <div style={styles.detailRow}>
+                    <TeamOutlined style={styles.detailIcon} />
+                    <Text style={styles.detailLabel}>인원</Text>
+                    <Text style={styles.detailValue}>{guestCount}명</Text>
+                </div>
+                <div style={styles.detailRow}>
+                    <Text style={{ ...styles.detailLabel, marginLeft: 20 }}>금액</Text>
+                    <Text style={styles.detailValue} strong>{formatCurrency(depositAmount)}</Text>
+                </div>
+                {specialRequest && (
+                    <>
+                        <Divider style={{ margin: '12px 0' }} />
+                        <Text style={{ ...styles.detailLabel, display: 'block', marginBottom: 6 }}>요청 사항</Text>
+                        <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary, whiteSpace: 'pre-wrap' }}>
+                            {specialRequest}
+                        </Text>
+                    </>
+                )}
+                {status === 'REJECTED' && rejectionReason && (
+                    <>
+                        <Divider style={{ margin: '12px 0' }} />
+                        <Text style={{ ...styles.detailLabel, display: 'block', marginBottom: 6 }}>거절 사유</Text>
+                        <Text style={{ fontSize: fontSize.sm, color: colors.error.main }}>{rejectionReason}</Text>
+                    </>
+                )}
+            </Modal>
+
+            <Modal
+                title={
+                    <Flex align="center" gap={8}>
+                        <ExclamationCircleFilled style={{ color: colors.error.main, fontSize: 18 }} />
+                        <span>예약 거절</span>
+                    </Flex>
+                }
                 open={rejectModalOpen}
                 onOk={handleRejectConfirm}
                 onCancel={() => { setRejectModalOpen(false); setRejectReason(''); }}
@@ -144,9 +215,8 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                 okButtonProps={{ danger: true }} centered
             >
                 <p style={{ color: colors.text.secondary, marginBottom: 12 }}>거절 사유를 입력하면 고객에게 표시됩니다. (선택)</p>
-                <TextArea rows={3} placeholder="예) 해당 시간대 예약이 마감되었습니다."
-                    value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} maxLength={200} />
-                <div style={{ textAlign: 'left', marginTop: 4, fontSize: 12, color: colors.text.tertiary }}>{rejectReason.length} / 200</div>
+                <FormTextArea rows={3} placeholder="예) 해당 시간대 예약이 마감되었습니다."
+                    value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} maxLength={200} showCount />
             </Modal>
         </>
     );
@@ -169,6 +239,10 @@ const styles = {
     right:        { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
     price:        { fontSize: fontSize.base, color: colors.text.primary },
     actionGroup:  { display: 'flex', gap: 10 },
+    detailRow:    { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0' },
+    detailIcon:   { fontSize: 13, color: colors.text.tertiary, width: 16 },
+    detailLabel:  { fontSize: fontSize.sm, color: colors.text.tertiary, width: 50, flexShrink: 0 },
+    detailValue:  { fontSize: fontSize.sm, color: colors.text.primary },
 };
 
 export default ReservationCard;

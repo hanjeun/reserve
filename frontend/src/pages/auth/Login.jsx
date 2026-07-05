@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Form, Typography, Divider, Flex } from 'antd';
+import { Form, Typography, Divider, Flex, Modal } from 'antd';
+import { ExclamationCircleFilled } from '@ant-design/icons';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -38,31 +39,20 @@ const Login = () => {
     useDocumentTitle('로그인');
     const navigate = useNavigate();
     const location = useLocation();
-    const { message, modal } = useMessage();
+    const { message } = useMessage();
     const from = location.state?.from?.pathname || "/";
     const hasHandledRef = useRef(false);
     const [loading, setLoading] = useState(false);
+    // 정지/영구정지 안내 모달 상태 — 앱 전반 모달 스타일(큰색 제목 + 텍스트 본문 + 단일 버튼)과 통일하기 위해
+    // antd 기본 modal.error() 대신 직접 제어하는 Modal 사용 (빨간 X 아이콘 없이 다른 안내 모달과 동일한 톤)
+    const [suspendInfo, setSuspendInfo] = useState(null); // { title, until, reason }
 
     // 정지/영구정지 안내 모달 — 소셜·이메일 로그인 공통 포맷 (배너 차별 없이 동일한 UX)
     const showSuspendModal = (status, until, reason) => {
         const isBanned = status === 'BANNED';
-        modal.error({
+        setSuspendInfo({
             title: isBanned ? '영구 정지된 계정입니다' : '이용이 제한된 계정입니다',
-            content: (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {!isBanned && until && (
-                        <Text>정지 기간: <Text strong>{until}까지</Text></Text>
-                    )}
-                    {reason && (
-                        <Text>사유: {reason}</Text>
-                    )}
-                    <Text type="secondary" style={{ marginTop: 4 }}>
-                        문의사항은 관리자에게 문의해주세요.
-                    </Text>
-                </div>
-            ),
-            okText: '확인',
-            centered: true,
+            isBanned, until, reason,
         });
     };
 
@@ -106,7 +96,6 @@ const Login = () => {
             message.error(decodeURIComponent(oauthMessage));
             window.history.replaceState({}, '', '/login');
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoggedIn, location.state, navigate, message]);
 
     const onLoginSubmit = async (values) => {
@@ -197,6 +186,36 @@ const Login = () => {
                     </Text>
                 </Flex>
             </div>
+
+            {/* 정지/영구정지 안내 — 앱 전반 모달과 동일한 톤(아이콘 + 플레인 제목 + 본문 + 단일 버튼) */}
+            <Modal
+                title={
+                    <Flex align="center" gap={8}>
+                        <ExclamationCircleFilled style={{ color: suspendInfo?.isBanned ? colors.error.main : colors.warning.main, fontSize: 18 }} />
+                        <span>{suspendInfo?.title}</span>
+                    </Flex>
+                }
+                open={!!suspendInfo}
+                onOk={() => setSuspendInfo(null)}
+                onCancel={() => setSuspendInfo(null)}
+                okText="확인"
+                cancelButtonProps={{ style: { display: 'none' } }}
+                centered
+            >
+                {suspendInfo && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
+                        {!suspendInfo.isBanned && suspendInfo.until && (
+                            <Text>정지 기간: <Text strong>{suspendInfo.until}까지</Text></Text>
+                        )}
+                        {suspendInfo.reason && (
+                            <Text>사유: {suspendInfo.reason}</Text>
+                        )}
+                        <Text type="secondary" style={{ marginTop: 4 }}>
+                            문의사항은 관리자에게 문의해주세요.
+                        </Text>
+                    </div>
+                )}
+            </Modal>
         </PageContainer>
     );
 };

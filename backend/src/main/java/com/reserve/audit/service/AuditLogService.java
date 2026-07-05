@@ -3,9 +3,7 @@ package com.reserve.audit.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reserve.audit.entity.AuditLog;
 import com.reserve.audit.repository.AuditLogRepository;
-import com.reserve.mailbox.entity.AdminMail;
 import com.reserve.mailbox.entity.AdminSentMail;
-import com.reserve.mailbox.repository.AdminMailRepository;
 import com.reserve.mailbox.repository.AdminSentMailRepository;
 import com.reserve.reservation.entity.Reservation;
 import com.reserve.reservation.repository.ReservationRepository;
@@ -43,23 +41,12 @@ public class AuditLogService {
     private static final int AUDIT_LOG_RETENTION_DAYS = 90;
 
     private final AuditLogRepository auditLogRepository;
-    private final AdminMailRepository adminMailRepository;
     private final AdminSentMailRepository adminSentMailRepository;
     private final ReservationRepository reservationRepository;
     private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
 
     // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
-
-    @Transactional
-    public void softDeleteMail(Long mailId) {
-        AdminMail mail = adminMailRepository.findById(mailId)
-                .orElseThrow(() -> new IllegalArgumentException("Mail not found: " + mailId));
-        mail.softDelete();
-        saveAuditLog("MAIL", mailId, "SOFT_DELETE",
-                Map.of("fromEmail", mail.getFromEmail(), "subject", nullSafe(mail.getSubject())));
-        log.info("Mail soft-deleted: id={}", mailId);
-    }
 
     @Transactional
     public void softDeleteSentMail(Long mailId) {
@@ -117,7 +104,6 @@ public class AuditLogService {
     @Transactional
     public void restore(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
-            case "MAIL"        -> adminMailRepository.restoreById(entityId);
             case "SENT_MAIL"   -> adminSentMailRepository.restoreById(entityId);
             case "RESERVATION" -> reservationRepository.restoreById(entityId);
             case "REVIEW"      -> reviewRepository.restoreById(entityId);
@@ -237,7 +223,6 @@ public class AuditLogService {
 
     private void hardDeleteEntity(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
-            case "MAIL"        -> adminMailRepository.deleteById(entityId);
             case "SENT_MAIL"   -> adminSentMailRepository.deleteById(entityId);
             case "RESERVATION" -> reservationRepository.deleteById(entityId);
             case "REVIEW"      -> reviewRepository.deleteById(entityId);

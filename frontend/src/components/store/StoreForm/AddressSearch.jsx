@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useReducer, useState, useRef, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import api from '../../../api/axios';
@@ -6,64 +6,114 @@ import useDebounce from '../../../hooks/useDebounce';
 import { colors, fontSize, radius } from '../../../styles/tokens';
 import { animation } from '../../../styles/tokens/animations';
 
+// ─── 검색/선택 상태 리듀서 ─────────────────────────────────────────────────
+// 원래 query/detail/zipCode/selected/results/open/loading/activeIdx 8개 useState로
+// 나뉘어 있던 상태를 하나의 리듀서로 통합 (focused/detailFocused는 별도 activeField로 통합)
+const initialState = {
+    query: '',
+    detail: '',
+    zipCode: '',
+    selected: false,
+    results: [],
+    open: false,
+    loading: false,
+    activeIdx: -1,
+};
+
+function reducer(state, action) {
+    switch (action.type) {
+        case 'RESET_FOR_VALUE':
+            return { ...state, query: action.query, selected: true };
+        case 'CLEAR_ALL':
+            return { ...state, query: '', detail: '', zipCode: '', selected: false };
+        case 'SET_ZIPCODE':
+            return { ...state, zipCode: action.zipCode };
+        case 'SET_DETAIL_VALUE':
+            return { ...state, detail: action.detail };
+        case 'SEARCH_LOADING':
+            return { ...state, loading: true };
+        case 'SEARCH_RESULTS':
+            return { ...state, results: action.results, open: action.results.length > 0, activeIdx: -1, loading: false };
+        case 'SEARCH_EMPTY':
+        case 'SEARCH_ERROR':
+            return { ...state, results: [], open: false, loading: false };
+        case 'QUERY_CHANGE':
+            return {
+                ...state,
+                query: action.value,
+                selected: false,
+                ...(action.value === '' ? { results: [], open: false } : {}),
+            };
+        case 'DETAIL_CHANGE':
+            return { ...state, detail: action.value };
+        case 'SELECT_RESULT':
+            return {
+                ...state,
+                query: action.road, zipCode: action.zone, detail: action.building,
+                selected: true, results: [], open: false, activeIdx: -1,
+            };
+        case 'CLOSE_DROPDOWN':
+            return { ...state, open: false };
+        case 'FOCUS_RESET_FOR_EDIT':
+            return { ...state, selected: false, query: '', results: [], open: false };
+        case 'OPEN_IF_RESULTS':
+            return state.results.length > 0 ? { ...state, open: true } : state;
+        case 'ARROW_DOWN':
+            return { ...state, activeIdx: state.activeIdx < state.results.length - 1 ? state.activeIdx + 1 : state.activeIdx };
+        case 'ARROW_UP':
+            return { ...state, activeIdx: state.activeIdx > 0 ? state.activeIdx - 1 : -1 };
+        case 'SET_ACTIVE_IDX':
+            return { ...state, activeIdx: action.idx };
+        default:
+            return state;
+    }
+}
+
 // id prop: Form.Item이 label for 연결을 위해 주입 — 메인 input에 전달
 const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetail: addressDetailProp = '', onChange, onMeta, placeholder = '도로명 또는 지번 주소를 검색하세요' }) => {
-    const [query, setQuery]         = useState('');
-    const [detail, setDetail]       = useState('');
-    const [zipCode, setZipCode]     = useState('');
-    const [selected, setSelected]   = useState(false);
-    const [results, setResults]     = useState([]);
-    const [open, setOpen]           = useState(false);
-    const [loading, setLoading]     = useState(false);
-    const [focused, setFocused]     = useState(false);
-    const [detailFocused, setDetailFocused] = useState(false);
-    const [activeIdx, setActiveIdx] = useState(-1);
+    const [state, dispatch] = useReducer(reducer, initialState);
+    // focused/detailFocused 통합 — 동시에 둘 다 포커스될 수 없으므로 하나의 필드로 표현
+    const [activeField, setActiveField] = useState(null); // null | 'query' | 'detail'
 
     const containerRef   = useRef(null);
     const skipBlurRef    = useRef(false);
     const detailRef      = useRef(null);
     const isEditMode     = useRef(false);
+    // search()는 useCallback([]) 로 고정되어 클로저가 최초 상태를 캡처하므로,
+    // 매 검색 시점의 최신 selected 값을 동기적으로 읽기 위한 ref 미러 (state.selected와 effect로 동기화)
     const selectedRef    = useRef(false);
     const touchState     = useRef({ startX: 0, scrollStart: 0 });
-    const debouncedQuery = useDebounce(query, 400);
+    const debouncedQuery = useDebounce(state.query, 400);
 
-    const setSelectedBoth = (val) => { setSelected(val); selectedRef.current = val; };
+    useEffect(() => { selectedRef.current = state.selected; }, [state.selected]);
 
     useEffect(() => {
         if (value?.trim()) {
-            setQuery(value.trim());
-            setSelectedBoth(true);
+            dispatch({ type: 'RESET_FOR_VALUE', query: value.trim() });
             isEditMode.current = true;
         } else {
-            setQuery('');
-            setDetail('');
-            setZipCode('');
-            setSelectedBoth(false);
+            dispatch({ type: 'CLEAR_ALL' });
             isEditMode.current = false;
         }
     }, [value]);
 
-    useEffect(() => { if (zipCodeProp)       setZipCode(zipCodeProp); },       [zipCodeProp]);
-    useEffect(() => { if (addressDetailProp) setDetail(addressDetailProp); }, [addressDetailProp]);
+    useEffect(() => { if (zipCodeProp)       dispatch({ type: 'SET_ZIPCODE', zipCode: zipCodeProp }); },       [zipCodeProp]);
+    useEffect(() => { if (addressDetailProp) dispatch({ type: 'SET_DETAIL_VALUE', detail: addressDetailProp }); }, [addressDetailProp]);
 
     const emitChange = useCallback((road) => { onChange?.(road); }, [onChange]);
 
     const search = useCallback(async (q) => {
         if (!q || q.trim().length < 3 || selectedRef.current) {
-            if (!selectedRef.current) { setResults([]); setOpen(false); }
+            if (!selectedRef.current) dispatch({ type: 'SEARCH_EMPTY' });
             return;
         }
-        setLoading(true);
+        dispatch({ type: 'SEARCH_LOADING' });
         try {
             const data = await api.get('/api/address/search', { params: { query: q.trim() } });
             const docs = data?.documents ?? [];
-            setResults(docs);
-            setOpen(docs.length > 0);
-            setActiveIdx(-1);
+            dispatch({ type: 'SEARCH_RESULTS', results: docs });
         } catch {
-            setResults([]); setOpen(false);
-        } finally {
-            setLoading(false);
+            dispatch({ type: 'SEARCH_ERROR' });
         }
     }, []);
 
@@ -71,17 +121,17 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 
     useEffect(() => {
         const handler = (e) => {
-            if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+            if (containerRef.current && !containerRef.current.contains(e.target)) dispatch({ type: 'CLOSE_DROPDOWN' });
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
     useEffect(() => {
-        if (selected && !isEditMode.current && detailRef.current) {
+        if (state.selected && !isEditMode.current && detailRef.current) {
             setTimeout(() => detailRef.current?.focus(), 80);
         }
-    }, [selected]);
+    }, [state.selected]);
 
     const handleSelect = (doc) => {
         skipBlurRef.current = false;
@@ -90,12 +140,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         const building = doc?.road_address?.building_name || '';
         const lat      = Number.parseFloat(doc?.y);
         const lng      = Number.parseFloat(doc?.x);
-        setQuery(road);
-        setZipCode(zone);
-        setDetail(building);
-        setSelectedBoth(true);
-        setResults([]);
-        setOpen(false);
+        dispatch({ type: 'SELECT_RESULT', road, zone, building });
         isEditMode.current = false;
         emitChange(road);
         onMeta?.({ zipCode: zone, addressDetail: building, latitude: lat, longitude: lng });
@@ -103,20 +148,19 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 
     const handleQueryChange = (e) => {
         const v = e.target.value;
-        setQuery(v);
-        setSelectedBoth(false);
-        if (!v) { setResults([]); setOpen(false); onChange?.(''); }
+        dispatch({ type: 'QUERY_CHANGE', value: v });
+        if (!v) onChange?.('');
     };
 
-    const handleDetailChange = (e) => { setDetail(e.target.value); };
+    const handleDetailChange = (e) => { dispatch({ type: 'DETAIL_CHANGE', value: e.target.value }); };
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') e.preventDefault();
-        if (!open) return;
-        if (e.key === 'ArrowDown')                     { e.preventDefault(); setActiveIdx(i => (i < results.length - 1 ? i + 1 : i)); }
-        else if (e.key === 'ArrowUp')                  { e.preventDefault(); setActiveIdx(i => (i > 0 ? i - 1 : -1)); }
-        else if (e.key === 'Enter' && activeIdx >= 0) { handleSelect(results[activeIdx]); }
-        else if (e.key === 'Escape')                  { setOpen(false); }
+        if (!state.open) return;
+        if (e.key === 'ArrowDown')                     { e.preventDefault(); dispatch({ type: 'ARROW_DOWN' }); }
+        else if (e.key === 'ArrowUp')                  { e.preventDefault(); dispatch({ type: 'ARROW_UP' }); }
+        else if (e.key === 'Enter' && state.activeIdx >= 0) { handleSelect(state.results[state.activeIdx]); }
+        else if (e.key === 'Escape')                  { dispatch({ type: 'CLOSE_DROPDOWN' }); }
     };
 
     const boxStyle = (isFocused) => ({
@@ -135,31 +179,28 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 
             {/* ① 도로명 주소 검색창 */}
             <div style={{ position: 'relative' }}>
-                <div style={boxStyle(focused)}>
-                    <EnvironmentOutlined style={{ color: selected ? colors.primary.main : colors.text.tertiary, fontSize: 14, marginRight: 8, flexShrink: 0, transition: 'color 0.2s' }} />
+                <div style={boxStyle(activeField === 'query')}>
+                    <EnvironmentOutlined style={{ color: state.selected ? colors.primary.main : colors.text.tertiary, fontSize: 14, marginRight: 8, flexShrink: 0, transition: 'color 0.2s' }} />
                     {/* id: Form.Item label for 연결 / name: 브라우저 자동완성 식별 */}
                     <input
                         id={id}
                         name={id || 'address'}
                         autoComplete="off"
-                        value={query}
+                        value={state.query}
                         onChange={handleQueryChange}
                         onKeyDown={handleKeyDown}
                         onFocus={() => {
-                            setFocused(true);
+                            setActiveField('query');
                             if (selectedRef.current) {
-                                setSelectedBoth(false);
-                                setQuery('');
-                                setResults([]);
-                                setOpen(false);
+                                dispatch({ type: 'FOCUS_RESET_FOR_EDIT' });
                                 isEditMode.current = false;
-                            } else if (results.length > 0) {
-                                setOpen(true);
+                            } else if (state.results.length > 0) {
+                                dispatch({ type: 'OPEN_IF_RESULTS' });
                             }
                         }}
                         onBlur={() => {
-                            setFocused(false);
-                            if (!skipBlurRef.current) setOpen(false);
+                            setActiveField(null);
+                            if (!skipBlurRef.current) dispatch({ type: 'CLOSE_DROPDOWN' });
                             skipBlurRef.current = false;
                         }}
                         placeholder={placeholder}
@@ -169,7 +210,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             fontFamily: 'inherit', cursor: 'text',
                         }}
                     />
-                    {loading && (
+                    {state.loading && (
                         <div style={{
                             width: 14, height: 14, flexShrink: 0,
                             border: `2px solid ${colors.border.light}`,
@@ -181,7 +222,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                 </div>
 
                 {/* 드롭다운 */}
-                {open && results.length > 0 && (
+                {state.open && state.results.length > 0 && (
                     <div
                         role="listbox"
                         tabIndex={-1}
@@ -197,7 +238,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             animation: animation.slideUpIn,
                         }}
                     >
-                        {results.map((doc, i) => {
+                        {state.results.map((doc, i) => {
                             const road  = doc.road_address?.address_name;
                             const jibun = doc.address?.address_name ?? doc.address_name;
                             const zone  = doc.road_address?.zone_no;
@@ -206,17 +247,17 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                                 <div
                                     key={uniqueKey}
                                     role="option"
-                                    aria-selected={i === activeIdx}
+                                    aria-selected={i === state.activeIdx}
                                     tabIndex={-1}
                                     onMouseDown={() => handleSelect(doc)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(doc); }}
-                                    onMouseEnter={() => setActiveIdx(i)}
-                                    onMouseLeave={() => setActiveIdx(-1)}
+                                    onMouseEnter={() => dispatch({ type: 'SET_ACTIVE_IDX', idx: i })}
+                                    onMouseLeave={() => dispatch({ type: 'SET_ACTIVE_IDX', idx: -1 })}
                                     style={{
                                         display: 'flex', alignItems: 'flex-start', gap: 10,
                                         padding: '10px 14px', cursor: 'pointer',
-                                        background: i === activeIdx ? colors.gray[50] : '#fff',
-                                        borderBottom: i < results.length - 1 ? `1px solid ${colors.border.light}` : 'none',
+                                        background: i === state.activeIdx ? colors.gray[50] : '#fff',
+                                        borderBottom: i < state.results.length - 1 ? `1px solid ${colors.border.light}` : 'none',
                                     }}
                                 >
                                     <EnvironmentOutlined style={{ color: colors.primary.main, marginTop: 3, flexShrink: 0, fontSize: 13 }} />
@@ -245,9 +286,9 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
             </div>
 
             {/* ② 선택 후 — 우편번호 + 상세주소 */}
-            {(selected || zipCode) && (
+            {(state.selected || state.zipCode) && (
                 <div style={{ display: 'flex', gap: 8, minWidth: 0, width: '100%', animation: animation.slideUpIn }}>
-                    {zipCode && (
+                    {state.zipCode && (
                         // 우편번호: readOnly → div 기반 터치 스크롤 컨테이너
                         <div style={{ ...boxStyle(false), width: 76, flexShrink: 0, cursor: 'default', overflow: 'hidden' }}>
                             <div style={{
@@ -258,13 +299,13 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                                 color: colors.text.primary,
                                 fontFamily: 'inherit', userSelect: 'none', textAlign: 'center',
                             }}>
-                                {zipCode}
+                                {state.zipCode}
                             </div>
                         </div>
                     )}
                     {/* 상세주소: 터치 드래그로 스크롤 — onTouchStart/Move로 scrollLeft 조작 */}
                     <div
-                        style={{ ...boxStyle(detailFocused), flex: 1, minWidth: 0, overflow: 'hidden', touchAction: 'pan-y' }}
+                        style={{ ...boxStyle(activeField === 'detail'), flex: 1, minWidth: 0, overflow: 'hidden', touchAction: 'pan-y' }}
                         onTouchStart={(e) => {
                             touchState.current.startX = e.touches[0].clientX;
                             touchState.current.scrollStart = detailRef.current?.scrollLeft || 0;
@@ -278,10 +319,10 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                         <input
                             ref={detailRef}
                             autoComplete="off"
-                            value={detail}
+                            value={state.detail}
                             onChange={handleDetailChange}
-                            onFocus={() => setDetailFocused(true)}
-                            onBlur={() => setDetailFocused(false)}
+                            onFocus={() => setActiveField('detail')}
+                            onBlur={() => setActiveField(null)}
                             onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                             placeholder="상세주소 (동, 호수 등)"
                             style={{

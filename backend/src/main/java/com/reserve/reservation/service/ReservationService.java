@@ -10,6 +10,7 @@ import com.reserve.reservation.dto.ReservationCreateRequest;
 import com.reserve.reservation.dto.ReservationResponse;
 import com.reserve.reservation.dto.ReservationSearchDto;
 import com.reserve.reservation.dto.ReservationUpdateRequest;
+import com.reserve.reservation.dto.SlotAvailabilityResponse;
 import com.reserve.reservation.entity.Reservation;
 import com.reserve.reservation.repository.ReservationRepository;
 import com.reserve.store.repository.StoreRepository;
@@ -23,8 +24,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -72,7 +75,9 @@ public class ReservationService {
             throw new ReservationException("서비스 이용 약관에 동의해야 예약할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        Store store = storeRepository.findById(request.getStoreId())
+        // 비관적 락으로 조회 — 이 store row에 대한 동시 예약 요청을 트랜잭션 종료까지 순차화해서
+        // 아래 잔여 인원 체크(check) → 저장(act) 사이의 레이스 컨디션(오버부킹)을 막는다.
+        Store store = storeRepository.findByIdForUpdate(request.getStoreId())
                 .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         // 가게 주인이 정지된 경우 신규 예약 차단
@@ -200,6 +205,48 @@ public class ReservationService {
         }
 
         return response;
+    }
+
+    /**
+     * 날짜별 시간대 선택 UI용: 영업시간·브레이크타임과 해당 날짜의 실시간 잔여 인원을 함께 반영해
+     * 슬롯별 예약 가능 여부를 내려준다. (정원 기준 미만 시 모든 시간대 available=true)
+     */
+    @Transactional(readOnly = true)
+    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) {
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        if (store.getOpenTime() == null || store.getCloseTime() == null) {
+            return List.of();
+        }
+
+        int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
+        LocalTime open  = store.getOpenTime();
+        LocalTime close = store.getCloseTime();
+        LocalTime breakStart = store.getBreakStartTime();
+        LocalTime breakEnd   = store.getBreakEndTime();
+        boolean hasBreak = breakStart != null && breakEnd != null;
+        Integer capacity = store.getMaxCapacityPerSlot();
+
+        Map<LocalTime, Long> guestSumByTime = reservationRepository
+                .sumActiveGuestsGroupedByTime(storeId, date).stream()
+                .collect(Collectors.toMap(
+                        row -> (LocalTime) row[0],
+                        row -> ((Number) row[1]).longValue()
+                ));
+
+        List<SlotAvailabilityResponse> result = new ArrayList<>();
+        LocalTime cursor = open;
+        while (!cursor.isAfter(close)) {
+            boolean inBreak = hasBreak && !cursor.isBefore(breakStart) && cursor.isBefore(breakEnd);
+            if (!inBreak) {
+                long booked = guestSumByTime.getOrDefault(cursor, 0L);
+                boolean available = capacity == null || capacity <= 0 || booked < capacity;
+                result.add(new SlotAvailabilityResponse(cursor.toString().substring(0, 5), available));
+            }
+            cursor = cursor.plusMinutes(slotMin);
+        }
+        return result;
     }
 
     /**
@@ -395,6 +442,22 @@ public class ReservationService {
                             : ReservationResponse.fromEntity(r);
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 가게 상세 페이지 진입 시 호출: 이 회원이 해당 가게에서 리뷰 작성 가능한(가장 최근 COMPLETED) 예약이 있는지 조회
+     * 서버에서 바로 필터링된 1건만 내려보내므로 클라이언트가 내 전체 예약 목록을 불러올 필요가 없음
+     */
+    @Transactional(readOnly = true)
+    public ReservationResponse getLatestCompletedReservationForStore(Member member, Long storeId) {
+        return reservationRepository
+                .findFirstByMemberIdAndStoreIdAndStatusOrderByIdDesc(member.getId(), storeId, Reservation.ReservationStatus.COMPLETED)
+                .map(r -> {
+                    Long reviewId = reservationRepository.findReviewIdsByReservationIds(List.of(r.getId())).stream()
+                            .findFirst().map(row -> (Long) row[1]).orElse(null);
+                    return reviewId != null ? ReservationResponse.fromEntityWithReviewId(r, reviewId) : ReservationResponse.fromEntity(r);
+                })
+                .orElse(null);
     }
 
     /**

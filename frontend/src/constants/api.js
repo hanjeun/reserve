@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
     RESERVATION: {
         LIST:                '/api/reservations',
         MY_RESERVATIONS:     '/api/reservations/my',
+        MY_COMPLETED_FOR_STORE: (storeId) => `/api/reservations/my/store/${storeId}/completed`,
         STORE_RESERVATIONS:  '/api/reservations/store',
         CREATE:              '/api/reservations',
         DETAIL:              (id) => `/api/reservations/${id}`,
@@ -38,6 +39,7 @@ export const API_ENDPOINTS = {
         REJECT:              (id) => `/api/reservations/${id}/reject`,
         COMPLETE:            (id) => `/api/reservations/${id}/complete`,
         NO_SHOW:             (id) => `/api/reservations/${id}/no-show`,
+        AVAILABILITY:        '/api/reservations/availability',
     },
     REVIEW: {
         CREATE:          '/api/reviews',
@@ -93,14 +95,19 @@ export const API_ENDPOINTS = {
         KAKAO:  '/oauth2/authorization/kakao',
     },
     MAIL: {
-        LIST:         '/api/admin/mail',
-        DETAIL:       (id) => `/api/admin/mail/${id}`,
-        REPLY:        (id) => `/api/admin/mail/${id}/reply`,
-        UNREAD_COUNT: '/api/admin/mail/unread-count',
         COMPOSE:      '/api/admin/mail/compose',
         SENT:         '/api/admin/mail/sent',
-        DELETE:       (id) => `/api/admin/mail/${id}`,
-        DELETE_SENT:  (id) => `/api/admin/mail/sent/${id}`,
+    },
+    INQUIRY: {
+        MY:            '/api/inquiries/my',
+        ADMIN_ALL:     '/api/inquiries/admin/all',
+        DETAIL:        (id) => `/api/inquiries/${id}`,
+        ADMIN_DETAIL:  (id) => `/api/inquiries/admin/${id}`,
+        CREATE:        '/api/inquiries',
+        DELETE:        (id) => `/api/inquiries/${id}`,
+        ADMIN_ANSWER:  (id) => `/api/inquiries/${id}/answer`,
+        ADMIN_DELETE:  (id) => `/api/inquiries/admin/${id}`,
+        PENDING_COUNT: '/api/inquiries/pending-count',
     },
     TRASH: {
         LIST:    '/api/admin/trash',

@@ -3,7 +3,7 @@ import { Form, Flex, Input, Switch, Typography } from 'antd';
 import { FormInput, FormTextArea, FormSelect, FormTimePicker } from '../../common';
 import AddressSearch from './AddressSearch';
 import {
-    STORE_CATEGORIES, RESERVATION_SLOT_OPTIONS,
+    RESERVATION_SLOT_OPTIONS,
     FULL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_RATE_OPTIONS,
     BOOKING_DEADLINE_OPTIONS, PAYMENT_TIMEOUT_OPTIONS,
 } from '../../../constants';
@@ -62,14 +62,15 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
     return (
         <>
             <Form.Item label="가게 이름" name="name" rules={VALIDATION_RULES.storeName} style={mb}>
-                <FormInput placeholder="식당 명칭" />
+                <FormInput placeholder="가게 이름" />
             </Form.Item>
 
             <FieldRow style={isMobile ? {} : { marginBottom: 12 }}>
                 <Form.Item
                     label="카테고리" name="category" rules={VALIDATION_RULES.category}
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>업종에 맞게 자유롭게 입력하세요</Text>}
                 >
-                    <FormSelect placeholder="선택" options={STORE_CATEGORIES} />
+                    <FormInput placeholder="예: 필라테스, 네일샵, 한식 등" maxLength={30} />
                 </Form.Item>
                 <Form.Item
                     label="예약 단위" name="reservationSlotMinutes"

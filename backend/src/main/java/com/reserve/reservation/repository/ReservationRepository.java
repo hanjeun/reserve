@@ -46,6 +46,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     Page<Reservation> findAllWithStoreAndMemberPaged(Pageable pageable);
 
     /**
+     * 가게 상세 페이지 리뷰 작성 가능 여부 판단용: 해당 회원이 이 가게에서 가장 최근에 COMPLETED된 예약 1건 조회
+     * (StoreDetail 진입 시 내 전체 예약을 불러와 클라이언트에서 필터링하던 것을 서버 필터로 대체)
+     */
+    java.util.Optional<Reservation> findFirstByMemberIdAndStoreIdAndStatusOrderByIdDesc(
+            Long memberId, Long storeId, Reservation.ReservationStatus status);
+
+    /**
      * 특정 가게의 예약 내역 조회 (최신순) - member fetch join으로 N+1 방지
      */
     @Query("SELECT r FROM Reservation r JOIN FETCH r.member WHERE r.store = :store ORDER BY r.createdAt DESC")
@@ -87,6 +94,19 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("storeId") Long storeId,
             @Param("date") java.time.LocalDate date,
             @Param("time") java.time.LocalTime time
+    );
+
+    /**
+     * 날짜별 시간대 선택 UI용: 해당 날짜의 시간대별 활성 예약(PENDING/CONFIRMED) 인원 합계를 한 번에 조회
+     * (슬롯마다 sumActiveGuestsBySlot을 반복 호출하는 대신 GROUP BY로 1쿼리)
+     * 반환: [reservationTime, guestCountSum] 쌍의 Object[] 리스트
+     */
+    @Query("SELECT r.reservationTime, SUM(r.guestCount) FROM Reservation r " +
+           "WHERE r.store.id = :storeId AND r.reservationDate = :date AND r.status IN ('PENDING', 'CONFIRMED') " +
+           "GROUP BY r.reservationTime")
+    List<Object[]> sumActiveGuestsGroupedByTime(
+            @Param("storeId") Long storeId,
+            @Param("date") java.time.LocalDate date
     );
 
     /**

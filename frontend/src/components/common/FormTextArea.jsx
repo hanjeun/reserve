@@ -27,6 +27,9 @@ const FormTextArea = ({
         borderRadius: radius.lg,
         backgroundColor: disabled ? colors.gray[100] : colors.gray[50],
         border: 'none',
+        // showCount일 때 AntD가 카운터를 wrapper 밖으로 절대위치(하단 메운)로 붙여서, wrapper 자체는 그 공간을 안 차지함
+        // → 바로 다음 요소(모달 footer 등)와 카운터가 시각적으로 겹치는 문제 방지를 위해 여유 공간 확보
+        marginBottom: showCount ? 22 : 0,
         ...style,
     };
 
@@ -35,6 +38,7 @@ const FormTextArea = ({
     return (
         <TextArea
             rows={rows}
+            className="reserve-form-field"
             placeholder={placeholder}
             disabled={disabled}
             variant="filled"

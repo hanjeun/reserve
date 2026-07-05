@@ -8,15 +8,18 @@ import com.reserve.global.ratelimit.RateLimiter;
 import com.reserve.member.entity.Member;
 import com.reserve.reservation.dto.ReservationCreateRequest;
 import com.reserve.reservation.dto.ReservationResponse;
+import com.reserve.reservation.dto.SlotAvailabilityResponse;
 import com.reserve.reservation.service.ReservationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -49,6 +52,21 @@ public class ReservationApiController {
     public ResponseEntity<ApiResponse<List<ReservationResponse>>> getMyReservations() {
         List<ReservationResponse> reservations = reservationService.getMyReservations(SecurityUtil.getCurrentMember());
         return ResponseEntity.ok(ApiResponse.success(reservations, "내 예약 목록 조회 성공"));
+    }
+
+    @GetMapping("/my/store/{storeId}/completed")
+    public ResponseEntity<ApiResponse<ReservationResponse>> getMyLatestCompletedForStore(@PathVariable Long storeId) {
+        ReservationResponse reservation = reservationService.getLatestCompletedReservationForStore(SecurityUtil.getCurrentMember(), storeId);
+        return ResponseEntity.ok(ApiResponse.success(reservation, "조회 성공"));
+    }
+
+    // 예약 날짜 선택 시 실시간 시간대별 가능 여부 조회 (공개 API — 로그인 불필요)
+    @GetMapping("/availability")
+    public ResponseEntity<ApiResponse<List<SlotAvailabilityResponse>>> getAvailability(
+            @RequestParam Long storeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        List<SlotAvailabilityResponse> slots = reservationService.getAvailability(storeId, date);
+        return ResponseEntity.ok(ApiResponse.success(slots, "시간대별 예약 가능 여부 조회 성공"));
     }
 
     @GetMapping("/{id}")

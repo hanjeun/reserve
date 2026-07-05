@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Divider, Typography } from 'antd';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
+import { InquiryModal } from '../common';
 
 const { Text } = Typography;
 
@@ -110,10 +111,12 @@ const ExternalLink = ({ href, label }) => (
 
 const AppFooter = () => {
     const navigate = useNavigate();
+    const [inquiryOpen, setInquiryOpen] = useState(false);
 
     return (
         <>
             <style>{FOOTER_STYLES}</style>
+            <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} />
 
             <footer style={{ backgroundColor: colors.background.surface, borderTop: `1px solid ${colors.border.light}`, padding: '0 24px 36px' }}>
                 <div style={{ maxWidth: 1100, margin: '0 auto', paddingTop: 48 }}>
@@ -125,7 +128,7 @@ const AppFooter = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 280 }}>
                             <div style={{ fontSize: 20, fontWeight: 800, color: colors.primary.main, letterSpacing: '-0.5px' }}>RESERVE</div>
                             <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, lineHeight: 1.7 }}>
-                                미식의 즐거움 버튼 클릭 한 번으로,<br />
+                                예약이 필요한 순간,<br />
                                 예약부터 결제까지 한 번에.
                             </Text>
                             <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
@@ -139,7 +142,7 @@ const AppFooter = () => {
                             {/* 서비스 */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
                                 <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>서비스</Text>
-                                <FooterLink label="식당 탐색" onClick={() => navigate('/stores')} />
+                                <FooterLink label="가게 탐색" onClick={() => navigate('/stores')} />
                                 <FooterLink label="예약 확인" onClick={() => navigate('/my-reservations')} />
                             </div>
                             
@@ -155,7 +158,7 @@ const AppFooter = () => {
                                 <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>개발자</Text>
                                 <ExternalLink href="https://velog.io/@hanjeun/series/RESERVE" label="개발 블로그 →" />
                                 <ExternalLink href="https://github.com/hanjeun/reserve" label="GitHub 저장소 →" />
-                                <ExternalLink href="mailto:reserve@reserve.it.kr" label="문의하기" />
+                                <FooterLink label="문의하기" onClick={() => setInquiryOpen(true)} />
                             </div>
                         </div>
                     </div>

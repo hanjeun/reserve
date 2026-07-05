@@ -9,13 +9,15 @@ import {
     FileTextOutlined, StarFilled, EnvironmentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { PageContainer, Button, FormTextArea, FormDatePicker, FormTimePicker, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
+import { PageContainer, Button, FormTextArea, FormDatePicker, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
 import { ReviewList } from '../../components/review';
 import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { getDetailImageUrl } from '../../utils';
-import { colors, radius, fontWeight, fontSize, heights } from '../../styles/tokens';
+import { colors, radius, fontWeight, fontSize, heights, animation } from '../../styles/tokens';
 import { VALIDATION_RULES } from '../../utils/validation';
+import api from '../../api/axios';
+import { API_ENDPOINTS } from '../../constants';
 
 const { Title, Text } = Typography;
 
@@ -53,6 +55,36 @@ const customStyles = `
   .ant-image { width: 100% !important; }
   .ant-image-img { width: 100% !important; height: auto !important; display: block !important; }
   .slick-slide[aria-hidden="true"] * { pointer-events: none; }
+  .rsv-tap-btn {
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+  .rsv-tap-btn:focus {
+    outline: none;
+  }
+  .rsv-tap-btn:focus-visible {
+    box-shadow: 0 0 0 2px ${colors.primary.light};
+  }
+  .rsv-time-pill {
+    background: transparent;
+    color: ${colors.text.secondary};
+    transition: background-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
+  }
+  .rsv-time-pill:hover:not(:disabled) {
+    background-color: ${colors.gray[100]};
+    color: ${colors.text.primary};
+  }
+  .rsv-time-pill.rsv-selected {
+    background-color: ${colors.gray[200]};
+    color: ${colors.text.primary};
+    font-weight: 600;
+    transform: scale(1.04);
+  }
+  .rsv-time-pill:disabled {
+    color: ${colors.text.disabled};
+    cursor: not-allowed;
+    text-decoration: line-through;
+  }
 `;
 
 // 인원 수 입력 스텝퍼
@@ -63,10 +95,10 @@ const GuestCountInput = ({ value = 1, onChange }) => {
         <div style={inputStyles.wrapper}>
             <span style={inputStyles.count}>{value}명</span>
             <div style={inputStyles.btnGroup}>
-                <button type="button" onClick={dec} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : 1 }}>
+                <button type="button" className="rsv-tap-btn" onClick={dec} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : 1 }}>
                     <MinusOutlined style={{ fontSize: 12 }} />
                 </button>
-                <button type="button" onClick={inc} style={inputStyles.btn}>
+                <button type="button" className="rsv-tap-btn" onClick={inc} style={inputStyles.btn}>
                     <PlusOutlined style={{ fontSize: 12 }} />
                 </button>
             </div>
@@ -224,48 +256,119 @@ const infoStyles = {
     divider: { height: 1, background: colors.border.light },
 };
 
-// buildDisabledTime 헬퍼: 모듈 레벨에 두어 중첩 깊이 감소
-const toMins = (timeStr) => {
-    const [h, m] = timeStr.substring(0, 5).split(':').map(Number);
-    return h * 60 + m;
-};
+// 예약 시간 선택 — 날짜 선택 시 GET /api/reservations/availability 조회해서 슬롯별 실시간 잔여 인원을 반영한 필 그리드로 보여준다.
+// AntD FormTimePicker(시/분 스크롤 휠) 대신 네이버 예약 스타일의 pill 그리드 + scaleSpringIn 토큰으로 대체.
+const TimeSlotPicker = ({ store, dateValue, value, onChange }) => {
+    const [slots, setSlots] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const dateKey = dateValue ? dateValue.format('YYYY-MM-DD') : null;
 
-const getDisabledHours = (slotMin, isValidSlot) => {
-    const disabled = [];
-    for (let h = 0; h < 24; h++) {
-        const hasValid = Array.from({ length: Math.ceil(60 / slotMin) }, (_, i) => i * slotMin)
-            .some(m => isValidSlot(h * 60 + m));
-        if (!hasValid) disabled.push(h);
+    React.useEffect(() => {
+        if (!dateKey || !store?.id) { setSlots([]); return; }
+        let cancelled = false;
+        setLoading(true);
+        api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId: store.id, date: dateKey } })
+            .then((data) => { if (!cancelled) setSlots(data || []); })
+            .catch(() => { if (!cancelled) setSlots([]); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [dateKey, store?.id]);
+
+    // 날짜가 바뀌어 이전에 고른 시간이 새 날짜에는 없거나 마감된 경우 선택 초기화
+    React.useEffect(() => {
+        if (value && slots.length > 0 && !slots.some((s) => s.time === value && s.available)) {
+            onChange?.(undefined);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slots]);
+
+    if (!dateKey) {
+        return (
+            <div style={timeSlotStyles.placeholder}>
+                <span>날짜를 먼저 선택해주세요</span>
+                <ClockCircleOutlined style={timeSlotStyles.placeholderIcon} />
+            </div>
+        );
     }
-    return disabled;
+    if (loading) {
+        return (
+            <div style={timeSlotStyles.placeholder}>
+                <span>불러오는 중...</span>
+                <ClockCircleOutlined style={timeSlotStyles.placeholderIcon} />
+            </div>
+        );
+    }
+    if (slots.length === 0) {
+        return (
+            <div style={timeSlotStyles.placeholder}>
+                <span>예약 가능한 시간이 없어요</span>
+                <ClockCircleOutlined style={timeSlotStyles.placeholderIcon} />
+            </div>
+        );
+    }
+
+    const am = slots.filter((s) => Number(s.time.split(':')[0]) < 12);
+    const pm = slots.filter((s) => Number(s.time.split(':')[0]) >= 12);
+
+    return (
+        <div>
+            {am.length > 0 && (
+                <>
+                    <div style={timeSlotStyles.groupLabel}>오전</div>
+                    <div style={timeSlotStyles.grid}>
+                        {am.map((s, i) => (
+                            <TimeSlotPill key={s.time} slot={s} selected={value === s.time}
+                                onClick={() => onChange?.(s.time)} delay={i * 40} />
+                        ))}
+                    </div>
+                </>
+            )}
+            {pm.length > 0 && (
+                <>
+                    <div style={{ ...timeSlotStyles.groupLabel, marginTop: am.length > 0 ? 14 : 0 }}>오후</div>
+                    <div style={timeSlotStyles.grid}>
+                        {pm.map((s, i) => (
+                            <TimeSlotPill key={s.time} slot={s} selected={value === s.time}
+                                onClick={() => onChange?.(s.time)} delay={i * 40} />
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
 };
 
-const getDisabledMinutes = (hour, isValidSlot) =>
-    Array.from({ length: 60 }, (_, m) => m).filter(m => !isValidSlot(hour * 60 + m));
+const TimeSlotPill = ({ slot, selected, onClick, delay }) => (
+    <button type="button"
+        className={`rsv-tap-btn rsv-time-pill${selected ? ' rsv-selected' : ''}`}
+        disabled={!slot.available} onClick={onClick}
+        style={{
+            ...timeSlotStyles.pill,
+            animation: animation.scaleSpringIn,
+            animationDelay: `${delay}ms`,
+        }}>
+        {slot.time}
+    </button>
+);
 
-const buildDisabledTime = (store) => {
-    if (!store?.openTime || !store?.closeTime) return undefined;
-
-    const openMins   = toMins(store.openTime);
-    const closeMins  = toMins(store.closeTime);
-    const slotMin    = store.reservationSlotMinutes ?? 30;
-    const bStartMins = store.breakStartTime ? toMins(store.breakStartTime) : -1;
-    const bEndMins   = store.breakEndTime   ? toMins(store.breakEndTime)   : -1;
-    const hasBreak   = bStartMins >= 0 && bEndMins >= 0;
-
-    const isValidSlot = (totalMins) =>
-        totalMins >= openMins &&
-        totalMins <= closeMins &&
-        (!hasBreak || totalMins < bStartMins || totalMins >= bEndMins);
-
-    return () => ({
-        disabledHours:   () => getDisabledHours(slotMin, isValidSlot),
-        disabledMinutes: (hour) => getDisabledMinutes(hour, isValidSlot),
-    });
+const timeSlotStyles = {
+    placeholder: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: heights.input, padding: '0 11px', boxSizing: 'border-box',
+        fontSize: fontSize.lg, fontWeight: fontWeight.regular, color: 'rgba(0, 0, 0, 0.25)',
+        background: colors.gray[50], borderRadius: radius.lg,
+    },
+    placeholderIcon: { fontSize: 14, color: 'rgba(0, 0, 0, 0.25)' },
+    groupLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, fontWeight: fontWeight.medium, marginBottom: 8 },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
+    pill: {
+        padding: '9px 0', borderRadius: radius.pill, border: 'none',
+        fontSize: fontSize.sm, fontWeight: fontWeight.medium, cursor: 'pointer',
+    },
 };
 
 const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => {
-    const disabledTime = React.useMemo(() => buildDisabledTime(store), [store]);
+    const dateValue = Form.useWatch('reservationDate', form);
     return (
     <div style={isPC ? pcFormStyles.panel : {}}>
         <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
@@ -281,13 +384,7 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC }) => {
             </Form.Item>
             <Form.Item label="예약 시간" name="reservationTime"
                 rules={[{ required: true, message: '시간을 선택해주세요.' }]}>
-                <FormTimePicker
-                    placeholder={store?.openTime && store?.closeTime
-                        ? `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}` : '시간 선택'}
-                    hideDisabledOptions
-                    minuteStep={store?.reservationSlotMinutes ?? 30}
-                    disabledTime={disabledTime}
-                />
+                <TimeSlotPicker store={store} dateValue={dateValue} />
             </Form.Item>
             <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
                 <GuestCountInput />

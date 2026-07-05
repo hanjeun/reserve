@@ -58,6 +58,10 @@ const FormSelect = ({
                 .${selectClassName} .ant-select-selection-item,
                 .${selectClassName} .ant-select-selection-placeholder {
                     line-height: ${heights.input} !important;
+                    font-size: 16px !important;
+                }
+                .${selectClassName} .ant-select-selection-search-input {
+                    font-size: 16px !important;
                 }
             `}</style>
         </>

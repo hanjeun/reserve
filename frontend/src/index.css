@@ -30,6 +30,11 @@ a {
   color: inherit;
 }
 
+/* button/input은 브라우저 기본값이 폰트 상속을 안 받아서(웹 표준 동작) 전역으로 맞춰줌 */
+button, input, textarea, select {
+  font-family: inherit;
+}
+
 /* Ant Design v6: Select open 상태 화살표 회전 */
 .ant-select-suffix {
     transition: transform 0.2s;
@@ -195,4 +200,33 @@ a {
         min-width: 30px !important;
         height: 30px !important;
     }
+}
+
+/* ── 폼 입력 필드 placeholder·입력 텍스트 크기 전역 통일(16px) ── */
+/* FormInput / FormTextArea가 붙이는 .reserve-form-field 클래스 — AntD의 Input/InputNumber/Password/TextArea 내부 <input>·<textarea>까지 강제 적용 */
+.reserve-form-field.ant-input,
+.reserve-form-field .ant-input,
+.reserve-form-field.ant-input-number .ant-input-number-input,
+.reserve-form-field textarea.ant-input {
+    font-size: 16px !important;
+}
+.reserve-form-field .ant-input::placeholder,
+.reserve-form-field.ant-input::placeholder,
+.reserve-form-field.ant-input-number .ant-input-number-input::placeholder,
+.reserve-form-field textarea.ant-input::placeholder {
+    font-size: 16px !important;
+}
+.ant-picker-cell-selected .ant-picker-cell-inner,
+.ant-picker-cell-range-start .ant-picker-cell-inner,
+.ant-picker-cell-range-end .ant-picker-cell-inner {
+    background-color: #e5e8eb !important;
+    color: #1a1f27 !important;
+    font-weight: 600 !important;
+}
+.ant-picker-cell-selected .ant-picker-cell-inner:hover {
+    background-color: #e5e8eb !important;
+}
+/* 오늘 날짜 테두리도 파란색 대신 회색계로 */
+.ant-picker-cell-today .ant-picker-cell-inner::before {
+    border-color: #b5b8bd !important;
 }

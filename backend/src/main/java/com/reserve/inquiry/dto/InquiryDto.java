@@ -16,6 +16,8 @@ public class InquiryDto {
         private String category;
         private String title;
         private String content;
+        private String guestName;   // 비로그인일 때만 사용
+        private String guestEmail;  // 비로그인일 때만 사용
     }
 
     @Getter
@@ -33,13 +35,15 @@ public class InquiryDto {
         private String statusDisplayName;
         private String answer;
         private String memberName;
+        private String memberEmail;
         private Long memberId;
         private String createdAt;
         private String answeredAt;
 
         public static InquiryResponse fromEntity(Inquiry inquiry) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-            
+            boolean isGuest = inquiry.getMember() == null;
+
             return InquiryResponse.builder()
                     .id(inquiry.getId())
                     .category(inquiry.getCategory().name())
@@ -49,8 +53,9 @@ public class InquiryDto {
                     .status(inquiry.getStatus().name())
                     .statusDisplayName(inquiry.getStatus().getDisplayName())
                     .answer(inquiry.getAnswer())
-                    .memberName(inquiry.getMember().getName())
-                    .memberId(inquiry.getMember().getId())
+                    .memberName(isGuest ? inquiry.getGuestName() + " (비회원)" : inquiry.getMember().getName())
+                    .memberEmail(isGuest ? inquiry.getGuestEmail() : inquiry.getMember().getEmail())
+                    .memberId(isGuest ? null : inquiry.getMember().getId())
                     .createdAt(inquiry.getCreatedAt().format(formatter))
                     .answeredAt(inquiry.getAnsweredAt() != null ? inquiry.getAnsweredAt().format(formatter) : null)
                     .build();

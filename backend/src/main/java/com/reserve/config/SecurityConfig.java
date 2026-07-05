@@ -82,6 +82,9 @@ public class SecurityConfig {
                         // 주소 검색 — 가게 등록/수정 시 비로그인도 검색 가능
                         .requestMatchers("/api/address/**").authenticated()
 
+                        // 문의하기 작성 — 정지된 회원도 문의할 수 있어야 해서 비로그인 허용 (나머지 /api/inquiries/**는 인증 필요, 아래 anyRequest에 걸림)
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/inquiries").permitAll()
+
                         // 관리자 전용
                         .requestMatchers("/admin/**", "/api/business-verification/admin/**", "/api/admin/**").hasRole("ADMIN")
 

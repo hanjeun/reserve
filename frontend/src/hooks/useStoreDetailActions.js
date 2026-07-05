@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import reservationService from '../services/reservationService';
-import { formatDate, formatTimeForApi } from '../utils/date';
+import { formatDate, formatTimeForApi, formatTime } from '../utils/date';
 
 const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message }) => {
     const navigate  = useNavigate();
@@ -69,9 +69,11 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             return;
         }
 
+        // reservationTime은 TimeSlotPicker에서 "HH:mm" 문자열로 온다(기존 dayjs 객체 전제 코드와 호환되게 formatTime으로 먼저 정규화)
+        const [resHour, resMinute] = formatTime(values.reservationTime).split(':').map(Number);
         const dt = values.reservationDate
-            .hour(values.reservationTime.hour())
-            .minute(values.reservationTime.minute())
+            .hour(resHour)
+            .minute(resMinute)
             .second(0).millisecond(0);
 
         if (dt.isBefore(dayjs())) {

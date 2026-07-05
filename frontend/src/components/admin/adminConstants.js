@@ -9,7 +9,6 @@
  */
 
 export const ENTITY_LABELS = {
-    MAIL:        { label: '수신 메일',  color: 'blue'    },
     SENT_MAIL:   { label: '발송 메일',  color: 'cyan'    },
     MEMBER:      { label: '회원',       color: 'purple'  },
     STORE:       { label: '가게',       color: 'green'   },
@@ -20,7 +19,6 @@ export const ENTITY_LABELS = {
 // 휴지통(TrashTab) 필터 전용 — 회원/가게는 휴지통 미사용이므로 제외
 export const ENTITY_TYPE_OPTIONS = [
     { value: '',            label: '전체' },
-    { value: 'MAIL',        label: '수신 메일' },
     { value: 'SENT_MAIL',   label: '발송 메일' },
     { value: 'RESERVATION', label: '예약' },
     { value: 'REVIEW',      label: '리뷰' },
@@ -29,7 +27,6 @@ export const ENTITY_TYPE_OPTIONS = [
 // 시스템 로그(AuditLogTab) 필터 전용 — 제재 로그(MEMBER/STORE)도 포함
 export const AUDIT_TYPE_OPTIONS = [
     { value: '',            label: '전체' },
-    { value: 'MAIL',        label: '수신 메일' },
     { value: 'SENT_MAIL',   label: '발송 메일' },
     { value: 'MEMBER',      label: '회원' },
     { value: 'STORE',       label: '가게' },

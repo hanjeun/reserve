@@ -71,6 +71,10 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/stores/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/favorites/status/**").permitAll()
+                        // 실시간 잔여 슬롯 조회 — 로그인 여부와 무관하게 누구나 시간대만 볼 수 있어야 함
+                        // (실제 예약 생성은 여전히 아래 "/api/reservations/**" 규칙에 걸려 인증 필요 — 미로그인 사용자는
+                        //  '예약하기' 버튼 클릭 시 프론트에서 isLoggedIn 체크 후 로그인 안내로 자연스럽게 유도됨)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/availability").permitAll()
 
                         // 예약 - 공개 조회만 허용, 나머지는 인증 필요
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/{id}").authenticated()

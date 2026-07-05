@@ -22,6 +22,8 @@ const useStoreList = () => {
 
     const keyword = urlSearchParams.get('keyword') || '';
     const sort    = urlSearchParams.get('sort')    || 'rating';
+    const lat     = urlSearchParams.get('lat');
+    const lng     = urlSearchParams.get('lng');
 
     const {
         data,
@@ -31,9 +33,12 @@ const useStoreList = () => {
         fetchNextPage,
         error,
     } = useInfiniteQuery({
-        queryKey: storeKeys.list({ keyword, sort }),
+        queryKey: storeKeys.list({ keyword, sort, lat, lng }),
         queryFn: ({ pageParam = 0 }) =>
-            storeService.getStores({ keyword, sort, page: pageParam, size: PAGE_SIZE }),
+            storeService.getStores({
+                keyword, sort, page: pageParam, size: PAGE_SIZE,
+                ...(sort === 'distance' && lat && lng ? { lat, lng } : {}),
+            }),
         // Spring Page 응답: { content, number, totalPages, totalElements, last }
         getNextPageParam: (lastPage) =>
             lastPage?.last ? undefined : (lastPage?.number ?? 0) + 1,
@@ -64,7 +69,7 @@ const useStoreList = () => {
         hasNextPage:  hasNextPage ?? false,
         fetchNextPage,
         error:        error?.message || null,
-        searchParams: { keyword, sort },
+        searchParams: { keyword, sort, lat, lng },
         setSearchParams,
     };
 };

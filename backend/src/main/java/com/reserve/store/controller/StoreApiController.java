@@ -48,15 +48,18 @@ public class StoreApiController {
 
     // 전체 가게 조회 — 페이지네이션 지원
     // page, size 파라미터 있으면 Page 반환, 없으면 기존 List 반환 (하위 호환)
+    // lat/lng: sort=distance일 때만 사용 (프론트가 Geolocation 또는 회원 등록 좌표를 전달)
     @GetMapping
     public ApiResponse<?> getAllStores(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false, defaultValue = "rating") String sort,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false, defaultValue = "20") int size
+            @RequestParam(required = false, defaultValue = "20") int size,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng
     ) {
         if (page != null) {
-            Page<StoreResponse> storePage = storeService.searchStoresPaged(keyword, sort, page, size);
+            Page<StoreResponse> storePage = storeService.searchStoresPaged(keyword, sort, page, size, lat, lng);
             return ApiResponse.success(storePage, "가게 목록 조회 성공");
         }
         // 기존 클라이언트 하위 호환

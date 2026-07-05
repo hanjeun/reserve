@@ -355,15 +355,15 @@ public class StoreService {
      */
     /** 가게 목록 조회 — 페이지네이션 지원 */
     @Transactional(readOnly = true)
-    public Page<StoreResponse> searchStoresPaged(String keyword, String sort, int page, int size) {
+    public Page<StoreResponse> searchStoresPaged(String keyword, String sort, int page, int size, Double lat, Double lng) {
         Pageable pageable = PageRequest.of(page, size);
         if (keyword == null || keyword.trim().isEmpty()) {
-            Page<Store> storePage = getAllStoresSortedPaged(sort, pageable);
+            Page<Store> storePage = getAllStoresSortedPaged(sort, pageable, lat, lng);
             return storePage.map(StoreResponse::fromEntity);
         } else {
             Page<Store> storePage = storeRepository.searchStoresPaged(keyword.trim(), pageable);
             // 인메모리 정렬 (키워드 검색 + 정렬 조합)
-            List<Store> sorted = sortStores(storePage.getContent(), sort);
+            List<Store> sorted = sortStores(storePage.getContent(), sort, lat, lng);
             return new PageImpl<>(
                 sorted.stream().map(StoreResponse::fromEntity).collect(Collectors.toList()),
                 pageable,
@@ -372,14 +372,55 @@ public class StoreService {
         }
     }
 
-    private Page<Store> getAllStoresSortedPaged(String sort, Pageable pageable) {
+    private Page<Store> getAllStoresSortedPaged(String sort, Pageable pageable, Double lat, Double lng) {
         if (sort == null) sort = "rating";
+        // "distance": 좌표 없으면 rating으로 fallback (굴직하게 복귀)
+        if ("distance".equals(sort) && lat != null && lng != null) {
+            List<Store> all = storeRepository.findByDeletedAtIsNullAndStatus(StoreStatus.ACTIVE);
+            List<Store> sorted = sortByDistance(all, lat, lng);
+            return paginate(sorted, pageable);
+        }
         // 공개 목록에서는 소프트 삭제 + 제재(정지/영구정지) 가게를 제외
         return switch (sort) {
             case "recent"  -> storeRepository.findByDeletedAtIsNullAndStatusOrderByCreatedAtDesc(StoreStatus.ACTIVE, pageable);
             case "reviews" -> storeRepository.findByDeletedAtIsNullAndStatusOrderByReviewCountDesc(StoreStatus.ACTIVE, pageable);
             default        -> storeRepository.findByDeletedAtIsNullAndStatusOrderByRatingDesc(StoreStatus.ACTIVE, pageable);
         };
+    }
+
+    /** 이미 정렬된 리스트를 Pageable 기준으로 수동 페이지네이션 (native Haversine 미사용 대안) */
+    private Page<Store> paginate(List<Store> sorted, Pageable pageable) {
+        int start = (int) pageable.getOffset();
+        if (start >= sorted.size()) return new PageImpl<>(List.of(), pageable, sorted.size());
+        int end = Math.min(start + pageable.getPageSize(), sorted.size());
+        return new PageImpl<>(sorted.subList(start, end), pageable, sorted.size());
+    }
+
+    /** 하버사인(Haversine) 공식으로 거리순 정렬 — 좌표 없는 가게는 맨 뒤로 (제외하지 않고 노출만 뒤로 미룸) */
+    private List<Store> sortByDistance(List<Store> stores, double lat, double lng) {
+        return stores.stream()
+                .sorted((a, b) -> {
+                    Double da = distanceKm(lat, lng, a.getLatitude(), a.getLongitude());
+                    Double db = distanceKm(lat, lng, b.getLatitude(), b.getLongitude());
+                    if (da == null && db == null) return 0;
+                    if (da == null) return 1;   // a: 좌표 없음 → 뒤로
+                    if (db == null) return -1;  // b: 좌표 없음 → a가 앞으로
+                    return Double.compare(da, db);
+                })
+                .collect(Collectors.toList());
+    }
+
+    /** 두 좌표 간 거리(km). 둘 중 하나라도 좌표가 없으면 null 반환 */
+    private static Double distanceKm(double lat1, double lng1, Double lat2, Double lng2) {
+        if (lat2 == null || lng2 == null) return null;
+        final double EARTH_RADIUS_KM = 6371.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return EARTH_RADIUS_KM * c;
     }
 
     /** 하위 호환용 — 기존 전체 조회 (내부 로직용) */
@@ -390,7 +431,7 @@ public class StoreService {
             stores = getAllStoresSorted(sort);
         } else {
             stores = storeRepository.searchStores(keyword.trim());
-            stores = sortStores(stores, sort);
+            stores = sortStores(stores, sort, null, null);
         }
         return stores.stream().map(StoreResponse::fromEntity).collect(Collectors.toList());
     }
@@ -404,8 +445,11 @@ public class StoreService {
         };
     }
 
-    private List<Store> sortStores(List<Store> stores, String sort) {
+    private List<Store> sortStores(List<Store> stores, String sort, Double lat, Double lng) {
         if (sort == null) sort = "rating";
+        if ("distance".equals(sort) && lat != null && lng != null) {
+            return sortByDistance(stores, lat, lng);
+        }
         return switch (sort) {
             case "recent" -> stores.stream().sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())).collect(Collectors.toList());
             case "reviews" -> stores.stream().sorted((a, b) -> Integer.compare(b.getReviewCount(), a.getReviewCount())).collect(Collectors.toList());

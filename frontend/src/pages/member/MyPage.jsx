@@ -8,8 +8,10 @@ import {
     ShopOutlined,
     ClockCircleOutlined,
     UploadOutlined,
+    EnvironmentOutlined,
 } from '@ant-design/icons';
 import { PageContainer, Button, FormInput, Avatar, Bone } from '../../components/common';
+import AddressSearch from '../../components/store/StoreForm/AddressSearch';
 import { useMessage } from '../../hooks';
 import { memberService, businessService } from '../../services';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -251,6 +253,55 @@ const ProfileImageTab = ({ user }) => {
                     </button>
                 )}
             </div>
+        </div>
+    );
+};
+
+// ─── 위치 등록 탭 (거리순 가게 정렬 폴백용) ────────────────────────────────────────
+// Geolocation을 거부했거나 인앱 브라우저라 지원이 안 될 때, 가게 등록과 동일한
+// AddressSearch(카카오 주소 검색)로 직접 주소를 입력해 좌표를 저장한다.
+const LocationTab = ({ user }) => {
+    const { message } = useMessage();
+    const [address, setAddress] = useState('');
+    const [coords, setCoords] = useState(null); // { latitude, longitude }
+    const [loading, setLoading] = useState(false);
+
+    const hasSaved = user?.latitude != null && user?.longitude != null;
+
+    const handleSave = async () => {
+        if (!coords) { message.warning('주소를 검색해서 선택해주세요'); return; }
+        setLoading(true);
+        try {
+            await memberService.updateLocation(coords.latitude, coords.longitude);
+            await useAuthStore.getState().checkAuth(true);
+            message.success('위치가 등록되었습니다');
+        } catch (err) {
+            handleApiError(err, message, '위치 등록에 실패했습니다');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={styles.securityNotice}>
+                <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
+                    {hasSaved
+                        ? '등록된 위치가 있어요. 거리순 가게 목록에서 위치 권한을 허용하지 않았을 때 이 주소가 기준이 돼요.'
+                        : '거리순 가게 목록을 이용할 때 위치 권한을 허용하지 않았다면, 여기서 주소를 등록해두면 그 주소 기준으로 거리순 정렬이 적용돼요.'}
+                </Text>
+            </div>
+            <AddressSearch
+                value={address}
+                onChange={setAddress}
+                onMeta={({ latitude, longitude }) => {
+                    if (latitude && longitude) setCoords({ latitude, longitude });
+                }}
+                placeholder="도로명 또는 지번 주소를 검색하세요"
+            />
+            <Button variant="primary" onClick={handleSave} loading={loading} disabled={!coords} block>
+                위치 저장
+            </Button>
         </div>
     );
 };
@@ -707,6 +758,11 @@ const MyPage = () => {
             key: 'photo',
             label: <span style={styles.tabLabel}><CameraOutlined style={{ marginRight: 6 }} />사진</span>,
             children: <ProfileImageTab user={user} />,
+        },
+        {
+            key: 'location',
+            label: <span style={styles.tabLabel}><EnvironmentOutlined style={{ marginRight: 6 }} />위치</span>,
+            children: <LocationTab user={user} />,
         },
         ...(!hasAdminAccess(user?.role) ? [{
             key: 'business',

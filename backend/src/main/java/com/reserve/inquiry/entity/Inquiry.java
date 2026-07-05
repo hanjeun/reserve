@@ -25,8 +25,15 @@ public class Inquiry {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false)
+    @JoinColumn(name = "member_id")
     private Member member;
+
+    // 비로그인(게스트) 문의용 — member가 null일 때만 사용됨 (정지된 회원도 문의 가능하게 하기 위함)
+    @Column(name = "guest_name", length = 50)
+    private String guestName;
+
+    @Column(name = "guest_email", length = 100)
+    private String guestEmail;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

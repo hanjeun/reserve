@@ -63,10 +63,10 @@ public class InquiryApiController {
         return ApiResponse.success(inquiry, "관리자용 상세 조회 성공");
     }
 
-    // 문의 작성
+    // 문의 작성 - 로그인 안 해도 가능(게스트). 로그인 상태면 회원으로 귀속, 아니면 요청의 guestName/guestEmail을 서비스 계층에서 검증
     @PostMapping
     public ApiResponse<InquiryDto.InquiryResponse> createInquiry(@RequestBody InquiryDto.InquiryRequest request) {
-        Long memberId = SecurityUtil.getCurrentMemberId();
+        Long memberId = SecurityUtil.isLoggedIn() ? SecurityUtil.getCurrentMemberId() : null;
         InquiryDto.InquiryResponse response = inquiryService.createInquiry(memberId, request);
         return ApiResponse.success(response, "문의가 성공적으로 등록되었습니다.");
     }

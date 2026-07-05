@@ -113,7 +113,20 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 <FormTimePicker.RangePicker />   // 영업시간 설정용
 ```
 
-모든 입력 필드: `variant="filled"`, `border: none`, `backgroundColor: colors.gray[50]`, `borderRadius: radius.lg`, `height: heights.input`
+모든 입력 필드: `variant="filled"`, `border: none`, `backgroundColor: colors.gray[50]`, `borderRadius: radius.lg`, `height: heights.input`, `fontSize: 16px`(호출부 `size` prop과 무관하게 항상 동일 — `.reserve-form-field` CSS 클래스로 전역 강제)
+
+### FormModal
+
+```jsx
+import { FormModal, FormField } from '../components/common';
+
+<FormModal title="문의하기" open={open} onClose={onClose} onSubmit={handleSubmit} submitting={sending}>
+    <FormField label="제목"><FormInput ... /></FormField>
+    <FormField label="내용"><FormTextArea ... /></FormField>
+</FormModal>
+```
+
+"작성해서 제출" 계열 모달(문의하기, 메일 작성 등)의 공용 뼈대 — 너비(520px 고정) · 타이틀 스타일 · 취소/제출 버튼 스타일 · 필드 세로 간격을 한 곳에서 관리해 모달마다 제각각 달라지는 것을 막는다.
 
 ### PageContainer
 

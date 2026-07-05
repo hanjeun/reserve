@@ -3,17 +3,30 @@ package com.reserve.store.repository;
 import com.reserve.member.entity.Member;
 import com.reserve.store.entity.Store;
 import com.reserve.store.entity.StoreStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import org.springframework.data.jpa.repository.Modifying;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
+
+    /**
+     * 예약 정원 체크용 비관적 락 조회.
+     * 같은 가게에 대한 동시 예약 요청(check-then-act: 잔여 인원 조회 → 저장)이
+     * 순서대로 처리되도록 트랜잭션 종료까지 row를 잠근다.
+     * 예약 생성(createReservation)에서만 사용 — 단순 조회에는 findById 그대로 사용.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Store s WHERE s.id = :id")
+    Optional<Store> findByIdForUpdate(@Param("id") Long id);
 
     // 사업자 — 본인 가게 목록 (소프트 삭제된 가게 제외)
     List<Store> findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(Member owner);

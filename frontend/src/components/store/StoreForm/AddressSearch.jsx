@@ -70,7 +70,7 @@ function reducer(state, action) {
 }
 
 // id prop: Form.Item이 label for 연결을 위해 주입 — 메인 input에 전달
-const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetail: addressDetailProp = '', onChange, onMeta, placeholder = '도로명 또는 지번 주소를 검색하세요' }) => {
+const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetail: addressDetailProp = '', onChange, onMeta, onDetailChange, placeholder = '도로명 또는 지번 주소를 검색하세요' }) => {
     const [state, dispatch] = useReducer(reducer, initialState);
     // focused/detailFocused 통합 — 동시에 둘 다 포커스될 수 없으므로 하나의 필드로 표현
     const [activeField, setActiveField] = useState(null); // null | 'query' | 'detail'
@@ -152,7 +152,12 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         if (!v) onChange?.('');
     };
 
-    const handleDetailChange = (e) => { dispatch({ type: 'DETAIL_CHANGE', value: e.target.value }); };
+    // 상세주소 입력은 내부 state만 바꾸고 부모로 전파 안 되던 버그 수정 — 사용자가 직접 수정해도 form에 반영되도록 onDetailChange 호출 추가
+    const handleDetailChange = (e) => {
+        const v = e.target.value;
+        dispatch({ type: 'DETAIL_CHANGE', value: v });
+        onDetailChange?.(v);
+    };
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') e.preventDefault();
@@ -339,13 +344,14 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 };
 
 AddressSearch.propTypes = {
-    id:            PropTypes.string,
-    value:         PropTypes.string,
-    zipCode:       PropTypes.string,
-    addressDetail: PropTypes.string,
-    onChange:      PropTypes.func,
-    onMeta:        PropTypes.func,
-    placeholder:   PropTypes.string,
+    id:             PropTypes.string,
+    value:          PropTypes.string,
+    zipCode:        PropTypes.string,
+    addressDetail:  PropTypes.string,
+    onChange:       PropTypes.func,
+    onMeta:         PropTypes.func,
+    onDetailChange: PropTypes.func,
+    placeholder:    PropTypes.string,
 };
 
 export default AddressSearch;

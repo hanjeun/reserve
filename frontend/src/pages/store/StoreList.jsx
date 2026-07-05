@@ -2,7 +2,8 @@ import React, { useEffect, useCallback } from 'react';
 import { Empty, Spin } from 'antd';
 import { PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
-import { useStoreList, useGeolocation } from '../../hooks';
+import { useStoreList, useGeolocation, useMessage } from '../../hooks';
+import useAuthStore from '../../store/useAuthStore';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { SORT_OPTIONS } from '../../constants';
 import { fontWeight, fontSize, colors } from '../../styles/tokens';
@@ -48,17 +49,27 @@ const StoreList = () => {
     }, [setSearchParams]);
 
     const { request: requestLocation, requesting: locating } = useGeolocation();
+    const { user } = useAuthStore();
+    const { message } = useMessage();
 
-    // 거리순 선택 시만 Geolocation 요청 — 실패하면 sort를 바꾸지 않음(useGeolocation이 이미 토스트로 이유 안내)
+    // 거리순 선택 시 Geolocation 먼저 요청 — 실패/거부 시 마이페이지에 등록해둔 위치가 있으면 그것으로 폴백
+    // (둘 다 없으면 useGeolocation이 이미 보여준 토스트로 이유 안내된 상태라 sort를 바꾸지 않음)
     const handleSortChange = useCallback(async (value) => {
         if (value !== 'distance') {
             setSearchParams({ sort: value, lat: null, lng: null });
             return;
         }
         const position = await requestLocation();
-        if (!position) return;
-        setSearchParams({ sort: 'distance', lat: position.latitude, lng: position.longitude });
-    }, [setSearchParams, requestLocation]);
+        if (position) {
+            setSearchParams({ sort: 'distance', lat: position.latitude, lng: position.longitude });
+            return;
+        }
+        if (user?.latitude != null && user?.longitude != null) {
+            message.info('마이페이지에 등록된 위치 기준으로 정렬할게요.');
+            setSearchParams({ sort: 'distance', lat: user.latitude, lng: user.longitude });
+        }
+        // 둘 다 없으면 sort를 바꾸지 않음 — useGeolocation이 이미 상황별 토스트를 보여줌
+    }, [setSearchParams, requestLocation, user, message]);
 
     return (
         <PageContainer size="xl" paddingTop="40px">

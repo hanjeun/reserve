@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { colors } from '../../styles/tokens';
 
 /**
@@ -68,6 +69,14 @@ const Loading = ({
       {ring}
     </div>
   );
+};
+
+Loading.propTypes = {
+  fullPage: PropTypes.bool,
+  size: PropTypes.number,
+  thickness: PropTypes.number,
+  color: PropTypes.string,
+  minHeight: PropTypes.string,
 };
 
 export default Loading;

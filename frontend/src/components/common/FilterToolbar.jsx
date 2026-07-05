@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Input, Select, Typography } from 'antd';
 import { SearchOutlined, SyncOutlined } from '@ant-design/icons';
 import { Button } from './index';
@@ -111,6 +112,28 @@ const FilterToolbar = ({
             </div>
         </div>
     );
+};
+
+FilterToolbar.propTypes = {
+    selects: PropTypes.arrayOf(PropTypes.shape({
+        value: PropTypes.any,
+        onChange: PropTypes.func,
+        options: PropTypes.array,
+        width: PropTypes.number,
+        disabled: PropTypes.bool,
+        placeholder: PropTypes.string,
+    })),
+    count: PropTypes.number,
+    search: PropTypes.shape({
+        placeholder: PropTypes.string,
+        value: PropTypes.string,
+        onChange: PropTypes.func,
+        disabled: PropTypes.bool,
+    }),
+    onReload: PropTypes.func,
+    loading: PropTypes.bool,
+    extra: PropTypes.node,
+    style: PropTypes.object,
 };
 
 export default FilterToolbar;

@@ -12,6 +12,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { colors, radius } from '../../styles/tokens';
 
 /* ─────────────────────────────────────────────
@@ -445,6 +446,39 @@ const AdminTableSkeleton = ({ rows = 8, cols = [160, 140, 120, 100, 90, 180] }) 
     ))}
   </div>
 );
+
+Bone.propTypes = {
+  width: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  style: PropTypes.object,
+  borderRadius: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};
+
+StoreCardSkeleton.propTypes = {
+  count: PropTypes.number,
+  withActions: PropTypes.bool,
+};
+
+ReservationCardSkeleton.propTypes = {
+  count: PropTypes.number,
+};
+
+MyReservationCardSkeleton.propTypes = {
+  count: PropTypes.number,
+};
+
+ReviewCardSkeleton.propTypes = {
+  count: PropTypes.number,
+};
+
+FavoriteCardSkeleton.propTypes = {
+  count: PropTypes.number,
+};
+
+AdminTableSkeleton.propTypes = {
+  rows: PropTypes.number,
+  cols: PropTypes.arrayOf(PropTypes.number),
+};
 
 export {
   Bone,

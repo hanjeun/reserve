@@ -14,6 +14,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Select } from 'antd';
 import { colors, radius, heights } from '../../styles/tokens';
 
@@ -70,5 +71,13 @@ const FormSelect = ({
 
 // Option을 직접 export
 FormSelect.Option = Select.Option;
+
+FormSelect.propTypes = {
+    placeholder: PropTypes.string,
+    disabled: PropTypes.bool,
+    options: PropTypes.array,
+    children: PropTypes.node,
+    style: PropTypes.object,
+};
 
 export default FormSelect;

@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { Pagination } from 'antd';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { colors, fontWeight, fontSize } from '../../styles/tokens';
@@ -155,3 +156,11 @@ export default function CustomPagination({ current, total, pageSize = 10, onChan
         </>
     );
 }
+
+CustomPagination.propTypes = {
+    current: PropTypes.number,
+    total: PropTypes.number,
+    pageSize: PropTypes.number,
+    onChange: PropTypes.func,
+    style: PropTypes.object,
+};

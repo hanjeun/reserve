@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
 
 const STYLES = {
@@ -49,5 +50,11 @@ const STYLES = {
 const Badge = ({ variant = 'category', style, children }) => (
     <span style={{ ...STYLES[variant], ...style }}>{children}</span>
 );
+
+Badge.propTypes = {
+    variant: PropTypes.oneOf(['category', 'keyword']),
+    style: PropTypes.object,
+    children: PropTypes.node,
+};
 
 export default Badge;

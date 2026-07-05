@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { TimePicker } from 'antd';
 import { colors, radius, heights } from '../../styles/tokens';
 
@@ -49,5 +50,19 @@ FormTimePicker.RangePicker = ({ disabled = false, format = 'HH:mm', style, id, .
         {...rest}
     />
 );
+
+FormTimePicker.propTypes = {
+    placeholder: PropTypes.string,
+    disabled: PropTypes.bool,
+    format: PropTypes.string,
+    style: PropTypes.object,
+};
+
+FormTimePicker.RangePicker.propTypes = {
+    disabled: PropTypes.bool,
+    format: PropTypes.string,
+    style: PropTypes.object,
+    id: PropTypes.string,
+};
 
 export default FormTimePicker;

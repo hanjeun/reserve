@@ -5,6 +5,7 @@
  * 제출되면 DB(Inquiry)에 저장되고, 운영자 개인 이메일로도 알림이 감(백엔드에서 처리).
  */
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import FormModal, { FormField } from './FormModal';
 import FormSelect from './FormSelect';
@@ -105,6 +106,11 @@ const InquiryModal = ({ open, onClose }) => {
             )}
         </FormModal>
     );
+};
+
+InquiryModal.propTypes = {
+    open: PropTypes.bool,
+    onClose: PropTypes.func,
 };
 
 export default InquiryModal;

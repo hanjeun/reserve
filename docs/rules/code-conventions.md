@@ -127,6 +127,12 @@ src/
 
 - 컴포넌트: 함수형 + 화살표 함수
 - 스타일: 인라인 스타일 + 디자인 토큰 사용 (`colors`, `radius`, `fontSize` 등)
-- 상태관리: 전역은 Zustand, 로컬은 useState
+- 상태관리: 인증 등 클라이언트 상태는 Zustand, 서버 데이터(목록/상세/뮤테이션)는 TanStack Query, 로컬 UI 상태는 useState
 - API 호출: `services/` 레이어에서만
 - import 순서: 외부 라이브러리 → 내부 컴포넌트 → 유틸/훅 → 스타일
+
+### PropTypes (2026-07 확정)
+
+- **`components/common/`(공용 컴포넌트)만 PropTypes 필수.** 재사용되는 곳이라 prop 계약을 명시하는 실익이 있음
+- `pages/`, `components/admin/`, `components/store/` 등 1회성 소비 컴포넌트는 PropTypes 생략 — SonarCloud Quality Profile에서 해당 경로는 `react/prop-types` 규칙 제외 처리됨
+- 이유: TypeScript 미도입 상태에서 전체 70개 컴포넌트에 PropTypes를 강제하면 유지보수 부담만 커지고 실질적 안전성 이득은 적음. 공용 컴포넌트만이라도 계약을 명시하는 절충안

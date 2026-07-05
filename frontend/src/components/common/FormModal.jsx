@@ -12,6 +12,7 @@
  * </FormModal>
  */
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Modal, Typography } from 'antd';
 import Button from './Button';
 import { fontSize, radius } from '../../styles/tokens';
@@ -26,6 +27,11 @@ export const FormField = ({ label, children }) => (
         {children}
     </div>
 );
+
+FormField.propTypes = {
+    label: PropTypes.string,
+    children: PropTypes.node,
+};
 
 const FormModal = ({
     title,
@@ -65,5 +71,19 @@ const FormModal = ({
         </div>
     </Modal>
 );
+
+FormModal.propTypes = {
+    title: PropTypes.node,
+    open: PropTypes.bool,
+    onClose: PropTypes.func,
+    onSubmit: PropTypes.func,
+    submitting: PropTypes.bool,
+    submitText: PropTypes.string,
+    cancelText: PropTypes.string,
+    submitDisabled: PropTypes.bool,
+    width: PropTypes.number,
+    footer: PropTypes.node,
+    children: PropTypes.node,
+};
 
 export default FormModal;

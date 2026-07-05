@@ -58,6 +58,14 @@ public class MemberApiController {
         return ApiResponse.success(updated, agreed ? "마케팅 수신에 동의했습니다." : "마케팅 수신 동의를 철회했습니다.");
     }
 
+    // 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 거부/미지원 시 주소 검색 폴백으로 호출
+    @PatchMapping("/me/location")
+    public ApiResponse<MemberResponse> updateLocation(@RequestBody java.util.Map<String, Double> body) {
+        Member member = SecurityUtil.getCurrentMember("인증된 사용자 정보를 찾을 수 없습니다.");
+        MemberResponse updated = memberService.updateLocation(member.getId(), body.get("latitude"), body.get("longitude"));
+        return ApiResponse.success(updated, "위치가 등록되었습니다.");
+    }
+
     // 회원 탈퇴
     @DeleteMapping("/delete")
     public ApiResponse<Void> deleteMember() {

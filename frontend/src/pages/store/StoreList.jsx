@@ -2,7 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import { Empty, Spin } from 'antd';
 import { PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
-import { useStoreList } from '../../hooks';
+import { useStoreList, useGeolocation } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { SORT_OPTIONS } from '../../constants';
 import { fontWeight, fontSize, colors } from '../../styles/tokens';
@@ -47,6 +47,19 @@ const StoreList = () => {
         setSearchParams({ keyword: value });
     }, [setSearchParams]);
 
+    const { request: requestLocation, requesting: locating } = useGeolocation();
+
+    // 거리순 선택 시만 Geolocation 요청 — 실패하면 sort를 바꾸지 않음(useGeolocation이 이미 토스트로 이유 안내)
+    const handleSortChange = useCallback(async (value) => {
+        if (value !== 'distance') {
+            setSearchParams({ sort: value, lat: null, lng: null });
+            return;
+        }
+        const position = await requestLocation();
+        if (!position) return;
+        setSearchParams({ sort: 'distance', lat: position.latitude, lng: position.longitude });
+    }, [setSearchParams, requestLocation]);
+
     return (
         <PageContainer size="xl" paddingTop="40px">
             {/* 헤더 */}
@@ -73,9 +86,10 @@ const StoreList = () => {
                         value={searchParams.sort}
                         style={{ width: 120 }}
                         size="large"
-                        onChange={(value) => setSearchParams({ sort: value })}
+                        onChange={handleSortChange}
                         options={SORT_OPTIONS}
-                        disabled={loading}
+                        disabled={loading || locating}
+                        loading={locating}
                     />
                 </div>
             </div>

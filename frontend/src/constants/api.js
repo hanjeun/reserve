@@ -57,6 +57,7 @@ export const API_ENDPOINTS = {
         PROFILE_IMAGE:     '/api/member/profile-image',
         DELETE:            '/api/member/delete',
         MARKETING_CONSENT: '/api/member/me/marketing-consent',
+        LOCATION:          '/api/member/me/location',
     },
     BUSINESS: {
         SUBMIT:         '/api/business-verification/submit',
@@ -134,4 +135,5 @@ export const SORT_OPTIONS = [
     { value: 'rating',      label: '별점순' },
     { value: 'reviewCount', label: '리뷰순' },
     { value: 'name',        label: '이름순' },
+    { value: 'distance',    label: '거리순' },
 ];

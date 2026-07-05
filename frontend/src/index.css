@@ -230,3 +230,47 @@ button, input, textarea, select {
 .ant-picker-cell-today .ant-picker-cell-inner::before {
     border-color: #b5b8bd !important;
 }
+
+/* ── Toss 스타일 캐쥳형(필) 탭 네비게이션 — pagination/date picker와 동일한 선택 색상(#e5e8eb) 통일 ── */
+.reserve-pill-tabs .ant-tabs-nav::before {
+    border-bottom: none !important;
+}
+.reserve-pill-tabs .ant-tabs-ink-bar {
+    display: none !important;
+}
+.reserve-pill-tabs .ant-tabs-nav-list {
+    gap: 4px;
+    background-color: #f2f4f6;
+    padding: 4px;
+    border-radius: 100px;
+}
+.reserve-pill-tabs .ant-tabs-tab {
+    margin: 0 !important;
+    padding: 8px 18px !important;
+    border-radius: 100px !important;
+    transition: background-color 0.2s ease, color 0.2s ease !important;
+}
+.reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn {
+    color: #8b95a1;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+.reserve-pill-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn {
+    color: #1a1f27 !important;
+}
+.reserve-pill-tabs .ant-tabs-tab-active {
+    background-color: #e5e8eb !important;
+}
+.reserve-pill-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #1a1f27 !important;
+    font-weight: 600 !important;
+}
+/* 모바일에서도 캐쥳 트랙 유지, 좀 더 콤팩트하게 */
+@media (max-width: 768px) {
+    .reserve-pill-tabs .ant-tabs-nav-list {
+        padding: 3px;
+    }
+    .reserve-pill-tabs .ant-tabs-tab {
+        padding: 7px 14px !important;
+    }
+}

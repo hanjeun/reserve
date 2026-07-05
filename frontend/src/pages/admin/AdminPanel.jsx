@@ -199,6 +199,7 @@ const AdminPanel = () => {
             </div>
             {/* ref 및 scrollIntoView 제거 — iOS WebKit 수평 viewport 밀림 버그 방지 */}
             <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabItems}
+                className="reserve-pill-tabs"
                 animated={{ inkBar: true, tabPane: false }} />
 
             <Modal title="사업자 인증 상세" open={detailOpen} onCancel={() => setDetailOpen(false)}

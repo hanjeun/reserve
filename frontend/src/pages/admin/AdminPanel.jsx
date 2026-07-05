@@ -55,7 +55,6 @@ const AdminPanel = () => {
     const location = useLocation();
 
     const activeTab = new URLSearchParams(location.search).get('tab') || 'pending';
-    const [mailUnread, setMailUnread] = useState(0);
 
     // 탭 클릭 시 URL만 변경 — 필터 리셋은 아래 useEffect가 담당
     const handleTabChange = (key) => navigate(`?tab=${key}`, { replace: true });
@@ -181,17 +180,8 @@ const AdminPanel = () => {
         },
         {
             key: 'mailbox',
-            label: (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <MailOutlined />메일함
-                    {mailUnread > 0 && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, borderRadius: 9, background: '#f04452', color: '#fff', fontSize: 11, fontWeight: 700, padding: '0 4px', lineHeight: 1 }}>
-                            {mailUnread > 99 ? '99+' : mailUnread}
-                        </span>
-                    )}
-                </span>
-            ),
-            children: <MailboxTab onUnreadCountChange={setMailUnread} />,
+            label: tabLabel(<MailOutlined />, '메일함'),
+            children: <MailboxTab />,
         },
         { key: 'trash',      label: tabLabel(<DeleteOutlined />,  '휴지통'),     children: <TrashTab /> },
         { key: 'audit-logs', label: tabLabel(<FileTextOutlined />, '시스템 로그'), children: <AuditLogTab /> },

@@ -11,6 +11,7 @@
 import React from 'react';
 import { Input, InputNumber } from 'antd';
 import { colors, radius, heights } from '../../styles/tokens';
+import { fontSize } from '../../styles/tokens';
 
 const FormInput = ({ 
     type = 'text',
@@ -30,6 +31,7 @@ const FormInput = ({
         border: 'none',
         paddingLeft: 12,
         paddingRight: 12,
+        fontSize: fontSize.lg,  // 입력 텍스트·placeholder 크기 고정(16px) — 호출부 size prop과 무관하게 항상 동일
         ...style,
     };
 
@@ -38,6 +40,7 @@ const FormInput = ({
         return (
             <Input.Password
                 id={id}
+                className="reserve-form-field"
                 placeholder={placeholder}
                 disabled={disabled}
                 variant="filled"
@@ -52,6 +55,7 @@ const FormInput = ({
         return (
             <InputNumber
                 id={id}
+                className="reserve-form-field"
                 placeholder={placeholder}
                 disabled={disabled}
                 variant="filled"
@@ -66,6 +70,7 @@ const FormInput = ({
     return (
         <Input
             id={id}
+            className="reserve-form-field"
             type={type}
             placeholder={placeholder}
             disabled={disabled}

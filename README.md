@@ -79,7 +79,7 @@ RESERVE는 업종에 구애받지 않고, 예약이 필요한 순간 누구나 �
 | **인프라** | AWS Lightsail, Docker, Nginx, GitHub Actions |
 | **배포 방식** | Blue/Green 무중단 배포, 헬스체크 자동 롤백 |
 | **스토리지** | AWS S3 + CloudFront CDN |
-| **이메일** | Resend, ImprovMX |
+| **이메일** | Resend |
 | **결제** | 포트원 V2 (카카오페이) |
 | **소셜 로그인** | Google, Naver, Kakao OAuth2 |
 | **모니터링** | Grafana, Loki, Promtail, Sentry, UptimeRobot |

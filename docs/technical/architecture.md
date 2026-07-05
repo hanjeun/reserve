@@ -131,6 +131,5 @@ feature/*     ← 기능별 작업
 | **DockerHub** | Docker 이미지 저장소 (hanjeun/reserve) |
 | **GitHub Actions** | CI/CD 파이프라인 |
 | **Resend** | 이메일 발송 (reserve@reserve.it.kr) |
-| **ImprovMX** | 이메일 수신 포워딩 (→ hanjeun111@gmail.com) |
 | **Portone V2** | 카카오페이 결제 |
 | **Google/Naver/Kakao** | OAuth2 소셜 로그인 |

@@ -16,8 +16,16 @@ import { colors, fontWeight } from '../../styles/tokens';
 
 const { Text } = Typography;
 
-const PIE_COLORS = ['#3182f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
-const CHART_COLORS = { warning: '#f59e0b' };
+// 차트 팔레트 — 브랜드 토큰 우선, 토큰에 없는 보조색만 별도 지정 (2026-07 대시보드 Toss 리디자인)
+const PIE_COLORS = [
+    colors.primary.main,   // #3182f6
+    colors.success.main,   // #00c73c
+    colors.warning.main,   // #ffb800
+    colors.error.main,     // #f04452
+    '#8b5cf6',             // 보조색 (토큰에 없는 purple)
+    '#06b6d4',             // 보조색 (토큰에 없는 cyan)
+];
+const CHART_COLORS = { warning: colors.warning.main };
 
 const ChartCard = ({ title, children, height = 260 }) => (
     <Card size="small" title={title} style={{ flex: 1, minWidth: 260 }}>
@@ -203,9 +211,9 @@ const DashboardTab = () => {
                 <Card size="small" title="최근 감사 로그 요약">
                     <Row gutter={[24, 8]}>
                         {[
-                            { key: 'SOFT_DELETE', label: '소프트 삭제', color: '#f59e0b' },
-                            { key: 'RESTORE',     label: '복구',        color: '#22c55e' },
-                            { key: 'HARD_DELETE', label: '영구 삭제',   color: '#ef4444' },
+                            { key: 'SOFT_DELETE', label: '소프트 삭제', color: colors.warning.main },
+                            { key: 'RESTORE',     label: '복구',        color: colors.success.main },
+                            { key: 'HARD_DELETE', label: '영구 삭제',   color: colors.error.main },
                         ].map(({ key, label, color }) => (
                             <Col key={key} xs={8}>
                                 <Statistic

@@ -735,7 +735,7 @@ const MyPage = () => {
             {/* 정보 수정 탭 */}
             <div style={styles.tabsCard}>
                 <Text strong style={styles.sectionTitle}>내 정보 수정</Text>
-                <Tabs defaultActiveKey="name" items={tabItems} animated={{ inkBar: true, tabPane: false }} />
+                <Tabs defaultActiveKey="name" items={tabItems} className="reserve-pill-tabs" animated={{ inkBar: true, tabPane: false }} />
             </div>
 
             <Divider />

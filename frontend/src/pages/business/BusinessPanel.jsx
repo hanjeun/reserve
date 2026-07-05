@@ -197,6 +197,7 @@ const BusinessPanel = () => {
                 activeKey={activeTab}
                 onChange={setActiveTab}
                 items={tabItems}
+                className="reserve-pill-tabs"
                 animated={{ inkBar: true, tabPane: false }}
                 style={{ marginBottom: 8 }}
             />

@@ -108,6 +108,7 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                     zipCode={zipCode}
                     addressDetail={addressDetail}
                     onMeta={(meta) => form?.setFieldsValue(meta)}
+                    onDetailChange={(v) => form?.setFieldsValue({ addressDetail: v })}
                 />
             </Form.Item>
             <Form.Item name="latitude" hidden><Input /></Form.Item>

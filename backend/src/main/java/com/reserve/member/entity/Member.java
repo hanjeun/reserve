@@ -83,6 +83,13 @@ public class Member {
     @Column(name = "suspend_reason")
     private String suspendReason;
 
+    // 위치 기반 거리순 정렬용 — nullable (미입력/거부 시 null 유지, 거리순 정렬은 rating으로 fallback)
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     // 권한 체크 헬퍼 메서드
     public boolean isUser() {
         return this.role == Role.USER;

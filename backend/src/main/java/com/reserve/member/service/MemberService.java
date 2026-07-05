@@ -193,6 +193,21 @@ public class MemberService {
     }
 
     /**
+     * 위치 기반 거리순 정렬용 좌표 등록/수정.
+     * 브라우저 Geolocation 거부·인앱 브라우저 미지원 시 사용자가 마이페이지에서
+     * 주소 검색으로 직접 등록하는 폴백 경로 — StoreForm의 AddressSearch와 동일한
+     * Kakao 주소 검색 결과(latitude/longitude)를 그대로 저장.
+     */
+    @Transactional
+    public MemberResponse updateLocation(Long memberId, Double latitude, Double longitude) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(MemberException::notFound);
+        member.setLatitude(latitude);
+        member.setLongitude(longitude);
+        return MemberResponse.fromEntity(memberRepository.save(member));
+    }
+
+    /**
      * 소셜 로그인 신규 가입 시 약관 동의 처리.
      * termsAgreed(필수)는 항상 true로 세팅, marketingAgreed(선택)는 사용자 선택값 반영.
      */

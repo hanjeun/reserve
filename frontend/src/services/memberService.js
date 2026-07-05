@@ -33,6 +33,10 @@ const memberService = {
     /** 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경) */
     updateMarketingConsent: (marketingAgreed) =>
         api.patch(API_ENDPOINTS.MEMBER.MARKETING_CONSENT, { marketingAgreed }),
+
+    /** 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 실패 시 마이페이지 주소 등록 폴백에서 호출 */
+    updateLocation: (latitude, longitude) =>
+        api.patch(API_ENDPOINTS.MEMBER.LOCATION, { latitude, longitude }),
 };
 
 export default memberService;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { HeartOutlined, HeartFilled } from '@ant-design/icons';
 import favoriteService from '../../services/favoriteService';
 import useAuthStore from '../../store/useAuthStore';
@@ -84,6 +85,13 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
             }
         </button>
     );
+};
+
+FavoriteButton.propTypes = {
+    storeId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+    initialStatus: PropTypes.bool,
+    size: PropTypes.oneOf(['sm', 'md']),
+    style: PropTypes.object,
 };
 
 export default FavoriteButton;

@@ -7,6 +7,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Input } from 'antd';
 import { colors, radius } from '../../styles/tokens';
 
@@ -49,6 +50,15 @@ const FormTextArea = ({
             {...rest}
         />
     );
+};
+
+FormTextArea.propTypes = {
+    rows: PropTypes.number,
+    placeholder: PropTypes.string,
+    disabled: PropTypes.bool,
+    maxLength: PropTypes.number,
+    showCount: PropTypes.bool,
+    style: PropTypes.object,
 };
 
 export default FormTextArea;

@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { colors, maxWidth as maxWidthTokens } from '../../styles/tokens';
 
 const PageContainer = ({ 
@@ -45,6 +46,17 @@ const PageContainer = ({
             {children}
         </div>
     );
+};
+
+PageContainer.propTypes = {
+    size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl']),
+    paddingTop: PropTypes.string,
+    paddingBottom: PropTypes.string,
+    paddingX: PropTypes.string,
+    center: PropTypes.bool,
+    backgroundColor: PropTypes.string,
+    children: PropTypes.node,
+    style: PropTypes.object,
 };
 
 export default PageContainer;

@@ -43,6 +43,10 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     Page<Store> findByDeletedAtIsNullAndStatusOrderByReviewCountDesc(StoreStatus status, Pageable pageable);
     Page<Store> findByDeletedAtIsNullAndStatusOrderByCreatedAtDesc(StoreStatus status, Pageable pageable);
 
+    // 거리순 정렬용 — 정렬 없이 전체 가져와 서비스 계층에서 Haversine 계산 후 인메모리 정렬/페이지네이션
+    // (가게 수가 적은 현재 규모에서는 문제없음 — native SQL Haversine은 H2(test)/MySQL(prod) 호환성 리스크가 있어 의도적으로 피함)
+    List<Store> findByDeletedAtIsNullAndStatus(StoreStatus status);
+
     @Query("SELECT s FROM Store s WHERE " +
            "LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(s.description) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

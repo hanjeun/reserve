@@ -13,6 +13,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Card as AntCard } from 'antd';
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
 
@@ -123,6 +124,30 @@ Card.Add = ({ children, onClick, minHeight = '350px' }) => {
             `}</style>
         </div>
     );
+};
+
+Card.propTypes = {
+    hoverable: PropTypes.bool,
+    actions: PropTypes.array,
+    children: PropTypes.node,
+    style: PropTypes.object,
+    onClick: PropTypes.func,
+};
+
+Card.Cover.propTypes = {
+    src: PropTypes.string,
+    alt: PropTypes.string,
+};
+
+Card.Body.propTypes = {
+    children: PropTypes.node,
+    style: PropTypes.object,
+};
+
+Card.Add.propTypes = {
+    children: PropTypes.node,
+    onClick: PropTypes.func,
+    minHeight: PropTypes.string,
 };
 
 export default Card;

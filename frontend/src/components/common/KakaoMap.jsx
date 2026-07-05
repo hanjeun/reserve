@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { colors, fontSize, radius } from '../../styles/tokens';
 
@@ -152,6 +153,14 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
             )}
         </div>
     );
+};
+
+KakaoMap.propTypes = {
+    latitude: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    longitude: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    address: PropTypes.string,
+    storeName: PropTypes.string,
+    height: PropTypes.number,
 };
 
 export default KakaoMap;

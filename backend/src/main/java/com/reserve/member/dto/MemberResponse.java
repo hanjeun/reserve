@@ -24,6 +24,8 @@ public class MemberResponse {
     private MemberStatus status;
     private LocalDateTime suspendedUntil;
     private String suspendReason;
+    private Double latitude;
+    private Double longitude;
 
     public static MemberResponse fromEntity(Member member) {
         return new MemberResponse(
@@ -38,7 +40,9 @@ public class MemberResponse {
                 member.isMarketingAgreed(),
                 member.getStatus(),
                 member.getSuspendedUntil(),
-                member.getSuspendReason()
+                member.getSuspendReason(),
+                member.getLatitude(),
+                member.getLongitude()
         );
     }
 }

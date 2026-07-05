@@ -68,7 +68,9 @@ const customStyles = `
   .rsv-time-pill {
     background: transparent;
     color: ${colors.text.secondary};
-    transition: background-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
+    transition: background-color 0.2s ease,
+                transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                color 0.15s ease;
   }
   .rsv-time-pill:hover:not(:disabled) {
     background-color: ${colors.gray[100]};
@@ -362,7 +364,7 @@ const timeSlotStyles = {
     groupLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, fontWeight: fontWeight.medium, marginBottom: 8 },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
     pill: {
-        padding: '9px 0', borderRadius: radius.pill, border: 'none',
+        padding: '9px 0', borderRadius: radius.md, border: 'none',
         fontSize: fontSize.sm, fontWeight: fontWeight.medium, cursor: 'pointer',
     },
 };

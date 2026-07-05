@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { DatePicker } from 'antd';
 import { colors, radius, heights } from '../../styles/tokens';
 
@@ -36,6 +37,13 @@ const FormDatePicker = ({
             {...rest}
         />
     );
+};
+
+FormDatePicker.propTypes = {
+    placeholder: PropTypes.string,
+    disabled: PropTypes.bool,
+    format: PropTypes.string,
+    style: PropTypes.object,
 };
 
 export default FormDatePicker;

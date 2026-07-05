@@ -6,6 +6,7 @@
  * - 레이어 방식: 아이콘이 항상 뒤에, 이미지가 위에 덮음
  */
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { UserOutlined } from '@ant-design/icons';
 import { getImageUrl } from '../../utils/image';
 import { colors } from '../../styles/tokens';
@@ -54,6 +55,12 @@ const Avatar = ({ src, size = 36, style }) => {
             )}
         </div>
     );
+};
+
+Avatar.propTypes = {
+    src: PropTypes.string,
+    size: PropTypes.number,
+    style: PropTypes.object,
 };
 
 export default Avatar;

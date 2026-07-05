@@ -12,6 +12,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { colors, radius, heights, fontWeight, fontSize, shadows, transitions } from '../../styles/tokens';
 
 const VARIANTS = {
@@ -234,5 +235,21 @@ const Button = ({
 };
 
 const spinStyle = {};
+
+Button.propTypes = {
+    variant: PropTypes.oneOf([
+        'primary', 'secondary', 'ghost', 'ghost-sm', 'ghost-sm-primary',
+        'ghost-sm-success', 'ghost-sm-danger', 'hero', 'outline', 'danger', 'link',
+    ]),
+    size: PropTypes.oneOf(['sm', 'md', 'lg', 'hero']),
+    block: PropTypes.bool,
+    loading: PropTypes.bool,
+    disabled: PropTypes.bool,
+    htmlType: PropTypes.oneOf(['button', 'submit', 'reset']),
+    icon: PropTypes.node,
+    children: PropTypes.node,
+    style: PropTypes.object,
+    onClick: PropTypes.func,
+};
 
 export default Button;

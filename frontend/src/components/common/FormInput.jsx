@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Input, InputNumber } from 'antd';
 import { colors, radius, heights } from '../../styles/tokens';
 import { fontSize } from '../../styles/tokens';
@@ -163,6 +164,32 @@ const spinStyle = {
     borderTopColor: '#fff',
     borderRadius: '50%',
     animation: 'reserve-spin 0.6s linear infinite',
+};
+
+FormInput.propTypes = {
+    type: PropTypes.oneOf(['text', 'password', 'number', 'email']),
+    placeholder: PropTypes.string,
+    disabled: PropTypes.bool,
+    suffix: PropTypes.node,
+    prefix: PropTypes.node,
+    maxLength: PropTypes.number,
+    id: PropTypes.string,
+    style: PropTypes.object,
+};
+
+FormInput.WithButton.propTypes = {
+    placeholder: PropTypes.string,
+    disabled: PropTypes.bool,
+    buttonText: PropTypes.node,
+    buttonLoading: PropTypes.bool,
+    buttonDisabled: PropTypes.bool,
+    buttonStyle: PropTypes.object,
+    onButtonClick: PropTypes.func,
+    verified: PropTypes.bool,
+    style: PropTypes.object,
+    value: PropTypes.string,
+    onChange: PropTypes.func,
+    id: PropTypes.string,
 };
 
 export default FormInput;

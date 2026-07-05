@@ -96,7 +96,6 @@ const Login = () => {
             message.error(decodeURIComponent(oauthMessage));
             window.history.replaceState({}, '', '/login');
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoggedIn, location.state, navigate, message]);
 
     const onLoginSubmit = async (values) => {

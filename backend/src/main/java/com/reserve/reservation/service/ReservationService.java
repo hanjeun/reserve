@@ -116,6 +116,22 @@ public class ReservationService {
             }
         }
 
+        // 영업시간 검증 — getAvailability와 동일한 기준: 예약 시각은 [open, close - slotMin] 범위 안이어야 함.
+        // (프론트 슬롯 목록에 안 떰는 시각을 API로 직접 찌러넣는 우회 차단)
+        if (store.getOpenTime() != null && store.getCloseTime() != null) {
+            int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
+            LocalTime resTime = request.getReservationTime();
+            LocalTime lastSlot = store.getCloseTime().minusMinutes(slotMin);
+            if (resTime.isBefore(store.getOpenTime()) || resTime.isAfter(lastSlot)) {
+                String hoursStr = store.getOpenTime().toString().substring(0, 5)
+                    + " ~ " + store.getCloseTime().toString().substring(0, 5);
+                throw new ReservationException(
+                    "영업시간(" + hoursStr + ") 내의 예약 가능한 시간대를 선택해주세요.",
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
         // 나중 결제 허용 검증: allowLatePayment=false + 예약금 있으면 즉시 결제 필수
         boolean hasDeposit = store.getNoShowDeposit() != null && store.getNoShowDeposit() > 0;
         if (hasDeposit && !Boolean.TRUE.equals(store.getAllowLatePayment())) {
@@ -237,7 +253,11 @@ public class ReservationService {
 
         List<SlotAvailabilityResponse> result = new ArrayList<>();
         LocalTime cursor = open;
-        while (!cursor.isAfter(close)) {
+        // close는 "영업 종료 시각"이므로, 예약이 예약 단위(slotMin)만큼 자리를 점유한다고 보고
+        // 마지막 슬롯 + slotMin 이 close를 넘어가면 제외한다.
+        // 예) 09:00~21:00, 30분 단위 → 마지막 슬롯 20:30(20:30+30=21:00, 종료와 일치), 21:00 슬롯은 21:30이 되어 제외.
+        // (close가 자정을 넘어가는 가게는 LocalTime wrap-around로 정상 처리 안 되지만, 이는 기존 코드도 동일한 한계)
+        while (!cursor.plusMinutes(slotMin).isAfter(close)) {
             boolean inBreak = hasBreak && !cursor.isBefore(breakStart) && cursor.isBefore(breakEnd);
             if (!inBreak) {
                 long booked = guestSumByTime.getOrDefault(cursor, 0L);

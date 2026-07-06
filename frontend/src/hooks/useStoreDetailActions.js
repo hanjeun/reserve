@@ -40,7 +40,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
 
     // ── 예약 결과 처리 (onFinish에서 분리해 중첩 제거) ──────────────────────
     const handleReservationResult = async (reservation) => {
-        if (!reservation?.depositAmount) {
+        if ((Number(reservation?.depositAmount) || 0) <= 0) {
             message.success('예약이 완료되었습니다.');
             navigate('/my-reservations');
             return;

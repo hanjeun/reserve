@@ -136,12 +136,7 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
             </div>
 
             <Modal
-                title={
-                    <Flex align="center" gap={8}>
-                        <FileTextOutlined style={{ color: colors.primary.main, fontSize: 18 }} />
-                        <span>예약 상세</span>
-                    </Flex>
-                }
+                title="예약 상세"
                 open={detailOpen}
                 onCancel={() => setDetailOpen(false)}
                 footer={null}

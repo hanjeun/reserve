@@ -41,10 +41,25 @@ const STYLES = {
         marginBottom: 4,
         whiteSpace: 'nowrap',
     },
+    // 광고 배지 — 주황계(warning 톤). category(파랑)·keyword(회색)와 안 겹치도록 분리.
+    // "파트너"라는 단어는 이미 BUSINESS 역할 표시에 쓰이고 있어서(roles.js) 혜동 방지차 "광고"로만 표기.
+    ad: {
+        display: 'inline-block',
+        background: colors.warning?.light || '#fff8e6',
+        color: colors.warning?.main || '#ffb800',
+        fontSize: fontSize.xs,
+        fontWeight: fontWeight.medium,
+        padding: '2px 8px',
+        borderRadius: radius.sm,
+        lineHeight: '20px',
+        marginRight: 6,
+        marginBottom: 4,
+        whiteSpace: 'nowrap',
+    },
 };
 
 /**
- * @param {'category' | 'keyword'} variant
+ * @param {'category' | 'keyword' | 'ad'} variant
  * @param {React.CSSProperties} style - 추가 오버라이드 스타일
  */
 const Badge = ({ variant = 'category', style, children }) => (
@@ -52,7 +67,7 @@ const Badge = ({ variant = 'category', style, children }) => (
 );
 
 Badge.propTypes = {
-    variant: PropTypes.oneOf(['category', 'keyword']),
+    variant: PropTypes.oneOf(['category', 'keyword', 'ad']),
     style: PropTypes.object,
     children: PropTypes.node,
 };

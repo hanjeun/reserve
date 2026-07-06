@@ -41,6 +41,14 @@ export const API_ENDPOINTS = {
         NO_SHOW:             (id) => `/api/reservations/${id}/no-show`,
         AVAILABILITY:        '/api/reservations/availability',
     },
+    ADVERTISEMENT: {
+        CREATE:         '/api/advertisements',
+        VERIFY_PAYMENT: '/api/advertisements/verify-payment',
+        ACTIVE:         '/api/advertisements/active',
+        MY_ADS:         '/api/advertisements/my',
+        ADMIN_ALL:      '/api/advertisements/admin/all',
+        ADMIN_SUSPEND:  (id) => `/api/advertisements/admin/${id}/suspend`,
+    },
     REVIEW: {
         CREATE:          '/api/reviews',
         BY_STORE:        (storeId) => `/api/reviews/store/${storeId}`,

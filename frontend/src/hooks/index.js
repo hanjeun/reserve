@@ -19,3 +19,4 @@ export { storeKeys, reservationKeys, memberKeys } from './queryKeys';
 export { useWindowWidth } from './useWindowWidth';
 export { default as useStoreDetailActions } from './useStoreDetailActions';
 export { default as useGeolocation } from './useGeolocation';
+export { default as useAdPayment } from './useAdPayment';

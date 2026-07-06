@@ -12,7 +12,7 @@ const { Title, Text } = Typography;
  * 가게 카드 컴포넌트
  * StoreList에서 사용
  */
-const StoreCard = ({ store }) => {
+const StoreCard = ({ store, isAdvertised = false }) => {
     const navigate = useNavigate();
     const { id, name, category, mainImageUrl, rating, reviewCount } = store;
 
@@ -39,6 +39,11 @@ const StoreCard = ({ store }) => {
                 <Badge variant="category" style={{ marginBottom: 6 }}>
                     {category || '기타'}
                 </Badge>
+                {isAdvertised && (
+                    <Badge variant="ad" style={{ marginBottom: 6 }}>
+                        광고
+                    </Badge>
+                )}
                 <Title level={5} style={{ margin: '0 0 4px', fontSize: fontSize.xl }}>
                     {name}
                 </Title>

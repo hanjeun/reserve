@@ -76,6 +76,9 @@ public class SecurityConfig {
                         //  '예약하기' 버튼 클릭 시 프론트에서 isLoggedIn 체크 후 로그인 안내로 자연스럽게 유도됨)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/availability").permitAll()
 
+                        // 광고 노출 목록 — 공개 API (StoreList 배지/배너 위젯이 로그인 여부와 무관하게 보여야 함)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/advertisements/active").permitAll()
+
                         // 예약 - 공개 조회만 허용, 나머지는 인증 필요
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/{id}").authenticated()
                         .requestMatchers("/api/reservations/**").authenticated()

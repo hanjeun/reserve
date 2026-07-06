@@ -6,7 +6,7 @@ import {
 import {
     CalendarOutlined, SafetyCertificateOutlined, IdcardOutlined, MailOutlined,
     DeleteOutlined, FileTextOutlined, BarChartOutlined, TeamOutlined, ShopOutlined,
-    ExclamationCircleFilled,
+    ExclamationCircleFilled, NotificationOutlined,
 } from '@ant-design/icons';
 import MailboxTab from '../../components/admin/MailboxTab';
 import TrashTab from '../../components/admin/TrashTab';
@@ -15,6 +15,7 @@ import DashboardTab from '../../components/admin/DashboardTab';
 import MembersTab from '../../components/admin/MembersTab';
 import StoresAdminTab from '../../components/admin/StoresAdminTab';
 import ReservationsAllTab from '../../components/admin/ReservationsAllTab';
+import AdminAdsTab from '../../components/admin/AdminAdsTab';
 import { PageContainer, Button, AdminTableSkeleton, FilterToolbar } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -189,6 +190,7 @@ const AdminPanel = () => {
         { key: 'members',      label: tabLabel(<TeamOutlined />, '회원 관리'), children: <MembersTab /> },
         { key: 'stores-admin', label: tabLabel(<ShopOutlined />,  '가게 관리'), children: <StoresAdminTab /> },
         { key: 'reservations', label: tabLabel(<CalendarOutlined />, '전체 예약'), children: <ReservationsAllTab /> },
+        { key: 'ads', label: tabLabel(<NotificationOutlined />, '광고 관리'), children: <AdminAdsTab /> },
     ];
 
     return (

@@ -5,3 +5,4 @@ export { default as memberService } from './memberService';
 export { default as paymentService } from './paymentService';
 export { default as businessService } from './businessService';
 export { default as favoriteService } from './favoriteService';
+export { default as adService } from './adService';

@@ -1,10 +1,12 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { Empty, Spin } from 'antd';
 import { PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
+import AdBanner from '../../components/advertisement/AdBanner';
 import { useStoreList, useGeolocation, useMessage } from '../../hooks';
 import useAuthStore from '../../store/useAuthStore';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import adService from '../../services/adService';
 import { SORT_OPTIONS } from '../../constants';
 import { fontWeight, fontSize, colors } from '../../styles/tokens';
 import { Input, Select, Typography } from 'antd';
@@ -64,6 +66,19 @@ const StoreList = () => {
         }
         return null;
     }, [searchParams.lat, searchParams.lng, savedLat, savedLng]);
+
+    // 광고 데이터 — 배지형(BADGE)은 storeId Set으로, 배너형(BANNER)은 리스트 그대로
+    const [adStoreIds, setAdStoreIds] = useState(new Set());
+    const [bannerAds, setBannerAds] = useState([]);
+
+    useEffect(() => {
+        adService.getActiveAds('BADGE')
+            .then((list) => setAdStoreIds(new Set((list || []).map((a) => a.storeId))))
+            .catch(() => {});
+        adService.getActiveAds('BANNER')
+            .then((list) => setBannerAds(Array.isArray(list) ? list : []))
+            .catch(() => {});
+    }, []);
 
     // 거리순 선택 시 Geolocation 먼저 요청 — 실패/거부 시 마이페이지에 등록해둔 위치가 있으면 그것으로 폴백
     // (둘 다 없으면 useGeolocation이 이미 보여준 토스트로 이유 안내된 상태라 sort를 바꾸지 않음)
@@ -133,7 +148,7 @@ const StoreList = () => {
                     <div style={styles.grid}>
                         {stores.map(store => (
                             <div key={store.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
-                                <StoreCard store={store} userLocation={nearbyUserLocation} />
+                                <StoreCard store={store} userLocation={nearbyUserLocation} isAdvertised={adStoreIds.has(store.id)} />
                             </div>
                         ))}
                     </div>
@@ -158,6 +173,7 @@ const StoreList = () => {
                     )}
                 </>
             )}
+            <AdBanner ads={bannerAds} />
         </PageContainer>
     );
 };

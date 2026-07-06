@@ -17,8 +17,10 @@ const { Title, Text } = Typography;
  * userLocation({ latitude, longitude })을 받으면 가게 좌표와 3km 이내일 때
  * "우리동네" 배지를 표시함. 전달 안 되면(위치 모를 때) 배지 자체를 안 그림 —
  * 위치 권한을 이 카드가 직접 요청하지 않는다(수동적으로 있는 값만 사용).
+ *
+ * isAdvertised가 true면 "광고" 배지도 함께 표시(배지형 광고 상품).
  */
-const StoreCard = ({ store, userLocation }) => {
+const StoreCard = ({ store, userLocation, isAdvertised = false }) => {
     const navigate = useNavigate();
     const { id, name, category, mainImageUrl, rating, reviewCount, latitude, longitude, nearbyRadiusKm } = store;
     const nearby = isNearby(userLocation, latitude, longitude, nearbyRadiusKm ?? undefined);
@@ -46,6 +48,11 @@ const StoreCard = ({ store, userLocation }) => {
                 <Badge variant="category" style={{ marginBottom: 6 }}>
                     {category || '기타'}
                 </Badge>
+                {isAdvertised && (
+                    <Badge variant="ad" style={{ marginBottom: 6 }}>
+                        광고
+                    </Badge>
+                )}
                 {nearby && (
                     <Badge variant="nearby" style={{ marginBottom: 6 }}>
                         우리동네
@@ -84,6 +91,7 @@ StoreCard.propTypes = {
         latitude: PropTypes.number,
         longitude: PropTypes.number,
     }),
+    isAdvertised: PropTypes.bool,
 };
 
 export default StoreCard;

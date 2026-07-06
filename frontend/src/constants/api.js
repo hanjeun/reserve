@@ -43,6 +43,14 @@ export const API_ENDPOINTS = {
         QR_TOKEN:            (id) => `/api/reservations/${id}/qr-token`,
         QR_CHECKIN:          '/api/reservations/qr-checkin',
     },
+    ADVERTISEMENT: {
+        CREATE:         '/api/advertisements',
+        VERIFY_PAYMENT: '/api/advertisements/verify-payment',
+        ACTIVE:         '/api/advertisements/active',
+        MY_ADS:         '/api/advertisements/my',
+        ADMIN_ALL:      '/api/advertisements/admin/all',
+        ADMIN_SUSPEND:  (id) => `/api/advertisements/admin/${id}/suspend`,
+    },
     REVIEW: {
         CREATE:          '/api/reviews',
         BY_STORE:        (storeId) => `/api/reviews/store/${storeId}`,

@@ -41,6 +41,11 @@ public final class FileStoragePaths {
         return "users/" + memberId + "/businesses";
     }
 
+    /** 광고 배너 이미지: users/{memberId}/stores/{storeId}/advertisements */
+    public static String advertisement(Long memberId, Long storeId) {
+        return "users/" + memberId + "/stores/" + storeId + "/advertisements";
+    }
+
     // ========== 시스템 영역 (향후 확장) ==========
 
     /** 공지사항 이미지: notices/{noticeId}/images */

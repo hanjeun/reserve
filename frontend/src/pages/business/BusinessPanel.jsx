@@ -5,10 +5,12 @@ import {
     ClockCircleOutlined,
     PartitionOutlined,
     QrcodeOutlined,
+    NotificationOutlined,
 } from '@ant-design/icons';
 import { PageContainer, ReservationCardSkeleton, FilterToolbar } from '../../components/common';
 import ReservationCard from '../../components/reservation/ReservationCard';
 import QrScannerTab from '../../components/reservation/QrScannerTab';
+import AdManageTab from '../../components/advertisement/AdManageTab';
 import useManageReservations from '../../hooks/useManageReservations';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
@@ -184,6 +186,15 @@ const BusinessPanel = () => {
                 </span>
             ),
             children: <QrScannerTab />,
+        },
+        {
+            key: 'ads',
+            label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <NotificationOutlined /> 광고 관리
+                </span>
+            ),
+            children: <AdManageTab />,
         },
         {
             key: 'analytics',

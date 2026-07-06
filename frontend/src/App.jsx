@@ -94,7 +94,7 @@ function AppContent() {
 
 function AppRoutes() {
     return (
-        <Layout style={{ minHeight: '100dvh', backgroundColor: colors.background.default }}>
+        <Layout style={{ minHeight: '100vh', backgroundColor: colors.background.default }}>
             <ScrollToTop />
             <Header />
             <Content>

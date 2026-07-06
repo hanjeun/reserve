@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Empty, Typography } from 'antd';
 import {
     CalendarOutlined, ClockCircleOutlined, TeamOutlined, UserOutlined,
-    CreditCardOutlined, DeleteOutlined,
+    CreditCardOutlined, DeleteOutlined, QrcodeOutlined,
 } from '@ant-design/icons';
 import { PageContainer, Button, FilterToolbar, MyReservationCardSkeleton } from '../../components/common';
 import ReservationStatusBadge from '../../components/reservation/ReservationStatusBadge';
+import QrCodeModal from '../../components/reservation/QrCodeModal';
 import { useReservations, useMessage, usePayment, useWindowWidth } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
@@ -42,6 +43,7 @@ const MyReservations = () => {
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [keyword, setKeyword] = useState('');
     const debouncedKeyword = useDebounce(keyword, 300);
+    const [qrReservationId, setQrReservationId] = useState(null);
 
     useEffect(() => {
         refetch();
@@ -199,6 +201,13 @@ const MyReservations = () => {
                                         </Button>
                                     )}
                                     {(res.status === 'PENDING' || res.status === 'CONFIRMED') && (
+                                        <Button variant="ghost-sm" size="sm"
+                                            onClick={(e) => { e.stopPropagation(); setQrReservationId(res.id); }}
+                                            style={{ color: colors.text.secondary }}>
+                                            <QrcodeOutlined /> QR
+                                        </Button>
+                                    )}
+                                    {(res.status === 'PENDING' || res.status === 'CONFIRMED') && (
                                         <Button variant="ghost-sm-danger"
                                             onClick={(e) => { e.stopPropagation(); handleCancel(res); }}>
                                             취소
@@ -242,6 +251,11 @@ const MyReservations = () => {
                     ))}
                 </div>
             )}
+            <QrCodeModal
+                reservationId={qrReservationId}
+                open={qrReservationId != null}
+                onClose={() => setQrReservationId(null)}
+            />
         </PageContainer>
     );
 };

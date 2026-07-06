@@ -12,6 +12,8 @@ const reservationService = {
     rejectReservation:   (id, reason)   => api.patch(API_ENDPOINTS.RESERVATION.REJECT(id), { rejectionReason: reason }),
     completeReservation: (id)           => api.patch(API_ENDPOINTS.RESERVATION.COMPLETE(id)),
     noShowReservation:   (id)           => api.patch(API_ENDPOINTS.RESERVATION.NO_SHOW(id)),
+    getQrToken:          (id)           => api.get(API_ENDPOINTS.RESERVATION.QR_TOKEN(id)),
+    checkInByQr:         (token)        => api.post(API_ENDPOINTS.RESERVATION.QR_CHECKIN, { token }),
 };
 
 export default reservationService;

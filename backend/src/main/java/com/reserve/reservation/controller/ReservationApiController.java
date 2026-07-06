@@ -60,6 +60,13 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(reservation, "조회 성공"));
     }
 
+    // QR 체크인용 토큰 발급 — 본인 예약만 가능
+    @GetMapping("/{id}/qr-token")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getQrCheckinToken(@PathVariable Long id) {
+        String token = reservationService.generateQrCheckinToken(id, SecurityUtil.getCurrentMember());
+        return ResponseEntity.ok(ApiResponse.success(Map.of("token", token), "QR 토큰 발급 성공"));
+    }
+
     // 예약 날짜 선택 시 실시간 시간대별 가능 여부 조회 (공개 API — 로그인 불필요)
     @GetMapping("/availability")
     public ResponseEntity<ApiResponse<List<SlotAvailabilityResponse>>> getAvailability(
@@ -130,6 +137,19 @@ public class ReservationApiController {
         validateBusinessAuth(member);
         reservationService.markNoShow(id, member);
         return ResponseEntity.ok(ApiResponse.success(null, "노쇼 처리되었습니다."));
+    }
+
+    // QR 스캔을 통한 자동 체크인 — 스캔 즉시 CONFIRMED로 자동 승인
+    @PostMapping("/qr-checkin")
+    public ResponseEntity<ApiResponse<ReservationResponse>> checkInByQrToken(@RequestBody Map<String, String> body) {
+        Member member = SecurityUtil.getCurrentMember();
+        validateBusinessAuth(member);
+        String token = body.get("token");
+        if (token == null || token.isBlank()) {
+            throw new ReservationException("QR 토큰이 없습니다.", HttpStatus.BAD_REQUEST);
+        }
+        ReservationResponse reservation = reservationService.checkInByQrToken(token, member);
+        return ResponseEntity.ok(ApiResponse.success(reservation, "체크인되었습니다."));
     }
 
     private void validateBusinessAuth(Member member) {

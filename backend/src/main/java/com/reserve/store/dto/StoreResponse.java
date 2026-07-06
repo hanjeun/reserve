@@ -61,6 +61,7 @@ public class StoreResponse {
     private Integer bookingDeadlineHours;
     private Integer paymentTimeoutMinutes;
     private Integer reservationSlotMinutes;
+    private Integer nearbyRadiusKm;
     private Boolean allowLatePayment;
     private Boolean allowDuplicateReservation;
     private Boolean emailNotificationEnabled;
@@ -103,6 +104,7 @@ public class StoreResponse {
                 .bookingDeadlineHours(store.getBookingDeadlineHours())
                 .paymentTimeoutMinutes(store.getPaymentTimeoutMinutes())
                 .reservationSlotMinutes(store.getReservationSlotMinutes())
+                .nearbyRadiusKm(store.getNearbyRadiusKm())
                 .allowLatePayment(store.getAllowLatePayment())
                 .allowDuplicateReservation(store.getAllowDuplicateReservation())
                 .emailNotificationEnabled(store.getEmailNotificationEnabled())

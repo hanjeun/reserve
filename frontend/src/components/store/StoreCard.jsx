@@ -20,8 +20,8 @@ const { Title, Text } = Typography;
  */
 const StoreCard = ({ store, userLocation }) => {
     const navigate = useNavigate();
-    const { id, name, category, mainImageUrl, rating, reviewCount, latitude, longitude } = store;
-    const nearby = isNearby(userLocation, latitude, longitude);
+    const { id, name, category, mainImageUrl, rating, reviewCount, latitude, longitude, nearbyRadiusKm } = store;
+    const nearby = isNearby(userLocation, latitude, longitude, nearbyRadiusKm ?? undefined);
 
     return (
         <Card hoverable onClick={() => navigate(`/store/${id}`)}>
@@ -78,6 +78,7 @@ StoreCard.propTypes = {
         reviewCount: PropTypes.number,
         latitude: PropTypes.number,
         longitude: PropTypes.number,
+        nearbyRadiusKm: PropTypes.number,
     }).isRequired,
     userLocation: PropTypes.shape({
         latitude: PropTypes.number,

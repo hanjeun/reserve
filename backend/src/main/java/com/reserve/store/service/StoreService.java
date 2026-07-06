@@ -77,6 +77,7 @@ public class StoreService {
                 .bookingDeadlineHours(request.getBookingDeadlineHours())
                 .paymentTimeoutMinutes(request.getPaymentTimeoutMinutes() != null ? request.getPaymentTimeoutMinutes() : 30)
                 .reservationSlotMinutes(request.getReservationSlotMinutes() != null ? request.getReservationSlotMinutes() : 30)
+                .nearbyRadiusKm(clampNearbyRadiusKm(request.getNearbyRadiusKm()))
                 .allowLatePayment(request.getAllowLatePayment() != null ? request.getAllowLatePayment() : false)
                 .allowDuplicateReservation(request.getAllowDuplicateReservation() != null ? request.getAllowDuplicateReservation() : false)
                 .emailNotificationEnabled(request.getEmailNotificationEnabled() != null ? request.getEmailNotificationEnabled() : true)
@@ -204,6 +205,7 @@ public class StoreService {
             store.setBookingDeadlineHours(request.getBookingDeadlineHours());
             if (request.getPaymentTimeoutMinutes() != null) store.setPaymentTimeoutMinutes(request.getPaymentTimeoutMinutes());
             if (request.getReservationSlotMinutes() != null) store.setReservationSlotMinutes(request.getReservationSlotMinutes());
+            if (request.getNearbyRadiusKm() != null) store.setNearbyRadiusKm(clampNearbyRadiusKm(request.getNearbyRadiusKm()));
             if (request.getAllowLatePayment() != null) store.setAllowLatePayment(request.getAllowLatePayment());
             // allowDuplicateReservation: 항상 업데이트 (null-safe, 기본 false)
             store.setAllowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()));
@@ -348,6 +350,21 @@ public class StoreService {
             }
         }
         store.setDetailImageList(finalDetailImages);
+    }
+
+    /**
+     * "우리동네" 배지 기준 거리(km) 검증 — 사장님이 직접 입력하지만 1~10km 범위로 강제 클램프.
+     * null이면 기본값(3km).
+     */
+    private static final int MIN_NEARBY_RADIUS_KM = 1;
+    private static final int MAX_NEARBY_RADIUS_KM = 10;
+    private static final int DEFAULT_NEARBY_RADIUS_KM = 3;
+
+    private Integer clampNearbyRadiusKm(Integer km) {
+        if (km == null) return DEFAULT_NEARBY_RADIUS_KM;
+        if (km < MIN_NEARBY_RADIUS_KM) return MIN_NEARBY_RADIUS_KM;
+        if (km > MAX_NEARBY_RADIUS_KM) return MAX_NEARBY_RADIUS_KM;
+        return km;
     }
 
     /**

@@ -20,12 +20,12 @@ export const haversineKm = (lat1, lng1, lat2, lng2) => {
     return EARTH_RADIUS_KM * c;
 };
 
-/** "우리동네" 배지 기준 거리 (km) */
+/** "우리동네" 배지 기본 거리(km) — 가게가 개별 설정 안 해둘을 때만 사용 */
 export const NEARBY_THRESHOLD_KM = 3;
 
-/** userLocation({latitude,longitude})과 가게 좌표가 기준 거리 이내인지 */
-export const isNearby = (userLocation, storeLat, storeLng) => {
+/** userLocation({latitude,longitude})과 가게 좌표가 기준 거리(radiusKm, 없으면 기본값) 이내인지 — radiusKm은 가게마다 사장님이 직접 설정(1~10km) */
+export const isNearby = (userLocation, storeLat, storeLng, radiusKm = NEARBY_THRESHOLD_KM) => {
     if (!userLocation?.latitude || !userLocation?.longitude) return false;
     const dist = haversineKm(userLocation.latitude, userLocation.longitude, storeLat, storeLng);
-    return dist != null && dist <= NEARBY_THRESHOLD_KM;
+    return dist != null && dist <= radiusKm;
 };

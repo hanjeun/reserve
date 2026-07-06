@@ -13,6 +13,7 @@ import com.reserve.reservation.dto.ReservationUpdateRequest;
 import com.reserve.reservation.dto.SlotAvailabilityResponse;
 import com.reserve.reservation.entity.Reservation;
 import com.reserve.reservation.repository.ReservationRepository;
+import com.reserve.reservation.util.QrCheckinTokenProvider;
 import com.reserve.store.repository.StoreRepository;
 import com.reserve.store.entity.Store;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class ReservationService {
     private final EmailService emailService;
     private final MemberRepository memberRepository;
     private final AuditLogService auditLogService;
+    private final QrCheckinTokenProvider qrCheckinTokenProvider;
 
     public ReservationService(
             ReservationRepository reservationRepository,
@@ -49,13 +51,15 @@ public class ReservationService {
             @Lazy PaymentService paymentService,
             EmailService emailService,
             MemberRepository memberRepository,
-            @Lazy AuditLogService auditLogService) {
+            @Lazy AuditLogService auditLogService,
+            QrCheckinTokenProvider qrCheckinTokenProvider) {
         this.reservationRepository = reservationRepository;
         this.storeRepository = storeRepository;
         this.paymentService = paymentService;
         this.emailService = emailService;
         this.memberRepository = memberRepository;
         this.auditLogService = auditLogService;
+        this.qrCheckinTokenProvider = qrCheckinTokenProvider;
     }
 
     /**
@@ -321,6 +325,60 @@ public class ReservationService {
         }
 
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+    }
+
+    /**
+     * QR 체크인용 토큰 발급 (사용자용) — 본인 예약만 발급 가능
+     */
+    @Transactional(readOnly = true)
+    public String generateQrCheckinToken(Long reservationId, Member member) {
+        Reservation reservation = findByIdOrThrow(reservationId);
+        validateOwnership(reservation, member);
+        return qrCheckinTokenProvider.generateToken(reservationId);
+    }
+
+    /**
+     * QR 스캔을 통한 자동 체크인 (사업자용) — 스캔 즉시 CONFIRMED로 자동 승인.
+     * 이미 CONFIRMED인 예약을 재스캔해도 에러 대신 그대로 성공 처리(idempotent)해서
+     * 같은 QR을 여러 번 스캔해도 문제없음. CANCELLED/REJECTED/COMPLETED/NO_SHOW는 거부.
+     */
+    @Transactional
+    public ReservationResponse checkInByQrToken(String token, Member owner) {
+        Long reservationId = qrCheckinTokenProvider.parseReservationId(token);
+        Reservation reservation = findByIdOrThrow(reservationId);
+        validateStoreOwner(reservation, owner);
+
+        if (reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED) {
+            return ReservationResponse.fromEntity(reservation);
+        }
+        if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
+            throw new ReservationException(
+                    "대기 중인 예약만 QR 체크인이 가능합니다. (현재 상태: " + reservation.getStatus() + ")",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
+
+        // 유저에게 승인 알림 (약연 — approveReservation과 동일한 패턴)
+        if (reservation.getMember().isEmailNotificationEnabled()) {
+            try {
+                String memberName = reservation.getMember().getName() != null
+                        ? reservation.getMember().getName() : "고객";
+                emailService.sendReservationConfirmedEmail(
+                        reservation.getMember().getEmail(),
+                        memberName,
+                        reservation.getStore().getName(),
+                        reservation.getReservationDate().toString(),
+                        reservation.getReservationTime().toString().substring(0, 5),
+                        reservation.getGuestCount()
+                );
+            } catch (Exception e) {
+                log.warn("QR 체크인 승인 알림 이메일 발송 실패: {}", e.getMessage());
+            }
+        }
+
+        return ReservationResponse.fromEntity(reservation);
     }
 
     /**

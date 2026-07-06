@@ -40,6 +40,8 @@ export const API_ENDPOINTS = {
         COMPLETE:            (id) => `/api/reservations/${id}/complete`,
         NO_SHOW:             (id) => `/api/reservations/${id}/no-show`,
         AVAILABILITY:        '/api/reservations/availability',
+        QR_TOKEN:            (id) => `/api/reservations/${id}/qr-token`,
+        QR_CHECKIN:          '/api/reservations/qr-checkin',
     },
     REVIEW: {
         CREATE:          '/api/reviews',

@@ -145,6 +145,11 @@ public class Store {
     @Builder.Default
     private Integer reservationSlotMinutes = 30;
 
+    // "우리동네" 배지 표시 기준 거리(km) - 사장님이 직접 설정, 1~10km 범위로 제한(StoreService 검증)
+    @Column(name = "nearby_radius_km")
+    @Builder.Default
+    private Integer nearbyRadiusKm = 3;
+
     // 나중 결제 허용 여부 (true = 예약금 있어도 즉시 결제 없이 예약 가능, 추후 결제하기 버튼으로 결제)
     @Column(name = "allow_late_payment", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default

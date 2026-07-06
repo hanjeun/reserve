@@ -1,9 +1,11 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { Typography, Flex } from 'antd';
 import { StarFilled } from '@ant-design/icons';
 import { Card, FavoriteButton, Badge } from '../common';
 import { getThumbnailUrl } from '../../utils';
+import { isNearby } from '../../utils/distance';
 import { fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
@@ -11,10 +13,15 @@ const { Title, Text } = Typography;
 /**
  * 가게 카드 컴포넌트
  * StoreList에서 사용
+ *
+ * userLocation({ latitude, longitude })을 받으면 가게 좌표와 3km 이내일 때
+ * "우리동네" 배지를 표시함. 전달 안 되면(위치 모를 때) 배지 자체를 안 그림 —
+ * 위치 권한을 이 카드가 직접 요청하지 않는다(수동적으로 있는 값만 사용).
  */
-const StoreCard = ({ store }) => {
+const StoreCard = ({ store, userLocation }) => {
     const navigate = useNavigate();
-    const { id, name, category, mainImageUrl, rating, reviewCount } = store;
+    const { id, name, category, mainImageUrl, rating, reviewCount, latitude, longitude, nearbyRadiusKm } = store;
+    const nearby = isNearby(userLocation, latitude, longitude, nearbyRadiusKm ?? undefined);
 
     return (
         <Card hoverable onClick={() => navigate(`/store/${id}`)}>
@@ -39,6 +46,11 @@ const StoreCard = ({ store }) => {
                 <Badge variant="category" style={{ marginBottom: 6 }}>
                     {category || '기타'}
                 </Badge>
+                {nearby && (
+                    <Badge variant="nearby" style={{ marginBottom: 6 }}>
+                        우리동네
+                    </Badge>
+                )}
                 <Title level={5} style={{ margin: '0 0 4px', fontSize: fontSize.xl }}>
                     {name}
                 </Title>
@@ -54,6 +66,24 @@ const StoreCard = ({ store }) => {
             </div>
         </Card>
     );
+};
+
+StoreCard.propTypes = {
+    store: PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+        name: PropTypes.string,
+        category: PropTypes.string,
+        mainImageUrl: PropTypes.string,
+        rating: PropTypes.number,
+        reviewCount: PropTypes.number,
+        latitude: PropTypes.number,
+        longitude: PropTypes.number,
+        nearbyRadiusKm: PropTypes.number,
+    }).isRequired,
+    userLocation: PropTypes.shape({
+        latitude: PropTypes.number,
+        longitude: PropTypes.number,
+    }),
 };
 
 export default StoreCard;

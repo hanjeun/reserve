@@ -52,6 +52,19 @@ const StoreList = () => {
     const { user } = useAuthStore();
     const { message } = useMessage();
 
+    // "우리동네" 배지용 위치 — 거리순 정렬 중이면 그 때 쓴 라이브 좌표, 아니면 마이페이지에 저장된 위치
+    const savedLat = user?.latitude;
+    const savedLng = user?.longitude;
+    const nearbyUserLocation = React.useMemo(() => {
+        if (searchParams.lat && searchParams.lng) {
+            return { latitude: Number(searchParams.lat), longitude: Number(searchParams.lng) };
+        }
+        if (savedLat != null && savedLng != null) {
+            return { latitude: savedLat, longitude: savedLng };
+        }
+        return null;
+    }, [searchParams.lat, searchParams.lng, savedLat, savedLng]);
+
     // 거리순 선택 시 Geolocation 먼저 요청 — 실패/거부 시 마이페이지에 등록해둔 위치가 있으면 그것으로 폴백
     // (둘 다 없으면 useGeolocation이 이미 보여준 토스트로 이유 안내된 상태라 sort를 바꾸지 않음)
     const handleSortChange = useCallback(async (value) => {
@@ -120,7 +133,7 @@ const StoreList = () => {
                     <div style={styles.grid}>
                         {stores.map(store => (
                             <div key={store.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
-                                <StoreCard store={store} />
+                                <StoreCard store={store} userLocation={nearbyUserLocation} />
                             </div>
                         ))}
                     </div>

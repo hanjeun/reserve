@@ -77,6 +77,9 @@ public class StoreCreateRequest {
     // 예약 단위 시간 (분, 기본 30분)
     private Integer reservationSlotMinutes = 30;
 
+    // "우리동네" 배지 표시 기준 거리(km, 기본 3km) - 1~10 범위로 제한(StoreService 검증)
+    private Integer nearbyRadiusKm = 3;
+
     // 나중 결제 허용 (기본 false)
     private Boolean allowLatePayment = false;
 

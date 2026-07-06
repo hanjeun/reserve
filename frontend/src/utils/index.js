@@ -8,3 +8,4 @@ export * from './validation';
 export * from './common';
 export * from './form';
 export * from './errorHandler';
+export * from './distance';

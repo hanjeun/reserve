@@ -76,6 +76,9 @@ public class StoreUpdateRequest {
     // 예약 단위 시간 (분)
     private Integer reservationSlotMinutes;
 
+    // "우리동네" 배지 표시 기준 거리(km) - null = 변경 없음, 1~10 범위로 제한(StoreService 검증)
+    private Integer nearbyRadiusKm;
+
     // 나중 결제 허용
     private Boolean allowLatePayment;
 

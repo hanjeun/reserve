@@ -49,6 +49,7 @@ export const buildStoreFormData = (values) => {
 
     fd.append('paymentTimeoutMinutes',  values.paymentTimeoutMinutes  ?? 30);
     fd.append('reservationSlotMinutes', values.reservationSlotMinutes ?? 30);
+    fd.append('nearbyRadiusKm',         values.nearbyRadiusKm ?? 3);
 
     // 영업 시간
     if (values.times) {

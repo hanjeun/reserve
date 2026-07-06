@@ -231,7 +231,10 @@ button, input, textarea, select {
     border-color: #b5b8bd !important;
 }
 
-/* ── Toss 스타일 캐쥳형(필) 탭 네비게이션 — pagination/date picker와 동일한 선택 색상(#e5e8eb) 통일 ── */
+/* ── Toss 스타일 라운드 사각형 탭 네비게이션 (2026-07 수정: 캡슐형에서 변경) ──
+   흰 배경 트랙 + 선택 시에만 pagination/date picker와 동일한 회색(#e5e8eb),
+   radius도 pagination과 동일하게 완전한 원이 아닌 8~10px 라운드 사각형으로 통일,
+   선택 시 스프링 스케일 애니메이션 추가 */
 .reserve-pill-tabs .ant-tabs-nav::before {
     border-bottom: none !important;
 }
@@ -240,15 +243,16 @@ button, input, textarea, select {
 }
 .reserve-pill-tabs .ant-tabs-nav-list {
     gap: 4px;
-    background-color: #f2f4f6;
-    padding: 4px;
-    border-radius: 100px;
 }
 .reserve-pill-tabs .ant-tabs-tab {
     margin: 0 !important;
     padding: 8px 18px !important;
-    border-radius: 100px !important;
-    transition: background-color 0.2s ease, color 0.2s ease !important;
+    border-radius: 10px !important;
+    background-color: transparent !important;
+    transition: background-color 0.2s ease !important;
+}
+.reserve-pill-tabs .ant-tabs-tab:hover:not(.ant-tabs-tab-active) {
+    background-color: #f2f4f6 !important;
 }
 .reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn {
     color: #8b95a1;
@@ -261,15 +265,14 @@ button, input, textarea, select {
 .reserve-pill-tabs .ant-tabs-tab-active {
     background-color: #e5e8eb !important;
 }
+.reserve-pill-tabs .ant-tabs-tab-active:hover {
+    background-color: #e5e8eb !important;
+}
 .reserve-pill-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
     color: #1a1f27 !important;
     font-weight: 600 !important;
 }
-/* 모바일에서도 캐쥳 트랙 유지, 좀 더 콤팩트하게 */
 @media (max-width: 768px) {
-    .reserve-pill-tabs .ant-tabs-nav-list {
-        padding: 3px;
-    }
     .reserve-pill-tabs .ant-tabs-tab {
         padding: 7px 14px !important;
     }

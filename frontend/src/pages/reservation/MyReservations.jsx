@@ -186,7 +186,7 @@ const MyReservations = () => {
                                         </>
                                     )}
                                     {res.specialRequest && (
-                                        <Text type="secondary" style={{ ...styles.special, maxWidth: isWide ? 400 : 200 }}>
+                                        <Text type="secondary" style={{ ...styles.special, maxWidth: isWide ? 400 : 200 }} ellipsis>
                                             &quot;{res.specialRequest}&quot;
                                         </Text>
                                     )}
@@ -201,9 +201,9 @@ const MyReservations = () => {
                                         </Button>
                                     )}
                                     {(res.status === 'PENDING' || res.status === 'CONFIRMED') && (
-                                        <Button variant="ghost-sm" size="sm"
+                                        <Button variant="secondary" size="md"
                                             onClick={(e) => { e.stopPropagation(); setQrReservationId(res.id); }}
-                                            style={{ color: colors.text.secondary }}>
+                                            style={{ marginTop: 2 }}>
                                             <QrcodeOutlined /> QR
                                         </Button>
                                     )}
@@ -275,7 +275,7 @@ const styles = {
     metaItem:      { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: fontSize.sm, color: colors.text.secondary, whiteSpace: 'nowrap' },
     metaIcon:      { fontSize: 12, color: colors.text.tertiary },
     dot:           { color: colors.text.tertiary, fontSize: fontSize.xs },
-    special:       { fontSize: fontSize.xs, color: colors.text.secondary },
+    special:       { fontSize: fontSize.xs, color: colors.text.secondary, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
     right:         { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
     price:         { fontSize: fontSize.base, color: colors.text.primary },
     rejection:     { fontSize: fontSize.xs, textAlign: 'left', width: '100%' },

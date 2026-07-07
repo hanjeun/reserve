@@ -277,3 +277,79 @@ button, input, textarea, select {
         padding: 7px 14px !important;
     }
 }
+
+/* ── SegmentedControl — 소수 선택지용, pill-tabs와 동일한 톤 ── */
+.reserve-segmented-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    background-color: transparent;
+    color: #8b95a1;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.reserve-segmented-btn:hover:not(:disabled):not(.reserve-segmented-btn--active) {
+    background-color: #f2f4f6;
+    color: #1a1f27;
+}
+.reserve-segmented-btn--active {
+    background-color: #e5e8eb;
+    color: #1a1f27;
+    font-weight: 600;
+}
+.reserve-segmented-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+@media (max-width: 768px) {
+    .reserve-segmented-btn {
+        padding: 9px 14px;
+        font-size: 13px;
+    }
+}
+
+/* ── SegmentedControl — 소수 선택지(광고 유형, 문의 카테고리 등) 전용, 위 pill-tabs와 동일한 톤 ── */
+.reserve-segmented-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    cursor: pointer;
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #8b95a1;
+    font-family: inherit;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    white-space: nowrap;
+}
+.reserve-segmented-btn:hover:not(:disabled):not(.reserve-segmented-btn--active) {
+    background-color: #f2f4f6;
+    color: #1a1f27;
+}
+.reserve-segmented-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+.reserve-segmented-btn--active {
+    background-color: #e5e8eb;
+    color: #1a1f27 !important;
+    font-weight: 600;
+}
+.reserve-segmented-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+@media (max-width: 768px) {
+    .reserve-segmented-btn {
+        padding: 9px 12px;
+        font-size: 13px;
+    }
+}

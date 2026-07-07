@@ -55,7 +55,7 @@ const customStyles = `
   .ant-carousel .slick-next { right: 10px !important; }
   .ant-carousel .slick-slide[aria-hidden="true"] { visibility: hidden; }
   .ant-image { width: 100% !important; height: 100% !important; }
-  .ant-image-img { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; }
+  .ant-image-img { width: 100% !important; height: 100% !important; object-fit: contain !important; background: ${colors.gray[50]} !important; display: block !important; }
   .slick-slide[aria-hidden="true"] * { pointer-events: none; }
   .rsv-tap-btn {
     -webkit-tap-highlight-color: transparent;
@@ -577,13 +577,13 @@ const styles = {
     storeTitle:       { fontSize: fontSize['5xl'], fontWeight: fontWeight.extrabold, marginBottom: 12, marginTop: 20 },
     divider:          { margin: '24px 0' },
     sectionTitle:     { marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold },
-    mainImg:          { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+    mainImg:          { width: '100%', height: '100%', objectFit: 'contain', backgroundColor: colors.gray[50], display: 'block' },
     pcGrid:           { display: 'flex', gap: 36, alignItems: 'flex-start' },
     pcLeft:           { flex: '0 0 50%', minWidth: 0, maxWidth: 560 },
     pcRight:          { flex: 1, minWidth: 320, maxWidth: 440, position: 'sticky', top: 80, alignSelf: 'flex-start' },
-    pcImageWrapper:   { width: '100%', overflow: 'hidden', borderRadius: radius.xl, lineHeight: 0, aspectRatio: '4 / 3' },
-    pcMainImg:        { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-    mobileImageWrapper: { width: '100%', overflow: 'hidden', marginBottom: 0, lineHeight: 0, borderRadius: radius.xl, aspectRatio: '4 / 3' },
+    pcImageWrapper:   { width: '100%', overflow: 'hidden', borderRadius: radius.xl, lineHeight: 0, aspectRatio: '16 / 10', backgroundColor: colors.gray[50] },
+    pcMainImg:        { width: '100%', height: '100%', objectFit: 'contain', backgroundColor: colors.gray[50], display: 'block' },
+    mobileImageWrapper: { width: '100%', overflow: 'hidden', marginBottom: 0, lineHeight: 0, borderRadius: radius.xl, aspectRatio: '16 / 10', backgroundColor: colors.gray[50] },
     imgFavBtn:        { position: 'absolute', top: 12, right: 12, zIndex: 5 },
 };
 

@@ -42,9 +42,9 @@ public class Advertisement {
     @Column(name = "ad_type", nullable = false)
     private AdType adType;
 
-    // BANNER 타입만 사용 (S3 CloudFront URL). BADGE는 null.
-    @Column(name = "image_url")
-    private String imageUrl;
+    // BANNER 타입만 사용 (S3 CloudFront URL, 콤마로 구분된 문자열로 저장 — Store.detailImages와 동일한 패턴). BADGE는 null.
+    @Column(name = "image_urls", length = 2000)
+    private String imageUrls;
 
     // BANNER 타입만 사용 — 배너에 표시할 문구
     @Column(name = "title", length = 100)
@@ -81,5 +81,21 @@ public class Advertisement {
     public boolean isWithinDateRange() {
         LocalDate today = LocalDate.now();
         return !today.isBefore(startDate) && !today.isAfter(endDate);
+    }
+
+    // 배너 이미지 편의 메서드 — Store.getDetailImageList()/setDetailImageList()와 동일한 패턴
+    public java.util.List<String> getImageUrlList() {
+        if (imageUrls == null || imageUrls.trim().isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+        return java.util.List.of(imageUrls.split(","));
+    }
+
+    public void setImageUrlList(java.util.List<String> urlList) {
+        if (urlList == null || urlList.isEmpty()) {
+            this.imageUrls = "";
+        } else {
+            this.imageUrls = String.join(",", urlList);
+        }
     }
 }

@@ -4,7 +4,7 @@ import {
     CheckOutlined, CloseOutlined,
     CheckCircleOutlined, WarningOutlined,
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined,
-    DeleteOutlined, ExclamationCircleFilled, MailOutlined, FileTextOutlined,
+    DeleteOutlined, ExclamationCircleFilled, MailOutlined, FileTextOutlined, DollarOutlined,
 } from '@ant-design/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import { Button, FormTextArea } from '../common';
@@ -175,7 +175,8 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                     <Text style={styles.detailValue}>{guestCount}명</Text>
                 </div>
                 <div style={styles.detailRow}>
-                    <Text style={{ ...styles.detailLabel, marginLeft: 20 }}>금액</Text>
+                    <DollarOutlined style={styles.detailIcon} />
+                    <Text style={styles.detailLabel}>금액</Text>
                     <Text style={styles.detailValue} strong>{formatCurrency(depositAmount)}</Text>
                 </div>
                 {specialRequest && (

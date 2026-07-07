@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -17,7 +18,7 @@ public class AdvertisementResponse {
     private Long storeId;
     private String storeName;
     private String adType;
-    private String imageUrl;
+    private List<String> imageUrls;
     private String title;
     private String description;
     private LocalDate startDate;
@@ -33,7 +34,7 @@ public class AdvertisementResponse {
                 .storeId(ad.getStore().getId())
                 .storeName(ad.getStore().getName())
                 .adType(ad.getAdType().name())
-                .imageUrl(ad.getImageUrl())
+                .imageUrls(ad.getImageUrlList())
                 .title(ad.getTitle())
                 .description(ad.getDescription())
                 .startDate(ad.getStartDate())

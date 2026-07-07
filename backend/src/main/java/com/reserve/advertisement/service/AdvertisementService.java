@@ -50,6 +50,8 @@ public class AdvertisementService {
     // 가격 정책 (예시값 — 나중에 조정)
     private static final int BADGE_PRICE_PER_DAY  = 1_000;
     private static final int BANNER_PRICE_PER_DAY = 5_000;
+    // 배너 이미지 최대 장수 — Store 상세 이미지(최대 5장)와 동일하게 통일
+    private static final int MAX_BANNER_IMAGES = 5;
 
     private final AdvertisementRepository advertisementRepository;
     private final StoreRepository storeRepository;
@@ -87,18 +89,24 @@ public class AdvertisementService {
 
         long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
 
-        String imageUrl = null;
+        List<String> imageUrls = new java.util.ArrayList<>();
         if (adType == AdType.BANNER) {
-            MultipartFile image = request.getImage();
-            if (image == null || image.isEmpty()) {
-                throw new AdvertisementException("배너 광고는 이미지가 필수입니다.", HttpStatus.BAD_REQUEST);
+            List<MultipartFile> images = request.getImages();
+            if (images == null || images.isEmpty() || images.stream().allMatch(MultipartFile::isEmpty)) {
+                throw new AdvertisementException("배너 광고는 이미지가 최소 1장 필요합니다.", HttpStatus.BAD_REQUEST);
+            }
+            if (images.size() > MAX_BANNER_IMAGES) {
+                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
             }
             if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
                 throw new AdvertisementException("배너 광고는 제목이 필수입니다.", HttpStatus.BAD_REQUEST);
             }
-            String key = fileStorageService.storeFile(
-                    image, FileStoragePaths.advertisement(owner.getId(), store.getId()));
-            imageUrl = fileStorageService.getPublicUrl(key);
+            for (MultipartFile image : images) {
+                if (image.isEmpty()) continue;
+                String key = fileStorageService.storeFile(
+                        image, FileStoragePaths.advertisement(owner.getId(), store.getId()));
+                imageUrls.add(fileStorageService.getPublicUrl(key));
+            }
         }
 
         int pricePerDay = adType == AdType.BADGE ? BADGE_PRICE_PER_DAY : BANNER_PRICE_PER_DAY;
@@ -110,7 +118,6 @@ public class AdvertisementService {
         Advertisement ad = Advertisement.builder()
                 .store(store)
                 .adType(adType)
-                .imageUrl(imageUrl)
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .startDate(request.getStartDate())
@@ -119,6 +126,7 @@ public class AdvertisementService {
                 .merchantUid(merchantUid)
                 .status(AdStatus.PENDING_PAYMENT)
                 .build();
+        ad.setImageUrlList(imageUrls);
 
         advertisementRepository.save(ad);
         log.info("Advertisement created (pending payment): adId={}, storeId={}, type={}, amount={}",

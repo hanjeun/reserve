@@ -23,3 +23,4 @@ export { default as FilterToolbar } from './FilterToolbar';
 export { default as CustomPagination } from './CustomPagination';
 export { default as InquiryModal } from './InquiryModal';
 export { default as FormModal, FormField } from './FormModal';
+export { default as SegmentedControl } from './SegmentedControl';

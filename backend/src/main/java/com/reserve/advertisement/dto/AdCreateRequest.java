@@ -6,6 +6,7 @@ import lombok.Setter;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -20,7 +21,7 @@ public class AdCreateRequest {
     // BANNER 타입만 사용
     private String title;
     private String description;
-    private MultipartFile image;
+    private List<MultipartFile> images;
 
     private LocalDate startDate;
     private LocalDate endDate;

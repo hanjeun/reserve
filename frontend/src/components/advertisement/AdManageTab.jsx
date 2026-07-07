@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Table, Tag, Upload, DatePicker, Radio, Empty } from 'antd';
-import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
-import { Button, FormModal, FormField, FormInput, FormTextArea, FormSelect } from '../common';
-import { useAdPayment, useMessage } from '../../hooks';
+import { Typography, Table, Tag, Upload, Empty } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Button, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl } from '../common';
+import { useAdPayment, useMessage, useImagePreview } from '../../hooks';
 import adService from '../../services/adService';
 import storeService from '../../services/storeService';
 import { fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
-const { RangePicker } = DatePicker;
+
+const AD_TYPE_OPTIONS = [
+    { value: 'BADGE', label: '배지형 (1,000원/일)' },
+    { value: 'BANNER', label: '배너형 (5,000원/일)' },
+];
 
 const STATUS_LABELS = {
     PENDING_PAYMENT: { label: '결제 대기', color: 'default' },
@@ -18,6 +22,9 @@ const STATUS_LABELS = {
     SUSPENDED:       { label: '중단됨',    color: 'error' },
 };
 
+// 배너 이미지 최대 장수 — 가게 상세 이미지(최대 5장)와 동일하게 통일
+const MAX_BANNER_IMAGES = 5;
+
 /**
  * 사업자 광고 관리 탭 — 내 광고 목록 + 새 광고 신청(결제).
  * 가격: BADGE 1,000원/일, BANNER 5,000원/일 (예시값, 추후 조정 가능)
@@ -25,6 +32,7 @@ const STATUS_LABELS = {
 const AdManageTab = () => {
     const { message } = useMessage();
     const { pay, paying } = useAdPayment();
+    const { handlePreview, PreviewModal } = useImagePreview();
     const [ads, setAds] = useState([]);
     const [loading, setLoading] = useState(true);
     const [myStores, setMyStores] = useState([]);
@@ -35,7 +43,8 @@ const AdManageTab = () => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [dateRange, setDateRange] = useState(null);
-    const [imageFile, setImageFile] = useState(null);
+    // 가게 등록 폼(StoreImages)과 동일한 picture-card fileList 패턴 — 여러 장 지원
+    const [imageFiles, setImageFiles] = useState([]);
 
     const refetch = () => {
         setLoading(true);
@@ -58,14 +67,16 @@ const AdManageTab = () => {
         setTitle('');
         setDescription('');
         setDateRange(null);
-        setImageFile(null);
+        setImageFiles([]);
     };
+
+    const handleImagesChange = ({ fileList }) => setImageFiles(fileList.slice(0, MAX_BANNER_IMAGES));
 
     const handleSubmit = async () => {
         if (!storeId) { message.warning('가게를 선택해주세요.'); return; }
         if (!dateRange) { message.warning('노출 기간을 선택해주세요.'); return; }
-        if (adType === 'BANNER' && (!imageFile || !title.trim())) {
-            message.warning('배너 광고는 이미지와 제목이 필수입니다.');
+        if (adType === 'BANNER' && (imageFiles.length === 0 || !title.trim())) {
+            message.warning('배너 광고는 이미지(최소 1장)와 제목이 필수입니다.');
             return;
         }
 
@@ -76,7 +87,7 @@ const AdManageTab = () => {
         formData.append('endDate', dateRange[1].format('YYYY-MM-DD'));
         if (title) formData.append('title', title);
         if (description) formData.append('description', description);
-        if (imageFile) formData.append('image', imageFile);
+        imageFiles.forEach((f) => { if (f.originFileObj) formData.append('images', f.originFileObj); });
 
         const result = await pay(formData);
         if (result.success) {
@@ -102,11 +113,11 @@ const AdManageTab = () => {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text type="secondary" style={{ fontSize: fontSize.sm }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <Text type="secondary" style={{ fontSize: fontSize.sm, flex: '1 1 260px', minWidth: 0 }}>
                     배지형(1,000원/일)은 가게 목록에 &quot;광고&quot; 배지로, 배너형(5,000원/일)은 화면 우측 하단 배너로 노출돼요.
                 </Text>
-                <Button variant="primary" onClick={() => setModalOpen(true)}>
+                <Button variant="primary" onClick={() => setModalOpen(true)} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
                     <PlusOutlined /> 새 광고 신청
                 </Button>
             </div>
@@ -141,14 +152,14 @@ const AdManageTab = () => {
                     />
                 </FormField>
                 <FormField label="광고 유형">
-                    <Radio.Group value={adType} onChange={(e) => setAdType(e.target.value)}>
-                        <Radio.Button value="BADGE">배지형 (1,000원/일)</Radio.Button>
-                        <Radio.Button value="BANNER">배너형 (5,000원/일)</Radio.Button>
-                    </Radio.Group>
+                    <SegmentedControl
+                        value={adType}
+                        onChange={setAdType}
+                        options={AD_TYPE_OPTIONS}
+                    />
                 </FormField>
                 <FormField label="노출 기간">
-                    <RangePicker
-                        style={{ width: '100%' }}
+                    <FormDatePicker.RangePicker
                         value={dateRange}
                         onChange={setDateRange}
                     />
@@ -161,16 +172,26 @@ const AdManageTab = () => {
                         <FormField label="배너 설명 (선택)">
                             <FormTextArea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={100} />
                         </FormField>
-                        <FormField label="배너 이미지">
+                        <FormField label={`배너 이미지 (최대 ${MAX_BANNER_IMAGES}장, 여러 장이면 배너에서 자동으로 넘어가요)`}>
                             <Upload
+                                listType="picture-card"
                                 accept="image/*"
-                                maxCount={1}
-                                beforeUpload={(file) => { setImageFile(file); return false; }}
-                                onRemove={() => setImageFile(null)}
+                                fileList={imageFiles}
+                                onChange={handleImagesChange}
+                                onPreview={handlePreview}
+                                beforeUpload={() => false}
+                                maxCount={MAX_BANNER_IMAGES}
+                                multiple
                             >
-                                <Button variant="secondary"><UploadOutlined /> 이미지 선택</Button>
+                                {imageFiles.length < MAX_BANNER_IMAGES && (
+                                    <div>
+                                        <PlusOutlined />
+                                        <div style={{ marginTop: 8 }}>업로드</div>
+                                    </div>
+                                )}
                             </Upload>
                         </FormField>
+                        <PreviewModal />
                     </>
                 )}
             </FormModal>

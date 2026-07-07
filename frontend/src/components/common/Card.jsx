@@ -66,11 +66,11 @@ const Card = ({
  * 카드 커버 이미지
  */
 Card.Cover = ({ src, alt }) => (
-    <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0, aspectRatio: '4 / 3' }}>
+    <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
         <img
             alt={alt}
             src={src}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
+            style={{ width: '100%', height: 'auto', objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
             className="card-image"
         />
     </div>

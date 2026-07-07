@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Typography, Flex, Divider } from 'antd';
+import { Modal, Typography, Flex, Divider, Tooltip } from 'antd';
 import {
     CheckOutlined, CloseOutlined,
     CheckCircleOutlined, WarningOutlined,
@@ -70,15 +70,15 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
 
                 {/* 정보 - 클릭하면 상세 모달 */}
                 <div style={{ ...styles.info, cursor: 'pointer' }} onClick={() => setDetailOpen(true)}>
-                    <Text strong style={isWide ? styles.storeNameWide : styles.storeName}>{storeName}</Text>
+                    <Text strong style={isWide ? styles.storeNameWide : styles.storeName}>
+                        {storeName}
+                        {specialRequest && (
+                            <Tooltip title="요청사항 있음 — 눌러서 확인">
+                                <FileTextOutlined style={styles.requestIcon} />
+                            </Tooltip>
+                        )}
+                    </Text>
                     {isWide ? metaItemsFlat : metaItemsStacked}
-                    {specialRequest && (
-                        <div style={styles.metaRow}>
-                            <Text type="secondary" style={styles.special} ellipsis={{ tooltip: specialRequest }}>
-                                &quot;{specialRequest}&quot;
-                            </Text>
-                        </div>
-                    )}
                 </div>
 
                 {/* 우측: 상태 + 금액 + 액션버튼 */}
@@ -232,6 +232,7 @@ const styles = {
     metaIcon:     { fontSize: 12, color: colors.text.tertiary },
     dot:          { color: colors.text.tertiary, fontSize: fontSize.xs },
     special:      { fontSize: fontSize.xs, color: colors.text.secondary, maxWidth: 400 },
+    requestIcon:  { fontSize: 12, color: colors.text.tertiary, marginLeft: 6 },
     right:        { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0, minWidth: 70 },
     price:        { fontSize: fontSize.base, color: colors.text.primary },
     actionGroup:  { display: 'flex', gap: 10 },

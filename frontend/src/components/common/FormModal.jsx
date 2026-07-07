@@ -53,10 +53,10 @@ const FormModal = ({
         footer={
             footer !== undefined ? footer : (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-                    <Button variant="ghost" size="md" onClick={onClose} disabled={submitting}>
+                    <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
                         {cancelText}
                     </Button>
-                    <Button variant="primary" size="md" loading={submitting} disabled={submitDisabled} onClick={onSubmit}
+                    <Button variant="primary" size="sm" loading={submitting} disabled={submitDisabled} onClick={onSubmit}
                         style={{ borderRadius: radius.xl, paddingLeft: 24, paddingRight: 24 }}>
                         {submitText}
                     </Button>

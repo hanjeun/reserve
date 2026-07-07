@@ -20,7 +20,12 @@ const STATUS_LABELS = {
     ACTIVE:          { label: '노출 중',   color: 'success' },
     EXPIRED:         { label: '만료됨',    color: 'default' },
     SUSPENDED:       { label: '중단됨',    color: 'error' },
+    CANCELLED:       { label: '취소됨',    color: 'default' },
+    REFUNDED:        { label: '환불됨',    color: 'default' },
 };
+
+// 취소 가능한 상태 — 결제 전(돈 안 나감)이거나 이미 결제된 노출 중(전액 환불)만
+const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'ACTIVE'];
 
 // 배너 이미지 최대 장수 — 가게 상세 이미지(최대 5장)와 동일하게 통일
 const MAX_BANNER_IMAGES = 5;
@@ -30,7 +35,7 @@ const MAX_BANNER_IMAGES = 5;
  * 가격: BADGE 1,000원/일, BANNER 5,000원/일 (예시값, 추후 조정 가능)
  */
 const AdManageTab = () => {
-    const { message } = useMessage();
+    const { message, confirm } = useMessage();
     const { pay, paying } = useAdPayment();
     const { handlePreview, PreviewModal } = useImagePreview();
     const [ads, setAds] = useState([]);
@@ -97,6 +102,27 @@ const AdManageTab = () => {
         }
     };
 
+    const handleCancel = (ad) => {
+        const isPaid = ad.status === 'ACTIVE';
+        confirm({
+            title: '광고 취소',
+            content: isPaid
+                ? `결제된 ${ad.amount?.toLocaleString()}원이 전액 환불됩니다. 즉시 노출이 중단되며 되돌릴 수 없습니다.`
+                : '아직 결제되지 않은 신청입니다. 목록에서 바로 삭제됩니다.',
+            okText: isPaid ? '환불하기' : '취소하기', cancelText: '닫기',
+            okButtonProps: { danger: true }, centered: true,
+            onOk: async () => {
+                try {
+                    await adService.cancelAd(ad.id);
+                    message.success(isPaid ? '환불 처리되었습니다.' : '광고가 취소되었습니다.');
+                    refetch();
+                } catch {
+                    message.error('취소에 실패했습니다.');
+                }
+            },
+        });
+    };
+
     const columns = [
         { title: '가게', dataIndex: 'storeName', key: 'storeName' },
         {
@@ -109,6 +135,14 @@ const AdManageTab = () => {
             title: '상태', dataIndex: 'status', key: 'status',
             render: (v) => <Tag color={STATUS_LABELS[v]?.color}>{STATUS_LABELS[v]?.label || v}</Tag>,
         },
+        {
+            title: '', key: 'actions',
+            render: (_, r) => CANCELLABLE_STATUSES.includes(r.status) ? (
+                <Button variant="ghost-sm-danger" onClick={() => handleCancel(r)}>
+                    {r.status === 'ACTIVE' ? '환불' : '취소'}
+                </Button>
+            ) : null,
+        },
     ];
 
     return (
@@ -117,7 +151,7 @@ const AdManageTab = () => {
                 <Text type="secondary" style={{ fontSize: fontSize.sm, flex: '1 1 260px', minWidth: 0 }}>
                     배지형(1,000원/일)은 가게 목록에 &quot;광고&quot; 배지로, 배너형(5,000원/일)은 화면 우측 하단 배너로 노출돼요.
                 </Text>
-                <Button variant="primary" onClick={() => setModalOpen(true)} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                <Button variant="primary" size="sm" onClick={() => setModalOpen(true)} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
                     <PlusOutlined /> 새 광고 신청
                 </Button>
             </div>

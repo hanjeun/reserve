@@ -211,6 +211,32 @@ public class AdvertisementService {
         log.info("Advertisement suspended: adId={}, reason={}", adId, reason);
     }
 
+    /**
+     * 광고 취소 (사업자용, 본인 가게만).
+     * 결제 대기 중(PENDING_PAYMENT)이면 실제로 결제된 돈이 없으므로 그냥 취소 처리만 함.
+     * 이미 결제 완료(ACTIVE)면 PortoneService로 전액 환불 후 상태 전환.
+     */
+    @Transactional
+    public void cancelAd(Long adId, Member owner) {
+        Advertisement ad = advertisementRepository.findById(adId)
+                .orElseThrow(AdvertisementException::notFound);
+
+        if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
+            throw AdvertisementException.forbidden("본인 광고만 취소할 수 있습니다.");
+        }
+
+        if (ad.getStatus() == AdStatus.PENDING_PAYMENT) {
+            ad.setStatus(AdStatus.CANCELLED);
+            log.info("Advertisement cancelled before payment: adId={}", adId);
+        } else if (ad.getStatus() == AdStatus.ACTIVE) {
+            portoneService.cancelPayment(ad.getMerchantUid(), null, "사업자 요청 광고 취소");
+            ad.setStatus(AdStatus.REFUNDED);
+            log.info("Advertisement refunded: adId={}, merchantUid={}", adId, ad.getMerchantUid());
+        } else {
+            throw new AdvertisementException("취소할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
     /** 매일 자정 스케줄러 — endDate 지난 ACTIVE 광고를 EXPIRED로 전환 */
     @Transactional
     public void expireOverdueAds() {

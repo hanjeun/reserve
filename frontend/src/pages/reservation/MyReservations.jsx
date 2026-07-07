@@ -201,17 +201,16 @@ const MyReservations = () => {
                                         </Button>
                                     )}
                                     {(res.status === 'PENDING' || res.status === 'CONFIRMED') && (
-                                        <Button variant="secondary" size="md"
-                                            onClick={(e) => { e.stopPropagation(); setQrReservationId(res.id); }}
-                                            style={{ marginTop: 2 }}>
-                                            <QrcodeOutlined /> QR
-                                        </Button>
-                                    )}
-                                    {(res.status === 'PENDING' || res.status === 'CONFIRMED') && (
-                                        <Button variant="ghost-sm-danger"
-                                            onClick={(e) => { e.stopPropagation(); handleCancel(res); }}>
-                                            취소
-                                        </Button>
+                                        <div style={{ display: 'flex', gap: 10 }}>
+                                            <Button variant="ghost-sm-primary"
+                                                onClick={(e) => { e.stopPropagation(); setQrReservationId(res.id); }}>
+                                                <QrcodeOutlined /> QR
+                                            </Button>
+                                            <Button variant="ghost-sm-danger"
+                                                onClick={(e) => { e.stopPropagation(); handleCancel(res); }}>
+                                                취소
+                                            </Button>
+                                        </div>
                                     )}
                                     {res.status === 'COMPLETED' && (
                                         <>

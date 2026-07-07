@@ -221,6 +221,7 @@ const BusinessPanel = () => {
                 items={tabItems}
                 className="reserve-pill-tabs"
                 animated={{ inkBar: true, tabPane: false }}
+                destroyOnHidden
                 style={{ marginBottom: 8 }}
             />
         </PageContainer>

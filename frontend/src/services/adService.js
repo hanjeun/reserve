@@ -7,6 +7,7 @@ const adService = {
         headers: { 'Content-Type': 'multipart/form-data' },
     }),
     verifyPayment: (merchantUid) => api.post(API_ENDPOINTS.ADVERTISEMENT.VERIFY_PAYMENT, { merchantUid }),
+    cancelAd: (id) => api.delete(API_ENDPOINTS.ADVERTISEMENT.CANCEL(id)),
     getActiveAds: (adType) => api.get(API_ENDPOINTS.ADVERTISEMENT.ACTIVE, { params: { type: adType } }),
     getMyAds: () => api.get(API_ENDPOINTS.ADVERTISEMENT.MY_ADS),
     getAllAds: (page = 0, size = 50) => api.get(API_ENDPOINTS.ADVERTISEMENT.ADMIN_ALL, { params: { page, size } }),

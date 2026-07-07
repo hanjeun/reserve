@@ -50,6 +50,7 @@ export const API_ENDPOINTS = {
         MY_ADS:         '/api/advertisements/my',
         ADMIN_ALL:      '/api/advertisements/admin/all',
         ADMIN_SUSPEND:  (id) => `/api/advertisements/admin/${id}/suspend`,
+        CANCEL:         (id) => `/api/advertisements/${id}`,
     },
     REVIEW: {
         CREATE:          '/api/reviews',

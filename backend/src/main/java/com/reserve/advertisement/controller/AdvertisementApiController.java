@@ -78,6 +78,15 @@ public class AdvertisementApiController {
         return ApiResponse.success(null, "광고가 중단되었습니다.");
     }
 
+    // 광고 취소 (사업자용, 본인 가게만) — 결제 전이면 그냥 취소, 결제 후면 전액 환불
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> cancelAd(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        validateBusinessAuth(member);
+        advertisementService.cancelAd(id, member);
+        return ApiResponse.success(null, "광고가 취소되었습니다.");
+    }
+
     private void validateBusinessAuth(Member member) {
         if (!member.isBusiness() && !member.isAdmin()) {
             throw ReservationException.forbidden("사업자 권한이 없습니다.");

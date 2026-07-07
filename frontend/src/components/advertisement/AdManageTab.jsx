@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Table, Tag, Upload, Empty } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl } from '../common';
+import { Button, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl, AdminTableSkeleton } from '../common';
 import { useAdPayment, useMessage, useImagePreview } from '../../hooks';
 import adService from '../../services/adService';
 import storeService from '../../services/storeService';
@@ -156,16 +156,18 @@ const AdManageTab = () => {
                 </Button>
             </div>
 
-            {ads.length === 0 && !loading ? (
+            {loading ? (
+                <AdminTableSkeleton rows={3} />
+            ) : ads.length === 0 ? (
                 <Empty description="신청한 광고가 없습니다." />
             ) : (
                 <Table
                     rowKey="id"
                     columns={columns}
                     dataSource={ads}
-                    loading={loading}
-                    pagination={false}
                     size="small"
+                    scroll={{ x: 'max-content' }}
+                    pagination={false}
                 />
             )}
 
@@ -175,7 +177,7 @@ const AdManageTab = () => {
                 onClose={() => { setModalOpen(false); resetForm(); }}
                 onSubmit={handleSubmit}
                 submitting={paying}
-                submitText="결제하고 신청하기"
+                submitText="결제하기"
             >
                 <FormField label="가게">
                     <FormSelect

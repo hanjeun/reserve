@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Modal, Typography, Spin } from 'antd';
+import { Modal, Typography } from 'antd';
 import { QRCodeSVG } from 'qrcode.react';
 import reservationService from '../../services/reservationService';
 import { useMessage } from '../../hooks';
+import { Loading } from '../common';
 import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -39,7 +40,7 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
         >
             <div style={styles.wrapper}>
                 {loading ? (
-                    <div style={styles.spinnerBox}><Spin /></div>
+                    <div style={styles.spinnerBox}><Loading minHeight="0" /></div>
                 ) : token ? (
                     <QRCodeSVG value={token} size={220} level="M" />
                 ) : (

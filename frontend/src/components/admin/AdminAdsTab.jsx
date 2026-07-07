@@ -91,6 +91,8 @@ const AdminAdsTab = () => {
             rowKey="id"
             columns={columns}
             dataSource={ads}
+            size="middle"
+            scroll={{ x: 'max-content' }}
             pagination={{ pageSize: 15, showSizeChanger: false }}
             locale={{ emptyText: '등록된 광고가 없습니다.' }}
         />

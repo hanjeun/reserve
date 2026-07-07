@@ -4,8 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { reservationKeys } from '../../hooks/queryKeys';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { Typography } from 'antd';
-import { LoadingOutlined } from '@ant-design/icons';
-import { PageContainer, Button } from '../../components/common';
+import { PageContainer, Button, Loading } from '../../components/common';
 import paymentService from '../../services/paymentService';
 import { formatCurrency } from '../../utils';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
@@ -63,7 +62,7 @@ const PaymentResult = () => {
         return (
             <PageContainer size="sm" paddingTop="80px">
                 <div style={styles.center}>
-                    <LoadingOutlined style={{ fontSize: 40, color: colors.primary.main }} />
+                    <Loading />
                     <Text style={{ marginTop: 20, fontSize: fontSize.lg, color: colors.text.secondary }}>
                         결제 확인 중...
                     </Text>

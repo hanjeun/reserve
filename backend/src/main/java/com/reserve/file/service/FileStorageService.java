@@ -117,6 +117,34 @@ public class FileStorageService {
         }
     }
 
+    /**
+     * 업로드된 이미지의 원본 너비/높이를 전체 디코딩 없이 헤더만 파싱해서 읽어온다.
+     * 스토어/상세 이미지 업로드 시 원본 비율을 미리 저장해두면 프론트 스켈레톤이 그 비율대로 미리 그려져 CLS를 줄일 수 있다.
+     * 측정에 실패해도(지원하지 않는 포맷 등) 업로드 자체는 막지 않고 null 반환해서 호출부가 그냥 생략하게 함.
+     */
+    public int[] readImageDimensions(MultipartFile file) {
+        if (file == null || file.isEmpty()) return null;
+        try (javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(file.getInputStream())) {
+            java.util.Iterator<javax.imageio.ImageReader> readers = javax.imageio.ImageIO.getImageReaders(iis);
+            if (!readers.hasNext()) {
+                log.warn("No ImageReader available for uploaded file: {}", file.getOriginalFilename());
+                return null;
+            }
+            javax.imageio.ImageReader reader = readers.next();
+            try {
+                reader.setInput(iis, true); // seekForwardOnly=true — 전체 디코딩 없이 헤더만 읽음
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                return new int[]{width, height};
+            } finally {
+                reader.dispose();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to read image dimensions for {}: {}", file.getOriginalFilename(), e.getMessage());
+            return null;
+        }
+    }
+
     /** Public 파일용 CloudFront URL 생성 (프로필, 가게 이미지 등) */
     public String getPublicUrl(String key) {
         if (key == null) return null;

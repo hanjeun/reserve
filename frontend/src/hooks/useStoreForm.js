@@ -114,6 +114,7 @@ export const useStoreForm = ({
             bookingDeadlineHours:      initialData.bookingDeadlineHours      ?? undefined,
             paymentTimeoutMinutes:     initialData.paymentTimeoutMinutes     ?? 30,
             reservationSlotMinutes:    initialData.reservationSlotMinutes    ?? 30,
+            nearbyRadiusKm:            initialData.nearbyRadiusKm            ?? 3,
             times: initialData.openTime && initialData.closeTime
                 ? [dayjs(initialData.openTime, 'HH:mm'), dayjs(initialData.closeTime, 'HH:mm')]
                 : null,

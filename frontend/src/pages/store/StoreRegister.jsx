@@ -19,7 +19,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 const StoreRegister = () => {
     useDocumentTitle('가게 등록');
     const [form] = Form.useForm();
-    const { handlePreview, PreviewModal } = useImagePreview();
+    const { handlePreview, PreviewModal, suppressLinkNavigation } = useImagePreview();
     
     // 비즈니스 로직을 useStoreForm hook에 위임
     const {
@@ -43,6 +43,7 @@ const StoreRegister = () => {
                 onMainImageChange={handleMainImageChange}
                 onDetailImagesChange={handleDetailImagesChange}
                 onPreview={handlePreview}
+                onPreviewClickCapture={suppressLinkNavigation}
             />
             
             {/* 이미지 미리보기 모달 */}

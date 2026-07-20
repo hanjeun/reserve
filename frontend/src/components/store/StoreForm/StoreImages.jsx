@@ -28,6 +28,7 @@ const StoreImages = ({
     onMainImageChange,
     onDetailImagesChange,
     onPreview,
+    onPreviewClickCapture,
     mainImageRequired = true,
 }) => {
     return (
@@ -48,6 +49,7 @@ const StoreImages = ({
                     onPreview={onPreview}
                     beforeUpload={validateImage}
                     maxCount={1}
+                    onClickCapture={onPreviewClickCapture}
                 >
                     {mainImage.length === 0 && <UploadButton />}
                 </Upload>
@@ -63,10 +65,11 @@ const StoreImages = ({
                     listType="picture-card"
                     fileList={detailImages}
                     onChange={onDetailImagesChange}
-                    onPreview={onPreview}
+                    onPreview={(file) => onPreview(file, detailImages)}
                     beforeUpload={validateImage}
                     maxCount={5}
                     multiple
+                    onClickCapture={onPreviewClickCapture}
                 >
                     {detailImages.length < 5 && <UploadButton />}
                 </Upload>

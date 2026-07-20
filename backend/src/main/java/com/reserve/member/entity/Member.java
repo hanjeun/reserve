@@ -90,6 +90,37 @@ public class Member {
     @Column(name = "longitude")
     private Double longitude;
 
+    /**
+     * 위치 등록 시 사용자가 실제로 고른 주소 문자열.
+     *
+     * 2026-07 전수조사로 추가됨. 예전엔 latitude/longitude만 저장했는데, 그러면 마이페이지의
+     * 위치 탭을 다시 열었을 때 "무엇을 저장했는지"를 화면에 되살릴 방법이 전혀 없었다 —
+     * 좌표만으로는 주소를 역산할 수 없으니 AddressSearch 입력칸이 항상 빈칸으로 뜨고,
+     * 저장 버튼도 (좌표가 로컬 state라) 계속 비활성이라 사용자 입장에선 "저장이 안 됐다"고
+     * 보였다. 실제로는 DB에 좌표가 멀쩡히 들어가 있었고 거리순 정렬/우리동네 배지도 잘 동작했음.
+     * → 좌표와 함께 원본 주소 문자열도 보관해서 화면이 저장 상태를 정직하게 보여줄 수 있게 함.
+     *
+     * nullable: 이 컬럼이 생기기 전에 위치를 등록한 기존 회원은 좌표만 있고 주소는 null이다.
+     */
+    @Column(name = "location_address")
+    private String locationAddress;
+
+    /**
+     * 우편번호 / 상세주소.
+     *
+     * AddressSearch 컴포넌트는 도로명주소 + 우편번호 + 상세주소 3개를 한 세트로 다루는데
+     * (Store 엔티티도 address / zip_code / address_detail 3개를 모두 저장한다),
+     * Member엔 location_address 하나만 있어서 우편번호와 상세주소를 저장할 곳이 없었다.
+     * 그래서 마이페이지 위치 탭에서 주소를 저장하고 새로고침하면 도로명만 복원되고
+     * 우편번호 칸은 아예 안 뜨고 상세주소는 빈칸이 되는 버그가 있었다 (2026-07 전수조사).
+     * → Store와 동일한 컨벤션으로 3개를 모두 보관한다.
+     */
+    @Column(name = "location_zip_code", length = 10)
+    private String locationZipCode;
+
+    @Column(name = "location_address_detail")
+    private String locationAddressDetail;
+
     // 권한 체크 헬퍼 메서드
     public boolean isUser() {
         return this.role == Role.USER;

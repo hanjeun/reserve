@@ -62,6 +62,14 @@ public class Store {
     @Column(name = "main_image_url")
     private String mainImageUrl;
 
+    // 메인 이미지 원본 크기 — 업로드 시 ImageIO로 헤더만 읽어 저장(전체 디코딩 안 함),
+    // 프론트 스켈레톤이 실제 이미지 비율대로 미리 그려지게 해서 CLS 방지용. 측정 실패해도 업로드 자체는 막지 않고 null로 놓음
+    @Column(name = "main_image_width")
+    private Integer mainImageWidth;
+
+    @Column(name = "main_image_height")
+    private Integer mainImageHeight;
+
     @Column(name = "rating")
     private Double rating;
 
@@ -76,6 +84,12 @@ public class Store {
     // 상세 이미지 URL들 (콤마로 구분된 문자열로 저장)
     @Column(name = "detail_images", length = 2000)
     private String detailImages;
+
+    // detailImages와 1:1 순서 대응되는 각 이미지의 원본 크기 JSON 배열
+    // 예: [{"width":1200,"height":800},{"width":900,"height":1200}] — url은 detailImages에 이미 있어서 중복 저장 안 함.
+    // 파싱/직렬화는 StoreService에서 Jackson으로 처리(엔티티는 단순 원시 문자열 보관만 담당)
+    @Column(name = "detail_images_meta", length = 2000)
+    private String detailImagesMeta;
 
     // 영업 시간
     @Column(name = "open_time")

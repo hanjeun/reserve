@@ -2,6 +2,7 @@ package com.reserve.member.controller;
 
 import com.reserve.config.util.SecurityUtil;
 import com.reserve.global.common.ApiResponse;
+import com.reserve.member.dto.LocationUpdateRequest;
 import com.reserve.member.dto.MemberResponse;
 import com.reserve.member.dto.MemberUpdateRequest;
 import com.reserve.member.entity.Member;
@@ -60,9 +61,9 @@ public class MemberApiController {
 
     // 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 거부/미지원 시 주소 검색 폴백으로 호출
     @PatchMapping("/me/location")
-    public ApiResponse<MemberResponse> updateLocation(@RequestBody java.util.Map<String, Double> body) {
+    public ApiResponse<MemberResponse> updateLocation(@RequestBody LocationUpdateRequest body) {
         Member member = SecurityUtil.getCurrentMember("인증된 사용자 정보를 찾을 수 없습니다.");
-        MemberResponse updated = memberService.updateLocation(member.getId(), body.get("latitude"), body.get("longitude"));
+        MemberResponse updated = memberService.updateLocation(member.getId(), body);
         return ApiResponse.success(updated, "위치가 등록되었습니다.");
     }
 

@@ -6,6 +6,7 @@ import com.reserve.global.error.StoreException;
 import com.reserve.member.entity.Member;
 import com.reserve.store.dto.StoreCreateRequest;
 import com.reserve.store.dto.StoreResponse;
+import com.reserve.store.dto.StoreStatisticsResponse;
 import com.reserve.store.dto.StoreUpdateRequest;
 import com.reserve.store.service.StoreService;
 import lombok.RequiredArgsConstructor;
@@ -116,6 +117,18 @@ public class StoreApiController {
         validateBusinessAuth(member);
         int count = storeService.countActiveReservations(id, member);
         return ApiResponse.success(count, "활성 예약 수 조회 성공");
+    }
+
+    // 사업자 "통계 · 분석" 탭 — 기간(range=7d|30d|90d, 기본 30d) 통계 조회
+    @GetMapping("/{id}/statistics")
+    public ApiResponse<StoreStatisticsResponse> getStoreStatistics(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "30d") String range
+    ) {
+        Member member = SecurityUtil.getCurrentMember("통계 조회를 위해 로그인이 필요합니다.");
+        validateBusinessAuth(member);
+        StoreStatisticsResponse stats = storeService.getStoreStatistics(id, member, range);
+        return ApiResponse.success(stats, "가게 통계 조회 성공");
     }
 
     // 가게 삭제

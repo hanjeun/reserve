@@ -35,8 +35,12 @@ const memberService = {
         api.patch(API_ENDPOINTS.MEMBER.MARKETING_CONSENT, { marketingAgreed }),
 
     /** 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 실패 시 마이페이지 주소 등록 폴백에서 호출 */
-    updateLocation: (latitude, longitude) =>
-        api.patch(API_ENDPOINTS.MEMBER.LOCATION, { latitude, longitude }),
+    // 2026-07 전수조사: AddressSearch는 도로명 + 우편번호 + 상세주소를 한 세트로 다룬다.
+    // 예전엔 좌표(+나중엔 도로명)만 보내서, 저장 후 새로고침하면 우편번호 칸이 아예 안 뜨고
+    // 상세주소는 빈칸이 되는 버그가 있었다 — 저장할 곳(컬럼) 자체가 없었기 때문.
+    // 각 주소 필드는 서버에서 null/blank면 기존 값을 덮어쓰지 않는다.
+    updateLocation: ({ latitude, longitude, address, zipCode, addressDetail }) =>
+        api.patch(API_ENDPOINTS.MEMBER.LOCATION, { latitude, longitude, address, zipCode, addressDetail }),
 };
 
 export default memberService;

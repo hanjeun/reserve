@@ -1,12 +1,15 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { Empty, Spin } from 'antd';
-import { PageContainer, StoreCardSkeleton } from '../../components/common';
+import { Empty } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { PageContainer, StoreCardSkeleton, Loading } from '../../components/common';
 import { StoreCard } from '../../components/store';
 import AdBanner from '../../components/advertisement/AdBanner';
 import { useStoreList, useGeolocation, useMessage } from '../../hooks';
 import useAuthStore from '../../store/useAuthStore';
+import useLocationStore from '../../store/useLocationStore';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import adService from '../../services/adService';
+import { adKeys } from '../../hooks/queryKeys';
 import { SORT_OPTIONS } from '../../constants';
 import { fontWeight, fontSize, colors } from '../../styles/tokens';
 import { Input, Select, Typography } from 'antd';
@@ -16,10 +19,28 @@ const { Search } = Input;
 
 const PAGE_SIZE = 12;
 
+// 2026-07 추가 — MyFavorites/MyStores와 동일한 이유로 masonry(columns) 대신 고정 그리드로 전환.
+// 예전엔 columns:'4 240px'라 컨테이너 폭에 따라 3열/4열을 오갔다(최소폭 240px만 보장하는 방식이라
+// PC에서도 폭에 따라 3열로 나오는 경우가 있었음) — PC에서는 항상 4열 고정, 좁은 화면만 미디어
+// 쿼리로 2열/1열로 줄어들게 통일.
+const GRID_STYLE = `
+  .rsv-store-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 900px) {
+    .rsv-store-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .rsv-store-grid { grid-template-columns: 1fr; }
+  }
+`;
+
 const StoreList = () => {
     const {
         stores, totalElements,
-        loading, fetchingNext,
+        loading, refetching, fetchingNext,
         hasNextPage, fetchNextPage,
         searchParams, setSearchParams,
     } = useStoreList();
@@ -53,54 +74,99 @@ const StoreList = () => {
     const { request: requestLocation, requesting: locating } = useGeolocation();
     const { user } = useAuthStore();
     const { message } = useMessage();
-
-    // "우리동네" 배지용 위치 — 거리순 정렬 중이면 그 때 쓴 라이브 좌표, 아니면 마이페이지에 저장된 위치
-    const savedLat = user?.latitude;
-    const savedLng = user?.longitude;
+    const { liveLocation, setLiveLocation } = useLocationStore();
+    // "우리동네" 배지용 위치 — 정렬 기준과 무관하게 항상 같은 우선순위로 나온다(이건 이전에는
+    // searchParams.lat/lng에만 의존해서, 거리순이 아닌 다른 정렬로 바꾸면 배지가 사라지던 버그가 있었음).
+    //
+    // 2026-07 우선순위 수정: 예전엔 liveLocation(라이브 위치)이 있으면 무조건 그걸 먼저 썼는데,
+    // 이러면 "우리동네"가 사용자가 설정한 안정적인 홈 개념이 아니라 "거리순 정렬 한 번 눌러서
+    // 위치 권한을 허용한 순간의 GPS 위치"로 세션 내내 고정돼버린다. 예: 마이페이지엔 청와대로
+    // 저장해뒀는데 지금 안산에 있어서 거리순 한 번 눌렀더니, 그 뒤로는 별점순으로 바꿔도 계속
+    // 안산 근처 가게만 "우리동네"로 뜨고 청와대 근처 가게는 배지가 사라짐 — "우리동네"라는
+    // 이름의 취지(내가 사는/자주 가는 동네라는 안정적인 정체성)와 맞지 않는 동작.
+    // → 마이페이지에 저장된 위치를 최우선으로 하고, 저장된 위치가 아예 없는 사용자에게만
+    // 라이브 위치를 폴백으로 사용한다. "거리순 정렬" 자체는 여전히 라이브 위치를 우선 써서
+    // 실제 물리적 현재 위치 기준으로 정렬한다(이건 "우리동네"와 별개 개념 — searchParams.lat/lng로
+    // 처리되고 이 값과는 무관함).
     const nearbyUserLocation = React.useMemo(() => {
-        if (searchParams.lat && searchParams.lng) {
-            return { latitude: Number(searchParams.lat), longitude: Number(searchParams.lng) };
+        if (user?.latitude != null && user?.longitude != null) {
+            return { latitude: user.latitude, longitude: user.longitude };
         }
-        if (savedLat != null && savedLng != null) {
-            return { latitude: savedLat, longitude: savedLng };
-        }
+        if (liveLocation) return liveLocation;
         return null;
-    }, [searchParams.lat, searchParams.lng, savedLat, savedLng]);
+    }, [liveLocation, user]);
 
-    // 광고 데이터 — 배지형(BADGE)은 storeId Set으로, 배너형(BANNER)은 리스트 그대로
-    const [adStoreIds, setAdStoreIds] = useState(new Set());
-    const [bannerAds, setBannerAds] = useState([]);
-
-    useEffect(() => {
-        adService.getActiveAds('BADGE')
-            .then((list) => setAdStoreIds(new Set((list || []).map((a) => a.storeId))))
-            .catch(() => {});
-        adService.getActiveAds('BANNER')
-            .then((list) => setBannerAds(Array.isArray(list) ? list : []))
-            .catch(() => {});
-    }, []);
+    // 광고 데이터 — 이전에는 useEffect+useState로 매번 새로 불러오고 에러도 조용히 삼켜졌던 부분 —
+    // TanStack Query로 전환해서 캐싱도 되고(staleTime 5분, 페이지 오가는 마다 재조회 안 함),
+    // 만약 실패해도 조용히 빈 배열로 폴백되는 건 동일(광고는 장식적 요소라 따로 에러 토스트는 불필요).
+    //
+    // 2026-07 추가: Set<storeId> 대신 Map<storeId, adId>로 바꿈 — 배지 노출 지표를 기록하려면
+    // 어느 storeId가 광고를 가지고 있는지뿐만 아니라 그 광고(Advertisement)의 adId도 필요하다.
+    const { data: adStoreMap = new Map() } = useQuery({
+        queryKey: adKeys.active('BADGE'),
+        queryFn: async () => {
+            const list = await adService.getActiveAds('BADGE');
+            return new Map((list || []).map((a) => [a.storeId, a.id]));
+        },
+        staleTime: 1000 * 60 * 5,
+    });
+    const { data: bannerAds = [] } = useQuery({
+        queryKey: adKeys.active('BANNER'),
+        queryFn: async () => {
+            const list = await adService.getActiveAds('BANNER');
+            return Array.isArray(list) ? list : [];
+        },
+        staleTime: 1000 * 60 * 5,
+    });
 
     // 거리순 선택 시 Geolocation 먼저 요청 — 실패/거부 시 마이페이지에 등록해둔 위치가 있으면 그것으로 폴백
     // (둘 다 없으면 useGeolocation이 이미 보여준 토스트로 이유 안내된 상태라 sort를 바꾸지 않음)
+    const roundCoord = (n) => Math.round(n * 1000) / 1000;
+
+    /**
+     * 선택 즉시 반영되는 "낙관적" 정렬 값 (2026-07 추가).
+     *
+     * 정렬 값의 진실은 URL(searchParams.sort)인데, 거리순만은 좌표를 먼저 받아야 해서
+     * requestLocation()이 끝난 뒤에나 setSearchParams가 불렸다. 그러니 권한 팝업/GPS를
+     * 기다리는 동안 Select는 여전히 이전 값(예: "리뷰순")을 보여주면서 스피너만 돌고,
+     * 좌표가 도착한 뒤에야 "거리순"으로 바뀜다 — 분명히 거리순을 눌렀는데 화면은
+     * 리뷰순인 채 빙글빙글 돌아서 고장처럼 보였다.
+     * → 선택 즉시 pendingSort로 라벨을 바꾸고(스피너는 그대로 돌림), 권한 거부 등으로 정렬을
+     *   적용하지 못하면 원래 값으로 되돌린다.
+     */
+    const [pendingSort, setPendingSort] = useState(null);
+
     const handleSortChange = useCallback(async (value) => {
         if (value !== 'distance') {
+            setPendingSort(null);
             setSearchParams({ sort: value, lat: null, lng: null });
             return;
         }
+
+        // 라벨을 먼저 "거리순"으로 — 좌표를 기다리는 동안에도 선택이 유지된다
+        setPendingSort('distance');
+
         const position = await requestLocation();
         if (position) {
-            setSearchParams({ sort: 'distance', lat: position.latitude, lng: position.longitude });
+            setLiveLocation(position);
+            setSearchParams({ sort: 'distance', lat: roundCoord(position.latitude), lng: roundCoord(position.longitude) });
+            setPendingSort(null);
             return;
         }
         if (user?.latitude != null && user?.longitude != null) {
             message.info('마이페이지에 등록된 위치 기준으로 정렬할게요.');
-            setSearchParams({ sort: 'distance', lat: user.latitude, lng: user.longitude });
+            setSearchParams({ sort: 'distance', lat: roundCoord(user.latitude), lng: roundCoord(user.longitude) });
+            setPendingSort(null);
+            return;
         }
-        // 둘 다 없으면 sort를 바꾸지 않음 — useGeolocation이 이미 상황별 토스트를 보여줌
-    }, [setSearchParams, requestLocation, user, message]);
+        // 둘 다 없으면 sort를 바꾸지 않음 — useGeolocation이 이미 상황별 토스트를 보여줌.
+        // 낙관적으로 바꿔둔 라벨도 원래 값으로 되돌린다.
+        setPendingSort(null);
+    }, [setSearchParams, requestLocation, user, message, setLiveLocation]);
 
     return (
         <PageContainer size="xl" paddingTop="40px">
+            <style>{GRID_STYLE}</style>
             {/* 헤더 */}
             <div style={styles.header}>
                 <div style={styles.headerLeft}>
@@ -122,21 +188,28 @@ const StoreList = () => {
                         disabled={loading}
                     />
                     <Select
-                        value={searchParams.sort}
+                        value={pendingSort ?? searchParams.sort}
                         style={{ width: 120 }}
                         size="large"
                         onChange={handleSortChange}
                         options={SORT_OPTIONS}
-                        disabled={loading || locating}
+                        disabled={loading || locating || refetching}
                         loading={locating}
                     />
                 </div>
             </div>
 
-            {/* 최초 로딩 스켈레톤 */}
-            {loading ? (
+            {/* 스켈레톤 — 최초 로딩뿐 아니라 검색어/정렬 변경으로 인한 재조회(refetching) 때도 동일하게
+                노출(2026-07 수정). keepPreviousData 덕에 재조회 중엔 원래 직전 카드가 그대로 남아있어서
+                "조용히 있다가 휙 바뀌는" 문제가 있었는데, 처음엔 살짝 흐리게+스피너 오버레이로 시도했다가
+                "가게 리스트는 원래 스켈레톤이 컨벤션이니 그걸 그대로 재사용하는 게 낫다"는 판단으로 변경 —
+                정렬/검색 바꿀 때마다 카드가 스켈레톤으로 한 번 갈아입긴 하지만(실사용에서는 아주 짧은 순간),
+                최초 로딩과 완전히 동일한 신호를 주는 쪽이 일관적임
+                2026-07 추가: grid를 고정 4열(rsv-store-grid)로 전환 (위 GRID_STYLE 참고) —
+                masonry(columns)는 PC 폭에서도 3열로 나올 때가 있어서 항상 4열이 보장되는 그리드로 바꿈. */}
+            {(loading || refetching) ? (
                 <div style={styles.skeletonWrap}>
-                    <div style={styles.grid}>
+                    <div className="rsv-store-grid">
                         <StoreCardSkeleton count={PAGE_SIZE} />
                     </div>
                     <div style={styles.fadeOut} />
@@ -145,10 +218,10 @@ const StoreList = () => {
                 <Empty description="조건에 맞는 가게가 없습니다." style={{ marginTop: 100 }} />
             ) : (
                 <>
-                    <div style={styles.grid}>
+                    <div className="rsv-store-grid">
                         {stores.map(store => (
-                            <div key={store.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
-                                <StoreCard store={store} userLocation={nearbyUserLocation} isAdvertised={adStoreIds.has(store.id)} />
+                            <div key={store.id}>
+                                <StoreCard store={store} userLocation={nearbyUserLocation} isAdvertised={adStoreMap.has(store.id)} adId={adStoreMap.get(store.id)} />
                             </div>
                         ))}
                     </div>
@@ -159,7 +232,7 @@ const StoreList = () => {
                     {/* 추가 페이지 로딩 스피너 */}
                     {fetchingNext && (
                         <div style={styles.spinnerWrap}>
-                            <Spin size="default" />
+                            <Loading minHeight="0" />
                         </div>
                     )}
 
@@ -198,7 +271,6 @@ const styles = {
         background: 'linear-gradient(to bottom, transparent 0%, #ffffff 100%)',
         pointerEvents: 'none',
     },
-    grid:        { columns: '4 240px', columnGap: 24 },
     sentinel:    { marginTop: 8 },
     spinnerWrap: { display: 'flex', justifyContent: 'center', padding: '24px 0' },
     endMessage:  {

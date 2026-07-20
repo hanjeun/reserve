@@ -13,6 +13,7 @@ import com.reserve.email.service.EmailVerificationService;
 import com.reserve.favorite.repository.FavoriteRepository;
 import com.reserve.global.error.MemberException;
 import com.reserve.member.dto.MemberDto;
+import com.reserve.member.dto.LocationUpdateRequest;
 import com.reserve.member.dto.MemberResponse;
 import com.reserve.member.dto.MemberUpdateRequest;
 import com.reserve.member.entity.AuthProvider;
@@ -199,12 +200,33 @@ public class MemberService {
      * Kakao 주소 검색 결과(latitude/longitude)를 그대로 저장.
      */
     @Transactional
-    public MemberResponse updateLocation(Long memberId, Double latitude, Double longitude) {
+    /**
+     * 마이페이지 위치 등록.
+     *
+     * 2026-07 전수조사: 예전엔 좌표(latitude/longitude)만 저장했다. 저장 자체는 잘 동작했지만
+     * (거리순 정렬/우리동네 배지 모두 정상), 좌표로 주소를 역산할 수는 없으니 위치 탭을 다시 열면
+     * 화면이 항상 빈 상태로 보여서 사용자 입장에선 "저장이 안 됐다"고 느껴졌다.
+     * → AddressSearch가 다루는 3종(도로명/우편번호/상세주소)을 Store와 동일하게 모두 보관한다.
+     *
+     * 각 주소 필드는 null/blank면 기존 값을 덮어쓰지 않는다 — 좌표만 넘기는 호출
+     * (브라우저 Geolocation 기반 등)이 기존에 등록해둔 주소를 지워버리면 안 되기 때문.
+     */
+    public MemberResponse updateLocation(Long memberId, LocationUpdateRequest request) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(MemberException::notFound);
-        member.setLatitude(latitude);
-        member.setLongitude(longitude);
+
+        member.setLatitude(request.getLatitude());
+        member.setLongitude(request.getLongitude());
+
+        if (hasText(request.getAddress()))       member.setLocationAddress(request.getAddress());
+        if (hasText(request.getZipCode()))       member.setLocationZipCode(request.getZipCode());
+        if (hasText(request.getAddressDetail())) member.setLocationAddressDetail(request.getAddressDetail());
+
         return MemberResponse.fromEntity(memberRepository.save(member));
+    }
+
+    private boolean hasText(String s) {
+        return s != null && !s.isBlank();
     }
 
     /**

@@ -1,6 +1,10 @@
 package com.reserve.store.controller;
 
 import com.reserve.global.common.ApiResponse;
+import com.reserve.global.error.StoreException;
+import com.reserve.global.ratelimit.IpExtractor;
+import com.reserve.global.ratelimit.RateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +29,7 @@ import java.util.Map;
 public class AddressController {
 
     private final RestTemplate restTemplate;
+    private final RateLimiter rateLimiter;
 
     @Value("${kakao.rest-api-key:}")
     private String kakaoRestApiKey;
@@ -32,7 +37,16 @@ public class AddressController {
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Map<String, Object>>> searchAddress(
             @RequestParam String query,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            HttpServletRequest httpRequest) {
+        // 2026-07 전수조사: 이 엔드포인트는 서버 보관 Kakao REST 키로 카카오 API를 대신 호출해준다.
+        // 로그인은 필요하지만 계정 하나만 있으면 우리 카카오 쿼터를 무제한 소진시킬 수 있어서
+        // 다른 비용성 엔드포인트(이메일 발송 등)와 동일하게 IP 기준 rate limit을 건다.
+        String ip = IpExtractor.extract(httpRequest);
+        if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.ADDRESS_SEARCH)) {
+            throw new StoreException("주소 검색 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
         Map<String, Object> empty = Map.of("documents", List.of());
 
         if (query == null || query.trim().length() < 2) {

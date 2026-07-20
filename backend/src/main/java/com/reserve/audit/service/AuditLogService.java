@@ -1,8 +1,11 @@
 package com.reserve.audit.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.reserve.advertisement.entity.Advertisement;
+import com.reserve.advertisement.repository.AdvertisementRepository;
 import com.reserve.audit.entity.AuditLog;
 import com.reserve.audit.repository.AuditLogRepository;
+import com.reserve.global.error.AuditException;
 import com.reserve.mailbox.entity.AdminSentMail;
 import com.reserve.mailbox.repository.AdminSentMailRepository;
 import com.reserve.reservation.entity.Reservation;
@@ -26,8 +29,8 @@ import java.util.Map;
  * 감사 로그(AuditLog) + 휴지통(Trash) 서비스.
  *
  * 설계 메모: 휴지통(소프트 삭제 + 복구)은 "실수로 지워도 되돌릴 수 있어야 하는" 콘텐츠 —
- * 예약(RESERVATION), 리뷰(REVIEW), 메일(MAIL/SENT_MAIL) — 에만 적용한다.
- * 회원(MEMBER)/가게(STORE)는 운영 정책 위반에 대한 제재이므로 정지/영구정지로 처리하며
+ * 예약(RESERVATION), 리뷰(REVIEW), 메일(MAIL/SENT_MAIL), 광고(ADVERTISEMENT, 2026-07 추가)
+ * — 에만 적용한다. 회원(MEMBER)/가게(STORE)는 운영 정책 위반에 대한 제재이므로 정지/영구정지로 처리하며
  * (AdminManagementController 참고) 더 이상 이 서비스에서 소프트 삭제하지 않는다.
  * logMemberSanction/logStoreSanction은 제재 행위를 감사 로그로만 남기고
  * 실제 soft-delete 엔트리(휴지통 표시 대상)를 만들지 않는다.
@@ -44,6 +47,7 @@ public class AuditLogService {
     private final AdminSentMailRepository adminSentMailRepository;
     private final ReservationRepository reservationRepository;
     private final ReviewRepository reviewRepository;
+    private final AdvertisementRepository advertisementRepository;
     private final ObjectMapper objectMapper;
 
     // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
@@ -51,7 +55,7 @@ public class AuditLogService {
     @Transactional
     public void softDeleteSentMail(Long mailId) {
         AdminSentMail mail = adminSentMailRepository.findById(mailId)
-                .orElseThrow(() -> new IllegalArgumentException("SentMail not found: " + mailId));
+                .orElseThrow(() -> AuditException.notFound("SentMail not found: " + mailId));
         mail.softDelete();
         saveAuditLog("SENT_MAIL", mailId, "SOFT_DELETE",
                 Map.of("toEmail", mail.getToEmail(), "subject", nullSafe(mail.getSubject())));
@@ -74,7 +78,7 @@ public class AuditLogService {
     @Transactional
     public void softDeleteReservation(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new IllegalArgumentException("Reservation not found: " + reservationId));
+                .orElseThrow(() -> AuditException.notFound("Reservation not found: " + reservationId));
         reservation.softDelete();
         saveAuditLog("RESERVATION", reservationId, "SOFT_DELETE", Map.of(
                 "가게",   reservation.getStore().getName(),
@@ -88,7 +92,7 @@ public class AuditLogService {
     @Transactional
     public void softDeleteReview(Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new IllegalArgumentException("Review not found: " + reviewId));
+                .orElseThrow(() -> AuditException.notFound("Review not found: " + reviewId));
         review.softDelete();
         saveAuditLog("REVIEW", reviewId, "SOFT_DELETE", Map.of(
                 "가게",   review.getStore().getName(),
@@ -99,15 +103,35 @@ public class AuditLogService {
         log.info("Review soft-deleted: id={}", reviewId);
     }
 
+    /**
+     * 광고 종료상태 행 숨기기(소프트삭제) — 2026-07 추가.
+     * 호출측(AdvertisementService.removeAd)에서 이미 종료상태(EXPIRED/CANCELLED/REFUNDED/SUSPENDED)만
+     * 허용하는지 검증한 뒤 호출함.
+     */
+    @Transactional
+    public void softDeleteAdvertisement(Long adId) {
+        Advertisement ad = advertisementRepository.findById(adId)
+                .orElseThrow(() -> AuditException.notFound("Advertisement not found: " + adId));
+        ad.softDelete();
+        saveAuditLog("ADVERTISEMENT", adId, "SOFT_DELETE", Map.of(
+                "가게",   ad.getStore().getName(),
+                "유형",   ad.getAdType().name(),
+                "기간",   ad.getStartDate() + " ~ " + ad.getEndDate(),
+                "상태",   ad.getStatus().name()
+        ));
+        log.info("Advertisement soft-deleted: id={}", adId);
+    }
+
     // ── 복구 (예약/리뷰/메일만 해당) ──────────────────────────────
 
     @Transactional
     public void restore(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
-            case "SENT_MAIL"   -> adminSentMailRepository.restoreById(entityId);
-            case "RESERVATION" -> reservationRepository.restoreById(entityId);
-            case "REVIEW"      -> reviewRepository.restoreById(entityId);
-            default -> throw new IllegalArgumentException("휴지통 복구가 지원되지 않는 항목입니다: " + entityType);
+            case "SENT_MAIL"      -> adminSentMailRepository.restoreById(entityId);
+            case "RESERVATION"    -> reservationRepository.restoreById(entityId);
+            case "REVIEW"         -> reviewRepository.restoreById(entityId);
+            case "ADVERTISEMENT"  -> advertisementRepository.restoreById(entityId);
+            default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목입니다: " + entityType);
         }
         // 휴지통에서 제거 (SOFT_DELETE 로그 삭제)
         auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);
@@ -223,10 +247,11 @@ public class AuditLogService {
 
     private void hardDeleteEntity(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
-            case "SENT_MAIL"   -> adminSentMailRepository.deleteById(entityId);
-            case "RESERVATION" -> reservationRepository.deleteById(entityId);
-            case "REVIEW"      -> reviewRepository.deleteById(entityId);
-            default -> throw new IllegalArgumentException("휴지통 영구삭제가 지원되지 않는 항목입니다: " + entityType);
+            case "SENT_MAIL"      -> adminSentMailRepository.deleteById(entityId);
+            case "RESERVATION"    -> reservationRepository.deleteById(entityId);
+            case "REVIEW"         -> reviewRepository.deleteById(entityId);
+            case "ADVERTISEMENT"  -> advertisementRepository.deleteById(entityId);
+            default -> throw new AuditException("휴지통 영구삭제가 지원되지 않는 항목입니다: " + entityType);
         }
     }
 

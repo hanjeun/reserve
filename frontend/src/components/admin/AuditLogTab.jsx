@@ -1,7 +1,9 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Typography, Table, Tag } from 'antd';
-import { FilterToolbar, AdminTableSkeleton } from '../common';
-import { useMessage } from '../../hooks';
+import React, { useEffect } from 'react';
+import { Typography, Tag } from 'antd';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
+import { useMessage, useQueryParamsState } from '../../hooks';
+import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
@@ -47,40 +49,74 @@ const formatActor = (actorEmail) => {
     return actorEmail;
 };
 
-// 최초 로딩 전용 스켈레톤 — AdminTableSkeleton과 동일한 톤 유지
-const SkeletonRows = () => <AdminTableSkeleton rows={8} cols={[155, 115, 120, 300, 200]} />;
+// 스켈레톤 — 실제 테이블 컬럼과 1:1로 대응
+const PAGE_SIZE = 10;
+const QUERY_DEFAULTS = { type: '', page: '0' };
+const SKELETON_HEADERS = ['일시', '행위', '대상', '로그 내용', '처리자'];
+// '로그 내용'은 실제 columns에서 width를 안 준 유동 컬럼이라 null로 표시한다 —
+// 그래야 스켈레톤도 실제 테이블처럼 "고정 컬럼은 지정 폭, 로그 내용이 남는 공간 흡수"가 된다.
+const SKELETON_COLS    = [155, 115, 120, null, 200];
 
+/**
+ * 스켈레톤 행 개수를 "실제로 채워질 행 수"로 계산한다 (2026-07 추가).
+ * keepPreviousData 덕에 페이지를 넘기는 순간엔 이미 totalElements를 알고 있으므로,
+ * 마지막 페이지가 3건이면 스켈레톤도 3줄만 그릴 수 있다 — 10줄 그렸다가 3줄로
+ * 줄어들면서 화면이 튀는 걸 막는다. 최초 로딩(total을 모름)엔 pageSize로 폴백.
+ */
+const skeletonRowCount = (total, pageIdx, pageSize) => {
+    if (!total) return pageSize;
+    const remaining = total - pageIdx * pageSize;
+    return Math.max(1, Math.min(pageSize, remaining));
+};
+
+/**
+ * 2026-07-09: TanStack Query로 전환 — 서버 사이드 페이지네이션(type + page)이라
+ * 쿼리 키에 둘 다 포함. placeholderData: keepPreviousData로 페이지 이동/필터 변경 시
+ * 이전 페이지의 진짜 데이터가 유지되다가 교체되어, Table을 언마운트하지 않아도
+ * 깜빡임 없이 자연스럽게 넘어감(예전의 hasLoadedOnceRef 수동 관리가 필요 없어짐).
+ *
+ * 2026-07 버그 수정(1차): 위 설명대로 깜빡임(스켈레톤 재노출)은 없지만, 그 대신 페이지 이동이나
+ * 필터 변경 시 새 데이터가 올 때까지 아무 신호 없이 "조용히 있다가 휙 바뀌는" 문제가 있었음.
+ *
+ * 2026-07 전수조사(2차 — 1차 수정을 되돌림): 1차에서 AntD Table의 loading prop을 썼는데, 이건
+ * AntD 기본 <Spin>("점 4개" 스피너)을 그려서 우리 디자인 시스템(셰이머 스켈레톤 / 링 스피너)과
+ * 전혀 다른, 눈에 띄게 이질적인 로딩 UI가 노출됐음 — 이 프로젝트의 목록 화면 로딩 관례는
+ * 일관되게 "스켈레톤"이므로(StoreList/MyReservations/BusinessPanel 전부 동일), 최초 로딩뿐
+ * 아니라 페이지 이동·필터 변경 시에도 동일한 AdminTableSkeleton을 보여주도록 통일.
+ * 2026-07 전수조사(3차): 스켈레톤이 <DataTable>을 통째로 대체해서 페이지네이션까지 같이 사라졌던
+ * 트레이드오프를 해소 — AdminTableSkeleton에 pagination을 넘겨서 로딩 중에도 페이지 버튼을
+ * (disabled 상태로) 그대로 유지한다. 페이지 버튼은 total/current만 알면 그릴 수 있고
+ * keepPreviousData 덕에 그 값은 이미 손안에 있다. 행 개수도 total로부터 정확히 계산한다.
+ * 2026-07 전수조사(4차): 필터/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) —
+ * 새로고침해도 유지되고 링크 공유도 가능해짐(MembersTab 등과 동일한 이유).
+ */
 const AuditLogTab = () => {
     const { message } = useMessage();
-    const [logs, setLogs]               = useState([]);
-    const [loading, setLoading]         = useState(false);
-    const [typeFilter, setTypeFilter]   = useState('');
-    const [page, setPage]               = useState(0);
-    const [totalElements, setTotalElements] = useState(0);
+    const [{ type: typeFilter, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
+    const page = Number(pageStr) || 0;
+    const setPage = (p) => setQuery({ page: String(p) });
 
-    // 첫 마운트 때만 스켈레톤 — 이후 새로고침/페이지전환은 Table을 그대로 유지한 채 데이터만 교체
-    // (Table을 언마운트하면 헤더/페이지네이션까지 같이 사라졌다 나타나며 깜빡임 발생)
-    const hasLoadedOnceRef = useRef(false);
-
-    const load = useCallback(async (p = 0) => {
-        setLoading(true);
-        try {
-            const params = { page: p, size: 10 };
+    const { data, isLoading: loading, isFetching, error, refetch } = useQuery({
+        queryKey: [...adminKeys.auditLogs(), typeFilter, page],
+        queryFn: async () => {
+            const params = { page, size: PAGE_SIZE };
             if (typeFilter) params.type = typeFilter;
-            const data = await api.get(API_ENDPOINTS.AUDIT_LOG.LIST, { params });
-            setLogs(data?.content ?? []);
-            const total = data?.totalElements ?? data?.page?.totalElements ?? 0;
-            setTotalElements(total);
-            setPage(p);
-        } catch {
-            message.error('시스템 로그를 불러오지 못했습니다.');
-        } finally {
-            setLoading(false);
-            hasLoadedOnceRef.current = true;
-        }
-    }, [message, typeFilter]);
+            const result = await api.get(API_ENDPOINTS.AUDIT_LOG.LIST, { params });
+            return {
+                logs: result?.content ?? [],
+                totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
+            };
+        },
+        placeholderData: keepPreviousData,
+    });
+    useEffect(() => {
+        if (error) message.error('시스템 로그를 불러오지 못했습니다.');
+    }, [error, message]);
+    const logs = data?.logs ?? [];
+    const totalElements = data?.totalElements ?? 0;
 
-    useEffect(() => { load(0); }, [load]);
+    // 하나의 setQuery 호출로 묶음(따로 호출하면 뒤 호출이 앞 변경을 덮어씀 — useQueryParamState.js 상단 주석 참고)
+    const handleFilterChange = (v) => setQuery({ type: v, page: '0' });
 
     const columns = [
         {
@@ -134,12 +170,12 @@ const AuditLogTab = () => {
             <FilterToolbar
                 selects={[{
                     value: typeFilter,
-                    onChange: (v) => { setTypeFilter(v); load(0); },
+                    onChange: handleFilterChange,
                     options: AUDIT_TYPE_OPTIONS,
                     width: 140,
                 }]}
                 count={totalElements}
-                onReload={() => load(page)}
+                onReload={refetch}
                 loading={loading}
             />
 
@@ -155,23 +191,25 @@ const AuditLogTab = () => {
                 소프트 삭제, 복구, 영구 삭제 등 관리자 행위가 기록됩니다. 로그는 90일 후 자동 삭제됩니다.
             </div>
 
-            {/* 첫 로딩에만 스켈레톤. 이후로는 Table을 절대 언마운트하지 않음
-              * → 새로고침/페이지전환 시 헤더·페이지네이션이 그대로 유지되고 데이터만 교체됨 (깜빡임 없음) */}
-            {!hasLoadedOnceRef.current && loading ? (
-                <SkeletonRows />
+            {(loading || isFetching) ? (
+                <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS}
+                    headers={SKELETON_HEADERS}
+                    actionBtns={0}
+                    pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
+                />
             ) : (
-                <Table
+                <DataTable
                     columns={columns}
                     dataSource={logs}
                     rowKey="id"
-                    size="middle"
-                    scroll={{ x: 800 }}
                     pagination={{
                         current: page + 1,
-                        pageSize: 10,
+                        pageSize: PAGE_SIZE,
                         total: totalElements,
                         showSizeChanger: false,
-                        onChange: (p) => load(p - 1),
+                        onChange: (p) => setPage(p - 1),
                     }}
                     locale={{ emptyText: '시스템 로그가 없습니다.' }}
                 />

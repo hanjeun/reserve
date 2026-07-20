@@ -2,6 +2,8 @@ package com.reserve.audit.controller;
 
 import com.reserve.audit.service.AuditLogService;
 import com.reserve.global.common.ApiResponse;
+import com.reserve.global.error.MemberException;
+import com.reserve.global.error.StoreException;
 import com.reserve.member.entity.Member;
 import com.reserve.member.repository.MemberRepository;
 import com.reserve.store.dto.StoreResponse;
@@ -68,9 +70,9 @@ public class AdminManagementController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Member not found: " + id));
+                .orElseThrow(MemberException::notFound);
         if (member.getRole().name().equals("ADMIN")) {
-            throw new IllegalArgumentException("관리자는 제재할 수 없습니다.");
+            throw new MemberException("관리자는 제재할 수 없습니다.");
         }
         int days = Integer.parseInt(body.getOrDefault("days", "7"));
         String reason = body.getOrDefault("reason", "");
@@ -88,9 +90,9 @@ public class AdminManagementController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Member not found: " + id));
+                .orElseThrow(MemberException::notFound);
         if (member.getRole().name().equals("ADMIN")) {
-            throw new IllegalArgumentException("관리자는 제재할 수 없습니다.");
+            throw new MemberException("관리자는 제재할 수 없습니다.");
         }
         String reason = body.getOrDefault("reason", "");
         member.ban(reason.isEmpty() ? null : reason);
@@ -104,7 +106,7 @@ public class AdminManagementController {
     @PostMapping("/members/{id}/unban")
     public ApiResponse<Void> unbanMember(@PathVariable Long id) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Member not found: " + id));
+                .orElseThrow(MemberException::notFound);
         member.unban();
         memberRepository.save(member);
         auditLogService.logMemberSanction(id, member.getEmail(), "UNBAN", "정지 해제");
@@ -134,7 +136,7 @@ public class AdminManagementController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         Store store = storeRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Store not found: " + id));
+                .orElseThrow(StoreException::notFound);
         int days = Integer.parseInt(body.getOrDefault("days", "7"));
         String reason = body.getOrDefault("reason", "");
         LocalDateTime until = LocalDateTime.now().plusDays(days);
@@ -151,7 +153,7 @@ public class AdminManagementController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         Store store = storeRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Store not found: " + id));
+                .orElseThrow(StoreException::notFound);
         String reason = body.getOrDefault("reason", "");
         store.ban(reason.isEmpty() ? null : reason);
         storeRepository.save(store);
@@ -164,7 +166,7 @@ public class AdminManagementController {
     @PostMapping("/stores/{id}/unban")
     public ApiResponse<Void> unbanStore(@PathVariable Long id) {
         Store store = storeRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Store not found: " + id));
+                .orElseThrow(StoreException::notFound);
         store.unban();
         storeRepository.save(store);
         auditLogService.logStoreSanction(id, store.getName(), "UNBAN", "영업정지 해제");

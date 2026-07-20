@@ -14,6 +14,7 @@ import com.reserve.reservation.dto.SlotAvailabilityResponse;
 import com.reserve.reservation.entity.Reservation;
 import com.reserve.reservation.repository.ReservationRepository;
 import com.reserve.reservation.util.QrCheckinTokenProvider;
+import com.reserve.reservation.util.ReservationCodeGenerator;
 import com.reserve.store.repository.StoreRepository;
 import com.reserve.store.entity.Store;
 import lombok.extern.slf4j.Slf4j;
@@ -89,53 +90,6 @@ public class ReservationService {
             throw new ReservationException("현재 운영이 중단된 가게입니다. 신규 예약을 받지 않습니다.", HttpStatus.BAD_REQUEST);
         }
 
-        LocalDateTime reservationDateTime = LocalDateTime.of(request.getReservationDate(), request.getReservationTime());
-        LocalDateTime now = LocalDateTime.now();
-
-        if (reservationDateTime.isBefore(now)) {
-            throw new ReservationException("예약 날짜/시간은 현재 이후여야 합니다.", HttpStatus.BAD_REQUEST);
-        }
-
-        // 예약 마감 시간 검증 (예약 시간 N시간 전까지만 예약 가능)
-        if (store.getBookingDeadlineHours() != null && store.getBookingDeadlineHours() > 0) {
-            LocalDateTime deadline = reservationDateTime.minusHours(store.getBookingDeadlineHours());
-            if (now.isAfter(deadline)) {
-                throw new ReservationException(
-                    "예약 마감 시간이 지났습니다. 예약 시간 " + store.getBookingDeadlineHours() + "시간 전까지만 예약 가능합니다.",
-                    HttpStatus.BAD_REQUEST
-                );
-            }
-        }
-
-        // 브레이크 타임 검증 (breakStartTime 이상, breakEndTime 미만은 예약 불가)
-        if (store.getBreakStartTime() != null && store.getBreakEndTime() != null) {
-            LocalTime resTime = request.getReservationTime();
-            if (!resTime.isBefore(store.getBreakStartTime()) && resTime.isBefore(store.getBreakEndTime())) {
-                String breakStr = store.getBreakStartTime().toString().substring(0, 5)
-                    + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
-                throw new ReservationException(
-                    "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
-                    HttpStatus.BAD_REQUEST
-                );
-            }
-        }
-
-        // 영업시간 검증 — getAvailability와 동일한 기준: 예약 시각은 [open, close - slotMin] 범위 안이어야 함.
-        // (프론트 슬롯 목록에 안 떰는 시각을 API로 직접 찌러넣는 우회 차단)
-        if (store.getOpenTime() != null && store.getCloseTime() != null) {
-            int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
-            LocalTime resTime = request.getReservationTime();
-            LocalTime lastSlot = store.getCloseTime().minusMinutes(slotMin);
-            if (resTime.isBefore(store.getOpenTime()) || resTime.isAfter(lastSlot)) {
-                String hoursStr = store.getOpenTime().toString().substring(0, 5)
-                    + " ~ " + store.getCloseTime().toString().substring(0, 5);
-                throw new ReservationException(
-                    "영업시간(" + hoursStr + ") 내의 예약 가능한 시간대를 선택해주세요.",
-                    HttpStatus.BAD_REQUEST
-                );
-            }
-        }
-
         // 나중 결제 허용 검증: allowLatePayment=false + 예약금 있으면 즉시 결제 필수
         boolean hasDeposit = store.getNoShowDeposit() != null && store.getNoShowDeposit() > 0;
         if (hasDeposit && !Boolean.TRUE.equals(store.getAllowLatePayment())) {
@@ -148,39 +102,10 @@ public class ReservationService {
             }
         }
 
-        // 중복 예약 방지: 가게 정책에 따라 같은 날짜 활성 예약 여부 확인
-        if (!Boolean.TRUE.equals(store.getAllowDuplicateReservation())) {
-            boolean isDuplicate = reservationRepository.existsActiveReservationByMemberAndStoreAndDate(
-                    member.getId(), store.getId(), request.getReservationDate());
-            if (isDuplicate) {
-                throw new ReservationException(
-                        "이미 해당 날짜에 예약이 존재합니다. 같은 날 중복 예약은 불가합니다.",
-                        HttpStatus.CONFLICT
-                );
-            }
-        }
-
-        // 동시간대 인원 체크
-        int currentGuests = reservationRepository.sumActiveGuestsBySlot(
-                store.getId(),
-                request.getReservationDate(),
-                request.getReservationTime()
-        );
-        if (store.getMaxCapacityPerSlot() != null) {
-            int remaining = store.getMaxCapacityPerSlot() - currentGuests;
-            if (remaining <= 0) {
-                throw new ReservationException(
-                        "해당 시간대 예약이 마감되었습니다. (" + currentGuests + "/" + store.getMaxCapacityPerSlot() + "명 마감) 다른 시간대를 선택해주세요.",
-                        HttpStatus.CONFLICT
-                );
-            }
-            if (request.getGuestCount() > remaining) {
-                throw new ReservationException(
-                        "선택하신 인원(" + request.getGuestCount() + "명)이 남은 자리(" + remaining + "명)를 초과합니다.",
-                        HttpStatus.CONFLICT
-                );
-            }
-        }
+        // 슬롯 검증(날짜/시간/인원 유효성 + 브레이크타임·영업시간·마감·중복·정원) — 생성/수정 공용.
+        // 생성이므로 제외할 기존 예약이 없어 excludeReservationId = null.
+        validateReservationSlot(store, member,
+                request.getReservationDate(), request.getReservationTime(), request.getGuestCount(), null);
 
         // 자동 승인 여부에 따라 초기 상태 결정
         // - 예약금 없음 + 자동승인 ON → 즉시 CONFIRMED
@@ -194,6 +119,7 @@ public class ReservationService {
         Reservation reservation = Reservation.builder()
                 .member(member)
                 .store(store)
+                .reservationCode(generateUniqueReservationCode(request.getReservationDate()))
                 .reservationDate(request.getReservationDate())
                 .reservationTime(request.getReservationTime())
                 .guestCount(request.getGuestCount())
@@ -225,6 +151,98 @@ public class ReservationService {
         }
 
         return response;
+    }
+
+    /**
+     * 예약 슬롯 검증 (생성·수정 공용).
+     * 날짜/시간이 현재 이후인지, 예약 마감·브레이크타임·영업시간 범위 안인지, 중복/정원에 걸리지 않는지 확인한다.
+     *
+     * @param excludeReservationId 정원·중복 계산에서 제외할 예약 ID. 생성 시엔 null(제외 대상 없음),
+     *                             수정 시엔 자기 자신의 ID를 넘겨 "인원을 안 늘렸는데 자기 자신 때문에 마감"으로
+     *                             잘못 판정되는 것을 막는다.
+     */
+    private void validateReservationSlot(Store store, Member member,
+                                         LocalDate date, LocalTime time, Integer guestCount,
+                                         Long excludeReservationId) {
+        LocalDateTime reservationDateTime = LocalDateTime.of(date, time);
+        LocalDateTime now = LocalDateTime.now();
+
+        if (reservationDateTime.isBefore(now)) {
+            throw new ReservationException("예약 날짜/시간은 현재 이후여야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        // 예약 마감 시간 검증 (예약 시간 N시간 전까지만 예약 가능)
+        if (store.getBookingDeadlineHours() != null && store.getBookingDeadlineHours() > 0) {
+            LocalDateTime deadline = reservationDateTime.minusHours(store.getBookingDeadlineHours());
+            if (now.isAfter(deadline)) {
+                throw new ReservationException(
+                    "예약 마감 시간이 지났습니다. 예약 시간 " + store.getBookingDeadlineHours() + "시간 전까지만 예약 가능합니다.",
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
+        // 브레이크 타임 검증 (breakStartTime 이상, breakEndTime 미만은 예약 불가)
+        if (store.getBreakStartTime() != null && store.getBreakEndTime() != null) {
+            if (!time.isBefore(store.getBreakStartTime()) && time.isBefore(store.getBreakEndTime())) {
+                String breakStr = store.getBreakStartTime().toString().substring(0, 5)
+                    + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
+                throw new ReservationException(
+                    "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
+        // 영업시간 검증 — getAvailability와 동일한 기준: 예약 시각은 [open, close - slotMin] 범위 안이어야 함.
+        // (프론트 슬롯 목록에 안 떴는 시각을 API로 직접 찔러넣는 우회 차단)
+        if (store.getOpenTime() != null && store.getCloseTime() != null) {
+            int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
+            LocalTime lastSlot = store.getCloseTime().minusMinutes(slotMin);
+            if (time.isBefore(store.getOpenTime()) || time.isAfter(lastSlot)) {
+                String hoursStr = store.getOpenTime().toString().substring(0, 5)
+                    + " ~ " + store.getCloseTime().toString().substring(0, 5);
+                throw new ReservationException(
+                    "영업시간(" + hoursStr + ") 내의 예약 가능한 시간대를 선택해주세요.",
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
+        // 중복 예약 방지: 가게 정책에 따라 같은 날짜 활성 예약 여부 확인 (수정 시 자기 자신은 제외)
+        if (!Boolean.TRUE.equals(store.getAllowDuplicateReservation())) {
+            boolean isDuplicate = (excludeReservationId == null)
+                    ? reservationRepository.existsActiveReservationByMemberAndStoreAndDate(
+                            member.getId(), store.getId(), date)
+                    : reservationRepository.existsActiveReservationByMemberAndStoreAndDateExcluding(
+                            member.getId(), store.getId(), date, excludeReservationId);
+            if (isDuplicate) {
+                throw new ReservationException(
+                        "이미 해당 날짜에 예약이 존재합니다. 같은 날 중복 예약은 불가합니다.",
+                        HttpStatus.CONFLICT
+                );
+            }
+        }
+
+        // 동시간대 인원 체크 (수정 시 자기 자신의 기존 인원은 제외)
+        int currentGuests = (excludeReservationId == null)
+                ? reservationRepository.sumActiveGuestsBySlot(store.getId(), date, time)
+                : reservationRepository.sumActiveGuestsBySlotExcluding(store.getId(), date, time, excludeReservationId);
+        if (store.getMaxCapacityPerSlot() != null) {
+            int remaining = store.getMaxCapacityPerSlot() - currentGuests;
+            if (remaining <= 0) {
+                throw new ReservationException(
+                        "해당 시간대 예약이 마감되었습니다. (" + currentGuests + "/" + store.getMaxCapacityPerSlot() + "명 마감) 다른 시간대를 선택해주세요.",
+                        HttpStatus.CONFLICT
+                );
+            }
+            if (guestCount > remaining) {
+                throw new ReservationException(
+                        "선택하신 인원(" + guestCount + "명)이 남은 자리(" + remaining + "명)를 초과합니다.",
+                        HttpStatus.CONFLICT
+                );
+            }
+        }
     }
 
     /**
@@ -285,26 +303,69 @@ public class ReservationService {
 
     /**
      * 예약 수정 (사용자용)
+     *
+     * 정책:
+     * - PENDING(승인 전): 자유롭게 수정.
+     * - CONFIRMED(승인 후, 미결제): 수정 허용하되 내용이 바뀌므로 다시 PENDING으로 되돌려 사장님 재승인을 받는다.
+     *   (예약금 없음 + 자동 승인 ON인 가게는 생성과 동일하게 즉시 CONFIRMED로 자동 승인)
+     * - 이미 결제된 예약: 수정 불가 → 취소 후 재예약으로 유도(결제 정합성 보호).
+     * - COMPLETED/REJECTED/CANCELLED/NO_SHOW: 종료 상태라 수정 불가.
+     *
+     * status 필드는 사용자가 임의로 바꿀 수 없도록 요청에서 무시하고 서버가 위 규칙대로 결정한다.
      */
     @Transactional
     public ReservationResponse updateReservation(Long id, ReservationUpdateRequest request, Member member) {
         Reservation reservation = findByIdOrThrow(id);
         validateOwnership(reservation, member);
 
-        if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
-            throw new ReservationException("대기 중인 예약만 수정할 수 있습니다.", HttpStatus.BAD_REQUEST);
+        Reservation.ReservationStatus current = reservation.getStatus();
+        boolean editableStatus = current == Reservation.ReservationStatus.PENDING
+                || current == Reservation.ReservationStatus.CONFIRMED;
+        if (!editableStatus) {
+            throw new ReservationException("완료·취소·거절·노쇼된 예약은 변경할 수 없습니다.", HttpStatus.BAD_REQUEST);
         }
 
-        if (request.getReservationDate() != null) reservation.setReservationDate(request.getReservationDate());
-        if (request.getReservationTime() != null) reservation.setReservationTime(request.getReservationTime());
-        if (request.getGuestCount() != null) reservation.setGuestCount(request.getGuestCount());
-        if (request.getSpecialRequest() != null) reservation.setSpecialRequest(request.getSpecialRequest());
-
-        LocalDateTime reservationDateTime = LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime());
-        if (reservationDateTime.isBefore(LocalDateTime.now())) {
-            throw new ReservationException("수정하려는 날짜가 이미 지났습니다.", HttpStatus.BAD_REQUEST);
+        // 결제된 예약은 수정 불가 — 취소 후 재예약으로 유도(부분 환불/재결제 정합성 보호)
+        if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
+            throw new ReservationException(
+                    "이미 결제된 예약은 변경할 수 없습니다. 취소 후 다시 예약해주세요.", HttpStatus.BAD_REQUEST);
         }
 
+        // 슬롯 재검증을 위해 가게를 비관적 락으로 조회 (생성과 동일하게 오버부킹 레이스 차단)
+        Store store = storeRepository.findByIdForUpdate(reservation.getStore().getId())
+                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        // 운영 중단된 가게로는 예약을 옮길 수 없음
+        if (store.getOwner() != null && store.getOwner().isSuspended()) {
+            throw new ReservationException("현재 운영이 중단된 가게입니다. 예약을 변경할 수 없습니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        // 요청에 담긴 값만 반영, 나머지는 기존값 유지 (status는 무시)
+        LocalDate newDate = request.getReservationDate() != null ? request.getReservationDate() : reservation.getReservationDate();
+        LocalTime newTime = request.getReservationTime() != null ? request.getReservationTime() : reservation.getReservationTime();
+        Integer newGuestCount = request.getGuestCount() != null ? request.getGuestCount() : reservation.getGuestCount();
+
+        // 생성과 동일한 검증 — 단, 자기 자신은 정원/중복 계산에서 제외
+        validateReservationSlot(store, member, newDate, newTime, newGuestCount, reservation.getId());
+
+        reservation.setReservationDate(newDate);
+        reservation.setReservationTime(newTime);
+        reservation.setGuestCount(newGuestCount);
+        if (request.getSpecialRequest() != null) {
+            reservation.setSpecialRequest(request.getSpecialRequest());
+        }
+
+        // 재승인 정책: 내용이 바뀌었으니 CONFIRMED였던 예약도 PENDING으로 되돌려 사장님이 다시 확인하게 한다.
+        // 단, 예약금 없음 + 자동 승인 ON인 가게는 생성과 동일하게 즉시 CONFIRMED로 자동 승인.
+        // NOTE: 재승인 알림 메일은 현재 범위에서 제외 — 필요해지면 approveReservation과 동일한 패턴으로 추가.
+        boolean hasDeposit = store.getNoShowDeposit() != null && store.getNoShowDeposit() > 0;
+        Reservation.ReservationStatus newStatus =
+                Boolean.TRUE.equals(store.getAutoApprovalEnabled()) && !hasDeposit
+                        ? Reservation.ReservationStatus.CONFIRMED
+                        : Reservation.ReservationStatus.PENDING;
+        reservation.setStatus(newStatus);
+
+        log.info("Reservation updated: id={}, memberId={}, newStatus={}", id, member.getId(), newStatus);
         return ReservationResponse.fromEntity(reservationRepository.save(reservation));
     }
 
@@ -334,7 +395,7 @@ public class ReservationService {
     public String generateQrCheckinToken(Long reservationId, Member member) {
         Reservation reservation = findByIdOrThrow(reservationId);
         validateOwnership(reservation, member);
-        return qrCheckinTokenProvider.generateToken(reservationId);
+        return qrCheckinTokenProvider.generateToken(reservationId, reservation.getReservationDate());
     }
 
     /**
@@ -588,6 +649,21 @@ public class ReservationService {
     }
 
     // ========== 내부 도우미 메서드 ==========
+
+    /**
+     * unique한 표시용 예약번호 생성 — DB의 unique 제약과 충돌하지 않을 때까지 재시도.
+     * 4자리 랜덤(약 100만 조합)이라 같은 날 충돌 확률은 극히 낮지만, 만약을 대비해 몇 번 재생성한다.
+     */
+    private String generateUniqueReservationCode(LocalDate reservationDate) {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            String code = ReservationCodeGenerator.generate(reservationDate);
+            if (!reservationRepository.existsByReservationCode(code)) {
+                return code;
+            }
+        }
+        // 극히 드문 연속 충돌 — 타임스탬프 suffix로 확실히 유일하게 만든다.
+        return ReservationCodeGenerator.generate(reservationDate) + System.nanoTime() % 1000;
+    }
 
     private Reservation findByIdOrThrow(Long id) {
         return reservationRepository.findById(id)

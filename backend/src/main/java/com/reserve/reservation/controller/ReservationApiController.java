@@ -8,6 +8,7 @@ import com.reserve.global.ratelimit.RateLimiter;
 import com.reserve.member.entity.Member;
 import com.reserve.reservation.dto.ReservationCreateRequest;
 import com.reserve.reservation.dto.ReservationResponse;
+import com.reserve.reservation.dto.ReservationUpdateRequest;
 import com.reserve.reservation.dto.SlotAvailabilityResponse;
 import com.reserve.reservation.service.ReservationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -80,6 +81,15 @@ public class ReservationApiController {
     public ResponseEntity<ApiResponse<ReservationResponse>> getReservation(@PathVariable Long id) {
         ReservationResponse reservation = reservationService.getReservation(id, SecurityUtil.getCurrentMember());
         return ResponseEntity.ok(ApiResponse.success(reservation, "예약 상세 조회 성공"));
+    }
+
+    // 예약 수정 (사용자 본인) — 날짜/시간/인원/요청사항 변경. status는 서버가 재승인 규칙대로 결정하므로 요청값은 무시.
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<ReservationResponse>> updateReservation(
+            @PathVariable Long id,
+            @Valid @RequestBody ReservationUpdateRequest request) {
+        ReservationResponse reservation = reservationService.updateReservation(id, request, SecurityUtil.getCurrentMember());
+        return ResponseEntity.ok(ApiResponse.success(reservation, "예약이 변경되었습니다."));
     }
 
     @PatchMapping("/{id}/cancel")

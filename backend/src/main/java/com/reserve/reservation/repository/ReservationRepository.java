@@ -97,6 +97,19 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     );
 
     /**
+     * 동시간대 활성 예약 인원 합계 조회 — 특정 예약 1건은 제외한다.
+     * 예약 "수정" 시 자기 자신이 이미 그 슬롯의 인원에 포함돼 있어(수정 전 값 기준) 남은 자리 계산에서
+     * 자신을 빼지 않으면 인원을 안 늘려도 "마감"으로 잘못 판정될 수 있으므로, excludeReservationId로 자신을 제외한다.
+     */
+    @Query("SELECT COALESCE(SUM(r.guestCount), 0) FROM Reservation r WHERE r.store.id = :storeId AND r.reservationDate = :date AND r.reservationTime = :time AND r.status IN ('PENDING', 'CONFIRMED') AND r.id <> :excludeReservationId")
+    int sumActiveGuestsBySlotExcluding(
+            @Param("storeId") Long storeId,
+            @Param("date") java.time.LocalDate date,
+            @Param("time") java.time.LocalTime time,
+            @Param("excludeReservationId") Long excludeReservationId
+    );
+
+    /**
      * 날짜별 시간대 선택 UI용: 해당 날짜의 시간대별 활성 예약(PENDING/CONFIRMED) 인원 합계를 한 번에 조회
      * (슬롯마다 sumActiveGuestsBySlot을 반복 호출하는 대신 GROUP BY로 1쿼리)
      * 반환: [reservationTime, guestCountSum] 쌍의 Object[] 리스트
@@ -168,6 +181,18 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     );
 
     /**
+     * 중복 예약 방지(수정용): 특정 예약 1건을 제외하고 같은 회원+가게+날짜에 활성 예약이 있는지 확인.
+     * 예약 수정 시 자기 자신이 걸려 "이미 예약 존재"로 잘못 막히는 것을 방지한다.
+     */
+    @Query("SELECT COUNT(r) > 0 FROM Reservation r WHERE r.member.id = :memberId AND r.store.id = :storeId AND r.reservationDate = :date AND r.status IN ('PENDING', 'CONFIRMED') AND r.id <> :excludeReservationId")
+    boolean existsActiveReservationByMemberAndStoreAndDateExcluding(
+            @Param("memberId") Long memberId,
+            @Param("storeId") Long storeId,
+            @Param("date") LocalDate date,
+            @Param("excludeReservationId") Long excludeReservationId
+    );
+
+    /**
      * 가게 삭제 전 활성 예약(PENDING/CONFIRMED) 건수 조회
      */
     @Query("SELECT COUNT(r) FROM Reservation r WHERE r.store.id = :storeId AND r.status IN ('PENDING', 'CONFIRMED')")
@@ -201,4 +226,42 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Modifying
     @Query("DELETE FROM Reservation r WHERE r.deletedAt IS NOT NULL AND r.deletedAt < :cutoff")
     int hardDeleteByDeletedAtBefore(LocalDateTime cutoff);
+
+    /**
+     * 표시용 예약번호 중복 방지: 생성한 코드가 이미 존재하는지 확인(unique 제약 검사 전 재생성용).
+     */
+    boolean existsByReservationCode(String reservationCode);
+
+    /**
+     * 예약번호 백필용: reservationCode가 아직 없는(null) 예약만 조회.
+     * ddl-auto: update로 컬럼이 nullable로 추가된 뒤, 기존 행을 앱 시작 시 1회 채우기 위함.
+     */
+    List<Reservation> findByReservationCodeIsNull();
+
+    /**
+     * 사업자 통계 탭 — 기간 내 일별 예약 건수 추이 (reservationDate 기준 GROUP BY)
+     * 반환: [reservationDate, count] 쌍의 Object[] 리스트
+     */
+    @Query("SELECT r.reservationDate, COUNT(r) FROM Reservation r " +
+           "WHERE r.store.id = :storeId AND r.reservationDate BETWEEN :start AND :end AND r.deletedAt IS NULL " +
+           "GROUP BY r.reservationDate")
+    List<Object[]> countGroupedByDate(@Param("storeId") Long storeId, @Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    /**
+     * 사업자 통계 탭 — 기간 내 상태별 건수 분포
+     * 반환: [status, count] 쌍의 Object[] 리스트
+     */
+    @Query("SELECT r.status, COUNT(r) FROM Reservation r " +
+           "WHERE r.store.id = :storeId AND r.reservationDate BETWEEN :start AND :end AND r.deletedAt IS NULL " +
+           "GROUP BY r.status")
+    List<Object[]> countGroupedByStatus(@Param("storeId") Long storeId, @Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    /**
+     * 사업자 통계 탭 — 기간 내 일별 예약금 매출(결제 완료건만) 추이
+     * 반환: [reservationDate, sum(depositAmount)] 쌍의 Object[] 리스트
+     */
+    @Query("SELECT r.reservationDate, SUM(r.depositAmount) FROM Reservation r " +
+           "WHERE r.store.id = :storeId AND r.depositPaid = true AND r.reservationDate BETWEEN :start AND :end AND r.deletedAt IS NULL " +
+           "GROUP BY r.reservationDate")
+    List<Object[]> sumDepositGroupedByDate(@Param("storeId") Long storeId, @Param("start") LocalDate start, @Param("end") LocalDate end);
 }

@@ -16,6 +16,7 @@ import java.time.LocalTime;
 public class ReservationResponse {
     
     private Long id;
+    private String reservationCode;
     private Long storeId;
     private String storeName;
     private String storeMainImageUrl;
@@ -40,6 +41,7 @@ public class ReservationResponse {
     public static ReservationResponse fromEntity(Reservation reservation) {
         return ReservationResponse.builder()
                 .id(reservation.getId())
+                .reservationCode(reservation.getReservationCode())
                 .storeId(reservation.getStore().getId())
                 .storeName(reservation.getStore().getName())
                 .storeMainImageUrl(reservation.getStore().getMainImageUrl())
@@ -63,6 +65,7 @@ public class ReservationResponse {
     public static ReservationResponse fromEntityWithReviewId(Reservation reservation, Long reviewId) {
         return ReservationResponse.builder()
                 .id(reservation.getId())
+                .reservationCode(reservation.getReservationCode())
                 .storeId(reservation.getStore().getId())
                 .storeName(reservation.getStore().getName())
                 .storeMainImageUrl(reservation.getStore().getMainImageUrl())

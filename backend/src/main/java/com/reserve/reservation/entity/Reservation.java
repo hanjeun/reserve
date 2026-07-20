@@ -28,6 +28,11 @@ public class Reservation {
     @Column(name = "reservation_id")
     private Long id;
 
+    // 표시용 예약번호 (R-YYYYMMDD-XXXX) — auto-increment id 노출 대신 사람이 읽고 대조하는 용도.
+    // ddl-auto: update 환경이라 기존 행 백필을 위해 nullable로 둔다(ReservationCodeBackfillRunner가 1회 채움).
+    @Column(name = "reservation_code", length = 20, unique = true)
+    private String reservationCode;
+
     // 예약한 사용자
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)

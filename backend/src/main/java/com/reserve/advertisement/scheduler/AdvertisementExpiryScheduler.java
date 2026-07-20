@@ -1,5 +1,6 @@
-package com.reserve.advertisement.service;
+package com.reserve.advertisement.scheduler;
 
+import com.reserve.advertisement.service.AdvertisementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

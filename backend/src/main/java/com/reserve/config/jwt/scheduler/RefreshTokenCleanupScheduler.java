@@ -1,4 +1,4 @@
-package com.reserve.config.jwt;
+package com.reserve.config.jwt.scheduler;
 
 import com.reserve.config.jwt.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;

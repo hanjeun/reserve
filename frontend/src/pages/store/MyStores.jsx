@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Typography, Empty, Modal, Flex, Radio, Spin } from 'antd';
+import { Typography, Empty, Modal, Flex, Radio } from 'antd';
 import { StarFilled, EditOutlined, DeleteOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { PageContainer, Card, StoreCardSkeleton, Badge } from '../../components/common';
+import { PageContainer, Card, StoreCardSkeleton, Badge, ModalLoading } from '../../components/common';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { getThumbnailUrl } from '../../utils';
@@ -10,6 +10,22 @@ import { colors, radius, fontWeight, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
 
 const { Title, Text } = Typography;
+
+// 2026-07 추가 — MyFavorites/StoreList와 동일한 이유로 masonry(columns) 대신 고정 그리드로 전환.
+// PC에서 항상 4열로 고정되고, 좁은 화면에서만 미디어 쿼리로 2열/1열로 줄어든다.
+const GRID_STYLE = `
+  .rsv-mystore-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 900px) {
+    .rsv-mystore-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .rsv-mystore-grid { grid-template-columns: 1fr; }
+  }
+`;
 
 // ─── 삭제 옵션 카드 스타일 ───────────────────────────────────────────────────
 const optionCardStyle = (selected, isDanger) => ({
@@ -67,6 +83,10 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
             open={open}
             onOk={handleOk}
             onCancel={onCancel}
+            /* maskClosable={false}: 가게 삭제 — 되돌릴 수 없는 파괴적 액션이라 명시적으로 버튼을 눌러야 닫히게 한다.
+               컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
+               (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
+            maskClosable={false}
             okText="삭제하기"
             cancelText="취소"
             okButtonProps={{
@@ -85,10 +105,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
 
                 {/* 예약 수 로딩 */}
                 {loadingCount ? (
-                    <Flex align="center" gap={8} style={{ margin: '20px 0' }}>
-                        <Spin size="small" />
-                        <Text type="secondary" style={{ fontSize: fontSize.sm }}>예약 현황 확인 중...</Text>
-                    </Flex>
+                    <ModalLoading text="예약 현황 확인 중..." minHeight="120px" />
                 ) : activeCount !== null && (
                     <div style={{ marginTop: 16 }}>
                         {/* 예약 없음 */}
@@ -197,6 +214,7 @@ const MyStores = () => {
 
     return (
         <PageContainer size="xl" paddingTop="40px">
+            <style>{GRID_STYLE}</style>
             {/* 헤더 */}
             <div style={{ marginBottom: '40px' }}>
                 <Title level={2} style={{ margin: '0 0 8px 0', fontWeight: fontWeight.extrabold }}>
@@ -207,28 +225,36 @@ const MyStores = () => {
                 </Text>
             </div>
 
-            {/* 카드 영역 */}
+            {/* 카드 영역 — 2026-07 수정: 고정 4열 그리드(rsv-mystore-grid)로 통일(위 GRID_STYLE 참고).
+                Card.Add도 같은 시점에 borderRadius를 0(각짐)으로 맞춰서 실제 가게 카드와 모서리가 일치한다. */}
             {loading ? (
-                <div style={{ columns: '4 240px', columnGap: 24 }}>
+                <div className="rsv-mystore-grid">
                     <StoreCardSkeleton count={4} withActions />
                 </div>
             ) : stores.length > 0 ? (
-                <div style={{ columns: '4 240px', columnGap: 24 }}>
+                <div className="rsv-mystore-grid">
                     {stores.map(store => (
-                        <div key={store.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
+                        <div key={store.id}>
                             <Card
                                 hoverable
                                 actions={[
-                                    <EditOutlined
+                                    /* onClick을 아이콘이 아니라 li 전체를 채우는 wrapper에 건다 — 예전에는
+                                       아이콘 자체에만 onClick이 있어 아이콘 픽셀만 눌러야 동작하고 주위 네모
+                                       여백은 안 눌렸다. 각 li를 꿉 채우는 클릭 영역으로 감싸 네모 전체가 눌리게 한다. */
+                                    <div
                                         key="edit"
                                         onClick={(e) => { e.stopPropagation(); navigate(`/store/${store.id}/edit`); }}
-                                        style={{ fontSize: '18px' }}
-                                    />,
-                                    <DeleteOutlined
+                                        style={styles.cardAction}
+                                    >
+                                        <EditOutlined style={{ fontSize: '18px' }} />
+                                    </div>,
+                                    <div
                                         key="delete"
                                         onClick={(e) => handleDeleteClick(e, store)}
-                                        style={{ fontSize: '18px', color: colors.error.main }}
-                                    />,
+                                        style={styles.cardAction}
+                                    >
+                                        <DeleteOutlined style={{ fontSize: '18px', color: colors.error.main }} />
+                                    </div>,
                                 ]}
                                 onClick={() => navigate(`/store/${store.id}`)}
                             >
@@ -250,7 +276,7 @@ const MyStores = () => {
                             </Card>
                         </div>
                     ))}
-                    <div style={{ breakInside: 'avoid', marginBottom: 24 }}>
+                    <div>
                         <Card.Add onClick={() => navigate('/store/register')} minHeight="350px">
                             새 가게 등록하기
                         </Card.Add>
@@ -273,6 +299,19 @@ const MyStores = () => {
             />
         </PageContainer>
     );
+};
+
+const styles = {
+    // 가게 카드 하단 액션(수정/삭제) — AntD Card actions의 <li> 안을 꿉 채워
+    // 아이콘뿐 아니라 네모 영역 전체가 클릭되게 한다. 세로 padding으로 클릭 높이도 확보.
+    cardAction: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        padding: '4px 0',
+        cursor: 'pointer',
+    },
 };
 
 export default MyStores;

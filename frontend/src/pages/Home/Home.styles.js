@@ -6,7 +6,7 @@ export const styles = {
         overflowX: 'hidden',
     },
     contentArea: {
-        minHeight: `calc(100dvh - ${heights.header})`,
+        minHeight: `calc(100svh - ${heights.header})`,
         padding: '0 24px',
         gap: 0,
         position: 'relative',
@@ -64,7 +64,7 @@ export const styles = {
 
     // ── PC 섹션 ──
     section: {
-        minHeight: `calc(100dvh - ${heights.header})`,
+        minHeight: `calc(100svh - ${heights.header})`,
         scrollMarginTop: heights.header,
         padding: '0 24px',
         display: 'flex',
@@ -96,7 +96,7 @@ export const styles = {
     sectionMobile: {
         // minHeight 복원: 모바일에서도 섹션이 화면을 꽉 채워야 V버튼 클릭 시 다음 섹션 침범 없이 깔끔함
         // overscroll-behavior-y: none은 이미 제거했으므로 스크롤 고정 느낙 없음
-        minHeight: `calc(100dvh - ${heights.header})`,
+        minHeight: `calc(100svh - ${heights.header})`,
         scrollMarginTop: heights.header,
         padding: '60px 20px',
         display: 'flex',

@@ -72,7 +72,10 @@ const VARIANTS = {
     },
     outline: {
         background: 'transparent',
-        color: colors.text.tertiary,
+        // 2026-07: 예전엔 text.tertiary(연회색)라 같은 "모달 취소 버튼"인데도 AntD 기본 버튼
+        // (진한 텍스트)과 색이 달라 보였다. 모달 취소는 "그냥 장식"이 아니라 사용자가 실제로
+        // 누를 수 있어야 하는 동등한 선택지이므로 본문과 같은 진한 색이 맞다.
+        color: colors.text.primary,
         border: `1px solid ${colors.border.default}`,
         borderRadius: radius.xl,
         boxShadow: 'none',
@@ -215,7 +218,9 @@ const Button = ({
                 .reserve-btn--ghost-sm-danger:hover:not(:disabled)  { opacity: 0.7; }
                 .reserve-btn--ghost-sm-danger:active:not(:disabled) { opacity: 0.5; transform: scale(0.95); }
 
-                .reserve-btn--outline:hover:not(:disabled)  { border-color: #adb5bd; color: #6c757d; }
+                /* outline: hover 시 테두리만 진해지고 글자는 진한 색 그대로 유지
+                   (예전엔 hover에서 color를 #6c757d 회색으로 바꿔서 더 흐릿해졌음) */
+                .reserve-btn--outline:hover:not(:disabled)  { border-color: #adb5bd; background: rgba(0,0,0,0.02); }
                 .reserve-btn--outline:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
                 .reserve-btn--ghost:hover:not(:disabled)    { opacity: 0.7; }
                 .reserve-btn--ghost:active:not(:disabled)   { opacity: 0.5; transform: scale(0.94); }

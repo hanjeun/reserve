@@ -92,7 +92,7 @@ const InquiryModal = ({ open, onClose }) => {
             </FormField>
             <FormField label="제목">
                 <FormInput placeholder="문의 제목을 입력하세요" value={title}
-                    onChange={(e) => setTitle(e.target.value)} maxLength={200} />
+                    onChange={(e) => setTitle(e.target.value)} maxLength={200} showCount />
             </FormField>
             <FormField label="내용">
                 <FormTextArea rows={6} placeholder="문의하실 내용을 자세히 적어주세요."

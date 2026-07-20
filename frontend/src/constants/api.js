@@ -25,6 +25,7 @@ export const API_ENDPOINTS = {
         UPDATE:          (id) => `/api/stores/${id}`,
         DELETE:          (id) => `/api/stores/${id}`,
         AUTO_APPROVAL:   (id) => `/api/stores/${id}/auto-approval`,
+        STATISTICS:      (id) => `/api/stores/${id}/statistics`,
     },
     RESERVATION: {
         LIST:                '/api/reservations',
@@ -33,6 +34,7 @@ export const API_ENDPOINTS = {
         STORE_RESERVATIONS:  '/api/reservations/store',
         CREATE:              '/api/reservations',
         DETAIL:              (id) => `/api/reservations/${id}`,
+        UPDATE:              (id) => `/api/reservations/${id}`,
         CANCEL:              (id) => `/api/reservations/${id}/cancel`,
         REMOVE:              (id) => `/api/reservations/${id}/remove`,
         APPROVE:             (id) => `/api/reservations/${id}/approve`,
@@ -44,13 +46,21 @@ export const API_ENDPOINTS = {
         QR_CHECKIN:          '/api/reservations/qr-checkin',
     },
     ADVERTISEMENT: {
-        CREATE:         '/api/advertisements',
+        CREATE:          '/api/advertisements',
+        PREPARE_PAYMENT: (id) => `/api/advertisements/${id}/prepare-payment`,
         VERIFY_PAYMENT: '/api/advertisements/verify-payment',
         ACTIVE:         '/api/advertisements/active',
         MY_ADS:         '/api/advertisements/my',
         ADMIN_ALL:      '/api/advertisements/admin/all',
         ADMIN_SUSPEND:  (id) => `/api/advertisements/admin/${id}/suspend`,
         CANCEL:         (id) => `/api/advertisements/${id}`,
+        // 종료상태 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가
+        REMOVE:         (id) => `/api/advertisements/${id}/remove`,
+        UPDATE:         (id) => `/api/advertisements/${id}`,
+        // 광고 성과 지표(2026-07 추가)
+        IMPRESSION:     (id) => `/api/advertisements/${id}/impression`,
+        CLICK:          (id) => `/api/advertisements/${id}/click`,
+        CONVERSION:     (id) => `/api/advertisements/${id}/conversion`,
     },
     REVIEW: {
         CREATE:          '/api/reviews',

@@ -38,7 +38,13 @@ const SegmentedControl = ({ options, value, onChange, block = true, wrap = false
                     disabled={disabled || opt.disabled}
                     onClick={() => onChange(opt.value)}
                     className={`reserve-segmented-btn${active ? ' reserve-segmented-btn--active' : ''}`}
-                    style={block ? { flex: 1 } : undefined}
+                    style={
+                        // 2026-07 버그 수정: wrap 모드에서 flex:1을 쓰면, 줄이 바뀌어 혼자 남은 마지막
+                        // 버튼(예: 문의하기 모달 "기타 문의")이 해당 줄을 혼자 차지하면서 전체 폭으로 늘어나는
+                        // 문제가 있었다(flex-grow:1이 경쟁자 없이 혼자면 100% 차지). wrap일 때는 내용만큼만
+                        // 차지하게(flex-grow 없음) 바꿔, 혼자 남아도 늘어나지 않고 자연스럽게 줄바꿈되게 함.
+                        wrap ? { flex: '0 0 auto' } : (block ? { flex: 1 } : undefined)
+                    }
                 >
                     {opt.label}
                 </button>

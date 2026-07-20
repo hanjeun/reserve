@@ -9,6 +9,7 @@ import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS, API_BASE_URL } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
+import { saveRedirect, consumeRedirect } from '../../utils/redirect';
 import { colors, radius, heights, fontWeight, fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
@@ -40,7 +41,15 @@ const Login = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { message } = useMessage();
-    const from = location.state?.from?.pathname || "/";
+    // 로그인 성공 후 돌아갈 경로.
+    // 1순위: PrivateRoute가 넘겨준 router state (이메일 로그인 경로)
+    // 2순위: sessionStorage (소셜 로그인은 전체 페이지 리다이렉트라 router state가 날아간다)
+    // 참고: 아래 useEffect가 안내 메시지를 띄우며 state를 비우기 때문에, 여기서 렌더 시점에
+    //       미리 값을 잡아둬야 유실되지 않는다.
+    const fromState = location.state?.from
+        ? `${location.state.from.pathname || ''}${location.state.from.search || ''}`
+        : null;
+    const fromRef = useRef(fromState);
     const hasHandledRef = useRef(false);
     const [loading, setLoading] = useState(false);
     // 정지/영구정지 안내 모달 상태 — 앱 전반 모달 스타일(큰색 제목 + 텍스트 본문 + 단일 버튼)과 통일하기 위해
@@ -70,7 +79,12 @@ const Login = () => {
         if (location.state?.prevented) {
             hasHandledRef.current = true;
             message.warning('로그인이 필요한 서비스입니다.');
-            navigate('/login', { replace: true, state: {} });
+            // 2026-07 버그 수정: 예전엔 여기서 state를 통째로 비웠다({}).
+            // 그런데 그 state 안엔 PrivateRoute가 넣어준 from(원래 가려던 페이지)도 같이 들어 있어서,
+            // 안내 메시지를 띄우는 순간 복귀 경로가 사라지고 로그인 성공 후 항상 '/'로 가버렸다.
+            // (아래 onLoginSubmit에 navigate(from) 복귀 코드가 이미 있었는데도 이 한 줄 때문에 무력화)
+            // -> 메시지를 한 번만 띄우기 위해 prevented 플래그만 지우고 from은 그대로 남긴다.
+            navigate('/login', { replace: true, state: { from: location.state.from } });
             return;
         }
 
@@ -105,7 +119,9 @@ const Login = () => {
             if (res) {
                 login(res);
                 message.success(`${res.name}님, 로그인되었습니다!`);
-                navigate(from, { replace: true });
+                // router state → sessionStorage → '/' 순으로 복귀 경로 결정
+                const target = fromRef.current || consumeRedirect() || '/';
+                navigate(target, { replace: true });
             }
         } catch (err) {
             if (err?.isSessionExpired) return;
@@ -124,6 +140,10 @@ const Login = () => {
     };
 
     const handleSocialLogin = (provider) => {
+        // 소셜 로그인은 백엔드로 전체 페이지 리다이렉트를 하기 때문에 React Router의 state가
+        // 살아남지 못한다 — 떠나기 직전에 복귀 경로를 sessionStorage에 남긴다.
+        // (같은 탭 안의 왕복이라 sessionStorage는 유지된다. OAuthCallback/SocialAgreement가 소비)
+        if (fromRef.current) saveRedirect(fromRef.current);
         window.location.href = `${API_BASE_URL}/oauth2/authorization/${provider}`;
     };
 

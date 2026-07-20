@@ -11,12 +11,25 @@ import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 
 const { Text } = Typography;
 
+/**
+ * 결제 결과 페이지 — 예약금 결제(usePayment)와 광고 결제(useAdPayment) 둘 다 이 페이지로
+ * 돌아온다. 데스크톱은 각 훅이 직접 navigate하고(success=true, imp_uid 없음 — 이미 검증
+ * 완료된 상태), 모바일은 백엔드 리다이렉트(/api/payment/mobile-redirect,
+ * /api/advertisements/mobile-redirect)가 검증까지 끝낸 뒤 여기로 리다이렉트한다
+ * (2026-07 광고 모바일 결제 추가로 두 흐름이 이 페이지를 공유하게 됨).
+ *
+ * type 쿼리파라미터로 예약/광고를 구분 — 광고는 merchantUid가 Payment 테이블이 아니라
+ * advertisement 테이블에 있어 paymentService.verify()로 검증할 수 없으므로(백엔드에서
+ * 이미 끝내고 옴), 문구/버튼만 다르게 보여주고 재검증 로직 자체를 타지 않는다.
+ */
 const PaymentResult = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     useDocumentTitle('결제 결과');
 
     const success       = searchParams.get('success') === 'true';
+    const type          = searchParams.get('type') || 'reservation'; // 'reservation' | 'ad'
+    const isAd           = type === 'ad';
     const merchantUid   = searchParams.get('merchant_uid');
     const impUid        = searchParams.get('imp_uid');
     const errorMsg      = searchParams.get('error_msg');
@@ -30,6 +43,11 @@ const PaymentResult = () => {
     const queryClient = useQueryClient();
 
     useEffect(() => {
+        // 광고는 백엔드 리다이렉트가 검증까지 이미 끝내고 온 것 — 여기서 재검증하지 않는다.
+        if (isAd) {
+            if (success) setTimeout(() => setAnimate(true), 100);
+            return;
+        }
         if (success && impUid && merchantUid && !verified) {
             verifyPayment();
         } else if (success && !impUid) {
@@ -101,8 +119,8 @@ const PaymentResult = () => {
                         <Button variant="primary" size="lg" block onClick={() => navigate(-1)}>
                             다시 시도하기
                         </Button>
-                        <Button variant="secondary" size="lg" block onClick={() => navigate('/my-reservations')}>
-                            내 예약 확인
+                        <Button variant="secondary" size="lg" block onClick={() => navigate(isAd ? '/business' : '/my-reservations')}>
+                            {isAd ? '파트너 패널로' : '내 예약 확인'}
                         </Button>
                     </div>
                 </div>
@@ -129,15 +147,17 @@ const PaymentResult = () => {
 
                 <div style={{ opacity: animate ? 1 : 0, transform: animate ? 'translateY(0)' : 'translateY(12px)', transition: 'all 0.35s ease 0.15s' }}>
                     <Text style={styles.mainTitle}>결제 완료</Text>
-                    <Text style={styles.desc}>예약금이 정상적으로 결제되었습니다.</Text>
+                    <Text style={styles.desc}>
+                        {isAd ? '광고가 등록되었습니다.' : '예약금이 정상적으로 결제되었습니다.'}
+                    </Text>
                 </div>
 
-                {/* 결제 상세 */}
+                {/* 결제 상세 — 광고는 모바일 리다이렉트로 오면 금액/결제수단 상세가 없어 주문번호만 표시 */}
                 <div style={{ ...styles.infoCard, opacity: animate ? 1 : 0, transform: animate ? 'translateY(0)' : 'translateY(12px)', transition: 'all 0.35s ease 0.25s' }}>
                     {displayMerchantUid && (
                         <div style={styles.infoRow}>
                             <Text style={styles.infoLabel}>주문번호</Text>
-                            <Text style={{ ...styles.infoValue, fontSize: fontSize.xs, color: colors.text.tertiary, fontFamily: 'monospace' }}>
+                            <Text style={{ ...styles.infoValue, fontSize: fontSize.xs, color: colors.text.tertiary }}>
                                 {displayMerchantUid}
                             </Text>
                         </div>
@@ -167,19 +187,29 @@ const PaymentResult = () => {
                 {/* 안내 문구 */}
                 <div style={{ ...styles.noticeBox, opacity: animate ? 1 : 0, transition: 'opacity 0.35s ease 0.35s' }}>
                     <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, lineHeight: 1.6 }}>
-                        예약 확정 여부는 가게 승인 후 변경됩니다.{'\n'}
-                        취소 시 환불 정책에 따라 처리됩니다.
+                        {isAd
+                            ? '광고는 결제 즉시 활성화되어 바로 노출을 시작합니다.'
+                            : <>예약 확정 여부는 가게 승인 후 변경됩니다.{'\n'}취소 시 환불 정책에 따라 처리됩니다.</>
+                        }
                     </Text>
                 </div>
 
                 {/* 버튼 */}
                 <div style={{ ...styles.btnGroup, opacity: animate ? 1 : 0, transform: animate ? 'translateY(0)' : 'translateY(8px)', transition: 'all 0.35s ease 0.4s' }}>
-                    <Button variant="primary" size="lg" block onClick={() => navigate('/my-reservations', { state: { refetch: true } })}>
-                        내 예약 확인하기
-                    </Button>
-                    <Button variant="secondary" size="lg" block onClick={() => navigate('/stores')}>
-                        다른 가게 둘러보기
-                    </Button>
+                    {isAd ? (
+                        <Button variant="primary" size="lg" block onClick={() => navigate('/business', { state: { activeTab: 'ads' } })}>
+                            내 광고 확인하기
+                        </Button>
+                    ) : (
+                        <>
+                            <Button variant="primary" size="lg" block onClick={() => navigate('/my-reservations', { state: { refetch: true } })}>
+                                내 예약 확인하기
+                            </Button>
+                            <Button variant="secondary" size="lg" block onClick={() => navigate('/stores')}>
+                                다른 가게 둘러보기
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
         </PageContainer>

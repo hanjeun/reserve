@@ -45,7 +45,7 @@ public class PaymentApiController {
         String redirectBase = "redirect:" + frontendUrl + "/payment/result";
 
         if (!isSuccess) {
-            return redirectBase + "?success=false&merchant_uid=" + merchantUid + "&message=" + errorMsg;
+            return redirectBase + "?success=false&merchant_uid=" + merchantUid + "&error_msg=" + (errorMsg != null ? errorMsg : "");
         }
 
         try {
@@ -62,7 +62,7 @@ public class PaymentApiController {
             return redirectBase + "?success=true&merchant_uid=" + merchantUid;
         } catch (Exception e) {
             log.error("Mobile redirect processing error: {}", e.getMessage());
-            return redirectBase + "?success=false&message=" + e.getMessage();
+            return redirectBase + "?success=false&merchant_uid=" + merchantUid + "&error_msg=" + e.getMessage();
         }
     }
 

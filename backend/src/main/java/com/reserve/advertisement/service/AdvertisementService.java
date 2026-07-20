@@ -2,11 +2,13 @@ package com.reserve.advertisement.service;
 
 import com.reserve.advertisement.dto.AdCreateRequest;
 import com.reserve.advertisement.dto.AdPaymentPrepareResponse;
+import com.reserve.advertisement.dto.AdUpdateRequest;
 import com.reserve.advertisement.dto.AdvertisementResponse;
 import com.reserve.advertisement.entity.AdStatus;
 import com.reserve.advertisement.entity.AdType;
 import com.reserve.advertisement.entity.Advertisement;
 import com.reserve.advertisement.repository.AdvertisementRepository;
+import com.reserve.audit.service.AuditLogService;
 import com.reserve.file.service.FileStorageService;
 import com.reserve.file.util.FileStoragePaths;
 import com.reserve.global.error.AdvertisementException;
@@ -31,7 +33,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -57,6 +62,8 @@ public class AdvertisementService {
     private final StoreRepository storeRepository;
     private final FileStorageService fileStorageService;
     private final PortoneService portoneService;
+    private final AdCounterBuffer adCounterBuffer;
+    private final AuditLogService auditLogService;
 
     /**
      * 광고 신청 + 결제 준비 (사업자용, 본인 가게만)
@@ -76,6 +83,19 @@ public class AdvertisementService {
         } catch (Exception e) {
             throw new AdvertisementException("광고 유형이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
+
+        // 중복 신청 방지(2026-07 추가): 카카오페이 결제창이 닫히지 않은 채로 남아있거나 사용자가 결제를
+        // 마무리지으면 모달을 닫고 "새 광고 신청"을 다시 누를 수 있어, 같은 가게+타입으로 결제 대기/실패
+        // 상태인 신청이 이미 쌓이는 버그가 있었다 — 같은 건이 있으면 새로 만들지 않고 기존 신청을 재사용하게 막는다.
+        advertisementRepository
+                .findFirstByStoreIdAndAdTypeAndStatusIn(store.getId(), adType,
+                        List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED))
+                .ifPresent(existing -> {
+                    throw new AdvertisementException(
+                            "이미 결제 대기 중인 " + (adType == AdType.BADGE ? "배지형" : "배너형") +
+                            " 신청이 있습니다. 기존 신청을 결제하거나 취소한 후 다시 시도해주세요.",
+                            HttpStatus.CONFLICT);
+                });
 
         if (request.getStartDate() == null || request.getEndDate() == null) {
             throw new AdvertisementException("노출 시작일과 종료일을 입력해주세요.", HttpStatus.BAD_REQUEST);
@@ -145,6 +165,42 @@ public class AdvertisementService {
     }
 
     /**
+     * 결제 재시도 준비 (사업자용, 본인 가게만).
+     * PENDING_PAYMENT(팝업을 닫거나 이탈해 결제를 안 한 경우) 또는 PAYMENT_FAILED 상태에서만 가능.
+     * 포트원은 결제 시도마다 새 merchantUid가 필요하므로 재발급 후 저장한다 (가게/이미지/기간 등 기존 신청 내용은 그대로 유지).
+     */
+    @Transactional
+    public AdPaymentPrepareResponse preparePayment(Long adId, Member owner) {
+        Advertisement ad = advertisementRepository.findById(adId)
+                .orElseThrow(AdvertisementException::notFound);
+
+        if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
+            throw AdvertisementException.forbidden("본인 광고만 결제할 수 있습니다.");
+        }
+        if (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED) {
+            throw new AdvertisementException("결제할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        String merchantUid = "AD-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + "-" + UUID.randomUUID().toString().substring(0, 6);
+        ad.setMerchantUid(merchantUid);
+        ad.setStatus(AdStatus.PENDING_PAYMENT);
+
+        log.info("Advertisement payment re-prepared: adId={}, merchantUid={}", ad.getId(), merchantUid);
+
+        return AdPaymentPrepareResponse.builder()
+                .adId(ad.getId())
+                .merchantUid(merchantUid)
+                .amount(ad.getAmount())
+                .productName(ad.getStore().getName() + " " + (ad.getAdType() == AdType.BADGE ? "광고 배지" : "배너 광고"))
+                .buyerName(owner.getName())
+                .buyerEmail(owner.getEmail())
+                .buyerTel("")
+                .impCode(portoneService.getImpCode())
+                .build();
+    }
+
+    /**
      * 결제 검증 + 광고 활성화 (사업자용) — 결제 완료 즉시 ACTIVE(사전 승인 없음, 사후 제재 방식)
      */
     @Transactional
@@ -156,7 +212,26 @@ public class AdvertisementService {
             throw AdvertisementException.forbidden("본인 광고만 결제할 수 있습니다.");
         }
 
-        PortoneV2PaymentResponse payment = portoneService.getPaymentInfo(merchantUid);
+        return doVerifyAndActivate(ad);
+    }
+
+    /**
+     * 모바일 결제 리다이렉트 전용 검증 (2026-07 추가).
+     * 포트원이 결제 후 돌려보내는 GET 콜백은 인증 헤더(JWT) 없이 브라우저가 직접
+     * 마지막으로 이동해서 오는 것이라 owner를 알 방법이 없다 — 예약 결제의
+     * /api/payment/mobile-redirect와 동일한 보안 모델(merchantUid 자체가 포트원에서만
+     * 발급되는 유일 식별자라 이것으로 충분하다고 본다)을 따른다 — 소유자 검증만 생략하고
+     * 결제 검증/활성화 로직은 완전히 동일하다.
+     */
+    @Transactional
+    public AdvertisementResponse verifyPaymentByMerchantUid(String merchantUid) {
+        Advertisement ad = advertisementRepository.findByMerchantUid(merchantUid)
+                .orElseThrow(AdvertisementException::notFound);
+        return doVerifyAndActivate(ad);
+    }
+
+    private AdvertisementResponse doVerifyAndActivate(Advertisement ad) {
+        PortoneV2PaymentResponse payment = portoneService.getPaymentInfo(ad.getMerchantUid());
 
         if (payment.getAmount() != ad.getAmount()) {
             ad.setStatus(AdStatus.PAYMENT_FAILED);
@@ -168,16 +243,16 @@ public class AdvertisementService {
         }
 
         ad.setStatus(AdStatus.ACTIVE);
-        log.info("Advertisement activated: adId={}, merchantUid={}", ad.getId(), merchantUid);
+        log.info("Advertisement activated: adId={}, merchantUid={}", ad.getId(), ad.getMerchantUid());
         return AdvertisementResponse.fromEntity(ad);
     }
 
-    /** 노출용 — 공개 API, 타입별 ACTIVE + 기간 내 광고 목록 */
+    /** 노출용 — 공개 API, 타입별 ACTIVE + 기간 내 광고 목록 (최근 결제순 — 배너 독점 방지) */
     @Transactional(readOnly = true)
     public List<AdvertisementResponse> getActiveAds(AdType adType) {
         LocalDate today = LocalDate.now();
         return advertisementRepository
-                .findByStatusAndAdTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                .findByStatusAndAdTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(
                         AdStatus.ACTIVE, adType, today, today)
                 .stream()
                 .map(AdvertisementResponse::fromEntity)
@@ -225,9 +300,10 @@ public class AdvertisementService {
             throw AdvertisementException.forbidden("본인 광고만 취소할 수 있습니다.");
         }
 
-        if (ad.getStatus() == AdStatus.PENDING_PAYMENT) {
+        if (ad.getStatus() == AdStatus.PENDING_PAYMENT || ad.getStatus() == AdStatus.PAYMENT_FAILED) {
+            AdStatus previousStatus = ad.getStatus();
             ad.setStatus(AdStatus.CANCELLED);
-            log.info("Advertisement cancelled before payment: adId={}", adId);
+            log.info("Advertisement cancelled before payment: adId={}, previousStatus={}", adId, previousStatus);
         } else if (ad.getStatus() == AdStatus.ACTIVE) {
             portoneService.cancelPayment(ad.getMerchantUid(), null, "사업자 요청 광고 취소");
             ad.setStatus(AdStatus.REFUNDED);
@@ -235,6 +311,67 @@ public class AdvertisementService {
         } else {
             throw new AdvertisementException("취소할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    /**
+     * 배너 광고 콘텐츠(제목/설명/이미지) 수정 (사업자용, 본인 가게만).
+     * 2026-07 추가 — 가게/유형/기간은 결제 금액과 엮여있어 수정 범위 밖(바꾸려면 취소 후 재신청).
+     * BADGE는 title/description/images 자체가 없으므로(BANNER만 사용) 수정 대상이 아니다.
+     * CANCELLED/EXPIRED/SUSPENDED/REFUNDED는 이미 끝난 광고라 수정 불가(cancelAd와 동일한 상태 체크 철학).
+     */
+    @Transactional
+    public AdvertisementResponse updateAd(Long adId, AdUpdateRequest request, Member owner) {
+        Advertisement ad = advertisementRepository.findById(adId)
+                .orElseThrow(AdvertisementException::notFound);
+
+        if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
+            throw AdvertisementException.forbidden("본인 광고만 수정할 수 있습니다.");
+        }
+        if (ad.getAdType() != AdType.BANNER) {
+            throw new AdvertisementException("배지형 광고는 수정할 내용이 없습니다.", HttpStatus.BAD_REQUEST);
+        }
+        if (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED
+                && ad.getStatus() != AdStatus.ACTIVE) {
+            throw new AdvertisementException("수정할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (request.getTitle() != null) {
+            if (request.getTitle().trim().isEmpty()) {
+                throw new AdvertisementException("배너 광고는 제목이 필수입니다.", HttpStatus.BAD_REQUEST);
+            }
+            ad.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null) {
+            ad.setDescription(request.getDescription());
+        }
+
+        // images가 null이면 기존 이미지 유지 — 값이 있으면 통째로 교체(createAd와 동일한 검증/업로드 규칙).
+        // 2026-07 버그수정 — 교체만 하고 예전 이미지를 S3에서 지우지 않았다(StoreService.updateStoreImages는
+        // 교체/삭제된 파일을 항상 fileStorageService.deleteFile로 정리하는데 이 메소드만 빠져있었음) —
+        // 그대로 두면 사용자가 배너를 여러 번 고칠수록 고아(orphan) 파일이 버킷에 계속 쌓여 스토리지 비용만
+        // 늘어난다. 새 이미지가 실제로 업로드되고 난 다음(예외 발생 시 예전 파일은 그대로 남아있어야 하므로)
+        // 예전 URL을 먼저 지운다.
+        List<MultipartFile> images = request.getImages();
+        if (images != null && !images.isEmpty() && images.stream().anyMatch(f -> !f.isEmpty())) {
+            if (images.size() > MAX_BANNER_IMAGES) {
+                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
+            }
+            List<String> newImageUrls = new java.util.ArrayList<>();
+            for (MultipartFile image : images) {
+                if (image.isEmpty()) continue;
+                String key = fileStorageService.storeFile(
+                        image, FileStoragePaths.advertisement(owner.getId(), ad.getStore().getId()));
+                newImageUrls.add(fileStorageService.getPublicUrl(key));
+            }
+            List<String> oldImageUrls = ad.getImageUrlList();
+            ad.setImageUrlList(newImageUrls);
+            if (oldImageUrls != null) {
+                oldImageUrls.forEach(fileStorageService::deleteFile);
+            }
+        }
+
+        log.info("Advertisement updated: adId={}", adId);
+        return AdvertisementResponse.fromEntity(ad);
     }
 
     /** 매일 자정 스케줄러 — endDate 지난 ACTIVE 광고를 EXPIRED로 전환 */
@@ -246,5 +383,83 @@ public class AdvertisementService {
         if (!overdue.isEmpty()) {
             log.info("Expired {} overdue advertisements", overdue.size());
         }
+    }
+
+    /**
+     * 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가.
+     * 종료상태(EXPIRED/CANCELLED/REFUNDED/SUSPENDED)인 본인 가게 광고만 가능 — cancelAd와 동일하게
+     * 관리자 우회 없이 본인 확인만(기존 서비스 메서드들과 일관성 유지).
+     * 예약(ReservationService.removeReservation)과 동일한 패턴 — 결제/노출 이력은 그대로
+     * 보존하고 목록에서만 숨김(30일 휴지통 보관 후 자동 영구삭제).
+     */
+    @Transactional
+    public void removeAd(Long adId, Member owner) {
+        Advertisement ad = advertisementRepository.findById(adId)
+                .orElseThrow(AdvertisementException::notFound);
+
+        if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
+            throw AdvertisementException.forbidden("본인 광고만 삭제할 수 있습니다.");
+        }
+
+        boolean isDeletable = ad.getStatus() == AdStatus.EXPIRED
+                || ad.getStatus() == AdStatus.CANCELLED
+                || ad.getStatus() == AdStatus.REFUNDED
+                || ad.getStatus() == AdStatus.SUSPENDED;
+
+        if (!isDeletable) {
+            throw new AdvertisementException("만료·취소·환불·중단 상태의 광고만 삭제할 수 있습니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        auditLogService.softDeleteAdvertisement(adId);
+        log.info("Advertisement removed: adId={}, ownerId={}", adId, owner.getId());
+    }
+
+    /**
+     * 광고 성과 지표 기록(2026-07 추가) — 누구나 볼 수 있는 공개 엔드포인트(로그인 불필요).
+     * 광고는 장식적 요소라 실패해도 조용히 무시 — 호출측에서는 에러를 사용자에게 노출하지 않는다.
+     * 봇/중복 집계 방지용 rate limiting은 현재 미구현 — 지금 규모에서는 허용 가능한 트레이드오프로 남겨둔다.
+     *
+     * 2026-07 추가 개선 — 예전엔 여기서 바로 findById + save(dirty checking)로 DB를 즉시 건드려서,
+     * 노출 하나마다 SELECT + UPDATE가 나갔다. 지금은 AdCounterBuffer에 인메모리로만 쌓아두고,
+     * 실제 DB 반영은 AdCounterFlushScheduler가 30초마다 한 번에 처리한다(RateLimiter와 동일한
+     * in-memory 패턴). 그래서 이 메서드들엔 더 이상 @Transactional이 필요 없다 — DB를 안 건드리니까.
+     */
+    public void recordImpression(Long adId) {
+        adCounterBuffer.increment(adId, AdCounterBuffer.CounterType.IMPRESSION);
+    }
+
+    /** 배너 클릭 기록(2026-07 추가) — BANNER만 호출(BADGE는 프론트에서 자체적으로 호출 안 함) */
+    public void recordClick(Long adId) {
+        adCounterBuffer.increment(adId, AdCounterBuffer.CounterType.CLICK);
+    }
+
+    /**
+     * 전환 기록(2026-07 추가) — 프론트가 sessionStorage로 "이 예약이 배너 클릭에서 이어졌다"를 판단해서
+     * 예약 생성 직후에 호출한다. 서버에서 귀속 윈도를 재검증하지 않는다(단순 지표용 카운터라 적당한
+     * 수준의 신뢰도로 충분 — 결제/정산과 무관한 단순 참고용 지표이므로 서버 측 재검증은 과잉이라 생략).
+     */
+    public void recordConversion(Long adId) {
+        adCounterBuffer.increment(adId, AdCounterBuffer.CounterType.CONVERSION);
+    }
+
+    /**
+     * AdCounterBuffer에 쌓인 노출/클릭/전환 카운터를 DB에 일괄 반영 (AdCounterFlushScheduler 전용).
+     * adId별로 델타(누적 증가분)만 계산해서 "UPDATE ... SET count = count + delta" 한 방으로 처리 —
+     * 광고 개수만큼만 UPDATE가 나가지, 이벤트 개수만큼 나가지 않는다.
+     */
+    @Transactional
+    public void flushCounters() {
+        flushBucket(adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.IMPRESSION), advertisementRepository::addImpressionCount);
+        flushBucket(adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.CLICK), advertisementRepository::addClickCount);
+        flushBucket(adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.CONVERSION), advertisementRepository::addConversionCount);
+    }
+
+    private void flushBucket(Map<Long, LongAdder> bucket, BiConsumer<Long, Long> updater) {
+        bucket.forEach((adId, adder) -> {
+            long delta = adder.sum();
+            if (delta > 0) {
+                updater.accept(adId, delta);
+            }
+        });
     }
 }

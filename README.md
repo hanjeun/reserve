@@ -15,6 +15,7 @@
 ![AWS](https://img.shields.io/badge/AWS-Lightsail-FF9900?style=flat&logo=amazonaws&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Blue/Green-2496ED?style=flat&logo=docker&logoColor=white)
 ![CI/CD](https://github.com/hanjeun/reserve/actions/workflows/CICD.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/hanjeun/reserve?style=flat&color=blue)
 
 </div>
 
@@ -24,7 +25,7 @@
 
 RESERVE는 업종에 구애받지 않고, 예약이 필요한 순간 누구나 가장 빠르게 예약할 수 있도록 도와주는 플랫폼입니다.
 
-손님은 원하는 가게를 검색하고 간편하게 예약할 수 있으며, 사장님은 예약 관리와 승인/거절을 한 곳에서 처리할 수 있습니다. 노쇼 방지를 위한 예약금 결제 기능도 제공합니다.
+손님은 원하는 가게를 검색하고 간편하게 예약할 수 있으며, 사장님은 예약 관리와 승인/거절, 가게 홍보(광고)를 한 곳에서 처리할 수 있습니다. 노쇼 방지를 위한 예약금 결제와 방문 확인용 QR 체크인 기능도 제공합니다.
 
 ---
 
@@ -47,22 +48,25 @@ RESERVE는 업종에 구애받지 않고, 예약이 필요한 순간 누구나 �
 ## 주요 기능
 
 ### 손님
-- 가게 검색 · 정렬 · 즐겨찾기
-- 날짜 · 시간 · 인원 선택 후 예약
+- 가게 검색 · 정렬 · 즐겨찾기, 가까운 가게 **우리동네 배지**(위치 기반)
+- 날짜 · 시간 · 인원 선택 후 예약, 예약 **수정**
 - 노쇼 예약금 카카오페이 결제
+- 방문 시 **QR 체크인**(예약 코드 · QR 표시)
 - 예약 내역 조회 · 취소
 - 리뷰 작성 · 수정 · 삭제
 - Google / Naver / Kakao 소셜 로그인
 
 ### 사장님 (파트너)
 - 가게 등록 · 수정 · 삭제
-- 예약 승인 / 거절 / 완료 / 노쇼 처리
+- 예약 승인 / 거절 / 완료 / 노쇼 처리, **QR 스캔 체크인**
 - 자동 승인 · 예약금 · 환불 정책 설정
+- **광고 등록 · 결제**(배지형 · 배너형, 포트원 결제)
+- 예약/매출 **통계** 조회
 - 예약 알림 이메일 수신 설정
 
 ### 관리자
 - 사업자 인증 심사 (승인 / 거절)
-- 전체 회원 · 예약 · 메일함 조회
+- 전체 회원 · 예약 · 광고 · 메일함 조회
 - 소프트 삭제 · 휴지통 복구
 - 시스템 로그 (감사 기록) 조회
 - 통계 대시보드 (가게 등록 추이, 예약 현황)
@@ -74,7 +78,7 @@ RESERVE는 업종에 구애받지 않고, 예약이 필요한 순간 누구나 �
 | 영역 | 기술 |
 |---|---|
 | **Backend** | Spring Boot 3.5.6, Java 21, Spring Security, JWT, OAuth2 |
-| **Frontend** | React 19, Vite, Ant Design 6, React Query 5, Zustand, Recharts |
+| **Frontend** | React 19, Vite, Ant Design 6, TanStack Query 5, Zustand, Recharts |
 | **Database** | MySQL 8.0 |
 | **인프라** | AWS Lightsail, Docker, Nginx, GitHub Actions |
 | **배포 방식** | Blue/Green 무중단 배포, 헬스체크 자동 롤백 |
@@ -82,6 +86,7 @@ RESERVE는 업종에 구애받지 않고, 예약이 필요한 순간 누구나 �
 | **이메일** | Resend |
 | **결제** | 포트원 V2 (카카오페이) |
 | **소셜 로그인** | Google, Naver, Kakao OAuth2 |
+| **성능 · 보안** | 라우트 코드 분할, Bucket4j Rate Limiting, 비관적 락 동시성 제어 |
 | **모니터링** | Grafana, Loki, Promtail, Sentry, UptimeRobot |
 | **코드 품질** | SonarCloud, ESLint |
 
@@ -114,5 +119,3 @@ deploy-backend → Blue/Green 전환 → 헬스체크 → Nginx upstream 교체 
 | [디자인 시스템](docs/technical/design-system.md) | 디자인 토큰 · 공통 컴포넌트 |
 | [코드 컨벤션](docs/rules/code-conventions.md) | 네이밍 규칙 · 패키지 구조 |
 | [Git 워크플로우](docs/rules/git-workflow.md) | 브랜치 전략 · PR 방법 · 커밋 메시지 |
-
----

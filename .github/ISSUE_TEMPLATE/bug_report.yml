@@ -1,0 +1,20 @@
+name: Bug report
+description: Report a bug in RESERVE
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, expected result, and actual result.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "OS / browser / viewport width (e.g. iOS Safari, 390px)"
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or logs

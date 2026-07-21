@@ -1,0 +1,28 @@
+package kr.it.reserve.advertisement.dto;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@Getter
+@Setter
+@NoArgsConstructor
+public class AdCreateRequest {
+
+    private Long storeId;
+
+    // BADGE | BANNER (entity.advertisement.kr.it.reserve.AdType)
+    private String adType;
+
+    // BANNER 타입만 사용
+    private String title;
+    private String description;
+    private List<MultipartFile> images;
+
+    private LocalDate startDate;
+    private LocalDate endDate;
+}

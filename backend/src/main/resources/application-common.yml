@@ -81,7 +81,7 @@ jwt:
 logging:
   level:
     root: INFO
-    com.reserve: DEBUG
+    kr.it.reserve: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 

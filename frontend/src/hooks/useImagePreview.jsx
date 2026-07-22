@@ -33,6 +33,19 @@ import { Image } from 'antd';
 // AntD Image preview의 닫힘 트랜지션(zoom/fade) 재생 시간. 여유를 조금 둠.
 const EXIT_DURATION = 300;
 
+// blob URL 해제 공통 헬퍼 — blob이 아닌 URL(S3/CloudFront)은 해제 대상이 아니다. (상태 비의존 순수 함수 → 모듈 레벨)
+const revokeIfBlob = (url) => {
+    if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+};
+
+// AntD Upload file → 미리보기 URL. 업로드 전(originFileObj) 파일은 blob 생성. (상태 비의존 순수 함수 → 모듈 레벨)
+const fileToUrl = (file) => {
+    if (file.url) return { url: file.url, isBlob: false };
+    if (file.preview) return { url: file.preview, isBlob: false };
+    if (file.originFileObj) return { url: URL.createObjectURL(file.originFileObj), isBlob: true };
+    return null;
+};
+
 const useImagePreview = () => {
     const [previewOpen, setPreviewOpen] = useState(false);
     // 프리뷰에 넘길 이미지 URL 배열 + 시작 인덱스
@@ -43,29 +56,17 @@ const useImagePreview = () => {
     // (클로저가 캡쳐한 시점의 state가 아니라 최신 값을 봐야 한다).
     const activeBlobsRef = useRef([]);
 
-    // blob URL 해제 공통 헬퍼 — blob이 아닌 URL(S3/CloudFront)은 해제 대상이 아니다.
-    const revokeIfBlob = (url) => {
-        if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
-    };
-
-    const revokeAllBlobs = () => {
+    // blob URL 일괄 해제 — activeBlobsRef(ref)만 참조하므로 안정적(useCallback deps 비움).
+    const revokeAllBlobs = useCallback(() => {
         activeBlobsRef.current.forEach(revokeIfBlob);
         activeBlobsRef.current = [];
-    };
-
-    // AntD Upload file → 미리보기 URL. 업로드 전(originFileObj) 파일은 blob 생성.
-    const fileToUrl = (file) => {
-        if (file.url) return { url: file.url, isBlob: false };
-        if (file.preview) return { url: file.preview, isBlob: false };
-        if (file.originFileObj) return { url: URL.createObjectURL(file.originFileObj), isBlob: true };
-        return null;
-    };
+    }, []);
 
     // 언마운트 시: 예약된 정리 타이머 취소 + 남아있는 blob URL 해제.
     useEffect(() => () => {
         if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
         revokeAllBlobs();
-    }, []);
+    }, [revokeAllBlobs]);
 
     /**
      * @param file     클릭한 파일(AntD Upload onPreview가 넘겨주는 것)
@@ -84,7 +85,7 @@ const useImagePreview = () => {
         const items = [];
         const blobs = [];
         let current = 0;
-        list.forEach((f, i) => {
+        list.forEach((f) => {
             const resolved = fileToUrl(f);
             if (!resolved) return;
             items.push({ src: resolved.url });
@@ -98,7 +99,7 @@ const useImagePreview = () => {
         setPreviewItems(items);
         setPreviewCurrent(current);
         setPreviewOpen(true);
-    }, []);
+    }, [revokeAllBlobs]);
 
     const handleCancel = useCallback(() => {
         // 1) 먼저 닫기만 — DOM은 그대로 두어 AntD가 닫힘 애니메이션을 재생하게 함
@@ -112,15 +113,19 @@ const useImagePreview = () => {
             setPreviewCurrent(0);
             exitTimerRef.current = null;
         }, EXIT_DURATION);
-    }, []);
+    }, [revokeAllBlobs]);
 
     // 최신 값을 ref로도 들고 있는다 — 아래 PreviewModal의 deps를 비워 참조를 고정하기 위한 용도.
+    // (안정적 identity의 PreviewModal이 최신 state를 읽게 하려는 의도적 ref 동기화. useEffect로 옮기면
+    //  한 렌더 밀려 PreviewModal이 stale 값을 읽어 프리뷰가 안 열리므로, 이 3줄만 rule 예외 처리.)
     const previewOpenRef = useRef(previewOpen);
     const previewItemsRef = useRef(previewItems);
     const previewCurrentRef = useRef(previewCurrent);
+    /* eslint-disable react-hooks/refs */
     previewOpenRef.current = previewOpen;
     previewItemsRef.current = previewItems;
     previewCurrentRef.current = previewCurrent;
+    /* eslint-enable react-hooks/refs */
 
     /**
      * Image.PreviewGroup + items 방식

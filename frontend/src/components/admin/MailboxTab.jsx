@@ -1,13 +1,19 @@
 /**
  * RESERVE - 관리자 메일함 탭 (발송 전용)
  * 받은편지함/웹훅 수신 기능은 제거됨 — 문의는 Inquiry 도메인(문의 내역 탭)이 대신 처리.
+ *
+ * 2026-07 전수조사 — 검색어를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab 등과
+ * 동일한 이유(새로고침해도 유지, 링크 공유 가능).
  */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Typography, Input, Divider, Skeleton } from 'antd';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Typography, Input, Divider } from 'antd';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined } from '@ant-design/icons';
 import { Button, FormTextArea, FormInput, FormModal, FormField } from '../common';
+import { Bone } from '../common/Skeletons';
 import useDebounce from '../../hooks/useDebounce';
-import { useMessage, useWindowWidth } from '../../hooks';
+import { useMessage, useWindowWidth, useQueryParamsState } from '../../hooks';
+import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
@@ -39,48 +45,49 @@ const formatFullDate = (dateStr) => {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const useSentMailData = (message) => {
-    const [sentMails, setSentMails] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [selectedSent, setSelectedSent] = useState(null);
 
-    const loadSentMails = useCallback(async () => {
-        setLoading(true);
-        try {
+    const { data: sentMails = [], isLoading: loading, error, refetch: loadSentMails } = useQuery({
+        queryKey: adminKeys.sentMails(),
+        queryFn: async () => {
             const data = await api.get(API_ENDPOINTS.MAIL.SENT);
-            setSentMails(Array.isArray(data) ? data : (data?.content ?? []));
-        } catch { message.error('보낸 메일을 불러오지 못했습니다.'); }
-        finally { setLoading(false); }
-    }, [message]);
-
-    useEffect(() => { loadSentMails(); }, [loadSentMails]);
+            return Array.isArray(data) ? data : (data?.content ?? []);
+        },
+    });
+    useEffect(() => {
+        if (error) message.error('보낸 메일을 불러오지 못했습니다.');
+    }, [error, message]);
 
     return { sentMails, loading, selectedSent, setSelectedSent, loadSentMails };
 };
 
-const useComposeMail = ({ message, loadSentMails }) => {
+const useComposeMail = ({ message }) => {
+    const queryClient = useQueryClient();
     const [composing, setComposing] = useState(false);
     const [composeForm, setComposeForm] = useState({ toEmail: '', subject: '', body: '' });
-    const [composeSending, setComposeSending] = useState(false);
 
     const resetCompose = () => { setComposing(false); setComposeForm({ toEmail: '', subject: '', body: '' }); };
 
-    const handleComposeSend = async () => {
+    const sendMutation = useMutation({
+        mutationFn: (form) => api.post(API_ENDPOINTS.MAIL.COMPOSE, form),
+        onSuccess: () => {
+            message.success('메일을 보냈습니다.');
+            resetCompose();
+            queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
+        },
+        onError: () => message.error('메일 발송에 실패했습니다.'),
+    });
+
+    const handleComposeSend = () => {
         const trimmedEmail = composeForm.toEmail.trim();
         if (!trimmedEmail) { message.warning('받는 사람 이메일을 입력해주세요.'); return; }
         if (!EMAIL_REGEX.test(trimmedEmail)) { message.warning('올바른 이메일 형식을 입력해주세요.'); return; }
         if (!composeForm.subject.trim()) { message.warning('제목을 입력해주세요.'); return; }
         if (!composeForm.body.trim()) { message.warning('내용을 입력해주세요.'); return; }
-        setComposeSending(true);
-        try {
-            await api.post(API_ENDPOINTS.MAIL.COMPOSE, composeForm);
-            message.success('메일을 보냈습니다.');
-            resetCompose();
-            loadSentMails();
-        } catch { message.error('메일 발송에 실패했습니다.'); }
-        finally { setComposeSending(false); }
+        sendMutation.mutate(composeForm);
     };
 
-    return { composing, setComposing, composeForm, setComposeForm, composeSending, resetCompose, handleComposeSend };
+    return { composing, setComposing, composeForm, setComposeForm, composeSending: sendMutation.isPending, resetCompose, handleComposeSend };
 };
 
 const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
@@ -108,6 +115,31 @@ const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
         </div>
     );
 };
+
+/**
+ * 보낸 메일 목록 스켈레톤 — 아래 SentMailItem의 실제 3줄 구조(받는사람+날짜 / 제목 / 본문미리보기)에 대응.
+ *
+ * 2026-07 전수조사: 예전엔 AntD 기본 <Skeleton active paragraph>를 썼는데, 이건 우리
+ * 디자인 시스템의 shimmer Bone과 전혀 다른 톤/애니메이션이라 관리자 패널 안에서 이 탭만
+ * 혼자 이질적으로 보였다 — 공용 Bone으로 교체하고 실제 행 레이아웃과 같은 모양으로 맞춤.
+ */
+const SentMailSkeleton = () => (
+    <div style={styles.singlePanel}>
+        {['sk-0', 'sk-1', 'sk-2', 'sk-3'].map((key) => (
+            <div key={key} style={{ padding: '14px 16px 14px 22px', borderBottom: `1px solid ${colors.border.light}` }}>
+                {/* 1줄: 받는 사람 + 보낸 시각 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <Bone width="45%" height={13} />
+                    <Bone width={44} height={11} />
+                </div>
+                {/* 2줄: 제목 */}
+                <Bone width="65%" height={13} style={{ marginTop: 6 }} />
+                {/* 3줄: 본문 미리보기 */}
+                <Bone width="80%" height={11} style={{ marginTop: 6 }} />
+            </div>
+        ))}
+    </div>
+);
 
 const SentMailItem = ({ mail, isSelected, onClick }) => (
     <button onClick={() => onClick(mail)} style={{ ...styles.mailItem, background: isSelected ? colors.primary.light : 'transparent' }}>
@@ -153,11 +185,11 @@ const SentDetailContent = ({ mail }) => (
 const MailboxTab = () => {
     const { message } = useMessage();
     const isMobile = useWindowWidth() < 768;
-    const [search, setSearch] = useState('');
+    const [{ search }, setQuery] = useQueryParamsState({ search: '' });
     const debouncedSearch = useDebounce(search, 300);
 
     const mail = useSentMailData(message);
-    const send = useComposeMail({ message, loadSentMails: mail.loadSentMails });
+    const send = useComposeMail({ message });
 
     const filteredSent = useMemo(() => {
         if (!debouncedSearch.trim()) return mail.sentMails;
@@ -176,19 +208,11 @@ const MailboxTab = () => {
 
     return (
         <div>
-            <SearchBar value={search} onChange={(e) => setSearch(e.target.value)}
+            <SearchBar value={search} onChange={(e) => setQuery({ search: e.target.value })}
                 onReload={mail.loadSentMails} loading={mail.loading}
                 onCompose={() => send.setComposing(true)} />
 
-            {showLoading && (
-                <div style={styles.singlePanel}>
-                    {['sk-0', 'sk-1', 'sk-2', 'sk-3'].map((key) => (
-                        <div key={key} style={{ padding: '16px 20px', borderBottom: `1px solid ${colors.border.light}` }}>
-                            <Skeleton active paragraph={{ rows: 2 }} title={false} />
-                        </div>
-                    ))}
-                </div>
-            )}
+            {showLoading && <SentMailSkeleton />}
 
             {showEmpty && (
                 <div style={styles.emptyPanel}>
@@ -260,7 +284,7 @@ const MailboxTab = () => {
                 </FormField>
                 <FormField label="제목">
                     <FormInput placeholder="메일 제목" value={send.composeForm.subject}
-                        onChange={(e) => send.setComposeForm(f => ({ ...f, subject: e.target.value }))} maxLength={500} />
+                        onChange={(e) => send.setComposeForm(f => ({ ...f, subject: e.target.value }))} maxLength={500} showCount />
                 </FormField>
                 <FormField label="내용">
                     <FormTextArea rows={8} placeholder="메일 내용을 입력하세요..." value={send.composeForm.body}

@@ -1,12 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Empty, Tabs, Typography } from 'antd';
 import {
     CalendarOutlined,
     ClockCircleOutlined,
     PartitionOutlined,
+    QrcodeOutlined,
+    NotificationOutlined,
 } from '@ant-design/icons';
 import { PageContainer, ReservationCardSkeleton, FilterToolbar } from '../../components/common';
 import ReservationCard from '../../components/reservation/ReservationCard';
+import QrScannerTab from '../../components/reservation/QrScannerTab';
+import AdManageTab from '../../components/advertisement/AdManageTab';
+import StatisticsTab from '../../components/business/StatisticsTab';
 import useManageReservations from '../../hooks/useManageReservations';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
@@ -34,7 +40,7 @@ const ReservationTab = () => {
     const debouncedKeyword = useDebounce(keyword, 300);
     const [storeFilter, setStoreFilter]   = useState('ALL');
     const [myStores, setMyStores]         = useState([]);
-    const { reservations, loading, actionLoading, approve, reject, complete, noShow, refetch } = useManageReservations();
+    const { reservations, loading, refetching, actionLoading, approve, reject, complete, noShow, refetch } = useManageReservations();
     const { message, confirm } = useMessage();
 
     const handleRemove = (id) => {
@@ -81,7 +87,7 @@ const ReservationTab = () => {
         <>
             <FilterToolbar
                 selects={[
-                    ...(myStores.length > 1 ? [{
+                    {
                         value: storeFilter,
                         onChange: setStoreFilter,
                         width: 140,
@@ -90,7 +96,7 @@ const ReservationTab = () => {
                             { value: 'ALL', label: '전체 가게' },
                             ...myStores.map(s => ({ value: String(s.id), label: s.name }))
                         ],
-                    }] : []),
+                    },
                     {
                         value: statusFilter,
                         onChange: setStatusFilter,
@@ -100,20 +106,23 @@ const ReservationTab = () => {
                     },
                 ]}
                 count={filtered.length}
-                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약자로 검색', disabled: loading }}
+                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약자로 검색', disabled: loading || refetching }}
                 onReload={refetch}
-                loading={loading}
+                loading={loading || refetching}
                 extra={
                     pendingCount > 0 && statusFilter !== 'PENDING' ? (
                         <span style={styles.pendingBadge}>
                             <ClockCircleOutlined style={{ fontSize: 11 }} />
-                            {' '}승인 대기 {pendingCount}건
+                            승인 대기 {pendingCount}건
                         </span>
                     ) : null
                 }
             />
 
-            {loading ? (
+            {/* 코드리뷰 지적사항 반영(2026-07): 승인/거절/완료/노쇼 처리 후 onSettled로 백그라운드
+                재검증이 도는 동안(refetching)에도 최초 로딩과 동일하게 스켈레톤 노출 —
+                MyReservations.jsx/StoreList.jsx와 동일 컨벤션 */}
+            {(loading || refetching) ? (
                 <ReservationCardSkeleton count={5} />
             ) : filtered.length === 0 ? (
                 <div style={{ marginTop: 80 }}>
@@ -147,21 +156,10 @@ const ReservationTab = () => {
     );
 };
 
-const ComingSoonTab = ({ label }) => (
-    <div style={{ marginTop: 80 }}>
-        <Empty
-            image={<PartitionOutlined style={{ fontSize: 48, color: colors.border.default }} />}
-            description={
-                <span style={{ color: colors.text.tertiary }}>
-                    <strong>{label}</strong> 기능이 곧 추가됩니다.
-                </span>
-            }
-        />
-    </div>
-);
-
 const BusinessPanel = () => {
-    const [activeTab, setActiveTab] = useState('reservations');
+    const location = useLocation();
+    // 결제 결과 페이지(PaymentResult.jsx)에서 "내 광고 확인하기" 누르면 광고 관리 탭으로 바로 열리게(2026-07)
+    const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'reservations');
     useDocumentTitle('파트너 패널');
 
     const tabItems = [
@@ -169,19 +167,37 @@ const BusinessPanel = () => {
             key: 'reservations',
             label: (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <CalendarOutlined /> 예약 관리
+                    <CalendarOutlined />예약 관리
                 </span>
             ),
             children: <ReservationTab />,
         },
         {
+            key: 'qr-checkin',
+            label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <QrcodeOutlined />QR 체크인
+                </span>
+            ),
+            children: <QrScannerTab />,
+        },
+        {
+            key: 'ads',
+            label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <NotificationOutlined />광고 관리
+                </span>
+            ),
+            children: <AdManageTab />,
+        },
+        {
             key: 'analytics',
             label: (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <PartitionOutlined /> 통계 · 분석
+                    <PartitionOutlined />통계 · 분석
                 </span>
             ),
-            children: <ComingSoonTab label="통계 · 분석" />,
+            children: <StatisticsTab />,
         },
     ];
 
@@ -199,6 +215,7 @@ const BusinessPanel = () => {
                 items={tabItems}
                 className="reserve-pill-tabs"
                 animated={{ inkBar: true, tabPane: false }}
+                destroyOnHidden
                 style={{ marginBottom: 8 }}
             />
         </PageContainer>

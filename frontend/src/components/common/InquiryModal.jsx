@@ -8,9 +8,9 @@ import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import FormModal, { FormField } from './FormModal';
-import FormSelect from './FormSelect';
 import FormInput from './FormInput';
 import FormTextArea from './FormTextArea';
+import SegmentedControl from './SegmentedControl';
 import useAuthStore from '../../store/useAuthStore';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
@@ -88,11 +88,11 @@ const InquiryModal = ({ open, onClose }) => {
                 </div>
             )}
             <FormField label="문의 유형">
-                <FormSelect value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+                <SegmentedControl value={category} onChange={setCategory} options={CATEGORY_OPTIONS} wrap />
             </FormField>
             <FormField label="제목">
                 <FormInput placeholder="문의 제목을 입력하세요" value={title}
-                    onChange={(e) => setTitle(e.target.value)} maxLength={200} />
+                    onChange={(e) => setTitle(e.target.value)} maxLength={200} showCount />
             </FormField>
             <FormField label="내용">
                 <FormTextArea rows={6} placeholder="문의하실 내용을 자세히 적어주세요."

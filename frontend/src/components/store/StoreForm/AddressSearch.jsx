@@ -3,8 +3,10 @@ import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import api from '../../../api/axios';
 import useDebounce from '../../../hooks/useDebounce';
-import { colors, fontSize, radius } from '../../../styles/tokens';
+import { colors, fontSize, radius, heights } from '../../../styles/tokens';
 import { animation } from '../../../styles/tokens/animations';
+import useExitAnimation from '../../../hooks/useExitAnimation';
+import { ArcSpinner } from '../../common/Loading';
 
 // ─── 검색/선택 상태 리듀서 ─────────────────────────────────────────────────
 // 원래 query/detail/zipCode/selected/results/open/loading/activeIdx 8개 useState로
@@ -18,44 +20,54 @@ const initialState = {
     open: false,
     loading: false,
     activeIdx: -1,
+    // ② 블록(우편번호+상세주소) 등장 시 slideUpIn 애니메이션을 재생할지.
+    // 사용자가 드롭다운에서 직접 선택했을 때만 true — 마이페이지 처음 열 때의 초기
+    // 프리필(zipCodeProp)에서는 false라 이미 있던 주소가 애니메이션 없이 바로 보인다.
+    animateSection: false,
 };
 
 function reducer(state, action) {
     switch (action.type) {
         case 'RESET_FOR_VALUE':
-            return { ...state, query: action.query, selected: true };
+            // value prop 주입(부모 폼 초기화) — 이미 있던 값이므로 애니메이션 없이.
+            return { ...state, query: action.query, selected: true, animateSection: false };
         case 'CLEAR_ALL':
-            return { ...state, query: '', detail: '', zipCode: '', selected: false };
+            return { ...state, query: '', detail: '', zipCode: '', selected: false, animateSection: false };
         case 'SET_ZIPCODE':
-            return { ...state, zipCode: action.zipCode };
+            // 초기 프리필 — 애니메이션 없이 바로 표시.
+            return { ...state, zipCode: action.zipCode, animateSection: false };
         case 'SET_DETAIL_VALUE':
             return { ...state, detail: action.detail };
         case 'SEARCH_LOADING':
             return { ...state, loading: true };
         case 'SEARCH_RESULTS':
-            return { ...state, results: action.results, open: action.results.length > 0, activeIdx: -1, loading: false };
+            return { ...state, results: action.results, open: action.results.length > 0, activeIdx: action.results.length > 0 ? 0 : -1, loading: false };
         case 'SEARCH_EMPTY':
         case 'SEARCH_ERROR':
             return { ...state, results: [], open: false, loading: false };
         case 'QUERY_CHANGE':
+            // 선택된 주소를 사용자가 직접 고치기 시작하면(편집 시작) 우편번호/상세주소를 함께 비운다.
+            // 새 주소를 드롭다운에서 다시 선택할 때까지 아래 ② 블록(우편번호+상세주소)이 노출되지
+            // 않도록 — 화면엔 새 주소를 타이핑 중인데 옛 우편번호/상세주소가 남아 어긋나 보이는 걸 막는다.
             return {
                 ...state,
                 query: action.value,
                 selected: false,
+                ...(action.wasSelected ? { zipCode: '', detail: '' } : {}),
                 ...(action.value === '' ? { results: [], open: false } : {}),
             };
         case 'DETAIL_CHANGE':
             return { ...state, detail: action.value };
         case 'SELECT_RESULT':
+            // 사용자가 드롭다운에서 직접 선택 — 이때만 ② 블록이 slideUpIn으로 등장한다.
             return {
                 ...state,
                 query: action.road, zipCode: action.zone, detail: action.building,
                 selected: true, results: [], open: false, activeIdx: -1,
+                animateSection: true,
             };
         case 'CLOSE_DROPDOWN':
             return { ...state, open: false };
-        case 'FOCUS_RESET_FOR_EDIT':
-            return { ...state, selected: false, query: '', results: [], open: false };
         case 'OPEN_IF_RESULTS':
             return state.results.length > 0 ? { ...state, open: true } : state;
         case 'ARROW_DOWN':
@@ -84,6 +96,21 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const selectedRef    = useRef(false);
     const touchState     = useRef({ startX: 0, scrollStart: 0 });
     const debouncedQuery = useDebounce(state.query, 400);
+
+    // 드롭다운이 닫힐 때(선택/blur/ESC)도 슬라이드 아웃 애니메이션이 재생되도록.
+    // SELECT_RESULT는 results를 즉시 []로 비우므로, 닫히는 애니메이션 동안 보여줄 마지막 결과를
+    // 별도로 기억해둔다. effect+setState는 리렌더가 한 번 더 발생하고(cascading render 경고 대상),
+    // ref는 렌더링 중 읽기/쓰기가 금지되어(이 프로젝트 lint 규칙) 둘 다 못 씀 — 대신 렌더링 도중
+    // 이전 값과 비교해서 바로 setState하는, React 공식 문서의 "prop 변경 시 state 조정" 패턴 사용
+    // (effect 없이 렌더 도중 호출하는 setState는 같은 렌더 사이클 안에서 처리되어 cascading이 아님).
+    const [prevResultsRef, setPrevResultsRef] = useState(state.results);
+    const [lastResults, setLastResults] = useState(state.results);
+    if (state.results !== prevResultsRef) {
+        setPrevResultsRef(state.results);
+        if (state.results.length > 0) setLastResults(state.results);
+    }
+    const dropdownOpen = state.open && state.results.length > 0;
+    const { shouldRender: dropdownShouldRender, isClosing: dropdownClosing } = useExitAnimation(dropdownOpen, 200);
 
     useEffect(() => { selectedRef.current = state.selected; }, [state.selected]);
 
@@ -148,7 +175,17 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 
     const handleQueryChange = (e) => {
         const v = e.target.value;
-        dispatch({ type: 'QUERY_CHANGE', value: v });
+        // 2026-07 재작업 — 이전엔 주소 필드에 "포커스만 해도"(커서만 올려도) 우편번호/상세주소/좌표를
+        // 싹 비웠다(FOCUS_RESET_FOR_EDIT). 커서만 올렸다 뗐을 뿐인데 기존 값이 다 날아가 사용자 경험이
+        // 나빴다. 이제 포커스로는 아무것도 안 지우고, 사용자가 실제로 주소를 "고치기 시작할 때"(=이미
+        // 선택된 상태에서 타이핑) 그 시점에만 이전 우편번호/상세주소/좌표를 무효화한다.
+        // wasSelected 플래그로 리듀서가 zipCode/detail을 함께 비우고, 여기서 부모의 메타도 비운다.
+        const wasSelected = selectedRef.current;
+        if (wasSelected) {
+            onMeta?.({ zipCode: '', addressDetail: '', latitude: null, longitude: null });
+            isEditMode.current = false;
+        }
+        dispatch({ type: 'QUERY_CHANGE', value: v, wasSelected });
         if (!v) onChange?.('');
     };
 
@@ -164,17 +201,20 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         if (!state.open) return;
         if (e.key === 'ArrowDown')                     { e.preventDefault(); dispatch({ type: 'ARROW_DOWN' }); }
         else if (e.key === 'ArrowUp')                  { e.preventDefault(); dispatch({ type: 'ARROW_UP' }); }
-        else if (e.key === 'Enter' && state.activeIdx >= 0) { handleSelect(state.results[state.activeIdx]); }
+        else if (e.key === 'Enter' && state.results.length > 0) { handleSelect(state.results[state.activeIdx >= 0 ? state.activeIdx : 0]); }
         else if (e.key === 'Escape')                  { dispatch({ type: 'CLOSE_DROPDOWN' }); }
     };
 
     const boxStyle = (isFocused) => ({
         display: 'flex', alignItems: 'center',
         background: colors.gray[50],
-        border: `1px solid ${isFocused ? colors.primary.main : colors.border.default}`,
+        // 표준 FormInput(variant="filled")과 동일하게 — 평소에는 테두리 없이 배경색으로만
+        // 경계를 나타내고, 포커스 시에만 파란 테두리. transparent 1px로 두어 포커스
+        // 전후 레이아웃 시프트(1px 밀림)가 없게 한다.
+        border: `1px solid ${isFocused ? colors.primary.main : 'transparent'}`,
         borderRadius: radius.lg,
         boxSizing: 'border-box',
-        padding: '0 12px', height: 44,
+        padding: '0 12px', height: heights.input,
         transition: 'border-color 0.2s, box-shadow 0.2s',
         boxShadow: isFocused ? `0 0 0 2px ${colors.primary.main}18` : 'none',
     });
@@ -190,16 +230,17 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                     <input
                         id={id}
                         name={id || 'address'}
+                        className="reserve-address-input"
                         autoComplete="off"
                         value={state.query}
                         onChange={handleQueryChange}
                         onKeyDown={handleKeyDown}
                         onFocus={() => {
+                            // 2026-07 — 포커스(커서 올림)로는 절대 기존 값을 지우지 않는다. 이미 선택된 주소가
+                            // 있으면 그대로 두고, 검색 결과가 남아 있을 때만 드롭다운을 다시 연다.
+                            // (실제 초기화는 사용자가 주소를 직접 고치기 시작할 때 handleQueryChange에서 처리)
                             setActiveField('query');
-                            if (selectedRef.current) {
-                                dispatch({ type: 'FOCUS_RESET_FOR_EDIT' });
-                                isEditMode.current = false;
-                            } else if (state.results.length > 0) {
+                            if (!selectedRef.current && state.results.length > 0) {
                                 dispatch({ type: 'OPEN_IF_RESULTS' });
                             }
                         }}
@@ -211,23 +252,21 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                         placeholder={placeholder}
                         style={{
                             flex: 1, border: 'none', outline: 'none', background: 'transparent',
-                            fontSize: fontSize.base, color: colors.text.primary,
+                            fontSize: fontSize.lg, color: colors.text.primary,
                             fontFamily: 'inherit', cursor: 'text',
                         }}
                     />
                     {state.loading && (
-                        <div style={{
-                            width: 14, height: 14, flexShrink: 0,
-                            border: `2px solid ${colors.border.light}`,
-                            borderTopColor: colors.primary.main,
-                            borderRadius: '50%',
-                            animation: 'reserve-spin 0.6s linear infinite',
-                        }} />
+                        <ArcSpinner size={14} stroke={7} color={colors.primary.main} track={colors.border.light} />
                     )}
                 </div>
 
-                {/* 드롭다운 */}
-                {state.open && state.results.length > 0 && (
+                {/* 드롭다운 — 닫힐 때(선택/blur/ESC)도 슬라이드 아웃 애니메이션이 재생되도록
+                    useExitAnimation으로 열림/닫힘 렌더링을 분리(2026-07 버그 수정: 이전엔
+                    state.open이 false가 되는 즉시 언마운트되어 여는 애니메이션만 보이고
+                    닫힐 때는 애니메이션 없이 바로 사라졌음). 목록은 SELECT_RESULT 시 즉시
+                    비워지는 state.results 대신, 닫히는 동안 마지막으로 유효했던 lastResults를 사용 */}
+                {dropdownShouldRender && (
                     <div
                         role="listbox"
                         tabIndex={-1}
@@ -240,10 +279,10 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             borderRadius: radius.lg,
                             boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
                             overflow: 'hidden', maxHeight: 280, overflowY: 'auto',
-                            animation: animation.slideUpIn,
+                            animation: dropdownClosing ? animation.slideUpOut : animation.slideUpIn,
                         }}
                     >
-                        {state.results.map((doc, i) => {
+                        {lastResults.map((doc, i) => {
                             const road  = doc.road_address?.address_name;
                             const jibun = doc.address?.address_name ?? doc.address_name;
                             const zone  = doc.road_address?.zone_no;
@@ -262,7 +301,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                                         display: 'flex', alignItems: 'flex-start', gap: 10,
                                         padding: '10px 14px', cursor: 'pointer',
                                         background: i === state.activeIdx ? colors.gray[50] : '#fff',
-                                        borderBottom: i < state.results.length - 1 ? `1px solid ${colors.border.light}` : 'none',
+                                        borderBottom: i < lastResults.length - 1 ? `1px solid ${colors.border.light}` : 'none',
                                     }}
                                 >
                                     <EnvironmentOutlined style={{ color: colors.primary.main, marginTop: 3, flexShrink: 0, fontSize: 13 }} />
@@ -290,17 +329,18 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                 )}
             </div>
 
-            {/* ② 선택 후 — 우편번호 + 상세주소 */}
+            {/* ② 선택 후 — 우편번호 + 상세주소. 사용자가 드롭다운에서 직접 선택했을 때만
+                slideUpIn으로 등장하고, 마이페이지 초기 프리필(이미 있던 주소)에서는 애니메이션 없이 바로 보인다. */}
             {(state.selected || state.zipCode) && (
-                <div style={{ display: 'flex', gap: 8, minWidth: 0, width: '100%', animation: animation.slideUpIn }}>
+                <div style={{ display: 'flex', gap: 8, minWidth: 0, width: '100%', animation: state.animateSection ? animation.slideUpIn : 'none' }}>
                     {state.zipCode && (
                         // 우편번호: readOnly → div 기반 터치 스크롤 컨테이너
-                        <div style={{ ...boxStyle(false), width: 76, flexShrink: 0, cursor: 'default', overflow: 'hidden' }}>
+                        <div style={{ ...boxStyle(false), width: 82, flexShrink: 0, cursor: 'default', overflow: 'hidden' }}>
                             <div style={{
                                 width: '100%',
                                 overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none',
                                 msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch',
-                                fontSize: fontSize.base,
+                                fontSize: fontSize.lg,
                                 color: colors.text.primary,
                                 fontFamily: 'inherit', userSelect: 'none', textAlign: 'center',
                             }}>
@@ -323,6 +363,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                     >
                         <input
                             ref={detailRef}
+                            className="reserve-address-input"
                             autoComplete="off"
                             value={state.detail}
                             onChange={handleDetailChange}
@@ -332,7 +373,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             placeholder="상세주소 (동, 호수 등)"
                             style={{
                                 flex: 1, minWidth: 0, width: '100%', border: 'none', outline: 'none', background: 'transparent',
-                                fontSize: fontSize.base, color: colors.text.primary, fontFamily: 'inherit',
+                                fontSize: fontSize.lg, color: colors.text.primary, fontFamily: 'inherit',
                                 overflowX: 'auto', whiteSpace: 'nowrap',
                             }}
                         />

@@ -3,7 +3,7 @@ import { Form, Flex, Input, Switch, Typography } from 'antd';
 import { FormInput, FormTextArea, FormSelect, FormTimePicker } from '../../common';
 import AddressSearch from './AddressSearch';
 import {
-    RESERVATION_SLOT_OPTIONS,
+    RESERVATION_SLOT_OPTIONS, NEARBY_RADIUS_OPTIONS,
     FULL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_RATE_OPTIONS,
     BOOKING_DEADLINE_OPTIONS, PAYMENT_TIMEOUT_OPTIONS,
 } from '../../../constants';
@@ -140,6 +140,16 @@ const SettingsSection = () => (
                 extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>0원이면 예약금 없음</Text>}
             >
                 <FormInput type="number" placeholder="0" suffix="원" min={0} max={100000} precision={0} />
+            </Form.Item>
+        </FieldRow>
+
+        <FieldRow>
+            <Form.Item
+                label="우리동네 배지 기준" name="nearbyRadiusKm"
+                rules={[{ required: true, message: '기준 거리를 선택해주세요.' }]}
+                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>내 가게가 이 거리 이내면 "우리동네" 배지가 붙어요</Text>}
+            >
+                <FormSelect options={NEARBY_RADIUS_OPTIONS} placeholder="기준 거리 선택" />
             </Form.Item>
         </FieldRow>
 

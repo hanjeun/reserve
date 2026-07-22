@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import paymentService from '../services/paymentService';
 import useMessage from './useMessage';
+import { guardPaymentWindow } from '../utils/paymentWindowGuard';
 
 // 흐름: prepare → IMP.request_pay → verify → /payment/result 리다이렉트
 const usePayment = () => {
@@ -34,6 +35,7 @@ const usePayment = () => {
             window.IMP.init(impCode);
 
             return await new Promise((resolve) => {
+                const guard = guardPaymentWindow(() => { setPaying(false); resolve({ success: false, cancelled: true }); });
                 window.IMP.request_pay(
                     {
                         // V1 SDK + V2 채널 혼용 — pg, channel_key 둘 다 필요
@@ -49,6 +51,7 @@ const usePayment = () => {
                         m_redirect_url: `${window.location.origin}/api/payment/mobile-redirect`,  // 모바일 결제 후 백엔드 리다이렉트
                     },
                     async (rsp) => {
+                        guard.markSettled();
                         if (rsp.success) {
                             // 2. 결제 검증
                             try {

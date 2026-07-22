@@ -1,0 +1,60 @@
+package kr.it.reserve.email.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+
+import java.util.Properties;
+
+@Configuration
+public class MailConfig {
+
+    @Value("${mail.host}")
+    private String host;
+
+    @Value("${mail.port}")
+    private int port;
+
+    @Value("${mail.username}")
+    private String username;
+
+    @Value("${mail.password}")
+    private String password;
+
+    @Value("${mail.properties.mail.smtp.auth}")
+    private boolean auth;
+
+    @Value("${mail.properties.mail.smtp.connectiontimeout}")
+    private int connectionTimeout;
+
+    @Value("${mail.properties.mail.smtp.timeout}")
+    private int timeout;
+
+    @Value("${mail.properties.mail.smtp.writetimeout}")
+    private int writeTimeout;
+
+    @Bean
+    public JavaMailSender javaMailSender() {
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost(host);
+        mailSender.setPort(port);
+        mailSender.setUsername(username);
+        mailSender.setPassword(password);
+        mailSender.setDefaultEncoding("UTF-8");
+
+        Properties props = mailSender.getJavaMailProperties();
+        props.put("mail.transport.protocol", "smtp");
+        props.put("mail.smtp.auth", String.valueOf(auth));
+        props.put("mail.smtp.ssl.enable", "true");
+        props.put("mail.smtp.port", "465");
+        props.put("mail.smtp.socketFactory.port", "465");
+        props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+        props.put("mail.smtp.connectiontimeout", String.valueOf(connectionTimeout));
+        props.put("mail.smtp.timeout", String.valueOf(timeout));
+        props.put("mail.smtp.writetimeout", String.valueOf(writeTimeout));
+
+        return mailSender;
+    }
+}

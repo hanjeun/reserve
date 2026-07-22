@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Typography, Divider, Form, Tabs, Switch, Image } from 'antd';
+import { Typography, Divider, Form, Tabs, Switch, Image, Input } from 'antd';
 import {
     LockOutlined,
     ExclamationCircleOutlined,
@@ -17,7 +17,9 @@ import { memberService, businessService } from '../../services';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { hasAdminAccess } from '../../constants/roles';
 import { handleApiError } from '../../utils/errorHandler';
+import { VALIDATION_RULES } from '../../utils/validation';
 import useAuthStore from '../../store/useAuthStore';
+import useExitAnimation from '../../hooks/useExitAnimation';
 import { useNavigate } from 'react-router-dom';
 import { colors, radius, shadows, fontSize, fontWeight, animation } from '../../styles/tokens';
 
@@ -193,6 +195,10 @@ const ProfileImageTab = ({ user }) => {
     };
 
     const previewSrc = pending?.previewUrl ?? (user?.profileImageUrl || user?.profileImage);
+    // 취소/저장 버튼 행 — 새 이미지를 고르면 슬라이드 인으로 나타나는데, 취소를 누르면(pending이 null이
+    // 되는 순간) 그 자리에서 바로 사라져서 "열릴 땐 애니메이션, 닫힐 땐 즉시"였던 것을 수정
+    const showButtons = !!pending?.file;
+    const { shouldRender: buttonsShouldRender, isClosing: buttonsClosing } = useExitAnimation(showButtons, 200);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -223,8 +229,8 @@ const ProfileImageTab = ({ user }) => {
             </Text>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 4 }}>
-                {pending?.file ? (
-                    <div style={{ display: 'flex', gap: 8, animation: animation.slideUpIn }}>
+                {buttonsShouldRender ? (
+                    <div style={{ display: 'flex', gap: 8, animation: buttonsClosing ? animation.slideUpOut : animation.slideUpIn }}>
                         <Button variant="secondary" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
                             취소
                         </Button>
@@ -258,21 +264,48 @@ const ProfileImageTab = ({ user }) => {
 };
 
 // ─── 위치 등록 탭 (거리순 가게 정렬 폴백용) ────────────────────────────────────────
-// Geolocation을 거부했거나 인앱 브라우저라 지원이 안 될 때, 가게 등록과 동일한
-// AddressSearch(카카오 주소 검색)로 직접 주소를 입력해 좌표를 저장한다.
+// 2026-07 전수조사 — "위치를 분명 저장했는데 저장 안 된 것처럼 보임" 버그 수정:
+// 저장 자체는 잘 되고 있었다(DB에 좌표가 들어가고 거리순 정렬/우리동네 배지도 정상 동작).
+// 문제는 화면이었다 — member 테이블에 좌표만 있고 주소 문자열 컬럼이 없어서, 탭을 다시 열면
+//   - AddressSearch는 항상 빈칸 (좌표로 주소를 역산할 수 없으니 프리필할 데이터가 없음)
+//   - coords는 로컬 state라 마운트 시마다 null → disabled={!coords}로 버튼이 항상 비활성
+// 이 조합 때문에 사용자 입장에선 "저장이 안 됐다"고 보였다.
+// → 백엔드에 location_address 컬럼을 추가해 주소 문자열까지 보관하고, 여기서 그걸 프리필한다.
 const LocationTab = ({ user }) => {
     const { message } = useMessage();
-    const [address, setAddress] = useState('');
-    const [coords, setCoords] = useState(null); // { latitude, longitude }
-    const [loading, setLoading] = useState(false);
+    const [form] = Form.useForm();
 
     const hasSaved = user?.latitude != null && user?.longitude != null;
 
-    const handleSave = async () => {
-        if (!coords) { message.warning('주소를 검색해서 선택해주세요'); return; }
+    // 좌표(latitude/longitude)는 AddressSearch의 onMeta 콜백으로만 들어오는 값이라 일반 폼 필드로 다루기
+    // 애매해서(사용자가 직접 입력하는 값이 아니라 검색 결과 선택 시에만 바뀜) 별도 state로 관리한다.
+    const [coords, setCoords] = useState(
+        hasSaved ? { latitude: user.latitude, longitude: user.longitude } : null
+    );
+    const [loading, setLoading] = useState(false);
+
+    // 주소 컬럼이 생기기 전에 위치를 등록한 기존 회원은 좌표만 있고 주소는 null이다.
+    // "위치는 등록되어 있지만 그게 어떤 주소인지는 보여줄 수 없는" 상태임을 안내문으로 따로 알린다.
+    const savedWithoutAddress = hasSaved && !user?.locationAddress;
+
+    // 2026-07 추가 — 주소를 새로 채우고 나서 address/addressDetail만 지우면 zipCode만 남는
+    // 버그를 막기 위해 버튼을 임의로 disable하는 대신 disabled={!coords}만 검사하고 address/detail이
+    // 비어있어도 무시하고 있었는데, StoreBasicInfo(가게 주소)와 동일한 컨벤션으로 바꿔서 프로젝트에서
+    // 필수 텍스트 필드는 Form.Item + VALIDATION_RULES로 검증하고 미입력이면 버튼은 그대로 눌리게 하되
+    // 빨간 테두리 + 메시지가 뜨는 식 — 즉 NameTab/PasswordTab/StoreBasicInfo와 동일한 패턴으로 통일.
+    // coords는 Form 필드가 아니라 onMeta로만 들어오는 별도 값이라 rules로는 검증 못해서, Form 검증이 통과된
+    // 다음(onFinish 안)에 추가로 확인한다.
+    const onFinish = async (values) => {
+        if (!coords) { message.warning('검색 결과에서 주소를 선택해주세요'); return; }
         setLoading(true);
         try {
-            await memberService.updateLocation(coords.latitude, coords.longitude);
+            await memberService.updateLocation({
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                address: values.address,
+                zipCode: values.zipCode,
+                addressDetail: values.addressDetail,
+            });
             await useAuthStore.getState().checkAuth(true);
             message.success('위치가 등록되었습니다');
         } catch (err) {
@@ -282,32 +315,69 @@ const LocationTab = ({ user }) => {
         }
     };
 
+    let noticeText;
+    if (user?.locationAddress) {
+        const full = [user.locationAddress, user.locationAddressDetail].filter(Boolean).join(' ');
+        noticeText = `등록된 위치: ${full} — 거리순 가게 목록에서 위치 권한을 허용하지 않았을 때 이 주소가 기준이 돼요. 바꾸려면 아래에서 다시 검색하세요.`;
+    } else if (savedWithoutAddress) {
+        noticeText = '등록된 위치가 있어요. 다만 주소가 함께 저장되기 전에 등록된 거라 어떤 주소인지 표시할 수가 없어요. 아래에서 다시 검색해 저장하면 주소까지 함께 기록돼요.';
+    } else {
+        noticeText = '위치 권한을 허용하지 않았다면, 여기에 주소를 등록해두면 그 주소 기준으로 거리순 정렬을 이용할 수 있어요.';
+    }
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={styles.securityNotice}>
+            {/* securityNotice는 PasswordTab과 공유하는데 marginBottom:16이 들어있다. 여기는
+                외부 컨테이너가 flex+gap:12로 이미 간격을 만들므로, 안내박스의 marginBottom까지
+                더해지면 이 줄 아래만 28px로 과도하게 벌어져 위아래 간격이 어깧난다 — 0으로 상쇄. */}
+            <div style={{ ...styles.securityNotice, marginBottom: 0 }}>
                 <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
-                    {hasSaved
-                        ? '등록된 위치가 있어요. 거리순 가게 목록에서 위치 권한을 허용하지 않았을 때 이 주소가 기준이 돼요.'
-                        : '거리순 가게 목록을 이용할 때 위치 권한을 허용하지 않았다면, 여기서 주소를 등록해두면 그 주소 기준으로 거리순 정렬이 적용돼요.'}
+                    {noticeText}
                 </Text>
             </div>
-            <AddressSearch
-                value={address}
-                onChange={setAddress}
-                onMeta={({ latitude, longitude }) => {
-                    if (latitude && longitude) setCoords({ latitude, longitude });
+            <Form
+                form={form}
+                onFinish={onFinish}
+                layout="vertical"
+                requiredMark={false}
+                initialValues={{
+                    address: user?.locationAddress || '',
+                    zipCode: user?.locationZipCode || '',
+                    addressDetail: user?.locationAddressDetail || '',
                 }}
-                placeholder="도로명 또는 지번 주소를 검색하세요"
-            />
-            <Button variant="primary" onClick={handleSave} loading={loading} disabled={!coords} block>
-                위치 저장
-            </Button>
+            >
+                {/* AddressSearch가 도로명·우편번호·상세주소를 한 세트로 다룬다. Form.Item(name="address")이
+                    value/onChange를 자동으로 주입해줌(StoreBasicInfo와 동일한 방식). 가게 등록 폼과 동일하게
+                    주소 필드만 rules로 검증한다 — 상세주소는 실제로 선택적인 주소가 많아(단독주택 등)
+                    필수로 강제하지 않는다. */}
+                <Form.Item name="address" rules={VALIDATION_RULES.address} style={{ marginBottom: 12 }}>
+                    <AddressSearch
+                        zipCode={user?.locationZipCode || ''}
+                        addressDetail={user?.locationAddressDetail || ''}
+                        onMeta={(meta) => {
+                            // 2026-07 추가 — 좀 있으면 setCoords를 건너뛰고 이전 좌표가 그대로 남았다.
+                            // AddressSearch가 주소를 고치려고 재포커스할 때 onMeta({ latitude: null, ... })를
+                            // 보내는데, 여기서 null을 무시하면 새 주소를 타이핑만 하고 드롭다운에서
+                            // 다시 선택하지 않은 채 저장하면 이전 주소의 좌표가 새 주소에 붙어버린다.
+                            // 그래서 명시적으로 null이면 coords도 다시 null로 비우고, onFinish의 이건 가드가 다시 걸리게 한다.
+                            setCoords(meta.latitude && meta.longitude ? { latitude: meta.latitude, longitude: meta.longitude } : null);
+                            form.setFieldsValue({ zipCode: meta.zipCode ?? '', addressDetail: meta.addressDetail ?? '' });
+                        }}
+                        onDetailChange={(v) => form.setFieldsValue({ addressDetail: v })}
+                        placeholder="도로명 또는 지번 주소를 검색하세요"
+                    />
+                </Form.Item>
+                <Form.Item name="zipCode" hidden><Input /></Form.Item>
+                <Form.Item name="addressDetail" hidden><Input /></Form.Item>
+                <Button variant="primary" htmlType="submit" loading={loading} block>
+                    위치 저장
+                </Button>
+            </Form>
         </div>
     );
 };
 
-// ─── 사업자 전환 탭 ─────────────────────────────────────────────────────────────
-
+// ─── 사업자 전환 탭 ───────────────────────────────────────────────────────────
 const BusinessTab = ({ user }) => {
     const { message, confirm } = useMessage();
     const [status, setStatus]     = useState(null);
@@ -361,7 +431,7 @@ const BusinessTab = ({ user }) => {
         }
     };
 
-    // 수정 모드 진입 시 기존 데이터 자동 체우기
+    // 수정 모드 진입 시 기존 데이터 자동 채우기
     const handleStartEdit = async () => {
         try {
             const current = await businessService.getMyStatus();

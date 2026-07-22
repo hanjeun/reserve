@@ -19,6 +19,7 @@ const StoreForm = ({
     onMainImageChange,
     onDetailImagesChange,
     onPreview,
+    onPreviewClickCapture,
     onCancel,
     formRef,
     initialValues: externalInitialValues,
@@ -65,6 +66,7 @@ const StoreForm = ({
                     onMainImageChange={onMainImageChange}
                     onDetailImagesChange={onDetailImagesChange}
                     onPreview={onPreview}
+                    onPreviewClickCapture={onPreviewClickCapture}
                     mainImageRequired={mode === 'create'}
                 />
                 <StoreFormActions mode={mode} loading={loading} onCancel={onCancel} />

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { colors, fontSize, radius } from '../../styles/tokens';
+import { Bone } from './Skeletons';
 
 /**
  * 카카오맵 컴포넌트
@@ -24,6 +25,18 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
     const mapRef       = useRef(null);
     const mapInstance  = useRef(null);
     const [visible, setVisible] = useState(false);
+    // 지도가 실제로 그려지기 전까지(뷰포트 진입 대기 + SDK 로드 + 지오코딩) 스켈레톤 표시용.
+    // 기존엔 이 구간이 그냥 고정 회색 박스(colors.gray[100])였는데, 다른 컴포넌트들과 다르게
+    // 셰이머 스켈레톤 컨벤션이 전혀 없었음(2026-07 신규 추가) — Skeletons.jsx의 Bone/shimmer를 그대로 재사용.
+    //
+    // 참고(디버깅 기록): 페이지가 완전히 로드된 뒤에야 지도 영역이 마운트되므로(store 데이터 로딩 전엔
+    // KakaoMap 자체가 존재하지 않음), 스켈레톤이 "페이지 나머지가 다 뜨고 난 뒤 지도 자리에서만 따로"
+    // 잠깐 보이는 건 정상 동작이다(레이지 로드 아키텍처상 불가피 — 예전엔 이 구간이 무늬 없는 회색
+    // 박스라 눈에 덜 띄었을 뿐). IntersectionObserver 자체는 실제 사용자 브라우저에서 정상 동작 확인
+    // (SDK 로드/좌표 파싱/지도 초기화 로직 전부 정상 — 브라우저 자동화 테스트 환경이 탭을 항상
+    // document.hidden=true로 유지해서 IntersectionObserver 콜백이 아예 발화하지 않는 것까지 직접
+    // 확인함 — 이건 크롬의 백그라운드 탭 스로틀링이지 이 컴포넌트의 버그가 아니었음).
+    const [mapReady, setMapReady] = useState(false);
 
     const kakaoMapUrl = address
         ? `https://map.kakao.com/link/search/${encodeURIComponent(address)}`
@@ -40,6 +53,16 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
         observer.observe(el);
         return () => observer.disconnect();
     }, []);
+
+    // 안전장치 — SDK 로드 실패나 지오코딩 결과 없음(status !== OK) 같은 실패 케이스는 별도 처리가
+    // 없어서 예전엔 그냥 조용히 회색 박스로 남았는데, 스켈레톤을 셰이머로 바꾸고 나니 그 경우 영원히
+    // 반짝이는 것처럼 보일 수 있음 — 8초 지나도 지도가 안 뜨면 스켈레톤을 그만 보여주고 정적인
+    // 회색 박스로 폴백(실패를 감추진 않지만 최소한 "계속 로딩 중"처럼 보이진 않게).
+    useEffect(() => {
+        if (!visible) return undefined;
+        const failSafeTimer = setTimeout(() => setMapReady(true), 8000);
+        return () => clearTimeout(failSafeTimer);
+    }, [visible]);
 
     // visible 될 때 한 번만 지도 초기화
     useEffect(() => {
@@ -99,6 +122,7 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
             }
 
             mapInstance.current = map;
+            setMapReady(true);
             setTimeout(() => { map.relayout(); map.setCenter(center); }, 100);
         };
 
@@ -128,6 +152,16 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
                 ref={mapRef}
                 style={{ width: '100%', height, background: colors.gray[100] }}
             />
+            {/* 지도 준비 전 셰이머 스켈레톤 — 다른 화면의 Bone/shimmer 컨벤션과 통일.
+                지도 div(mapRef) 위에 겹쳐두고, 실제 지도가 뜨면(mapReady) 사라짐 */}
+            {!mapReady && (
+                <Bone
+                    width="100%"
+                    height={height}
+                    borderRadius={0}
+                    style={{ position: 'absolute', inset: 0 }}
+                />
+            )}
             {kakaoMapUrl && (
                 <a
                     href={kakaoMapUrl}

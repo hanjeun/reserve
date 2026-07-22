@@ -131,7 +131,7 @@ src/
 - API 호출: `services/` 레이어에서만
 - import 순서: 외부 라이브러리 → 내부 컴포넌트 → 유틸/훅 → 스타일
 
-### PropTypes (2026-07 확정)
+### PropTypes
 
 - **`components/common/`(공용 컴포넌트)만 PropTypes 필수.** 재사용되는 곳이라 prop 계약을 명시하는 실익이 있음
 - `pages/`, `components/admin/`, `components/store/` 등 1회성 소비 컴포넌트는 PropTypes 생략 — SonarCloud Quality Profile에서 해당 경로는 `react/prop-types` 규칙 제외 처리됨

@@ -6,6 +6,7 @@ import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
+import { consumeRedirect, clearRedirect } from '../../utils/redirect';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight, agreement as A } from '../../styles/tokens';
 
@@ -36,7 +37,9 @@ const SocialAgreement = () => {
             // 로컬 스토어도 동기화 (termsAgreed + marketingAgreed 반영)
             login({ ...user, termsAgreed: true, marketingAgreed: agreements.marketing });
             message.success('환영합니다! RESERVE를 시작해보세요.');
-            navigate('/', { replace: true });
+            // 2026-07: 신규 소셜 가입자도 약관 동의까지 마치면 원래 가려던 페이지로 보낸다.
+            // (OAuthCallback은 신규 가입자의 복귀 경로를 일부러 소비하지 않고 남겨둔다)
+            navigate(consumeRedirect() || '/', { replace: true });
         } catch {
             message.error('오류가 발생했습니다. 다시 시도해주세요.');
         } finally {
@@ -45,6 +48,8 @@ const SocialAgreement = () => {
     };
 
     const handleLogout = () => {
+        // 동의를 거절하고 나가는 경우라 복귀 경로도 같이 버린다(다음 로그인 때 엉뚜한 곳으로 가는 걸 방지)
+        clearRedirect();
         logout();
         navigate('/login', { replace: true });
     };

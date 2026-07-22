@@ -25,7 +25,7 @@ const StoreEdit = () => {
     const [form] = Form.useForm();
     const { message } = useMessage();
     const { formReady, formRef } = useFormReady();
-    const { handlePreview, PreviewModal } = useImagePreview();
+    const { handlePreview, PreviewModal, suppressLinkNavigation } = useImagePreview();
     useDocumentTitle('가게 수정');
     
     const { user } = useAuthStore();
@@ -109,6 +109,7 @@ const StoreEdit = () => {
                 onMainImageChange={handleMainImageChange}
                 onDetailImagesChange={handleDetailImagesChange}
                 onPreview={handlePreview}
+                onPreviewClickCapture={suppressLinkNavigation}
                 onCancel={handleCancel}
                 initialValues={store ? getInitialValues() : undefined}
             />

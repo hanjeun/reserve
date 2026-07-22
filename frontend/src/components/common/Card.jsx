@@ -15,7 +15,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Card as AntCard } from 'antd';
-import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
+import { colors, shadows, fontSize, fontWeight } from '../../styles/tokens';
 
 const Card = ({ 
     hoverable = false,
@@ -63,13 +63,19 @@ const Card = ({
 };
 
 /**
- * 카드 커버 이미지
+ * 카드 커버 이미지.
+ * width/height props are passed through as real HTML attributes on <img> — browsers use
+ * these to reserve the correct aspect-ratio space before the image resource even loads,
+ * preventing layout shift independently of any skeleton (supported in all modern browsers).
+ * mainImageWidth/Height가 없으면 그냥 생략되고 지금과 동일하게 동작함.
  */
-Card.Cover = ({ src, alt }) => (
+Card.Cover = ({ src, alt, width, height }) => (
     <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
         <img
             alt={alt}
             src={src}
+            width={width}
+            height={height}
             style={{ width: '100%', height: 'auto', objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
             className="card-image"
         />
@@ -89,12 +95,14 @@ Card.Body = ({ children, style }) => {
 
 /**
  * 추가 카드 (새 가게 등록 등)
+ * 2026-07 수정 — borderRadius를 실제 Card(각진 사각형, radius 0)와 맞춤.
+ * 예전엔 radius['2xl']이라 옆에 나란히 놓이는 실제 가게 카드와 모서리가 안 맞았다.
  */
 Card.Add = ({ children, onClick, minHeight = '350px' }) => {
     const addCardStyle = {
         height: '100%',
         minHeight,
-        borderRadius: radius['2xl'],
+        borderRadius: 0,
         border: `2px dashed ${colors.border.light}`,
         display: 'flex',
         flexDirection: 'column',
@@ -137,6 +145,8 @@ Card.propTypes = {
 Card.Cover.propTypes = {
     src: PropTypes.string,
     alt: PropTypes.string,
+    width: PropTypes.number,
+    height: PropTypes.number,
 };
 
 Card.Body.propTypes = {

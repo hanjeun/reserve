@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Rate, Typography, Empty } from 'antd';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ReviewCardSkeleton } from '../common';
 import {
     UserOutlined, EditOutlined, DeleteOutlined,
@@ -8,6 +9,7 @@ import {
 import reviewService from '../../services/reviewService';
 import { formatRelativeTime } from '../../utils';
 import { useMessage } from '../../hooks';
+import { reviewKeys } from '../../hooks/queryKeys';
 import useAuthStore from '../../store/useAuthStore';
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
 import { FormInput, FormTextArea } from '../common';
@@ -54,6 +56,7 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                     onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                     placeholder="리뷰 제목을 입력해주세요"
                     maxLength={100}
+                    showCount
                 />
                 <FormTextArea
                     value={form.content}
@@ -83,41 +86,48 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
     );
 };
 
-/** 가게 상세 페이지 리뷰 목록 + 작성/수정/삭제 */
+/**
+ * 가게 상세 페이지 리뷰 목록 + 작성/수정/삭제
+ *
+ * 2026-07 추가 — isPC prop. 리뷰 섹션이 StoreDetail.jsx의 2단 레이아웃(pcGrid) 밖으로 나와
+ * 풀와이드가 되면서, PC에서는 카드 목록을 2열 그리드로 채우고("빈 오른쪽 공간" 문제 해결),
+ * 리뷰가 없을 때의 안내 문구도 그 풀와이드 안에서 진짜로 중앙에 오도록 한다.
+ * isPC를 안 넘기면(기존 호출부 호환) 모바일과 동일한 1열 레이아웃으로 동작한다.
+ */
 const ReviewList = ({
     storeId,
     completedReservation = null,
     focusReviewId = null,
     onRatingLoad,
+    isPC = false,
 }) => {
     const { user } = useAuthStore();
     const { message, confirm } = useMessage();
+    const queryClient = useQueryClient();
 
-    const [reviews,     setReviews]     = useState([]);
-    const [loading,     setLoading]     = useState(true);
     const [writeForm,   setWriteForm]   = useState({ rating: 0, title: '', content: '' });
-    const [submitting,  setSubmitting]  = useState(false);
     const [written,     setWritten]     = useState(false);
     const [editingId,   setEditingId]   = useState(null);
     const [editForm,    setEditForm]    = useState({ rating: 0, title: '', content: '' });
-    const [editLoading, setEditLoading] = useState(false);
 
     const reviewRefs = useRef({});
 
-    const notifyRating = (list) => {
-        if (!onRatingLoad) return;
-        const avg = list.length ? (list.reduce((s, r) => s + r.rating, 0) / list.length).toFixed(1) : null;
-        onRatingLoad({ avg: avg ? Number(avg) : null, count: list.length });
-    };
+    // 2026-07-09: TanStack Query로 전환 (reviewKeys.byStore) — 생성/수정/삭제는
+    // 다시 불러오기 대신 setQueryData로 캐시를 직접 수정해서(기존 로컬 state 스플라이싱과 동일한 체감) 즉시 반영된다.
+    const { data: reviews = [], isLoading: loading } = useQuery({
+        queryKey: reviewKeys.byStore(storeId),
+        queryFn: async () => {
+            const data = await reviewService.getReviewsByStore(storeId);
+            return Array.isArray(data) ? data : [];
+        },
+        enabled: !!storeId,
+    });
 
     useEffect(() => {
-        if (!storeId) return;
-        setLoading(true);
-        reviewService.getReviewsByStore(storeId)
-            .then(data => { const list = Array.isArray(data) ? data : []; setReviews(list); notifyRating(list); })
-            .catch(() => setReviews([]))
-            .finally(() => setLoading(false));
-    }, [storeId]); // eslint-disable-line react-hooks/exhaustive-deps
+        if (!onRatingLoad) return;
+        const avg = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
+        onRatingLoad({ avg: avg ? Number(avg) : null, count: reviews.length });
+    }, [reviews]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!focusReviewId || loading) return;
@@ -127,25 +137,27 @@ const ReviewList = ({
         return () => clearTimeout(timer);
     }, [focusReviewId, loading]);
 
-    const handleWriteSubmit = async () => {
-        if (!writeForm.rating)                    return message.warning('별점을 선택해주세요');
-        if (!writeForm.title.trim())              return message.warning('제목을 입력해주세요');
-        if (writeForm.content.trim().length < 10) return message.warning('내용을 10자 이상 입력해주세요');
-        setSubmitting(true);
-        try {
-            const created = await reviewService.createReview({
-                reservationId: completedReservation.reservationId,
-                rating:  writeForm.rating,
-                title:   writeForm.title.trim(),
-                content: writeForm.content.trim(),
-            });
-            const updated = [created, ...reviews];
-            setReviews(updated); notifyRating(updated);
+    const createMutation = useMutation({
+        mutationFn: (payload) => reviewService.createReview(payload),
+        onSuccess: (created) => {
+            queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => [created, ...old]);
             message.success('리뷰가 등록되었습니다');
             setWriteForm({ rating: 0, title: '', content: '' });
             setWritten(true);
-        } catch { message.error('리뷰 등록에 실패했습니다'); }
-        finally  { setSubmitting(false); }
+        },
+        onError: () => message.error('리뷰 등록에 실패했습니다'),
+    });
+
+    const handleWriteSubmit = () => {
+        if (!writeForm.rating)                    return message.warning('별점을 선택해주세요');
+        if (!writeForm.title.trim())              return message.warning('제목을 입력해주세요');
+        if (writeForm.content.trim().length < 10) return message.warning('내용을 10자 이상 입력해주세요');
+        createMutation.mutate({
+            reservationId: completedReservation.reservationId,
+            rating:  writeForm.rating,
+            title:   writeForm.title.trim(),
+            content: writeForm.content.trim(),
+        });
     };
 
     const startEdit = (review) => {
@@ -154,46 +166,51 @@ const ReviewList = ({
     };
     const cancelEdit = () => { setEditingId(null); setEditForm({ rating: 0, title: '', content: '' }); };
 
-    const submitEdit = async (reviewId) => {
+    const updateMutation = useMutation({
+        mutationFn: ({ reviewId, payload }) => reviewService.updateReview(reviewId, payload),
+        onSuccess: (_, { reviewId, payload }) => {
+            queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) =>
+                old.map(r => (r.id === reviewId ? { ...r, ...payload } : r))
+            );
+            message.success('리뷰가 수정되었습니다');
+            cancelEdit();
+        },
+        onError: () => message.error('리뷰 수정에 실패했습니다'),
+    });
+
+    const submitEdit = (reviewId) => {
         if (!editForm.rating)                    return message.warning('별점을 선택해주세요');
         if (!editForm.title.trim())              return message.warning('제목을 입력해주세요');
         if (editForm.content.trim().length < 10) return message.warning('내용을 10자 이상 입력해주세요');
-        setEditLoading(true);
-        try {
-            await reviewService.updateReview(reviewId, {
-                rating:  editForm.rating,
-                title:   editForm.title.trim(),
-                content: editForm.content.trim(),
-            });
-            const updated = reviews.map(r =>
-                r.id === reviewId
-                    ? { ...r, rating: editForm.rating, title: editForm.title.trim(), content: editForm.content.trim() }
-                    : r
-            );
-            setReviews(updated); notifyRating(updated);
-            message.success('리뷰가 수정되었습니다');
-            cancelEdit();
-        } catch { message.error('리뷰 수정에 실패했습니다'); }
-        finally  { setEditLoading(false); }
+        updateMutation.mutate({
+            reviewId,
+            payload: { rating: editForm.rating, title: editForm.title.trim(), content: editForm.content.trim() },
+        });
     };
+
+    const deleteMutation = useMutation({
+        mutationFn: (reviewId) => reviewService.deleteReview(reviewId),
+        onSuccess: (_, reviewId) => {
+            queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => old.filter(r => r.id !== reviewId));
+            message.success('리뷰가 삭제되었습니다');
+        },
+        onError: () => message.error('리뷰 삭제에 실패했습니다'),
+    });
 
     const handleDelete = (reviewId) => {
         confirm({
             title: '리뷰 삭제', content: '리뷰를 삭제하시겠습니까? 삭제 후 되돌릴 수 없습니다.',
             okText: '삭제하기', cancelText: '취소', okButtonProps: { danger: true }, centered: true,
-            onOk: async () => {
-                try {
-                    await reviewService.deleteReview(reviewId);
-                    const updated = reviews.filter(r => r.id !== reviewId);
-                    setReviews(updated); notifyRating(updated);
-                    message.success('리뷰가 삭제되었습니다');
-                } catch { message.error('리뷰 삭제에 실패했습니다'); }
-            },
+            onOk: () => deleteMutation.mutateAsync(reviewId),
         });
     };
 
-    if (loading) return <ReviewCardSkeleton count={3} />;
+    // 2026-07 추가: PC에서는 2열 그리드라 한 화면에 더 많이 채워지는 게 자연스러워서 개수를 4로 늘림
+    // (3개면 2열 그리드에서 한 칸이 어중간하게 비어 보인다). 모바일은 기존과 동일하게 3.
+    if (loading) return <ReviewCardSkeleton count={isPC ? 4 : 3} isPC={isPC} />;
 
+    const submitting = createMutation.isPending;
+    const editLoading = updateMutation.isPending;
     const canWrite  = !!completedReservation && !completedReservation.reviewId && !written;
     const avgRating = reviews.length
         ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
@@ -224,6 +241,9 @@ const ReviewList = ({
             )}
 
             {reviews.length === 0 ? (
+                // 2026-07 수정 — 리뷰 섹션이 풀와이드가 된 만큼, 안내 문구도 그 풀와이드 폭 전체를
+                // 기준으로 진짜 중앙에 오도록 flex 중앙정렬로 감쌌다(예전엔 Empty 자체는 좌우 중앙이지만
+                // 그 바깥을 감싼 섹션이 좁은 폭에 고정되어 있어서 화면 전체 기준으로는 왼쪽에 쏠려 보였다).
                 <div style={styles.emptyWrap}>
                     <Empty
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -231,7 +251,7 @@ const ReviewList = ({
                     />
                 </div>
             ) : (
-                <div style={styles.list}>
+                <div style={isPC ? styles.listGridPC : styles.list}>
                     {reviews.map(review => {
                         const isOwner   = user && user.email === review.memberEmail;
                         const isEditing = editingId === review.id;
@@ -239,7 +259,8 @@ const ReviewList = ({
 
                         if (isEditing) {
                             return (
-                                <div key={review.id} ref={el => { reviewRefs.current[review.id] = el; }}>
+                                <div key={review.id} ref={el => { reviewRefs.current[review.id] = el; }}
+                                    style={isPC ? styles.gridSpanAll : undefined}>
                                     <ReviewForm
                                         userName={review.memberName}
                                         form={editForm} setForm={setEditForm}
@@ -312,10 +333,27 @@ const styles = {
         lineHeight: 1, letterSpacing: '-1px',
     },
     reviewCount: { color: colors.text.tertiary, fontSize: fontSize.sm, marginTop: 2 },
-    emptyWrap: { padding: '40px 0 20px' },
+    // 2026-07 수정 — 풀와이드 섹션 전체를 기준으로 아이콘+문구가 진짜 중앙에 오도록 flex 중앙정렬.
+    emptyWrap: {
+        padding: '60px 0 40px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+    },
     list: { display: 'flex', flexDirection: 'column', gap: 12 },
+    // 2026-07 추가 — PC 전용 2열 그리드. 리뷰 섹션이 풀와이드가 되면서 1열로만 쌓으면
+    // 오른쪽 절반이 계속 비어 보이는 문제가 있었다.
+    listGridPC: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, alignItems: 'start' },
+    // 작성/수정 폼은 입력창이 있어 2열 중 한 칸에 넣기엔 좁으므로 그리드 전체 폭을 차지하게 함
+    gridSpanAll: { gridColumn: '1 / -1' },
     card: {
-        padding: '20px 16px 0 16px',
+        // 2026-07 버그 수정: 예전엔 padding이 '20px 16px 0 16px'(하단 0)이었다.
+        // 하단을 cardActions(marginTop 16 + 좌우 -16)가 채워주는 구조였는데, 그 액션바는
+        // isOwner일 때만 렌더된다 — 즉 남의 리뷰에서는 본문 마지막 줄이 카드 아래 테두리에
+        // 그대로 붙어버렸다. 살리려면 하단에도 padding을 주고, 액션바가 있을 땐 marginBottom으로 상쇄한다.
+        padding: '20px 16px',
         backgroundColor: colors.background.paper, borderRadius: radius.xl,
         border: `1px solid ${colors.border.light}`, boxShadow: shadows.card,
         overflow: 'hidden', transition: 'box-shadow 0.2s, border-color 0.2s',
@@ -341,7 +379,9 @@ const styles = {
     formBody: { display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 8 },
     cardActions: {
         display: 'flex', borderTop: `1px solid ${colors.border.light}`,
-        marginTop: 16, marginLeft: -16, marginRight: -16,
+        // marginBottom: -20 — card의 아래 padding(20px)을 상쇄해서 액션바가 카드 밑변에 딱 붙게 함.
+        // (액션바가 없는 남의 리뷰에서는 그 padding이 그대로 살아서 본문이 테두리에 안 붙는다)
+        marginTop: 16, marginLeft: -16, marginRight: -16, marginBottom: -20,
     },
     actionBtn: {
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',

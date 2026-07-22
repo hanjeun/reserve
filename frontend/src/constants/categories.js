@@ -81,3 +81,14 @@ export const RESERVATION_SLOT_OPTIONS = [
     { value: 120, label: '2시간' },
     { value: 240, label: '4시간' },
 ];
+
+// "우리동네" 배지 표시 기준 거리 옵션 (백엔드 StoreService와 동일하게 1~10km로 제한, 0 = 배지 끄기)
+export const NEARBY_RADIUS_OPTIONS = [
+    { value: 1,  label: '1km' },
+    { value: 2,  label: '2km' },
+    { value: 3,  label: '3km' },
+    { value: 5,  label: '5km' },
+    { value: 7,  label: '7km' },
+    { value: 10, label: '10km' },
+    { value: 0,  label: '없음 (배지 표시 안 함)' },
+];

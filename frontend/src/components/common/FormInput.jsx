@@ -6,6 +6,7 @@
  * <FormInput type="password" placeholder="비밀번호" />
  * <FormInput type="number" suffix="원" />
  * <FormInput disabled />
+ * <FormInput maxLength={40} showCount />
  */
 
 import React from 'react';
@@ -21,6 +22,7 @@ const FormInput = ({
     suffix,
     prefix,
     maxLength,
+    showCount = false,
     id,
     style,
     ...rest 
@@ -33,6 +35,9 @@ const FormInput = ({
         paddingLeft: 12,
         paddingRight: 12,
         fontSize: fontSize.lg,  // 입력 텍스트·placeholder 크기 고정(16px) — 호출부 size prop과 무관하게 항상 동일
+        // showCount일 때 AntD가 카운터를 wrapper 밖으로 절대위치로 붙여서 표시하므로, 바로 다음 요소(모달 footer 등)를
+        // 침범하지 않도록 FormTextArea와 동일하게 여유 공간을 미리 확보해둠
+        marginBottom: showCount ? 22 : 0,
         ...style,
     };
 
@@ -47,6 +52,7 @@ const FormInput = ({
                 variant="filled"
                 style={baseStyle}
                 maxLength={maxLength}
+                showCount={showCount}
                 {...rest}
             />
         );
@@ -80,6 +86,7 @@ const FormInput = ({
             suffix={suffix}
             prefix={prefix}
             maxLength={maxLength}
+            showCount={showCount}
             {...rest}
         />
     );
@@ -173,6 +180,7 @@ FormInput.propTypes = {
     suffix: PropTypes.node,
     prefix: PropTypes.node,
     maxLength: PropTypes.number,
+    showCount: PropTypes.bool,
     id: PropTypes.string,
     style: PropTypes.object,
 };

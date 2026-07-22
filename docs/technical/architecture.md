@@ -4,33 +4,7 @@
 
 ## 인프라 구성
 
-```mermaid
-graph TD
-    User["사용자"] --> R53["Route 53\nreserve.it.kr"]
-    R53 --> LS
-
-    subgraph LS["AWS Lightsail · 서울"]
-        Nginx["Nginx :80/:443\nSSL · 정적 파일 서빙"]
-        Blue["Spring Boot Blue\n:8080"]
-        Green["Spring Boot Green\n:8081"]
-        MySQL["MySQL 8.0"]
-        Monitor["Grafana + Loki\ngrafana.reserve.it.kr"]
-
-        Nginx -->|"/api/* /oauth2/*"| Blue
-        Nginx -->|"/api/* /oauth2/*"| Green
-        Nginx -->|"/*"| Static["React SPA\n정적 파일"]
-        Blue --> MySQL
-        Green --> MySQL
-        Monitor -.->|"로그 수집"| Blue
-    end
-
-    Blue --> S3["AWS S3\nreserve-it-kr-bucket"]
-    S3 --> CF["CloudFront\ncdn.reserve.it.kr"]
-    Portone["포트원 V2"] -.-> Blue
-    OAuth["Google / Naver / Kakao"] -.-> Blue
-```
-
-
+![RESERVE 아키텍처](../images/RESERVE_Architecture.png)
 
 ---
 

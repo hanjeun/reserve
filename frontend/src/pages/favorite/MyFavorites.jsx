@@ -1,29 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Empty, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import { favoriteKeys } from '../../hooks/queryKeys';
 import favoriteService from '../../services/favoriteService';
 import { fontWeight, fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 
+// 2026-07 추가 — masonry(columns) 대신 고정 그리드로 전환.
+// 예전엔 columns:'4 240px'라 브라우저가 컨테이너 폭에 따라 3열/4열을 오가는 방식이었고
+// (최소폭 240px만 보장), PC에서는 거의 항상 4열이 가능한 폭인데도 3열로 나오는 경우가 있었다.
+// PC에서는 항상 4열로 고정되도록 repeat(4, 1fr) 그리드로 바꾸고, 모바일은 미디어 쿼리로
+// 2열/1열로 자연스럽게 줄어들게 했다.
+const GRID_STYLE = `
+  .rsv-fav-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 900px) {
+    .rsv-fav-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .rsv-fav-grid { grid-template-columns: 1fr; }
+  }
+`;
+
 const MyFavorites = () => {
     const { message } = useMessage();
     useDocumentTitle('즐겨찾기');
-    const [favorites, setFavorites] = useState([]);
-    const [loading, setLoading]     = useState(true);
-    const fetchedRef = React.useRef(false);
 
-    useEffect(() => {
-        if (fetchedRef.current) return;
-        fetchedRef.current = true;
-        favoriteService.getMyFavorites()
-            .then(data => setFavorites(data || []))
-            .catch(() => message.error('즐겨찾기 목록을 불러오지 못했습니다.'))
-            .finally(() => setLoading(false));
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const { data: favorites = [], isLoading: loading, error } = useQuery({
+        queryKey: favoriteKeys.my(),
+        queryFn: async () => {
+            const data = await favoriteService.getMyFavorites();
+            return data || [];
+        },
+    });
+    React.useEffect(() => {
+        if (error) message.error('즐겨찾기 목록을 불러오지 못했습니다.');
+    }, [error, message]);
 
     // FavoriteDto → StoreCard가 기대하는 store 형태로 변환
     const toStoreShape = (fav) => ({
@@ -37,6 +57,7 @@ const MyFavorites = () => {
 
     return (
         <PageContainer size="xl" paddingTop="40px">
+            <style>{GRID_STYLE}</style>
             {/* 헤더 */}
             <div style={styles.header}>
                 <Title level={2} style={styles.title}>즐겨찾기</Title>
@@ -47,15 +68,15 @@ const MyFavorites = () => {
                 </Text>
             </div>
 
-            {/* 컨텐츠 */}
+            {/* 컨텐츠 — 2026-07 수정: 고정 4열 그리드(rsv-fav-grid)로 통일 (아래 GRID_STYLE 참고) */}
             {loading ? (
-                <div style={styles.grid}>
-                    <StoreCardSkeleton count={6} />
+                <div className="rsv-fav-grid">
+                    <StoreCardSkeleton count={8} />
                 </div>
             ) : favorites.length === 0 ? (
                 <Empty description="아직 즐겨찾기한 가게가 없습니다." style={{ marginTop: 100 }} />
             ) : (
-                <div style={styles.grid}>
+                <div className="rsv-fav-grid">
                     {favorites.map(fav => (
                         <div key={fav.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
                             <StoreCard store={toStoreShape(fav)} />
@@ -70,7 +91,6 @@ const MyFavorites = () => {
 const styles = {
     header: { marginBottom: 40 },
     title:  { margin: '0 0 8px', fontWeight: fontWeight.extrabold },
-    grid:   { columns: '4 240px', columnGap: 24 },
 };
 
 export default MyFavorites;

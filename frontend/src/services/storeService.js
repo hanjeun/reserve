@@ -11,6 +11,7 @@ const storeService = {
     getStoreForEdit:          (storeId)           => api.get(`/api/stores/${storeId}/edit`),
     getMyStores:              ()                  => api.get(API_ENDPOINTS.STORE.MY_STORES),
     toggleAutoApproval:       (storeId, enabled)  => api.patch(API_ENDPOINTS.STORE.AUTO_APPROVAL(storeId), null, { params: { enabled } }),
+    getStatistics:            (storeId, range = '30d') => api.get(API_ENDPOINTS.STORE.STATISTICS(storeId), { params: { range } }),
 };
 
 export default storeService;

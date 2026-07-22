@@ -35,6 +35,18 @@ button, input, textarea, select {
   font-family: inherit;
 }
 
+/* ── 드롭다운(Select/FormSelect 등 "롤러") 옵션 목록 — hover/선택 항목 사이 여백 ──
+   AntD 기본값은 옵션들이 서로 딱 붙어있는 하나의 긴 직사각형 리스트라, 마우스가 올라간
+   항목(hover)과 실제 선택된 항목(selected)이 이웃해 있으면 경계가 안 보여서 하나로
+   뭉쳐 보인다. 각 옵션에 살짝 마진 + 라운드를 줘서 필(pill) 하나하나로 분리되게 함 —
+   .reserve-pill-tabs/.reserve-segmented-btn과 같은 톤. 전역 클래스라 FormSelect를 쓰는
+   모든 드롭다운("롤러")에 한 번에 적용된다. */
+.ant-select-dropdown .ant-select-item {
+    border-radius: 8px !important;
+    margin: 1px 4px !important;
+    width: auto !important;
+}
+
 /* Ant Design v6: Select open 상태 화살표 회전 */
 .ant-select-suffix {
     transition: transform 0.2s;
@@ -43,10 +55,8 @@ button, input, textarea, select {
     transform: rotate(180deg);
 }
 
-/* 관리자 패널 탭 — 오버플로우 화살표 숨기고 스크롤로 대체 */
-.ant-tabs-nav-operations {
-    display: none !important;
-}
+/* 관리자/사업자 패널 탭 — 탭이 좌우로 넘칠 때 AntD 자체 "더보기"(∨) 버튼으로 접근하게 둔.
+   (2026-07-08: 직접 구현한 PillTabBar로 교체해봤다가 오히려 더 이상해졌다고 해서, 검증된 AntD 기본 메커니즘(더보기 버튼)으로 다시 되돌림) */
 
 /* 모바일 input 자동 확대 방지 (iOS Safari: font-size < 16px 시 자동 줌) */
 @media (max-width: 768px) {
@@ -54,15 +64,6 @@ button, input, textarea, select {
         font-size: 16px !important;
     }
 }
-/*
-.ant-tabs-nav-wrap {
-    overflow-x: auto !important;
-    scrollbar-width: none;
-}
-.ant-tabs-nav-wrap::-webkit-scrollbar {
-    display: none;
-}
-*/
 
 /* ── Toss 스타일 페이지네이션 글로벌 적용 ────────────────────────────────────────── */
 .ant-pagination {
@@ -216,6 +217,18 @@ button, input, textarea, select {
 .reserve-form-field textarea.ant-input::placeholder {
     font-size: 16px !important;
 }
+
+/* ── AddressSearch의 raw <input> — 표준 FormInput과 placeholder 톤 통일 ──
+   AddressSearch는 드롭다운/터치 스크롤 때문에 AntD Input 대신 raw <input>을 쓴다.
+   그래서 placeholder가 .reserve-form-field(=.ant-input 기준) 규칙의 적용을 받지 못해
+   브라우저 기본 placeholder(더 진하고 굵게) 색·굵기로 나와 다른 필드와 달라 보였다.
+   표준 filled input과 동일하게 tertiary(#8b95a1) 색 + 기본 굵기 + 16px로 맞춘다. */
+.reserve-address-input::placeholder {
+    color: #8b95a1 !important;
+    font-weight: 400 !important;
+    font-size: 16px !important;
+    opacity: 1; /* Firefox는 placeholder에 기본 opacity 0.54를 걸어 더 연하게 만든다 — 명시적으로 1 */
+}
 .ant-picker-cell-selected .ant-picker-cell-inner,
 .ant-picker-cell-range-start .ant-picker-cell-inner,
 .ant-picker-cell-range-end .ant-picker-cell-inner {
@@ -231,7 +244,37 @@ button, input, textarea, select {
     border-color: #b5b8bd !important;
 }
 
-/* ── Toss 스타일 캐쥳형(필) 탭 네비게이션 — pagination/date picker와 동일한 선택 색상(#e5e8eb) 통일 ── */
+/* RangePicker (FormDatePicker.RangePicker) default layout shows two calendar months side by
+   side, which needs 550px+ of width. On a narrow phone screen (375-430px) the left month
+   overflows off the edge of the screen. Below 576px, show only ONE month panel at a time
+   (matching how most mobile date-range pickers work: tap 시작일, pick from the one visible
+   month; tap 종료일, pick from the one visible month again, navigating months as needed) --
+   the underlying start/end selection logic is driven by which input has focus, not by how
+   many panels are in the DOM, so hiding the second panel doesn't affect picking either date.
+   PC keeps the original two-month side-by-side view untouched.
+   (2026-07-10: found on a real device testing the ad banner's exposure-period date range field;
+   first tried stacking both months vertically, but that was still too tall for a mobile modal,
+   so switched to hiding the second panel entirely per feedback) */
+@media (max-width: 576px) {
+    .ant-picker-dropdown .ant-picker-panels {
+        flex-direction: column !important;
+    }
+    .ant-picker-dropdown .ant-picker-panels > .ant-picker-panel:nth-of-type(2) {
+        display: none !important;
+    }
+    .ant-picker-dropdown .ant-picker-panel-container {
+        width: auto !important;
+        max-width: calc(100vw - 24px) !important;
+    }
+    .ant-picker-dropdown .ant-picker-panel {
+        width: 100% !important;
+    }
+}
+
+/* ── Toss 스타일 라운드 사각형 탭 네비게이션 (2026-07 수정: 캡슐형에서 변경) ──
+   흰 배경 트랙 + 선택 시에만 pagination/date picker와 동일한 회색(#e5e8eb),
+   radius도 pagination과 동일하게 완전한 원이 아닌 8~10px 라운드 사각형으로 통일,
+   선택 시 스프링 스케일 애니메이션 추가 */
 .reserve-pill-tabs .ant-tabs-nav::before {
     border-bottom: none !important;
 }
@@ -240,15 +283,16 @@ button, input, textarea, select {
 }
 .reserve-pill-tabs .ant-tabs-nav-list {
     gap: 4px;
-    background-color: #f2f4f6;
-    padding: 4px;
-    border-radius: 100px;
 }
 .reserve-pill-tabs .ant-tabs-tab {
     margin: 0 !important;
     padding: 8px 18px !important;
-    border-radius: 100px !important;
-    transition: background-color 0.2s ease, color 0.2s ease !important;
+    border-radius: 10px !important;
+    background-color: transparent !important;
+    transition: background-color 0.2s ease !important;
+}
+.reserve-pill-tabs .ant-tabs-tab:hover:not(.ant-tabs-tab-active) {
+    background-color: #f2f4f6 !important;
 }
 .reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn {
     color: #8b95a1;
@@ -261,16 +305,148 @@ button, input, textarea, select {
 .reserve-pill-tabs .ant-tabs-tab-active {
     background-color: #e5e8eb !important;
 }
+.reserve-pill-tabs .ant-tabs-tab-active:hover {
+    background-color: #e5e8eb !important;
+}
 .reserve-pill-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
     color: #1a1f27 !important;
     font-weight: 600 !important;
 }
-/* 모바일에서도 캐쥳 트랙 유지, 좀 더 콤팩트하게 */
 @media (max-width: 768px) {
-    .reserve-pill-tabs .ant-tabs-nav-list {
-        padding: 3px;
-    }
     .reserve-pill-tabs .ant-tabs-tab {
         padding: 7px 14px !important;
     }
+}
+/* 더보기(∨) 버튼도 우리 톤으로 — 기본 AntD 파란 혹 테두리 없이 회색 계열 */
+.reserve-pill-tabs .ant-tabs-nav-more {
+    color: #8b95a1 !important;
+    background: transparent !important;
+    border-radius: 10px !important;
+}
+.reserve-pill-tabs .ant-tabs-nav-more:hover {
+    background-color: #f2f4f6 !important;
+    color: #1a1f27 !important;
+}
+.reserve-pill-tabs .ant-tabs-dropdown-menu-item-selected {
+    background-color: #e5e8eb !important;
+    color: #1a1f27 !important;
+}
+
+
+.reserve-segmented-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    cursor: pointer;
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #8b95a1;
+    font-family: inherit;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    white-space: nowrap;
+}
+.reserve-segmented-btn:hover:not(:disabled):not(.reserve-segmented-btn--active) {
+    background-color: #f2f4f6;
+    color: #1a1f27;
+}
+.reserve-segmented-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+.reserve-segmented-btn--active {
+    background-color: #e5e8eb;
+    color: #1a1f27 !important;
+    font-weight: 600;
+}
+.reserve-segmented-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+@media (max-width: 768px) {
+    .reserve-segmented-btn {
+        padding: 8px 10px;
+        font-size: 12.5px;
+    }
+}
+
+/* DataTable fitContent option.
+   AntD Table inlines min-width:100% on its <table> element whenever scroll.x is set,
+   so when the sum of column widths is less than the available space, every column
+   gets stretched proportionally instead of staying at its set width.
+   For tables where every column already has an explicit width (no flexible column
+   left to intentionally absorb the extra space), pass fitContent to DataTable so it
+   adds this class and the table only takes up the real sum of its column widths.
+   (2026-07-09: added after finding the store-name column in the ad management table
+   was growing well past its set width) */
+.reserve-table-fit-content .ant-table table {
+    min-width: max-content !important;
+}
+
+/* ── 모달 닫기(X) 버튼 톤 통일 ─────────────────────────────────────────────
+   증상: 모바일에서 모달을 처음 열면 X에 회색 배경(hover처럼)이, 다시 열면 파란 배경+외곽선이
+   뜨다가, 2~3번 뒤면 정상이 된다. 원인은 AntD 6이 Modal 스타일을 CSS-in-JS로 동적
+   주입하는데, 그 주입 시점이 index.css보다 늦어질 때가 있어 — 같은 specificity면
+   나중에 로드된 AntD 기본 focus 스타일(파란 아웃라인/그림자)가 이기고, 주입이 안정된
+   뒤에야 내 규칙이 이긴다(그래서 "처음 몇 번만 이상"). 부모 선택자(.ant-modal-root)를
+   붙여 specificity를 올려 주입 순서와 무관하게 항상 이기게 하고, X는 원래 강조 배경이
+   필요 없는 요소라 평소/포커스는 전부 투명, hover에만 회색을 준다(파란은 어디에도 없음). */
+.ant-modal-root .ant-modal-close,
+.ant-modal-root .ant-modal-close:focus,
+.ant-modal-root .ant-modal-close:focus-visible,
+.ant-modal-root .ant-modal-close:active {
+    outline: none !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+}
+.ant-modal-root .ant-modal-close:hover {
+    background-color: #f2f4f6 !important;
+}
+
+/* ── 모달 박스(.ant-modal) 포커스 파란 테두리 제거 ──────────────────────
+   진짜 범인은 X 버튼이 아니라 모달 박스 자체였다. AntD 6 구조상 .ant-modal은
+   tabindex="-1" role="dialog"로 포커스 가능한 모달 컴테이너인데, 열릴 때 포커스 트랩이
+   여기에 포커스를 주면 브라우저 기본 focus-visible 아웃라인(하늘색)이 모달 박스 전체를
+   둠러싸다. 모달 박스는 이미 띄워져 있어 포커스 테두리가 필요 없으므로 아웃라인만
+   제거한다(container의 정상 그림자 box-shadow는 건드리지 않는다). specificity를 위해
+   .ant-modal-root를 앞에 붙인다. — 이것이 이미지에서 보이던 "모달 하늘색 테두리"의 진찢 원인. */
+.ant-modal-root .ant-modal,
+.ant-modal-root .ant-modal:focus,
+.ant-modal-root .ant-modal:focus-visible,
+.ant-modal-root .ant-modal-container:focus,
+.ant-modal-root .ant-modal-container:focus-visible {
+    outline: none !important;
+}
+
+/* ── 이미지 미리보기 툴바 톤 통일 (useImagePreview가 rootClassName으로 거는 클래스) ──
+   AntD 기본 프리뷰 툴바(하단 아이콘들)은 우리 디자인 시스템과 이질적이라,
+   pagination/tabs/segmented와 같은 톤(평소에는 아이콘만, hover 시에만 둥근 박스)으로 맞춘다.
+   각 버튼은 .ant-image-preview-operations-operation — 평소 배경 투명, hover에만 회색 박스. */
+.reserve-image-preview .ant-image-preview-operations-operation {
+    border-radius: 8px !important;
+    padding: 8px !important;
+    margin: 0 2px !important;
+    background-color: transparent !important;
+    transition: background-color 0.15s ease !important;
+}
+.reserve-image-preview .ant-image-preview-operations-operation:hover {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+}
+.reserve-image-preview .ant-image-preview-operations-operation-disabled {
+    opacity: 0.35 !important;
+}
+.reserve-image-preview .ant-image-preview-operations-operation-disabled:hover {
+    background-color: transparent !important;
+}
+/* 좌·우 넘기기 화살표(여러 장일 때)도 같은 톤 — 평소 투명, hover 시에만 둥근 박스 */
+.reserve-image-preview .ant-image-preview-switch-left,
+.reserve-image-preview .ant-image-preview-switch-right {
+    border-radius: 8px !important;
+    background-color: rgba(0, 0, 0, 0.2) !important;
+    transition: background-color 0.15s ease !important;
+}
+.reserve-image-preview .ant-image-preview-switch-left:hover,
+.reserve-image-preview .ant-image-preview-switch-right:hover {
+    background-color: rgba(0, 0, 0, 0.45) !important;
 }

@@ -5,7 +5,6 @@ import ReservationStatusBadge from './ReservationStatusBadge';
 import { formatCurrency, getThumbnailUrl } from '../../utils';
 import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
 import { useWindowWidth } from '../../hooks';
-import { onActivateKey } from '../../utils/a11y';
 
 const { Text } = Typography;
 
@@ -39,23 +38,20 @@ const ReservationRow = ({ reservation, onOpenDetail, renderMeta, renderActions, 
         <div style={styles.row}>
             {/* 메인 줄 — 이미지 + 정보 + 오른쪽 컬럼(상태/가격/버튼). 항상 nowrap. */}
             <div style={styles.mainRow}>
-                <div
+                <button
+                    type="button"
                     style={isWide ? styles.imgWrapWide : styles.imgWrap}
                     onClick={onOpenDetail}
-                    onKeyDown={onActivateKey(onOpenDetail)}
-                    role="button"
-                    tabIndex={0}
                     aria-label={`${storeName} 예약 상세 보기`}
                 >
                     <img src={getThumbnailUrl(storeMainImageUrl)} alt={storeName} style={styles.img} />
-                </div>
+                </button>
 
-                <div
+                <button
+                    type="button"
                     style={styles.info}
                     onClick={onOpenDetail}
-                    onKeyDown={onActivateKey(onOpenDetail)}
-                    role="button"
-                    tabIndex={0}
+                    aria-label={`${storeName} 예약 상세 보기`}
                 >
                     <Text strong style={isWide ? styles.storeNameWide : styles.storeName}>
                         {storeName}
@@ -66,7 +62,7 @@ const ReservationRow = ({ reservation, onOpenDetail, renderMeta, renderActions, 
                         )}
                     </Text>
                     {renderMeta(isWide)}
-                </div>
+                </button>
 
                 {/* 오른쪽 컬럼 — 상태 → 가격 → 액션 버튼까지 세로 정렬(오른쪽 끝). PC/모바일 동일. */}
                 <div style={styles.statusPrice}>
@@ -82,16 +78,21 @@ const ReservationRow = ({ reservation, onOpenDetail, renderMeta, renderActions, 
     );
 };
 
+// 썸네일·정보 영역은 <div role="button">이 아니라 네이티브 <button>으로 렌더한다 —
+// 키보드(Tab/Enter/Space)와 스크린리더 지원을 브라우저에 맡기기 위해서다(SonarCloud a11y).
+// 대신 버튼 기본 외형(배경·테두리·패딩·폰트·가운데정렬)을 지워 예전 div 시절 모양을 그대로 유지한다.
+const btnReset = { background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left' };
+
 const styles = {
     // 바깥 셀 — 세로 스택: 메인 줄 + 부가 문구 줄
     row:    { display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 0' },
     // 메인 줄 — 항상 nowrap 한 줄. 오른쪽 컬럼은 위쪽 정렬(버튼이 아래로 늘어나므로).
     mainRow: { display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'nowrap' },
-    imgWrap:      { width: 56, height: 56, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0, cursor: 'pointer' },
-    imgWrapWide:  { width: 72, height: 72, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0, cursor: 'pointer' },
+    imgWrap:      { ...btnReset, width: 56, height: 56, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0, cursor: 'pointer' },
+    imgWrapWide:  { ...btnReset, width: 72, height: 72, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0, cursor: 'pointer' },
     img:          { width: '100%', height: '100%', objectFit: 'cover' },
     // 정보 영역 — 세로 가운데(이미지와 시각적으로 맞도록). alignSelf:center로 오른쪽 컬럼과 독립.
-    info:         { flex: 1, minWidth: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', gap: 5, cursor: 'pointer' },
+    info:         { ...btnReset, flex: 1, minWidth: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', gap: 5, cursor: 'pointer' },
     storeName:     { fontSize: fontSize.base, color: colors.text.primary, display: 'block', lineHeight: 1.3 },
     storeNameWide: { fontSize: fontSize.lg, color: colors.text.primary, display: 'block', lineHeight: 1.3, fontWeight: fontWeight.semibold },
     requestIcon:   { fontSize: 12, color: colors.text.tertiary, marginLeft: 6 },

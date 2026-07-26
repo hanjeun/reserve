@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Empty, Tabs, Typography } from 'antd';
+import { Empty, Typography, Tabs } from 'antd';
 import {
     CalendarOutlined,
     ClockCircleOutlined,
@@ -214,6 +214,7 @@ const BusinessPanel = () => {
                 onChange={setActiveTab}
                 items={tabItems}
                 className="reserve-pill-tabs"
+                tabBarGutter={4}
                 animated={{ inkBar: true, tabPane: false }}
                 destroyOnHidden
                 style={{ marginBottom: 8 }}

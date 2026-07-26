@@ -15,6 +15,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
+import { EMAIL_REGEX } from '../../utils/validation';
 import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -26,8 +27,6 @@ const CATEGORY_OPTIONS = [
     { value: 'ACCOUNT', label: '계정 문의' },
     { value: 'ETC', label: '기타 문의' },
 ];
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const InquiryModal = ({ open, onClose }) => {
     const { isLoggedIn } = useAuthStore();

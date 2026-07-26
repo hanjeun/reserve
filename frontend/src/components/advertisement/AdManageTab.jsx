@@ -29,17 +29,17 @@ const STATUS_LABELS = {
 };
 
 // 결제 가능한 상태 — 아직 결제 전(대기)이거나 결제가 실패한 경우
-const PAYABLE_STATUSES = ['PENDING_PAYMENT', 'PAYMENT_FAILED'];
+const PAYABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED']);
 
 // 취소 가능한 상태 — 결제 전(돈 안 나감) 또는 결제 실패(돈 안 나감)이거나 이미 결제된 노출 중(전액 환불)만
-const CANCELLABLE_STATUSES = ['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTIVE'];
+const CANCELLABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTIVE']);
 
 // 수정 가능한 상태 — 백엔드 updateAd와 동일한 규칙(CANCELLED/EXPIRED/SUSPENDED/REFUNDED는 수정 불가)
-const EDITABLE_STATUSES = ['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTIVE'];
+const EDITABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTIVE']);
 
 // 종료상태(만료/취소/환불/중단) — 목록에서 직접 숨길 수 있는 상태(소프트삭제) — 2026-07 추가,
 // 백엔드 AdvertisementService.removeAd와 동일한 규칙
-const REMOVABLE_STATUSES = ['EXPIRED', 'CANCELLED', 'REFUNDED', 'SUSPENDED'];
+const REMOVABLE_STATUSES = new Set(['EXPIRED', 'CANCELLED', 'REFUNDED', 'SUSPENDED']);
 
 // 배너 이미지 최대 장수 — 가게 상세 이미지(최대 5장)와 동일하게 통일
 const MAX_BANNER_IMAGES = 5;
@@ -253,22 +253,22 @@ const AdManageTab = () => {
             title: '처리', key: 'actions', width: 220,
             render: (_, r) => (
                 <div style={{ display: 'flex', gap: 8 }}>
-                    {PAYABLE_STATUSES.includes(r.status) && (
+                    {PAYABLE_STATUSES.has(r.status) && (
                         <Button variant="ghost-sm-primary" loading={payingId === r.id} onClick={() => handlePay(r)}>
                             <CreditCardOutlined /> 결제
                         </Button>
                     )}
-                    {r.adType === 'BANNER' && EDITABLE_STATUSES.includes(r.status) && (
+                    {r.adType === 'BANNER' && EDITABLE_STATUSES.has(r.status) && (
                         <Button variant="ghost-sm" onClick={() => handleEdit(r)}>
                             <EditOutlined /> 수정
                         </Button>
                     )}
-                    {CANCELLABLE_STATUSES.includes(r.status) && (
+                    {CANCELLABLE_STATUSES.has(r.status) && (
                         <Button variant="ghost-sm-danger" onClick={() => handleCancel(r)}>
                             <CloseOutlined /> {r.status === 'ACTIVE' ? '환불' : '취소'}
                         </Button>
                     )}
-                    {REMOVABLE_STATUSES.includes(r.status) && (
+                    {REMOVABLE_STATUSES.has(r.status) && (
                         <Button variant="ghost-sm" onClick={() => handleRemove(r)} style={{ color: colors.text.tertiary }}>
                             <DeleteOutlined /> 삭제
                         </Button>

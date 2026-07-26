@@ -82,14 +82,22 @@ const Bone = ({ width = '100%', height = 14, style = {}, borderRadius }) => {
 };
 
 /* ─────────────────────────────────────────────
+   스켈레톤용 안정적 key 생성
+   스켈레톤은 순서가 바뀌거나 항목이 추가/삭제되지 않는 정적 목록이라 인덱스를 key로 써도
+   실제 버그는 없지만, 배열 인덱스 key 규칙(SonarCloud/react)을 지키면서 의도를 분명히 하려고
+   문자열 key를 미리 만들어 쓴다 (MailboxTab의 스켈레톤과 동일한 컨벤션).
+───────────────────────────────────────────── */
+const skeletonKeys = (n, prefix = 'sk') => Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
+
+/* ─────────────────────────────────────────────
    StoreCardSkeleton
    StoreCard 구조: 커버이미지 + 태그 + 제목 + 별점 (Card 컴포넌트: border + boxShadow, radius 0)
 ───────────────────────────────────────────── */
 const StoreCardSkeleton = ({ count = 6, withActions = false }) => (
   <>
-    {Array.from({ length: count }).map((_, i) => (
+    {skeletonKeys(count, 'store').map((key) => (
       /* 실제 카드와 동일한 래핑 구조 — breakInside + marginBottom */
-      <div key={i} style={{ breakInside: 'avoid', marginBottom: 24 }}>
+      <div key={key} style={{ breakInside: 'avoid', marginBottom: 24 }}>
         <div
           style={{
             borderRadius: 0,
@@ -171,13 +179,49 @@ const ReservationRowSkeletonItem = ({ isWide, withCode = false }) => {
   // 로딩이 끝나는 순간 버튼 개수가 변해 폭이 튀지 않게 한다.
   const actionBones = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-      {Array.from({ length: withCode ? 3 : 2 }).map((_, i) => (
-        <Bone key={i} width={40} height={14} borderRadius={4} />
+      {skeletonKeys(withCode ? 3 : 2, 'act').map((key) => (
+        <Bone key={key} width={40} height={14} borderRadius={4} />
       ))}
     </div>
   );
   // 예약번호 줄 Bone — 손님 카드에만(withCode). PC/모바일 동일하게 가게명 아래 한 줄.
   const codeBone = withCode ? <Bone width={isWide ? 120 : '55%'} height={13} /> : null;
+  // 메타 정보 줄 — 예전엔 JSX 안에서 isWide ? ... : withCode ? ... : ... 3중 중첩 삼항이었는데
+  // 읽기 어려워서(SonarCloud: 중첩 삼항 추출) if/else로 분리했다. 렌더 결과는 동일하다.
+  let metaBones;
+  if (isWide) {
+    /* PC: metaRowFlat — 이름·인원·날짜·시간이 한 줄에 */
+    metaBones = (
+      <div style={{ display: 'flex', gap: 12 }}>
+        <Bone width={56} height={12} />
+        <Bone width={48} height={12} />
+        <Bone width={72} height={12} />
+        <Bone width={56} height={12} />
+      </div>
+    );
+  } else if (withCode) {
+    /* 모바일 손님: 날짜·시간 한 줄(예약번호는 위 codeBone이 담당) */
+    metaBones = (
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Bone width={72} height={12} />
+        <Bone width={56} height={12} />
+      </div>
+    );
+  } else {
+    /* 모바일 사업자: 이름·인원 / 날짜·시간 2줄 */
+    metaBones = (
+      <>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Bone width={56} height={12} />
+          <Bone width={48} height={12} />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Bone width={72} height={12} />
+          <Bone width={56} height={12} />
+        </div>
+      </>
+    );
+  }
   return (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 0' }}>
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: isWide ? 16 : 12, flexWrap: 'nowrap' }}>
@@ -192,33 +236,7 @@ const ReservationRowSkeletonItem = ({ isWide, withCode = false }) => {
         <Bone width={isWide ? '35%' : '45%'} height={isWide ? 17 : 15} />
         {/* 예약번호 (손님만) */}
         {codeBone}
-        {isWide ? (
-          /* PC: metaRowFlat — 이름·인원·날짜·시간이 한 줄에 */
-          <div style={{ display: 'flex', gap: 12 }}>
-            <Bone width={56} height={12} />
-            <Bone width={48} height={12} />
-            <Bone width={72} height={12} />
-            <Bone width={56} height={12} />
-          </div>
-        ) : withCode ? (
-          /* 모바일 손님: 날짜·시간 한 줄(예약번호는 위 codeBone이 담당) */
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Bone width={72} height={12} />
-            <Bone width={56} height={12} />
-          </div>
-        ) : (
-          /* 모바일 사업자: 이름·인원 / 날짜·시간 2줄 */
-          <>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Bone width={56} height={12} />
-              <Bone width={48} height={12} />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Bone width={72} height={12} />
-              <Bone width={56} height={12} />
-            </div>
-          </>
-        )}
+        {metaBones}
       </div>
 
       {/* 우측 컬럼 — 상태/금액, 그리고 버튼까지 세로 정렬(실제 statusPrice와 동일) */}
@@ -237,8 +255,8 @@ const ReservationRowSkeletonList = ({ count, withCode = false }) => {
   const isWide = useIsWideRow();
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <React.Fragment key={i}>
+      {skeletonKeys(count, 'row').map((key, i) => (
+        <React.Fragment key={key}>
           <ReservationRowSkeletonItem isWide={isWide} withCode={withCode} />
           {i < count - 1 && (
             <div style={{ height: 1, background: colors.border.light }} />
@@ -310,7 +328,7 @@ const ReviewCardSkeleton = ({ count = 3, isPC = false }) => (
         : { display: 'flex', flexDirection: 'column', gap: 12 }
     }
   >
-    {Array.from({ length: count }).map((_, i) => <ReviewCardSkeletonItem key={i} />)}
+    {skeletonKeys(count, 'rev').map((key) => <ReviewCardSkeletonItem key={key} />)}
   </div>
 );
 
@@ -321,8 +339,9 @@ const DETAIL_BREAKPOINT = 900;
 
 const InfoRowsSkeleton = () => (
   <>
-    {[80, 60, 90, 72, 68].map((w, i) => (
-      <div key={i} style={{
+    {/* 폭 값이 서로 모두 달라서 값 자체가 안정적인 key가 된다(배열 인덱스 key 회피) */}
+    {[80, 60, 90, 72, 68].map((w) => (
+      <div key={w} style={{
         display: 'flex', alignItems: 'center', gap: 10,
         padding: '11px 0',
         borderBottom: `1px solid ${colors.border.light}`,
@@ -487,6 +506,9 @@ const AdminTableSkeleton = ({
 }) => {
   const lastIdx = cols.length - 1;
   const hasFlexCol = cols.some((w) => w == null);
+  // 컬럼/행 key — 배열 인덱스를 key로 쓰지 않기 위해 미리 만들어 두는 안정적인 문자열 key
+  const colKeys = skeletonKeys(cols.length, 'col');
+  const rowKeys = skeletonKeys(rows, 'row');
 
   // 위 주석의 규칙을 그대로 구현
   const colStyle = (w) => {
@@ -526,7 +548,7 @@ const AdminTableSkeleton = ({
         >
           {cols.map((w, i) => (
             <div
-              key={i}
+              key={colKeys[i]}
               style={{
                 ...colStyle(w),
                 // 실제 AntD <th>와 동일: fontSize 14(테마 기본) / fontWeight 600 / 본문과 같은 진한 색.
@@ -545,9 +567,9 @@ const AdminTableSkeleton = ({
         </div>
 
         {/* 데이터 행들 */}
-        {Array.from({ length: rows }).map((_, ri) => (
+        {rowKeys.map((rowKey, ri) => (
           <div
-            key={ri}
+            key={rowKey}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -563,10 +585,10 @@ const AdminTableSkeleton = ({
               // 마지막 열 = "처리"(버튼) 열
               if (ci === lastIdx) {
                 return (
-                  <div key={ci} style={{ ...style, display: 'flex', alignItems: 'center', gap: 6, minHeight: 22 }}>
+                  <div key={colKeys[ci]} style={{ ...style, display: 'flex', alignItems: 'center', gap: 6, minHeight: 22 }}>
                     {actionBtns > 0
-                      ? Array.from({ length: actionBtns }).map((__, bi) => (
-                        <Bone key={bi} width={52} height={22} borderRadius={4} />
+                      ? skeletonKeys(actionBtns, 'btn').map((btnKey) => (
+                        <Bone key={btnKey} width={52} height={22} borderRadius={4} />
                       ))
                       : <Bone width="70%" height={14} />}
                   </div>
@@ -576,7 +598,7 @@ const AdminTableSkeleton = ({
               // 사업자 인증 탭처럼 첫 열이 "이름 + 이메일" 2줄인 경우
               if (ci === 0 && stackFirstCol) {
                 return (
-                  <div key={ci} style={{ ...style, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div key={colKeys[ci]} style={{ ...style, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <Bone width="60%" height={14} />
                     <Bone width="85%" height={12} />
                   </div>
@@ -584,7 +606,7 @@ const AdminTableSkeleton = ({
               }
 
               return (
-                <div key={ci} style={{ ...style, display: 'flex', alignItems: 'center', minHeight: 22 }}>
+                <div key={colKeys[ci]} style={{ ...style, display: 'flex', alignItems: 'center', minHeight: 22 }}>
                   <Bone width={`${55 + (ci % 3) * 15}%`} height={14} />
                 </div>
               );

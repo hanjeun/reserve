@@ -74,9 +74,13 @@ const styles = {
         display: 'block',
         marginBottom: 4,
     },
-    valueRow: { display: 'flex', alignItems: 'baseline', gap: 6 },
-    value: { fontSize: 24, fontWeight: fontWeight.extrabold, color: colors.text.primary, lineHeight: 1.2 },
-    suffix: { fontSize: fontSize.xs, color: colors.text.tertiary },
+    // 값과 suffix는 같은 flex 줄에 있는데, suffix가 길면(예: "진행 중인 광고 없음") 값 쪽이
+    // 밀려서 글자 단위로 줄바꿈됐다 — "없음"이 "없 / 음"으로 쪼개지던 원인.
+    // 값은 절대 줄이지도 쪼개지도 않게 고정하고(nowrap + flexShrink 0), 대신 자리가 모자라면
+    // suffix가 통째로 아랫줄로 내려가게 한다(flexWrap). 짧을 땐 지금처럼 한 줄에 나란히 붙는다.
+    valueRow: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' },
+    value: { fontSize: 24, fontWeight: fontWeight.extrabold, color: colors.text.primary, lineHeight: 1.2, whiteSpace: 'nowrap', flexShrink: 0 },
+    suffix: { fontSize: fontSize.xs, color: colors.text.tertiary, minWidth: 0 },
     trendPill: {
         display: 'inline-flex',
         alignItems: 'center',

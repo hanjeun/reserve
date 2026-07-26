@@ -70,7 +70,13 @@ export default function FaqSection({ isMobile }) {
             style={{
                 background: colors.gray[50],
                 scrollMarginTop: heights.header,
-                minHeight: `calc(100dvh - ${heights.header})`,
+                // 이 섹션은 홈의 마지막이라 아래로 넘어갈 다음 섹션이 없다.
+                // 다른 섹션이 화면을 꽉 채우는 건 V버튼으로 넘길 때 다음 섹션 침범을 막기 위한 것인데
+                // (Home.styles.js 주석 참고) 여기엔 해당이 없어서, 모바일에서는 내용 높이만큼만 쓴다.
+                // 예전엔 모바일에서도 높이를 강제해 마지막 질문 아래로 회색 여백이 크게 남았다.
+                // 데스크톱은 기존 리듬을 유지하되 단위를 100svh로 맞춘다 — 홈의 나머지 섹션이 전부 svh이고,
+                // dvh는 모바일에서 주소창이 접힐 때 커져서 여백이 한 번 더 벌어진다.
+                minHeight: isMobile ? undefined : `calc(100svh - ${heights.header})`,
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'flex-start',

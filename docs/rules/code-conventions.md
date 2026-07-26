@@ -18,13 +18,13 @@
 | 클래스 | PascalCase | `ReservationService` |
 | 메서드/변수 | camelCase | `getReservationById` |
 | 상수 | UPPER_SNAKE_CASE | `MAX_GUEST_COUNT` |
-| 패키지 | lowercase | `com.reserve.reservation` |
+| 패키지 | lowercase | `kr.it.reserve.reservation` |
 | DB 컬럼 | snake_case | `reservation_date` |
 
 ### 패키지 구조
 
 ```
-com.reserve
+kr.it.reserve
 ├── config/          # 설정 (Security, JWT, S3 등)
 ├── {domain}/
 │   ├── controller/  # API 진입점

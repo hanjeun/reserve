@@ -23,14 +23,21 @@
 
 ## S3 폴더 구조
 
+모든 경로는 `users/{memberId}/` 아래로 들어간다 (`file/util/FileStoragePaths.java` 기준).
+
 ```
 reserve-it-kr-bucket/
-├── profiles/          ← 프로필 이미지
-├── stores/
-│   ├── thumbnails/    ← 가게 대표 이미지
-│   └── images/        ← 가게 상세 이미지
-└── businesses/        ← 사업자 인증 서류
+└── users/{memberId}/
+    ├── profiles/                              ← 프로필 이미지
+    ├── businesses/                            ← 사업자 인증 서류 (pre-signed URL로만 조회)
+    └── stores/{storeId}/
+        ├── thumbnails/                        ← 가게 대표 이미지
+        ├── images/                            ← 가게 상세 이미지
+        └── advertisements/                    ← 광고 배너 이미지
 ```
+
+> 로컬 개발 환경에서는 맨 앞에 `local/` 접두가 하나 더 붙는다(운영 객체와 섞이지 않도록).
+> 예: `local/users/1/profiles/xxx.jpg` — `FileStorageService`의 env-prefix 참고.
 
 ---
 

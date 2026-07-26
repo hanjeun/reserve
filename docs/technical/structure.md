@@ -35,12 +35,12 @@ RESERVE/
 
 ---
 
-## 백엔드 (`backend/src/main/java/com/reserve/`) — 20개 패키지
+## 백엔드 (`backend/src/main/java/kr/it/reserve/`) — 20개 패키지
 
-진입점은 `com/reserve/ReserveApplication.java`.
+진입점은 `kr/it/reserve/ReserveApplication.java`.
 
 ```
-com.reserve/
+kr.it.reserve/
 ├── config/
 │   ├── SecurityConfig.java        ← Spring Security, CORS, JWT 필터, permitAll 규칙
 │   ├── WebMvcConfig.java          ← MVC 설정

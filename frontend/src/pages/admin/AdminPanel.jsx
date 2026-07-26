@@ -81,6 +81,7 @@ const AdminPanel = () => {
                 onChange={handleTabChange}
                 items={tabItems}
                 className="reserve-pill-tabs"
+                tabBarGutter={4}
                 animated={{ inkBar: true, tabPane: false }}
             />
         </PageContainer>

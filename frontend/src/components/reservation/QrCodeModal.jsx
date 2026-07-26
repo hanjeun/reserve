@@ -44,11 +44,13 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
             width={340}
         >
             <div style={styles.wrapper}>
-                {isLoading ? (
+                {isLoading && (
                     <div style={styles.spinnerBox}><ModalLoading text="QR 코드를 불러오는 중..." minHeight="0" /></div>
-                ) : token ? (
+                )}
+                {!isLoading && token && (
                     <QRCodeSVG value={token} size={220} level="M" />
-                ) : (
+                )}
+                {!isLoading && !token && (
                     <Text type="secondary">
                         {isError ? 'QR 코드를 불러오지 못했습니다.' : 'QR 코드를 불러올 수 없습니다.'}
                     </Text>

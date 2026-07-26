@@ -55,6 +55,12 @@ const useImagePreview = () => {
     // 현재 화면에 띄우고 있는 blob URL들 — 언마운트/닫힘 cleanup에서 해제해야 하므로 ref로 보관
     // (클로저가 캡쳐한 시점의 state가 아니라 최신 값을 봐야 한다).
     const activeBlobsRef = useRef([]);
+    // 프리뷰를 열 때마다 1씩 증가하는 세션 번호 — PreviewGroup의 key로 쓴다.
+    // (닫힘 정리를 EXIT_DURATION만큼 미루기 때문에, 그 안에 다시 열면 아직 퇴장 중인 DOM이
+    //  그대로 살아있다. AntD는 그 엘리먼트를 재사용하는데, 퇴장 모션이 끝나기 전에 다시
+    //  visible=true가 되면 입장 모션이 병합되어 생략된다 — "빨리 열고 닫으면 여는 애니메이션만
+    //  씹힌다"의 원인. key를 바꿔 강제로 새 인스턴스를 마운트하면 항상 처음부터 재생된다.)
+    const previewSessionRef = useRef(0);
 
     // blob URL 일괄 해제 — activeBlobsRef(ref)만 참조하므로 안정적(useCallback deps 비움).
     const revokeAllBlobs = useCallback(() => {
@@ -96,6 +102,7 @@ const useImagePreview = () => {
         if (items.length === 0) return;
 
         activeBlobsRef.current = blobs;
+        previewSessionRef.current += 1; // 새 세션 — PreviewGroup을 새로 마운트시켜 입장 애니메이션을 보장
         setPreviewItems(items);
         setPreviewCurrent(current);
         setPreviewOpen(true);
@@ -138,6 +145,7 @@ const useImagePreview = () => {
         if (previewItemsRef.current.length === 0) return null;
         return (
             <Image.PreviewGroup
+                key={previewSessionRef.current}
                 items={previewItemsRef.current}
                 preview={{
                     visible: previewOpenRef.current,

@@ -70,9 +70,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # npx 대신 package.json의 lint:ci 스크립트를 호출한다 — npx는 로컬에 없으면 레지스트리에서
+      # 즉석으로 받아 실행할 수 있어(그 패키지의 lifecycle 스크립트까지) 공급망 관점에서 위험하다.
+      # npm ci로 설치된 로컬 eslint만 쓰도록 고정. 실행되는 명령 자체는 이전과 동일하다.
       - name: Run ESLint
         working-directory: frontend
-        run: npx eslint src --max-warnings 0
+        run: npm run lint:ci
 
       # .env.production 파일을 GitHub Secrets로 생성
       - name: Create .env.production

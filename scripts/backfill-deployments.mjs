@@ -17,6 +17,11 @@
  * 요구사항: Node 18+, gh CLI(로그인, repo scope). REPO 환경변수로 대상 지정(기본 hanjeun/reserve).
  */
 import { execFileSync } from 'node:child_process';
+import { resolveBin } from './resolve-bin.mjs';
+
+// PATH 탐색 대신 절대 경로로 실행한다 — 이유는 resolve-bin.mjs 주석 참고(S4036).
+const GH_BIN = resolveBin('gh');
+const GIT_BIN = resolveBin('git');
 
 const REPO = process.env.REPO || 'hanjeun/reserve';
 const ENV_NAME = 'production';
@@ -29,7 +34,7 @@ const sh = (cmd, a, input) =>
 
 // semver 오름차순 정렬(v1.0.0 → v1.13.0) → 마지막 생성분이 최신 활성 배포가 됨.
 // (생성일 정렬은 일괄 태깅 시 순서가 꼬여 목록이 뒤섞임)
-const tags = sh('git', ['tag', '-l'])
+const tags = sh(GIT_BIN, ['tag', '-l'])
   .split('\n')
   .map((t) => t.trim())
   .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
@@ -46,19 +51,19 @@ if (tags.length === 0) {
 console.log(`대상 태그 ${tags.length}개: ${tags.join(', ')}\n`);
 
 const ghApi = (method, path, bodyObj) =>
-  sh('gh', ['api', '--method', method, path, '--input', '-'], JSON.stringify(bodyObj));
+  sh(GH_BIN, ['api', '--method', method, path, '--input', '-'], JSON.stringify(bodyObj));
 
 // --reset: 기존 production 배포를 inactive 처리 후 삭제 (semver 순서로 새로 깔기 위함)
 if (RESET) {
   const existing = JSON.parse(
-    sh('gh', ['api', `repos/${REPO}/deployments?environment=${ENV_NAME}&per_page=100`])
+    sh(GH_BIN, ['api', `repos/${REPO}/deployments?environment=${ENV_NAME}&per_page=100`])
   );
   console.log(`--reset: 기존 production 배포 ${existing.length}개 삭제 예정`);
   if (APPLY) {
     for (const d of existing) {
       try {
         ghApi('POST', `repos/${REPO}/deployments/${d.id}/statuses`, { state: 'inactive' });
-        sh('gh', ['api', '--method', 'DELETE', `repos/${REPO}/deployments/${d.id}`]);
+        sh(GH_BIN, ['api', '--method', 'DELETE', `repos/${REPO}/deployments/${d.id}`]);
         console.log(`🗑  삭제 #${d.id} (${d.ref})`);
       } catch (e) {
         console.error(`✗ 삭제 실패 #${d.id}: ${e.stderr || e.message}`);

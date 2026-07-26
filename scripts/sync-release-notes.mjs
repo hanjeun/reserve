@@ -20,6 +20,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { resolveBin } from './resolve-bin.mjs';
 
 const REPO = process.env.REPO || 'hanjeun/reserve';
 const args = process.argv.slice(2);
@@ -52,8 +53,10 @@ if (sections.length === 0) {
   process.exit(1);
 }
 
+// PATH 탐색 대신 절대 경로로 실행한다 — 이유는 resolve-bin.mjs 주석 참고(S4036).
+const GH_BIN = resolveBin('gh');
 const gh = (a, input) =>
-  execFileSync('gh', a, { encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'pipe'] });
+  execFileSync(GH_BIN, a, { encoding: 'utf8', input, stdio: ['pipe', 'pipe', 'pipe'] });
 
 const targets = onlyVersion ? sections.filter((s) => s.version === onlyVersion) : sections;
 if (targets.length === 0) {
@@ -72,7 +75,7 @@ for (const { version, body } of targets) {
 
   // 이전에 주입한 블록(마커+뒤따르는 --- 구분선)을 제거해 idempotent 하게
   let base = current;
-  const between = new RegExp(`${START}[\\s\\S]*?${END}\\s*(?:\\r?\\n---\\r?\\n)?`, 'g');
+  const between = new RegExp(String.raw`${START}[\s\S]*?${END}\s*(?:\r?\n---\r?\n)?`, 'g');
   base = base.replace(between, '').trimStart();
 
   // 예전에 손으로 적어둔 짧은 한글 태그라인 제거: "What's Changed" / "Full Changelog" 앞부분을 버린다.

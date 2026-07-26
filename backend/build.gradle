@@ -29,7 +29,7 @@ configurations {
 // (0.12.x부터는 내부 API가 builder 패턴으로 크게 바뀌어서 단순 버전 업그레이드가 아니라
 //  TokenProvider 코드 자체를 손봐야 함 — 지금은 0.11.5 유지)
 ext {
-    jjwtVersion = '0.11.5'
+    jjwtVersion = '0.13.0'
 }
 
 dependencies {

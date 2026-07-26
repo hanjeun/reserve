@@ -251,7 +251,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                         }}
                         placeholder={placeholder}
                         style={{
-                            flex: 1, border: 'none', outline: 'none', background: 'transparent',
+                            flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent',
                             fontSize: fontSize.lg, color: colors.text.primary,
                             fontFamily: 'inherit', cursor: 'text',
                         }}

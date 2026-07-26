@@ -17,6 +17,15 @@
 const skipIfEmpty = (fn) => (_, value) =>
     !value || value === '' ? Promise.resolve() : fn(value);
 
+// 이메일 형식 — 예전엔 이 정규식이 여기·InquiryModal·MailboxTab 3곳에 똑같이 복붙돼 있어
+// 한 곳만 고치면 서로 어긋나는 구조였다 — 여기로 통합하고 다른 두 곳은 import해서 쓴다.
+//
+// 도메인 쪽 문자 클래스에서 '.'을 제외해 앞뒤가 겹치지 않게 만든 형태다.
+// 예전 형태 /^[^\s@]+@[^\s@]+\.[^\s@]+$/는 '.'이 양쪽 [^\s@]+에 모두 포함돼서, 매칭에
+// 실패할 때 나눌 수 있는 경계를 전부 되짚는 백트래킹이 길이에 대해 초선형으로 늘어난다(SonarCloud 지적).
+// 부수 효과: 'a@b..c'처럼 점이 연속되거나 'a@b.c.'처럼 끝에 오는 값은 이제 거부된다(예전엔 통과).
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
 export const VALIDATION_RULES = {
     // ─── 가게 관련 ────────────────────────────────────────────────────────────
     storeName: [
@@ -91,7 +100,7 @@ export const VALIDATION_RULES = {
         { required: true, message: '이메일을 입력해주세요' },
         {
             validator: skipIfEmpty((v) =>
-                /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+                EMAIL_REGEX.test(v)
                     ? Promise.resolve()
                     : Promise.reject(new Error('올바른 이메일 형식이 아닙니다'))
             ),

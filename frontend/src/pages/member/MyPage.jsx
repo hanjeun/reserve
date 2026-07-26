@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Typography, Divider, Form, Tabs, Switch, Image, Input } from 'antd';
+import { Typography, Divider, Form, Switch, Upload, Input, Tabs } from 'antd';
 import {
     LockOutlined,
     ExclamationCircleOutlined,
@@ -20,6 +20,7 @@ import { handleApiError } from '../../utils/errorHandler';
 import { VALIDATION_RULES } from '../../utils/validation';
 import useAuthStore from '../../store/useAuthStore';
 import useExitAnimation from '../../hooks/useExitAnimation';
+import useImagePreview from '../../hooks/useImagePreview';
 import { useNavigate } from 'react-router-dom';
 import { colors, radius, shadows, fontSize, fontWeight, animation } from '../../styles/tokens';
 
@@ -384,14 +385,13 @@ const BusinessTab = ({ user }) => {
     const [rejectionReason, setRejectionReason] = useState(null);
     const [statusLoading, setStatusLoading] = useState(true);
     const [form, setForm]         = useState({ businessName: '', businessNumber: '', memo: '' });
-    const [imageFile, setImageFile] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
+    const [licenseList, setLicenseList] = useState([]);
+    const { handlePreview, PreviewModal, suppressLinkNavigation } = useImagePreview();
     const [submitLoading, setSubmitLoading] = useState(false);
     const [updateLoading, setUpdateLoading] = useState(false);
     const [cancelLoading, setCancelLoading] = useState(false);
     const [resignLoading, setResignLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const fileInputRef = useRef(null);
 
     const isBusiness = user?.role === 'BUSINESS';
 
@@ -406,24 +406,24 @@ const BusinessTab = ({ user }) => {
             .finally(() => setStatusLoading(false));
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleFileChange = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) return message.error('이미지 파일만 업로드 가능합니다');
-        if (file.size > 5 * 1024 * 1024) return message.error('5MB 이하 파일만 가능합니다');
-        setImageFile(file);
-        setImagePreview(URL.createObjectURL(file));
+    // 사업자 등록증도 가게 이미지와 동일한 picture-card Upload + 공유 useImagePreview로 통일.
+    // AntD Upload가 fileList/썸네일을 관리하므로 별도 blob URL 관리가 필요 없다.
+    const licenseFile = licenseList[0]?.originFileObj ?? null;
+    const handleLicenseChange = ({ fileList }) => setLicenseList(fileList);
+    const beforeUploadLicense = (file) => {
+        if (!file.type.startsWith('image/')) { message.error('이미지 파일만 업로드 가능합니다'); return Upload.LIST_IGNORE; }
+        if (file.size > 5 * 1024 * 1024) { message.error('5MB 이하 파일만 가능합니다'); return Upload.LIST_IGNORE; }
+        return false;
     };
 
     const handleUpdate = async () => {
         if (!form.businessName.trim()) return message.warning('상호명을 입력해주세요');
         setUpdateLoading(true);
         try {
-            await businessService.update({ ...form, licenseImage: imageFile || undefined });
+            await businessService.update({ ...form, licenseImage: licenseFile || undefined });
             message.success('수정되었습니다.');
             setIsEditing(false);
-            setImageFile(null);
-            setImagePreview(null);
+            setLicenseList([]);
         } catch (err) {
             handleApiError(err, message, '수정에 실패했습니다');
         } finally {
@@ -448,10 +448,10 @@ const BusinessTab = ({ user }) => {
 
     const handleSubmit = async () => {
         if (!form.businessName.trim()) return message.warning('상호명을 입력해주세요');
-        if (!imageFile) return message.warning('사업자 등록증 이미지를 업로드해주세요');
+        if (!licenseFile) return message.warning('사업자 등록증 이미지를 업로드해주세요');
         setSubmitLoading(true);
         try {
-            await businessService.submit({ ...form, licenseImage: imageFile });
+            await businessService.submit({ ...form, licenseImage: licenseFile });
             message.success('사업자 인증 신청이 완료되었습니다. 관리자 승인 후 이용 가능합니다.');
             setStatus('PENDING');
         } catch (err) {
@@ -472,7 +472,7 @@ const BusinessTab = ({ user }) => {
                     message.success('신청이 취소되었습니다');
                     setStatus(null);
                     setForm({ businessName: '', businessNumber: '', memo: '' });
-                    setImageFile(null); setImagePreview(null);
+                    setLicenseList([]);
                 } catch (err) {
                     handleApiError(err, message, '취소에 실패했습니다');
                 } finally {
@@ -551,11 +551,13 @@ const BusinessTab = ({ user }) => {
                 </div>
                 <BusinessForm
                     form={form} setForm={setForm}
-                    imageFile={imageFile} imagePreview={imagePreview}
-                    fileInputRef={fileInputRef} onFileChange={handleFileChange}
+                    fileList={licenseList} onFileListChange={handleLicenseChange}
+                    onPreview={handlePreview} onPreviewClickCapture={suppressLinkNavigation}
+                    beforeUpload={beforeUploadLicense}
                     onSubmit={handleUpdate} loading={updateLoading}
                     submitLabel="수정 저장"
                 />
+                <PreviewModal />
                 <Button variant="secondary" onClick={() => setIsEditing(false)} block>취소</Button>
             </div>
         );
@@ -597,26 +599,31 @@ const BusinessTab = ({ user }) => {
             )}
             <BusinessForm
                 form={form} setForm={setForm}
-                imageFile={imageFile} imagePreview={imagePreview}
-                fileInputRef={fileInputRef} onFileChange={handleFileChange}
+                fileList={licenseList} onFileListChange={handleLicenseChange}
+                onPreview={handlePreview} onPreviewClickCapture={suppressLinkNavigation}
+                beforeUpload={beforeUploadLicense}
                 onSubmit={handleSubmit} loading={submitLoading}
             />
+            <PreviewModal />
         </div>
     );
 
     // ── 미신청 (기본) ──
     return (
-        <BusinessForm
-            form={form} setForm={setForm}
-            imageFile={imageFile} imagePreview={imagePreview}
-            fileInputRef={fileInputRef} onFileChange={handleFileChange}
-            onSubmit={handleSubmit} loading={submitLoading}
-        />
+        <>
+            <BusinessForm
+                form={form} setForm={setForm}
+                fileList={licenseList} onFileListChange={handleLicenseChange}
+                onPreview={handlePreview} onPreviewClickCapture={suppressLinkNavigation}
+                beforeUpload={beforeUploadLicense}
+                onSubmit={handleSubmit} loading={submitLoading}
+            />
+            <PreviewModal />
+        </>
     );
 };
 
-// eslint-disable-next-line no-unused-vars
-const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, onFileChange, onSubmit, loading, submitLabel = '사업자 인증 신청' }) => (
+const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청' }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={bizStyles.infoNotice}>
             <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
@@ -640,26 +647,25 @@ const BusinessForm = ({ form, setForm, imageFile, imagePreview, fileInputRef, on
             onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
         />
 
-        {/* 이미지 업로드 — 선택 후 Ant Design Image로 클릭 시 전체화면 프리뷰 */}
-        <div style={bizStyles.imageUpload(!!imagePreview)}>
-            {imagePreview ? (
-                <Image
-                    src={imagePreview}
-                    alt="사업자 등록증"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: radius.lg }}
-                    preview={{ mask: '크게 보기' }}
-                />
-            ) : (
-                <div
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%', height: '100%', justifyContent: 'center' }}
-                    onClick={() => fileInputRef.current?.click()}
-                >
-                    <UploadOutlined style={{ fontSize: 22, color: colors.text.tertiary }} />
-                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>사업자 등록증 이미지 업로드 *</Text>
+        {/* 사업자 등록증 — 가게 이미지 업로드(StoreImages)와 동일한 picture-card Upload + 공유 useImagePreview 재사용.
+            눈(미리보기)·휴지통(삭제) 아이콘까지 가게 폼과 완전히 동일하게 동작한다. */}
+        <Upload
+            listType="picture-card"
+            fileList={fileList}
+            onChange={onFileListChange}
+            onPreview={onPreview}
+            onClickCapture={onPreviewClickCapture}
+            beforeUpload={beforeUpload}
+            accept="image/*"
+            maxCount={1}
+        >
+            {fileList.length === 0 && (
+                <div>
+                    <UploadOutlined style={{ fontSize: 20, color: colors.text.tertiary }} />
+                    <div style={{ marginTop: 8, fontSize: fontSize.xs, color: colors.text.tertiary }}>사업자 등록증 *</div>
                 </div>
             )}
-        </div>
-        <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChange} />
+        </Upload>
 
         <Button variant="primary" loading={loading} onClick={onSubmit} block>{submitLabel}</Button>
     </div>
@@ -679,15 +685,6 @@ const bizStyles = {
         backgroundColor: colors.primary.light,
         borderRadius: radius.lg, padding: '8px 12px',
     },
-    imageUpload: (hasImage) => ({
-        height: hasImage ? 160 : 100,
-        border: `2px dashed ${colors.border.default}`,
-        borderRadius: radius.lg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', overflow: 'hidden',
-        backgroundColor: colors.gray[50],
-        transition: 'border-color 0.2s',
-    }),
     resignSection: {
         display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', gap: 16,
@@ -861,7 +858,7 @@ const MyPage = () => {
             {/* 정보 수정 탭 */}
             <div style={styles.tabsCard}>
                 <Text strong style={styles.sectionTitle}>내 정보 수정</Text>
-                <Tabs defaultActiveKey="name" items={tabItems} className="reserve-pill-tabs" animated={{ inkBar: true, tabPane: false }} />
+                <Tabs defaultActiveKey="name" items={tabItems} className="reserve-pill-tabs" tabBarGutter={4} animated={{ inkBar: true, tabPane: false }} />
             </div>
 
             <Divider />

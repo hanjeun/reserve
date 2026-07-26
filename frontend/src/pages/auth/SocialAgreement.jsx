@@ -77,7 +77,7 @@ const SocialAgreement = () => {
                                 <Checkbox checked={agreements.terms} onChange={e => setAgreements(p => ({ ...p, terms: e.target.checked }))} />
                                 <Text style={A.itemText}><span style={A.requiredTag}>필수</span> 서비스 이용약관</Text>
                             </button>
-                            <button style={A.viewLink} onClick={() => window.open('/terms', '_blank')}>보기</button>
+                            <button type="button" style={A.viewLink} onClick={() => window.open('/terms', '_blank')}>보기</button>
                         </div>
                         <div style={A.itemRow}>
                             <button type="button" style={{ ...A.itemLeft, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
@@ -85,7 +85,7 @@ const SocialAgreement = () => {
                                 <Checkbox checked={agreements.privacy} onChange={e => setAgreements(p => ({ ...p, privacy: e.target.checked }))} />
                                 <Text style={A.itemText}><span style={A.requiredTag}>필수</span> 개인정보 처리방침</Text>
                             </button>
-                            <button style={A.viewLink} onClick={() => window.open('/privacy', '_blank')}>보기</button>
+                            <button type="button" style={A.viewLink} onClick={() => window.open('/privacy', '_blank')}>보기</button>
                         </div>
                         <div style={A.itemRow}>
                             <button type="button" style={{ ...A.itemLeft, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}

@@ -73,8 +73,8 @@ export default function FaqSection({ isMobile }) {
                 minHeight: `calc(100dvh - ${heights.header})`,
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'center',
-                padding: isMobile ? '60px 24px' : '60px 24px',
+                justifyContent: 'flex-start',
+                padding: '60px 24px',
                 boxSizing: 'border-box',
             }}
         >

@@ -241,20 +241,24 @@ const MyStores = () => {
                                     /* onClick을 아이콘이 아니라 li 전체를 채우는 wrapper에 건다 — 예전에는
                                        아이콘 자체에만 onClick이 있어 아이콘 픽셀만 눌러야 동작하고 주위 네모
                                        여백은 안 눌렸다. 각 li를 꿉 채우는 클릭 영역으로 감싸 네모 전체가 눌리게 한다. */
-                                    <div
+                                    <button
                                         key="edit"
+                                        type="button"
+                                        aria-label={`${store.name} 수정`}
                                         onClick={(e) => { e.stopPropagation(); navigate(`/store/${store.id}/edit`); }}
                                         style={styles.cardAction}
                                     >
                                         <EditOutlined style={{ fontSize: '18px' }} />
-                                    </div>,
-                                    <div
+                                    </button>,
+                                    <button
                                         key="delete"
+                                        type="button"
+                                        aria-label={`${store.name} 삭제`}
                                         onClick={(e) => handleDeleteClick(e, store)}
                                         style={styles.cardAction}
                                     >
                                         <DeleteOutlined style={{ fontSize: '18px', color: colors.error.main }} />
-                                    </div>,
+                                    </button>,
                                 ]}
                                 onClick={() => navigate(`/store/${store.id}`)}
                             >
@@ -311,6 +315,12 @@ const styles = {
         width: '100%',
         padding: '4px 0',
         cursor: 'pointer',
+        // <div>에서 네이티브 <button>으로 바꾸면서(키보드·스크린리더 지원)
+        // 버튼 기본 외형을 지워 예전 모양을 그대로 유지한다.
+        background: 'none',
+        border: 'none',
+        color: 'inherit',
+        font: 'inherit',
     },
 };
 

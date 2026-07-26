@@ -5,6 +5,7 @@ import ReservationStatusBadge from './ReservationStatusBadge';
 import { formatCurrency, getThumbnailUrl } from '../../utils';
 import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
 import { useWindowWidth } from '../../hooks';
+import { onActivateKey } from '../../utils/a11y';
 
 const { Text } = Typography;
 
@@ -38,11 +39,24 @@ const ReservationRow = ({ reservation, onOpenDetail, renderMeta, renderActions, 
         <div style={styles.row}>
             {/* 메인 줄 — 이미지 + 정보 + 오른쪽 컬럼(상태/가격/버튼). 항상 nowrap. */}
             <div style={styles.mainRow}>
-                <div style={isWide ? styles.imgWrapWide : styles.imgWrap} onClick={onOpenDetail}>
+                <div
+                    style={isWide ? styles.imgWrapWide : styles.imgWrap}
+                    onClick={onOpenDetail}
+                    onKeyDown={onActivateKey(onOpenDetail)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${storeName} 예약 상세 보기`}
+                >
                     <img src={getThumbnailUrl(storeMainImageUrl)} alt={storeName} style={styles.img} />
                 </div>
 
-                <div style={styles.info} onClick={onOpenDetail}>
+                <div
+                    style={styles.info}
+                    onClick={onOpenDetail}
+                    onKeyDown={onActivateKey(onOpenDetail)}
+                    role="button"
+                    tabIndex={0}
+                >
                     <Text strong style={isWide ? styles.storeNameWide : styles.storeName}>
                         {storeName}
                         {specialRequest && (

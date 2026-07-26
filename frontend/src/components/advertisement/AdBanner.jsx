@@ -9,6 +9,7 @@ import adService from '../../services/adService';
 import { recordAdClick } from '../../utils/adAttribution';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import { useWindowWidth } from '../../hooks';
+import { onActivateKey } from '../../utils/a11y';
 
 const { Text } = Typography;
 
@@ -95,7 +96,14 @@ const AdBanner = ({ ads }) => {
             >
                 <CloseOutlined style={{ fontSize: 11 }} />
             </button>
-            <div style={styles.clickArea} onClick={handleBannerClick}>
+            <div
+                style={styles.clickArea}
+                onClick={handleBannerClick}
+                onKeyDown={onActivateKey(handleBannerClick)}
+                role="button"
+                tabIndex={0}
+                aria-label={`${ad.title} 광고 — 가게 상세로 이동`}
+            >
                 {images.length > 1 ? (
                     <div className="ad-banner-carousel" style={{ ...styles.imageWrapper, height: imgHeight }}>
                         <Carousel infinite draggable dotPlacement="bottom" autoplay autoplaySpeed={3500}>

@@ -4,7 +4,7 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
-// Dependency locking — 의존성 버전 고정으로 보안 강화 (SonarCloud S6405)
+// Dependency locking ???�존??버전 고정?�로 보안 강화 (SonarCloud S6405)
 dependencyLocking {
     lockAllConfigurations()
 }
@@ -25,15 +25,13 @@ configurations {
     }
 }
 
-// JJWT는 스프링부트가 버전을 관리해주지 않는 외부 라이브러리라 한 곳에 모아 관리
-// (0.12.x부터는 내부 API가 builder 패턴으로 크게 바뀌어서 단순 버전 업그레이드가 아니라
-//  TokenProvider 코드 자체를 손봐야 함 — 지금은 0.11.5 유지)
+// JJWT???�프링�??��? 버전??관리해주�? ?�는 ?��? ?�이브러리라 ??곳에 모아 관�?// (0.12.x부?�는 ?��? API가 builder ?�턴?�로 ?�게 바뀌어???�순 버전 ?�그?�이?��? ?�니??//  TokenProvider 코드 ?�체�??�봐??????지금�? 0.11.5 ?��?)
 ext {
-    jjwtVersion = '0.11.5'
+    jjwtVersion = '0.13.0'
 }
 
 dependencies {
-    // AWS SDK Platform BOM — 관련 의존성보다 먼저 선언해두는 게 관례상 가독성이 좋음(기능적 차이는 없음)
+    // AWS SDK Platform BOM ??관???�존?�보??먼�? ?�언?�두??�?관례??가?�성??좋음(기능??차이???�음)
     implementation platform('software.amazon.awssdk:bom:2.48.4')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -48,7 +46,7 @@ dependencies {
     implementation 'com.bucket4j:bucket4j-core:8.10.1'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    // AWS S3 (이미지 업로드 + Pre-signed URL)
+    // AWS S3 (?��?지 ?�로??+ Pre-signed URL)
     implementation 'software.amazon.awssdk:s3'
 
 
@@ -66,11 +64,11 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     
-    // H2 Database (로컬 테스트용)
+    // H2 Database (로컬 ?�스?�용)
     runtimeOnly 'com.h2database:h2'
 }
 
-// plain.jar 생성 비활성화 (실행 가능한 bootJar만 생성)
+// plain.jar ?�성 비활?�화 (?�행 가?�한 bootJar�??�성)
 jar {
     enabled = false
 }

@@ -78,12 +78,14 @@ public class TokenProvider {
 
     private String makeToken(Member member, Date expiry) {
         Date now = new Date();
+        // jjwt 0.13 API — 0.12에서 set* 계열이 전부 이름을 바꿨고 parserBuilder()는 삭제됐다.
+        // (setHeaderParam → header().add(), setIssuer → issuer, setSubject → subject 등)
         return Jwts.builder()
-                .setHeaderParam("typ", "JWT")
-                .setIssuer(jwtProperties.getIssuer())
-                .setIssuedAt(now)
-                .setExpiration(expiry)
-                .setSubject(member.getEmail())
+                .header().add("typ", "JWT").and()
+                .issuer(jwtProperties.getIssuer())
+                .issuedAt(now)
+                .expiration(expiry)
+                .subject(member.getEmail())
                 .claim("id", member.getId())
                 .claim("role", member.getRole().name())
                 .signWith(cachedSecretKey)
@@ -92,10 +94,10 @@ public class TokenProvider {
 
     public boolean validToken(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(cachedSecretKey)
+            Jwts.parser()
+                    .verifyWith(cachedSecretKey)
                     .build()
-                    .parseClaimsJws(token);
+                    .parseSignedClaims(token);
             return true;
         } catch (Exception e) {
             log.debug("유효하지 않은 토큰입니다: {}", e.getMessage());
@@ -133,10 +135,10 @@ public class TokenProvider {
     }
 
     private Claims getClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(cachedSecretKey)
+        return Jwts.parser()
+                .verifyWith(cachedSecretKey)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }

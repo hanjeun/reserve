@@ -63,9 +63,10 @@ public class QrCheckinTokenProvider {
         LocalDateTime expiryDateTime = baseDate.plusDays(1).atStartOfDay().plusHours(GRACE_HOURS_AFTER_MIDNIGHT);
         Date expiry = Date.from(expiryDateTime.atZone(ZoneId.systemDefault()).toInstant());
 
+        // jjwt 0.13 API — setIssuedAt/setExpiration은 issuedAt/expiration으로 이름이 바뀌었다.
         return Jwts.builder()
-                .setIssuedAt(new Date())
-                .setExpiration(expiry)
+                .issuedAt(new Date())
+                .expiration(expiry)
                 .claim(CLAIM_RESERVATION_ID, reservationId)
                 .claim(CLAIM_PURPOSE, PURPOSE)
                 .signWith(secretKey)
@@ -79,11 +80,11 @@ public class QrCheckinTokenProvider {
     public Long parseReservationId(String token) {
         Claims claims;
         try {
-            claims = Jwts.parserBuilder()
-                    .setSigningKey(secretKey)
+            claims = Jwts.parser()
+                    .verifyWith(secretKey)
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .parseSignedClaims(token)
+                    .getPayload();
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
             log.debug("Expired QR check-in token: {}", e.getMessage());
             throw new ReservationException("만료된 QR 코드입니다. 예약 상세에서 QR을 다시 열어주세요.");

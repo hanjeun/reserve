@@ -15,6 +15,15 @@ import adService from '../services/adService';
 import { consumeAdClickAttribution } from '../utils/adAttribution';
 import { formatDate, formatTimeForApi, formatTime } from '../utils/date';
 
+// 에러 메시지 추출 — Error 객체면 message, 문자열이면 그대로, 그 외엔 null.
+// 예전엔 예약 수정/생성 두 곳에 똑같은 중첩 삼항이 복붙돼 있었다
+// (SonarCloud: 중첩 삼항 추출 — 겸사해서 중복도 같이 제거).
+const toErrorMessage = (err) => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'string') return err;
+    return null;
+};
+
 const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message }) => {
     const navigate  = useNavigate();
     const location  = useLocation();
@@ -131,9 +140,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             message.success('예약이 변경되었습니다.');
             navigate('/my-reservations', { state: { refetch: true } });
         } catch (err) {
-            const errMsg = err instanceof Error ? err.message
-                         : typeof err === 'string' ? err
-                         : null;
+            const errMsg = toErrorMessage(err);
             message.error({ content: errMsg || '예약 변경에 실패했습니다. 다시 시도해주세요.', duration: 5 });
         }
     };
@@ -188,9 +195,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             if (attributedAdId) adService.recordConversion(attributedAdId);
             await handleReservationResult(reservation);
         } catch (err) {
-            const errMsg = err instanceof Error ? err.message
-                         : typeof err === 'string' ? err
-                         : null;
+            const errMsg = toErrorMessage(err);
             message.error({ content: errMsg || '예약에 실패했습니다. 다시 시도해주세요.', duration: 5 });
         }
     };

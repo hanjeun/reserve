@@ -19,6 +19,9 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
+    # localhost 전용 개발 계정이다. 공개 레포라 기본값이 그대로 보이지만, 이 DB는 외부에
+    # 노출되지 않고 운영 DB는 prod 프로파일에서 ${DB_PASSWORD}로 따로 주입된다.
+    # 다른 값을 쓰려면 DB_PASSWORD_LOCAL 환경변수로 덮으면 된다. 이 값을 다른 곳에 재사용하지 말 것.
     password: ${DB_PASSWORD_LOCAL:1234}
 
   # OAuth2 Redirect URI (localhost)

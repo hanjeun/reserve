@@ -16,6 +16,7 @@ import { useMessage, useWindowWidth, useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
+import { EMAIL_REGEX } from '../../utils/validation';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 
 const { Text, Title, Paragraph } = Typography;
@@ -41,8 +42,6 @@ const formatFullDate = (dateStr) => {
     return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. `
          + `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const useSentMailData = (message) => {
     const [selectedSent, setSelectedSent] = useState(null);
@@ -142,7 +141,7 @@ const SentMailSkeleton = () => (
 );
 
 const SentMailItem = ({ mail, isSelected, onClick }) => (
-    <button onClick={() => onClick(mail)} style={{ ...styles.mailItem, background: isSelected ? colors.primary.light : 'transparent' }}>
+    <button type="button" onClick={() => onClick(mail)} style={{ ...styles.mailItem, background: isSelected ? colors.primary.light : 'transparent' }}>
         <div style={{ flex: 1, minWidth: 0, paddingLeft: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
                 <Text style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.text.primary, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -228,7 +227,7 @@ const MailboxTab = () => {
 
             {showMobDetail && (
                 <div style={styles.mobileDetail}>
-                    <button onClick={() => mail.setSelectedSent(null)} style={styles.backBtn}>
+                    <button type="button" onClick={() => mail.setSelectedSent(null)} style={styles.backBtn}>
                         <ArrowLeftOutlined style={{ fontSize: 14, marginRight: 6, color: colors.text.secondary }} />
                         <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>목록으로</Text>
                     </button>

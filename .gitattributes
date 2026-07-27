@@ -13,3 +13,12 @@
 *.yaml text eol=lf
 *.html text eol=lf
 *.md text eol=lf
+*.svg text eol=lf
+.env.example text eol=lf
+
+# 백엔드 소스 - LF 고정
+# (규칙이 없어서 IDE가 저장한 CRLF가 그대로 커밋 대상으로 잡혔다.
+#  내용은 그대로인데 java 파일 52개가 전부 "변경됨"으로 뜨던 원인)
+*.java text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf

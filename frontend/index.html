@@ -37,9 +37,11 @@
     <!-- ─── 아이콘 ────────────────────────────────────────── -->
     <!-- SVG는 지원 브라우저에서 우선 사용, PNG는 미지원 브라우저(iOS Safari 등) 폴백 -->
     <!-- apple-touch-icon은 반드시 PNG여야 함 — SVG는 iOS가 무시하고 기본 아이콘으로 대체함 -->
+    <!-- PNG 폴백은 512px 원본(R_logo.png)을 그대로 준다. 예전엔 16/32px 파일을 줬는데
+         고DPI 화면에서 그 작은 원본이 확대돼 뭉개져 보였다. 브라우저가 큰 원본을 축소하는
+         편이 훨씬 선명하고, 파일도 이미 저장소에 있는 것을 재사용한다. -->
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/R_logo.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
 
     <!-- ─── JSON-LD 구조화 데이터 (구글 리치 결과) ───────── -->

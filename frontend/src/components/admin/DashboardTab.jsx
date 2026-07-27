@@ -151,7 +151,7 @@ const DashboardTab = () => {
                 차트 모양(도넛/막대)에 가까운 스켈레톤을 넣음 */}
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ChartCard title="예약 상태 분포" height={240}>
-                    {loading ? (
+                    {loading && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <div style={{ position: 'relative', width: 180, height: 180 }}>
                                 <Bone width={180} height={180} borderRadius="50%" />
@@ -163,7 +163,8 @@ const DashboardTab = () => {
                                 }} />
                             </div>
                         </div>
-                    ) : stats?.reservationPieData?.length ? (
+                    )}
+                    {!loading && stats?.reservationPieData?.length > 0 && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 16 }}>
                             <div style={{ width: 130, height: 130, flexShrink: 0 }}>
                                 <ResponsiveContainer width="100%" height="100%">
@@ -185,7 +186,8 @@ const DashboardTab = () => {
                             </div>
                             <PieLegend data={stats.reservationPieData} palette={chartPalette} />
                         </div>
-                    ) : (
+                    )}
+                    {!loading && !stats?.reservationPieData?.length && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Text type="secondary">데이터가 없습니다.</Text>
                         </div>
@@ -193,13 +195,14 @@ const DashboardTab = () => {
                 </ChartCard>
 
                 <ChartCard title="휴지통 유형별 현황" height={240}>
-                    {loading ? (
+                    {loading && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 24, paddingBottom: 24 }}>
-                            {[70, 110, 55, 90].map((h, i) => (
-                                <Bone key={i} width={36} height={h} borderRadius={6} />
+                            {[70, 110, 55, 90].map((h) => (
+                                <Bone key={h} width={36} height={h} borderRadius={6} />
                             ))}
                         </div>
-                    ) : stats?.trashBarData?.length ? (
+                    )}
+                    {!loading && stats?.trashBarData?.length > 0 && (
                         <ResponsiveContainer width="100%" height={240}>
                             <BarChart data={stats.trashBarData} margin={{ top: 4, right: 8, bottom: 4, left: -20 }}>
                                 <CartesianGrid {...chartGridProps} />
@@ -209,7 +212,8 @@ const DashboardTab = () => {
                                 <Bar dataKey="count" fill={colors.warning.main} radius={chartBarRadius} maxBarSize={40} />
                             </BarChart>
                         </ResponsiveContainer>
-                    ) : (
+                    )}
+                    {!loading && !stats?.trashBarData?.length && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Text type="secondary">휴지통이 비어있습니다.</Text>
                         </div>

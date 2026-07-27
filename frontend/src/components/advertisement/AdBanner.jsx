@@ -9,6 +9,7 @@ import adService from '../../services/adService';
 import { recordAdClick } from '../../utils/adAttribution';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import { useWindowWidth } from '../../hooks';
+import { onActivateKey } from '../../utils/a11y';
 
 const { Text } = Typography;
 
@@ -95,7 +96,20 @@ const AdBanner = ({ ads }) => {
             >
                 <CloseOutlined style={{ fontSize: 11 }} />
             </button>
-            <div style={styles.clickArea} onClick={handleBannerClick}>
+            {/* 여기는 의도적으로 네이티브 <button>이 아니라 <div role="button">이다.
+                (SonarCloud가 "role=button 대신 <button>을 쓰라"고 지적하지만 이 경우엔 따르면 안 된다)
+                안쪽 Carousel의 점(dots)이 실제 <button> 요소라서(.slick-dots li button),
+                이 영역을 <button>으로 감싸면 button 안에 button이 들어가 HTML 규격 위반이 되고
+                스크린리더에서 오히려 더 나빠진다. 그래서 role+tabIndex+키보드 핸들러로 접근성을 준다.
+                ReservationRow/MyStores처럼 안쪽에 인터랙티브 요소가 없는 곳은 <button>으로 바꿨다. */}
+            <div
+                style={styles.clickArea}
+                onClick={handleBannerClick}
+                onKeyDown={onActivateKey(handleBannerClick)}
+                role="button"
+                tabIndex={0}
+                aria-label={`${ad.title} 광고 — 가게 상세로 이동`}
+            >
                 {images.length > 1 ? (
                     <div className="ad-banner-carousel" style={{ ...styles.imageWrapper, height: imgHeight }}>
                         <Carousel infinite draggable dotPlacement="bottom" autoplay autoplaySpeed={3500}>

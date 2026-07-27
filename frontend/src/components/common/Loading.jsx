@@ -46,6 +46,7 @@ export const ArcSpinner = ({
       display: 'block',
       flexShrink: 0,
       transformOrigin: 'center',
+      transformBox: 'fill-box',
       animation: 'reserve-spin 2s linear infinite',
     }}
   >

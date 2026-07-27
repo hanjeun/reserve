@@ -16,6 +16,14 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
+// 버튼 폭 계산 — 예전엔 JSX 안에서 wrap ? ... : (block ? ... : ...) 형태의 중첩 삼항이었다
+// (SonarCloud: 중첩 삼항 추출). 분기 자체는 그대로고 읽기 쉬운 형태로만 바꿨다.
+const getButtonFlexStyle = (wrap, block) => {
+    if (wrap) return { flex: '0 0 auto' };
+    if (block) return { flex: 1 };
+    return undefined;
+};
+
 const SegmentedControl = ({ options, value, onChange, block = true, wrap = false, disabled = false }) => (
     <div
         className="reserve-segmented"
@@ -43,7 +51,7 @@ const SegmentedControl = ({ options, value, onChange, block = true, wrap = false
                         // 버튼(예: 문의하기 모달 "기타 문의")이 해당 줄을 혼자 차지하면서 전체 폭으로 늘어나는
                         // 문제가 있었다(flex-grow:1이 경쟁자 없이 혼자면 100% 차지). wrap일 때는 내용만큼만
                         // 차지하게(flex-grow 없음) 바꿔, 혼자 남아도 늘어나지 않고 자연스럽게 줄바꿈되게 함.
-                        wrap ? { flex: '0 0 auto' } : (block ? { flex: 1 } : undefined)
+                        getButtonFlexStyle(wrap, block)
                     }
                 >
                     {opt.label}

@@ -31,11 +31,26 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      # `build`는 test를 포함한다. 예전엔 `-x test`로 테스트를 건너뛰었지만,
+      # src/test/resources/application.yml에 H2·JWT·OAuth2·S3 더미 설정이 모두 갖춰져 있어
+      # 외부 의존 없이 통과한다(2026-07-28 기준 12개 통과, 약 30초).
+      # 특히 SecurityConfigAuthorizationTest는 permitAll/authenticated 규칙이 의도와 어긋나는
+      # 회귀를 잡는 유일한 안전망이라 CI에서 반드시 돌아야 한다.
       - name: Build with Gradle
         working-directory: backend
         run: |
           chmod +x ./gradlew
-          ./gradlew clean build -x test
+          ./gradlew clean build
+
+      # 테스트가 깨졌을 때 Actions 로그만으로는 원인 파악이 어려워 리포트를 첨부한다.
+      # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/build/reports/tests/test/
+          retention-days: 7
 
       - name: Login to DockerHub
         uses: docker/login-action@v4

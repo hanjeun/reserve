@@ -48,7 +48,10 @@ const SHIMMER_STYLE = `
       ${colors.gray[100]} 75%
     );
     background-size: 800px 100%;
-    animation: reserve-shimmer 1.4s ease-in-out infinite;
+    /* ★ linear여야 한다. ease-in-out은 "각 반복마다" 가속·감속을 적용하므로 무한 반복에서는
+       사이클 끝마다 속도가 0으로 떨어졌다가 다시 붙는다 — 하이라이트가 주기적으로 멈칫하는
+       원인이었다. 위치는 문제없다(background-size 800px = 이동거리 800px이라 이음매는 없음). */
+    animation: reserve-shimmer 1.4s linear infinite;
     border-radius: 6px;
   }
 `;

@@ -523,7 +523,7 @@ const StoreDetail = () => {
                         <div style={styles.pcLeft}>
                             <div style={{ position: 'relative' }}>
                                 <div style={styles.pcImageWrapper}>
-                                    <Image.PreviewGroup><Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
+                                    <Image.PreviewGroup preview={{ rootClassName: 'reserve-image-preview' }}><Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
                                         {sliderImages.map((img, sliderIdx) => (
                                             <div key={img}>
                                                 <Image src={getDetailImageUrl(img)} alt={`${store.name}-${sliderIdx}`}
@@ -575,7 +575,7 @@ const StoreDetail = () => {
                     <section style={{ padding: 0 }}>
                         <div style={{ position: 'relative' }}>
                             <div style={styles.mobileImageWrapper}>
-                                <Image.PreviewGroup><Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
+                                <Image.PreviewGroup preview={{ rootClassName: 'reserve-image-preview' }}><Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
                                     {sliderImages.map((img, sliderIdx) => (
                                         <div key={img}>
                                             <Image src={getDetailImageUrl(img)} alt={`${store.name}-${sliderIdx}`}

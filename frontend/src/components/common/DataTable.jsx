@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Table } from 'antd';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 
@@ -63,6 +64,21 @@ const DataTable = ({ pageSize = 15, pagination, size = 'middle', fitContent = fa
             {...rest}
         />
     );
+};
+
+// components/common의 공용 컴포넌트는 PropTypes 필수 (docs/rules/code-conventions.md).
+// columns/dataSource 등 나머지 Table props는 ...rest로 그대로 위임하므로 여기서 다시 선언하지 않는다 —
+// 이 컴포넌트가 직접 해석하는 prop만 계약으로 명시한다.
+DataTable.propTypes = {
+    /** 페이지당 행 수 (pagination이 false면 무시) */
+    pageSize: PropTypes.number,
+    /** false면 페이지네이션 비활성, 객체면 기본 설정에 병합 */
+    pagination: PropTypes.oneOfType([PropTypes.bool, PropTypes.object]),
+    /** AntD Table size — 기본 middle로 통일(관리자/사업자 패널 간 여백 불일치 방지) */
+    size: PropTypes.oneOf(['small', 'middle', 'large']),
+    /** 모든 열이 고정폭일 때 true — 테이블이 컨테이너 전체 폭을 차지하지 않게 함 */
+    fitContent: PropTypes.bool,
+    className: PropTypes.string,
 };
 
 export default DataTable;

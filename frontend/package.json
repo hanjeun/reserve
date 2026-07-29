@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
-    "@sentry/react": "^10.67.0",
+    "@sentry/react": "^10.69.0",
     "@tanstack/react-query": "^5.101.4",
     "antd": "^6.2.0",
     "axios": "^1.18.0",

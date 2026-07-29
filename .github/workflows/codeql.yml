@@ -1,0 +1,71 @@
+name: CodeQL
+
+# GitHub 무료 코드 스캐닝(public 레포 한정). CICD.yml과 분리한 이유:
+#  - CICD.yml은 main 전용 트리거인데 CodeQL은 dev에서도 돌아야 한다(Dependabot PR이 dev로 온다)
+#  - 배포 파이프라인이 스캔 때문에 느려지거나 실패하면 안 된다
+on:
+  push:
+    branches: [ "main", "dev" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ "main", "dev" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  schedule:
+    # 매주 월요일 03:00 UTC (한국시간 정오). 새 룰셋이 나와도 코드 변경 없이 재스캔된다.
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # 스캔 결과를 Security 탭에 업로드
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install JDK 21
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # autobuild 대신 수동 빌드 — 백엔드가 하위 디렉토리(backend/)에 있어 autobuild가
+      # 루트에서 빌드 파일을 못 찾을 수 있다. assemble은 컴파일+jar만 하고 테스트는 건너뛴다
+      # (테스트는 CICD.yml의 build-backend가 이미 돌린다).
+      - name: Build backend for analysis
+        if: matrix.language == 'java-kotlin'
+        working-directory: backend
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assemble
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

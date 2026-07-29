@@ -79,14 +79,17 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
                 backdropFilter: 'blur(8px)',
                 boxShadow:      '0 2px 8px rgba(0,0,0,0.12)',
                 transition:     'transform 0.15s, box-shadow 0.15s',
-                opacity:        toggleMutation.isPending ? 0.7 : 1,
+                // 응답 대기 중 opacity를 낮추지 않는다. onMutate의 낙관적 업데이트로 하트는 이미
+                // 즉시 채워지는데, 버튼 전체가 반투명해지면 그 빨강이 "덜 진한 빨강"으로 보이다가
+                // 응답이 와서(=성공 메시지가 뜰 때) 비로소 제 색이 되는 것처럼 느껴진다.
+                // 낙관적 업데이트의 목적(즉각 반응)과 정면으로 어긋나므로 제거. 중복 클릭은 disabled가 막는다.
                 flexShrink:     0,
                 ...style,
             }}
             title={isFavorite ? '즐겨찾기 삭제' : '즐겨찾기 추가'}
         >
             {isFavorite
-                ? <HeartFilled  style={{ fontSize: iconSize, color: colors.error?.main || '#ff4d4f' }} />
+                ? <HeartFilled  style={{ fontSize: iconSize, color: colors.error.main }} />
                 : <HeartOutlined style={{ fontSize: iconSize, color: colors.text.tertiary }} />
             }
         </button>

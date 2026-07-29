@@ -2,7 +2,9 @@ version: '3.8'
 services:
   blue:
     container_name: blue
-    image: ${DOCKERHUB_USERNAME}/reserve:latest
+    # CI가 IMAGE_TAG=sha-<커밋>을 export해서 커밋 고정 이미지를 띄운다.
+    # 수동 실행 등으로 값이 없으면 기존처럼 :latest로 폴백한다.
+    image: ${DOCKERHUB_USERNAME}/reserve:${IMAGE_TAG:-latest}
     ports:
       - "8080:8080"
     environment:

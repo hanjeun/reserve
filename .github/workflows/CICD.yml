@@ -31,23 +31,55 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      # `build`는 test를 포함한다. 예전엔 `-x test`로 테스트를 건너뛰었지만,
+      # src/test/resources/application.yml에 H2·JWT·OAuth2·S3 더미 설정이 모두 갖춰져 있어
+      # 외부 의존 없이 통과한다(2026-07-28 기준 12개 통과, 약 30초).
+      # 특히 SecurityConfigAuthorizationTest는 permitAll/authenticated 규칙이 의도와 어긋나는
+      # 회귀를 잡는 유일한 안전망이라 CI에서 반드시 돌아야 한다.
       - name: Build with Gradle
         working-directory: backend
         run: |
           chmod +x ./gradlew
-          ./gradlew clean build -x test
+          ./gradlew clean build
 
+      # 테스트가 깨졌을 때 Actions 로그만으로는 원인 파악이 어려워 리포트를 첨부한다.
+      # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: backend/build/reports/tests/test/
+          retention-days: 7
+
+      # ── 여기부터는 main push에서만 실행한다 ──────────────────────────────
+      # 예전엔 조건이 없어서 main으로 PR을 여는 것만으로 이미지가 빌드·푸시됐다.
+      # deploy-backend가 :latest를 pull하므로, PR을 열어둔 상태에서 배포가 돌면
+      # 머지되지도 않은 PR 코드가 운영에 나갈 수 있었다. (실제로 dev→main PR 3건이 이 경로를 탔다)
+      # 빌드·테스트는 위에서 이미 끝났으므로 PR의 검증 가치는 그대로 유지된다.
       - name: Login to DockerHub
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # 커밋 SHA 태그를 함께 붙인다. :latest만 있으면 "지금 운영에 뜬 게 어느 커밋인지",
+      # "롤백하면 어디로 돌아가는지"를 특정할 수 없다. sha-<커밋>은 불변이라 롤백 대상이 명확해진다.
+      # :latest도 계속 유지 — 수동 조작이나 긴급 상황의 폴백 경로로 남겨둔다.
       - name: Build Docker image
-        run: docker build --platform linux/amd64 -t ${{ secrets.DOCKERHUB_USERNAME }}/reserve ./backend
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/reserve:sha-${{ github.sha }} \
+            ./backend
 
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/reserve:sha-${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
 
   # ─────────────────────────────────────────────────────────
   # 2. 프론트엔드 빌드 + EC2 Nginx로 정적 파일 배포
@@ -98,9 +130,16 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      # ── 여기부터는 main push에서만 실행한다 ──────────────────────────────
+      # ★ job 레벨에 if를 걸면 안 된다. build-frontend는 main 브랜치 보호의 "필수 상태 체크"라,
+      #   job이 스킵되면 체크가 보고되지 않아 모든 PR이 영영 머지 불가가 된다.
+      #   (deployments.md에 적어둔 deploy-backend 함정의 반대 방향 사례)
+      #   그래서 job은 그대로 돌리고 배포 스텝 3개에만 조건을 건다 —
+      #   PR에서는 npm ci·lint·build까지만 돌아 검증은 유지되고 서버는 건드리지 않는다.
       # 빌드 결과물(dist/)을 EC2로 전송
       - name: Deploy frontend to EC2
-        uses: appleboy/scp-action@master
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
@@ -111,7 +150,8 @@ jobs:
 
       # nginx 설정 파일 EC2로 전송
       - name: Deploy nginx config
-        uses: appleboy/scp-action@master
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
@@ -123,7 +163,8 @@ jobs:
       # Nginx가 서빙하는 폴더로 이동 + 권한 설정
       # PRIVATE_IP 플레이스홀더를 서버 사설 IP로 치환 후 Nginx에 적용
       - name: Reload Nginx static files
-        uses: appleboy/ssh-action@master
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
@@ -178,7 +219,7 @@ jobs:
 
   # SSH 접속 정보 (AWS Lightsail — 변수명은 EC2 시절 레거시, 실제론 Lightsail)
       - name: Deploy docker-compose files to EC2
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           username: ubuntu
@@ -187,13 +228,17 @@ jobs:
           target: "/home/ubuntu/"
 
       - name: Docker compose up (target)
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
+            # 커밋 SHA로 고정된 이미지를 배포한다. :latest는 언제든 다른 커밋으로 바뀔 수 있어
+            # "지금 뜬 게 어느 커밋인지"를 사후에 특정할 수 없었다.
+            # compose 파일은 ${IMAGE_TAG:-latest}로 읽으므로 미설정 시 기존 동작(:latest)으로 폴백한다.
+            export IMAGE_TAG=sha-${{ github.sha }}
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/reserve:$IMAGE_TAG
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             export JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
             export GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
@@ -220,7 +265,7 @@ jobs:
             sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
@@ -240,7 +285,7 @@ jobs:
 
       - name: Rollback on health check failure
         if: failure()
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
@@ -253,7 +298,7 @@ jobs:
 
       - name: Switch Nginx upstream
         if: success()
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
@@ -263,7 +308,7 @@ jobs:
               'echo "set \$service_url ${{ env.TARGET_UPSTREAM }};" > /etc/nginx/conf.d/service-env.inc && nginx -s reload'
 
       - name: Stop old server
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
@@ -273,7 +318,7 @@ jobs:
             sudo docker rm   ${{ env.CURRENT_UPSTREAM }} || true
 
       - name: Cleanup Docker resources
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}

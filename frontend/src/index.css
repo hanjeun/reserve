@@ -470,6 +470,11 @@ button, input, textarea, select {
 .reserve-image-preview .ant-image-preview-operations-operation-disabled:hover {
     background-color: transparent !important;
 }
+/* 툴바 컨테이너 — AntD 기본은 pill(긴 타원)이라 우리 "둥근 네모" 톤과 어긋난다.
+   안쪽 아이콘 버튼들과 같은 8px로 맞춰 하나의 각진 카드처럼 보이게 한다. */
+.reserve-image-preview .ant-image-preview-actions {
+    border-radius: 8px !important;
+}
 /* 좌·우 넘기기 화살표(여러 장일 때)도 같은 톤 */
 .reserve-image-preview .ant-image-preview-switch-prev,
 .reserve-image-preview .ant-image-preview-switch-next,

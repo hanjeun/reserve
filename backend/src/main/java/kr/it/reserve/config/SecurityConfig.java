@@ -49,6 +49,11 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // CSRF 토큰을 쓰지 않는 대신 SameSite=Lax 쿠키가 방어선이다(CookieUtil 참고).
+                // 인증 토큰은 Authorization 헤더 또는 쿠키로 오는데(JwtAuthenticationFilter.resolveToken),
+                // 쿠키 경로가 있는 이상 cross-site 요청에 쿠키가 붙지 않도록 막는 쪽이 핵심이다.
+                // Lax는 cross-site POST/PUT/PATCH/DELETE에 쿠키를 보내지 않으므로 상태 변경 요청이 차단된다.
+                // ⚠️ CookieUtil의 SameSite를 None으로 되돌리면 이 방어가 통째로 사라진다.
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable())

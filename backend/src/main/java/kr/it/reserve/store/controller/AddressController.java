@@ -60,8 +60,10 @@ public class AddressController {
         }
 
         try {
+            // fromHttpUrl은 Spring 6.2에서 deprecated — 빌드 로그의 "deprecated API" 경고 출처였다.
+            // fromUriString은 http/https 검증만 빠질 뿐 동작이 같고, 여기서는 호스트가 상수라 무관하다.
             URI uri = UriComponentsBuilder
-                    .fromHttpUrl("https://dapi.kakao.com/v2/local/search/address.json")
+                    .fromUriString("https://dapi.kakao.com/v2/local/search/address.json")
                     .queryParam("query", query.trim())
                     .queryParam("size", safeSize)
                     .encode()

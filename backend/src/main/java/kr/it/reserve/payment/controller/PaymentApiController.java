@@ -2,8 +2,8 @@ package kr.it.reserve.payment.controller;
 
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.error.BusinessException;
 import kr.it.reserve.global.error.PaymentException;
-import kr.it.reserve.payment.dto.*;
 import kr.it.reserve.payment.dto.*;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.repository.PaymentRepository;
@@ -14,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -46,7 +48,7 @@ public class PaymentApiController {
         String redirectBase = "redirect:" + frontendUrl + "/payment/result";
 
         if (!isSuccess) {
-            return redirectBase + "?success=false&merchant_uid=" + merchantUid + "&error_msg=" + (errorMsg != null ? errorMsg : "");
+            return redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(errorMsg);
         }
 
         try {
@@ -60,11 +62,27 @@ public class PaymentApiController {
             verifyDto.setReservationId(payment.getReservation().getId());
 
             paymentService.verifyAndCompletePayment(verifyDto);
-            return redirectBase + "?success=true&merchant_uid=" + merchantUid;
+            return redirectBase + "?success=true&merchant_uid=" + enc(merchantUid);
+        } catch (BusinessException e) {
+            // 도메인 예외의 메시지는 애초에 사용자에게 보여줄 목적으로 쓴 한국어 문구라 그대로 전달한다.
+            log.warn("Mobile payment redirect failed: merchant_uid={}, {}", merchantUid, e.getMessage());
+            return redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(e.getMessage());
         } catch (Exception e) {
-            log.error("Mobile redirect processing error: {}", e.getMessage());
-            return redirectBase + "?success=false&merchant_uid=" + merchantUid + "&error_msg=" + e.getMessage();
+            // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
+            // 브라우저 주소창에 그대로 실려 나가므로 고정 문구로 대체하고, 원인은 로그·Sentry에만 남긴다.
+            log.error("Mobile payment redirect error: merchant_uid={}", merchantUid, e);
+            return redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
+                    + "&error_msg=" + enc("결제 처리 중 오류가 발생했습니다.");
         }
+    }
+
+    /**
+     * 리다이렉트 쿼리스트링에 실을 값을 URL 인코딩한다.
+     * Spring의 "redirect:" 접두 문자열은 이미 붙어 있는 쿼리스트링을 그대로 Location 헤더로 내보내므로,
+     * 값에 &·#·%가 섞이면 파라미터가 잘리거나 뒤에 임의 파라미터를 덧붙일 수 있다.
+     */
+    private static String enc(String value) {
+        return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     /**

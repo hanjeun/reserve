@@ -46,7 +46,7 @@ jobs:
       # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
       - name: Upload test report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-report
           path: backend/build/reports/tests/test/

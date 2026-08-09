@@ -1,0 +1,79 @@
+# ============================================================
+# MySQL 8 — 운영 DB
+# ============================================================
+#
+# ⚠️⚠️ 이 파일을 서버에서 그대로 `up -d` 하기 전에 반드시 읽을 것 ⚠️⚠️
+#
+# 이 파일은 "서버에 이미 떠 있는 MySQL을 레포에서 재현하기 위한" 정의다.
+# 지금까지 MySQL은 서버에서 수동으로 띄운 컨테이너였고 레포에 정의가 없었다
+# (blue/green은 jdbc:mysql://mysql:3306 으로 연결만 했다).
+# 즉 서버를 재구축해야 할 때 되살릴 수단이 없는 상태였고, 그 공백을 메우는 게 이 파일의 목적이다.
+#
+# 값이 실제 컨테이너와 다르면 **데이터가 들어 있지 않은 새 볼륨으로 컨테이너가 뜬다.**
+# 앱에서 보기엔 "DB가 텅 비었다"가 되고, 그 상태로 시간이 지나면 복구가 훨씬 어려워진다.
+# 그래서 적용 전에 아래를 반드시 대조한다:
+#
+#   docker inspect mysql --format '{{.Config.Image}}'                      # image 태그
+#   docker inspect mysql --format '{{json .Mounts}}' | python3 -m json.tool # 볼륨 이름·경로
+#   docker inspect mysql --format '{{json .Config.Env}}' | python3 -m json.tool
+#   docker inspect mysql --format '{{json .NetworkSettings.Networks}}' | python3 -m json.tool
+#   docker inspect mysql --format '{{json .HostConfig.PortBindings}}'
+#
+# 특히 **볼륨 이름**이 아래 `mysql-data`와 다르면 이 파일을 서버 값에 맞춰 고칠 것.
+# 확신이 없으면 절대 up 하지 말고, 먼저 백업부터 뜬다(scripts/backup-mysql.sh).
+#
+# 자세한 절차는 docs/technical/backup.md 참고.
+# ============================================================
+
+services:
+  mysql:
+    # 서버의 실제 태그와 일치해야 한다. 8.0 계열 안에서도 마이너 다운그레이드는
+    # 데이터 디렉토리 호환 문제를 일으킬 수 있으므로 위 docker inspect 값을 그대로 쓸 것.
+    image: mysql:8.0
+    container_name: mysql
+
+    # 127.0.0.1 바인딩 — 외부에서 3306에 직접 접근하지 못하게 한다.
+    # 0.0.0.0으로 바꾸지 말 것. 앱 컨테이너는 app-network 안에서 `mysql:3306`으로 붙으므로
+    # 포트를 호스트에 열 필요가 없고, 이 바인딩은 서버에서의 수동 점검·백업용이다.
+    ports:
+      - "127.0.0.1:3306:3306"
+
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=reserve
+      - TZ=Asia/Seoul
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # 느린 쿼리 가시성 (Promtail이 /var/log/reserve 를 읽는다)
+      - --slow-query-log=ON
+      - --slow-query-log-file=/var/log/reserve/mysql-slow.log
+      - --long-query-time=2
+
+    volumes:
+      # ★ 데이터. 이 이름이 서버의 실제 볼륨과 달라야 할 이유는 없지만, 다르면 빈 DB가 뜬다.
+      - mysql-data:/var/lib/mysql
+      - /var/log/reserve:/var/log/reserve
+
+    networks:
+      - app-network
+
+    restart: unless-stopped
+
+    # 앱 컨테이너보다 먼저 준비되도록 헬스체크를 둔다.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  # external: true 로 두지 않은 이유 — 신규 서버 구축 시 자동 생성되게 하려는 것이다.
+  # 기존 서버에 적용할 때는 위 docker inspect로 확인한 이름과 일치시켜야 한다.
+  mysql-data:
+
+networks:
+  app-network:
+    external: true

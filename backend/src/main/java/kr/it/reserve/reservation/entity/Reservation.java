@@ -14,7 +14,23 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Entity
-@Table(name = "reservation")
+/*
+ * 인덱스는 ReservationRepository의 실제 쿼리에서 역산했다(추측으로 넣지 않았다).
+ * ddl-auto: update 라 재시작 시 자동 생성된다. 단 **삭제·변경은 자동 반영되지 않으므로**
+ * 여기서 이름을 바꾸면 옛 인덱스가 DB에 그대로 남는다 — 수동 DROP이 필요하다.
+ *
+ * 복합 인덱스는 왼쪽부터 쓰이므로 (등호 조건 → 정렬) 순서로 놓는다.
+ */
+@Table(name = "reservation", indexes = {
+    // findByMemberOrderByCreatedAtDesc — 내 예약 목록. 로그인 사용자가 가장 자주 여는 화면.
+    @Index(name = "idx_reservation_member", columnList = "member_id, deleted_at, created_at"),
+    // getAvailability 계열 — 예약 가능 시간 계산. 가게 상세에서 날짜를 고를 때마다 돈다.
+    @Index(name = "idx_reservation_store_date", columnList = "store_id, reservation_date"),
+    // findByStoreOrderByReservationDateDesc… — 사업자 패널 목록
+    @Index(name = "idx_reservation_store_date_time", columnList = "store_id, reservation_date, reservation_time"),
+    // 관리자 전체 목록 (deletedAt IS NULL ORDER BY createdAt DESC)
+    @Index(name = "idx_reservation_deleted_created", columnList = "deleted_at, created_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

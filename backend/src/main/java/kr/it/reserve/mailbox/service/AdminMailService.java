@@ -9,6 +9,9 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -17,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.UnsupportedEncodingException;
-import java.util.List;
 
 /**
  * 관리자 메일 발송 — 발송 전용 서비스.
@@ -57,11 +59,26 @@ public class AdminMailService {
     }
 
     /* ── 보낸 메일 목록 ─────────────────────────────────── */
-    public List<AdminSentMailResponse> getSentMailList() {
-        return sentMailRepository.findByDeletedAtIsNullOrderBySentAtDesc()
-                .stream()
-                .map(AdminSentMailResponse::from)
-                .toList();
+    /** 한 번에 내려줄 수 있는 최대 건수. 호출측이 큰 size 를 보내 전량을 끌어가지 못하게 막는다. */
+    private static final int MAX_PAGE_SIZE = 100;
+
+    /**
+     * 보낸 메일 목록 — 페이지 단위. {@code search} 가 있으면 받는사람·제목으로 서버에서 걸러낸다.
+     *
+     * <p>예전에는 페이지 개념 없이 전량을 내려주고 프론트가 {@code Array.filter} 했다.
+     * 보낸 메일은 계속 쌓이기만 하는 데이터라 시간이 지날수록 응답이 커진다.
+     */
+    public Page<AdminSentMailResponse> getSentMailList(int page, int size, String search) {
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safePage = Math.max(page, 0);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+
+        String keyword = search != null ? search.trim() : "";
+        Page<AdminSentMail> mails = keyword.isEmpty()
+                ? sentMailRepository.findByDeletedAtIsNullOrderBySentAtDesc(pageable)
+                : sentMailRepository.searchByToEmailOrSubject(keyword, pageable);
+
+        return mails.map(AdminSentMailResponse::from);
     }
 
     /* ── 이메일 발송 내부 메서드 ────────────────────────── */

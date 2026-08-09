@@ -53,9 +53,10 @@ logging:
 s3:
   env-prefix: local
 
-# CORS 로컬 허용 출처 추가 (common.yml의 운영 도메인에 덮어쓰기가 아닌 추가)
+# CORS 허용 출처 (쉼표 구분 — SecurityConfig의 @Value List<String> 바인딩)
+#
+# ⚠️ ngrok 도메인은 실기기(모바일) 테스트용이라 로컬 프로파일에만 둔다.
+#    운영(prod)에 새는 순간 제3자 도메인이 allowCredentials=true로 우리 쿠키를 읽을 수 있다.
+#    ngrok 주소가 바뀌면 여기만 고치면 된다.
 cors:
-  allowed-origins:
-    - "http://localhost:5173"
-    - "https://reserve.it.kr"
-    - "https://slouching-blubber-worst.ngrok-free.dev"
+  allowed-origins: "http://localhost:5173,https://reserve.it.kr,https://slouching-blubber-worst.ngrok-free.dev"

@@ -44,7 +44,14 @@ public class ReservationExpiryScheduler {
         int expiredCount = 0;
 
         for (Reservation reservation : candidates) {
-            int timeoutMinutes = getTimeoutMinutes(reservation);
+            Integer timeoutMinutes = getTimeoutMinutes(reservation);
+
+            // ★ null = 제한 없음 — 이 가게는 미결제 예약을 자동 취소하지 않는다(2026-08-09 신설).
+            //   예전엔 프론트가 "제한 없음"을 1440분으로 보냈는데 그건 사실 24시간 자동취소였고,
+            //   0 을 보내면 아래 `> 0` 가드에 걸려 오히려 기본값 30분으로 돌아갔다 —
+            //   어느 쪽으로도 진짜 무제한이 불가능했다.
+            if (timeoutMinutes == null) continue;
+
             LocalDateTime expireAt = reservation.getCreatedAt().plusMinutes(timeoutMinutes);
 
             if (now.isAfter(expireAt)) {
@@ -66,11 +73,18 @@ public class ReservationExpiryScheduler {
     }
 
     /**
-     * 가게별 결제 대기 만료 시간 (분 단위)
-     * store.paymentTimeoutMinutes 없으면 기본값 30분
+     * 가게별 결제 대기 만료 시간 (분 단위).
+     *
+     * @return 만료 분. <b>{@code null} 이면 "제한 없음"</b> — 자동 취소하지 않는다.
+     *         값이 없으면(예전 데이터) 기본 30분.
+     *
+     * <p>⚠️ "제한 없음"을 고른 가게는 미결제 예약이 슬롯을 계속 점유한다.
+     * 예약금을 받는 가게가 이걸 고르면 자리만 막히고 돈은 안 들어오는 상태가 될 수 있다.
      */
-    private int getTimeoutMinutes(Reservation reservation) {
+    private Integer getTimeoutMinutes(Reservation reservation) {
         Integer timeout = reservation.getStore().getPaymentTimeoutMinutes();
-        return (timeout != null && timeout > 0) ? timeout : 30;
+        if (timeout == null) return 30;
+        if (timeout <= 0) return null;   // 0 = 제한 없음 (StoreService.PAYMENT_TIMEOUT_UNLIMITED)
+        return timeout;
     }
 }

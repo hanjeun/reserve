@@ -16,7 +16,7 @@
 set -euo pipefail
 
 CONFIG_FILE="${RESERVE_BACKUP_ENV:-/etc/reserve-backup.env}"
-if [ -f "$CONFIG_FILE" ]; then
+if [[ -f "$CONFIG_FILE" ]]; then
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"
 fi
@@ -42,12 +42,12 @@ usage() {
 # 인자 파싱
 # ─────────────────────────────────────────────────────────
 SOURCE=""
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
     case "$1" in
         --list)
             echo "=== local (${BACKUP_DIR}) ==="
             ls -lh "${BACKUP_DIR}"/reserve-*.sql.gz 2>/dev/null || echo "(none)"
-            if [ -n "$S3_BUCKET" ]; then
+            if [[ -n "$S3_BUCKET" ]]; then
                 echo
                 echo "=== s3 (s3://${S3_BUCKET}/${S3_PREFIX}/) ==="
                 aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" --human-readable || echo "(unavailable)"
@@ -55,14 +55,14 @@ while [ $# -gt 0 ]; do
             exit 0
             ;;
         --dry-run) DRY_RUN=1; shift ;;
-        --target)  TARGET_DB="${2:-}"; [ -n "$TARGET_DB" ] || die "--target needs a value"; shift 2 ;;
+        --target)  TARGET_DB="${2:-}"; [[ -n "$TARGET_DB" ]] || die "--target needs a value"; shift 2 ;;
         -h|--help) usage 0 ;;
         -*)        die "unknown option: $1" ;;
         *)         SOURCE="$1"; shift ;;
     esac
 done
 
-[ -n "$SOURCE" ] || usage 1
+[[ -n "$SOURCE" ]] || usage 1
 
 # ─────────────────────────────────────────────────────────
 # 백업 파일 준비
@@ -78,13 +78,13 @@ case "$SOURCE" in
         aws s3 cp "$SOURCE" "$WORK_FILE" --only-show-errors || die "S3 download failed"
         ;;
     *)
-        [ -f "$SOURCE" ] || die "file not found: $SOURCE"
+        [[ -f "$SOURCE" ]] || die "file not found: $SOURCE"
         WORK_FILE="$SOURCE"
         ;;
 esac
 
 cleanup() {
-    if [ "$CLEANUP_WORK" -eq 1 ]; then
+    if [[ "$CLEANUP_WORK" -eq 1 ]]; then
         rm -f "$WORK_FILE"
     fi
 }
@@ -103,7 +103,7 @@ DUMP_DATE="$(gunzip -c "$WORK_FILE" | grep -m1 -o 'Dump completed on .*' || echo
 echo "  tables : ${TABLE_COUNT}"
 echo "  ${DUMP_DATE}"
 
-if [ "$DRY_RUN" -eq 1 ]; then
+if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "dry-run: dump is valid. nothing was changed."
     exit 0
 fi
@@ -112,14 +112,14 @@ fi
 # 확인 — 운영 DB를 덮어쓰는 경우 한 번 더 막는다
 # ─────────────────────────────────────────────────────────
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 || die "container '$MYSQL_CONTAINER' not found"
-[ -n "${DB_PASSWORD:-}" ] || die "DB_PASSWORD is not set (check $CONFIG_FILE)"
+[[ -n "${DB_PASSWORD:-}" ]] || die "DB_PASSWORD is not set (check $CONFIG_FILE)"
 
 echo
 echo "  source : ${SOURCE}"
 echo "  target : ${TARGET_DB} (container: ${MYSQL_CONTAINER})"
 echo
 
-if [ "$TARGET_DB" = "$DB_NAME" ]; then
+if [[ "$TARGET_DB" = "$DB_NAME" ]]; then
     cat <<WARN
 ⚠️  운영 DB '${DB_NAME}' 를 덮어씁니다. 이 시점 이후의 데이터는 사라집니다.
     - 먼저 현재 상태를 한 번 더 백업했습니까? (scripts/backup-mysql.sh)
@@ -127,7 +127,7 @@ if [ "$TARGET_DB" = "$DB_NAME" ]; then
 WARN
     printf "계속하려면 정확히 'RESTORE %s' 를 입력하세요: " "$DB_NAME"
     read -r CONFIRM
-    [ "$CONFIRM" = "RESTORE ${DB_NAME}" ] || die "aborted"
+    [[ "$CONFIRM" = "RESTORE ${DB_NAME}" ]] || die "aborted"
 fi
 
 # ─────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ gunzip -c "$WORK_FILE" | docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONT
 RESTORE_STATUS="${PIPESTATUS[1]}"
 set -e
 
-[ "$RESTORE_STATUS" -eq 0 ] || die "restore failed with status $RESTORE_STATUS"
+[[ "$RESTORE_STATUS" -eq 0 ]] || die "restore failed with status $RESTORE_STATUS"
 
 # ─────────────────────────────────────────────────────────
 # 복원 후 대조 — "명령이 성공했다"와 "데이터가 들어갔다"는 다르다
@@ -159,7 +159,7 @@ echo "restore complete."
 echo "  dump tables     : ${TABLE_COUNT}"
 echo "  restored tables : ${RESTORED_TABLES}"
 
-if [ "$RESTORED_TABLES" -ne "$TABLE_COUNT" ]; then
+if [[ "$RESTORED_TABLES" -ne "$TABLE_COUNT" ]]; then
     echo "⚠️  테이블 수가 다릅니다. 복원이 부분적으로만 됐을 수 있으니 확인하세요." >&2
     exit 1
 fi

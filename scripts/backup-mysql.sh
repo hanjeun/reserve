@@ -22,7 +22,7 @@ set -euo pipefail
 # 설정
 # ─────────────────────────────────────────────────────────
 CONFIG_FILE="${RESERVE_BACKUP_ENV:-/etc/reserve-backup.env}"
-if [ -f "$CONFIG_FILE" ]; then
+if [[ -f "$CONFIG_FILE" ]]; then
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"
 fi
@@ -53,7 +53,7 @@ log() {
 fail() {
     log "ERROR $*"
     # 실패한 부분 파일은 남기지 않는다. 남기면 다음 복원 때 후보로 잡혀 위험하다.
-    if [ -f "$DUMP_FILE" ]; then
+    if [[ -f "$DUMP_FILE" ]]; then
         rm -f "$DUMP_FILE"
     fi
     exit 1
@@ -66,17 +66,17 @@ trap 'fail "unexpected failure at line $LINENO"' ERR
 # ─────────────────────────────────────────────────────────
 log "=== backup start (db=${DB_NAME}) ==="
 
-[ -n "${DB_PASSWORD:-}" ] || fail "DB_PASSWORD is not set (check $CONFIG_FILE)"
+[[ -n "${DB_PASSWORD:-}" ]] || fail "DB_PASSWORD is not set (check $CONFIG_FILE)"
 
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
     || fail "container '$MYSQL_CONTAINER' not found"
 
 RUNNING="$(docker inspect -f '{{.State.Running}}' "$MYSQL_CONTAINER")"
-[ "$RUNNING" = "true" ] || fail "container '$MYSQL_CONTAINER' is not running"
+[[ "$RUNNING" = "true" ]] || fail "container '$MYSQL_CONTAINER' is not running"
 
 # 디스크 여유 확인 — 여유가 없으면 잘린 덤프가 나온다.
 AVAIL_MB="$(df -Pm "$BACKUP_DIR" | awk 'NR==2 {print $4}')"
-if [ "$AVAIL_MB" -lt 500 ]; then
+if [[ "$AVAIL_MB" -lt 500 ]]; then
     fail "not enough disk space in $BACKUP_DIR (${AVAIL_MB}MB available, need >=500MB)"
 fi
 
@@ -103,7 +103,7 @@ docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
 DUMP_STATUS="${PIPESTATUS[0]}"
 set -e
 
-[ "$DUMP_STATUS" -eq 0 ] || fail "mysqldump exited with status $DUMP_STATUS"
+[[ "$DUMP_STATUS" -eq 0 ]] || fail "mysqldump exited with status $DUMP_STATUS"
 
 # ─────────────────────────────────────────────────────────
 # 검증 — 여기가 이 스크립트의 핵심이다
@@ -117,20 +117,20 @@ if ! gunzip -c "$DUMP_FILE" | tail -5 | grep -q "Dump completed"; then
 fi
 
 DUMP_SIZE="$(stat -c %s "$DUMP_FILE")"
-[ "$DUMP_SIZE" -gt 1024 ] || fail "dump suspiciously small (${DUMP_SIZE} bytes)"
+[[ "$DUMP_SIZE" -gt 1024 ]] || fail "dump suspiciously small (${DUMP_SIZE} bytes)"
 
 TABLE_COUNT="$(gunzip -c "$DUMP_FILE" | grep -c '^CREATE TABLE' || true)"
 log "verified: $(numfmt --to=iec "$DUMP_SIZE" 2>/dev/null || echo "${DUMP_SIZE}B"), ${TABLE_COUNT} tables"
 
 # 테이블이 갑자기 줄었다면 뭔가 잘못된 것이다(권한 변경, DB 지정 실수 등).
-if [ "$TABLE_COUNT" -lt 10 ]; then
+if [[ "$TABLE_COUNT" -lt 10 ]]; then
     log "WARN only ${TABLE_COUNT} tables in dump — expected ~20. Check DB_NAME and grants."
 fi
 
 # ─────────────────────────────────────────────────────────
 # S3 업로드
 # ─────────────────────────────────────────────────────────
-if [ -n "$S3_BUCKET" ]; then
+if [[ -n "$S3_BUCKET" ]]; then
     S3_URI="s3://${S3_BUCKET}/${S3_PREFIX}/$(basename "$DUMP_FILE")"
     log "uploading to ${S3_URI}"
 
@@ -158,9 +158,9 @@ fi
 # ─────────────────────────────────────────────────────────
 # 로컬 보관 정리
 # ─────────────────────────────────────────────────────────
-# `[ cond ] && cmd` 형태는 set -e / ERR trap과 섞이면 동작이 헷갈리므로 if로 쓴다.
+# `[[ cond ]] && cmd` 형태는 set -e / ERR trap과 섞이면 동작이 헷갈리므로 if로 쓴다.
 DELETED="$(find "$BACKUP_DIR" -name 'reserve-*.sql.gz' -mtime "+${LOCAL_RETENTION_DAYS}" -print -delete | wc -l)"
-if [ "$DELETED" -gt 0 ]; then
+if [[ "$DELETED" -gt 0 ]]; then
     log "pruned ${DELETED} local backup(s) older than ${LOCAL_RETENTION_DAYS} days"
 fi
 

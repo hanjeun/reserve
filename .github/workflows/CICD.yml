@@ -13,11 +13,12 @@ on:
       - 'docs/**'
   workflow_dispatch:
 
+# ★ 워크플로 전체는 읽기만 가진다(최소 권한).
+#   deployments: write 는 그게 실제로 필요한 deploy-backend 잡에만 따로 준다 —
+#   여기 적으면 build-backend·build-frontend 까지 쓸데없는 쓰기 권한을 받는다.
+#   (SonarCloud: "Move this write permission from workflow level to job level")
 permissions:
   contents: read
-  # deploy-backend 잡이 GitHub Deployment 객체를 만들기 위해 필요하다.
-  # 이게 없으면 저장소 Environments 탭·커밋 화면에 "언제 무엇이 production에 나갔는지" 기록이 남지 않는다.
-  deployments: write
 
 jobs:
   # ─────────────────────────────────────────────────────────
@@ -194,6 +195,11 @@ jobs:
   # 3. Blue/Green 백엔드 배포 (백엔드 빌드 완료 후 실행)
   # ─────────────────────────────────────────────────────────
   deploy-backend:
+    # 이 잡만 GitHub Deployment 객체를 만든다. 잡 레벨 permissions 는 워크플로 레벨을
+    # **대체**하므로, 체크아웃에 필요한 contents: read 를 함께 적어줘야 한다.
+    permissions:
+      contents: read
+      deployments: write
     needs: build-backend
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest

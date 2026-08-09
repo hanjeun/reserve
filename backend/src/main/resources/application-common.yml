@@ -106,9 +106,13 @@ mail:
 portone:
   pg-provider: ${PORTONE_PG_PROVIDER:kakaopay}
 
-# CORS 허용 출처 (쉼표 구분 — @Value List<String> 바인딩)
-cors:
-  allowed-origins: "https://reserve.it.kr"
+# CORS 허용 출처는 프로파일별로만 정의한다 (local.yml / prod.yml).
+#
+# 여기(common)에 두면 안 되는 이유: 프로파일 그룹이 `local: secret, common` 이라
+# 활성 프로파일 순서가 [local, secret, common]이 되고, Spring은 last-wins이므로
+# common.yml이 local.yml을 덮어쓴다. 실제로 예전에 이 키가 common에 있어서
+# local.yml의 localhost 출처가 무력화돼 있었다(그래서 SecurityConfig가 코드에
+# 하드코딩된 목록을 쓰고 있었다).
 
 # Actuator (헬스체크)
 management:

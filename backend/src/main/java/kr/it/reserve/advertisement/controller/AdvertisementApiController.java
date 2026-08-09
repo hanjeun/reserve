@@ -146,13 +146,17 @@ public class AdvertisementApiController {
     }
 
     // 전체 광고 목록 (관리자용)
+    // search: 가게 이름 부분 일치. 비우면 전건.
+    // 예전에는 프론트가 받은 페이지 안에서만 필터링해 다른 페이지의 광고가 검색되지 않았다 —
+    // 검색을 서버로 옮긴 이유는 AdvertisementRepository#searchForAdmin 주석 참고.
     @GetMapping("/admin/all")
     public ApiResponse<Page<AdvertisementResponse>> getAllAds(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String search) {
         Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         validateAdminAuth(member);
-        return ApiResponse.success(advertisementService.getAllAds(page, size), "조회 성공");
+        return ApiResponse.success(advertisementService.getAllAds(page, size, search), "조회 성공");
     }
 
     // 광고 강제 중단 (관리자용) — 사전 승인 대신 사후 제재

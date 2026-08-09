@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.store.entity.Store;
-import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -55,7 +54,9 @@ public class StoreResponse {
     private Double rating;
     private Integer reviewCount;
 
-    @Min(value = 0, message = "노쇼 금액은 0원 이상이어야 합니다.")
+    // (2026-08-09) 여기 있던 @Min 을 제거했다 — 이건 **응답** DTO 라 Bean Validation 이
+    // 아예 동작하지 않는다(응답 객체는 검증 대상이 아니다). "검증이 있다"는 착각만 줌.
+    // 실제 방어는 StoreService 의 clampDeposit() 이 맡는다.
     private Integer noShowDeposit;  // 노쇼 방지금
     
     // ========== 환불 정책 ==========

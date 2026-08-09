@@ -206,8 +206,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * store.paymentTimeoutMinutes 기반으로 만료 기준을 각 가게별로 계산하기 위해
      * 스케줄러에서 조회 후 Java 레벨에서 필터링
      */
+    // 2026-07-29: allowLatePayment 조건을 빠뜨려서 "나중 결제 허용" 가게의 예약까지
+    // 30분 뒤 자동 취소되고 있었다(= 그 설정이 사실상 동작하지 않았다).
+    // 나중 결제를 허용한 가게는 애초에 결제 없이 예약을 유지하겠다는 뜻이므로 만료 대상에서 제외한다.
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH r.member "
          + "WHERE r.status = 'PENDING' AND r.depositAmount > 0 AND r.depositPaid = false "
+         + "AND s.allowLatePayment = false "
          + "AND r.createdAt < :cutoff")
     List<Reservation> findExpiredUnpaidReservations(@Param("cutoff") LocalDateTime cutoff);
 

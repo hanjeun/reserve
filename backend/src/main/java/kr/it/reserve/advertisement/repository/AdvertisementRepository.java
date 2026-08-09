@@ -42,6 +42,36 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
     @Query("SELECT a FROM Advertisement a JOIN FETCH a.store WHERE a.deletedAt IS NULL ORDER BY a.createdAt DESC")
     Page<Advertisement> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+    /**
+     * 관리자 광고 목록 — 가게 이름 검색 포함.
+     *
+     * <p><b>왜 필요한가:</b> 예전에는 이 목록을 서버에서 페이지 단위로 받아온 뒤
+     * 프론트(AdminAdsTab)가 {@code Array.filter}로 걸렀다. 그래서 <b>검색이 현재 페이지 안에서만</b>
+     * 동작했다 — 2페이지에 있는 광고는 1페이지에서 검색해도 나오지 않는다.
+     * 데이터가 늘수록 "분명 있는데 검색이 안 된다"가 되므로 검색을 서버로 옮겼다.
+     *
+     * <p><b>keyword가 NULL 검사 대신 빈 문자열인 이유:</b>
+     * {@code (:keyword IS NULL OR ...)} 형태는 Hibernate 6에서 파라미터 타입 추론이 필요해
+     * 상황에 따라 캐스팅을 요구한다. 빈 문자열이면 {@code LIKE '%%'}가 되어 전건 매칭이므로
+     * 분기 자체가 사라진다. 서비스에서 null을 빈 문자열로 정규화해 넘긴다.
+     *
+     * <p><b>countQuery를 직접 준 이유:</b> 본 쿼리에 {@code JOIN FETCH}가 있어 Spring Data가
+     * 파생시키는 count 쿼리에도 fetch가 섞이면 실패할 수 있다. count에는 fetch 없는 일반 join을 쓴다.
+     * ({@code a.store}는 ToOne이라 fetch join + 페이징을 해도 메모리 페이징으로 떨어지지 않는다 —
+     *  컬렉션 fetch join이었다면 HHH000104 경고와 함께 전건 로딩이 됐을 것이다)
+     *
+     * <p>⚠️ 이 검색도 {@code LIKE '%kw%'}라 인덱스를 타지 못한다. 광고는 건수가 적어 당장은
+     * 문제가 없지만, 가게 검색(StoreRepository)처럼 커지면 FULLTEXT로 옮겨야 한다.
+     */
+    @Query(value = "SELECT a FROM Advertisement a JOIN FETCH a.store s "
+                 + "WHERE a.deletedAt IS NULL "
+                 + "AND LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) "
+                 + "ORDER BY a.createdAt DESC",
+           countQuery = "SELECT COUNT(a) FROM Advertisement a JOIN a.store s "
+                      + "WHERE a.deletedAt IS NULL "
+                      + "AND LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<Advertisement> searchForAdmin(@Param("keyword") String keyword, Pageable pageable);
+
     @Modifying
     @Query("UPDATE Advertisement a SET a.deletedAt = NULL WHERE a.id = :id")
     void restoreById(@Param("id") Long id);

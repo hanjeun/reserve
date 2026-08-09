@@ -3,7 +3,8 @@ import { Flex } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { colors, radius, fontWeight, fontSize } from '../../../../styles/tokens';
 import { Button } from '../../../../components/common';
-import { mockInputBase, mockFormLabel } from '../../Home.styles';
+// 목업 폭은 Home.styles.js 의 HOME_MOCKUP_WIDTH 하나에서 온다 — 섹션마다 달라지면 간격이 어긋난다.
+import { mockInputBase, mockFormLabel, HOME_MOCKUP_WIDTH } from '../../Home.styles';
 
 export default function MockBookingForm() {
     const [count, setCount] = useState(1);
@@ -14,8 +15,8 @@ export default function MockBookingForm() {
 
     return (
         <div style={{
-            width: '100%', maxWidth: 360,
-            background: '#fff',
+            width: '100%', maxWidth: HOME_MOCKUP_WIDTH,
+            background: colors.background.paper,
             borderRadius: radius['2xl'],
             padding: 'clamp(18px, 4vw, 28px) clamp(16px, 4vw, 24px)',
             boxShadow: '0 4px 24px rgba(0,0,0,0.08)',

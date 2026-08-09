@@ -30,46 +30,19 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Pagination } from 'antd';
-import { colors, radius, shadows } from '../../styles/tokens';
-
-/* ─────────────────────────────────────────────
-   shimmer 키프레임 (전역 1회 주입)
-───────────────────────────────────────────── */
-const SHIMMER_STYLE = `
-  @keyframes reserve-shimmer {
-    0%   { background-position: -400px 0; }
-    100% { background-position:  400px 0; }
-  }
-  .reserve-skeleton-block {
-    background: linear-gradient(
-      90deg,
-      ${colors.gray[100]} 25%,
-      ${colors.gray[200]} 50%,
-      ${colors.gray[100]} 75%
-    );
-    background-size: 800px 100%;
-    /* ★ linear여야 한다. ease-in-out은 "각 반복마다" 가속·감속을 적용하므로 무한 반복에서는
-       사이클 끝마다 속도가 0으로 떨어졌다가 다시 붙는다 — 하이라이트가 주기적으로 멈칫하는
-       원인이었다. 위치는 문제없다(background-size 800px = 이동거리 800px이라 이음매는 없음). */
-    animation: reserve-shimmer 1.4s linear infinite;
-    border-radius: 6px;
-  }
-`;
-
-let styleInjected = false;
-const injectStyle = () => {
-  if (styleInjected || typeof document === 'undefined') return;
-  const el = document.createElement('style');
-  el.textContent = SHIMMER_STYLE;
-  document.head.appendChild(el);
-  styleInjected = true;
-};
+import { colors, radius, shadows, field, fieldPx } from '../../styles/tokens';
 
 /* ─────────────────────────────────────────────
    기본 블록 (shimmer 적용된 div)
+
+   ★ 2026-08-04 — shimmer CSS 는 이 파일에 없다. `index.css` 의 "스켈레톤 shimmer" 블록에 있다.
+     예전에는 이 파일이 런타임에 <style> 을 document.head 에 주입했다. 그 방식의 문제:
+       1) 전역 규칙이 컴포넌트 파일에 숨어 있어, 이 파일을 import 하지 않는 화면에는 규칙이 없다
+          (이 프로젝트가 같은 함정에 두 번 빠졌다 — CLAUDE.md "설계 원칙" 참고)
+       2) head 맨 뒤에 붙어서 index.css 규칙을 덮어버린다 — 두 곳에 두면 반드시 충돌한다
+     → 규칙은 index.css 한 곳에만 둔다. 여기서는 클래스명만 붙인다.
 ───────────────────────────────────────────── */
 const Bone = ({ width = '100%', height = 14, style = {}, borderRadius }) => {
-  injectStyle();
   return (
     <div
       className="reserve-skeleton-block"
@@ -169,98 +142,76 @@ const useIsWideRow = (breakpoint = 576) => {
   return isWide;
 };
 
-// 2026-07 ReservationRow 재작업(최종) 반영: 실제 카드가 오른쪽 컬럼[상태 → 가격 → 버튼] 세로
-// 정렬 구조로 바뀌었고, 손님(withCode) 카드는 왼쪽 정보가 [가게명 / 예약번호 / 메타] 3줄로 늘었다.
-// 스켈레톤도 따라가야 로딩이 끝나는 순간 레이아웃이 안 튄다. withCode=true(손님)면 예약번호 줄을
-// 하나 더 넣어 실제 info의 3줄과 맞춘다. 사업자(withCode=false)는 예약번호 줄이 없다.
-const ReservationRowSkeletonItem = ({ isWide, withCode = false }) => {
-  // 액션 버튼 Bone 묶음 — 실제 버튼은 텍스트형(ghost)이라 아주 얇고 작다(실측 약 40x15,
-  // fontSize 13, padding 0). 예전에는 Bone을 64x26으로 그려서 실제보다 훨씬 크고 무거워
-  // 보였다(오른쪽이 왼쪽 메타 텍스트보다 딜밈) — 실측값(40x14)에 맞춰 왼쪽 메타 Bone과
-  // 같은 시각 무게로 맞춘다. PC/모바일/사업자/손님 전부 동일.
-  // 손님(withCode)은 버튼 3개(변경/QR/취소), 사업자는 2개 — 실제 카드와 개수를 맞춴서
-  // 로딩이 끝나는 순간 버튼 개수가 변해 폭이 튀지 않게 한다.
+// 2026-07-30 ReservationRow 3줄 독립 정렬 구조 반영.
+// 실제 카드는 [썸네일] + 3줄 스택이고, 각 줄이 자기 안에서 좌우로 나뉜다:
+//   줄1 가게명 | 상태 / 줄2 예약번호 | 금액 / 줄3 날짜·시간 | 액션 버튼
+// 예전 스켈레톤은 오른쪽 컬럼(상태→가격→버튼)을 하나로 묶어 그렸는데, 실제 카드가 바뀌면서
+// 로딩이 끝나는 순간 요소들이 자리를 옮겨 앉는 문제가 생겼다 — 같은 3줄 구조로 맞춘다.
+const ReservationRowSkeletonItem = ({ isWide, actionCount = 2 }) => {
+  // 액션 버튼 Bone — 실제 버튼은 텍스트형(ghost)이라 얇다(실측 약 40x15, fontSize 13, padding 0).
+  // 손님은 3개(변경/QR/취소), 사업자는 2개(승인/거절) — 실제와 개수를 맞춰야 폭이 안 튄다.
+  // 미결제 예약은 결제하기까지 4개지만, 로딩 시점엔 알 수 없어 다수 케이스에 맞춘다.
   const actionBones = (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-      {skeletonKeys(withCode ? 3 : 2, 'act').map((key) => (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
+      {skeletonKeys(actionCount, 'act').map((key) => (
         <Bone key={key} width={40} height={14} borderRadius={4} />
       ))}
     </div>
   );
-  // 예약번호 줄 Bone — 손님 카드에만(withCode). PC/모바일 동일하게 가게명 아래 한 줄.
-  const codeBone = withCode ? <Bone width={isWide ? 120 : '55%'} height={13} /> : null;
-  // 메타 정보 줄 — 예전엔 JSX 안에서 isWide ? ... : withCode ? ... : ... 3중 중첩 삼항이었는데
-  // 읽기 어려워서(SonarCloud: 중첩 삼항 추출) if/else로 분리했다. 렌더 결과는 동일하다.
-  let metaBones;
-  if (isWide) {
-    /* PC: metaRowFlat — 이름·인원·날짜·시간이 한 줄에 */
-    metaBones = (
-      <div style={{ display: 'flex', gap: 12 }}>
-        <Bone width={56} height={12} />
-        <Bone width={48} height={12} />
-        <Bone width={72} height={12} />
-        <Bone width={56} height={12} />
-      </div>
-    );
-  } else if (withCode) {
-    /* 모바일 손님: 날짜·시간 한 줄(예약번호는 위 codeBone이 담당) */
-    metaBones = (
-      <div style={{ display: 'flex', gap: 8 }}>
-        <Bone width={72} height={12} />
-        <Bone width={56} height={12} />
-      </div>
-    );
-  } else {
-    /* 모바일 사업자: 이름·인원 / 날짜·시간 2줄 */
-    metaBones = (
-      <>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Bone width={56} height={12} />
-          <Bone width={48} height={12} />
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Bone width={72} height={12} />
-          <Bone width={56} height={12} />
-        </div>
-      </>
-    );
-  }
+
+  // 줄 높이 = Bone 높이. 실제 카드(ReservationRow)가 이 값에 맞춰 line-height를 고정한다.
+  // 반대로 스켈레톤을 텍스트 line-height(1.5714)에 맞추면 카드가 113.6px로 커지는데,
+  // 썸네일(56px)보다 한참 크고 정보량 대비 헐렁해 보여서 촘촘한 쪽(92px)을 기준으로 삼았다.
+  // ReservationRow.jsx의 line1/line2/line3와 같은 값을 유지할 것 (한쪽만 바꾸면 로딩 전후로 카드가 튄다).
+  const line = { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 };
+  const line1 = { ...line, height: isWide ? 20 : 18 };
+  const line2 = { ...line, height: 18 };
+  const line3 = { ...line, height: 16 };
+
   return (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 0' }}>
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: isWide ? 16 : 12, flexWrap: 'nowrap' }}>
-      {/* 썸네일 — 실제 imgWrap(56x56)/imgWrapWide(72x72)와 동일하게 반응형 */}
-      <Bone width={isWide ? 72 : 56} height={isWide ? 72 : 56} borderRadius={radius.lg ?? 8} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'nowrap' }}>
+        {/* 썸네일 — 실제 imgWrap(56x56)/imgWrapWide(72x72)와 동일하게 반응형 */}
+        <Bone width={isWide ? 72 : 56} height={isWide ? 72 : 56} borderRadius={radius.lg ?? 8} />
 
-      {/* 중앙 정보 영역 — 실제 info와 동일(alignSelf:center로 이미지 높이 기준 세로 가운데 정렬).
-          실제 ReservationRow가 info에 alignSelf:center를 줘서, info가 이미지보다 짧을 때 위아래
-          공백이 균등하게 나누어진다 — 스켈레톤도 맞춰야 로딩 전후 비율이 안 튀다. */}
-      <div style={{ flex: 1, minWidth: 0, alignSelf: 'center', display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {/* 가게명 */}
-        <Bone width={isWide ? '35%' : '45%'} height={isWide ? 17 : 15} />
-        {/* 예약번호 (손님만) */}
-        {codeBone}
-        {metaBones}
-      </div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {/* 줄1 — 가게명 | 상태 라벨 */}
+          <div style={line1}>
+            <Bone width={isWide ? '35%' : '45%'} height={isWide ? 17 : 15} />
+            <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+              <Bone width={52} height={15} />
+            </div>
+          </div>
 
-      {/* 우측 컬럼 — 상태/금액, 그리고 버튼까지 세로 정렬(실제 statusPrice와 동일) */}
-      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, minWidth: 70 }}>
-        <Bone width={52} height={20} borderRadius={10} />
-        <Bone width={64} height={15} />
-        {/* 상태/가격 아래 버튼 Bone까지 같은 컬럼에(PC/모바일 동일) */}
-        {actionBones}
+          {/* 줄2 — 예약번호(손님·사업자 모두 표시) | 금액 */}
+          <div style={line2}>
+            <Bone width={isWide ? 120 : '50%'} height={13} />
+            <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+              <Bone width={64} height={15} />
+            </div>
+          </div>
+
+          {/* 줄3 — 날짜·시간 | 액션 버튼. 실제 카드에서 폭이 모자라면 줄어드는 건 이 줄의 왼쪽뿐이다. */}
+          <div style={line3}>
+            <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+              <Bone width={72} height={12} />
+              <Bone width={48} height={12} />
+            </div>
+            <div style={{ marginLeft: 'auto', flexShrink: 0 }}>{actionBones}</div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
   );
 };
 
-const ReservationRowSkeletonList = ({ count, withCode = false }) => {
+const ReservationRowSkeletonList = ({ count, actionCount = 2 }) => {
   const isWide = useIsWideRow();
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {skeletonKeys(count, 'row').map((key, i) => (
         <React.Fragment key={key}>
-          <ReservationRowSkeletonItem isWide={isWide} withCode={withCode} />
+          <ReservationRowSkeletonItem isWide={isWide} actionCount={actionCount} />
           {i < count - 1 && (
             <div style={{ height: 1, background: colors.border.light }} />
           )}
@@ -270,12 +221,12 @@ const ReservationRowSkeletonList = ({ count, withCode = false }) => {
   );
 };
 
-/** ReservationCard.jsx(사업자 예약 관리 탭) 로딩용 — 2026-07부터 사업자도 손님과 동일하게
- *  예약번호 줄을 보여주므로(withCode) 3줄 구조 스켈레톤을 쓴다. */
-const ReservationCardSkeleton = ({ count = 5 }) => <ReservationRowSkeletonList count={count} withCode />;
+/** ReservationCard.jsx(사업자 예약 관리 탭) 로딩용 — 액션 버튼은 승인/거절 2개.
+ *  예전에는 손님과 같은 3개로 그려서 오른쪽 폭이 로딩 후에 줄어들었다. */
+const ReservationCardSkeleton = ({ count = 5 }) => <ReservationRowSkeletonList count={count} actionCount={2} />;
 
-/** MyReservations.jsx(고객 내 예약) 로딩용 — 예약번호 줄이 있는 3줄 구조(withCode) */
-const MyReservationCardSkeleton = ({ count = 4 }) => <ReservationRowSkeletonList count={count} withCode />;
+/** MyReservations.jsx(고객 내 예약) 로딩용 — 액션 버튼은 변경/QR/취소 3개. */
+const MyReservationCardSkeleton = ({ count = 4 }) => <ReservationRowSkeletonList count={count} actionCount={3} />;
 
 /* ─────────────────────────────────────────────
    ReviewCardSkeleton
@@ -340,7 +291,12 @@ const ReviewCardSkeleton = ({ count = 3, isPC = false }) => (
 ───────────────────────────────────────────── */
 const DETAIL_BREAKPOINT = 900;
 
-const InfoRowsSkeleton = () => (
+/**
+ * @param mapHeight KakaoMap 에 넘기는 height 와 **같은 값**이어야 한다.
+ *   StoreDetail 은 PC 220 / 모바일 200 으로 다르게 넘긴다 — 한쪽만 고치면
+ *   로딩 전후로 아래 내용이 그 차이만큼 밀린다.
+ */
+const InfoRowsSkeleton = ({ mapHeight = 220 }) => (
   <>
     {/* 폭 값이 서로 모두 달라서 값 자체가 안정적인 key가 된다(배열 인덱스 key 회피) */}
     {[80, 60, 90, 72, 68].map((w) => (
@@ -356,6 +312,15 @@ const InfoRowsSkeleton = () => (
         </div>
       </div>
     ))}
+    {/* 지도 자리 — 2026-08-06 추가.
+        KakaoMap 컴포넌트 안에는 이미 자체 Bone 이 있지만(지도 로딩 중 오버레이),
+        그건 **가게 데이터를 받은 뒤** 지도가 뜨기까지의 구간만 덮는다.
+        페이지 스켈레톤 단계에서는 KakaoMap 이 아직 렌더되지도 않아 그 자리가 통째로 비어 있었고,
+        로딩이 끝나는 순간 지도 블록이 튀어나와 아래 내용이 밀렸다.
+        높이는 호출부가 KakaoMap 에 넘기는 값과 같아야 한다 — 한쪽만 바꾸면 다시 튄다. */}
+    <div style={{ marginTop: 20 }}>
+      <Bone height={mapHeight} borderRadius={12} />
+    </div>
   </>
 );
 
@@ -375,13 +340,13 @@ const FormFieldsSkeleton = () => (
     {['예약 날짜', '예약 시간', '인원 수'].map((label) => (
       <div key={label} style={{ marginBottom: 24 }}>
         <span style={staticLabelStyle}>{label}</span>
-        <Bone height={54} borderRadius={14} />
+        <Bone height={fieldPx(field.height)} borderRadius={fieldPx(field.radius)} />
       </div>
     ))}
     {/* 요청 사항 — FormTextArea rows=3 */}
     <div style={{ marginBottom: 24 }}>
       <span style={staticLabelStyle}>요청 사항</span>
-      <Bone height={94} borderRadius={14} />
+      <Bone height={94} borderRadius={fieldPx(field.radius)} />
     </div>
     {/* 예약 신청하기 버튼 — Button variant="primary" size="lg" */}
     <Bone height={56} borderRadius={16} style={{ marginTop: 4 }} />
@@ -428,7 +393,7 @@ const StoreDetailSkeleton = ({ imageHint, isPC: isPCProp }) => {
           {/* 커버 이미지 — 실제 pcImageWrapper의 borderRadius: radius.xl(16px) */}
           <Bone height="auto" borderRadius={16} style={{ marginBottom: 20, ...coverStyle }} />
           <Bone width="50%" height={28} style={{ marginBottom: 20 }} />
-          <InfoRowsSkeleton />
+          <InfoRowsSkeleton mapHeight={220} />
         </div>
         {/* 오른쪽: 예약폼 — StoreDetail.jsx의 pcRight + formCard와 동일한 폭/모서리 */}
         <div style={{
@@ -458,7 +423,7 @@ const StoreDetailSkeleton = ({ imageHint, isPC: isPCProp }) => {
     <div>
       <Bone height="auto" borderRadius={16} style={{ width: '100%', ...coverStyle }} />
       <Bone width="55%" height={28} style={{ marginTop: 20, marginBottom: 16 }} />
-      <InfoRowsSkeleton />
+      <InfoRowsSkeleton mapHeight={200} />
       <Bone height={1} borderRadius={0} style={{ margin: '20px 0' }} />
       <div style={{ fontSize: 22, fontWeight: 800, color: colors.text.primary, marginBottom: 20 }}>
         예약하기

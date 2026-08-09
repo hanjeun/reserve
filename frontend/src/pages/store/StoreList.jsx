@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { Empty } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { PageContainer, StoreCardSkeleton, Loading } from '../../components/common';
+import { PageContainer, StoreCardSkeleton, Loading, FilterSelect } from '../../components/common';
 import { StoreCard } from '../../components/store';
 import AdBanner from '../../components/advertisement/AdBanner';
 import { useStoreList, useGeolocation, useMessage } from '../../hooks';
@@ -12,7 +12,7 @@ import adService from '../../services/adService';
 import { adKeys } from '../../hooks/queryKeys';
 import { SORT_OPTIONS } from '../../constants';
 import { fontWeight, fontSize, colors } from '../../styles/tokens';
-import { Input, Select, Typography } from 'antd';
+import { Input, Typography } from 'antd';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -23,16 +23,33 @@ const PAGE_SIZE = 12;
 // 예전엔 columns:'4 240px'라 컨테이너 폭에 따라 3열/4열을 오갔다(최소폭 240px만 보장하는 방식이라
 // PC에서도 폭에 따라 3열로 나오는 경우가 있었음) — PC에서는 항상 4열 고정, 좁은 화면만 미디어
 // 쿼리로 2열/1열로 줄어들게 통일.
+// 2026-07-30 — 3열 단계 추가. 예전엔 4열(>900) / 2열(481~900) / 1열(≤480) 세 단계뿐이라
+// 900 경계에서 카드 실폭이 195px → 414px로 2.1배 튀었다(컨테이너 maxWidth 1200, 패딩 24, gap 24 기준).
+// 아이패드 가로(1024)가 4열 구간에 들어가 카드가 226px까지 눌리던 것도 같은 원인.
+//
+// 카드 최소 240px를 기준으로 역산한 경계:
+//   4열: 4*240 + 3*24 + 48 = 1080
+//   3열: 3*240 + 2*24 + 48 =  816
+//   2열: 2*240 + 1*24 + 48 =  552
+// 단계 내 폭 편차가 2.1배 → 1.4배로 줄어든다.
+//
+// ★ 폰·노트북 결과는 이전과 완전히 동일하다:
+//   390px → 1열(전과 같음, 경계만 480→552로 올라갔고 폰은 그보다 훨씬 좁다)
+//   1280·1440px → 4열(전과 같음)
+//   바뀌는 건 481~1079px 구간뿐이다.
 const GRID_STYLE = `
   .rsv-store-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
   }
-  @media (max-width: 900px) {
+  @media (max-width: 1079px) {
+    .rsv-store-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 815px) {
     .rsv-store-grid { grid-template-columns: repeat(2, 1fr); }
   }
-  @media (max-width: 480px) {
+  @media (max-width: 551px) {
     .rsv-store-grid { grid-template-columns: 1fr; }
   }
 `;
@@ -187,10 +204,12 @@ const StoreList = () => {
                         allowClear
                         disabled={loading}
                     />
-                    <Select
+                    {/* FilterSelect — 목록 위의 조작 도구라 흰 면 + 테두리.
+                        예전엔 순수 <Select>에 className을 손으로 붙여야 했고, 그걸 잊어서
+                        여기가 회색으로 떨어져 있었다. 이제 컴포넌트가 강제한다. */}
+                    <FilterSelect
                         value={pendingSort ?? searchParams.sort}
                         style={{ width: 120 }}
-                        size="large"
                         onChange={handleSortChange}
                         options={SORT_OPTIONS}
                         disabled={loading || locating || refetching}
@@ -268,7 +287,7 @@ const styles = {
         position: 'absolute',
         bottom: 0, left: 0, right: 0,
         height: '55%',
-        background: 'linear-gradient(to bottom, transparent 0%, #ffffff 100%)',
+        background: 'linear-gradient(to bottom, transparent 0%, var(--c-bg-default, #ffffff) 100%)',
         pointerEvents: 'none',
     },
     sentinel:    { marginTop: 8 },

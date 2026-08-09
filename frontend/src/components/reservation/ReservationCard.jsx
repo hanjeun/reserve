@@ -6,7 +6,6 @@ import {
     DeleteOutlined, ExclamationCircleFilled,
 } from '@ant-design/icons';
 import ReservationRow from './ReservationRow';
-import ReservationMeta from './ReservationMeta';
 import ReservationDetailModal from './ReservationDetailModal';
 import { Button, FormTextArea } from '../common';
 import { colors } from '../../styles/tokens';
@@ -23,7 +22,7 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
     const [rejectReason, setRejectReason] = useState('');
     const [detailOpen, setDetailOpen] = useState(false);
 
-    const { id, memberName, guestCount, reservationDate, reservationTime, status, reservationCode } = reservation;
+    const { id, status } = reservation;
 
     const isActing = (key) => actionLoading === `${key}-${id}`;
     const hasAction = status === 'PENDING' || status === 'CONFIRMED';
@@ -76,19 +75,9 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
             <ReservationRow
                 reservation={reservation}
                 onOpenDetail={() => setDetailOpen(true)}
-                renderMeta={(isWide) => (
-                    <ReservationMeta
-                        memberName={memberName}
-                        guestCount={guestCount}
-                        reservationDate={reservationDate}
-                        reservationTime={reservationTime}
-                        isWide={isWide}
-                        // 2026-07 — 손님(MyReservations)과 동일하게, 모바일에서는 이름/인원 대신
-                        // 예약번호+날짜/시간을 보여준다. PC에서는 예약번호 줄 + 이름·인원·날짜·시간.
-                        mobileCodeMode
-                        reservationCode={reservationCode}
-                    />
-                )}
+                // 사업자는 누가 예약했는지가 중요하므로 PC에서 이름·인원을 날짜 줄에 함께 보여준다.
+                // 모바일은 폭이 없어 날짜·시간만 — 이름은 카드를 눌러 상세에서 확인한다.
+                showMemberInfo
                 renderActions={renderActions}
             />
 

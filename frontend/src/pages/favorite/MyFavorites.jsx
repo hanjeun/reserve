@@ -16,19 +16,10 @@ const { Title, Text } = Typography;
 // (최소폭 240px만 보장), PC에서는 거의 항상 4열이 가능한 폭인데도 3열로 나오는 경우가 있었다.
 // PC에서는 항상 4열로 고정되도록 repeat(4, 1fr) 그리드로 바꾸고, 모바일은 미디어 쿼리로
 // 2열/1열로 자연스럽게 줄어들게 했다.
-const GRID_STYLE = `
-  .rsv-fav-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
-  }
-  @media (max-width: 900px) {
-    .rsv-fav-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 480px) {
-    .rsv-fav-grid { grid-template-columns: 1fr; }
-  }
-`;
+// 2026-07-30 — 3열 단계 추가(경계 근거는 StoreList.jsx의 GRID_STYLE 주석 참고).
+// CSS 는 index.css 로 이관했다(2026-08-05). JSX 안 <style> 은 인스턴스마다 렌더되고,
+// 전역 규칙이 컴포넌트에 숨으면 그 컴포넌트를 안 쓰는 화면에는 규칙이 없다.
+// 전역 정책은 index.css — CLAUDE.md "설계 원칙" 참고.
 
 const MyFavorites = () => {
     const { message } = useMessage();
@@ -57,7 +48,6 @@ const MyFavorites = () => {
 
     return (
         <PageContainer size="xl" paddingTop="40px">
-            <style>{GRID_STYLE}</style>
             {/* 헤더 */}
             <div style={styles.header}>
                 <Title level={2} style={styles.title}>즐겨찾기</Title>
@@ -68,7 +58,7 @@ const MyFavorites = () => {
                 </Text>
             </div>
 
-            {/* 컨텐츠 — 2026-07 수정: 고정 4열 그리드(rsv-fav-grid)로 통일 (아래 GRID_STYLE 참고) */}
+            {/* 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다. */}
             {loading ? (
                 <div className="rsv-fav-grid">
                     <StoreCardSkeleton count={8} />

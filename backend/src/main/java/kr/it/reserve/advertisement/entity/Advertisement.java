@@ -20,7 +20,19 @@ import java.time.LocalDateTime;
  * 관리자가 사후에 SUSPENDED로 내린다(Store의 정지 패턴과 동일한 철학).
  */
 @Entity
-@Table(name = "advertisement")
+/*
+ * 인덱스는 AdvertisementRepository의 실제 쿼리에서 역산했다. (근거는 Reservation 엔티티 주석 참고)
+ * ※ merchant_uid는 @Column(unique = true)라 유니크 제약이 이미 인덱스 역할을 한다 — 중복 정의하지 않는다.
+ */
+@Table(name = "advertisement", indexes = {
+    // findByStatusAndAdTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqual… —
+    // 노출 중인 광고 조회. 홈·목록에서 매 요청 돌기 때문에 여기가 가장 뜨겁다.
+    @Index(name = "idx_ad_active", columnList = "status, ad_type, start_date, end_date"),
+    // findByStatusAndEndDateBefore — 만료 처리 스케줄러(AdvertisementExpiryScheduler)
+    @Index(name = "idx_ad_status_end", columnList = "status, end_date"),
+    // 관리자 전체 목록 (deletedAt IS NULL ORDER BY createdAt DESC)
+    @Index(name = "idx_ad_deleted_created", columnList = "deleted_at, created_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

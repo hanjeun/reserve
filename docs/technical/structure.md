@@ -94,8 +94,13 @@ application-local.yml    ← 로컬 개발 (localhost MySQL, redirect URI)
 application-prod.yml     ← 운영 (Docker MySQL, 배포 도메인)
 application-blue.yml     ← Blue 컨테이너 포트 (8080)
 application-green.yml    ← Green 컨테이너 포트 (8081)
-application-secret.yml   ← 민감 정보 (gitignore, 로컬에서 직접 생성)
+application-secret.yml   ← 민감 정보의 ${ENV_VAR} 플레이스홀더. 레포에 추적되는 게 정상
 ```
+
+> `application-secret.yml`은 **gitignore 대상이 아니다.** `application.yml`이 secret 프로파일을
+> include하므로 이 파일이 없으면 앱이 뜨지 않는다. 내용은 전부 `${ENV_VAR}` 플레이스홀더이고
+> 실제 값은 배포 환경변수로 주입된다 — **이 파일에 실제 값을 적으면 안 된다.**
+> (예전 `.gitignore`에 이 파일이 있었지만 이미 추적 중이라 효력이 없었다. 거짓 안심이라 2026-07-26에 제거했다.)
 
 ---
 

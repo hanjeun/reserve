@@ -7,7 +7,7 @@ export default function MockMyReservationsMobile() {
     return (
         <div style={{
             width: '100%',
-            background: '#fff',
+            background: colors.background.paper,
             borderRadius: radius['2xl'],
             padding: '16px 18px',
             boxShadow: '0 4px 24px rgba(0,0,0,0.08)',

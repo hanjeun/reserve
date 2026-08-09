@@ -13,7 +13,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "store")
+/*
+ * 인덱스는 StoreRepository의 실제 쿼리에서 역산했다. (근거는 Reservation 엔티티 주석 참고)
+ * ※ 거리순 정렬은 Haversine 인메모리 계산이라(StoreService.distanceKm) 인덱스로 못 돕는다 —
+ *   latitude/longitude에 인덱스를 넣어봐야 쓰이지 않으므로 넣지 않았다.
+ */
+@Table(name = "store", indexes = {
+    // findByDeletedAtIsNullAndStatusOrderBy… — 가게 목록(평점순·리뷰순·최신순 전부 이 조합)
+    @Index(name = "idx_store_deleted_status", columnList = "deleted_at, status, created_at"),
+    // findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc — 내 가게 목록
+    @Index(name = "idx_store_owner", columnList = "owner_id, deleted_at, created_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

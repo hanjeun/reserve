@@ -10,7 +10,7 @@ import { Typography } from 'antd';
 import FormModal, { FormField } from './FormModal';
 import FormInput from './FormInput';
 import FormTextArea from './FormTextArea';
-import SegmentedControl from './SegmentedControl';
+import SegmentedGrid from './SegmentedGrid';
 import useAuthStore from '../../store/useAuthStore';
 import { useMessage } from '../../hooks';
 import api from '../../api/axios';
@@ -20,12 +20,25 @@ import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
 
+// 라벨에서 "문의"를 뺐다 — 바로 위 FormField가 이미 "문의 유형"이라 중복인 데다,
+// "○○ 문의"는 모바일 모달 폭(약 320px)에 안 들어간다.
+//
+// 개수를 5 → 8로 늘린 이유: 5개는 어느 폭에서도 4+1로 갈라져 마지막 줄에 하나만 남았다.
+// 억지로 한 줄에 욱여넣으면 글자가 잘리므로, **4의 배수로 맞춰 대칭으로 접히게** 하는 쪽을 택했다
+// (넓으면 8+0 또는 4+4, 좁으면 2+2+2+2 — 어느 쪽이든 줄 끝이 비지 않는다).
+// 늘어난 3개는 채우기용이 아니라 실제로 문의가 갈리는 도메인이다(환불·광고·리뷰).
+//
+// ★ 백엔드 Inquiry.InquiryCategory와 **값·순서가 1:1로 일치**해야 한다.
+//   서버가 valueOf()로 파싱하므로 여기에만 있는 값을 보내면 400이 난다.
 const CATEGORY_OPTIONS = [
-    { value: 'RESERVATION', label: '예약 문의' },
-    { value: 'PAYMENT', label: '결제 문의' },
-    { value: 'STORE', label: '가게 문의' },
-    { value: 'ACCOUNT', label: '계정 문의' },
-    { value: 'ETC', label: '기타 문의' },
+    { value: 'RESERVATION', label: '예약' },
+    { value: 'PAYMENT', label: '결제' },
+    { value: 'REFUND', label: '환불' },
+    { value: 'STORE', label: '가게' },
+    { value: 'AD', label: '광고' },
+    { value: 'REVIEW', label: '리뷰' },
+    { value: 'ACCOUNT', label: '계정' },
+    { value: 'ETC', label: '기타' },
 ];
 
 const InquiryModal = ({ open, onClose }) => {
@@ -38,19 +51,42 @@ const InquiryModal = ({ open, onClose }) => {
     const [guestName, setGuestName] = useState('');
     const [guestEmail, setGuestEmail] = useState('');
     const [sending, setSending] = useState(false);
+    // 필드별 에러 메시지 { title: '...', content: '...' }. 비어 있으면 에러 없음.
+    const [errors, setErrors] = useState({});
+
+    // 사용자가 고치기 시작하면 그 칸의 에러는 즉시 지운다.
+    // 다 고쳤는데 빨간 글씨가 남아 있으면 "아직 틀렸나?" 하고 헷갈린다.
+    const clearError = (field) => setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
 
     const reset = () => {
-        setCategory('ETC'); setTitle(''); setContent(''); setGuestName(''); setGuestEmail('');
+        setCategory('ETC'); setTitle(''); setContent(''); setGuestName(''); setGuestEmail(''); setErrors({});
     };
     const handleClose = () => { if (!sending) { onClose(); reset(); } };
 
-    const handleSubmit = async () => {
+    /**
+     * 검증 — 틀린 칸을 **전부** 모아 각 칸 아래에 표시한다.
+     *
+     * 예전엔 `if (...) { message.warning(...); return; }` 를 네 번 이어 붙여서
+     * ① 첫 번째 오류만 알려주고(고치면 다음 오류가 또 나온다) ② 토스트가 사라지면 어느 칸이
+     * 문제였는지 알 수 없고 ③ 보내기를 여러 번 누르면 같은 토스트가 겹쳐 쌓였다(실제 증상).
+     * 한 번에 다 보여주면 사용자가 한 번에 고칠 수 있다.
+     */
+    const validate = () => {
+        const next = {};
         if (!isLoggedIn) {
-            if (!guestName.trim()) { message.warning('이름을 입력해주세요.'); return; }
-            if (!guestEmail.trim() || !EMAIL_REGEX.test(guestEmail.trim())) { message.warning('올바른 이메일을 입력해주세요.'); return; }
+            if (!guestName.trim()) next.guestName = '이름을 입력해주세요.';
+            if (!guestEmail.trim() || !EMAIL_REGEX.test(guestEmail.trim())) {
+                next.guestEmail = '올바른 이메일을 입력해주세요.';
+            }
         }
-        if (!title.trim()) { message.warning('제목을 입력해주세요.'); return; }
-        if (!content.trim()) { message.warning('문의 내용을 입력해주세요.'); return; }
+        if (!title.trim()) next.title = '제목을 입력해주세요.';
+        if (!content.trim()) next.content = '문의 내용을 입력해주세요.';
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
+
+    const handleSubmit = async () => {
+        if (!validate()) return;
 
         setSending(true);
         try {
@@ -73,29 +109,31 @@ const InquiryModal = ({ open, onClose }) => {
             {!isLoggedIn && (
                 <div style={{ display: 'flex', gap: 10 }}>
                     <div style={{ flex: 1 }}>
-                        <FormField label="이름">
+                        <FormField label="이름" error={errors.guestName}>
                             <FormInput placeholder="이름" value={guestName}
-                                onChange={(e) => setGuestName(e.target.value)} maxLength={50} />
+                                onChange={(e) => { setGuestName(e.target.value); clearError('guestName'); }} maxLength={50} />
                         </FormField>
                     </div>
                     <div style={{ flex: 1.4 }}>
-                        <FormField label="이메일">
+                        <FormField label="이메일" error={errors.guestEmail}>
                             <FormInput placeholder="example@email.com" value={guestEmail}
-                                onChange={(e) => setGuestEmail(e.target.value)} maxLength={100} />
+                                onChange={(e) => { setGuestEmail(e.target.value); clearError('guestEmail'); }} maxLength={100} />
                         </FormField>
                     </div>
                 </div>
             )}
             <FormField label="문의 유형">
-                <SegmentedControl value={category} onChange={setCategory} options={CATEGORY_OPTIONS} wrap />
+                {/* columns={4} — 8개가 항상 4+4로 대칭이 된다.
+                    wrap(flex)은 왼쪽부터 채우는 방식이라 폭에 따라 5+3처럼 갈라졌다. */}
+                <SegmentedGrid value={category} onChange={setCategory} options={CATEGORY_OPTIONS} columns={4} />
             </FormField>
-            <FormField label="제목">
+            <FormField label="제목" error={errors.title}>
                 <FormInput placeholder="문의 제목을 입력하세요" value={title}
-                    onChange={(e) => setTitle(e.target.value)} maxLength={200} showCount />
+                    onChange={(e) => { setTitle(e.target.value); clearError('title'); }} maxLength={200} showCount />
             </FormField>
-            <FormField label="내용">
+            <FormField label="내용" error={errors.content}>
                 <FormTextArea rows={6} placeholder="문의하실 내용을 자세히 적어주세요."
-                    value={content} onChange={(e) => setContent(e.target.value)}
+                    value={content} onChange={(e) => { setContent(e.target.value); clearError('content'); }}
                     maxLength={2000} showCount />
             </FormField>
             {!isLoggedIn && (

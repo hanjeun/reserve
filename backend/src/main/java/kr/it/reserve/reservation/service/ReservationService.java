@@ -228,7 +228,13 @@ public class ReservationService {
         int currentGuests = (excludeReservationId == null)
                 ? reservationRepository.sumActiveGuestsBySlot(store.getId(), date, time)
                 : reservationRepository.sumActiveGuestsBySlotExcluding(store.getId(), date, time, excludeReservationId);
-        if (store.getMaxCapacityPerSlot() != null) {
+        // ★ `!= null` 만 보면 안 된다 — 0 이하는 이 필드에서 **무제한**을 뜻한다(2026-08-09).
+        //   아래 getAvailableSlots 의 `capacity <= 0` 분기가 이미 그렇게 해석하고 있어서,
+        //   여기서만 null 만 거르면 조회는 "전부 예약 가능", 예약은 "항상 마감"으로
+        //   **서로 반대로 판정**한다. 사용자에겐 전 시간대가 열려 보이는데 누르면 전부 마감 에러가 난다.
+        //   신규 저장은 StoreService.normalizeCapacity 가 null 로 통일하지만,
+        //   이미 0 이 들어간 기존 데이터가 있을 수 있어 읽는 쪽에서도 방어한다.
+        if (store.getMaxCapacityPerSlot() != null && store.getMaxCapacityPerSlot() > 0) {
             int remaining = store.getMaxCapacityPerSlot() - currentGuests;
             if (remaining <= 0) {
                 throw new ReservationException(
@@ -279,6 +285,15 @@ public class ReservationService {
         // 마지막 슬롯 + slotMin 이 close를 넘어가면 제외한다.
         // 예) 09:00~21:00, 30분 단위 → 마지막 슬롯 20:30(20:30+30=21:00, 종료와 일치), 21:00 슬롯은 21:30이 되어 제외.
         // (close가 자정을 넘어가는 가게는 LocalTime wrap-around로 정상 처리 안 되지만, 이는 기존 코드도 동일한 한계)
+        // ★ slotMin 이 0 이면 cursor 가 전진하지 않아 **무한루프 + result 무한 증가(OOM)** 가 된다.
+        //   저장 시 StoreService.clampSlotMinutes 가 막지만, 그 전에 저장된 데이터나 수동 DB 변경이
+        //   있을 수 있어 **읽는 쪽에도 가드를 둔다**. 이 경로는 로그인만 하면 누구나 호출할 수 있다.
+        if (slotMin <= 0) {
+            log.warn("Invalid reservationSlotMinutes: storeId={}, value={} - returning empty slots",
+                    store.getId(), slotMin);
+            return result;
+        }
+
         while (!cursor.plusMinutes(slotMin).isAfter(close)) {
             boolean inBreak = hasBreak && !cursor.isBefore(breakStart) && cursor.isBefore(breakEnd);
             if (!inBreak) {

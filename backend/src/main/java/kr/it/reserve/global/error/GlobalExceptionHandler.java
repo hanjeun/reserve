@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -64,6 +66,27 @@ public class GlobalExceptionHandler {
         log.warn("Access Denied: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("해당 리소스에 대한 접근 권한이 없습니다."));
+    }
+
+    /**
+     * 존재하지 않는 경로 (404 Not Found)
+     *
+     * 이 핸들러가 없으면 아래 Exception.class 캐치올에 걸려 404가 500으로 나가고,
+     * log.error + 스택트레이스가 남는다. 스캐너가 랜덤 경로를 긁는 것만으로
+     * ERROR 로그와 Sentry가 도배돼 진짜 장애가 묻힌다(실제로 겪은 증상).
+     *
+     * NoResourceFoundException: 정적 리소스 미존재 (Spring Boot 3.2+ 기본 경로)
+     * NoHandlerFoundException : throw-exception-if-no-handler-found=true 일 때의 컨트롤러 미매핑
+     *
+     * 공격이 아닌 정상적인 오탈자·캐시된 옛 클라이언트도 여기 걸리므로 WARN 한 줄만 남긴다.
+     * 요청 경로는 남기되 예외 스택은 남기지 않는다(정보량 대비 노이즈가 크다).
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    protected ResponseEntity<ApiResponse<Void>> handleNotFound(Exception e) {
+        log.warn("No handler found: {}", e.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("요청하신 경로를 찾을 수 없습니다."));
     }
 
     /**

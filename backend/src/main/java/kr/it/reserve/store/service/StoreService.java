@@ -22,6 +22,7 @@ import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +58,25 @@ public class StoreService {
     private final PaymentRepository paymentRepository;
     private final AdvertisementRepository advertisementRepository;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 가게 검색에 MySQL FULLTEXT(ngram)를 쓸지 여부.
+     *
+     * <p>prod에서만 true다. 테스트는 H2로 돌고 H2에는 {@code MATCH ... AGAINST}가 없어서,
+     * 무조건 켜면 CI가 깨진다. local도 개발용 MySQL에 FULLTEXT 인덱스를 만들어 두지 않았으면
+     * 에러가 나므로 기본값을 false로 둔다.
+     *
+     * <p>★ 이 필드는 <b>final이 아니어야 한다.</b> 이 클래스는 Lombok {@code @RequiredArgsConstructor}를
+     * 쓰는데, final 필드는 생성자 파라미터가 되고 그때 {@code @Value}는 (copyableAnnotations 설정 없이는)
+     * 생성자로 복사되지 않아 주입이 안 된다. non-final이면 필드 주입 경로를 탄다.
+     *
+     * <p>선행 조건: {@code docs/technical/manual-ddl.md}의 FULLTEXT 인덱스 DDL 적용.
+     */
+    @Value("${search.store.fulltext-enabled:false}")
+    private boolean fulltextEnabled;
+
+    /** ngram 파서의 최소 토큰 길이. 이보다 짧은 검색어는 FULLTEXT로 잡히지 않아 LIKE로 폴백한다. */
+    private static final int NGRAM_TOKEN_SIZE = 2;
     // 이름을 "imageUploadExecutor"로 맞춰서 AsyncConfig의 @Bean(name = "imageUploadExecutor")와
     // 매칭시킴 — Lombok의 @RequiredArgsConstructor는 @Qualifier를 생성자로 복사해주지 않아서
     // (IDE 경고 확인함), 대신 Spring의 "타입이 여러 개면 파라미터명=빈이름으로 매칭" 폴백에 의존.
@@ -148,15 +168,17 @@ public class StoreService {
                 .category(request.getCategory())
                 .rating(0.0)
                 .reviewCount(0)
-                .noShowDeposit(request.getNoShowDeposit() != null ? request.getNoShowDeposit() : 0)
-                .fullRefundDays(request.getFullRefundDays() != null ? request.getFullRefundDays() : 3)
-                .partialRefundDays(request.getPartialRefundDays() != null ? request.getPartialRefundDays() : 1)
-                .partialRefundRate(request.getPartialRefundRate() != null ? request.getPartialRefundRate() : 50)
-                .maxCapacityPerSlot(request.getMaxCapacityPerSlot())
+                // 옵션 값은 전부 clamp/normalize 를 거친다 — 아래 "가게 옵션 정규화" 절 참고.
+                .noShowDeposit(clampDeposit(request.getNoShowDeposit()))
+                .fullRefundDays(clampFullRefundDays(request.getFullRefundDays()))
+                .partialRefundDays(clampPartialRefundDays(
+                        request.getPartialRefundDays(), clampFullRefundDays(request.getFullRefundDays())))
+                .partialRefundRate(clampPartialRefundRate(request.getPartialRefundRate()))
+                .maxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()))
                 .autoApprovalEnabled(request.getAutoApprovalEnabled() != null ? request.getAutoApprovalEnabled() : false)
-                .bookingDeadlineHours(request.getBookingDeadlineHours())
-                .paymentTimeoutMinutes(request.getPaymentTimeoutMinutes() != null ? request.getPaymentTimeoutMinutes() : 30)
-                .reservationSlotMinutes(request.getReservationSlotMinutes() != null ? request.getReservationSlotMinutes() : 30)
+                .bookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()))
+                .paymentTimeoutMinutes(clampPaymentTimeout(request.getPaymentTimeoutMinutes()))
+                .reservationSlotMinutes(clampSlotMinutes(request.getReservationSlotMinutes()))
                 .nearbyRadiusKm(clampNearbyRadiusKm(request.getNearbyRadiusKm()))
                 .allowLatePayment(request.getAllowLatePayment() != null ? request.getAllowLatePayment() : false)
                 .allowDuplicateReservation(request.getAllowDuplicateReservation() != null ? request.getAllowDuplicateReservation() : false)
@@ -170,9 +192,12 @@ public class StoreService {
         if (request.getOpenTime() != null && request.getCloseTime() != null) {
             store.setOpenTime(request.getOpenTime());
             store.setCloseTime(request.getCloseTime());
-            store.setBreakStartTime(request.getBreakStartTime());
-            store.setBreakEndTime(request.getBreakEndTime());
         }
+        // ★ 브레이크타임은 영업시간 if 블록 **밖**에 둔다.
+        //   예전엔 안에 있어서 영업시간 없이 브레이크타임만 보내면 조용히 버려졌고,
+        //   수정 경로(updateStore)는 블록 밖이라 **생성과 수정의 동작이 달랐다**.
+        store.setBreakStartTime(request.getBreakStartTime());
+        store.setBreakEndTime(request.getBreakEndTime());
 
         Store savedStore = storeRepository.save(store);
         Long storeId = savedStore.getId();
@@ -278,17 +303,23 @@ public class StoreService {
             if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
             if (request.getPhone() != null) store.setPhone(request.getPhone());
             if (request.getCategory() != null) store.setCategory(request.getCategory());
-            if (request.getNoShowDeposit() != null) store.setNoShowDeposit(request.getNoShowDeposit());
-            if (request.getFullRefundDays() != null) store.setFullRefundDays(request.getFullRefundDays());
-            if (request.getPartialRefundDays() != null) store.setPartialRefundDays(request.getPartialRefundDays());
-            if (request.getPartialRefundRate() != null) store.setPartialRefundRate(request.getPartialRefundRate());
+            // 옵션 값은 전부 clamp/normalize 를 거친다(생성 경로와 동일) — "가게 옵션 정규화" 절 참고.
+            if (request.getNoShowDeposit() != null) store.setNoShowDeposit(clampDeposit(request.getNoShowDeposit()));
+            if (request.getFullRefundDays() != null) store.setFullRefundDays(clampFullRefundDays(request.getFullRefundDays()));
+            if (request.getPartialRefundDays() != null) {
+                // 비교 기준은 "이번 요청의 fullDays"가 아니라 **최종 저장될 fullDays** 여야 한다.
+                // 전액 기준일을 안 보낸 부분 수정 요청이면 기존 값과 비교해야 구간이 맞는지 판단된다.
+                store.setPartialRefundDays(clampPartialRefundDays(
+                        request.getPartialRefundDays(), store.getFullRefundDays()));
+            }
+            if (request.getPartialRefundRate() != null) store.setPartialRefundRate(clampPartialRefundRate(request.getPartialRefundRate()));
             // maxCapacityPerSlot: 항상 업데이트 (null = 무제한, 프론트가 명시적으로 보냄)
-            store.setMaxCapacityPerSlot(request.getMaxCapacityPerSlot());
+            store.setMaxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()));
             // autoApprovalEnabled: 항상 업데이트 (null-safe, 기본 false)
             store.setAutoApprovalEnabled(Boolean.TRUE.equals(request.getAutoApprovalEnabled()));
-            store.setBookingDeadlineHours(request.getBookingDeadlineHours());
-            if (request.getPaymentTimeoutMinutes() != null) store.setPaymentTimeoutMinutes(request.getPaymentTimeoutMinutes());
-            if (request.getReservationSlotMinutes() != null) store.setReservationSlotMinutes(request.getReservationSlotMinutes());
+            store.setBookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()));
+            if (request.getPaymentTimeoutMinutes() != null) store.setPaymentTimeoutMinutes(clampPaymentTimeout(request.getPaymentTimeoutMinutes()));
+            if (request.getReservationSlotMinutes() != null) store.setReservationSlotMinutes(clampSlotMinutes(request.getReservationSlotMinutes()));
             if (request.getNearbyRadiusKm() != null) store.setNearbyRadiusKm(clampNearbyRadiusKm(request.getNearbyRadiusKm()));
             if (request.getAllowLatePayment() != null) store.setAllowLatePayment(request.getAllowLatePayment());
             // allowDuplicateReservation: 항상 업데이트 (null-safe, 기본 false)
@@ -300,7 +331,7 @@ public class StoreService {
             // 브레이크 타임: null 전송 시 삭제, 값 있으면 업데이트
             store.setBreakStartTime(request.getBreakStartTime());
             store.setBreakEndTime(request.getBreakEndTime());
-            if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
+            // (2026-08-09) 여기 있던 setCloseTime 중복 호출을 제거했다 — 위에서 이미 같은 값을 넣는다.
 
             if (request.getKeywords() != null) {
                 store.setKeywordList(request.getKeywords());
@@ -547,6 +578,98 @@ public class StoreService {
         return km;
     }
 
+    // ══ 가게 옵션 정규화 (2026-08-09 신설) ════════════════════════════════
+    //
+    // ★ 왜 컨트롤러의 @Valid 가 아니라 여기인가
+    //   이 두 엔드포인트는 @ModelAttribute(multipart) 라 검증 실패가 BindException 으로
+    //   나가 기존 에러 응답 규격과 달라진다. 또 사장님 입력은 Select 라 범위를 벗어날 일이
+    //   없고, 실제 위험은 **API 를 직접 두드리는 경우**다. 그럴 땐 거절보다 안전한 값으로
+    //   수렴시키는 쪽이 서비스를 멈추지 않는다. 위 clampNearbyRadiusKm 이 이미 그 패턴이다.
+    //   생성·수정 두 경로가 **반드시 여기를 지나가게** 해서 한 쪽만 고치는 사고를 막는다.
+
+    /** 예약 단위 시간(분). ★ 0 이면 ReservationService 의 슬롯 루프가 전진하지 않아 **무한루프 + OOM** 이 된다. */
+    private static final int MIN_SLOT_MINUTES = 5;
+    private static final int MAX_SLOT_MINUTES = 480;
+    private static final int DEFAULT_SLOT_MINUTES = 30;
+
+    private Integer clampSlotMinutes(Integer minutes) {
+        if (minutes == null) return DEFAULT_SLOT_MINUTES;
+        if (minutes < MIN_SLOT_MINUTES) return MIN_SLOT_MINUTES;
+        if (minutes > MAX_SLOT_MINUTES) return MAX_SLOT_MINUTES;
+        return minutes;
+    }
+
+    /**
+     * 슬롯당 정원. <b>null = 무제한</b> 이 이 필드의 약속이다.
+     * 0 이하를 그대로 저장하면 조회는 "무제한"으로, 예약 검증은 "항상 마감"으로 반대로 판정해
+     * 사용자에겐 전 시간대가 열려 보이는데 누르면 전부 마감 에러가 난다. → null 로 통일한다.
+     */
+    private static final int MAX_CAPACITY_PER_SLOT = 999;
+
+    private Integer normalizeCapacity(Integer capacity) {
+        if (capacity == null || capacity <= 0) return null;
+        return Math.min(capacity, MAX_CAPACITY_PER_SLOT);
+    }
+
+    /** 결제 대기 만료(분). <b>0 = 제한 없음</b>(스케줄러가 건너뛴다). 그 외는 1분~7일. */
+    private static final int MAX_PAYMENT_TIMEOUT_MINUTES = 60 * 24 * 7;
+    private static final int DEFAULT_PAYMENT_TIMEOUT_MINUTES = 30;
+    static final int PAYMENT_TIMEOUT_UNLIMITED = 0;
+
+    private Integer clampPaymentTimeout(Integer minutes) {
+        if (minutes == null) return DEFAULT_PAYMENT_TIMEOUT_MINUTES;
+        if (minutes <= PAYMENT_TIMEOUT_UNLIMITED) return PAYMENT_TIMEOUT_UNLIMITED;
+        return Math.min(minutes, MAX_PAYMENT_TIMEOUT_MINUTES);
+    }
+
+    /** 예약 마감(시간 전). null 또는 0 = 제한 없음. 음수는 0 으로 수렴. */
+    private static final int MAX_BOOKING_DEADLINE_HOURS = 24 * 365;
+
+    private Integer clampBookingDeadlineHours(Integer hours) {
+        if (hours == null) return null;
+        if (hours <= 0) return 0;
+        return Math.min(hours, MAX_BOOKING_DEADLINE_HOURS);
+    }
+
+    /** 노쇼 예약금. 음수가 들어가면 결제 금액이 음수가 된다. */
+    private static final int MAX_DEPOSIT = 10_000_000;
+
+    private Integer clampDeposit(Integer amount) {
+        if (amount == null) return 0;
+        if (amount < 0) return 0;
+        return Math.min(amount, MAX_DEPOSIT);
+    }
+
+    private static final int MAX_REFUND_DAYS = 365;
+
+    /** 전액 환불 기준일. <b>0 = 환불 없음</b>(sentinel). */
+    private Integer clampFullRefundDays(Integer days) {
+        if (days == null) return 3;
+        if (days <= 0) return 0;
+        return Math.min(days, MAX_REFUND_DAYS);
+    }
+
+    /**
+     * 부분 환불 기준일. <b>0 = 적용 안 함</b>(sentinel).
+     * ★ fullDays 이상이면 부분 환불 구간(partial <= d < full)이 비어 설정이 조용히 죽는다.
+     * 사장님은 설정했다고 믿고 있는데 아무 일도 안 일어나므로, 차라리 "적용 안 함"으로 정규화해
+     * 화면에도 그대로 보이게 한다.
+     */
+    private Integer clampPartialRefundDays(Integer days, Integer fullDays) {
+        if (days == null) return null;
+        if (days <= 0) return 0;
+        int capped = Math.min(days, MAX_REFUND_DAYS);
+        if (fullDays != null && fullDays > 0 && capped >= fullDays) return 0;
+        return capped;
+    }
+
+    /** 부분 환불율(%). 100 초과면 결제액보다 많이 환불하려다 PG 단에서 실패한다. */
+    private Integer clampPartialRefundRate(Integer rate) {
+        if (rate == null) return 50;
+        if (rate < 0) return 0;
+        return Math.min(rate, 100);
+    }
+
     /**
      * 키워드로 가게 검색 및 정렬 (기존 유지)
      */
@@ -558,7 +681,7 @@ public class StoreService {
             Page<Store> storePage = getAllStoresSortedPaged(sort, pageable, lat, lng);
             return storePage.map(StoreResponse::fromEntity);
         } else {
-            Page<Store> storePage = storeRepository.searchStoresPaged(keyword.trim(), pageable);
+            Page<Store> storePage = searchStoreEntities(keyword.trim(), pageable);
             // 인메모리 정렬 (키워드 검색 + 정렬 조합)
             List<Store> sorted = sortStores(storePage.getContent(), sort, lat, lng);
             return new PageImpl<>(
@@ -567,6 +690,50 @@ public class StoreService {
                 storePage.getTotalElements()
             );
         }
+    }
+
+    /**
+     * 키워드 검색 실행 경로 선택 — FULLTEXT(빠름) vs LIKE(느리지만 어디서나 동작).
+     *
+     * <p>FULLTEXT를 쓰지 못하는 경우가 둘 있고, 둘 다 조용히 LIKE로 폴백한다.
+     * <ol>
+     *   <li>{@code search.store.fulltext-enabled=false} — 테스트(H2)·local 기본값</li>
+     *   <li>ngram 토큰 길이보다 짧은 검색어 — ngram 파서는 2글자 미만을 색인하지 않으므로
+     *       "김" 같은 1글자 검색이 FULLTEXT에서는 <b>0건</b>이 된다.
+     *       사용자 입장에선 검색이 고장난 것으로 보이므로 이 경우만 LIKE로 보낸다.</li>
+     * </ol>
+     */
+    private Page<Store> searchStoreEntities(String keyword, Pageable pageable) {
+        if (fulltextEnabled && keyword.length() >= NGRAM_TOKEN_SIZE) {
+            return storeRepository.searchStoresFulltextPaged(toBooleanModeQuery(keyword), pageable);
+        }
+        return storeRepository.searchStoresPaged(keyword, pageable);
+    }
+
+    /**
+     * 사용자 입력을 MySQL BOOLEAN MODE 검색식으로 안전하게 변환한다.
+     *
+     * <p><b>이 정제를 빼면 안 되는 이유:</b> BOOLEAN MODE는 {@code + - > < ( ) ~ * " @}를 연산자로 읽는다.
+     * 예를 들어 사용자가 {@code "강남 -맛집"}을 치면 "맛집을 제외"로 해석되고,
+     * 짝이 맞지 않는 따옴표나 괄호는 <b>SQL 에러(1064/1690)</b>를 낸다. 즉 정제 없이는
+     * 사용자가 검색창에 특수문자를 넣는 것만으로 500이 난다.
+     *
+     * <p>처리 방식: 연산자 문자를 공백으로 치환해 <b>평범한 단어들</b>로 만든 뒤,
+     * 각 토큰에 {@code +}를 붙여 AND 검색으로 만든다. LIKE 시절의 동작(입력한 말이 다 들어간 가게)과
+     * 가장 가깝기 때문이다. ({@code +} 없이 넘기면 OR가 되어 결과가 과하게 넓어진다)
+     */
+    private String toBooleanModeQuery(String keyword) {
+        String cleaned = keyword.replaceAll("[+\\-><()~*\"@]", " ").trim();
+        if (cleaned.isEmpty()) {
+            return keyword;   // 특수문자만 입력한 경우 — 어차피 0건이지만 빈 검색식은 문법 오류라 원문을 넘긴다
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String token : cleaned.split("\\s+")) {
+            if (token.length() < NGRAM_TOKEN_SIZE) continue;   // ngram이 색인하지 않는 토큰은 조건에서 뺀다
+            if (sb.length() > 0) sb.append(' ');
+            sb.append('+').append(token);
+        }
+        return sb.length() > 0 ? sb.toString() : cleaned;
     }
 
     private Page<Store> getAllStoresSortedPaged(String sort, Pageable pageable, Double lat, Double lng) {

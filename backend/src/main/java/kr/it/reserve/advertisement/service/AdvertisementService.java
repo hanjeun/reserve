@@ -271,8 +271,22 @@ public class AdvertisementService {
     /** 전체 광고 목록 (관리자용) */
     @Transactional(readOnly = true)
     public Page<AdvertisementResponse> getAllAds(int page, int size) {
+        return getAllAds(page, size, null);
+    }
+
+    /**
+     * 관리자 광고 목록 (가게 이름 검색).
+     *
+     * <p>검색을 서버에서 하는 이유는 {@code AdvertisementRepository#searchForAdmin} 주석 참고 —
+     * 요약하면 예전에는 프론트가 현재 페이지만 필터링해서 다른 페이지의 광고가 검색되지 않았다.
+     *
+     * <p>keyword는 여기서 빈 문자열로 정규화한다. 쿼리 쪽에서 NULL 분기를 없애기 위한 것이고,
+     * 공백만 입력한 경우도 "검색 안 함"으로 취급하는 게 사용자 기대에 맞다.
+     */
+    public Page<AdvertisementResponse> getAllAds(int page, int size, String keyword) {
         Pageable pageable = PageRequest.of(page, size);
-        return advertisementRepository.findAllByOrderByCreatedAtDesc(pageable)
+        String normalized = (keyword == null) ? "" : keyword.trim();
+        return advertisementRepository.searchForAdmin(normalized, pageable)
                 .map(AdvertisementResponse::fromEntity);
     }
 

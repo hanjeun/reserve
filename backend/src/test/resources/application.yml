@@ -104,3 +104,12 @@ s3:
   region: ap-northeast-2
   access-key: test-access-key
   secret-key: test-secret-key
+
+# ★ 유출 비밀번호 검사를 테스트에서만 끈다.
+# 켜두면 테스트가 외부 네트워크(api.pwnedpasswords.com)에 의존하게 된다 —
+# 코드가 fail-open 이라 테스트가 "깨지진" 않지만, 오프라인 환경에선 검사마다
+# 타임아웃 3초를 그대로 기다리고, 테스트 결과가 외부 서비스 상태에 따라 흔들린다.
+# 운영·로컬은 코드 기본값(true)을 그대로 쓴다.
+security:
+  pwned-password:
+    enabled: false

@@ -12,6 +12,7 @@ import kr.it.reserve.notice.repository.NoticeRepository;
 import kr.it.reserve.email.service.EmailVerificationService;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
 import kr.it.reserve.global.error.MemberException;
+import kr.it.reserve.global.security.PwnedPasswordChecker;
 import kr.it.reserve.member.dto.MemberDto;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
@@ -60,6 +61,15 @@ public class MemberService {
     private final NoticeRepository noticeRepository;
     private final FileStorageService fileStorageService;
     private final BusinessVerificationRepository businessVerificationRepository;
+    private final PwnedPasswordChecker pwnedPasswordChecker;
+
+    /**
+     * 유출 비밀번호 거부 문구. 회원가입·비밀번호 변경에서 같은 문구를 쓴다.
+     * "몇 번 유출됐는지"는 알려주지 않는다 — 사용자가 할 수 있는 행동이 바뀌지 않는데
+     * 숫자만 크면 불안만 준다.
+     */
+    private static final String PWNED_PASSWORD_MESSAGE =
+            "다른 사이트에서 유출된 적이 있는 비밀번호입니다. 다른 비밀번호를 사용해주세요.";
 
     @Transactional
     public Long join(MemberDto memberDto) {
@@ -74,6 +84,12 @@ public class MemberService {
 
         if (!emailVerificationService.isEmailVerified(memberDto.getEmail())) {
             throw new MemberException("이메일 인증이 필요합니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        // 유출 리스트 검사는 마지막에 둔다 — 이메일 중복·인증처럼 서버 안에서 끝나는 검증을
+        // 먼저 통과시켜야, 어차피 거절될 요청에 외부 API 호출을 낭비하지 않는다.
+        if (pwnedPasswordChecker.isPwned(memberDto.getPassword())) {
+            throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
 
         return memberRepository.save(Member.builder()
@@ -99,6 +115,20 @@ public class MemberService {
     public Member findByEmail(String email) {
         return memberRepository.findByEmail(email)
                 .orElseThrow(MemberException::notFound);
+    }
+
+    /**
+     * 이메일로 회원을 찾되 <b>없으면 예외 대신 null</b>을 반환한다.
+     *
+     * <p>로그인처럼 "계정이 없다"는 사실 자체를 응답으로 드러내면 안 되는 경로에서 쓴다.
+     * {@link #findByEmail}은 미존재 시 404 {@code 회원을 찾을 수 없습니다.}를 던지는데,
+     * 로그인에서 그걸 쓰면 비밀번호를 모르는 사람도 이메일만 넣어보고 가입 여부를 확정할 수 있다
+     * (user enumeration). 호출측이 존재/부재를 구분하지 않고 같은 응답을 내도록 null 을 준다.
+     *
+     * @return 회원 또는 {@code null}
+     */
+    public Member findByEmailOrNull(String email) {
+        return memberRepository.findByEmail(email).orElse(null);
     }
 
     @Transactional
@@ -128,6 +158,9 @@ public class MemberService {
             }
             if (!request.getPassword().equals(request.getPasswordConfirm())) {
                 throw new MemberException("비밀번호가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+            }
+            if (pwnedPasswordChecker.isPwned(request.getPassword())) {
+                throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
             }
             member.setPassword(bCryptPasswordEncoder.encode(request.getPassword()));
         }

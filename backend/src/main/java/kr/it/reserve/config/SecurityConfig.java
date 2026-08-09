@@ -9,6 +9,7 @@ import kr.it.reserve.global.common.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -31,13 +32,20 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // CORS 허용 출처
-    // 운영: reserve.it.kr, 로컬: localhost:5173
-    private static final List<String> ALLOWED_ORIGINS = List.of(
-            "http://localhost:5173",
-            "https://reserve.it.kr",
-            "https://slouching-blubber-worst.ngrok-free.dev"
-    );
+    /**
+     * CORS 허용 출처 — 프로파일별 yml에서 주입한다(쉼표 구분).
+     *
+     *  - local  : localhost:5173 + reserve.it.kr + ngrok(실기기 테스트)  → application-local.yml
+     *  - prod   : reserve.it.kr 만                                      → application-prod.yml
+     *
+     * 예전엔 이 목록이 코드에 하드코딩돼 있어 ngrok 테스트 도메인이 운영에도 들어가 있었다.
+     * allowCredentials=true와 함께라면 그 도메인이 우리 쿠키를 읽을 수 있으므로 환경 분리가 필수다.
+     *
+     * 기본값은 운영 도메인 — 테스트 컨텍스트처럼 이 키가 없는 환경에서도 뜨게 하기 위한 것이며,
+     * 실제 환경은 위 두 yml이 항상 값을 제공한다.
+     */
+    @Value("${cors.allowed-origins:https://reserve.it.kr}")
+    private List<String> allowedOrigins;
 
     private final TokenProvider tokenProvider;
     private final CustomOAuth2UserService customOAuth2UserService;
@@ -140,8 +148,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // yml에서 주입 (common.yml: 운영 도메인, local.yml: localhost 추가)
-        configuration.setAllowedOrigins(ALLOWED_ORIGINS);
+        // 프로파일별 yml에서 주입 (local.yml: localhost·ngrok 포함 / prod.yml: 운영 도메인만)
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

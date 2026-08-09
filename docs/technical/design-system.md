@@ -190,6 +190,190 @@ import { colors, radius, fontWeight, fontSize, heights } from '../styles/tokens'
 
 ---
 
+## 꺾쇠·화살표 회전 규칙 (2026-08-05 확정)
+
+**규칙: 왕복 180°.** 펼치면 시계방향으로 180°, 접으면 같은 길을 반시계로 되돌아온다.
+
+| 대상 | 구현 위치 | 회전 대상 |
+|---|---|---|
+| 드롭다운 꺾쇠 (Select) | `index.css` → `.ant-select-open .ant-select-suffix` | `span.ant-select-suffix` |
+| 아코디언 화살표 (FAQ) | `FaqSection.jsx` 안 `faqCollapseStyles` → `.ant-collapse-item-active .ant-collapse-arrow` | `span.ant-collapse-arrow` |
+
+둘 다 **span을 돌린다**(svg 아님). 상태는 AntD가 관리하고(`.ant-select-open` / `.ant-collapse-item-active`)
+우리 CSS가 그 클래스로 판정하므로 **React 상태가 필요 없다.**
+
+### 반드시 지킬 것 — 닫힘 상태에 `rotate(0deg)`를 명시한다
+
+```css
+.faq-collapse .ant-collapse-arrow            { transform: rotate(0deg); }   /* ← none 이면 안 된다 */
+.faq-collapse .ant-collapse-item-active
+  .ant-collapse-arrow                        { transform: rotate(180deg); }
+```
+
+`transform: none` ↔ `rotate(180deg)` 로 두면 브라우저가 각도가 아니라 **행렬을 보간**한다.
+정확히 180°는 행렬 분해에서 방향이 결정되지 않는 퇴화 케이스라 엔진이 임의로(보통 반시계) 방향을 고른다.
+"펼칠 때 반시계로 돈다"는 증상의 실제 원인이 이것이었다(2026-08-04 브라우저 실측으로 확정).
+두 끝값을 모두 각도로 두면 각도 보간이 되어 시계방향이 보장된다.
+
+### 왜 왕복인가
+
+Material·iOS·Bootstrap·AntD 기본값이 전부 왕복이다. "같은 문을 열고 닫는다"는 물리 은유이고,
+드롭다운 꺾쇠는 **방향 지시자**(아래로 열림 / 위로 닫힘)라 되돌아오는 게 의미에 맞다.
+
+---
+
+### ↩️ 되돌리기 — "항상 같은 방향으로 연속 회전"으로 바꾸려면
+
+2026-08-05에 한 번 구현했다가 **정석(왕복)으로 되돌린** 방식이다.
+두 번 누르면 360°가 완성되고, 회전이 끊기지 않아 더 부드럽게 느껴진다.
+아래 절차를 그대로 따르면 복원된다. (당시 브라우저 실측으로 각도가
+`0 → 180 → 360 → 540 → 720` 으로 단조 증가하는 것까지 확인했다)
+
+**왜 CSS만으로는 안 되는가** — CSS transition은 두 상태를 오가는 것이라 왕복밖에 표현할 수 없다.
+단방향 연속은 "직전에 몇 번 돌았는지"를 알아야 하므로 **상태가 필요하다.**
+
+**1) `FaqSection.jsx` 의 CSS에서 회전 선언 두 개를 지운다.**
+`transition`과 `transform-origin`은 남긴다. `rotate(...)`가 CSS에 남아 있으면 인라인 회전과
+겹쳐서 각도가 두 배가 된다 — **회전의 출처는 한 곳이어야 한다.**
+
+**2) 컴포넌트에 토글 횟수 상태를 넣는다.**
+
+```jsx
+import { useState } from 'react';
+
+// 한 번 토글할 때 돌아가는 각도. 부호가 곧 방향이다(양수 = 시계, 음수 = 반시계).
+const ROTATION_STEP = 180;
+
+const [turns, setTurns] = useState({});        // { [panelKey]: 누적 토글 횟수 }
+// accordion 이라 열린 패널은 최대 하나. onChange 는 "열린 키"만 주므로,
+// 무엇이 닫혔는지 알려면 직전 활성 키를 따로 들고 있어야 한다.
+const [activeKey, setActiveKey] = useState();
+
+const handleChange = (key) => {
+    const next = Array.isArray(key) ? key[0] : key;
+    setTurns((prev) => {
+        const t = { ...prev };
+        const bump = (k) => { if (k != null) t[k] = (t[k] ?? 0) + 1; };
+        if (activeKey != null && activeKey !== next) bump(activeKey);  // 닫히는 패널
+        if (next != null) bump(next);                                 // 열리는 패널
+        return t;
+    });
+    setActiveKey(next);
+};
+```
+
+**3) `<Collapse>` 를 제어 모드로 바꾸고 `expandIcon` 에서 각도를 준다.**
+
+```jsx
+<Collapse
+    activeKey={activeKey}
+    onChange={handleChange}
+    /* panelKey 는 rc-collapse 가 Panel props 로 넘겨준다
+       (@rc-component/collapse/es/Panel.js — expandIcon(props) 에 props 전체가 들어온다) */
+    expandIcon={({ panelKey }) => (
+        <DownOutlined style={{
+            fontSize: 12,
+            color: colors.text.tertiary,
+            transform: `rotate(${ROTATION_STEP * (turns[panelKey] ?? 0)}deg)`,
+        }} />
+    )}
+    /* ...나머지 props 동일 */
+/>
+```
+
+**알아둘 점**
+
+- 각도 값은 계속 커진다(180, 360, 540 …). 화면상으로는 180°마다 같은 모습이라 문제없다.
+- 방향을 뒤집으려면 `ROTATION_STEP` 의 **부호만** 바꾼다.
+- **드롭다운 꺾쇠까지 통일하려면** `FilterSelect`/`FormSelect` 에 같은 카운터를 넣어야 한다
+  (`onDropdownVisibleChange` 로 토글을 세고 인라인 `transform` 을 준다).
+  관문 컴포넌트가 이미 있으므로 그 두 파일만 고치면 전 화면에 적용된다 —
+  화면마다 손대야 했다면 반드시 샜을 것이다.
+- 이 방식은 **정석에서 벗어난 선택**이다. 되돌릴 때는 이 문서의 "규칙: 왕복 180°"로 복귀하고,
+  상태(`turns`/`activeKey`/`handleChange`)와 `useState` import 를 함께 지운다.
+
+---
+
+## Select는 두 종류다 — 컴포넌트로 강제한다 (2026-08-04 등재)
+
+| 컴포넌트 | 모양 | 언제 쓰나 |
+|---|---|---|
+| **`FormSelect`** | 채움형 회색 (`gray[50]` / 다크 `#23262b`), 높이 54px | **값을 적어 넣는 칸.** 가게 등록 카테고리, 마이페이지 글꼴, 광고 등록 |
+| **`FilterSelect`** | 흰 면 + 옅은 테두리 (다크 `#1e2126`), `size="large"` | **목록을 조작하는 도구.** 별점순, 예약관리·광고관리 필터, 통계 가게 선택 |
+
+`FormSelect`는 `FormInput`·`FormTextArea`·`FormDatePicker`·`FormTimePicker`와 같은 톤·같은 높이다.
+입력칸이 아닌 것을 채움형으로 칠하면 폼처럼 보여 위계가 무너지고,
+반대로 입력칸을 흰 면으로 두면 옆의 입력들과 어긋난다. **두 갈래인 게 정상이다.**
+
+> ⚠️ **순수 AntD `<Select>`를 직접 쓰지 말 것.** 예전에는 `className="reserve-filter-select"`를
+> 개발자가 기억해서 붙여야 했고, **두 번 잊었다** — StoreList의 "별점순"과 StatisticsTab의 가게 선택이
+> 클래스 없이 렌더돼 회색으로 떨어져 있었다. StatisticsTab 주석에는 "FilterToolbar와 정확히 일치하도록
+> 맞춘다"고 적혀 있었는데 **의도만 있고 구현이 없던** 상태였다.
+> 이제 어느 쪽인지는 `import` 하는 순간 결정된다.
+
+### 이 사건의 교훈 — 규칙은 주석이 아니라 코드에 둔다
+
+이 프로젝트에서 반복된 회귀는 **전부** "주석에는 규칙이 있는데 강제 장치가 없는" 케이스였다.
+
+| 사례 | 규칙이 어디 있었나 | 결과 |
+|---|---|---|
+| 필터 Select 색 | 주석 + 외워야 하는 className | 2곳이 회색으로 떨어짐 |
+| 카드 hover 그림자 | 주석 | 인라인 `boxShadow`가 hover를 죽임 |
+| 확인 모달 줄바꿈 | 호출부 8곳이 각자 처리 | `useMessage.confirm` 래퍼로 관문화해서 해결 |
+
+**해법의 공통 형태는 "관문 하나"다.** 호출부를 N곳 고치는 대신, 반드시 지나가는 지점 한 곳에서 강제한다.
+`useMessage.confirm`이 그렇고, `FormSelect`/`FilterSelect`가 그렇다.
+
+### 전역 CSS는 컴포넌트 안에 두지 않는다
+
+`.reserve-form-select` / `.reserve-filter-select` 규칙은 **`index.css`에 있다.**
+컴포넌트 파일 안의 `<style>` 태그에 전역 규칙을 넣으면 **그 컴포넌트를 안 쓰는 화면에는
+규칙이 아예 존재하지 않는다.** 이 함정에 두 번 빠졌다(위 표의 1·2번).
+
+- **전역 정책**(색·높이·상태별 톤) → `index.css`
+- **컴포넌트 지역 스타일**(그 인스턴스에만 적용되는 폭·간격) → 인라인 `style`
+
+> 아직 파일 안 `<style>`을 쓰는 곳이 남아 있다 — `Button`, `Card`, `AdBanner`, `Loading`,
+> `Footer`, `QrScannerTab`, `MyFavorites`, `FilterToolbar`. 전역 규칙이 섞여 있으면 옮기는 게 맞다.
+
+---
+
+## 폼 검증 에러 메시지 (2026-08-04 등재)
+
+에러를 그리는 경로가 두 개라 화면마다 크기·거리가 달랐다. 아래 규격으로 통일했다.
+
+| 항목 | 값 |
+|---|---|
+| 위치 | 컨트롤 **바로 아래**, 간격 `6px` |
+| 크기 | `12px` / `line-height 1.5` (본문보다 작게 — 보조 설명의 위계) |
+| 색 | `colors.error.main` (라이트 `#f04452` / 다크 `#ff6b76`) |
+| 접근성 | `role="alert"` — 스크린리더가 즉시 읽는다 |
+| 사라짐 | **재검증 성공 시에만.** 타이머로 지우지 않는다 |
+
+구현 위치 — 둘 다 같은 규격을 내야 한다.
+
+1. **AntD `Form.Item`** (가게 등록·광고 신청·제재 모달 등) → `index.css`의
+   `.ant-form-item-explain` 전역 규칙이 크기·간격을 맞추고, 색은
+   `App.jsx`의 `ConfigProvider token.colorError`가 맡는다.
+2. **`FormField`** (`components/common/FormModal.jsx`, 문의 모달 등) → 컴포넌트가 직접 렌더.
+
+> ⚠️ AntD 기본 에러색은 `#ff4d4f`로 이 프로젝트 색(`#f04452`)과 다르다.
+> `ConfigProvider`에서 `colorError`를 맞추지 않으면 **두 종류의 빨강이 섞인다.**
+> 이 토큰 값은 AntD가 JS로 파생색을 계산하므로 `var(--c-error)`를 넣을 수 없다 — 리터럴이어야 하고,
+> 그래서 `theme.css`와 값이 중복된다. 한쪽을 고치면 반드시 다른 쪽도 고쳐야 한다.
+
+### 왜 자동으로 사라지게 하지 않는가
+
+검증 에러는 **"지금 이 값이 잘못됐다"는 지속 상태**다. 값이 그대로인데 메시지만 사라지면
+사용자는 이유를 잃고 제출을 다시 눌러야 원인을 다시 본다.
+**WCAG 3.3.1(오류 식별)** 은 에러를 텍스트로 식별 가능하게 유지하도록 요구한다.
+
+타이머로 사라지는 것은 **토스트**의 역할이다 — 결과 통보(`저장되었습니다`)처럼 지나가는 사건.
+반대로 "제목을 입력해주세요"를 토스트로 띄우면, 사라진 뒤에 어느 칸이 문제였는지 알 수 없다
+(문의 모달이 실제로 그랬고, 그래서 인라인으로 옮겼다).
+
+---
+
 ## 규칙
 
 - UI에 텍스트 이모지 사용 금지 — Ant Design 아이콘만 사용

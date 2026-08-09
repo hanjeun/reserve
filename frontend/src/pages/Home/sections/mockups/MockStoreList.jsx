@@ -3,13 +3,15 @@ import { Flex } from 'antd';
 import { StarFilled, HeartOutlined, HeartFilled } from '@ant-design/icons';
 import { colors, shadows, fontSize, fontWeight, radius } from '../../../../styles/tokens';
 import { STORE_DATA } from '../../Home.data';
+// 목업 폭은 Home.styles.js 의 HOME_MOCKUP_WIDTH 하나에서 온다 — 섹션마다 달라지면 간격이 어긋난다.
+import { HOME_MOCKUP_WIDTH } from '../../Home.styles';
 
 export default function MockStoreList() {
     const [liked, setLiked] = useState({});
 
     return (
         <>
-            <div style={{ width: '100%', maxWidth: 380, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, boxSizing: 'border-box' }}>
+            <div style={{ width: '100%', maxWidth: HOME_MOCKUP_WIDTH, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, boxSizing: 'border-box' }}>
                 {STORE_DATA.map((s, i) => (
                     <div
                         key={i}
@@ -19,7 +21,7 @@ export default function MockStoreList() {
                             overflow: 'hidden',
                             border: `1px solid ${colors.border.light}`,
                             boxShadow: shadows.card,
-                            background: '#fff',
+                            background: colors.background.paper,
                             cursor: 'pointer',
                         }}
                     >
@@ -29,7 +31,7 @@ export default function MockStoreList() {
                                 <img
                                     src={s.img}
                                     alt={s.name}
-                                    className="card-image"
+                                    className="mock-card-image"
                                     style={{
                                         width: '100%',
                                         height: 'auto',
@@ -102,10 +104,17 @@ export default function MockStoreList() {
                 ))}
             </div>
 
-            {/* Card.jsx와 동일한 hover CSS — 이미지만 scale, 카드는 그대로 */}
+            {/* Card.jsx와 동일한 hover CSS — 이미지만 scale, 카드는 그대로.
+                클래스명은 Card.jsx의 .reserve-card-image와 겹치지 않게 mock- 접두사를 쓴다
+                (예전엔 둘 다 'card-image'였고, 부모 선택자가 달라서 우연히 안 부딪혔을 뿐이다). */}
             <style>{`
-                .mock-card:hover .card-image {
+                .mock-card:hover .mock-card-image {
                     transform: scale(1.05);
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .mock-card:hover .mock-card-image {
+                        transform: none;
+                    }
                 }
             `}</style>
         </>

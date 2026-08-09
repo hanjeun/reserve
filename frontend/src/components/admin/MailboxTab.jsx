@@ -4,10 +4,16 @@
  *
  * 2026-07 전수조사 — 검색어를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab 등과
  * 동일한 이유(새로고침해도 유지, 링크 공유 가능).
+ *
+ * 2026-08-09: ★ 페이지네이션·검색을 서버로 올렸다.
+ *   예전에는 page 파라미터 자체가 없어서 **보낸 메일 전량**을 받아온 뒤 그 배열을 filter 했다.
+ *   보낸 메일은 지우지 않는 한 계속 쌓이기만 하는 데이터고, 응답에 본문(body)까지 통째로
+ *   들어 있어서 시간이 지날수록 이 화면만 눈에 띄게 느려진다.
+ *   백엔드 GET /api/admin/mail/sent 의 **응답 형식도 배열 → Page 로 바뀌었다**(같이 배포할 것).
  */
-import React, { useState, useMemo, useEffect } from 'react';
-import { Typography, Input, Divider } from 'antd';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { Typography, Input, Divider, Pagination } from 'antd';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined } from '@ant-design/icons';
 import { Button, FormTextArea, FormInput, FormModal, FormField } from '../common';
 import { Bone } from '../common/Skeletons';
@@ -20,6 +26,10 @@ import { EMAIL_REGEX } from '../../utils/validation';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 
 const { Text, Title, Paragraph } = Typography;
+
+// 목록 패널이 좌측 360px 고정 높이라 20건이면 스크롤 한 번으로 닿는다. 더 늘리면 페이지 의미가 없어진다.
+const PAGE_SIZE = 20;
+const QUERY_DEFAULTS = { search: '', page: '1' };
 
 const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -43,21 +53,41 @@ const formatFullDate = (dateStr) => {
          + `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-const useSentMailData = (message) => {
+// data?.mails 가 매 렌더 새 배열이면 자식들이 불필요하게 다시 그려진다 — 상수 빈 배열로 막는다.
+const EMPTY_MAILS = [];
+
+const useSentMailData = (message, page, search) => {
     const [selectedSent, setSelectedSent] = useState(null);
 
-    const { data: sentMails = [], isLoading: loading, error, refetch: loadSentMails } = useQuery({
-        queryKey: adminKeys.sentMails(),
+    const { data, isLoading: loading, isFetching, error, refetch: loadSentMails } = useQuery({
+        // ★ page·검색어가 쿼리키에 들어가야 한다. 서버가 두 값을 모두 반영하므로
+        //   키에 없으면 페이지를 넘기거나 검색어를 바꿔도 이전 응답이 그대로 재사용된다.
+        queryKey: [...adminKeys.sentMails(), page, search],
         queryFn: async () => {
-            const data = await api.get(API_ENDPOINTS.MAIL.SENT);
-            return Array.isArray(data) ? data : (data?.content ?? []);
+            const result = await api.get(API_ENDPOINTS.MAIL.SENT, {
+                params: {
+                    page: page - 1,          // 서버 0-based, 화면 1-based
+                    size: PAGE_SIZE,
+                    ...(search.trim() ? { search: search.trim() } : {}),
+                },
+            });
+            return {
+                mails: result?.content ?? [],
+                // Spring Boot 3.5부터 페이지 메타가 page:{} 하위로 이동했다 — 신버전 우선, 구버전 폴백.
+                totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
+            };
         },
+        placeholderData: keepPreviousData,
     });
     useEffect(() => {
         if (error) message.error('보낸 메일을 불러오지 못했습니다.');
     }, [error, message]);
 
-    return { sentMails, loading, selectedSent, setSelectedSent, loadSentMails };
+    return {
+        sentMails: data?.mails ?? EMPTY_MAILS,
+        totalElements: data?.totalElements ?? 0,
+        loading, isFetching, selectedSent, setSelectedSent, loadSentMails,
+    };
 };
 
 const useComposeMail = ({ message }) => {
@@ -181,24 +211,51 @@ const SentDetailContent = ({ mail }) => (
     </>
 );
 
+/**
+ * 목록 하단 페이지네이션. 한 페이지에 다 들어가면 아예 렌더하지 않는다 —
+ * 버튼이 하나뿐인 페이지네이션은 정보를 주지 않고 목록 높이만 잡아먹는다.
+ * 페이지 크기 선택·빠른이동은 끈다 — 좌측 360px 패널에 들어가지 않고, 쓸 일도 없다.
+ */
+const MailPagination = ({ page, total, onChange, simple = false }) => {
+    if (total <= PAGE_SIZE) return null;
+    return (
+        <div style={styles.paginationBar}>
+            <Pagination
+                current={page}
+                pageSize={PAGE_SIZE}
+                total={total}
+                onChange={onChange}
+                simple={simple}
+                size="small"
+                showSizeChanger={false}
+                showQuickJumper={false}
+            />
+        </div>
+    );
+};
+
 const MailboxTab = () => {
     const { message } = useMessage();
     const isMobile = useWindowWidth() < 768;
-    const [{ search }, setQuery] = useQueryParamsState({ search: '' });
+    const [{ search, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
     const debouncedSearch = useDebounce(search, 300);
+    const page = Number(pageStr) || 1;
 
-    const mail = useSentMailData(message);
+    const mail = useSentMailData(message, page, debouncedSearch);
     const send = useComposeMail({ message });
 
-    const filteredSent = useMemo(() => {
-        if (!debouncedSearch.trim()) return mail.sentMails;
-        const kw = debouncedSearch.toLowerCase();
-        return mail.sentMails.filter(m =>
-            m.toEmail?.toLowerCase().includes(kw) || m.subject?.toLowerCase().includes(kw)
-        );
-    }, [mail.sentMails, debouncedSearch]);
+    // 클라이언트 filter 제거 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
+    // useDebounce 는 유지 — 이젠 타이핑 한 글자마다 서버를 때리지 않기 위한 장치다.
+    const filteredSent = mail.sentMails;
 
-    const isEmpty = !mail.loading && mail.sentMails.length === 0;
+    // 검색어가 바뀌면 페이지를 1로 되돌린다 — 3페이지를 보던 중 검색하면 결과가 1페이지뿐인데
+    // 3페이지를 요청해 빈 화면이 된다. 반드시 한 번의 setQuery 호출로 묶는다(MembersTab 주석 참고).
+    const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
+    const handlePageChange = (p) => { setQuery({ page: String(p) }); mail.setSelectedSent(null); };
+
+    // "보낸 메일이 없습니다"는 검색어가 없을 때만 띄우는 게 맞다.
+    // 검색 결과가 0건인 건 목록 패널 안의 "검색 결과가 없습니다"가 담당한다.
+    const isEmpty = mail.totalElements === 0 && !debouncedSearch.trim();
     const showLoading = mail.loading;
     const showEmpty = !mail.loading && isEmpty;
     const showMobDetail = !showLoading && !showEmpty && isMobile && !!mail.selectedSent;
@@ -207,8 +264,8 @@ const MailboxTab = () => {
 
     return (
         <div>
-            <SearchBar value={search} onChange={(e) => setQuery({ search: e.target.value })}
-                onReload={mail.loadSentMails} loading={mail.loading}
+            <SearchBar value={search} onChange={handleSearchChange}
+                onReload={mail.loadSentMails} loading={mail.loading || mail.isFetching}
                 onCompose={() => send.setComposing(true)} />
 
             {showLoading && <SentMailSkeleton />}
@@ -236,15 +293,19 @@ const MailboxTab = () => {
             )}
 
             {showMobList && (
-                <div style={styles.singlePanel}>
-                    {filteredSent.length === 0 ? (
-                        <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                            <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
-                        </div>
-                    ) : filteredSent.map(m => (
-                        <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent} />
-                    ))}
-                </div>
+                <>
+                    <div style={styles.singlePanel}>
+                        {filteredSent.length === 0 ? (
+                            <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                                <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
+                            </div>
+                        ) : filteredSent.map(m => (
+                            <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent} />
+                        ))}
+                    </div>
+                    {/* 모바일은 폭이 좁아 simple 모드("1 / 5") — 번호 버튼을 다 깔면 줄바꿈이 난다. */}
+                    <MailPagination page={page} total={mail.totalElements} onChange={handlePageChange} simple />
+                </>
             )}
 
             {showDesktop && (
@@ -259,6 +320,8 @@ const MailboxTab = () => {
                                 <SentMailItem key={m.id} mail={m} isSelected={m.id === mail.selectedSent?.id} onClick={mail.setSelectedSent} />
                             ))}
                         </div>
+                        {/* 목록 패널 바닥에 고정 — flex:1 인 스크롤 영역 밖에 두어야 항상 보인다. */}
+                        <MailPagination page={page} total={mail.totalElements} onChange={handlePageChange} />
                     </div>
                     <div style={styles.detailPanel}>
                         {!mail.selectedSent ? (
@@ -305,6 +368,8 @@ const styles = {
     mobileDetail: { padding: '16px 0' },
     mailItem:     { width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', padding: '14px 16px 14px 14px', display: 'flex', gap: 10, alignItems: 'flex-start', transition: 'background 0.15s', borderBottom: `1px solid ${colors.border.light}` },
     backBtn:      { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 0 16px 0' },
+    // 데스크톱은 목록 패널 안쪽 바닥(위 경계선 있음), 모바일은 카드 바로 아래에 떨어져 놓인다.
+    paginationBar: { display: 'flex', justifyContent: 'center', padding: '10px 8px', borderTop: `1px solid ${colors.border.light}` },
 };
 
 export default MailboxTab;

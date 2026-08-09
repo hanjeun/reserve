@@ -181,3 +181,71 @@ gh pr merge <번호> -R $REPO --squash --delete-branch
 1. `sync-release-notes.mjs --apply` — 릴리즈 설명 정리 (브랜치 보호와 무관, 지금 가능)
 2. 3-1 브랜치 보호 → 3-2 자동 삭제 → 3-3 Dependabot 정리
 3. `production` 환경 생성 → `backfill-deployments.mjs --apply` → 2-2 CICD.yml 블록 적용(프리뷰 브랜치)
+
+---
+
+## 4. 배포 직후 서버 작업 체크리스트
+
+레포에는 들어가 있지만 **서버에서 손을 대야 비로소 동작하는 것들**이다.
+순서가 중요한 것만 모았고, 각 항목의 상세는 링크된 문서에 있다.
+
+### 4-1. CSP 위반 관측 (배포 즉시)
+
+`nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.
+
+1. 배포 후 https://reserve.it.kr 에서 개발자도구 콘솔을 열고 **주요 화면을 한 바퀴 돌면서**
+   `[Report Only]` 로 시작하는 경고를 모은다.
+   → 홈 / 가게 목록 · 검색 / 가게 상세(**카카오맵이 뜨는 화면**) / 예약 · **결제** / 로그인(소셜 3사) /
+     마이페이지 이미지 업로드 · 미리보기 / 관리자 패널
+2. 경고가 0건이면 헤더명에서 **`-Report-Only` 만 지우고** 재배포한다(값은 그대로).
+3. 경고가 있으면 그 출처를 해당 지시문에 추가한다. **절대 `unsafe-inline` 을 script-src 에 넣지 말 것**
+   — 그순간 CSP 가 막아야 할 XSS 를 전부 통과시킨다(style-src 는 antd 때문에 어쩔 수 없다).
+
+> 결제는 PC 에서 popup(`window.open`)이라 CSP 대상이 아니지만 **모바일은 리다이렉트/iframe**
+> 경로라 다르게 동작한다. 모바일에서도 한 번 결제해볼 것.
+
+### 4-2. 가게 검색 FULLTEXT (순서 고정 — 뒤집으면 검색이 전부 500)
+
+상세: [`manual-ddl.md`](manual-ddl.md)
+
+```bash
+# ① (권장) 먼저 백업
+/usr/local/bin/reserve-backup
+
+# ② DDL 적용
+docker exec -it -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -u root reserve -e "
+ALTER TABLE store ADD FULLTEXT INDEX ft_store_search
+  (store_name, description, address, category, keywords) WITH PARSER ngram;
+SHOW INDEX FROM store WHERE Index_type = 'FULLTEXT';"
+```
+
+③ `manual-ddl.md` 이력 표에 한 줄 기록(현재 `_(미적용)_`)
+④ 그 다음 **별도 배포로** `application-prod.yml` 의 `fulltext-enabled` 주석을 해제
+
+> 현재 플래그는 안전하게 **주석 처리된 상태**다. 인덱스 없이 켜면
+> `Can't find FULLTEXT index matching the column list` 로 키워드 검색이 전부 500 이 된다.
+
+### 4-3. nginx 로그를 실제 파일로 (그냥 두면 Loki 에 0건)
+
+상세: [`monitoring.md`](monitoring.md) — "nginx 로그 수집"
+
+공식 nginx 이미지는 `access.log` 를 `/dev/stdout` 으로 심볼릭 링크해둔다 — **파일이 없다.**
+그래서 promtail 이 읽을 게 없다. 호스트 디렉토리를 마운트해야 실제 파일이 생긴다.
+
+```bash
+sudo mkdir -p /var/log/nginx
+# nginxserver 재생성 시  -v /var/log/nginx:/var/log/nginx  추가
+scp promtail-config.yml ubuntu@<서버>:~/ && ssh ubuntu@<서버> 'docker restart promtail'
+```
+
+확인: Grafana 에서 `{job="nginx"}` 가 0건이면 마운트가 안 된 것이다.
+
+### 4-4. 알림 규칙
+
+상세: [`monitoring.md`](monitoring.md) — "알림 규칙(Grafana Alerting)"
+
+Contact point 의 **Test 버튼으로 수신까지** 확인한 뒤 규칙을 만든다.
+SMTP 가 안 묶여 있으면 알림은 **조용히 안 온다**.
+
+> 429 알림은 4-3 이, 백업 알림은 백업 cron 등록이 선행돼야 한다.
+> 선행 작업 없이 먼저 켜두면 부질없이 계속 울린다.

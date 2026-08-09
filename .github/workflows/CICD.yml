@@ -13,6 +13,10 @@ on:
       - 'docs/**'
   workflow_dispatch:
 
+# ★ 워크플로 전체는 읽기만 가진다(최소 권한).
+#   deployments: write 는 그게 실제로 필요한 deploy-backend 잡에만 따로 준다 —
+#   여기 적으면 build-backend·build-frontend 까지 쓸데없는 쓰기 권한을 받는다.
+#   (SonarCloud: "Move this write permission from workflow level to job level")
 permissions:
   contents: read
 
@@ -67,19 +71,28 @@ jobs:
       # 커밋 SHA 태그를 함께 붙인다. :latest만 있으면 "지금 운영에 뜬 게 어느 커밋인지",
       # "롤백하면 어디로 돌아가는지"를 특정할 수 없다. sha-<커밋>은 불변이라 롤백 대상이 명확해진다.
       # :latest도 계속 유지 — 수동 조작이나 긴급 상황의 폴백 경로로 남겨둔다.
+      # 시크릿과 github 컨텍스트는 run 스크립트에 직접 확장하지 않고 env로 넘긴다.
+      # ${{ }}는 셸이 해석하기 전에 문자열로 치환되므로, 값에 따옴표나 개행이 섞이면
+      # 스크립트 구조 자체가 바뀔 수 있다(SonarCloud: Avoid expanding secrets in a run block).
       - name: Build Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           docker build --platform linux/amd64 \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/reserve:sha-${{ github.sha }} \
+            -t "$DOCKERHUB_USERNAME/reserve:latest" \
+            -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
 
       - name: Push Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/reserve:sha-${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/reserve:latest
+          docker push "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA"
+          docker push "$DOCKERHUB_USERNAME/reserve:latest"
 
   # ─────────────────────────────────────────────────────────
   # 2. 프론트엔드 빌드 + EC2 Nginx로 정적 파일 배포
@@ -182,26 +195,82 @@ jobs:
   # 3. Blue/Green 백엔드 배포 (백엔드 빌드 완료 후 실행)
   # ─────────────────────────────────────────────────────────
   deploy-backend:
+    # 이 잡만 GitHub Deployment 객체를 만든다. 잡 레벨 permissions 는 워크플로 레벨을
+    # **대체**하므로, 체크아웃에 필요한 contents: read 를 함께 적어줘야 한다.
+    permissions:
+      contents: read
+      deployments: write
     needs: build-backend
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
+      # 배포 이력 기록 — first-party 액션만 쓴다(외부 액션 의존성 추가 없음).
+      # 이 스텝이 실패해도 배포 자체는 막지 않도록 continue-on-error를 둔다.
+      - name: Create GitHub deployment
+        id: deployment
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const dep = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'production',
+              required_contexts: [],
+              auto_merge: false,
+              production_environment: true,
+              description: 'Blue/Green backend deploy',
+            });
+            core.setOutput('id', dep.data.id);
+
+      # ★ 판별은 반드시 서버 안에서 한다.
+      #
+      # 예전엔 GitHub 러너에서 `http://<SERVER_IP>:8080|8081/actuator/health` 를 외부망으로 쳤다.
+      # 그런데 8080·8081은 Lightsail 방화벽에서 막혀 있어 항상 연결 실패였다.
+      # 실제 Actions 로그(run 30237158924 / 29889775850)에서 두 번 다 이렇게 찍혔다:
+      #     Blue status: 000000 / Green status: 000000 / Current upstream: none
+      # 결과적으로 **매 배포가 CURRENT_UPSTREAM=none → 항상 blue로 배포 + `docker stop none`** 이었다.
+      # 즉 무중단 배포가 작동한 적이 없고 green은 영영 쓰이지 않았다.
+      # 아래 Health check 스텝이 이미 SSH 내부 curl 패턴이므로 같은 방식으로 맞춘다.
+      #
+      # (`000000` 이 찍혔던 이유: curl이 -w로 "000"을 출력하고 exit≠0이라 `|| echo "000"`까지 실행돼
+      #  두 번 붙었다. 아래에서는 명령 치환 밖에서 폴백을 주어 값이 겹치지 않게 한다.)
+      - name: Detect active upstream (inside server)
+        id: detect
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          username: ubuntu
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          capture_stdout: true
+          script: |
+            STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 http://localhost:8080/actuator/health) || STATUS_BLUE="000"
+            STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 http://localhost:8081/actuator/health) || STATUS_GREEN="000"
+            echo "blue=$STATUS_BLUE green=$STATUS_GREEN"
+            if [ "$STATUS_BLUE" = "200" ]; then
+              echo "DETECTED_UPSTREAM=blue"
+            elif [ "$STATUS_GREEN" = "200" ]; then
+              echo "DETECTED_UPSTREAM=green"
+            else
+              echo "DETECTED_UPSTREAM=none"
+            fi
+
       - name: Set target IP
+        env:
+          # capture_stdout 결과에는 drone-ssh의 래퍼 출력이 섞이므로 마지막 표식 줄만 골라 쓴다.
+          DETECT_STDOUT: ${{ steps.detect.outputs.stdout }}
         run: |
-          STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 "http://${{ secrets.RESERVE_SERVER_IP }}:8080/actuator/health" || echo "000")
-          echo "Blue status: $STATUS_BLUE"
+          CURRENT_UPSTREAM=$(printf '%s\n' "$DETECT_STDOUT" \
+            | grep -o 'DETECTED_UPSTREAM=[a-z]*' | tail -n 1 | cut -d= -f2)
 
-          STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 "http://${{ secrets.RESERVE_SERVER_IP }}:8081/actuator/health" || echo "000")
-          echo "Green status: $STATUS_GREEN"
-
-          if [ "$STATUS_BLUE" = "200" ]; then
-            CURRENT_UPSTREAM="blue"
-          elif [ "$STATUS_GREEN" = "200" ]; then
-            CURRENT_UPSTREAM="green"
-          else
-            CURRENT_UPSTREAM="none"
+          # 판별 자체가 실패했으면(출력 파싱 불가) 배포를 멈춘다.
+          # 여기서 조용히 none으로 넘어가면 예전과 똑같이 매번 blue를 덮어쓰게 된다.
+          if [ -z "$CURRENT_UPSTREAM" ]; then
+            echo "::error::Failed to detect active upstream from SSH output"
+            exit 1
           fi
 
           echo "Current upstream: $CURRENT_UPSTREAM"
@@ -314,8 +383,14 @@ jobs:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo docker stop ${{ env.CURRENT_UPSTREAM }} || true
-            sudo docker rm   ${{ env.CURRENT_UPSTREAM }} || true
+            # 최초 기동처럼 이전 컨테이너가 없는 경우 CURRENT_UPSTREAM=none 이다.
+            # `docker stop none`은 매번 에러를 뱉으므로(예전 로그를 오래 오염시켰다) 건너뛴다.
+            if [ "${{ env.CURRENT_UPSTREAM }}" = "none" ]; then
+              echo "No previous container to stop (first deploy or both were down)"
+            else
+              sudo docker stop ${{ env.CURRENT_UPSTREAM }} || true
+              sudo docker rm   ${{ env.CURRENT_UPSTREAM }} || true
+            fi
 
       - name: Cleanup Docker resources
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
@@ -326,3 +401,33 @@ jobs:
           script: |
             sudo docker image prune -af --filter "until=24h" || true
             sudo docker system prune -f || true
+
+      # 배포 결과 기록. deployment 생성이 실패했으면(id 없음) 조용히 건너뛴다.
+      - name: Mark deployment success
+        if: success() && steps.deployment.outputs.id
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.id }},
+              state: 'success',
+              environment_url: 'https://reserve.it.kr',
+              description: 'Deployed to production',
+            });
+
+      - name: Mark deployment failure
+        if: failure() && steps.deployment.outputs.id
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.id }},
+              state: 'failure',
+              description: 'Deploy failed (health check/rollback)',
+            });

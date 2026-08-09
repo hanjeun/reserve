@@ -1,75 +1,45 @@
 /**
- * RESERVE Design System - FormSelect Component
- * 
+ * RESERVE Design System - FormSelect
+ *
+ * **폼에 값을 입력하는 셀렉트.** 채움형 회색 — FormInput·FormTextArea·FormDatePicker·FormTimePicker와
+ * 같은 톤이고 높이도 같다(54px).
+ * 목록·툴바 위의 조작 도구라면 이게 아니라 `FilterSelect`(흰 면 + 테두리)를 쓴다.
+ *
  * 사용법:
- * <FormSelect placeholder="선택">
- *     <FormSelect.Option value="한식">한식</FormSelect.Option>
- * </FormSelect>
- * 
- * 또는 options prop 사용:
- * <FormSelect 
- *     placeholder="선택" 
- *     options={[{ value: '한식', label: '한식' }]} 
- * />
+ *   <FormSelect placeholder="선택" options={[{ value: '한식', label: '한식' }]} />
+ *   <FormSelect placeholder="선택">
+ *       <FormSelect.Option value="한식">한식</FormSelect.Option>
+ *   </FormSelect>
+ *
+ * ★ 스타일은 이 파일에 없다 — `index.css` 의 "폼 입력용 Select" 블록에 있다.
+ *   2026-08-04에 이 파일 안의 <style> 태그를 걷어냈다. 컴포넌트 안에 전역 CSS를 넣으면
+ *   그 컴포넌트를 안 쓰는 화면에는 규칙이 존재하지 않게 되고, 이 프로젝트는 이미 그 함정에
+ *   두 번 빠졌다(필터 Select 색, 카드 hover 그림자).
+ *   전역 정책은 index.css, 컴포넌트 지역 스타일만 인라인 — 이 경계를 지킨다.
  */
 
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Select } from 'antd';
-import { colors, radius, heights } from '../../styles/tokens';
 
-const FormSelect = ({ 
-    placeholder,
-    disabled = false,
-    options,
-    children,
-    style,
-    ...rest 
-}) => {
-    const selectStyle = {
-        width: '100%',
-        ...style,
-    };
+/** index.css 의 `.ant-select.reserve-form-select` 규칙과 짝이다. 한쪽만 고치지 말 것. */
+const FORM_CLASS = 'reserve-form-select';
 
-    // CSS로 높이 및 배경 적용
-    const selectClassName = 'reserve-form-select';
+const FormSelect = ({ placeholder, disabled = false, options, children, style, className, ...rest }) => (
+    <Select
+        placeholder={placeholder}
+        disabled={disabled}
+        variant="filled"
+        style={{ width: '100%', ...style }}
+        options={options}
+        // 호출측 className 을 버리지 않고 이어 붙인다(폭·정렬용 유틸 클래스와 함께 쓰는 경우가 있다).
+        className={className ? `${FORM_CLASS} ${className}` : FORM_CLASS}
+        {...rest}
+    >
+        {children}
+    </Select>
+);
 
-    return (
-        <>
-            <Select
-                placeholder={placeholder}
-                disabled={disabled}
-                variant="filled"
-                style={selectStyle}
-                options={options}
-                className={selectClassName}
-                {...rest}
-            >
-                {children}
-            </Select>
-            <style>{`
-                .${selectClassName} .ant-select-selector {
-                    height: ${heights.input} !important;
-                    border-radius: ${radius.lg} !important;
-                    background-color: ${disabled ? colors.gray[100] : colors.gray[50]} !important;
-                    border: none !important;
-                    display: flex !important;
-                    align-items: center !important;
-                }
-                .${selectClassName} .ant-select-selection-item,
-                .${selectClassName} .ant-select-selection-placeholder {
-                    line-height: ${heights.input} !important;
-                    font-size: 16px !important;
-                }
-                .${selectClassName} .ant-select-selection-search-input {
-                    font-size: 16px !important;
-                }
-            `}</style>
-        </>
-    );
-};
-
-// Option을 직접 export
 FormSelect.Option = Select.Option;
 
 FormSelect.propTypes = {
@@ -78,6 +48,7 @@ FormSelect.propTypes = {
     options: PropTypes.array,
     children: PropTypes.node,
     style: PropTypes.object,
+    className: PropTypes.string,
 };
 
 export default FormSelect;

@@ -44,8 +44,10 @@ const PageContainer = ({
         ...style,
     };
 
+    // reserve-page-container: 359px 이하에서만 좌우 패딩을 줄이는 CSS 훅(index.css).
+    // 인라인 스타일로는 미디어쿼리를 걸 수 없어 클래스로 뺐다.
     return (
-        <div style={containerStyle} {...rest}>
+        <div className="reserve-page-container" style={containerStyle} {...rest}>
             {children}
         </div>
     );

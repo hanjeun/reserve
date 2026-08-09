@@ -127,7 +127,10 @@ const Header = () => {
 
 const styles = {
     header: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        // 반투명 + blur(스크롤 시 콘텐츠가 비쳐 보이는 유리 효과)라 불투명 토큰을 그대로 쓸 수 없다.
+        // theme.css가 라이트/다크에서 각각 흰색·어두운색 반투명 값을 넣어준다.
+        // 폴백은 기존 값과 동일한 rgba(255,255,255,0.9) — 변수를 못 읽어도 라이트 모드는 그대로다.
+        backgroundColor: 'var(--c-header-bg, rgba(255, 255, 255, 0.9))',
         backdropFilter: 'blur(20px)',
         display: 'flex',
         justifyContent: 'space-between',

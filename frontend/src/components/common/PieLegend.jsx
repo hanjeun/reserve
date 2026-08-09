@@ -37,10 +37,16 @@ const PieLegend = ({ data, palette }) => {
                     >
                         {d.name}
                     </Text>
-                    <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, flexShrink: 0 }}>
+                    {/* 숫자 칸에는 반드시 whiteSpace: nowrap을 준다.
+                        flexShrink: 0만으로는 부족하다 — 폭이 고정되면 그 안에서 글자 단위로 접힌다.
+                        실제로 아래 퍼센트가 width: 34였는데 "100%"(4글자)가 안 들어가서
+                        "100 / %" 두 줄로 쪼개졌다(대시보드 "상태별 분포"에서 확인).
+                        width 대신 minWidth를 쓰는 이유: 오른쪽 정렬을 유지하면서도 세 자리 수(100%)나
+                        네 자리 건수가 오면 칸이 늘어날 수 있어야 한다. */}
+                    <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, flexShrink: 0, whiteSpace: 'nowrap' }}>
                         {d.value}건
                     </Text>
-                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, flexShrink: 0, width: 34, textAlign: 'right' }}>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, flexShrink: 0, minWidth: 42, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {total ? Math.round((d.value / total) * 100) : 0}%
                     </Text>
                 </div>

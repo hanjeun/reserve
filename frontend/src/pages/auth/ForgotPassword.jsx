@@ -90,14 +90,15 @@ const ForgotPassword = () => {
             await form.validateFields(['email']);
             const emailVal = form.getFieldValue('email').trim();
             setSendLoading(true);
-            const result = await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email: emailVal });
+            await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email: emailVal });
 
-            if (!result?.sent) {
-                message.warning('가입된 이메일이 아니거나 소셜 로그인 계정입니다.');
-                return;
-            }
-
-            message.success('인증 코드를 발송했습니다.');
+            // ★ 가입 여부를 화면에 드러내지 않는다.
+            //   예전에는 응답의 sent 값으로 "가입된 이메일이 아니거나 소셜 로그인 계정입니다"를 띄웠다.
+            //   비밀번호를 모르는 사람도 이메일만 넣어보고 가입 여부를 확정할 수 있었다(user enumeration).
+            //   서버도 이제 그 값을 주지 않는다 — 노출을 막는 지점은 프론트가 아니라 API 여야 한다.
+            //   미가입 이메일이면 아래 코드 입력 화면으로 넘어가고 메일이 오지 않을 뿐이다
+            //   (GitHub·Google 등이 쓰는 방식). 그 상황은 안내 문구가 설명한다.
+            message.success('입력하신 이메일로 인증 코드를 보냈습니다.');
             setEmail(emailVal);
             setIsCodeSent(true);
             setIsVerified(false);
@@ -115,11 +116,8 @@ const ForgotPassword = () => {
     const handleResend = async () => {
         try {
             setSendLoading(true);
-            const result = await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email });
-            if (!result?.sent) {
-                message.warning('가입된 이메일이 아니거나 소셜 로그인 계정입니다.');
-                return;
-            }
+            // 재발송도 같은 이유로 가입 여부를 구분하지 않는다(위 handleSendCode 주석 참고).
+            await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email });
             message.success('인증 코드를 재발송했습니다.');
             startTimer();
         } catch (err) {

@@ -69,7 +69,9 @@ const skeletonRowCount = (total, pageIdx1, pageSize) => {
 
 const DetailRow = ({ label, children }) => (
     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <Text style={{ width: 80, flexShrink: 0, color: colors.text.tertiary, fontSize: fontSize.sm }}>{label}</Text>
+        {/* whiteSpace: nowrap 필수 — 고정 폭 라벨은 폭이 모자라면 글자 단위로 접힌다.
+            여기 라벨 중 "사업자등록증"(6자)이 80px에 아슬아슬해서 폰트가 조금만 커져도 두 줄이 된다. */}
+        <Text style={{ width: 80, flexShrink: 0, color: colors.text.tertiary, fontSize: fontSize.sm, whiteSpace: 'nowrap' }}>{label}</Text>
         <div style={{ flex: 1 }}>
             {typeof children === 'string'
                 ? <Text style={{ fontSize: fontSize.sm, color: colors.text.primary }}>{children}</Text>

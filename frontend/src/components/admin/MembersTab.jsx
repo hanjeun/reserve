@@ -17,6 +17,13 @@
  *    로딩 종료 시 열이 재배치되며 화면이 튀었다.
  * 3) 로딩 조건을 다른 탭들과 동일하게 (isLoading || isFetching)으로 통일 —
  *    예전엔 members.length === 0 조건 때문에 새로고침 시엔 아무 로딩 신호도 없었다.
+ * 2026-08-09: ★ 페이지네이션·검색을 서버로 올렸다.
+ *    예전에는 {@code size: 100} 을 하드코딩해 한 번에 받아온 뒤 그 배열을 filter 했다.
+ *    그래서 **101번째 회원부터는 검색은커녕 목록에 뜨지도 않았다**.
+ *    AdminAdsTab 이 먼저 거친 길과 똑같은 문제·똑같은 해법이다.
+ *    ★ queryKey 에 page 와 debouncedSearch 가 반드시 들어가야 한다 — 빠뜨리면
+ *      검색어가 바뀌어도 같은 캐시를 재사용해 화면이 그대로 멈춰 있는다.
+ *
  * 4) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamsState) — 새로고침해도 필터가
  *    유지되고 링크 공유도 가능해짐. ★ 검색어 변경 시 페이지를 1로 되돌리는 것까지 한 번의
  *    setQuery 호출로 같이 처리한다 — 따로 호출하면(useQueryParamState 단일 키 버전이었을 때)
@@ -76,6 +83,10 @@ const skeletonRowCount = (total, pageIdx1, pageSize) => {
     return Math.max(1, Math.min(pageSize, remaining));
 };
 
+// data?.members 가 매 렌더 새 배열 레퍼런스를 만들면 dataSource 가 매번 바뀐 것으로 보여
+// Table 이 불필요하게 다시 그려진다. AdminAdsTab 과 같은 이유로 상수 빈 배열을 둔다.
+const EMPTY_MEMBERS = [];
+
 const MembersTab = () => {
     const { message, confirm } = useMessage();
     const queryClient = useQueryClient();
@@ -88,24 +99,37 @@ const MembersTab = () => {
     const [banOpen, setBanOpen]               = useState(false);
 
     const {
-        data: members = [], isLoading: memberLoading, isFetching, error: membersError, refetch,
+        data, isLoading: memberLoading, isFetching, error: membersError, refetch,
     } = useQuery({
-        queryKey: adminKeys.members(),
+        // ★ page·검색어가 쿼리키에 들어가야 한다. 서버가 페이지네이션·검색을 하므로
+        //   이 둘이 바뀌면 결과가 달라진다 — 키에 없으면 이전 응답을 그대로 재사용해버린다.
+        queryKey: [...adminKeys.members(), page, debouncedMemberSearch],
         queryFn: async () => {
-            const data = await api.get(API_ENDPOINTS.ADMIN_MANAGE.MEMBERS, { params: { page: 0, size: 100 } });
-            return data?.content ?? [];
+            // 서버는 0-based, 이 화면은 1-based(AntD Table) — 여기서 한 번만 변환한다.
+            const result = await api.get(API_ENDPOINTS.ADMIN_MANAGE.MEMBERS, {
+                params: {
+                    page: page - 1,
+                    size: PAGE_SIZE,
+                    ...(debouncedMemberSearch.trim() ? { search: debouncedMemberSearch.trim() } : {}),
+                },
+            });
+            return {
+                members: result?.content ?? [],
+                // Spring Boot 3.5부터 페이지 메타가 page:{} 하위로 이동했다 — 신버전을 먼저 읽고 구버전도 폴백.
+                totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
+            };
         },
         placeholderData: keepPreviousData,
     });
+    const members = data?.members ?? EMPTY_MEMBERS;
+    const totalElements = data?.totalElements ?? 0;
     useEffect(() => {
         if (membersError) message.error('회원 목록을 불러오지 못했습니다.');
     }, [membersError, message]);
 
-    const filteredMembers = React.useMemo(() => {
-        if (!debouncedMemberSearch.trim()) return members;
-        const kw = debouncedMemberSearch.toLowerCase();
-        return members.filter(m => m.name?.toLowerCase().includes(kw) || m.email?.toLowerCase().includes(kw));
-    }, [members, debouncedMemberSearch]);
+    // 클라이언트 filter 는 제거했다 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
+    // useDebounce 는 그대로 둔다. 이젠 "리렌더 억제"가 아니라 **타이핑 한 글자마다 서버를
+    // 때리지 않기 위한 것**이라 오히려 더 중요해졌다(300ms).
 
     // 검색어가 바뀌어 결과가 줄어들면 이전 페이지 번호가 존재하지 않는 페이지를 가리킬 수 있어 1로 복귀.
     // 반드시 한 번의 setQuery 호출로 묶는다(위 파일 상단 주석 참고).
@@ -193,25 +217,25 @@ const MembersTab = () => {
     return (
         <>
             <FilterToolbar
-                count={filteredMembers.length}
+                count={totalElements}
                 search={{ value: memberSearch, onChange: handleSearchChange, placeholder: '이름, 이메일로 검색' }}
                 onReload={refetch}
                 loading={memberLoading || isFetching}
             />
             {(memberLoading || isFetching) ? (
                 <AdminTableSkeleton
-                    rows={skeletonRowCount(filteredMembers.length, page, PAGE_SIZE)}
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}
                     headers={SKELETON_HEADERS}
                     actionBtns={2}
-                    pagination={filteredMembers.length ? { current: page, pageSize: PAGE_SIZE, total: filteredMembers.length } : null}
+                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
                 />
             ) : (
                 <DataTable
                     columns={memberColumns}
-                    dataSource={filteredMembers}
+                    dataSource={members}
                     rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: filteredMembers.length, onChange: setPage }}
+                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
                     locale={{ emptyText: '회원이 없습니다.' }}
                 />
             )}

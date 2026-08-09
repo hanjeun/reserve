@@ -23,3 +23,4 @@ export { default as useAdPayment } from './useAdPayment';
 export { default as useStoreImageHint } from './useStoreImageHint';
 export { default as useExitAnimation } from './useExitAnimation';
 export { useQueryParamsState } from './useQueryParamState';
+export { default as useImagePreviewSwipe } from './useImagePreviewSwipe';

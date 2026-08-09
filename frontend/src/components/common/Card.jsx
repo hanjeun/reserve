@@ -15,7 +15,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Card as AntCard } from 'antd';
-import { colors, shadows, fontSize, fontWeight } from '../../styles/tokens';
+// shadows 는 더 이상 쓰지 않는다 — 그림자 값은 index.css 의 "Card 그림자·hover" 블록에 있다.
+import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
 const Card = ({ 
     hoverable = false,
@@ -25,11 +26,15 @@ const Card = ({
     onClick,
     ...rest 
 }) => {
+    // ★ boxShadow를 여기(인라인)에 두지 않는다 — hover 그림자가 죽는다.
+    //   인라인 스타일은 클래스 규칙보다 우선이라, 인라인으로 box-shadow를 박으면
+    //   AntD hoverable의 hover 그림자도, 아래 .reserve-card:hover 규칙도 전부 밀린다.
+    //   실제로 그래서 "그림자 상승 + 이미지 줌"이라고 적어둔 관용구의 절반(그림자)이
+    //   구현돼 있지 않았다. 그림자는 아래 <style>의 클래스 규칙이 담당한다.
     const cardStyle = {
         borderRadius: 0,
         overflow: 'hidden',
         border: `1px solid ${colors.border.light}`,
-        boxShadow: shadows.card,
         ...style,
     };
 
@@ -46,18 +51,10 @@ const Card = ({
             >
                 {children}
             </AntCard>
-            <style>{`
-                .reserve-card:hover .card-image {
-                    transform: scale(1.05);
-                }
-                .reserve-card .ant-card-actions {
-                    background: #fff !important;
-                    border-top: 1px solid ${colors.border.light};
-                }
-                .reserve-card .ant-card-actions > li {
-                    margin: 12px 0 !important;
-                }
-            `}</style>
+            {/* 그림자·hover·actions 줄 CSS 는 index.css 의 "Card 그림자·hover" 블록으로 옮겼다.
+                JSX 안 <style> 은 인스턴스마다 렌더돼서, 카드가 수십 개인 목록 화면에서
+                동일한 태그가 그만큼 쌓였다. 전역 정책은 index.css — CLAUDE.md 설계 원칙 참고.
+                ★ 이 컴포넌트를 쓰는 쪽에서 인라인 boxShadow 를 주면 hover 그림자가 죽는다. */}
         </>
     );
 };
@@ -68,6 +65,9 @@ const Card = ({
  * these to reserve the correct aspect-ratio space before the image resource even loads,
  * preventing layout shift independently of any skeleton (supported in all modern browsers).
  * mainImageWidth/Height가 없으면 그냥 생략되고 지금과 동일하게 동작함.
+ *
+ * className은 `reserve-` 접두사를 지킨다. 전역 CSS라, 접두사 없는 이름(예전 'card-image')은
+ * 다른 라이브러리나 목업 컴포넌트와 충돌할 여지가 있었다.
  */
 Card.Cover = ({ src, alt, width, height }) => (
     <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
@@ -77,7 +77,7 @@ Card.Cover = ({ src, alt, width, height }) => (
             width={width}
             height={height}
             style={{ width: '100%', height: 'auto', objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
-            className="card-image"
+            className="reserve-card-image"
         />
     </div>
 );
@@ -124,12 +124,6 @@ Card.Add = ({ children, onClick, minHeight = '350px' }) => {
             <span style={{ fontSize: fontSize.lg, fontWeight: fontWeight.semibold }}>
                 {children}
             </span>
-            <style>{`
-                .reserve-card-add:hover {
-                    border-color: ${colors.primary.main};
-                    color: ${colors.primary.main};
-                }
-            `}</style>
         </div>
     );
 };

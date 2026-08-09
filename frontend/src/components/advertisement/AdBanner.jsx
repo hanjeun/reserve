@@ -86,7 +86,6 @@ const AdBanner = ({ ads }) => {
                 opacity: (visible && !isClosing) ? 1 : 0,
             }}
         >
-            <style>{bannerCarouselStyles}</style>
             <button
                 type="button"
                 aria-label="광고 닫기"
@@ -146,23 +145,9 @@ const AdBanner = ({ ads }) => {
 };
 
 // 배너 위젯 안의 미니 캐러셀 — 가게 상세 캐러셀의 점(dots)/슬라이드 스타일을 축소판으로 재사용
-const bannerCarouselStyles = `
-  .ad-banner-carousel .ant-carousel { line-height: 0; }
-  .ad-banner-carousel .slick-slide { line-height: 0; }
-  .ad-banner-carousel .slick-dots { bottom: 8px !important; margin: 0 !important; }
-  .ad-banner-carousel .slick-dots li { margin: 0 3px !important; }
-  .ad-banner-carousel .slick-dots li button {
-    width: 5px !important; height: 5px !important; border-radius: 50% !important;
-    background: #fff !important; opacity: 0.6 !important; padding: 0 !important;
-  }
-  .ad-banner-carousel .slick-dots li.slick-active button { opacity: 1 !important; width: 12px !important; border-radius: 6px !important; }
-
-  /* 닫기 버튼 — 우리 디자인 시스템의 Button 컴포넌트와 동일한 누르면 살짝 줄어드는 press 피드백
-     (2026-07 추가 — 예전엔 raw button이라 hover/active 피드백이 전혀 없어서 누르고도 누르는 건지 알 수 없었다) */
-  .ad-banner-close-btn { transition: transform 0.12s ease, background 0.12s ease; }
-  .ad-banner-close-btn:hover { background: #fff !important; }
-  .ad-banner-close-btn:active { transform: scale(0.88); }
-`;
+// CSS 는 index.css 로 이관했다(2026-08-05). JSX 안 <style> 은 인스턴스마다 렌더되고,
+// 전역 규칙이 컴포넌트에 숨으면 그 컴포넌트를 안 쓰는 화면에는 규칙이 없다.
+// 전역 정책은 index.css — CLAUDE.md "설계 원칙" 참고.
 
 const styles = {
     wrapper: {
@@ -170,7 +155,7 @@ const styles = {
         right: 20,
         bottom: 20,
         width: 280,
-        background: '#fff',
+        background: colors.background.paper,
         borderRadius: radius.xl,
         boxShadow: shadows?.cardHover || '0 8px 24px rgba(0,0,0,0.12)',
         overflow: 'hidden',

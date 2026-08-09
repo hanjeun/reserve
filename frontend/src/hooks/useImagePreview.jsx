@@ -134,6 +134,11 @@ const useImagePreview = () => {
     previewCurrentRef.current = previewCurrent;
     /* eslint-enable react-hooks/refs */
 
+    // 스와이프로 장 넘기기는 이 훅에 두지 않는다.
+    // 프리뷰를 여는 경로가 두 가지(이 훅 / PreviewGroup 직접 사용)라 어느 한쪽 state 에
+    // 묶으면 반쪽만 동작한다 — 실제로 그렇게 만들었다가 가게 상세에서 전혀 안 먹었다.
+    // 지금은 App.jsx 가 useImagePreviewSwipe() 를 전역 1회 호출한다(DOM 기준으로 동작).
+
     /**
      * Image.PreviewGroup + items 방식
      * - visible / onVisibleChange 로 열기/닫기를 외부에서 제어
@@ -156,6 +161,12 @@ const useImagePreview = () => {
                     // 되돌아가 버린다(넘김이 안 되는 버그의 원인). 여기서 ref를 먼저 갱신해 다음
                     // 렌더에서도 같은 인덱스가 유지되게 하고, state도 갱신해 리렌더를 트리거한다.
                     onChange: (index) => { previewCurrentRef.current = index; setPreviewCurrent(index); },
+                    // ⚠️ rootClassName은 antd 6에서 deprecated 경고가 뜨지만 일부러 되돌렸다(2026-07-30).
+                    // 경고대로 classNames.root로 바꿨더니 preview 루트에 클래스가 아예 안 붙어
+                    // .reserve-image-preview(둥근 네모 툴바·화살표·닫기) 스타일이 통째로 죽었다.
+                    // 브라우저에서 확인: 미리보기 DOM에 우리 클래스 0건.
+                    // antd의 semantic classNames에서 preview 루트는 popup.root 계열이라
+                    // preview 안의 classNames.root와는 다른 자리다. 경고는 감수하고 동작을 택한다.
                     rootClassName: 'reserve-image-preview',
                 }}
             />

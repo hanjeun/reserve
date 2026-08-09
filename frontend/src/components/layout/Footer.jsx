@@ -12,40 +12,9 @@ const { Text } = Typography;
    - 모바일: 대표자(위, text-align:left) → copyright(아래)
              CSS order 속성으로 DOM 순서 변경 없이 시각 순서만 교체
 ───────────────────────────────────────────────────────────────*/
-const FOOTER_STYLES = `
-.footer-copyright {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-}
-.footer-copyright-left {
-    order: 1;
-    font-size: 12px;
-    line-height: 1.8;
-}
-.footer-copyright-right {
-    order: 2;
-    font-size: 12px;
-    line-height: 1.8;
-    text-align: right;
-}
-@media (max-width: 767px) {
-    .footer-copyright {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    .footer-copyright-left {
-        order: 2;
-    }
-    .footer-copyright-right {
-        order: 1;
-        text-align: left;
-    }
-}
-`;
+// CSS 는 index.css 로 이관했다(2026-08-05). JSX 안 <style> 은 인스턴스마다 렌더되고,
+// 전역 규칙이 컴포넌트에 숨으면 그 컴포넌트를 안 쓰는 화면에는 규칙이 없다.
+// 전역 정책은 index.css — CLAUDE.md "설계 원칙" 참고.
 
 const GithubIcon = () => (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
@@ -60,11 +29,21 @@ const VelogIcon = () => (
     </svg>
 );
 
-const SocialBtn = ({ href, icon, label }) => (
+/**
+ * 소셜 아이콘 버튼.
+ *
+ * hover 규칙 — "판을 칠하는" 게 아니라 아이콘 자체가 브랜드 색으로 채워진다.
+ * 배경은 계속 투명이고, 아이콘(currentColor SVG)과 테두리만 브랜드 색이 된다.
+ *   GitHub — 라이트 #181717(공식 검정) / 다크 #ffffff (다크 배경에선 흰 마크가 원본)
+ *   Velog  — 양쪽 모두 #20C997(공식 민트)
+ *
+ * ★ 색은 JS 인라인이 아니라 index.css의 .reserve-social 규칙이 준다.
+ *   인라인 + var(--c-...) 조합에서 값이 무효가 되어 hover 색이 아예 안 바뀌는 문제를 겪었다.
+ */
+const SocialBtn = ({ href, icon, label, variant }) => (
     <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label}
-        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '50%', border: `1.5px solid ${colors.border.default}`, color: colors.text.tertiary, background: 'transparent', transition: 'all 0.18s', textDecoration: 'none' }}
-        onMouseEnter={e => { e.currentTarget.style.background = colors.text.primary; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = colors.text.primary; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.text.tertiary; e.currentTarget.style.borderColor = colors.border.default; }}>
+        className={`reserve-social${variant ? ` reserve-social--${variant}` : ''}`}
+        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '50%', border: `1.5px solid ${colors.border.default}`, color: colors.text.tertiary, background: 'transparent', transition: 'all 0.18s', textDecoration: 'none' }}>
         {icon}
     </a>
 );
@@ -115,7 +94,6 @@ const AppFooter = () => {
 
     return (
         <>
-            <style>{FOOTER_STYLES}</style>
             <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} />
 
             <footer style={{ backgroundColor: colors.background.surface, borderTop: `1px solid ${colors.border.light}`, padding: '0 24px 36px' }}>
@@ -133,7 +111,7 @@ const AppFooter = () => {
                             </Text>
                             <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
                                 <SocialBtn href="https://github.com/hanjeun/reserve" icon={<GithubIcon />} label="GitHub" />
-                                <SocialBtn href="https://velog.io/@hanjeun/series/RESERVE" icon={<VelogIcon />} label="Velog" />
+                                <SocialBtn href="https://velog.io/@hanjeun/series/RESERVE" icon={<VelogIcon />} label="Velog" variant="velog" />
                             </div>
                         </div>
 

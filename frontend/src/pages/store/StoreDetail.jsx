@@ -17,7 +17,7 @@ import { rememberImageHints } from '../../utils/imageHintCache';
 import { getDetailImageUrl } from '../../utils';
 import { isNearby } from '../../utils/distance';
 import useLocationStore from '../../store/useLocationStore';
-import { colors, radius, fontWeight, fontSize, heights, animation } from '../../styles/tokens';
+import { colors, radius, fontWeight, fontSize, heights, animation, field } from '../../styles/tokens';
 import { VALIDATION_RULES } from '../../utils/validation';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -32,30 +32,13 @@ const customStyles = `
     width: 32px !important; height: 32px !important; border-radius: 8px !important;
     display: flex !important; align-items: center !important; justify-content: center !important;
   }
-  .ant-carousel { overflow: hidden !important; }
-  .ant-carousel .slick-list { background: transparent !important; border: none !important; box-shadow: none !important; }
-  .ant-carousel .slick-slide > div { line-height: 0 !important; font-size: 0 !important; }
-  .ant-carousel .slick-prev::after, .ant-carousel .slick-next::after { display: none !important; }
-  .ant-carousel .slick-prev, .ant-carousel .slick-next {
-    z-index: 10 !important; width: 40px !important; height: 40px !important; background: none !important;
-    top: 50% !important; transform: translateY(-50%) !important; display: flex !important;
-    align-items: center !important; justify-content: center !important;
-  }
-  .ant-carousel .slick-prev::before, .ant-carousel .slick-next::before {
-    content: '' !important; display: block !important; width: 12px !important; height: 12px !important;
-    border-top: 2.5px solid rgba(255,255,255,0.9) !important; border-right: 2.5px solid rgba(255,255,255,0.9) !important;
-    transition: all 0.2s ease !important; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)) !important;
-  }
-  .ant-carousel .slick-prev::before { transform: rotate(-135deg) !important; margin-left: 6px !important; }
-  .ant-carousel .slick-next::before { transform: rotate(45deg) !important; margin-right: 6px !important; }
-  .ant-carousel .slick-dots { bottom: 15px !important; display: flex !important; justify-content: center !important; line-height: 0 !important; }
-  .ant-carousel .slick-dots li { margin: 0 4px !important; }
-  .ant-carousel .slick-dots li button { background: #fff !important; opacity: 0.5 !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; padding: 0 !important; }
-  .ant-carousel .slick-dots li.slick-active button { opacity: 1 !important; width: 16px !important; border-radius: 10px !important; }
-  .ant-carousel .slick-prev { left: 10px !important; }
-  .ant-carousel .slick-next { right: 10px !important; }
-  .ant-carousel .slick-slide[aria-hidden="true"] { visibility: hidden; }
-  
+  /* 2026-08-06 - Carousel 전역 규칙은 여기서 걷어내 index.css 의 .reserve-carousel 로 옮겼다.
+     이 style 블록은 컴포넌트 마운트 시 head 맨 뒤에 붙어 index.css 를 항상 덮는다.
+     그래서 index.css 에 점·화살표 규칙을 넣어도 이 화면에서만 반영되지 않았고,
+     모바일 화살표 숨김(display:none)도 여기 있던 display: flex !important 에 밀렸다.
+     CLAUDE.md 의 "전역 CSS 는 index.css 에" 가 정확히 이 사고를 막으려는 규칙이다.
+     주의: 이 문자열은 template literal 이라 주석 안에서도 백틱을 쓸 수 없다. */
+
   /* 원본 비율을 유지하도록 두 번째 코드의 height: 100%와 object-fit 제거 */
   .ant-image { width: 100% !important; }
   .ant-image-img { width: 100% !important; height: auto !important; display: block !important; }
@@ -308,26 +291,17 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
 
     if (!dateKey) {
         return (
-            <div style={timeSlotStyles.placeholder}>
-                <span>날짜를 먼저 선택해주세요</span>
-                <ClockCircleOutlined style={timeSlotStyles.placeholderIcon} />
-            </div>
+            <TimePlaceholder text="날짜를 먼저 선택해주세요" />
         );
     }
     if (loading) {
         return (
-            <div style={timeSlotStyles.placeholder}>
-                <span>불러오는 중...</span>
-                <ClockCircleOutlined style={timeSlotStyles.placeholderIcon} />
-            </div>
+            <TimePlaceholder text="불러오는 중..." />
         );
     }
     if (slots.length === 0) {
         return (
-            <div style={timeSlotStyles.placeholder}>
-                <span>예약 가능한 시간이 없어요</span>
-                <ClockCircleOutlined style={timeSlotStyles.placeholderIcon} />
-            </div>
+            <TimePlaceholder text="예약 가능한 시간이 없어요" />
         );
     }
 
@@ -375,14 +349,53 @@ const TimeSlotPill = ({ slot, selected, onClick, delay }) => (
     </button>
 );
 
+/**
+ * 시간 선택 자리표시자.
+ *
+ * ★ 2026-08-06 — 왜 컴포넌트로 뺐나
+ *   이 칸은 AntD TimePicker 가 아니라 커스텀 div 다(시간은 pill 그리드로 고르므로).
+ *   그래서 Form.Item 이 붙여주는 `ant-picker-status-error` 클래스가 존재하지 않았고,
+ *   바로 위 "예약 날짜"(진짜 DatePicker)는 미입력 시 아이콘이 빨개지는데
+ *   "예약 시간"만 회색으로 남아 **같은 폼에서 두 칸이 다르게 반응**했다.
+ *   → Form.Item.useStatus() 로 에러 상태를 직접 읽어 같은 언어로 반응시킨다.
+ *
+ *   타이포도 함께 맞췄다. DatePicker 의 placeholder 는 실제 <input> 의 ::placeholder 라
+ *   폰트·크기가 AntD 토큰을 따르는데, 이쪽은 <span> 이라 상속 경로가 달랐다.
+ *   fontFamily: inherit 를 명시하고 아이콘 크기를 AntD suffix(16px)에 맞춘다.
+ */
+const TimePlaceholder = ({ text }) => {
+    const { status } = Form.Item.useStatus();
+    const isError = status === 'error';
+    // 테두리는 그리지 않는다 — 날짜 칸(AntD DatePicker)이 filled variant 라 에러에도 선이
+    // 생기지 않는다. 여기만 선을 그리면 두 칸이 또 달라 보인다(그게 원래 문제였다).
+    // 에러 신호는 아이콘 색 + 아래 빨간 안내문으로 충분하다.
+    return (
+        <div style={timeSlotStyles.placeholder}>
+            <span>{text}</span>
+            <ClockCircleOutlined style={{
+                ...timeSlotStyles.placeholderIcon,
+                color: isError ? colors.error.main : colors.text.placeholder,
+            }} />
+        </div>
+    );
+};
+
 const timeSlotStyles = {
     placeholder: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: heights.input, padding: '0 11px', boxSizing: 'border-box',
-        fontSize: fontSize.lg, fontWeight: fontWeight.regular, color: 'rgba(0, 0, 0, 0.25)',
+        // ★ 색을 하드코딩하지 말 것 — 여기 rgba(0,0,0,0.25)가 박혀 있어서 다크모드에서
+        //   배경만 어두워지고 글자는 검은색 그대로라 "날짜를 먼저 선택해주세요"가 안 보였다.
+        //   colors.*는 var(--c-...) 문자열이라 브라우저가 페인트 시점에 테마별로 해석한다.
+        //   colors.text.placeholder는 AntD의 colorTextPlaceholder와 같은 값이라
+        //   바로 옆 FormDatePicker의 "날짜 선택"과 톤이 정확히 일치한다.
+        fontSize: fontSize.lg, fontWeight: fontWeight.regular, color: colors.text.placeholder,
+        fontFamily: 'inherit',
         background: colors.gray[50], borderRadius: radius.lg,
+        transition: 'box-shadow 0.2s',
     },
-    placeholderIcon: { fontSize: 14, color: 'rgba(0, 0, 0, 0.25)' },
+    /* AntD picker 의 suffix 아이콘과 같은 크기(16px). 14px 이면 날짜 칸보다 작아 보였다. */
+    placeholderIcon: { fontSize: field.iconSize, color: field.placeholderColor },
     groupLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, fontWeight: fontWeight.medium, marginBottom: 8 },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
     pill: {
@@ -508,6 +521,17 @@ const StoreDetail = () => {
     );
 
     const sliderImages = store.detailImageUrls?.length > 0 ? store.detailImageUrls : [store.mainImageUrl];
+    // ★ 2026-08-06 — 프리뷰에 "3 / 4" 처럼 실제보다 많은 장수가 뜨던 버그
+    //   react-slick 은 infinite 루프를 위해 앞뒤 슬라이드를 **복제**한다(.slick-cloned).
+    //   복제본도 진짜 <Image> 라서 Image.PreviewGroup 이 그것까지 수집한다 →
+    //   사진 2장을 넣으면 프리뷰가 4장으로 잡히고, 넘겨도 같은 사진이 반복돼
+    //   "스와이프가 안 먹는다"처럼 보인다.
+    //   ★ 2026-08-06 2차 — 처음엔 infinite 를 껐다. 그랬더니 더 나쁜 증상이 생겼다:
+    //   사진 2장 + autoplay 면 캐러셀이 **마지막 장에 멈춰** 있고, 그 상태에서 왼쪽으로
+    //   쓸면(= 다음 장) 갈 곳이 없어 아무 일도 안 일어난다 → "스와이프가 안 된다"로 보인다.
+    //   (실측: 오른쪽 쓸기는 1→0 으로 정상 동작했다. 즉 스와이프 자체는 멀쩡했다.)
+    //   → infinite 는 되살리고, 장수 문제는 PreviewGroup 에 items 를 명시해서 푼다.
+    //     items 를 주면 AntD 가 자식 <Image> 를 수집하지 않으므로 복제본이 섞이지 않는다.
     const containerSize = isPC ? 'xl' : 'md';
     const nearby = isNearby(nearbyUserLocation, store.latitude, store.longitude, store.nearbyRadiusKm ?? undefined);
 
@@ -523,11 +547,20 @@ const StoreDetail = () => {
                         <div style={styles.pcLeft}>
                             <div style={{ position: 'relative' }}>
                                 <div style={styles.pcImageWrapper}>
-                                    <Image.PreviewGroup preview={{ rootClassName: 'reserve-image-preview' }}><Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
+                                    <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} preview={{ rootClassName: 'reserve-image-preview' }}><Carousel className="reserve-carousel" infinite
+                                        /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
+                                           swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
+                                           짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.
+                                           touchThreshold 를 낮춰 감도도 올린다(기본 5는 둔하다). */
+                                        draggable swipe touchMove swipeToSlide touchThreshold={12}
+                                        dotPlacement="bottom" autoplay>
                                         {sliderImages.map((img, sliderIdx) => (
                                             <div key={img}>
+                                                {/* draggable={false} — PC 마우스 드래그 스와이프용.
+                                                    브라우저 기본 이미지 드래그가 slick 의 mousemove 를 가로채기 때문이다.
+                                                    CSS 쪽(-webkit-user-drag)은 index.css 에 있고, 이 속성은 Firefox 용이다. */}
                                                 <Image src={getDetailImageUrl(img)} alt={`${store.name}-${sliderIdx}`}
-                                                    width="100%" style={styles.pcMainImg}
+                                                    width="100%" style={styles.pcMainImg} draggable={false}
                                                     preview={{ mask: '크게 보기' }} />
                                             </div>
                                         ))}
@@ -575,11 +608,17 @@ const StoreDetail = () => {
                     <section style={{ padding: 0 }}>
                         <div style={{ position: 'relative' }}>
                             <div style={styles.mobileImageWrapper}>
-                                <Image.PreviewGroup preview={{ rootClassName: 'reserve-image-preview' }}><Carousel arrows infinite draggable dotPlacement="bottom" autoplay>
+                                <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} preview={{ rootClassName: 'reserve-image-preview' }}><Carousel className="reserve-carousel" infinite
+                                        /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
+                                           swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
+                                           짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.
+                                           touchThreshold 를 낮춰 감도도 올린다(기본 5는 둔하다). */
+                                        draggable swipe touchMove swipeToSlide touchThreshold={12}
+                                        dotPlacement="bottom" autoplay>
                                     {sliderImages.map((img, sliderIdx) => (
                                         <div key={img}>
                                             <Image src={getDetailImageUrl(img)} alt={`${store.name}-${sliderIdx}`}
-                                                width="100%" style={styles.mainImg}
+                                                width="100%" style={styles.mainImg} draggable={false}
                                                 preview={{ mask: '크게 보기' }} />
                                         </div>
                                     ))}

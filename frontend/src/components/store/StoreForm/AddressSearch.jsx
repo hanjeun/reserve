@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import api from '../../../api/axios';
 import useDebounce from '../../../hooks/useDebounce';
-import { colors, fontSize, radius, heights } from '../../../styles/tokens';
+import { colors, fontSize, radius, heights, withAlpha } from '../../../styles/tokens';
 import { animation } from '../../../styles/tokens/animations';
 import useExitAnimation from '../../../hooks/useExitAnimation';
 import { ArcSpinner } from '../../common/Loading';
@@ -112,6 +112,21 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const dropdownOpen = state.open && state.results.length > 0;
     const { shouldRender: dropdownShouldRender, isClosing: dropdownClosing } = useExitAnimation(dropdownOpen, 200);
 
+    // ② 블록(우편번호+상세주소)도 드롭다운과 같은 규칙을 따른다.
+    // 2026-08-06 이전엔 여기가 그냥 `{(selected || zipCode) && ...}` 였다 — 등장은 slideUpIn 이
+    // 재생되는데 주소를 지우면 **애니메이션 없이 툭 사라졌다.** 훅이 이미 있는데 드롭다운에만
+    // 걸려 있던 케이스라, 같은 훅을 통과시켜 좌우 대칭을 맞춘다.
+    const sectionOpen = state.selected || !!state.zipCode;
+    const { shouldRender: sectionShouldRender, isClosing: sectionClosing } = useExitAnimation(sectionOpen, 200);
+    // 닫히는 200ms 동안 state.zipCode/detail 은 이미 비워져 있다. 그대로 그리면 슬라이드가
+    // 시작되기도 전에 내용이 사라져 "빈 상자만 내려가는" 모양이 된다 —
+    // 위 lastResults 와 같은 패턴으로 마지막 값을 붙잡아 둔다.
+    const [lastSection, setLastSection] = useState({ zipCode: '', detail: '' });
+    if (sectionOpen && (lastSection.zipCode !== state.zipCode || lastSection.detail !== state.detail)) {
+        setLastSection({ zipCode: state.zipCode, detail: state.detail });
+    }
+    const section = sectionClosing ? lastSection : { zipCode: state.zipCode, detail: state.detail };
+
     useEffect(() => { selectedRef.current = state.selected; }, [state.selected]);
 
     useEffect(() => {
@@ -216,7 +231,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         boxSizing: 'border-box',
         padding: '0 12px', height: heights.input,
         transition: 'border-color 0.2s, box-shadow 0.2s',
-        boxShadow: isFocused ? `0 0 0 2px ${colors.primary.main}18` : 'none',
+        boxShadow: isFocused ? `0 0 0 2px ${withAlpha(colors.primary.main, 20)}` : 'none',
     });
 
     return (
@@ -274,7 +289,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                         onMouseDown={() => { skipBlurRef.current = true; }}
                         style={{
                             position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
-                            marginTop: 4, background: '#fff',
+                            marginTop: 4, background: colors.background.paper,
                             border: `1px solid ${colors.border.default}`,
                             borderRadius: radius.lg,
                             boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
@@ -300,7 +315,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                                     style={{
                                         display: 'flex', alignItems: 'flex-start', gap: 10,
                                         padding: '10px 14px', cursor: 'pointer',
-                                        background: i === state.activeIdx ? colors.gray[50] : '#fff',
+                                        background: i === state.activeIdx ? colors.gray[50] : colors.background.paper,
                                         borderBottom: i < lastResults.length - 1 ? `1px solid ${colors.border.light}` : 'none',
                                     }}
                                 >
@@ -331,9 +346,14 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 
             {/* ② 선택 후 — 우편번호 + 상세주소. 사용자가 드롭다운에서 직접 선택했을 때만
                 slideUpIn으로 등장하고, 마이페이지 초기 프리필(이미 있던 주소)에서는 애니메이션 없이 바로 보인다. */}
-            {(state.selected || state.zipCode) && (
-                <div style={{ display: 'flex', gap: 8, minWidth: 0, width: '100%', animation: state.animateSection ? animation.slideUpIn : 'none' }}>
-                    {state.zipCode && (
+            {sectionShouldRender && (
+                <div style={{
+                    display: 'flex', gap: 8, minWidth: 0, width: '100%',
+                    animation: sectionClosing
+                        ? animation.slideUpOut
+                        : (state.animateSection ? animation.slideUpIn : 'none'),
+                }}>
+                    {section.zipCode && (
                         // 우편번호: readOnly → div 기반 터치 스크롤 컨테이너
                         <div style={{ ...boxStyle(false), width: 82, flexShrink: 0, cursor: 'default', overflow: 'hidden' }}>
                             <div style={{
@@ -344,7 +364,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                                 color: colors.text.primary,
                                 fontFamily: 'inherit', userSelect: 'none', textAlign: 'center',
                             }}>
-                                {state.zipCode}
+                                {section.zipCode}
                             </div>
                         </div>
                     )}
@@ -365,7 +385,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             ref={detailRef}
                             className="reserve-address-input"
                             autoComplete="off"
-                            value={state.detail}
+                            value={section.detail}
                             onChange={handleDetailChange}
                             onFocus={() => setActiveField('detail')}
                             onBlur={() => setActiveField(null)}

@@ -2,11 +2,13 @@ import React from 'react';
 import { colors, radius, fontSize, fontWeight } from '../../../../styles/tokens';
 import { Button } from '../../../../components/common';
 import { RESERVATION_DATA } from '../../Home.data';
+// 목업 폭은 Home.styles.js 의 HOME_MOCKUP_WIDTH 하나에서 온다 — 섹션마다 달라지면 간격이 어긋난다.
+import { HOME_MOCKUP_WIDTH } from '../../Home.styles';
 
 // 실제 MyReservations 페이지와 동일한 레이아웃
 export default function MockMyReservations() {
     return (
-        <div style={{ width: '100%', maxWidth: 400, background: '#fff', borderRadius: radius['2xl'], padding: 'clamp(14px, 3vw, 20px) clamp(16px, 3vw, 24px)', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: `1px solid ${colors.border.light}`, boxSizing: 'border-box' }}>
+        <div style={{ width: '100%', maxWidth: HOME_MOCKUP_WIDTH, background: colors.background.paper, borderRadius: radius['2xl'], padding: 'clamp(14px, 3vw, 20px) clamp(16px, 3vw, 24px)', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: `1px solid ${colors.border.light}`, boxSizing: 'border-box' }}>
             {/* 페이지 타이틀 */}
             <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${colors.border.light}` }}>
                 <div style={{ fontSize: fontSize.lg, fontWeight: fontWeight.extrabold, color: colors.text.primary, letterSpacing: '-0.3px' }}>내 예약 확인</div>

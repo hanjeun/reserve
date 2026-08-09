@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Typography, Empty, Select } from 'antd';
+import { Typography, Empty } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import {
     AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '@ant-design/icons';
-import { StatCard, ChartCard, SegmentedControl, PieLegend } from '../common';
+import { StatCard, ChartCard, SegmentedControl, PieLegend, FilterSelect } from '../common';
 import { Bone } from '../common/Skeletons';
 import { useMessage, useMyStores, useWindowWidth } from '../../hooks';
 import storeService from '../../services/storeService';
@@ -130,16 +130,15 @@ const StatisticsTab = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* 가게 선택 + 기간 선택 */}
             <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-                {/* 2026-07 수정 — FormSelect(폼 입력용, 회색 채움 배경)에서 순수 AntD Select(size=large)로 교체.
-                    이 셀렉터는 사실 "폼 입력"이 아니라 예약관리/광고관리 탭의 가게 필터와 동일한 "필터" 역할이고,
-                    그 탭들은 FilterToolbar가 내부적으로 순수 AntD Select를 쓰고 있어서(FormSelect가 아님) 둘이
-                    시각적으로 달랐다 — 테두리/배경이 정확히 일치하도록 맞춘다.
-                    2026-07 추가 — 모바일에서도 기간 세그먼트와 같은 줄에 남도록 flexShrink 허용 + 폭 축소. */}
-                <Select
+                {/* 이 셀렉터는 "폼 입력"이 아니라 예약관리·광고관리 탭의 가게 필터와 같은 "필터" 역할이다.
+                    2026-08-04 — 순수 <Select> + className 조합에서 FilterSelect로 교체.
+                    예전 주석에 "FilterToolbar와 정확히 일치하도록 맞춘다"고 적어뒀는데 className을
+                    붙이지 않아 **의도만 있고 구현이 없던** 상태였다. 컴포넌트가 강제하니 이제 어긋날 수 없다.
+                    모바일에서도 기간 세그먼트와 같은 줄에 남도록 flexShrink 허용 + 폭 축소. */}
+                <FilterSelect
                     value={storeId}
                     onChange={setStoreId}
                     options={myStores.map((s) => ({ value: s.id, label: s.name }))}
-                    size="large"
                     style={{ width: isMobile ? 138 : 180, minWidth: 0, flexShrink: 1 }}
                 />
                 <SegmentedControl value={range} onChange={setRange} options={RANGE_OPTIONS} block={false} />

@@ -1,10 +1,12 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Layout, ConfigProvider, App as AntApp } from 'antd';
+import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore';
-import { colors, animationKeyframes } from './styles/tokens';
+import { colors, rawColors, animationKeyframes, field, fieldPx } from './styles/tokens';
+import useTheme from './hooks/useTheme';
+import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
 
 // 라우트 단위 Code Splitting (2026-07): 예전엔 모든 페이지를 정적 import해서 첫 번들 JS에
 // 관리자 패널·예약 화면 등 무거운 페이지 코드까지 전부 번들링되었음. React.lazy로 쪼개서
@@ -51,32 +53,91 @@ const validateMessages = {
     },
 };
 
-const themeConfig = {
+/**
+ * AntD 테마 설정.
+ *
+ * ★ 여기서는 `colors`(= var(--c-...) 문자열)를 쓰면 안 되고 `rawColors`(실제 hex)를 써야 한다.
+ *   AntD는 colorPrimary 하나로 hover/active/disabled 등 10단계 파생색을 **색 연산으로 만든다**.
+ *   'var(--c-primary, #3182f6)' 같은 문자열은 파싱이 안 돼 파생색이 전부 깨진다.
+ *   (CSS 변수는 브라우저가 페인트 때 해석하지만, AntD의 계산은 JS에서 먼저 일어난다)
+ *
+ * 그래서 AntD 쪽은 CSS 변수로 자동 전환되지 않는다 → darkAlgorithm으로 별도 전환한다.
+ * 우리 컴포넌트(= colors 토큰 사용)는 CSS 변수로 알아서 따라간다. 두 계층이 나뉘어 있는 셈이다.
+ *
+ * fontFamily도 var(--app-font)를 못 쓴다(AntD가 내부적으로 문자열을 조작하는 곳이 있다).
+ * 대신 전역 CSS에서 body/:root에 --app-font를 걸어두었고, AntD 컴포넌트는 상속으로 따라온다.
+ */
+/**
+ * @param isDark   다크 모드인지
+ * @param accent   사용자가 고른 포인트 색의 **리터럴 hex** (useTheme 의 accentColors).
+ *                 AntD 토큰은 CSS 변수를 못 받는다 — AntD 가 JS 로 파생색을 계산하기 때문이다.
+ *                 그래서 CSS 쪽(--c-primary)과 여기(colorPrimary)를 각각 넣어야 하고,
+ *                 둘 다 같은 출처(ACCENT_OPTIONS)에서 나오므로 어긋나지 않는다.
+ */
+const buildThemeConfig = (isDark, accent) => ({
+    algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
     token: {
-        colorPrimary: colors.primary.main,
-        colorBgContainer: colors.background.default,
-        colorBorder: colors.border.light,
-        borderRadius: 14,
-        fontFamily: '"Pretendard Variable", Pretendard, -apple-system, sans-serif',
+        colorPrimary: accent.main,
+        colorBgContainer: isDark ? '#1e2126' : '#ffffff',
+        colorBorder: isDark ? '#2d3138' : rawColors.gray[100],
+        borderRadius: fieldPx(field.radius),
+        // 2026-08-04 — AntD 기본 에러색(#ff4d4f)과 이 프로젝트 색(#f04452)이 달라서
+        // "AntD Form.Item 이 그린 빨강"과 "FormField 가 그린 빨강"이 미묘하게 다른 색이었다.
+        // 여기서 한 번 맞추면 Form 검증 메시지·에러 상태 테두리·경고 아이콘까지 전부 따라온다.
+        // rawColors 를 쓰는 이유: ConfigProvider 토큰은 AntD 가 JS 로 파생색(hover/알파)을 계산하므로
+        // var(--c-error) 같은 CSS 값을 넣으면 계산에 실패한다(리터럴이어야 한다).
+        // 값의 출처는 styles/theme.css 의 --c-error / --c-warning (라이트 :root, 다크 [data-theme=dark]).
+        // 그 파일을 고치면 여기도 함께 고쳐야 한다 — CSS 변수를 못 쓰는 자리라 중복이 불가피하다.
+        colorError:   isDark ? '#ff6b76' : '#f04452',
+        colorWarning: isDark ? '#ffc633' : '#ffb800',
+        // 다크에서 placeholder·비활성 글자를 AntD 기본값보다 밝게 올린다.
+        // 기본값은 라이트/다크 모두 25% 알파인데, 흰 배경 위의 25% 검정은 잘 보이는 반면
+        // 어두운 배경(#1a1d21) 위의 25% 흰색은 사실상 어두운 회색으로 보인다 —
+        // "날짜 선택", "날짜를 먼저 선택해주세요"가 검게 보인다는 증상의 실제 원인이었다.
+        // 라이트는 기존 AntD 기본값을 그대로 명시해 변화가 없도록 한다.
+        colorTextPlaceholder: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.25)',
+        colorTextDisabled:    isDark ? 'rgba(255, 255, 255, 0.38)' : 'rgba(0, 0, 0, 0.25)',
+        // 'inherit' — 글꼴 옵션이 동작하려면 여기서 특정 폰트를 박으면 안 된다.
+        // 예전엔 Pretendard를 하드코딩해서 AntD가 모든 .ant-* 요소에 그 font-family를 주입했고,
+        // 그래서 마이페이지에서 '명조'를 골라도 AntD 컴포넌트는 그대로 프리텐다드였다.
+        // inherit면 body의 var(--app-font)를 그대로 물려받는다.
+        fontFamily: 'inherit',
     },
     components: {
         Button: {
             primaryColor: '#fff',
-            colorPrimary: colors.primary.main,
+            colorPrimary: accent.main,
         },
         Input: {
-            colorBgContainer: colors.gray[50],
+            colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
+        },
+        // Select는 다른 폼 컨트롤과 **같은 gray[50]**이어야 한다.
+        // FormInput·FormTextArea·FormDatePicker·FormTimePicker가 전부
+        // `disabled ? gray[100] : gray[50]`을 쓴다 — 이게 이 프로젝트의 채움형(filled) 입력 규칙이다.
+        // 한때 "흰 배경에서 롤러가 안 보인다"고 gray[100]으로 올렸는데, 그러면 Select만 다른 톤이 되어
+        // 같은 폼 안에서 입력칸끼리 색이 어긋난다. 옅게 보이는 건 채움형 입력의 의도된 특성이다
+        // (토스 계열 UI의 관례 — 테두리 대신 아주 옅은 면으로 입력 영역을 암시).
+        // 더 진하게 갈 거면 Select만이 아니라 5개 전부를 함께 바꾸는 디자인 시스템 결정이어야 한다.
+        Select: {
+            colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
+            colorBgElevated: isDark ? '#1e2126' : '#ffffff',   // 드롭다운 패널
+            optionSelectedBg: isDark ? '#2d3138' : rawColors.gray[200],
+        },
+        // Card의 actions(가게 카드 하단 수정/삭제 줄)는 전용 토큰(actionsBg)을 쓴다.
+        // 전역 colorBgContainer를 따라가지 않아서, 다크에서 이 줄만 흰 띠로 남아 있었다.
+        Card: {
+            actionsBg: isDark ? '#1e2126' : '#ffffff',
         },
         Tabs: {
-            inkBarColor: colors.primary.main,
+            inkBarColor: accent.main,
             horizontalItemGutter: 24,
-            itemColor: colors.text.tertiary,
-            itemHoverColor: colors.text.primary,
-            itemSelectedColor: colors.primary.main,
-            colorBorderSecondary: colors.border.light,
+            itemColor: isDark ? '#8b939e' : rawColors.gray[500],
+            itemHoverColor: isDark ? '#e8eaed' : rawColors.gray[900],
+            itemSelectedColor: accent.main,
+            colorBorderSecondary: isDark ? '#23262b' : rawColors.gray[100],
         },
     },
-};
+});
 
 /**
  * AntD <Spin>(및 Table의 loading prop)의 기본 인디케이터를 우리 링 스피너로 교체.
@@ -172,6 +233,28 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+    // 우리 컴포넌트 색은 CSS 변수라 자동으로 따라오지만, AntD는 JS로 파생색을 계산하므로
+    // 여기서 resolvedTheme을 읽어 algorithm을 갈아끼워야 한다(buildThemeConfig 주석 참고).
+    // accentColors 는 지금 테마에 맞는 **리터럴 hex** 다(useTheme 참고).
+    // CSS 쪽은 --c-primary 로 이미 바뀌어 있고, AntD 쪽만 여기서 따로 먹여준다.
+    const { resolvedTheme, accentColors } = useTheme();
+    // 이미지 프리뷰 좌우 스와이프 — 전역 1회 설치.
+    // 프리뷰를 여는 경로가 두 가지(useImagePreview 훅 / PreviewGroup 직접 사용)라
+    // 어느 한쪽 state 에 묶으면 반쪽만 동작한다. DOM 을 기준으로 붙는다.
+    useImagePreviewSwipe();
+    const themeConfig = useMemo(
+        () => buildThemeConfig(resolvedTheme === 'dark', accentColors),
+        // accentColors 는 **안정 참조**다 — useTheme 이 모듈 상수 ACCENT_OPTIONS 안의
+        // light/darkMode 객체를 그대로 돌려주므로, 색이 바뀌지 않으면 같은 객체가 온다.
+        // 그래서 객체를 그대로 deps 에 넣어도 불필요한 재생성이 없다.
+        //
+        // ★ accentColors.main 처럼 **속성**을 deps 에 쓰면 안 된다.
+        //   이 프로젝트의 ESLint 에 react-hooks/preserve-manual-memoization 이 켜져 있어
+        //   "추론된 의존성(accentColors)보다 덜 구체적인 속성을 적었다"며 에러가 나고,
+        //   React Compiler 가 이 컴포넌트 최적화를 **건너뛴다**(실제로 그렇게 lint 를 깨뜨렸다).
+        [resolvedTheme, accentColors]
+    );
+
     return (
         <QueryClientProvider client={queryClient}>
             <BrowserRouter>

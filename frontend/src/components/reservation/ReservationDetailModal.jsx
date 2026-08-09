@@ -103,7 +103,8 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
 const styles = {
     detailRow:   { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0' },
     detailIcon:  { fontSize: 13, color: colors.text.tertiary, width: 16 },
-    detailLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, width: 50, flexShrink: 0 },
+    // whiteSpace: nowrap 필수 — 고정 폭(50px)이라 폭이 모자라면 "예약자"가 글자 단위로 접힌다.
+    detailLabel: { fontSize: fontSize.sm, color: colors.text.tertiary, width: 50, flexShrink: 0, whiteSpace: 'nowrap' },
     detailValue: { fontSize: fontSize.sm, color: colors.text.primary },
 };
 

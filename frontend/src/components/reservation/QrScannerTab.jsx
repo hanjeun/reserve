@@ -5,7 +5,7 @@ import { CheckCircleFilled, ReloadOutlined, ExclamationCircleOutlined } from '@a
 import { Button, Bone } from '../common';
 import reservationService from '../../services/reservationService';
 import { useMessage } from '../../hooks';
-import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
+import { colors, radius, shadows, fontSize, fontWeight, withAlpha } from '../../styles/tokens';
 
 const { Text } = Typography;
 const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
@@ -164,7 +164,7 @@ const QrScannerTab = () => {
                                 <>
                                     <Text strong style={styles.overlayTitle}>카메라를 켜고 스캔을 시작하세요</Text>
                                     <Button variant="primary" size="sm" onClick={startScanning}>
-                                        카메라로 QR 스캔 시작
+                                        QR 스캔 시작
                                     </Button>
                                 </>
                             )}
@@ -180,7 +180,7 @@ const QrScannerTab = () => {
                             )}
                             {status === 'error' && (
                                 <>
-                                    <div style={{ ...styles.iconBadge, background: `${colors.error.main}18`, color: colors.error.main }}>
+                                    <div style={{ ...styles.iconBadge, background: withAlpha(colors.error.main), color: colors.error.main }}>
                                         <ExclamationCircleOutlined style={{ fontSize: 26 }} />
                                     </div>
                                     <Text style={{ color: colors.error.main, textAlign: 'center', padding: '0 20px', fontSize: fontSize.sm }}>
@@ -270,7 +270,7 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `${colors.primary.main}18`,
+        background: withAlpha(colors.primary.main),
         color: colors.primary.main,
     },
     overlayTitle: { fontSize: fontSize.sm, color: colors.text.primary },

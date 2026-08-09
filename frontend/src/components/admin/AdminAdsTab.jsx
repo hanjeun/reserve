@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tag, Typography } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { StopOutlined } from '@ant-design/icons';
@@ -43,8 +43,10 @@ const STATUS_CONFIG = {
  */
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', page: '0' };
-// ads/?? []가 매 렌더 새 배열 레퍼런스를 만들어서 아래 filteredAds useMemo가 매번
-// 다시 계산되는 걸 방지하기 위한 안정적인 빈 배열 상수(ESLint exhaustive-deps 지적 반영)
+// data?.ads ?? [] 가 매 렌더 새 배열 레퍼런스를 만들면 이 값을 deps로 받는 훅·자식이
+// 매번 다시 계산·리렌더된다. 안정적인 빈 배열 상수로 그걸 막는다.
+// (원래는 클라이언트 필터 useMemo 때문에 도입했는데, 그 필터를 서버로 옮긴 뒤에도
+//  dataSource 레퍼런스 안정성 때문에 그대로 두는 게 맞다)
 const EMPTY_ADS = [];
 
 // 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지 (2026-07 전수조사)
@@ -73,10 +75,15 @@ const AdminAdsTab = () => {
     // 어떤 광고를 중단하려는지 기억해야 해서 target을 state로 들고 있는다(null = 닫힌 상태).
     const [suspendTarget, setSuspendTarget] = useState(null);
 
+    // ★ queryKey에 debouncedSearch가 반드시 들어가야 한다.
+    //   예전에는 [admin(), page]뿐이라 검색어가 바뀌어도 같은 캐시를 재사용했고,
+    //   서버는 페이지네이션만 하는데 프론트가 그 페이지 안에서만 filter를 걸어서
+    //   **검색이 현재 페이지 안에서만 동작**했다(2페이지의 광고는 1페이지에서 검색해도 안 나옴).
+    //   검색을 서버로 넘기고, 검색어를 캐시 키에 포함시켜 해결한다.
     const { data, isLoading: loading, isFetching, error: adsError, refetch } = useQuery({
-        queryKey: [...adKeys.admin(), page],
+        queryKey: [...adKeys.admin(), page, debouncedSearch],
         queryFn: async () => {
-            const result = await adService.getAllAds(page, PAGE_SIZE);
+            const result = await adService.getAllAds(page, PAGE_SIZE, debouncedSearch);
             return {
                 ads: result?.content ?? [],
                 // Spring Boot 3.5부터 페이지 메타가 page:{} 하위로 이동(2026-07 버그 수정 — 다른
@@ -105,12 +112,9 @@ const AdminAdsTab = () => {
         onError: () => message.error('중단 처리에 실패했습니다.'),
     });
 
-    const filteredAds = useMemo(() => {
-        if (!debouncedSearch.trim()) return ads;
-        const kw = debouncedSearch.toLowerCase();
-        return ads.filter((a) => a.storeName?.toLowerCase().includes(kw));
-    }, [ads, debouncedSearch]);
-
+    // 클라이언트 필터(filteredAds)는 제거했다 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
+    // useDebounce는 그대로 둔다. 이제는 "리렌더 억제"가 아니라 **타이핑 한 글자마다 서버를 때리지
+    // 않기 위한 것**이라 오히려 더 중요해졌다(300ms).
     const handleSuspend = (record) => setSuspendTarget(record);
 
     const columns = [
@@ -157,7 +161,7 @@ const AdminAdsTab = () => {
                 <DataTable
                     rowKey="id"
                     columns={columns}
-                    dataSource={filteredAds}
+                    dataSource={ads}
                     pagination={{
                         current: page + 1,
                         pageSize: PAGE_SIZE,

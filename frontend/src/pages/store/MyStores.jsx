@@ -12,17 +12,21 @@ import storeService from '../../services/storeService';
 const { Title, Text } = Typography;
 
 // 2026-07 추가 — MyFavorites/StoreList와 동일한 이유로 masonry(columns) 대신 고정 그리드로 전환.
-// PC에서 항상 4열로 고정되고, 좁은 화면에서만 미디어 쿼리로 2열/1열로 줄어든다.
+// 2026-07-30 — 3열 단계 추가(경계 근거는 StoreList.jsx의 GRID_STYLE 주석 참고).
+// 세 목록이 같은 경계를 쓰는 게 중요하다 — 다르면 화면을 옮길 때 열 수가 튄다.
 const GRID_STYLE = `
   .rsv-mystore-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
   }
-  @media (max-width: 900px) {
+  @media (max-width: 1079px) {
+    .rsv-mystore-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 815px) {
     .rsv-mystore-grid { grid-template-columns: repeat(2, 1fr); }
   }
-  @media (max-width: 480px) {
+  @media (max-width: 551px) {
     .rsv-mystore-grid { grid-template-columns: 1fr; }
   }
 `;
@@ -246,6 +250,7 @@ const MyStores = () => {
                                         type="button"
                                         aria-label={`${store.name} 수정`}
                                         onClick={(e) => { e.stopPropagation(); navigate(`/store/${store.id}/edit`); }}
+                                        className="reserve-card-action"
                                         style={styles.cardAction}
                                     >
                                         <EditOutlined style={{ fontSize: '18px' }} />
@@ -255,6 +260,7 @@ const MyStores = () => {
                                         type="button"
                                         aria-label={`${store.name} 삭제`}
                                         onClick={(e) => handleDeleteClick(e, store)}
+                                        className="reserve-card-action"
                                         style={styles.cardAction}
                                     >
                                         <DeleteOutlined style={{ fontSize: '18px', color: colors.error.main }} />

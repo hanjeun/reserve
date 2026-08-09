@@ -192,52 +192,13 @@ const Button = ({
                     </>
                 )}
             </button>
-            <style>{`
-                .reserve-btn {
-                    -webkit-appearance: none;
-                    appearance: none;
-                    -webkit-tap-highlight-color: transparent;
-                }
-                .reserve-btn--primary:active:not(:disabled),
-                .reserve-btn--secondary:active:not(:disabled),
-                .reserve-btn--danger:active:not(:disabled),
-                .reserve-btn--hero:active:not(:disabled) {
-                    transform: scale(0.96);
-                    opacity: 0.88;
-                }
-                .reserve-btn--primary:hover:not(:disabled)  { opacity: 0.9; }
-                .reserve-btn--secondary:hover:not(:disabled){ opacity: 0.85; }
-                .reserve-btn--hero:hover:not(:disabled)     { opacity: 0.92; box-shadow: 0 12px 24px rgba(49,130,246,0.28); }
-
-                .reserve-btn--ghost-sm:hover:not(:disabled)         { opacity: 0.7; }
-                .reserve-btn--ghost-sm:active:not(:disabled)        { opacity: 0.5; transform: scale(0.95); }
-                .reserve-btn--ghost-sm-primary:hover:not(:disabled) { opacity: 0.7; }
-                .reserve-btn--ghost-sm-primary:active:not(:disabled){ opacity: 0.5; transform: scale(0.95); }
-                .reserve-btn--ghost-sm-success:hover:not(:disabled) { opacity: 0.7; }
-                .reserve-btn--ghost-sm-success:active:not(:disabled){ opacity: 0.5; transform: scale(0.95); }
-                .reserve-btn--ghost-sm-danger:hover:not(:disabled)  { opacity: 0.7; }
-                .reserve-btn--ghost-sm-danger:active:not(:disabled) { opacity: 0.5; transform: scale(0.95); }
-
-                /* outline: hover 시 테두리만 진해지고 글자는 진한 색 그대로 유지
-                   (예전엔 hover에서 color를 #6c757d 회색으로 바꿔서 더 흐릿해졌음) */
-                .reserve-btn--outline:hover:not(:disabled)  { border-color: #adb5bd; background: rgba(0,0,0,0.02); }
-                .reserve-btn--outline:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
-                .reserve-btn--ghost:hover:not(:disabled)    { opacity: 0.7; }
-                .reserve-btn--ghost:active:not(:disabled)   { opacity: 0.5; transform: scale(0.94); }
-                .reserve-btn--link:hover:not(:disabled)     { opacity: 0.75; }
-
-                .reserve-btn-spin {
-                    display: inline-block;
-                    width: 14px; height: 14px;
-                    border: 2px solid rgba(255,255,255,0.4);
-                    border-top-color: #fff;
-                    border-radius: 50%;
-                    animation: reserve-spin 0.6s linear infinite;
-                }
-            `}</style>
         </>
     );
 };
+/* hover·active 등 상호작용 CSS 는 index.css 의 "Button 상호작용 상태" 블록에 있다.
+   예전에는 이 파일 안의 <style> 태그였는데, JSX 안의 style 은 **인스턴스마다 렌더**되어
+   버튼이 많은 화면에서 동일한 태그가 수십 개 쌓였다(실측: 마이페이지에서 3개).
+   전역 정책은 index.css 로 — CLAUDE.md "설계 원칙" 참고. */
 
 const spinStyle = {};
 

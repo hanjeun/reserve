@@ -18,7 +18,13 @@ const adService = {
     }),
     getActiveAds: (adType) => api.get(API_ENDPOINTS.ADVERTISEMENT.ACTIVE, { params: { type: adType } }),
     getMyAds: () => api.get(API_ENDPOINTS.ADVERTISEMENT.MY_ADS),
-    getAllAds: (page = 0, size = 50) => api.get(API_ENDPOINTS.ADVERTISEMENT.ADMIN_ALL, { params: { page, size } }),
+    // search: 가게 이름 부분 일치(관리자 광고 목록). 빈 문자열이면 파라미터를 아예 보내지 않는다 —
+    // 서버는 null과 ""를 같게 취급하지만, 쿼리스트링에 빈 값이 남으면 React Query 캐시 키와
+    // 요청 URL이 불필요하게 갈라진다.
+    getAllAds: (page = 0, size = 50, search = '') =>
+        api.get(API_ENDPOINTS.ADVERTISEMENT.ADMIN_ALL, {
+            params: { page, size, ...(search ? { search } : {}) },
+        }),
     suspendAd: (id, reason) => api.patch(API_ENDPOINTS.ADVERTISEMENT.ADMIN_SUSPEND(id), { reason }),
 
     /**

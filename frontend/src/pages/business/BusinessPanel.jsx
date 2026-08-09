@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import { Empty, Typography, Tabs } from 'antd';
 import {
     CalendarOutlined,
-    ClockCircleOutlined,
     PartitionOutlined,
     QrcodeOutlined,
     NotificationOutlined,
@@ -81,8 +80,6 @@ const ReservationTab = () => {
         return list;
     }, [reservations, statusFilter, storeFilter, debouncedKeyword]);
 
-    const pendingCount = !loading ? reservations.filter(r => r.status === 'PENDING').length : 0;
-
     return (
         <>
             <FilterToolbar
@@ -109,14 +106,10 @@ const ReservationTab = () => {
                 search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약자로 검색', disabled: loading || refetching }}
                 onReload={refetch}
                 loading={loading || refetching}
-                extra={
-                    pendingCount > 0 && statusFilter !== 'PENDING' ? (
-                        <span style={styles.pendingBadge}>
-                            <ClockCircleOutlined style={{ fontSize: 11 }} />
-                            승인 대기 {pendingCount}건
-                        </span>
-                    ) : null
-                }
+                /* 2026-07-30 — "승인 대기 N건" 배지를 제거했다.
+                   셀렉트 줄에 들어가기엔 폭이 부족해 항상 둘째 줄로 밀렸고, 그 때문에 탭과 검색창
+                   사이에 줄이 하나 더 끼어 레이아웃이 산만해졌다. 승인 대기 건수는 상태 필터와
+                   카드의 상태 라벨로 이미 알 수 있다. */
             />
 
             {/* 코드리뷰 지적사항 반영(2026-07): 승인/거절/완료/노쇼 처리 후 onSettled로 백그라운드
@@ -225,17 +218,6 @@ const BusinessPanel = () => {
 
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
-    pendingBadge: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        background: colors.warning?.light || '#fff7e6',
-        color: colors.warning?.main || '#fa8c16',
-        borderRadius: 20,
-        padding: '3px 10px',
-        fontSize: fontSize.xs,
-        fontWeight: fontWeight.semibold,
-    },
     list:    { display: 'flex', flexDirection: 'column', paddingBottom: 40 },
     divider: { height: 1, background: colors.border?.light || '#f0f0f0' },
 };

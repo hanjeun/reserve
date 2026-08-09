@@ -9,8 +9,10 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import reservationService from '../services/reservationService';
+import { reservationKeys } from './queryKeys';
 import adService from '../services/adService';
 import { consumeAdClickAttribution } from '../utils/adAttribution';
 import { formatDate, formatTimeForApi, formatTime } from '../utils/date';
@@ -28,6 +30,25 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const navigate  = useNavigate();
     const location  = useLocation();
     const [searchParams] = useSearchParams();
+    const queryClient = useQueryClient();
+
+    // 예약을 만들거나 고친 뒤 예약 목록 캐시를 무효화한다.
+    //
+    // 이게 없어서 "예약했는데 내 예약에 안 보이고 새로고침해야 나온다"가 났다. 경로가 이랬다:
+    //   createReservation은 useMutation이 아니라 그냥 await이라 invalidate가 없었고,
+    //   navigate('/my-reservations')도 state.refetch를 안 실어보냈다.
+    //   MyReservations는 location.state?.refetch일 때만 강제 refetch하고,
+    //   전역 staleTime이 3분이라 그 안에 들어가면 캐시가 그대로 나온다.
+    //
+    // invalidateQueries는 staleTime을 무시하고 즉시 stale로 표시하므로, 목록 페이지가
+    // 마운트되는 순간 자동으로 재조회된다 — 별도 이벤트 버스가 필요 없다.
+    // 이미 useReservations의 cancelMutation.onSettled가 쓰는 패턴과 같다.
+    //
+    // reservationKeys.all()로 넓게 지운다: 손님 목록(my)뿐 아니라, 사업자 계정이 자기 가게에
+    // 직접 예약을 넣는 경우의 관리 목록(manage)까지 한 번에 덮기 위해서다.
+    // ※ 다른 사용자(가게 주인)의 화면은 이 방법으로 갱신할 수 없다 — 별도 논의 대상.
+    const invalidateReservations = () =>
+        queryClient.invalidateQueries({ queryKey: reservationKeys.all() });
 
     const stateOpenWrite    = location.state?.openWrite    ?? false;
     const stateOpenReviewId = location.state?.openReviewId ?? null;
@@ -107,6 +128,9 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
 
     // ── 예약 결과 처리 (onFinish에서 분리해 중첩 제거) ──────────────────────
     const handleReservationResult = async (reservation) => {
+        // 목록으로 넘어가기 전에 무효화한다 — 결제 분기로 빠지는 경우까지 포함해
+        // 모든 경로가 한 번은 지나가는 지점이라 여기 한 곳에 두면 빠뜨릴 일이 없다.
+        invalidateReservations();
         if ((Number(reservation?.depositAmount) || 0) <= 0) {
             message.success('예약이 완료되었습니다.');
             navigate('/my-reservations');
@@ -138,6 +162,10 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 specialRequest:  values.specialRequest ?? null,
             });
             message.success('예약이 변경되었습니다.');
+            // 수정 경로는 원래 state.refetch로 강제 재조회를 시켜서 동작은 했다.
+            // invalidate가 정석이라 같이 걸어두고, state.refetch는 호환을 위해 남긴다
+            // (둘이 겹쳐도 TanStack Query가 중복 요청을 합쳐서 한 번만 나간다).
+            invalidateReservations();
             navigate('/my-reservations', { state: { refetch: true } });
         } catch (err) {
             const errMsg = toErrorMessage(err);

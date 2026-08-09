@@ -28,22 +28,43 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Typography } from 'antd';
 import Button from './Button';
+// colors 는 더 이상 쓰지 않는다 — 에러 텍스트 색은 index.css 의 .reserve-field-error 가 맡는다.
 import { fontSize, radius } from '../../styles/tokens';
 
 const { Text } = Typography;
 
-export const FormField = ({ label, children }) => (
+/**
+ * 폼 한 칸 — 라벨 + 입력 + (선택) 인라인 에러.
+ *
+ * error를 주면 입력칸 **바로 아래**에 빨간 글씨로 붙는다. 이게 정석인 이유:
+ * 토스트는 몇 초 뒤 사라지므로 "어느 칸이 잘못됐는지"를 다시 확인할 방법이 없고,
+ * 여러 칸이 동시에 틀리면 토스트가 겹쳐 쌓인다(실제로 문의하기에서 그렇게 됐다).
+ * 토스트는 **필드에 귀속되지 않는 오류**(서버 오류, 네트워크 실패)에만 쓴다.
+ *
+ * role="alert" — 스크린리더가 에러가 생긴 순간 읽어준다.
+ * 높이는 에러가 있을 때만 차지한다(항상 자리를 비워두면 폼이 성기게 보인다).
+ */
+export const FormField = ({ label, children, error }) => (
     <div>
         {label && (
             <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>{label}</Text>
         )}
         {children}
+        {/* ★ 스타일을 여기서 주지 않는다 — index.css 의 `.reserve-field-error` 가 유일한 출처다.
+            그 규칙은 AntD 의 `.ant-form-item-explain*` 과 **같은 선택자 목록**에 들어 있어서,
+            가게 등록(AntD Form.Item)과 이 모달(FormField)이 항상 같은 모양으로 나온다.
+            예전에는 여기 인라인으로 marginTop/fontSize/color 를 박아둬서, AntD 쪽만 고쳤을 때
+            이 화면은 그대로 남는 사고가 났다. */}
+        {error && (
+            <span className="reserve-field-error" role="alert">{error}</span>
+        )}
     </div>
 );
 
 FormField.propTypes = {
     label: PropTypes.string,
     children: PropTypes.node,
+    error: PropTypes.string,
 };
 
 const FormModal = ({

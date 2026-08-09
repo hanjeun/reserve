@@ -7,7 +7,6 @@ import {
 } from '@ant-design/icons';
 import { PageContainer, Button, FilterToolbar, MyReservationCardSkeleton, SpinIndicator } from '../../components/common';
 import ReservationRow from '../../components/reservation/ReservationRow';
-import ReservationMeta from '../../components/reservation/ReservationMeta';
 import ReservationDetailModal from '../../components/reservation/ReservationDetailModal';
 import QrCodeModal from '../../components/reservation/QrCodeModal';
 import { useReservations, useMessage, usePayment } from '../../hooks';
@@ -225,18 +224,6 @@ const MyReservations = () => {
         <ReservationRow
             reservation={res}
             onOpenDetail={() => setDetailReservation(res)}
-            renderMeta={(isWide) => (
-                <ReservationMeta
-                    memberName={res.memberName}
-                    guestCount={res.guestCount}
-                    reservationDate={res.reservationDate}
-                    reservationTime={res.reservationTime}
-                    isWide={isWide}
-                    // 모바일: 이름/인원 대신 예약번호+날짜/시간을 보여줌(2026-07).
-                    mobileCodeMode
-                    reservationCode={res.reservationCode}
-                />
-            )}
             renderActions={() => <ReservationActions res={res} {...actionHandlers} />}
             extraNote={
                 res.status === 'REJECTED' && res.rejectionReason ? (

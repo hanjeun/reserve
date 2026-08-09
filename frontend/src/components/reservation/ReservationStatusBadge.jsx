@@ -14,7 +14,12 @@ const STATUS_STYLE = {
     NO_SHOW:   { color: colors.text.tertiary  },
 };
 
-const ReservationStatusBadge = ({ status }) => {
+/**
+ * `unpaid` — 예약금이 있는데 아직 결제되지 않은 건.
+ * 별도 줄로 빼면 오른쪽 컬럼이 한 줄 더 길어져 스켈레톤·카드 높이가 어긋나므로
+ * 상태 라벨 뒤에 괄호로 붙인다("승인 대기 (미결제)").
+ */
+const ReservationStatusBadge = ({ status, unpaid = false }) => {
     const style = STATUS_STYLE[status] ?? STATUS_STYLE.PENDING;
     return (
         <span style={{
@@ -22,8 +27,11 @@ const ReservationStatusBadge = ({ status }) => {
             fontSize: fontSize.sm,
             fontWeight: fontWeight.semibold,
             whiteSpace: 'nowrap',
+            // ReservationRow가 줄 높이를 15px로 고정하므로 기본 line-height(1.5714=20.4)를 눌러둔다.
+            lineHeight: 1,
         }}>
             {RESERVATION_STATUS_LABELS[status] ?? status}
+            {unpaid && ' (미결제)'}
         </span>
     );
 };

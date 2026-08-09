@@ -19,7 +19,7 @@ export default function MockStoreListMobile() {
                             overflow: 'hidden',
                             border: `1px solid ${colors.border.light}`,
                             boxShadow: shadows.card,
-                            background: '#fff',
+                            background: colors.background.paper,
                             cursor: 'pointer',
                         }}
                     >
@@ -28,7 +28,7 @@ export default function MockStoreListMobile() {
                                 <img
                                     src={s.img}
                                     alt={s.name}
-                                    className="card-image"
+                                    className="mock-card-image"
                                     style={{
                                         width: '100%',
                                         height: 'auto',
@@ -89,9 +89,15 @@ export default function MockStoreListMobile() {
                     </div>
                 ))}
             </div>
+            {/* 클래스명은 Card.jsx의 .reserve-card-image와 겹치지 않게 mock- 접두사를 쓴다. */}
             <style>{`
-                .mock-card-m:hover .card-image {
+                .mock-card-m:hover .mock-card-image {
                     transform: scale(1.05);
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .mock-card-m:hover .mock-card-image {
+                        transform: none;
+                    }
                 }
             `}</style>
         </>

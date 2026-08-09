@@ -115,6 +115,7 @@ deploy-backend → Blue/Green 전환 → 헬스체크 → Nginx upstream 교체 
 | [사장님 가이드](docs/guide/owner-guide.md) | 가게 등록부터 예약 관리까지 |
 | [아키텍처](docs/technical/architecture.md) | 인프라 구조 · 배포 방식 · Git 브랜치 전략 |
 | [모니터링](docs/technical/monitoring.md) | Grafana · Loki · Sentry · UptimeRobot · SonarCloud |
+| [백업 · 복구](docs/technical/backup.md) | MySQL 백업 구성 · 복원 절차 · 복원 훈련 |
 | [코드 구조](docs/technical/structure.md) | 폴더 구조 · 라우트 · 환경변수 |
 | [디자인 시스템](docs/technical/design-system.md) | 디자인 토큰 · 공통 컴포넌트 |
 | [코드 컨벤션](docs/rules/code-conventions.md) | 네이밍 규칙 · 패키지 구조 |

@@ -12,6 +12,21 @@ MIT 263, ISC 22, Apache-2.0 13, BSD-2-Clause 7, BSD-3-Clause 4,
 0BSD 1, Python-2.0 1, CC-BY-4.0 1, OFL-1.1 1 (fonts).
 No copyleft (GPL / LGPL / AGPL / MPL) dependencies are present.
 
+### Fonts bundled outside npm
+
+`license-checker` only sees npm packages. Fonts vendored directly into the repo are listed here.
+
+| Font | Version | File | License |
+|---|---|---|---|
+| Pretendard | npm `pretendard@^1.3.9` | (bundled via `src/index.css` import) | OFL-1.1 |
+| SUITE | sun-typeface/SUITE 2.0.4 | `frontend/public/fonts/SUITE-Variable.woff2` | OFL-1.1 |
+
+SUITE has no npm package, so the variable `woff2` is committed to the repo and declared with
+`@font-face` in `frontend/src/index.css`. Upstream: https://github.com/sun-typeface/SUITE
+
+Both fonts are used under the SIL Open Font License 1.1, which permits bundling and
+redistribution as part of this application.
+
 Regenerate the full per-package list:
 
     cd frontend && npx license-checker --production --out ../THIRD_PARTY_frontend.txt

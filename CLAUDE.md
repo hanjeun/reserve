@@ -39,6 +39,27 @@ feature/*, hotfix/*
 
 ---
 
+## 설계 원칙 — 규칙은 주석이 아니라 코드에 둔다
+
+이 프로젝트에서 반복된 회귀는 **전부** "주석에는 규칙이 있는데 강제 장치가 없는" 케이스였다.
+필터 Select 색, 카드 hover 그림자, 확인 모달 줄바꿈 — 셋 다 주석에 "이렇게 해야 한다"만 있었고
+새로 추가하는 사람이 매번 놓쳤다.
+
+1. **정책은 관문 하나에서 강제한다.** 호출부 N곳을 고치는 대신 반드시 지나가는 지점에서 처리한다.
+   `useMessage.confirm`(줄바꿈), `FormSelect`/`FilterSelect`(색·높이)가 그 형태다.
+   className을 외워서 붙이게 만들면 반드시 샌다.
+2. **전역 CSS는 `index.css`에.** 컴포넌트 파일 안 `<style>` 태그에 전역 규칙을 넣으면
+   **그 컴포넌트를 안 쓰는 화면에는 규칙이 존재하지 않는다.** 이 함정에 두 번 빠졌다.
+   컴포넌트에는 그 인스턴스에만 적용되는 인라인 `style`만 둔다.
+3. **prop 분기가 3개를 넘으면 형제 컴포넌트로 갈라낸다.** 중첩을 깊게 하는 것보다 형제를 늘리는 게
+   읽기 쉽다. (`SegmentedControl`의 `wrap`/`block`/`columns`가 그 경계에 있다 — 다음 후보)
+4. **재사용은 두 번째 사용처가 생길 때 뺀다.** "혹시 재사용할까 봐" 미리 빼면 순수 손해고,
+   두 번째가 미묘하게 다르면 복붙이 정답일 수도 있다.
+
+세부는 `docs/technical/design-system.md`.
+
+---
+
 ## 함정 (실제로 겪은 것만)
 
 ### DB
@@ -50,6 +71,29 @@ feature/*, hotfix/*
 ```js
 const total = result?.page?.totalElements ?? result?.totalElements ?? 0;
 ```
+
+### 아이콘 회전 — 닫힘 상태를 `transform: none`으로 두면 방향이 뒤집힌다
+`none` ↔ `rotate(180deg)` 전환은 각도가 아니라 **행렬 보간**이고, 정확히 180°는 방향이
+결정되지 않는 퇴화 케이스라 엔진이 임의로 고른다("펼칠 때 반시계로 도는" 원인).
+닫힘 상태에도 `rotate(0deg)`를 명시할 것. 회전 규칙과 되돌리기 절차는
+`docs/technical/design-system.md`의 "꺾쇠·화살표 회전 규칙"에 있다.
+
+### CSS 주석 — 종료 기호를 문자로 적으면 다음 규칙이 통째로 사라진다
+주석 안에 주석 종료 기호를 그대로 적으면 거기서 주석이 끝난다. 뒤따르는 산문을 CSS 파서가
+**선택자로 해석**하고, 에러 복구를 위해 **다음 중괄호 블록까지 삼켜서 버린다.**
+`index.css`의 필터 Select 규칙이 이렇게 죽어 있었고("다크는 되는데 라이트만 회색") 두 세션을 날렸다.
+JSX template literal 안 주석에 백틱을 못 쓰는 것과 같은 종류의 함정이다(그 백틱으로 앱을 못 뜨게 만든 전례도 있다).
+```bash
+node -e "const p=require('postcss');const r=p.parse(require('fs').readFileSync('src/index.css','utf8'));
+r.walkRules(x=>{if(/[가-힣]/.test(x.selector))console.log('★ 파싱사고:',x.selector.slice(0,50))})"
+```
+
+### antd 6 — 클래스명이 바뀌었다
+`.ant-select-selector`는 **antd 5 이름이고 6에는 그 요소가 없다**(자식은 `-content` `-placeholder`
+`-input` `-prefix` `-suffix` `-selection-item`). 옛 이름은 조용히 무시된다 — `FormSelect`의 높이 CSS가
+이래서 통째로 죽어 있었다. 배경·높이·모서리는 루트 `.ant-select`가 갖고, 값은 **CSS 커스텀 프로퍼티**
+(`--ant-select-height` 등)로 흐른다. `padding-block`이 그 변수로 계산되므로 **`height`만 강제하면
+글자가 위로 쏠린다** — 변수를 덮어야 한다. 클래스 목록은 `node_modules/@rc-component/select`에서 확인.
 
 ### antd 6
 - `destroyOnClose` → **`destroyOnHidden`** (deprecated)
@@ -97,6 +141,8 @@ node scripts/backfill-deployments.mjs --reset --apply  # 태그별 Deployment �
 | `docs/technical/structure.md` | 폴더 구조·라우트·환경변수 |
 | `docs/technical/design-system.md` | 디자인 토큰·공통 컴포넌트 |
 | `docs/technical/deployments.md` | 릴리즈·배포 기록 런북 |
+| `docs/technical/backup.md` | MySQL 백업·복원 런북 (스크립트는 `scripts/*-mysql.sh`) |
+| `docs/technical/manual-ddl.md` | `ddl-auto`가 못 만드는 DDL(FULLTEXT·컬럼 삭제·타입 변경) 런북 + 적용 이력 |
 | `docs/rules/code-conventions.md` | 네이밍·로그·주석 |
 | `docs/rules/git-workflow.md` | 브랜치·커밋·PR |
 

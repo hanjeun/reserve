@@ -9,8 +9,12 @@ import {
     ClockCircleOutlined,
     UploadOutlined,
     EnvironmentOutlined,
+    DesktopOutlined,
+    SunOutlined,
+    MoonOutlined,
 } from '@ant-design/icons';
-import { PageContainer, Button, FormInput, Avatar, Bone } from '../../components/common';
+import { PageContainer, Button, FormInput, Avatar, Bone, SegmentedControl, FormSelect } from '../../components/common';
+import useTheme, { FONT_OPTIONS, ACCENT_OPTIONS } from '../../hooks/useTheme';
 import AddressSearch from '../../components/store/StoreForm/AddressSearch';
 import { useMessage } from '../../hooks';
 import { memberService, businessService } from '../../services';
@@ -22,7 +26,8 @@ import useAuthStore from '../../store/useAuthStore';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import useImagePreview from '../../hooks/useImagePreview';
 import { useNavigate } from 'react-router-dom';
-import { colors, radius, shadows, fontSize, fontWeight, animation } from '../../styles/tokens';
+import { colors, radius, shadows, fontSize, fontWeight, animation, breakpoints } from '../../styles/tokens';
+import { useWindowWidth } from '../../hooks';
 
 const { Text } = Typography;
 
@@ -603,6 +608,7 @@ const BusinessTab = ({ user }) => {
                 onPreview={handlePreview} onPreviewClickCapture={suppressLinkNavigation}
                 beforeUpload={beforeUploadLicense}
                 onSubmit={handleSubmit} loading={submitLoading}
+                licenseRequired
             />
             <PreviewModal />
         </div>
@@ -617,59 +623,109 @@ const BusinessTab = ({ user }) => {
                 onPreview={handlePreview} onPreviewClickCapture={suppressLinkNavigation}
                 beforeUpload={beforeUploadLicense}
                 onSubmit={handleSubmit} loading={submitLoading}
+                licenseRequired
             />
             <PreviewModal />
         </>
     );
 };
 
-const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청' }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={bizStyles.infoNotice}>
-            <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
-                사업자 등록증으로 간단히 인증하고 가게를 등록해보세요
-            </Text>
-        </div>
+/**
+ * 사업자 인증 입력 폼.
+ *
+ * ★ 2026-08-06 — 이 탭만 폼 규격 밖에 있었다
+ *   마이페이지의 이름·비밀번호·위치 탭은 전부 `Form.Item` + `rules` 라 미입력이면
+ *   **입력칸 밑에 빨간 글씨**가 붙는데, 사업자 탭만 useState 객체 + `message.warning` 토스트였다.
+ *   그래서 어느 칸이 문제인지 화면에서 알 수 없었고(토스트는 상단에 뜬다) 다른 탭과 감각이 달랐다.
+ *   → AntD Form 으로 옮겨 다른 탭과 같은 규격으로 맞춘다.
+ *
+ *   부모(BusinessTab)는 여전히 `form` state 로 값을 들고 있다(수정 모드 프리필·제출 payload 가
+ *   그 값을 쓴다). 그래서 여기서는 AntD Form 을 **입력·검증 계층으로만** 쓰고
+ *   `onValuesChange` 로 부모 state 를 계속 동기화한다 — 부모 쪽을 통째로 갈아엎지 않으면서
+ *   검증 UX 만 규격에 맞추는 절충이다.
+ *
+ *   `initialValues` 만 쓰고 setFieldsValue 이펙트를 두지 않는 이유: 수정 모드는
+ *   handleStartEdit 가 setForm → setIsEditing 순서로 호출해 **폼이 새 값으로 마운트**되므로
+ *   초기값만으로 충분하고, 이펙트를 두면 타이핑 중 값을 되돌릴 위험만 생긴다.
+ */
+const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청', licenseRequired = false }) => {
+    const [antdForm] = Form.useForm();
 
-        <FormInput
-            placeholder="상호명 *"
-            value={form.businessName}
-            onChange={e => setForm(f => ({ ...f, businessName: e.target.value }))}
-        />
-        <FormInput
-            placeholder="사업자 등록번호 (선택)"
-            value={form.businessNumber}
-            onChange={e => setForm(f => ({ ...f, businessNumber: e.target.value }))}
-        />
-        <FormInput
-            placeholder="추가 메모 (선택)"
-            value={form.memo}
-            onChange={e => setForm(f => ({ ...f, memo: e.target.value }))}
-        />
-
-        {/* 사업자 등록증 — 가게 이미지 업로드(StoreImages)와 동일한 picture-card Upload + 공유 useImagePreview 재사용.
-            눈(미리보기)·휴지통(삭제) 아이콘까지 가게 폼과 완전히 동일하게 동작한다. */}
-        <Upload
-            listType="picture-card"
-            fileList={fileList}
-            onChange={onFileListChange}
-            onPreview={onPreview}
-            onClickCapture={onPreviewClickCapture}
-            beforeUpload={beforeUpload}
-            accept="image/*"
-            maxCount={1}
+    return (
+        <Form
+            form={antdForm}
+            layout="vertical"
+            requiredMark={false}
+            size="large"
+            initialValues={form}
+            /* 폼이 들고 있는 필드 중 부모 state 로 넘길 것만 골라 담는다.
+               `...all` 로 통째로 넘기면 아래 등록증 검증용 더미 필드(license)까지 섞여
+               제출 payload 에 쓸데없는 키가 들어간다. */
+            onValuesChange={(_, all) => setForm(f => ({
+                ...f,
+                businessName: all.businessName ?? '',
+                businessNumber: all.businessNumber ?? '',
+                memo: all.memo ?? '',
+            }))}
+            onFinish={onSubmit}
         >
-            {fileList.length === 0 && (
-                <div>
-                    <UploadOutlined style={{ fontSize: 20, color: colors.text.tertiary }} />
-                    <div style={{ marginTop: 8, fontSize: fontSize.xs, color: colors.text.tertiary }}>사업자 등록증 *</div>
-                </div>
-            )}
-        </Upload>
+            <div style={{ ...bizStyles.infoNotice, marginBottom: 12 }}>
+                <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
+                    사업자 등록증으로 간단히 인증하고 가게를 등록해보세요
+                </Text>
+            </div>
 
-        <Button variant="primary" loading={loading} onClick={onSubmit} block>{submitLabel}</Button>
-    </div>
-);
+            <Form.Item
+                name="businessName"
+                style={{ marginBottom: 12 }}
+                rules={[{ required: true, whitespace: true, message: '상호명을 입력해주세요' }]}
+            >
+                <FormInput placeholder="상호명 *" />
+            </Form.Item>
+            <Form.Item name="businessNumber" style={{ marginBottom: 12 }}>
+                <FormInput placeholder="사업자 등록번호 (선택)" />
+            </Form.Item>
+            <Form.Item name="memo" style={{ marginBottom: 12 }}>
+                <FormInput placeholder="추가 메모 (선택)" />
+            </Form.Item>
+
+            {/* 사업자 등록증 — 가게 이미지 업로드(StoreImages)와 동일한 picture-card Upload + 공유 useImagePreview 재사용.
+                눈(미리보기)·휴지통(삭제) 아이콘까지 가게 폼과 완전히 동일하게 동작한다.
+                파일은 부모의 fileList 가 들고 있어 Form 의 값이 아니다 → validator 로만 검증한다.
+                수정 모드에서는 등록증 재업로드가 선택이라 licenseRequired 로 갈랐다. */}
+            <Form.Item
+                name="license"
+                style={{ marginBottom: 12 }}
+                rules={licenseRequired ? [{
+                    validator: () => (fileList.length > 0
+                        ? Promise.resolve()
+                        : Promise.reject(new Error('사업자 등록증 이미지를 업로드해주세요'))),
+                }] : undefined}
+            >
+                <Upload
+                    listType="picture-card"
+                    fileList={fileList}
+                    onChange={onFileListChange}
+                    onPreview={onPreview}
+                    onClickCapture={onPreviewClickCapture}
+                    beforeUpload={beforeUpload}
+                    accept="image/*"
+                    maxCount={1}
+                >
+                    {fileList.length === 0 && (
+                        <div>
+                            <UploadOutlined style={{ fontSize: 20, color: colors.text.tertiary }} />
+                            <div style={{ marginTop: 8, fontSize: fontSize.xs, color: colors.text.tertiary }}>사업자 등록증 *</div>
+                        </div>
+                    )}
+                </Upload>
+            </Form.Item>
+
+            {/* Button 은 우리 공용 컴포넌트라 htmlType 을 전달하지 않는다 → submit() 을 직접 호출한다. */}
+            <Button variant="primary" loading={loading} onClick={() => antdForm.submit()} block>{submitLabel}</Button>
+        </Form>
+    );
+};
 
 const bizStyles = {
     statusCard: (type) => ({
@@ -775,6 +831,107 @@ const NotificationSection = ({ user }) => {
     );
 };
 
+// ─── 디자인 설정 ─────────────────────────────────────────────────────────────
+/**
+ * 화면 모양(시스템/라이트/다크)과 글꼴을 고르는 섹션.
+ *
+ * 컨트롤은 새로 만들지 않고 기존 디자인 시스템을 그대로 쓴다 —
+ * 모양은 SegmentedControl(탭처럼 고르는 형태), 글꼴은 FormSelect(∨ 드롭다운).
+ * 토글(Switch)을 안 쓴 이유: 모양은 3지선다라 on/off로 표현할 수 없고,
+ * 나중에 언어 옵션이 붙어도 같은 두 컨트롤로 확장된다.
+ *
+ * 설정은 localStorage에 저장된다(기기별). 서버 동기화가 필요해지면
+ * Member 컬럼을 추가해 /api/member/me 응답에 실어 보내면 추가 요청 없이 확장된다.
+ */
+const AppearanceSection = () => {
+    const { theme, setTheme, font, setFont, accent, setAccent, resolvedTheme } = useTheme();
+
+    return (
+        <div style={styles.notificationSection}>
+            <Text strong style={styles.sectionTitle}>디자인</Text>
+
+            <div style={styles.designRow}>
+                <div style={styles.designLabel}>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>모양</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                        시스템을 고르면 기기 설정을 따라갑니다
+                    </Text>
+                </div>
+                <SegmentedControl
+                    block={false}
+                    value={theme}
+                    onChange={setTheme}
+                    options={[
+                        { value: 'system', label: <span><DesktopOutlined /> 시스템</span> },
+                        { value: 'light',  label: <span><SunOutlined /> 라이트</span> },
+                        { value: 'dark',   label: <span><MoonOutlined /> 다크</span> },
+                    ]}
+                />
+            </div>
+
+            <div style={{ borderTop: `1px solid ${colors.border.light}`, margin: '4px 0' }} />
+
+            {/* ★ 글꼴·포인트 색을 한 줄에 2개로 놓는다.
+                예전에는 글꼴 셀렉트 하나가 남는 폭을 전부 차지해서 "얇고 긴 띠"처럼 보였다.
+                FormSelect 는 width:100% 라 부모 칸이 폭을 정한다 — 2열 그리드로 칸을 반씩 나누면
+                가게 등록 폼(항목이 2열로 놓인 화면)과 같은 비율이 된다.
+                모바일(1열)에서는 원래대로 100%가 되는 게 맞다 — 좁은 화면에서 반칸은 너무 좁다. */}
+            <div style={styles.designGrid}>
+                <div>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>글꼴</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block', marginBottom: 8 }}>
+                        앱 전체에 적용됩니다
+                    </Text>
+                    <FormSelect
+                        value={font}
+                        onChange={setFont}
+                        /* ★ 각 옵션을 **그 글꼴로** 보여준다.
+                           예전에는 라벨이 전부 현재 적용된 글꼴로 렌더돼서, 고르기 전에
+                           어떤 모양인지 알 수 없었다(글꼴 선택기가 미리보기를 못 하는 셈).
+                           fontFamily 를 옵션마다 인라인으로 주면 목록에서 바로 비교된다. */
+                        options={FONT_OPTIONS.map(o => ({
+                            value: o.value,
+                            label: <span style={{ fontFamily: o.stack }}>{o.label}</span>,
+                        }))}
+                    />
+                </div>
+
+                <div>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>포인트 색</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block', marginBottom: 8 }}>
+                        버튼·강조 표시에 쓰입니다
+                    </Text>
+                    {/* 색은 이름만으로는 고르기 어렵다 — 옵션마다 실제 색 점을 함께 보여준다.
+                        점 색은 지금 테마(라이트/다크)에 맞는 값이어야 실제 적용 결과와 일치한다. */}
+                    <FormSelect
+                        value={accent}
+                        onChange={setAccent}
+                        options={ACCENT_OPTIONS.map(o => ({
+                            value: o.value,
+                            label: (
+                                // ★ verticalAlign: middle 이 필요하다 — inline-flex 박스의 baseline 은
+                                // 첫 flex 항목의 baseline 인데, 그 항목이 글자 없는 색 점이라 baseline 이
+                                // 박스 아래끝이 된다. 그러면 줄상자가 늘어나 이 셀렉트만 1px 높아진다
+                                // (실측: 글꼴 54.1px vs 포인트색 55.1px). middle 이면 그 영향이 사라진다.
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, verticalAlign: 'middle' }}>
+                                    <span
+                                        aria-hidden="true"
+                                        style={{
+                                            width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
+                                            background: (resolvedTheme === 'dark' ? o.darkMode : o.light).main,
+                                        }}
+                                    />
+                                    {o.label}
+                                </span>
+                            ),
+                        }))}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── MyPage 메인 ─────────────────────────────────────────────────────────────
 
 const MyPage = () => {
@@ -790,6 +947,7 @@ const MyPage = () => {
         confirm({
             title: '회원 탈퇴',
             icon: <ExclamationCircleOutlined style={{ color: colors.error.main }} />,
+            // 문장 단위 줄바꿈은 useMessage의 confirm 래퍼가 처리한다 — 여기선 평범한 문자열이면 된다.
             content: '탈퇴하면 모든 데이터가 삭제되며 복구할 수 없습니다. 정말 탈퇴하시겠습니까?',
             okText: '탈퇴하기',
             cancelText: '취소',
@@ -838,9 +996,17 @@ const MyPage = () => {
         }] : []),
     ];
 
-    return (
-        <PageContainer size="sm" paddingTop="48px">
+    // PC에서는 좌우 2단으로 나눈다(가게 상세의 pcLeft/pcRight와 같은 패턴).
+    // 예전엔 size="sm"(maxWidth 420)이라 PC에서도 모바일 폭 그대로였고 양옆이 텅 비었다.
+    // 모바일은 기존 흐름(세로 1열)을 그대로 유지한다 — 폰 화면은 건드리지 않는다는 원칙.
+    // 경계는 tablet(768) — 아이패드·갤럭시탭도 PC처럼 2단으로 본다.
+    // pc(900)로 잡았더니 아이패드 세로(768~820)가 모바일 1열이라 좌우가 텅 비어 어색했다.
+    // 768에서도 성립하는지 계산: 컨테이너 768-48=720, gap 32 → 좌우 합 688.
+    // pcLeft basis 420 + pcRight basis 300(minWidth 280)이면 688 안에 들어간다.
+    const isPC = useWindowWidth() >= breakpoints.tablet;
 
+    const leftColumn = (
+        <>
             {/* 프로필 헤더 */}
             <div style={styles.profileHeader}>
                 <Avatar src={user?.profileImageUrl || user?.profileImage} size={56} />
@@ -860,6 +1026,13 @@ const MyPage = () => {
                 <Text strong style={styles.sectionTitle}>내 정보 수정</Text>
                 <Tabs defaultActiveKey="name" items={tabItems} className="reserve-pill-tabs" tabBarGutter={4} animated={{ inkBar: true, tabPane: false }} />
             </div>
+        </>
+    );
+
+    const rightColumn = (
+        <>
+            {/* 디자인(모양·글꼴) */}
+            <AppearanceSection />
 
             <Divider />
 
@@ -873,7 +1046,7 @@ const MyPage = () => {
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main }}>회원 탈퇴</Text>
                     <Text type="secondary" style={{ display: 'block', fontSize: fontSize.xs, marginTop: 2 }}>
-                        탈퇴 시 모든 예약·리뷰 데이터가 삭제되며 복구할 수 없습니다
+                        모든 예약·리뷰 데이터가 삭제되며 복구할 수 없습니다
                     </Text>
                 </div>
                 <Button variant="danger" size="sm" onClick={handleDeleteAccount}
@@ -881,7 +1054,29 @@ const MyPage = () => {
                     탈퇴하기
                 </Button>
             </div>
+        </>
+    );
 
+    // 모바일: 기존과 완전히 동일한 세로 1열(size="sm", 420px). 순서도 그대로 —
+    // 프로필 → 내 정보 수정 → [디자인] → 알림 → 탈퇴. 디자인 섹션만 새로 끼어든다.
+    if (!isPC) {
+        return (
+            <PageContainer size="sm" paddingTop="48px">
+                {leftColumn}
+                <Divider />
+                {rightColumn}
+            </PageContainer>
+        );
+    }
+
+    // PC: 좌우 2단. 왼쪽은 프로필·정보수정(입력 위주라 넓게), 오른쪽은 설정·탈퇴.
+    // 오른쪽을 sticky로 두면 왼쪽 탭 내용이 길어져도 설정이 따라온다(StoreDetail과 같은 패턴).
+    return (
+        <PageContainer size="lg" paddingTop="48px">
+            <div style={styles.pcGrid}>
+                <div style={styles.pcLeft}>{leftColumn}</div>
+                <div style={styles.pcRight}>{rightColumn}</div>
+            </div>
         </PageContainer>
     );
 };
@@ -889,6 +1084,35 @@ const MyPage = () => {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = {
+    // ── PC 2단 (900px 이상) ──────────────────────────────────────────────────
+    // StoreDetail의 pcLeft/pcRight와 같은 구조. gap 32는 두 카드 묶음이 서로 다른 영역으로
+    // 읽히기에 충분하면서, 1000px 컨테이너에서 양쪽이 좁아지지 않는 값이다.
+    pcGrid:  { display: 'flex', gap: 32, alignItems: 'flex-start' },
+    // basis 420/300 — 아이패드 세로(768)에서도 두 열이 들어가는 값이다(위 isPC 주석의 계산 참고).
+    // 넓은 화면에서는 grow로 자연스럽게 벌어지고 pcRight의 maxWidth가 오른쪽 폭을 잡아준다.
+    pcLeft:  { flex: '1 1 420px', minWidth: 0 },
+    // sticky — 왼쪽 탭(위치/사업자 등)이 길어져도 설정이 화면에 남는다.
+    // top 80은 고정 헤더(64) + 여백. alignSelf: flex-start가 없으면 flex가 높이를 늘려 sticky가 안 먹는다.
+    pcRight: { flex: '1 1 300px', minWidth: 280, maxWidth: 420, position: 'sticky', top: 80, alignSelf: 'flex-start' },
+
+    // 디자인 섹션 — 라벨(왼쪽)과 컨트롤(오른쪽)이 한 줄. 좁아지면 컨트롤이 아래로 내려간다.
+    designRow: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 12, flexWrap: 'wrap', padding: '4px 0',
+    },
+    designLabel: { minWidth: 0, flex: '1 1 auto' },
+    // 글꼴·포인트 색을 한 줄에 2개. 최소 폭을 두어 좁아지면 자동으로 1열이 된다
+    // (미디어쿼리 없이 auto-fit + minmax 로 처리 — 브레이크포인트를 하나 더 만들 이유가 없다).
+    designGrid: {
+        display: 'grid',
+        // ★ 2열 고정이다. auto-fit + minmax(200px) 로 뒀더니 이 카드 폭에서 최소폭을 못 채워
+        //   1열로 접히고 결과적으로 2줄이 됐다 — "한 줄에 2개, 작게"가 요구사항이므로 고정한다.
+        //   좁아지면 각 칸이 함께 좁아질 뿐 줄이 늘지 않는다(가게 등록 폼도 모바일에서 2열을 유지한다).
+        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+        gap: 12,
+        padding: '4px 0',
+    },
+
     profileHeader: {
         display: 'flex', alignItems: 'center', gap: 16,
         padding: '20px 24px',

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Flex } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
-import { colors, radius, fontWeight, heights, fontSize } from '../../../../styles/tokens';
+import { colors, radius, fontWeight, heights, fontSize, field, fieldPx } from '../../../../styles/tokens';
 import { mockInputBase, mockFormLabel } from '../../Home.styles';
 
 const SECTION_BG = '#f8f9fa';
@@ -17,7 +17,7 @@ export default function MockBookingFormMobile() {
             height: 360,
             overflow: 'hidden',
             borderRadius: radius['2xl'],
-            background: '#fff',
+            background: colors.background.paper,
             border: `1px solid ${colors.border.light}`,
             boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
         }}>
@@ -57,7 +57,7 @@ export default function MockBookingFormMobile() {
                 </div>
                 <div>
                     <label style={{ ...mockFormLabel, fontSize: 12 }}>요청 사항</label>
-                    <div style={{ background: colors.gray[50], borderRadius: radius.lg, height: 54, display: 'flex', alignItems: 'flex-start', padding: '10px 14px' }}>
+                    <div style={{ background: colors.gray[50], borderRadius: field.radius, height: fieldPx(field.height), display: 'flex', alignItems: 'flex-start', padding: '10px 14px' }}>
                         <span style={{ color: colors.text.tertiary, fontSize: 13 }}>요청 사항을 입력하세요.</span>
                     </div>
                 </div>

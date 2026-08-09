@@ -9,7 +9,9 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { DatePicker } from 'antd';
+import { CalendarOutlined } from '@ant-design/icons';
 import { colors, radius, heights } from '../../styles/tokens';
+import { pickerSuffix, hasPickerValue } from './pickerSuffix';
 
 const baseStyle = (disabled, extra = {}) => ({
     width: '100%',
@@ -34,6 +36,7 @@ const FormDatePicker = ({
         variant="filled"
         size="large"
         style={baseStyle(disabled, style)}
+        suffixIcon={pickerSuffix(CalendarOutlined, hasPickerValue(rest.value), disabled)}
         {...rest}
     />
 );
@@ -52,6 +55,7 @@ FormDatePicker.RangePicker = ({ disabled = false, format = 'YYYY-MM-DD', style, 
         variant="filled"
         size="large"
         style={baseStyle(disabled, style)}
+        suffixIcon={pickerSuffix(CalendarOutlined, hasPickerValue(rest.value), disabled)}
         id={id ? { start: id } : undefined}
         {...rest}
     />

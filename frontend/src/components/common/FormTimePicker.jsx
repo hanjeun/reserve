@@ -9,7 +9,9 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { TimePicker } from 'antd';
+import { ClockCircleOutlined } from '@ant-design/icons';
 import { colors, radius, heights } from '../../styles/tokens';
+import { pickerSuffix, hasPickerValue } from './pickerSuffix';
 
 const baseStyle = (disabled, extra = {}) => ({
     width: '100%',
@@ -28,6 +30,7 @@ const FormTimePicker = ({ placeholder = '시간 선택', disabled = false, forma
         variant="filled"
         size="large"
         style={baseStyle(disabled, style)}
+        suffixIcon={pickerSuffix(ClockCircleOutlined, hasPickerValue(rest.value), disabled)}
         {...rest}
     />
 );
@@ -46,6 +49,7 @@ FormTimePicker.RangePicker = ({ disabled = false, format = 'HH:mm', style, id, .
         variant="filled"
         size="large"
         style={baseStyle(disabled, style)}
+        suffixIcon={pickerSuffix(ClockCircleOutlined, hasPickerValue(rest.value), disabled)}
         id={id ? { start: id } : undefined}
         {...rest}
     />

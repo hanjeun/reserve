@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -45,8 +46,28 @@ public class PaymentService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(MemberException::notFound);
 
+        // ★ 본인 예약인지 확인한다 (2026-08-09).
+        //   예전엔 reservationId 를 body 에서 받아 그대로 조회만 했다. 로그인만 하면
+        //   남의 예약에 대해 결제를 준비하고, 아래 금액 문제와 겹쳐 남의 예약을
+        //   임의 금액으로 "결제 완료" 상태로 만들 수 있었다.
+        if (reservation.getMember() == null || !reservation.getMember().getId().equals(memberId)) {
+            log.warn("Payment prepare denied - not owner: reservationId={}, memberId={}",
+                    reservation.getId(), memberId);
+            throw new PaymentException("본인의 예약만 결제할 수 있습니다.", HttpStatus.FORBIDDEN);
+        }
+
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
             throw new PaymentException("이미 결제가 완료된 예약입니다.", HttpStatus.CONFLICT);
+        }
+
+        // ★ 결제 금액은 서버에서만 정한다 (2026-08-09).
+        //   예전엔 requestDto.getAmount() 를 그대로 Payment.amount 에 넣었고,
+        //   verifyAndCompletePayment 는 PG 결제액을 "그 값"과 비교했다. 즉 검증이
+        //   공격자가 정한 숫자를 기준으로 통과했고, markDepositPaid 가 예약의
+        //   예약금을 그 금액으로 덮어썼다. 요청 본문의 amount 는 이제 무시한다.
+        int amount = resolveDepositAmount(reservation);
+        if (amount <= 0) {
+            throw new PaymentException("결제할 예약금이 없는 예약입니다.", HttpStatus.BAD_REQUEST);
         }
 
         // 기존 READY 상태 Payment가 있으면 재사용 (결제창 재시도 지원)
@@ -55,11 +76,18 @@ public class PaymentService {
         Payment existingReady = readyPayments.isEmpty() ? null : readyPayments.get(0);
 
         if (existingReady != null) {
+            // 재사용 시에도 금액을 현재 정책 값으로 다시 맞춘다 — 예전 READY 행에는
+            // 클라이언트가 보냈던 금액이 그대로 남아 있을 수 있다.
+            if (!Integer.valueOf(amount).equals(existingReady.getAmount())) {
+                log.info("Resyncing READY payment amount: paymentId={}, {} -> {}",
+                        existingReady.getId(), existingReady.getAmount(), amount);
+                existingReady.setAmount(amount);
+            }
             log.info("Reusing existing READY payment: paymentId={}, merchantUid={}",
                     existingReady.getId(), existingReady.getMerchantUid());
             return PaymentPrepareDto.builder()
                     .merchantUid(existingReady.getMerchantUid())
-                    .amount(existingReady.getAmount())
+                    .amount(amount)
                     .productName(existingReady.getProductName())
                     .buyerName(existingReady.getBuyerName())
                     .buyerEmail(existingReady.getBuyerEmail())
@@ -76,7 +104,7 @@ public class PaymentService {
                 .member(member)
                 .reservation(reservation)
                 .merchantUid(merchantUid)
-                .amount(requestDto.getAmount())
+                .amount(amount)
                 .productName(requestDto.getProductName())
                 .buyerName(requestDto.getBuyerName() != null ? requestDto.getBuyerName() : member.getName())
                 .buyerEmail(requestDto.getBuyerEmail() != null ? requestDto.getBuyerEmail() : member.getEmail())
@@ -89,7 +117,7 @@ public class PaymentService {
 
         return PaymentPrepareDto.builder()
                 .merchantUid(merchantUid)
-                .amount(requestDto.getAmount())
+                .amount(amount)
                 .productName(requestDto.getProductName())
                 .buyerName(payment.getBuyerName())
                 .buyerEmail(payment.getBuyerEmail())
@@ -100,9 +128,57 @@ public class PaymentService {
                 .build();
     }
 
+    /**
+     * 결제할 예약금을 서버에서 결정한다.
+     *
+     * <p>예약 생성 시 {@code store.noShowDeposit} 을 예약에 복사해 두므로(ReservationService)
+     * 예약의 값이 1순위다. 과거 데이터 등으로 비어 있으면 가게의 현재 설정으로 폴백한다.
+     * 어느 쪽도 없으면 0 을 돌려주고 호출측이 400 으로 막는다.
+     */
+    private int resolveDepositAmount(Reservation reservation) {
+        Integer fromReservation = reservation.getDepositAmount();
+        if (fromReservation != null && fromReservation > 0) {
+            return fromReservation;
+        }
+        Store store = reservation.getStore();
+        Integer fromStore = (store != null) ? store.getNoShowDeposit() : null;
+        return (fromStore != null && fromStore > 0) ? fromStore : 0;
+    }
+
+    /**
+     * 외부(사용자) 결제 검증 요청 — <b>본인 결제만.</b>
+     *
+     * <p>2026-08-09 추가. 예전 컨트롤러는 {@code SecurityUtil.getCurrentMember()} 의 반환값을
+     * 버리고 body 의 merchantUid 를 그대로 신뢰했다. 환불 엔드포인트에서 고친 것과 같은 구멍이다.
+     */
+    public PaymentResponseDto verifyAndCompletePaymentByMember(PaymentVerifyDto verifyDto, Member requester) {
+        Payment payment = paymentRepository.findByMerchantUid(verifyDto.getMerchantUid())
+                .orElseThrow(PaymentException::notFound);
+
+        if (payment.getMember() == null || !payment.getMember().getId().equals(requester.getId())) {
+            log.warn("Payment verify denied - not owner: merchantUid={}, requesterId={}",
+                    verifyDto.getMerchantUid(), requester.getId());
+            throw new PaymentException("본인의 결제만 검증할 수 있습니다.", HttpStatus.FORBIDDEN);
+        }
+
+        return verifyAndCompletePayment(verifyDto);
+    }
+
     public PaymentResponseDto verifyAndCompletePayment(PaymentVerifyDto verifyDto) {
         Payment payment = paymentRepository.findByMerchantUid(verifyDto.getMerchantUid())
                 .orElseThrow(PaymentException::notFound);
+
+        // ★ 상태 가드 (2026-08-09) — 예전엔 상태를 보지 않아 몇 번이든 다시 돌릴 수 있었다.
+        //   PC 결제는 usePayment 와 PaymentResult 에서 실제로 두 번 호출되고 있고,
+        //   환불된 결제에 대고 재실행하면 completePayment 가 다시 돌아 상태가 뒤엉킨다.
+        //   이미 끝난 검증은 같은 결과를 그대로 돌려주고(멱등), 그 외 상태는 막는다.
+        if (payment.getStatus() == Payment.PaymentStatus.PAID) {
+            log.info("Payment already verified, returning existing result: {}", payment.getMerchantUid());
+            return PaymentResponseDto.fromEntity(payment);
+        }
+        if (payment.getStatus() != Payment.PaymentStatus.READY) {
+            throw new PaymentException("검증할 수 있는 결제 상태가 아닙니다.", HttpStatus.BAD_REQUEST);
+        }
 
         // V2 API: merchantUid(=paymentId)로 조회
         PortoneV2PaymentResponse portonePayment = portoneService.getPaymentInfo(payment.getMerchantUid());
@@ -240,6 +316,16 @@ public class PaymentService {
         return refundPayment(safeDto);
     }
 
+    /**
+     * 예약 취소에 따른 자동 환불.
+     *
+     * <p>★ {@code REQUIRES_NEW} 인 이유 (2026-08-09) — 예전엔 호출자(cancelReservation)의
+     * 트랜잭션에 그대로 참여했다. 그래서 PG 가 에러를 주면 <b>예약 취소까지 통째로 롤백</b>됐고,
+     * 실제로 PortOne 이 404 를 주던 동안 예약금을 낸 고객은 예약 취소 자체가 불가능했다.
+     * 호출자가 예외를 catch 해도 소용없다 — 참여 트랜잭션에서 예외가 나면 전체가
+     * rollback-only 로 표시돼 커밋 시점에 터진다. 별도 트랜잭션이어야 격리된다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void refundByReservationCancel(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(ReservationException::notFound);
@@ -266,6 +352,30 @@ public class PaymentService {
         }
     }
 
+    /**
+     * 환불 예상 금액 조회 — <b>본인 예약 또는 ADMIN 만.</b>
+     *
+     * <p>2026-08-09 추가. 예전 컨트롤러는 로그인 여부만 보고 reservationId 를 그대로 받아서,
+     * 아무나 예약 ID 를 훑으며 다른 사람의 결제 금액·가게 환불 정책·예약 존재 여부를 읽을 수 있었다.
+     */
+    @Transactional(readOnly = true)
+    public RefundCalculationResult calculateRefundAmountForMember(Long reservationId, Member requester) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(ReservationException::notFound);
+
+        boolean isOwner = reservation.getMember() != null
+                && reservation.getMember().getId().equals(requester.getId());
+        boolean isAdmin = requester.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            log.warn("Refund preview denied - not owner: reservationId={}, requesterId={}",
+                    reservationId, requester.getId());
+            throw new PaymentException("본인의 예약만 조회할 수 있습니다.", HttpStatus.FORBIDDEN);
+        }
+
+        return calculateRefundAmount(reservationId);
+    }
+
     @Transactional(readOnly = true)
     public RefundCalculationResult calculateRefundAmount(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
@@ -280,11 +390,17 @@ public class PaymentService {
         //   둘이 어긋나면 화면엔 "5,000원 환불"이라고 보여주고 실제로는 다른 금액이 나간다.
         //   → **실제 결제 기록이 진실**이다. 결제 기록이 없을 때만 예약의 예약금으로 폴백한다
         //   (나중 결제·미결제 예약은 어차피 환불할 게 없어 0 으로 떨어진다).
+        // ★ 폴백을 없앴다 (2026-08-09).
+        //   예전엔 PAID 행이 없으면 reservation.depositAmount 로 폴백했다. 그런데
+        //   실행부(refundPayment)는 PAID 행이 없으면 404 를 던진다. 그래서 미리보기는
+        //   "10,000원 환불 가능"이라고 보여주고 실제 취소는 404 로 실패하는 상태였다.
+        //   부분 환불 후(PAID 행이 PARTIAL_REFUNDED 로 바뀜)와 미결제 예약에서 둘 다 발생한다.
+        //   미리보기와 실행이 같은 조회를 쓰도록 맞춘다 — 결제 기록이 없으면 환불액은 0 이다.
         int paidAmount = paymentRepository.findPaidByReservationId(reservationId)
                 .map(Payment::getAmount)
-                .orElseGet(() -> reservation.getDepositAmount() != null ? reservation.getDepositAmount() : 0);
+                .orElse(0);
 
-        if (paidAmount == 0) return new RefundCalculationResult(0, 0, "결제 내역 없음");
+        if (paidAmount <= 0) return new RefundCalculationResult(0, 0, "결제 내역 없음");
 
         int fullDays = store.getFullRefundDays() != null ? store.getFullRefundDays() : 3;
         int partialDays = store.getPartialRefundDays() != null ? store.getPartialRefundDays() : 1;
@@ -314,7 +430,9 @@ public class PaymentService {
         // 설정이 조용히 죽는다. 저장 시에도 막지만(StoreService), 이미 저장된 데이터가
         // 있을 수 있어 계산 시점에도 방어적으로 둔다.
         if (partialDays > 0 && partialDays < fullDays && daysUntil >= partialDays) {
-            return new RefundCalculationResult((paidAmount * partialRate) / 100, partialRate, "부분 환불 가능");
+            // int 곱셈은 결제액이 커지면 넘칠 수 있어 long 으로 계산한 뒤 결제액으로 한 번 더 자른다.
+            long partial = (long) paidAmount * partialRate / 100L;
+            return new RefundCalculationResult((int) Math.min(partial, paidAmount), partialRate, "부분 환불 가능");
         }
 
         return new RefundCalculationResult(0, 0, "환불 불가");

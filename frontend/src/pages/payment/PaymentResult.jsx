@@ -51,7 +51,11 @@ const PaymentResult = () => {
         if (success && impUid && merchantUid && !verified) {
             verifyPayment();
         } else if (success && !impUid) {
-            // 이미 검증된 케이스 (usePayment hook에서 직접 navigate)
+            // 이미 검증된 케이스 — 모바일은 백엔드 리다이렉트가 검증까지 끝내고 오므로 imp_uid가 없다.
+            // ★ 2026-08-09: 이 분기에 캐시 무효화가 빠져 있었다. 무효화는 verifyPayment 안에만
+            //   있어서 PC(재검증을 타는 경로)에서만 돌았고, 모바일로 결제하면 "내 예약"이
+            //   결제 전 상태 그대로 보였다(수동 새로고침을 눌러야 갱신됨).
+            queryClient.invalidateQueries({ queryKey: reservationKeys.my() });
             setTimeout(() => setAnimate(true), 100);
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps

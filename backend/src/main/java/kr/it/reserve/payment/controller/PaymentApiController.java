@@ -13,8 +13,11 @@ import kr.it.reserve.payment.service.PortoneService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -36,9 +39,14 @@ public class PaymentApiController {
     /**
      * [기능] 모바일 결제 사후 처리 (Redirect)
      * 결제 성공/실패 여부에 따라 프론트엔드 결과 페이지로 리다이렉트합니다.
+     *
+     * <p>★ 이 클래스는 {@code @RestController} 다. 예전에는 여기서 {@code "redirect:" + url} 문자열을
+     * 반환했는데, 뷰 리졸버를 타지 않으므로 302 가 나가지 않고 그 문자열이 <b>응답 본문</b>으로 찍혔다.
+     * 모바일 결제 후 브라우저에 {@code redirect:https://...} 가 그대로 보이고 이동하지 않던 원인이다.
+     * 302 는 {@link ResponseEntity} 로 직접 만들어야 한다.
      */
     @GetMapping("/mobile-redirect")
-    public String handleMobileRedirect(
+    public ResponseEntity<Void> handleMobileRedirect(
             @RequestParam(value = "imp_uid", required = false) String impUid,
             @RequestParam(value = "merchant_uid", required = false) String merchantUid,
             @RequestParam(value = "imp_success", required = false) String impSuccess,
@@ -46,10 +54,10 @@ public class PaymentApiController {
 
         log.info("Mobile payment redirect received: merchant_uid={}", merchantUid);
         boolean isSuccess = "true".equalsIgnoreCase(impSuccess);
-        String redirectBase = "redirect:" + frontendUrl + "/payment/result";
+        String redirectBase = frontendUrl + "/payment/result";
 
         if (!isSuccess) {
-            return redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(errorMsg);
+            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(errorMsg));
         }
 
         try {
@@ -63,24 +71,34 @@ public class PaymentApiController {
             verifyDto.setReservationId(payment.getReservation().getId());
 
             paymentService.verifyAndCompletePayment(verifyDto);
-            return redirectBase + "?success=true&merchant_uid=" + enc(merchantUid);
+            return redirect(redirectBase + "?success=true&merchant_uid=" + enc(merchantUid));
         } catch (BusinessException e) {
             // 도메인 예외의 메시지는 애초에 사용자에게 보여줄 목적으로 쓴 한국어 문구라 그대로 전달한다.
             log.warn("Mobile payment redirect failed: merchant_uid={}, {}", merchantUid, e.getMessage());
-            return redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(e.getMessage());
+            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(e.getMessage()));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
             // 브라우저 주소창에 그대로 실려 나가므로 고정 문구로 대체하고, 원인은 로그·Sentry에만 남긴다.
             log.error("Mobile payment redirect error: merchant_uid={}", merchantUid, e);
-            return redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("결제 처리 중 오류가 발생했습니다.");
+            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
+                    + "&error_msg=" + enc("결제 처리 중 오류가 발생했습니다."));
         }
     }
 
     /**
+     * 302 응답을 만든다. 목적지는 항상 우리 프론트엔드 URL 이고 쿼리 값은 {@link #enc} 로 인코딩된 뒤
+     * 넘어오므로, 외부 입력이 Location 헤더의 호스트를 바꾸는 경로는 없다(오픈 리다이렉트 아님).
+     */
+    private static ResponseEntity<Void> redirect(String location) {
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(location))
+                .build();
+    }
+
+    /**
      * 리다이렉트 쿼리스트링에 실을 값을 URL 인코딩한다.
-     * Spring의 "redirect:" 접두 문자열은 이미 붙어 있는 쿼리스트링을 그대로 Location 헤더로 내보내므로,
-     * 값에 &·#·%가 섞이면 파라미터가 잘리거나 뒤에 임의 파라미터를 덧붙일 수 있다.
+     * 여기서 만든 문자열은 그대로 Location 헤더가 되므로, 값에 &·#·%가 섞이면
+     * 파라미터가 잘리거나 뒤에 임의 파라미터를 덧붙일 수 있다.
      */
     private static String enc(String value) {
         return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);

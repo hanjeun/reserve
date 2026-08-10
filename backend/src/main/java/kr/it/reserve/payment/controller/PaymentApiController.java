@@ -44,20 +44,33 @@ public class PaymentApiController {
      * 반환했는데, 뷰 리졸버를 타지 않으므로 302 가 나가지 않고 그 문자열이 <b>응답 본문</b>으로 찍혔다.
      * 모바일 결제 후 브라우저에 {@code redirect:https://...} 가 그대로 보이고 이동하지 않던 원인이다.
      * 302 는 {@link ResponseEntity} 로 직접 만들어야 한다.
+     *
+     * <p>★ 2026-08-10 PortOne V2 전환 — 쿼리 파라미터 이름이 통째로 바뀌었다.
+     * <pre>
+     * V1: imp_uid / merchant_uid / imp_success / error_msg
+     * V2: paymentId / code / message            (성공 여부는 code 의 유무로 판단한다)
+     * </pre>
+     * V2 는 성공 시 {@code code} 를 보내지 않는다 — 그래서 "success 플래그"가 따로 없고
+     * <b>code 가 없으면 성공</b>이다. V1 의 {@code imp_success=true} 를 그대로 옮기면
+     * 모든 결제가 실패로 처리되므로 주의할 것.
+     *
+     * <p>{@code paymentId} 는 우리가 발급한 {@code merchantUid} 와 같은 값이다
+     * (요청 시 paymentId 에 merchantUid 를 그대로 실어 보낸다).
      */
     @GetMapping("/mobile-redirect")
     public ResponseEntity<Void> handleMobileRedirect(
-            @RequestParam(value = "imp_uid", required = false) String impUid,
-            @RequestParam(value = "merchant_uid", required = false) String merchantUid,
-            @RequestParam(value = "imp_success", required = false) String impSuccess,
-            @RequestParam(value = "error_msg", required = false) String errorMsg) {
+            @RequestParam(value = "paymentId", required = false) String paymentId,
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "message", required = false) String message) {
 
-        log.info("Mobile payment redirect received: merchant_uid={}", merchantUid);
-        boolean isSuccess = "true".equalsIgnoreCase(impSuccess);
+        log.info("Mobile payment redirect received: paymentId={}, code={}", paymentId, code);
+        boolean isSuccess = (code == null || code.isBlank());
         String redirectBase = frontendUrl + "/payment/result";
+        // 프론트 결과 페이지는 merchant_uid 로 읽는다. 파라미터 이름은 그대로 두고 값만 V2 의 paymentId 를 싣는다.
+        String merchantUid = paymentId;
 
         if (!isSuccess) {
-            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(errorMsg));
+            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(message));
         }
 
         try {
@@ -66,7 +79,6 @@ public class PaymentApiController {
                     .orElseThrow(() -> new PaymentException("결제 정보를 찾을 수 없습니다."));
 
             PaymentVerifyDto verifyDto = new PaymentVerifyDto();
-            verifyDto.setImpUid(impUid);
             verifyDto.setMerchantUid(merchantUid);
             verifyDto.setReservationId(payment.getReservation().getId());
 
@@ -179,7 +191,9 @@ public class PaymentApiController {
      */
     @GetMapping("/config")
     public ApiResponse<Map<String, String>> getPaymentConfig() {
-        Map<String, String> config = Map.of("impCode", portoneService.getImpCode());
+        // V2 의 storeId. 채널키는 공개 값이라 프론트 빌드 환경변수(VITE_PORTONE_CHANNEL_KEY)로 주입한다 —
+        // 여기서 같이 내리면 결제창을 열 때마다 왕복이 하나 더 생기고, 값이 두 곳에 존재하게 된다.
+        Map<String, String> config = Map.of("storeId", portoneService.getStoreId());
         return ApiResponse.success(config, "결제 설정 정보 조회 성공");
     }
 }

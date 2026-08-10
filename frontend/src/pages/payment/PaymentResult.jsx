@@ -31,6 +31,8 @@ const PaymentResult = () => {
     const type          = searchParams.get('type') || 'reservation'; // 'reservation' | 'ad'
     const isAd           = type === 'ad';
     const merchantUid   = searchParams.get('merchant_uid');
+    // imp_uid 는 PortOne V1 시절 파라미터다. V2 전환(2026-08-10) 이후 새 결제에는 실려 오지 않는다.
+    // 캐시된 옛 번들에서 넘어오는 요청을 위해 읽기만 남겨둔다 — 있으면 재검증(멱등), 없으면 검증 완료로 본다.
     const impUid        = searchParams.get('imp_uid');
     const errorMsg      = searchParams.get('error_msg');
     const reservationId = searchParams.get('reservation_id');

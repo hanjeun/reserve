@@ -92,7 +92,7 @@ public class PaymentService {
                     .buyerName(existingReady.getBuyerName())
                     .buyerEmail(existingReady.getBuyerEmail())
                     .buyerTel(existingReady.getBuyerTel())
-                    .impCode(portoneService.getImpCode())
+                    .storeId(portoneService.getStoreId())
                     .pgProvider(existingReady.getPgProvider())
                     .reservationId(reservation.getId())
                     .build();
@@ -122,7 +122,7 @@ public class PaymentService {
                 .buyerName(payment.getBuyerName())
                 .buyerEmail(payment.getBuyerEmail())
                 .buyerTel(payment.getBuyerTel())
-                .impCode(portoneService.getImpCode())
+                .storeId(portoneService.getStoreId())
                 .pgProvider(requestDto.getPgProvider())
                 .reservationId(reservation.getId())
                 .build();

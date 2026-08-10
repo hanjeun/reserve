@@ -119,8 +119,8 @@ public class PaymentApiController {
      */
     @PostMapping("/verify")
     public ApiResponse<PaymentResponseDto> verifyPayment(@RequestBody PaymentVerifyDto verifyDto) {
-        SecurityUtil.getCurrentMember("인증되지 않은 사용자입니다.");
-        PaymentResponseDto response = paymentService.verifyAndCompletePayment(verifyDto);
+        Member requester = SecurityUtil.getCurrentMember("인증되지 않은 사용자입니다.");
+        PaymentResponseDto response = paymentService.verifyAndCompletePaymentByMember(verifyDto, requester);
         return ApiResponse.success(response, "결제 검증 및 처리가 완료되었습니다.");
     }
 
@@ -162,8 +162,9 @@ public class PaymentApiController {
      */
     @GetMapping("/refund-preview/{reservationId}")
     public ApiResponse<Map<String, Object>> getRefundPreview(@PathVariable Long reservationId) {
-        SecurityUtil.getCurrentMember("조회 권한이 없습니다.");
-        PaymentService.RefundCalculationResult result = paymentService.calculateRefundAmount(reservationId);
+        Member requester = SecurityUtil.getCurrentMember("조회 권한이 없습니다.");
+        PaymentService.RefundCalculationResult result =
+                paymentService.calculateRefundAmountForMember(reservationId, requester);
 
         Map<String, Object> response = Map.of(
                 "refundAmount", result.getRefundAmount(),

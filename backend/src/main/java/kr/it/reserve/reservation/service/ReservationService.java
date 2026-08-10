@@ -396,11 +396,24 @@ public class ReservationService {
             throw new ReservationException("이미 취소된 예약입니다.", HttpStatus.BAD_REQUEST);
         }
 
-        if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
-            paymentService.refundByReservationCancel(id);
-        }
-
+        // ★ 환불 실패가 취소를 막지 않는다 (2026-08-09).
+        //   예전엔 환불을 먼저 부르고 그 다음에 CANCELLED 를 세팅했다. PG 가 에러를 주면
+        //   트랜잭션이 통째로 롤백돼 사용자는 500 만 보고 예약은 그대로 남았다.
+        //   실제로 PortOne 이 404 를 돌려주던 동안 예약금 결제 고객은 취소를 아예 못 했다.
+        //   취소는 사용자의 권리이고 PG 장애로 막혀서는 안 된다. 환불은 별도 트랜잭션
+        //   (refundByReservationCancel 의 REQUIRES_NEW)에서 시도하고, 실패하면 로그로 남긴다.
+        //   ⚠️ 아직 환불 재시도 원장이 없다 — 아래 ERROR 로그가 유일한 추적 수단이다.
+        //      운영에서 이 로그가 뜨면 포트원 콘솔에서 수동 취소해야 한다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+
+        if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
+            try {
+                paymentService.refundByReservationCancel(id);
+            } catch (Exception e) {
+                log.error("Refund failed while cancelling - reservation stays CANCELLED, refund needs manual action: reservationId={}",
+                        id, e);
+            }
+        }
     }
 
     /**

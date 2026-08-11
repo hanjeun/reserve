@@ -47,8 +47,25 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
                 {isLoading && (
                     <div style={styles.spinnerBox}><ModalLoading text="QR 코드를 불러오는 중..." minHeight="0" /></div>
                 )}
+                {/* ★ 인식률에 직접 영향을 주는 값들이라 임의로 줄이지 말 것 (2026-08-09).
+                    - marginSize: qrcode.react 기본값이 0 이다. QR 규격은 4모듈 여백(quiet zone)을
+                      요구하고 ZXing 은 그걸로 파인더 패턴을 찾는다. 라이트 모드에선 모달 흰 배경이
+                      우연히 여백 역할을 했지만 다크 모드에선 어두운 배경이 코드에 바로 맞닿아
+                      탐지가 실패한다.
+                    - bgColor/fgColor 고정 + 흰 배경 래퍼: 다크 모드에서 색이 반전되지 않게.
+                    - size 260: 220 → 260 으로 키우면 카메라 프레임에서 차지하는 비율이 커져
+                      모듈당 픽셀 수가 늘어난다. 실측 시뮬레이션에서 인식 거리가 늘어난 값이다. */}
                 {!isLoading && token && (
-                    <QRCodeSVG value={token} size={220} level="M" />
+                    <div style={styles.qrPlate}>
+                        <QRCodeSVG
+                            value={token}
+                            size={260}
+                            level="M"
+                            marginSize={4}
+                            bgColor="#FFFFFF"
+                            fgColor="#000000"
+                        />
+                    </div>
                 )}
                 {!isLoading && !token && (
                     <Text type="secondary">
@@ -65,7 +82,9 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
 
 const styles = {
     wrapper:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '12px 0 4px' },
-    spinnerBox: { width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    // 다크 모드에서도 QR 뒤는 항상 흰색이어야 한다 — 토큰 색이 아니라 고정색이다.
+    qrPlate:    { background: '#FFFFFF', borderRadius: 12, lineHeight: 0, padding: 0 },
+    spinnerBox: { width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' },
     hint:       { fontSize: fontSize.sm, color: colors.text.secondary, textAlign: 'center' },
 };
 

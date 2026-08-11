@@ -12,9 +12,11 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 /**
@@ -40,8 +42,22 @@ public class QrCheckinTokenProvider {
     private static final String CLAIM_RESERVATION_ID = "reservationId";
     private static final String CLAIM_PURPOSE = "purpose";
 
+    // ★ 짧은 클레임 이름 (2026-08-09) — 아래 "QR 크기" 주석 참고.
+    //   기존 이름으로 발급된 토큰도 계속 읽어야 하므로 파싱은 둘 다 받는다.
+    private static final String CLAIM_RESERVATION_ID_SHORT = "r";
+    private static final String CLAIM_PURPOSE_SHORT = "p";
+    private static final String PURPOSE_SHORT = "q";
+
     // 방문일 다음 날 자정 이후로도 이만큼은 더 유효(심야 영업/자정 직전 방문 대비)
     private static final int GRACE_HOURS_AFTER_MIDNIGHT = 6;
+
+    // 발급 시점 기준 상한. 예약일이 멀수록 만료가 한없이 길어지던 문제를 막는다.
+    private static final int MAX_LIFETIME_HOURS = 24;
+
+    // 예약 시각·만료 계산은 서비스 운영 시간대(KST) 기준이어야 한다.
+    // 앱 컨테이너에는 TZ가 설정돼 있지 않아 systemDefault()는 UTC로 잡힌다 —
+    // 그대로 두면 "방문일 다음 날 새벽 6시"가 실제로는 다음 날 15시(KST)가 된다.
+    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
     private final JwtProperties jwtProperties;
     private SecretKey secretKey;
@@ -58,18 +74,28 @@ public class QrCheckinTokenProvider {
      *                        null이면 안전하게 오늘 기준으로 계산한다.
      */
     public String generateToken(Long reservationId, LocalDate reservationDate) {
-        LocalDate baseDate = reservationDate != null ? reservationDate : LocalDate.now();
+        LocalDate baseDate = reservationDate != null ? reservationDate : LocalDate.now(SERVICE_ZONE);
         // 방문일 다음 날 00:00 + GRACE 시간까지 유효
         LocalDateTime expiryDateTime = baseDate.plusDays(1).atStartOfDay().plusHours(GRACE_HOURS_AFTER_MIDNIGHT);
-        Date expiry = Date.from(expiryDateTime.atZone(ZoneId.systemDefault()).toInstant());
+        Instant expiryInstant = expiryDateTime.atZone(SERVICE_ZONE).toInstant();
 
-        // jjwt 0.13 API — setIssuedAt/setExpiration은 issuedAt/expiration으로 이름이 바뀌었다.
+        // ★ 발급 시점 기준 상한을 씌운다 (2026-08-09).
+        //   예전엔 만료가 예약일에만 걸려 있어서, 90일 뒤 예약이면 91일짜리 토큰이 나왔다.
+        //   QR 모달은 열 때마다 서버에서 새 토큰을 받으므로 짧게 잡아도 사용성에 영향이 없다.
+        Instant cap = Instant.now().plus(MAX_LIFETIME_HOURS, ChronoUnit.HOURS);
+        Date expiry = Date.from(expiryInstant.isBefore(cap) ? expiryInstant : cap);
+
+        // ★ 페이로드를 줄인다 (2026-08-09) — QR이 아예 안 읽히던 문제의 절반이 여기였다.
+        //   jwt.secret-key가 64자 이상이면 jjwt가 서명 알고리즘을 HS512로 자동 선택하고,
+        //   서명만 86자가 붙는다. 여기에 iat와 긴 클레임 이름까지 더해 토큰이 215자가 됐고
+        //   QR은 버전 11(61x61 모듈)이 됐다. 스캐너 쪽 해상도로는 못 읽는 밀도다.
+        //   HS256 고정 + iat 제거 + 짧은 클레임 이름으로 113자(버전 7, 45x45)까지 줄인다.
+        //   HS256도 이 용도(짧은 수명·서버 단독 검증)에는 충분하다.
         return Jwts.builder()
-                .issuedAt(new Date())
                 .expiration(expiry)
-                .claim(CLAIM_RESERVATION_ID, reservationId)
-                .claim(CLAIM_PURPOSE, PURPOSE)
-                .signWith(secretKey)
+                .claim(CLAIM_RESERVATION_ID_SHORT, reservationId)
+                .claim(CLAIM_PURPOSE_SHORT, PURPOSE_SHORT)
+                .signWith(secretKey, Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -92,9 +118,21 @@ public class QrCheckinTokenProvider {
             log.debug("Invalid QR check-in token: {}", e.getMessage());
             throw new ReservationException("유효하지 않은 QR 코드입니다.");
         }
-        if (!PURPOSE.equals(claims.get(CLAIM_PURPOSE, String.class))) {
+        // 짧은 클레임(신규)과 긴 클레임(기존 발급분)을 둘 다 받는다.
+        // 배포 시점에 이미 열려 있던 QR이 즉시 무효가 되지 않도록 한 과도기 처리다.
+        boolean purposeOk = PURPOSE_SHORT.equals(claims.get(CLAIM_PURPOSE_SHORT, String.class))
+                || PURPOSE.equals(claims.get(CLAIM_PURPOSE, String.class));
+        if (!purposeOk) {
             throw new ReservationException("유효하지 않은 QR 코드입니다.");
         }
-        return claims.get(CLAIM_RESERVATION_ID, Long.class);
+
+        Long reservationId = claims.get(CLAIM_RESERVATION_ID_SHORT, Long.class);
+        if (reservationId == null) {
+            reservationId = claims.get(CLAIM_RESERVATION_ID, Long.class);
+        }
+        if (reservationId == null) {
+            throw new ReservationException("유효하지 않은 QR 코드입니다.");
+        }
+        return reservationId;
     }
 }

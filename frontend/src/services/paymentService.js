@@ -2,7 +2,7 @@
  * paymentService — 결제 관련 API
  *
  * 백엔드 엔드포인트:
- *   GET  /api/payment/config                    포트원 설정 (impCode)
+ *   GET  /api/payment/config                    포트원 설정 (V2 storeId)
  *   POST /api/payment/prepare                   결제 준비
  *   POST /api/payment/verify                    결제 검증/완료
  *   POST /api/payment/refund                    환불
@@ -13,7 +13,7 @@ import api from '../api/axios';
 import { API_ENDPOINTS } from '../constants';
 
 const paymentService = {
-    /** 포트원 설정 정보 (impCode) */
+    /** 포트원 설정 정보 (V2 storeId). 결제 준비 응답에도 storeId 가 실려 오므로 현재 호출처는 없다. */
     getConfig: () => api.get(API_ENDPOINTS.PAYMENT.CONFIG),
 
     /** 결제 준비 — { merchantUid, amount, ... } 반환 */

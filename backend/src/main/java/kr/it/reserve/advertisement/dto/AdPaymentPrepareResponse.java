@@ -14,5 +14,5 @@ public class AdPaymentPrepareResponse {
     private String buyerName;
     private String buyerEmail;
     private String buyerTel;
-    private String impCode;
+    private String storeId;   // PortOne V2 상점 ID (V1 의 impCode 를 대체)
 }

@@ -5,8 +5,13 @@ services:
     # CI가 IMAGE_TAG=sha-<커밋>을 export해서 커밋 고정 이미지를 띄운다.
     # 수동 실행 등으로 값이 없으면 기존처럼 :latest로 폴백한다.
     image: ${DOCKERHUB_USERNAME}/reserve:${IMAGE_TAG:-latest}
+    # application-green.yml 이 server.port: 8081 을 쓰므로 컨테이너 안에서도 8081 을 리슨한다.
+    # 예전에는 "8081:8080" 이어서 호스트 8081 이 아무도 안 듣는 컨테이너 8080 으로 갔다.
+    # blue 는 8080:8080 + port 8080 으로 이미 일치해 있어 문제가 없었고,
+    # 업스트림 감지가 항상 none 으로 떨어져 green 이 쓰인 적이 없어서 드러나지 않았다.
+    # nginx 도 upstream green 을 PRIVATE_IP:8081 로 보므로 세 곳이 전부 8081 로 맞아야 한다.
     ports:
-      - "8081:8080"
+      - "8081:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=green
       - SERVER_ENV=green

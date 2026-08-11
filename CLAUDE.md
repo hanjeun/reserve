@@ -125,7 +125,7 @@ r.walkRules(x=>{if(/[가-힣]/.test(x.selector))console.log('★ 파싱사고:',
 
 ```bash
 node scripts/sync-release-notes.mjs [vX.Y.Z] --apply   # CHANGELOG → GitHub 릴리즈 설명
-node scripts/backfill-deployments.mjs --reset --apply  # 태그별 Deployment 재생성
+node scripts/backfill-deployments.mjs --apply          # 태그별 Deployment (빠진 것만 생성)
 ```
 
 `docs/CHANGELOG.md`는 **사용자 눈높이 한국어**로, *브랜드 한 줄 → 변경 내용 → 마무리 한 줄* 형식을 지킨다.

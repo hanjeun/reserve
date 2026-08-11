@@ -32,14 +32,31 @@ CHANGELOG를 고칠 때마다 다시 돌리면 릴리즈 설명이 최신 요약
 `.github/workflows/CICD.yml` 은 `main` push 시 블루-그린으로 배포하지만 **GitHub Deployment 객체를 만들지 않는다**
 (`permissions: contents: read` 뿐). 그래서 저장소 Environments 탭·커밋 화면에 "언제 무엇이 production 에 나갔는지" 기록이 없다.
 
-### 2-1. 과거 백필 (한 번만)
+### 2-1. 태그 백필
 
-지난 태그 전부에 Deployment(+success)를 소급 생성한다. **시각은 '지금'으로 찍힌다**(과거 배포 시각 아님, 일관성/기록용).
+기록이 없는 태그에만 Deployment(+success)를 만든다. **시각은 '지금'으로 찍힌다**(과거 배포 시각 아님, 일관성/기록용).
 
 ```bash
-node scripts/backfill-deployments.mjs          # 미리보기
-node scripts/backfill-deployments.mjs --apply  # 실제 생성
+node scripts/backfill-deployments.mjs               # 미리보기 — 무엇을 만들지
+node scripts/backfill-deployments.mjs --apply       # 빠진 것만 생성
+node scripts/backfill-deployments.mjs --tag v2.2.0 --apply   # 특정 태그만
 ```
+
+**증분이라 몇 번을 돌려도 안전하다.** 태그를 커밋 SHA로 풀어서 이미 그 커밋에 배포 기록이 있으면
+건너뛴다 — 기존 기록의 ref 가 태그명이든 SHA 든 상관없다.
+
+> ⚠️ **`--reset` 은 제거됐다 (2026-08-11).** 그 플래그는 `environment=production` 인 배포를 전부 지우고
+> 다시 만들었는데, 거기에는 **CI/CD 가 배포 순간에 만든 진짜 기록(ref 가 커밋 SHA)**도 포함돼 있었다.
+> GitHub API 는 Deployment 생성 시각을 지정할 수 없어 **진짜 배포 시각은 복구되지 않는다.**
+> 2026-08-11 에 실제로 7건을 잃었다. 지금은 `--reset` 을 치면 에러와 함께 설명이 나온다.
+>
+> 이 스크립트가 만든 것만 지우려면 `--prune-backfilled` 를 쓴다. `description` 의
+> `backfilled-by-script` 표식으로 대상을 고르므로 CI/CD 기록에는 손대지 않는다.
+>
+> ```bash
+> node scripts/backfill-deployments.mjs --prune-backfilled           # 미리보기
+> node scripts/backfill-deployments.mjs --prune-backfilled --apply
+> ```
 
 > 실행 전, 저장소 Settings → Environments 에서 `production` 환경을 먼저 만들어 두면 깔끔하다(없어도 API가 자동 생성).
 

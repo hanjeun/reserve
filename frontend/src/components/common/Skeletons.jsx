@@ -221,8 +221,13 @@ const ReservationRowSkeletonList = ({ count, actionCount = 2 }) => {
   );
 };
 
-/** ReservationCard.jsx(사업자 예약 관리 탭) 로딩용 — 액션 버튼은 승인/거절 2개.
- *  예전에는 손님과 같은 3개로 그려서 오른쪽 폭이 로딩 후에 줄어들었다. */
+/** ReservationCard.jsx(사업자 예약 관리 탭) 로딩용 — 액션 버튼 2개 기준.
+ *  예전에는 손님과 같은 3개로 그려서 오른쪽 폭이 로딩 후에 줄어들었다.
+ *
+ *  ⚠️ 2026-08-11부터 사업자 카드의 버튼 수는 상태마다 다르다 —
+ *  PENDING 2개(승인·거절) / CONFIRMED 3개(완료·노쇼·취소) / 종료 상태 1개(삭제).
+ *  로딩 시점에는 목록에 무엇이 올지 알 수 없으므로 하나를 고를 수밖에 없고,
+ *  사업자가 가장 먼저 처리하는 PENDING(2개)에 맞춰 둔다. */
 const ReservationCardSkeleton = ({ count = 5 }) => <ReservationRowSkeletonList count={count} actionCount={2} />;
 
 /** MyReservations.jsx(고객 내 예약) 로딩용 — 액션 버튼은 변경/QR/취소 3개. */

@@ -133,6 +133,23 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(null, "예약이 거절되었습니다."));
     }
 
+    /**
+     * 확정된 예약을 가게가 취소한다 (2026-08-11 신설). 전액 환불이 함께 실행된다.
+     *
+     * <p>{@code PATCH /{id}/cancel} 과 <b>경로가 다른 이유</b> — 그쪽은 예약자 본인 검증
+     * ({@code validateOwnership})을 타서 가게 주인은 403 이다. 같은 엔드포인트에서 분기하면
+     * "요청자가 누구냐"에 따라 권한 규칙과 환불 금액이 달라지는 메서드가 되어 위험하다.
+     */
+    @PatchMapping("/{id}/store-cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelReservationByStore(
+            @PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
+        Member member = SecurityUtil.getCurrentMember();
+        validateBusinessAuth(member);
+        String reason = (body != null) ? body.get("cancelReason") : null;
+        reservationService.cancelReservationByStore(id, member, reason);
+        return ResponseEntity.ok(ApiResponse.success(null, "예약이 취소되었습니다. 예약금은 전액 환불됩니다."));
+    }
+
     @PatchMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<Void>> completeReservation(@PathVariable Long id) {
         Member member = SecurityUtil.getCurrentMember();

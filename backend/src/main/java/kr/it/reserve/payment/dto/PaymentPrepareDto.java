@@ -18,7 +18,7 @@ public class PaymentPrepareDto {
     private String buyerName;       // 구매자 이름
     private String buyerEmail;      // 구매자 이메일
     private String buyerTel;        // 구매자 전화번호
-    private String impCode;         // 가맹점 식별코드
+    private String storeId;         // PortOne V2 상점 ID (V1 의 impCode 를 대체)
     private String pgProvider;      // PG사
     private Long reservationId;     // 예약 ID
 }

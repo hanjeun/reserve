@@ -31,6 +31,8 @@ const PaymentResult = () => {
     const type          = searchParams.get('type') || 'reservation'; // 'reservation' | 'ad'
     const isAd           = type === 'ad';
     const merchantUid   = searchParams.get('merchant_uid');
+    // imp_uid 는 PortOne V1 시절 파라미터다. V2 전환(2026-08-10) 이후 새 결제에는 실려 오지 않는다.
+    // 캐시된 옛 번들에서 넘어오는 요청을 위해 읽기만 남겨둔다 — 있으면 재검증(멱등), 없으면 검증 완료로 본다.
     const impUid        = searchParams.get('imp_uid');
     const errorMsg      = searchParams.get('error_msg');
     const reservationId = searchParams.get('reservation_id');
@@ -51,7 +53,11 @@ const PaymentResult = () => {
         if (success && impUid && merchantUid && !verified) {
             verifyPayment();
         } else if (success && !impUid) {
-            // 이미 검증된 케이스 (usePayment hook에서 직접 navigate)
+            // 이미 검증된 케이스 — 모바일은 백엔드 리다이렉트가 검증까지 끝내고 오므로 imp_uid가 없다.
+            // ★ 2026-08-09: 이 분기에 캐시 무효화가 빠져 있었다. 무효화는 verifyPayment 안에만
+            //   있어서 PC(재검증을 타는 경로)에서만 돌았고, 모바일로 결제하면 "내 예약"이
+            //   결제 전 상태 그대로 보였다(수동 새로고침을 눌러야 갱신됨).
+            queryClient.invalidateQueries({ queryKey: reservationKeys.my() });
             setTimeout(() => setAnimate(true), 100);
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps

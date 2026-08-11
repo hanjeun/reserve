@@ -10,6 +10,22 @@ import { colors, radius, shadows, fontSize, fontWeight, withAlpha } from '../../
 const { Text } = Typography;
 const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
 
+// ★★ 디코딩 해상도 (2026-08-09) — QR이 아예 안 읽히던 원인이자 그 해결책이다.
+//
+// html5-qrcode는 디코딩용 캔버스를 <video>의 **레이아웃 CSS 픽셀**(clientWidth/Height)로 만들고,
+// 카메라 프레임 전체를 그 캔버스로 축소해서 ZXing에 넘긴다(esm/html5-qrcode.js:484-545, 553-575).
+// DPR 보정도 없다. 즉 카메라가 1280이든 4K든 **디코더가 보는 건 컨테이너 CSS 폭이 전부**다.
+// 390px 폰에서 프리뷰 박스는 약 302px이었고, 그러면 모듈당 1.3px 수준이라 ZXing 하한(약 2px)에
+// 못 미쳐 영원히 못 읽는다. 폰 기본 카메라 앱은 센서 원본을 읽으니 같은 QR이 잘 읽혔다.
+//
+// transform: scale()은 페인트 단계라 clientWidth를 바꾸지 않는다. 그래서 <video>를 CSS상
+// 720x540으로 두고 화면에서만 축소해 보여주면, 보이는 크기는 그대로인데 디코딩 캔버스만 720이 된다.
+// 실측 시뮬레이션(합성 프레임 → 캔버스 축소 → jsQR): 캔버스 302에선 10cm에서도 실패,
+// 캔버스 720에선 10~20cm에서 인식. 값을 줄이면 그만큼 인식 거리가 짧아진다.
+const DECODE_WIDTH = 720;
+const DECODE_HEIGHT = 540;                 // 4:3 — videoConstraints와 비율을 맞춰 왜곡을 없앤다
+const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
+
 // 라이브러리가 넣는 <video>가 컨테이너를 정확히 꽉 채우도록 강제 (검은 여백/크롭 방지) +
 // 스캔 대기 dot의 pulse 링 애니메이션 (2026-07 리디자인 — App.jsx 전역 keyframes와 동일한
 // 로컬 <style> 태그 패턴, 이 컴포넌트에서만 쓰는 애니메이션이라 전역에 안 얹고 여기 둠)
@@ -58,6 +74,12 @@ const QrScannerTab = () => {
     const [errorMsg, setErrorMsg] = useState('');
     const [lastResult, setLastResult] = useState(null);
 
+    // 디코딩 루프가 실제로 도는지 확인하는 유일한 신호 (아래 startScanning 주석 참고)
+    const decodeTickRef = useRef(0);
+    const resumeTimerRef = useRef(null);
+    const previewRef = useRef(null);
+    const [previewScale, setPreviewScale] = useState(DEFAULT_PREVIEW_SCALE);
+
     // 2026-07 추가: 다른 탭(예약 관리 등)은 다 서버 데이터 로딩 스켈레톤이 있는데 이 탭만
     // 없어서 이질적으로 보였다. 카메라 상태(idle/starting/scanning)는 서버 데이터가 아니라
     // 로컬 상태라 원래 기다릴 게 없지만, BusinessPanel Tabs가 destroyOnHidden이라 이 탭으로
@@ -69,9 +91,30 @@ const QrScannerTab = () => {
         return () => clearTimeout(t);
     }, []);
 
+    // 고정 720x540 스캐너 영역을 실제 프리뷰 박스 폭에 맞춰 시각적으로만 축소한다.
+    // (레이아웃 크기는 720 그대로여야 디코딩 캔버스가 720이 된다 — 위 DECODE_WIDTH 주석)
+    useEffect(() => {
+        if (!ready) return undefined;
+        const el = previewRef.current;
+        if (!el) return undefined;
+        const update = () => {
+            const w = el.clientWidth;
+            if (w > 0) setPreviewScale(w / DECODE_WIDTH);
+        };
+        update();
+        const observer = new ResizeObserver(update);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [ready]);
+
     const handleScanSuccess = useCallback(async (decodedText) => {
         if (processingRef.current) return;
         processingRef.current = true;
+
+        // 스캐너를 잠시 멈춘다 (2026-08-09). 예전엔 루프가 계속 돌아서 QR이 화면에 남아 있는 동안
+        // 2초마다 체크인 API를 다시 호출했다 — 성공 토스트가 무한히 다시 뜨고 요청도 계속 나갔다.
+        try { html5QrRef.current?.pause(false); } catch { /* 이미 멈춰 있으면 무시 */ }
+
         try {
             const reservation = await reservationService.checkInByQr(decodedText);
             setLastResult(reservation);
@@ -80,35 +123,98 @@ const QrScannerTab = () => {
             message.error(err?.message || 'QR 체크인에 실패했습니다.');
         } finally {
             // 2초 텀을 두고 다시 스캔 허용 (같은 QR 연속 인식 방지)
-            setTimeout(() => { processingRef.current = false; }, 2000);
+            clearTimeout(resumeTimerRef.current);
+            resumeTimerRef.current = setTimeout(() => {
+                processingRef.current = false;
+                try { html5QrRef.current?.resume(); } catch { /* 이미 중지됐으면 무시 */ }
+            }, 2000);
         }
     }, [message]);
 
     const startScanning = useCallback(async () => {
         setStatus('starting');
         setErrorMsg('');
+        decodeTickRef.current = 0;
+
+        // 이전 인스턴스가 남아 있으면 반드시 정리하고 시작한다 — start()가 컨테이너를
+        // clearElement()로 비워버리기 때문에, 정리하지 않으면 이전 인스턴스의 스캔 루프와
+        // 카메라 트랙이 DOM에서 떨어진 채로 계속 살아 있게 된다("다시 시도"를 누를 때 발생).
+        const previous = html5QrRef.current;
+        if (previous) {
+            html5QrRef.current = null;
+            try { await previous.stop(); } catch { /* 이미 멈춰 있으면 무시 */ }
+        }
+
         try {
             const html5Qr = new Html5Qrcode(SCANNER_ELEMENT_ID);
             html5QrRef.current = html5Qr;
-            // qrbox를 안 주면 카메라 프레임 전체를 그대로(크롭 없이) 스캔 영역으로 씀 —
-            // 흰 가이드 프레임 오버레이 자체가 없어져서 "잘려 보이는" 문제도 같이 해결됨.
+            // qrbox는 여전히 주지 않는다 — 프레임 전체를 스캔 영역으로 쓴다.
+            // (예전에 qrbox를 넣었다가 비디오가 잘려 보이고 검은 여백이 생겼던 이력이 있다.
+            //  해상도는 qrbox가 아니라 위 DECODE_WIDTH 방식으로 해결한다.)
             await html5Qr.start(
                 { facingMode: 'environment' },
-                { fps: 10 },
+                {
+                    fps: 10,
+                    // videoConstraints가 있으면 첫 인자 대신 이 값이 쓰인다(내부 areVideoConstraintsEnabled).
+                    // 4:3으로 요청해 DECODE_WIDTH/HEIGHT 비율과 맞춘다 — 16:9가 오면 드로잉 단계에서
+                    // 프레임이 4:3으로 눌려 모듈이 정사각형이 아니게 되고 인식률이 떨어진다.
+                    videoConstraints: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 960 },
+                    },
+                    // 미설정이면 라이브러리가 실패한 프레임마다 캔버스를 좌우반전해서 한 번 더 디코딩하는데,
+                    // 변환을 원복하지 않아 그 다음 프레임까지 반전된 상태로 그려진다. 결과적으로 절반의
+                    // 프레임이 버려진다. QR은 반전되면 못 읽으므로 끄는 쪽이 항상 이득이다.
+                    disableFlip: true,
+                },
                 handleScanSuccess,
-                () => {} // 프레임마다 "QR을 못 찾음"으로 계속 호출되므로 무시
+                () => {
+                    // 이 콜백은 "이번 프레임에서 QR을 못 찾음"으로 초당 10회 호출된다.
+                    // 예전엔 빈 함수라 통째로 버렸는데, 이게 **디코딩 루프가 살아 있다는 유일한 신호**다.
+                    // start()의 Promise는 video.play()를 부른 직후 resolve되고, 실제 스캔 루프는
+                    // 그 뒤 'playing' 이벤트 핸들러에서 만들어진다. 그래서 루프가 안 떠도
+                    // "스캔 대기 중…"이 그대로 보이는 상태가 가능했다.
+                    decodeTickRef.current += 1;
+                }
             );
+
             setStatus('scanning');
-        } catch {
+
+            // 루프가 정말 도는지 확인한다. 1.5초면 fps 10 기준 10회 이상 들어와야 한다.
+            setTimeout(() => {
+                if (html5QrRef.current === html5Qr && decodeTickRef.current === 0) {
+                    console.warn('[QR] decode loop did not start (no error-callback ticks)');
+                }
+            }, 1500);
+        } catch (err) {
+            console.error('[QR] camera start failed', err);
             setStatus('error');
-            setErrorMsg('카메라를 시작할 수 없습니다. 브라우저 카메라 권한을 확인해주세요.');
+            const name = err?.name || '';
+            if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+                setErrorMsg('카메라 권한이 거부됐습니다. 브라우저 설정에서 허용해주세요.');
+            } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+                setErrorMsg('다른 앱이 카메라를 쓰고 있습니다. 해당 앱을 닫고 다시 시도해주세요.');
+            } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+                setErrorMsg('사용할 수 있는 후면 카메라를 찾지 못했습니다.');
+            } else {
+                setErrorMsg('카메라를 시작할 수 없습니다. 브라우저 카메라 권한을 확인해주세요.');
+            }
         }
     }, [handleScanSuccess]);
 
+    // ★ isScanning으로 가드하지 않는다 (2026-08-09).
+    //   isScanning은 'playing' 이벤트 핸들러 안에서야 true가 된다. 카메라가 켜지는 도중에
+    //   탭을 옮기면 이 값이 false여서 stop()을 건너뛰었고, 컴포넌트는 사라졌는데 카메라
+    //   트랙만 살아남았다(녹색 표시등이 계속 켜져 있는 상태). 무조건 stop()을 부르고
+    //   "이미 멈춰 있음" 예외는 삼킨다.
     const stopScanning = useCallback(async () => {
+        clearTimeout(resumeTimerRef.current);
+        processingRef.current = false;
         const scanner = html5QrRef.current;
-        if (scanner?.isScanning) {
-            try { await scanner.stop(); } catch { /* ignore */ }
+        html5QrRef.current = null;
+        if (scanner) {
+            try { await scanner.stop(); } catch { /* 아직 시작 전이거나 이미 멈춤 */ }
         }
         setStatus('idle');
         setLastResult(null);
@@ -116,8 +222,13 @@ const QrScannerTab = () => {
 
     // 컴포넌트가 언마운트될 때(다른 탭으로 이동 등) 카메라를 반드시 끔
     useEffect(() => () => {
-        if (html5QrRef.current?.isScanning) {
-            html5QrRef.current.stop().catch(() => {});
+        clearTimeout(resumeTimerRef.current);
+        const scanner = html5QrRef.current;
+        html5QrRef.current = null;
+        if (scanner) {
+            Promise.resolve()
+                .then(() => scanner.stop())
+                .catch(() => {});
         }
     }, []);
 
@@ -145,8 +256,13 @@ const QrScannerTab = () => {
                 </Text>
 
                 {/* 스캐너 프리뷰 박스 — 항상 렌더링(display:none 금지), 오버레이만 상태별로 전환 */}
-                <div style={styles.previewBox}>
-                    <div id={SCANNER_ELEMENT_ID} style={styles.scannerFill} />
+                <div style={styles.previewBox} ref={previewRef}>
+                    {/* 레이아웃 크기는 720x540 고정, 보이는 크기만 transform으로 줄인다.
+                        (이 div의 clientWidth가 그대로 디코딩 캔버스 크기가 된다) */}
+                    <div
+                        id={SCANNER_ELEMENT_ID}
+                        style={{ ...styles.scannerFill, transform: `scale(${previewScale})` }}
+                    />
 
                     {/* 스캔 중에만 보이는 모서리 브라켓 가이드 — 순수 장식, 실제 스캔 영역과 무관 */}
                     {status === 'scanning' && (
@@ -243,7 +359,14 @@ const styles = {
         border: `1px solid ${colors.border.light}`,
         backgroundColor: colors.gray[100],
     },
-    scannerFill: { width: '100%', height: '100%' },
+    scannerFill: {
+        width: DECODE_WIDTH,
+        height: DECODE_HEIGHT,
+        transformOrigin: 'top left',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+    },
     bracketFrame: { position: 'absolute', inset: 0, pointerEvents: 'none' },
     corner: {
         position: 'absolute',

@@ -87,9 +87,6 @@ mail:
 
 # PortOne 테스트 설정
 portone:
-  imp-key: test-imp-key
-  imp-secret: test-imp-secret
-  imp-code: test-imp-code
   v2-secret: test-v2-secret
   store-id: test-store-id
 

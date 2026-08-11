@@ -15,8 +15,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -39,41 +42,66 @@ public class AdvertisementApiController {
      * merchantUid가 Payment 테이블이 아니라 advertisement 테이블 자체에 있어 완전히 별도
      * 엔드포인트로 둔다. 결과 페이지에 type=ad를 붙여서 PaymentResult.jsx가 예약용
      * 문구/버튼과 구별해 보여준다.
+     *
+     * <p>★ 2026-08-10 두 가지를 함께 고쳤다.
+     * <ol>
+     *   <li><b>302 가 나가지 않던 버그.</b> 이 클래스는 {@code @RestController} 라 뷰 리졸버를 타지 않는데
+     *       {@code "redirect:" + url} 문자열을 반환하고 있었다. 그 문자열이 <b>응답 본문</b>으로 찍혀서
+     *       모바일 광고 결제 후 브라우저에 {@code redirect:https://...} 가 그대로 보이고 이동하지 않았다.
+     *       예약 결제 쪽은 PR #122 에서 고쳤는데 같은 패턴을 복사해 둔 이 파일이 빠져 있었다.</li>
+     *   <li><b>PortOne V2 파라미터.</b> {@code merchant_uid/imp_success/error_msg} →
+     *       {@code paymentId/code/message}. V2 는 성공 시 {@code code} 를 보내지 않으므로
+     *       <b>code 가 없으면 성공</b>이다.</li>
+     * </ol>
      */
     @GetMapping("/mobile-redirect")
-    public String handleMobileRedirect(
-            @RequestParam(value = "merchant_uid", required = false) String merchantUid,
-            @RequestParam(value = "imp_success", required = false) String impSuccess,
-            @RequestParam(value = "error_msg", required = false) String errorMsg) {
+    public ResponseEntity<Void> handleMobileRedirect(
+            @RequestParam(value = "paymentId", required = false) String paymentId,
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "message", required = false) String message) {
 
-        boolean isSuccess = "true".equalsIgnoreCase(impSuccess);
-        String redirectBase = "redirect:" + frontendUrl + "/payment/result";
+        boolean isSuccess = (code == null || code.isBlank());
+        String redirectBase = frontendUrl + "/payment/result";
+        // 프론트 결과 페이지는 merchant_uid 로 읽는다. 이름은 그대로 두고 값만 V2 의 paymentId 를 싣는다.
+        String merchantUid = paymentId;
+
+        log.info("Ad mobile redirect received: paymentId={}, code={}", paymentId, code);
 
         if (!isSuccess) {
-            return redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc(errorMsg);
+            return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
+                    + "&error_msg=" + enc(message));
         }
 
         try {
             advertisementService.verifyPaymentByMerchantUid(merchantUid);
-            return redirectBase + "?success=true&type=ad&merchant_uid=" + enc(merchantUid);
+            return redirect(redirectBase + "?success=true&type=ad&merchant_uid=" + enc(merchantUid));
         } catch (BusinessException e) {
             // 도메인 예외의 메시지는 애초에 사용자에게 보여줄 목적으로 쓴 한국어 문구라 그대로 전달한다.
             log.warn("Ad mobile redirect verification failed: merchantUid={}, {}", merchantUid, e.getMessage());
-            return redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc(e.getMessage());
+            return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
+                    + "&error_msg=" + enc(e.getMessage()));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
             // 브라우저 주소창에 그대로 실려 나가므로 고정 문구로 대체하고, 원인은 로그·Sentry에만 남긴다.
             log.error("Ad mobile redirect error: merchantUid={}", merchantUid, e);
-            return redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("광고 결제 처리 중 오류가 발생했습니다.");
+            return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
+                    + "&error_msg=" + enc("광고 결제 처리 중 오류가 발생했습니다."));
         }
     }
 
     /**
+     * 302 응답을 만든다. 목적지는 항상 우리 프론트엔드 URL 이고 쿼리 값은 {@link #enc} 로 인코딩된 뒤
+     * 넘어오므로, 외부 입력이 Location 헤더의 호스트를 바꾸는 경로는 없다(오픈 리다이렉트 아님).
+     */
+    private static ResponseEntity<Void> redirect(String location) {
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(location))
+                .build();
+    }
+
+    /**
      * 리다이렉트 쿼리스트링에 실을 값을 URL 인코딩한다.
-     * Spring의 "redirect:" 접두 문자열은 이미 붙어 있는 쿼리스트링을 그대로 Location 헤더로 내보내므로,
+     * 여기서 만든 문자열은 그대로 Location 헤더가 되므로,
      * 값에 &·#·%가 섞이면 파라미터가 잘리거나 뒤에 임의 파라미터를 덧붙일 수 있다.
      */
     private static String enc(String value) {

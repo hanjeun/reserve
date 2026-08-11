@@ -39,7 +39,7 @@ const ReservationTab = () => {
     const debouncedKeyword = useDebounce(keyword, 300);
     const [storeFilter, setStoreFilter]   = useState('ALL');
     const [myStores, setMyStores]         = useState([]);
-    const { reservations, loading, refetching, actionLoading, approve, reject, complete, noShow, refetch } = useManageReservations();
+    const { reservations, loading, refetching, actionLoading, approve, reject, storeCancel, complete, noShow, refetch } = useManageReservations();
     const { message, confirm } = useMessage();
 
     const handleRemove = (id) => {
@@ -138,6 +138,7 @@ const ReservationTab = () => {
                                 onReject={reject}
                                 onComplete={complete}
                                 onNoShow={noShow}
+                                onStoreCancel={storeCancel}
                                 onRemove={handleRemove}
                             />
                             {i < filtered.length - 1 && <div style={styles.divider} />}

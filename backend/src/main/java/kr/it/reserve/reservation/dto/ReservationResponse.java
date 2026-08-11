@@ -29,7 +29,15 @@ public class ReservationResponse {
     private String status;
     private String specialRequest;
     private String rejectionReason;
-    
+
+    /**
+     * 가게가 취소한 사유 (2026-08-11 추가). {@code rejectionReason} 과 <b>합치면 안 된다</b> —
+     * 화면이 그 필드를 "거절 사유"라는 라벨로 보여주기 때문에, 취소 건에 그 라벨이 붙으면
+     * 이용자가 무슨 일이 있었는지 오해한다.
+     */
+    private String cancelReason;
+
+
     // 결제 관련 필드
     private Boolean depositPaid;
     private Integer depositAmount;
@@ -46,29 +54,13 @@ public class ReservationResponse {
     // 리뷰 관련 필드 (null = 아직 리뷰 미작성)
     private Long reviewId;
 
+    /**
+     * ★ 필드를 추가할 땐 {@link #fromEntityWithReviewId} 한 곳만 고치면 된다 (2026-08-11 정리).
+     * 예전엔 두 팩토리가 같은 빌더 체인을 통째로 복사해 갖고 있어서, 새 필드를 한쪽에만 넣으면
+     * <b>화면에 따라 값이 있다 없다</b> 했다(목록엔 뜨는데 상세엔 안 뜨는 식). 이제 위임한다.
+     */
     public static ReservationResponse fromEntity(Reservation reservation) {
-        return ReservationResponse.builder()
-                .id(reservation.getId())
-                .reservationCode(reservation.getReservationCode())
-                .storeId(reservation.getStore().getId())
-                .storeName(reservation.getStore().getName())
-                .storeMainImageUrl(reservation.getStore().getMainImageUrl())
-                .memberId(reservation.getMember().getId())
-                .memberName(reservation.getMember().getName())
-                .memberEmail(reservation.getMember().getEmail())
-                .reservationDate(reservation.getReservationDate())
-                .reservationTime(reservation.getReservationTime())
-                .guestCount(reservation.getGuestCount())
-                .status(reservation.getStatus().name())
-                .specialRequest(reservation.getSpecialRequest())
-                .rejectionReason(reservation.getRejectionReason())
-                .depositPaid(reservation.getDepositPaid())
-                .depositAmount(reservation.getDepositAmount())
-                .noShowDeposit(reservation.getStore().getNoShowDeposit())
-                .allowLatePayment(reservation.getStore().getAllowLatePayment())
-                .paymentTimeoutMinutes(reservation.getStore().getPaymentTimeoutMinutes())
-                .reviewId(null)  // 기본값 null, 서비스에서 set
-                .build();
+        return fromEntityWithReviewId(reservation, null);
     }
 
     /** 리뷰 ID를 포함한 응답 생성 (내 예약 목록 전용) */
@@ -88,6 +80,7 @@ public class ReservationResponse {
                 .status(reservation.getStatus().name())
                 .specialRequest(reservation.getSpecialRequest())
                 .rejectionReason(reservation.getRejectionReason())
+                .cancelReason(reservation.getCancelReason())
                 .depositPaid(reservation.getDepositPaid())
                 .depositAmount(reservation.getDepositAmount())
                 .noShowDeposit(reservation.getStore().getNoShowDeposit())

@@ -11,6 +11,8 @@ const reservationService = {
     cancelReservation:   (id)           => api.patch(API_ENDPOINTS.RESERVATION.CANCEL(id)),
     approveReservation:  (id)           => api.patch(API_ENDPOINTS.RESERVATION.APPROVE(id)),
     rejectReservation:   (id, reason)   => api.patch(API_ENDPOINTS.RESERVATION.REJECT(id), { rejectionReason: reason }),
+    // 사업자용 취소 — 서버가 전액 환불까지 함께 처리한다(가게 귀책이라 환불 정책을 타지 않는다)
+    storeCancelReservation: (id, reason) => api.patch(API_ENDPOINTS.RESERVATION.STORE_CANCEL(id), { cancelReason: reason }),
     completeReservation: (id)           => api.patch(API_ENDPOINTS.RESERVATION.COMPLETE(id)),
     noShowReservation:   (id)           => api.patch(API_ENDPOINTS.RESERVATION.NO_SHOW(id)),
     getQrToken:          (id)           => api.get(API_ENDPOINTS.RESERVATION.QR_TOKEN(id)),

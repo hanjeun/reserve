@@ -59,6 +59,17 @@ const useManageReservations = () => {
         onSettled,
     });
 
+    // 확정된 예약을 가게가 취소 (2026-08-11 신설). 거절과 달리 서버가 **전액 환불**까지 실행한다.
+    // 그래서 성공 메시지에도 환불을 명시한다 — 사장님 입장에서 돈이 나가는 동작이라
+    // "취소했습니다"만 뜨면 환불이 됐는지 따로 확인하러 가야 한다.
+    const storeCancelMutation = useMutation({
+        mutationFn: ({ id, reason }) => reservationService.storeCancelReservation(id, reason),
+        onMutate:   ({ id }) => optimisticPatch(id, 'CANCELLED'),
+        onSuccess:  () => message.success('예약을 취소했습니다. 예약금은 전액 환불됩니다'),
+        onError,
+        onSettled,
+    });
+
     const completeMutation = useMutation({
         mutationFn: (id) => reservationService.completeReservation(id),
         onMutate:   (id) => optimisticPatch(id, 'COMPLETED'),
@@ -79,6 +90,7 @@ const useManageReservations = () => {
     const getActionLoading = () => {
         if (approveMutation.isPending)  return `approve-${approveMutation.variables}`;
         if (rejectMutation.isPending)   return `reject-${rejectMutation.variables?.id}`;
+        if (storeCancelMutation.isPending) return `storecancel-${storeCancelMutation.variables?.id}`;
         if (completeMutation.isPending) return `complete-${completeMutation.variables}`;
         if (noShowMutation.isPending)   return `noshow-${noShowMutation.variables}`;
         return null;
@@ -94,6 +106,7 @@ const useManageReservations = () => {
         actionLoading: getActionLoading(),
         approve:  (id) => approveMutation.mutateAsync(id),
         reject:   (id, reason = '') => rejectMutation.mutateAsync({ id, reason }),
+        storeCancel: (id, reason = '') => storeCancelMutation.mutateAsync({ id, reason }),
         complete: (id) => completeMutation.mutateAsync(id),
         noShow:   (id) => noShowMutation.mutateAsync(id),
         refetch:  () => queryClient.invalidateQueries({ queryKey: reservationKeys.manage() }),

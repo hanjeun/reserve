@@ -22,8 +22,16 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     // 예약 ID로 조회 (단일 - 주의: 레코드 여러 개면 예외 발생)
     Optional<Payment> findByReservationId(Long reservationId);
 
-    // 예약 ID + PAID 상태로 조회 (안전한 버전)
-    @Query("SELECT p FROM Payment p WHERE p.reservation.id = :reservationId AND p.status = 'PAID' ORDER BY p.createdAt DESC")
+    /**
+     * 예약 ID + PAID 상태로 가장 최근 1건.
+     *
+     * <p>★ {@code LIMIT 1} 이 반드시 있어야 한다 (2026-08-11 추가).
+     * 반환 타입이 {@link Optional} 이라 "0개 또는 1개"를 기대하는데, 이 조건으로 PAID 가 2행 이상
+     * 나올 수 있는 경로가 존재한다(부분 환불 후 재결제 등). 그러면 Hibernate 가
+     * {@code NonUniqueResultException} 을 던져 <b>환불·취소가 통째로 500</b> 이 된다.
+     * {@code ORDER BY} 만으로는 행 수가 줄지 않는다.
+     */
+    @Query("SELECT p FROM Payment p WHERE p.reservation.id = :reservationId AND p.status = 'PAID' ORDER BY p.createdAt DESC LIMIT 1")
     Optional<Payment> findPaidByReservationId(@Param("reservationId") Long reservationId);
 
     // 예약 ID + READY 상태로 가장 최근 조회 (결제창 재시도용)

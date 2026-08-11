@@ -518,6 +518,16 @@ public class ReservationService {
         reservation.setStatus(Reservation.ReservationStatus.REJECTED);
         reservation.setRejectionReason(reason != null ? reason : "가게 사정으로 인한 거절");
 
+        // ★ 거절은 전액 환불이다 (2026-08-11 추가).
+        //   그 전까지 이 메서드에는 환불 호출이 **한 줄도 없었다**. 예약금을 낸 이용자의 예약을
+        //   가게가 거절하면 상태만 REJECTED 로 바뀌고 돈은 가게에 남았다. 이용약관
+        //   (frontend/src/pages/policy/Terms.jsx)이 "가게 사정에 의한 취소는 전액 환불"이라고
+        //   명시하고 있으므로 약관 위반이었고, 이용자가 되돌릴 수단도 없었다.
+        //   ⚠️ 정책 계산(calculateRefundAmount)을 쓰면 안 된다 — 그건 이용자 귀책 취소의 위약금
+        //      규칙이라, 가게가 당일에 거절해도 0원이 나올 수 있다. 전액 경로를 따로 쓴다.
+        //   실패해도 거절은 유지한다(cancelReservation 과 같은 이유).
+        refundFullByStoreDecisionQuietly(id, "가게의 예약 거절에 따른 전액 환불", reservation);
+
         // 유저에게 거절 알림 (비동기) — 개인 알림 설정 ON일 때만
         if (reservation.getMember().isEmailNotificationEnabled()) {
             try {
@@ -535,6 +545,108 @@ public class ReservationService {
             } catch (Exception e) {
                 log.warn("Reservation rejection email failed: {}", e.getMessage());
             }
+        }
+    }
+
+    /**
+     * 예약 취소 (사업자용) — <b>확정된 예약을 가게가 취소한다. 전액 환불.</b> (2026-08-11 신설)
+     *
+     * <h3>왜 만들었나</h3>
+     * 그 전까지 가게에는 <b>예약을 취소할 수단이 아예 없었다.</b>
+     * {@link #cancelReservation} 은 {@code validateOwnership} 을 타서 예약자 본인만 통과하고
+     * 가게 주인은 403 이다. 그래서 사장님이 갑자기 문을 닫아야 할 때 할 수 있는 게
+     * "노쇼 처리"밖에 없었고, 그건 오지 않은 손님을 벌하는 상태라 사실과 정반대로 기록된다.
+     *
+     * <h3>왜 CONFIRMED 만인가</h3>
+     * PENDING 은 이미 {@link #rejectReservation}(거절)이 담당한다. 같은 일을 하는 버튼이
+     * 두 개면 사장님이 무엇을 눌러야 할지 모르고, 기록도 REJECTED/CANCELLED 로 갈린다.
+     * 상태별로 정확히 하나의 종료 경로만 둔다.
+     *
+     * <h3>환불</h3>
+     * 가게 귀책이므로 <b>정책 무시하고 전액</b>이다({@code refundFullByStoreDecision}).
+     * 사유는 {@code cancelReason} 에 넣는다 — {@code rejectionReason} 을 재사용하면
+     * 화면이 "거절 사유"라는 라벨로 보여줘 이용자가 오해한다.
+     */
+    @Transactional
+    public void cancelReservationByStore(Long id, Member owner, String reason) {
+        Reservation reservation = findByIdOrThrow(id);
+        validateStoreOwner(reservation, owner);
+
+        if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+            throw new ReservationException(
+                    "승인된 예약만 취소할 수 있습니다. 대기 중인 예약은 '거절'을 사용해주세요.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        String cancelReason = (reason != null && !reason.isBlank()) ? reason : "가게 사정으로 인한 취소";
+
+        // cancelReservation 과 같은 순서 — 상태를 먼저 확정하고 환불은 별도 트랜잭션에서 시도한다.
+        // PG 장애가 예약 취소 자체를 막으면 사장님도 이용자도 아무것도 못 하는 상태로 갇힌다.
+        reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+        reservation.setCancelReason(cancelReason);
+
+        refundFullByStoreDecisionQuietly(id, "가게의 예약 취소에 따른 전액 환불", reservation);
+
+        if (reservation.getMember().isEmailNotificationEnabled()) {
+            try {
+                String memberName = reservation.getMember().getName() != null
+                        ? reservation.getMember().getName() : "고객";
+                emailService.sendReservationCancelledByStoreEmail(
+                        reservation.getMember().getEmail(),
+                        memberName,
+                        reservation.getStore().getName(),
+                        reservation.getReservationDate().toString(),
+                        reservation.getReservationTime().toString().substring(0, 5),
+                        reservation.getGuestCount(),
+                        cancelReason
+                );
+            } catch (Exception e) {
+                log.warn("Store cancellation email failed: {}", e.getMessage());
+            }
+        }
+
+        log.info("Reservation cancelled by store: id={}, ownerId={}", id, owner.getId());
+    }
+
+    /**
+     * 가게 측 결정에 따른 전액 환불을 <b>실패해도 흐름을 막지 않게</b> 실행한다.
+     *
+     * <p>거절·취소 양쪽에서 같은 규칙이 필요해 뽑아냈다. 결제하지 않은 예약은 건너뛴다.
+     *
+     * <p>★ <b>성공하면 여기서도 예약금 플래그를 지워야 한다</b> (2026-08-11).
+     * 환불은 {@code REQUIRES_NEW} 라 <b>다른 영속성 컨텍스트</b>에서 돈다. 그쪽에서
+     * {@code reservation.setDepositPaid(false)} 를 해도 그건 그 컨텍스트가 로드한 <b>다른 인스턴스</b>다.
+     * 이 메서드를 부른 트랜잭션은 status 를 바꿔놨으니 커밋 때 UPDATE 를 날리는데,
+     * 이 엔티티들엔 {@code @DynamicUpdate} 가 없어 <b>모든 컬럼을 다시 쓴다</b> —
+     * 방금 false 로 만든 {@code deposit_paid} 가 true 로 되돌아간다.
+     * 그래서 바깥 인스턴스에도 같은 값을 적용해 커밋이 올바른 값을 쓰게 한다.
+     * (전액 환불이라 조건 없이 0으로 만든다 — 부분 환불이면 이렇게 하면 안 된다.)
+     *
+     * <p>★ <b>반환값을 봐야 한다. "예외가 안 났다" ≠ "돈이 돌아갔다".</b>
+     * 환불할 PAID 결제가 없으면 그쪽은 조용히 {@code false} 를 준다. 그걸 성공으로 읽고
+     * 플래그를 지우면, 이미 부분 환불돼 있던 예약에서 <b>남은 금액을 안 돌려준 채</b>
+     * "전액 환불 완료"로 기록되고 고객에게는 전액 환불 메일까지 나간다.
+     * 플래그를 지우는 건 <b>실제로 환불이 일어났을 때뿐</b>이다 —
+     * {@code depositPaid} 가 true 로 남아 있으면 최소한 "정산이 안 끝난 건"으로 눈에 띈다.
+     *
+     * <p>⚠️ 환불 재시도 원장이 아직 없다 — 아래 로그가 유일한 추적 수단이고,
+     * 운영에서 이 로그가 뜨면 포트원 콘솔에서 수동 처리해야 한다.
+     */
+    private void refundFullByStoreDecisionQuietly(Long reservationId, String reason, Reservation reservation) {
+        if (!Boolean.TRUE.equals(reservation.getDepositPaid())) {
+            return;
+        }
+        try {
+            if (paymentService.refundFullByStoreDecision(reservationId, reason)) {
+                reservation.setDepositPaid(false);
+                reservation.setDepositAmount(0);
+            } else {
+                log.error("Deposit marked paid but no refundable payment found - needs manual settlement: reservationId={}",
+                        reservationId);
+            }
+        } catch (Exception e) {
+            log.error("Store-side full refund failed - status change kept, refund needs manual action: reservationId={}",
+                    reservationId, e);
         }
     }
 

@@ -353,6 +353,51 @@ public class PaymentService {
     }
 
     /**
+     * 가게 측 결정(거절·취소)에 따른 <b>전액</b> 환불 (2026-08-11 추가).
+     *
+     * <p><b>왜 정책 계산({@link #calculateRefundAmount})을 쓰지 않나</b> — 그 정책은
+     * "이용자가 마음을 바꿔 취소할 때 며칠 전이냐"로 위약금을 매기는 규칙이다.
+     * 가게가 거절하거나 취소한 건 이용자 귀책이 아니므로 위약금을 물릴 근거가 없다.
+     * 이용약관({@code frontend/src/pages/policy/Terms.jsx})도 가게 사정에 의한 취소는
+     * 전액 환불이라고 명시하고 있다. 정책을 그대로 태우면 "가게가 당일에 취소했는데
+     * 예약금은 한 푼도 못 돌려받는" 상황이 나온다.
+     *
+     * <p><b>왜 {@code REQUIRES_NEW} 인가</b> — {@link #refundByReservationCancel} 과 같은 이유다.
+     * 호출자(예약 거절·취소)의 트랜잭션에 참여하면 PG 오류 한 번에 <b>상태 변경까지 통째로 롤백</b>된다.
+     * 호출자가 예외를 catch 해도 소용없다(참여 트랜잭션은 rollback-only 로 마킹된다).
+     *
+     * <p>결제 기록이 없으면(무료 예약 등) 조용히 반환한다 — 환불할 게 없는 건 오류가 아니다.
+     *
+     * @return 실제로 환불이 일어났으면 {@code true}, 환불할 결제가 없었으면 {@code false}.
+     *         ★ <b>이 값을 반드시 봐야 한다</b> — "예외가 안 났다"와 "돈이 돌아갔다"는 다른 말이다.
+     *         PAID 행이 없는 경우(이미 부분 환불돼 PARTIAL_REFUNDED 로 넘어간 결제 등)에도
+     *         이 메서드는 정상 반환한다. 그걸 성공으로 읽고 예약금 플래그를 지우면
+     *         <b>남은 금액을 영영 안 돌려준 채 "전액 환불됨"으로 기록</b>된다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean refundFullByStoreDecision(Long reservationId, String reason) {
+        Payment payment = paymentRepository.findPaidByReservationId(reservationId).orElse(null);
+
+        if (payment == null) {
+            log.warn("No refundable PAID payment for store-side decision - deposit flags left untouched: reservationId={}",
+                    reservationId);
+            return false;
+        }
+
+        PaymentRefundDto refundDto = PaymentRefundDto.builder()
+                .reservationId(reservationId)
+                // 명시적으로 결제 전액을 싣는다. null 을 넘기면 refundPayment 가 payment.getAmount()
+                // 로 채워주긴 하지만, "전액"이 이 메서드의 계약이므로 값으로 드러내 둔다.
+                .refundAmount(payment.getAmount())
+                .refundReason(reason != null && !reason.isBlank() ? reason : "가게 사정에 의한 취소 - 전액 환불")
+                .build();
+
+        log.info("Full refund by store decision: reservationId={}, amount={}", reservationId, payment.getAmount());
+        refundPayment(refundDto);
+        return true;
+    }
+
+    /**
      * 환불 예상 금액 조회 — <b>본인 예약 또는 ADMIN 만.</b>
      *
      * <p>2026-08-09 추가. 예전 컨트롤러는 로그인 여부만 보고 reservationId 를 그대로 받아서,

@@ -32,6 +32,22 @@ const STATUS_OPTIONS = [
 ];
 
 /**
+ * 카드 맨 아래 사유 문구. 상태에 따라 읽는 필드와 라벨이 다르다 (2026-08-11).
+ *
+ * <p>{@code rejectionReason} 하나로 뭉뚱그리지 않는다 — 취소된 예약에 "거절 사유"라는 라벨이
+ * 붙으면 이용자가 무슨 일이 있었는지 오해한다. 백엔드도 같은 이유로 컬럼을 따로 뒀다.
+ */
+const reasonNote = (res) => {
+    const map = {
+        REJECTED:  { label: '거절 사유', value: res.rejectionReason },
+        CANCELLED: { label: '취소 사유', value: res.cancelReason },
+    };
+    const note = map[res.status];
+    if (!note?.value) return null;
+    return <Text type="secondary" style={styles.rejection}>{note.label}: {note.value}</Text>;
+};
+
+/**
  * 예약 카드의 액션 버튼 묶음(결제/변경/QR/취소/리뷰/삭제).
  * 상태별로 나오는 버튼이 달라서 별도 컴포넌트로 추출.
  * 2026-07: 감싸는 flex wrapper(정렬/간격)는 ReservationRow가 담당하므로
@@ -186,7 +202,19 @@ const MyReservations = () => {
                 </span>
             ),
             okText: '취소하기', cancelText: '닫기',
-            okButtonProps: { danger: true, loading: true }, centered: true,
+            // ★ loading 이 아니라 disabled 다 (2026-08-11).
+            //   ⚠️ 오해 정정 — loading 이 클릭을 통과시키는 건 **아니다**.
+            //   antd 6.2.0 Button.handleClick 은 innerLoading 이면 preventDefault 하고 빠진다
+            //   (node_modules/antd/es/button/Button.js:183-188). 마우스 클릭은 이미 막혀 있었다.
+            //   진짜 문제는 그 다음 줄이다 — 렌더되는 <button> 의 disabled 속성은
+            //   mergedDisabled 로만 결정되고 innerLoading 은 넣지 않는다(같은 파일 302).
+            //   그래서 loading 상태의 버튼은 **여전히 포커스를 받고 스크린리더에는 평범한
+            //   활성 버튼으로 읽힌다.** Tab 으로 가서 Enter 를 눌러도 아무 일이 안 일어나는데
+            //   왜 안 되는지 알 방법이 없다. 되돌릴 수 없는 "취소하기"에서 그러면 안 된다.
+            //   disabled 는 DOM 속성까지 내려가서 포커스에서 빠지고 회색으로 바뀐다 —
+            //   "아직 누를 때가 아니다"가 눈과 보조기술 양쪽에 실제로 전달된다.
+            //   덤으로 본문 SpinIndicator 와 버튼 스피너가 겹치던 것도 사라진다.
+            okButtonProps: { danger: true, disabled: true }, centered: true,
             onOk: () => cancelReservation(res.id),
         });
 
@@ -195,13 +223,13 @@ const MyReservations = () => {
                 const content = preview.refundAmount > 0
                     ? `예약을 취소하면 ${formatCurrency(preview.refundAmount)}이 환불됩니다. (${preview.reason})`
                     : `취소 시점 기준 환불 불가 조건입니다. (${preview.reason}) 예약을 취소하시겠습니까?`;
-                modalHandle.update({ content, okButtonProps: { danger: true, loading: false } });
+                modalHandle.update({ content, okButtonProps: { danger: true, disabled: false } });
             })
             .catch(() => {
                 // 환불 조회 실패해도 취소는 계속 가능하게 — 기본 문구로 되돌림
                 modalHandle.update({
                     content: '예약을 취소하시겠습니까? 취소 후 되돌릴 수 없습니다.',
-                    okButtonProps: { danger: true, loading: false },
+                    okButtonProps: { danger: true, disabled: false },
                 });
             });
     };
@@ -225,11 +253,11 @@ const MyReservations = () => {
             reservation={res}
             onOpenDetail={() => setDetailReservation(res)}
             renderActions={() => <ReservationActions res={res} {...actionHandlers} />}
-            extraNote={
-                res.status === 'REJECTED' && res.rejectionReason ? (
-                    <Text type="secondary" style={styles.rejection}>사유: {res.rejectionReason}</Text>
-                ) : null
-            }
+            // 사유 문구 — 거절(REJECTED)과 취소(CANCELLED)는 서로 다른 필드를 읽는다.
+            // CANCELLED 의 cancelReason 은 **가게가 취소했을 때만** 채워진다(2026-08-11 신설).
+            // 본인이 취소한 건에는 값이 없어 이 줄이 그대로 사라진다 — 자기가 누른 걸 다시
+            // 설명할 필요는 없으니 의도한 동작이다.
+            extraNote={reasonNote(res)}
         />
     );
 

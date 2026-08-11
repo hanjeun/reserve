@@ -62,7 +62,27 @@ public class EmailService {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 승인되었습니다",
                 buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "승인", "#1db954", "예약이 확정되었습니다! 방문 당일 즐거운 시간 되세요.", null));
+                        guestCount, "승인", "#1db954", "예약이 확정되었습니다! 방문 당일 즐거운 시간 되세요.", null, null));
+    }
+
+    /**
+     * 가게 사정에 의한 예약 취소 알림 → 유저 (2026-08-11 추가).
+     *
+     * <p>거절 메일과 따로 둔다 — 거절은 "아직 승인 안 된 요청을 안 받는 것"이고,
+     * 취소는 "이미 확정된 약속을 가게가 깬 것"이다. 사용자가 받는 충격이 다르므로
+     * 문구도 다르고, 환불 안내가 반드시 들어가야 한다.
+     */
+    @Async
+    public void sendReservationCancelledByStoreEmail(String toEmail, String memberName,
+                                                     String storeName, String reservationDate,
+                                                     String reservationTime, int guestCount,
+                                                     String cancelReason) {
+        String name = resolveName(memberName, toEmail);
+        sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 취소되었습니다",
+                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
+                        guestCount, "취소", "#ff4d4f",
+                        "가게 사정으로 예약이 취소되었습니다. 결제하신 예약금은 전액 환불됩니다.",
+                        cancelReason, "취소 사유"));
     }
 
     /** 예약 거절 알림 → 유저 */
@@ -74,7 +94,8 @@ public class EmailService {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 거절되었습니다",
                 buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "거절", "#ff4d4f", "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.", rejectionReason));
+                        guestCount, "거절", "#ff4d4f", "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.",
+                        rejectionReason, "거절 사유"));
     }
 
     /** 신규 예약 알림 → 사장님 */
@@ -117,13 +138,18 @@ public class EmailService {
         }
     }
 
+    /**
+     * @param reason      사유 본문. {@code null} 이면 사유 행 자체를 렌더하지 않는다.
+     * @param reasonLabel 사유 행의 라벨. <b>"거절 사유"로 고정하면 안 된다</b> (2026-08-11) —
+     *                    취소 메일에 "거절 사유"가 찍히면 이용자가 무슨 일이 있었는지 오해한다.
+     */
     private String buildReservationStatusContent(String memberName, String storeName,
                                                   String reservationDate, String reservationTime,
                                                   int guestCount, String statusLabel, String statusColor,
-                                                  String statusMessage, String rejectionReason) {
-        String reasonRow = rejectionReason != null
-                ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">거절 사유</td><td style=\"color:#191f28;font-weight:600;\">"
-                  + rejectionReason + "</td></tr>"
+                                                  String statusMessage, String reason, String reasonLabel) {
+        String reasonRow = reason != null
+                ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">" + (reasonLabel != null ? reasonLabel : "사유")
+                  + "</td><td style=\"color:#191f28;font-weight:600;\">" + reason + "</td></tr>"
                 : "";
         return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"

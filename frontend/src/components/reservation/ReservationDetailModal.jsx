@@ -30,8 +30,16 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
 
     const {
         storeName, reservationCode, memberName, memberEmail, reservationDate, reservationTime,
-        guestCount, depositAmount, status, specialRequest, rejectionReason,
+        guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason,
     } = cached;
+
+    // 거절과 취소는 서로 다른 필드를 다른 라벨로 보여준다 (2026-08-11).
+    // 하나로 합치면 취소된 예약에 "거절 사유"가 찍혀 이용자가 오해한다.
+    // cancelReason 은 가게가 취소했을 때만 채워지므로, 본인 취소 건에는 이 블록이 안 나온다.
+    const reasonBlock =
+        (status === 'REJECTED' && rejectionReason) ? { label: '거절 사유', value: rejectionReason }
+      : (status === 'CANCELLED' && cancelReason)   ? { label: '취소 사유', value: cancelReason }
+      : null;
 
     return (
         <Modal title="예약 상세" open={open} onCancel={onClose} footer={null} centered>
@@ -89,11 +97,11 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
                     </Text>
                 </>
             )}
-            {status === 'REJECTED' && rejectionReason && (
+            {reasonBlock && (
                 <>
                     <Divider style={{ margin: '12px 0' }} />
-                    <Text style={{ ...styles.detailLabel, display: 'block', marginBottom: 6 }}>거절 사유</Text>
-                    <Text style={{ fontSize: fontSize.sm, color: colors.error.main }}>{rejectionReason}</Text>
+                    <Text style={{ ...styles.detailLabel, display: 'block', marginBottom: 6 }}>{reasonBlock.label}</Text>
+                    <Text style={{ fontSize: fontSize.sm, color: colors.error.main }}>{reasonBlock.value}</Text>
                 </>
             )}
         </Modal>

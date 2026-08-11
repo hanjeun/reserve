@@ -23,8 +23,35 @@ const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
 // 실측 시뮬레이션(합성 프레임 → 캔버스 축소 → jsQR): 캔버스 302에선 10cm에서도 실패,
 // 캔버스 720에선 10~20cm에서 인식. 값을 줄이면 그만큼 인식 거리가 짧아진다.
 const DECODE_WIDTH = 720;
-const DECODE_HEIGHT = 540;                 // 4:3 — videoConstraints와 비율을 맞춰 왜곡을 없앤다
 const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
+
+// ★★ 종횡비 (2026-08-11) — QR이 "가끔" 안 읽히던 나머지 절반의 원인.
+//
+// 라이브러리는 카메라 프레임 **전체**를 컨테이너 크기의 캔버스로 그린다
+// (html5-qrcode.js:558-571). 축소 비율을 가로·세로 따로 계산하는 게 핵심이다.
+//
+//   widthRatio  = videoWidth  / video.clientWidth
+//   heightRatio = videoHeight / video.clientHeight
+//   drawImage(video, 0, 0, videoWidth, videoHeight, 0, 0, 컨테이너W, 컨테이너H)
+//
+// 즉 **컨테이너 비율 ≠ 카메라 비율이면 프레임이 눌린다.** 배포 후 실측한 값이 정확히 그랬다:
+// 캔버스 720x540(4:3) 인데 카메라는 1280x720(16:9) 이라 가로만 1.33배 압축됐다.
+// QR 모듈이 정사각형이 아니게 되니 파인더 패턴의 1:1:3:1:1 비율이 축마다 달라지고,
+// 인식 거리가 눈에 띄게 짧아진다. `videoConstraints` 에 4:3(1280x960)을 ideal 로 요청했지만
+// ideal 은 강제가 아니라 선호도라, 카메라가 16:9 모드를 주면 그냥 그게 온다.
+//
+// 그래서 **컨테이너 비율을 카메라에 맞춘다**(반대가 아니라).
+// ① 기본값을 16:9 로 둔다 — 휴대폰·웹캠 스트림이 거의 항상 이 비율이라 대개 한 번에 맞는다.
+// ② 시작 직후 실제 videoWidth/videoHeight 를 읽어 다르면 컨테이너를 고치고 딱 한 번 재시작한다.
+// 비율이 맞으면 object-fit:cover 가 아무것도 자르지 않으므로,
+// **화면에 보이는 영역 = 디코더가 보는 영역** 이 된다(예전엔 보이는 건 잘리고 디코더는 전체였다).
+//
+// ⚠️ 가로 720은 건드리지 말 것 — 2026-08-09에 실측으로 잡은 값이다(위 주석).
+//    세로는 이 값에서 비율로 유도된다(16:9면 405).
+const DEFAULT_DECODE_ASPECT = 16 / 9;
+const decodeHeightFor = (aspect) => Math.round(DECODE_WIDTH / aspect);
+// 이 이상 어긋나면 재시작해서 고친다. 1~2%는 반올림 오차라 재시작할 값어치가 없다.
+const ASPECT_TOLERANCE = 0.02;
 
 // 라이브러리가 넣는 <video>가 컨테이너를 정확히 꽉 채우도록 강제 (검은 여백/크롭 방지) +
 // 스캔 대기 dot의 pulse 링 애니메이션 (2026-07 리디자인 — App.jsx 전역 keyframes와 동일한
@@ -79,6 +106,17 @@ const QrScannerTab = () => {
     const resumeTimerRef = useRef(null);
     const previewRef = useRef(null);
     const [previewScale, setPreviewScale] = useState(DEFAULT_PREVIEW_SCALE);
+
+    // 디코딩 컨테이너의 종횡비 — 카메라가 실제로 주는 비율을 따라간다(위 DEFAULT_DECODE_ASPECT 주석).
+    // ref 를 같이 두는 이유: 보정 판단이 startScanning 콜백 안에서 일어나는데,
+    // 그 콜백은 렌더 시점의 state 를 캡처하고 있어 최신값을 못 본다.
+    const [decodeAspect, setDecodeAspect] = useState(DEFAULT_DECODE_ASPECT);
+    const decodeAspectRef = useRef(DEFAULT_DECODE_ASPECT);
+    // 보정은 마운트당 한 번만. 카메라가 비율을 오락가락 보고해도 재시작 루프에 빠지지 않는다.
+    const aspectCorrectedRef = useRef(false);
+    const restartForAspectRef = useRef(false);
+
+    const decodeHeight = decodeHeightFor(decodeAspect);
 
     // 2026-07 추가: 다른 탭(예약 관리 등)은 다 서버 데이터 로딩 스켈레톤이 있는데 이 탭만
     // 없어서 이질적으로 보였다. 카메라 상태(idle/starting/scanning)는 서버 데이터가 아니라
@@ -158,10 +196,15 @@ const QrScannerTab = () => {
                     // videoConstraints가 있으면 첫 인자 대신 이 값이 쓰인다(내부 areVideoConstraintsEnabled).
                     // 4:3으로 요청해 DECODE_WIDTH/HEIGHT 비율과 맞춘다 — 16:9가 오면 드로잉 단계에서
                     // 프레임이 4:3으로 눌려 모듈이 정사각형이 아니게 되고 인식률이 떨어진다.
+                    // ★ 16:9 를 요청한다 (2026-08-11 변경, 이전엔 4:3 1280x960).
+                    //   ideal 은 "강제"가 아니라 적합도 점수라, 카메라에 없는 모드를 요청하면
+                    //   가장 가까운 걸 준다 — 4:3을 달라고 해놓고 16:9를 받아 프레임이 눌리고 있었다.
+                    //   휴대폰·웹캠이 사실상 항상 갖고 있는 1280x720 을 요청해 적합도 거리를 0으로 만든다.
+                    //   그래도 다른 비율이 오면 아래에서 실측해 컨테이너를 맞추고 한 번 재시작한다.
                     videoConstraints: {
                         facingMode: 'environment',
                         width: { ideal: 1280 },
-                        height: { ideal: 960 },
+                        height: { ideal: 720 },
                     },
                     // 미설정이면 라이브러리가 실패한 프레임마다 캔버스를 좌우반전해서 한 번 더 디코딩하는데,
                     // 변환을 원복하지 않아 그 다음 프레임까지 반전된 상태로 그려진다. 결과적으로 절반의
@@ -180,6 +223,33 @@ const QrScannerTab = () => {
             );
 
             setStatus('scanning');
+
+            // ── 종횡비 실측·보정 (2026-08-11) ───────────────────────────────────────
+            // start() 는 'playing' 이후에 resolve 되고 videoWidth/Height 는 그보다 앞선
+            // 'loadedmetadata' 에서 채워지므로, 이 시점에 이미 읽을 수 있다.
+            // 디코딩 캔버스는 setupUi 에서 컨테이너 크기로 **이미 고정**됐다 — 그래서 컨테이너를
+            // 고치는 것만으론 부족하고 재시작이 필요하다. 대신 마운트당 한 번뿐이다.
+            const videoEl = document.getElementById(SCANNER_ELEMENT_ID)?.querySelector('video');
+            const nativeW = videoEl?.videoWidth ?? 0;
+            const nativeH = videoEl?.videoHeight ?? 0;
+            if (!aspectCorrectedRef.current && nativeW > 0 && nativeH > 0) {
+                const actual = nativeW / nativeH;
+                const drift = Math.abs(actual - decodeAspectRef.current) / actual;
+                if (drift > ASPECT_TOLERANCE) {
+                    console.warn(
+                        `[QR] aspect mismatch: camera ${nativeW}x${nativeH} (${actual.toFixed(3)}) `
+                        + `vs decode canvas ${decodeAspectRef.current.toFixed(3)} - resizing and restarting once`
+                    );
+                    aspectCorrectedRef.current = true;
+                    decodeAspectRef.current = actual;
+                    restartForAspectRef.current = true;
+                    // 컨테이너가 새 높이로 다시 그려진 뒤에 재시작해야 한다 → 아래 useEffect 가 처리.
+                    setDecodeAspect(actual);
+                    return;
+                }
+                // 이미 맞으면 두 번 다시 재지 않는다.
+                aspectCorrectedRef.current = true;
+            }
 
             // 루프가 정말 도는지 확인한다. 1.5초면 fps 10 기준 10회 이상 들어와야 한다.
             setTimeout(() => {
@@ -202,6 +272,14 @@ const QrScannerTab = () => {
             }
         }
     }, [handleScanSuccess]);
+
+    // 종횡비 보정 뒤 재시작 — decodeAspect 가 반영돼 컨테이너가 새 높이로 그려진 다음에 돈다.
+    // 플래그가 없으면 마운트 시점과 startScanning 재생성 시점에도 카메라가 켜져버린다.
+    useEffect(() => {
+        if (!restartForAspectRef.current) return;
+        restartForAspectRef.current = false;
+        startScanning();
+    }, [decodeAspect, startScanning]);
 
     // ★ isScanning으로 가드하지 않는다 (2026-08-09).
     //   isScanning은 'playing' 이벤트 핸들러 안에서야 true가 된다. 카메라가 켜지는 도중에
@@ -239,7 +317,9 @@ const QrScannerTab = () => {
                 <div style={styles.card}>
                     <Bone width={90} height={18} style={{ marginBottom: 8 }} />
                     <Bone width="85%" height={13} style={{ marginBottom: 16 }} />
-                    <Bone width="100%" height="auto" borderRadius={radius.xl} style={{ aspectRatio: '4 / 3' }} />
+                    {/* 프리뷰 박스와 같은 비율이어야 스켈레톤이 사라질 때 카드 높이가 안 튄다 */}
+                    <Bone width="100%" height="auto" borderRadius={radius.xl}
+                        style={{ aspectRatio: `${DECODE_WIDTH} / ${decodeHeight}` }} />
                 </div>
             </div>
         );
@@ -255,22 +335,32 @@ const QrScannerTab = () => {
                     고객의 예약 QR을 카메라로 비추면 자동으로 체크인(승인)됩니다.
                 </Text>
 
-                {/* 스캐너 프리뷰 박스 — 항상 렌더링(display:none 금지), 오버레이만 상태별로 전환 */}
-                <div style={styles.previewBox} ref={previewRef}>
-                    {/* 레이아웃 크기는 720x540 고정, 보이는 크기만 transform으로 줄인다.
-                        (이 div의 clientWidth가 그대로 디코딩 캔버스 크기가 된다) */}
+                {/* 스캐너 프리뷰 박스 — 항상 렌더링(display:none 금지), 오버레이만 상태별로 전환.
+                    비율은 카메라가 실제로 주는 값을 따라간다(고정 4:3 아님 — 상단 종횡비 주석). */}
+                <div
+                    style={{ ...styles.previewBox, aspectRatio: `${DECODE_WIDTH} / ${decodeHeight}` }}
+                    ref={previewRef}
+                >
+                    {/* 레이아웃 크기는 720 x (720/카메라비율) 고정, 보이는 크기만 transform으로 줄인다.
+                        (이 div의 clientWidth/clientHeight가 그대로 디코딩 캔버스 크기가 된다) */}
                     <div
                         id={SCANNER_ELEMENT_ID}
-                        style={{ ...styles.scannerFill, transform: `scale(${previewScale})` }}
+                        style={{ ...styles.scannerFill, height: decodeHeight, transform: `scale(${previewScale})` }}
                     />
 
-                    {/* 스캔 중에만 보이는 모서리 브라켓 가이드 — 순수 장식, 실제 스캔 영역과 무관 */}
+                    {/* 스캔 중에만 보이는 모서리 브라켓 가이드 — 순수 장식, 실제 스캔 영역과 무관.
+                        2026-08-11: 프레임 전체(4:3)에 걸쳐 있던 걸 **정사각형**으로 바꿨다.
+                        QR 자체가 정사각형이라 직사각 가이드는 "어디에 맞추라는 건지"가 흐릿하고,
+                        가로로 넓은 가이드는 사용자가 QR을 멀찍이 들게 만들어 오히려 인식이 나빠졌다.
+                        가이드보다 바깥도 실제로는 스캔된다 — 안에 넣으면 확실하다는 뜻일 뿐이다. */}
                     {status === 'scanning' && (
                         <div style={styles.bracketFrame}>
-                            <span style={{ ...styles.corner, top: 14, left: 14, borderRight: 'none', borderBottom: 'none' }} />
-                            <span style={{ ...styles.corner, top: 14, right: 14, borderLeft: 'none', borderBottom: 'none' }} />
-                            <span style={{ ...styles.corner, bottom: 14, left: 14, borderRight: 'none', borderTop: 'none' }} />
-                            <span style={{ ...styles.corner, bottom: 14, right: 14, borderLeft: 'none', borderTop: 'none' }} />
+                            <div style={styles.bracketSquare}>
+                                <span style={{ ...styles.corner, top: 0, left: 0, borderRight: 'none', borderBottom: 'none' }} />
+                                <span style={{ ...styles.corner, top: 0, right: 0, borderLeft: 'none', borderBottom: 'none' }} />
+                                <span style={{ ...styles.corner, bottom: 0, left: 0, borderRight: 'none', borderTop: 'none' }} />
+                                <span style={{ ...styles.corner, bottom: 0, right: 0, borderLeft: 'none', borderTop: 'none' }} />
+                            </div>
                         </div>
                     )}
 
@@ -350,24 +440,36 @@ const styles = {
     },
     cardTitle: { display: 'block', fontSize: fontSize.base, color: colors.text.primary, marginBottom: 4 },
     hint:     { display: 'block', marginBottom: 16, fontSize: fontSize.sm, lineHeight: 1.5 },
+    // aspectRatio 는 렌더에서 카메라 실측값으로 덮는다 — 여기 고정값을 두지 않는다.
     previewBox: {
         position: 'relative',
         width: '100%',
-        aspectRatio: '4 / 3',
         borderRadius: radius.xl,
         overflow: 'hidden',
         border: `1px solid ${colors.border.light}`,
         backgroundColor: colors.gray[100],
     },
+    // height 도 렌더에서 덮는다(카메라 비율에서 유도).
     scannerFill: {
         width: DECODE_WIDTH,
-        height: DECODE_HEIGHT,
         transformOrigin: 'top left',
         position: 'absolute',
         top: 0,
         left: 0,
     },
-    bracketFrame: { position: 'absolute', inset: 0, pointerEvents: 'none' },
+    // 정사각 가이드를 프레임 가운데에 놓는다. 프리뷰는 항상 가로가 긴 비율이라
+    // 세로가 한계치다 → 한 변 = 높이. padding 으로 가장자리에서 살짝 띄운다.
+    bracketFrame: {
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 14,
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+    },
+    bracketSquare: { position: 'relative', height: '100%', aspectRatio: '1 / 1', maxWidth: '100%' },
     corner: {
         position: 'absolute',
         width: 28,

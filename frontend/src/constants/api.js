@@ -36,6 +36,8 @@ export const API_ENDPOINTS = {
         DETAIL:              (id) => `/api/reservations/${id}`,
         UPDATE:              (id) => `/api/reservations/${id}`,
         CANCEL:              (id) => `/api/reservations/${id}/cancel`,
+        // 사업자가 확정된 예약을 취소 — CANCEL과 다른 경로다. 그쪽은 예약자 본인만 통과한다(가게는 403).
+        STORE_CANCEL:        (id) => `/api/reservations/${id}/store-cancel`,
         REMOVE:              (id) => `/api/reservations/${id}/remove`,
         APPROVE:             (id) => `/api/reservations/${id}/approve`,
         REJECT:              (id) => `/api/reservations/${id}/reject`,

@@ -160,7 +160,7 @@ public class AdvertisementService {
                 .buyerName(owner.getName())
                 .buyerEmail(owner.getEmail())
                 .buyerTel("")
-                .impCode(portoneService.getImpCode())
+                .storeId(portoneService.getStoreId())
                 .build();
     }
 
@@ -196,7 +196,7 @@ public class AdvertisementService {
                 .buyerName(owner.getName())
                 .buyerEmail(owner.getEmail())
                 .buyerTel("")
-                .impCode(portoneService.getImpCode())
+                .storeId(portoneService.getStoreId())
                 .build();
     }
 

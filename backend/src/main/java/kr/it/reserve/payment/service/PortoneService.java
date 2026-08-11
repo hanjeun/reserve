@@ -23,16 +23,13 @@ public class PortoneService {
 
     private final RestTemplate restTemplate;
 
-    // V1: 프론트엔드 IMP.init()용 고객사 식별코드
-    @Getter
-    @Value("${portone.imp-code}")
-    private String impCode;
-
     // V2: REST API 인증 시크릿 (토큰 교환 불필요)
     @Value("${portone.v2-secret}")
     private String v2Secret;
 
-    // V2: 상점 ID
+    // V2: 상점 ID.
+    // 프론트엔드 PortOne.requestPayment()의 storeId 로도 내려간다 — V1 의 impCode 자리를 대체한다.
+    @Getter
     @Value("${portone.store-id}")
     private String storeId;
 
@@ -41,9 +38,10 @@ public class PortoneService {
     /**
      * 기동 시 PortOne 설정을 한 번 점검한다.
      *
-     * <p>storeId 는 취소 요청에서만 쓰이므로, 값이 잘못돼 있어도 결제·조회는 멀쩡히 돌아가고
-     * <b>환불을 실제로 시도하는 순간에야</b> 404 로 드러난다(2026-08-09에 그렇게 터졌다).
-     * 그때까지 아무 신호가 없는 게 문제라 기동 로그에 상태를 남긴다.
+     * <p>예전에는 storeId 가 취소 요청에서만 쓰여서, 값이 잘못돼 있어도 결제·조회는 멀쩡히 돌아가고
+     * <b>환불을 실제로 시도하는 순간에야</b> 404 로 드러났다(2026-08-09에 그렇게 터졌다).
+     * V2 전환 이후로는 storeId 가 <b>결제창을 여는 데에도</b> 필요하므로 비어 있으면 결제 자체가 시작되지 않는다.
+     * 그래서 경고가 아니라 에러로 남긴다.
      */
     @PostConstruct
     void checkPortoneConfig() {
@@ -51,7 +49,7 @@ public class PortoneService {
             log.error("PORTONE_V2_SECRET is empty - every PortOne V2 call will fail");
         }
         if (storeId == null || storeId.isBlank()) {
-            log.warn("PORTONE_STORE_ID is empty - cancel requests will omit storeId (falls back to the secret's default store)");
+            log.error("PORTONE_STORE_ID is empty - the payment window cannot be opened and cancellations will fail");
         } else {
             log.info("PortOne V2 config loaded: storeId={}", storeId);
         }

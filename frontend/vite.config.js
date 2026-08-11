@@ -27,6 +27,7 @@ export default defineConfig({
                     'vendor-motion': ['framer-motion'],
                     'vendor-qr': ['html5-qrcode', 'qrcode.react'],
                     'vendor-sentry': ['@sentry/react'],
+                    'vendor-payment': ['@portone/browser-sdk/v2'],
                     'vendor-misc': ['axios', '@tanstack/react-query', 'zustand', 'hangul-js'],
                 },
             },

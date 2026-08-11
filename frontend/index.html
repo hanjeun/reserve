@@ -72,8 +72,10 @@
     }
     </script>
 
-    <!-- ─── 포트원 결제 SDK ────────────────────────────────── -->
-    <script src="https://cdn.iamport.kr/v1/iamport.js"></script>
+    <!-- 포트원 결제 SDK 는 더 이상 여기서 로드하지 않는다 (2026-08-10 V2 전환).
+         @portone/browser-sdk 가 결제를 시작하는 순간에만 cdn.portone.io 스크립트를 주입하므로,
+         결제하지 않는 대부분의 방문자는 이 스크립트를 아예 받지 않는다.
+         CSP script-src 에는 cdn.portone.io 가 필요하다 — nginx/default.conf 참고. -->
     <!-- 카카오맵 JavaScript SDK (autoload=false → 컴포넌트에서 명시적 load) -->
     <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=%VITE_KAKAO_JS_KEY%&autoload=false&libraries=services"></script>
   </head>

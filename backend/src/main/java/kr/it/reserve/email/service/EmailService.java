@@ -98,6 +98,25 @@ public class EmailService {
                         rejectionReason, "거절 사유"));
     }
 
+    /**
+     * 승인 취소 알림 → 유저 (2026-08-11 신설, Undo 전용).
+     *
+     * <p>사장님이 승인을 잘못 눌러 되돌렸을 때 보낸다. <b>이 메일이 없으면 안 된다</b> —
+     * 승인 순간 이미 "예약이 승인되었습니다" 메일이 나갔기 때문에, 되돌리기만 하고 알리지 않으면
+     * 이용자는 확정된 줄 알고 방문한다. 거절이 아니라 "다시 대기 상태"라는 걸 분명히 한다.
+     */
+    @Async
+    public void sendReservationApprovalRevokedEmail(String toEmail, String memberName,
+                                                    String storeName, String reservationDate,
+                                                    String reservationTime, int guestCount) {
+        String name = resolveName(memberName, toEmail);
+        sendReservationStatusEmail(toEmail, "[RESERVE] 예약 승인이 취소되었습니다",
+                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
+                        guestCount, "대기", "#faad14",
+                        "앞서 보내드린 승인 안내를 취소합니다. 예약은 다시 승인 대기 상태입니다.",
+                        null, null));
+    }
+
     /** 신규 예약 알림 → 사장님 */
     @Async
     public void sendNewReservationAlertToOwner(String ownerEmail, String ownerName,

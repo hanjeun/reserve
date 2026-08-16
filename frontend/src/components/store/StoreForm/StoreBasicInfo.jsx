@@ -1,5 +1,6 @@
 import React from 'react';
-import { Form, Flex, Input, Switch, Typography } from 'antd';
+import dayjs from 'dayjs';
+import { Form, Flex, Input, Switch, Typography, Checkbox, DatePicker } from 'antd';
 import { FormInput, FormTextArea, FormSelect, FormTimePicker } from '../../common';
 import AddressSearch from './AddressSearch';
 import {
@@ -161,6 +162,51 @@ const SettingsSection = () => (
             <ToggleItem name="allowDuplicateReservation" label="중복 예약 허용"  desc="OFF 시 같은 날짜에 1인 1예약만 가능" />
             <ToggleItem name="emailNotificationEnabled"  label="예약 알림 메일"  desc="새 예약 접수 시 이메일로 알림 받기" />
         </Flex>
+
+        <Divider />
+        <SectionLabel>휴무 · 예약 범위</SectionLabel>
+        {/* 2026-08-11 신설. 그 전까지 영업시간이 요일 구분 없이 하나뿐이라
+            **월요일 휴무인 가게도 월요일 예약을 받았다.** 기능이 없는 게 아니라
+            잘못된 예약을 받는 상태였고, 사장님이 하나씩 거절해야 했다. */}
+        <Form.Item
+            label="정기 휴무" name="closedDays"
+            extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                선택한 요일은 예약을 받지 않아요. 안 고르면 연중무휴예요
+            </Text>}
+        >
+            {/* ISO 요일 번호(월=1 … 일=7) — 백엔드 Store.isClosedOn 이 같은 기준으로 판정한다.
+                0=일요일인 JS getDay()와 다르니 섞지 말 것. */}
+            <Checkbox.Group options={[
+                { label: '월', value: 1 }, { label: '화', value: 2 }, { label: '수', value: 3 },
+                { label: '목', value: 4 }, { label: '금', value: 5 }, { label: '토', value: 6 },
+                { label: '일', value: 7 },
+            ]} />
+        </Form.Item>
+
+        <FieldRow>
+            <Form.Item
+                label="임시 휴무일" name="closedDates"
+                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                    명절·개인 사정 등 특정 날짜만 쉴 때. 지난 날짜는 저장 시 자동으로 정리돼요
+                </Text>}
+            >
+                <DatePicker
+                    multiple
+                    placeholder="날짜 선택"
+                    style={{ width: '100%' }}
+                    maxTagCount="responsive"
+                    disabledDate={(d) => d && d.isBefore(dayjs().startOf('day'))}
+                />
+            </Form.Item>
+            <Form.Item
+                label="예약 가능 기간" name="maxAdvanceBookingDays"
+                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                    오늘부터 며칠 뒤까지 받을지. 비워두면 제한 없음
+                </Text>}
+            >
+                <FormInput type="number" placeholder="예) 30" suffix="일" min={1} max={365} precision={0} />
+            </Form.Item>
+        </FieldRow>
 
         <Divider />
         <SectionLabel>환불 정책</SectionLabel>

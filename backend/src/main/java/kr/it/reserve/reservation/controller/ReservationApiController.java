@@ -7,6 +7,7 @@ import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
+import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
@@ -150,6 +151,24 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(null, "예약이 취소되었습니다. 예약금은 전액 환불됩니다."));
     }
 
+    /** 승인 되돌리기 — 오조작 정정용. 10분 이내만 허용되고 이용자에게 승인 취소 메일이 나간다. */
+    @PatchMapping("/{id}/undo-approve")
+    public ResponseEntity<ApiResponse<Void>> undoApprove(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember();
+        validateBusinessAuth(member);
+        reservationService.undoApprove(id, member);
+        return ResponseEntity.ok(ApiResponse.success(null, "승인을 되돌렸습니다."));
+    }
+
+    /** 이용완료 되돌리기 — 오조작 정정용. 10분 이내만 허용. */
+    @PatchMapping("/{id}/undo-complete")
+    public ResponseEntity<ApiResponse<Void>> undoComplete(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember();
+        validateBusinessAuth(member);
+        reservationService.undoComplete(id, member);
+        return ResponseEntity.ok(ApiResponse.success(null, "이용완료를 되돌렸습니다."));
+    }
+
     @PatchMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<Void>> completeReservation(@PathVariable Long id) {
         Member member = SecurityUtil.getCurrentMember();
@@ -168,15 +187,16 @@ public class ReservationApiController {
 
     // QR 스캔을 통한 자동 체크인 — 스캔 즉시 CONFIRMED로 자동 승인
     @PostMapping("/qr-checkin")
-    public ResponseEntity<ApiResponse<ReservationResponse>> checkInByQrToken(@RequestBody Map<String, String> body) {
+    public ResponseEntity<ApiResponse<QrCheckinResponse>> checkInByQrToken(@RequestBody Map<String, String> body) {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         String token = body.get("token");
         if (token == null || token.isBlank()) {
             throw new ReservationException("QR 토큰이 없습니다.", HttpStatus.BAD_REQUEST);
         }
-        ReservationResponse reservation = reservationService.checkInByQrToken(token, member);
-        return ResponseEntity.ok(ApiResponse.success(reservation, "체크인되었습니다."));
+        QrCheckinResponse result = reservationService.checkInByQrToken(token, member);
+        return ResponseEntity.ok(ApiResponse.success(
+                result, result.isAlreadyCheckedIn() ? "이미 승인된 예약입니다." : "예약이 승인되었습니다."));
     }
 
     private void validateBusinessAuth(Member member) {

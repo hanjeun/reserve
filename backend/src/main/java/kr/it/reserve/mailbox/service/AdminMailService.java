@@ -4,6 +4,8 @@ import kr.it.reserve.mailbox.dto.AdminSentMailResponse;
 import kr.it.reserve.mailbox.dto.ComposeMailRequest;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
+import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.repository.MemberRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class AdminMailService {
 
     private final AdminSentMailRepository sentMailRepository;
     private final JavaMailSender mailSender;
+    private final MemberRepository memberRepository;
 
     @Value("${mail.from:${mail.username}}")
     private String fromEmail;
@@ -46,6 +49,9 @@ public class AdminMailService {
     /* ── 새 메일 작성 발송 + DB 저장 ───────────────────── */
     @Transactional
     public void compose(ComposeMailRequest request) {
+        if (request.isMarketing()) {
+            requireMarketingConsent(request.getToEmail());
+        }
         sendReplyEmail(request.getToEmail(), request.getSubject(), request.getBody());
 
         AdminSentMail sent = AdminSentMail.builder()
@@ -56,6 +62,35 @@ public class AdminMailService {
         sentMailRepository.save(sent);
 
         log.info("Mail composed and saved: to={}", request.getToEmail());
+    }
+
+    /**
+     * 광고성 메일의 수신 동의 확인 (2026-08-11 신설).
+     *
+     * <p><b>왜 필요했나</b> — 가입·마이페이지에서 마케팅 수신 동의를 받아 DB 에 저장하고 있었지만,
+     * 그 값을 <b>읽는 코드가 한 줄도 없었다.</b> 동의를 관리하는 척만 하고 실제로는 아무것도
+     * 강제하지 않는 상태였다. 정보통신망법상 광고성 정보는 사전 동의가 필요하고,
+     * 수신 거부자에게 보내면 과태료 대상이다.
+     *
+     * <p>이 메일함은 임의의 주소로 보낼 수 있어 <b>회원이 아닌 주소</b>도 대상이 된다.
+     * 그 경우엔 동의를 확인할 방법 자체가 없으므로 광고 발송을 거부한다 —
+     * "확인할 수 없으면 보내지 않는다"가 안전한 기본값이다.
+     */
+    private void requireMarketingConsent(String toEmail) {
+        // ★ 탈퇴 회원을 제외하는 조회를 쓴다. findByEmail 은 소프트 삭제된 회원도 잡는데,
+        //   탈퇴한 사람에게 광고를 보내는 건 동의 없이 보내는 것보다 나쁘다.
+        Member member = memberRepository.findByEmailAndDeletedAtIsNull(toEmail).orElse(null);
+
+        if (member == null) {
+            log.warn("Marketing mail blocked - not a member: to={}", toEmail);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "회원이 아닌 주소로는 광고성 메일을 보낼 수 없습니다. 광고가 아니라면 '광고성 정보' 체크를 해제해주세요.");
+        }
+        if (!member.isMarketingAgreed()) {
+            log.warn("Marketing mail blocked - consent not given: memberId={}", member.getId());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "이 회원은 마케팅 정보 수신에 동의하지 않았습니다. 광고가 아니라면 '광고성 정보' 체크를 해제해주세요.");
+        }
     }
 
     /* ── 보낸 메일 목록 ─────────────────────────────────── */

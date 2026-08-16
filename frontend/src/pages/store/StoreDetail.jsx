@@ -404,6 +404,44 @@ const timeSlotStyles = {
     },
 };
 
+/**
+ * 달력에서 고를 수 없는 날짜 판정 — 과거 · 정기 휴무 요일 · 임시 휴무일 · 예약 가능 기간 밖.
+ *
+ * <p>백엔드 {@code Store.isClosedOn} 과 <b>같은 기준</b>이어야 한다. 여기서만 막고 서버가 안 막으면
+ * API 를 직접 찔러 우회할 수 있고, 서버만 막고 여기서 안 막으면 사용자가 끝까지 입력한 뒤에야
+ * 거부당한다. 둘 다 필요하다.
+ *
+ * <p>⚠️ 요일 번호는 ISO(월=1 … 일=7)다. dayjs 의 {@code .day()} 는 일=0 이라 그대로 쓰면
+ * 하루씩 밀린다 — {@code .isoWeekday()} 없이 계산할 수 있게 일요일만 7 로 바꿔 맞춘다.
+ */
+const makeDisabledDate = (store) => (d) => {
+    if (!d) return false;
+    if (d.isBefore(dayjs().startOf('day'))) return true;
+
+    const maxDays = store?.maxAdvanceBookingDays;
+    if (maxDays > 0 && d.isAfter(dayjs().add(maxDays, 'day').endOf('day'))) return true;
+
+    const isoDay = d.day() === 0 ? 7 : d.day();
+    if ((store?.closedDays ?? []).includes(isoDay)) return true;
+
+    return (store?.closedDates ?? []).includes(d.format('YYYY-MM-DD'));
+};
+
+/** 달력에서 회색으로 막힌 이유를 미리 알려준다 — 막아만 두면 "왜 안 눌리지"가 된다. */
+const bookingRangeHint = (store) => {
+    const days = (store?.closedDays ?? []);
+    const labels = ['', '월', '화', '수', '목', '금', '토', '일'];
+    const parts = [];
+    if (days.length > 0) parts.push(`매주 ${days.map(d => labels[d]).join('·')} 휴무`);
+    if (store?.maxAdvanceBookingDays > 0) parts.push(`${store.maxAdvanceBookingDays}일 이내만 예약 가능`);
+    if (parts.length === 0) return null;
+    return (
+        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+            {parts.join(' · ')}
+        </Text>
+    );
+};
+
 const ReservationPanel = ({ store, form, onFinish, paying, isPC, isEditMode }) => {
     const dateValue = Form.useWatch('reservationDate', form);
     return (
@@ -415,9 +453,13 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC, isEditMode }) =
             initialValues={{ guestCount: 1 }} requiredMark={false}
             style={{ fontWeight: fontWeight.medium }}>
             <Form.Item label="예약 날짜" name="reservationDate"
-                rules={[{ required: true, message: '날짜를 선택해주세요.' }]}>
-                <FormDatePicker placeholder="날짜 선택"
-                    disabledDate={(d) => d && d.isBefore(dayjs().startOf('day'))} />
+                rules={[{ required: true, message: '날짜를 선택해주세요.' }]}
+                extra={bookingRangeHint(store)}>
+                {/* 휴무일·예약 가능 기간을 달력에서 미리 막는다 (2026-08-11).
+                    서버도 같은 조건으로 거부하지만(Store.isClosedOn), 고를 수 있게 두고 나서
+                    에러로 알려주는 건 나쁜 흐름이다 — 고르고, 시간까지 고르고, 제출한 뒤에야
+                    "휴무일입니다"가 뜬다. 달력에서 회색으로 보이면 그 왕복이 통째로 사라진다. */}
+                <FormDatePicker placeholder="날짜 선택" disabledDate={makeDisabledDate(store)} />
             </Form.Item>
             <Form.Item label="예약 시간" name="reservationTime"
                 rules={[{ required: true, message: '시간을 선택해주세요.' }]}>

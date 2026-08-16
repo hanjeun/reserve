@@ -12,6 +12,9 @@ const STATUS_STYLE = {
     CANCELLED: { color: colors.text.tertiary  },
     COMPLETED: { color: colors.success.main   },
     NO_SHOW:   { color: colors.text.tertiary  },
+    // 확정(파랑)과 달라야 한다 — 사장님이 처리해야 할 건이라 눈에 걸려야 하고,
+    // 대기(주황)와도 성격이 비슷하다("네가 할 일이 남았다").
+    UNCONFIRMED: { color: colors.warning.main },
 };
 
 /**

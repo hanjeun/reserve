@@ -47,6 +47,30 @@ export const buildStoreFormData = (values) => {
     // 예약 마감 시간 (없으면 미전송 → 백엔드 null = 제한 없음)
     appendOptional(fd, 'bookingDeadlineHours', values.bookingDeadlineHours);
 
+    // ── 휴무 (2026-08-11) ────────────────────────────────────────────────────
+    // ⚠️ multipart 에서 배열은 **같은 키를 여러 번 append** 해야 스프링이 List 로 바인딩한다.
+    //    JSON.stringify 로 보내면 List<Integer> 에 못 꽂히고 400 이 난다.
+    //
+    // ⚠️ 값이 없어도 키를 하나는 보내야 한다. 아무것도 안 보내면 스프링이 필드를 null 로 두는데,
+    //    서비스는 "항상 덮어쓰기"라 null → 빈 목록이 되어 결과적으로는 같다. 다만 그건 우연히
+    //    맞는 것이라, 빈 문자열을 명시적으로 보내 "비우겠다"는 의도를 드러낸다.
+    //    (백엔드 normalizeClosedDays/Dates 가 빈 값·형식 오류를 걸러낸다.)
+    const closedDays = values.closedDays ?? [];
+    if (closedDays.length === 0) fd.append('closedDays', '');
+    else closedDays.forEach(d => fd.append('closedDays', String(d)));
+
+    const closedDates = (values.closedDates ?? [])
+        .map(d => (typeof d === 'string' ? d : d?.format?.('YYYY-MM-DD')))
+        .filter(Boolean);
+    if (closedDates.length === 0) fd.append('closedDates', '');
+    else closedDates.forEach(d => fd.append('closedDates', d));
+
+    // 빈 값 = 제한 없음
+    fd.append('maxAdvanceBookingDays',
+        (values.maxAdvanceBookingDays != null && values.maxAdvanceBookingDays !== '')
+            ? String(values.maxAdvanceBookingDays) : ''
+    );
+
     fd.append('paymentTimeoutMinutes',  values.paymentTimeoutMinutes  ?? 30);
     fd.append('reservationSlotMinutes', values.reservationSlotMinutes ?? 30);
     fd.append('nearbyRadiusKm',         values.nearbyRadiusKm ?? 3);

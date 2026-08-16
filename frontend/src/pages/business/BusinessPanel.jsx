@@ -27,6 +27,7 @@ const STATUS_OPTIONS = [
     { value: 'ALL',       label: '전체 상태' },
     { value: 'PENDING',   label: '승인 대기' },
     { value: 'CONFIRMED', label: '확정' },
+    { value: 'UNCONFIRMED', label: '미확인' },
     { value: 'COMPLETED', label: '완료' },
     { value: 'REJECTED',  label: '거절' },
     { value: 'CANCELLED', label: '취소' },

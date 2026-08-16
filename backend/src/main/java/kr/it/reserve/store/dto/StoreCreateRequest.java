@@ -89,6 +89,18 @@ public class StoreCreateRequest {
     // 이메일 알림 수신 여부 (기본 true)
     private Boolean emailNotificationEnabled = true;
 
+    /**
+     * 정기 휴무 요일 — ISO 요일 번호 목록 (월=1 … 일=7). 빈 목록·null = 연중무휴.
+     * 폼이 multipart 라 문자열 CSV 로도 올 수 있어 서비스에서 정규화한다.
+     */
+    private List<Integer> closedDays;
+
+    /** 임시 휴무일 — ISO 날짜 문자열 목록("2026-09-15"). 지난 날짜는 저장 시 걸러진다. */
+    private List<String> closedDates;
+
+    /** 오늘부터 며칠 뒤까지 예약을 받을지. null·0 이하 = 제한 없음. */
+    private Integer maxAdvanceBookingDays;
+
     public Integer getMaxCapacityPerSlot() {
         if (maxCapacityPerSlotRaw == null || maxCapacityPerSlotRaw.isBlank()) return null;
         try { return Integer.parseInt(maxCapacityPerSlotRaw.trim()); }

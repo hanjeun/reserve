@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
@@ -214,6 +215,27 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
          + "AND s.allowLatePayment = false "
          + "AND r.createdAt < :cutoff")
     List<Reservation> findExpiredUnpaidReservations(@Param("cutoff") LocalDateTime cutoff);
+
+    /**
+     * 예약 시각이 지났는데 아직 PENDING/CONFIRMED 로 남아 있는 예약 (2026-08-11 신설).
+     *
+     * <p>{@code ReservationElapsedScheduler} 가 PENDING 은 취소+환불, CONFIRMED 는 UNCONFIRMED 로 넘긴다.
+     *
+     * <p>⚠️ {@code date}·{@code time} 은 반드시 <b>KST 기준 현재</b>를 넘겨야 한다.
+     * 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 KST 값인데, 앱 컨테이너에는 TZ 설정이 없어
+     * {@code LocalDateTime.now()} 가 UTC 로 나온다. 그대로 비교하면 9시간이 어긋나
+     * 아직 오지 않은 예약을 취소해버린다. (QrCheckinTokenProvider 가 같은 이유로 SERVICE_ZONE 을 쓴다.)
+     *
+     * <p>정렬은 오래된 것부터 — 배치 상한에 걸려도 가장 오래 방치된 건이 먼저 처리된다.
+     */
+    @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member "
+         + "WHERE r.deletedAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED') "
+         + "AND (r.reservationDate < :date "
+         + "     OR (r.reservationDate = :date AND r.reservationTime <= :time)) "
+         + "ORDER BY r.reservationDate ASC, r.reservationTime ASC")
+    List<Reservation> findElapsedActiveReservations(@Param("date") LocalDate date,
+                                                    @Param("time") LocalTime time,
+                                                    Pageable pageable);
 
     /**
      * 가게 소프트 삭제 시 PENDING 예약 자동 취소

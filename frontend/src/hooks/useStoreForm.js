@@ -115,6 +115,11 @@ export const useStoreForm = ({
             paymentTimeoutMinutes:     initialData.paymentTimeoutMinutes     ?? 30,
             reservationSlotMinutes:    initialData.reservationSlotMinutes    ?? 30,
             nearbyRadiusKm:            initialData.nearbyRadiusKm            ?? 3,
+            // 휴무·예약범위 (2026-08-11). 서버가 항상 배열을 내려주지만, 옛 응답이 캐시에 남아
+            // 있을 수 있어 ?? [] 로 받는다 — undefined 면 Checkbox.Group 이 uncontrolled 로 떨어진다.
+            closedDays:                initialData.closedDays                ?? [],
+            closedDates:               (initialData.closedDates ?? []).map(d => dayjs(d)),
+            maxAdvanceBookingDays:     initialData.maxAdvanceBookingDays     ?? undefined,
             times: initialData.openTime && initialData.closeTime
                 ? [dayjs(initialData.openTime, 'HH:mm'), dayjs(initialData.closeTime, 'HH:mm')]
                 : null,

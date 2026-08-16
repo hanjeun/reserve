@@ -12,7 +12,7 @@
  *   백엔드 GET /api/admin/mail/sent 의 **응답 형식도 배열 → Page 로 바뀌었다**(같이 배포할 것).
  */
 import React, { useState, useEffect } from 'react';
-import { Typography, Input, Divider, Pagination } from 'antd';
+import { Typography, Input, Divider, Pagination, Checkbox } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined } from '@ant-design/icons';
 import { Button, FormTextArea, FormInput, FormModal, FormField } from '../common';
@@ -93,9 +93,13 @@ const useSentMailData = (message, page, search) => {
 const useComposeMail = ({ message }) => {
     const queryClient = useQueryClient();
     const [composing, setComposing] = useState(false);
-    const [composeForm, setComposeForm] = useState({ toEmail: '', subject: '', body: '' });
+    // marketing: 광고성 정보 여부 (2026-08-11).
+    // ⚠️ 백엔드는 이 값이 없으면 **광고로 간주**한다(안전한 쪽이 기본). 그래서 화면에서는
+    //    반드시 명시적으로 보내야 하고, 기본값은 false(=문의 답변 등 일반 발송)로 둔다.
+    //    광고를 보낼 때만 체크하게 해서, 체크하는 순간 동의 확인이 걸리게 만든다.
+    const [composeForm, setComposeForm] = useState({ toEmail: '', subject: '', body: '', marketing: false });
 
-    const resetCompose = () => { setComposing(false); setComposeForm({ toEmail: '', subject: '', body: '' }); };
+    const resetCompose = () => { setComposing(false); setComposeForm({ toEmail: '', subject: '', body: '', marketing: false }); };
 
     const sendMutation = useMutation({
         mutationFn: (form) => api.post(API_ENDPOINTS.MAIL.COMPOSE, form),
@@ -347,6 +351,21 @@ const MailboxTab = () => {
                 <FormField label="제목">
                     <FormInput placeholder="메일 제목" value={send.composeForm.subject}
                         onChange={(e) => send.setComposeForm(f => ({ ...f, subject: e.target.value }))} maxLength={500} showCount />
+                </FormField>
+                <FormField label="광고성 정보">
+                    {/* 체크하면 서버가 수신자의 마케팅 수신 동의를 확인하고, 동의하지 않았거나
+                        회원이 아니면 발송을 거부한다. 정보통신망법상 광고성 정보는 사전 동의가 필요하다. */}
+                    <Checkbox
+                        checked={send.composeForm.marketing}
+                        onChange={(e) => send.setComposeForm(f => ({ ...f, marketing: e.target.checked }))}
+                    >
+                        <Text style={{ fontSize: fontSize.sm }}>
+                            광고·홍보 메일입니다
+                            <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block' }}>
+                                체크하면 수신 동의한 회원에게만 발송됩니다
+                            </Text>
+                        </Text>
+                    </Checkbox>
                 </FormField>
                 <FormField label="내용">
                     <FormTextArea rows={8} placeholder="메일 내용을 입력하세요..." value={send.composeForm.body}

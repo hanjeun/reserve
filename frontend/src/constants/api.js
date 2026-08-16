@@ -42,6 +42,9 @@ export const API_ENDPOINTS = {
         APPROVE:             (id) => `/api/reservations/${id}/approve`,
         REJECT:              (id) => `/api/reservations/${id}/reject`,
         COMPLETE:            (id) => `/api/reservations/${id}/complete`,
+        // 오조작 정정용 Undo — 서버가 10분 이내만 허용한다
+        UNDO_APPROVE:        (id) => `/api/reservations/${id}/undo-approve`,
+        UNDO_COMPLETE:       (id) => `/api/reservations/${id}/undo-complete`,
         NO_SHOW:             (id) => `/api/reservations/${id}/no-show`,
         AVAILABILITY:        '/api/reservations/availability',
         QR_TOKEN:            (id) => `/api/reservations/${id}/qr-token`,

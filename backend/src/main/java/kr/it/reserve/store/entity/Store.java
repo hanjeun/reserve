@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -114,6 +115,40 @@ public class Store {
 
     @Column(name = "break_end_time")
     private LocalTime breakEndTime;
+
+    /**
+     * 정기 휴무 요일 — ISO 요일 번호를 콤마로 이어 저장한다 (월=1 … 일=7). 예: {@code "1,3"}
+     * ({@code keywords}·{@code detailImages} 와 같은 CSV 컨벤션. 별도 테이블을 두기엔 값이 최대 7개다.)
+     *
+     * <p><b>왜 필요했나</b> (2026-08-11 신설) — 그 전까지 영업시간이 요일 구분 없이 하나뿐이라
+     * <b>월요일 휴무인 가게도 월요일 예약을 받았다.</b> 기능이 없는 게 아니라 잘못된 예약을 받는
+     * 상태였고, 사장님은 그걸 하나씩 거절해야 했다. 거절은 이제 전액 환불이 나가므로
+     * 예약금이 왕복하는 비용까지 붙는다.
+     *
+     * <p>{@code null}·빈 문자열 = 휴무 없음(연중무휴).
+     */
+    @Column(name = "closed_days", length = 20)
+    private String closedDays;
+
+    /**
+     * 임시 휴무일 — ISO 날짜를 콤마로 이어 저장한다. 예: {@code "2026-09-15,2026-09-16"}
+     *
+     * <p>명절·개인 사정처럼 <b>특정 날짜만</b> 닫는 경우. 정기 휴무({@link #closedDays})가 있어도
+     * 이게 없으면 그날 들어온 예약을 일일이 거절해야 한다.
+     *
+     * <p>지난 날짜는 {@code StoreService} 가 저장 시점에 걸러낸다 — 안 그러면 이 값이 무한히 길어진다.
+     */
+    @Column(name = "closed_dates", length = 1000)
+    private String closedDates;
+
+    /**
+     * 오늘부터 며칠 뒤까지 예약을 받을지. {@code null} = 제한 없음.
+     *
+     * <p>그 전까지 미래 날짜 제한이 아예 없어 <b>1년 뒤 예약도 들어왔다.</b>
+     * 가게 입장에서 그렇게 먼 예약은 운영 계획을 세울 수 없고, 이용자도 잊어버린다.
+     */
+    @Column(name = "max_advance_booking_days")
+    private Integer maxAdvanceBookingDays;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
@@ -272,5 +307,52 @@ public class Store {
         } else {
             this.detailImages = String.join(",", imageList);
         }
+    }
+
+    // ── 휴무 (2026-08-11) ────────────────────────────────────────────────────
+    // 파싱을 엔티티에 두는 이유 — 이 CSV 를 읽는 곳이 셋이다(예약 검증, 가능시간 조회, 응답 DTO).
+    // 각자 split 하게 두면 "빈 문자열" "공백 섞임" 같은 케이스를 한 곳만 처리하는 사고가 난다.
+
+    /** 정기 휴무 요일 (ISO: 월=1 … 일=7). 값이 없으면 빈 리스트. */
+    public List<Integer> getClosedDayList() {
+        return parseCsv(closedDays).stream().map(Integer::valueOf).toList();
+    }
+
+    public void setClosedDayList(List<Integer> days) {
+        this.closedDays = (days == null || days.isEmpty()) ? null
+                : days.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+    }
+
+    /** 임시 휴무일. 값이 없으면 빈 리스트. */
+    public List<LocalDate> getClosedDateList() {
+        return parseCsv(closedDates).stream().map(LocalDate::parse).toList();
+    }
+
+    public void setClosedDateList(List<LocalDate> dates) {
+        this.closedDates = (dates == null || dates.isEmpty()) ? null
+                : dates.stream().map(LocalDate::toString).collect(java.util.stream.Collectors.joining(","));
+    }
+
+    /**
+     * 그 날짜에 문을 닫는가 — 정기 휴무 요일이거나 임시 휴무일이면 {@code true}.
+     *
+     * <p>예약 검증·가능시간 조회·달력 표시가 <b>모두 이 한 메서드를 지나게</b> 한다.
+     * 세 곳에 같은 판정을 복사해두면 한 곳만 고쳐지는 일이 반드시 생긴다.
+     */
+    public boolean isClosedOn(LocalDate date) {
+        if (date == null) return false;
+        return getClosedDayList().contains(date.getDayOfWeek().getValue())
+                || getClosedDateList().contains(date);
+    }
+
+    /** 빈 값·공백·후행 콤마를 한 곳에서 흡수한다. */
+    private static List<String> parseCsv(String csv) {
+        if (csv == null || csv.isBlank()) return new ArrayList<>();
+        List<String> out = new ArrayList<>();
+        for (String part : csv.split(",")) {
+            String v = part.trim();
+            if (!v.isEmpty()) out.add(v);
+        }
+        return out;
     }
 }

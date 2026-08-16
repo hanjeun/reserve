@@ -40,9 +40,26 @@ const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
 // 인식 거리가 눈에 띄게 짧아진다. `videoConstraints` 에 4:3(1280x960)을 ideal 로 요청했지만
 // ideal 은 강제가 아니라 선호도라, 카메라가 16:9 모드를 주면 그냥 그게 온다.
 //
+// ─── 2026-08-11 실측 (아이폰 Safari) ────────────────────────────────────────
+// native 720x1280 (세로!) / canvas 720x405 → heightRatio 3.16 배 압축.
+// **아이폰은 기기를 가로로 눕혀도 스트림을 돌리지 않는다.** 화면 표시만 회전하고
+// videoWidth/Height 는 그대로 720x1280 이다. 그래서 "가로로 들면 될 것"은 틀렸다.
+// 이 상태에선 QR 모듈이 가로로 3배 긴 직사각형이 되어 파인더 패턴이 아예 안 잡힌다 —
+// 크게 비추든 밝게 하든 소용없다. 형태가 망가진 것이라서.
+// (PC 웹캠은 진짜 1280x720 이라 기본값과 우연히 맞아 멀쩡했다. 그래서 "PC 는 되는데
+//  폰만 안 되는" 증상이 나왔고, PC 에서 잰 값으로 판단하면 원인을 놓친다.)
+//
 // 그래서 **컨테이너 비율을 카메라에 맞춘다**(반대가 아니라).
-// ① 기본값을 16:9 로 둔다 — 휴대폰·웹캠 스트림이 거의 항상 이 비율이라 대개 한 번에 맞는다.
-// ② 시작 직후 실제 videoWidth/videoHeight 를 읽어 다르면 컨테이너를 고치고 딱 한 번 재시작한다.
+// ① 기본값은 16:9 — 첫 프레임 전까지 쓸 잠정값일 뿐이다. 폰은 대개 세로라 곧 교체된다.
+// ② 해상도가 확정되는 이벤트('loadedmetadata'·'resize')에서 실제 videoWidth/videoHeight 를
+//    읽어, 다르면 컨테이너를 고치고 재시작한다.
+//    ⚠️ start() 직후에 읽으면 안 된다 — 그때는 0 이다. 라이브러리가 setupSurface() 를 부르고
+//    곧바로 반환하므로 start() 의 Promise 는 'playing' **이전에** resolve 된다
+//    (camera/core-impl.js). 이 함정에 한 번 빠져 보정이 통째로 죽어 있었다.
+//
+// 세로(720x1280)면 디코딩 캔버스가 921,600px 이 되어 가로(291,600px)의 3.2배다.
+// 프레임당 비용이 그만큼 늘지만, 형태가 맞아야 읽히기라도 하므로 정확도를 택한다.
+// 체감이 느리면 fps 를 낮추는 쪽으로 상쇄할 것 — 폭 720 을 깎으면 인식 거리가 짧아진다.
 // 비율이 맞으면 object-fit:cover 가 아무것도 자르지 않으므로,
 // **화면에 보이는 영역 = 디코더가 보는 영역** 이 된다(예전엔 보이는 건 잘리고 디코더는 전체였다).
 //
@@ -52,6 +69,8 @@ const DEFAULT_DECODE_ASPECT = 16 / 9;
 const decodeHeightFor = (aspect) => Math.round(DECODE_WIDTH / aspect);
 // 이 이상 어긋나면 재시작해서 고친다. 1~2%는 반올림 오차라 재시작할 값어치가 없다.
 const ASPECT_TOLERANCE = 0.02;
+// 재시작 상한. 카메라가 비율을 흔들어도 무한 재시작에 빠지지 않게 한다.
+const MAX_ASPECT_FIXES = 3;
 
 // 라이브러리가 넣는 <video>가 컨테이너를 정확히 꽉 채우도록 강제 (검은 여백/크롭 방지) +
 // 스캔 대기 dot의 pulse 링 애니메이션 (2026-07 리디자인 — App.jsx 전역 keyframes와 동일한
@@ -112,11 +131,22 @@ const QrScannerTab = () => {
     // 그 콜백은 렌더 시점의 state 를 캡처하고 있어 최신값을 못 본다.
     const [decodeAspect, setDecodeAspect] = useState(DEFAULT_DECODE_ASPECT);
     const decodeAspectRef = useRef(DEFAULT_DECODE_ASPECT);
-    // 보정은 마운트당 한 번만. 카메라가 비율을 오락가락 보고해도 재시작 루프에 빠지지 않는다.
-    const aspectCorrectedRef = useRef(false);
+    // 카메라가 비율을 오락가락 보고해도 재시작 루프에 빠지지 않도록 횟수를 제한한다.
+    // (자기 제한이 이미 걸려 있다 — 보정 후 decodeAspectRef === actual 이라 다음 측정은 통과한다.
+    //  이 카운터는 하드웨어가 값을 흔들 때를 위한 안전장치다.)
+    const aspectFixCountRef = useRef(0);
     const restartForAspectRef = useRef(false);
+    const aspectWatcherCleanupRef = useRef(null);
 
     const decodeHeight = decodeHeightFor(decodeAspect);
+
+    // ?qrdebug=1 — 화면에 실측값을 띄운다.
+    // 모바일 Safari 는 콘솔을 붙이기가 사실상 불가능해서(맥이 있어야 한다) 숫자를 볼 방법이 없었다.
+    // 북마클릿도 iOS 에서 주소창 경로가 막혀 실패했다. 그래서 앱 안에 넣는다 —
+    // 쿼리 파라미터가 없으면 아무것도 렌더하지 않으므로 평소 화면에는 영향이 없다.
+    const debugOn = typeof window !== 'undefined'
+        && new URLSearchParams(window.location.search).get('qrdebug') === '1';
+    const [debugInfo, setDebugInfo] = useState(null);
 
     // 2026-07 추가: 다른 탭(예약 관리 등)은 다 서버 데이터 로딩 스켈레톤이 있는데 이 탭만
     // 없어서 이질적으로 보였다. 카메라 상태(idle/starting/scanning)는 서버 데이터가 아니라
@@ -145,6 +175,32 @@ const QrScannerTab = () => {
         return () => observer.disconnect();
     }, [ready]);
 
+    // ?qrdebug=1 일 때만 도는 폴링. 화면에 실측값을 계속 갱신한다.
+    useEffect(() => {
+        if (!debugOn || status !== 'scanning') return undefined;
+        const tick = () => {
+            const el = document.getElementById(SCANNER_ELEMENT_ID);
+            const v = el?.querySelector('video');
+            const c = el?.querySelector('canvas');
+            if (!v || !c) return;
+            const nw = v.videoWidth;
+            const nh = v.videoHeight;
+            setDebugInfo({
+                native: `${nw}x${nh}`,
+                canvas: `${c.width}x${c.height}`,
+                // 이 둘이 다르면 프레임이 눌린다 — 그게 QR 이 안 읽히는 원인이었다.
+                nativeAspect: nh ? (nw / nh).toFixed(3) : '-',
+                canvasAspect: c.height ? (c.width / c.height).toFixed(3) : '-',
+                // 디코딩 루프가 살아 있다는 유일한 신호. 멈춰 있으면 이 숫자가 안 는다.
+                ticks: decodeTickRef.current,
+                fixes: aspectFixCountRef.current,
+            });
+        };
+        tick();
+        const id = setInterval(tick, 500);
+        return () => clearInterval(id);
+    }, [debugOn, status]);
+
     const handleScanSuccess = useCallback(async (decodedText) => {
         if (processingRef.current) return;
         processingRef.current = true;
@@ -154,9 +210,17 @@ const QrScannerTab = () => {
         try { html5QrRef.current?.pause(false); } catch { /* 이미 멈춰 있으면 무시 */ }
 
         try {
-            const reservation = await reservationService.checkInByQr(decodedText);
-            setLastResult(reservation);
-            message.success(`${reservation.memberName || '고객'}님 예약이 체크인됐습니다.`);
+            // 응답이 { reservation, alreadyCheckedIn } 로 바뀌었다 (2026-08-11).
+            // 체크인은 멱등이라 같은 QR 을 다시 비춰도 성공하는데, 그때도 "승인되었습니다"가 뜨면
+            // 방금 내가 처리한 건지 아까 이미 된 건지 구분이 안 된다.
+            const { reservation, alreadyCheckedIn } = await reservationService.checkInByQr(decodedText);
+            setLastResult({ ...reservation, alreadyCheckedIn });
+            const who = reservation.memberName || '고객';
+            if (alreadyCheckedIn) {
+                message.info(`${who}님은 이미 승인된 예약입니다.`);
+            } else {
+                message.success(`${who}님 예약이 승인되었습니다.`);
+            }
         } catch (err) {
             message.error(err?.message || 'QR 체크인에 실패했습니다.');
         } finally {
@@ -168,6 +232,56 @@ const QrScannerTab = () => {
             }, 2000);
         }
     }, [message]);
+
+    /**
+     * 카메라 해상도가 확정되는 시점에 컨테이너 비율을 맞춘다.
+     *
+     * <p>왜 이벤트냐 — start() 가 resolve 될 때 videoWidth 는 아직 0 이다(위 주석).
+     * 'loadedmetadata' 는 해상도가 처음 정해질 때, 'resize' 는 **도중에 바뀔 때**
+     * (기기 회전·카메라 전환) 발생한다. 둘 다 듣는다.
+     *
+     * <p>보정 후 decodeAspectRef 가 실측값이 되므로 다음 측정은 그냥 통과한다(자기 제한).
+     * 카운터는 하드웨어가 값을 흔들 때 재시작이 반복되는 것만 막는다.
+     */
+    const attachAspectWatcher = useCallback(() => {
+        aspectWatcherCleanupRef.current?.();
+        aspectWatcherCleanupRef.current = null;
+
+        const videoEl = document.getElementById(SCANNER_ELEMENT_ID)?.querySelector('video');
+        if (!videoEl) return;
+
+        const measure = () => {
+            const w = videoEl.videoWidth;
+            const h = videoEl.videoHeight;
+            if (!w || !h) return;
+
+            const actual = w / h;
+            const drift = Math.abs(actual - decodeAspectRef.current) / actual;
+            if (drift <= ASPECT_TOLERANCE) return;
+            if (aspectFixCountRef.current >= MAX_ASPECT_FIXES) {
+                console.warn(`[QR] aspect still drifting after ${MAX_ASPECT_FIXES} fixes - giving up`);
+                return;
+            }
+
+            console.warn(
+                `[QR] aspect mismatch: camera ${w}x${h} (${actual.toFixed(3)}) vs decode canvas `
+                + `${decodeAspectRef.current.toFixed(3)} - resizing container and restarting`
+            );
+            aspectFixCountRef.current += 1;
+            decodeAspectRef.current = actual;
+            restartForAspectRef.current = true;
+            // 컨테이너가 새 높이로 다시 그려진 뒤에 재시작해야 한다 → 아래 useEffect 가 처리.
+            setDecodeAspect(actual);
+        };
+
+        measure();  // 이미 메타데이터가 온 뒤일 수도 있다
+        videoEl.addEventListener('loadedmetadata', measure);
+        videoEl.addEventListener('resize', measure);
+        aspectWatcherCleanupRef.current = () => {
+            videoEl.removeEventListener('loadedmetadata', measure);
+            videoEl.removeEventListener('resize', measure);
+        };
+    }, []);
 
     const startScanning = useCallback(async () => {
         setStatus('starting');
@@ -224,32 +338,16 @@ const QrScannerTab = () => {
 
             setStatus('scanning');
 
-            // ── 종횡비 실측·보정 (2026-08-11) ───────────────────────────────────────
-            // start() 는 'playing' 이후에 resolve 되고 videoWidth/Height 는 그보다 앞선
-            // 'loadedmetadata' 에서 채워지므로, 이 시점에 이미 읽을 수 있다.
-            // 디코딩 캔버스는 setupUi 에서 컨테이너 크기로 **이미 고정**됐다 — 그래서 컨테이너를
-            // 고치는 것만으론 부족하고 재시작이 필요하다. 대신 마운트당 한 번뿐이다.
-            const videoEl = document.getElementById(SCANNER_ELEMENT_ID)?.querySelector('video');
-            const nativeW = videoEl?.videoWidth ?? 0;
-            const nativeH = videoEl?.videoHeight ?? 0;
-            if (!aspectCorrectedRef.current && nativeW > 0 && nativeH > 0) {
-                const actual = nativeW / nativeH;
-                const drift = Math.abs(actual - decodeAspectRef.current) / actual;
-                if (drift > ASPECT_TOLERANCE) {
-                    console.warn(
-                        `[QR] aspect mismatch: camera ${nativeW}x${nativeH} (${actual.toFixed(3)}) `
-                        + `vs decode canvas ${decodeAspectRef.current.toFixed(3)} - resizing and restarting once`
-                    );
-                    aspectCorrectedRef.current = true;
-                    decodeAspectRef.current = actual;
-                    restartForAspectRef.current = true;
-                    // 컨테이너가 새 높이로 다시 그려진 뒤에 재시작해야 한다 → 아래 useEffect 가 처리.
-                    setDecodeAspect(actual);
-                    return;
-                }
-                // 이미 맞으면 두 번 다시 재지 않는다.
-                aspectCorrectedRef.current = true;
-            }
+            // ── 종횡비 실측·보정 ────────────────────────────────────────────────────
+            // ⚠️ 여기서 videoWidth 를 바로 읽으면 안 된다 (2026-08-11 실패에서 배움).
+            //   start() 의 Promise 는 'playing' **이전에** resolve 된다 — 라이브러리가
+            //   setupSurface() 를 부르고 곧바로 반환하기 때문이다(camera/core-impl.js).
+            //   그래서 이 시점의 videoWidth 는 0 이고, 예전 코드는 `nativeW > 0` 가드에 막혀
+            //   보정이 **한 번도 실행되지 않았다.** 컨테이너는 카메라와 무관하게 16:9 로 굳었다.
+            //   PC 웹캠(1280x720)은 우연히 그 값이라 멀쩡했고, 아이폰(720x1280 세로)에서만
+            //   세로가 3.16배 짓눌려 QR 이 아예 안 읽혔다.
+            //   → 해상도가 확정되는 이벤트에 붙는다.
+            attachAspectWatcher();
 
             // 루프가 정말 도는지 확인한다. 1.5초면 fps 10 기준 10회 이상 들어와야 한다.
             setTimeout(() => {
@@ -271,7 +369,7 @@ const QrScannerTab = () => {
                 setErrorMsg('카메라를 시작할 수 없습니다. 브라우저 카메라 권한을 확인해주세요.');
             }
         }
-    }, [handleScanSuccess]);
+    }, [handleScanSuccess, attachAspectWatcher]);
 
     // 종횡비 보정 뒤 재시작 — decodeAspect 가 반영돼 컨테이너가 새 높이로 그려진 다음에 돈다.
     // 플래그가 없으면 마운트 시점과 startScanning 재생성 시점에도 카메라가 켜져버린다.
@@ -287,6 +385,8 @@ const QrScannerTab = () => {
     //   트랙만 살아남았다(녹색 표시등이 계속 켜져 있는 상태). 무조건 stop()을 부르고
     //   "이미 멈춰 있음" 예외는 삼킨다.
     const stopScanning = useCallback(async () => {
+        aspectWatcherCleanupRef.current?.();
+        aspectWatcherCleanupRef.current = null;
         clearTimeout(resumeTimerRef.current);
         processingRef.current = false;
         const scanner = html5QrRef.current;
@@ -300,6 +400,8 @@ const QrScannerTab = () => {
 
     // 컴포넌트가 언마운트될 때(다른 탭으로 이동 등) 카메라를 반드시 끔
     useEffect(() => () => {
+        aspectWatcherCleanupRef.current?.();
+        aspectWatcherCleanupRef.current = null;
         clearTimeout(resumeTimerRef.current);
         const scanner = html5QrRef.current;
         html5QrRef.current = null;
@@ -410,15 +512,34 @@ const QrScannerTab = () => {
                         <Button variant="ghost-sm" onClick={stopScanning}>스캔 중지</Button>
                     </div>
                 )}
+
+                {/* ?qrdebug=1 진단 패널. 모바일에서 콘솔을 못 붙여 매번 원인 추적이 막혔던 걸 없앤다.
+                    nativeAspect ≠ canvasAspect 면 프레임이 눌린 상태이고, 그게 QR 이 안 읽히는 원인이다.
+                    ticks 가 안 늘면 디코딩 루프 자체가 안 도는 것이라 완전히 다른 문제다. */}
+                {debugOn && debugInfo && (
+                    <div style={styles.debugPanel}>
+                        <div>native <b>{debugInfo.native}</b> ({debugInfo.nativeAspect})</div>
+                        <div>canvas <b>{debugInfo.canvas}</b> ({debugInfo.canvasAspect})</div>
+                        <div style={{ color: debugInfo.nativeAspect === debugInfo.canvasAspect ? colors.success.main : colors.error.main }}>
+                            {debugInfo.nativeAspect === debugInfo.canvasAspect ? '비율 일치 — 왜곡 없음' : '⚠ 비율 불일치 — 프레임 눌림'}
+                        </div>
+                        <div>ticks {debugInfo.ticks} · 보정 {debugInfo.fixes}회</div>
+                    </div>
+                )}
             </div>
 
             {lastResult && (
                 <div style={styles.resultCard}>
-                    <div style={styles.resultIconBadge}>
+                    {/* 이미 승인된 건은 초록(성공)이 아니라 파랑(정보)으로 — 색만 봐도
+                        "방금 내가 처리했다"와 "원래 되어 있었다"가 구분돼야 한다. */}
+                    <div style={{
+                        ...styles.resultIconBadge,
+                        background: lastResult.alreadyCheckedIn ? colors.primary.main : colors.success.main,
+                    }}>
                         <CheckCircleFilled style={{ fontSize: 30, color: '#fff' }} />
                     </div>
                     <Text strong style={styles.resultTitle}>
-                        {lastResult.memberName || '고객'}님 체크인 완료
+                        {lastResult.memberName || '고객'}님 {lastResult.alreadyCheckedIn ? '이미 승인됨' : '승인 완료'}
                     </Text>
                     <Text type="secondary" style={{ fontSize: fontSize.sm }}>
                         {lastResult.reservationDate} {lastResult.reservationTime?.substring(0, 5) || ''} · {lastResult.guestCount}명
@@ -512,6 +633,16 @@ const styles = {
         display: 'block', width: 8, height: 8, borderRadius: '50%',
         backgroundColor: colors.success.main, flexShrink: 0,
         animation: 'reserve-qr-pulse 1.4s ease-out infinite',
+    },
+    debugPanel: {
+        marginTop: 10,
+        padding: '10px 12px',
+        borderRadius: radius.lg,
+        backgroundColor: colors.gray[50],
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: fontSize.xs,
+        lineHeight: 1.6,
+        color: colors.text.secondary,
     },
     resultCard: {
         display: 'flex',

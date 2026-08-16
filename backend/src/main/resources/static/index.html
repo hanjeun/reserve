@@ -8,7 +8,16 @@
     <style>
         body {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            /* Pretendard 를 앞에 둔다 — 설치돼 있으면 앱과 같은 글꼴로 보이고, 없으면 아래 시스템
+               글꼴로 조용히 내려간다(윈도우 맑은 고딕 등). 그래서 "로고만 다른 글꼴"이 아니게 된다.
+
+               ⚠️ 여기서 웹폰트를 받아오지 않는다. 앱은 npm 패키지(pretendard)를 번들에 넣어
+               self-host 하는데, 그 산출물은 해시가 붙은 프론트 dist 자산이라 백엔드가 참조할 수 없다.
+               폰트 파일을 이 static 폴더에 복사하면 2MB 가 jar 에 들어가는데, 개발자만 보는
+               안내 페이지 하나 때문에 배포 아티팩트를 불릴 이유가 없다.
+               CDN <link> 는 이 프로젝트가 명시적으로 버린 방식이다(useTheme.js 주석 참고 —
+               외부 의존·프라이버시·CSP·방식 일관성 4가지 이유). */
+            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
             background: #f8f9fa;
             display: flex;
             align-items: center;

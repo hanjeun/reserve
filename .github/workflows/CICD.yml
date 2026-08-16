@@ -50,7 +50,7 @@ jobs:
       # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
       - name: Upload test report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-report
           path: backend/build/reports/tests/test/
@@ -211,7 +211,7 @@ jobs:
       - name: Create GitHub deployment
         id: deployment
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const dep = await github.rest.repos.createDeployment({
@@ -406,7 +406,7 @@ jobs:
       - name: Mark deployment success
         if: success() && steps.deployment.outputs.id
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({
@@ -421,7 +421,7 @@ jobs:
       - name: Mark deployment failure
         if: failure() && steps.deployment.outputs.id
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({

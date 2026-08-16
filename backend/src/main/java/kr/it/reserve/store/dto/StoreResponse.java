@@ -75,6 +75,12 @@ public class StoreResponse {
     private Boolean allowDuplicateReservation;
     private Boolean emailNotificationEnabled;
 
+    // 휴무·예약범위 (2026-08-11). 달력이 어떤 날짜를 막을지 결정하는 데 쓰인다 —
+    // 서버 검증(Store.isClosedOn)과 같은 값을 내려야 화면과 실제 동작이 어긋나지 않는다.
+    private List<Integer> closedDays;
+    private List<String> closedDates;
+    private Integer maxAdvanceBookingDays;
+
     private LocalDateTime createdAt;
     private Long ownerId;  // 소유자 ID (프론트 권한 검증용)
 
@@ -159,6 +165,9 @@ public class StoreResponse {
                 .allowLatePayment(store.getAllowLatePayment())
                 .allowDuplicateReservation(store.getAllowDuplicateReservation())
                 .emailNotificationEnabled(store.getEmailNotificationEnabled())
+                .closedDays(store.getClosedDayList())
+                .closedDates(store.getClosedDateList().stream().map(java.time.LocalDate::toString).toList())
+                .maxAdvanceBookingDays(store.getMaxAdvanceBookingDays())
                 .createdAt(store.getCreatedAt())
                 .ownerId(store.getOwner() != null ? store.getOwner().getId() : null)
                 .status(store.getStatus() != null ? store.getStatus().name() : "ACTIVE")

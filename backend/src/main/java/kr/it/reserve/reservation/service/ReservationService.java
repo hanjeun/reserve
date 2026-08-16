@@ -7,6 +7,7 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
+import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationSearchDto;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
@@ -45,6 +46,9 @@ public class ReservationService {
     private final MemberRepository memberRepository;
     private final AuditLogService auditLogService;
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
+
+    /** Undo 허용 시간(분). 토스트가 떠 있는 몇 초보다 넉넉하되, 실수 정정 범위를 넘지 않는 값. */
+    private static final int UNDO_WINDOW_MINUTES = 10;
 
     public ReservationService(
             ReservationRepository reservationRepository,
@@ -171,6 +175,27 @@ public class ReservationService {
             throw new ReservationException("예약 날짜/시간은 현재 이후여야 합니다.", HttpStatus.BAD_REQUEST);
         }
 
+        // ★ 휴무 검증 (2026-08-11 신설).
+        //   그 전까지 영업시간이 요일 구분 없이 하나뿐이라 **월요일 휴무인 가게도 월요일 예약을 받았다.**
+        //   기능이 없는 게 아니라 잘못된 예약을 받는 상태였고, 사장님은 그걸 하나씩 거절해야 했다.
+        //   거절은 이제 전액 환불이 나가므로 예약금이 왕복하는 비용까지 붙는다.
+        //   판정은 Store.isClosedOn 한 곳에만 둔다 — 여기와 getAvailability, 달력이 같은 답을 내야 한다.
+        if (store.isClosedOn(date)) {
+            throw new ReservationException("휴무일에는 예약할 수 없습니다. 다른 날짜를 선택해주세요.", HttpStatus.BAD_REQUEST);
+        }
+
+        // ★ 예약 가능 범위 검증 (2026-08-11 신설).
+        //   그 전까지 미래 날짜 제한이 없어 1년 뒤 예약도 들어왔다. 그렇게 먼 예약은 가게가 운영
+        //   계획을 세울 수 없고 이용자도 잊어버린다. null = 제한 없음(기존 가게의 동작 유지).
+        Integer maxAdvance = store.getMaxAdvanceBookingDays();
+        if (maxAdvance != null && maxAdvance > 0) {
+            LocalDate lastBookable = LocalDate.now().plusDays(maxAdvance);
+            if (date.isAfter(lastBookable)) {
+                throw new ReservationException(
+                        "이 가게는 " + maxAdvance + "일 이내의 날짜만 예약할 수 있습니다.", HttpStatus.BAD_REQUEST);
+            }
+        }
+
         // 예약 마감 시간 검증 (예약 시간 N시간 전까지만 예약 가능)
         if (store.getBookingDeadlineHours() != null && store.getBookingDeadlineHours() > 0) {
             LocalDateTime deadline = reservationDateTime.minusHours(store.getBookingDeadlineHours());
@@ -261,6 +286,12 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         if (store.getOpenTime() == null || store.getCloseTime() == null) {
+            return List.of();
+        }
+
+        // 휴무일은 슬롯이 하나도 없다 (2026-08-11). 빈 목록을 주면 화면이 "예약 가능한 시간이 없습니다"를
+        // 그대로 보여주므로 별도 분기가 필요 없다 — 검증(validateReservationSlot)과 같은 판정을 쓴다.
+        if (store.isClosedOn(date)) {
             return List.of();
         }
 
@@ -432,13 +463,18 @@ public class ReservationService {
      * 같은 QR을 여러 번 스캔해도 문제없음. CANCELLED/REJECTED/COMPLETED/NO_SHOW는 거부.
      */
     @Transactional
-    public ReservationResponse checkInByQrToken(String token, Member owner) {
+    public QrCheckinResponse checkInByQrToken(String token, Member owner) {
         Long reservationId = qrCheckinTokenProvider.parseReservationId(token);
         Reservation reservation = findByIdOrThrow(reservationId);
         validateStoreOwner(reservation, owner);
 
+        // ★ 이미 승인된 건은 "바뀐 게 없다"는 사실을 함께 돌려준다 (2026-08-11).
+        //   재스캔을 에러로 만들지 않는 건 그대로다(멱등) — 같은 QR 을 두 번 비추는 건 흔하고,
+        //   그때마다 빨간 에러가 뜨면 사장님이 뭘 잘못한 줄 안다.
+        //   다만 화면에는 "승인되었습니다"가 아니라 "이미 승인된 예약입니다"라고 나와야
+        //   방금 처리한 건지 아닌지를 헷갈리지 않는다.
         if (reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED) {
-            return ReservationResponse.fromEntity(reservation);
+            return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), true);
         }
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
             throw new ReservationException(
@@ -467,7 +503,7 @@ public class ReservationService {
             }
         }
 
-        return ReservationResponse.fromEntity(reservation);
+        return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), false);
     }
 
     /**
@@ -572,7 +608,7 @@ public class ReservationService {
         Reservation reservation = findByIdOrThrow(id);
         validateStoreOwner(reservation, owner);
 
-        if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+        if (!isClosable(reservation)) {
             throw new ReservationException(
                     "승인된 예약만 취소할 수 있습니다. 대기 중인 예약은 '거절'을 사용해주세요.",
                     HttpStatus.BAD_REQUEST);
@@ -651,6 +687,87 @@ public class ReservationService {
     }
 
     /**
+     * 승인 되돌리기 (사업자용, 2026-08-11 신설) — CONFIRMED → PENDING.
+     *
+     * <p>승인 버튼은 확인 모달 없이 한 번에 확정된다. 목록에서 바로 옆 줄을 누르는 오조작이
+     * 잦은데, 그 전까지 되돌릴 방법이 <b>거절뿐</b>이었다 — 거절은 이용자에게 "거절됨"으로
+     * 남고 거절 메일까지 나가므로, 실수 정정에 쓰기엔 흔적이 너무 크다.
+     *
+     * <p><b>승인 취소 메일을 반드시 보낸다.</b> 승인 순간 이미 "승인되었습니다" 메일이 나갔다.
+     * 되돌리기만 하고 알리지 않으면 이용자는 확정된 줄 알고 방문한다.
+     *
+     * <p><b>돈은 건드리지 않는다.</b> 승인은 결제와 무관한 상태 전이라 환불할 것이 없다.
+     * 예약금을 낸 예약이면 {@code depositPaid} 는 true 로 남고, PENDING 으로 돌아가도 그대로다.
+     */
+    @Transactional
+    public void undoApprove(Long id, Member owner) {
+        Reservation reservation = findByIdOrThrow(id);
+        validateStoreOwner(reservation, owner);
+
+        if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+            throw new ReservationException("승인된 예약만 되돌릴 수 있습니다.", HttpStatus.BAD_REQUEST);
+        }
+        requireWithinUndoWindow(reservation);
+
+        reservation.setStatus(Reservation.ReservationStatus.PENDING);
+        log.info("Approval undone: reservationId={}, ownerId={}", id, owner.getId());
+
+        if (reservation.getMember().isEmailNotificationEnabled()) {
+            try {
+                String memberName = reservation.getMember().getName() != null
+                        ? reservation.getMember().getName() : "고객";
+                emailService.sendReservationApprovalRevokedEmail(
+                        reservation.getMember().getEmail(), memberName,
+                        reservation.getStore().getName(),
+                        reservation.getReservationDate().toString(),
+                        reservation.getReservationTime().toString().substring(0, 5),
+                        reservation.getGuestCount());
+            } catch (Exception e) {
+                log.warn("Approval revoked email failed: {}", e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 이용완료 되돌리기 (사업자용, 2026-08-11 신설) — COMPLETED → CONFIRMED.
+     *
+     * <p>완료는 이용자에게 메일이 나가지 않으므로 알림도 필요 없다.
+     * 예약 시각이 이미 지난 건이면 {@code ReservationElapsedScheduler} 가 곧 UNCONFIRMED 로
+     * 옮긴다 — 되돌린 직후 CONFIRMED 로 두는 게 맞고, 그 뒤는 평소 규칙에 맡긴다.
+     */
+    @Transactional
+    public void undoComplete(Long id, Member owner) {
+        Reservation reservation = findByIdOrThrow(id);
+        validateStoreOwner(reservation, owner);
+
+        if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
+            throw new ReservationException("이용완료된 예약만 되돌릴 수 있습니다.", HttpStatus.BAD_REQUEST);
+        }
+        requireWithinUndoWindow(reservation);
+
+        reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
+        log.info("Completion undone: reservationId={}, ownerId={}", id, owner.getId());
+    }
+
+    /**
+     * Undo 는 <b>방금 누른 걸 무르는 용도</b>다. 시간 제한이 없으면 며칠 전 예약도 되돌릴 수 있어
+     * 사실상 무제한 상태 되돌리기가 되고, 이용자가 이미 안내받은 내용과 어긋난다.
+     * 오래된 건을 되돌려야 한다면 그건 Undo 가 아니라 취소·거절로 처리할 일이다.
+     *
+     * <p>⚠️ 여기서는 {@code LocalDateTime.now()} 가 맞다 — KST 로 바꾸면 안 된다.
+     * {@code updatedAt} 은 {@code @LastModifiedDate} 가 <b>JVM 시계</b>로 찍은 값이라
+     * 같은 시계끼리 비교해야 한다. (예약 날짜·시각은 이용자에게 보이는 KST 값이라 반대다 —
+     * ReservationElapsedScheduler 가 그래서 SERVICE_ZONE 을 쓴다.)
+     */
+    private void requireWithinUndoWindow(Reservation reservation) {
+        LocalDateTime changedAt = reservation.getUpdatedAt();
+        if (changedAt == null || changedAt.isBefore(LocalDateTime.now().minusMinutes(UNDO_WINDOW_MINUTES))) {
+            throw new ReservationException(
+                    "되돌릴 수 있는 시간이 지났습니다. 취소 또는 거절을 사용해주세요.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /**
      * 이용완료 처리 (사업자용)
      */
     @Transactional
@@ -658,7 +775,9 @@ public class ReservationService {
         Reservation reservation = findByIdOrThrow(id);
         validateStoreOwner(reservation, owner);
 
-        if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+        // UNCONFIRMED 도 받는다 (2026-08-11) — 그건 "승인됐는데 시간이 지나도록 사장님이
+        // 처리를 안 한" 상태다. 처리를 안 했다는 이유로 처리 수단을 막으면 영영 못 닫는다.
+        if (!isClosable(reservation)) {
             throw new ReservationException("승인된 예약만 이용완료 처리가 가능합니다.", HttpStatus.BAD_REQUEST);
         }
 
@@ -673,7 +792,7 @@ public class ReservationService {
         Reservation reservation = findByIdOrThrow(id);
         validateStoreOwner(reservation, owner);
 
-        if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
+        if (!isClosable(reservation)) {
             throw new ReservationException("승인된 예약만 노쇼 처리가 가능합니다.", HttpStatus.BAD_REQUEST);
         }
 
@@ -814,6 +933,18 @@ public class ReservationService {
         if (!reservation.getMember().getId().equals(member.getId())) {
             throw new ReservationException("해당 예약에 대한 권한이 없습니다.", HttpStatus.FORBIDDEN);
         }
+    }
+
+    /**
+     * 사장님이 아직 "닫을" 수 있는 상태인가 — 완료·노쇼·취소의 공통 조건 (2026-08-11).
+     *
+     * <p>CONFIRMED 와 UNCONFIRMED 를 같이 받는다. UNCONFIRMED 는 CONFIRMED 에서
+     * 시간만 지난 것이지 성격이 다른 상태가 아니다. 세 곳에 같은 조건을 복사해두면
+     * 나중에 상태가 하나 더 생겼을 때 한 곳만 고쳐지는 사고가 난다.
+     */
+    private boolean isClosable(Reservation reservation) {
+        return reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED
+                || reservation.getStatus() == Reservation.ReservationStatus.UNCONFIRMED;
     }
 
     private void validateStoreOwner(Reservation reservation, Member owner) {

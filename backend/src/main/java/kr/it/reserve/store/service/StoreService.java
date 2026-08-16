@@ -183,7 +183,11 @@ public class StoreService {
                 .allowLatePayment(request.getAllowLatePayment() != null ? request.getAllowLatePayment() : false)
                 .allowDuplicateReservation(request.getAllowDuplicateReservation() != null ? request.getAllowDuplicateReservation() : false)
                 .emailNotificationEnabled(request.getEmailNotificationEnabled() != null ? request.getEmailNotificationEnabled() : true)
+                .maxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()))
                 .build();
+
+        store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
+        store.setClosedDateList(normalizeClosedDates(request.getClosedDates()));
 
         if (request.getKeywords() != null && !request.getKeywords().isEmpty()) {
             store.setKeywordList(request.getKeywords());
@@ -326,6 +330,11 @@ public class StoreService {
             store.setAllowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()));
             // emailNotificationEnabled: null이면 변경 안 함
             if (request.getEmailNotificationEnabled() != null) store.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
+            // 휴무는 "항상 덮어쓴다" — 요일·날짜를 **빼는** 것도 정상적인 수정이라
+            // null 가드를 두면 마지막 휴무를 지울 방법이 없어진다.
+            store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
+            store.setClosedDateList(normalizeClosedDates(request.getClosedDates()));
+            store.setMaxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()));
             if (request.getOpenTime() != null) store.setOpenTime(request.getOpenTime());
             if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
             // 브레이크 타임: null 전송 시 삭제, 값 있으면 업데이트
@@ -624,6 +633,46 @@ public class StoreService {
 
     /** 예약 마감(시간 전). null 또는 0 = 제한 없음. 음수는 0 으로 수렴. */
     private static final int MAX_BOOKING_DEADLINE_HOURS = 24 * 365;
+
+    /**
+     * 정기 휴무 요일 정규화 — ISO 범위(1~7) 밖 값과 중복을 버린다 (2026-08-11).
+     * 폼에서 오는 값이라 신뢰하지 않는다. 범위를 안 자르면 {@code isClosedOn} 이 영원히 못 맞추는
+     * 값(예: 0, 8)이 들어가 "휴무로 저장했는데 예약이 들어오는" 상태가 된다.
+     */
+    private List<Integer> normalizeClosedDays(List<Integer> days) {
+        if (days == null) return List.of();
+        return days.stream()
+                .filter(d -> d != null && d >= 1 && d <= 7)
+                .distinct().sorted().toList();
+    }
+
+    /**
+     * 임시 휴무일 정규화 — 파싱 실패·중복·<b>지난 날짜</b>를 버린다.
+     *
+     * <p>지난 날짜를 안 걸러내면 이 컬럼이 해가 갈수록 무한히 길어지고(varchar(1000) 상한),
+     * 아무 효과도 없는 값이 계속 쌓인다. 저장할 때마다 정리하는 게 별도 청소 배치보다 싸다.
+     */
+    private List<LocalDate> normalizeClosedDates(List<String> raw) {
+        if (raw == null) return List.of();
+        LocalDate today = LocalDate.now();
+        List<LocalDate> out = new ArrayList<>();
+        for (String v : raw) {
+            if (v == null || v.isBlank()) continue;
+            try {
+                LocalDate d = LocalDate.parse(v.trim());
+                if (!d.isBefore(today) && !out.contains(d)) out.add(d);
+            } catch (Exception ignored) {
+                // 형식이 깨진 값은 조용히 버린다 — 저장을 통째로 실패시킬 만한 사안이 아니다.
+            }
+        }
+        return out.stream().sorted().toList();
+    }
+
+    /** null·0 이하 = 제한 없음. 상한 365 — 그 이상은 실수로 보는 게 맞다. */
+    private Integer clampMaxAdvanceBookingDays(Integer days) {
+        if (days == null || days <= 0) return null;
+        return Math.min(days, 365);
+    }
 
     private Integer clampBookingDeadlineHours(Integer hours) {
         if (hours == null) return null;

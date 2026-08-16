@@ -8,6 +8,7 @@ import {
 import ReservationRow from './ReservationRow';
 import ReservationDetailModal from './ReservationDetailModal';
 import { Button, FormTextArea } from '../common';
+import useMessage from '../../hooks/useMessage';
 import { colors } from '../../styles/tokens';
 
 /**
@@ -47,13 +48,35 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
     const [reasonModal, setReasonModal] = useState(null);
     const [reason, setReason] = useState('');
     const [detailOpen, setDetailOpen] = useState(false);
+    const { confirm } = useMessage();
 
     const { id, status } = reservation;
 
     const isActing = (key) => actionLoading === `${key}-${id}`;
-    const hasAction = status === 'PENDING' || status === 'CONFIRMED';
+    // UNCONFIRMED = 승인됐는데 시간이 지나도록 처리가 안 된 건 (2026-08-11).
+    // CONFIRMED 와 똑같은 버튼을 준다 — 처리를 안 했다는 이유로 처리 수단을 막으면 영영 못 닫는다.
+    const isOpenConfirmed = status === 'CONFIRMED' || status === 'UNCONFIRMED';
+    const hasAction = status === 'PENDING' || isOpenConfirmed;
 
     const closeReasonModal = () => { setReasonModal(null); setReason(''); };
+
+    /**
+     * 노쇼는 확인을 한 번 받는다 (2026-08-11).
+     *
+     * <p>거절·취소에는 사유 모달이 있어 손이 한 번 멈추는데, 노쇼만 <b>누르는 즉시 확정</b>이었다.
+     * 완료 버튼 바로 옆이라 오조작이 쉽고, 되돌리는 수단도 없다.
+     * 게다가 노쇼는 <b>손님에게 불이익이 남는 기록</b>이라 셋 중 가장 무거운데 가장 쉬웠다.
+     * 사유는 받지 않는다 — 노쇼는 "안 왔다"는 사실 하나뿐이라 적을 게 없다.
+     */
+    const handleNoShow = () => {
+        confirm({
+            title: '노쇼 처리',
+            content: '이 예약을 노쇼로 기록합니다. 고객에게 불이익이 남을 수 있고 되돌릴 수 없습니다.',
+            okText: '노쇼 확인', cancelText: '닫기',
+            okButtonProps: { danger: true }, centered: true,
+            onOk: () => onNoShow(id),
+        });
+    };
 
     const handleReasonConfirm = () => {
         if (reasonModal === 'reject') onReject(id, reason);
@@ -78,12 +101,12 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                     {/* CONFIRMED 는 버튼이 3개다. 모바일 폭 계산은 ReservationRow의 actionGroup 주석 참고 —
                         2글자 ghost-sm 버튼 3개(≈22.5px)에 gap 6이면 79.5px이라, 손님 쪽 최대치인
                         4버튼 125.6px보다 한참 여유가 있어 날짜가 잘리지 않는다. */}
-                    {status === 'CONFIRMED' && (
+                    {isOpenConfirmed && (
                         <>
                             <Button variant="ghost-sm-success" loading={isActing('complete')} onClick={() => onComplete(id)}>
                                 <CheckCircleOutlined /> 완료
                             </Button>
-                            <Button variant="ghost-sm-danger" loading={isActing('noshow')} onClick={() => onNoShow(id)}>
+                            <Button variant="ghost-sm-danger" loading={isActing('noshow')} onClick={handleNoShow}>
                                 <WarningOutlined /> 노쇼
                             </Button>
                             {/* 2026-08-11 신설 — 그 전까지 가게에는 예약을 취소할 수단이 아예 없었다.

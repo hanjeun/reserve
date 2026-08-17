@@ -48,7 +48,7 @@ public class Member {
     // 사용자가 직접 이미지를 변경(업로드 or 기본이미지로 삭제)한 경우 true
     // true면 소셜 재로그인 시 소셜 프로필 이미지로 덮어쓰지 않음
     @Builder.Default
-    @Column(name = "profile_image_locked", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    @Column(name = "profile_image_locked", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean profileImageLocked = false;
 
     @Column(name = "oauth_access_token", length = 2048)
@@ -56,17 +56,17 @@ public class Member {
 
     // 개인 이메일 알림 수신 여부 (예약 승인/거절 등)
     @Builder.Default
-    @Column(name = "email_notification_enabled", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 1")
+    @Column(name = "email_notification_enabled", nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
     private boolean emailNotificationEnabled = true;
 
     // 서비스 이용약관 동의 여부 (소셜 로그인 신규 가입 시 별도 동의)
     @Builder.Default
-    @Column(name = "terms_agreed", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    @Column(name = "terms_agreed", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean termsAgreed = false;
 
     // 이메일 마케팅 수신 동의 여부 (선택 동의)
     @Builder.Default
-    @Column(name = "marketing_agreed", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    @Column(name = "marketing_agreed", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean marketingAgreed = false;
 
     @Column(name = "deleted_at")

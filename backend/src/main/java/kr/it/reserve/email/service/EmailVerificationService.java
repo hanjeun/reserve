@@ -2,6 +2,7 @@ package kr.it.reserve.email.service;
 
 import kr.it.reserve.email.entity.EmailVerification;
 import kr.it.reserve.email.repository.EmailVerificationRepository;
+import kr.it.reserve.global.error.BusinessException;
 import kr.it.reserve.global.error.EmailException; // 추가
 import kr.it.reserve.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -57,7 +58,13 @@ public class EmailVerificationService {
         log.info("Verification code sent: email={}", email);
     }
 
-    @Transactional
+    /**
+     * 코드 검증.
+     *
+     * <p>{@code noRollbackFor} 가 없으면 실패 카운터가 예외와 함께 롤백돼 <b>영원히 0</b>이 된다 —
+     * 근거는 {@code PasswordResetService.verifyCode} 주석에 자세히 적어뒀다.
+     */
+    @Transactional(noRollbackFor = BusinessException.class)
     public boolean verifyCode(String email, String code) {
         EmailVerification verification = verificationRepository
                 .findTopByEmailOrderByCreatedAtDesc(email)
@@ -68,7 +75,17 @@ public class EmailVerificationService {
             throw new EmailException("인증 시간이 만료되었습니다. 다시 요청해주세요.", HttpStatus.GONE);
         }
 
+        // 시도 횟수 상한 (2026-08-16) — 코드가 6자리 숫자라 이 상한이 1차 방어다.
+        if (verification.isAttemptExhausted()) {
+            log.warn("Email verification attempts exhausted: email={}", email);
+            throw new EmailException("인증 시도 횟수를 초과했습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
+        }
+
         if (!verification.getVerificationCode().equals(code)) {
+            verification.recordFailedAttempt();
+            verificationRepository.save(verification);
+            log.warn("Email verification code mismatch: email={}, attempt={}/{}",
+                    email, verification.getAttemptCount(), EmailVerification.MAX_VERIFY_ATTEMPTS);
             // [수정] 잘못된 입력값이므로 400 Bad Request
             throw new EmailException("인증 코드가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
         }

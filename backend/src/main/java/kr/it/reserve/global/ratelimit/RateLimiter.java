@@ -58,7 +58,34 @@ public class RateLimiter {
         EMAIL_SEND(5, Duration.ofMinutes(10)),
         RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
         SIGNUP(5, Duration.ofMinutes(10)),              // 10분에 5회 회원가입
-        PASSWORD_RESET(3, Duration.ofMinutes(10)),       // 10분에 3회 비밀번호 리셋
+        /**
+         * 이메일로 받은 <b>6자리 인증 코드</b> 대조 시도 제한 — IP 축 (2026-08-16 신설).
+         *
+         * <h3>왜 필요했나</h3>
+         * 비밀번호 재설정·가입 인증 둘 다 코드가 6자리 숫자(90만 가지)인데
+         * {@code verify-code} 에는 <b>아무 제한이 없었다</b>. nginx 의 20r/s 만으로도
+         * 한 IP 가 코드 유효시간 5분 안에 6,000회를 시도할 수 있었고, 성공하면
+         * 비밀번호 재설정 = <b>계정 탈취</b>다.
+         *
+         * <h3>1차 방어는 여기가 아니다</h3>
+         * 진짜 상한은 토큰에 박은 {@code attemptCount}(5회)다 — 그건 요청지와 무관하게
+         * "코드 한 장당" 걸리므로 IP 를 아무리 돌려도 우회되지 않는다.
+         * 이 정책은 <b>코드를 계속 재발송하며 긁는</b> 패턴을 막는 2차 방어다.
+         *
+         * <p>30회로 잡은 이유: 회사·학교 NAT 뒤에서 여러 사람이 동시에 가입할 수 있다.
+         * 사람이 코드 하나에 5회까지 틀린다 쳐도 10분에 30회를 넘기긴 어렵다.
+         */
+        CODE_VERIFY(30, Duration.ofMinutes(10)),
+        /**
+         * 같은 제한의 <b>계정(이메일) 축</b>. {@code LOGIN} + {@code LOGIN_ACCOUNT} 와 같은 구조다.
+         *
+         * <p>IP 축만 두면 분산 공격에 뚫리고, 계정 축만 두면 NAT 뒤 정상 사용자가 함께 막힌다.
+         * 두 축이 서로의 사각지대를 메운다 — 근거는 {@link Policy#LOGIN_ACCOUNT} 주석에 있다.
+         *
+         * <p>⚠️ 키로 넘기는 이메일은 <b>소문자로 정규화</b>해야 한다. 안 하면
+         * {@code A@x.com} 과 {@code a@x.com} 이 다른 버킷이 되어 제한이 무의미해진다.
+         */
+        CODE_VERIFY_ACCOUNT(20, Duration.ofMinutes(10)),
         // 주소 검색은 서버가 보관한 Kakao REST 키로 카카오 로컬 API를 프록시하는 엔드포인트다.
         // 인증은 걸려 있지만(SecurityConfig) 계정 하나만 있으면 카카오 API 쿼터를 무제한 소진시킬 수
         // 있었기 때문에 IP 기준 상한을 둔다. 주소 검색은 타이핑 중 디바운스(300ms)로 호출되는 UI라

@@ -140,6 +140,19 @@ const QrScannerTab = () => {
 
     const decodeHeight = decodeHeightFor(decodeAspect);
 
+    // 정사각 가이드의 한 변 = 프레임의 **짧은 쪽**. 어느 쪽이 짧은지는 카메라 비율이 정한다.
+    //
+    // 2026-08-16: 예전엔 `height: 100%` 로 고정하고 "프리뷰는 항상 가로가 긴 비율"이라 적어뒀는데,
+    // 종횡비 정렬을 넣으면서 그 전제가 깨졌다 — 아이폰 후면 카메라는 720x1280 **세로** 스트림을 준다.
+    // 세로 프레임에서 높이를 한 변으로 잡으면 정사각형이 폭을 넘쳐(1280 > 720) 잘려나가고,
+    // 결과적으로 가이드가 프레임 전체에 걸친 직사각형처럼 보인다. 실제로 그렇게 나갔다.
+    //
+    // CSS 만으로는 `min(가로, 세로)` 를 잡기가 번거롭다(aspect-ratio 는 max-* 로 눌러도
+    // 확정된 쪽을 되돌리지 않는다). 비율 숫자를 이미 갖고 있으니 여기서 한 번에 정한다.
+    const bracketSideStyle = decodeAspect >= 1
+        ? { height: '100%', width: 'auto' }   // 가로가 긴 프레임(PC 웹캠 등) → 높이가 한계
+        : { width: '100%', height: 'auto' };  // 세로가 긴 프레임(폰 후면 카메라) → 폭이 한계
+
     // ?qrdebug=1 — 화면에 실측값을 띄운다.
     // 모바일 Safari 는 콘솔을 붙이기가 사실상 불가능해서(맥이 있어야 한다) 숫자를 볼 방법이 없었다.
     // 북마클릿도 iOS 에서 주소창 경로가 막혀 실패했다. 그래서 앱 안에 넣는다 —
@@ -457,7 +470,7 @@ const QrScannerTab = () => {
                         가이드보다 바깥도 실제로는 스캔된다 — 안에 넣으면 확실하다는 뜻일 뿐이다. */}
                     {status === 'scanning' && (
                         <div style={styles.bracketFrame}>
-                            <div style={styles.bracketSquare}>
+                            <div style={{ ...styles.bracketSquare, ...bracketSideStyle }}>
                                 <span style={{ ...styles.corner, top: 0, left: 0, borderRight: 'none', borderBottom: 'none' }} />
                                 <span style={{ ...styles.corner, top: 0, right: 0, borderLeft: 'none', borderBottom: 'none' }} />
                                 <span style={{ ...styles.corner, bottom: 0, left: 0, borderRight: 'none', borderTop: 'none' }} />
@@ -578,8 +591,8 @@ const styles = {
         top: 0,
         left: 0,
     },
-    // 정사각 가이드를 프레임 가운데에 놓는다. 프리뷰는 항상 가로가 긴 비율이라
-    // 세로가 한계치다 → 한 변 = 높이. padding 으로 가장자리에서 살짝 띄운다.
+    // 정사각 가이드를 프레임 가운데에 놓는다. padding 으로 가장자리에서 살짝 띄운다.
+    // 한 변은 **프레임의 짧은 쪽**이어야 한다 — 어느 쪽이 짧은지는 렌더에서 정한다(bracketSideStyle).
     bracketFrame: {
         position: 'absolute',
         inset: 0,
@@ -590,7 +603,7 @@ const styles = {
         boxSizing: 'border-box',
         pointerEvents: 'none',
     },
-    bracketSquare: { position: 'relative', height: '100%', aspectRatio: '1 / 1', maxWidth: '100%' },
+    bracketSquare: { position: 'relative', aspectRatio: '1 / 1' },
     corner: {
         position: 'absolute',
         width: 28,

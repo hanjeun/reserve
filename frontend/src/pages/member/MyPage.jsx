@@ -302,7 +302,12 @@ const LocationTab = ({ user }) => {
     // coords는 Form 필드가 아니라 onMeta로만 들어오는 별도 값이라 rules로는 검증 못해서, Form 검증이 통과된
     // 다음(onFinish 안)에 추가로 확인한다.
     const onFinish = async (values) => {
-        if (!coords) { message.warning('검색 결과에서 주소를 선택해주세요'); return; }
+        // coords 는 Form 필드가 아니라 AddressSearch 의 onMeta 로만 들어오는 값이라 rules 로 못 잡는다.
+        // 그래도 사용자가 볼 때는 "주소 칸의 문제"이므로, 토스트 대신 setFields 로 그 칸에 붙인다.
+        if (!coords) {
+            form.setFields([{ name: 'address', errors: ['검색 결과에서 주소를 선택해주세요'] }]);
+            return;
+        }
         setLoading(true);
         try {
             await memberService.updateLocation({
@@ -421,8 +426,10 @@ const BusinessTab = ({ user }) => {
         return false;
     };
 
+    // 상호명 검사는 BusinessForm 의 Form.Item rules 가 이미 막는다 —
+    // onFinish 는 검증을 통과해야만 불리므로 여기서 다시 검사하면 절대 안 걸리는 죽은 코드다.
+    // (죽은 검사를 남겨두면 "검증이 여기 있다"고 오해해서 진짜 규칙을 못 찾는다)
     const handleUpdate = async () => {
-        if (!form.businessName.trim()) return message.warning('상호명을 입력해주세요');
         setUpdateLoading(true);
         try {
             await businessService.update({ ...form, licenseImage: licenseFile || undefined });
@@ -451,9 +458,8 @@ const BusinessTab = ({ user }) => {
         setIsEditing(true);
     };
 
+    // 상호명·등록증 검사도 BusinessForm 의 rules / license validator 가 담당한다(위 handleUpdate 주석 참고).
     const handleSubmit = async () => {
-        if (!form.businessName.trim()) return message.warning('상호명을 입력해주세요');
-        if (!licenseFile) return message.warning('사업자 등록증 이미지를 업로드해주세요');
         setSubmitLoading(true);
         try {
             await businessService.submit({ ...form, licenseImage: licenseFile });

@@ -32,7 +32,7 @@ import {
     CheckOutlined, CloseOutlined, StopOutlined, EyeOutlined, ExclamationCircleFilled,
 } from '@ant-design/icons';
 import {
-    Button, AdminTableSkeleton, FilterToolbar, FormTextArea, DataTable, ModalLoading,
+    Button, AdminTableSkeleton, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
 } from '../common';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
@@ -87,7 +87,7 @@ DetailRow.propTypes = { label: PropTypes.string, children: PropTypes.node };
  * 입력값(reason) 초기화는 key 토글이 아니라 Modal의 destroyOnHidden이 담당한다 —
  * 그래야 닫힘 애니메이션이 재생될 시간이 확보된다.
  */
-const RejectModalBody = ({ target, onChange }) => {
+const RejectModalBody = ({ target, onChange, error, onErrorClear }) => {
     const [reason, setReason] = useState('');
     onChange(reason);
     return (
@@ -95,16 +95,40 @@ const RejectModalBody = ({ target, onChange }) => {
             <Text type="secondary" style={{ display: 'block', marginBottom: 10 }}>
                 &apos;{target?.memberName}&apos; 님의 인증 신청을 거절하는 이유를 입력하세요.
             </Text>
-            <FormTextArea rows={4} placeholder="예: 사업자등록증 이미지가 불명확합니다."
-                value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} showCount />
+            {/* 미입력 경고를 토스트에서 인라인으로 옮겼다. 모달 위에 뜬 토스트는 몇 초 뒤 사라져서
+                "무엇이 잘못됐는지"가 화면에 남지 않는다 — 여기서는 칸 바로 아래에 붙는다. */}
+            <FormField error={error}>
+                <FormTextArea rows={4} placeholder="예: 사업자등록증 이미지가 불명확합니다."
+                    value={reason} onChange={(e) => { setReason(e.target.value); onErrorClear(); }}
+                    maxLength={300} showCount />
+            </FormField>
         </div>
     );
 };
 
-RejectModalBody.propTypes = { target: PropTypes.object, onChange: PropTypes.func.isRequired };
+RejectModalBody.propTypes = {
+    target: PropTypes.object,
+    onChange: PropTypes.func.isRequired,
+    error: PropTypes.string,
+    onErrorClear: PropTypes.func.isRequired,
+};
 
 const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
     const reasonRef = React.useRef('');
+    // 오류는 여기(모달)에 둔다. 본문은 destroyOnHidden 으로 매번 새로 마운트되므로
+    // 본문에 두면 "거절 처리"를 누른 직후 오류가 화면에 남지 않는다.
+    // 대신 닫을 때·보낼 때 명시적으로 지운다 — 이펙트로 지우면 이 레포의
+    // react-hooks/set-state-in-effect 규칙에 걸린다.
+    const [error, setError] = useState('');
+
+    const handleCancel = () => { setError(''); onCancel(); };
+    const handleOk = () => {
+        const reason = reasonRef.current?.trim();
+        if (!reason) { setError('거절 사유를 입력해주세요.'); return; }
+        setError('');
+        onOk(reason);
+    };
+
     return (
         <Modal
             title={
@@ -114,8 +138,8 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
                 </Flex>
             }
             open={open}
-            onCancel={onCancel}
-            onOk={() => onOk(reasonRef.current)}
+            onCancel={handleCancel}
+            onOk={handleOk}
             /* maskClosable={false}: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
@@ -126,7 +150,8 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
             centered
             destroyOnHidden
         >
-            <RejectModalBody target={target} onChange={(v) => { reasonRef.current = v; }} />
+            <RejectModalBody target={target} onChange={(v) => { reasonRef.current = v; }}
+                error={error} onErrorClear={() => setError('')} />
         </Modal>
     );
 };
@@ -203,8 +228,8 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     const openRejectModal = (record) => { setRejectTarget(record); setRejectOpen(true); };
 
+    // 빈 사유 검사는 RejectModal 안에서 인라인으로 처리한다 — 여기까지 오면 이미 채워져 있다.
     const handleReject = (reason) => {
-        if (!reason?.trim()) { message.warning('거절 사유를 입력해주세요.'); return; }
         rejectMutation.mutate({ id: rejectTarget.id, reason });
     };
 

@@ -4,7 +4,7 @@ import api from "../../api/axios";
 import useAuthStore from "../../store/useAuthStore";
 import { Form, Typography, Flex, Checkbox } from 'antd';
 import { PageContainer, Button, FormInput } from '../../components/common';
-import { useMessage, useEmailVerification } from '../../hooks';
+import { useMessage, useEmailVerification, useFormErrors } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
@@ -34,6 +34,9 @@ const Signup = () => {
 
     const [submitLoading, setSubmitLoading] = React.useState(false);
     const [agreements, setAgreements] = React.useState({ terms: false, privacy: false, marketing: false });
+    // 약관은 Form.Item 이 아니라 Form 밖의 체크박스 묶음이라 rules 로 못 잡는다.
+    // 그렇다고 토스트로 밀면 약관 블록에서 눈을 떼야 이유를 볼 수 있다 — 블록 아래에 붙인다.
+    const { errors: agreeErrors, validate: agreeValidate, clearError: clearAgreeError } = useFormErrors();
     const allRequired = agreements.terms && agreements.privacy;
     const allChecked  = agreements.terms && agreements.privacy && agreements.marketing;
 
@@ -45,8 +48,12 @@ const Signup = () => {
     }, [isLoggedIn, navigate]);
 
     const onSignupSubmit = async (values) => {
-        if (!isVerified)   return message.error('이메일 인증을 먼저 완료해주세요.');
-        if (!allRequired)  return message.error('필수 약관에 동의해주세요.');
+        // isVerified 는 제출 버튼의 disabled={!isVerified} 가 이미 막는다 — 여기서 다시 검사하면
+        // 절대 안 걸리는 죽은 코드다. 약관은 버튼 조건에 없으므로 여기서 검사하고,
+        // 토스트가 아니라 약관 블록 아래에 붙인다(눈을 떼지 않고 이유를 볼 수 있게).
+        if (!agreeValidate((e) => {
+            if (!allRequired) e.agreements = '필수 약관에 동의해주세요.';
+        })) return;
 
         setSubmitLoading(true);
         try {
@@ -152,7 +159,7 @@ const Signup = () => {
 
                         <button type="button" style={{ ...A.allRow, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', width: '100%' }}
                             onClick={() => toggleAll(!allChecked)}>
-                            <Checkbox checked={allChecked} onChange={e => toggleAll(e.target.checked)} onClick={e => e.stopPropagation()} />
+                            <Checkbox checked={allChecked} onChange={e => { toggleAll(e.target.checked); clearAgreeError('agreements'); }} onClick={e => e.stopPropagation()} />
                             <span style={A.allText}>전체 동의하기</span>
                         </button>
 
@@ -165,7 +172,7 @@ const Signup = () => {
                                 <div key={key} style={A.itemRow}>
                                     <button type="button" style={{ ...A.itemLeft, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
                                         onClick={() => toggle(key)}>
-                                        <Checkbox checked={agreements[key]} onChange={() => toggle(key)} onClick={e => e.stopPropagation()} />
+                                        <Checkbox checked={agreements[key]} onChange={() => { toggle(key); clearAgreeError('agreements'); }} onClick={e => e.stopPropagation()} />
                                         <span style={A.itemText}>
                                             <span style={required ? A.requiredTag : A.optionalTag}>
                                                 {required ? '필수' : '선택'}
@@ -182,6 +189,11 @@ const Signup = () => {
                                 </div>
                             ))}
                         </div>
+                        {/* 스타일 출처는 index.css 의 .reserve-field-error 하나다 —
+                            AntD Form.Item 의 에러와 같은 모양이 되도록 클래스만 붙인다. */}
+                        {agreeErrors.agreements && (
+                            <span className="reserve-field-error" role="alert">{agreeErrors.agreements}</span>
+                        )}
                     </div>
 
                     <div style={{ marginTop: '20px' }}>

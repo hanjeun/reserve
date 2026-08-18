@@ -39,6 +39,14 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
     // 만료 스케줄러용 — ACTIVE인데 endDate 지난 것들
     List<Advertisement> findByStatusAndEndDateBefore(AdStatus status, LocalDate date);
 
+    /**
+     * 결제되지 않은 채 <b>노출 시작일이 지나버린</b> 광고. 자동 취소 대상이다.
+     *
+     * <p>{@code PENDING_PAYMENT}(결제창을 닫았거나 이탈)와 {@code PAYMENT_FAILED} 둘 다 본다 —
+     * 사용자 입장에선 "아직 돈을 안 낸 신청"으로 똑같고, 둘 다 재결제 버튼이 붙기 때문이다.
+     */
+    List<Advertisement> findByStatusInAndStartDateBefore(java.util.Collection<AdStatus> statuses, LocalDate date);
+
     @Query("SELECT a FROM Advertisement a JOIN FETCH a.store WHERE a.deletedAt IS NULL ORDER BY a.createdAt DESC")
     Page<Advertisement> findAllByOrderByCreatedAtDesc(Pageable pageable);
 

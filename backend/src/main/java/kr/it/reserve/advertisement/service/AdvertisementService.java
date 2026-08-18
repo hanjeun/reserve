@@ -157,11 +157,42 @@ public class AdvertisementService {
                 .merchantUid(merchantUid)
                 .amount(amount)
                 .productName(store.getName() + " " + (adType == AdType.BADGE ? "광고 배지" : "배너 광고"))
-                .buyerName(owner.getName())
+                .buyerName(resolveBuyerName(store.getOwner(), owner.getEmail()))
                 .buyerEmail(owner.getEmail())
                 .buyerTel("")
                 .storeId(portoneService.getStoreId())
                 .build();
+    }
+
+    /**
+     * 결제창에 넘길 구매자 이름을 고른다.
+     *
+     * <h3>★ {@code SecurityUtil.getCurrentMember()} 의 이름을 쓰면 안 된다</h3>
+     * 그 Member 는 DB 에서 온 게 아니라 <b>JWT 클레임으로 재조립한 것</b>이라
+     * {@code id}·{@code email}·{@code role} 만 채워져 있고 <b>{@code name} 은 항상 null</b> 이다
+     * ({@code TokenProvider.getMemberFromTokenWithoutDB} 참고).
+     *
+     * <p>그대로 넘기면 PortOne V2 가 <i>"data.customer.fullName 파라미터가 string 형식이 아닙니다"</i>
+     * 로 거절해 <b>결제창이 아예 안 열린다.</b> V1 은 이 값을 느슨하게 받아 넘어갔지만
+     * V2 는 타입을 엄격히 검증한다 — 즉 null 은 원래 있었고 V2 전환이 드러낸 것이다.
+     *
+     * <p>여기 넘어오는 {@code storeOwner} 는 {@code storeRepository} 로 조회한 엔티티의 소유자라
+     * 실제 행이 로드된다. 호출부가 이미 {@code storeOwner.getId().equals(owner.getId())} 로
+     * 동일인임을 확인한 뒤이므로 다른 사람 이름이 들어갈 일은 없다.
+     * (같은 문제를 {@code ReservationService} 는 {@code memberRepository.findById} 로 다시 읽어 피한다.)
+     *
+     * <p>마지막 폴백을 두는 이유: 이름이 비어 있는 계정이 하나라도 있으면 결제 자체가 막힌다.
+     * 결제창의 표시용 값일 뿐이라, 막느니 이메일 앞부분이라도 채워 보내는 쪽이 낫다.
+     */
+    private String resolveBuyerName(Member storeOwner, String fallbackEmail) {
+        if (storeOwner != null && storeOwner.getName() != null && !storeOwner.getName().isBlank()) {
+            return storeOwner.getName();
+        }
+        log.warn("Advertisement payment: store owner name is missing, falling back to email local-part");
+        if (fallbackEmail != null && fallbackEmail.contains("@")) {
+            return fallbackEmail.substring(0, fallbackEmail.indexOf('@'));
+        }
+        return "고객";
     }
 
     /**
@@ -193,7 +224,7 @@ public class AdvertisementService {
                 .merchantUid(merchantUid)
                 .amount(ad.getAmount())
                 .productName(ad.getStore().getName() + " " + (ad.getAdType() == AdType.BADGE ? "광고 배지" : "배너 광고"))
-                .buyerName(owner.getName())
+                .buyerName(resolveBuyerName(ad.getStore().getOwner(), owner.getEmail()))
                 .buyerEmail(owner.getEmail())
                 .buyerTel("")
                 .storeId(portoneService.getStoreId())

@@ -1,15 +1,38 @@
 package kr.it.reserve.config;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
 
+@Slf4j
 @Configuration
 @EnableAsync
-public class AsyncConfig {
+public class AsyncConfig implements AsyncConfigurer {
+
+    /**
+     * {@code void @Async} 메서드에서 새어 나온 예외를 <b>우리 로거로</b> 받는다.
+     *
+     * <p>이걸 등록하지 않으면 Spring 기본 {@code SimpleAsyncUncaughtExceptionHandler} 가
+     * {@code "Unexpected exception occurred invoking async method: ..."} 라는 생소한 문구로 남긴다.
+     * 2026-08 메일 장애 때 실제로 그 문구 때문에 로그를 grep 해도 안 걸렸고, 원인을 찾는 데
+     * 오래 걸렸다. 도메인 이름({@code kr.it.reserve})으로 찍혀야 검색과 알림 규칙에 잡힌다.
+     *
+     * <p>여기서 삼키지 않고 <b>ERROR 로 크게 남기는 게 목적</b>이다 — 비동기 작업의 실패는
+     * 사용자 응답에 영향을 주지 않으므로, 로그가 유일한 발견 경로다.
+     */
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return (ex, method, params) ->
+                log.error("Async method failed: {}.{} — {}: {}",
+                        method.getDeclaringClass().getSimpleName(), method.getName(),
+                        ex.getClass().getSimpleName(), ex.getMessage(), ex);
+    }
     // 비동기 이메일 발송을 위한 설정
 
     /**

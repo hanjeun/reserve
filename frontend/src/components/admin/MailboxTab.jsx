@@ -18,7 +18,7 @@ import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, SyncOut
 import { Button, FormTextArea, FormInput, FormModal, FormField } from '../common';
 import { Bone } from '../common/Skeletons';
 import useDebounce from '../../hooks/useDebounce';
-import { useMessage, useWindowWidth, useQueryParamsState } from '../../hooks';
+import { useMessage, useWindowWidth, useQueryParamsState, useFormErrors } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -98,8 +98,9 @@ const useComposeMail = ({ message }) => {
     //    반드시 명시적으로 보내야 하고, 기본값은 false(=문의 답변 등 일반 발송)로 둔다.
     //    광고를 보낼 때만 체크하게 해서, 체크하는 순간 동의 확인이 걸리게 만든다.
     const [composeForm, setComposeForm] = useState({ toEmail: '', subject: '', body: '', marketing: false });
+    const { errors, validate, clearError, resetErrors } = useFormErrors();
 
-    const resetCompose = () => { setComposing(false); setComposeForm({ toEmail: '', subject: '', body: '', marketing: false }); };
+    const resetCompose = () => { setComposing(false); setComposeForm({ toEmail: '', subject: '', body: '', marketing: false }); resetErrors(); };
 
     const sendMutation = useMutation({
         mutationFn: (form) => api.post(API_ENDPOINTS.MAIL.COMPOSE, form),
@@ -113,14 +114,18 @@ const useComposeMail = ({ message }) => {
 
     const handleComposeSend = () => {
         const trimmedEmail = composeForm.toEmail.trim();
-        if (!trimmedEmail) { message.warning('받는 사람 이메일을 입력해주세요.'); return; }
-        if (!EMAIL_REGEX.test(trimmedEmail)) { message.warning('올바른 이메일 형식을 입력해주세요.'); return; }
-        if (!composeForm.subject.trim()) { message.warning('제목을 입력해주세요.'); return; }
-        if (!composeForm.body.trim()) { message.warning('내용을 입력해주세요.'); return; }
+        // 네 칸을 한 번에 검사한다. 예전엔 warning 토스트를 네 번 이어 붙여서
+        // 첫 오류만 보이고, 겹쳐 누르면 토스트가 쌓였다.
+        if (!validate((e) => {
+            if (!trimmedEmail) e.toEmail = '받는 사람 이메일을 입력해주세요.';
+            else if (!EMAIL_REGEX.test(trimmedEmail)) e.toEmail = '올바른 이메일 형식을 입력해주세요.';
+            if (!composeForm.subject.trim()) e.subject = '제목을 입력해주세요.';
+            if (!composeForm.body.trim()) e.body = '내용을 입력해주세요.';
+        })) return;
         sendMutation.mutate(composeForm);
     };
 
-    return { composing, setComposing, composeForm, setComposeForm, composeSending: sendMutation.isPending, resetCompose, handleComposeSend };
+    return { composing, setComposing, composeForm, setComposeForm, composeSending: sendMutation.isPending, resetCompose, handleComposeSend, errors, clearError };
 };
 
 const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
@@ -344,13 +349,13 @@ const MailboxTab = () => {
 
             <FormModal title="새 메일 작성" open={send.composing} onClose={send.resetCompose}
                 onSubmit={send.handleComposeSend} submitting={send.composeSending}>
-                <FormField label="받는 사람">
+                <FormField label="받는 사람" error={send.errors.toEmail}>
                     <FormInput placeholder="example@email.com" value={send.composeForm.toEmail}
-                        onChange={(e) => send.setComposeForm(f => ({ ...f, toEmail: e.target.value }))} />
+                        onChange={(e) => { send.setComposeForm(f => ({ ...f, toEmail: e.target.value })); send.clearError('toEmail'); }} />
                 </FormField>
-                <FormField label="제목">
+                <FormField label="제목" error={send.errors.subject}>
                     <FormInput placeholder="메일 제목" value={send.composeForm.subject}
-                        onChange={(e) => send.setComposeForm(f => ({ ...f, subject: e.target.value }))} maxLength={500} showCount />
+                        onChange={(e) => { send.setComposeForm(f => ({ ...f, subject: e.target.value })); send.clearError('subject'); }} maxLength={500} showCount />
                 </FormField>
                 <FormField label="광고성 정보">
                     {/* 체크하면 서버가 수신자의 마케팅 수신 동의를 확인하고, 동의하지 않았거나
@@ -367,9 +372,9 @@ const MailboxTab = () => {
                         </Text>
                     </Checkbox>
                 </FormField>
-                <FormField label="내용">
+                <FormField label="내용" error={send.errors.body}>
                     <FormTextArea rows={8} placeholder="메일 내용을 입력하세요..." value={send.composeForm.body}
-                        onChange={(e) => send.setComposeForm(f => ({ ...f, body: e.target.value }))}
+                        onChange={(e) => { send.setComposeForm(f => ({ ...f, body: e.target.value })); send.clearError('body'); }}
                         maxLength={5000} showCount />
                 </FormField>
             </FormModal>

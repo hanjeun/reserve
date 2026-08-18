@@ -211,6 +211,18 @@ public class AdvertisementService {
         if (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED) {
             throw new AdvertisementException("결제할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
         }
+        // ★ 노출 시작일이 지났으면 결제를 막는다 — createAd 와 같은 규칙이다.
+        //
+        // 예전엔 이 검사가 없어서 **신규 신청은 막으면서 재결제는 통과하는 비대칭**이 있었다.
+        // 그 결과 2026-07-17~18 짜리 광고를 8월에 결제할 수 있었고, 결제하면 ACTIVE 가 됐다가
+        // 다음 스케줄러에서 곧바로 EXPIRED 로 넘어갔다 — **돈만 내고 노출은 0일**이었다.
+        //
+        // endDate 가 아니라 startDate 를 기준으로 삼는다: 기간이 일부만 남은 경우에도
+        // 결제한 만큼 노출되지 않으므로, 부분 소진 자체를 허용하지 않는다(사용자 결정 2026-08-18).
+        if (ad.getStartDate() != null && ad.getStartDate().isBefore(LocalDate.now())) {
+            throw new AdvertisementException(
+                    "노출 시작일이 지난 광고는 결제할 수 없습니다. 새로 신청해주세요.", HttpStatus.BAD_REQUEST);
+        }
 
         String merchantUid = "AD-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
                 + "-" + UUID.randomUUID().toString().substring(0, 6);
@@ -427,6 +439,33 @@ public class AdvertisementService {
         overdue.forEach(ad -> ad.setStatus(AdStatus.EXPIRED));
         if (!overdue.isEmpty()) {
             log.info("Expired {} overdue advertisements", overdue.size());
+        }
+    }
+
+    /**
+     * 결제되지 않은 채 노출 시작일이 지난 광고를 <b>취소</b>로 정리한다.
+     *
+     * <h3>왜 필요한가</h3>
+     * {@link #expireOverdueAds} 는 {@code ACTIVE} 만 보기 때문에, 결제하지 않은 신청은
+     * 기간이 아무리 지나도 <b>"결제 대기" 상태로 목록에 영원히 남아 있었다.</b>
+     * 거기 붙은 결제 버튼이 계속 살아 있어서 이미 지나간 기간에 돈을 낼 수 있었다.
+     * {@code preparePayment} 에 시작일 검사를 넣어 결제 자체는 막았지만, 그것만으로는
+     * 누를 수 없는 버튼이 계속 보인다 — 원인은 <b>죽은 신청이 정리되지 않는 것</b>이다.
+     *
+     * <h3>왜 EXPIRED 가 아니라 CANCELLED 인가</h3>
+     * {@code EXPIRED} 는 "노출을 마치고 끝났다"는 뜻이라, 한 번도 노출된 적 없는 건에 붙이면
+     * 통계와 이력이 거짓말을 한다. 돈이 오간 적도 없으므로 환불 경로도 필요 없다.
+     * 예약에서 승인되지 않은 채 시간이 지난 건을 취소로 정리하는 것과 같은 성격이다.
+     *
+     * <p>돈을 건드리지 않는다 — 애초에 결제되지 않은 건만 대상이다.
+     */
+    @Transactional
+    public void cancelUnpaidOverdueAds() {
+        List<Advertisement> stale = advertisementRepository.findByStatusInAndStartDateBefore(
+                List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED), LocalDate.now());
+        stale.forEach(ad -> ad.setStatus(AdStatus.CANCELLED));
+        if (!stale.isEmpty()) {
+            log.info("Cancelled {} unpaid advertisements past their start date", stale.size());
         }
     }
 

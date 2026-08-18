@@ -372,6 +372,60 @@ const handleChange = (key) => {
 반대로 "제목을 입력해주세요"를 토스트로 띄우면, 사라진 뒤에 어느 칸이 문제였는지 알 수 없다
 (문의 모달이 실제로 그랬고, 그래서 인라인으로 옮겼다).
 
+### ★ 2026-08-17 — 이 규칙을 lint 로 강제한다
+
+위 규격을 2026-08-04에 등재해뒀는데, **실제로 지켜진 파일이 `InquiryModal` 하나뿐이었다.**
+`FormField`는 진작에 `error` prop을 받고 있었는데도 나머지 폼 8개는 전부
+`message.warning`을 이어 붙이고 있었다. 필터 Select 색·카드 hover 그림자와 같은 실패 방식이다 —
+**규칙이 문서와 주석에만 있으면 반드시 샌다.** 그래서 두 가지를 넣었다.
+
+**① 관문 훅 `useFormErrors`** (`hooks/useFormErrors.js`)
+
+`errors` state + `clearError` + "틀린 칸을 전부 모으는 `validate`"를 매번 손으로 쓰게 두면
+그게 귀찮아서 `message.warning` 한 줄로 돌아간다. 훅 하나를 import 하면 끝나게 만들었다.
+
+```jsx
+const { errors, validate, clearError, resetErrors } = useFormErrors();
+
+if (!validate((e) => {                       // early return 금지 — 틀린 칸을 전부 채운다
+    if (!storeId) e.storeId = '가게를 선택해주세요.';
+    if (!dateRange) e.dateRange = '노출 기간을 선택해주세요.';
+})) return;
+
+<FormField label="가게" error={errors.storeId}>
+    <FormSelect onChange={(v) => { setStoreId(v); clearError('storeId'); }} />
+</FormField>
+```
+
+**② `no-restricted-syntax` lint 규칙** (`eslint.config.js`)
+
+`message.warning`/`error`의 인자가 "○○을 **입력/선택/업로드/동의**해주세요" 또는 "…**필수입니다**"
+꼴이면 CI가 실패한다. 이 코드베이스의 검증 문구가 실제로 쓰는 어미만 보므로,
+`로그인이 필요한 서비스입니다`·`위치를 가져올 수 없어요` 같은 **필드에 귀속되지 않는**
+정당한 토스트는 걸리지 않는다. 변수로 조립한 문구는 못 잡는다 — 의도적이다.
+넓게 잡으면 정당한 토스트까지 막아서 결국 `eslint-disable` 주석이 늘어난다.
+
+### 어느 기계를 쓸지 — 판단 기준은 하나다
+
+> **이 입력칸이 AntD `<Form>` 안에 있는가?**
+
+| 상황 | 쓸 것 |
+|---|---|
+| `<Form>` 안의 칸 | `Form.Item` 의 `rules` |
+| `<Form>` 안이지만 Form 필드가 아닌 값(업로드 파일, 지도 좌표 등) | `form.setFields([{ name, errors: ['...'] }])` |
+| `<Form>` 밖의 폼(`FormModal`·`FormField`) | `useFormErrors` + `<FormField error={...}>` |
+| `FormField`로 감쌀 자리가 없는 곳(별점, 약관 체크박스 묶음) | `<span className="reserve-field-error" role="alert">` 직접 |
+
+⚠️ **두 기계를 한 칸에 섞지 말 것.** `Form.Item rules`와 `FormField error`를 같이 주면
+같은 칸 아래에 에러가 두 번 렌더된다.
+
+### 검증 로직을 두 군데 두지 말 것
+
+전환하면서 **도달할 수 없는 검사 3곳**을 발견해 지웠다 —
+제출 버튼이 `disabled`로 이미 막고 있거나(`Signup`의 `isVerified`, `SocialAgreement`의 `allRequired`),
+AntD `onFinish`가 검증 통과 후에만 불리는데 핸들러에서 같은 검사를 반복하고 있었다(`MyPage` 사업자 폼).
+**죽은 검사는 없는 것보다 나쁘다** — 읽는 사람이 "검증이 여기 있다"고 믿어 진짜 관문을 못 찾는다.
+
 ---
 
 ## 규칙

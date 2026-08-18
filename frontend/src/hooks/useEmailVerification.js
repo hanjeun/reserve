@@ -134,10 +134,15 @@ export default function useEmailVerification({
 
     // ── 코드 검증 ─────────────────────────────────────────────────────────────
     const verifyCode = async () => {
-        if (timeLeft === 0) return message.warning('인증 시간이 만료되었습니다.');
+        // 이 화면은 AntD Form 을 쓰므로 인라인 에러도 Form 의 기계(setFields)로 붙인다.
+        // FormField 의 error prop 과 섞으면 같은 칸에 에러가 두 군데서 렌더된다 —
+        // 판단 기준은 "이 입력칸이 <Form> 안에 있는가" 하나다.
+        const setCodeError = (msg) => form.setFields([{ name: codeFieldName, errors: [msg] }]);
+
+        if (timeLeft === 0) return setCodeError('인증 시간이 만료되었습니다. 재발송해주세요.');
         const email = form.getFieldValue(emailFieldName)?.trim();
         const code  = form.getFieldValue(codeFieldName)?.trim();
-        if (!code) return message.warning('인증번호를 입력해주세요.');
+        if (!code) return setCodeError('인증번호를 입력해주세요.');
 
         setVerifyLoading(true);
         try {
@@ -149,7 +154,8 @@ export default function useEmailVerification({
             onVerified?.(email);
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
-            message.error(msg || '인증번호가 올바르지 않습니다.');
+            // 인증번호 오류는 특정 칸에 귀속되는 오류라 토스트가 아니라 칸 아래에 붙인다.
+            setCodeError(msg || '인증번호가 올바르지 않습니다.');
         } finally {
             setVerifyLoading(false);
         }

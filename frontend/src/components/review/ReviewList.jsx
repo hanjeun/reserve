@@ -8,18 +8,19 @@ import {
 } from '@ant-design/icons';
 import reviewService from '../../services/reviewService';
 import { formatRelativeTime } from '../../utils';
-import { useMessage } from '../../hooks';
+import { useMessage, useFormErrors } from '../../hooks';
 import { reviewKeys } from '../../hooks/queryKeys';
 import useAuthStore from '../../store/useAuthStore';
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
-import { FormInput, FormTextArea } from '../common';
+import { FormInput, FormTextArea, FormField } from '../common';
 
 const { Text } = Typography;
 
 const RATING_LABELS = { 1: '별로였어요', 2: '아쉬웠어요', 3: '괜찮았어요', 4: '좋았어요', 5: '최고였어요!' };
 
 /** 리뷰 작성/수정 공용 폼 */
-const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: formLoading, isEdit }) => {
+const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: formLoading, isEdit,
+                     errors = {}, clearError = () => {} }) => {
     const [hover, setHover] = useState(0);
     const displayRating = hover || form.rating;
 
@@ -35,11 +36,17 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                         <div style={{ marginTop: 2 }}>
                             <Rate
                                 value={displayRating}
-                                onChange={val => setForm(f => ({ ...f, rating: val }))}
+                                onChange={val => { setForm(f => ({ ...f, rating: val })); clearError('rating'); }}
                                 onHoverChange={setHover}
                                 style={{ fontSize: 15, color: colors.warning.main }}
                                 allowClear={false}
                             />
+                            {/* 별점은 카드 헤더에 있어 FormField 로 감쌀 자리가 없다.
+                                에러 표기는 같은 클래스(.reserve-field-error)를 직접 써서
+                                아래 입력칸들과 모양을 맞춘다 — 스타일 출처는 index.css 하나다. */}
+                            {errors.rating && (
+                                <span className="reserve-field-error" role="alert">{errors.rating}</span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -51,21 +58,27 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
             <div style={styles.divider} />
 
             <div style={styles.formBody}>
-                <FormInput
-                    value={form.title}
-                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                    placeholder="리뷰 제목을 입력해주세요"
-                    maxLength={100}
-                    showCount
-                />
-                <FormTextArea
-                    value={form.content}
-                    onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-                    placeholder="서비스, 분위기 등 솔직한 경험을 공유해주세요 (10자 이상)"
-                    rows={4}
-                    maxLength={1000}
-                    showCount
-                />
+                {/* 라벨은 placeholder 가 대신하므로 FormField 에 label 을 주지 않는다 —
+                    인라인 에러 슬롯을 얻으려고 감싸는 것이다. */}
+                <FormField error={errors.title}>
+                    <FormInput
+                        value={form.title}
+                        onChange={e => { setForm(f => ({ ...f, title: e.target.value })); clearError('title'); }}
+                        placeholder="리뷰 제목을 입력해주세요"
+                        maxLength={100}
+                        showCount
+                    />
+                </FormField>
+                <FormField error={errors.content}>
+                    <FormTextArea
+                        value={form.content}
+                        onChange={e => { setForm(f => ({ ...f, content: e.target.value })); clearError('content'); }}
+                        placeholder="서비스, 분위기 등 솔직한 경험을 공유해주세요 (10자 이상)"
+                        rows={4}
+                        maxLength={1000}
+                        showCount
+                    />
+                </FormField>
             </div>
 
             <div style={styles.cardActions}>
@@ -110,6 +123,12 @@ const ReviewList = ({
     const [editingId,   setEditingId]   = useState(null);
     const [editForm,    setEditForm]    = useState({ rating: 0, title: '', content: '' });
 
+    // 작성 폼과 수정 폼은 화면에 동시에 떠 있을 수 있다(아래 목록에서 한 건을 수정하는 동안
+    // 위쪽 작성 폼이 그대로 남는다). 오류 상태를 공유하면 한쪽 검증이 다른 쪽 칸을 빨갛게 만든다.
+    const { errors: writeErrors, validate: writeValidate, clearError: clearWriteError } = useFormErrors();
+    const { errors: editErrors, validate: editValidate,
+            clearError: clearEditError, resetErrors: resetEditErrors } = useFormErrors();
+
     const reviewRefs = useRef({});
 
     // 2026-07-09: TanStack Query로 전환 (reviewKeys.byStore) — 생성/수정/삭제는
@@ -149,9 +168,11 @@ const ReviewList = ({
     });
 
     const handleWriteSubmit = () => {
-        if (!writeForm.rating)                    return message.warning('별점을 선택해주세요');
-        if (!writeForm.title.trim())              return message.warning('제목을 입력해주세요');
-        if (writeForm.content.trim().length < 10) return message.warning('내용을 10자 이상 입력해주세요');
+        if (!writeValidate((e) => {
+            if (!writeForm.rating) e.rating = '별점을 선택해주세요';
+            if (!writeForm.title.trim()) e.title = '제목을 입력해주세요';
+            if (writeForm.content.trim().length < 10) e.content = '내용을 10자 이상 입력해주세요';
+        })) return;
         createMutation.mutate({
             reservationId: completedReservation.reservationId,
             rating:  writeForm.rating,
@@ -161,10 +182,11 @@ const ReviewList = ({
     };
 
     const startEdit = (review) => {
+        resetEditErrors();
         setEditingId(review.id);
         setEditForm({ rating: review.rating, title: review.title || '', content: review.content });
     };
-    const cancelEdit = () => { setEditingId(null); setEditForm({ rating: 0, title: '', content: '' }); };
+    const cancelEdit = () => { setEditingId(null); setEditForm({ rating: 0, title: '', content: '' }); resetEditErrors(); };
 
     const updateMutation = useMutation({
         mutationFn: ({ reviewId, payload }) => reviewService.updateReview(reviewId, payload),
@@ -179,9 +201,11 @@ const ReviewList = ({
     });
 
     const submitEdit = (reviewId) => {
-        if (!editForm.rating)                    return message.warning('별점을 선택해주세요');
-        if (!editForm.title.trim())              return message.warning('제목을 입력해주세요');
-        if (editForm.content.trim().length < 10) return message.warning('내용을 10자 이상 입력해주세요');
+        if (!editValidate((e) => {
+            if (!editForm.rating) e.rating = '별점을 선택해주세요';
+            if (!editForm.title.trim()) e.title = '제목을 입력해주세요';
+            if (editForm.content.trim().length < 10) e.content = '내용을 10자 이상 입력해주세요';
+        })) return;
         updateMutation.mutate({
             reviewId,
             payload: { rating: editForm.rating, title: editForm.title.trim(), content: editForm.content.trim() },
@@ -222,6 +246,7 @@ const ReviewList = ({
                     <ReviewForm
                         userName={user?.name ?? '나'}
                         form={writeForm} setForm={setWriteForm}
+                        errors={writeErrors} clearError={clearWriteError}
                         onSubmit={handleWriteSubmit}
                         onCancel={() => { setWritten(true); setWriteForm({ rating: 0, title: '', content: '' }); }}
                         loading={submitting} isEdit={false}
@@ -264,6 +289,7 @@ const ReviewList = ({
                                     <ReviewForm
                                         userName={review.memberName}
                                         form={editForm} setForm={setEditForm}
+                                        errors={editErrors} clearError={clearEditError}
                                         onSubmit={() => submitEdit(review.id)}
                                         onCancel={cancelEdit}
                                         loading={editLoading} isEdit={true}

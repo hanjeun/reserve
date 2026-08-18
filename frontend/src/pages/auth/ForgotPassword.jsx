@@ -129,9 +129,12 @@ const ForgotPassword = () => {
     };
 
     const handleVerifyCode = async () => {
-        if (timeLeft === 0) return message.warning('인증 시간이 만료되었습니다.');
+        // AntD Form 화면이므로 인라인 에러는 setFields 로 붙인다(useEmailVerification 과 같은 규약).
+        const setCodeError = (msg) => form.setFields([{ name: 'verificationCode', errors: [msg] }]);
+
+        if (timeLeft === 0) return setCodeError('인증 시간이 만료되었습니다. 재발송해주세요.');
         const code = form.getFieldValue('verificationCode')?.trim();
-        if (!code) return message.warning('인증번호를 입력해주세요.');
+        if (!code) return setCodeError('인증번호를 입력해주세요.');
         setVerifyLoading(true);
         try {
             await api.post(API_ENDPOINTS.PASSWORD_RESET.VERIFY_CODE, { email, code });
@@ -140,7 +143,7 @@ const ForgotPassword = () => {
             clearInterval(timerRef.current);
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
-            message.error(msg || '인증번호가 올바르지 않습니다.');
+            setCodeError(msg || '인증번호가 올바르지 않습니다.');
         } finally {
             setVerifyLoading(false);
         }

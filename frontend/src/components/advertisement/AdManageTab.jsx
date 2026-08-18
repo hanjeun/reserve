@@ -3,7 +3,7 @@ import { Typography, Tag, Upload } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PlusOutlined, CreditCardOutlined, CloseOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Button, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl, AdminTableSkeleton, DataTable, FilterToolbar } from '../common';
-import { useAdPayment, useMessage, useImagePreview, useMyStores } from '../../hooks';
+import { useAdPayment, useMessage, useImagePreview, useMyStores, useFormErrors } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
 import adService from '../../services/adService';
@@ -88,6 +88,12 @@ const AdManageTab = () => {
     // 2026-07 추가 — 배너 광고 수정용 별도 모달 state. 새 신청 모달과 달리 가게/유형/기간이 없어서
     // 그 모달을 그대로 재사용하기 애매해 별도로 둔다. editTarget이 null이면 닫힌 상태.
     const [editTarget, setEditTarget] = useState(null);
+
+    // 신청 모달과 수정 모달이 각각 자기 오류를 든다. 하나로 합치면 한쪽 모달을 닫을 때
+    // 다른 쪽 빨간 글씨까지 지워지고, 필드명(title)이 겹쳐 엉뚱한 칸에 에러가 붙는다.
+    const { errors, validate, clearError, resetErrors } = useFormErrors();
+    const { errors: editErrors, validate: editValidate,
+            clearError: clearEditError, resetErrors: resetEditErrors } = useFormErrors();
     const [editTitle, setEditTitle] = useState('');
     const [editDescription, setEditDescription] = useState('');
     const [editImageFiles, setEditImageFiles] = useState([]);
@@ -141,17 +147,29 @@ const AdManageTab = () => {
         setDescription('');
         setDateRange(null);
         setImageFiles([]);
+        // 모달을 닫았다 다시 열었을 때 지난 오류가 남아 있으면 안 된다.
+        resetErrors();
     };
 
-    const handleImagesChange = ({ fileList }) => setImageFiles(fileList.slice(0, MAX_BANNER_IMAGES));
+    const handleImagesChange = ({ fileList }) => {
+        setImageFiles(fileList.slice(0, MAX_BANNER_IMAGES));
+        clearError('images');
+    };
 
     const handleSubmit = async () => {
-        if (!storeId) { message.warning('가게를 선택해주세요.'); return; }
-        if (!dateRange) { message.warning('노출 기간을 선택해주세요.'); return; }
-        if (adType === 'BANNER' && (imageFiles.length === 0 || !title.trim())) {
-            message.warning('배너 광고는 이미지(최소 1장)와 제목이 필수입니다.');
-            return;
-        }
+        // 틀린 칸을 한 번에 모아 각 칸 아래에 붙인다.
+        // 예전엔 message.warning 을 세 번 이어 붙여서 ① 첫 오류만 알려주고(고치면 다음 게 또 뜬다)
+        // ② 토스트가 사라지면 어느 칸이 문제였는지 알 수 없었다.
+        // 배너 필수 조건은 원래 한 덩어리(이미지+제목)로 묶여 있었는데, 실제로 비어 있는 건
+        // 둘 중 하나일 수 있으므로 칸별로 갈라서 표시한다.
+        if (!validate((e) => {
+            if (!storeId) e.storeId = '가게를 선택해주세요.';
+            if (!dateRange) e.dateRange = '노출 기간을 선택해주세요.';
+            if (adType === 'BANNER') {
+                if (imageFiles.length === 0) e.images = '배너 광고는 이미지가 최소 1장 필요합니다.';
+                if (!title.trim()) e.title = '배너 제목을 입력해주세요.';
+            }
+        })) return;
 
         const formData = new FormData();
         formData.append('storeId', storeId);
@@ -175,6 +193,7 @@ const AdManageTab = () => {
     // antd Upload가 인식하는 최소 형태({ uid, name, status: 'done', url })로 변환해서 보여준다
     // (사용자가 지우지 않는 한 그 그대로 유지되고, 새로 고르면 전체 교체된다 — AdUpdateRequest 규칙과 일치).
     const handleEdit = (ad) => {
+        resetEditErrors();
         setEditTarget(ad);
         setEditTitle(ad.title || '');
         setEditDescription(ad.description || '');
@@ -189,7 +208,9 @@ const AdManageTab = () => {
     const handleEditImagesChange = ({ fileList }) => setEditImageFiles(fileList.slice(0, MAX_BANNER_IMAGES));
 
     const handleUpdateSubmit = async () => {
-        if (!editTitle.trim()) { message.warning('배너 제목을 입력해주세요.'); return; }
+        if (!editValidate((e) => {
+            if (!editTitle.trim()) e.editTitle = '배너 제목을 입력해주세요.';
+        })) return;
 
         const formData = new FormData();
         formData.append('title', editTitle);
@@ -332,11 +353,11 @@ const AdManageTab = () => {
             >
                 <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        <FormField label="가게">
+                        <FormField label="가게" error={errors.storeId}>
                             <FormSelect
                                 placeholder="가게 선택"
                                 value={storeId}
-                                onChange={setStoreId}
+                                onChange={(v) => { setStoreId(v); clearError('storeId'); }}
                                 options={myStores.map((s) => ({ value: s.id, label: s.name }))}
                             />
                         </FormField>
@@ -351,21 +372,21 @@ const AdManageTab = () => {
                         </FormField>
                     </div>
                 </div>
-                <FormField label="노출 기간">
+                <FormField label="노출 기간" error={errors.dateRange}>
                     <FormDatePicker.RangePicker
                         value={dateRange}
-                        onChange={setDateRange}
+                        onChange={(v) => { setDateRange(v); clearError('dateRange'); }}
                     />
                 </FormField>
                 {adType === 'BANNER' && (
                     <>
-                        <FormField label="배너 제목">
-                            <FormInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예) 여름맞이 20% 할인" maxLength={40} showCount />
+                        <FormField label="배너 제목" error={errors.title}>
+                            <FormInput value={title} onChange={(e) => { setTitle(e.target.value); clearError('title'); }} placeholder="예) 여름맞이 20% 할인" maxLength={40} showCount />
                         </FormField>
                         <FormField label="배너 설명 (선택)">
                             <FormTextArea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={100} showCount />
                         </FormField>
-                        <FormField label={`배너 이미지 (최대 ${MAX_BANNER_IMAGES}장, 여러 장이면 배너에서 자동으로 넘어가요)`}>
+                        <FormField label={`배너 이미지 (최대 ${MAX_BANNER_IMAGES}장, 여러 장이면 배너에서 자동으로 넘어가요)`} error={errors.images}>
                             {/* 2026-07 추가(수정): 처음엔 2:1로 고정 크롭하는 방식이었는데, 원본 이미지가 잘리지 않았으면
                                 하는 요청으로 AdBanner가 첫 이미지의 실제 비율을 그대로 따르도록 바뀌었다(더 이상 잘리지 않음).
                                 그래도 가로형(가로가 긴) 이미지가 위젯과 가장 잘 어울린다는 안내는 남겨둔다(극단적으로 세로가 긴
@@ -407,8 +428,8 @@ const AdManageTab = () => {
                 submitting={updateMutation.isPending}
                 submitText="저장"
             >
-                <FormField label="배너 제목">
-                    <FormInput value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="예) 여름맞이 20% 할인" maxLength={40} showCount />
+                <FormField label="배너 제목" error={editErrors.editTitle}>
+                    <FormInput value={editTitle} onChange={(e) => { setEditTitle(e.target.value); clearEditError('editTitle'); }} placeholder="예) 여름맞이 20% 할인" maxLength={40} showCount />
                 </FormField>
                 <FormField label="배너 설명 (선택)">
                     <FormTextArea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} maxLength={100} showCount />

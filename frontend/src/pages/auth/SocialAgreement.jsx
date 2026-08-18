@@ -27,7 +27,9 @@ const SocialAgreement = () => {
     const handleAll = (checked) => setAgreements({ terms: checked, privacy: checked, marketing: checked });
 
     const handleSubmit = async () => {
-        if (!allRequired) { message.warning('필수 항목에 동의해주세요.'); return; }
+        // 필수 동의 검사는 아래 "시작하기" 버튼의 disabled={!allRequired} 가 이미 막는다 —
+        // 여기서 다시 검사해도 도달할 수 없는 죽은 코드라 지운다.
+        // (죽은 검사를 남겨두면 "검증이 여기 있다"고 오해해서 진짜 관문을 못 찾는다)
         setLoading(true);
         try {
             // marketingAgreed(선택) 여부를 서버에 전달

@@ -52,8 +52,13 @@ public class PasswordResetController {
         // (GitHub·Google 등이 쓰는 방식). 안내 문구로 그 상황을 설명한다.
         //
         // 반환값을 버리는 게 아니라 로그로만 남긴다 — 운영자는 알아야 하고 공격자는 몰라야 한다.
-        boolean sent = passwordResetService.sendResetCode(email);
-        log.info("Password reset requested: sent={}", sent);
+        // ★ 이 값은 "메일이 도착했다"가 아니라 "발송을 큐에 넣었다"는 뜻이다.
+        //    sendResetCode 는 @Async 인 emailService.sendPasswordResetEmail 을 부르고 바로 반환한다.
+        //    예전 문구가 `sent={}` 라서, 2026-08 메일 장애 때 이 로그만 보고 "정상 발송"으로
+        //    오해했다(실제로는 2초 뒤 다른 스레드에서 SMTP 인증이 실패하고 있었다).
+        //    실제 발송 성공은 EmailService 의 "Password reset email sent" 로그로만 확인할 수 있다.
+        boolean queued = passwordResetService.sendResetCode(email);
+        log.info("Password reset queued (not yet delivered): queued={}", queued);
 
         return ResponseEntity.ok(ApiResponse.success(
                 null, "입력하신 이메일로 인증 코드를 보냈습니다. 메일이 오지 않으면 가입 여부를 확인해주세요."));

@@ -110,3 +110,14 @@ s3:
 security:
   pwned-password:
     enabled: false
+
+# DDL 생성 실패를 보이게 한다 (2026-08-16 추가).
+#
+# Hibernate 는 CREATE TABLE 이 실패해도 **로그만 남기고 계속 진행한다.** 그래서
+# columnDefinition = "TINYINT(1) DEFAULT 0" 처럼 MySQL 전용 문법이 들어 있으면
+# H2 에서 그 테이블만 조용히 안 만들어지고, 나중에 그 테이블을 쓰는 테스트가
+# "Table not found" 로 죽는다 — 원인이 엔티티에 있는데 증상은 테스트에 나타난다.
+# 실제로 member·password_reset_token 두 테이블이 이 상태로 방치돼 있었다.
+logging:
+  level:
+    org.hibernate.tool.schema.internal.ExceptionHandlerLoggedImpl: DEBUG

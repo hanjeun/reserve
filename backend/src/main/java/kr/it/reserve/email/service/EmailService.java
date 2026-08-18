@@ -8,11 +8,32 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+/**
+ * ★★ catch 절에 {@link MailException} 이 반드시 들어가야 한다 — 빼면 장애가 통째로 숨는다.
+ *
+ * <p>{@code mailSender.send()} 는 {@code MessagingException} 을 던지지 않는다.
+ * Spring 이 전부 {@code MailException}({@code MailAuthenticationException} ·
+ * {@code MailSendException}) 으로 감싸는데, 그건 {@code RuntimeException} 이라
+ * 예전의 {@code catch (MessagingException | UnsupportedEncodingException)} 에 <b>안 걸렸다.</b>
+ *
+ * <p>게다가 이 메서드들은 {@code @Async} 라 호출자에게도 전파되지 않는다. 그 결과
+ * <b>2026-07-29 부터 3주 동안 모든 메일이 안 나갔는데 아무도 몰랐다</b> —
+ * 유출로 폐기된 Resend 키 때문에 SMTP 가 {@code 535 Authentication credentials invalid} 를
+ * 돌려주고 있었고, 화면에는 계속 "발송되었습니다" 가 떴다.
+ * (회원가입 인증·비밀번호 재설정·예약 알림이 전부 죽어 있었다.)
+ *
+ * <p>실패가 눈에 보이게 하는 장치는 세 겹이다:
+ * ① 여기 {@code MailException} catch → 도메인 로그로 남는다
+ * ② {@code AsyncConfig} 의 {@code AsyncUncaughtExceptionHandler} → 그래도 새는 것을 잡는다
+ * ③ Grafana 알림은 "실패 시"가 아니라 <b>"일정 시간 내 성공 0건"</b> 으로 걸어야 한다 —
+ *    이번에도 실패 로그는 있었다. 아무도 안 봤을 뿐이다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -44,7 +65,7 @@ public class EmailService {
             helper.setText(buildVerificationEmailContent(verificationCode), true);
             mailSender.send(message);
             log.info("Verification email sent: email={}", toEmail);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Email send failed: {}", e.getMessage());
             throw new EmailException("인증 이메일 발송 중 서버 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -137,7 +158,7 @@ public class EmailService {
             helper.setText(buildOwnerAlertContent(oName, storeName, mName, memberEmail, reservationDate, reservationTime, guestCount), true);
             mailSender.send(message);
             log.info("Reservation notification email sent: email={}", ownerEmail);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Reservation notification email failed ({}): {}", ownerEmail, e.getMessage());
         }
     }
@@ -152,7 +173,7 @@ public class EmailService {
             helper.setText(htmlContent, true);
             mailSender.send(message);
             log.info("Reservation notification email sent: email={}", toEmail);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Reservation notification email failed ({}): {}", toEmail, e.getMessage());
         }
     }
@@ -242,7 +263,7 @@ public class EmailService {
             ), true);
             mailSender.send(message);
             log.info("Business approval email sent: email={}", toEmail);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Business approval email failed ({}): {}", toEmail, e.getMessage());
         }
     }
@@ -265,7 +286,7 @@ public class EmailService {
             ), true);
             mailSender.send(message);
             log.info("Business rejection email sent: email={}", toEmail);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Business rejection email failed ({}): {}", toEmail, e.getMessage());
         }
     }
@@ -294,7 +315,7 @@ public class EmailService {
             helper.setText(buildInquiryAlertContent(memberName, memberEmail, categoryDisplayName, title, content), true);
             mailSender.send(message);
             log.info("New inquiry alert email sent to admin: title={}", title);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Inquiry alert email failed: {}", e.getMessage());
         }
     }
@@ -362,7 +383,7 @@ public class EmailService {
             helper.setText(buildPasswordResetEmailContent(code), true);
             mailSender.send(message);
             log.info("Password reset email sent: email={}", toEmail);
-        } catch (MessagingException | UnsupportedEncodingException e) {
+        } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Password reset email failed: {}", e.getMessage());
         }
     }

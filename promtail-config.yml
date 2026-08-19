@@ -1,3 +1,8 @@
+# Deployed to the server at ~/promtail-config.yml, which is what the compose
+# file mounts. Editing this file alone changes nothing on the server:
+#   scp promtail-config.yml ubuntu@<server>:~/ && docker restart promtail
+# See docs/technical/monitoring.md.
+
 server:
   http_listen_port: 9080
 
@@ -8,7 +13,21 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # 애플리케이션 로그 (Logback) + 백업 스크립트 로그(backup.log)
+  # Spring Boot application log (logback).
+  #
+  # pipeline_stages is NOT optional here. Without it promtail stamps each line
+  # with the moment it was READ, not the moment it was WRITTEN. A promtail
+  # restart re-reads the whole file and dumps a day of logs into one second,
+  # which silently destroys every time-based panel and alert. That was the state
+  # of this stack until 2026-08-19 and nobody noticed, because the dashboards
+  # still rendered -- they were just showing a lie.
+  #
+  # The app container runs in UTC, so `location: UTC` must match logback's
+  # %d{yyyy-MM-dd HH:mm:ss}. Getting this wrong shifts everything by 9 hours.
+  #
+  # The `level` label is what the dashboards filter on. It is an index label, so
+  # {job="reserve", level="ERROR"} costs far less than scanning lines for "ERROR"
+  # -- and it cannot false-positive on a message that merely contains the word.
   - job_name: reserve
     static_configs:
       - targets:
@@ -16,26 +35,29 @@ scrape_configs:
         labels:
           job: reserve
           __path__: /var/log/reserve/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +(?P<level>[A-Z]+)'
+      - labels:
+          level:
+      - timestamp:
+          source: ts
+          format: '2006-01-02 15:04:05'
+          location: UTC
 
-  # nginx 접근/에러 로그.
+  # Host/container metrics from scripts/collect-metrics.sh (cron, every minute).
   #
-  # 이게 없으면 nginx가 막은 429(rate limit)·404·스캐닝 UA를 **전혀 볼 수 없다.**
-  # 방어(limit_req 20r/s, limit_conn 50)는 돌고 있는데 그 기록이 Loki에 안 들어와서
-  # "지금 공격을 받고 있는지"를 확인할 방법이 없었다.
+  # No Prometheus + node_exporter: this is a 2GB box and blue/green deploys run
+  # two ~600MB app containers at once, which already pushes it into swap.
+  # Prometheus would add 170-320MB and could OOM a deploy. This path costs no
+  # resident memory at all. Trade-off: fixed 1-minute resolution.
   #
-  # ⚠️ 이 job이 실제로 동작하려면 **서버에서 두 가지가 선행돼야 한다** (docs/technical/monitoring.md 참고):
-  #   1) nginx 컨테이너가 로그를 진짜 파일로 남길 것.
-  #      공식 nginx 이미지는 /var/log/nginx/access.log 를 /dev/stdout 으로 심볼릭 링크해 둔다
-  #      → 파일이 없으므로 이 경로를 아무리 읽어도 0건이다.
-  #      호스트 디렉토리를 nginxserver:/var/log/nginx 로 마운트해서 실제 파일로 남겨야 한다.
-  #   2) promtail 컨테이너에 그 호스트 디렉토리를 read-only로 마운트할 것
-  #      (docker-compose-monitoring.yml에 추가해 뒀다).
-  #
-  # 설정 후 확인: Grafana에서 `{job="nginx"}` 가 0건이면 위 1)이 안 된 것이다.
-  - job_name: nginx
+  # No timestamp stage on purpose -- these lines carry no time field, and the
+  # read time IS the sample time (within a second).
+  - job_name: metrics
     static_configs:
       - targets:
           - localhost
         labels:
-          job: nginx
-          __path__: /var/log/nginx/*.log
+          job: metrics
+          __path__: /var/log/metrics/*.log

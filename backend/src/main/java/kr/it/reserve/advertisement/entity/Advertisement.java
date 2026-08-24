@@ -1,5 +1,6 @@
 package kr.it.reserve.advertisement.entity;
 
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.store.entity.Store;
 import jakarta.persistence.*;
 import lombok.*;
@@ -136,9 +137,12 @@ public class Advertisement {
         return this.deletedAt != null;
     }
 
-    /** 오늘 날짜 기준으로 노출 기간 내인지 (status와 별개로 날짜만 체크) */
+    /**
+     * 오늘 날짜 기준으로 노출 기간 내인지 (status와 별개로 날짜만 체크).
+     * startDate·endDate 는 사장님이 고른 한국 날짜이므로 오늘도 KST 여야 한다(ServiceTime 참고).
+     */
     public boolean isWithinDateRange() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = ServiceTime.today();
         return !today.isBefore(startDate) && !today.isAfter(endDate);
     }
 

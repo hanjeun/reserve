@@ -76,6 +76,12 @@ public class SecurityConfig {
                         .requestMatchers("/hc", "/env").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
 
+                        // PortOne 웹훅 — PG 서버가 부르므로 로그인 세션이 없다. permitAll 이 맞다.
+                        // ★ 이 엔드포인트의 인증은 **본문 서명 검증**(PortoneWebhookVerifier)이 전담한다.
+                        //   시크릿이 비어 있으면 전부 거부하는 fail-closed 다.
+                        //   경로를 넓히지 말 것 — "/api/payment/**" 로 풀면 결제·환불 API 가 통째로 열린다.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payment/webhook/portone").permitAll()
+
                         // 인증 관련 API
                         .requestMatchers("/api/auth/**", "/api/email/**", "/api/password-reset/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/login/**").permitAll()

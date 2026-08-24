@@ -2,6 +2,25 @@
  * RESERVE - 폼 유틸리티
  */
 
+/**
+ * `<Form scrollToFirstError={SCROLL_TO_FIRST_ERROR}>` 로 쓴다.
+ *
+ * 긴 폼(가게 등록은 화면 3~4개 높이다)에서 제출 버튼은 맨 아래에 있는데, 검증에 걸린 칸은
+ * 위쪽일 때가 많다. 그러면 화면상으로는 **아무 일도 안 일어난 것처럼 보인다** — 버튼을 눌렀는데
+ * 그대로다. 실제로는 저 위에서 빨간 글씨가 떠 있을 뿐이다.
+ *
+ * ⚠️ `inline: 'nearest'` 를 반드시 유지할 것. 기본값은 가로 위치까지 맞추려 드는데,
+ *    iOS WebKit 에서 그게 **viewport 전체를 수평으로 밀어버린다**(AdminPanel.jsx:77 에
+ *    같은 원인으로 scrollIntoView 를 걷어낸 이력이 있다).
+ *    `scrollMode: 'if-needed'` 는 이미 보이는 칸이면 아예 스크롤하지 않게 한다.
+ */
+export const SCROLL_TO_FIRST_ERROR = {
+    behavior: 'smooth',
+    block: 'center',
+    inline: 'nearest',
+    scrollMode: 'if-needed',
+};
+
 // null/undefined/빈 문자열이 아닐 때만 append
 const appendOptional = (fd, key, val) => {
     if (val != null && val !== '') fd.append(key, val);
@@ -64,6 +83,26 @@ export const buildStoreFormData = (values) => {
         .filter(Boolean);
     if (closedDates.length === 0) fd.append('closedDates', '');
     else closedDates.forEach(d => fd.append('closedDates', d));
+
+    // 예약 방식 (2026-08-24). 값이 없으면 서버가 SLOT 으로 흡수하지만,
+    // 명시적으로 보내는 편이 "무엇을 의도했는지"가 드러난다.
+    fd.append('bookingType', values.bookingType || 'SLOT');
+
+    // 회차 목록 — 휴무와 같은 이유로 빈 값이라도 키를 하나 보낸다(서버가 항상 덮어쓴다).
+    // ★ SESSION 이 아닐 때도 보낸다. 서버가 방식에 따라 버릴지 말지 정한다 —
+    //   프론트가 미리 거르면 두 곳이 같은 규칙을 알고 있어야 해서 언젠가 어긋난다.
+    const sessionTimes = (values.sessionTimes ?? [])
+        .map(t => (typeof t === 'string' ? t : t?.format?.('HH:mm')))
+        .filter(Boolean);
+    if (sessionTimes.length === 0) fd.append('sessionTimes', '');
+    else sessionTimes.forEach(t => fd.append('sessionTimes', t));
+
+    // 운영 기간 (2026-08-24). 휴무와 같은 이유로 **빈 값이라도 키를 보낸다** —
+    // 서버가 항상 덮어쓰기라, 안 보내면 기간을 지우려는 조작이 조용히 무시된다.
+    const period = values.operatingPeriod ?? [];
+    const toIso = (d) => (typeof d === 'string' ? d : d?.format?.('YYYY-MM-DD')) || '';
+    fd.append('openDate',  toIso(period[0]));
+    fd.append('closeDate', toIso(period[1]));
 
     // 빈 값 = 제한 없음
     fd.append('maxAdvanceBookingDays',

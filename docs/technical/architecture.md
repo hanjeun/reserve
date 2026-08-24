@@ -98,10 +98,21 @@ feature/*     ← 기능별 작업
 
 ## SSL 인증서
 
-- **방식**: Let's Encrypt (Certbot)
-- **위치**: `/etc/letsencrypt/live/reserve.it.kr/`
+- **방식**: Let's Encrypt (Certbot **standalone**)
+- **위치**: `/etc/letsencrypt/live/reserve.it.kr/` (reserve.it.kr · www · grafana)
 - **자동갱신**: certbot.timer (systemd, 하루 2번 체크)
-- **Nginx reload 훅**: `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh`
+- **갱신 훅**: `/etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh` → `docker stop nginxserver`
+  `/etc/letsencrypt/renewal-hooks/post/start-nginx.sh` → `docker start nginxserver`
+
+> ⚠️ **`deploy/reload-nginx.sh` 방식으로 되돌리지 말 것. 2026-07-21 에 인증서가 실제로 만료됐다.**
+>
+> nginx 는 호스트 systemd 서비스가 아니라 **`nginxserver` 라는 도커 컨테이너**이고 80/443 을 점유한다.
+> 그래서 `standalone` 갱신이 80 을 못 잡아 조용히 실패했고(`webroot` 도 SPA 가 챌린지 경로를 가로채 실패),
+> 자동갱신이 몇 달간 실패하는 동안 아무도 몰랐다. `systemctl stop/reload nginx` 는 "Unit not found" 로 끝난다.
+>
+> 지금 구조는 갱신 때마다 컨테이너를 잠깐 내렸다 올린다 — **다운타임 약 30초, 60일에 한 번.**
+> 확인은 `sudo certbot renew --dry-run` (pre 훅이 nginxserver 를 멈추고 post 훅이 되살리면 정상).
+> DNS-01/Route53 으로 무중단 갱신하는 길이 있지만 IAM 설정이 필요해 보류 중이다.
 
 ---
 

@@ -12,6 +12,9 @@ services:
     # nginx 도 upstream green 을 PRIVATE_IP:8081 로 보므로 세 곳이 전부 8081 로 맞아야 한다.
     ports:
       - "8081:8081"
+    # ★★ TZ 를 여기에 추가하지 말 것 — 이유는 docker-compose-blue.yml 의 같은 자리에 적어두었다.
+    #    요약: 이미 UTC 로 쌓인 컬럼에 KST 가 섞이고, promtail 타임스탬프 파싱이 깨진다.
+    #    KST 가 필요한 자리는 kr.it.reserve.global.common.ServiceTime 으로 코드에서 명시한다.
     environment:
       - SPRING_PROFILES_ACTIVE=green
       - SERVER_ENV=green
@@ -29,6 +32,12 @@ services:
       - PORTONE_IMP_CODE=${PORTONE_IMP_CODE}
       - PORTONE_V2_SECRET=${PORTONE_V2_SECRET}
       - PORTONE_STORE_ID=${PORTONE_STORE_ID}
+      # PortOne 웹훅 서명 검증용 시크릿(whsec_...). 값이 비면 웹훅을 전부 거부한다(fail-closed).
+      # ★ 앱은 이 값이 없어도 정상 기동한다 — 그래서 빠져 있어도 아무 에러가 안 난다.
+      #   PortOne 콘솔에 웹훅을 등록해두고 이 줄이 없으면, 취소 알림이 조용히 전부 4xx 로 버려진다.
+      - PORTONE_WEBHOOK_SECRET=${PORTONE_WEBHOOK_SECRET}
+      # QR 체크인 서명 키(선택). 비면 로그인 시크릿에서 파생한다 — 비어 있는 게 정상이다.
+      - QR_TOKEN_SECRET=${QR_TOKEN_SECRET}
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       - DB_PASSWORD=${DB_PASSWORD}
       - MAIL_FROM=${MAIL_FROM}

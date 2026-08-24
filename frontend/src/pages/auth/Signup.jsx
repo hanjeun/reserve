@@ -8,6 +8,7 @@ import { useMessage, useEmailVerification, useFormErrors } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
+import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
 import { colors, fontWeight, fontSize, animation, agreement as A } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
@@ -88,7 +89,8 @@ const Signup = () => {
                 <Title level={2} style={styles.title}>회원가입</Title>
                 <Text type="secondary" style={styles.subtitle}>간편한 가입으로 예약을 시작하세요</Text>
 
-                <Form form={form} onFinish={onSignupSubmit} layout="vertical" size="large" requiredMark={false}>
+                <Form form={form} onFinish={onSignupSubmit} layout="vertical" size="large" requiredMark={false}
+                      scrollToFirstError={SCROLL_TO_FIRST_ERROR}>
 
                     {/* 이름 */}
                     <Form.Item name="name" rules={[{ required: true, message: '이름을 입력해주세요' }]}>

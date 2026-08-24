@@ -2,7 +2,13 @@
  * 약관 동의 UI 공통 스타일 토큰
  * Signup.jsx, SocialAgreement.jsx 공통 사용
  */
-import { colors, fontSize, fontWeight, withAlpha } from './index';
+// ★ 배럴('./index')이 아니라 원본 모듈에서 직접 가져온다.
+//   index.js 가 이 파일을 re-export 하므로 './index' 를 쓰면 index → agreement → index 순환이 된다.
+//   지금은 동작하지만 Rollup 이 "agreement 를 청크로 분리할 수 없다"고 경고하고,
+//   청크가 갈리는 순간 초기화 순서가 꼬여 colors 가 undefined 인 채로 평가될 수 있다
+//   (이 파일은 모듈 최상위에서 colors.* 를 읽어 객체를 만든다).
+import { colors, withAlpha } from './colors';
+import { fontSize, fontWeight } from './typography';
 
 export const agreement = {
     section:     { marginTop: 32 },

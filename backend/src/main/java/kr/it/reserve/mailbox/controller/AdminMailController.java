@@ -39,6 +39,19 @@ public class AdminMailController {
         return ResponseEntity.ok(ApiResponse.success(result, "보낸 메일 목록 조회 성공"));
     }
 
+    // ── 보낸 메일 휴지통으로 이동 (ADMIN) ─────────────────
+    /**
+     * 소프트 삭제다. 휴지통 탭에서 30일 안에 복구할 수 있고, 그 뒤 스케줄러가 영구 삭제한다.
+     * 영구 삭제는 이 엔드포인트가 아니라 {@code DELETE /api/admin/trash/SENT_MAIL/{id}} 가 맡는다 —
+     * 되돌릴 수 없는 동작은 휴지통 화면 한 곳에만 두는 게 맞다.
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/sent/{id}")
+    public ResponseEntity<ApiResponse<Void>> moveToTrash(@PathVariable Long id) {
+        adminMailService.moveToTrash(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "휴지통으로 옮겼습니다."));
+    }
+
     // ── 새 메일 작성 발송 (ADMIN) ─────────────────────────
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/compose")

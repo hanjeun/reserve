@@ -120,6 +120,16 @@ export const useStoreForm = ({
             closedDays:                initialData.closedDays                ?? [],
             closedDates:               (initialData.closedDates ?? []).map(d => dayjs(d)),
             maxAdvanceBookingDays:     initialData.maxAdvanceBookingDays     ?? undefined,
+            // 예약 방식 (2026-08-24). 서버가 항상 값을 내려주지만(resolveBookingType 이 null 을 흡수),
+            // 옛 응답이 캐시에 남아 있을 수 있어 ?? 'SLOT' 로 받는다.
+            bookingType:               initialData.bookingType               ?? 'SLOT',
+            sessionTimes:              (initialData.sessionTimes ?? []).map(t => dayjs(t, 'HH:mm')),
+            // 운영 기간 (2026-08-24). 한쪽만 있는 것도 유효한 상태라 각각 따로 변환한다 —
+            // "오늘부터 무기한"·"언제부터든 이 날까지" 둘 다 사장님이 쓸 법한 설정이다.
+            operatingPeriod: (initialData.openDate || initialData.closeDate)
+                ? [initialData.openDate ? dayjs(initialData.openDate) : null,
+                   initialData.closeDate ? dayjs(initialData.closeDate) : null]
+                : null,
             times: initialData.openTime && initialData.closeTime
                 ? [dayjs(initialData.openTime, 'HH:mm'), dayjs(initialData.closeTime, 'HH:mm')]
                 : null,

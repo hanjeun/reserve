@@ -181,16 +181,17 @@ const Button = ({
                 style={baseStyle}
                 {...rest}
             >
+                {/* ★ 로딩 중에도 children 을 그대로 둔다. 스피너는 **아이콘 자리**를 대신할 뿐이다.
+                    예전에는 loading 이면 children 을 통째로 버렸는데, 그 결과 호출부가 정성껏 넘긴
+                    "등록 중…" "수정 중…" "결제 중…" 같은 문구가 **화면에 한 번도 나온 적이 없었다**
+                    (StoreFormActions 등 8곳). 버튼이 빈 채로 도는 것보다 무엇을 기다리는지 보이는 게 낫다.
+                    관문이 여기 하나라 이 세 줄로 8곳이 같이 살아난다. */}
                 {loading ? (
                     <span style={spinStyle} className="reserve-btn-spin" />
-                ) : (
-                    <>
-                        {icon && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }}>{icon}</span>
-                        )}
-                        {children}
-                    </>
+                ) : icon && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }}>{icon}</span>
                 )}
+                {children}
             </button>
         </>
     );

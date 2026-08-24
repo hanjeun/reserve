@@ -8,9 +8,13 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.Mac;
+
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -23,9 +27,34 @@ import java.util.Date;
  * 예약 QR 체크인용 토큰 발급/검증.
  *
  * 로그인용 TokenProvider와 완전히 분리된 별도 컴포넌트 — 로그인 인증 로직에는
- * 전혀 손대지 않고 QR 기능만 독립적으로 다룰 수 있게 하기 위함. 서명 키는
- * 기존 JWT 시크릿(jwt.secret-key)을 재사용하되(새 비밀값 관리 부담 없음),
- * "purpose" 클레임으로 로그인 토큰과 혼동/재사용되지 않도록 구분한다.
+ * 전혀 손대지 않고 QR 기능만 독립적으로 다룰 수 있게 하기 위함.
+ *
+ * <p><b>★ 서명 키는 로그인 JWT 키와 다르다 (2026-08-24 분리).</b>
+ * 그전까지는 {@code jwt.secret-key} 를 그대로 재사용하고 {@code purpose} 클레임으로만 구분했다.
+ * 그러면 <b>두 토큰이 서로의 서명 검증을 통과한다</b> — 어느 한쪽 경로에서 purpose 확인을
+ * 빠뜨리는 순간 QR 토큰이 로그인 토큰으로, 또는 그 반대로 쓰일 수 있다는 뜻이다.
+ * 실제로 역방향(QR 토큰을 인증에 사용)은 {@code TokenProvider} 가 {@code Role.valueOf(null)} 로
+ * NPE 를 내면서 <b>우연히</b> 막히고 있었다. 우연에 기대는 방어는 방어가 아니다.
+ * 키가 다르면 서명 단계에서 구조적으로 막힌다 — purpose 검사는 2차 방어로 남는다.
+ *
+ * <p><b>키를 얻는 방법 두 가지</b>
+ * <ol>
+ *   <li>{@code qr.token-secret}({@code QR_TOKEN_SECRET}) 이 설정돼 있으면 그 값을 쓴다 — 완전 독립</li>
+ *   <li>비어 있으면 <b>로그인 시크릿에서 파생</b>한다: {@code HMAC-SHA256(jwtSecret, "reserve/qr-checkin/v1")}</li>
+ * </ol>
+ *
+ * <p>파생을 기본값으로 둔 이유는 <b>새 환경변수를 서버에 넣기 전까지 이 수정이 아무 효과가 없는 상태를
+ * 만들지 않기 위해서다.</b> 이 프로젝트는 "코드는 고쳤는데 값이 서버에 도달하지 않아 조용히 그대로였다"에
+ * 두 번 물렸다(2026-07-29 Resend, 2026-08-24 PortOne 웹훅 시크릿). 파생 키는 배포 즉시 유효하고,
+ * 서버 설정이 0개 필요하며, 로그인 키와 다른 값이라 위 목적을 그대로 달성한다.
+ *
+ * <p>대가는 하나다 — 로그인 시크릿이 유출되면 QR 키도 계산할 수 있다. 다만 그 시점엔 이미
+ * 로그인 토큰 자체를 위조할 수 있으므로 실질적으로 잃는 것이 없다. 완전한 독립이 필요해지면
+ * {@code QR_TOKEN_SECRET} 을 넣기만 하면 되고, 배선은 compose·CI 에 이미 되어 있다.
+ *
+ * <p>⚠️ <b>배포 직후 이미 화면에 띄워둔 QR 은 무효가 된다</b>(서명 키가 바뀌므로).
+ * QR 모달은 열 때마다 서버에서 새 토큰을 받으므로 다시 열면 끝이고, 토큰 수명이 최대 24시간이라
+ * 영향 구간도 그만큼이다.
  *
  * 만료 정책(2026-07 변경): 예전엔 "언제든 스캔 가능"이라며 만료를 아예 두지 않았는데,
  * 토큰이 유출되면 방문일이 한참 지난 뒤에도 그 예약을 CONFIRMED 처리할 수 있는 약점이 있었다.
@@ -57,14 +86,60 @@ public class QrCheckinTokenProvider {
     // 예약 시각·만료 계산은 서비스 운영 시간대(KST) 기준이어야 한다.
     // 앱 컨테이너에는 TZ가 설정돼 있지 않아 systemDefault()는 UTC로 잡힌다 —
     // 그대로 두면 "방문일 다음 날 새벽 6시"가 실제로는 다음 날 15시(KST)가 된다.
-    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
+    // 값은 ServiceTime 한 곳에서만 정한다(같은 상수가 ReservationElapsedScheduler 에도 있었다).
+    private static final ZoneId SERVICE_ZONE = kr.it.reserve.global.common.ServiceTime.ZONE;
+
+    /**
+     * 파생 키의 용도 라벨. <b>바꾸면 그 순간 발급돼 있던 QR 이 전부 무효가 된다.</b>
+     * 버전을 올려야 할 일이 생기면 그 사실을 알고 올릴 것 (예: v1 → v2).
+     */
+    private static final String DERIVATION_INFO = "reserve/qr-checkin/v1";
+    private static final String HMAC_ALG = "HmacSHA256";
+
+    /** 최소 32바이트. HS256 의 블록 크기이고, 그보다 짧으면 jjwt 가 거부한다. */
+    private static final int MIN_EXPLICIT_SECRET_LENGTH = 32;
 
     private final JwtProperties jwtProperties;
+
+    /** 비워두면 로그인 시크릿에서 파생한다 — 클래스 주석의 "키를 얻는 방법" 참고. */
+    @Value("${qr.token-secret:}")
+    private String qrTokenSecret;
+
     private SecretKey secretKey;
 
     @PostConstruct
     public void init() {
-        this.secretKey = Keys.hmacShaKeyFor(jwtProperties.getSecretKey().getBytes(StandardCharsets.UTF_8));
+        if (qrTokenSecret != null && !qrTokenSecret.isBlank()) {
+            String trimmed = qrTokenSecret.trim();
+            if (trimmed.length() < MIN_EXPLICIT_SECRET_LENGTH) {
+                // 조용히 파생으로 폴백하지 않는다 — 값을 넣었는데 안 쓰이는 게 제일 나쁘다.
+                throw new IllegalStateException(
+                        "qr.token-secret 은 최소 " + MIN_EXPLICIT_SECRET_LENGTH + "자 이상이어야 합니다. "
+                                + "(현재 " + trimmed.length() + "자) 값을 비우면 로그인 시크릿에서 파생합니다.");
+            }
+            this.secretKey = Keys.hmacShaKeyFor(trimmed.getBytes(StandardCharsets.UTF_8));
+            log.info("QR check-in signing key: dedicated secret (qr.token-secret)");
+        } else {
+            this.secretKey = deriveFromJwtSecret(jwtProperties.getSecretKey());
+            log.info("QR check-in signing key: derived from jwt.secret-key (info={})", DERIVATION_INFO);
+        }
+    }
+
+    /**
+     * 로그인 시크릿에서 QR 전용 키를 유도한다. HKDF 의 expand 단계와 같은 형태로,
+     * 같은 입력에는 항상 같은 32바이트가 나오고 원본 시크릿과는 완전히 다른 값이 된다.
+     * → 로그인 토큰과 QR 토큰이 서로의 서명 검증을 통과할 수 없다.
+     */
+    private static SecretKey deriveFromJwtSecret(String jwtSecret) {
+        try {
+            Mac mac = Mac.getInstance(HMAC_ALG);
+            mac.init(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALG));
+            return Keys.hmacShaKeyFor(mac.doFinal(DERIVATION_INFO.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.GeneralSecurityException e) {
+            // HmacSHA256 은 모든 JRE 가 반드시 제공한다. 여기 오면 런타임이 망가진 것이므로
+            // 조용히 로그인 키로 폴백하지 않는다 — 그러면 분리가 없던 일이 된다.
+            throw new IllegalStateException("QR 서명 키 유도에 실패했습니다.", e);
+        }
     }
 
     /**

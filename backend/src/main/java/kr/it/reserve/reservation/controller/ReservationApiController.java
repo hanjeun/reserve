@@ -186,10 +186,21 @@ public class ReservationApiController {
     }
 
     // QR 스캔을 통한 자동 체크인 — 스캔 즉시 CONFIRMED로 자동 승인
+    //
+    // ★ 2026-08-19 레이트리밋 추가. 이 엔드포인트는 예약을 CONFIRMED 로 바꾸는 상태 변경 API 인데
+    //   호출 횟수 제한이 전혀 없었다. 토큰 자체는 서명돼 있어 위조는 불가능하지만, 유출된 토큰을
+    //   스크립트로 쏟아붓거나 응답 문구 차이로 예약 상태를 캐내는 건 막을 게 없었다.
+    //   한도 근거는 RateLimiter.Policy#QR_CHECKIN 주석 참고.
     @PostMapping("/qr-checkin")
-    public ResponseEntity<ApiResponse<QrCheckinResponse>> checkInByQrToken(@RequestBody Map<String, String> body) {
+    public ResponseEntity<ApiResponse<QrCheckinResponse>> checkInByQrToken(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest httpRequest) {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
+        if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.QR_CHECKIN)) {
+            throw new ReservationException("QR 체크인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+                    HttpStatus.TOO_MANY_REQUESTS);
+        }
         String token = body.get("token");
         if (token == null || token.isBlank()) {
             throw new ReservationException("QR 토큰이 없습니다.", HttpStatus.BAD_REQUEST);

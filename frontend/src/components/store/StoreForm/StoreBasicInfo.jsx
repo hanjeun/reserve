@@ -7,8 +7,10 @@ import {
     RESERVATION_SLOT_OPTIONS, NEARBY_RADIUS_OPTIONS,
     FULL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_RATE_OPTIONS,
     BOOKING_DEADLINE_OPTIONS, PAYMENT_TIMEOUT_OPTIONS,
+    BOOKING_TYPE_OPTIONS, BOOKING_TYPE_HINTS,
 } from '../../../constants';
 import { VALIDATION_RULES } from '../../../utils/validation';
+import { useWindowWidth } from '../../../hooks';
 import { colors, fontSize, fontWeight } from '../../../styles/tokens';
 
 const { Text } = Typography;
@@ -48,23 +50,77 @@ const toggleStyles = {
     desc:  { fontSize: fontSize.xs, color: colors.text.tertiary, flex: 1 },
 };
 
-// 2-셀 Flex Row
-const FieldRow = ({ children, style }) => (
-    <Flex gap={12} style={{ marginBottom: 18, ...style }}>
-        {React.Children.map(children, child =>
-            React.cloneElement(child, { style: { flex: 1, marginBottom: 0, ...child.props.style } })
-        )}
-    </Flex>
-);
+/**
+ * 한 줄에 2~3개를 나란히 놓는 행. **모바일에서는 세로로 쌓는다.**
+ *
+ * ★ 예전에는 폭과 무관하게 항상 가로였다. 이 컴포넌트를 쓰는 7곳이 전부 같은 문제를 겪었고,
+ *   그중 최악은 영업시간이었다 — 360px 화면에서 칸 하나가 약 160px 인데 그 안에
+ *   `[시작] → [종료]` 와 시계 아이콘이 다 들어가야 했다. 환불 정책은 3열이라 칸당 100px 미만.
+ *   숫자 입력은 그럭저럭 보여도 RangePicker·Select 는 글자가 잘렸다.
+ *
+ * 세로로 쌓으면 스크롤이 조금 길어지는 대신 모든 칸이 제 폭을 갖는다.
+ * 모바일에서 세로 스크롤은 값싸고, 잘린 글자는 비싸다.
+ *
+ * 폭 판정을 호출부에서 prop 으로 받지 않고 여기서 하는 이유: 이 파일의 SettingsSection 은
+ * isMobile 을 안 받는다. 관문 한 곳에서 정해야 7곳이 어긋나지 않는다(CLAUDE.md 설계 원칙).
+ */
+const FieldRow = ({ children, style }) => {
+    const isMobile = useWindowWidth() < 768;
+    // 간격은 Flex 의 gap 으로만 준다 — 자식에 marginBottom 을 쓰면 마지막 칸 뒤에도
+    // 여백이 붙어 행 자신의 marginBottom 과 겹친다(아래 cloneElement 가 0 으로 덮는 이유).
+    return (
+        <Flex
+            vertical={isMobile}
+            gap={isMobile ? 18 : 12}
+            style={{ marginBottom: 18, ...style }}
+        >
+            {React.Children.map(children, child =>
+                React.cloneElement(child, { style: { flex: 1, marginBottom: 0, ...child.props.style } })
+            )}
+        </Flex>
+    );
+};
 
 // 기본 정보 (왼쪽 컬럼)
 const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' }) => {
     const mb = isMobile ? MB : MB_PC;
+    // 예약 방식에 따라 아래 칸들의 의미가 바뀐다 — 안내 문구와 회차 칸 노출을 여기서 갈라준다.
+    // useWatch 를 쓰는 이유: 값이 바뀌는 즉시 다시 그려야 하는데, form.getFieldValue 는 리렌더를 안 일으킨다.
+    const bookingType = Form.useWatch('bookingType', form) ?? 'SLOT';
     return (
         <>
             <Form.Item label="가게 이름" name="name" rules={VALIDATION_RULES.storeName} style={mb}>
                 <FormInput placeholder="가게 이름" />
             </Form.Item>
+
+            {/* 예약 방식 (2026-08-24 신설). 이 값 하나가 아래 칸들의 의미를 바꾼다 —
+                SLOT 이면 "예약 단위"가, SESSION 이면 "회차 목록"이 실제로 쓰인다.
+                그래서 두 칸보다 위에 둔다. */}
+            <Form.Item
+                label="예약 방식" name="bookingType"
+                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                    {BOOKING_TYPE_HINTS[bookingType] ?? BOOKING_TYPE_HINTS.SLOT}
+                </Text>}
+                style={mb}
+            >
+                <FormSelect options={BOOKING_TYPE_OPTIONS} placeholder="시간대 (기본)" />
+            </Form.Item>
+
+            {/* 회차 목록은 SESSION 일 때만 의미가 있다. 항상 보여주면 "적었는데 안 쓰이는" 칸이 된다 —
+                이 프로젝트가 죽은 검사·죽은 옵션으로 여러 번 데인 패턴이다. */}
+            {bookingType === 'SESSION' && (
+                <Form.Item
+                    label="회차 시각" name="sessionTimes"
+                    rules={[{ required: true, message: '회차를 하나 이상 등록해주세요.' }]}
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                        예: 11:00, 14:00, 17:00 — 적은 시각만 예약을 받아요 (영업시간과 별개)
+                    </Text>}
+                    style={mb}
+                >
+                    <FormTimePicker multiple format="HH:mm" placeholder="회차 시각 선택"
+                        style={{ width: '100%' }} maxTagCount="responsive" />
+                </Form.Item>
+            )}
 
             <FieldRow style={isMobile ? {} : { marginBottom: 12 }}>
                 <Form.Item
@@ -76,14 +132,19 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                 <Form.Item
                     label="예약 단위" name="reservationSlotMinutes"
                     rules={[{ required: true, message: '예약 단위를 선택해주세요.' }]}
-                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>시간 선택 시 간격 단위</Text>}
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                        {bookingType === 'SLOT' ? '시간 선택 시 간격 단위' : '지금 방식에서는 쓰이지 않아요'}
+                    </Text>}
                 >
+                    {/* 값은 그대로 저장한다 — SLOT 으로 되돌렸을 때 예전 설정이 살아 있어야 한다.
+                        다만 "지금은 안 쓰인다"는 걸 말해준다. 말 안 하면 고쳐놓고 왜 안 먹는지 찾게 된다. */}
                     <FormSelect options={RESERVATION_SLOT_OPTIONS} placeholder="선택" />
                 </Form.Item>
             </FieldRow>
 
             <Form.Item label="연락처" name="phone" rules={VALIDATION_RULES.phone} style={mb}>
-                <FormInput placeholder="02-000-0000" />
+                {/* placeholder·에러문구·정규식이 서로 다른 말을 하면 안 된다. 셋 다 같은 예시로 맞춰둘 것. */}
+                <FormInput placeholder="02-1234-5678" />
             </Form.Item>
 
             <FieldRow style={isMobile ? {} : { marginBottom: 12 }}>
@@ -95,6 +156,10 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                 <Form.Item
                     label="브레이크 타임"
                     name="breakTimes"
+                    rules={VALIDATION_RULES.breakTimes}
+                    // 영업시간이 바뀌면 브레이크 검증도 다시 돌아야 한다 — 안 그러면
+                    // 영업시간을 줄였을 때 범위 밖이 된 브레이크가 그대로 통과한다.
+                    dependencies={['times']}
                     extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>브레이크 없으면 비워두세요</Text>}
                 >
                     <FormTimePicker.RangePicker
@@ -140,7 +205,15 @@ const SettingsSection = () => (
                 rules={VALIDATION_RULES.noShowDeposit}
                 extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>0원이면 예약금 없음</Text>}
             >
-                <FormInput type="number" placeholder="0" suffix="원" min={0} max={100000} precision={0} />
+                {/* step 1000 · 천단위 콤마 — 기본 step 은 1 이라 스피너로 10,000원을 만들려면
+                    1만 번을 눌러야 했다. 예약금은 천 원 단위로 정하는 값이다.
+                    parser 는 콤마를 걷어내 숫자로 되돌린다(없으면 두 번째 입력부터 NaN 이 된다). */}
+                <FormInput
+                    type="number" placeholder="0" suffix="원"
+                    min={0} max={100000} precision={0} step={1000}
+                    formatter={(v) => (v == null || v === '' ? '' : `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ','))}
+                    parser={(v) => (v ? v.replace(/,/g, '') : v)}
+                />
             </Form.Item>
         </FieldRow>
 
@@ -176,11 +249,30 @@ const SettingsSection = () => (
         >
             {/* ISO 요일 번호(월=1 … 일=7) — 백엔드 Store.isClosedOn 이 같은 기준으로 판정한다.
                 0=일요일인 JS getDay()와 다르니 섞지 말 것. */}
-            <Checkbox.Group options={[
+            {/* className 은 index.css 의 7칸 그리드 규칙과 짝이다 —
+                기본 줄바꿈에 맡기면 모바일에서 '일' 하나만 다음 줄로 떨어진다. */}
+            <Checkbox.Group className="reserve-weekday-group" options={[
                 { label: '월', value: 1 }, { label: '화', value: 2 }, { label: '수', value: 3 },
                 { label: '목', value: 4 }, { label: '금', value: 5 }, { label: '토', value: 6 },
                 { label: '일', value: 7 },
             ]} />
+        </Form.Item>
+
+        {/* 운영 기간 (2026-08-24 신설).
+            휴무일과 성격이 다르다 — 휴무는 "여는 가게가 그날만 쉰다"이고,
+            이건 "그 기간 밖에는 가게가 아예 없다"이다. 팝업스토어·기간 한정 클래스용.
+            비워두면 지금까지와 똑같이 무기한 영업이라 기존 가게는 영향이 없다. */}
+        <Form.Item
+            label="운영 기간" name="operatingPeriod"
+            extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                팝업스토어처럼 기간이 정해진 경우에만. 비워두면 계속 운영해요 (종료일 당일까지 예약 가능)
+            </Text>}
+        >
+            <DatePicker.RangePicker
+                placeholder={['시작일', '종료일']}
+                style={{ width: '100%' }}
+                allowEmpty={[true, true]}
+            />
         </Form.Item>
 
         <FieldRow>
@@ -200,8 +292,9 @@ const SettingsSection = () => (
             </Form.Item>
             <Form.Item
                 label="예약 가능 기간" name="maxAdvanceBookingDays"
+                rules={VALIDATION_RULES.maxAdvanceBookingDays}
                 extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                    오늘부터 며칠 뒤까지 받을지. 비워두면 제한 없음
+                    오늘부터 며칠 뒤까지 받을지. 비워두면 제한 없음 (최대 365일)
                 </Text>}
             >
                 <FormInput type="number" placeholder="예) 30" suffix="일" min={1} max={365} precision={0} />

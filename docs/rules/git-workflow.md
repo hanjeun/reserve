@@ -142,9 +142,23 @@ release: home page mobile/PC layout improvements
 
 ## 머지 옵션
 
-| 옵션 | 설명 | 권장 |
+| 대상 | 옵션 | 설명 |
 |---|---|---|
-| Create a merge commit | feature 커밋 그대로 + 머지 커밋 추가 | feature → dev, dev → main |
+| `feature/*`·`fix/*`·`chore/*` → `dev` | **Create a merge commit** | 브랜치 커밋 그대로 + 머지 커밋 추가 |
+| `dev` → `main` (release) | **Squash and merge** | main 은 `Require linear history` 라 merge commit 을 못 받는다. 이 옵션만 가능 |
+
+> ★ `dev` → `main` 을 Squash 하면 **dev 가 main 의 조상이 아니게 된다.**
+> 머지 직후 반드시 계보를 다시 이어줄 것 — 파일은 하나도 안 바뀐다:
+>
+> ```bash
+> git checkout dev && git pull origin dev
+> git merge -s ours origin/main -m "chore: record vX.Y.Z release squash into dev"
+> git push origin dev
+> ```
+>
+> 이걸 빼먹으면 다음 릴리즈 PR 에서 **이미 배포된 내용이 충돌로 되살아나고**,
+> 충돌 해결을 한 번 잘못하면 배포된 수정이 되돌아간다. 실제로 `#120` 이후 이 상태로 방치돼
+> hotfix 4개(`#121`~`#123`)가 dev 에 없는 기간이 있었다.
 
 ---
 

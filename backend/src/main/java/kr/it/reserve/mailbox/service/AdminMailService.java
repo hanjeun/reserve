@@ -1,5 +1,6 @@
 package kr.it.reserve.mailbox.service;
 
+import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.mailbox.dto.AdminSentMailResponse;
 import kr.it.reserve.mailbox.dto.ComposeMailRequest;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
@@ -39,6 +40,7 @@ public class AdminMailService {
     private final AdminSentMailRepository sentMailRepository;
     private final JavaMailSender mailSender;
     private final MemberRepository memberRepository;
+    private final AuditLogService auditLogService;
 
     @Value("${mail.from:${mail.username}}")
     private String fromEmail;
@@ -114,6 +116,28 @@ public class AdminMailService {
                 : sentMailRepository.searchByToEmailOrSubject(keyword, pageable);
 
         return mails.map(AdminSentMailResponse::from);
+    }
+
+    /* ── 휴지통으로 이동 ────────────────────────────────── */
+
+    /**
+     * 보낸 메일을 휴지통으로 옮긴다(소프트 삭제).
+     *
+     * <p><b>★ 여기까지 오는 배관은 원래 다 있었고, 부르는 사람만 없었다.</b>
+     * {@code AdminSentMail.deletedAt} · {@code softDelete()} · 목록 쿼리의 {@code deletedAt IS NULL} ·
+     * {@code AuditLogService.softDeleteSentMail} · 휴지통 복구({@code restoreById}) ·
+     * 30일 뒤 자동 영구삭제까지 전부 구현돼 있었는데, <b>deletedAt 을 세팅하는 진입점이 없어서</b>
+     * SENT_MAIL 은 휴지통에 한 번도 나타날 수 없었다. 이 메서드가 그 빠진 한 칸이다.
+     *
+     * <p>실제 삭제가 아니라 소프트 삭제인 이유 — 보낸 메일은 "무엇을 보냈는가"의 기록이다.
+     * 실수로 지웠을 때 되돌릴 수 없으면 그 기록의 가치가 사라진다. 휴지통에서 30일 뒤
+     * {@code TrashCleanupScheduler} 가 영구 삭제한다.
+     */
+    @Transactional
+    public void moveToTrash(Long mailId) {
+        // 엔티티 로드·softDelete·감사 로그 기록이 한 곳에 묶여 있다.
+        // 여기서 다시 구현하면 감사 로그를 빠뜨리기 쉬워 그대로 위임한다.
+        auditLogService.softDeleteSentMail(mailId);
     }
 
     /* ── 이메일 발송 내부 메서드 ────────────────────────── */

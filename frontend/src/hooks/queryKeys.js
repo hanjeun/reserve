@@ -51,4 +51,13 @@ export const adminKeys = {
     sentMails:            () => ['admin', 'sentMails'],
     businessVerifications: () => ['admin', 'businessVerifications'],
     dashboardStats:       () => ['admin', 'dashboardStats'],
+    chatRooms:            () => ['admin', 'chatRooms'],
+    chatRoom:             (id) => ['admin', 'chatRoom', id],
+    chatWaiting:          () => ['admin', 'chatWaiting'],
+};
+
+// 인앱 채팅 (손님 쪽). 방이 하나뿐이라 키에 ID 가 필요 없다.
+export const chatKeys = {
+    my:     () => ['chat', 'my'],
+    unread: () => ['chat', 'unread'],
 };

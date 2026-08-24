@@ -2,6 +2,7 @@ package kr.it.reserve.reservation.service;
 
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
@@ -169,7 +170,11 @@ public class ReservationService {
                                          LocalDate date, LocalTime time, Integer guestCount,
                                          Long excludeReservationId) {
         LocalDateTime reservationDateTime = LocalDateTime.of(date, time);
-        LocalDateTime now = LocalDateTime.now();
+        // ★ 반드시 KST 기준 "지금"이어야 한다. date·time 은 사용자가 고른 한국 시각이고,
+        //   컨테이너는 UTC 라 인자 없는 now() 는 9시간 뒤처진다.
+        //   그 상태에서는 **이미 지나간 시간대의 예약이 검사를 통과했다**
+        //   (예: 14:00 KST 에 오늘 08:00 예약 → UTC 로는 05:00 < 08:00 이라 미래로 보인다).
+        LocalDateTime now = ServiceTime.now();
 
         if (reservationDateTime.isBefore(now)) {
             throw new ReservationException("예약 날짜/시간은 현재 이후여야 합니다.", HttpStatus.BAD_REQUEST);
@@ -179,9 +184,17 @@ public class ReservationService {
         //   그 전까지 영업시간이 요일 구분 없이 하나뿐이라 **월요일 휴무인 가게도 월요일 예약을 받았다.**
         //   기능이 없는 게 아니라 잘못된 예약을 받는 상태였고, 사장님은 그걸 하나씩 거절해야 했다.
         //   거절은 이제 전액 환불이 나가므로 예약금이 왕복하는 비용까지 붙는다.
-        //   판정은 Store.isClosedOn 한 곳에만 둔다 — 여기와 getAvailability, 달력이 같은 답을 내야 한다.
-        if (store.isClosedOn(date)) {
-            throw new ReservationException("휴무일에는 예약할 수 없습니다. 다른 날짜를 선택해주세요.", HttpStatus.BAD_REQUEST);
+        //   판정은 Store.isBookableOn 한 곳에만 둔다 — 여기와 getAvailability, 달력이 같은 답을 내야 한다.
+        //
+        //   2026-08-24: 운영 기간(openDate~closeDate)이 생기면서 isClosedOn → isBookableOn 으로 넓혔다.
+        //   휴무와 운영기간을 각각 판정하면 두 곳이 언젠가 어긋난다. 문구는 어느 쪽에 걸렸는지
+        //   구분해서 보여준다 — "휴무일"이라고만 하면 팝업스토어 기간 밖에 온 손님이 혼란스럽다.
+        if (!store.isBookableOn(date)) {
+            throw new ReservationException(
+                    store.isClosedOn(date)
+                            ? "휴무일에는 예약할 수 없습니다. 다른 날짜를 선택해주세요."
+                            : "예약을 받는 기간이 아닙니다. 다른 날짜를 선택해주세요.",
+                    HttpStatus.BAD_REQUEST);
         }
 
         // ★ 예약 가능 범위 검증 (2026-08-11 신설).
@@ -189,7 +202,8 @@ public class ReservationService {
         //   계획을 세울 수 없고 이용자도 잊어버린다. null = 제한 없음(기존 가게의 동작 유지).
         Integer maxAdvance = store.getMaxAdvanceBookingDays();
         if (maxAdvance != null && maxAdvance > 0) {
-            LocalDate lastBookable = LocalDate.now().plusDays(maxAdvance);
+            // 사장님이 정한 "오늘부터 N일"의 오늘은 한국 날짜다(ServiceTime 참고).
+            LocalDate lastBookable = ServiceTime.today().plusDays(maxAdvance);
             if (date.isAfter(lastBookable)) {
                 throw new ReservationException(
                         "이 가게는 " + maxAdvance + "일 이내의 날짜만 예약할 수 있습니다.", HttpStatus.BAD_REQUEST);
@@ -208,7 +222,13 @@ public class ReservationService {
         }
 
         // 브레이크 타임 검증 (breakStartTime 이상, breakEndTime 미만은 예약 불가)
-        if (store.getBreakStartTime() != null && store.getBreakEndTime() != null) {
+        //
+        // ★ SLOT 방식에만 적용한다 (2026-08-24). SESSION 은 사장님이 회차를 직접 적은 것이라
+        //   그 위에 브레이크타임을 얹으면 "적었는데 예약이 안 되는" 상태가 된다.
+        //   DAY 는 시각 자체가 의미를 갖지 않는다.
+        //   아래 목록 포함 검사만으로도 막히지만, 이 분기가 있어야 **왜 막혔는지**를 말해줄 수 있다.
+        if (store.resolveBookingType() == Store.BookingType.SLOT
+                && store.getBreakStartTime() != null && store.getBreakEndTime() != null) {
             if (!time.isBefore(store.getBreakStartTime()) && time.isBefore(store.getBreakEndTime())) {
                 String breakStr = store.getBreakStartTime().toString().substring(0, 5)
                     + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
@@ -219,19 +239,23 @@ public class ReservationService {
             }
         }
 
-        // 영업시간 검증 — getAvailability와 동일한 기준: 예약 시각은 [open, close - slotMin] 범위 안이어야 함.
-        // (프론트 슬롯 목록에 안 떴는 시각을 API로 직접 찔러넣는 우회 차단)
-        if (store.getOpenTime() != null && store.getCloseTime() != null) {
-            int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
-            LocalTime lastSlot = store.getCloseTime().minusMinutes(slotMin);
-            if (time.isBefore(store.getOpenTime()) || time.isAfter(lastSlot)) {
-                String hoursStr = store.getOpenTime().toString().substring(0, 5)
-                    + " ~ " + store.getCloseTime().toString().substring(0, 5);
-                throw new ReservationException(
-                    "영업시간(" + hoursStr + ") 내의 예약 가능한 시간대를 선택해주세요.",
-                    HttpStatus.BAD_REQUEST
-                );
-            }
+        // ★ 예약 시각 검증 — getAvailability 와 **같은 목록**을 써서 포함 여부만 본다 (2026-08-24).
+        //
+        //   예전에는 여기서 [open, close - slotMin] **범위**를 비교했다. 그런데 화면은 슬롯 목록을
+        //   보여주므로 둘이 같은 판정이 아니었다 — 30분 단위 가게에 09:07 을 API 로 직접 보내면
+        //   범위 검사는 통과했다(목록엔 없는 시각인데도). 목록 포함 여부로 바꾸면 그 틈이 사라지고,
+        //   예약 방식이 셋으로 늘어도 여기에 분기를 더할 필요가 없다.
+        //
+        //   ⚠️ 이 변경으로 격자에서 벗어난 시각은 이제 거절된다. UI 로 만든 예약은 항상 격자 위에
+        //      있으므로 정상 경로에는 영향이 없다.
+        List<LocalTime> bookable = bookableSlotTimes(store, date);
+        if (!bookable.contains(time)) {
+            throw new ReservationException(
+                bookable.isEmpty()
+                    ? "이 날짜에는 예약을 받지 않습니다. 다른 날짜를 선택해주세요."
+                    : "예약 가능한 시간대를 선택해주세요.",
+                HttpStatus.BAD_REQUEST
+            );
         }
 
         // 중복 예약 방지: 가게 정책에 따라 같은 날짜 활성 예약 여부 확인 (수정 시 자기 자신은 제외)
@@ -285,53 +309,82 @@ public class ReservationService {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
-        if (store.getOpenTime() == null || store.getCloseTime() == null) {
-            return List.of();
-        }
-
-        // 휴무일은 슬롯이 하나도 없다 (2026-08-11). 빈 목록을 주면 화면이 "예약 가능한 시간이 없습니다"를
-        // 그대로 보여주므로 별도 분기가 필요 없다 — 검증(validateReservationSlot)과 같은 판정을 쓴다.
-        if (store.isClosedOn(date)) {
-            return List.of();
-        }
-
-        int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
-        LocalTime open  = store.getOpenTime();
-        LocalTime close = store.getCloseTime();
-        LocalTime breakStart = store.getBreakStartTime();
-        LocalTime breakEnd   = store.getBreakEndTime();
-        boolean hasBreak = breakStart != null && breakEnd != null;
-        Integer capacity = store.getMaxCapacityPerSlot();
-
         Map<LocalTime, Long> guestSumByTime = reservationRepository
                 .sumActiveGuestsGroupedByTime(storeId, date).stream()
                 .collect(Collectors.toMap(
                         row -> (LocalTime) row[0],
                         row -> ((Number) row[1]).longValue()
                 ));
+        Integer capacity = store.getMaxCapacityPerSlot();
 
-        List<SlotAvailabilityResponse> result = new ArrayList<>();
-        LocalTime cursor = open;
-        // close는 "영업 종료 시각"이므로, 예약이 예약 단위(slotMin)만큼 자리를 점유한다고 보고
-        // 마지막 슬롯 + slotMin 이 close를 넘어가면 제외한다.
-        // 예) 09:00~21:00, 30분 단위 → 마지막 슬롯 20:30(20:30+30=21:00, 종료와 일치), 21:00 슬롯은 21:30이 되어 제외.
-        // (close가 자정을 넘어가는 가게는 LocalTime wrap-around로 정상 처리 안 되지만, 이는 기존 코드도 동일한 한계)
-        // ★ slotMin 이 0 이면 cursor 가 전진하지 않아 **무한루프 + result 무한 증가(OOM)** 가 된다.
-        //   저장 시 StoreService.clampSlotMinutes 가 막지만, 그 전에 저장된 데이터나 수동 DB 변경이
-        //   있을 수 있어 **읽는 쪽에도 가드를 둔다**. 이 경로는 로그인만 하면 누구나 호출할 수 있다.
+        return bookableSlotTimes(store, date).stream()
+                .map(t -> {
+                    long booked = guestSumByTime.getOrDefault(t, 0L);
+                    boolean available = capacity == null || capacity <= 0 || booked < capacity;
+                    return new SlotAvailabilityResponse(t.toString().substring(0, 5), available);
+                })
+                .toList();
+    }
+
+    /**
+     * <b>그 가게가 그 날 받을 수 있는 예약 시각 목록.</b> 예약 방식별 분기는 여기 한 곳뿐이다.
+     *
+     * <p>★ 이 메서드가 이 클래스에서 가장 중요한 관문이다. 예전에는 같은 판정이 두 벌 있었다 —
+     * {@code getAvailability} 는 슬롯을 <b>생성</b>했고, {@code validateReservationSlot} 은
+     * 범위를 <b>비교</b>했다. 두 코드가 다른 모양이라 실제로 어긋나 있었다:
+     * 30분 단위 가게에 {@code 09:07} 을 API 로 직접 보내면 범위 검사는 통과했다(슬롯 목록엔 없는데도).
+     * 목록을 만들어 <b>포함 여부로 검사</b>하면 그 틈이 원천적으로 사라지고,
+     * 예약 방식이 셋으로 늘어도 분기가 한 곳에만 생긴다.
+     *
+     * <p>비어 있는 목록 = 그 날은 예약을 받지 않는다. 화면은 "예약 가능한 시간이 없습니다"를
+     * 그대로 보여주므로 호출측에 별도 분기가 필요 없다.
+     */
+    private List<LocalTime> bookableSlotTimes(Store store, LocalDate date) {
+        // 휴무일·운영기간 밖 (2026-08-11, 2026-08-24). 판정은 Store 한 곳에 있다.
+        if (!store.isBookableOn(date)) return List.of();
+
+        return switch (store.resolveBookingType()) {
+            // 사장님이 나열한 회차 그대로. 영업시간·브레이크타임을 적용하지 않는다 —
+            // 회차를 직접 적었다는 건 그 시각에 받겠다는 뜻이고, 그 위에 다른 규칙을 얹으면
+            // "적었는데 안 보이는" 상태가 된다.
+            case SESSION -> store.getSessionTimeList();
+
+            // 하루 = 슬롯 한 개. 정원·중복·마감·결제가 전부 그대로 재사용된다.
+            case DAY -> List.of(store.dayBookingTime());
+
+            case SLOT -> slotGrid(store);
+        };
+    }
+
+    /** SLOT 방식의 시각 격자 — 영업시간을 예약 단위로 쪼개고 브레이크타임을 뺀다. */
+    private List<LocalTime> slotGrid(Store store) {
+        if (store.getOpenTime() == null || store.getCloseTime() == null) return List.of();
+
+        int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
+        // ★ slotMin 이 0 이면 cursor 가 전진하지 않아 **무한루프 + OOM** 이 된다.
+        //   저장 시 clampSlotMinutes 가 막지만, 그 전에 저장된 데이터나 수동 DB 변경이 있을 수 있어
+        //   읽는 쪽에도 가드를 둔다. 이 경로는 로그인만 하면 누구나 호출할 수 있다.
         if (slotMin <= 0) {
             log.warn("Invalid reservationSlotMinutes: storeId={}, value={} - returning empty slots",
                     store.getId(), slotMin);
-            return result;
+            return List.of();
         }
 
+        LocalTime open  = store.getOpenTime();
+        LocalTime close = store.getCloseTime();
+        LocalTime breakStart = store.getBreakStartTime();
+        LocalTime breakEnd   = store.getBreakEndTime();
+        boolean hasBreak = breakStart != null && breakEnd != null;
+
+        List<LocalTime> result = new ArrayList<>();
+        LocalTime cursor = open;
+        // close 는 "영업 종료 시각"이므로, 예약이 예약 단위만큼 자리를 점유한다고 보고
+        // 마지막 슬롯 + slotMin 이 close 를 넘어가면 제외한다.
+        // 예) 09:00~21:00 / 30분 → 마지막 슬롯 20:30. 21:00 은 21:30 이 되어 제외.
+        // (close 가 자정을 넘어가는 가게는 지원하지 않는다 — StoreService 가 저장 단계에서 거절한다.)
         while (!cursor.plusMinutes(slotMin).isAfter(close)) {
             boolean inBreak = hasBreak && !cursor.isBefore(breakStart) && cursor.isBefore(breakEnd);
-            if (!inBreak) {
-                long booked = guestSumByTime.getOrDefault(cursor, 0L);
-                boolean available = capacity == null || capacity <= 0 || booked < capacity;
-                result.add(new SlotAvailabilityResponse(cursor.toString().substring(0, 5), available));
-            }
+            if (!inBreak) result.add(cursor);
             cursor = cursor.plusMinutes(slotMin);
         }
         return result;
@@ -468,15 +521,41 @@ public class ReservationService {
         Reservation reservation = findByIdOrThrow(reservationId);
         validateStoreOwner(reservation, owner);
 
+        // ★★ 방문 당일에만 체크인할 수 있다 (2026-08-19 신설).
+        //
+        //   그 전까지 날짜 검사가 아예 없었다. 토큰 만료는 "방문일 다음 날 새벽" 과 "발급 후 24시간"
+        //   중 빠른 쪽인데, **3개월 뒤 예약이라도 방금 발급한 QR 은 24시간 동안 유효하다.**
+        //   그래서 손님이 오늘 그 QR 을 보여주면 사장님의 승인 절차를 건너뛰고 곧바로 CONFIRMED 가 됐다.
+        //   QR 체크인은 "왔다"를 증명하는 수단이지 "미리 확정받는" 수단이 아니다.
+        //
+        //   비교 기준은 반드시 KST 다 — reservationDate 는 손님이 고른 한국 날짜이고
+        //   컨테이너는 UTC 로 돈다(ServiceTime 참고). 이걸 놓치면 매일 09시 이전에 오탐이 난다.
+        LocalDate today = ServiceTime.today();
+        if (!today.equals(reservation.getReservationDate())) {
+            // 감사 로그: 거부는 WARN 으로 남긴다. Loki 에 level 인덱스가 있어
+            // {job="reserve", level="WARN"} |= "QR check-in" 한 줄로 이상 패턴을 볼 수 있다.
+            log.warn("QR check-in rejected (date mismatch): reservationId={}, storeId={}, ownerId={}, reservationDate={}, today={}",
+                    reservation.getId(), reservation.getStore().getId(), owner.getId(),
+                    reservation.getReservationDate(), today);
+            throw new ReservationException(
+                    "방문 당일에만 QR 체크인이 가능합니다. (예약일: " + reservation.getReservationDate() + ")",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
         // ★ 이미 승인된 건은 "바뀐 게 없다"는 사실을 함께 돌려준다 (2026-08-11).
         //   재스캔을 에러로 만들지 않는 건 그대로다(멱등) — 같은 QR 을 두 번 비추는 건 흔하고,
         //   그때마다 빨간 에러가 뜨면 사장님이 뭘 잘못한 줄 안다.
         //   다만 화면에는 "승인되었습니다"가 아니라 "이미 승인된 예약입니다"라고 나와야
         //   방금 처리한 건지 아닌지를 헷갈리지 않는다.
         if (reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED) {
+            log.info("QR check-in repeated (already confirmed): reservationId={}, storeId={}, ownerId={}",
+                    reservation.getId(), reservation.getStore().getId(), owner.getId());
             return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), true);
         }
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
+            log.warn("QR check-in rejected (bad status): reservationId={}, storeId={}, ownerId={}, status={}",
+                    reservation.getId(), reservation.getStore().getId(), owner.getId(), reservation.getStatus());
             throw new ReservationException(
                     "대기 중인 예약만 QR 체크인이 가능합니다. (현재 상태: " + reservation.getStatus() + ")",
                     HttpStatus.BAD_REQUEST
@@ -484,6 +563,18 @@ public class ReservationService {
         }
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
+
+        // ★ 감사 로그 (2026-08-19 신설). QR 체크인은 사장님의 승인 클릭을 건너뛰고 예약을 확정시키는
+        //   유일한 경로인데, 성공했다는 기록이 어디에도 남지 않았다. 나중에 "승인한 적 없는데 확정돼 있다"는
+        //   문의가 오면 확인할 방법이 없다는 뜻이다. 개인정보(이름·연락처)는 넣지 않고 식별자만 남긴다.
+        //
+        //   audit_log 테이블(AuditLogService)이 아니라 로그로 남기는 이유: 그 테이블은
+        //   "휴지통 스냅샷 + 관리자 행위"용이고 90일 뒤 스케줄러가 지운다. 체크인은 영업 중 반복되는
+        //   일반 동작이라 매 스캔마다 행을 쌓으면 성격이 다른 데이터가 섞이고 조회도 느려진다.
+        //   Loki 가 이미 이 로그를 수집하고 level 라벨로 인덱싱하므로 조회는 그쪽이 낫다.
+        log.info("QR check-in confirmed: reservationId={}, storeId={}, ownerId={}, reservationDate={}, reservationTime={}",
+                reservation.getId(), reservation.getStore().getId(), owner.getId(),
+                reservation.getReservationDate(), reservation.getReservationTime());
 
         // 유저에게 승인 알림 (약연 — approveReservation과 동일한 패턴)
         if (reservation.getMember().isEmailNotificationEnabled()) {

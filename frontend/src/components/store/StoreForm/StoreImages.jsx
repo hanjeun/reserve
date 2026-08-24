@@ -4,6 +4,19 @@ import { PlusOutlined } from '@ant-design/icons';
 
 const MAX_SIZE_MB = 10;
 
+/**
+ * Upload 의 onChange 이벤트에서 폼 값으로 쓸 배열만 꺼낸다.
+ *
+ * ★ 이게 없으면 `required` 검사가 통째로 무력해진다.
+ * Upload 는 `{ file, fileList }` 객체를 onChange 로 넘기는데, 그 객체가 그대로 폼 값이 되면
+ * fileList 가 비어 있어도 **객체 자체는 truthy** 라 required 를 통과한다.
+ * 즉 "이미지를 올렸다가 지우고 제출" 하면 대표 이미지 없이 등록이 됐다.
+ *
+ * 배열로 바꿔주면 `[]` 가 되어 async-validator 가 빈 값으로 판정한다.
+ * (실제 파일은 폼이 아니라 useStoreForm 의 state 로 전송되므로, 이 값은 검증 전용이다.)
+ */
+const normFileList = (e) => (Array.isArray(e) ? e : e?.fileList ?? []);
+
 const validateImage = (file) => {
     if (!file.type.startsWith('image/')) {
         antMessage.error('이미지 파일만 업로드할 수 있습니다');
@@ -39,6 +52,7 @@ const StoreImages = ({
             <Form.Item
                 label="대표 이미지"
                 name="mainImage"
+                getValueFromEvent={normFileList}
                 extra={`JPG · PNG · WEBP 등 이미지 파일 / 최대 ${MAX_SIZE_MB}MB`}
                 rules={mainImageRequired ? [{ required: true, message: '대표 이미지를 등록해주세요' }] : []}
             >
@@ -59,6 +73,7 @@ const StoreImages = ({
             <Form.Item
                 label="상세 이미지 (최대 5장)"
                 name="detailImages"
+                getValueFromEvent={normFileList}
                 extra={`JPG · PNG · WEBP 등 이미지 파일 / 장당 최대 ${MAX_SIZE_MB}MB`}
             >
                 <Upload

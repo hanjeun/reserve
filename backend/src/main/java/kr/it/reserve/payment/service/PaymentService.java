@@ -1,5 +1,6 @@
 package kr.it.reserve.payment.service;
 
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.global.error.ReservationException;
@@ -8,6 +9,7 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.dto.*;
 import kr.it.reserve.payment.dto.*;
+import kr.it.reserve.payment.dto.PortoneV2CancelResponse;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.entity.Reservation;
@@ -38,6 +40,7 @@ public class PaymentService {
     private final ReservationRepository reservationRepository;
     private final MemberRepository memberRepository;
     private final PortoneService portoneService;
+    private final RefundLedgerService refundLedgerService;
 
     public PaymentPrepareDto preparePayment(PaymentRequestDto requestDto, Long memberId) {
         Reservation reservation = reservationRepository.findById(requestDto.getReservationId())
@@ -222,10 +225,20 @@ public class PaymentService {
      * {@link #refundByMemberRequest(Long, String, Member)} 를 거쳐야 한다.
      */
     public PaymentResponseDto refundPayment(PaymentRefundDto refundDto) {
+        // ★★ 행을 잠그고 읽는다 (2026-08-23) — 이중 환불 방어의 핵심.
+        //   예전엔 잠금 없이 읽어서, 동시 요청 둘이 모두 PAID 를 보고 **둘 다 PG 취소를 불렀다.**
+        //   왜 낙관적 락이 아닌지는 PaymentRepository#findByIdForUpdate 주석에 있다
+        //   (요약: 되돌릴 수 없는 PG 호출이 커밋보다 먼저 일어나서 낙관적 락으로는 못 막는다).
         Payment payment = (refundDto.getPaymentId() != null)
-                ? paymentRepository.findById(refundDto.getPaymentId()).orElseThrow(PaymentException::notFound)
-                : paymentRepository.findPaidByReservationId(refundDto.getReservationId()).orElseThrow(PaymentException::notFound);
+                ? paymentRepository.findByIdForUpdate(refundDto.getPaymentId()).orElseThrow(PaymentException::notFound)
+                : paymentRepository.findPaidByReservationIdForUpdate(refundDto.getReservationId()).orElseThrow(PaymentException::notFound);
 
+        // 잠근 뒤에 다시 본다. 앞선 요청이 방금 바꿔놨을 수 있고, 그걸 여기서 걸러야 한다.
+        if (payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING) {
+            // 결말을 모르는 채로 또 취소를 걸면 이중 환불이다. 재시도는 스케줄러·웹훅이 결말을 확정한 뒤에.
+            throw new PaymentException("직전 환불 요청의 처리 결과를 확인하는 중입니다. 잠시 후 다시 시도해주세요.",
+                    HttpStatus.CONFLICT);
+        }
         if (payment.getStatus() != Payment.PaymentStatus.PAID) {
             throw new PaymentException("환불 가능한 결제 상태가 아닙니다.", HttpStatus.BAD_REQUEST);
         }
@@ -238,24 +251,122 @@ public class PaymentService {
         if (refundAmount == null || refundAmount <= 0) {
             throw new PaymentException("환불 금액이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
-        if (refundAmount > payment.getAmount()) {
-            log.warn("Refund amount exceeds paid amount: paymentId={}, requested={}, paid={}",
-                    payment.getId(), refundAmount, payment.getAmount());
-            throw new PaymentException("환불 금액이 결제 금액을 초과합니다.", HttpStatus.BAD_REQUEST);
+        // 2026-08-23: 비교 대상이 결제액 → **남은 환불 가능액** 으로 바뀌었다.
+        // 부분 환불이 이미 있었다면 결제액 기준으로는 통과하면서 총액을 넘길 수 있었다.
+        if (refundAmount > payment.remainingRefundable()) {
+            log.warn("Refund amount exceeds refundable balance: paymentId={}, requested={}, paid={}, alreadyRefunded={}",
+                    payment.getId(), refundAmount, payment.getAmount(), payment.refundedSoFar());
+            throw new PaymentException("환불 금액이 남은 환불 가능 금액을 초과합니다.", HttpStatus.BAD_REQUEST);
         }
 
-        // V2 API: merchantUid 기반으로 취소
-        portoneService.cancelPayment(payment.getMerchantUid(), refundAmount, refundDto.getRefundReason());
+        // ★ PG 를 부르기 **직전**에 원장을 남기고 즉시 커밋한다(별도 트랜잭션).
+        //   여기서부터 PG 응답을 받기 전까지가 유일한 "돈은 움직였는데 기록이 없는" 구간이다.
+        //   그 구간에서 서버가 죽어도 원장에 REQUESTED 가 남아 사람이 찾아낼 수 있다.
+        Long attemptId = refundLedgerService.start(
+                payment.getId(), payment.getMerchantUid(), refundAmount, refundDto.getRefundReason());
 
-        payment.refundPayment(refundAmount, refundDto.getRefundReason());
+        PortoneV2CancelResponse cancelResult;
+        try {
+            cancelResult = portoneService.cancelPayment(
+                    payment.getMerchantUid(), refundAmount, refundDto.getRefundReason());
+        } catch (RuntimeException e) {
+            // PG 호출 자체가 실패(4xx/5xx/통신). 돈이 나갔는지는 **알 수 없다** —
+            // 요청이 PG 에 닿은 뒤 응답만 못 받았을 수도 있다. 그래서 FAILED 로 닫되
+            // 원장에 사유를 남겨 사람이 콘솔에서 대조하게 한다.
+            refundLedgerService.failed(attemptId, e.getMessage());
+            throw e;
+        }
 
-        if (refundAmount.equals(payment.getAmount())) {
+        // ★★ A-4: 응답 상태를 실제로 본다 (2026-08-23).
+        //   예전엔 응답을 버리고 무조건 환불 완료로 적었다. REQUESTED 는 "접수됨"이지 "환불됨"이 아니다.
+        switch (cancelResult.resolveStatus()) {
+            case SUCCEEDED -> {
+                refundLedgerService.succeeded(attemptId, cancelResult.cancellationId(), cancelResult.cancelledAmount());
+                applyRefundSucceeded(payment, refundAmount, refundDto.getRefundReason());
+            }
+            case REQUESTED, UNKNOWN -> {
+                String note = "PG cancellation not final: " + cancelResult.resolveStatus();
+                refundLedgerService.pending(attemptId, cancelResult.cancellationId(), note);
+                payment.markRefundPending(refundDto.getRefundReason());
+                log.warn("Refund is not final yet: paymentId={}, merchantUid={}, status={}, cancellationId={}",
+                        payment.getId(), payment.getMerchantUid(), cancelResult.resolveStatus(),
+                        cancelResult.cancellationId());
+                // 예약 상태는 건드리지 않는다. 돈이 돌아온 게 확정된 뒤에 바꾼다.
+            }
+            case FAILED -> {
+                refundLedgerService.failed(attemptId, cancelResult.failureReason());
+                log.error("Refund rejected by PG: paymentId={}, merchantUid={}, reason={}",
+                        payment.getId(), payment.getMerchantUid(), cancelResult.failureReason());
+                throw new PaymentException("환불이 거절되었습니다. 고객센터로 문의해주세요.",
+                        HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        return PaymentResponseDto.fromEntity(payment);
+    }
+
+    /**
+     * 환불이 <b>확정</b>됐을 때만 실행되는 뒷정리. 웹훅·스케줄러도 같은 결말에 도달하면 여기를 부른다 —
+     * 확정 처리를 세 곳에 복붙하면 반드시 어긋난다(설계 원칙: 관문 하나).
+     */
+    void applyRefundSucceeded(Payment payment, Integer refundAmount, String reason) {
+        payment.refundPayment(refundAmount, reason);
+
+        if (payment.getStatus() == Payment.PaymentStatus.REFUNDED) {
             Reservation reservation = payment.getReservation();
             reservation.setDepositPaid(false);
             reservation.setDepositAmount(0);
         }
+        log.info("Refund confirmed: paymentId={}, merchantUid={}, amount={}, totalRefunded={}, status={}",
+                payment.getId(), payment.getMerchantUid(), refundAmount,
+                payment.refundedSoFar(), payment.getStatus());
+    }
 
-        return PaymentResponseDto.fromEntity(payment);
+    /**
+     * 미결 환불의 <b>성공 확정</b> — 재조회 스케줄러와 PortOne 웹훅이 함께 쓴다.
+     *
+     * <p>여기서도 행을 잠그고 상태를 다시 본다. 웹훅과 스케줄러가 <b>동시에</b> 같은 결말에
+     * 도달하는 건 정상이고(웹훅이 먼저 오고 스케줄러가 뒤따르는 식), 그때 두 번 반영되면
+     * 환불액이 두 배로 적힌다.
+     *
+     * @return 이번 호출이 실제로 상태를 바꿨으면 true. 이미 처리돼 있었으면 false(멱등).
+     */
+    @Transactional
+    public boolean confirmPendingRefund(Long paymentId, Integer refundAmount, String reason) {
+        Payment payment = paymentRepository.findByIdForUpdate(paymentId).orElse(null);
+        if (payment == null) {
+            log.error("Cannot confirm refund - payment not found: paymentId={}", paymentId);
+            return false;
+        }
+        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING) {
+            log.info("Refund confirmation skipped - not pending: paymentId={}, status={}",
+                    paymentId, payment.getStatus());
+            return false;
+        }
+        applyRefundSucceeded(payment, refundAmount, reason);
+        return true;
+    }
+
+    /**
+     * 미결 환불의 <b>최종 실패 확정</b>. 돈이 안 나갔으므로 결제를 PAID 로 되돌린다 —
+     * 그래야 손님이 다시 취소를 시도할 수 있다. 되돌리지 않으면 REFUND_PENDING 에 영원히 갇힌다.
+     *
+     * @return 이번 호출이 실제로 상태를 바꿨으면 true.
+     */
+    @Transactional
+    public boolean revertPendingRefund(Long paymentId, String failReason) {
+        Payment payment = paymentRepository.findByIdForUpdate(paymentId).orElse(null);
+        if (payment == null) {
+            log.error("Cannot revert refund - payment not found: paymentId={}", paymentId);
+            return false;
+        }
+        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING) {
+            return false;
+        }
+        payment.revertRefundPending(failReason);
+        log.warn("Pending refund reverted: paymentId={}, merchantUid={}, status={}, reason={}",
+                paymentId, payment.getMerchantUid(), payment.getStatus(), failReason);
+        return true;
     }
 
     /**
@@ -427,7 +538,10 @@ public class PaymentService {
                 .orElseThrow(() -> new PaymentException("예약 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         Store store = reservation.getStore();
-        long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), reservation.getReservationDate());
+        // ★ KST 기준 오늘이어야 한다 — 환불 구간을 가르는 숫자다.
+        //   컨테이너가 UTC 라 인자 없는 LocalDate.now() 는 한국 시간 00:00~09:00 사이에 "어제"를 준다.
+        //   그러면 daysUntil 이 1 커져서 **정책보다 한 구간 후한 환불**이 나갔다(부분 환불 → 전액 등).
+        long daysUntil = ChronoUnit.DAYS.between(ServiceTime.today(), reservation.getReservationDate());
 
         // ★ 금액의 출처를 하나로 모은다 (2026-08-09)
         //   예전엔 계산은 reservation.depositAmount(예약 만들 때 복사해둔 값)를 쓰고,

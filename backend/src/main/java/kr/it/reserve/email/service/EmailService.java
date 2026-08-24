@@ -15,24 +15,21 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
- * ★★ catch 절에 {@link MailException} 이 반드시 들어가야 한다 — 빼면 장애가 통째로 숨는다.
+ * 메일 발송. 모든 발송 메서드는 {@code @Async} 다.
  *
- * <p>{@code mailSender.send()} 는 {@code MessagingException} 을 던지지 않는다.
- * Spring 이 전부 {@code MailException}({@code MailAuthenticationException} ·
- * {@code MailSendException}) 으로 감싸는데, 그건 {@code RuntimeException} 이라
- * 예전의 {@code catch (MessagingException | UnsupportedEncodingException)} 에 <b>안 걸렸다.</b>
+ * <h2>지켜야 할 계약 — 두 가지</h2>
+ * <ol>
+ *   <li><b>catch 절에서 {@link MailException} 을 빼지 말 것.</b>
+ *       {@code mailSender.send()} 는 {@code MessagingException} 을 던지지 않는다 —
+ *       Spring 이 전부 {@code MailException}({@code RuntimeException} 계열)으로 감싼다.
+ *       빼면 발송 실패가 <b>로그 한 줄 없이</b> 사라지고, {@code @Async} 라 호출자도 모른다.</li>
+ *   <li><b>실패 로그 문구를 바꾸지 말 것.</b> Grafana 알림 규칙이 이 문구를 문자열로 매칭한다.
+ *       바꾸면 알림이 사라지는 게 아니라 <b>영영 울리지 않는다</b>(고장이 안 보인다).
+ *       바꿔야 한다면 {@code docs/technical/monitoring.md} 의 알림 규칙을 같이 고칠 것.</li>
+ * </ol>
  *
- * <p>게다가 이 메서드들은 {@code @Async} 라 호출자에게도 전파되지 않는다. 그 결과
- * <b>2026-07-29 부터 3주 동안 모든 메일이 안 나갔는데 아무도 몰랐다</b> —
- * 유출로 폐기된 Resend 키 때문에 SMTP 가 {@code 535 Authentication credentials invalid} 를
- * 돌려주고 있었고, 화면에는 계속 "발송되었습니다" 가 떴다.
- * (회원가입 인증·비밀번호 재설정·예약 알림이 전부 죽어 있었다.)
- *
- * <p>실패가 눈에 보이게 하는 장치는 세 겹이다:
- * ① 여기 {@code MailException} catch → 도메인 로그로 남는다
- * ② {@code AsyncConfig} 의 {@code AsyncUncaughtExceptionHandler} → 그래도 새는 것을 잡는다
- * ③ Grafana 알림은 "실패 시"가 아니라 <b>"일정 시간 내 성공 0건"</b> 으로 걸어야 한다 —
- *    이번에도 실패 로그는 있었다. 아무도 안 봤을 뿐이다.
+ * <p>이 계약이 왜 생겼는지(2026-07-29 메일 3주 무단 중단)와 방어 3겹의 전체 그림은
+ * {@code docs/technical/monitoring.md} 에 있다.
  */
 @Slf4j
 @Service

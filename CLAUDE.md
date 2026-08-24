@@ -31,7 +31,11 @@ dev    ← 통합 (기본 브랜치, PR 받는 곳)
 feature/*, hotfix/*
 ```
 
-- 머지는 **merge commit** (squash 아님)
+- 머지 방식은 **대상 브랜치에 따라 다르다** — main 은 `Require linear history` 가 켜져 있어 merge commit 을 받지 못한다
+  - `feature/*`·`fix/*`·`chore/*` → `dev` : **Create a merge commit**
+  - `dev` → `main` (release PR) : **Squash and merge** (선형 히스토리 강제라 이것만 가능)
+  - squash 뒤에는 dev 계보가 끊기므로 **`git merge -s ours origin/main -m "chore: record vX.Y.Z release squash into dev"`** 로 되돌려 잇는다.
+    빼먹으면 다음 릴리즈 PR 에서 이미 배포된 내용이 충돌로 되살아난다
 - 커밋/PR 제목: **영어**, `type: subject`, 소문자 시작, 마침표 없음, 현재형
   (`feat` `fix` `refactor` `docs` `chore` `style` `release`)
 - **릴리스 노트와 사용자 대상 문구는 한국어** — 의도된 것이다. 커밋 규칙 대상 아님
@@ -141,6 +145,7 @@ node scripts/backfill-deployments.mjs --apply          # 태그별 Deployment (�
 | `docs/technical/structure.md` | 폴더 구조·라우트·환경변수 |
 | `docs/technical/design-system.md` | 디자인 토큰·공통 컴포넌트 |
 | `docs/technical/deployments.md` | 릴리즈·배포 기록 런북 |
+| `docs/technical/payments.md` | **결제·환불 안전장치·웹훅·미결 대응 런북** |
 | `docs/technical/backup.md` | MySQL 백업·복원 런북 (스크립트는 `scripts/*-mysql.sh`) |
 | `docs/technical/manual-ddl.md` | `ddl-auto`가 못 만드는 DDL(FULLTEXT·컬럼 삭제·타입 변경) 런북 + 적용 이력 |
 | `docs/rules/code-conventions.md` | 네이밍·로그·주석 |

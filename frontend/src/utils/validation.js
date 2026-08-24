@@ -26,6 +26,28 @@ const skipIfEmpty = (fn) => (_, value) =>
 // 부수 효과: 'a@b..c'처럼 점이 연속되거나 'a@b.c.'처럼 끝에 오는 값은 이제 거부된다(예전엔 통과).
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
+// 국내 전화번호 — 하이픈을 전부 넣거나 전부 빼거나, 둘 중 하나만 허용한다.
+//
+// 예전 형태 /^(0\d{1,2})-?(\d{3,4})-(\d{4})$/ 는 **앞 하이픈만 선택이고 뒤 하이픈은 필수**여서
+// 세 곳이 서로 다른 말을 하고 있었다(실측):
+//   placeholder "02-000-0000" / 에러문구 "예: 02-1234-5678" / 정규식
+//   01012345678   → 거부   (가장 흔하게 치는 형태인데 막혔다)
+//   0101234-5678  → 통과   (아무도 이렇게 쓰지 않는데 뚫렸다)
+// 어느 쪽도 의도가 아니었다.
+//
+// 자릿수: 지역번호 0X~0XX + 국번 3~4 + 번호 4 → 하이픈 없이는 총 9~11자리.
+// (02-123-4567 같은 서울 7자리 국번도 두 형태 모두에서 통과한다)
+export const PHONE_REGEX = /^(?:0\d{1,2}-\d{3,4}-\d{4}|0\d{8,10})$/;
+
+/**
+ * dayjs 시간값 → "HH:mm" 문자열.
+ *
+ * 시각 비교를 dayjs 의 isBefore/isSame 대신 문자열로 하는 이유 — TimePicker 값은 날짜 부분이
+ * 서로 다를 수 있어서(오늘 만든 값과 폼 초기화 때 만든 값) 날짜까지 포함해 비교하면
+ * 같은 시각인데 다르다고 나온다. "HH:mm" 은 사전순 비교가 곧 시각순 비교라 안전하다.
+ */
+const toHm = (v) => (v && typeof v.format === 'function' ? v.format('HH:mm') : String(v ?? ''));
+
 export const VALIDATION_RULES = {
     // ─── 가게 관련 ────────────────────────────────────────────────────────────
     storeName: [
@@ -55,9 +77,9 @@ export const VALIDATION_RULES = {
         { required: true, message: '연락처를 입력해주세요' },
         {
             validator: skipIfEmpty((v) =>
-                /^(0\d{1,2})-?(\d{3,4})-(\d{4})$/.test(v)
+                PHONE_REGEX.test(String(v).trim())
                     ? Promise.resolve()
-                    : Promise.reject(new Error('올바른 전화번호 형식이 아닙니다 (예: 02-1234-5678)'))
+                    : Promise.reject(new Error('전화번호를 02-1234-5678 또는 0212345678 형식으로 입력해주세요'))
             ),
         },
     ],
@@ -70,8 +92,59 @@ export const VALIDATION_RULES = {
     maxCapacityPerSlot: [
         { type: 'number', min: 1, max: 999, message: '1~999명 사이로 입력해주세요' },
     ],
+    // ★ InputNumber 의 min/max 만 두면 범위를 벗어난 값이 **조용히 잘려서 저장**된다.
+    //   500 을 넣고 제출하면 에러 없이 365 로 바뀌어 들어가고, 사용자는 한참 뒤에 발견한다.
+    //   clamp 는 UI 편의일 뿐 검증이 아니므로 rules 로 따로 막는다.
+    maxAdvanceBookingDays: [
+        { type: 'number', min: 1, max: 365, message: '1~365일 사이로 입력해주세요' },
+    ],
+    // 영업시간 — AntD RangePicker 는 두 값의 순서를 알아서 맞춰주므로 "마감이 오픈보다 앞"은
+    // 사실상 안 나온다. 그런데 **같은 시각**은 통과한다. 길이가 0인 영업시간은 슬롯이 하나도
+    // 안 나와서, 저장은 성공하는데 손님 쪽 예약 가능 시간이 0개가 된다(백엔드도 같은 이유로 거절).
     businessHours: [
         { required: true, message: '영업 시간을 선택해주세요' },
+        {
+            validator: (_rule, value) => {
+                if (!value || !value[0] || !value[1]) return Promise.resolve();
+                if (toHm(value[0]) === toHm(value[1])) {
+                    return Promise.reject(new Error('오픈과 마감이 같습니다. 영업 시간을 확인해주세요'));
+                }
+                return Promise.resolve();
+            },
+        },
+    ],
+
+    // 브레이크 타임 — 영업시간 **안**에 있어야 한다.
+    //
+    // ★ 다른 필드(times)를 봐야 해서 함수 형태의 rule 을 쓴다. AntD 는 rules 배열 안의 함수에
+    //   form 인스턴스를 넘겨주므로 getFieldValue 로 영업시간을 읽을 수 있다.
+    //   상수 배열로는 표현할 수 없는 유일한 검증이라 여기만 모양이 다르다.
+    //
+    // ★ 한쪽만 고른 경우는 여기서 막지 않는다 — 서버가 양쪽을 지운다.
+    //   "브레이크를 지우는 중"인 정상적인 조작 과정이라 에러를 띄우면 오히려 방해가 된다.
+    breakTimes: [
+        ({ getFieldValue }) => ({
+            validator: (_rule, value) => {
+                if (!value || !value[0] || !value[1]) return Promise.resolve();
+
+                const bs = toHm(value[0]);
+                const be = toHm(value[1]);
+                if (bs === be) {
+                    return Promise.reject(new Error('브레이크 시작과 종료가 같습니다'));
+                }
+
+                const times = getFieldValue('times');
+                if (!times || !times[0] || !times[1]) return Promise.resolve();
+
+                const open = toHm(times[0]);
+                const close = toHm(times[1]);
+                if (bs < open || be > close) {
+                    return Promise.reject(
+                        new Error(`브레이크 타임은 영업시간(${open}~${close}) 안에 있어야 합니다`));
+                }
+                return Promise.resolve();
+            },
+        }),
     ],
 
     // ─── 예약 관련 ────────────────────────────────────────────────────────────

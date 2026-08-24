@@ -9,6 +9,7 @@ import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.service.ReservationService;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -104,5 +105,65 @@ class ReservationAvailabilityTest {
         List<String> times = availableTimes(storeWithHours(LocalTime.of(9, 0), LocalTime.of(9, 45), 30));
 
         assertThat(times).containsExactly("09:00");
+    }
+
+    // ── 예약 방식 (2026-08-24) ─────────────────────────────────────────────
+    //
+    // 세 방식이 **같은 관문**(bookableSlotTimes)을 지나므로, 여기서 방식별 결과만 고정하면
+    // 예약 생성 검증(validateReservationSlot)도 같은 답을 내는 것이 보장된다 —
+    // 그쪽이 이 목록의 "포함 여부"만 보기 때문이다.
+
+    @Test
+    @DisplayName("★ bookingType 이 null 이면 SLOT 으로 동작한다 — ddl-auto 로 컬럼만 추가된 기존 가게")
+    void nullBookingTypeBehavesAsSlot() {
+        // 이 케이스가 깨지면 기존 가게 전부가 예약 불가가 된다.
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(11, 0), 60);
+        assertThat(store.getBookingType()).isNull();
+
+        assertThat(availableTimes(store)).containsExactly("09:00", "10:00");
+    }
+
+    @Test
+    @DisplayName("SESSION — 사장님이 나열한 회차만 나온다. 영업시간·브레이크타임을 얹지 않는다")
+    void sessionUsesListedTimesOnly() {
+        // 영업시간은 09:00~11:00 인데 회차는 그 밖(14:00)까지 있다.
+        // 회차를 직접 적었다는 건 그 시각에 받겠다는 뜻이므로 그대로 나와야 한다 —
+        // 여기에 영업시간을 얹으면 "적었는데 안 보이는" 상태가 된다.
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(11, 0), 60);
+        store.setBookingType(Store.BookingType.SESSION);
+        store.setSessionTimeList(List.of(LocalTime.of(14, 0), LocalTime.of(11, 0)));
+
+        assertThat(availableTimes(store)).containsExactly("11:00", "14:00"); // 정렬됨
+    }
+
+    @Test
+    @DisplayName("DAY — 하루에 슬롯이 딱 하나. 그 시각은 영업 시작 시각이다")
+    void dayHasExactlyOneSlot() {
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(21, 0), 30);
+        store.setBookingType(Store.BookingType.DAY);
+
+        // 시간을 nullable 로 만들지 않고 "하루 = 슬롯 한 개"로 모델링한 결과 —
+        // 정원·중복·마감·결제가 전부 그대로 재사용된다.
+        assertThat(availableTimes(store)).containsExactly("09:00");
+    }
+
+    @Test
+    @DisplayName("DAY — 영업시간이 없어도 슬롯 하나는 나온다 (자정)")
+    void dayWorksWithoutBusinessHours() {
+        Store store = Store.builder().build();
+        store.setId(1L);
+        store.setBookingType(Store.BookingType.DAY);
+
+        assertThat(availableTimes(store)).containsExactly("00:00");
+    }
+
+    @Test
+    @DisplayName("운영 기간 밖이면 방식과 무관하게 슬롯이 0개다")
+    void outsideOperatingPeriodYieldsNothing() {
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(21, 0), 30);
+        // availableTimes 는 2026-07-10 을 조회한다. 그 뒤로 기간을 잡으면 밖이다.
+        store.setOpenDate(LocalDate.of(2026, 8, 1));
+
+        assertThat(availableTimes(store)).isEmpty();
     }
 }

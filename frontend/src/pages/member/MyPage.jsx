@@ -22,6 +22,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { hasAdminAccess } from '../../constants/roles';
 import { handleApiError } from '../../utils/errorHandler';
 import { VALIDATION_RULES } from '../../utils/validation';
+import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
 import useAuthStore from '../../store/useAuthStore';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import useImagePreview from '../../hooks/useImagePreview';
@@ -351,6 +352,7 @@ const LocationTab = ({ user }) => {
                 onFinish={onFinish}
                 layout="vertical"
                 requiredMark={false}
+                scrollToFirstError={SCROLL_TO_FIRST_ERROR}
                 initialValues={{
                     address: user?.locationAddress || '',
                     zipCode: user?.locationZipCode || '',
@@ -663,6 +665,7 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
             layout="vertical"
             requiredMark={false}
             size="large"
+            scrollToFirstError={SCROLL_TO_FIRST_ERROR}
             initialValues={form}
             /* 폼이 들고 있는 필드 중 부모 state 로 넘길 것만 골라 담는다.
                `...all` 로 통째로 넘기면 아래 등록증 검증용 더미 필드(license)까지 섞여

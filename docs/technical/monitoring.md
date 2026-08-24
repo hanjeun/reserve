@@ -22,6 +22,40 @@ cron ─ collect-metrics.sh ─→ /var/log/metrics/*.log ─┴─ Promtail ─
 
 ---
 
+## ★ 이 스택이 존재하는 이유 — 2026-07-29 메일 3주 무단 중단
+
+> 코드에서 이 문서를 가리키는 지점: `EmailService` 클래스 주석, `AsyncConfig`.
+> **`EmailService` 의 catch 절에서 `MailException` 을 지우면 이 사고가 그대로 재현된다.**
+
+**무슨 일이 있었나.** 유출로 폐기된 Resend 키가 서버에 남아 있어 SMTP 가
+`535 Authentication credentials invalid` 를 돌려주고 있었다. 그런데 화면에는 계속
+"발송되었습니다" 가 떴고, **3주 동안 회원가입 인증·비밀번호 재설정·예약 알림 메일이 전부 죽어 있었다.**
+
+**왜 아무도 몰랐나.** 두 겹으로 숨었다.
+
+1. `mailSender.send()` 는 `MessagingException` 을 던지지 않는다. Spring 이 전부
+   `MailException`(`MailAuthenticationException` · `MailSendException`)으로 감싸는데,
+   그건 `RuntimeException` 이라 당시의 `catch (MessagingException | UnsupportedEncodingException)` 에
+   **걸리지 않았다.**
+2. 발송 메서드는 `@Async` 라 예외가 호출자에게 전파되지도 않았다.
+
+**교훈은 "로그를 남기자" 가 아니다.** 실패 로그는 첫날부터 쌓이고 있었다(총 13건).
+**아무도 그 로그를 보지 않았다는 것**이 진짜 원인이고, 그래서 이 모니터링 스택이 생겼다.
+사람이 로그 파일을 열어보는 절차는 반드시 실패한다 — 기계가 깨워야 한다.
+
+**지금 걸려 있는 방어는 세 겹이다.**
+
+| 겹 | 위치 | 역할 |
+|---|---|---|
+| ① | `EmailService` 의 catch 절에 포함된 `MailException` | 실패를 도메인 로그로 남긴다 |
+| ② | `AsyncConfig` 의 `AsyncUncaughtExceptionHandler` | ①을 빠져나가는 것까지 잡는다 |
+| ③ | 아래 "알림 규칙 1. 메일 발송 실패" | 그 로그를 **사람에게 밀어준다** |
+
+③이 없으면 ①·②는 "잘 기록된 채로 아무도 모르는 장애"를 만들 뿐이다.
+알림을 "성공 0건"이 아니라 "실패 1건 이상"으로 건 이유는 아래 별도 절에 있다.
+
+---
+
 ## ★ 왜 Prometheus 가 없는가
 
 CPU·메모리를 보는 표준 조합은 Prometheus + node_exporter 다. **이 서버에는 넣으면 안 된다.**
@@ -259,14 +293,21 @@ Grafana 알림 메일은 SMTP 를 탄다. 그 SMTP 를 Resend 로 잡으면 2026
 sum(count_over_time({job="reserve"} |~ `email failed|Email send failed|Mail send failed` [1h]))
 ```
 
-**2. ERROR 급증** — ABOVE 20 / 5분 주기 / pending 10m
+**2. ERROR 급증** — ABOVE 5 / 5분 주기 / pending 10m
 
 ```logql
 sum(count_over_time({job="reserve", level="ERROR"} [10m]))
 ```
 
-임계값 20은 임시값이다. "레벨별 로그 추세" 패널에서 평소치를 일주일쯤 보고 조인다.
+**임계값을 20 → 5 로 내렸다 (2026-08-19).** 처음에 20으로 잡은 건 "평소치를 모르니 넉넉하게"였는데,
+스택을 띄우고 실측해 보니 이 서비스는 **하루 로그가 통째로 수십 줄** 수준이다
+(배포 직후 `wc -l /var/log/reserve/app.log` = 4). 10분 안에 ERROR 20건이 쌓이려면
+이미 서비스가 완전히 넘어간 뒤여야 한다 — **울릴 수 없는 알림은 없는 알림과 같다.**
+5는 "한두 건의 일회성 예외로는 안 깨우되, 반복되는 실패는 놓치지 않는" 선이다.
 `pending 10m` 은 배포 직후 스파이크로 깨우지 않기 위한 것이다.
+
+> 트래픽이 늘면 이 숫자도 같이 올려야 한다. 기준은 "평소 10분 ERROR 최대치의 2~3배" —
+> "레벨별 로그 추세" 패널에서 읽는다.
 
 **3. 로그인 실패 급증** — ABOVE 30 / 5분 주기 / pending 10m
 
@@ -280,7 +321,17 @@ sum(count_over_time({job="reserve"} |= `Login failed` [10m]))
 sum(count_over_time({job="metrics"} [10m]))
 ```
 
-**5. 백업 미실행** — BELOW 1 / 1시간 주기. **백업 cron 등록 + 첫 수동 실행 뒤에 켤 것**
+**5. 미결 환불** — ABOVE 0 / 1시간 주기 (2026-08-23 추가)
+
+```logql
+sum(count_over_time({job="reserve"} |= `Refund stuck unresolved` [1h]))
+```
+
+자동 재조회로도 결말이 안 난 환불이 있다는 뜻이다. **이 프로젝트에서 사람을 깨울 이유가
+가장 확실한 신호** — 손님 돈이 어디 있는지 아무도 모르는 상태다.
+대응 절차는 `docs/technical/payments.md` 의 "미결 환불이 생겼을 때".
+
+**6. 백업 미실행** — BELOW 1 / 1시간 주기. **백업 cron 등록 + 첫 수동 실행 뒤에 켤 것**
 
 ```logql
 sum(count_over_time({job="reserve"} |~ `\[backup\] === backup done` [26h]))
@@ -308,7 +359,13 @@ cron 이나 promtail 이 죽으면 대시보드가 **옛날 값에서 조용히 
 ### 문구 의존성
 
 **로그 문구를 바꾸면 해당 알림은 사라지지 않고 영영 안 울린다.**
-`Login failed` 는 `AuthApiController`, 메일 문구는 `EmailService` 에서 확인할 것.
+
+| 알림 | 문구가 있는 곳 |
+|---|---|
+| 로그인 실패 급증 | `AuthApiController` |
+| 메일 발송 실패 | `EmailService` |
+| 미결 환불 | `RefundReconciliationScheduler` (`Refund stuck unresolved`) |
+
 로그 문구를 고칠 때 이 문서를 같이 볼 것.
 
 ---

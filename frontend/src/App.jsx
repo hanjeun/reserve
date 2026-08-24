@@ -34,6 +34,10 @@ const Privacy = lazy(() => import('./pages/legal/Privacy'));
 
 import Header from './components/layout/Header';
 import AppFooter from './components/layout/Footer';
+// 인앱 채팅 런처 — 로그인 상태에서만 스스로 렌더한다(컴포넌트 안에서 판단).
+// 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다 — 붙이는 걸 잊는 페이지가 생기면
+// "어떤 화면에서는 문의가 안 되는" 상태가 된다.
+import ChatLauncher from './components/chat/ChatLauncher';
 import OfflineBanner from './components/layout/OfflineBanner';
 import Loading, { SpinIndicator } from './components/common/Loading';
 import PrivateRoute from './components/PrivateRoute';
@@ -217,6 +221,7 @@ function AppRoutes() {
             </Content>
 
             <AppFooter />
+            <ChatLauncher />
         </Layout>
     );
 }

@@ -100,3 +100,24 @@ export const NEARBY_RADIUS_OPTIONS = [
     { value: 10, label: '10km' },
     { value: 0,  label: '없음 (배지 표시 안 함)' },
 ];
+
+/**
+ * 예약 방식 (2026-08-24 신설).
+ *
+ * ★ 체크박스를 늘리지 않고 **하나를 고르면 나머지가 따라오게** 한다.
+ *   옵션을 여러 개 주면 사장님이 조합을 만들지 못한다.
+ *
+ * 값은 백엔드 Store.BookingType 과 정확히 같아야 한다.
+ */
+export const BOOKING_TYPE_OPTIONS = [
+    { value: 'SLOT',    label: '시간대 (기본)' },
+    { value: 'SESSION', label: '회차제' },
+    { value: 'DAY',     label: '날짜만' },
+];
+
+/** 화면에 왜 이걸 고르는지 한 줄로 설명한다 — 이름만으로는 고를 수 없다. */
+export const BOOKING_TYPE_HINTS = {
+    SLOT:    '영업시간을 예약 단위로 쪼개요. 식당·미용실·병원',
+    SESSION: '회차를 직접 정해요. 공연·클래스·투어',
+    DAY:     '시간 선택 없이 날짜만 받아요. 팝업스토어·종일권·대관',
+};

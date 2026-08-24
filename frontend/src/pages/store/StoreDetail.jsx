@@ -289,9 +289,24 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dateKey]);
 
+    // ── 예약 방식 DAY (2026-08-24) ────────────────────────────────────────
+    // 서버가 슬롯을 딱 하나 내려준다("하루 = 슬롯 한 개"). 고를 게 없으므로 자동으로 채우고
+    // 그리드 대신 안내 한 줄만 보여준다.
+    //
+    // ★ 시간 칸을 아예 없애지 않는 이유 — 서버는 여전히 reservationTime 을 필수로 받는다.
+    //   칸을 지우면 값을 넣을 곳이 사라져서 화면마다 따로 채워 넣어야 하고, 그러면 빠뜨리는 곳이 생긴다.
+    //   같은 칸을 그대로 두고 **채우는 방법만** 바꾸는 쪽이 갈라지지 않는다.
+    const isDayBooking = store?.bookingType === 'DAY';
+    const onlySlot = isDayBooking ? slots[0] : null;
+
+    React.useEffect(() => {
+        if (!onlySlot || value === onlySlot.time) return;
+        onChange?.(onlySlot.time);
+    }, [onlySlot, value, onChange]);
+
     if (!dateKey) {
         return (
-            <TimePlaceholder text="날짜를 먼저 선택해주세요" />
+            <TimePlaceholder text={isDayBooking ? '날짜를 선택해주세요' : '날짜를 먼저 선택해주세요'} />
         );
     }
     if (loading) {
@@ -302,6 +317,15 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
     if (slots.length === 0) {
         return (
             <TimePlaceholder text="예약 가능한 시간이 없어요" />
+        );
+    }
+
+    if (isDayBooking) {
+        return (
+            <TimePlaceholder
+                text={onlySlot?.available === false
+                    ? '이 날은 예약이 마감됐어요'
+                    : '이 가게는 날짜만 선택하면 돼요'} />
         );
     }
 
@@ -421,10 +445,16 @@ const makeDisabledDate = (store) => (d) => {
     const maxDays = store?.maxAdvanceBookingDays;
     if (maxDays > 0 && d.isAfter(dayjs().add(maxDays, 'day').endOf('day'))) return true;
 
+    // 운영 기간 (2026-08-24) — 서버 Store.isBookableOn 과 같은 판정이어야 한다.
+    // 경계는 양쪽 포함이다: 종료일 당일은 여는 날이다.
+    const ymd = d.format('YYYY-MM-DD');
+    if (store?.openDate && ymd < store.openDate) return true;
+    if (store?.closeDate && ymd > store.closeDate) return true;
+
     const isoDay = d.day() === 0 ? 7 : d.day();
     if ((store?.closedDays ?? []).includes(isoDay)) return true;
 
-    return (store?.closedDates ?? []).includes(d.format('YYYY-MM-DD'));
+    return (store?.closedDates ?? []).includes(ymd);
 };
 
 /** 달력에서 회색으로 막힌 이유를 미리 알려준다 — 막아만 두면 "왜 안 눌리지"가 된다. */
@@ -433,6 +463,10 @@ const bookingRangeHint = (store) => {
     const labels = ['', '월', '화', '수', '목', '금', '토', '일'];
     const parts = [];
     if (days.length > 0) parts.push(`매주 ${days.map(d => labels[d]).join('·')} 휴무`);
+    // 운영 기간은 제일 앞에 세운다 — 기간 자체가 끝났으면 나머지 안내가 의미가 없다.
+    if (store?.openDate && store?.closeDate) parts.unshift(`${store.openDate} ~ ${store.closeDate} 운영`);
+    else if (store?.closeDate) parts.unshift(`${store.closeDate}까지 운영`);
+    else if (store?.openDate) parts.unshift(`${store.openDate}부터 운영`);
     if (store?.maxAdvanceBookingDays > 0) parts.push(`${store.maxAdvanceBookingDays}일 이내만 예약 가능`);
     if (parts.length === 0) return null;
     return (
@@ -461,8 +495,12 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC, isEditMode }) =
                     "휴무일입니다"가 뜬다. 달력에서 회색으로 보이면 그 왕복이 통째로 사라진다. */}
                 <FormDatePicker placeholder="날짜 선택" disabledDate={makeDisabledDate(store)} />
             </Form.Item>
-            <Form.Item label="예약 시간" name="reservationTime"
-                rules={[{ required: true, message: '시간을 선택해주세요.' }]}>
+            {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
+                "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
+            <Form.Item
+                label={store?.bookingType === 'DAY' ? '예약 확인' : (store?.bookingType === 'SESSION' ? '회차 선택' : '예약 시간')}
+                name="reservationTime"
+                rules={[{ required: true, message: store?.bookingType === 'DAY' ? '날짜를 선택해주세요.' : '시간을 선택해주세요.' }]}>
                 <TimeSlotPicker store={store} dateValue={dateValue} form={form} />
             </Form.Item>
             <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>

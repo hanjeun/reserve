@@ -2,6 +2,7 @@ package kr.it.reserve.store.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -188,6 +190,8 @@ public class StoreService {
 
         store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
         store.setClosedDateList(normalizeClosedDates(request.getClosedDates()));
+        applyOperatingPeriod(store, request.getOpenDate(), request.getCloseDate());
+        applyBookingType(store, request.getBookingType(), request.getSessionTimes());
 
         if (request.getKeywords() != null && !request.getKeywords().isEmpty()) {
             store.setKeywordList(request.getKeywords());
@@ -202,6 +206,9 @@ public class StoreService {
         //   수정 경로(updateStore)는 블록 밖이라 **생성과 수정의 동작이 달랐다**.
         store.setBreakStartTime(request.getBreakStartTime());
         store.setBreakEndTime(request.getBreakEndTime());
+        // ★ 저장 직전에 "최종 값"으로 검증한다 — 요청 본문이 아니라 엔티티를 본다.
+        //   요청만 보면 생성/수정 경로가 서로 다른 판정을 하게 된다(수정은 일부 필드만 올 수 있다).
+        validateBusinessHours(store);
 
         Store savedStore = storeRepository.save(store);
         Long storeId = savedStore.getId();
@@ -334,6 +341,10 @@ public class StoreService {
             // null 가드를 두면 마지막 휴무를 지울 방법이 없어진다.
             store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
             store.setClosedDateList(normalizeClosedDates(request.getClosedDates()));
+            // 휴무와 같은 이유로 항상 덮어쓴다 — 운영 기간을 **없애는** 것도 정상적인 수정이라
+            // null 가드를 두면 한 번 넣은 기간을 지울 방법이 사라진다.
+            applyOperatingPeriod(store, request.getOpenDate(), request.getCloseDate());
+            applyBookingType(store, request.getBookingType(), request.getSessionTimes());
             store.setMaxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()));
             if (request.getOpenTime() != null) store.setOpenTime(request.getOpenTime());
             if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
@@ -341,6 +352,9 @@ public class StoreService {
             store.setBreakStartTime(request.getBreakStartTime());
             store.setBreakEndTime(request.getBreakEndTime());
             // (2026-08-09) 여기 있던 setCloseTime 중복 호출을 제거했다 — 위에서 이미 같은 값을 넣는다.
+            // ★ 병합이 끝난 뒤 검증한다. 요청에 openTime 만 왔다면 기존 closeTime 과 비교돼야 한다 —
+            //   요청 본문끼리만 비교하면 "12시 오픈만 보냈는데 마감이 10시인 가게"를 통과시킨다.
+            validateBusinessHours(store);
 
             if (request.getKeywords() != null) {
                 store.setKeywordList(request.getKeywords());
@@ -406,7 +420,7 @@ public class StoreService {
             case "90d" -> 90;
             default -> 30;
         };
-        LocalDate end = LocalDate.now();
+        LocalDate end = ServiceTime.today();
         LocalDate start = end.minusDays(days - 1L);
 
         // 예약 추이 — 데이터 없는 날짜도 0건으로 빈칸 없이 채운다(차트가 중간에 끓기지 않게)
@@ -445,7 +459,7 @@ public class StoreService {
                 .map(ad -> StoreStatisticsResponse.AdSummary.builder()
                         .adType(ad.getAdType().name())
                         .status(ad.getStatus().name())
-                        .daysRemaining((int) ChronoUnit.DAYS.between(LocalDate.now(), ad.getEndDate()))
+                        .daysRemaining((int) ChronoUnit.DAYS.between(ServiceTime.today(), ad.getEndDate()))
                         .impressionCount(ad.getImpressionCount())
                         .clickCount(ad.getClickCount())
                         .conversionCount(ad.getConversionCount())
@@ -587,6 +601,163 @@ public class StoreService {
         return km;
     }
 
+    /**
+     * 운영 기간(openDate~closeDate)을 정규화해 저장한다 (2026-08-24 신설).
+     *
+     * <p><b>지난 날짜를 걸러내지 않는다</b> — {@code closedDates} 는 걸러내지만 여기는 다르다.
+     * 임시 휴무는 계속 쌓이기만 하는 목록이라 정리가 필요하지만, 운영 기간은 값 하나이고
+     * <b>이미 끝난 팝업스토어</b>도 정상적인 상태다. 걸러내면 종료된 가게가 갑자기 무기한 영업이 된다.
+     *
+     * <p>형식이 깨진 값은 {@code null}(제한 없음)로 흡수한다 — 저장을 통째로 실패시킬 사안이 아니고,
+     * 이 화면은 날짜 선택기를 쓰므로 정상 조작으로는 깨진 값이 나오지 않는다.
+     *
+     * <p>종료일이 시작일보다 앞이면 <b>거절한다.</b> 그 조합은 "예약을 받을 수 있는 날이 하루도 없는
+     * 가게"가 되는데, 영업시간 뒤집힘과 같은 종류의 조용한 고장이다.
+     */
+    private void applyOperatingPeriod(Store store, String rawOpen, String rawClose) {
+        LocalDate open  = parseIsoDateOrNull(rawOpen);
+        LocalDate close = parseIsoDateOrNull(rawClose);
+
+        if (open != null && close != null && close.isBefore(open)) {
+            throw new StoreException(
+                    "운영 종료일은 시작일보다 뒤여야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+        store.setOpenDate(open);
+        store.setCloseDate(close);
+    }
+
+    /** 형식이 깨졌거나 비어 있으면 {@code null}. 호출측에서 "제한 없음"으로 읽힌다. */
+    private LocalDate parseIsoDateOrNull(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return LocalDate.parse(raw.trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 예약 방식과 회차 목록을 정규화해 저장한다 (2026-08-24 신설).
+     *
+     * <p><b>모르는 값은 거절하지 않고 {@code SLOT} 으로 흡수한다.</b> 이 값이 잘못 오면
+     * 가게가 예약을 못 받는 상태가 되는데, 그건 400 을 돌려주는 것보다 훨씬 나쁘다.
+     * 옛 클라이언트가 이 필드를 아예 안 보내는 경우도 같은 경로로 흘러간다.
+     *
+     * <p><b>SESSION 인데 회차가 하나도 없으면 거절한다.</b> 그 상태로 저장하면
+     * 예약 가능한 시각이 0개인 가게가 조용히 만들어진다 — 영업시간 뒤집힘과 같은 종류다.
+     *
+     * <p>회차 목록은 <b>방식과 무관하게 항상 덮어쓴다.</b> SLOT 으로 되돌릴 때 옛 회차가 남아 있으면,
+     * 나중에 다시 SESSION 으로 바꿨을 때 기억나지 않는 값이 되살아난다.
+     */
+    private void applyBookingType(Store store, String rawType, List<String> rawSessions) {
+        Store.BookingType type = parseBookingType(rawType);
+        List<LocalTime> sessions = normalizeSessionTimes(rawSessions);
+
+        if (type == Store.BookingType.SESSION && sessions.isEmpty()) {
+            throw new StoreException(
+                    "회차제로 받으려면 회차 시각을 하나 이상 등록해주세요.", HttpStatus.BAD_REQUEST);
+        }
+
+        store.setBookingType(type);
+        // SESSION 이 아니면 비운다 — 남겨두면 방식을 오갈 때 옛 값이 되살아난다.
+        store.setSessionTimeList(type == Store.BookingType.SESSION ? sessions : List.of());
+    }
+
+    /** 모르는 값·빈 값은 전부 SLOT. 대소문자는 흡수한다. */
+    private Store.BookingType parseBookingType(String raw) {
+        if (raw == null || raw.isBlank()) return Store.BookingType.SLOT;
+        try {
+            return Store.BookingType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown bookingType '{}' - falling back to SLOT", raw);
+            return Store.BookingType.SLOT;
+        }
+    }
+
+    /**
+     * 회차 시각 정규화 — 형식이 깨진 값은 버리고, 중복을 없애고, 정렬한다.
+     * 상한 {@value #MAX_SESSION_TIMES} 개 — 그 이상은 SLOT 방식으로 다뤄야 할 규모다.
+     */
+    private List<LocalTime> normalizeSessionTimes(List<String> raw) {
+        if (raw == null) return List.of();
+        List<LocalTime> out = new ArrayList<>();
+        for (String v : raw) {
+            if (v == null || v.isBlank()) continue;
+            try {
+                LocalTime t = LocalTime.parse(v.trim());
+                if (!out.contains(t)) out.add(t);
+            } catch (Exception ignored) {
+                // 형식이 깨진 값은 조용히 버린다 — 저장을 통째로 실패시킬 사안이 아니다.
+                // 전부 깨졌다면 위 applyBookingType 의 "회차 0개" 검사가 잡아준다.
+            }
+        }
+        return out.stream().sorted().limit(MAX_SESSION_TIMES).toList();
+    }
+
+    // ══ 영업시간 정합성 (2026-08-24 신설) ══════════════════════════════════
+    //
+    // ★ 왜 clamp 가 아니라 거절인가 — 다른 옵션들은 "이상한 값이 오면 안전한 값으로 수렴"시킨다.
+    //   숫자 하나는 무엇으로 고쳐야 할지가 자명하기 때문이다(음수 정원 → 무제한 등).
+    //   그런데 "오픈 12시, 마감 10시"는 무엇으로 고쳐야 할지가 자명하지 않다.
+    //   임의로 뒤집거나 버리면 사장님이 의도한 것과 다른 가게가 조용히 저장된다.
+    //
+    // ★ 그리고 이건 조용히 두면 안 되는 종류다. 지금까지는 검증이 없어서 저장은 성공하고
+    //   화면도 정상인데 **슬롯 생성 루프가 한 번도 안 돌아 손님 쪽 예약 가능 시간이 0개**가 됐다
+    //   (ReservationService: while (!cursor.plusMinutes(slotMin).isAfter(close))).
+    //   사장님은 예약이 안 들어오는 이유를 알 방법이 없다. 시끄러운 실패가 맞다.
+
+    /**
+     * 영업시간·브레이크타임의 정합성을 검사한다. 어긋나면 {@link StoreException} 으로 거절한다.
+     *
+     * <p><b>반드시 병합이 끝난 엔티티를 넘길 것.</b> 수정 경로는 일부 필드만 오므로
+     * 요청 본문끼리 비교하면 기존 값과의 모순을 놓친다.
+     *
+     * <p>브레이크타임이 <b>한쪽만</b> 온 경우는 거절하지 않고 <b>양쪽을 지운다</b> —
+     * 슬롯 계산이 {@code breakStart != null && breakEnd != null} 일 때만 브레이크로 취급하므로
+     * 한쪽만 남겨두면 "설정한 것 같은데 적용은 안 되는" 상태가 된다. 그건 데이터를 지우는 쪽이
+     * 오해가 적다(사장님 입력이 불완전했던 것이지 모순은 아니다).
+     */
+    private void validateBusinessHours(Store store) {
+        LocalTime open  = store.getOpenTime();
+        LocalTime close = store.getCloseTime();
+
+        if (open != null && close != null && !open.isBefore(close)) {
+            // 같은 시각도 거절이다 — 길이가 0인 영업시간은 슬롯이 하나도 안 나온다.
+            // ⚠️ 자정을 넘는 영업시간(22:00~02:00)은 지금 구조가 지원하지 않는다.
+            //    LocalTime 비교라 wrap-around 를 표현할 수 없고, 슬롯 루프도 마찬가지다.
+            //    지원하려면 "다음날로 넘어가는 영업"을 모델에 넣어야 하므로 별도 작업이다.
+            //    그때까지는 여기서 걸러서 "저장은 됐는데 예약이 안 되는" 상태를 막는다.
+            throw new StoreException(
+                    "마감 시간은 오픈 시간보다 뒤여야 합니다. 자정을 넘겨 영업하는 경우는 아직 지원하지 않습니다.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        LocalTime breakStart = store.getBreakStartTime();
+        LocalTime breakEnd   = store.getBreakEndTime();
+
+        // 한쪽만 온 경우 — 조용히 버리지 않고 양쪽을 지워 "적용 안 되는 반쪽 설정"을 없앤다.
+        if (breakStart == null || breakEnd == null) {
+            store.setBreakStartTime(null);
+            store.setBreakEndTime(null);
+            return;
+        }
+
+        if (!breakStart.isBefore(breakEnd)) {
+            throw new StoreException("브레이크 타임 종료는 시작보다 뒤여야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        // 영업시간이 아직 정해지지 않은 가게라면 범위 비교를 할 수 없다 — 여기서 멈춘다.
+        if (open == null || close == null) return;
+
+        if (breakStart.isBefore(open) || breakEnd.isAfter(close)) {
+            throw new StoreException(
+                    "브레이크 타임은 영업시간 안에 있어야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /** 회차 상한. 이보다 많아지면 SLOT 방식이 맞다. */
+    private static final int MAX_SESSION_TIMES = 50;
+
     // ══ 가게 옵션 정규화 (2026-08-09 신설) ════════════════════════════════
     //
     // ★ 왜 컨트롤러의 @Valid 가 아니라 여기인가
@@ -654,7 +825,7 @@ public class StoreService {
      */
     private List<LocalDate> normalizeClosedDates(List<String> raw) {
         if (raw == null) return List.of();
-        LocalDate today = LocalDate.now();
+        LocalDate today = ServiceTime.today();
         List<LocalDate> out = new ArrayList<>();
         for (String v : raw) {
             if (v == null || v.isBlank()) continue;

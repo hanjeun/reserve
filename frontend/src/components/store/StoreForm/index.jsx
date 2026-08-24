@@ -3,6 +3,7 @@ import { Form, Typography } from 'antd';
 import { PageContainer } from '../../common';
 import { fontWeight, fontSize } from '../../../styles/tokens';
 import { useWindowWidth } from '../../../hooks';
+import { SCROLL_TO_FIRST_ERROR } from '../../../utils/form';
 import StoreBasicInfo from './StoreBasicInfo';
 import StoreImages from './StoreImages';
 import StoreFormActions from './StoreFormActions';
@@ -48,6 +49,7 @@ const StoreForm = ({
                 size="large"
                 validateTrigger="onBlur"
                 requiredMark={false}
+                scrollToFirstError={SCROLL_TO_FIRST_ERROR}
                 initialValues={mode === 'create' ? {
                     autoApprovalEnabled: false,
                     allowLatePayment: false,

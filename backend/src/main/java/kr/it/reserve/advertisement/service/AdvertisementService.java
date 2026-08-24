@@ -1,5 +1,6 @@
 package kr.it.reserve.advertisement.service;
 
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.advertisement.dto.AdCreateRequest;
 import kr.it.reserve.advertisement.dto.AdPaymentPrepareResponse;
 import kr.it.reserve.advertisement.dto.AdUpdateRequest;
@@ -100,7 +101,7 @@ public class AdvertisementService {
         if (request.getStartDate() == null || request.getEndDate() == null) {
             throw new AdvertisementException("노출 시작일과 종료일을 입력해주세요.", HttpStatus.BAD_REQUEST);
         }
-        if (request.getStartDate().isBefore(LocalDate.now())) {
+        if (request.getStartDate().isBefore(ServiceTime.today())) {
             throw new AdvertisementException("시작일은 오늘 이후여야 합니다.", HttpStatus.BAD_REQUEST);
         }
         if (request.getEndDate().isBefore(request.getStartDate())) {
@@ -219,7 +220,7 @@ public class AdvertisementService {
         //
         // endDate 가 아니라 startDate 를 기준으로 삼는다: 기간이 일부만 남은 경우에도
         // 결제한 만큼 노출되지 않으므로, 부분 소진 자체를 허용하지 않는다(사용자 결정 2026-08-18).
-        if (ad.getStartDate() != null && ad.getStartDate().isBefore(LocalDate.now())) {
+        if (ad.getStartDate() != null && ad.getStartDate().isBefore(ServiceTime.today())) {
             throw new AdvertisementException(
                     "노출 시작일이 지난 광고는 결제할 수 없습니다. 새로 신청해주세요.", HttpStatus.BAD_REQUEST);
         }
@@ -293,7 +294,7 @@ public class AdvertisementService {
     /** 노출용 — 공개 API, 타입별 ACTIVE + 기간 내 광고 목록 (최근 결제순 — 배너 독점 방지) */
     @Transactional(readOnly = true)
     public List<AdvertisementResponse> getActiveAds(AdType adType) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = ServiceTime.today();
         return advertisementRepository
                 .findByStatusAndAdTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(
                         AdStatus.ACTIVE, adType, today, today)
@@ -435,7 +436,7 @@ public class AdvertisementService {
     @Transactional
     public void expireOverdueAds() {
         List<Advertisement> overdue = advertisementRepository
-                .findByStatusAndEndDateBefore(AdStatus.ACTIVE, LocalDate.now());
+                .findByStatusAndEndDateBefore(AdStatus.ACTIVE, ServiceTime.today());
         overdue.forEach(ad -> ad.setStatus(AdStatus.EXPIRED));
         if (!overdue.isEmpty()) {
             log.info("Expired {} overdue advertisements", overdue.size());
@@ -462,7 +463,7 @@ public class AdvertisementService {
     @Transactional
     public void cancelUnpaidOverdueAds() {
         List<Advertisement> stale = advertisementRepository.findByStatusInAndStartDateBefore(
-                List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED), LocalDate.now());
+                List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED), ServiceTime.today());
         stale.forEach(ad -> ad.setStatus(AdStatus.CANCELLED));
         if (!stale.isEmpty()) {
             log.info("Cancelled {} unpaid advertisements past their start date", stale.size());

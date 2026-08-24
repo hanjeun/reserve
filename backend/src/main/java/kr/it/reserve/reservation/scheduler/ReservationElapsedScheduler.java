@@ -53,7 +53,9 @@ public class ReservationElapsedScheduler {
      * 그대로 비교하면 9시간이 어긋나 <b>아직 오지 않은 예약을 취소하고 환불까지 해버린다.</b>
      * (QrCheckinTokenProvider 가 같은 이유로 SERVICE_ZONE 을 쓴다 — 같은 함정이다.)
      */
-    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
+    // 값은 ServiceTime 한 곳에서만 정한다 — 예전엔 이 상수가 여기와 QrCheckinTokenProvider 에
+    // 따로 복사돼 있었고, 규칙은 두 파일 주석에만 있어서 나머지 열 몇 곳이 조용히 UTC 로 돌았다.
+    private static final ZoneId SERVICE_ZONE = kr.it.reserve.global.common.ServiceTime.ZONE;
 
     /**
      * 한 번에 처리할 최대 건수. 첫 배포 때 밀린 과거 예약이 한꺼번에 걸릴 수 있는데,

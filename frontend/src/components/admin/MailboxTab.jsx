@@ -14,7 +14,7 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Input, Divider, Pagination, Checkbox } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined } from '@ant-design/icons';
+import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Button, FormTextArea, FormInput, FormModal, FormField } from '../common';
 import { Bone } from '../common/Skeletons';
 import useDebounce from '../../hooks/useDebounce';
@@ -128,6 +128,42 @@ const useComposeMail = ({ message }) => {
     return { composing, setComposing, composeForm, setComposeForm, composeSending: sendMutation.isPending, resetCompose, handleComposeSend, errors, clearError };
 };
 
+/**
+ * 보낸 메일을 휴지통으로 보낸다.
+ *
+ * 실제 삭제가 아니라 소프트 삭제다 — 보낸 메일은 "무엇을 보냈는가"의 기록이라
+ * 실수로 지웠을 때 되돌릴 수 없으면 기록의 가치가 사라진다.
+ * 휴지통 탭에서 30일 안에 복구할 수 있고, 그 뒤 스케줄러가 영구 삭제한다.
+ */
+const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
+    const queryClient = useQueryClient();
+    const { confirm } = useMessage();
+
+    const mutation = useMutation({
+        mutationFn: (id) => api.delete(API_ENDPOINTS.MAIL.TRASH_SENT(id)),
+        onSuccess: (_data, id) => {
+            message.success('휴지통으로 옮겼습니다.');
+            // 지운 메일을 보고 있었다면 상세를 비운다 — 안 비우면 목록에서 사라진 메일이
+            // 오른쪽 패널에 계속 남아 "지워졌는데 아직 있다"처럼 보인다.
+            if (selectedSent?.id === id) setSelectedSent(null);
+            queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
+            // 휴지통 탭이 이 메일을 새로 받아야 한다.
+            queryClient.invalidateQueries({ queryKey: adminKeys.trash() });
+        },
+        onError: () => message.error('휴지통으로 옮기지 못했습니다.'),
+    });
+
+    const askAndTrash = (mail) => confirm({
+        title: '휴지통으로 이동',
+        content: `"${mail.subject || '(제목 없음)'}" 메일을 휴지통으로 옮깁니다. 휴지통 탭에서 30일 안에 복구할 수 있습니다.`,
+        okText: '휴지통으로',
+        okButtonProps: { danger: true },
+        onOk: () => mutation.mutateAsync(mail.id),
+    });
+
+    return { askAndTrash, trashing: mutation.isPending };
+};
+
 const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
     const [cooldown, setCooldown] = useState(false);
     const handleReload = () => {
@@ -179,9 +215,21 @@ const SentMailSkeleton = () => (
     </div>
 );
 
-const SentMailItem = ({ mail, isSelected, onClick }) => (
-    <button type="button" onClick={() => onClick(mail)} style={{ ...styles.mailItem, background: isSelected ? colors.primary.light : 'transparent' }}>
-        <div style={{ flex: 1, minWidth: 0, paddingLeft: 8 }}>
+/**
+ * 목록 한 줄.
+ *
+ * ★ 휴지통 버튼을 행 안에 넣으면서 구조가 바뀌었다 — 예전엔 행 전체가 하나의 {@code <button>}
+ *   이었는데, {@code <button>} 안에 {@code <button>} 은 HTML 상 허용되지 않는다(중첩 금지).
+ *   그래서 바깥을 div 로 바꾸고, "본문 선택"과 "휴지통"을 **형제 버튼 둘**로 나눴다.
+ *   각각이 진짜 버튼이라 키보드 Tab·Enter·스크린리더가 그대로 동작한다.
+ *
+ * ★ hover/active/선택 상태는 index.css 의 .reserve-maillist-item 이 담당한다.
+ *   인라인 style 로는 :hover 를 표현할 수 없어서, 예전엔 transition 만 걸어놓고
+ *   정작 바뀌는 값이 없어 **눌리는 느낌이 전혀 없었다.**
+ */
+const SentMailItem = ({ mail, isSelected, onClick, onTrash, trashing }) => (
+    <div className={`reserve-maillist-item${isSelected ? ' is-selected' : ''}`} style={styles.mailItem}>
+        <button type="button" onClick={() => onClick(mail)} className="reserve-maillist-main" style={styles.mailItemMain}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
                 <Text style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.text.primary, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     → {mail.toEmail}
@@ -194,15 +242,27 @@ const SentMailItem = ({ mail, isSelected, onClick }) => (
             <Text style={{ display: 'block', fontSize: fontSize.xs, color: colors.text.tertiary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {mail.bodyPreview || ''}
             </Text>
-        </div>
-    </button>
+        </button>
+        <button type="button" className="reserve-maillist-trash" style={styles.mailItemTrash}
+            onClick={() => onTrash(mail)} disabled={trashing}
+            aria-label={`${mail.subject || '제목 없음'} 메일을 휴지통으로`} title="휴지통으로">
+            <DeleteOutlined />
+        </button>
+    </div>
 );
 
-const SentDetailContent = ({ mail }) => (
+const SentDetailContent = ({ mail, onTrash, trashing }) => (
     <>
-        <Title level={4} style={{ fontWeight: fontWeight.bold, color: colors.text.primary, marginBottom: 16, lineHeight: 1.4 }}>
-            {mail.subject || '(제목 없음)'}
-        </Title>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+            <Title level={4} style={{ flex: 1, minWidth: 0, fontWeight: fontWeight.bold, color: colors.text.primary, margin: 0, lineHeight: 1.4 }}>
+                {mail.subject || '(제목 없음)'}
+            </Title>
+            {/* 목록에서도 지울 수 있지만, 읽고 나서 지우는 게 자연스러운 순서라 여기에도 둔다. */}
+            <Button variant="ghost-sm" size="md" onClick={() => onTrash(mail)} disabled={trashing}
+                style={{ flexShrink: 0, gap: 6 }}>
+                <DeleteOutlined /> 휴지통
+            </Button>
+        </div>
         <div style={{ background: colors.background.subtle, borderRadius: radius.md, padding: '12px 16px', marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 6 }}>
                 <Text style={{ width: 72, flexShrink: 0, fontSize: fontSize.xs, color: colors.text.tertiary, paddingTop: 2 }}>받는 사람</Text>
@@ -252,6 +312,7 @@ const MailboxTab = () => {
 
     const mail = useSentMailData(message, page, debouncedSearch);
     const send = useComposeMail({ message });
+    const trash = useTrashMail({ message, selectedSent: mail.selectedSent, setSelectedSent: mail.setSelectedSent });
 
     // 클라이언트 filter 제거 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
     // useDebounce 는 유지 — 이젠 타이핑 한 글자마다 서버를 때리지 않기 위한 장치다.
@@ -297,7 +358,7 @@ const MailboxTab = () => {
                         <ArrowLeftOutlined style={{ fontSize: 14, marginRight: 6, color: colors.text.secondary }} />
                         <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>목록으로</Text>
                     </button>
-                    <SentDetailContent mail={mail.selectedSent} />
+                    <SentDetailContent mail={mail.selectedSent} onTrash={trash.askAndTrash} trashing={trash.trashing} />
                 </div>
             )}
 
@@ -309,7 +370,8 @@ const MailboxTab = () => {
                                 <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
                             </div>
                         ) : filteredSent.map(m => (
-                            <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent} />
+                            <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent}
+                                onTrash={trash.askAndTrash} trashing={trash.trashing} />
                         ))}
                     </div>
                     {/* 모바일은 폭이 좁아 simple 모드("1 / 5") — 번호 버튼을 다 깔면 줄바꿈이 난다. */}
@@ -326,7 +388,8 @@ const MailboxTab = () => {
                                     <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
                                 </div>
                             ) : filteredSent.map(m => (
-                                <SentMailItem key={m.id} mail={m} isSelected={m.id === mail.selectedSent?.id} onClick={mail.setSelectedSent} />
+                                <SentMailItem key={m.id} mail={m} isSelected={m.id === mail.selectedSent?.id} onClick={mail.setSelectedSent}
+                                    onTrash={trash.askAndTrash} trashing={trash.trashing} />
                             ))}
                         </div>
                         {/* 목록 패널 바닥에 고정 — flex:1 인 스크롤 영역 밖에 두어야 항상 보인다. */}
@@ -340,7 +403,7 @@ const MailboxTab = () => {
                             </div>
                         ) : (
                             <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column' }}>
-                                <SentDetailContent mail={mail.selectedSent} />
+                                <SentDetailContent mail={mail.selectedSent} onTrash={trash.askAndTrash} trashing={trash.trashing} />
                             </div>
                         )}
                     </div>
@@ -390,7 +453,11 @@ const styles = {
     detailPanel:  { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: colors.background.paper },
     emptyDetail:  { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 },
     mobileDetail: { padding: '16px 0' },
-    mailItem:     { width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', padding: '14px 16px 14px 14px', display: 'flex', gap: 10, alignItems: 'flex-start', transition: 'background 0.15s', borderBottom: `1px solid ${colors.border.light}` },
+    // 행 껍데기. 배경·hover·선택 표시는 index.css 의 .reserve-maillist-item 이 갖는다 —
+    // 인라인 style 로는 :hover 를 쓸 수 없어서 여기에 두면 눌리는 느낌이 안 난다.
+    mailItem:     { display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${colors.border.light}` },
+    mailItemMain: { flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 8px 14px 22px' },
+    mailItemTrash:{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: '0 16px', display: 'flex', alignItems: 'center' },
     backBtn:      { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 0 16px 0' },
     // 데스크톱은 목록 패널 안쪽 바닥(위 경계선 있음), 모바일은 카드 바로 아래에 떨어져 놓인다.
     paginationBar: { display: 'flex', justifyContent: 'center', padding: '10px 8px', borderTop: `1px solid ${colors.border.light}` },

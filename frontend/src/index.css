@@ -1442,6 +1442,36 @@ input:disabled {
     --preview-btn-bg: rgba(0, 0, 0, 0.12);
     --preview-btn-hover: rgba(229, 232, 235, 0.28);
 }
+
+/* ── 미리보기 "첫 열림"에서만 확대 애니메이션이 씹히던 문제 (2026-08-19) ──────────────
+   증상: 새로고침 후 맨 처음 사진을 클릭하면 확대 없이 툭 뜬다. 두 번째부터는 정상.
+
+   원인은 레이스지만 데이터 경합이 아니라 **스타일 주입과 애니메이션 시작의 프레임 경합**이다.
+   @rc-component/image 의 Preview 는 portalRender 게이팅 때문에 첫 클릭 전까지 DOM 에
+   존재하지 않는다. 첫 클릭 순간 Portal 이 처음 만들어지고, 바로 그때 AntD 6 가
+   .ant-image-preview-* 스타일을 CSS-in-JS 로 문서에 주입한다.
+   트랜지션은 "시작 상태가 한 프레임 그려진 뒤 끝 상태로 바뀌어야" 걸리는데, 스타일이 방금
+   주입돼 그 틈이 없으니 브라우저가 곧장 최종 상태로 점프한다. 클릭 지점에서 커지는
+   transformOrigin 효과도 같이 죽어서 "그냥 툭 뜬다"로 보인다.
+   두 번째부터 멀쩡한 이유가 이것이다 — 그때는 스타일이 이미 문서에 있다.
+
+   같은 규칙을 정적으로 선언해두면 주입을 기다릴 필요가 없어진다.
+   ※ AntD 가 나중에 같은 값을 주입하므로 충돌하지 않는다.
+      값은 antd/lib/image/style/index.js 의 genPreviewMotion 과 맞춰둘 것.
+   ※ 검증은 하드 리프레시(Ctrl+Shift+R) 후 **맨 처음 클릭**. 두 번째부터는 원래 정상이라
+      그것만 보면 고쳤는지 알 수 없다. */
+.ant-image-preview-fade { transition: opacity 0.3s; }
+.ant-image-preview-fade-appear,
+.ant-image-preview-fade-enter { opacity: 0; }
+.ant-image-preview-fade-appear .ant-image-preview-body,
+.ant-image-preview-fade-enter  .ant-image-preview-body { transform: scale(0); }
+.ant-image-preview-fade-appear-active,
+.ant-image-preview-fade-enter-active { opacity: 1; }
+.ant-image-preview-fade-appear-active .ant-image-preview-body,
+.ant-image-preview-fade-enter-active  .ant-image-preview-body {
+    transform: scale(1);
+    transition: transform 0.3s;
+}
 .reserve-image-preview .ant-image-preview-actions-action,
 .reserve-image-preview .ant-image-preview-operations-operation {
     border-radius: 8px !important;
@@ -1505,4 +1535,80 @@ input:disabled {
 }
 .reserve-image-preview .ant-image-preview-close:hover {
     background-color: var(--preview-btn-hover) !important;
+}
+
+/* ── 정기 휴무 요일 — 7칸 고정 그리드 (2026-08-24 신설) ──────────────────────
+   AntD Checkbox.Group 기본은 inline-flex 자연 줄바꿈이라, 360px 화면에서
+   월~토 여섯 개가 한 줄에 들어가고 **'일' 하나만 다음 줄로 떨어졌다.**
+   PC 에서는 한 줄에 다 들어가서 안 보이던 문제라 오래 남아 있었다.
+
+   요일은 개수가 7로 고정이고 순서에 의미가 있으므로, 자연 줄바꿈에 맡기지 않고
+   7칸 그리드로 고정한다 — 폭이 좁아지면 칸이 같이 좁아질 뿐 줄이 나뉘지 않는다.
+
+   ★ 클래스는 StoreBasicInfo.jsx 의 Checkbox.Group 에 붙어 있다.
+     전역 CSS 를 여기 두는 이유는 CLAUDE.md "설계 원칙" 2번 참고 —
+     컴포넌트 안 <style> 에 두면 그 컴포넌트를 안 쓰는 화면에는 규칙이 존재하지 않는다. */
+.reserve-weekday-group.ant-checkbox-group {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 10px 2px;
+    width: 100%;
+}
+/* AntD 가 item 에 margin-inline-end 를 주는데, 그리드에서는 gap 이 그 역할을 하므로
+   남겨두면 마지막 칸이 밀려 나간다. */
+.reserve-weekday-group.ant-checkbox-group .ant-checkbox-group-item,
+.reserve-weekday-group.ant-checkbox-group .ant-checkbox-wrapper {
+    margin: 0;
+    margin-inline-end: 0;
+    min-width: 0;
+}
+/* 320px 같은 극단적 폭에서 칸당 약 39px 밖에 안 남는다. 체크박스(16) + 글자(13) 사이
+   기본 간격이 8px 이라 아슬아슬해서, 이 그룹에서만 좁힌다. */
+.reserve-weekday-group.ant-checkbox-group .ant-checkbox-label {
+    padding-inline-start: 5px;
+    padding-inline-end: 0;
+}
+
+/* ── 관리자 메일함 목록 행 (2026-08-24 신설) ─────────────────────────────────
+   예전엔 행 전체가 인라인 style 을 가진 <button> 하나였고 transition 만 걸려 있었다.
+   인라인 style 로는 :hover 를 표현할 수 없으므로 **바뀌는 값이 없었다** —
+   전환 대상만 있고 전환할 상태가 없는, 눌리는 느낌이 0인 상태였다.
+
+   지금은 행이 div 껍데기 + 형제 버튼 둘(본문 선택 / 휴지통)이다.
+   <button> 안에 <button> 은 HTML 상 허용되지 않아서 나눈 구조다.
+
+   ★ 선택 상태를 왼쪽 4px 띠로 표시한다. 배경만으로 구분하면 라이트 테마에서
+     hover 색과 선택 색이 비슷해져 "지금 뭘 보고 있는지"가 흐려진다. */
+.reserve-maillist-item {
+    position: relative;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+.reserve-maillist-item:hover { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
+.reserve-maillist-item:active { background: rgba(0, 0, 0, 0.06); }
+.reserve-maillist-item.is-selected { background: var(--c-primary-light, #e8f3ff); }
+.reserve-maillist-item.is-selected::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--c-primary, #3182f6);
+}
+/* 키보드로 이동했을 때도 행 전체가 선택 대상임이 보여야 한다. */
+.reserve-maillist-item:focus-within { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
+
+/* 휴지통 버튼 — 평소엔 존재감을 낮추고, 행에 올렸을 때 드러난다.
+   터치 기기에는 hover 가 없으므로 항상 보이게 둔다(아래 미디어쿼리). */
+.reserve-maillist-trash {
+    color: var(--c-text-tertiary, #8b95a1);
+    opacity: 0.45;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+.reserve-maillist-item:hover .reserve-maillist-trash { opacity: 1; }
+.reserve-maillist-trash:hover { color: var(--c-error, #f04452); }
+.reserve-maillist-trash:focus-visible { opacity: 1; }
+.reserve-maillist-trash:disabled { cursor: not-allowed; opacity: 0.25; }
+
+@media (hover: none) {
+    .reserve-maillist-trash { opacity: 0.8; }
 }

@@ -6,12 +6,30 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+  # ★ dev 를 넣은 이유 — Dependabot 은 기본 브랜치(dev)로 PR 을 내는데, 예전엔 트리거가 main 뿐이라
+  #   **의존성 PR 이 빌드·린트를 한 번도 안 거치고 머지됐다.** 실제로 eslint 메이저 범프가
+  #   기존 코드 13곳을 깨뜨리는 걸 사람이 손으로 돌려보고서야 발견했다.
+  #   배포는 안 돈다 — deploy-backend 잡과 배포 스텝에 `github.ref == 'refs/heads/main' && push` 가드가 이미 있다.
+  #   push 에는 dev 를 넣지 않는다(같은 커밋을 PR 과 push 로 두 번 빌드하게 된다).
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
     paths-ignore:
       - '**.md'
       - 'docs/**'
   workflow_dispatch:
+
+# ★ 배포가 겹치는 것을 막는다.
+#   예전엔 이 블록이 없어서 main 에 두 번 연달아 머지하면 배포 두 개가 동시에 돌 수 있었다.
+#   그러면 서로의 컨테이너를 밟고 nginx 업스트림 스위칭이 엇갈린다.
+#   지금까지는 "하나씩 머지한다"는 **사람의 습관**으로만 회피하고 있었다.
+#
+#   cancel-in-progress 를 조건부로 둔 이유:
+#     PR 빌드  → 취소해도 안전하다(배포가 없다). 새 푸시가 오면 앞의 것은 어차피 쓸모없다.
+#     main push → **절대 취소하면 안 된다.** 이미지 푸시·컨테이너 기동 중간에 끊기면
+#                 어느 쪽도 아닌 상태로 남는다. 큐잉이 맞다.
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # ★ 워크플로 전체는 읽기만 가진다(최소 권한).
 #   deployments: write 는 그게 실제로 필요한 deploy-backend 잡에만 따로 준다 —
@@ -27,10 +45,10 @@ jobs:
   build-backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -50,7 +68,7 @@ jobs:
       # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
       - name: Upload test report on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-test-report
           path: backend/build/reports/tests/test/
@@ -63,7 +81,7 @@ jobs:
       # 빌드·테스트는 위에서 이미 끝났으므로 PR의 검증 가치는 그대로 유지된다.
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -102,10 +120,10 @@ jobs:
     needs: build-backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -204,14 +222,14 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # 배포 이력 기록 — first-party 액션만 쓴다(외부 액션 의존성 추가 없음).
       # 이 스텝이 실패해도 배포 자체는 막지 않도록 continue-on-error를 둔다.
       - name: Create GitHub deployment
         id: deployment
         continue-on-error: true
-        uses: actions/github-script@v9
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
           script: |
             const dep = await github.rest.repos.createDeployment({
@@ -322,6 +340,8 @@ jobs:
             export PORTONE_IMP_CODE=${{ secrets.PORTONE_IMP_CODE }}
             export PORTONE_V2_SECRET=${{ secrets.PORTONE_V2_SECRET }}
             export PORTONE_STORE_ID=${{ secrets.PORTONE_STORE_ID }}
+            export PORTONE_WEBHOOK_SECRET=${{ secrets.PORTONE_WEBHOOK_SECRET }}
+            export QR_TOKEN_SECRET=${{ secrets.QR_TOKEN_SECRET }}
             export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             export MAIL_FROM=${{ secrets.MAIL_FROM }}
             export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -405,7 +425,7 @@ jobs:
       - name: Mark deployment success
         if: success() && steps.deployment.outputs.id
         continue-on-error: true
-        uses: actions/github-script@v9
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({
@@ -420,7 +440,7 @@ jobs:
       - name: Mark deployment failure
         if: failure() && steps.deployment.outputs.id
         continue-on-error: true
-        uses: actions/github-script@v9
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({

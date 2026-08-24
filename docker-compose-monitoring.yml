@@ -1,9 +1,18 @@
+# Deployed to the server at ~/docker-compose-monitoring.yml.
+# Apply with:  docker compose -f ~/docker-compose-monitoring.yml up -d
+# See docs/technical/monitoring.md.
+
 services:
   loki:
     image: grafana/loki:2.9.0
     container_name: loki
     ports:
       - "3100:3100"
+    volumes:
+      # Without this, all log history lives in the container layer and a single
+      # `docker compose up --force-recreate` wipes it. That is how this stack
+      # ran until 2026-08-19.
+      - loki-data:/loki
     networks:
       - app-network
     restart: unless-stopped
@@ -13,14 +22,14 @@ services:
     container_name: promtail
     volumes:
       - /var/log/reserve:/var/log/reserve:ro
-      # nginx 접근/에러 로그. 이 마운트가 없으면 promtail-config.yml의 nginx job이 읽을 게 없다.
-      # ※ nginx 컨테이너 쪽에서도 같은 호스트 경로를 마운트해 로그를 실제 파일로 남겨야 한다
-      #   (공식 이미지는 기본이 stdout 심볼릭 링크다). 자세한 건 promtail-config.yml 주석 참고.
-      - /var/log/nginx:/var/log/nginx:ro
-      # ⚠️ 레포↔서버 드리프트 주의: 이 파일은 **서버의 ~/promtail-config.yml**을 마운트한다.
-      #   레포의 promtail-config.yml을 고쳐도 서버로 복사하지 않으면 반영되지 않는다.
-      #   반영: scp promtail-config.yml ubuntu@서버:~/ && docker restart promtail
+      - /var/log/metrics:/var/log/metrics:ro
+      # ⚠️ 서버의 ~/promtail-config.yml 을 마운트한다. 레포만 고치면 반영되지 않는다.
       - ~/promtail-config.yml:/etc/promtail/config.yml
+      # positions.yaml records how far each file has been read. On the container
+      # layer it vanishes on restart, so promtail re-ships the whole file and
+      # every line lands at the restart moment -- which is what broke the time
+      # axis before the timestamp stage was added.
+      - promtail-positions:/tmp
     networks:
       - app-network
     restart: unless-stopped
@@ -31,16 +40,13 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # 비밀번호를 레포에 박아두지 않는다.
+      # Not hardcoded: this seeds the password when grafana-data is first
+      # created, so a literal value in a public repo IS the initial password.
+      # The running instance already has its own, making this a no-op today --
+      # it matters the next time the volume is recreated.
       #
-      # 이 값은 **grafana-data 볼륨이 처음 만들어질 때만** 적용된다. 지금 운영 중인 인스턴스는
-      # 이미 비번이 변경돼 있어서 이 줄은 사실상 무력하다. 그래서 예전의 `=admin` 은 로그인에
-      # 쓰이진 않았지만, 볼륨을 초기화하거나 서버를 재구축하면 다시 그 값으로 시드된다 —
-      # 공개 레포에 초기 비번이 적혀 있는 셈이라 지웠다.
-      #
-      # `:?`(미설정 시 기동 실패)는 쓰지 않는다. 환경변수를 깜빡하고 monitoring을 재시작하면
-      # Grafana가 통째로 안 뜨는데, 이건 지금 위험보다 실수 비용이 더 크다.
-      # 미설정 시에는 빈 값이 되어 Grafana가 자체 기본 동작(첫 로그인 시 비번 변경 요구)을 한다.
+      # `:?`(미설정 시 기동 실패)는 쓰지 않는다. 환경변수를 깜빡하고 재시작하면
+      # Grafana 가 통째로 안 뜨는데, 그게 지금 위험보다 실수 비용이 크다.
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
@@ -51,6 +57,8 @@ services:
 
 volumes:
   grafana-data:
+  loki-data:
+  promtail-positions:
 
 networks:
   app-network:

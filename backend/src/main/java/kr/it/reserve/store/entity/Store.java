@@ -142,6 +142,47 @@ public class Store {
     private String closedDates;
 
     /**
+     * 예약을 어떤 방식으로 받는가 (2026-08-24 신설). {@code null} = {@link BookingType#SLOT}.
+     *
+     * <p>⚠️ <b>{@code null} 을 SLOT 으로 읽는 것이 생명줄이다.</b> {@code ddl-auto: update} 는
+     * 컬럼을 추가할 뿐 기존 행을 채우지 않으므로, 기존 가게는 전부 {@code NULL} 이다.
+     * 직접 읽지 말고 {@link #resolveBookingType()} 을 쓸 것.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "booking_type", length = 20)
+    private BookingType bookingType;
+
+    /**
+     * {@link BookingType#SESSION} 전용 — 사장님이 직접 나열한 회차 시각. 예: {@code "11:00,14:00,17:00"}
+     *
+     * <p>별도 테이블이 아니라 CSV 인 이유 — 회차는 하루 3~10개, 순서가 있고, 검색 대상이 아니다.
+     * {@code closedDays} 가 같은 방식이고 잘 돌고 있다. <b>회차마다 정원이 달라지면</b> 그때
+     * 테이블로 올린다 — 미리 만들면 조인과 라이프사이클만 늘어난다.
+     */
+    @Column(name = "session_times", length = 500)
+    private String sessionTimes;
+
+    /**
+     * 운영 시작일 — 이 날짜 <b>이전</b>은 예약을 받지 않는다. {@code null} = 시작일 제한 없음.
+     *
+     * <p>팝업스토어·기간 한정 클래스처럼 <b>영업 자체에 기간이 있는</b> 가게를 위한 것이다.
+     * 휴무일({@link #closedDays}·{@link #closedDates})로는 표현할 수 없다 —
+     * 휴무는 "여는 가게가 그날만 쉰다"이고, 이건 "그 기간 밖에는 가게가 존재하지 않는다"이다.
+     */
+    @Column(name = "open_date")
+    private LocalDate openDate;
+
+    /**
+     * 운영 종료일 — 이 날짜 <b>다음</b>은 예약을 받지 않는다(종료일 당일은 영업). {@code null} = 무기한.
+     *
+     * <p>⚠️ {@code ddl-auto: update} 는 컬럼을 추가할 뿐 <b>기존 행을 채우지 않는다.</b>
+     * 기존 가게는 두 값이 모두 {@code NULL} 이고, 그건 "무기한 영업" 으로 해석돼
+     * 지금까지와 똑같이 동작한다 — 마이그레이션이 필요 없는 이유다.
+     */
+    @Column(name = "close_date")
+    private LocalDate closeDate;
+
+    /**
      * 오늘부터 며칠 뒤까지 예약을 받을지. {@code null} = 제한 없음.
      *
      * <p>그 전까지 미래 날짜 제한이 아예 없어 <b>1년 뒤 예약도 들어왔다.</b>
@@ -343,6 +384,69 @@ public class Store {
         if (date == null) return false;
         return getClosedDayList().contains(date.getDayOfWeek().getValue())
                 || getClosedDateList().contains(date);
+    }
+
+    /**
+     * 그 날짜에 <b>예약을 받을 수 있는가</b> — 운영 기간 안이고 휴무가 아니면 {@code true}.
+     *
+     * <p><b>★ 예약 검증·가능시간 조회·달력이 전부 이 메서드 하나를 지나야 한다.</b>
+     * 휴무 판정이 {@link #isClosedOn} 한 곳에 모여 있어서 지금까지 어긋난 적이 없었다.
+     * 운영 기간을 새 판정으로 따로 만들면 그 이점이 사라진다 — "화면엔 되는데 누르면 안 되는"
+     * 상태는 판정이 흩어질 때 생긴다.
+     *
+     * <p>경계는 <b>양쪽 모두 포함</b>이다. 사장님이 "9/1~9/30 운영"이라고 적으면
+     * 9월 30일은 여는 날이라고 읽는 게 자연스럽다.
+     */
+    /**
+     * 예약 방식. <b>화면은 이 값 하나만 고르고 나머지는 따라온다</b> —
+     * 체크박스를 여러 개 주면 사장님이 조합을 만들지 못한다.
+     */
+    public enum BookingType {
+        /** 영업시간을 예약 단위로 쪼갠다. 식당·미용실·병원. <b>기본값이자 기존 동작.</b> */
+        SLOT,
+        /** 사장님이 회차를 직접 나열한다. 공연·클래스·투어. */
+        SESSION,
+        /** 시간 선택이 없다 — 날짜만 고른다. 팝업스토어·종일권·대관. */
+        DAY
+    }
+
+    /** {@code null} 을 흡수한다. <b>기존 가게(NULL)는 전부 SLOT 이다.</b> 직접 필드를 읽지 말 것. */
+    public BookingType resolveBookingType() {
+        return bookingType != null ? bookingType : BookingType.SLOT;
+    }
+
+    /** 회차 목록(SESSION 전용). 비어 있으면 빈 리스트. */
+    public List<LocalTime> getSessionTimeList() {
+        return parseCsv(sessionTimes).stream().map(LocalTime::parse).sorted().toList();
+    }
+
+    public void setSessionTimeList(List<LocalTime> times) {
+        this.sessionTimes = (times == null || times.isEmpty()) ? null
+                : times.stream().distinct().sorted()
+                       .map(t -> t.toString().substring(0, 5))
+                       .collect(java.util.stream.Collectors.joining(","));
+    }
+
+    /**
+     * {@link BookingType#DAY} 예약이 저장될 시각.
+     *
+     * <p><b>왜 시간을 nullable 로 안 만들었나</b> — 정원 계산·중복 검사·QR·환불이 전부
+     * {@code reservationTime} 에 묶여 있다. nullable 로 바꾸면 그 전부에 분기가 생긴다.
+     * "하루 = 슬롯 한 개"로 보면 <b>기존 로직이 한 줄도 안 바뀌고 재사용된다.</b>
+     *
+     * <p>{@code 0} 같은 sentinel 을 쓰지 않는 것과 같은 결의 판단이다 —
+     * 이 프로젝트는 sentinel 때문에 환불 정책이 통째로 뒤집힌 전례가 있다.
+     * 여기서는 "의미 없는 특수값"이 아니라 <b>실제로 그 가게가 문 여는 시각</b>을 쓴다.
+     */
+    public LocalTime dayBookingTime() {
+        return openTime != null ? openTime : LocalTime.MIDNIGHT;
+    }
+
+    public boolean isBookableOn(LocalDate date) {
+        if (date == null) return false;
+        if (openDate != null && date.isBefore(openDate)) return false;
+        if (closeDate != null && date.isAfter(closeDate)) return false;
+        return !isClosedOn(date);
     }
 
     /** 빈 값·공백·후행 콤마를 한 곳에서 흡수한다. */

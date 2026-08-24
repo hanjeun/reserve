@@ -233,11 +233,9 @@ mail:
   password: YOUR_RESEND_API_KEY
 
 portone:
-  imp-key: ...
-  imp-secret: ...
-  imp-code: ...
-  v2-secret: ...
-  store-id: ...
+  v2-secret: ...        # PORTONE_V2_SECRET  — REST API 인증 시크릿
+  store-id: ...         # PORTONE_STORE_ID   — 상점 ID (결제창·취소 양쪽에서 쓴다)
+  webhook-secret: ...   # PORTONE_WEBHOOK_SECRET — 웹훅 서명 검증용 (whsec_ + base64)
 
 S3_BUCKET_NAME: YOUR_S3_BUCKET
 CLOUDFRONT_DOMAIN: YOUR_CLOUDFRONT_DOMAIN
@@ -245,3 +243,10 @@ AWS_REGION: ap-northeast-2
 AWS_ACCESS_KEY_ID: YOUR_ACCESS_KEY
 AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 ```
+
+> **`imp-key`·`imp-secret`·`imp-code` 는 없앴다** — PortOne V1(구 아임포트) 시절 값이다.
+> V2 는 토큰 교환 없이 `v2-secret` 하나로 호출하고, `imp-code` 자리는 `store-id` 가 대체한다.
+
+> **`PORTONE_WEBHOOK_SECRET` 은 비워도 앱이 뜬다.** 대신 웹훅이 **전부 거부**된다(fail-closed).
+> 이 값이 없으면 "결제는 됐는데 브라우저가 안 돌아온" 건을 PG 가 알려줄 수 없다 —
+> 설정 절차는 `docs/technical/payments.md` 참고.

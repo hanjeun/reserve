@@ -7,6 +7,18 @@ services:
     image: ${DOCKERHUB_USERNAME}/reserve:${IMAGE_TAG:-latest}
     ports:
       - "8080:8080"
+    # ★★ TZ 를 여기에 추가하지 말 것 (2026-08-19 검토 결론).
+    #
+    # 이 컨테이너는 **의도적으로 UTC 로 돈다.** "TZ=Asia/Seoul 이 빠졌다"는 지적이 여러 번 있었지만
+    # 지금 와서 넣으면 고치는 것보다 부수는 게 크다:
+    #   1) createdAt·paidAt·deletedAt 등 이미 UTC 로 쌓인 컬럼에 그 시점부터 KST 값이 섞인다.
+    #      같은 컬럼에 두 시간대가 공존하면 사후 구분이 불가능하다.
+    #   2) logback 출력이 KST 로 바뀌어 promtail 의 `location: UTC` 파싱이 깨진다
+    #      (2026-08-19 에 고쳐 배포한 그 파이프라인이다 — docs/technical/monitoring.md).
+    #
+    # KST 가 필요한 곳(사용자가 고른 날짜·시각과 비교하는 자리)은 코드에서 명시한다:
+    #   kr.it.reserve.global.common.ServiceTime → today() / now()
+    # 이유와 판단 기준은 그 클래스의 Javadoc 에 정리돼 있다.
     environment:
       - SPRING_PROFILES_ACTIVE=blue
       - SERVER_ENV=blue
@@ -24,6 +36,12 @@ services:
       - PORTONE_IMP_CODE=${PORTONE_IMP_CODE}
       - PORTONE_V2_SECRET=${PORTONE_V2_SECRET}
       - PORTONE_STORE_ID=${PORTONE_STORE_ID}
+      # PortOne 웹훅 서명 검증용 시크릿(whsec_...). 값이 비면 웹훅을 전부 거부한다(fail-closed).
+      # ★ 앱은 이 값이 없어도 정상 기동한다 — 그래서 빠져 있어도 아무 에러가 안 난다.
+      #   PortOne 콘솔에 웹훅을 등록해두고 이 줄이 없으면, 취소 알림이 조용히 전부 4xx 로 버려진다.
+      - PORTONE_WEBHOOK_SECRET=${PORTONE_WEBHOOK_SECRET}
+      # QR 체크인 서명 키(선택). 비면 로그인 시크릿에서 파생한다 — 비어 있는 게 정상이다.
+      - QR_TOKEN_SECRET=${QR_TOKEN_SECRET}
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       - DB_PASSWORD=${DB_PASSWORD}
       - MAIL_FROM=${MAIL_FROM}

@@ -121,9 +121,24 @@ export const API_ENDPOINTS = {
         NAVER:  '/oauth2/authorization/naver',
         KAKAO:  '/oauth2/authorization/kakao',
     },
+    // 인앱 채팅 (2026-08-24). 손님은 방 ID 를 고르지 않는다 — 서버가 회원으로부터 찾거나 만든다.
+    // 폴링 경로(MY_MESSAGES)만 roomId 를 받는데, 그때도 서버가 소유를 확인한다.
+    CHAT: {
+        MY:            '/api/chat/my',
+        MY_SEND:       '/api/chat/my/messages',
+        MY_MESSAGES:   '/api/chat/my/messages',
+        MY_UNREAD:     '/api/chat/my/unread',
+        ADMIN_ROOMS:   '/api/admin/chat/rooms',
+        ADMIN_ROOM:    (id) => `/api/admin/chat/rooms/${id}`,
+        ADMIN_POLL:    (id) => `/api/admin/chat/rooms/${id}/messages`,
+        ADMIN_REPLY:   (id) => `/api/admin/chat/rooms/${id}/messages`,
+        ADMIN_WAITING: '/api/admin/chat/waiting-count',
+    },
     MAIL: {
         COMPOSE:      '/api/admin/mail/compose',
         SENT:         '/api/admin/mail/sent',
+        // 소프트 삭제(휴지통 이동). 영구 삭제는 TRASH.DELETE('SENT_MAIL', id) 가 맡는다.
+        TRASH_SENT:   (id) => `/api/admin/mail/sent/${id}`,
     },
     INQUIRY: {
         MY:            '/api/inquiries/my',

@@ -4,9 +4,9 @@ import { Typography, Tabs } from 'antd';
 import {
     CalendarOutlined, SafetyCertificateOutlined, IdcardOutlined, MailOutlined,
     DeleteOutlined, FileTextOutlined, BarChartOutlined, TeamOutlined, ShopOutlined,
-    NotificationOutlined,
-} from '@ant-design/icons';
+    NotificationOutlined, MessageOutlined,} from '@ant-design/icons';
 import MailboxTab from '../../components/admin/MailboxTab';
+import ChatTab from '../../components/admin/ChatTab';
 import TrashTab from '../../components/admin/TrashTab';
 import AuditLogTab from '../../components/admin/AuditLogTab';
 import DashboardTab from '../../components/admin/DashboardTab';
@@ -56,6 +56,8 @@ const AdminPanel = () => {
         { key: 'pending',       label: tabLabel(<IdcardOutlined />,              '대기 중'),     children: <BusinessVerificationTab mode="pending" /> },
         { key: 'all',           label: tabLabel(<SafetyCertificateOutlined />,   '전체 목록'),   children: <BusinessVerificationTab mode="all" /> },
         { key: 'mailbox',       label: tabLabel(<MailOutlined />,                '메일함'),      children: <MailboxTab /> },
+        // 채팅은 메일함 바로 옆에 둔다 — 둘 다 "사람이 답을 기다리는 곳"이라 같이 본다.
+        { key: 'chat',          label: tabLabel(<MessageOutlined />,             '문의 채팅'),   children: <ChatTab /> },
         { key: 'trash',         label: tabLabel(<DeleteOutlined />,              '휴지통'),      children: <TrashTab /> },
         { key: 'audit-logs',    label: tabLabel(<FileTextOutlined />,            '시스템 로그'), children: <AuditLogTab /> },
         { key: 'dashboard',     label: tabLabel(<BarChartOutlined />,            '대시보드'),    children: <DashboardTab /> },

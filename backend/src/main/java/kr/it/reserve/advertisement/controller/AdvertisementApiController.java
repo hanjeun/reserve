@@ -10,7 +10,10 @@ import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.BusinessException;
 import kr.it.reserve.global.error.ReservationException;
+import kr.it.reserve.global.ratelimit.IpExtractor;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +35,7 @@ import java.util.Map;
 public class AdvertisementApiController {
 
     private final AdvertisementService advertisementService;
+    private final RateLimiter rateLimiter;
 
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
@@ -146,23 +150,48 @@ public class AdvertisementApiController {
     // 광고 성과 지표(2026-07 추가) — 셋 다 공개 API(로그인 불필요). 장식적 요소라 실패해도 500을 터뜨리지 않고
     // 항상 200을 돌려줌(프론트에서도 실패를 사용자에게 노출하지 않음).
     @PatchMapping("/{id}/impression")
-    public ApiResponse<Void> recordImpression(@PathVariable Long id) {
-        advertisementService.recordImpression(id);
+    public ApiResponse<Void> recordImpression(@PathVariable Long id, HttpServletRequest request) {
+        if (allowMetric(request)) {
+            advertisementService.recordImpression(id);
+        }
         return ApiResponse.success(null, "기록됨");
     }
 
     // 배너 클릭 기록(2026-07 추가) — 공개 API
     @PatchMapping("/{id}/click")
-    public ApiResponse<Void> recordClick(@PathVariable Long id) {
-        advertisementService.recordClick(id);
+    public ApiResponse<Void> recordClick(@PathVariable Long id, HttpServletRequest request) {
+        if (allowMetric(request)) {
+            advertisementService.recordClick(id);
+        }
         return ApiResponse.success(null, "기록됨");
     }
 
     // 전환 기록(2026-07 추가) — 공개 API, 예약 생성 직후 프론트가 호출(귀속 판단은 sessionStorage 기반)
     @PatchMapping("/{id}/conversion")
-    public ApiResponse<Void> recordConversion(@PathVariable Long id) {
-        advertisementService.recordConversion(id);
+    public ApiResponse<Void> recordConversion(@PathVariable Long id, HttpServletRequest request) {
+        if (allowMetric(request)) {
+            advertisementService.recordConversion(id);
+        }
         return ApiResponse.success(null, "기록됨");
+    }
+
+    /**
+     * 광고 지표(노출·클릭·전환) 기록을 받아줄지 판단한다 — 2026-08 추가.
+     *
+     * <p><b>왜 필요했나.</b> 위 세 엔드포인트는 로그인이 필요 없고 카운터를 그냥 올려준다.
+     * 백엔드 상한이 없어서 {@code curl} 반복만으로 노출수·클릭수를 임의로 부풀릴 수 있었다.
+     * 광고는 <b>돈을 받고 파는 상품</b>이라 지표가 왜곡되면 청구와 성과 보고의 신뢰가 통째로 흔들린다.
+     *
+     * <p><b>왜 429 를 던지지 않는가.</b> 이 세 엔드포인트의 계약은 "무슨 일이 있어도 200"이다
+     * (프론트가 실패를 사용자에게 노출하지 않는다). 한도를 넘기면 <b>조용히 기록만 건너뛰고</b>
+     * 응답은 그대로 성공으로 돌려준다. 덤으로, 429 를 돌려주면 자동화 스크립트에 "여기가 한도다"라고
+     * 알려주는 셈이라 한도 바로 아래로 맞춰 계속 긁게 만든다.
+     *
+     * <p>계정 축({@code LOGIN_ACCOUNT} 같은)이 없는 이유는 공개 API 라 식별할 계정 자체가 없어서다.
+     * IP 한 축만 건다 — 한도를 넉넉하게(분당 120) 잡은 근거는 {@link RateLimiter.Policy#AD_METRIC} 주석에 있다.
+     */
+    private boolean allowMetric(HttpServletRequest request) {
+        return rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.AD_METRIC);
     }
 
     // 내 광고 신청 내역 (사업자용)

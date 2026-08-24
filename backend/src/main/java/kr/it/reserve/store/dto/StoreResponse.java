@@ -70,6 +70,22 @@ public class StoreResponse {
     private Integer bookingDeadlineHours;
     private Integer paymentTimeoutMinutes;
     private Integer reservationSlotMinutes;
+    /**
+     * 예약 방식 — {@code SLOT} · {@code SESSION} · {@code DAY}.
+     * <b>항상 값이 있다</b>({@code resolveBookingType} 이 null 을 SLOT 으로 흡수한다) —
+     * 화면이 null 분기를 하지 않아도 되게 만든 것이다.
+     */
+    private String bookingType;
+
+    /** SESSION 전용 회차 시각("11:00"). 다른 방식이면 빈 목록. */
+    private List<String> sessionTimes;
+
+    /** 운영 시작일(ISO). null = 제한 없음. 화면이 달력에서 이 날 이전을 막는 데 쓴다. */
+    private String openDate;
+
+    /** 운영 종료일(ISO). 당일까지 영업. null = 무기한. */
+    private String closeDate;
+
     private Integer nearbyRadiusKm;
     private Boolean allowLatePayment;
     private Boolean allowDuplicateReservation;
@@ -165,6 +181,11 @@ public class StoreResponse {
                 .allowLatePayment(store.getAllowLatePayment())
                 .allowDuplicateReservation(store.getAllowDuplicateReservation())
                 .emailNotificationEnabled(store.getEmailNotificationEnabled())
+                .bookingType(store.resolveBookingType().name())
+                .sessionTimes(store.getSessionTimeList().stream()
+                        .map(t -> t.toString().substring(0, 5)).toList())
+                .openDate(store.getOpenDate() != null ? store.getOpenDate().toString() : null)
+                .closeDate(store.getCloseDate() != null ? store.getCloseDate().toString() : null)
                 .closedDays(store.getClosedDayList())
                 .closedDates(store.getClosedDateList().stream().map(java.time.LocalDate::toString).toList())
                 .maxAdvanceBookingDays(store.getMaxAdvanceBookingDays())

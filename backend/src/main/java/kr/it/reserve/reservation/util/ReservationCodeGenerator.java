@@ -1,5 +1,7 @@
 package kr.it.reserve.reservation.util;
 
+import kr.it.reserve.global.common.ServiceTime;
+
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -34,7 +36,8 @@ public final class ReservationCodeGenerator {
      * @param reservationDate 예약 방문 날짜 (null이면 오늘 날짜로 폴백)
      */
     public static String generate(LocalDate reservationDate) {
-        LocalDate date = reservationDate != null ? reservationDate : LocalDate.now();
+        // 코드에 찍히는 날짜는 사람이 읽는 한국 날짜다 — 새벽에 발급해도 "어제"로 찍히면 안 된다.
+        LocalDate date = reservationDate != null ? reservationDate : ServiceTime.today();
         StringBuilder sb = new StringBuilder("R-");
         sb.append(date.format(DATE_FMT));
         sb.append('-');

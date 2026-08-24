@@ -2,6 +2,7 @@ package kr.it.reserve.payment.service;
 
 import jakarta.annotation.PostConstruct;
 import kr.it.reserve.global.error.PaymentException;
+import kr.it.reserve.payment.dto.PortoneV2CancelResponse;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -92,10 +93,19 @@ public class PortoneService {
     }
 
     /**
-     * V2 결제 취소 (환불)
-     * POST /payments/{paymentId}/cancel
+     * V2 결제 취소 (환불).
+     * {@code POST /payments/{paymentId}/cancel}
+     *
+     * <p>★ 2026-08-23 — <b>반환 타입이 {@code void} 에서 바뀌었다.</b> 예전에는 응답 본문을
+     * {@code Void.class} 로 받아 통째로 버렸고, 그래서 HTTP 200 만 오면 호출측이 무조건
+     * "환불 완료"로 기록했다. 그런데 PortOne V2 의 취소는 <b>200 을 주면서
+     * {@code status: "REQUESTED"}(접수만 됨)를 돌려줄 수 있다.</b> 그 뒤 PG 에서 실패하면
+     * 우리 DB 는 REFUNDED 인데 손님 돈은 그대로인 상태가 된다.
+     * 이제 결과를 그대로 돌려주고, <b>무엇으로 기록할지는 호출측이 정한다.</b>
+     *
+     * @return 취소 결과. 예외를 던지지 않았다면 최소한 PG 가 요청을 받긴 한 것이다.
      */
-    public void cancelPayment(String merchantUid, Integer amount, String reason) {
+    public PortoneV2CancelResponse cancelPayment(String merchantUid, Integer amount, String reason) {
         String url = V2_API_URL + "/payments/" + merchantUid + "/cancel";
 
         Map<String, Object> body = new HashMap<>();
@@ -119,8 +129,20 @@ public class PortoneService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            restTemplate.postForEntity(url, entity, Void.class);
-            log.info("Portone V2 payment cancelled: paymentId={}, amount={}", merchantUid, amount);
+            ResponseEntity<PortoneV2CancelResponse> response =
+                    restTemplate.postForEntity(url, entity, PortoneV2CancelResponse.class);
+
+            PortoneV2CancelResponse result = response.getBody();
+            if (result == null) {
+                // 200 인데 본문이 없다. 성공으로 낙관하지 않는다 — UNKNOWN 을 돌려주면
+                // 호출측이 원장에 미결로 남기고 사람이 확인하게 된다.
+                log.error("Portone V2 cancel returned an empty body: paymentId={}, amount={}", merchantUid, amount);
+                return new PortoneV2CancelResponse();
+            }
+
+            log.info("Portone V2 cancel responded: paymentId={}, amount={}, status={}, cancellationId={}",
+                    merchantUid, amount, result.resolveStatus(), result.cancellationId());
+            return result;
 
         } catch (PaymentException e) {
             throw e;

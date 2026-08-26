@@ -2,8 +2,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Input, Typography } from 'antd';
 import FilterSelect from './FilterSelect';
-import { SearchOutlined, SyncOutlined } from '@ant-design/icons';
-import { Button } from './index';
+import RefreshButton from './RefreshButton';
+import { SearchOutlined } from '@ant-design/icons';
 import { useWindowWidth } from '../../hooks';
 import { colors, fontSize } from '../../styles/tokens';
 
@@ -29,27 +29,16 @@ const FilterToolbar = ({
     extra,
     style,
 }) => {
-    const [cooldown, setCooldown] = React.useState(false);
+
     // 2026-07 추가 — 좁은 화면에서 셀렉트 2개(예: 가게+상태)가 각자 고정폭(140px등)을 고집해서
     // 둘이 합치면 한 줄에 안 들어가 위아래로 쉽게 쌓이던 문제 — 매우 좁은 화면에서만 선택들이
     // 고정폭 대신 균등 분할(flex:1)되게 해서 항상 한 줄에 나란히 들어가게 한다.
     const isNarrow = useWindowWidth() < 480;
 
-    const handleReload = React.useCallback(() => {
-        if (!onReload || cooldown || loading) return;
-        setCooldown(true);
-        onReload();
-        setTimeout(() => setCooldown(false), 3000);
-    }, [onReload, cooldown, loading]);
-
-    const reloadDisabled = loading || cooldown;
-
-    const reloadBtn = onReload && (
-        <Button variant="ghost-sm" size="md" onClick={handleReload} disabled={reloadDisabled}
-            style={{ flexShrink: 0 }}>
-            <SyncOutlined spin={loading} /> 새로고침
-        </Button>
-    );
+    /* 쿨다운·스피너 정지는 RefreshButton 이 갖는다 — 예전엔 이 파일과 MailboxTab, ChatTab 이
+       같은 3초 쿨다운을 각자 구현하고 있었고(정리 안 되는 setTimeout 포함),
+       회전이 중간에서 끊겨 아이콘이 튀는 문제도 네 곳에 똑같이 있었다. */
+    const reloadBtn = <RefreshButton onReload={onReload} loading={loading} />;
 
     if (selects.length > 0) {
         /* selects 있음 — 2줄 구조 */
@@ -136,12 +125,7 @@ const FilterToolbar = ({
                         {count}건
                     </Text>
                 )}
-                {onReload && (
-                    <Button variant="ghost-sm" size="md" onClick={handleReload} disabled={reloadDisabled}
-                        style={{ flexShrink: 0, marginLeft: 'auto' }}>
-                        <SyncOutlined spin={loading} /> 새로고침
-                    </Button>
-                )}
+                <RefreshButton onReload={onReload} loading={loading} style={{ marginLeft: 'auto' }} />
             </div>
         </div>
     );

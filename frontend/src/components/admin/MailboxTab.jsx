@@ -14,8 +14,8 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Input, Divider, Pagination, Checkbox } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, SyncOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Button, FormTextArea, FormInput, FormModal, FormField } from '../common';
+import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Button, FormTextArea, FormInput, FormModal, FormField, RefreshButton } from '../common';
 import { Bone } from '../common/Skeletons';
 import useDebounce from '../../hooks/useDebounce';
 import { useMessage, useWindowWidth, useQueryParamsState, useFormErrors } from '../../hooks';
@@ -164,13 +164,10 @@ const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
     return { askAndTrash, trashing: mutation.isPending };
 };
 
+// 쿨다운·스피너 정지는 RefreshButton 이 갖는다(2026-08-25). 예전엔 여기서 3초 쿨다운을
+// 직접 구현했는데, setTimeout 을 정리하지 않아 쿨다운 도중 화면을 떠나면 사라진 컴포넌트에
+// setState 가 걸렸다. 같은 구현이 FilterToolbar·ChatTab 에도 따로 있었다.
 const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
-    const [cooldown, setCooldown] = useState(false);
-    const handleReload = () => {
-        if (cooldown || loading) return;
-        setCooldown(true); onReload();
-        setTimeout(() => setCooldown(false), 3000);
-    };
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 40 }}>
@@ -178,10 +175,7 @@ const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
                     style={{ height: 40, borderRadius: 20, paddingLeft: 20, paddingRight: 20, flexShrink: 0, gap: 6 }}>
                     <SendOutlined /> 새 메일
                 </Button>
-                <Button variant="ghost-sm" size="md" onClick={handleReload} disabled={loading || cooldown}
-                    style={{ flexShrink: 0, marginLeft: 'auto' }}>
-                    <SyncOutlined spin={loading} /> 새로고침
-                </Button>
+                <RefreshButton onReload={onReload} loading={loading} style={{ marginLeft: 'auto' }} />
             </div>
             <Input prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
                 placeholder="받는 사람, 제목 검색" value={value} onChange={onChange}
@@ -197,10 +191,12 @@ const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
  * 디자인 시스템의 shimmer Bone과 전혀 다른 톤/애니메이션이라 관리자 패널 안에서 이 탭만
  * 혼자 이질적으로 보였다 — 공용 Bone으로 교체하고 실제 행 레이아웃과 같은 모양으로 맞춤.
  */
+// ★ 행 패딩은 아래 SentMailItem 의 본문 버튼과 **같은 값**이어야 한다('14px 16px').
+//   다르면 로딩이 끝나는 순간 글자가 옆으로 튄다.
 const SentMailSkeleton = () => (
     <div style={styles.singlePanel}>
         {['sk-0', 'sk-1', 'sk-2', 'sk-3'].map((key) => (
-            <div key={key} style={{ padding: '14px 16px 14px 22px', borderBottom: `1px solid ${colors.border.light}` }}>
+            <div key={key} style={{ padding: '14px 16px', borderBottom: `1px solid ${colors.border.light}` }}>
                 {/* 1줄: 받는 사람 + 보낸 시각 */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                     <Bone width="45%" height={13} />
@@ -354,10 +350,15 @@ const MailboxTab = () => {
 
             {showMobDetail && (
                 <div style={styles.mobileDetail}>
-                    <button type="button" onClick={() => mail.setSelectedSent(null)} style={styles.backBtn}>
-                        <ArrowLeftOutlined style={{ fontSize: 14, marginRight: 6, color: colors.text.secondary }} />
-                        <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary }}>목록으로</Text>
-                    </button>
+                    {/* ★ 손으로 만든 <button> 을 쓰지 않는다 (2026-08-24 2차).
+                        가게 상세의 "뒤로가기"와 **같은 컴포넌트·같은 variant** 다.
+                        한때 전용 클래스(.reserve-backlink)를 따로 만들었는데, 그러면
+                        hover 색·포커스 링·모서리를 이 화면만 따로 갖게 된다 —
+                        실제로 파란 알약처럼 보인다는 지적이 나왔다.
+                        같은 동작(뒤로 가기)은 같은 버튼으로 그린다. */}
+                    <Button variant="ghost" onClick={() => mail.setSelectedSent(null)} style={styles.backBtn}>
+                        <ArrowLeftOutlined style={{ fontSize: 14 }} /> 목록으로
+                    </Button>
                     <SentDetailContent mail={mail.selectedSent} onTrash={trash.askAndTrash} trashing={trash.trashing} />
                 </div>
             )}
@@ -456,9 +457,25 @@ const styles = {
     // 행 껍데기. 배경·hover·선택 표시는 index.css 의 .reserve-maillist-item 이 갖는다 —
     // 인라인 style 로는 :hover 를 쓸 수 없어서 여기에 두면 눌리는 느낌이 안 난다.
     mailItem:     { display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${colors.border.light}` },
-    mailItemMain: { flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 8px 14px 22px' },
-    mailItemTrash:{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: '0 16px', display: 'flex', alignItems: 'center' },
-    backBtn:      { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 0 16px 0' },
+    // 왼쪽 22 → 16 (2026-08-24). 22 는 선택 표시용 세로줄(4px) 자리를 비우려던 값인데
+    // 그 줄을 없앴다 — 연한 파란 배경만으로 충분하고, 목록마다 세로선이 생겨 어긋나 보였다.
+    // 위 SentMailSkeleton 과 같은 값을 유지할 것.
+    mailItemMain: { flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 4px 14px 16px' },
+    /**
+     * ★ 휴지통 버튼 위치 (2026-08-24 2차 수정).
+     *
+     * 전에는 3줄짜리 행의 **세로 한가운데**에 떠 있었다. 그런데 오른쪽 열에서 눈에 먼저
+     * 들어오는 기준선은 같은 열 맨 위의 보낸 시각("3일 전")이다. 아이콘만 한 줄 아래에
+     * 있으니 오른쪽 정렬이 어긋난 것처럼 보였다.
+     * alignSelf 로 위에 붙이고 marginTop 으로 **첫 줄의 중심**에 맞춘다
+     * (본문 상단 패딩 14 + 첫 줄 높이 절반 ≈ 23 → 32px 판의 중심이 그 지점에 온다).
+     *
+     * 크기를 32×32 로 고정한 이유 — 아이콘만 있으면 어디를 눌러야 하는지가 안 보이고
+     * 손가락 목표로도 작다. 둥근 네모 판은 index.css 가 hover 에서 드러낸다.
+     */
+    mailItemTrash:{ alignSelf: 'flex-start', flexShrink: 0, width: 32, height: 32, margin: '7px 14px 0 0', padding: 0, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    // 가게 상세(StoreDetail)의 backBtn 과 같은 값 — 두 화면의 뒤로가기가 달라 보이면 안 된다.
+    backBtn:      { marginBottom: 12, padding: '4px 8px', fontSize: fontSize.sm, color: colors.text.secondary },
     // 데스크톱은 목록 패널 안쪽 바닥(위 경계선 있음), 모바일은 카드 바로 아래에 떨어져 놓인다.
     paginationBar: { display: 'flex', justifyContent: 'center', padding: '10px 8px', borderTop: `1px solid ${colors.border.light}` },
 };

@@ -122,6 +122,26 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("date") java.time.LocalDate date
     );
 
+
+    /**
+     * 달력(월 단위)용: 한 달치 활성 예약 인원을 <b>날짜·시각별로 한 번에</b> 조회한다.
+     *
+     * <p>★ 날짜마다 {@code sumActiveGuestsGroupedByTime} 을 부르면 달력 한 장에 <b>최대 31 쿼리</b>가 된다.
+     *   손님이 달을 넘길 때마다 그만큼 나가므로, 목록 화면에서 흔히 나오는 N+1 과 같은 형태다.
+     *   {@code BETWEEN} 한 번으로 묶는다.
+     *
+     * <p>반환: {@code [reservationDate, reservationTime, guestCountSum]}
+     */
+    @Query("SELECT r.reservationDate, r.reservationTime, SUM(r.guestCount) FROM Reservation r " +
+           "WHERE r.store.id = :storeId AND r.reservationDate BETWEEN :from AND :to " +
+           "AND r.status IN ('PENDING', 'CONFIRMED') " +
+           "GROUP BY r.reservationDate, r.reservationTime")
+    List<Object[]> sumActiveGuestsGroupedByDateAndTime(
+            @Param("storeId") Long storeId,
+            @Param("from") java.time.LocalDate from,
+            @Param("to") java.time.LocalDate to
+    );
+
     /**
      * 가게별 예약자 이름으로 검색
      */

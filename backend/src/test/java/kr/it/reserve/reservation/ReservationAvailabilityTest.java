@@ -2,6 +2,7 @@ package kr.it.reserve.reservation;
 
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
@@ -72,11 +73,21 @@ class ReservationAvailabilityTest {
         return store;
     }
 
+    /**
+     * 조회 대상 날짜. <b>반드시 미래여야 한다.</b>
+     *
+     * <p>예전에는 {@code LocalDate.of(2026, 7, 10)} 이 박혀 있었다. 작성 시점엔 미래였지만
+     * 시간이 지나 과거가 됐고, {@code getAvailability} 가 <b>지난 시각을 걸러내기 시작한
+     * 2026-08-25 부터는 전부 빈 목록</b>이 된다. 날짜를 고정한 픽스처는 이렇게 조용히 썩는다.
+     * 이 테스트가 보려는 것은 <b>슬롯 경계와 예약 방식</b>이지 특정 날짜가 아니므로 상대값을 쓴다.
+     */
+    private static final LocalDate TARGET_DATE = ServiceTime.today().plusDays(30);
+
     private List<String> availableTimes(Store store) {
         when(storeRepository.findById(anyLong())).thenReturn(Optional.of(store));
         lenient().when(reservationRepository.sumActiveGuestsGroupedByTime(anyLong(), any(LocalDate.class)))
                 .thenReturn(List.of()); // 예약 없음
-        return reservationService.getAvailability(1L, LocalDate.of(2026, 7, 10))
+        return reservationService.getAvailability(1L, TARGET_DATE)
                 .stream().map(SlotAvailabilityResponse::getTime).toList();
     }
 
@@ -161,8 +172,8 @@ class ReservationAvailabilityTest {
     @DisplayName("운영 기간 밖이면 방식과 무관하게 슬롯이 0개다")
     void outsideOperatingPeriodYieldsNothing() {
         Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(21, 0), 30);
-        // availableTimes 는 2026-07-10 을 조회한다. 그 뒤로 기간을 잡으면 밖이다.
-        store.setOpenDate(LocalDate.of(2026, 8, 1));
+        // 조회 대상(TARGET_DATE)보다 운영 시작일이 더 뒤면 그 날은 기간 밖이다.
+        store.setOpenDate(TARGET_DATE.plusDays(1));
 
         assertThat(availableTimes(store)).isEmpty();
     }

@@ -10,6 +10,7 @@ import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
+import kr.it.reserve.reservation.dto.CalendarDayResponse;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.service.ReservationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -76,6 +79,29 @@ public class ReservationApiController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         List<SlotAvailabilityResponse> slots = reservationService.getAvailability(storeId, date);
         return ResponseEntity.ok(ApiResponse.success(slots, "시간대별 예약 가능 여부 조회 성공"));
+    }
+
+    /**
+     * 달력용 월 단위 조회 (공개 API — 로그인 불필요).
+     *
+     * <p><b>{@code month} 를 {@code YearMonth} 로 바인딩하지 않는 이유</b> — 형식이 틀렸을 때
+     * 스프링이 {@code MethodArgumentTypeMismatchException} 을 던지고, 그건 이 프로젝트의
+     * {@code ApiResponse} 에러 규격을 타지 않는다. 프론트가 처리 못 하는 모양의 400 이 나가느니
+     * 직접 파싱해서 <b>다른 400 과 같은 모양</b>으로 돌려준다.
+     * ({@code StoreCreateRequest.openDate} 가 String 인 것과 같은 이유다.)
+     */
+    @GetMapping("/calendar")
+    public ResponseEntity<ApiResponse<List<CalendarDayResponse>>> getMonthCalendar(
+            @RequestParam Long storeId,
+            @RequestParam String month) {
+        YearMonth target;
+        try {
+            target = YearMonth.parse(month);
+        } catch (DateTimeParseException e) {
+            throw new ReservationException("month 는 YYYY-MM 형식이어야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+        List<CalendarDayResponse> days = reservationService.getMonthCalendar(storeId, target);
+        return ResponseEntity.ok(ApiResponse.success(days, "달력 조회 성공"));
     }
 
     @GetMapping("/{id}")

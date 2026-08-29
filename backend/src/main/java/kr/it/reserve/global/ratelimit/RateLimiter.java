@@ -13,9 +13,9 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * IP 기반 Rate Limiter (in-memory, Bucket4j)
  *
- * 엔드포인트별 정책:
- *  - LOGIN      : 10분에 10회
- *  - EMAIL_SEND : 10분에 5회 (이메일 발송 비용 고려)
+ * <p>정책 목록과 <b>각 한도를 그렇게 잡은 근거</b>는 아래 {@link Policy} 안에 정책별로 적어두었다.
+ * 여기에 목록을 복사해두면 정책이 늘 때마다 이 주석만 낡는다(실제로 그랬다 —
+ * 12개가 있는데 2개만 적혀 있었다).
  *
  * <h2>버킷 만료가 왜 필요한가</h2>
  * 키가 {@code POLICY:IP} 라서 서로 다른 IP가 들어올 때마다 엔트리가 하나씩 늘어난다.
@@ -116,7 +116,45 @@ public class RateLimiter {
          * 문 앞에 사람이 줄을 서도 분당 60을 넘기긴 어렵고, 자동화는 이 선을 훨씬 넘는다.
          * 매장 태블릿은 IP 하나를 공유하므로 좁게 잡으면 성수기 정상 영업을 막게 된다.
          */
-        QR_CHECKIN(60, Duration.ofMinutes(1));
+        QR_CHECKIN(60, Duration.ofMinutes(1)),
+        /**
+         * 인앱 채팅 전송 — IP 축 (2026-08-25 신설).
+         *
+         * <p>로그인이 필요한 경로라 급한 구멍은 아니다. 다만 상한이 <b>하나도</b> 없어서
+         * 계정 하나로 {@code chat_message} 를 무한히 늘릴 수 있었다(본문 2000자 상한만 있었다).
+         * 화면은 전송 중 버튼을 잠그지만 그건 화면의 예의일 뿐 <b>API 를 직접 부르면 아무 제약이 없다.</b>
+         *
+         * <p>분당 30으로 잡은 근거: 사람이 손으로 치는 채팅은 분당 10~15줄이 빠른 축이다.
+         * 짧은 문장을 연달아 던지는 습관까지 감안해 두 배를 줬다. 정상 대화가 막히면
+         * 그 즉시 신뢰를 잃는 종류의 기능이라 넉넉한 쪽이 맞다.
+         *
+         * <p>계정 축을 두지 않은 이유 — 이미 로그인 관문을 통과했고, 한 사람이 여러 IP 로
+         * 분산해 도배하는 시나리오는 이 서비스 규모에서 현실적이지 않다.
+         * 필요해지면 {@code LOGIN}/{@code LOGIN_ACCOUNT} 처럼 이중 축으로 넓히면 된다.
+         */
+        CHAT_SEND(30, Duration.ofMinutes(1)),
+        /**
+         * 문의하기 작성 — IP 축 (2026-08-25 신설).
+         *
+         * <h3>이게 왜 급했나</h3>
+         * {@code POST /api/inquiries} 는 <b>비로그인 허용</b>이다(정지된 회원도 문의할 수 있어야 해서
+         * 의도된 설계). 그런데 상한이 없었고, 이 엔드포인트는 저장만 하는 게 아니라
+         * <b>요청마다 알림 메일을 한 통 보낸다</b>({@code InquiryService#createInquiry}).
+         *
+         * <p>유일한 방어가 nginx 의 IP당 20r/s(burst 40)이라, 한 IP 만으로도 하루 백만 단위 요청이 가능했고
+         * 그만큼 메일이 나간다. 피해는 DB 가 아니라 <b>도메인 평판</b>이다 —
+         * 2026-07 유출 사고의 결론이 "위험한 건 키가 아니라 {@code reserve@reserve.it.kr} 이라는 이름"이었다.
+         * 스팸 신고가 쌓이면 진짜 예약 알림 메일이 안 들어간다.
+         *
+         * <h3>★ 왜 EMAIL_SEND 를 재사용하지 않나</h3>
+         * 버킷을 공유하면 <b>문의 도배가 회원가입 인증메일까지 같이 막는다.</b>
+         * 정책 이름이 키에 들어가므로 별도 정책을 두는 순간 그 간섭이 사라진다.
+         *
+         * <p>10분에 5회로 잡은 근거: 문의는 한 번 쓰고 답을 기다리는 동작이다.
+         * 정상 사용자가 10분 안에 5건을 쓰는 경우는 사실상 없고, 카페·회사 NAT 를 감안해도
+         * 문의는 한 IP 에서 동시에 여러 명이 쏟아내는 종류가 아니다.
+         */
+        INQUIRY_CREATE(5, Duration.ofMinutes(10));
 
         final int capacity;
         final Duration refillDuration;
@@ -124,6 +162,14 @@ public class RateLimiter {
         Policy(int capacity, Duration refillDuration) {
             this.capacity = capacity;
             this.refillDuration = refillDuration;
+        }
+
+        /**
+         * 이 정책의 한도. 테스트가 숫자를 다시 적지 않게 하려고 노출한다 —
+         * 테스트에 한도를 하드코딩하면 정책을 바꿀 때 <b>테스트가 옛 값을 지키려 든다.</b>
+         */
+        public int capacity() {
+            return capacity;
         }
     }
 

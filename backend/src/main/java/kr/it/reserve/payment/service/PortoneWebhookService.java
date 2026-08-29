@@ -62,11 +62,12 @@ public class PortoneWebhookService {
         }
 
         String type = text(root, "type");
-        JsonNode data = root.path("data");
-        String merchantUid = text(data, "paymentId");   // V2 의 paymentId = 우리 merchantUid
+        String merchantUid = extractPaymentId(root);    // V2 의 결제 식별자 = 우리 merchantUid
 
         if (merchantUid == null || merchantUid.isBlank()) {
-            log.info("PortOne webhook ignored - no paymentId: type={}", type);
+            // ★ INFO 가 아니라 WARN 이다. 여기 걸리면 서명은 통과했는데 본문을 못 읽은 것이고,
+            //   그건 거의 항상 콘솔의 웹훅 버전 설정 문제다. 조용히 넘기면 못 찾는다.
+            log.warn("PortOne webhook ignored - no payment id in body: type={}", type);
             return;
         }
         log.info("PortOne webhook received: type={}, merchantUid={}", type, merchantUid);
@@ -133,6 +134,45 @@ public class PortoneWebhookService {
             default -> log.info("PortOne webhook did not settle anything: merchantUid={}, pgStatus={}",
                     merchantUid, pgStatus);
         }
+    }
+
+    /**
+     * 본문에서 결제 식별자를 꺼낸다. <b>포트원 웹훅 버전 두 가지를 모두 받는다.</b>
+     *
+     * <pre>
+     * 2024-04-25 (권장)  {"type":"Transaction.Cancelled","timestamp":"2024-04-25T10:00:00.000Z",
+     *                     "data":{"paymentId":"...","storeId":"...","transactionId":"..."}}
+     * 2024-01-01 (구)    {"payment_id":"...","tx_id":"...","status":"Ready"}
+     * </pre>
+     *
+     * <h3>왜 둘 다 받나</h3>
+     * 버전을 정하는 건 <b>포트원 콘솔의 드롭다운</b>이다 — 즉 우리 코드 밖에서 바뀔 수 있고,
+     * 신규 등록 화면의 기본값이 구버전(2024-01-01)이다.
+     * 한쪽만 읽으면 다른 쪽이 선택됐을 때 <b>서명은 통과하고 본문만 조용히 버려진다.</b>
+     * 컨트롤러는 200 을 돌려주므로 포트원 콘솔에는 "정상 전송"으로 찍히고 재전송도 오지 않는다 —
+     * <b>어디에도 에러가 남지 않는</b> 종류의 고장이고, 이 프로젝트가 반복해서 당한 형태다
+     * (메일 3주 미발송, 웹훅 시크릿 미배선).
+     *
+     * <h3>구버전을 받아도 안전한 이유</h3>
+     * 우리는 본문의 {@code status} 를 쓰지 않는다. 본문은 "무엇이 바뀌었는지"의 <b>신호</b>일 뿐이고
+     * 실제 상태는 조회 API 로 다시 물어본다(클래스 주석 참고).
+     * 그래서 <b>결제 식별자 하나만 확보되면 두 버전이 완전히 같은 경로로 처리된다.</b>
+     */
+    private static String extractPaymentId(JsonNode root) {
+        String current = text(root.path("data"), "paymentId");
+        if (current != null && !current.isBlank()) {
+            return current;
+        }
+
+        String legacy = text(root, "payment_id");
+        if (legacy != null && !legacy.isBlank()) {
+            // 동작은 하지만 콘솔 설정을 바꾸는 게 맞다 — 구버전에는 type 이 없어서
+            // 어떤 이벤트로 깨어난 것인지 로그에서 구분할 수 없다.
+            log.warn("PortOne webhook is on the legacy 2024-01-01 format - "
+                    + "change the console webhook version to 2024-04-25: merchantUid={}", legacy);
+            return legacy;
+        }
+        return null;
     }
 
     private static String text(JsonNode node, String field) {

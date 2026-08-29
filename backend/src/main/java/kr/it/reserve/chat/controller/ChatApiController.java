@@ -1,11 +1,14 @@
 package kr.it.reserve.chat.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import kr.it.reserve.chat.dto.ChatMessageResponse;
 import kr.it.reserve.chat.dto.SendMessageRequest;
 import kr.it.reserve.chat.entity.ChatRoom;
 import kr.it.reserve.chat.service.ChatService;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.ratelimit.IpExtractor;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.member.entity.Member;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ import java.util.Map;
 public class ChatApiController {
 
     private final ChatService chatService;
+    private final RateLimiter rateLimiter;
 
     /** 내 대화 열기 — 방이 없으면 만들고, 최근 메시지를 주고, 안 읽음을 0으로. */
     @PreAuthorize("isAuthenticated()")
@@ -40,10 +44,23 @@ public class ChatApiController {
                 Map.of("roomId", room.getId(), "messages", messages), "대화 조회 성공"));
     }
 
+    /**
+     * 메시지 전송.
+     *
+     * <p>화면은 전송 중 버튼을 잠그지만 그건 <b>화면의 예의일 뿐</b>이다 —
+     * API 를 직접 부르면 아무 제약이 없어서 계정 하나로 대화 테이블을 무한히 늘릴 수 있었다.
+     * 한도 근거는 {@link RateLimiter.Policy#CHAT_SEND} 주석에 있다.
+     */
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/my/messages")
-    public ResponseEntity<ApiResponse<ChatMessageResponse>> send(@Valid @RequestBody SendMessageRequest request) {
+    public ResponseEntity<ApiResponse<ChatMessageResponse>> send(
+            @Valid @RequestBody SendMessageRequest request,
+            HttpServletRequest httpRequest) {
         Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)) {
+            return ResponseEntity.status(429)
+                    .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해주세요."));
+        }
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMember(me, request.getContent()), "전송 완료"));
     }

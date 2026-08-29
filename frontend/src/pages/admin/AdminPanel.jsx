@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Typography, Tabs } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import {
     CalendarOutlined, SafetyCertificateOutlined, IdcardOutlined, MailOutlined,
     DeleteOutlined, FileTextOutlined, BarChartOutlined, TeamOutlined, ShopOutlined,
     NotificationOutlined, MessageOutlined,} from '@ant-design/icons';
+import { UnreadPill } from '../../components/common';
 import MailboxTab from '../../components/admin/MailboxTab';
 import ChatTab from '../../components/admin/ChatTab';
 import TrashTab from '../../components/admin/TrashTab';
@@ -17,6 +19,9 @@ import AdminAdsTab from '../../components/admin/AdminAdsTab';
 import BusinessVerificationTab from '../../components/admin/BusinessVerificationTab';
 import { PageContainer } from '../../components/common';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import { adminKeys } from '../../hooks/queryKeys';
+import api from '../../api/axios';
+import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
@@ -27,6 +32,44 @@ const tabLabel = (icon, text) => (
         {icon}{text}
     </span>
 );
+
+/** 배지 폴링 주기. 관리자 패널은 켜둔 채로 오래 두는 화면이라 짧게 잡으면 안 된다. */
+const CHAT_BADGE_POLL_MS = 60000;
+
+/**
+ * 문의 채팅 탭 라벨 — 답을 기다리는 방 개수를 배지로 보여준다.
+ *
+ * ★ 2026-08-24 2차: 백엔드에 {@code /api/admin/chat/waiting-count} 가 있고 queryKey 도
+ *   있는데 **부르는 곳이 한 군데도 없었다.** 그래서 손님이 문의를 보내도 관리자는
+ *   탭을 직접 눌러보기 전에는 알 방법이 없었다("메시지가 어디로 가는지 모르겠다"의 정체).
+ *   이 프로젝트에서 "만들어두고 호출부가 없는" 패턴은 메일 휴지통에서도 한 번 났다 —
+ *   기능이 아니라 **연결**이 빠지는 종류의 고장이라 테스트로도 안 잡힌다.
+ *
+ * 60초인 이유 — 탭 안으로 들어가면 목록이 4초 폴링으로 최신을 보여준다.
+ * 배지는 "들어가 볼 이유가 있는가"만 알려주면 되므로 이 정도면 충분하고,
+ * 짧게 잡으면 화면을 열어둔 것만으로 서버를 계속 두드린다.
+ *
+ * 배지를 지우는 쪽은 ChatTab 이다. ★ 2026-08-25: 무효화만 하면 **서버 왕복이 끝나야** 숫자가
+ * 사라져서 "눌렀는데 안 없어진다"로 보였다. 이제 ChatTab 이 캐시를 먼저 내려놓고(즉시 반영),
+ * 무효화는 그 값을 서버로 확인하는 역할만 한다.
+ *
+ * 표시는 {@code UnreadPill} — 바로 아래 방 목록과 **같은 컴포넌트**다.
+ * 예전에는 탭이 AntD 기본 빨강 원, 목록이 파란 알약이라 같은 뜻의 숫자가 두 모양이었다.
+ */
+const ChatTabLabel = () => {
+    const { data: waiting = 0 } = useQuery({
+        queryKey: adminKeys.chatWaiting(),
+        queryFn: () => api.get(API_ENDPOINTS.CHAT.ADMIN_WAITING),
+        refetchInterval: CHAT_BADGE_POLL_MS,
+    });
+
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <MessageOutlined />문의 채팅
+            <UnreadPill count={waiting} style={{ marginLeft: 2 }} />
+        </span>
+    );
+};
 
 /**
  * 관리자 패널 — 순수 탭 셸.
@@ -57,7 +100,7 @@ const AdminPanel = () => {
         { key: 'all',           label: tabLabel(<SafetyCertificateOutlined />,   '전체 목록'),   children: <BusinessVerificationTab mode="all" /> },
         { key: 'mailbox',       label: tabLabel(<MailOutlined />,                '메일함'),      children: <MailboxTab /> },
         // 채팅은 메일함 바로 옆에 둔다 — 둘 다 "사람이 답을 기다리는 곳"이라 같이 본다.
-        { key: 'chat',          label: tabLabel(<MessageOutlined />,             '문의 채팅'),   children: <ChatTab /> },
+        { key: 'chat',          label: <ChatTabLabel />,                                        children: <ChatTab /> },
         { key: 'trash',         label: tabLabel(<DeleteOutlined />,              '휴지통'),      children: <TrashTab /> },
         { key: 'audit-logs',    label: tabLabel(<FileTextOutlined />,            '시스템 로그'), children: <AuditLogTab /> },
         { key: 'dashboard',     label: tabLabel(<BarChartOutlined />,            '대시보드'),    children: <DashboardTab /> },

@@ -46,7 +46,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
-    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
+    // 버전을 적지 않는다 — Spring Boot BOM 이 관리하는 의존성이라 Boot 가 검증한 버전이 붙는다.
+    // 직접 박아두면 Boot 와 어긋날 수 있고, dependabot 이 EE 11(3.0.0) PR 을 계속 올린다.
+    implementation 'jakarta.annotation:jakarta.annotation-api'
     implementation 'com.bucket4j:bucket4j-core:8.10.1'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 

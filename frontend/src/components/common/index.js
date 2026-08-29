@@ -35,3 +35,5 @@ export { default as DataTable } from './DataTable';
 export { default as StatCard } from './StatCard';
 export { default as ChartCard } from './ChartCard';
 export { default as PieLegend } from './PieLegend';
+export { default as UnreadPill } from './UnreadPill';
+export { default as RefreshButton } from './RefreshButton';

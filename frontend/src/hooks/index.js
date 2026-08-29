@@ -26,3 +26,4 @@ export { default as useExitAnimation } from './useExitAnimation';
 export { useQueryParamsState } from './useQueryParamState';
 export { default as useImagePreviewSwipe } from './useImagePreviewSwipe';
 export { default as useBookingCalendar } from './useBookingCalendar';
+export { default as useChatThread } from './useChatThread';

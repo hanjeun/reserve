@@ -69,7 +69,7 @@ const AdManageTab = () => {
     const queryClient = useQueryClient();
     const { pay, payExisting, paying, payingId } = useAdPayment();
     const { stores: myStores } = useMyStores();
-    const { handlePreview, PreviewModal, suppressLinkNavigation } = useImagePreview();
+    const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
     const [modalOpen, setModalOpen] = useState(false);
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebounce(search, 300);
@@ -413,7 +413,7 @@ const AdManageTab = () => {
                                 )}
                             </Upload>
                         </FormField>
-                        <PreviewModal />
+                        {previewNode}
                     </>
                 )}
             </FormModal>
@@ -457,7 +457,7 @@ const AdManageTab = () => {
                         )}
                     </Upload>
                 </FormField>
-                <PreviewModal />
+                {previewNode}
             </FormModal>
         </div>
     );

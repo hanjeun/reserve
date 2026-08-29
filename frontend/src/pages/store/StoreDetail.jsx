@@ -8,8 +8,8 @@ import {
     ThunderboltOutlined, RollbackOutlined, HourglassOutlined, TeamOutlined,
     FileTextOutlined, StarFilled, EnvironmentOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import { PageContainer, Button, FormTextArea, FormDatePicker, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
+import { PageContainer, Button, FormTextArea, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
+import { BookingCalendar } from '../../components/store';
 import { ReviewList } from '../../components/review';
 import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions, useStoreImageHint } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -428,35 +428,6 @@ const timeSlotStyles = {
     },
 };
 
-/**
- * 달력에서 고를 수 없는 날짜 판정 — 과거 · 정기 휴무 요일 · 임시 휴무일 · 예약 가능 기간 밖.
- *
- * <p>백엔드 {@code Store.isClosedOn} 과 <b>같은 기준</b>이어야 한다. 여기서만 막고 서버가 안 막으면
- * API 를 직접 찔러 우회할 수 있고, 서버만 막고 여기서 안 막으면 사용자가 끝까지 입력한 뒤에야
- * 거부당한다. 둘 다 필요하다.
- *
- * <p>⚠️ 요일 번호는 ISO(월=1 … 일=7)다. dayjs 의 {@code .day()} 는 일=0 이라 그대로 쓰면
- * 하루씩 밀린다 — {@code .isoWeekday()} 없이 계산할 수 있게 일요일만 7 로 바꿔 맞춘다.
- */
-const makeDisabledDate = (store) => (d) => {
-    if (!d) return false;
-    if (d.isBefore(dayjs().startOf('day'))) return true;
-
-    const maxDays = store?.maxAdvanceBookingDays;
-    if (maxDays > 0 && d.isAfter(dayjs().add(maxDays, 'day').endOf('day'))) return true;
-
-    // 운영 기간 (2026-08-24) — 서버 Store.isBookableOn 과 같은 판정이어야 한다.
-    // 경계는 양쪽 포함이다: 종료일 당일은 여는 날이다.
-    const ymd = d.format('YYYY-MM-DD');
-    if (store?.openDate && ymd < store.openDate) return true;
-    if (store?.closeDate && ymd > store.closeDate) return true;
-
-    const isoDay = d.day() === 0 ? 7 : d.day();
-    if ((store?.closedDays ?? []).includes(isoDay)) return true;
-
-    return (store?.closedDates ?? []).includes(ymd);
-};
-
 /** 달력에서 회색으로 막힌 이유를 미리 알려준다 — 막아만 두면 "왜 안 눌리지"가 된다. */
 const bookingRangeHint = (store) => {
     const days = (store?.closedDays ?? []);
@@ -489,11 +460,13 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC, isEditMode }) =
             <Form.Item label="예약 날짜" name="reservationDate"
                 rules={[{ required: true, message: '날짜를 선택해주세요.' }]}
                 extra={bookingRangeHint(store)}>
-                {/* 휴무일·예약 가능 기간을 달력에서 미리 막는다 (2026-08-11).
-                    서버도 같은 조건으로 거부하지만(Store.isClosedOn), 고를 수 있게 두고 나서
-                    에러로 알려주는 건 나쁜 흐름이다 — 고르고, 시간까지 고르고, 제출한 뒤에야
-                    "휴무일입니다"가 뜬다. 달력에서 회색으로 보이면 그 왕복이 통째로 사라진다. */}
-                <FormDatePicker placeholder="날짜 선택" disabledDate={makeDisabledDate(store)} />
+                {/* ★ 2026-08-25 — AntD DatePicker 팝업에서 인라인 BookingCalendar 로 교체.
+                    예전에는 disabledDate 로 막았는데 그건 **회색밖에 못 칠한다** — 정기휴무,
+                    임시휴무, 운영기간 밖, 예약범위 초과, 정원 마감이 전부 같은 회색이라
+                    "왜 안 눌리지"를 알 방법이 없었다. 게다가 그 다섯 판정이 서버(isBookableOn)와
+                    **프론트에도 따로**(makeDisabledDate) 있어서 언젠가 어긋날 자리였다.
+                    이제 사유는 서버가 내려주고 달력은 그리기만 한다. */}
+                <BookingCalendar storeId={store?.id} />
             </Form.Item>
             {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
                 "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
@@ -596,7 +569,19 @@ const StoreDetail = () => {
     if (!store) return (
         <PageContainer size={isPC ? 'xl' : 'md'} paddingTop={isPC ? '32px' : '20px'}>
             {backButton}
-            <div style={{ textAlign: 'center', marginTop: 100 }}>데이터가 없습니다.</div>
+                        {/*
+              * ★ "불러오기 실패" 와 "가게가 없음" 을 같은 문장으로 말하지 않는다(2026-08-29).
+              *   예전엔 둘 다 "데이터가 없습니다." 였다. 그래서 서버가 잠깐 내려간 것뿐인데
+              *   손님에게 **사실이 아닌 말**을 했고 — 다시 열면 될 상황을 가게가 사라진 것으로
+              *   읽게 만들었다. 되돌아올 수 있는 상태를 되돌아올 수 없는 것처럼 말한 셈이다.
+              *
+              *   `error` 는 axios 인터셉터가 만든 완성된 문장이라 사유와 다음 행동이 이미 들어 있다
+              *   ("서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요." / "정보를 찾을 수 없습니다.").
+              *   그대로 쓰면 문구가 한 군데(axios.js)에서만 관리된다.
+              */}
+            <div style={{ textAlign: 'center', marginTop: 100 }}>
+                {error ?? '요청하신 가게를 찾을 수 없습니다.'}
+            </div>
         </PageContainer>
     );
 
@@ -627,7 +612,7 @@ const StoreDetail = () => {
                         <div style={styles.pcLeft}>
                             <div style={{ position: 'relative' }}>
                                 <div style={styles.pcImageWrapper}>
-                                    <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} preview={{ rootClassName: 'reserve-image-preview' }}><Carousel className="reserve-carousel" infinite
+                                    <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={{ popup: { root: 'reserve-image-preview' } }}><Carousel className="reserve-carousel" infinite
                                         /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
                                            swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
                                            짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.
@@ -688,7 +673,7 @@ const StoreDetail = () => {
                     <section style={{ padding: 0 }}>
                         <div style={{ position: 'relative' }}>
                             <div style={styles.mobileImageWrapper}>
-                                <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} preview={{ rootClassName: 'reserve-image-preview' }}><Carousel className="reserve-carousel" infinite
+                                <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={{ popup: { root: 'reserve-image-preview' } }}><Carousel className="reserve-carousel" infinite
                                         /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
                                            swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
                                            짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.

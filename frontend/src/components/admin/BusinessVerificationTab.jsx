@@ -416,7 +416,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                             <DetailRow label="사업자등록증">
                                 <Image src={getDetailImageUrl(detailItem.licenseImageUrl)} alt="사업자등록증"
                                     style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }}
-                                    preview={{ rootClassName: 'reserve-image-preview' }} />
+                                    classNames={{ popup: { root: 'reserve-image-preview' } }} />
                             </DetailRow>
                         )}
                         <DetailRow label="신청일">{detailItem.createdAt?.substring(0, 10)}</DetailRow>

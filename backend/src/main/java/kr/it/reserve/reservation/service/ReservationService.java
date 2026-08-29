@@ -3,10 +3,12 @@ package kr.it.reserve.reservation.service;
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
+import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
+import kr.it.reserve.reservation.dto.CalendarDayResponse;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
@@ -31,9 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -42,6 +47,8 @@ public class ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final StoreRepository storeRepository;
+    /** 달력을 빨갛게 칠하는 용도. 죽어도 예약 판정에는 영향이 없다(HolidayService 주석 참고). */
+    private final HolidayService holidayService;
     private final PaymentService paymentService;
     private final EmailService emailService;
     private final MemberRepository memberRepository;
@@ -54,6 +61,7 @@ public class ReservationService {
     public ReservationService(
             ReservationRepository reservationRepository,
             StoreRepository storeRepository,
+            HolidayService holidayService,
             @Lazy PaymentService paymentService,
             EmailService emailService,
             MemberRepository memberRepository,
@@ -61,6 +69,7 @@ public class ReservationService {
             QrCheckinTokenProvider qrCheckinTokenProvider) {
         this.reservationRepository = reservationRepository;
         this.storeRepository = storeRepository;
+        this.holidayService = holidayService;
         this.paymentService = paymentService;
         this.emailService = emailService;
         this.memberRepository = memberRepository;
@@ -317,7 +326,7 @@ public class ReservationService {
                 ));
         Integer capacity = store.getMaxCapacityPerSlot();
 
-        return bookableSlotTimes(store, date).stream()
+        return bookableSlotTimesNow(store, date).stream()
                 .map(t -> {
                     long booked = guestSumByTime.getOrDefault(t, 0L);
                     boolean available = capacity == null || capacity <= 0 || booked < capacity;
@@ -354,6 +363,117 @@ public class ReservationService {
 
             case SLOT -> slotGrid(store);
         };
+    }
+
+    /**
+     * <b>지금 실제로 고를 수 있는 시각 목록.</b> = 구조적 목록 − (이미 지난 시각) − (마감이 지난 시각)
+     *
+     * <p>★ {@link #bookableSlotTimes} 와 나눠 둔 이유 — 저쪽은 <b>가게의 성질</b>이고
+     * (영업시간·회차·휴무로 정해지며 "지금"과 무관하다), 이쪽은 <b>지금 시점의 사실</b>이다.
+     * 한 메서드에 섞으면 "이 가게는 그 날 09:00 을 받는가"라는 질문에 오후 2시엔 아니라고 답하게 된다.
+     *
+     * <p>★ 그런데 <b>화면은 이쪽을 봐야 한다.</b> 그전까지 {@code getAvailability} 는 구조적 목록을
+     * 그대로 내려줬다. 그래서 <b>오후 2시에 오늘 09:00 이 예약 가능한 것처럼 보였고</b>, 눌러서
+     * 제출하면 그제서야 "예약 날짜/시간은 현재 이후여야 합니다"가 떴다. 마감 시간
+     * ({@code bookingDeadlineHours})도 똑같이 화면에는 안 보이고 제출할 때만 걸렸다.
+     * 이 프로젝트가 계속 경계해 온 <b>"눌리는데 예약하면 거절"</b>의 전형이다.
+     *
+     * <p>{@code validateReservationSlot} 은 여전히 구조적 목록을 쓴다 — 거기엔 지난 시각·마감을
+     * <b>각각 따로 검사하는 코드가 이미 있고</b>, 그래야 "왜 안 되는지"를 구분해서 말해줄 수 있다.
+     * 여기서 걸러버리면 전부 "예약 가능한 시간대를 선택해주세요" 하나로 뭉개진다.
+     */
+    private List<LocalTime> bookableSlotTimesNow(Store store, LocalDate date) {
+        LocalDateTime now = ServiceTime.now();
+        Integer deadlineHours = store.getBookingDeadlineHours();
+
+        return bookableSlotTimes(store, date).stream()
+                .filter(t -> {
+                    LocalDateTime slotAt = LocalDateTime.of(date, t);
+                    if (!slotAt.isAfter(now)) return false;
+                    if (deadlineHours == null || deadlineHours <= 0) return true;
+                    return !now.isAfter(slotAt.minusHours(deadlineHours));
+                })
+                .toList();
+    }
+
+    /**
+     * 달력(월 단위) — 날짜마다 <b>상태와 그 사유</b>를 내려준다.
+     *
+     * <p>이 API 가 생긴 이유는 {@link CalendarDayResponse} 주석에 있다. 요약하면,
+     * {@code disabledDate} 는 회색으로 막는 것밖에 못 해서 휴무·기간밖·마감이 전부 한 색이 된다.
+     *
+     * <p><b>★ 판정 순서를 {@code validateReservationSlot} 과 맞춘다.</b>
+     * 지난날 → 휴무 → 운영기간 → 예약범위 → 정원. 순서가 다르면 달력이 말하는 이유와
+     * 예약 실패 메시지가 서로 다른 말을 하게 된다(둘 다 맞는 말이라도 사용자는 혼란스럽다).
+     *
+     * <p>쿼리는 <b>한 번</b>이다. 날짜마다 조회하면 달을 넘길 때마다 31 쿼리가 나간다.
+     */
+    @Transactional(readOnly = true)
+    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) {
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        LocalDate from = month.atDay(1);
+        LocalDate to = month.atEndOfMonth();
+
+        // [날짜][시각] -> 이미 잡힌 인원
+        Map<LocalDate, Map<LocalTime, Long>> bookedByDate = new HashMap<>();
+        for (Object[] row : reservationRepository.sumActiveGuestsGroupedByDateAndTime(storeId, from, to)) {
+            bookedByDate
+                    .computeIfAbsent((LocalDate) row[0], d -> new HashMap<>())
+                    .put((LocalTime) row[1], ((Number) row[2]).longValue());
+        }
+
+        Integer capacity = store.getMaxCapacityPerSlot();
+        boolean capped = capacity != null && capacity > 0;
+
+        LocalDate today = ServiceTime.today();
+        Integer maxAdvance = store.getMaxAdvanceBookingDays();
+        // null 또는 0 = 제한 없음. 기존 가게의 동작을 그대로 둔다(validateReservationSlot 과 같은 규칙).
+        LocalDate lastBookable = (maxAdvance != null && maxAdvance > 0) ? today.plusDays(maxAdvance) : null;
+
+        // 빨간날. 키가 없거나 포털이 죽어 있으면 빈 집합이 오고, 달력은 그대로 뜬다.
+        Set<LocalDate> holidays = holidayService.holidaysOf(month);
+
+        List<CalendarDayResponse> days = new ArrayList<>();
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            days.add(describeDay(store, date, today, lastBookable, capped, capacity,
+                    bookedByDate.getOrDefault(date, Map.of()), holidays.contains(date)));
+        }
+        return days;
+    }
+
+    /** 달력 한 칸. 순서가 곧 사유의 우선순위다 — {@link #getMonthCalendar} 주석 참고. */
+    private CalendarDayResponse describeDay(Store store, LocalDate date, LocalDate today,
+                                            LocalDate lastBookable, boolean capped, Integer capacity,
+                                            Map<LocalTime, Long> booked, boolean holiday) {
+        String ymd = date.toString();
+
+        if (date.isBefore(today)) {
+            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.PAST.name(), 0, 0, holiday);
+        }
+        // 휴무를 운영기간보다 먼저 본다 — validateReservationSlot 의 문구 분기와 같은 순서다.
+        if (store.isClosedOn(date)) {
+            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.CLOSED.name(), 0, 0, holiday);
+        }
+        if (!store.isBookableOn(date)) {
+            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.OUT_OF_PERIOD.name(), 0, 0, holiday);
+        }
+        if (lastBookable != null && date.isAfter(lastBookable)) {
+            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.TOO_FAR.name(), 0, 0, holiday);
+        }
+
+        int total = bookableSlotTimes(store, date).size();
+        long open = bookableSlotTimesNow(store, date).stream()
+                .filter(t -> !capped || booked.getOrDefault(t, 0L) < capacity)
+                .count();
+
+        // total 이 0 이면 영업시간이 비었거나 회차를 안 적은 가게다. 막힌 것은 맞지만
+        // 휴무도 기간밖도 아니므로 FULL 로 표현한다 — 화면에서는 둘 다 "예약 불가"다.
+        String status = open > 0
+                ? CalendarDayResponse.DayStatus.OPEN.name()
+                : CalendarDayResponse.DayStatus.FULL.name();
+        return new CalendarDayResponse(ymd, status, total, (int) open, holiday);
     }
 
     /** SLOT 방식의 시각 격자 — 영업시간을 예약 단위로 쪼개고 브레이크타임을 뺀다. */

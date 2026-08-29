@@ -87,9 +87,15 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
     const leading = month.day();                 // 1일이 무슨 요일인지 = 앞에 비울 칸 수
     const daysInMonth = month.daysInMonth();
 
+    /*
+     * 1일 앞의 빈 칸도 **실제 날짜**를 들고 있게 만든다(지난달 말일들).
+     * 인덱스를 key 로 쓰면(`blank-0`, `blank-1`…) 달을 넘길 때 앞칸 개수가 바뀌는데도
+     * React 가 같은 key 를 재사용해서, "몇 번째 칸이냐"가 달마다 다른 날을 가리키게 된다.
+     * 날짜 문자열은 달을 넘겨도 절대 겹치지 않는 안정적인 key 다.
+     */
     const cells = [];
-    for (let i = 0; i < leading; i += 1) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d += 1) cells.push(month.date(d));
+    for (let i = leading; i > 0; i -= 1) cells.push({ blank: true, key: month.subtract(i, 'day').format('YYYY-MM-DD') });
+    for (let d = 1; d <= daysInMonth; d += 1) cells.push({ blank: false, date: month.date(d) });
 
     const openCalendar = () => {
         // 열 때는 항상 고른 날짜(없으면 이번 달)로 돌아간다 —
@@ -158,7 +164,11 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
         // 키가 없거나 공공데이터포털이 죽으면 holiday 가 전부 false 로 와서 일요일만 남는다.
         const isRedDay = date.day() === 0 || info?.holiday === true;
 
+        // 한 번만 찾아 쓴다 — 아래에서 aria-label·라벨 렌더에 같이 들어간다.
+        const blockedLabel = BLOCKED_LABEL[dayStatus];
+        const dayLabel = date.format('M월 D일');
         const cls = ['rsv-tap-btn', 'reserve-cal-cell'];
+
         if (isSelected) cls.push('is-selected');
         if (!isOpenDay) cls.push('is-blocked');
         // 막힌 날에는 안 준다: 연한 회색이 "못 고른다"를 말해야 하는데 빨강이 끼면 신호가 섞인다.
@@ -172,7 +182,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                 disabled={!isOpenDay}
                 onClick={() => pick(date)}
                 aria-pressed={isSelected}
-                aria-label={`${date.format('M월 D일')}${BLOCKED_LABEL[dayStatus] ? ` ${BLOCKED_LABEL[dayStatus]}` : ''}`}
+                aria-label={blockedLabel ? `${dayLabel} ${blockedLabel}` : dayLabel}
                 style={{
                     ...styles.cell,
                     ...(isToday && !isSelected ? styles.cellToday : null),
@@ -187,9 +197,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                  *   **숫자가 위로 밀려 보였다**(선택된 회색 칸에서 특히 눈에 띈다).
                  */}
                 <span className="reserve-cal-day" style={styles.dayNum}>{date.date()}</span>
-                {BLOCKED_LABEL[dayStatus]
-                    ? <span style={styles.tag}>{BLOCKED_LABEL[dayStatus]}</span>
-                    : null}
+                {blockedLabel ? <span style={styles.tag}>{blockedLabel}</span> : null}
             </button>
         );
     };
@@ -274,7 +282,9 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                     </div>
                 ) : (
                     <div style={{ ...styles.grid, opacity: loading || fetching ? 0.45 : 1 }}>
-                        {cells.map((date, i) => (date ? renderDay(date, i) : <span key={`blank-${i}`} />))}
+                        {cells.map((cell, i) => (cell.blank
+                            ? <span key={cell.key} />
+                            : renderDay(cell.date, i)))}
                     </div>
                 )}
                 </div>

@@ -398,7 +398,7 @@ const BusinessTab = ({ user }) => {
     const [statusLoading, setStatusLoading] = useState(true);
     const [form, setForm]         = useState({ businessName: '', businessNumber: '', memo: '' });
     const [licenseList, setLicenseList] = useState([]);
-    const { handlePreview, PreviewModal, suppressLinkNavigation } = useImagePreview();
+    const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
     const [submitLoading, setSubmitLoading] = useState(false);
     const [updateLoading, setUpdateLoading] = useState(false);
     const [cancelLoading, setCancelLoading] = useState(false);
@@ -570,7 +570,7 @@ const BusinessTab = ({ user }) => {
                     onSubmit={handleUpdate} loading={updateLoading}
                     submitLabel="수정 저장"
                 />
-                <PreviewModal />
+                {previewNode}
                 <Button variant="secondary" onClick={() => setIsEditing(false)} block>취소</Button>
             </div>
         );
@@ -618,7 +618,7 @@ const BusinessTab = ({ user }) => {
                 onSubmit={handleSubmit} loading={submitLoading}
                 licenseRequired
             />
-            <PreviewModal />
+            {previewNode}
         </div>
     );
 
@@ -633,7 +633,7 @@ const BusinessTab = ({ user }) => {
                 onSubmit={handleSubmit} loading={submitLoading}
                 licenseRequired
             />
-            <PreviewModal />
+            {previewNode}
         </>
     );
 };

@@ -94,6 +94,8 @@ public class SecurityConfig {
                         // (실제 예약 생성은 여전히 아래 "/api/reservations/**" 규칙에 걸려 인증 필요 — 미로그인 사용자는
                         //  '예약하기' 버튼 클릭 시 프론트에서 isLoggedIn 체크 후 로그인 안내로 자연스럽게 유도됨)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/availability").permitAll()
+                        // 달력(월 단위)도 같은 성격의 공개 조회다 — 예약 가능 여부는 로그인 전에 보여야 고를 수 있다.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/calendar").permitAll()
 
                         // 광고 노출 목록 — 공개 API (StoreList 배지/배너 위젯이 로그인 여부와 무관하게 보여야 함)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/advertisements/active").permitAll()

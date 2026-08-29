@@ -10,17 +10,27 @@
  *
  * ★ 로그인한 사람에게만 보인다. 비로그인 문의는 기존 Inquiry(문의하기)가 담당한다 —
  *   대화는 "누구와의 대화인지"가 있어야 이어지는데, 비로그인은 그 축이 없다.
+ *
+ * ── 2026-08-24 2차 수정 ────────────────────────────────────────────────────
+ * ★ 여는/닫는 애니메이션. 1차 때 className 만 써놓고 index.css 에 대응 규칙을
+ *   안 넣어서 창이 그냥 뿅 나타났다 사라졌다. 애니메이션은 CSS 가 그리고,
+ *   여기서는 **DOM 에 언제까지 남길지**만 정한다(open / visible 두 상태).
+ * ★ 모서리를 둥근 네모로 통일. 입력칸은 field 토큰(높이·radius 의 단일 출처)을 따르고,
+ *   전송 버튼은 입력 껍데기 **안쪽**으로 넣었다 — 밖에 따로 떠 있으면
+ *   "이 버튼이 이 입력칸의 것"이라는 게 안 읽힌다.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { MessageOutlined, CloseOutlined, SendOutlined } from '@ant-design/icons';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { MessageOutlined, CloseOutlined, SendOutlined, LoadingOutlined } from '@ant-design/icons';
 import { Typography, Badge } from 'antd';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { chatKeys } from '../../hooks/queryKeys';
 import useAuthStore from '../../store/useAuthStore';
 import { useMessage } from '../../hooks';
-import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
+import useChatThread from '../../hooks/useChatThread';
+import ChatBubbleList from './ChatBubbleList';
+import { colors, fontSize, fontWeight, radius, field } from '../../styles/tokens';
 
 const { Text } = Typography;
 
@@ -29,35 +39,30 @@ const POLL_OPEN_MS = 4000;
 /** 닫혀 있을 때 배지만 확인하는 주기. 여기를 짧게 잡으면 접속자 전원이 서버를 두드린다. */
 const POLL_BADGE_MS = 60000;
 
-const formatTime = (iso) => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-};
-
-const Bubble = ({ msg }) => {
-    const mine = msg.senderRole === 'MEMBER';
-    return (
-        <div style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', gap: 6, alignItems: 'flex-end' }}>
-            {mine && <Text style={styles.stamp}>{formatTime(msg.createdAt)}</Text>}
-            <div style={{ ...styles.bubble, ...(mine ? styles.bubbleMine : styles.bubbleTheirs) }}>
-                {msg.content}
-            </div>
-            {!mine && <Text style={styles.stamp}>{formatTime(msg.createdAt)}</Text>}
-        </div>
-    );
-};
-
 const ChatLauncher = () => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
     const isLoggedIn = useAuthStore((s) => !!s.user);
 
+    /**
+     * 상태가 둘인 이유 — `open` 은 "열려 있는가"(폴링·배지의 기준),
+     * `visible` 은 "DOM 에 있는가"다.
+     *
+     * 하나로 합치면 닫는 순간 패널이 즉시 사라져서 **닫는 애니메이션을 보여줄 대상이 없다.**
+     * 그래서 닫을 때는 open 만 먼저 내리고(= is-closing 클래스가 붙어 축소 애니메이션 시작),
+     * 애니메이션이 끝났다는 신호(onAnimationEnd)를 받은 뒤에 visible 을 내린다.
+     * setTimeout 으로 시간을 재지 않는 이유는 CSS 의 duration 을 JS 가 또 알고 있어야 하고
+     * 둘이 어긋나면 잘리거나 남기 때문이다.
+     */
     const [open, setOpen] = useState(false);
+    const [visible, setVisible] = useState(false);
+
     const [draft, setDraft] = useState('');
-    const [messages, setMessages] = useState([]);
-    const [roomId, setRoomId] = useState(null);
     const bottomRef = useRef(null);
+
+    const openPanel = () => { setVisible(true); setOpen(true); };
+    const closePanel = () => setOpen(false);
+    const togglePanel = () => (open ? closePanel() : openPanel());
 
     // 배지 — 닫혀 있어도 돌지만 주기가 길다.
     const { data: unread = 0 } = useQuery({
@@ -67,74 +72,89 @@ const ChatLauncher = () => {
         refetchInterval: open ? false : POLL_BADGE_MS,
     });
 
-    // 패널을 열 때 방을 열고(없으면 생성) 최근 메시지를 받는다.
-    // 이 호출이 곧 "읽음 처리"다 — 별도 API 를 두면 화면이 그걸 부르는 걸 잊는 순간
-    // 배지가 영영 안 사라진다.
-    useEffect(() => {
-        if (!open || !isLoggedIn) return;
-        let cancelled = false;
-        api.get(API_ENDPOINTS.CHAT.MY)
-            .then((data) => {
-                if (cancelled) return;
-                setRoomId(data?.roomId ?? null);
-                setMessages(data?.messages ?? []);
-                queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
-            })
-            .catch(() => { if (!cancelled) message.error('대화를 불러오지 못했습니다.'); });
-        return () => { cancelled = true; };
-    }, [open, isLoggedIn, queryClient, message]);
+    /*
+     * 대화의 불러오기·폴링·전송은 전부 useChatThread 가 맡는다.
+     * 관리자 탭(ChatTab)과 **같은 훅**이다 — 예전엔 두 화면이 각자 짜서
+     * 폴링 타이머 리셋과 중복 붙임 버그가 양쪽에 똑같이 들어 있었다.
+     * 세 함수는 useCallback 으로 고정한다. 매 렌더 새 함수를 넘기면 훅 안의
+     * 이펙트가 매번 다시 돌아 타이머가 또 리셋된다 — 고치려던 그 버그로 되돌아간다.
+     */
+    const load = useCallback(
+        () => api.get(API_ENDPOINTS.CHAT.MY)
+            .then((d) => ({ roomId: d?.roomId ?? null, messages: d?.messages ?? [] })),
+        [],
+    );
+    const poll = useCallback(
+        (rid, afterId) => api.get(API_ENDPOINTS.CHAT.MY_MESSAGES, { params: { roomId: rid, afterId } }),
+        [],
+    );
+    const sendFn = useCallback(
+        (_rid, content) => api.post(API_ENDPOINTS.CHAT.MY_SEND, { content }),
+        [],
+    );
+    /**
+     * 불러오기 = 읽음 처리다.
+     *
+     * ★ 2026-08-25 — 무효화만 하면 서버 왕복이 끝나야 배지가 사라져서 늦게 느껴진다.
+     *   방금 읽었다는 걸 이미 아니까 **캐시를 먼저 0 으로** 두고, 무효화는 확인만 시킨다.
+     *   손님은 방이 하나뿐이라 0 이 정확한 값이다(관리자 쪽은 방이 여럿이라 1만 깎는다).
+     */
+    const onLoaded = useCallback(() => {
+        queryClient.setQueryData(chatKeys.unread(), 0);
+        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+    }, [queryClient]);
+    const onError = useCallback((msg) => message.error(msg), [message]);
 
-    // 증분 폴링 — 마지막으로 받은 id 뒤에 온 것만. 대화가 길어져도 폴링 비용이 늘지 않는다.
-    useEffect(() => {
-        if (!open || !roomId) return;
-        const tick = () => {
-            const afterId = messages.length ? messages[messages.length - 1].id : 0;
-            api.get(API_ENDPOINTS.CHAT.MY_MESSAGES, { params: { roomId, afterId } })
-                .then((fresh) => {
-                    if (!fresh?.length) return;
-                    setMessages((prev) => [...prev, ...fresh]);
-                })
-                .catch(() => { /* 폴링 실패는 조용히 넘긴다 — 다음 주기에 다시 시도한다 */ });
-        };
-        const timer = setInterval(tick, POLL_OPEN_MS);
-        return () => clearInterval(timer);
-    }, [open, roomId, messages]);
+    const { messages, sending, send } = useChatThread({
+        // 패널이 닫히면 null → 폴링이 멈추고 목록도 비워진다.
+        threadKey: open && isLoggedIn ? 'my' : null,
+        myRole: 'MEMBER',
+        load, poll, send: sendFn,
+        onLoaded, onError,
+        pollMs: POLL_OPEN_MS,
+    });
 
     // 새 메시지가 오면 아래로. 채팅은 항상 끝을 보고 있어야 한다.
     useEffect(() => {
         if (open) bottomRef.current?.scrollIntoView({ block: 'end' });
     }, [messages, open]);
 
-    const sendMutation = useMutation({
-        mutationFn: (content) => api.post(API_ENDPOINTS.CHAT.MY_SEND, { content }),
-        onSuccess: (sent) => {
-            // 서버가 돌려준 것을 그대로 붙인다 — 낙관적 추가를 하면 id·시각이 임시값이라
-            // 바로 뒤에 도는 증분 폴링이 같은 메시지를 한 번 더 붙인다.
-            setMessages((prev) => [...prev, sent]);
-            setDraft('');
-        },
-        onError: () => message.error('전송하지 못했습니다.'),
-    });
-
-    const handleSend = () => {
+    const handleSend = async () => {
         const text = draft.trim();
-        if (!text || sendMutation.isPending) return;
-        sendMutation.mutate(text);
+        if (!text || sending) return;
+        // 낙관적으로 먼저 비운다 — 말풍선이 이미 떠 있는데 입력칸에도 같은 글이 남아 있으면
+        // 두 번 보낸 것처럼 보인다. 실패하면 그대로 되돌린다.
+        setDraft('');
+        const ok = await send(text);
+        if (!ok) setDraft(text);
+    };
+
+    /**
+     * 닫는 애니메이션이 끝나면 DOM 에서 내린다.
+     *
+     * `e.target === e.currentTarget` 검사가 필요한 이유 — 패널 **안쪽** 요소의 애니메이션
+     * (예: 스켈레톤 shimmer)도 여기까지 버블링된다. 그걸 걸러내지 않으면
+     * 열려 있는 도중에 패널이 사라진다.
+     */
+    const handleAnimationEnd = (e) => {
+        if (e.target === e.currentTarget && !open) setVisible(false);
     };
 
     if (!isLoggedIn) return null;
 
     return (
         <>
-            {open && (
-                <div style={styles.panel} className="reserve-chat-panel">
+            {visible && (
+                <div style={styles.panel}
+                    className={`reserve-chat-panel${open ? '' : ' is-closing'}`}
+                    onAnimationEnd={handleAnimationEnd}>
                     <div style={styles.header}>
                         <div>
                             <Text style={styles.headerTitle}>문의하기</Text>
                             <Text style={styles.headerSub}>보통 하루 안에 답변드려요</Text>
                         </div>
-                        <button type="button" onClick={() => setOpen(false)}
-                            style={styles.iconBtn} aria-label="닫기">
+                        <button type="button" onClick={closePanel}
+                            style={styles.iconBtn} className="reserve-chat-close" aria-label="닫기">
                             <CloseOutlined />
                         </button>
                     </div>
@@ -147,43 +167,49 @@ const ChatLauncher = () => {
                                 </Text>
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                {messages.map((m) => <Bubble key={m.id} msg={m} />)}
-                            </div>
+                            <ChatBubbleList messages={messages} mine="MEMBER" />
                         )}
                         <div ref={bottomRef} />
                     </div>
 
                     <div style={styles.composer}>
-                        <textarea
-                            value={draft}
-                            onChange={(e) => setDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                                // Enter 전송 / Shift+Enter 줄바꿈 — 채팅의 관습이다.
-                                // IME 조합 중(한글)에는 Enter 가 확정이므로 무시해야 한다.
-                                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                                    e.preventDefault();
-                                    handleSend();
-                                }
-                            }}
-                            placeholder="메시지를 입력하세요"
-                            maxLength={2000}
-                            rows={2}
-                            style={styles.textarea}
-                        />
-                        <button type="button" onClick={handleSend}
-                            disabled={!draft.trim() || sendMutation.isPending}
-                            style={styles.sendBtn} aria-label="보내기">
-                            <SendOutlined />
-                        </button>
+                        {/* 입력칸과 전송 버튼을 한 껍데기 안에 둔다 — 포커스 표시도 껍데기가 받는다. */}
+                        <div style={styles.composerShell} className="reserve-chat-composer">
+                            <textarea
+                                value={draft}
+                                onChange={(e) => setDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    // Enter 전송 / Shift+Enter 줄바꿈 — 채팅의 관습이다.
+                                    // IME 조합 중(한글)에는 Enter 가 확정이므로 무시해야 한다.
+                                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder="메시지를 입력하세요"
+                                maxLength={2000}
+                                rows={1}
+                                style={styles.textarea}
+                            />
+                            {/* 전송 중에는 아이콘이 스피너로 바뀌고 버튼이 잠긴다.
+                                입력칸은 잠그지 않는다 — 보내는 동안 다음 문장을 이어 쓰는 게 자연스럽고,
+                                실제로 막히는 건 전송뿐이다. */}
+                            <button type="button" onClick={handleSend}
+                                disabled={!draft.trim() || sending}
+                                style={styles.sendBtn} className="reserve-chat-send"
+                                aria-label={sending ? '보내는 중' : '보내기'} aria-busy={sending}>
+                                {sending ? <LoadingOutlined /> : <SendOutlined />}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            <Badge count={open ? 0 : unread} offset={[-6, 6]}>
-                <button type="button" onClick={() => setOpen((v) => !v)}
-                    style={styles.launcher} className="reserve-chat-launcher"
-                    aria-label={open ? '문의 닫기' : '문의하기'}>
+            <Badge count={open ? 0 : unread} offset={[-8, 8]}>
+                <button type="button" onClick={togglePanel}
+                    style={styles.launcher}
+                    className={`reserve-chat-launcher${open ? ' is-open' : ''}`}
+                    aria-label={open ? '문의 닫기' : '문의하기'} aria-expanded={open}>
                     {open ? <CloseOutlined /> : <MessageOutlined />}
                 </button>
             </Badge>
@@ -193,45 +219,56 @@ const ChatLauncher = () => {
 
 const styles = {
     // 런처는 Badge 로 감싸므로 위치는 Badge 래퍼가 아니라 이 버튼이 갖는다.
+    // 원형(50%)이 아니라 둥근 네모다 — 서비스의 다른 모든 면과 같은 모서리 언어를 쓴다.
+    // ⚠️ background / boxShadow 가 여기 없는 건 실수가 아니다 — 둘 다 :hover 에서 바뀌므로
+    //    index.css 의 .reserve-chat-launcher 가 갖는다. 인라인에 두면 인라인이 이겨서
+    //    hover 가 죽는다(2026-08-24 브라우저 실측으로 확인).
     launcher: {
         position: 'fixed', right: 20, bottom: 20, zIndex: 1000,
-        width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: 'pointer',
-        background: colors.primary.main, color: '#fff', fontSize: 20,
-        boxShadow: '0 6px 20px rgba(49,130,246,0.35)',
+        width: 56, height: 56, borderRadius: radius['2xl'], border: 'none', cursor: 'pointer',
+        color: '#fff', fontSize: 21,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
     },
     panel: {
-        position: 'fixed', right: 20, bottom: 84, zIndex: 1000,
-        width: 340, maxWidth: 'calc(100vw - 40px)', height: 460, maxHeight: 'calc(100vh - 140px)',
+        position: 'fixed', right: 20, bottom: 88, zIndex: 1000,
+        width: 348, maxWidth: 'calc(100vw - 40px)', height: 470, maxHeight: 'calc(100vh - 148px)',
         background: colors.background.paper, border: `1px solid ${colors.border.default}`,
-        borderRadius: radius.lg, boxShadow: '0 12px 40px rgba(0,0,0,0.16)',
+        borderRadius: radius['2xl'], boxShadow: '0 12px 40px rgba(0,0,0,0.16)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
     },
     header: {
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-        padding: '14px 16px', borderBottom: `1px solid ${colors.border.light}`,
+        padding: '14px 14px 14px 18px', borderBottom: `1px solid ${colors.border.light}`,
     },
     headerTitle: { display: 'block', fontSize: fontSize.base, fontWeight: fontWeight.semibold, color: colors.text.primary },
     headerSub: { display: 'block', fontSize: fontSize.xs, color: colors.text.tertiary, marginTop: 2 },
-    iconBtn: { background: 'none', border: 'none', cursor: 'pointer', color: colors.text.tertiary, padding: 4 },
+    // 색·배경은 .reserve-chat-close 가 갖는다 — 모달 X 버튼과 같은 규칙(회색 hover, 파랑 없음).
+    // hover 에서 바뀌는 값이라 인라인에 둘 수 없다.
+    iconBtn: {
+        border: 'none', cursor: 'pointer', padding: 0,
+        width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    },
     body: { flex: 1, overflowY: 'auto', padding: '14px 16px', background: colors.background.subtle },
     empty: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    bubble: {
-        maxWidth: '78%', padding: '8px 12px', borderRadius: radius.md,
-        fontSize: fontSize.sm, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    composer: { padding: 12, borderTop: `1px solid ${colors.border.light}`, background: colors.background.paper },
+    // 껍데기가 곧 입력칸이다 — 테두리·모서리·포커스링을 여기가 갖고, 안의 textarea 는 투명하다.
+    // radius 를 리터럴로 적지 않는 이유는 field 토큰 주석에 있다(값이 흩어지면 반드시 어긋난다).
+    composerShell: {
+        display: 'flex', alignItems: 'flex-end', gap: 6, padding: 6,
+        borderRadius: field.radius,          // 상태와 무관 → 토큰에서 그대로
+        background: colors.background.paper, // 상태와 무관
+        // border 는 :focus-within 에서 색이 바뀌므로 .reserve-chat-composer 가 갖는다.
     },
-    bubbleMine: { background: colors.primary.main, color: '#fff', borderBottomRightRadius: 4 },
-    bubbleTheirs: { background: colors.background.paper, color: colors.text.primary, borderBottomLeftRadius: 4, border: `1px solid ${colors.border.light}` },
-    stamp: { fontSize: 10, color: colors.text.tertiary, flexShrink: 0 },
-    composer: { display: 'flex', gap: 8, padding: 12, borderTop: `1px solid ${colors.border.light}`, alignItems: 'flex-end' },
     textarea: {
-        flex: 1, resize: 'none', border: `1px solid ${colors.border.default}`, borderRadius: radius.md,
-        padding: '8px 10px', fontSize: fontSize.sm, fontFamily: 'inherit', outline: 'none',
-        background: colors.background.paper, color: colors.text.primary,
+        flex: 1, minWidth: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent',
+        padding: '7px 4px 7px 8px', margin: 0, maxHeight: 96, overflowY: 'auto',
+        fontSize: fontSize.sm, lineHeight: 1.5, fontFamily: 'inherit', color: colors.text.primary,
     },
+    // 전송 버튼도 둥근 네모. 껍데기 안쪽에 있어서 "이 입력칸의 버튼"으로 읽힌다.
+    // background 는 .reserve-chat-send 가 갖는다 — hover/disabled 에서 바뀐다.
     sendBtn: {
-        flexShrink: 0, width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
-        background: colors.primary.main, color: '#fff',
+        flexShrink: 0, width: 34, height: 34, borderRadius: radius.md, border: 'none', cursor: 'pointer',
+        color: '#fff', padding: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
     },
 };

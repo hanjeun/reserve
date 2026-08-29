@@ -25,7 +25,7 @@ const StoreEdit = () => {
     const [form] = Form.useForm();
     const { message } = useMessage();
     const { formReady, formRef } = useFormReady();
-    const { handlePreview, PreviewModal, suppressLinkNavigation } = useImagePreview();
+    const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
     useDocumentTitle('가게 수정');
     
     const { user } = useAuthStore();
@@ -115,7 +115,7 @@ const StoreEdit = () => {
             />
             
             {/* 이미지 미리보기 모달 */}
-            <PreviewModal />
+            {previewNode}
         </>
     );
 };

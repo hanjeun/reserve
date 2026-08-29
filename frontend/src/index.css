@@ -351,6 +351,33 @@ button, input, textarea, select {
         padding: 7px 10px !important;
     }
 }
+/* ── "…" 드롭다운을 스크롤 없이 다 보이게 (2026-08-25) ────────────────────
+   AntD 기본은 max-height 200px 이라, 관리자 패널처럼 접히는 탭이 7~8개면
+   5개쯤에서 잘리고 **드롭다운 안에서 또 스크롤**해야 했다.
+   접힌 목록을 보려고 연 건데 거기서 다시 스크롤하면 한눈에 보는 게 아니다.
+
+   ★ 왜 ConfigProvider 토큰이 아니라 CSS 인가 — 먼저 토큰으로 시도했다가 실패했다.
+     antd/es/tabs/style/index.js 끝부분이 이렇다:
+
+         mergeToken(token, { ..., tabsDropdownHeight: 200, ... })
+
+     merge() 는 뒤 객체의 키가 앞을 덮어쓴다(@ant-design/cssinjs-utils/es/util/statistic.js).
+     즉 이 200 은 **사용자가 theme.components.Tabs 에 무엇을 넣든 항상 마지막에 덮어쓴다.**
+     prepareComponentToken 에 있는 값들(itemColor 등)과 달리 공개 토큰이 아니다.
+     그래서 여기서는 CSS 가 유일한 경로다.
+
+   ★ !important 가 필요한 이유 — AntD 6 는 이 규칙을 런타임에 <head> 로 주입한다.
+     선택자 명시도가 같으면(둘 다 0,2,0) **나중에 삽입된 쪽**인 AntD 가 이긴다.
+
+   ★ px 고정이 아니라 뷰포트 기준인 이유 — 진짜 제약은 탭 개수가 아니라 화면 높이다.
+     탭이 늘어도 따라오고, 화면이 낮으면(폰 가로모드) 같이 줄어 화면 밖으로 안 나간다.
+     560px 상한은 데스크톱에서 드롭다운만 유난히 길어지는 걸 막는다.
+     min() 을 모르는 브라우저는 이 선언을 통째로 버리는데, 그러면 AntD 의 200px 이 남는다 —
+     망가지는 방향이 "예전과 같음"이라 안전하다. */
+.ant-tabs-dropdown .ant-tabs-dropdown-menu {
+    max-height: min(70vh, 560px) !important;
+}
+
 /* 더보기(∨) 버튼도 우리 톤으로 — 기본 AntD 파란 혹 테두리 없이 회색 계열 */
 .reserve-pill-tabs .ant-tabs-nav-more {
     color: var(--c-text-tertiary, #8b95a1) !important;
@@ -1584,31 +1611,222 @@ input:disabled {
     background: transparent;
     transition: background 0.15s ease;
 }
-.reserve-maillist-item:hover { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
-.reserve-maillist-item:active { background: rgba(0, 0, 0, 0.06); }
-.reserve-maillist-item.is-selected { background: var(--c-primary-light, #e8f3ff); }
-.reserve-maillist-item.is-selected::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 4px;
-    background: var(--c-primary, #3182f6);
-}
+
+/* ★★ 2026-08-25 — `:not(.is-selected)` 가 붙은 이유. 지우지 말 것.
+ *
+ * 증상: 방을 클릭하면 파란 배경이 **뒤늦게** 떴다. 정확히는, 클릭 직후에는 회색이었다가
+ *      포커스가 입력칸으로 옮겨간 뒤에야 파랗게 변했다.
+ *
+ * 원인: 아래 세 규칙의 명시도가 `.is-selected` 와 **똑같이 (0,2,0)** 이다.
+ *      CSS 는 명시도가 같으면 **나중에 선언된 쪽**이 이긴다. 그런데 `:focus-within` 이
+ *      `.is-selected` 보다 아래에 있었다 → 클릭한 행은 포커스를 갖고 있으므로
+ *      선택 파란색이 회색에 덮였다. 포커스가 떠나야 비로소 파란색이 보였던 것이다.
+ *
+ * 순서를 바꿔 고칠 수도 있지만 그러면 "왜 이 순서여야 하는가"가 코드에 안 남는다.
+ * `:not(.is-selected)` 는 의도를 선언으로 적는다 — **선택은 hover·focus 보다 강하다.** */
+.reserve-maillist-item:not(.is-selected):hover { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
+.reserve-maillist-item:not(.is-selected):active { background: rgba(0, 0, 0, 0.06); }
 /* 키보드로 이동했을 때도 행 전체가 선택 대상임이 보여야 한다. */
-.reserve-maillist-item:focus-within { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
+.reserve-maillist-item:not(.is-selected):focus-within { background: var(--c-bg-subtle, rgba(0, 0, 0, 0.03)); }
+
+/* 선택된 행은 **면**으로 표시한다. 왼쪽 레일(4px 세로줄)을 잠깐 뒀다가 뺐다(2026-08-24) —
+   연한 파란 배경만으로 이미 충분히 읽히는데 줄이 하나 더 붙으니 목록마다 세로선이 생겨
+   레이아웃이 어긋나 보였다. 표시가 둘이면 하나는 잉여다. */
+.reserve-maillist-item.is-selected { background: var(--c-primary-light, #e8f3ff); }
+/* 선택된 행에도 hover 피드백은 있어야 한다 — 없으면 "이 행은 안 눌리나?" 로 읽힌다.
+   같은 파랑 계열에서 한 단계만 진하게. */
+.reserve-maillist-item.is-selected:hover {
+    background: color-mix(in srgb, var(--c-primary, #3182f6) 14%, var(--c-bg-paper, #fff));
+}
 
 /* 휴지통 버튼 — 평소엔 존재감을 낮추고, 행에 올렸을 때 드러난다.
    터치 기기에는 hover 가 없으므로 항상 보이게 둔다(아래 미디어쿼리). */
+/* ⚠️ background 를 **여기서** 준다. JSX 인라인 style 에 background 를 두면
+   인라인 쪽 우선순위가 높아서 아래 :hover 규칙이 영영 적용되지 않는다.
+   (2026-08-24 실측으로 확인 — hover 시 계산된 배경이 rgba(0,0,0,0) 그대로였다.)
+   ★ 규칙: **상태(:hover/:active/:focus)에 따라 바뀌어야 하는 속성은 인라인에 두지 않는다.** */
 .reserve-maillist-trash {
+    background: transparent;
     color: var(--c-text-tertiary, #8b95a1);
     opacity: 0.45;
-    transition: opacity 0.15s ease, color 0.15s ease;
+    border-radius: 10px;
+    transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.12s ease;
 }
 .reserve-maillist-item:hover .reserve-maillist-trash { opacity: 1; }
-.reserve-maillist-trash:hover { color: var(--c-error, #f04452); }
+.reserve-maillist-trash:hover {
+    color: var(--c-error, #f04452);
+    background: var(--c-error-light, #fff0f1);
+}
+.reserve-maillist-trash:active { transform: scale(0.9); }
 .reserve-maillist-trash:focus-visible { opacity: 1; }
 .reserve-maillist-trash:disabled { cursor: not-allowed; opacity: 0.25; }
 
 @media (hover: none) {
     .reserve-maillist-trash { opacity: 0.8; }
+}
+
+/* ── 예약 달력 칸 (2026-08-25) ────────────────────────────────────
+   BookingCalendar 는 바로 아래 "예약 시간" pill 그리드와 **같은 언어**로 반응해야 한다.
+   같은 폼에서 두 칸이 다르게 반응하면 "디자인이 안 맞는다"가 된다.
+   짝이 되는 규칙은 StoreDetail 의 .rsv-time-pill 이다 - 한쪽만 고치지 말 것.
+
+   왜 index.css 인가 - hover 는 인라인 스타일로 표현할 수 없고,
+   전역 CSS 는 index.css 에 둔다는 규칙이 있다(CLAUDE.md). StoreDetail 의 style 블록은
+   head 맨 뒤에 붙어 index.css 를 덮으므로, 거기 넣으면 나중에 찾기 어려운 함정이 된다.
+
+   ⚠️ 선택 상태에 transform 을 쓰지 않는다. 칸에는 scaleSpringIn 이 both 로 걸려 있어서
+      애니메이션이 끝난 뒤에도 transform: scale(1) 이 남고, 그건 일반 선언보다 우선한다.
+      (.rsv-time-pill.rsv-selected 의 scale(1.04) 도 같은 이유로 실제로는 안 먹는다.) */
+.reserve-cal-cell {
+    background: transparent;
+    color: var(--c-text-primary, #1a1f27);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.reserve-cal-cell:hover:not(:disabled) {
+    background-color: var(--c-gray-100, #f2f4f6);
+}
+.reserve-cal-cell.is-selected {
+    background-color: var(--c-gray-200, #e5e8eb);
+    font-weight: 600;
+}
+/* 빨간날 — 달력의 오래된 약속이라 상태색과는 다른 역할이다.
+   막힌 날에는 주지 않는다(아래 :disabled 가 이긴다): 연한 회색이 "못 고른다"를 말해야 한다. */
+/* 공휴일도 같은 빨강이다. 판정은 서버가 준다(HolidayService) — 키가 없으면 일요일만 남는다. */
+.reserve-cal-cell.is-holiday { color: var(--c-error, #f04452); }
+/* 영업 안 하는 날 — 연한 회색 하나로만 말한다. 취소선까지 그으면 사유 라벨이 안 읽힌다. */
+.reserve-cal-cell:disabled {
+    color: var(--c-text-disabled, #b5b8bd);
+    cursor: not-allowed;
+}
+/* 날짜 필드 — 다른 입력칸을 눌렀을 때와 같은 정도로만 반응한다. */
+.reserve-cal-trigger:hover { background-color: var(--c-gray-100, #f2f4f6); }
+
+/* 달 넘기기 — 버튼이 작아서 항상 판을 깔면 답답하다. hover 에만 둥근 회색 판을 준다. */
+.reserve-cal-nav {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--c-text-secondary, #4e5968);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.reserve-cal-nav:hover:not(:disabled) {
+    background-color: var(--c-gray-100, #f2f4f6);
+    color: var(--c-text-primary, #1a1f27);
+}
+.reserve-cal-nav:disabled {
+    color: var(--c-text-disabled, #b5b8bd);
+    cursor: not-allowed;
+}
+
+/* 달력 모달 — 시간 pill 이 놓인 배경과 같은 흰 바탕. 여백만 조금 좁힌다. */
+.reserve-cal-modal .ant-modal-body { padding: 10px 6px 6px; }
+/* ══ 인앱 채팅 — 런처·패널·입력칸 (ChatLauncher / 관리자 ChatTab 공용) ═══════
+   ★ 2026-08-24 2차 수정. 1차 때 JSX 에 className 만 써두고 **여기에 대응하는 규칙을
+     한 줄도 안 넣었다.** 그래서 열고 닫을 때 창이 그냥 뿅 나타났다 사라졌고
+     (= "애니메이션이 없다"), 런처에 hover 피드백도 없었다.
+     인라인 style 로는 :hover 도 @keyframes 도 쓸 수 없다. 이게 그 자리다. */
+
+/* 런처 — 원이 아니라 둥근 네모다. 서비스 전체가 쓰는 모서리 언어를 따른다
+   (radius 토큰 · field.radius). 떠 있는 버튼 하나만 원형이면 그것만 이물감이 든다. */
+.reserve-chat-launcher {
+    /* ⚠️ background 와 box-shadow 는 hover 에서 바뀌므로 반드시 여기서 정한다.
+       인라인 style 로 주면 아래 :hover 의 box-shadow 가 무시된다. */
+    background: var(--c-primary, #3182f6);
+    /* ★ 그림자는 **무채색**이다 (2026-08-24 수정).
+       처음엔 rgba(49,130,246,.35) 로 파란 글로우를 줬는데, 반경 20px 짜리 파란 번짐이
+       작은 버튼 둘레에 고르게 퍼지면서 **테두리가 하나 더 있는 것처럼** 보였다.
+       (마우스 클릭 시 outline 은 0px none 임을 브라우저 실측으로 확인했다 — 포커스 링이 아니라
+       이 그림자가 범인이었다.) 값은 shadows.cardHover 계열의 무채색 톤을 따른다. */
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    transition: transform 0.18s cubic-bezier(0.34, 1.28, 0.64, 1),
+                box-shadow 0.18s ease, background 0.15s ease;
+}
+.reserve-chat-launcher:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+}
+.reserve-chat-launcher:active { transform: scale(0.93); }
+.reserve-chat-launcher:focus-visible { outline: 2px solid var(--c-primary, #3182f6); outline-offset: 3px; }
+/* 아이콘이 뚝 바뀌지 않게 — 닫기로 바뀔 때 살짝 돈다. */
+.reserve-chat-launcher .anticon { transition: transform 0.2s ease; }
+.reserve-chat-launcher.is-open .anticon { transform: rotate(90deg); }
+
+/* 패널 — 런처(우하단)에서 자라 나오는 느낌.
+   transform-origin 이 핵심이다. 가운데에서 커지면 "어느 버튼에서 나온 창인지"가 안 보인다. */
+@keyframes reserve-chat-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.93); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes reserve-chat-out {
+    from { opacity: 1; transform: translateY(0)   scale(1); }
+    to   { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+.reserve-chat-panel {
+    transform-origin: 100% 100%;
+    animation: reserve-chat-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.reserve-chat-panel.is-closing { animation: reserve-chat-out 0.15s ease-in both; }
+
+/* 입력 껍데기 — 포커스 표시는 안쪽 textarea 가 아니라 **껍데기 전체**에 나와야 한다.
+   실제 포커스를 받는 건 textarea 이므로 :focus-within 이다. */
+.reserve-chat-composer {
+    /* ⚠️ 테두리는 :focus-within 에서 색이 바뀐다 — 인라인에 두면 포커스링이 안 뜬다.
+       모서리(radius)는 상태와 무관하므로 field 토큰을 쓰는 인라인 쪽에 남긴다. */
+    border: 1px solid var(--c-border-default, #e5e8eb);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.reserve-chat-composer:focus-within {
+    border-color: var(--c-primary, #3182f6);
+    box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.14);
+}
+.reserve-chat-composer textarea::placeholder { color: var(--c-text-tertiary, #8b95a1); }
+
+/* 패널 닫기(X) — **모달 X 버튼과 같은 규칙을 쓴다.**
+   위 .ant-modal-close 블록과 값이 같다: 평소 투명, hover 는 회색 판, 파랑 없음, 아웃라인 없음.
+   처음엔 .reserve-backlink 를 재사용했는데 그건 링크용이라 hover 에서 글자가 primary 로
+   물들고 포커스 링도 파랗다 — 이 프로젝트가 예전에 "모달 하늘색 테두리"로 한참 잡았던
+   그 인상이 X 버튼에 그대로 돌아왔다. 닫기 버튼은 링크가 아니다. */
+.reserve-chat-close {
+    background: transparent;
+    color: var(--c-text-tertiary, #8b95a1);
+    border-radius: 8px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.reserve-chat-close:hover {
+    background: var(--c-gray-100, #f2f4f6);
+    color: var(--c-text-secondary, #4e5968);
+}
+.reserve-chat-close:focus,
+.reserve-chat-close:focus-visible { outline: none; box-shadow: none; }
+
+.reserve-chat-send {
+    background: var(--c-primary, #3182f6);   /* ⚠️ hover 에서 바뀐다 — 인라인 금지 */
+    transition: background 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+}
+.reserve-chat-send:hover:not(:disabled) { background: var(--c-primary-dark, #2272eb); }
+.reserve-chat-send:active:not(:disabled) { transform: scale(0.9); }
+.reserve-chat-send:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ⚠️ animation: none 으로 끄면 안 된다 — 패널을 DOM 에서 내리는 신호가 animationend 라
+   애니메이션이 아예 없으면 **닫기 후에도 패널이 영영 남는다.**
+   그래서 duration 만 0 에 가깝게 줄인다(즉시 끝나고 animationend 는 그대로 발생). */
+@media (prefers-reduced-motion: reduce) {
+    .reserve-chat-panel,
+    .reserve-chat-panel.is-closing { animation-duration: 0.01ms; }
+    .reserve-chat-launcher,
+    .reserve-chat-launcher .anticon,
+    .reserve-chat-send,
+    .reserve-chat-close,
+    .reserve-maillist-trash { transition: none; }
+    .reserve-chat-launcher:hover,
+    .reserve-chat-launcher:active,
+    .reserve-chat-send:active,
+    .reserve-maillist-trash:active { transform: none; }
 }

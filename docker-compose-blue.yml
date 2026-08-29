@@ -51,6 +51,8 @@ services:
       - CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}
       - SENTRY_DSN=${SENTRY_DSN}
       - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
+      # 없으면 달력에 빨간날 표시만 빠진다. 예약 동작에는 영향 없음.
+      - HOLIDAY_API_KEY=${HOLIDAY_API_KEY}
     volumes:
       - /var/log/reserve:/var/log/reserve
     networks:

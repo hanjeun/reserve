@@ -60,6 +60,7 @@ const StoreList = () => {
         loading, refetching, fetchingNext,
         hasNextPage, fetchNextPage,
         searchParams, setSearchParams,
+        error,
     } = useStoreList();
 
     useDocumentTitle('가게 목록', '원하는 조건으로 최고의 가게를 찾아보세요. RESERVE에서 다양한 업종을 간편하게 예약할 수 있습니다.');
@@ -92,6 +93,18 @@ const StoreList = () => {
     const { user } = useAuthStore();
     const { message } = useMessage();
     const { liveLocation, setLiveLocation } = useLocationStore();
+    
+    /*
+     * ★ 목록이 안 뜨는 이유를 말해준다(2026-08-29).
+     *   `useStoreList` 는 예전부터 error 를 내보내고 있었는데 여기서 아무도 안 받았다.
+     *   그래서 서버가 내려가면 이 화면은 **완전히 조용했다** — 토스트도 없고,
+     *   빈 목록이 "조건에 맞는 가게가 없습니다" 로 보여서 검색 결과가 없는 것처럼 읽혔다.
+     *   손님은 조건을 바꿔가며 계속 헛검색을 하게 된다. StoreDetail 과 같은 처리로 맞춘다.
+     */
+    React.useEffect(() => {
+        if (error) message.error(error);
+    }, [error, message]);
+    
     // "우리동네" 배지용 위치 — 정렬 기준과 무관하게 항상 같은 우선순위로 나온다(이건 이전에는
     // searchParams.lat/lng에만 의존해서, 거리순이 아닌 다른 정렬로 바꾸면 배지가 사라지던 버그가 있었음).
     //
@@ -234,7 +247,7 @@ const StoreList = () => {
                     <div style={styles.fadeOut} />
                 </div>
             ) : stores.length === 0 ? (
-                <Empty description="조건에 맞는 가게가 없습니다." style={{ marginTop: 100 }} />
+                <Empty description={error ?? '조건에 맞는 가게가 없습니다.'} style={{ marginTop: 100 }} />
             ) : (
                 <>
                     <div className="rsv-store-grid">

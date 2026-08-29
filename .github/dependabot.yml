@@ -6,14 +6,30 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["chore", "dependencies"]
+    # 그룹이 없으면 업데이트 하나당 PR 하나가 열린다(실제로 13개까지 쌓였다).
+    groups:
+      # eslint 코어와 플러그인은 버전이 물려 있어 따로 머지하면 그 사이 커밋에서 CI 가 깨진다.
+      eslint:
+        patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "eslint-config-*"]
+      # 나머지 minor/patch 는 한 덩어리로. 메이저는 여기 안 잡히고 따로 올라온다 — 그게 맞다.
+      frontend-minor:
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: "gradle"
     directory: "/backend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["chore", "dependencies"]
+    groups:
+      backend-minor:
+        update-types: ["minor", "patch"]
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     labels: ["chore", "dependencies"]
+    groups:
+      actions:
+        patterns: ["*"]

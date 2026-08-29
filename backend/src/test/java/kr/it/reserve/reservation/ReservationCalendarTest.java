@@ -3,6 +3,7 @@ package kr.it.reserve.reservation;
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
+import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
@@ -23,6 +24,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,6 +54,8 @@ class ReservationCalendarTest {
     @Mock private EmailService emailService;
     @Mock private MemberRepository memberRepository;
     @Mock private AuditLogService auditLogService;
+    /** 빨간날 색칠용. 기본 mock 이 빈 Set 을 주므로 공휴일 없음 = 기존 기대값 그대로다. */
+    @Mock private HolidayService holidayService;
 
     @InjectMocks
     private ReservationService reservationService;
@@ -81,6 +85,43 @@ class ReservationCalendarTest {
 
     private static String ymd(LocalDate d) {
         return d.toString();
+    }
+
+    @Test
+    @DisplayName("공휴일이 그대로 실려 내려온다 — 프론트가 날짜를 보고 다시 판정하지 않게")
+    void holidayFlagIsCarried() {
+        LocalDate holiday = NEXT_MONTH.atDay(5);
+        when(holidayService.holidaysOf(NEXT_MONTH)).thenReturn(Set.of(holiday));
+
+        Map<String, CalendarDayResponse> days = calendar(openStore());
+
+        assertThat(days.get(ymd(holiday)).isHoliday()).isTrue();
+        assertThat(days.get(ymd(NEXT_MONTH.atDay(6))).isHoliday()).isFalse();
+    }
+
+    @Test
+    @DisplayName("★ 공휴일이어도 예약은 열려 있다 — 빨간날은 색칠일 뿐 판정이 아니다")
+    void holidayDoesNotBlockBooking() {
+        LocalDate holiday = NEXT_MONTH.atDay(5);
+        when(holidayService.holidaysOf(NEXT_MONTH)).thenReturn(Set.of(holiday));
+
+        CalendarDayResponse day = calendar(openStore()).get(ymd(holiday));
+
+        assertThat(day.getStatus()).isEqualTo("OPEN");
+        assertThat(day.getOpenSlots()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("★ 공휴일 조회가 죽어도 달력은 그대로 뜬다 — 전부 false 로 내려올 뿐")
+    void holidayLookupFailureIsInvisible() {
+        // HolidayService 는 실패해도 예외 대신 빈 집합을 준다(HolidayServiceTest 계약).
+        when(holidayService.holidaysOf(NEXT_MONTH)).thenReturn(Set.of());
+
+        Map<String, CalendarDayResponse> days = calendar(openStore());
+
+        assertThat(days).hasSize(NEXT_MONTH.lengthOfMonth());
+        assertThat(days.values()).noneMatch(CalendarDayResponse::isHoliday);
+        assertThat(days.get(ymd(NEXT_MONTH.atDay(15))).getStatus()).isEqualTo("OPEN");
     }
 
     @Test

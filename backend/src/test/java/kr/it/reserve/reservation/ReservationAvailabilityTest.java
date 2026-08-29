@@ -3,6 +3,7 @@ package kr.it.reserve.reservation;
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
+import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
@@ -58,6 +59,10 @@ class ReservationAvailabilityTest {
 
     @Mock
     private AuditLogService auditLogService;
+
+    /** 빨간날 색칠용. 이 테스트는 시간 슬롯만 보므로 기본 mock(빈 Set) 그대로 둔다. */
+    @Mock
+    private HolidayService holidayService;
 
     @InjectMocks
     private ReservationService reservationService;

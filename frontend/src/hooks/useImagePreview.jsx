@@ -144,7 +144,7 @@ const useImagePreview = () => {
      * - visible / onVisibleChange 로 열기/닫기를 외부에서 제어
      * - items가 비워지는 시점이 닫힘 애니메이션 이후로 미뤄졌기 때문에 early return이 애니메이션을 자르지 않는다.
      * - deps를 비워 이 함수(컴포넌트) 참조를 완전히 고정 — 최신 값은 위 ref로 읽는다.
-     * - rootClassName으로 우리 톤 툴바 CSS(.reserve-image-preview)를 건다.
+     * - classNames.popup.root 로 우리 톤 툴바 CSS(.reserve-image-preview)를 건다.
      */
     const PreviewModal = useCallback(() => {
         if (previewItemsRef.current.length === 0) return null;
@@ -161,14 +161,22 @@ const useImagePreview = () => {
                     // 되돌아가 버린다(넘김이 안 되는 버그의 원인). 여기서 ref를 먼저 갱신해 다음
                     // 렌더에서도 같은 인덱스가 유지되게 하고, state도 갱신해 리렌더를 트리거한다.
                     onChange: (index) => { previewCurrentRef.current = index; setPreviewCurrent(index); },
-                    // ⚠️ rootClassName은 antd 6에서 deprecated 경고가 뜨지만 일부러 되돌렸다(2026-07-30).
-                    // 경고대로 classNames.root로 바꿨더니 preview 루트에 클래스가 아예 안 붙어
-                    // .reserve-image-preview(둥근 네모 툴바·화살표·닫기) 스타일이 통째로 죽었다.
-                    // 브라우저에서 확인: 미리보기 DOM에 우리 클래스 0건.
-                    // antd의 semantic classNames에서 preview 루트는 popup.root 계열이라
-                    // preview 안의 classNames.root와는 다른 자리다. 경고는 감수하고 동작을 택한다.
-                    rootClassName: 'reserve-image-preview',
                 }}
+                /*
+                 * ★ 툴바 톤 CSS 를 거는 자리 (2026-08-29 최종 정리).
+                 *
+                 * 예전엔 `preview={{ rootClassName }}` 이었고 antd 6 가 deprecated 경고를 띄웠다.
+                 * 경고가 시키는 대로 `classNames.root` 로 옮겼더니 클래스가 아예 안 붙어서
+                 * (2026-07-30) 경고를 감수하고 되돌렸었는데 — **경고 문구가 틀렸던 것**이다.
+                 *
+                 * antd 소스(image/PreviewGroup.js)를 보면 `preview.rootClassName` 은
+                 * `classNames.popup.root` 자리로 들어간다. `classNames.root` 는 이미지 래퍼고,
+                 * 미리보기 오버레이는 `popup.root` 다. 경고는 그 둘을 구분하지 못한다.
+                 *
+                 * 브라우저에서 확인: `.ant-image-preview ... reserve-image-preview` 로 정확히 붙고
+                 * 툴바·화살표·닫기가 그대로 살아 있으며 경고는 사라진다.
+                 */
+                classNames={{ popup: { root: 'reserve-image-preview' } }}
             />
         );
     }, [handleCancel]);

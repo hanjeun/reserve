@@ -47,6 +47,8 @@ export const API_ENDPOINTS = {
         UNDO_COMPLETE:       (id) => `/api/reservations/${id}/undo-complete`,
         NO_SHOW:             (id) => `/api/reservations/${id}/no-show`,
         AVAILABILITY:        '/api/reservations/availability',
+        // 달력용 월 단위 조회 — 날짜마다 상태와 그 사유(휴무/기간밖/마감…)를 함께 준다.
+        CALENDAR:            '/api/reservations/calendar',
         QR_TOKEN:            (id) => `/api/reservations/${id}/qr-token`,
         QR_CHECKIN:          '/api/reservations/qr-checkin',
     },

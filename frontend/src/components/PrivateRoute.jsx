@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
-import { useMessage } from '../hooks';
+import useMessage from '../hooks/useMessage';
 import { saveRedirect, pathFromLocation } from '../utils/redirect';
 
 /**

@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Typography, Flex, Divider } from 'antd';
 import {
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined, MailOutlined, DollarOutlined,
+    CheckCircleOutlined,
 } from '@ant-design/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import { formatTime, formatCurrency } from '../../utils';
@@ -30,7 +31,7 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
 
     const {
         storeName, reservationCode, memberName, memberEmail, reservationDate, reservationTime,
-        guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason,
+        guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason, checkedInAt,
     } = cached;
 
     // 거절과 취소는 서로 다른 필드를 다른 라벨로 보여준다 (2026-08-11).
@@ -88,6 +89,15 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
                 <Text style={styles.detailLabel}>금액</Text>
                 <Text style={styles.detailValue} strong>{formatCurrency(depositAmount)}</Text>
             </div>
+            {checkedInAt && (
+                <div style={styles.detailRow}>
+                    <CheckCircleOutlined style={{ ...styles.detailIcon, color: colors.success.main }} />
+                    <Text style={styles.detailLabel}>체크인</Text>
+                    <Text style={styles.detailValue}>
+                        {checkedInAt.substring(0, 16).replace('T', ' ')}
+                    </Text>
+                </div>
+            )}
             {specialRequest && (
                 <>
                     <Divider style={{ margin: '12px 0' }} />

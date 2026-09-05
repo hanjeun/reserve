@@ -39,6 +39,34 @@ public interface BusinessVerificationRepository extends JpaRepository<BusinessVe
            countQuery = "SELECT COUNT(bv) FROM BusinessVerification bv")
     Page<BusinessVerification> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+    /** 관리자 목록용 서버측 검색. 현재 페이지가 아니라 전체 요청 집합에서 검색한 뒤 페이지를 자른다. */
+    @Query(value = """
+            SELECT bv FROM BusinessVerification bv
+              JOIN FETCH bv.member m
+              LEFT JOIN FETCH bv.processedBy
+             WHERE (:status IS NULL OR bv.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(bv.businessName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR bv.businessNumber LIKE CONCAT('%', :keyword, '%'))
+             ORDER BY bv.createdAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(bv) FROM BusinessVerification bv
+              JOIN bv.member m
+             WHERE (:status IS NULL OR bv.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(bv.businessName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR bv.businessNumber LIKE CONCAT('%', :keyword, '%'))
+            """)
+    Page<BusinessVerification> searchForAdmin(
+            @Param("status") VerificationStatus status,
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
     // 대기중인 인증 요청 수
     long countByStatus(VerificationStatus status);
 

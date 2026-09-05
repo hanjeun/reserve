@@ -37,7 +37,7 @@ public class OAuthUnlinkService {
         String accessToken = member.getOauthAccessToken();
         if (accessToken == null) {
             log.warn("OAuth unlink failed: no access token. memberId={}", member.getId());
-            return true; // 혹은 필요에 따라 throw new AuthException
+            return false;
         }
 
         try {
@@ -48,9 +48,8 @@ public class OAuthUnlinkService {
                 default -> true;
             };
         } catch (Exception e) {
-            log.error("OAuth unlink error: {}", e.getMessage());
-            // 탈퇴가 중단되면 안 되므로 로그만 남기고 true 반환하는 정책 유지
-            return true;
+            log.error("OAuth unlink error: errorType={}", e.getClass().getSimpleName());
+            return false;
         }
     }
 
@@ -78,9 +77,8 @@ public class OAuthUnlinkService {
             return response.getStatusCode().is2xxSuccessful();
 
         } catch (Exception e) {
-            log.error("Google unlink failed: {}", e.getMessage());
-            // 토큰이 이미 만료되었거나 해제된 경우에도 탈퇴는 진행
-            return true;
+            log.error("Google unlink failed: errorType={}", e.getClass().getSimpleName());
+            return false;
         }
     }
 
@@ -97,13 +95,12 @@ public class OAuthUnlinkService {
         try {
             ResponseEntity<String> response = restTemplate.getForEntity(unlinkUrl, String.class);
 
-            log.info("Naver unlink response: status={}, body={}", response.getStatusCode(), response.getBody());
+            log.info("Naver unlink response: status={}", response.getStatusCode());
             return response.getStatusCode().is2xxSuccessful();
 
         } catch (Exception e) {
-            log.error("Naver unlink failed: {}", e.getMessage());
-            // 토큰이 이미 만료되었거나 해제된 경우에도 탈퇴는 진행
-            return true;
+            log.error("Naver unlink failed: errorType={}", e.getClass().getSimpleName());
+            return false;
         }
     }
 
@@ -128,13 +125,12 @@ public class OAuthUnlinkService {
                     String.class
             );
 
-            log.info("Kakao unlink response: status={}, body={}", response.getStatusCode(), response.getBody());
+            log.info("Kakao unlink response: status={}", response.getStatusCode());
             return response.getStatusCode().is2xxSuccessful();
 
         } catch (Exception e) {
-            log.error("Kakao unlink failed: {}", e.getMessage());
-            // 토큰이 이미 만료되었거나 해제된 경우에도 탈퇴는 진행
-            return true;
+            log.error("Kakao unlink failed: errorType={}", e.getClass().getSimpleName());
+            return false;
         }
     }
 }

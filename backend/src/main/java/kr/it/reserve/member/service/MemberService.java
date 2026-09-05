@@ -4,35 +4,36 @@ import kr.it.reserve.business.repository.BusinessVerificationRepository;
 import kr.it.reserve.community.repository.CommunityCommentRepository;
 import kr.it.reserve.community.repository.CommunityPostRepository;
 import kr.it.reserve.community.repository.PostLikeRepository;
-import kr.it.reserve.config.jwt.entity.RefreshToken;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
-import kr.it.reserve.config.oauth2.OAuthUnlinkService;
-import kr.it.reserve.inquiry.repository.InquiryRepository;
-import kr.it.reserve.notice.repository.NoticeRepository;
 import kr.it.reserve.email.service.EmailVerificationService;
+import kr.it.reserve.email.repository.EmailVerificationRepository;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.security.PwnedPasswordChecker;
-import kr.it.reserve.member.dto.MemberDto;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
+import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.member.event.MemberWithdrawalCommittedEvent;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.repository.PasswordResetTokenRepository;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
-import kr.it.reserve.review.repository.ReviewRepository;
-import kr.it.reserve.store.entity.Store;
-import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.util.FileStoragePaths;
+import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
+import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -47,20 +48,20 @@ public class MemberService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder bCryptPasswordEncoder;
     private final EmailVerificationService emailVerificationService;
-    private final OAuthUnlinkService oAuthUnlinkService;
-
-    private final StoreRepository storeRepository;
-    private final ReservationRepository reservationRepository;
     private final FavoriteRepository favoriteRepository;
     private final PromotionRepository promotionRepository;
-    private final ReviewRepository reviewRepository;
-    private final InquiryRepository inquiryRepository;
+    private final PaymentRepository paymentRepository;
+    private final ReservationRepository reservationRepository;
     private final CommunityPostRepository communityPostRepository;
     private final CommunityCommentRepository communityCommentRepository;
     private final PostLikeRepository postLikeRepository;
-    private final NoticeRepository noticeRepository;
     private final FileStorageService fileStorageService;
+    private final FileDeletionOutboxService fileDeletionOutboxService;
     private final BusinessVerificationRepository businessVerificationRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailVerificationRepository emailVerificationRepository;
+    private final DataLifecycleGuard dataLifecycleGuard;
+    private final ApplicationEventPublisher eventPublisher;
     private final PwnedPasswordChecker pwnedPasswordChecker;
 
     /**
@@ -72,39 +73,44 @@ public class MemberService {
             "다른 사이트에서 유출된 적이 있는 비밀번호입니다. 다른 비밀번호를 사용해주세요.";
 
     @Transactional
-    public Long join(MemberDto memberDto) {
+    public Long join(MemberSignupRequest signupRequest) {
         // 서버 측 필수 약관 동의 검증 (프론트 우회 방어)
-        if (!memberDto.isTermsAgreed()) {
+        if (!signupRequest.isTermsAgreed()) {
             throw new MemberException("필수 약관에 동의해주세요.", HttpStatus.BAD_REQUEST);
         }
 
-        if (memberRepository.findByEmail(memberDto.getEmail()).isPresent()) {
+        if (memberRepository.findByEmail(signupRequest.getEmail()).isPresent()) {
             throw MemberException.conflict("이미 사용 중인 이메일입니다.");
         }
 
-        if (!emailVerificationService.isEmailVerified(memberDto.getEmail())) {
+        if (!emailVerificationService.isEmailVerified(signupRequest.getEmail())) {
             throw new MemberException("이메일 인증이 필요합니다.", HttpStatus.BAD_REQUEST);
         }
 
         // 유출 리스트 검사는 마지막에 둔다 — 이메일 중복·인증처럼 서버 안에서 끝나는 검증을
         // 먼저 통과시켜야, 어차피 거절될 요청에 외부 API 호출을 낭비하지 않는다.
-        if (pwnedPasswordChecker.isPwned(memberDto.getPassword())) {
+        if (pwnedPasswordChecker.isPwned(signupRequest.getPassword())) {
             throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
 
         return memberRepository.save(Member.builder()
-                .name(memberDto.getName())
-                .email(memberDto.getEmail())
-                .password(bCryptPasswordEncoder.encode(memberDto.getPassword()))
-                .role(memberDto.getRole())
+                .name(signupRequest.getName())
+                .email(signupRequest.getEmail())
+                .password(bCryptPasswordEncoder.encode(signupRequest.getPassword()))
+                .role(Role.USER)
                 .provider(AuthProvider.LOCAL)
                 .termsAgreed(true)
-                .marketingAgreed(memberDto.isMarketingAgreed())
+                .marketingAgreed(signupRequest.isMarketingAgreed())
                 .build()).getId();
     }
 
     public Member findById(Long id) {
-        return memberRepository.findById(id)
+        return memberRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(MemberException::notFound);
+    }
+
+    private Member findByIdForUpdate(Long id) {
+        return memberRepository.findActiveByIdForUpdate(id)
                 .orElseThrow(MemberException::notFound);
     }
 
@@ -113,7 +119,7 @@ public class MemberService {
     }
 
     public Member findByEmail(String email) {
-        return memberRepository.findByEmail(email)
+        return memberRepository.findByEmailAndDeletedAtIsNull(email)
                 .orElseThrow(MemberException::notFound);
     }
 
@@ -128,13 +134,13 @@ public class MemberService {
      * @return 회원 또는 {@code null}
      */
     public Member findByEmailOrNull(String email) {
-        return memberRepository.findByEmail(email).orElse(null);
+        return memberRepository.findByEmailAndDeletedAtIsNull(email).orElse(null);
     }
 
     @Transactional
     public MemberResponse updateMember(Long memberId, MemberUpdateRequest request) {
         log.info("Member updated: memberId={}", memberId);
-        Member member = findById(memberId);
+        Member member = findByIdForUpdate(memberId);
 
         if (request.getName() != null && !request.getName().isEmpty()) {
             member.setName(request.getName());
@@ -165,15 +171,6 @@ public class MemberService {
             member.setPassword(bCryptPasswordEncoder.encode(request.getPassword()));
         }
 
-        if (request.getRole() != null && !request.getRole().isEmpty()) {
-            try {
-                Role newRole = Role.valueOf(request.getRole().toUpperCase());
-                member.setRole(newRole);
-            } catch (IllegalArgumentException e) {
-                throw new MemberException("유효하지 않은 권한입니다: " + request.getRole(), HttpStatus.BAD_REQUEST);
-            }
-        }
-
         if (request.getEmailNotificationEnabled() != null) {
             member.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
         }
@@ -187,13 +184,13 @@ public class MemberService {
     @Transactional
     public MemberResponse deleteProfileImage(Long memberId) {
         log.info("Profile image deleted: memberId={}", memberId);
-        Member member = findById(memberId);
-
-        fileStorageService.deleteFile(member.getProfileImage());
+        Member member = findByIdForUpdate(memberId);
+        String oldImage = member.getProfileImage();
 
         member.setProfileImage(null);
         member.setProfileImageLocked(true);
         Member updated = memberRepository.save(member);
+        fileDeletionOutboxService.enqueue(oldImage, "MEMBER_PROFILE_IMAGE", memberId);
         log.info("Profile image delete completed: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);
     }
@@ -201,14 +198,14 @@ public class MemberService {
     @Transactional
     public MemberResponse updateProfileImage(Long memberId, MultipartFile image) {
         log.info("Profile image updated: memberId={}", memberId);
-        Member member = findById(memberId);
-
-        fileStorageService.deleteFile(member.getProfileImage());
+        Member member = findByIdForUpdate(memberId);
+        String oldImage = member.getProfileImage();
 
         String key = fileStorageService.storeFile(image, FileStoragePaths.userProfile(memberId));
         member.setProfileImage(fileStorageService.getPublicUrl(key));
         member.setProfileImageLocked(true);
         Member updated = memberRepository.save(member);
+        fileDeletionOutboxService.enqueue(oldImage, "MEMBER_PROFILE_IMAGE", memberId);
         log.info("Profile image update completed: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);
     }
@@ -220,8 +217,7 @@ public class MemberService {
      */
     @Transactional
     public MemberResponse updateMarketingConsent(Long memberId, boolean marketingAgreed) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(MemberException::notFound);
+        Member member = findByIdForUpdate(memberId);
         member.setMarketingAgreed(marketingAgreed);
         return MemberResponse.fromEntity(memberRepository.save(member));
     }
@@ -245,8 +241,7 @@ public class MemberService {
      * (브라우저 Geolocation 기반 등)이 기존에 등록해둔 주소를 지워버리면 안 되기 때문.
      */
     public MemberResponse updateLocation(Long memberId, LocationUpdateRequest request) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(MemberException::notFound);
+        Member member = findByIdForUpdate(memberId);
 
         member.setLatitude(request.getLatitude());
         member.setLongitude(request.getLongitude());
@@ -268,44 +263,42 @@ public class MemberService {
      */
     @Transactional
     public void agreeTerms(Long memberId, boolean marketingAgreed) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+        Member member = findByIdForUpdate(memberId);
         member.setTermsAgreed(true);
         member.setMarketingAgreed(marketingAgreed);
     }
 
+    @Transactional(readOnly = true)
+    public MemberWithdrawalReadiness getWithdrawalReadiness(Long memberId) {
+        findById(memberId);
+        return dataLifecycleGuard.inspectMember(memberId);
+    }
+
     @Transactional
     public void deleteMember(Long memberId) {
-        log.info("Member deletion started: memberId={}", memberId);
-        Member member = findById(memberId);
+        log.info("Member withdrawal started: memberId={}", memberId);
+        Member member = findByIdForUpdate(memberId);
+        dataLifecycleGuard.requireMemberWithdrawalAllowed(memberId);
+
+        String originalEmail = member.getEmail();
+        String profileImage = member.getProfileImage();
 
         if (member.isOAuthUser()) {
-            log.info("OAuth unlink attempted");
-            oAuthUnlinkService.unlinkOAuth(member);
+            eventPublisher.publishEvent(new MemberWithdrawalCommittedEvent(
+                    member.getId(), member.getProvider(), member.getOauthAccessToken()));
         }
 
-        List<Store> ownedStores = storeRepository.findByOwnerId(memberId);
+        fileDeletionOutboxService.enqueue(profileImage, "MEMBER_PROFILE_IMAGE", memberId);
+        businessVerificationRepository.findByMemberOrderByCreatedAtDesc(member).forEach(verification ->
+                fileDeletionOutboxService.enqueue(
+                        verification.getLicenseImageKey(),
+                        "BUSINESS_LICENSE_IMAGE",
+                        verification.getId()));
 
-        for (Store store : ownedStores) {
-            Long storeId = store.getId();
-            reviewRepository.deleteByStoreId(storeId);
-            reservationRepository.deleteByStoreId(storeId);
-            favoriteRepository.deleteByStoreId(storeId);
-            promotionRepository.deleteByStoreId(storeId);
-
-            if (store.getMainImageUrl() != null) {
-                fileStorageService.deleteFile(store.getMainImageUrl());
-            }
-            store.getDetailImageList().forEach(fileStorageService::deleteFile);
-        }
-
-        storeRepository.deleteAll(ownedStores);
-
-        reviewRepository.deleteByMemberId(memberId);
-        reservationRepository.deleteByMemberId(memberId);
+        // 개인화·홍보·커뮤니티 데이터는 제거한다. 예약·결제·환불·후기·문의·채팅은
+        // 거래/분쟁 이력과 FK를 보존하되 아래 회원 행을 비식별화해 개인을 식별하지 못하게 한다.
         favoriteRepository.deleteByMemberId(memberId);
         promotionRepository.deleteByMemberId(memberId);
-        inquiryRepository.deleteByMemberId(memberId);
 
         List<Long> postIds = communityPostRepository.findPostIdsByAuthorId(memberId);
         if (!postIds.isEmpty()) {
@@ -316,13 +309,16 @@ public class MemberService {
         postLikeRepository.deleteByMemberId(memberId);
         communityCommentRepository.deleteByAuthorId(memberId);
         communityPostRepository.deleteByAuthorId(memberId);
-        noticeRepository.deleteByAuthorId(memberId);
         businessVerificationRepository.deleteByMemberId(memberId);
 
-        List<RefreshToken> tokens = refreshTokenRepository.findByMemberId(memberId);
-        refreshTokenRepository.deleteAll(tokens);
+        paymentRepository.anonymizeBuyerByMemberId(memberId);
+        reservationRepository.clearSpecialRequestsByMemberId(memberId);
 
-        memberRepository.deleteById(memberId);
-        log.info("Member deletion completed: memberId={}", memberId);
+        refreshTokenRepository.deleteByMemberId(memberId);
+        passwordResetTokenRepository.deleteByEmail(originalEmail);
+        emailVerificationRepository.deleteByEmail(originalEmail);
+
+        member.withdraw("withdrawn-" + memberId + "@reserve.invalid");
+        log.info("Member withdrawal completed: memberId={}", memberId);
     }
 }

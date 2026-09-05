@@ -60,7 +60,7 @@ import java.util.Date;
  * 토큰이 유출되면 방문일이 한참 지난 뒤에도 그 예약을 CONFIRMED 처리할 수 있는 약점이 있었다.
  * 이제 예약 방문일 다음 날 새벽(자정+GRACE)까지만 유효하도록 만료를 넣는다 — 방문일 당일 스캔은
  * 자정 넘어까지도 넉넉히 커버하면서, 지난 예약의 토큰은 자연 무효화된다.
- * (재사용 방지는 여전히 예약 상태 전이(PENDING → CONFIRMED)가 1차로 막아준다.)
+ * 재사용은 예약의 {@code checkedInAt} 멱등 기록이 막는다.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -187,10 +187,10 @@ public class QrCheckinTokenProvider {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            log.debug("Expired QR check-in token: {}", e.getMessage());
+            log.debug("Expired QR check-in token");
             throw new ReservationException("만료된 QR 코드입니다. 예약 상세에서 QR을 다시 열어주세요.");
         } catch (Exception e) {
-            log.debug("Invalid QR check-in token: {}", e.getMessage());
+            log.debug("Invalid QR check-in token: errorType={}", e.getClass().getSimpleName());
             throw new ReservationException("유효하지 않은 QR 코드입니다.");
         }
         // 짧은 클레임(신규)과 긴 클레임(기존 발급분)을 둘 다 받는다.

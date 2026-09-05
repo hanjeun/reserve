@@ -116,6 +116,8 @@ FormInput.WithButton = ({
     value,
     onChange,
     id,
+    className,
+    buttonAriaLabel,
     ...rest 
 }) => {
     const inputStyle = {
@@ -138,11 +140,14 @@ FormInput.WithButton = ({
         fontSize: '14px',
         ...buttonStyle,
     };
+    const buttonLabel = buttonAriaLabel
+        ?? (typeof buttonText === 'string' ? buttonText : undefined);
 
     return (
-        <div style={{ display: 'flex', gap: 0 }}>
+        <div className="reserve-form-field-with-button" style={{ display: 'flex', gap: 0 }}>
             <Input
                 id={id}
+                className={['reserve-form-field', className].filter(Boolean).join(' ')}
                 placeholder={placeholder}
                 disabled={disabled || verified}
                 variant="filled"
@@ -155,22 +160,15 @@ FormInput.WithButton = ({
                 type="button"
                 onClick={onButtonClick}
                 disabled={buttonDisabled || buttonLoading || verified}
+                className="reserve-form-field-button"
+                aria-label={buttonLoading && buttonLabel ? `${buttonLabel} 처리 중` : buttonLabel}
+                aria-busy={buttonLoading || undefined}
                 style={btnStyle}
             >
-                {buttonLoading ? <span style={spinStyle} /> : buttonText}
+                {buttonLoading ? <span className="reserve-form-field-button-spin" aria-hidden="true" /> : buttonText}
             </button>
         </div>
     );
-};
-
-const spinStyle = {
-    display: 'inline-block',
-    width: 14,
-    height: 14,
-    border: '2px solid rgba(255,255,255,0.4)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    animation: 'reserve-spin 0.6s linear infinite',
 };
 
 FormInput.propTypes = {
@@ -198,6 +196,8 @@ FormInput.WithButton.propTypes = {
     value: PropTypes.string,
     onChange: PropTypes.func,
     id: PropTypes.string,
+    className: PropTypes.string,
+    buttonAriaLabel: PropTypes.string,
 };
 
 export default FormInput;

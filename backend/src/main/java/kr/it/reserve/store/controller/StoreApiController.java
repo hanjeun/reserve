@@ -4,6 +4,7 @@ import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.StoreException;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.lifecycle.dto.StoreClosureReadiness;
 import kr.it.reserve.store.dto.StoreCreateRequest;
 import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.dto.StoreStatisticsResponse;
@@ -119,6 +120,15 @@ public class StoreApiController {
         return ApiResponse.success(count, "활성 예약 수 조회 성공");
     }
 
+    @GetMapping("/{id}/closure-readiness")
+    public ApiResponse<StoreClosureReadiness> getClosureReadiness(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        validateBusinessAuth(member);
+        return ApiResponse.success(
+                storeService.getClosureReadiness(id, member),
+                "영업 종료 준비 상태 조회 성공");
+    }
+
     // 사업자 "통계 · 분석" 탭 — 기간(range=7d|30d|90d, 기본 30d) 통계 조회
     @GetMapping("/{id}/statistics")
     public ApiResponse<StoreStatisticsResponse> getStoreStatistics(
@@ -131,17 +141,14 @@ public class StoreApiController {
         return ApiResponse.success(stats, "가게 통계 조회 성공");
     }
 
-    // 가게 삭제
+    // 가게 영업 종료 (거래 원장은 보존하고 공개 노출만 종료)
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteStore(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "false") boolean force
-    ) {
-        Member member = SecurityUtil.getCurrentMember("가게 삭제를 위해 로그인이 필요합니다.");
+    public ApiResponse<Void> deleteStore(@PathVariable Long id) {
+        Member member = SecurityUtil.getCurrentMember("가게 영업 종료를 위해 로그인이 필요합니다.");
         validateBusinessAuth(member);
 
-        storeService.deleteStore(id, member, force);
-        return ApiResponse.success(null, "가게가 삭제되었습니다.");
+        storeService.deleteStore(id, member);
+        return ApiResponse.success(null, "가게 영업이 종료되었습니다.");
     }
 
     // [중요] 사업자 권한 검증 공통 로직

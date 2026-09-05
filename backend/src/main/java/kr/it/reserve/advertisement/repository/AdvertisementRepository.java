@@ -18,6 +18,7 @@ import java.util.Optional;
 public interface AdvertisementRepository extends JpaRepository<Advertisement, Long> {
 
     Optional<Advertisement> findByMerchantUid(String merchantUid);
+    List<Advertisement> findByStoreId(Long storeId);
 
     // 2026-07 추가: 종료상태(만료/취소/환불/중단) 광고를 사업자가 직접 목록에서 숨길 수 있게(소프트삭제)
     // 되면서, 데리베이션 쿼리로는 WHERE를 추가할 수 없어 명시적 @Query로 바꿈 —
@@ -35,6 +36,8 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
 
     // 중복 신청 방지용(2026-07 추가) — 같은 가게+타입으로 결제 대기/실패 상태인 신청이 이미 있는지 확인
     Optional<Advertisement> findFirstByStoreIdAndAdTypeAndStatusIn(Long storeId, AdType adType, List<AdStatus> statuses);
+
+    long countByStoreIdAndStatusInAndDeletedAtIsNull(Long storeId, java.util.Collection<AdStatus> statuses);
 
     // 만료 스케줄러용 — ACTIVE인데 endDate 지난 것들
     List<Advertisement> findByStatusAndEndDateBefore(AdStatus status, LocalDate date);

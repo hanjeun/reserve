@@ -12,7 +12,7 @@ dependencyLocking {
 group = 'kr.it.reserve'
 // ⚠️ frontend/package.json 의 version 과 항상 같이 올린다.
 //    2.0.2 · 2.0.3 · 2.1.0 세 번을 여기만 안 올려서 프론트 2.1.0 / 백엔드 2.0.1 로 벌어져 있었다.
-version = '2.4.1'
+version = '2.5.0'
 description = 'We are reserve'
 
 java {

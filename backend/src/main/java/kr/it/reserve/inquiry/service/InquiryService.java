@@ -74,7 +74,7 @@ public class InquiryService {
         String notifierEmail;
 
         if (memberId != null) {
-            Member member = memberRepository.findById(memberId)
+            Member member = memberRepository.findActiveByIdForUpdate(memberId)
                     .orElseThrow(() -> new InquiryException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
             builder.member(member);
             notifierName = member.getName();

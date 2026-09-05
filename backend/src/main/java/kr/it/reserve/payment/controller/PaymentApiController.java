@@ -86,7 +86,8 @@ public class PaymentApiController {
             return redirect(redirectBase + "?success=true&merchant_uid=" + enc(merchantUid));
         } catch (BusinessException e) {
             // 도메인 예외의 메시지는 애초에 사용자에게 보여줄 목적으로 쓴 한국어 문구라 그대로 전달한다.
-            log.warn("Mobile payment redirect failed: merchant_uid={}, {}", merchantUid, e.getMessage());
+            log.warn("Mobile payment redirect failed: merchantUid={}, errorType={}",
+                    merchantUid, e.getClass().getSimpleName());
             return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(e.getMessage()));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.

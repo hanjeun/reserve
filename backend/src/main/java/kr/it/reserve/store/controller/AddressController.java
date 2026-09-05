@@ -82,7 +82,7 @@ public class AddressController {
             return ResponseEntity.ok(ApiResponse.success(body != null ? body : empty, ""));
 
         } catch (Exception e) {
-            log.error("Kakao address search failed: query={}, error={}", query, e.getMessage());
+            log.error("Kakao address search failed: errorType={}", e.getClass().getSimpleName());
             return ResponseEntity.ok(ApiResponse.success(empty, "주소 검색에 실패했습니다."));
         }
     }

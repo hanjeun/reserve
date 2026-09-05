@@ -67,26 +67,31 @@ const StoresAdminTab = () => {
     const [storeBanOpen, setStoreBanOpen]               = useState(false);
 
     const {
-        data: stores = [], isLoading: storeLoading, isFetching, error: storesError, refetch,
+        data, isLoading: storeLoading, isFetching, error: storesError, refetch,
     } = useQuery({
-        queryKey: adminKeys.stores(),
+        queryKey: [...adminKeys.stores(), page, debouncedStoreSearch],
         queryFn: async () => {
-            const data = await api.get(API_ENDPOINTS.ADMIN_MANAGE.STORES, { params: { page: 0, size: 100 } });
-            return data?.content ?? [];
+            const result = await api.get(API_ENDPOINTS.ADMIN_MANAGE.STORES, {
+                params: {
+                    page: page - 1,
+                    size: PAGE_SIZE,
+                    ...(debouncedStoreSearch.trim() ? { search: debouncedStoreSearch.trim() } : {}),
+                },
+            });
+            return {
+                stores: result?.content ?? [],
+                totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
+            };
         },
         placeholderData: keepPreviousData,
     });
+    const stores = data?.stores ?? [];
+    const totalElements = data?.totalElements ?? 0;
     useEffect(() => {
         if (storesError) message.error('가게 목록을 불러오지 못했습니다.');
     }, [storesError, message]);
 
-    const filteredStores = React.useMemo(() => {
-        if (!debouncedStoreSearch.trim()) return stores;
-        const kw = debouncedStoreSearch.toLowerCase();
-        return stores.filter(s => s.name?.toLowerCase().includes(kw) || s.address?.toLowerCase().includes(kw));
-    }, [stores, debouncedStoreSearch]);
-
-    // 검색어로 결과가 줄면 존재하지 않는 페이지를 가리킬 수 있어 1로 복귀
+    // 검색은 서버 전체 집합에 적용한다. 검색어가 바뀌면 존재하지 않을 수 있는 페이지를 초기화한다.
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
 
     const invalidateStores = () => queryClient.invalidateQueries({ queryKey: adminKeys.stores() });
@@ -168,25 +173,25 @@ const StoresAdminTab = () => {
     return (
         <>
             <FilterToolbar
-                count={filteredStores.length}
+                count={totalElements}
                 search={{ value: storeSearch, onChange: handleSearchChange, placeholder: '가게명, 주소로 검색' }}
                 onReload={refetch}
                 loading={storeLoading || isFetching}
             />
             {(storeLoading || isFetching) ? (
                 <AdminTableSkeleton
-                    rows={skeletonRowCount(filteredStores.length, page, PAGE_SIZE)}
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}
                     headers={SKELETON_HEADERS}
                     actionBtns={2}
-                    pagination={filteredStores.length ? { current: page, pageSize: PAGE_SIZE, total: filteredStores.length } : null}
+                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
                 />
             ) : (
                 <DataTable
                     columns={storeAdminColumns}
-                    dataSource={filteredStores}
+                    dataSource={stores}
                     rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: filteredStores.length, onChange: setPage }}
+                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
                     locale={{ emptyText: '가게가 없습니다.' }}
                 />
             )}

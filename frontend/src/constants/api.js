@@ -32,6 +32,7 @@ export const API_ENDPOINTS = {
         MY_RESERVATIONS:     '/api/reservations/my',
         MY_COMPLETED_FOR_STORE: (storeId) => `/api/reservations/my/store/${storeId}/completed`,
         STORE_RESERVATIONS:  '/api/reservations/store',
+        STORE_RESERVATION_SUMMARY: '/api/reservations/store/status-summary',
         CREATE:              '/api/reservations',
         DETAIL:              (id) => `/api/reservations/${id}`,
         UPDATE:              (id) => `/api/reservations/${id}`,
@@ -84,6 +85,7 @@ export const API_ENDPOINTS = {
         UPDATE:            '/api/member/update',
         PROFILE_IMAGE:     '/api/member/profile-image',
         DELETE:            '/api/member/delete',
+        WITHDRAWAL_READINESS: '/api/member/withdrawal-readiness',
         MARKETING_CONSENT: '/api/member/me/marketing-consent',
         LOCATION:          '/api/member/me/location',
     },
@@ -107,6 +109,15 @@ export const API_ENDPOINTS = {
         REFUND:         '/api/payment/refund',
         MY_PAYMENTS:    '/api/payment/my-payments',
         REFUND_PREVIEW: (id) => `/api/payment/refund-preview/${id}`,
+    },
+    PAYMENT_OPERATIONS: {
+        STALE_READY:       '/api/admin/payment-operations/stale-ready',
+        RECONCILE_READY:   (id) => `/api/admin/payment-operations/stale-ready/${id}/reconcile`,
+        ISSUES:            '/api/admin/payment-operations/issues',
+        ISSUE_COUNT:       '/api/admin/payment-operations/issues/open-count',
+        WEBHOOKS:          '/api/admin/payment-operations/webhooks',
+        WEBHOOK_COUNT:     '/api/admin/payment-operations/webhooks/unfinished-count',
+        RETRY_WEBHOOK:     (id) => `/api/admin/payment-operations/webhooks/${id}/retry`,
     },
     PASSWORD_RESET: {
         SEND_CODE:   '/api/password-reset/send-code',
@@ -139,7 +150,7 @@ export const API_ENDPOINTS = {
     MAIL: {
         COMPOSE:      '/api/admin/mail/compose',
         SENT:         '/api/admin/mail/sent',
-        // 소프트 삭제(휴지통 이동). 영구 삭제는 TRASH.DELETE('SENT_MAIL', id) 가 맡는다.
+        // 소프트 삭제(휴지통 이동). 보존 기간이 끝나면 서버 스케줄러가 자동 정리한다.
         TRASH_SENT:   (id) => `/api/admin/mail/sent/${id}`,
     },
     INQUIRY: {
@@ -156,7 +167,6 @@ export const API_ENDPOINTS = {
     TRASH: {
         LIST:    '/api/admin/trash',
         RESTORE: (type, id) => `/api/admin/trash/${type}/${id}/restore`,
-        DELETE:  (type, id) => `/api/admin/trash/${type}/${id}`,
     },
     AUDIT_LOG: {
         LIST: '/api/admin/audit-logs',

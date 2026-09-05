@@ -42,8 +42,7 @@ public class AdminMailController {
     // ── 보낸 메일 휴지통으로 이동 (ADMIN) ─────────────────
     /**
      * 소프트 삭제다. 휴지통 탭에서 30일 안에 복구할 수 있고, 그 뒤 스케줄러가 영구 삭제한다.
-     * 영구 삭제는 이 엔드포인트가 아니라 {@code DELETE /api/admin/trash/SENT_MAIL/{id}} 가 맡는다 —
-     * 되돌릴 수 없는 동작은 휴지통 화면 한 곳에만 두는 게 맞다.
+     * 관리자가 보존 기간을 건너뛰어 즉시 영구 삭제하는 HTTP 경로는 제공하지 않는다.
      */
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/sent/{id}")

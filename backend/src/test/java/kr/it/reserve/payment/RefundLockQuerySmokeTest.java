@@ -1,15 +1,21 @@
 package kr.it.reserve.payment;
 
 import kr.it.reserve.payment.entity.RefundAttempt;
+import kr.it.reserve.payment.entity.PaymentWebhookInbox;
+import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
 import kr.it.reserve.payment.repository.PaymentRepository;
+import kr.it.reserve.payment.repository.PaymentReconciliationIssueRepository;
+import kr.it.reserve.payment.repository.PaymentWebhookInboxRepository;
 import kr.it.reserve.payment.repository.RefundAttemptRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -38,16 +44,28 @@ class RefundLockQuerySmokeTest {
     @Autowired
     private RefundAttemptRepository refundAttemptRepository;
 
+    @Autowired
+    private PaymentWebhookInboxRepository paymentWebhookInboxRepository;
+
+    @Autowired
+    private PaymentReconciliationIssueRepository paymentReconciliationIssueRepository;
+
     @Test
     @Transactional
     @DisplayName("행 잠금 조회가 SQL 로 실행된다 (FOR UPDATE 구문이 살아 있는지)")
     void lockingFindersExecute() {
         assertThatCode(() -> paymentRepository.findByIdForUpdate(-1L)).doesNotThrowAnyException();
         assertThatCode(() -> paymentRepository.findPaidByReservationIdForUpdate(-1L)).doesNotThrowAnyException();
+        assertThatCode(() -> paymentRepository.findByMerchantUidForUpdate("missing"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> paymentRepository.findAllByReservationIdForUpdate(-1L))
+                .doesNotThrowAnyException();
 
         // 없는 ID 이므로 결과는 비어 있어야 한다 — 쿼리가 조건을 무시하고 아무 행이나 집지 않는지도 함께 본다.
         assertThat(paymentRepository.findByIdForUpdate(-1L)).isEmpty();
         assertThat(paymentRepository.findPaidByReservationIdForUpdate(-1L)).isEmpty();
+        assertThat(paymentRepository.findByMerchantUidForUpdate("missing")).isEmpty();
+        assertThat(paymentRepository.findAllByReservationIdForUpdate(-1L)).isEmpty();
     }
 
     @Test
@@ -58,5 +76,34 @@ class RefundLockQuerySmokeTest {
                 .doesNotThrowAnyException();
 
         assertThat(refundAttemptRepository.countByStatusIn(RefundAttempt.UNRESOLVED)).isZero();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("웹훅 inbox의 잠금·재시도 쿼리가 SQL로 실행된다")
+    void webhookInboxQueriesExecute() {
+        assertThatCode(() -> paymentWebhookInboxRepository.findByWebhookIdForUpdate("missing"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> paymentWebhookInboxRepository.findRetryableWebhookIds(
+                List.of(PaymentWebhookInbox.InboxStatus.RECEIVED, PaymentWebhookInbox.InboxStatus.FAILED),
+                PaymentWebhookInbox.InboxStatus.PROCESSING,
+                LocalDateTime.now(),
+                LocalDateTime.now().minusMinutes(5),
+                PageRequest.of(0, 50)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("결제 수동 대사 큐의 잠금·페이지 쿼리가 SQL로 실행된다")
+    void reconciliationIssueQueriesExecute() {
+        assertThatCode(() -> paymentReconciliationIssueRepository.findByIssueKeyForUpdate("missing"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> paymentReconciliationIssueRepository.findByStatusOrderByLastSeenAtDesc(
+                PaymentReconciliationIssue.IssueStatus.OPEN,
+                PageRequest.of(0, 50)))
+                .doesNotThrowAnyException();
+        assertThat(paymentReconciliationIssueRepository
+                .countByStatus(PaymentReconciliationIssue.IssueStatus.OPEN)).isZero();
     }
 }

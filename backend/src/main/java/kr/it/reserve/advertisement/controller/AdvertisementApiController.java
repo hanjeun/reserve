@@ -81,7 +81,8 @@ public class AdvertisementApiController {
             return redirect(redirectBase + "?success=true&type=ad&merchant_uid=" + enc(merchantUid));
         } catch (BusinessException e) {
             // 도메인 예외의 메시지는 애초에 사용자에게 보여줄 목적으로 쓴 한국어 문구라 그대로 전달한다.
-            log.warn("Ad mobile redirect verification failed: merchantUid={}, {}", merchantUid, e.getMessage());
+            log.warn("Ad mobile redirect verification failed: merchantUid={}, errorType={}",
+                    merchantUid, e.getClass().getSimpleName());
             return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
                     + "&error_msg=" + enc(e.getMessage()));
         } catch (Exception e) {

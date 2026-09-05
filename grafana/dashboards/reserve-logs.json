@@ -31,7 +31,7 @@
         "enable": true,
         "hide": false,
         "iconColor": "#9085e9",
-        "name": "배포",
+        "name": "배포 시점",
         "expr": "{job=\"reserve\"} |= `Starting ReserveApplication`",
         "titleFormat": "배포",
         "textFormat": "{{__line__}}"
@@ -42,7 +42,7 @@
   "graphTooltip": 1,
   "id": null,
   "links": [],
-  "refresh": "1m",
+  "refresh": "5m",
   "schemaVersion": 39,
   "tags": [
     "reserve",
@@ -167,20 +167,20 @@
       {
         "type": "textbox",
         "name": "search",
-        "label": "검색어",
+        "label": "로그 검색",
         "hide": 0,
-        "query": ".*",
+        "query": "",
         "skipUrlSync": false,
         "current": {
           "selected": false,
-          "text": ".*",
-          "value": ".*"
+          "text": "",
+          "value": ""
         },
         "options": [
           {
             "selected": true,
-            "text": ".*",
-            "value": ".*"
+            "text": "",
+            "value": ""
           }
         ]
       }
@@ -189,7 +189,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "지금 이상한가",
+      "title": "이상 징후",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -209,7 +209,7 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 0,
         "y": 1
@@ -217,10 +217,10 @@
       "id": 1,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -231,7 +231,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -241,7 +241,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -263,18 +263,9 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\", level=\"ERROR\"} [1h]))",
+          "expr": "sum(count_over_time({job=\"reserve\", level=\"ERROR\"} [1h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\", level=\"ERROR\"} [10m]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
@@ -287,7 +278,7 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 6,
         "y": 1
@@ -295,10 +286,10 @@
       "id": 2,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -309,7 +300,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -319,7 +310,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -341,18 +332,9 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\", level=\"WARN\"} [1h]))",
+          "expr": "sum(count_over_time({job=\"reserve\", level=\"WARN\"} [1h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\", level=\"WARN\"} [10m]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
@@ -365,7 +347,7 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 12,
         "y": 1
@@ -373,10 +355,10 @@
       "id": 3,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -387,7 +369,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -397,7 +379,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -419,18 +401,9 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Login failed` [1h]))",
+          "expr": "sum(count_over_time({job=\"reserve\"} |= `Login failed` [1h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Login failed` [10m]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
@@ -443,7 +416,7 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 18,
         "y": 1
@@ -451,10 +424,10 @@
       "id": 4,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -465,7 +438,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -475,7 +448,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -493,30 +466,21 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Portone` |~ `failed|error` [24h]))",
+          "expr": "sum(count_over_time({job=\"reserve\"} |= `Portone` |~ `failed|error` [24h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Portone` |~ `failed|error` [1h]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
     {
       "type": "row",
-      "title": "서비스가 돌고 있는가",
+      "title": "서비스 활동",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 5
       },
       "id": 101,
       "panels": []
@@ -524,24 +488,24 @@
     {
       "type": "stat",
       "title": "예약 생성 (최근 24시간)",
-      "description": "이 서비스의 존재 이유입니다. 아래 미니 그래프로 하루 중 언제 몰리는지 보입니다.",
+      "description": "최근 24시간 동안 생성된 예약 수입니다. 시간대별 흐름은 아래 추세 구역에서 확인합니다.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 0,
-        "y": 7
+        "y": 6
       },
       "id": 5,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -552,7 +516,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -576,18 +540,9 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation created` [24h]))",
+          "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation created` [24h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation created` [1h]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
@@ -600,18 +555,18 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 6,
-        "y": 7
+        "y": 6
       },
       "id": 6,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -622,7 +577,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -646,18 +601,9 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Payment verified` [24h]))",
+          "expr": "sum(count_over_time({job=\"reserve\"} |= `Payment verified` [24h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Payment verified` [1h]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
@@ -670,18 +616,18 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 12,
-        "y": 7
+        "y": 6
       },
       "id": 7,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -692,7 +638,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -716,42 +662,33 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\"} |~ `New OAuth2 member registered|Email verification completed` [24h]))",
+          "expr": "sum(count_over_time({job=\"reserve\"} |~ `New OAuth2 member registered|Email verification completed` [24h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |~ `New OAuth2 member registered|Email verification completed` [1h]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
     {
       "type": "stat",
       "title": "메일 발송 실패 (최근 24시간)",
-      "description": "★ 0이 아니면 즉시 확인하세요. 2026-07-29 ~ 08-17 장애 때 여기에 13건이 쌓여 있었고 아무도 보지 않았습니다.",
+      "description": "0이 아니면 즉시 확인합니다. 메일 장애를 가장 빠르게 드러내는 운영 지표입니다.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 6,
         "x": 18,
-        "y": 7
+        "y": 6
       },
       "id": 8,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -762,7 +699,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "short",
           "custom": {
             "fillOpacity": 12,
@@ -772,7 +709,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -790,341 +727,333 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\"} |~ `email failed|Email send failed|Mail send failed` [24h]))",
+          "expr": "sum(count_over_time({job=\"reserve\"} |~ `email failed|Email send failed|Mail send failed` [24h])) or vector(0)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |~ `email failed|Email send failed|Mail send failed` [1h]))",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
     {
       "type": "row",
-      "title": "추세",
-      "collapsed": false,
+      "title": "추세 · 필요할 때 펼치기",
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 10
       },
       "id": 102,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "레벨별 로그량",
-      "description": "세로선은 배포 시점입니다. 배포 직후 ERROR가 올라갔다면 그 배포를 의심하세요.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 13
-      },
-      "id": 9,
-      "options": {
-        "legend": {
-          "calcs": [
-            "sum"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 55,
-            "lineWidth": 0,
-            "showPoints": "never",
-            "spanNulls": false,
-            "barAlignment": 0,
-            "pointSize": 5,
-            "axisBorderShow": false,
-            "axisGridShow": true,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "레벨별 로그량",
+          "description": "세로선은 배포 시점입니다. 배포 직후 ERROR가 올라갔다면 그 배포를 의심하세요.",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 13
+          },
+          "id": 9,
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
             }
           },
-          "unit": "short",
-          "min": 0
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 55,
+                "lineWidth": 0,
+                "showPoints": "never",
+                "spanNulls": false,
+                "barAlignment": 0,
+                "pointSize": 5,
+                "axisBorderShow": false,
+                "axisGridShow": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "unit": "short",
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "INFO"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#898781",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "WARN"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#fab219",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "ERROR"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#d03b3b",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\", level=\"INFO\"} [$__auto]))",
+              "refId": "A",
+              "queryType": "range",
+              "legendFormat": "INFO"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\", level=\"WARN\"} [$__auto]))",
+              "refId": "B",
+              "queryType": "range",
+              "legendFormat": "WARN"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\", level=\"ERROR\"} [$__auto]))",
+              "refId": "C",
+              "queryType": "range",
+              "legendFormat": "ERROR"
+            }
+          ]
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "INFO"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#898781",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WARN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#fab219",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ERROR"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#d03b3b",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
         {
+          "type": "timeseries",
+          "title": "주요 활동",
+          "description": "전부 동시에 바닥에 붙으면 서비스가 멈춘 것이고, 하나만 떨어지면 그 기능이 고장난 것입니다.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "sum(count_over_time({job=\"reserve\", level=\"INFO\"} [5m]))",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "INFO"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 13
           },
-          "expr": "sum(count_over_time({job=\"reserve\", level=\"WARN\"} [5m]))",
-          "refId": "B",
-          "queryType": "range",
-          "legendFormat": "WARN"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\", level=\"ERROR\"} [5m]))",
-          "refId": "C",
-          "queryType": "range",
-          "legendFormat": "ERROR"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "주요 활동",
-      "description": "전부 동시에 바닥에 붙으면 서비스가 멈춘 것이고, 하나만 떨어지면 그 기능이 고장난 것입니다.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 13
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": [
-            "sum"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": false,
-            "barAlignment": 0,
-            "pointSize": 5,
-            "axisBorderShow": false,
-            "axisGridShow": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
+          "id": 10,
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
             }
           },
-          "unit": "short",
-          "min": 0
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "예약 생성"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3987e5",
-                  "mode": "fixed"
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": false,
+                "barAlignment": 0,
+                "pointSize": 5,
+                "axisBorderShow": false,
+                "axisGridShow": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
                 }
+              },
+              "unit": "short",
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "예약 생성"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3987e5",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "결제 완료"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#d95926",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "리뷰 작성"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#199e70",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "신규 가입"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#c98500",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "메일 발송"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#d55181",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
               }
             ]
           },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "결제 완료"
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation created` [$__auto]))",
+              "refId": "A",
+              "queryType": "range",
+              "legendFormat": "예약 생성"
             },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#d95926",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "리뷰 작성"
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Payment verified` [$__auto]))",
+              "refId": "B",
+              "queryType": "range",
+              "legendFormat": "결제 완료"
             },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#199e70",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "신규 가입"
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Review created: reviewId` [$__auto]))",
+              "refId": "C",
+              "queryType": "range",
+              "legendFormat": "리뷰 작성"
             },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#c98500",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "메일 발송"
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\"} |~ `New OAuth2 member registered|Email verification completed` [$__auto]))",
+              "refId": "D",
+              "queryType": "range",
+              "legendFormat": "신규 가입"
             },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#d55181",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation created` [1h]))",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "예약 생성"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Payment verified` [1h]))",
-          "refId": "B",
-          "queryType": "range",
-          "legendFormat": "결제 완료"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `Review created: reviewId` [1h]))",
-          "refId": "C",
-          "queryType": "range",
-          "legendFormat": "리뷰 작성"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |~ `New OAuth2 member registered|Email verification completed` [1h]))",
-          "refId": "D",
-          "queryType": "range",
-          "legendFormat": "신규 가입"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "sum(count_over_time({job=\"reserve\"} |= `email sent` [1h]))",
-          "refId": "E",
-          "queryType": "range",
-          "legendFormat": "메일 발송"
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `email sent` [$__auto]))",
+              "refId": "E",
+              "queryType": "range",
+              "legendFormat": "메일 발송"
+            }
+          ]
         }
       ]
     },
@@ -1136,7 +1065,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 11
       },
       "id": 103,
       "panels": [
@@ -1258,7 +1187,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation created` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation created` [$__auto]))",
               "refId": "A",
               "queryType": "range",
               "legendFormat": "생성"
@@ -1268,7 +1197,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation cancelled by store` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation cancelled by store` [$__auto]))",
               "refId": "B",
               "queryType": "range",
               "legendFormat": "가게 취소"
@@ -1278,7 +1207,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Auto-cancelled` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Auto-cancelled` [$__auto]))",
               "refId": "C",
               "queryType": "range",
               "legendFormat": "미결제 자동취소"
@@ -1288,7 +1217,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation removed` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Reservation removed` [$__auto]))",
               "refId": "D",
               "queryType": "range",
               "legendFormat": "회원 삭제"
@@ -1398,7 +1327,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Payment verified` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Payment verified` [$__auto]))",
               "refId": "A",
               "queryType": "range",
               "legendFormat": "결제 완료"
@@ -1408,7 +1337,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |~ `Refund requested|Full refund by store` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |~ `Refund requested|Full refund by store` [$__auto]))",
               "refId": "B",
               "queryType": "range",
               "legendFormat": "환불"
@@ -1418,7 +1347,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Advertisement activated` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Advertisement activated` [$__auto]))",
               "refId": "C",
               "queryType": "range",
               "legendFormat": "광고 결제"
@@ -1435,7 +1364,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 12
       },
       "id": 104,
       "panels": [
@@ -1542,7 +1471,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `OAuth2 login success` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `OAuth2 login success` [$__auto]))",
               "refId": "A",
               "queryType": "range",
               "legendFormat": "소셜 로그인"
@@ -1552,7 +1481,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Refresh token issued` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Refresh token issued` [$__auto]))",
               "refId": "B",
               "queryType": "range",
               "legendFormat": "토큰 발급"
@@ -1562,7 +1491,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Login failed` [1h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Login failed` [$__auto]))",
               "refId": "C",
               "queryType": "range",
               "legendFormat": "로그인 실패"
@@ -1571,8 +1500,8 @@
         },
         {
           "type": "timeseries",
-          "title": "관리자 · 사업자 활동",
-          "description": "제재와 사업자 인증 처리 현황입니다. 평소 0이므로 움직이면 곧 본인이 한 일입니다.",
+          "title": "관리자 · 보안 이벤트",
+          "description": "사업자 인증·제재와 CSP Report-Only 위반입니다. CSP는 배포 뒤 최소 7일 관측하고 설명되지 않는 위반이 없어야 강제로 전환합니다.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
@@ -1663,6 +1592,21 @@
                     }
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "CSP 위반"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#d03b3b",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
               }
             ]
           },
@@ -1672,7 +1616,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Business verification submitted` [6h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Business verification submitted` [$__auto]))",
               "refId": "A",
               "queryType": "range",
               "legendFormat": "사업자 신청"
@@ -1682,7 +1626,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |~ `Business verification approved|Business verification rejected` [6h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |~ `Business verification approved|Business verification rejected` [$__auto]))",
               "refId": "B",
               "queryType": "range",
               "legendFormat": "승인·거절"
@@ -1692,10 +1636,20 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |~ `Admin banned|Admin suspended` [6h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |~ `Admin banned|Admin suspended` [$__auto]))",
               "refId": "C",
               "queryType": "range",
               "legendFormat": "제재"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `CSP violation observed` [$__auto]))",
+              "refId": "D",
+              "queryType": "range",
+              "legendFormat": "CSP 위반"
             }
           ]
         }
@@ -1709,7 +1663,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 13
       },
       "id": 105,
       "panels": [
@@ -1936,7 +1890,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `Auto-cancelled` [6h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `Auto-cancelled` [$__auto]))",
               "refId": "A",
               "queryType": "range",
               "legendFormat": "예약 자동취소"
@@ -1946,7 +1900,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `overdue advertisements` [6h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `overdue advertisements` [$__auto]))",
               "refId": "B",
               "queryType": "range",
               "legendFormat": "광고 만료"
@@ -1956,7 +1910,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "sum(count_over_time({job=\"reserve\"} |= `unpaid advertisements past` [6h]))",
+              "expr": "sum(count_over_time({job=\"reserve\"} |= `unpaid advertisements past` [$__auto]))",
               "refId": "C",
               "queryType": "range",
               "legendFormat": "미결제 광고 취소"
@@ -1967,13 +1921,13 @@
     },
     {
       "type": "row",
-      "title": "무엇이 터지나",
+      "title": "오류 분석",
       "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 14
       },
       "id": 106,
       "panels": [
@@ -2175,51 +2129,52 @@
     },
     {
       "type": "row",
-      "title": "로그 보기",
-      "collapsed": false,
+      "title": "로그 상세 · 필요할 때 펼치기",
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 15
       },
       "id": 107,
-      "panels": []
-    },
-    {
-      "type": "logs",
-      "title": "로그 — $level / $domain / 검색: $search",
-      "description": "위 드롭다운 세 개로 걸러집니다. 영역을 고르면 그 도메인만, 검색어를 넣으면 그 문자열이 든 줄만 보입니다.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 18,
-        "w": 24,
-        "x": 0,
-        "y": 27
-      },
-      "id": 19,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": false,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
+      "panels": [
         {
+          "type": "logs",
+          "title": "필터링된 로그",
+          "description": "위 드롭다운 세 개로 걸러집니다. 영역을 고르면 그 도메인만, 검색어를 넣으면 그 문자열이 든 줄만 보입니다.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "{job=\"reserve\", level=~\"$level\"} |~ \"$domain\" |~ \"$search\"",
-          "refId": "A",
-          "queryType": "range"
+          "gridPos": {
+            "h": 18,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "id": 19,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "{job=\"reserve\", level=~\"$level\"} |~ \"$domain\" |~ \"$search\"",
+              "refId": "A",
+              "queryType": "range"
+            }
+          ]
         }
       ]
     }

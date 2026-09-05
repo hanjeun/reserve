@@ -1,10 +1,12 @@
 package kr.it.reserve.community.repository;
 
+import jakarta.persistence.LockModeType;
 import kr.it.reserve.community.entity.CommunityPost;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -42,6 +44,16 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
     // 단건 상세 조회 - author + comments fetch join으로 N+1 방지 (getPost 전용)
     @Query("SELECT DISTINCT p FROM CommunityPost p JOIN FETCH p.author LEFT JOIN FETCH p.comments WHERE p.id = :id")
     Optional<CommunityPost> findByIdWithAuthorAndComments(@Param("id") Long id);
+
+    /** 좋아요 토글은 게시글별로 직렬화해 like_count의 갱신 유실을 막는다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM CommunityPost p WHERE p.id = :id")
+    Optional<CommunityPost> findByIdForUpdate(@Param("id") Long id);
+
+    /** 조회수는 엔티티 read-modify-write 대신 DB에서 한 문장으로 증가시킨다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE CommunityPost p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
+    int incrementViewCount(@Param("id") Long id);
 
     // 댓글 개수 조회 (게시글 목록용 - comments 컬렉션 LAZY 로딩 방지)
     @Query("SELECT c.post.id, COUNT(c) FROM CommunityComment c WHERE c.post.id IN :postIds GROUP BY c.post.id")

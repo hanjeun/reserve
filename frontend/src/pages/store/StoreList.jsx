@@ -37,23 +37,6 @@ const PAGE_SIZE = 12;
 //   390px → 1열(전과 같음, 경계만 480→552로 올라갔고 폰은 그보다 훨씬 좁다)
 //   1280·1440px → 4열(전과 같음)
 //   바뀌는 건 481~1079px 구간뿐이다.
-const GRID_STYLE = `
-  .rsv-store-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
-  }
-  @media (max-width: 1079px) {
-    .rsv-store-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-  @media (max-width: 815px) {
-    .rsv-store-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 551px) {
-    .rsv-store-grid { grid-template-columns: 1fr; }
-  }
-`;
-
 const StoreList = () => {
     const {
         stores, totalElements,
@@ -196,7 +179,6 @@ const StoreList = () => {
 
     return (
         <PageContainer size="xl" paddingTop="40px">
-            <style>{GRID_STYLE}</style>
             {/* 헤더 */}
             <div style={styles.header}>
                 <div style={styles.headerLeft}>

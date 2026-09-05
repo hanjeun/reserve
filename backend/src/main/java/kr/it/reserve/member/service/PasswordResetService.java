@@ -37,15 +37,15 @@ public class PasswordResetService {
      */
     @Transactional
     public boolean sendResetCode(String email) {
-        var memberOpt = memberRepository.findByEmail(email);
+        var memberOpt = memberRepository.findByEmailAndDeletedAtIsNull(email);
         if (memberOpt.isEmpty()) {
-            log.info("Password reset requested: unregistered email={}", email);
+            log.info("Password reset request not deliverable");
             return false;
         }
         var member = memberOpt.get();
         if (member.getPassword() == null) {
             // OAuth 전용 계정 (Google/Naver/Kakao) → 로컬 비밀번호 없음
-            log.info("Password reset requested: OAuth-only account={}", email);
+            log.info("Password reset request not deliverable");
             return false;
         }
 
@@ -58,7 +58,7 @@ public class PasswordResetService {
                 .build();
         tokenRepository.save(token);
         emailService.sendPasswordResetEmail(email, code);
-        log.info("Password reset code sent: email={}", email);
+        log.info("Password reset code queued: memberId={}", member.getId());
         return true;
     }
 
@@ -86,8 +86,8 @@ public class PasswordResetService {
 
         if (!token.getToken().equals(code)) {
             token.recordFailedAttempt();
-            log.warn("Password reset code mismatch: email={}, attempt={}/{}",
-                    email, token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
+            log.warn("Password reset code mismatch: attempt={}/{}",
+                    token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
             throw new MemberException("인증 코드가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
         }
         token.markVerified();
@@ -101,7 +101,7 @@ public class PasswordResetService {
      */
     private void requireAttemptsLeft(PasswordResetToken token, String email) {
         if (token.isAttemptExhausted()) {
-            log.warn("Password reset code attempts exhausted: email={}", email);
+            log.warn("Password reset code attempts exhausted");
             throw new MemberException(
                     "인증 시도 횟수를 초과했습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
         }
@@ -133,15 +133,15 @@ public class PasswordResetService {
 
         if (!token.getToken().equals(code)) {
             token.recordFailedAttempt();
-            log.warn("Password reset code mismatch on reset: email={}, attempt={}/{}",
-                    email, token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
+            log.warn("Password reset code mismatch on reset: attempt={}/{}",
+                    token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
             throw new MemberException("잘못된 접근입니다.", HttpStatus.BAD_REQUEST);
         }
         if (!token.isVerified()) {
             throw new MemberException("코드 인증을 먼저 완료해주세요.", HttpStatus.BAD_REQUEST);
         }
 
-        Member member = memberRepository.findByEmail(email)
+        Member member = memberRepository.findActiveByEmailForUpdate(email)
                 .orElseThrow(MemberException::notFound);
 
         // 재설정 경로에도 같은 검사를 건다. 여기를 빼면 "가입은 막히는데 재설정으로는 들어간다"는
@@ -155,7 +155,7 @@ public class PasswordResetService {
 
         member.setPassword(passwordEncoder.encode(newPassword));
         tokenRepository.deleteByEmail(email);
-        log.info("Password reset completed: email={}", email);
+        log.info("Password reset completed: memberId={}", member.getId());
     }
 
     private String generateCode() {

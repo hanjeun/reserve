@@ -3,18 +3,29 @@ package kr.it.reserve.member.repository;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
 
     Optional<Member> findByEmailAndDeletedAtIsNull(String email);
+    Optional<Member> findByIdAndDeletedAtIsNull(Long id);
+
+    /** 탈퇴와 회원 상태 변경이 서로의 값을 덮어쓰지 않게 하는 공통 쓰기 잠금. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Member m WHERE m.id = :id AND m.deletedAt IS NULL")
+    Optional<Member> findActiveByIdForUpdate(@Param("id") Long id);
+
+    /** 비밀번호 재설정과 탈퇴를 이메일 기준으로 직렬화한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Member m WHERE m.email = :email AND m.deletedAt IS NULL")
+    Optional<Member> findActiveByEmailForUpdate(@Param("email") String email);
 
     // 관리자용 — 삭제되지 않은 전체 회원 목록
     Page<Member> findByDeletedAtIsNullOrderByIdDesc(Pageable pageable);
@@ -51,12 +62,4 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     // 하위 호환
     Optional<Member> findByProviderAndProviderId(AuthProvider provider, String providerId);
 
-    @Modifying
-    @Query("UPDATE Member m SET m.deletedAt = NULL WHERE m.id = :id")
-    void restoreById(Long id);
-
-    @Modifying
-    @Query("DELETE FROM Member m WHERE m.deletedAt IS NOT NULL AND m.deletedAt < :cutoff")
-    int hardDeleteByDeletedAtBefore(LocalDateTime cutoff);
 }
-

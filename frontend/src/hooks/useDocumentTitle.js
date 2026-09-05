@@ -30,13 +30,8 @@ const useDocumentTitle = (pageTitle, description) => {
         setMeta('meta[name="description"]', desc);
         setMeta('meta[property="og:title"]', title);
         setMeta('meta[property="og:description"]', desc);
-        setMeta('meta[property="og:url"]', window.location.href);
         setMeta('meta[name="twitter:title"]', title);
         setMeta('meta[name="twitter:description"]', desc);
-
-        // ── canonical ──────────────────────────────────────
-        let canonical = document.querySelector('link[rel="canonical"]');
-        if (canonical) canonical.setAttribute('href', window.location.href);
 
         // ── 페이지 이탈 시 기본값으로 복원 ─────────────────
         return () => {

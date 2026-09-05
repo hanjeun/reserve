@@ -1,6 +1,7 @@
 package kr.it.reserve.audit.controller;
 
 import kr.it.reserve.audit.service.AuditLogService;
+import kr.it.reserve.audit.service.AdminSanctionService;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.StoreException;
@@ -38,6 +39,7 @@ public class AdminManagementController {
     private final MemberRepository memberRepository;
     private final StoreRepository storeRepository;
     private final AuditLogService auditLogService;
+    private final AdminSanctionService adminSanctionService;
 
     // ── 회원 목록 조회 ────────────────────────────────────────────
 
@@ -86,19 +88,9 @@ public class AdminManagementController {
     public ApiResponse<Void> suspendMember(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        Member member = memberRepository.findById(id)
-                .orElseThrow(MemberException::notFound);
-        if (member.getRole().name().equals("ADMIN")) {
-            throw new MemberException("관리자는 제재할 수 없습니다.");
-        }
-        int days = Integer.parseInt(body.getOrDefault("days", "7"));
+        int days = parseDays(body.getOrDefault("days", "7"));
         String reason = body.getOrDefault("reason", "");
-        LocalDateTime until = LocalDateTime.now().plusDays(days);
-        member.suspend(until, reason.isEmpty() ? null : reason);
-        memberRepository.save(member);
-        auditLogService.logMemberSanction(id, member.getEmail(), "SUSPEND",
-                days + "일 정지" + (reason.isEmpty() ? "" : " / " + reason));
-        log.info("Admin suspended member: id={}, until={}", id, until);
+        adminSanctionService.suspendMember(id, days, reason);
         return ApiResponse.success(null, days + "일간 정지 처리되었습니다.");
     }
 
@@ -106,28 +98,14 @@ public class AdminManagementController {
     public ApiResponse<Void> banMember(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        Member member = memberRepository.findById(id)
-                .orElseThrow(MemberException::notFound);
-        if (member.getRole().name().equals("ADMIN")) {
-            throw new MemberException("관리자는 제재할 수 없습니다.");
-        }
         String reason = body.getOrDefault("reason", "");
-        member.ban(reason.isEmpty() ? null : reason);
-        memberRepository.save(member);
-        auditLogService.logMemberSanction(id, member.getEmail(), "BAN",
-                "영구 정지" + (reason.isEmpty() ? "" : " / " + reason));
-        log.info("Admin banned member: id={}", id);
+        adminSanctionService.banMember(id, reason);
         return ApiResponse.success(null, "영구 정지 처리되었습니다.");
     }
 
     @PostMapping("/members/{id}/unban")
     public ApiResponse<Void> unbanMember(@PathVariable Long id) {
-        Member member = memberRepository.findById(id)
-                .orElseThrow(MemberException::notFound);
-        member.unban();
-        memberRepository.save(member);
-        auditLogService.logMemberSanction(id, member.getEmail(), "UNBAN", "정지 해제");
-        log.info("Admin unbanned member: id={}", id);
+        adminSanctionService.unbanMember(id);
         return ApiResponse.success(null, "정지가 해제되었습니다.");
     }
 
@@ -136,10 +114,14 @@ public class AdminManagementController {
     @GetMapping("/stores")
     public ApiResponse<?> getStores(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String search
     ) {
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safePage = Math.max(page, 0);
+        String keyword = search != null ? search.trim() : "";
         Page<StoreResponse> stores = storeRepository
-                .findByDeletedAtIsNullOrderByCreatedAtDesc(PageRequest.of(page, size))
+                .searchForAdmin(keyword, PageRequest.of(safePage, safeSize))
                 .map(StoreResponse::fromEntity);
 
         return ApiResponse.success(stores, "가게 목록 조회 성공");
@@ -152,16 +134,9 @@ public class AdminManagementController {
     public ApiResponse<Void> suspendStore(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        Store store = storeRepository.findById(id)
-                .orElseThrow(StoreException::notFound);
-        int days = Integer.parseInt(body.getOrDefault("days", "7"));
+        int days = parseDays(body.getOrDefault("days", "7"));
         String reason = body.getOrDefault("reason", "");
-        LocalDateTime until = LocalDateTime.now().plusDays(days);
-        store.suspend(until, reason.isEmpty() ? null : reason);
-        storeRepository.save(store);
-        auditLogService.logStoreSanction(id, store.getName(), "SUSPEND",
-                days + "일 영업정지" + (reason.isEmpty() ? "" : " / " + reason));
-        log.info("Admin suspended store: id={}, until={}", id, until);
+        adminSanctionService.suspendStore(id, days, reason);
         return ApiResponse.success(null, days + "일간 영업정지 처리되었습니다.");
     }
 
@@ -169,25 +144,14 @@ public class AdminManagementController {
     public ApiResponse<Void> banStore(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        Store store = storeRepository.findById(id)
-                .orElseThrow(StoreException::notFound);
         String reason = body.getOrDefault("reason", "");
-        store.ban(reason.isEmpty() ? null : reason);
-        storeRepository.save(store);
-        auditLogService.logStoreSanction(id, store.getName(), "BAN",
-                "영구 폐업 처리" + (reason.isEmpty() ? "" : " / " + reason));
-        log.info("Admin banned store: id={}", id);
+        adminSanctionService.banStore(id, reason);
         return ApiResponse.success(null, "영구 폐업 처리되었습니다.");
     }
 
     @PostMapping("/stores/{id}/unban")
     public ApiResponse<Void> unbanStore(@PathVariable Long id) {
-        Store store = storeRepository.findById(id)
-                .orElseThrow(StoreException::notFound);
-        store.unban();
-        storeRepository.save(store);
-        auditLogService.logStoreSanction(id, store.getName(), "UNBAN", "영업정지 해제");
-        log.info("Admin unbanned store: id={}", id);
+        adminSanctionService.unbanStore(id);
         return ApiResponse.success(null, "영업정지가 해제되었습니다.");
     }
 
@@ -199,5 +163,13 @@ public class AdminManagementController {
         log.info("Admin soft-delete reservation: id={}", id);
         auditLogService.softDeleteReservation(id);
         return ApiResponse.success(null, "예약이 휴지통으로 이동되었습니다.");
+    }
+
+    private int parseDays(String rawDays) {
+        try {
+            return Integer.parseInt(rawDays);
+        } catch (NumberFormatException e) {
+            throw new MemberException("정지 기간은 숫자로 입력해주세요.", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
     }
 }

@@ -7,13 +7,18 @@ const handleIntersection = (entries) => {
     });
 };
 
-export function useScrollReveal(isMobile) {
+export function useScrollReveal(isMobile, prefersReducedMotion = false) {
     const observerRef = useRef(null);
 
     useEffect(() => {
         if (observerRef.current) {
             observerRef.current.disconnect();
             observerRef.current = null;
+        }
+
+        if (prefersReducedMotion) {
+            document.querySelectorAll('.reveal').forEach(el => el.classList.add('rv'));
+            return undefined;
         }
 
         const timer = setTimeout(() => {
@@ -29,5 +34,5 @@ export function useScrollReveal(isMobile) {
                 observerRef.current = null;
             }
         };
-    }, [isMobile]);
+    }, [isMobile, prefersReducedMotion]);
 }

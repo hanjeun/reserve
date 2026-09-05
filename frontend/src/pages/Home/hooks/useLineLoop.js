@@ -21,7 +21,7 @@ function buildErasingSeq(text) {
     return jaso.map((_, i) => Hangul.assemble(jaso.slice(0, jaso.length - i - 1)));
 }
 
-export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, startDelay = 1000 } = {}) {
+export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, startDelay = 1000, reducedMotion = false } = {}) {
     const [lineIdx, setLineIdx] = useState(0);
     const [current, setCurrent] = useState(fullText(LINES[0]));
     const idxRef = useRef(0);
@@ -31,6 +31,8 @@ export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, s
     useEffect(() => { speedRef.current = { typeSpeed, eraseSpeed, pauseMs, startDelay }; });
 
     useEffect(() => {
+        if (reducedMotion) return undefined;
+
         let cancelled = false;
         const schedule = (fn, ms) => {
             timerRef.current = setTimeout(() => { if (!cancelled) fn(); }, ms);
@@ -55,7 +57,11 @@ export function useLineLoop({ typeSpeed = 58, eraseSpeed = 40, pauseMs = 1800, s
         };
         schedule(erase, speedRef.current.startDelay);
         return () => { cancelled = true; clearTimeout(timerRef.current); };
-    }, []);
+    }, [reducedMotion]);
+
+    if (reducedMotion) {
+        return { current: fullText(LINES[0]), lineIdx: 0 };
+    }
 
     return { current, lineIdx };
 }

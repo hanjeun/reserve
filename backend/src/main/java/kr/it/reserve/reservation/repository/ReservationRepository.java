@@ -1,11 +1,13 @@
 package kr.it.reserve.reservation.repository;
 
+import jakarta.persistence.LockModeType;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.store.entity.Store;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +18,11 @@ import java.time.LocalTime;
 import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
+
+    /** QR 중복 스캔과 운영 상태 변경이 같은 예약을 동시에 덮어쓰지 않도록 잠근다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH s.owner JOIN FETCH r.member WHERE r.id = :id")
+    java.util.Optional<Reservation> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * 특정 회원의 예약 내역 조회 (최신순) - store, member fetch join으로 N+1 방지
@@ -45,6 +52,82 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member WHERE r.deletedAt IS NULL ORDER BY r.createdAt DESC")
     Page<Reservation> findAllWithStoreAndMemberPaged(Pageable pageable);
 
+    /** 관리자 예약 목록: 검색·상태를 전체 집합에 적용한 뒤 페이지를 자른다. */
+    @Query(value = """
+            SELECT r FROM Reservation r
+              JOIN FETCH r.store s
+              JOIN FETCH r.member m
+             WHERE r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
+             ORDER BY r.createdAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(r) FROM Reservation r
+              JOIN r.store s
+              JOIN r.member m
+             WHERE r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
+    Page<Reservation> searchForAdmin(
+            @Param("keyword") String keyword,
+            @Param("status") Reservation.ReservationStatus status,
+            Pageable pageable);
+
+    /** 사업자 예약 목록에도 같은 검색 계약을 적용하되 소유 가게 경계를 쿼리에서 강제한다. */
+    @Query(value = """
+            SELECT r FROM Reservation r
+              JOIN FETCH r.store s
+              JOIN FETCH r.member m
+             WHERE s.owner = :owner
+               AND r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
+             ORDER BY r.createdAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(r) FROM Reservation r
+              JOIN r.store s
+              JOIN r.member m
+             WHERE s.owner = :owner
+               AND r.deletedAt IS NULL
+               AND (:status IS NULL OR r.status = :status)
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
+    Page<Reservation> searchForStoreOwner(
+            @Param("owner") Member owner,
+            @Param("keyword") String keyword,
+            @Param("status") Reservation.ReservationStatus status,
+            Pageable pageable);
+
+    @Query("SELECT r.status, COUNT(r) FROM Reservation r WHERE r.deletedAt IS NULL GROUP BY r.status")
+    List<Object[]> countAdminReservationsGroupedByStatus();
+
+    @Query("""
+            SELECT r.status, COUNT(r) FROM Reservation r
+              JOIN r.store s
+             WHERE s.owner = :owner AND r.deletedAt IS NULL
+             GROUP BY r.status
+            """)
+    List<Object[]> countOwnerReservationsGroupedByStatus(@Param("owner") Member owner);
+
     /**
      * 가게 상세 페이지 리뷰 작성 가능 여부 판단용: 해당 회원이 이 가게에서 가장 최근에 COMPLETED된 예약 1건 조회
      * (StoreDetail 진입 시 내 전체 예약을 불러와 클라이언트에서 필터링하던 것을 서버 필터로 대체)
@@ -66,19 +149,10 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT rv.reservation.id, rv.id FROM Review rv WHERE rv.reservation.id IN :reservationIds")
     List<Object[]> findReviewIdsByReservationIds(@Param("reservationIds") List<Long> reservationIds);
 
-    /**
-     * 특정 가게의 모든 예약 삭제
-     */
-    @Modifying
-    @Query("DELETE FROM Reservation r WHERE r.store.id = :storeId")
-    void deleteByStoreId(@Param("storeId") Long storeId);
-
-    /**
-     * 특정 회원의 모든 예약 삭제
-     */
-    @Modifying
-    @Query("DELETE FROM Reservation r WHERE r.member.id = :memberId")
-    void deleteByMemberId(@Param("memberId") Long memberId);
+    /** 거래 상태는 보존하되 자유 입력 요청사항에 남을 수 있는 개인정보는 탈퇴 시 제거한다. */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Reservation r SET r.specialRequest = NULL WHERE r.member.id = :memberId")
+    int clearSpecialRequestsByMemberId(@Param("memberId") Long memberId);
 
     /**
      * 가게별 예약 목록 조회 (페이징)
@@ -218,6 +292,15 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT COUNT(r) FROM Reservation r WHERE r.store.id = :storeId AND r.status IN ('PENDING', 'CONFIRMED')")
     int countActiveReservationsByStoreId(@Param("storeId") Long storeId);
 
+    /** 폐업/탈퇴 관문: 진행 중 예약뿐 아니라 처리되지 않은 UNCONFIRMED도 의무로 본다. */
+    @Query("SELECT COUNT(r) FROM Reservation r WHERE r.store.id = :storeId " +
+           "AND r.deletedAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED', 'UNCONFIRMED')")
+    int countLifecycleBlockingByStoreId(@Param("storeId") Long storeId);
+
+    @Query("SELECT COUNT(r) FROM Reservation r WHERE r.member.id = :memberId " +
+           "AND r.deletedAt IS NULL AND r.status IN ('PENDING', 'CONFIRMED', 'UNCONFIRMED')")
+    int countLifecycleBlockingByMemberId(@Param("memberId") Long memberId);
+
     /**
      * 미결제 만료 대상 예약 조회
      * - PENDING 상태
@@ -267,10 +350,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Modifying
     @Query("UPDATE Reservation r SET r.deletedAt = NULL WHERE r.id = :id")
     void restoreById(Long id);
-
-    @Modifying
-    @Query("DELETE FROM Reservation r WHERE r.deletedAt IS NOT NULL AND r.deletedAt < :cutoff")
-    int hardDeleteByDeletedAtBefore(LocalDateTime cutoff);
 
     /**
      * 표시용 예약번호 중복 방지: 생성한 코드가 이미 존재하는지 확인(unique 제약 검사 전 재생성용).

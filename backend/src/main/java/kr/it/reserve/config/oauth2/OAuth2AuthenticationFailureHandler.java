@@ -29,7 +29,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException, ServletException {
 
-        log.error("OAuth2 login failed: {}", exception.getMessage());
+        log.error("OAuth2 login failed: errorType={}", exception.getClass().getSimpleName());
 
         String rawMessage = resolveMessage(exception);
         String errorMessage = URLEncoder.encode(rawMessage, StandardCharsets.UTF_8);
@@ -41,16 +41,11 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     }
 
     private String resolveMessage(AuthenticationException exception) {
-        log.debug("OAuth2 실패 예외 타입: {}, 메시지: {}", exception.getClass().getName(), exception.getMessage());
+        log.debug("OAuth2 failure type: {}", exception.getClass().getName());
 
-        // 우리가 직접 throw한 경우 — getMessage()에 한국어 메시지가 있음
-        // (단, errorCode 형식인 "[xxx] yyy" 는 Spring이 자동 생성한 것이므로 제외)
+        // 예외 원문은 공급자 응답·이메일·내부 구현 정보를 포함할 수 있으므로 URL로 전달하지 않는다.
+        // 사용자 문구는 신뢰할 수 있는 errorCode만 허용 목록으로 매핑한다.
         String msg = exception.getMessage();
-        if (msg != null && !msg.isBlank() && !msg.startsWith("[")) {
-            return msg;
-        }
-
-        // Spring Security가 자동으로 throw한 경우 — errorCode로 분기
         String errorCode = "";
         if (exception instanceof OAuth2AuthenticationException oaEx && oaEx.getError() != null) {
             errorCode = oaEx.getError().getErrorCode();
@@ -67,6 +62,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
             case "access_denied"                   -> "소셜 로그인을 취소했습니다.";
             case "authorization_request_not_found" -> "로그인 요청이 만료되었습니다. 다시 시도해주세요.";
             case "invalid_state"                   -> "잘못된 로그인 요청입니다. 다시 시도해주세요.";
+            case "email_conflict"                  -> "이미 가입된 이메일입니다. 기존 가입 방식으로 로그인해주세요.";
             default                                -> "소셜 로그인에 실패했습니다. 다시 시도해주세요.";
         };
     }

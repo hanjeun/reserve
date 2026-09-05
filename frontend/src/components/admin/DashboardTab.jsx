@@ -35,21 +35,18 @@ const useDashboardStats = () => {
     const query = useQuery({
         queryKey: adminKeys.dashboardStats(),
         queryFn: async () => {
-            const [bizAll, reservations, trash, auditLogs] = await Promise.allSettled([
+            const [bizAll, reservationSummary, trash, auditLogs] = await Promise.allSettled([
                 api.get(API_ENDPOINTS.BUSINESS.ADMIN_LIST,           { params: { page: 0, size: 1 } }),
-                api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS,{ params: { page: 0, size: 100 } }),
+                api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATION_SUMMARY),
                 api.get(API_ENDPOINTS.TRASH.LIST,                    { params: { page: 0, size: 50 } }),
                 api.get(API_ENDPOINTS.AUDIT_LOG.LIST,                { params: { page: 0, size: 50 } }),
             ]);
 
-            const resList  = reservations.status === 'fulfilled' ? (reservations.value?.content ?? []) : [];
             const trashList = trash.status === 'fulfilled'  ? (trash.value?.content ?? [])   : [];
             const logList  = auditLogs.status === 'fulfilled'  ? (auditLogs.value?.content ?? []) : [];
-
-            const statusCount = resList.reduce((acc, r) => {
-                acc[r.status] = (acc[r.status] || 0) + 1;
-                return acc;
-            }, {});
+            const statusCount = reservationSummary.status === 'fulfilled'
+                ? (reservationSummary.value?.statusCounts ?? {})
+                : {};
 
             const reservationPieData = Object.entries({
                 PENDING:   '대기 중',
@@ -82,7 +79,9 @@ const useDashboardStats = () => {
             // 아래 두 값이 항상 0으로 보였음 — 신버전(page.totalElements)을 우선 읽고 구버전도 폴백으로 허용.
             return {
                 totalBiz:  bizAll.status === 'fulfilled' ? (bizAll.value?.page?.totalElements ?? bizAll.value?.totalElements ?? 0) : '-',
-                totalRes:  resList.length,
+                totalRes:  reservationSummary.status === 'fulfilled'
+                    ? (reservationSummary.value?.total ?? 0)
+                    : '-',
                 trashCount: trashList.length,
                 logCount:  auditLogs.status === 'fulfilled' ? (auditLogs.value?.page?.totalElements ?? auditLogs.value?.totalElements ?? 0) : '-',
                 reservationPieData,

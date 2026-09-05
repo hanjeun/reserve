@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { Typography, Empty, Modal, Flex, Radio } from 'antd';
+import { Typography, Empty, Modal, Flex } from 'antd';
 import { StarFilled, EditOutlined, DeleteOutlined, ExclamationCircleFilled } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageContainer, Card, StoreCardSkeleton, Badge, ModalLoading } from '../../components/common';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -11,87 +11,59 @@ import storeService from '../../services/storeService';
 
 const { Title, Text } = Typography;
 
-// 2026-07 추가 — MyFavorites/StoreList와 동일한 이유로 masonry(columns) 대신 고정 그리드로 전환.
-// 2026-07-30 — 3열 단계 추가(경계 근거는 StoreList.jsx의 GRID_STYLE 주석 참고).
-// 세 목록이 같은 경계를 쓰는 게 중요하다 — 다르면 화면을 옮길 때 열 수가 튄다.
-const GRID_STYLE = `
-  .rsv-mystore-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
-  }
-  @media (max-width: 1079px) {
-    .rsv-mystore-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-  @media (max-width: 815px) {
-    .rsv-mystore-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 551px) {
-    .rsv-mystore-grid { grid-template-columns: 1fr; }
-  }
-`;
-
-// ─── 삭제 옵션 카드 스타일 ───────────────────────────────────────────────────
-const optionCardStyle = (selected, isDanger) => ({
-    padding: '12px 16px',
-    borderRadius: radius.md,
-    border: `1.5px solid ${selected
-        ? (isDanger ? colors.error.main : colors.primary.main)
-        : colors.border.default}`,
-    background: selected
-        ? (isDanger ? colors.error.light : colors.primary.light)
-        : colors.background.paper,
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-});
-
-// ─── 삭제 확인 모달 ──────────────────────────────────────────────────────────
+// ─── 영업 종료 확인 모달 ──────────────────────────────────────────────────────
 const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => {
-    const [loadingCount, setLoadingCount] = useState(false);
-    const [activeCount, setActiveCount] = useState(null);
-    const [deleteOption, setDeleteOption] = useState('safe'); // 'safe' | 'force'
+    const [loadingReadiness, setLoadingReadiness] = useState(false);
+    const [readiness, setReadiness] = useState(null);
+    const [readinessError, setReadinessError] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // 모달 열릴 때마다 활성 예약 수 조회
+    // 모달 열릴 때마다 예약·광고·환불·대사·웹훅을 한 번에 확인
     React.useEffect(() => {
         if (!open || !storeId) return;
-        setLoadingCount(true);
-        setActiveCount(null);
-        setDeleteOption('safe');
-        storeService.getActiveReservationsCount(storeId)
-            .then(count => setActiveCount(count))
-            .catch(() => setActiveCount(0))
-            .finally(() => setLoadingCount(false));
+        setLoadingReadiness(true);
+        setReadiness(null);
+        setReadinessError(false);
+        storeService.getClosureReadiness(storeId)
+            .then(setReadiness)
+            .catch(() => setReadinessError(true))
+            .finally(() => setLoadingReadiness(false));
     }, [open, storeId]);
 
     const handleOk = async () => {
         setSubmitting(true);
         try {
-            await onConfirm(deleteOption === 'force');
+            await onConfirm();
         } finally {
             setSubmitting(false);
         }
     };
 
-    const hasActiveReservations = activeCount > 0;
-    const canDelete = !loadingCount && (!hasActiveReservations || deleteOption === 'force');
+    const canDelete = !loadingReadiness && !readinessError && readiness?.canClose === true;
+    const blockerCount = readiness
+        ? readiness.unresolvedReservations
+            + readiness.activeAdvertisements
+            + readiness.unresolvedRefunds
+            + readiness.openPaymentIssues
+            + readiness.unfinishedWebhooks
+        : 0;
 
     return (
         <Modal
             title={
                 <Flex align="center" gap={8}>
                     <ExclamationCircleFilled style={{ color: colors.warning.main, fontSize: 18 }} />
-                    <span>가게 삭제</span>
+                    <span>가게 영업 종료</span>
                 </Flex>
             }
             open={open}
             onOk={handleOk}
             onCancel={onCancel}
-            /* maskClosable={false}: 가게 삭제 — 되돌릴 수 없는 파괴적 액션이라 명시적으로 버튼을 눌러야 닫히게 한다.
+            /* maskClosable={false}: 가게 영업 종료 — 명시적으로 버튼을 눌러야 닫히게 한다.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
             maskClosable={false}
-            okText="삭제하기"
+            okText="영업 종료"
             cancelText="취소"
             okButtonProps={{
                 danger: true,
@@ -104,68 +76,41 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
             <div style={{ padding: '4px 0 8px' }}>
                 {/* 가게명 */}
                 <Text style={{ fontSize: fontSize.md, color: colors.text.primary }}>
-                    <Text strong>"{storeName}"</Text>을(를) 삭제하려고 합니다.
+                    <Text strong>"{storeName}"</Text>의 영업을 종료하려고 합니다.
                 </Text>
 
                 {/* 예약 수 로딩 */}
-                {loadingCount ? (
-                    <ModalLoading text="예약 현황 확인 중..." minHeight="120px" />
-                ) : activeCount !== null && (
+                {loadingReadiness ? (
+                    <ModalLoading text="예약·결제 상태 확인 중..." minHeight="120px" />
+                ) : readinessError ? (
+                    <div style={{ marginTop: 16, background: colors.error.light, borderRadius: radius.md, padding: '12px 14px' }}>
+                        <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main, display: 'block', marginBottom: 2 }}>
+                            영업 종료 준비 상태를 확인하지 못했습니다
+                        </Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                            잠시 후 다시 시도해주세요. 확인 전에는 영업을 종료할 수 없습니다.
+                        </Text>
+                    </div>
+                ) : readiness && (
                     <div style={{ marginTop: 16 }}>
-                        {/* 예약 없음 */}
-                        {!hasActiveReservations && (
+                        {readiness.canClose && (
                             <div style={{ background: colors.success.light, borderRadius: radius.md, padding: '12px 14px' }}>
                                 <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
-                                    진행 중인 예약이 없습니다
+                                    미결 운영 항목이 없습니다
                                 </Text>
-                                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>가게를 안전하게 삭제할 수 있습니다.</Text>
+                                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>거래 원장을 보존한 채 공개 영업을 종료할 수 있습니다.</Text>
                             </div>
                         )}
 
-                        {/* 예약 있음 → 옵션 선택 */}
-                        {hasActiveReservations && (
-                            <>
-                                <div style={{ background: colors.warning.light, borderRadius: radius.md, padding: '12px 14px', marginBottom: 16 }}>
-                                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
-                                        진행 중인 예약 {activeCount}건이 있습니다
-                                    </Text>
-                                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>삭제 방식을 선택해주세요.</Text>
-                                </div>
-                                <Radio.Group
-                                    value={deleteOption}
-                                    onChange={e => setDeleteOption(e.target.value)}
-                                    style={{ width: '100%' }}
-                                >
-                                    <Flex vertical gap={10}>
-                                        <div style={optionCardStyle(deleteOption === 'safe', false)}>
-                                            <Radio value="safe">
-                                                <div>
-                                                    <Text strong style={{ fontSize: fontSize.md }}>
-                                                        삭제 안 함
-                                                    </Text>
-                                                    <br />
-                                                    <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                                                        진행 중인 예약을 먼저 완료하거나 거절한 후 삭제할 수 있습니다.
-                                                    </Text>
-                                                </div>
-                                            </Radio>
-                                        </div>
-                                        <div style={optionCardStyle(deleteOption === 'force', true)}>
-                                            <Radio value="force">
-                                                <div>
-                                                    <Text strong style={{ fontSize: fontSize.md, color: colors.error.main }}>
-                                                        예약 포함 강제 삭제
-                                                    </Text>
-                                                    <br />
-                                                    <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                                                        진행 중인 예약 {activeCount}건이 모두 취소되며 되돌릴 수 없습니다.
-                                                    </Text>
-                                                </div>
-                                            </Radio>
-                                        </div>
-                                    </Flex>
-                                </Radio.Group>
-                            </>
+                        {!readiness.canClose && (
+                            <div style={{ background: colors.warning.light, borderRadius: radius.md, padding: '12px 14px' }}>
+                                <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
+                                    먼저 처리해야 할 항목이 {blockerCount}건 있습니다
+                                </Text>
+                                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                                    예약 {readiness.unresolvedReservations} · 광고 {readiness.activeAdvertisements} · 환불 {readiness.unresolvedRefunds} · 결제 확인 {readiness.openPaymentIssues} · 웹훅 {readiness.unfinishedWebhooks}
+                                </Text>
+                            </div>
                         )}
                     </div>
                 )}
@@ -179,7 +124,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                     border: `1px solid ${colors.border.default}`,
                 }}>
                     <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                        삭제 후에는 가게 정보, 리뷰, 즐겨찾기 등 모든 데이터가 영구 삭제되며 복구할 수 없습니다.
+                        영업 종료 후 가게는 공개 목록에서 사라지고 이미지는 삭제 대기열로 이동합니다. 예약·결제·환불·리뷰 기록은 대사와 분쟁 대응을 위해 비공개로 보존합니다.
                     </Text>
                 </div>
             </div>
@@ -201,9 +146,9 @@ const MyStores = () => {
         setDeleteModalOpen(true);
     }, []);
 
-    const handleDeleteConfirm = useCallback(async (force) => {
+    const handleDeleteConfirm = useCallback(async () => {
         try {
-            await deleteStore(targetStore.id, force);
+            await deleteStore(targetStore.id);
             setDeleteModalOpen(false);
             setTargetStore(null);
         } catch {
@@ -218,7 +163,6 @@ const MyStores = () => {
 
     return (
         <PageContainer size="xl" paddingTop="40px">
-            <style>{GRID_STYLE}</style>
             {/* 헤더 */}
             <div style={{ marginBottom: '40px' }}>
                 <Title level={2} style={{ margin: '0 0 8px 0', fontWeight: fontWeight.extrabold }}>
@@ -266,23 +210,28 @@ const MyStores = () => {
                                         <DeleteOutlined style={{ fontSize: '18px', color: colors.error.main }} />
                                     </button>,
                                 ]}
-                                onClick={() => navigate(`/store/${store.id}`)}
                             >
-                                <Card.Cover src={getThumbnailUrl(store.mainImageUrl)} alt={store.name} />
-                                <div style={{ padding: '16px 16px 20px 16px' }}>
-                                    <Badge variant="category" style={{ marginBottom: 6 }}>
-                                        {store.category || '기타'}
-                                    </Badge>
-                                    <Title level={5} style={{ margin: '0 0 2px 0', fontSize: fontSize.xl }}>
-                                        {store.name}
-                                    </Title>
-                                    <Flex align="center" gap={4}>
-                                        <StarFilled style={{ color: '#fadb14', fontSize: '14px' }} />
-                                        <Text strong style={{ fontSize: fontSize.sm }}>
-                                            {store.rating?.toFixed(1) || '0.0'}
-                                        </Text>
-                                    </Flex>
-                                </div>
+                                <Link
+                                    to={`/store/${store.id}`}
+                                    className="reserve-card-link"
+                                    aria-label={`${store.name} 상세 보기`}
+                                >
+                                    <Card.Cover src={getThumbnailUrl(store.mainImageUrl)} alt={store.name} />
+                                    <div style={{ padding: '16px 16px 20px 16px' }}>
+                                        <Badge variant="category" style={{ marginBottom: 6 }}>
+                                            {store.category || '기타'}
+                                        </Badge>
+                                        <Title level={5} style={{ margin: '0 0 2px 0', fontSize: fontSize.xl }}>
+                                            {store.name}
+                                        </Title>
+                                        <Flex align="center" gap={4}>
+                                            <StarFilled style={{ color: '#fadb14', fontSize: '14px' }} />
+                                            <Text strong style={{ fontSize: fontSize.sm }}>
+                                                {store.rating?.toFixed(1) || '0.0'}
+                                            </Text>
+                                        </Flex>
+                                    </div>
+                                </Link>
                             </Card>
                         </div>
                     ))}

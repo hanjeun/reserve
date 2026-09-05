@@ -4,20 +4,7 @@
  */
 
 // ============================================
-// Keyframe CSS (앱 최상단에 한 번만 주입)
-// ============================================
-export const animationKeyframes = `
-  @keyframes fadeIn        { from { opacity: 0; }                           to { opacity: 1; } }
-  @keyframes fadeOut       { from { opacity: 1; }                           to { opacity: 0; } }
-  @keyframes slideUpIn     { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes slideUpOut    { from { opacity: 1; transform: translateY(0); }    to { opacity: 0; transform: translateY(10px); } }
-  @keyframes scaleSpringIn { from { opacity: 0; transform: scale(0.88); }      to { opacity: 1; transform: scale(1); } }
-  @keyframes scaleOut      { from { opacity: 1; transform: scale(1); }         to { opacity: 0; transform: scale(0.88); } }
-  @keyframes pulse          { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-`;
-
-// ============================================
-// animation 값 (style={{ animation: ... }} 용)
+// animation 값 (키프레임은 index.css, 값은 style={{ animation: ... }} 용)
 // ============================================
 export const animation = {
     fadeIn:        'fadeIn 0.2s ease both',

@@ -23,11 +23,11 @@ function renderParts(current, line) {
     );
 }
 
-const ANIMATION = `bounceAppear 0.75s cubic-bezier(0.22,1,0.36,1) 0.6s forwards, bounceY 1.6s ease-in-out 1.5s infinite`;
+const ANIMATION = `reserve-home-bounce-appear 0.75s cubic-bezier(0.22,1,0.36,1) 0.6s forwards, reserve-home-bounce-y 1.6s ease-in-out 1.5s infinite`;
 
-export default function HeroSection({ isMobile }) {
+export default function HeroSection({ isMobile, prefersReducedMotion }) {
     const navigate = useNavigate();
-    const { current, lineIdx } = useLineLoop();
+    const { current, lineIdx } = useLineLoop({ reducedMotion: prefersReducedMotion });
 
     return (
         <div style={{
@@ -91,9 +91,10 @@ export default function HeroSection({ isMobile }) {
                     bottom: isMobile ? 10 : 0,  // ✨ 핵심: 모바일은 띄우고, PC는 바닥에 붙임
                     left: 0,
                     right: 0,
-                    opacity: 0,
-                    animation: ANIMATION,
+                    opacity: prefersReducedMotion ? 1 : 0,
+                    animation: prefersReducedMotion ? 'none' : ANIMATION,
                 }}
+                prefersReducedMotion={prefersReducedMotion}
                 />
         </div>
     );

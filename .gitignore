@@ -51,6 +51,9 @@ bin/
 node_modules/
 dist/
 dist-ssr/
+test-results/
+playwright-report/
+blob-report/
 
 # ========================
 # 환경변수 (보안)
@@ -92,3 +95,10 @@ HELP.md
 cookies.txt
 *.deprecated.jsx
 *.unused
+# ========================
+# 에이전트 로컬 지침
+# ========================
+# AGENTS.md 는 CLAUDE.md 전체 + Cowork 프로젝트 지침을 합친 **로컬 전용** 파일이다.
+# 레포에 올리면 같은 규칙이 두 파일에 중복돼 한쪽만 고쳐지므로 추적하지 않는다.
+# 레포의 정본은 CLAUDE.md 다. (2026-09-01 결정)
+AGENTS.md

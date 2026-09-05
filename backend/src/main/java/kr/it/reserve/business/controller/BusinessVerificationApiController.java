@@ -6,6 +6,7 @@ import kr.it.reserve.business.entity.BusinessVerification.VerificationStatus;
 import kr.it.reserve.business.service.BusinessVerificationService;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.error.BizVerificationException;
 import kr.it.reserve.member.entity.Member;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,8 @@ import java.util.Map;
 @RequestMapping("/api/business-verification")
 @RequiredArgsConstructor
 public class BusinessVerificationApiController {
+
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final BusinessVerificationService verificationService;
 
@@ -52,9 +55,12 @@ public class BusinessVerificationApiController {
     @GetMapping("/admin/pending")
     public ApiResponse<Page<BusinessVerificationResponse>> getPendingList(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        return ApiResponse.success(verificationService.getPendingVerifications(pageable), "대기 목록 조회 성공");
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search) {
+        return ApiResponse.success(
+                verificationService.searchAdminVerifications(
+                        VerificationStatus.PENDING, search, boundedPage(page, size)),
+                "대기 목록 조회 성공");
     }
 
     /**
@@ -65,14 +71,13 @@ public class BusinessVerificationApiController {
     public ApiResponse<Page<BusinessVerificationResponse>> getAllList(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-
-        if (status != null && !status.isEmpty()) {
-            VerificationStatus verificationStatus = VerificationStatus.valueOf(status.toUpperCase());
-            return ApiResponse.success(verificationService.getVerificationsByStatus(verificationStatus, pageable), "필터 조회 성공");
-        }
-        return ApiResponse.success(verificationService.getAllVerifications(pageable), "전체 목록 조회 성공");
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search) {
+        VerificationStatus verificationStatus = parseStatus(status);
+        return ApiResponse.success(
+                verificationService.searchAdminVerifications(
+                        verificationStatus, search, boundedPage(page, size)),
+                verificationStatus == null ? "전체 목록 조회 성공" : "필터 조회 성공");
     }
 
     /**
@@ -153,5 +158,22 @@ public class BusinessVerificationApiController {
     public ApiResponse<Void> revokeBusinessRole(@PathVariable Long memberId) {
         verificationService.revokeBusinessRole(memberId, SecurityUtil.getCurrentMember());
         return ApiResponse.success(null, "사업자 자격이 취소되었습니다.");
+    }
+
+    private Pageable boundedPage(int page, int size) {
+        return PageRequest.of(
+                Math.max(0, page),
+                Math.min(Math.max(1, size), MAX_PAGE_SIZE));
+    }
+
+    private VerificationStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) return null;
+        try {
+            return VerificationStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BizVerificationException(
+                    "올바르지 않은 인증 상태입니다.",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
     }
 }

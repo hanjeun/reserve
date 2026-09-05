@@ -29,9 +29,9 @@ public class AsyncConfig implements AsyncConfigurer {
     @Override
     public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
         return (ex, method, params) ->
-                log.error("Async method failed: {}.{} — {}: {}",
+                log.error("Async method failed: {}.{} — errorType={}",
                         method.getDeclaringClass().getSimpleName(), method.getName(),
-                        ex.getClass().getSimpleName(), ex.getMessage(), ex);
+                        ex.getClass().getSimpleName());
     }
     // 비동기 이메일 발송을 위한 설정
 

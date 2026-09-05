@@ -8,7 +8,7 @@ import { getDetailImageUrl } from '../../utils/image';
 import adService from '../../services/adService';
 import { recordAdClick } from '../../utils/adAttribution';
 import useExitAnimation from '../../hooks/useExitAnimation';
-import { useWindowWidth } from '../../hooks';
+import { useReducedMotion, useWindowWidth } from '../../hooks';
 import { onActivateKey } from '../../utils/a11y';
 
 const { Text } = Typography;
@@ -28,6 +28,7 @@ const AdBanner = ({ ads }) => {
     // 2026-07 추가 — 모바일에서 280px 고정 폭이 화면을 너무 많이 차지해 광고가 과도하게 커 보여(스크린샷 확인),
     // 모바일(<480)에선 폭을 줄인다(220). 이미지 기준 폭도 bannerWidth를 따른다.
     const isMobile = useWindowWidth() < 480;
+    const prefersReducedMotion = useReducedMotion();
     const bannerWidth = isMobile ? 220 : 280;
     // 2026-07 추가: 위젯을 2:1 고정 비율로 두면 그 비율이 아닌 배너 이미지가 잘려나갔다.
     // 첫 이미지의 실제 비율을 측정해 wrapper 높이를 거기에 맞추고, objectFit: contain으로 바꿔서
@@ -43,14 +44,15 @@ const AdBanner = ({ ads }) => {
     // 있었다. AddressSearch 드롭다운과 동일한 패턴(useExitAnimation)으로 닫힐 동안도 wrapper의
     // 스타일을 유지해 기존 0.35s transform/opacity transition이 그대로 재생되게 한다.
     const [dismissed, setDismissed] = useState(false);
-    const { shouldRender, isClosing } = useExitAnimation(!dismissed, 350);
+    const { shouldRender, isClosing } = useExitAnimation(!dismissed, prefersReducedMotion ? 0 : 350);
 
     useEffect(() => {
         if (!ad) return;
-        // 챗 위젯처럼 페이지 진입 후 살짝 지연을 두고 슬라이드 인
-        const timer = setTimeout(() => setVisible(true), 800);
+        // 챗 위젯처럼 페이지 진입 후 살짝 지연을 두고 슬라이드 인한다.
+        // reduced-motion은 다음 태스크에서 즉시 표시해 effect 내부 동기 setState를 피한다.
+        const timer = setTimeout(() => setVisible(true), prefersReducedMotion ? 0 : 800);
         return () => clearTimeout(timer);
-    }, [ad]);
+    }, [ad, prefersReducedMotion]);
 
     // 노출 기록(2026-07 추가) — 같은 광고가 다시 렌더링되어도(검색어 입력 등) 중복 전송하지 않도록
     // adId를 ref에 기억해둔다(페이지를 아예 떠나가 다시 들어오면 새 마운트라 다시 기록되는 건 의도된 동작).
@@ -84,6 +86,7 @@ const AdBanner = ({ ads }) => {
                 bottom: isMobile ? 12 : 20,
                 transform: (visible && !isClosing) ? 'translateY(0)' : 'translateY(16px)',
                 opacity: (visible && !isClosing) ? 1 : 0,
+                transition: prefersReducedMotion ? 'none' : styles.wrapper.transition,
             }}
         >
             <button
@@ -102,6 +105,7 @@ const AdBanner = ({ ads }) => {
                 스크린리더에서 오히려 더 나빠진다. 그래서 role+tabIndex+키보드 핸들러로 접근성을 준다.
                 ReservationRow/MyStores처럼 안쪽에 인터랙티브 요소가 없는 곳은 <button>으로 바꿨다. */}
             <div
+                className="ad-banner-click-area"
                 style={styles.clickArea}
                 onClick={handleBannerClick}
                 onKeyDown={onActivateKey(handleBannerClick)}
@@ -111,7 +115,7 @@ const AdBanner = ({ ads }) => {
             >
                 {images.length > 1 ? (
                     <div className="ad-banner-carousel" style={{ ...styles.imageWrapper, height: imgHeight }}>
-                        <Carousel infinite draggable dotPlacement="bottom" autoplay autoplaySpeed={3500}>
+                        <Carousel infinite draggable dotPlacement="bottom" autoplay={!prefersReducedMotion} autoplaySpeed={3500}>
                             {images.map((url, i) => (
                                 <div key={url}>
                                     <img

@@ -1,6 +1,6 @@
 package kr.it.reserve.payment.controller;
 
-import kr.it.reserve.payment.service.PortoneWebhookService;
+import kr.it.reserve.payment.service.PaymentWebhookInboxProcessor;
 import kr.it.reserve.payment.service.PortoneWebhookVerifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PortoneWebhookController {
 
     private final PortoneWebhookVerifier verifier;
-    private final PortoneWebhookService webhookService;
+    private final PaymentWebhookInboxProcessor inboxProcessor;
 
     @PostMapping("/webhook/portone")
     public ResponseEntity<Void> receive(
@@ -53,11 +53,14 @@ public class PortoneWebhookController {
         }
 
         try {
-            webhookService.handle(rawBody);
+            // 서명 검증 뒤에는 반드시 durable inbox를 거친다. 처리 중 서버가 죽어도
+            // 저장된 결제 ID로 다시 PG 권위 상태를 조회할 수 있다.
+            inboxProcessor.receive(webhookId, rawBody);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             // 5xx 를 돌려주어 PortOne 의 재전송을 유도한다(클래스 주석 참고).
-            log.error("PortOne webhook processing failed: webhookId={}", webhookId, e);
+            log.error("PortOne webhook processing failed: webhookId={}, errorType={}",
+                    webhookId, e.getClass().getSimpleName());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

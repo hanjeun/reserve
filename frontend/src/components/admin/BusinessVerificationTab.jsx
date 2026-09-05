@@ -27,7 +27,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Typography, Tag, Modal, Image, Flex } from 'antd';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
     CheckOutlined, CloseOutlined, StopOutlined, EyeOutlined, ExclamationCircleFilled,
 } from '@ant-design/icons';
@@ -179,15 +179,27 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const setPage = (p) => setQuery({ page: String(p) });
 
     const { data, isLoading, isFetching, error, refetch } = useQuery({
-        queryKey: adminKeys.businessVerifications(),
+        queryKey: [...adminKeys.businessVerifications(), mode, page, debouncedSearch],
         queryFn: async () => {
-            const [pending, all] = await Promise.all([
-                api.get(API_ENDPOINTS.BUSINESS.ADMIN_PENDING, { params: { page: 0, size: 100 } }),
-                api.get(API_ENDPOINTS.BUSINESS.ADMIN_LIST,    { params: { page: 0, size: 100 } }),
-            ]);
-            return { pending: pending?.content || [], all: all?.content || [] };
+            const endpoint = mode === 'pending'
+                ? API_ENDPOINTS.BUSINESS.ADMIN_PENDING
+                : API_ENDPOINTS.BUSINESS.ADMIN_LIST;
+            const result = await api.get(endpoint, {
+                params: {
+                    page: page - 1,
+                    size: PAGE_SIZE,
+                    ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+                },
+            });
+            return {
+                items: result?.content ?? [],
+                totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
+            };
         },
+        placeholderData: keepPreviousData,
     });
+    const items = data?.items ?? [];
+    const totalElements = data?.totalElements ?? 0;
     useEffect(() => {
         if (error) message.error('목록을 불러오는데 실패했습니다.');
     }, [error, message]);
@@ -255,21 +267,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
             .finally(() => setDetailLoading(false));
     };
 
-    const filtered = React.useMemo(() => {
-        // list 계산을 useMemo 안으로 옮김 — 밖에 두면 (data?.pending ?? [])가 매 렌더 새 배열
-        // 레퍼런스를 만들어서 useMemo가 매번 재계산된다(ESLint exhaustive-deps 지적).
-        const list = (mode === 'pending' ? data?.pending : data?.all) ?? [];
-        if (!debouncedSearch.trim()) return list;
-        const kw = debouncedSearch.toLowerCase();
-        return list.filter(r =>
-            r.memberName?.toLowerCase().includes(kw)
-            || r.memberEmail?.toLowerCase().includes(kw)
-            || r.businessName?.toLowerCase().includes(kw)
-            || r.businessNumber?.includes(kw)
-        );
-    }, [data, mode, debouncedSearch]);
-
-    // 검색어로 결과가 줄면 존재하지 않는 페이지를 가리킬 수 있어 1로 복귀
+    // 검색은 서버 전체 신청 집합에서 수행한다. 검색어 변경 시 페이지를 초기화한다.
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
 
     const columns = [
@@ -335,26 +333,26 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                     onChange: handleSearchChange,
                     placeholder: '이름, 이메일, 상호명으로 검색',
                 }}
-                count={filtered.length}
+                count={totalElements}
                 onReload={refetch}
                 loading={isLoading || isFetching}
             />
 
             {(isLoading || isFetching) ? (
                 <AdminTableSkeleton
-                    rows={skeletonRowCount(filtered.length, page, PAGE_SIZE)}
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}
                     headers={SKELETON_HEADERS}
                     actionBtns={3}
                     stackFirstCol
-                    pagination={filtered.length ? { current: page, pageSize: PAGE_SIZE, total: filtered.length } : null}
+                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
                 />
             ) : (
                 <DataTable
                     columns={columns}
-                    dataSource={filtered}
+                    dataSource={items}
                     rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: filtered.length, onChange: setPage }}
+                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
                     locale={{ emptyText }}
                 />
             )}

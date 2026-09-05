@@ -60,9 +60,13 @@ public class ChatService {
      */
     @Transactional
     public ChatRoom openMyRoom(Member member) {
-        return roomRepository.findByMemberIdAndType(member.getId(), ChatRoom.RoomType.SUPPORT)
+        // 회원 행을 먼저 잠그면 같은 회원의 첫 두 요청이 동시에 빈 방을 보고 중복 생성하지 못한다.
+        Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
+                .orElseThrow(() -> new ChatException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        return roomRepository.findByMemberIdAndTypeForUpdate(
+                        activeMember.getId(), ChatRoom.RoomType.SUPPORT)
                 .orElseGet(() -> roomRepository.save(ChatRoom.builder()
-                        .member(memberRepository.getReferenceById(member.getId()))
+                        .member(activeMember)
                         .type(ChatRoom.RoomType.SUPPORT)
                         .build()));
     }
@@ -99,14 +103,14 @@ public class ChatService {
 
     @Transactional
     public List<ChatMessageResponse> readRoomAsAdmin(Long roomId) {
-        ChatRoom room = findRoom(roomId);
+        ChatRoom room = findRoomForUpdate(roomId);
         room.markRead(SenderRole.ADMIN);
         return recentMessages(roomId);
     }
 
     @Transactional
     public ChatMessageResponse sendAsAdmin(Member admin, Long roomId, String content) {
-        ChatRoom room = findRoom(roomId);
+        ChatRoom room = findRoomForUpdate(roomId);
         return append(room, SenderRole.ADMIN, admin.getId(), content);
     }
 
@@ -143,6 +147,11 @@ public class ChatService {
 
     private ChatRoom findRoom(Long roomId) {
         return roomRepository.findById(roomId)
+                .orElseThrow(() -> new ChatException("대화를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+    }
+
+    private ChatRoom findRoomForUpdate(Long roomId) {
+        return roomRepository.findByIdForUpdate(roomId)
                 .orElseThrow(() -> new ChatException("대화를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
     }
 

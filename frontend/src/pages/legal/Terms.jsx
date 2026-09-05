@@ -19,7 +19,7 @@ const Terms = () => {
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
                 <Title level={2} style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary, marginBottom: 8 }}>서비스 이용약관</Title>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 5월 17일</Text>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 9월 1일</Text>
             </div>
 
             <Section title="제1조 (목적)">
@@ -66,8 +66,8 @@ const Terms = () => {
             </Section>
 
             <Section title="제6조 (회원 탈퇴 및 데이터 처리)">
-                <Paragraph>이용자는 언제든지 마이페이지를 통해 회원 탈퇴를 요청할 수 있으며, 서비스는 즉시 탈퇴를 처리합니다.</Paragraph>
-                <Paragraph>탈퇴 시 이용자의 개인정보는 즉시 파기되나, 시스템 안정성 검증을 위한 감사 로그(Audit Log)는 개인정보 처리방침에 따라 90일간 분리 보관 후 파기됩니다. 이미 완료된 예약 이력은 가게 사업자의 운영을 위해 일정 기간 익명화하여 보관될 수 있습니다.</Paragraph>
+                <Paragraph>이용자는 마이페이지를 통해 회원 탈퇴를 요청할 수 있습니다. 다만 운영 중인 가게, 처리되지 않은 예약·환불·결제 확인 건이 있는 경우에는 이용자와 가게의 권리를 보호하기 위해 해당 처리를 마친 뒤 탈퇴할 수 있습니다.</Paragraph>
+                <Paragraph>탈퇴가 완료되면 로그인 정보, 이메일, 위치, 소셜 로그인 토큰 등 계정 식별정보를 제거하고 계정을 즉시 사용할 수 없게 합니다. 예약·결제·환불·후기 및 분쟁 대응에 필요한 기록은 회원을 직접 식별할 수 없도록 치환하여 보존하며, 자유 입력 예약 요청사항과 결제 구매자 연락처는 제거합니다. 감사 로그는 90일 후 자동 파기합니다.</Paragraph>
             </Section>
 
             <Section title="제7조 (면책조항)">

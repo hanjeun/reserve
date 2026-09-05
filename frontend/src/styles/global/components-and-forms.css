@@ -1,0 +1,399 @@
+/* ── Card 그림자·hover (2026-08-05: Card.jsx 에서 이관) ─────────────────────
+   Button 과 같은 이유로 옮겼다 — JSX 안 <style> 은 인스턴스마다 렌더된다.
+   카드는 목록 화면에서 수십 개가 동시에 뜨므로 중복이 가장 심한 곳이었다.
+
+   ★ hover 조건을 선택자에 박아두는 이유
+     `.ant-card-hoverable` 이 없는 카드까지 hover 효과가 걸리면, 클릭해도 아무 일이
+     일어나지 않는 **잘못된 어포던스**가 된다. 지금 사용처(StoreCard·MyStores)는 둘 다
+     hoverable 이지만, 비대화형 카드가 생기는 순간 조용히 어긋나므로 조건을 명시한다.
+
+   ★ 인라인 boxShadow 를 주지 말 것
+     Card 를 쓰는 쪽에서 style={{ boxShadow: ... }} 를 주면 인라인이 이 규칙을 이겨서
+     **hover 그림자가 통째로 죽는다.** 실제로 그렇게 회귀한 이력이 있다.
+
+   값의 출처는 tokens/spacing.js 의 shadows.card / shadows.cardHover 다.
+   CSS 에서는 JS 토큰을 참조할 수 없어 리터럴이 중복된다 — 한쪽을 고치면 다른 쪽도 고쳐야 한다. */
+.reserve-card {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);     /* = shadows.card */
+    transition: box-shadow 0.2s ease;
+}
+.reserve-card--interactive { cursor: pointer; }
+.reserve-card-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+.reserve-card-link:hover { color: inherit; }
+.reserve-card-link:focus { outline: none; }
+.reserve-card-link:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: -3px;
+}
+.reserve-card--interactive:focus { outline: none; }
+.reserve-card--interactive:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+}
+.reserve-card.ant-card-hoverable:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);     /* = shadows.cardHover */
+}
+.reserve-card.ant-card-hoverable:hover .reserve-card-image {
+    transform: scale(1.05);
+}
+/* "모션 줄이기"를 켠 사용자에게는 확대·그림자 전환을 끈다.
+   확대·이동 모션은 전정기관 장애가 있는 사용자에게 실제로 불편을 유발한다.
+   전역 * 리셋으로 한 번에 끄지 않는 이유: 이 프로젝트는 antd rc-motion 이 트랜지션
+   타이밍에 민감한 이력이 있어 대상을 좁혀서 끈다. */
+@media (prefers-reduced-motion: reduce) {
+    .reserve-card { transition: none; }
+    .reserve-card.ant-card-hoverable:hover .reserve-card-image { transform: none; }
+}
+/* Card actions(가게 카드 하단 수정·삭제 줄).
+   예전에 background 를 !important 흰색으로 박아둬서 다크에서 이 줄만 흰 띠로 남았고,
+   AntD 의 Card.actionsBg 토큰도 그 !important 에 밀려 무시됐다(2026-07-30).
+   이제 값이 CSS 변수라 다크가 자동으로 따라온다 — !important 도 필요 없다. */
+.reserve-card .ant-card-actions {
+    background: var(--c-bg-paper, #ffffff);
+    border-top: 1px solid var(--c-border-light, #f2f4f6);
+}
+/* margin 이 아니라 padding 이어야 한다.
+   margin 이면 그 12px 이 li 박스 바깥이라, 안쪽 버튼에 hover 배경을 깔아도 위아래 12px 이
+   칠해지지 않아 "일부만 회색으로 채워진" 모양이 됐다. padding 이면 li 박스가 셀 전체가 된다.
+   높이는 12+12 로 같아서 카드 크기는 변하지 않는다. */
+.reserve-card .ant-card-actions > li {
+    margin: 0 !important;
+    padding: 12px 0 !important;
+    transition: background-color 0.15s ease;
+}
+/* 가게 추가 카드(점선 테두리) hover — primary 색으로 강조. */
+.reserve-card-add:hover {
+    border-color: var(--c-primary, #3182f6);
+    color: var(--c-primary, #3182f6);
+}
+.reserve-card-add {
+    width: 100%;
+    padding: 0;
+    font: inherit;
+    text-align: center;
+}
+.reserve-card-add:focus,
+.reserve-card-action:focus { outline: none; }
+.reserve-card-add:focus-visible,
+.reserve-card-action:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+}
+/* ── Button 상호작용 상태 (2026-08-05: Button.jsx 에서 이관) ────────────────
+   ★ 왜 옮겼나 — JSX 안의 <style> 은 **인스턴스마다 하나씩 렌더된다.**
+     React 19 는 precedence prop 이 없으면 style 태그를 호이스팅·중복 제거하지 않는다.
+     브라우저 실측: 마이페이지 한 화면에 Button 의 동일한 style 태그가 3개 있었다.
+     버튼이 많은 화면(가게 목록·관리자 테이블)에서는 수십 개가 된다.
+   전역 정책은 이 파일에, 컴포넌트에는 인스턴스 전용 인라인 style 만 — CLAUDE.md 설계 원칙.
+
+   변수 보간이 전혀 없는 정적 CSS 였으므로 내용은 그대로 옮겼다. */
+.reserve-btn {
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.reserve-btn:focus { outline: none; }
+.reserve-btn:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+}
+.reserve-btn--primary:active:not(:disabled),
+.reserve-btn--secondary:active:not(:disabled),
+.reserve-btn--danger:active:not(:disabled),
+.reserve-btn--hero:active:not(:disabled) {
+    transform: scale(0.96);
+    opacity: 0.88;
+}
+.reserve-btn--primary:hover:not(:disabled)   { opacity: 0.9; }
+.reserve-btn--secondary:hover:not(:disabled) { opacity: 0.85; }
+.reserve-btn--hero:hover:not(:disabled)      { opacity: 0.92; box-shadow: 0 12px 24px rgba(49, 130, 246, 0.28); }
+
+.reserve-btn--ghost-sm:hover:not(:disabled)          { opacity: 0.7; }
+.reserve-btn--ghost-sm:active:not(:disabled)         { opacity: 0.5; transform: scale(0.95); }
+.reserve-btn--ghost-sm-primary:hover:not(:disabled)  { opacity: 0.7; }
+.reserve-btn--ghost-sm-primary:active:not(:disabled) { opacity: 0.5; transform: scale(0.95); }
+.reserve-btn--ghost-sm-success:hover:not(:disabled)  { opacity: 0.7; }
+.reserve-btn--ghost-sm-success:active:not(:disabled) { opacity: 0.5; transform: scale(0.95); }
+.reserve-btn--ghost-sm-danger:hover:not(:disabled)   { opacity: 0.7; }
+.reserve-btn--ghost-sm-danger:active:not(:disabled)  { opacity: 0.5; transform: scale(0.95); }
+
+/* outline: hover 시 테두리만 진해지고 글자는 진한 색 그대로 유지
+   (예전엔 hover에서 color를 회색으로 바꿔서 더 흐릿해졌다) */
+.reserve-btn--outline:hover:not(:disabled)  { border-color: #adb5bd; background: rgba(0, 0, 0, 0.02); }
+.reserve-btn--outline:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
+.reserve-btn--ghost:hover:not(:disabled)    { opacity: 0.7; }
+.reserve-btn--ghost:active:not(:disabled)   { opacity: 0.5; transform: scale(0.94); }
+.reserve-btn--link:hover:not(:disabled)     { opacity: 0.75; }
+
+.reserve-btn-spin {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: reserve-spin 0.6s linear infinite;
+}
+
+/* 즐겨찾기는 토글 버튼이다. JSX의 aria-pressed와 함께 키보드 포커스를 공통 정책으로 보인다. */
+.reserve-favorite-button:focus { outline: none; }
+.reserve-favorite-button:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+}
+
+/* FormInput.WithButton도 일반 FormInput과 같은 .reserve-form-field 관문을 통과한다.
+   결합 버튼의 로딩·포커스·비활성 상태는 호출부가 아니라 여기서 일관되게 처리한다. */
+.reserve-form-field-with-button { width: 100%; }
+.reserve-form-field-button {
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+.reserve-form-field-button:hover:not(:disabled) { opacity: 0.9; }
+.reserve-form-field-button:disabled { cursor: not-allowed; }
+.reserve-form-field-button:focus { outline: none; }
+.reserve-form-field-button:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+    position: relative;
+    z-index: 1;
+}
+.reserve-form-field-button-spin {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: reserve-spin 0.6s linear infinite;
+}
+
+/* ── 스켈레톤 shimmer — 페이지 전체가 하나의 파동을 공유한다 ─────────────────
+   2026-08-04: Skeletons.jsx 가 런타임에 <style> 을 head 에 주입하던 것을 여기로 옮겼다.
+
+   ★ 예전 방식의 문제 — "잔가시처럼 지저분하다"의 원인
+     예전에는 각 뼈대(.reserve-skeleton-block)가 **자기 박스를 기준으로** 800px 그라디언트를
+     따로 굴렸다. background-position 은 요소 자신의 박스 기준이라, 폭이 14px 인 뼈대와
+     100% 인 뼈대가 같은 순간에 서로 다른 밝기를 보인다.
+     특히 폭이 작은 뼈대(14·18·28·36·40px 짜리가 여럿 있다)는 800px 그라디언트의 아주 얇은
+     조각만 보여서 "흐르는 하이라이트"가 아니라 **밝기가 깜빡이는 점**으로 읽힌다.
+     그 점들이 제각각 깜빡여서 화면이 자잘하게 지저분해졌다.
+
+   ★ 고친 방식 — background-attachment: fixed
+     배경 위치 기준을 요소가 아니라 **뷰포트**로 바꾼다. 그러면 모든 뼈대가 하나의
+     화면 폭 그라디언트를 공유하고, 하이라이트 띠가 페이지를 가로질러 지나간다.
+     위쪽 뼈대를 지난 띠가 그대로 아래쪽 뼈대로 이어지는 — 유튜브 스켈레톤 같은 느낌이 된다.
+     작은 뼈대도 독립적으로 깜빡이지 않고 "띠가 지나갈 때만" 밝아진다.
+
+   ★ 트레이드오프 (알고 쓰는 것)
+     - fixed 배경 + 애니메이션은 매 프레임 뷰포트 단위 리페인트를 유발한다. 스켈레톤은
+       로딩 중 짧게만 보이므로 감수할 만하다고 판단했다.
+     - **iOS Safari 는 background-attachment: fixed 를 무시하고 scroll 처럼 처리한다.**
+       그 경우 예전과 같은 "요소 기준" 동작으로 조용히 되돌아간다(깨지지는 않는다).
+       그래서 그라디언트 폭을 vw 로 잡아 폴백에서도 한 요소가 너무 얇은 조각만 보지 않게 했다.
+
+   base 색은 그라디언트가 양끝에서 투명하므로 background-color 로 따로 깔아야 한다.
+   두 색 모두 CSS 변수라 다크 모드는 theme.css 가 알아서 바꿔준다.
+
+   ★ 2026-08-06 — 띠 색이 뒤집혀 있었다
+     하이라이트에 --c-gray-200 을 썼는데, 라이트에서는 200(#e5e8eb)이 바탕인
+     100(#f2f4f6)보다 **어둡다.** 그래서 밝은 띠가 흐르는 게 아니라 어두운 띠가
+     지나갔고, 뼈대가 여러 줄 쌓인 화면에서는 "검은 선이 줄줄이 지나가는" 것으로 보였다.
+     다크는 회색 스케일이 반전돼 200이 100보다 밝아 우연히 정상이었다 —
+     그래서 라이트에서만 증상이 났다.
+     → 전용 변수 --c-skeleton-shine 으로 분리했다(라이트 #fff / 다크 #2d3138).
+       "하이라이트는 바탕보다 밝다"를 회색 스케일 방향에 의존하지 않고 못 박는다. */
+@keyframes reserve-shimmer {
+    0%   { background-position: -70vw 0; }
+    100% { background-position: 170vw 0; }
+}
+.reserve-skeleton-block {
+    background-color: var(--c-gray-100, #f2f4f6);
+    /* ★ 2026-08-06 2차 — 대비를 낮추고 띠를 넓혔다.
+       처음엔 `transparent 0% → shine 50% → transparent 100%` 를 40vw 폭으로 굴렸는데,
+       ① 흰색과 바탕(#f2f4f6)의 대비가 커서 부드러운 물결이 아니라 **또렷한 흰 막대**로 읽혔고
+       ② 40vw 는 모바일에서 너무 좁아 막대가 짧게 끊겨 "직선 여러 개가 겹친" 느낌이 났다.
+       → 폭을 70vw 로 넓히고, 양끝을 20%/80% 에서 끝내 중앙부만 서서히 밝아지게 한다.
+         정점도 흰색이 아니라 반투명 흰색이라 바탕 톤을 완전히 덮지 않는다. */
+    background-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        transparent 20%,
+        var(--c-skeleton-shine, rgba(255, 255, 255, 0.55)) 50%,
+        transparent 80%,
+        transparent 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 70vw 100%;
+    background-attachment: fixed;
+    /* linear 여야 한다. ease-in-out 은 "각 반복마다" 가속·감속을 적용하므로 무한 반복에서는
+       사이클 끝마다 속도가 0으로 떨어졌다가 다시 붙는다 — 띠가 주기적으로 멈칫하는 원인이었다. */
+    animation: reserve-shimmer 1.8s linear infinite;
+    border-radius: 6px;
+}
+/* 모션 최소화를 켠 사용자에게는 흐르지 않는 평면 블록으로 보여준다.
+   로딩 중이라는 정보는 형태만으로 충분히 전달된다. */
+@media (prefers-reduced-motion: reduce) {
+    .reserve-skeleton-block {
+        animation: none;
+        background-image: none;
+    }
+}
+
+/* ── 폼 입력용 Select (FormSelect) — 채움형, 다른 입력칸과 같은 높이 ────────
+   2026-08-04: FormSelect.jsx 안의 <style> 태그에서 여기로 옮겼다.
+   컴포넌트 안에 전역 CSS를 넣으면 그 컴포넌트를 안 쓰는 화면에는 규칙이 아예 존재하지 않고,
+   이 프로젝트는 이미 그 함정에 두 번 빠졌다(필터 Select 색, 카드 그림자).
+   → 전역 정책은 이 파일, 컴포넌트 지역 스타일만 인라인. 이 경계를 지킨다.
+
+   ★ 왜 height 가 아니라 CSS 변수인가
+     AntD 6은 루트에서 padding-block 을
+       calc((var(--ant-select-height) - var(--ant-select-font-height)) / 2 - 테두리)
+     로 계산한다. height 만 강제하면 padding 이 옛 기준으로 남아 글자가 위로 쏠린다.
+     변수를 바꾸면 padding 이 함께 재계산돼 세로 중앙이 자동으로 맞는다.
+     font-height 를 같이 올리는 이유: 글자를 16px 로 키우면 줄상자가 커져서 총 높이가 54px 를 넘는다.
+     (16px 은 iOS 자동 확대 방지 기준선)
+
+   ★ 이 규칙이 없던 동안 무슨 일이 있었나
+     원래 코드는 .ant-select-selector 를 대상으로 했는데 그건 AntD 5 클래스이고 AntD 6에는
+     그 요소가 없다. 선택자가 아무것도 매칭하지 않아 규칙이 조용히 무시됐고, 그래서
+     FormSelect 만 AntD 기본 높이로 남아 옆의 FormInput(54px)보다 낮았다.
+
+   배경색은 여기서 지정하지 않는다 — App.jsx 의 ConfigProvider theme.components.Select 가 맡고,
+   테마 전환은 darkAlgorithm 이 처리한다. 여기서는 AntD 토큰으로 표현할 수 없는 것만 다룬다.
+
+   특이도: className 은 AntD 가 루트(.ant-select)에 붙인다. .ant-select 를 함께 걸어
+   variant 규칙(.ant-select.ant-select-filled = 0,2,0)과 맞춘다. */
+.ant-select.reserve-form-select {
+    --ant-select-height: 54px;          /* = heights.input. 바꿀 때 tokens/spacing.js 와 함께 고칠 것 */
+    --ant-select-font-size: 16px;
+    --ant-select-font-height: 25px;
+    --ant-select-border-radius: 14px;   /* = radius.lg */
+    /* ★★ 반드시 단위를 붙인다 — `0` 이 아니라 `0px`.
+       AntD 는 padding-block 을
+         calc((var(--ant-select-height) - var(--ant-select-font-height)) / 2 - var(--ant-select-border-size))
+       로 계산한다. 커스텀 프로퍼티는 토큰 그대로 치환되므로, 단위 없는 0 이 들어가면
+       `calc((54px - 25px) / 2 - 0)` 이 되어 **CSS calc 가 무효**가 된다
+       (길이에서 단위 없는 숫자를 뺄 수 없다). padding 이 0 으로 떨어져
+       셀렉트 높이가 글자 높이(25px)만 남았다 — 2026-08-05 브라우저 실측으로 확인. */
+    --ant-select-border-size: 0px;
+    align-items: center;
+}
+
+/* ── 폼 Select 는 색을 갖지 않는다 (2026-08-05 확정) ────────────────────────
+   한때 값 글자를 500 으로 굵히고 꺾쇠·포커스 테두리에 브랜드 색을 넣어봤다가 **전부 되돌렸다.**
+
+   되돌린 이유
+     1) 굵기 — 옆의 FormInput 은 400 이다. 셀렉트만 500 이면 같은 폼에서 셀렉트 줄만 무거워
+        보이고, 화면 전체가 "예전보다 굵어졌다"는 인상이 된다.
+     2) 색 — 채움형 입력은 옅은 면으로 "값을 넣는 칸"임을 암시하는 조용한 요소다.
+        FormInput·FormDatePicker·FormTimePicker 아이콘이 전부 무채색인데 셀렉트만 유채색이면
+        그 하나에 시선이 묶여 폼의 위계가 무너진다.
+     3) 포커스 테두리 색도 같은 이유로 뺐다 — 채움형은 테두리가 없는 게 규칙이고,
+        포커스는 AntD 기본 그림자(colorPrimary 기반)가 이미 표현한다.
+
+   글자 크기(16px)는 유지한다. FormInput 이 fontSize.lg(16px)를 명시적으로 고정하고 있어
+   이게 이 프로젝트 입력칸의 기준이다(iOS 자동 확대 방지 기준선과도 같다).
+
+   결론: 여기서 다루는 것은 **높이·모서리·글자 크기**뿐이다. 색과 굵기는 건드리지 않는다. */
+
+/* ── 폼 검증 에러 메시지 — 전역 통일 (2026-08-04 신설) ──────────────────────
+   이 프로젝트에는 에러를 그리는 경로가 **두 개**라 모양이 갈라져 있었다.
+
+     1) AntD Form.Item 자체 UI (가게 등록·광고 신청·제재 모달 등)
+        → AntD 기본값이 font-size 14px(token.fontSize), line-height 1.57
+     2) 직접 만든 FormField (components/common/FormModal.jsx, 문의 모달 등)
+        → font-size 12px(fontSize.xs), margin-top 6px
+
+   같은 성격의 메시지가 화면마다 크기와 거리가 달랐던 이유가 이것이다.
+   AntD 쪽을 FormField 규격으로 끌어와 하나로 맞춘다.
+
+   ★ 정한 규격 (docs/technical/design-system.md 에도 등재)
+       위치  : 컨트롤 바로 아래, 간격 6px
+       크기  : 12px (본문보다 작게 — 보조 설명의 위계)
+       색    : colors.error.main
+       사라짐: **재검증 성공 시에만.** 타이머로 지우지 않는다.
+
+   ★ 왜 타이머로 지우지 않는가
+     검증 에러는 "지금 이 값이 잘못됐다"는 지속 상태이고, 값이 그대로인데 메시지만 사라지면
+     사용자는 이유를 잃는다. WCAG 3.3.1은 에러를 텍스트로 식별 가능하게 유지하도록 요구한다.
+     타이머로 사라지는 것은 결과를 통보하는 토스트의 영역이다(저장 완료 등).
+
+   line-height 를 함께 지정하는 이유: font-size 만 줄이면 AntD 의 1.57 배 줄높이가 남아
+   메시지가 컨트롤에서 더 멀리 떨어져 보인다. "한참 아래에 작게" 뜨던 증상이 이것이다. */
+/* ★★ 2026-08-05 — 값을 두 곳에 맞춰 적는 게 아니라 **선택자를 한 규칙에 모았다.**
+     처음엔 AntD 쪽만 고쳤는데, 문의 모달(FormField)은 자기 인라인 스타일을 쓰고 있어서
+     제 수정이 스쳐 지나갔다. "가게 등록은 바뀌고 문의 모달은 안 바뀐" 이유가 그것이다.
+     같은 정책이 두 곳에 각자 하드코딩돼 있으면 한쪽을 고쳐도 다른 쪽은 그대로다.
+     → 우리 클래스 `.reserve-field-error` 를 만들고, AntD 클래스와 **같은 규칙에 나란히** 둔다.
+       이제 값을 바꾸면 두 경로가 동시에 따라온다. FormField 는 인라인 스타일을 갖지 않는다. */
+.reserve-field-error,
+.ant-form-item-explain,
+.ant-form-item-explain-error,
+.ant-form-item-explain-warning {
+    font-size: 12px;
+    line-height: 1.5;
+}
+.reserve-field-error,
+.ant-form-item-explain {
+    margin-top: 6px;
+}
+/* FormField 경로는 AntD 컨테이너가 없으므로 블록화와 색을 직접 준다.
+   AntD 경로의 색은 ConfigProvider token.colorError 가 맡는다(아래 주석 참고). */
+.reserve-field-error {
+    display: block;
+    color: var(--c-error, #f04452);
+}
+/* 색은 App.jsx 의 ConfigProvider token.colorError 가 담당하는 게 정석이라 여기서 지정하지 않는다.
+   AntD 기본 에러색은 #ff4d4f 이고 이 프로젝트 색은 #f04452 라 그냥 두면 서로 다른 빨강이 섞인다.
+   theme.css 의 --c-error 는 다크에서 #ff6b76 으로 바뀌므로 리터럴로 박으면 다크가 어긋난다. */
+
+/* ── 비활성 입력의 placeholder가 검게 보이는 문제 ────────────────────────────
+   "날짜를 먼저 선택해주세요"(비활성 TimePicker)만 유독 안 고쳐지던 이유가 여기 있다.
+   ConfigProvider의 colorTextPlaceholder / colorTextDisabled는 `color`를 바꾸는데,
+   WebKit은 disabled 상태의 input에 `-webkit-text-fill-color`를 따로 적용하고
+   이게 `color`를 **덮어쓴다**. 그래서 토큰을 아무리 올려도 화면은 그대로였다.
+   → 두 속성을 같이 지정해야 한다. 라이트 값은 AntD 기본과 같아 변화가 없다.
+
+   ★ 값에 CSS 변수를 쓰지 않는다. 이 프로젝트에서 var(--c-...)가 유독 특정 요소에서만
+     폴백으로 계산되는 현상을 두 번 겪었다(FormSelect 배경, 그리고 이 규칙의 1차 시도).
+     폴백이 라이트 값(검정)이라 다크에서 그대로 검게 보였다. 테마별 리터럴로 못 박는다.
+
+   ★★ 2026-08-04 정정 — 위 "var()가 폴백으로 계산된다"는 진단은 근거가 약하다.
+     CSS 커스텀 프로퍼티는 정상적으로 상속되며, 실제로 겪은 두 사례는 원인이 각각 따로 있었다.
+     (1) 필터 Select 배경: 이 파일 아래쪽 주석의 구문 오류가 규칙을 통째로 삼키고 있었다.
+     (2) AntD ConfigProvider 토큰에 var() 문자열을 넣는 경우: AntD는 토큰 색을 JS에서
+         파싱해 파생색(hover/active/알파)을 계산하므로 var() 문자열은 계산에 실패한다.
+         즉 "CSS가 이상한 것"이 아니라 "JS 색 계산기에 CSS 값을 넣은 것"이 문제였다.
+     결론: CSS 규칙 안에서는 var()를 써도 된다. ConfigProvider 토큰 값에만 쓰지 말 것.
+
+   ★ AntD 6 클래스명 주의 — .ant-select-selection-placeholder 는 **AntD 5 이름이고 6에는 없다.**
+     6의 자식 클래스는 -content / -placeholder / -input / -prefix / -suffix / -selection-item 이다
+     (node_modules/@rc-component/select 에서 전수 확인). 옛 이름은 조용히 무시된다. */
+.ant-picker-disabled input::placeholder,
+.ant-picker-disabled input,
+.ant-input-disabled::placeholder,
+.ant-input-disabled,
+.ant-select-disabled .ant-select-placeholder,
+.ant-select-disabled .ant-select-content,
+input:disabled::placeholder,
+input:disabled {
+    -webkit-text-fill-color: rgba(0, 0, 0, 0.25) !important;
+    color: rgba(0, 0, 0, 0.25) !important;
+    opacity: 1 !important;   /* 일부 브라우저가 placeholder에 기본 opacity를 더 얹는다 */
+}
+[data-theme='dark'] .ant-picker-disabled input::placeholder,
+[data-theme='dark'] .ant-picker-disabled input,
+[data-theme='dark'] .ant-input-disabled::placeholder,
+[data-theme='dark'] .ant-input-disabled,
+[data-theme='dark'] .ant-select-disabled .ant-select-placeholder,
+[data-theme='dark'] .ant-select-disabled .ant-select-content,
+[data-theme='dark'] input:disabled::placeholder,
+[data-theme='dark'] input:disabled {
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.42) !important;
+    color: rgba(255, 255, 255, 0.42) !important;
+}

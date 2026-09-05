@@ -36,8 +36,9 @@ permissions:
   contents: read
 
 env:
-  # 공개된 SSH 호스트 키 지문이다(시크릿 아님). 키가 바뀌면 배포가 멈추므로 서버 교체 시 함께 갱신한다.
-  RESERVE_SSH_FINGERPRINT: SHA256:gQC+4rUbieJA95kuJg91ta8IiuOXLwvAJeepdhJfmeM
+  # appleboy의 Go SSH 클라이언트가 이 서버에서 협상하는 ECDSA 호스트 키 지문이다(시크릿 아님).
+  # 로컬 OpenSSH가 주로 표시하는 ED25519 지문으로 바꾸면 같은 서버여도 fingerprint mismatch가 난다.
+  RESERVE_SSH_FINGERPRINT: SHA256:xUTdx0pKa31pVIYhaJyo8fEOekQbzTss15GxZbrT1Iw
 
 jobs:
   # ─────────────────────────────────────────────────────────

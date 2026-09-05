@@ -145,6 +145,34 @@ public class Member {
         return this.deletedAt != null;
     }
 
+    /**
+     * 거래 원장의 FK는 유지하면서 로그인·연락·위치 식별자는 제거한다.
+     * 이메일은 unique 제약 때문에 회원 ID 기반의 비식별 주소로 치환한다.
+     */
+    public void withdraw(String anonymizedEmail) {
+        this.name = "탈퇴한 회원";
+        this.email = anonymizedEmail;
+        this.password = null;
+        this.role = Role.USER;
+        this.provider = null;
+        this.providerId = null;
+        this.profileImage = null;
+        this.profileImageLocked = true;
+        this.oauthAccessToken = null;
+        this.emailNotificationEnabled = false;
+        this.termsAgreed = false;
+        this.marketingAgreed = false;
+        this.latitude = null;
+        this.longitude = null;
+        this.locationAddress = null;
+        this.locationZipCode = null;
+        this.locationAddressDetail = null;
+        this.status = MemberStatus.ACTIVE;
+        this.suspendedUntil = null;
+        this.suspendReason = null;
+        this.deletedAt = LocalDateTime.now();
+    }
+
     // 제재 상태 체크
     // 주의: DB 반영은 하지 않음. 호출측에서 @Transactional 필요
     public boolean isSuspended() {

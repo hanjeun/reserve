@@ -100,7 +100,7 @@ public class TokenProvider {
                     .parseSignedClaims(token);
             return true;
         } catch (Exception e) {
-            log.debug("유효하지 않은 토큰입니다: {}", e.getMessage());
+            log.debug("Invalid token: errorType={}", e.getClass().getSimpleName());
             return false;
         }
     }
@@ -110,28 +110,21 @@ public class TokenProvider {
     }
 
     /**
-     * JWT 클레임만으로 Member 객체 생성 (DB 조회 없음)
-     * 필터에서 사용 — id, role만 필요하므로 DB 조회 불필요
+     * 토큰 서명만 맞는 것으로 인증하지 않고 현재 활성 회원 행을 확인한다.
+     * 탈퇴·익명화 직후 기존 access token이 만료될 때까지 살아 있는 공백을 막는 관문이다.
      */
-    public Member getMemberFromTokenWithoutDB(String token) {
-        Claims claims = getClaims(token);
-        Long id = claims.get("id", Long.class);
-        Role role = Role.valueOf(claims.get("role", String.class));
-        String email = claims.getSubject();
-        return Member.builder()
-                .id(id)
-                .email(email)
-                .role(role)
-                .build();
+    public Member getActiveMemberFromToken(String token) {
+        Long userId = getUserId(token);
+        Member member = memberRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new AuthException("토큰과 일치하는 사용자를 찾을 수 없습니다."));
+        if (member.isSuspended()) {
+            throw new AuthException("현재 인증할 수 없는 사용자입니다.");
+        }
+        return member;
     }
 
-    /**
-     * DB에서 최신 Member 조회 (프로필 이미지 등 최신 정보 필요 시)
-     */
     public Member getMemberFromToken(String token) {
-        Long userId = getUserId(token);
-        return memberRepository.findById(userId)
-                .orElseThrow(() -> new AuthException("토큰과 일치하는 사용자를 찾을 수 없습니다."));
+        return getActiveMemberFromToken(token);
     }
 
     private Claims getClaims(String token) {

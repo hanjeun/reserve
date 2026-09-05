@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AdminSentMailRepository extends JpaRepository<AdminSentMail, Long> {
@@ -46,7 +45,4 @@ public interface AdminSentMailRepository extends JpaRepository<AdminSentMail, Lo
     @Query("UPDATE AdminSentMail m SET m.deletedAt = NULL WHERE m.id = :id")
     void restoreById(Long id);
 
-    @Modifying
-    @Query("DELETE FROM AdminSentMail m WHERE m.deletedAt IS NOT NULL AND m.deletedAt < :cutoff")
-    int hardDeleteByDeletedAtBefore(LocalDateTime cutoff);
 }

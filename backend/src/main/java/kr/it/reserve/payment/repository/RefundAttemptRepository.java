@@ -54,4 +54,24 @@ public interface RefundAttemptRepository extends JpaRepository<RefundAttempt, Lo
 
     /** 알림·대시보드용 미결 건수. */
     long countByStatusIn(Collection<RefundAttempt.Status> statuses);
+
+    @Query("""
+            SELECT COUNT(ra) FROM RefundAttempt ra
+             WHERE ra.status IN :statuses
+               AND ra.paymentId IN (
+                   SELECT p.id FROM Payment p WHERE p.reservation.store.id = :storeId)
+            """)
+    long countUnresolvedByStoreId(
+            @Param("storeId") Long storeId,
+            @Param("statuses") Collection<RefundAttempt.Status> statuses);
+
+    @Query("""
+            SELECT COUNT(ra) FROM RefundAttempt ra
+             WHERE ra.status IN :statuses
+               AND ra.paymentId IN (
+                   SELECT p.id FROM Payment p WHERE p.member.id = :memberId)
+            """)
+    long countUnresolvedByMemberId(
+            @Param("memberId") Long memberId,
+            @Param("statuses") Collection<RefundAttempt.Status> statuses);
 }

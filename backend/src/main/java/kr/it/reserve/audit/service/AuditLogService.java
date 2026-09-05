@@ -41,15 +41,13 @@ import java.util.Map;
 @Slf4j
 public class AuditLogService {
 
-    private static final int SOFT_DELETE_RETENTION_DAYS = 30;
-    private static final int AUDIT_LOG_RETENTION_DAYS = 90;
-
     private final AuditLogRepository auditLogRepository;
     private final AdminSentMailRepository adminSentMailRepository;
     private final ReservationRepository reservationRepository;
     private final ReviewRepository reviewRepository;
     private final AdvertisementRepository advertisementRepository;
     private final ObjectMapper objectMapper;
+    private final AuditCleanupWorker auditCleanupWorker;
 
     // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
 
@@ -193,26 +191,21 @@ public class AuditLogService {
         int success = 0;
         for (AuditLog item : expired) {
             try {
-                // 하나씩 별도 트랜잭션으로 실행 — 한 항목 실패해도 나머지 진행
-                deleteOneItem(item);
-                success++;
+                // 별도 빈의 REQUIRES_NEW 경계를 통과해야 실제로 항목별 트랜잭션이 된다.
+                if (auditCleanupWorker.deleteOneItem(item.getId(), now)) {
+                    success++;
+                }
             } catch (Exception e) {
-                log.warn("Auto hard-delete failed: type={}, id={}, error={}",
-                        item.getEntityType(), item.getEntityId(), e.getMessage());
+                log.warn("Auto hard-delete failed: type={}, id={}, errorType={}",
+                        item.getEntityType(), item.getEntityId(), e.getClass().getSimpleName());
             }
         }
 
-        int auditDeleted = auditLogRepository.deleteExpired(now.minusDays(AUDIT_LOG_RETENTION_DAYS));
+        // expiresAt 자체가 삭제 시각이다. 여기서 다시 90일을 빼면 의도한 90일이 180일이 된다.
+        // 실패한 SOFT_DELETE 로그는 다음 실행에서 재시도해야 하므로 이 일괄 정리에서 제외한다.
+        int auditDeleted = auditLogRepository.deleteExpiredNonTrash(now);
         log.info("Scheduled cleanup complete: success={}/{}, auditLogDeleted={}",
                 success, expired.size(), auditDeleted);
-    }
-
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    public void deleteOneItem(AuditLog item) {
-        hardDeleteEntity(item.getEntityType(), item.getEntityId());
-        auditLogRepository.deleteSoftDeleteLog(item.getEntityType(), item.getEntityId());
-        saveAuditLogWithActor(item.getEntityType(), item.getEntityId(),
-                "HARD_DELETE", Map.of(), "TrashCleanupScheduler");
     }
 
     // ── 목록 조회 ──────────────────────────────────────────────
@@ -236,20 +229,10 @@ public class AuditLogService {
 
     // ── 내부 유틸 ──────────────────────────────────────────────
 
-    private void hardDeleteEntity(String entityType, Long entityId) {
-        switch (entityType.toUpperCase()) {
-            case "SENT_MAIL"      -> adminSentMailRepository.deleteById(entityId);
-            case "RESERVATION"    -> reservationRepository.deleteById(entityId);
-            case "REVIEW"         -> reviewRepository.deleteById(entityId);
-            case "ADVERTISEMENT"  -> advertisementRepository.deleteById(entityId);
-            default -> throw new AuditException("휴지통 영구삭제가 지원되지 않는 항목입니다: " + entityType);
-        }
-    }
-
     private void saveAuditLogWithActor(String entityType, Long entityId, String action,
                                        Map<String, String> snapshotData, String actorEmail) {
         String snapshot = toJson(snapshotData);
-        LocalDateTime expiresAt = LocalDateTime.now().plusDays(AUDIT_LOG_RETENTION_DAYS);
+        LocalDateTime expiresAt = LocalDateTime.now().plusDays(AuditRetentionPolicy.AUDIT_DAYS);
         auditLogRepository.save(AuditLog.builder()
                 .entityType(entityType)
                 .entityId(entityId)
@@ -264,7 +247,9 @@ public class AuditLogService {
         String actorEmail = getCurrentUserEmail();
         String snapshot = toJson(snapshotData);
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(
-                "SOFT_DELETE".equals(action) ? SOFT_DELETE_RETENTION_DAYS : AUDIT_LOG_RETENTION_DAYS
+                "SOFT_DELETE".equals(action)
+                        ? AuditRetentionPolicy.TRASH_DAYS
+                        : AuditRetentionPolicy.AUDIT_DAYS
         );
         auditLogRepository.save(AuditLog.builder()
                 .entityType(entityType)

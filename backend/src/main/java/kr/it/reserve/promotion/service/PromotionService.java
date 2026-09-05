@@ -55,7 +55,7 @@ public class PromotionService {
     // 홍보글 작성
     @Transactional
     public PromotionDto.PromotionResponse createPromotion(Long memberId, PromotionDto.PromotionRequest request) {
-        Member member = memberRepository.findById(memberId)
+        Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() -> new PromotionException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         // 권한 확인
@@ -63,8 +63,12 @@ public class PromotionService {
             throw new PromotionException("사업자 또는 관리자만 홍보글을 작성할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        Store store = storeRepository.findById(request.getStoreId())
+        Store store = storeRepository.findByIdForUpdate(request.getStoreId())
                 .orElseThrow(() -> new PromotionException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        if (store.isDeleted() || store.isSuspended()) {
+            throw new PromotionException("현재 운영 중인 가게에만 홍보글을 등록할 수 있습니다.", HttpStatus.CONFLICT);
+        }
 
         // 소유권 확인
         if (!store.getOwner().getId().equals(memberId)) {

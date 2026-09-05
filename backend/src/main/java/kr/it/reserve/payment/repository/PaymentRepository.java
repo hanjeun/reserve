@@ -2,6 +2,8 @@ package kr.it.reserve.payment.repository;
 
 import jakarta.persistence.LockModeType;
 import kr.it.reserve.payment.entity.Payment;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -9,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,12 +20,18 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     
     // 가맹점 주문번호로 조회
     Optional<Payment> findByMerchantUid(String merchantUid);
+
+    /** 브라우저 검증·웹훅·만료 재확인이 같은 결제를 동시에 완료하지 않도록 잠근다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Payment p WHERE p.merchantUid = :merchantUid")
+    Optional<Payment> findByMerchantUidForUpdate(@Param("merchantUid") String merchantUid);
     
     // 포트원 결제번호로 조회
     Optional<Payment> findByImpUid(String impUid);
     
     // 예약 ID로 조회 (단일 - 주의: 레코드 여러 개면 예외 발생)
     Optional<Payment> findByReservationId(Long reservationId);
+    boolean existsByReservationId(Long reservationId);
 
     /**
      * 예약 ID + PAID 상태로 가장 최근 1건.
@@ -61,6 +70,14 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findByIdForUpdate(@Param("id") Long id);
 
     /**
+     * 예약 만료 재확인용. 한 예약의 결제 행을 한 스냅샷에서 모두 잠가
+     * READY→PAID 전환과 만료 취소가 서로 엇갈리지 않게 한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Payment p WHERE p.reservation.id = :reservationId ORDER BY p.createdAt DESC")
+    List<Payment> findAllByReservationIdForUpdate(@Param("reservationId") Long reservationId);
+
+    /**
      * 위와 같은 잠금 조회를 예약 ID 로. 조건·정렬·LIMIT 은 {@link #findPaidByReservationId} 와 같다
      * — 두 메서드가 <b>다른 행을 고르면</b> 잠금이 의미를 잃으므로 바꿀 때 반드시 같이 바꿀 것.
      */
@@ -77,6 +94,23 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     
     // 결제 상태로 조회
     List<Payment> findByStatus(Payment.PaymentStatus status);
+
+    /** 관리자 수동 대사용 오래된 READY 목록. 예약은 DTO 변환 시 필요한 ToOne이라 fetch join해 N+1을 막는다. */
+    @Query(value = """
+            SELECT p FROM Payment p
+              JOIN FETCH p.reservation r
+             WHERE p.status = 'READY' AND p.createdAt < :cutoff
+             ORDER BY p.createdAt ASC, p.id ASC
+            """,
+            countQuery = """
+            SELECT COUNT(p) FROM Payment p
+             WHERE p.status = 'READY' AND p.createdAt < :cutoff
+            """)
+    Page<Payment> findStaleReadyPayments(
+            @Param("cutoff") LocalDateTime cutoff,
+            Pageable pageable);
+
+    long countByStatusAndCreatedAtBefore(Payment.PaymentStatus status, LocalDateTime cutoff);
     
     // 회원 ID와 결제 상태로 조회
     List<Payment> findByMemberIdAndStatus(Long memberId, Payment.PaymentStatus status);
@@ -85,8 +119,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("SELECT p FROM Payment p JOIN p.reservation r WHERE r.store.id = :storeId ORDER BY p.createdAt DESC")
     List<Payment> findByStoreId(@Param("storeId") Long storeId);
 
-    // 가게 ID로 결제 전체 삭제 (가게 삭제 시 사용)
-    @Modifying
-    @Query("DELETE FROM Payment p WHERE p.reservation.id IN (SELECT r.id FROM Reservation r WHERE r.store.id = :storeId)")
-    void deleteByStoreId(@Param("storeId") Long storeId);
+    /** 탈퇴 시 주문번호·금액·상태는 보존하고 중복 저장된 구매자 식별자만 제거한다. */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Payment p SET p.buyerName = '탈퇴한 회원', p.buyerEmail = NULL, p.buyerTel = NULL " +
+           "WHERE p.member.id = :memberId")
+    int anonymizeBuyerByMemberId(@Param("memberId") Long memberId);
 }

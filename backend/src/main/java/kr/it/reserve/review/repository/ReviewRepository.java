@@ -43,21 +43,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // 가게의 리뷰 개수 조회
     long countByStoreId(Long storeId);
 
-    // 특정 가게의 모든 리뷰 삭제
-    @Modifying
-    @Query("DELETE FROM Review r WHERE r.store.id = :storeId")
-    void deleteByStoreId(@Param("storeId") Long storeId);
-
-    // 특정 회원의 모든 리뷰 삭제
-    @Modifying
-    @Query("DELETE FROM Review r WHERE r.member.id = :memberId")
-    void deleteByMemberId(@Param("memberId") Long memberId);
-
     @Modifying
     @Query("UPDATE Review r SET r.deletedAt = NULL WHERE r.id = :id")
     void restoreById(Long id);
 
-    @Modifying
-    @Query("DELETE FROM Review r WHERE r.deletedAt IS NOT NULL AND r.deletedAt < :cutoff")
-    int hardDeleteByDeletedAtBefore(java.time.LocalDateTime cutoff);
 }

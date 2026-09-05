@@ -8,9 +8,8 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.dto.*;
-import kr.it.reserve.payment.dto.*;
-import kr.it.reserve.payment.dto.PortoneV2CancelResponse;
 import kr.it.reserve.payment.entity.Payment;
+import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
@@ -41,12 +40,13 @@ public class PaymentService {
     private final MemberRepository memberRepository;
     private final PortoneService portoneService;
     private final RefundLedgerService refundLedgerService;
+    private final PaymentReconciliationIssueService reconciliationIssueService;
 
     public PaymentPrepareDto preparePayment(PaymentRequestDto requestDto, Long memberId) {
         Reservation reservation = reservationRepository.findById(requestDto.getReservationId())
                 .orElseThrow(ReservationException::notFound);
 
-        Member member = memberRepository.findById(memberId)
+        Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(MemberException::notFound);
 
         // ★ 본인 예약인지 확인한다 (2026-08-09).
@@ -57,6 +57,10 @@ public class PaymentService {
             log.warn("Payment prepare denied - not owner: reservationId={}, memberId={}",
                     reservation.getId(), memberId);
             throw new PaymentException("본인의 예약만 결제할 수 있습니다.", HttpStatus.FORBIDDEN);
+        }
+
+        if (!canReceivePayment(reservation)) {
+            throw new PaymentException("취소되거나 종료된 예약은 결제할 수 없습니다.", HttpStatus.CONFLICT);
         }
 
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
@@ -186,7 +190,290 @@ public class PaymentService {
         // V2 API: merchantUid(=paymentId)로 조회
         PortoneV2PaymentResponse portonePayment = portoneService.getPaymentInfo(payment.getMerchantUid());
 
+        return completeReadyPaymentFromPg(
+                payment.getMerchantUid(),
+                portonePayment,
+                verifyDto.getImpUid());
+    }
+
+    /**
+     * 브라우저가 돌아오지 않아도 웹훅이 확인한 PAID 상태를 복구한다.
+     * 결제 행을 잠근 뒤 상태를 다시 보므로 브라우저 검증과 동시에 와도 한 번만 완료된다.
+     */
+    public PaidRecoveryResult recoverPaidPaymentFromPg(
+            String merchantUid,
+            PortoneV2PaymentResponse portonePayment) {
+        Payment payment = paymentRepository.findByMerchantUidForUpdate(merchantUid).orElse(null);
+        if (payment == null) {
+            return PaidRecoveryResult.UNKNOWN_PAYMENT;
+        }
+
+        if (!portonePayment.isPaid()) {
+            return PaidRecoveryResult.NOT_PAID;
+        }
+
+        if (payment.getStatus() == Payment.PaymentStatus.PAID) {
+            ensureReservationPaidState(payment);
+            return PaidRecoveryResult.ALREADY_PAID;
+        }
+
+        if (payment.getStatus() != Payment.PaymentStatus.READY) {
+            recordIssue(
+                    "PAID",
+                    PaymentReconciliationIssue.IssueType.PAID_STATE_CONFLICT,
+                    payment,
+                    payment.getStatus().name());
+            throw new PaymentException(
+                    "결제 완료 상태를 자동 반영할 수 없습니다. 관리자 확인이 필요합니다.",
+                    HttpStatus.CONFLICT);
+        }
+
+        completeLockedReadyPayment(payment, portonePayment, null);
+        return PaidRecoveryResult.RECOVERED;
+    }
+
+    /**
+     * 예약 만료 직전에 PG를 다시 확인한다. 조회가 불확실하면 예약을 취소하지 않는 fail-closed 판정이다.
+     */
+    public ExpiryPaymentDecision reconcileBeforeReservationExpiry(Long reservationId) {
+        List<Payment> payments = paymentRepository.findAllByReservationIdForUpdate(reservationId);
+        Payment paid = payments.stream()
+                .filter(payment -> payment.getStatus() == Payment.PaymentStatus.PAID)
+                .findFirst()
+                .orElse(null);
+        if (paid != null) {
+            ensureReservationPaidState(paid);
+            resolveIssues(paid);
+            return ExpiryPaymentDecision.PAID_RECOVERED;
+        }
+
+        Payment payment = payments.stream()
+                .filter(candidate -> candidate.getStatus() == Payment.PaymentStatus.READY)
+                .findFirst()
+                .orElse(null);
+        if (payment == null && payments.isEmpty()) {
+            return ExpiryPaymentDecision.NO_PAYMENT;
+        }
+        if (payment == null) {
+            Payment latest = payments.get(0);
+            if (latest.getStatus() == Payment.PaymentStatus.FAILED
+                    || latest.getStatus() == Payment.PaymentStatus.CANCELLED) {
+                resolveIssues(latest);
+                return ExpiryPaymentDecision.NOT_PAID;
+            }
+            recordIssue(
+                    "EXPIRY",
+                    PaymentReconciliationIssue.IssueType.LOCAL_STATUS_UNCERTAIN,
+                    latest,
+                    latest.getStatus().name());
+            return ExpiryPaymentDecision.UNCERTAIN;
+        }
+
+        PortoneV2PaymentResponse portonePayment;
+        try {
+            portonePayment = portoneService.getPaymentInfo(payment.getMerchantUid());
+        } catch (RuntimeException e) {
+            recordIssue(
+                    "EXPIRY",
+                    PaymentReconciliationIssue.IssueType.EXPIRY_RECHECK_FAILED,
+                    payment,
+                    e.getClass().getSimpleName());
+            log.error("Payment expiry recheck failed: paymentId={}, merchantUid={}, errorType={}",
+                    payment.getId(), payment.getMerchantUid(), e.getClass().getSimpleName());
+            return ExpiryPaymentDecision.UNCERTAIN;
+        }
+
+        if (portonePayment.isPaid()) {
+            completeLockedReadyPayment(payment, portonePayment, null);
+            return ExpiryPaymentDecision.PAID_RECOVERED;
+        }
+
+        String pgStatus = portonePayment.getStatus();
+        if ("READY".equals(pgStatus) || "FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)) {
+            payment.failPayment("Payment window expired before completion");
+            resolveIssues(payment);
+            return ExpiryPaymentDecision.NOT_PAID;
+        }
+
+        recordIssue(
+                "EXPIRY",
+                PaymentReconciliationIssue.IssueType.EXPIRY_STATUS_UNCERTAIN,
+                payment,
+                pgStatus == null ? "NULL" : pgStatus);
+        log.warn("Payment expiry recheck is inconclusive: paymentId={}, merchantUid={}, pgStatus={}",
+                payment.getId(), payment.getMerchantUid(), pgStatus);
+        return ExpiryPaymentDecision.UNCERTAIN;
+    }
+
+    /**
+     * 관리자 수동 대사에서 오래된 READY 한 건을 PG 권위 상태와 다시 맞춘다.
+     *
+     * <p>자동 만료는 PENDING 예약만 훑으므로 이미 취소·삭제된 예약에 붙은 과거 READY는
+     * 영원히 남을 수 있다. 이 경로는 결제 행을 잠그고 PG를 다시 조회하되, 실제 돈이
+     * 확인된 충돌은 임의로 덮지 않고 대사 큐에 남긴다.
+     */
+    public StaleReadyReconciliationResponse reconcileStaleReadyPayment(Long paymentId) {
+        Payment payment = paymentRepository.findByIdForUpdate(paymentId)
+                .orElseThrow(PaymentException::notFound);
+
+        if (payment.getStatus() != Payment.PaymentStatus.READY) {
+            resolveIssues(payment);
+            return staleReadyResult(
+                    payment,
+                    null,
+                    StaleReadyReconciliationResponse.Outcome.ALREADY_RESOLVED);
+        }
+
+        PortoneV2PaymentResponse pgPayment;
+        try {
+            pgPayment = portoneService.getPaymentInfo(payment.getMerchantUid());
+        } catch (PaymentException e) {
+            if (e.getStatus() == HttpStatus.NOT_FOUND && !canReceivePayment(payment.getReservation())) {
+                payment.failPayment("Closed reservation has no payment at PG");
+                resolveIssues(payment);
+                return staleReadyResult(
+                        payment,
+                        "NOT_FOUND",
+                        StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
+            }
+            recordIssue(
+                    "STALE_READY",
+                    PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
+                    payment,
+                    e.getStatus().name());
+            return staleReadyResult(
+                    payment,
+                    null,
+                    StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
+        } catch (RuntimeException e) {
+            recordIssue(
+                    "STALE_READY",
+                    PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
+                    payment,
+                    e.getClass().getSimpleName());
+            return staleReadyResult(
+                    payment,
+                    null,
+                    StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
+        }
+
+        String pgStatus = pgPayment.getStatus();
+        if (pgPayment.isPaid()) {
+            if (!canReceivePayment(payment.getReservation())) {
+                recordIssue(
+                        "STALE_READY",
+                        PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
+                        payment,
+                        payment.getReservation().getStatus().name());
+                return staleReadyResult(
+                        payment,
+                        pgStatus,
+                        StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+            }
+            if (pgPayment.getAmount() != payment.getAmount()) {
+                recordIssue(
+                        "STALE_READY",
+                        PaymentReconciliationIssue.IssueType.PAID_AMOUNT_MISMATCH,
+                        payment,
+                        "EXPECTED_" + payment.getAmount() + "_ACTUAL_" + pgPayment.getAmount());
+                return staleReadyResult(
+                        payment,
+                        pgStatus,
+                        StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+            }
+
+            completeLockedReadyPayment(payment, pgPayment, null);
+            return staleReadyResult(
+                    payment,
+                    pgStatus,
+                    StaleReadyReconciliationResponse.Outcome.PAID_RECOVERED);
+        }
+
+        if ("FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)
+                || ("READY".equals(pgStatus) && !canReceivePayment(payment.getReservation()))) {
+            payment.failPayment("Stale payment reconciled from PG status: " + pgStatus);
+            resolveIssues(payment);
+            return staleReadyResult(
+                    payment,
+                    pgStatus,
+                    StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
+        }
+
+        if ("READY".equals(pgStatus)) {
+            recordIssue(
+                    "STALE_READY",
+                    PaymentReconciliationIssue.IssueType.STALE_READY_STILL_PENDING,
+                    payment,
+                    pgStatus);
+            return staleReadyResult(
+                    payment,
+                    pgStatus,
+                    StaleReadyReconciliationResponse.Outcome.STILL_PENDING);
+        }
+
+        recordIssue(
+                "STALE_READY",
+                PaymentReconciliationIssue.IssueType.STALE_READY_STATUS_UNCERTAIN,
+                payment,
+                pgStatus == null ? "NULL" : pgStatus);
+        return staleReadyResult(
+                payment,
+                pgStatus,
+                StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+    }
+
+    private StaleReadyReconciliationResponse staleReadyResult(
+            Payment payment,
+            String pgStatus,
+            StaleReadyReconciliationResponse.Outcome outcome) {
+        return new StaleReadyReconciliationResponse(
+                payment.getId(),
+                payment.getMerchantUid(),
+                payment.getStatus().name(),
+                pgStatus,
+                outcome);
+    }
+
+    private PaymentResponseDto completeReadyPaymentFromPg(
+            String merchantUid,
+            PortoneV2PaymentResponse portonePayment,
+            String fallbackImpUid) {
+        Payment lockedPayment = paymentRepository.findByMerchantUidForUpdate(merchantUid)
+                .orElseThrow(PaymentException::notFound);
+
+        if (lockedPayment.getStatus() == Payment.PaymentStatus.PAID) {
+            ensureReservationPaidState(lockedPayment);
+            return PaymentResponseDto.fromEntity(lockedPayment);
+        }
+        if (lockedPayment.getStatus() != Payment.PaymentStatus.READY) {
+            throw new PaymentException("검증할 수 있는 결제 상태가 아닙니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        completeLockedReadyPayment(lockedPayment, portonePayment, fallbackImpUid);
+        return PaymentResponseDto.fromEntity(lockedPayment);
+    }
+
+    private void completeLockedReadyPayment(
+            Payment payment,
+            PortoneV2PaymentResponse portonePayment,
+            String fallbackImpUid) {
+        if (!canReceivePayment(payment.getReservation())) {
+            recordIssue(
+                    "PAID",
+                    PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
+                    payment,
+                    payment.getReservation().getStatus().name());
+            throw new PaymentException(
+                    "취소되거나 종료된 예약의 결제가 확인되었습니다. 관리자 확인이 필요합니다.",
+                    HttpStatus.CONFLICT);
+        }
+
         if (portonePayment.getAmount() != payment.getAmount()) {
+            recordIssue(
+                    "PAID",
+                    PaymentReconciliationIssue.IssueType.PAID_AMOUNT_MISMATCH,
+                    payment,
+                    "EXPECTED_" + payment.getAmount() + "_ACTUAL_" + portonePayment.getAmount());
             payment.failPayment("결제 금액 불일치");
             throw new PaymentException("결제 금액이 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
         }
@@ -197,10 +484,26 @@ public class PaymentService {
         }
 
         // V2에서 pgTxId = imp_uid에 해당하는 PG사 거래번호
-        String pgTxId = portonePayment.getPgTxId() != null ? portonePayment.getPgTxId() : verifyDto.getImpUid();
+        String pgTxId = portonePayment.getPgTxId() != null ? portonePayment.getPgTxId() : fallbackImpUid;
         payment.completePayment(pgTxId, portonePayment.getPayMethod(), portonePayment.getPgProvider());
 
+        ensureReservationPaidState(payment);
+        resolveIssues(payment);
+        log.info("Payment verified: {}", payment.getMerchantUid());
+    }
+
+    private void ensureReservationPaidState(Payment payment) {
         Reservation reservation = payment.getReservation();
+        if (!canReceivePayment(reservation)) {
+            recordIssue(
+                    "PAID",
+                    PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
+                    payment,
+                    reservation.getStatus().name());
+            throw new PaymentException(
+                    "취소되거나 종료된 예약의 결제가 확인되었습니다. 관리자 확인이 필요합니다.",
+                    HttpStatus.CONFLICT);
+        }
         reservation.markDepositPaid(payment.getAmount());
 
         // 결제 완료 후 자동 승인 처리
@@ -211,9 +514,60 @@ public class PaymentService {
             reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
             log.info("Auto-approve processed: reservationId={}", reservation.getId());
         }
+    }
 
-        log.info("Payment verified: {}", payment.getMerchantUid());
-        return PaymentResponseDto.fromEntity(payment);
+    private boolean canReceivePayment(Reservation reservation) {
+        return reservation.getStatus() == Reservation.ReservationStatus.PENDING
+                || reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED;
+    }
+
+    private void recordIssue(
+            String category,
+            PaymentReconciliationIssue.IssueType issueType,
+            Payment payment,
+            String detailCode) {
+        String identity = payment != null && payment.getId() != null
+                ? payment.getId().toString()
+                : payment != null ? payment.getMerchantUid() : "UNKNOWN";
+        try {
+            reconciliationIssueService.record(
+                    category + ":" + identity,
+                    issueType,
+                    payment != null ? payment.getId() : null,
+                    payment != null && payment.getReservation() != null
+                            ? payment.getReservation().getId()
+                            : null,
+                    payment != null ? payment.getMerchantUid() : null,
+                    detailCode);
+        } catch (RuntimeException e) {
+            log.error("Payment reconciliation issue could not be persisted: paymentId={}, issueType={}, errorType={}",
+                    payment != null ? payment.getId() : null,
+                    issueType,
+                    e.getClass().getSimpleName());
+        }
+    }
+
+    private void resolveIssues(Payment payment) {
+        try {
+            reconciliationIssueService.resolveForPayment(payment.getId());
+        } catch (RuntimeException e) {
+            log.error("Payment reconciliation issue could not be resolved: paymentId={}, errorType={}",
+                    payment.getId(), e.getClass().getSimpleName());
+        }
+    }
+
+    public enum PaidRecoveryResult {
+        RECOVERED,
+        ALREADY_PAID,
+        NOT_PAID,
+        UNKNOWN_PAYMENT
+    }
+
+    public enum ExpiryPaymentDecision {
+        PAID_RECOVERED,
+        NOT_PAID,
+        NO_PAYMENT,
+        UNCERTAIN
     }
 
     /**
@@ -295,8 +649,8 @@ public class PaymentService {
             }
             case FAILED -> {
                 refundLedgerService.failed(attemptId, cancelResult.failureReason());
-                log.error("Refund rejected by PG: paymentId={}, merchantUid={}, reason={}",
-                        payment.getId(), payment.getMerchantUid(), cancelResult.failureReason());
+                log.error("Refund rejected by PG: paymentId={}, merchantUid={}, status={}",
+                        payment.getId(), payment.getMerchantUid(), cancelResult.resolveStatus());
                 throw new PaymentException("환불이 거절되었습니다. 고객센터로 문의해주세요.",
                         HttpStatus.INTERNAL_SERVER_ERROR);
             }
@@ -364,8 +718,8 @@ public class PaymentService {
             return false;
         }
         payment.revertRefundPending(failReason);
-        log.warn("Pending refund reverted: paymentId={}, merchantUid={}, status={}, reason={}",
-                paymentId, payment.getMerchantUid(), payment.getStatus(), failReason);
+        log.warn("Pending refund reverted: paymentId={}, merchantUid={}, status={}",
+                paymentId, payment.getMerchantUid(), payment.getStatus());
         return true;
     }
 
@@ -395,17 +749,20 @@ public class PaymentService {
             throw new PaymentException("예약 정보가 필요합니다.", HttpStatus.BAD_REQUEST);
         }
 
+        Member currentRequester = memberRepository.findActiveByIdForUpdate(requester.getId())
+                .orElseThrow(MemberException::notFound);
+
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(ReservationException::notFound);
 
         boolean isOwner = reservation.getMember() != null
-                && reservation.getMember().getId().equals(requester.getId());
-        boolean isAdmin = requester.getRole() == Role.ADMIN;
+                && reservation.getMember().getId().equals(currentRequester.getId());
+        boolean isAdmin = currentRequester.getRole() == Role.ADMIN;
 
         if (!isOwner && !isAdmin) {
             // 남의 예약이 "존재한다"는 사실까지 알려줄 필요는 없다 — 404 가 아니라 403 으로도
             // 충분히 새지만, 여기서는 권한 없음을 명확히 하는 쪽이 디버깅에 낫다.
-            log.warn("Refund denied - not owner: reservationId={}, requesterId={}", reservationId, requester.getId());
+            log.warn("Refund denied - not owner: reservationId={}, requesterId={}", reservationId, currentRequester.getId());
             throw new PaymentException("본인의 예약만 환불할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
@@ -422,7 +779,7 @@ public class PaymentService {
                 .build();
 
         log.info("Refund requested by member: reservationId={}, requesterId={}, admin={}, amount={}",
-                reservationId, requester.getId(), isAdmin, calculation.getRefundAmount());
+                reservationId, currentRequester.getId(), isAdmin, calculation.getRefundAmount());
 
         return refundPayment(safeDto);
     }
@@ -459,7 +816,7 @@ public class PaymentService {
 
             refundPayment(refundDto);
         } else {
-            log.info("Refund amount is 0 by policy: reason={}", calculation.getReason());
+            log.info("Refund amount is 0 by policy: reservationId={}", reservationId);
         }
     }
 

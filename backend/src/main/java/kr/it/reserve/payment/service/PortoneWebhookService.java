@@ -2,15 +2,16 @@ package kr.it.reserve.payment.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.payment.dto.PortoneWebhookSignal;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.entity.Payment;
+import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
 import kr.it.reserve.payment.entity.RefundAttempt;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.payment.repository.RefundAttemptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -29,10 +30,10 @@ import java.util.List;
  * 이유는 두 가지다 — ① 웹훅은 순서가 뒤바뀌어 도착할 수 있어서 오래된 사실을 최신처럼 적용할 위험이 있고,
  * ② 조회 API 가 언제나 최종 권위다. 신호와 사실을 분리하면 재전송·중복도 자연히 안전해진다.
  *
- * <h2>멱등</h2>
- * 같은 웹훅이 여러 번 올 수 있다(PortOne 은 실패 시 재전송한다).
- * 별도 처리 기록 테이블을 두지 않고, <b>적용 지점을 전부 멱등으로</b> 만들어 해결한다 —
- * 상태 전이가 {@code REFUND_PENDING → REFUNDED} 처럼 조건부라 두 번째 호출은 자연히 no-op 이 된다.
+ * <h2>멱등과 재처리</h2>
+ * 같은 웹훅이 여러 번 올 수 있으므로 {@link PaymentWebhookInboxProcessor}가 {@code webhook-id}를
+ * durable inbox에 먼저 기록한다. 이 서비스의 상태 전이도 조건부로 유지해, inbox 기록 직후
+ * 서버가 죽어 같은 결제를 다시 처리해도 두 번 반영되지 않게 한다.
  */
 @Slf4j
 @Service
@@ -45,61 +46,66 @@ public class PortoneWebhookService {
     private final PaymentRepository paymentRepository;
     private final RefundAttemptRepository refundAttemptRepository;
     private final RefundLedgerService refundLedgerService;
+    private final PaymentReconciliationIssueService reconciliationIssueService;
 
-    /**
-     * 서명 검증을 <b>이미 통과한</b> 본문을 처리한다.
-     *
-     * <p>모르는 {@code type} 은 조용히 무시한다 — PortOne 이 이벤트를 추가할 때마다
-     * 우리 엔드포인트가 에러를 내면 PG 쪽에서 재전송이 쌓이고 결국 웹훅이 비활성화된다.
-     */
-    public void handle(String rawBody) {
+    /** 서명 검증을 통과한 원문에서 저장할 최소 신호만 추출한다. */
+    public PortoneWebhookSignal parseSignal(String rawBody) {
         JsonNode root;
         try {
             root = objectMapper.readTree(rawBody);
         } catch (Exception e) {
-            log.error("PortOne webhook body is not valid JSON", e);
-            return;
+            log.error("PortOne webhook body is not valid JSON: errorType={}",
+                    e.getClass().getSimpleName());
+            return PortoneWebhookSignal.invalidJson();
+        }
+
+        if (root == null || root.isNull()) {
+            return PortoneWebhookSignal.invalidJson();
         }
 
         String type = text(root, "type");
         String merchantUid = extractPaymentId(root);    // V2 의 결제 식별자 = 우리 merchantUid
 
-        if (merchantUid == null || merchantUid.isBlank()) {
-            // ★ INFO 가 아니라 WARN 이다. 여기 걸리면 서명은 통과했는데 본문을 못 읽은 것이고,
-            //   그건 거의 항상 콘솔의 웹훅 버전 설정 문제다. 조용히 넘기면 못 찾는다.
-            log.warn("PortOne webhook ignored - no payment id in body: type={}", type);
-            return;
-        }
-        log.info("PortOne webhook received: type={}, merchantUid={}", type, merchantUid);
+        return new PortoneWebhookSignal(type, merchantUid, true);
+    }
 
-        // 본문이 아니라 조회 API 를 권위로 삼는다(클래스 주석 참고).
+    /** inbox에 저장된 결제 ID를 사용해 PG 권위 상태를 조회하고 반영한다. */
+    public void processMerchantUid(String merchantUid) {
         PortoneV2PaymentResponse pgPayment;
         try {
             pgPayment = portoneService.getPaymentInfo(merchantUid);
         } catch (Exception e) {
             // 여기서 예외를 밖으로 내보내면 컨트롤러가 5xx 를 주고 PortOne 이 재전송한다.
             // 일시적 장애라면 재전송이 오히려 도움이 되므로 컨트롤러 쪽에서 판단하게 그대로 던진다.
-            log.error("PortOne webhook could not read PG state: merchantUid={}", merchantUid, e);
+            log.error("PortOne webhook could not read PG state: merchantUid={}, errorType={}",
+                    merchantUid, e.getClass().getSimpleName());
             throw e;
         }
 
-        applyPgState(merchantUid, pgPayment.getStatus());
+        applyPgState(merchantUid, pgPayment);
     }
 
     /**
      * PG 가 말하는 현재 상태를 우리 쪽에 반영한다.
-     * <b>환불 확정/실패만 다룬다</b> — 결제 성립(PAID) 처리는 기존 검증 경로가 담당하고,
-     * 여기서 같은 일을 또 하면 두 경로가 어긋날 때 원인을 못 찾는다.
+     * READY 결제의 PAID 복구와 REFUND_PENDING 결말 확정을 각각 기존 PaymentService 관문으로 보낸다.
      */
-    @Transactional
-    public void applyPgState(String merchantUid, String pgStatus) {
+    public void applyPgState(String merchantUid, PortoneV2PaymentResponse pgPayment) {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid).orElse(null);
         if (payment == null) {
             // 다른 상점·다른 환경(로컬 테스트)의 웹훅일 수 있다. 에러가 아니다.
             log.info("PortOne webhook ignored - unknown merchantUid: {}", merchantUid);
             return;
         }
+
+        String pgStatus = pgPayment.getStatus();
         if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING) {
+            if (pgPayment.isPaid()) {
+                PaymentService.PaidRecoveryResult result =
+                        paymentService.recoverPaidPaymentFromPg(merchantUid, pgPayment);
+                log.info("Payment PAID state reconciled by webhook: merchantUid={}, result={}",
+                        merchantUid, result);
+                return;
+            }
             log.debug("PortOne webhook has nothing to settle: merchantUid={}, localStatus={}, pgStatus={}",
                     merchantUid, payment.getStatus(), pgStatus);
             return;
@@ -113,6 +119,9 @@ public class PortoneWebhookService {
                 .orElse(null);
 
         if (pending == null) {
+            recordIssue(payment, "REFUND:" + payment.getId(),
+                    PaymentReconciliationIssue.IssueType.REFUND_LEDGER_MISSING,
+                    "REFUND_PENDING_WITHOUT_UNRESOLVED_ATTEMPT");
             log.error("Payment is REFUND_PENDING but has no unresolved ledger entry: merchantUid={}", merchantUid);
             return;
         }
@@ -123,12 +132,14 @@ public class PortoneWebhookService {
                         payment.getId(), pending.getRequestedAmount(), pending.getReason());
                 refundLedgerService.succeeded(pending.getId(), pending.getCancellationId(),
                         pending.getRequestedAmount());
+                resolveIssues(payment);
                 log.info("Refund settled by webhook: merchantUid={}, pgStatus={}", merchantUid, pgStatus);
             }
             case "PAID" -> {
                 String note = "PG reports PAID via webhook after cancellation request";
                 paymentService.revertPendingRefund(payment.getId(), note);
                 refundLedgerService.failed(pending.getId(), note);
+                resolveIssues(payment);
                 log.error("Refund failed per webhook: merchantUid={}", merchantUid);
             }
             default -> log.info("PortOne webhook did not settle anything: merchantUid={}, pgStatus={}",
@@ -178,5 +189,33 @@ public class PortoneWebhookService {
     private static String text(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isTextual() ? value.asText() : null;
+    }
+
+    private void recordIssue(
+            Payment payment,
+            String issueKey,
+            PaymentReconciliationIssue.IssueType issueType,
+            String detailCode) {
+        try {
+            reconciliationIssueService.record(
+                    issueKey,
+                    issueType,
+                    payment.getId(),
+                    null,
+                    payment.getMerchantUid(),
+                    detailCode);
+        } catch (RuntimeException e) {
+            log.error("Webhook reconciliation issue could not be persisted: paymentId={}, issueType={}, errorType={}",
+                    payment.getId(), issueType, e.getClass().getSimpleName());
+        }
+    }
+
+    private void resolveIssues(Payment payment) {
+        try {
+            reconciliationIssueService.resolveForPayment(payment.getId());
+        } catch (RuntimeException e) {
+            log.error("Webhook reconciliation issue could not be resolved: paymentId={}, errorType={}",
+                    payment.getId(), e.getClass().getSimpleName());
+        }
     }
 }

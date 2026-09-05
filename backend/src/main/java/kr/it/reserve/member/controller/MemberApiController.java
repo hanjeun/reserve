@@ -1,15 +1,19 @@
 package kr.it.reserve.member.controller;
 
 import kr.it.reserve.config.util.SecurityUtil;
+import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.service.MemberService;
+import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RequiredArgsConstructor
 @RestController
@@ -68,10 +72,20 @@ public class MemberApiController {
     }
 
     // 회원 탈퇴
+    @GetMapping("/withdrawal-readiness")
+    public ApiResponse<MemberWithdrawalReadiness> getWithdrawalReadiness() {
+        Member member = SecurityUtil.getCurrentMember("탈퇴 준비 상태를 확인할 권한이 없습니다.");
+        return ApiResponse.success(
+                memberService.getWithdrawalReadiness(member.getId()),
+                "탈퇴 준비 상태 조회 성공");
+    }
+
     @DeleteMapping("/delete")
-    public ApiResponse<Void> deleteMember() {
+    public ApiResponse<Void> deleteMember(HttpServletRequest request, HttpServletResponse response) {
         Member member = SecurityUtil.getCurrentMember("탈퇴 권한이 없습니다.");
         memberService.deleteMember(member.getId());
+        CookieUtil.deleteCookie(request, response, "access_token");
+        CookieUtil.deleteCookie(request, response, "refresh_token");
         return ApiResponse.success(null, "회원 탈퇴가 완료되었습니다.");
     }
 }

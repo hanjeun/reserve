@@ -33,7 +33,7 @@ public class JwtAuthenticationFilter implements Filter {
             String token = resolveToken(httpRequest);
 
             if (token != null && tokenProvider.validToken(token)) {
-                Member member = tokenProvider.getMemberFromTokenWithoutDB(token);
+                Member member = tokenProvider.getActiveMemberFromToken(token);
                 String role = "ROLE_" + member.getRole().name();
 
                 Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -44,9 +44,9 @@ public class JwtAuthenticationFilter implements Filter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (AuthException e) {
-            log.warn("Authentication failed: {}", e.getMessage());
+            log.warn("Authentication failed: errorType={}", e.getClass().getSimpleName());
         } catch (Exception e) {
-            log.error("JWT filter internal error: {}", e.getMessage());
+            log.error("JWT filter internal error: errorType={}", e.getClass().getSimpleName());
         }
 
         chain.doFilter(request, response);

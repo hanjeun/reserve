@@ -7,13 +7,14 @@ import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
 import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.error.StoreException;
+import kr.it.reserve.lifecycle.dto.StoreClosureReadiness;
+import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
 import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
-import kr.it.reserve.review.repository.ReviewRepository;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.dto.StoreCreateRequest;
 import kr.it.reserve.store.dto.StoreResponse;
@@ -53,11 +54,11 @@ public class StoreService {
 
     private final StoreRepository storeRepository;
     private final FileStorageService fileStorageService;
+    private final FileDeletionOutboxService fileDeletionOutboxService;
+    private final DataLifecycleGuard dataLifecycleGuard;
     private final ReservationRepository reservationRepository;
     private final FavoriteRepository favoriteRepository;
     private final PromotionRepository promotionRepository;
-    private final ReviewRepository reviewRepository;
-    private final PaymentRepository paymentRepository;
     private final AdvertisementRepository advertisementRepository;
     private final ObjectMapper objectMapper;
 
@@ -92,7 +93,8 @@ public class StoreService {
         try {
             return objectMapper.readValue(json, new TypeReference<List<ImageDimension>>() {});
         } catch (Exception e) {
-            log.warn("Failed to parse detailImagesMeta, treating as empty: {}", e.getMessage());
+            log.warn("Failed to parse detailImagesMeta, treating as empty: errorType={}",
+                    e.getClass().getSimpleName());
             return new ArrayList<>();
         }
     }
@@ -101,7 +103,7 @@ public class StoreService {
         try {
             return objectMapper.writeValueAsString(list);
         } catch (Exception e) {
-            log.warn("Failed to serialize detailImagesMeta: {}", e.getMessage());
+            log.warn("Failed to serialize detailImagesMeta: errorType={}", e.getClass().getSimpleName());
             return null;
         }
     }
@@ -111,8 +113,8 @@ public class StoreService {
         return dim != null ? new ImageDimension(dim[0], dim[1]) : new ImageDimension(null, null);
     }
 
-    // 상세 이미지 하나 업로드 결과(URL + 원본 크기) — 병렬 업로드 후에도 입력 순서와 1:1 대응 유지
-    private record UploadedDetailImage(String url, ImageDimension dim) {}
+    // 상세 이미지 하나 업로드 결과(key + URL + 원본 크기) — key는 바깥 트랜잭션의 rollback cleanup 등록용
+    private record UploadedDetailImage(String key, String url, ImageDimension dim) {}
 
     /**
      * 상세 이미지 여러 장을 병렬로 S3 업로드(2026-07 추가 — "이미지 업로드 비동기 병렬 처리" 블로그 글 참고).
@@ -128,21 +130,24 @@ public class StoreService {
                 .map(f -> CompletableFuture.supplyAsync(() -> {
                     String key = fileStorageService.storeFile(f, FileStoragePaths.storeImage(memberId, storeId));
                     String url = fileStorageService.getPublicUrl(key);
-                    return new UploadedDetailImage(url, readImageDimension(f));
+                    return new UploadedDetailImage(key, url, readImageDimension(f));
                 }, imageUploadExecutor))
                 .toList();
-        return futures.stream()
-                .map(future -> {
-                    try {
-                        return future.join();
-                    } catch (CompletionException e) {
-                        // storeFile()이 던지는 FileException 등 원래 예외 타입을 그대로 보존 — CompletionException으로
-                        // 감싸인 채로 전파되면 전역 예외 핸들러(@ExceptionHandler)가 원래 타입으로 못 잡을 수 있음
-                        if (e.getCause() instanceof RuntimeException re) throw re;
-                        throw e;
-                    }
-                })
-                .toList();
+        try {
+            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+            List<UploadedDetailImage> results = futures.stream().map(CompletableFuture::join).toList();
+            // worker 스레드에는 Spring 트랜잭션 문맥이 없으므로 join 뒤 바깥 트랜잭션에 등록한다.
+            results.forEach(result -> fileStorageService.registerRollbackCleanup(result.key()));
+            return results;
+        } catch (CompletionException e) {
+            // allOf가 끝난 시점에는 모든 업로드가 끝났으므로, 부분 성공한 객체도 즉시 정리한다.
+            futures.stream()
+                    .filter(future -> !future.isCompletedExceptionally() && !future.isCancelled())
+                    .map(CompletableFuture::join)
+                    .forEach(result -> fileStorageService.deleteFile(result.key()));
+            if (e.getCause() instanceof RuntimeException re) throw re;
+            throw e;
+        }
     }
 
     /**
@@ -400,6 +405,16 @@ public class StoreService {
         return reservationRepository.countActiveReservationsByStoreId(id);
     }
 
+    @Transactional(readOnly = true)
+    public StoreClosureReadiness getClosureReadiness(Long id, Member member) {
+        Store store = storeRepository.findById(id)
+                .orElseThrow(StoreException::notFound);
+        if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
+            throw StoreException.forbidden("가게를 조회할 권한이 없습니다.");
+        }
+        return dataLifecycleGuard.inspectStore(id);
+    }
+
     /**
      * 사업자 "통계 · 분석" 탭 — 기간(range: 7d/30d/90d) 동안의 예약 추이/상태 분포/매출 추이 + 평점 + 광고 현황.
      * 관리자 대시보드(DashboardTab)와 달리 가게별로 오래 쌓이는 데이터라서, 프론트에서 100건 뒤지는 대신
@@ -480,48 +495,51 @@ public class StoreService {
     }
 
     /**
-     * 가게 삭제
-     * @param force true면 활성 예약이 있어도 강제 삭제
+     * 가게 영업 종료.
+     *
+     * <p>예약·결제·환불·리뷰·광고 원장은 삭제하지 않는다. 공개 목록에서만 숨기고,
+     * 비금전성 연결(즐겨찾기/홍보)은 정리하며 이미지 삭제는 durable outbox에 맡긴다.
      */
     @Transactional
-    public void deleteStore(Long id, Member member, boolean force) {
-        Store store = storeRepository.findById(id)
+    public void deleteStore(Long id, Member member) {
+        // 예약 생성·수정과 같은 가게 행 잠금을 사용한다. 준비도 확인 직후 새 예약이
+        // 끼어드는 check-then-close 레이스를 막는다.
+        Store store = storeRepository.findByIdForUpdate(id)
                 .orElseThrow(StoreException::notFound);
 
+        if (store.isDeleted()) {
+            throw StoreException.notFound();
+        }
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게를 삭제할 권한이 없습니다.");
+            throw StoreException.forbidden("가게 영업을 종료할 권한이 없습니다.");
         }
 
-        // force=false면 활성 예약 있을 때 차단
-        if (!force) {
-            int activeCount = reservationRepository.countActiveReservationsByStoreId(id);
-            if (activeCount > 0) {
-                throw new StoreException(
-                    "현재 진행 중인 예약이 " + activeCount + "건 있습니다. " +
-                    "예약 내역을 함께 삭제하려면 '예약 포함 삭제'를 선택해주세요.",
-                    HttpStatus.CONFLICT
-                );
-            }
-        }
+        dataLifecycleGuard.requireStoreClosureAllowed(id);
 
-        log.info("Store deletion started: storeId={}, force={}", id, force);
+        log.info("Store closure started: storeId={}", id);
 
-        // 삭제 순서: Payment → Review → Reservation → Favorite → Promotion → Store
-        // (Payment가 Reservation을 FK 참조하므로 Payment 먼저 삭제)
-        paymentRepository.deleteByStoreId(id);
-        reviewRepository.deleteByStoreId(id);
-        reservationRepository.deleteByStoreId(id);
+        // 공개/추천 연결은 즉시 제거한다. 거래 원장과 후기 이력은 그대로 둔다.
         favoriteRepository.deleteByStoreId(id);
         promotionRepository.deleteByStoreId(id);
 
-        // 이미지 파일 삭제
-        if (store.getMainImageUrl() != null) {
-            fileStorageService.deleteFile(store.getMainImageUrl());
-        }
-        store.getDetailImageList().forEach(fileStorageService::deleteFile);
+        fileDeletionOutboxService.enqueue(store.getMainImageUrl(), "STORE_MAIN_IMAGE", id);
+        store.getDetailImageList().forEach(
+                image -> fileDeletionOutboxService.enqueue(image, "STORE_DETAIL_IMAGE", id));
 
-        storeRepository.delete(store);
-        log.info("Store deleted: storeId={}", id);
+        advertisementRepository.findByStoreId(id).forEach(ad -> {
+            ad.getImageUrlList().forEach(
+                    image -> fileDeletionOutboxService.enqueue(image, "ADVERTISEMENT_IMAGE", ad.getId()));
+            ad.setImageUrlList(List.of());
+        });
+
+        store.setMainImageUrl(null);
+        store.setMainImageWidth(null);
+        store.setMainImageHeight(null);
+        store.setDetailImageList(List.of());
+        store.setDetailImagesMeta(null);
+        store.softDelete();
+
+        log.info("Store closure completed: storeId={}", id);
     }
 
     /**
@@ -532,15 +550,14 @@ public class StoreService {
         Long storeId = store.getId();
 
         if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
-            if (store.getMainImageUrl() != null) {
-                fileStorageService.deleteFile(store.getMainImageUrl());
-            }
+            String oldMainImage = store.getMainImageUrl();
             String key = fileStorageService.storeFile(
                     request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId));
             store.setMainImageUrl(fileStorageService.getPublicUrl(key));
             int[] dim = fileStorageService.readImageDimensions(request.getMainImage());
             store.setMainImageWidth(dim != null ? dim[0] : null);
             store.setMainImageHeight(dim != null ? dim[1] : null);
+            fileDeletionOutboxService.enqueue(oldMainImage, "STORE_MAIN_IMAGE", storeId);
         } else if (request.getExistingMainImageUrl() != null) {
             store.setMainImageUrl(request.getExistingMainImageUrl());
             // 기존 이미지를 그대로 유지하는 경우에는 width/height도 이미 저장된 값 그대로 유지된다(건드리지 않음)
@@ -575,7 +592,7 @@ public class StoreService {
         if (currentDetailImages != null) {
             for (String existingUrl : currentDetailImages) {
                 if (!finalDetailImages.contains(existingUrl)) {
-                    fileStorageService.deleteFile(existingUrl);
+                    fileDeletionOutboxService.enqueue(existingUrl, "STORE_DETAIL_IMAGE", storeId);
                 }
             }
         }

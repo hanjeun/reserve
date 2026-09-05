@@ -86,7 +86,7 @@ public class ReservationService {
         log.info("Reservation created: storeId={}, memberId={}", request.getStoreId(), member.getId());
 
         // 정지 체크 — JWT 크레임에는 status가 없으므로 DB에서 fresh 조회
-        Member freshMember = memberRepository.findById(member.getId())
+        Member freshMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new ReservationException("회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         if (freshMember.isSuspended()) {
             throw new ReservationException("계정이 정지된 상태입니다. 예약을 진행할 수 없습니다.", HttpStatus.FORBIDDEN);
@@ -99,6 +99,13 @@ public class ReservationService {
         // 아래 잔여 인원 체크(check) → 저장(act) 사이의 레이스 컨디션(오버부킹)을 막는다.
         Store store = storeRepository.findByIdForUpdate(request.getStoreId())
                 .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        if (store.isDeleted()) {
+            throw new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        }
+        if (store.isSuspended()) {
+            throw new ReservationException("현재 운영이 중단된 가게입니다. 신규 예약을 받지 않습니다.", HttpStatus.BAD_REQUEST);
+        }
 
         // 가게 주인이 정지된 경우 신규 예약 차단
         if (store.getOwner() != null && store.getOwner().isSuspended()) {
@@ -119,7 +126,7 @@ public class ReservationService {
 
         // 슬롯 검증(날짜/시간/인원 유효성 + 브레이크타임·영업시간·마감·중복·정원) — 생성/수정 공용.
         // 생성이므로 제외할 기존 예약이 없어 excludeReservationId = null.
-        validateReservationSlot(store, member,
+        validateReservationSlot(store, freshMember,
                 request.getReservationDate(), request.getReservationTime(), request.getGuestCount(), null);
 
         // 자동 승인 여부에 따라 초기 상태 결정
@@ -132,7 +139,7 @@ public class ReservationService {
                         : Reservation.ReservationStatus.PENDING;
 
         Reservation reservation = Reservation.builder()
-                .member(member)
+                .member(freshMember)
                 .store(store)
                 .reservationCode(generateUniqueReservationCode(request.getReservationDate()))
                 .reservationDate(request.getReservationDate())
@@ -159,7 +166,8 @@ public class ReservationService {
                         request.getGuestCount()
                 );
             } catch (Exception e) {
-                log.warn("Owner reservation notification email failed (service continues): {}", e.getMessage());
+                log.warn("Owner reservation notification email failed (service continues): errorType={}",
+                        e.getClass().getSimpleName());
             }
         } else {
             log.debug("사장님 이메일 알림 비활성화 상태 — 발송 건너뜀");
@@ -535,7 +543,7 @@ public class ReservationService {
      */
     @Transactional
     public ReservationResponse updateReservation(Long id, ReservationUpdateRequest request, Member member) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateOwnership(reservation, member);
 
         Reservation.ReservationStatus current = reservation.getStatus();
@@ -594,7 +602,7 @@ public class ReservationService {
      */
     @Transactional
     public void cancelReservation(Long id, Member member) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateOwnership(reservation, member);
 
         if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
@@ -711,7 +719,7 @@ public class ReservationService {
                         reservation.getGuestCount()
                 );
             } catch (Exception e) {
-                log.warn("QR 체크인 승인 알림 이메일 발송 실패: {}", e.getMessage());
+                log.warn("QR check-in approval email failed: errorType={}", e.getClass().getSimpleName());
             }
         }
 
@@ -723,7 +731,7 @@ public class ReservationService {
      */
     @Transactional
     public void approveReservation(Long id, Member owner) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
@@ -746,7 +754,7 @@ public class ReservationService {
                         reservation.getGuestCount()
                 );
             } catch (Exception e) {
-                log.warn("예약 승인 알림 이메일 발송 실패: {}", e.getMessage());
+                log.warn("Reservation approval email failed: errorType={}", e.getClass().getSimpleName());
             }
         }
     }
@@ -756,7 +764,7 @@ public class ReservationService {
      */
     @Transactional
     public void rejectReservation(Long id, Member owner, String reason) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
@@ -791,7 +799,7 @@ public class ReservationService {
                         reservation.getRejectionReason()
                 );
             } catch (Exception e) {
-                log.warn("Reservation rejection email failed: {}", e.getMessage());
+                log.warn("Reservation rejection email failed: errorType={}", e.getClass().getSimpleName());
             }
         }
     }
@@ -817,7 +825,7 @@ public class ReservationService {
      */
     @Transactional
     public void cancelReservationByStore(Long id, Member owner, String reason) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
         if (!isClosable(reservation)) {
@@ -849,7 +857,7 @@ public class ReservationService {
                         cancelReason
                 );
             } catch (Exception e) {
-                log.warn("Store cancellation email failed: {}", e.getMessage());
+                log.warn("Store cancellation email failed: errorType={}", e.getClass().getSimpleName());
             }
         }
 
@@ -913,7 +921,7 @@ public class ReservationService {
      */
     @Transactional
     public void undoApprove(Long id, Member owner) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
@@ -935,7 +943,7 @@ public class ReservationService {
                         reservation.getReservationTime().toString().substring(0, 5),
                         reservation.getGuestCount());
             } catch (Exception e) {
-                log.warn("Approval revoked email failed: {}", e.getMessage());
+                log.warn("Approval revoked email failed: errorType={}", e.getClass().getSimpleName());
             }
         }
     }
@@ -949,7 +957,7 @@ public class ReservationService {
      */
     @Transactional
     public void undoComplete(Long id, Member owner) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
@@ -984,7 +992,7 @@ public class ReservationService {
      */
     @Transactional
     public void completeReservation(Long id, Member owner) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
         // UNCONFIRMED 도 받는다 (2026-08-11) — 그건 "승인됐는데 시간이 지나도록 사장님이
@@ -1001,7 +1009,7 @@ public class ReservationService {
      */
     @Transactional
     public void markNoShow(Long id, Member owner) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
         validateStoreOwner(reservation, owner);
 
         if (!isClosable(reservation)) {
@@ -1107,7 +1115,7 @@ public class ReservationService {
      */
     @Transactional
     public void removeReservation(Long id, Member member) {
-        Reservation reservation = findByIdOrThrow(id);
+        Reservation reservation = findByIdForUpdateOrThrow(id);
 
         // 사용자 본인 또는 가게 사장님만 가능
         boolean isOwner = reservation.getMember().getId().equals(member.getId());
@@ -1151,6 +1159,12 @@ public class ReservationService {
 
     private Reservation findByIdOrThrow(Long id) {
         return reservationRepository.findById(id)
+                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+    }
+
+    /** 모든 예약 상태 변경이 거치는 행 잠금 관문. QR·취소·완료가 서로 값을 덮어쓰지 않게 한다. */
+    private Reservation findByIdForUpdateOrThrow(Long id) {
+        return reservationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
     }
 

@@ -63,7 +63,7 @@ public class AdminMailService {
                 .build();
         sentMailRepository.save(sent);
 
-        log.info("Mail composed and saved: to={}", request.getToEmail());
+        log.info("Mail composed and saved: mailId={}", sent.getId());
     }
 
     /**
@@ -84,7 +84,7 @@ public class AdminMailService {
         Member member = memberRepository.findByEmailAndDeletedAtIsNull(toEmail).orElse(null);
 
         if (member == null) {
-            log.warn("Marketing mail blocked - not a member: to={}", toEmail);
+            log.warn("Marketing mail blocked - recipient is not an active member");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "회원이 아닌 주소로는 광고성 메일을 보낼 수 없습니다. 광고가 아니라면 '광고성 정보' 체크를 해제해주세요.");
         }
@@ -151,7 +151,7 @@ public class AdminMailService {
             helper.setText(buildReplyHtml(body), true);
             mailSender.send(message);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("Mail send failed ({}): {}", toEmail, e.getMessage());
+            log.error("Mail send failed: errorType={}", e.getClass().getSimpleName());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "메일 발송 중 오류가 발생했습니다.");
         }
     }

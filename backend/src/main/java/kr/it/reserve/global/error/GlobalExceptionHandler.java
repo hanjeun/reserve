@@ -47,9 +47,11 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
         // 500대 에러는 ERROR, 400대는 WARN으로 로그 레벨 차등 적용
         if (e.getStatus().is5xxServerError()) {
-            log.error(" Server Business Error [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+            log.error("Server business error: type={}, status={}",
+                    e.getClass().getSimpleName(), e.getStatus().value());
         } else {
-            log.warn("Client Business Warning [{}]: {}", e.getClass().getSimpleName(), e.getMessage());
+            log.warn("Client business warning: type={}, status={}",
+                    e.getClass().getSimpleName(), e.getStatus().value());
         }
 
         return ResponseEntity
@@ -63,7 +65,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     protected ResponseEntity<ApiResponse<Void>> handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {
-        log.warn("Access Denied: {}", e.getMessage());
+        log.warn("Access denied");
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("해당 리소스에 대한 접근 권한이 없습니다."));
     }
@@ -83,7 +85,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
     protected ResponseEntity<ApiResponse<Void>> handleNotFound(Exception e) {
-        log.warn("No handler found: {}", e.getMessage());
+        log.warn("No handler found: errorType={}", e.getClass().getSimpleName());
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error("요청하신 경로를 찾을 수 없습니다."));

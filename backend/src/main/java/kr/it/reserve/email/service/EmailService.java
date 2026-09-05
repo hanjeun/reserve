@@ -23,9 +23,9 @@ import org.springframework.stereotype.Service;
  *       {@code mailSender.send()} 는 {@code MessagingException} 을 던지지 않는다 —
  *       Spring 이 전부 {@code MailException}({@code RuntimeException} 계열)으로 감싼다.
  *       빼면 발송 실패가 <b>로그 한 줄 없이</b> 사라지고, {@code @Async} 라 호출자도 모른다.</li>
- *   <li><b>실패 로그 문구를 바꾸지 말 것.</b> Grafana 알림 규칙이 이 문구를 문자열로 매칭한다.
- *       바꾸면 알림이 사라지는 게 아니라 <b>영영 울리지 않는다</b>(고장이 안 보인다).
- *       바꿔야 한다면 {@code docs/technical/monitoring.md} 의 알림 규칙을 같이 고칠 것.</li>
+ *   <li><b>실패 로그의 알림 기준 문구를 유지할 것.</b> Grafana 알림 규칙이 문구 일부를 문자열로 매칭한다.
+ *       기준 문구 뒤에는 수신자·제목·예외 메시지 대신 오류 타입처럼 개인정보가 아닌 진단값만 남긴다.
+ *       기준 문구를 바꿔야 한다면 {@code docs/technical/monitoring.md} 의 알림 규칙을 같이 고칠 것.</li>
  * </ol>
  *
  * <p>이 계약이 왜 생겼는지(2026-07-29 메일 3주 무단 중단)와 방어 3겹의 전체 그림은
@@ -61,9 +61,9 @@ public class EmailService {
             helper.setSubject("[RESERVE] 이메일 인증 코드");
             helper.setText(buildVerificationEmailContent(verificationCode), true);
             mailSender.send(message);
-            log.info("Verification email sent: email={}", toEmail);
+            log.info("Verification email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Email send failed: {}", e.getMessage());
+            log.error("Email send failed: errorType={}", e.getClass().getSimpleName());
             throw new EmailException("인증 이메일 발송 중 서버 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -154,9 +154,10 @@ public class EmailService {
             helper.setSubject("[RESERVE] 새로운 예약이 접수되었습니다");
             helper.setText(buildOwnerAlertContent(oName, storeName, mName, memberEmail, reservationDate, reservationTime, guestCount), true);
             mailSender.send(message);
-            log.info("Reservation notification email sent: email={}", ownerEmail);
+            log.info("Reservation notification email sent: recipient=owner");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Reservation notification email failed ({}): {}", ownerEmail, e.getMessage());
+            log.error("Reservation notification email failed: recipient=owner, errorType={}",
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -169,9 +170,10 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
             mailSender.send(message);
-            log.info("Reservation notification email sent: email={}", toEmail);
+            log.info("Reservation notification email sent: recipient=member");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Reservation notification email failed ({}): {}", toEmail, e.getMessage());
+            log.error("Reservation notification email failed: recipient=member, errorType={}",
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -259,9 +261,9 @@ public class EmailService {
                 null
             ), true);
             mailSender.send(message);
-            log.info("Business approval email sent: email={}", toEmail);
+            log.info("Business approval email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Business approval email failed ({}): {}", toEmail, e.getMessage());
+            log.error("Business approval email failed: errorType={}", e.getClass().getSimpleName());
         }
     }
 
@@ -282,9 +284,9 @@ public class EmailService {
                 rejectionReason
             ), true);
             mailSender.send(message);
-            log.info("Business rejection email sent: email={}", toEmail);
+            log.info("Business rejection email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Business rejection email failed ({}): {}", toEmail, e.getMessage());
+            log.error("Business rejection email failed: errorType={}", e.getClass().getSimpleName());
         }
     }
 
@@ -311,9 +313,9 @@ public class EmailService {
             helper.setSubject("[RESERVE 문의] " + title);
             helper.setText(buildInquiryAlertContent(memberName, memberEmail, categoryDisplayName, title, content), true);
             mailSender.send(message);
-            log.info("New inquiry alert email sent to admin: title={}", title);
+            log.info("New inquiry alert email sent to admin");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Inquiry alert email failed: {}", e.getMessage());
+            log.error("Inquiry alert email failed: errorType={}", e.getClass().getSimpleName());
         }
     }
 
@@ -379,9 +381,9 @@ public class EmailService {
             helper.setSubject("[RESERVE] 비밀번호 재설정 코드");
             helper.setText(buildPasswordResetEmailContent(code), true);
             mailSender.send(message);
-            log.info("Password reset email sent: email={}", toEmail);
+            log.info("Password reset email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
-            log.error("Password reset email failed: {}", e.getMessage());
+            log.error("Password reset email failed: errorType={}", e.getClass().getSimpleName());
         }
     }
 

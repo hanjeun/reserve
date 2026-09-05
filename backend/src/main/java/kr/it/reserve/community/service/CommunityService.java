@@ -75,8 +75,11 @@ public class CommunityService {
 
     @Transactional
     public CommunityDto.PostResponse getPost(Long postId, Long memberId) {
-        CommunityPost post = findPostOrThrow(postId);
-        post.incrementViewCount();
+        if (postRepository.incrementViewCount(postId) == 0) {
+            throw new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        }
+        CommunityPost post = postRepository.findByIdWithAuthorAndComments(postId)
+                .orElseThrow(() -> new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         boolean isLiked = memberId != null && postLikeRepository.existsByPostIdAndMemberId(postId, memberId);
         return CommunityDto.PostResponse.fromEntity(post, memberId != null ? memberId : -1L, isLiked);
@@ -147,8 +150,10 @@ public class CommunityService {
 
     @Transactional
     public boolean toggleLike(Long postId, Long memberId) {
-        CommunityPost post = findPostOrThrow(postId);
+        // 회원 → 게시글 순으로 잠근다. 회원 탈퇴도 회원 행을 먼저 잠그므로 역순 교착을 피한다.
         Member member = findMemberOrThrow(memberId);
+        CommunityPost post = postRepository.findByIdForUpdate(postId)
+                .orElseThrow(() -> new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         return postLikeRepository.findByPostIdAndMemberId(postId, memberId)
                 .map(like -> {
@@ -175,7 +180,7 @@ public class CommunityService {
     }
 
     private Member findMemberOrThrow(Long memberId) {
-        return memberRepository.findById(memberId)
+        return memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() -> new CommunityException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
     }
 

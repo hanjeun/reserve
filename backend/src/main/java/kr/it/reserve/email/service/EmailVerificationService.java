@@ -28,7 +28,7 @@ public class EmailVerificationService {
 
     @Transactional
     public void sendVerificationCode(String email) {
-        if (memberRepository.findByEmail(email).isPresent()) {
+        if (memberRepository.findByEmailAndDeletedAtIsNull(email).isPresent()) {
             throw new EmailException("이미 가입된 이메일입니다.", HttpStatus.CONFLICT);
         }
 
@@ -55,7 +55,7 @@ public class EmailVerificationService {
 
         emailService.sendVerificationEmail(email, code);
 
-        log.info("Verification code sent: email={}", email);
+        log.info("Verification code sent");
     }
 
     /**
@@ -77,15 +77,15 @@ public class EmailVerificationService {
 
         // 시도 횟수 상한 (2026-08-16) — 코드가 6자리 숫자라 이 상한이 1차 방어다.
         if (verification.isAttemptExhausted()) {
-            log.warn("Email verification attempts exhausted: email={}", email);
+            log.warn("Email verification attempts exhausted");
             throw new EmailException("인증 시도 횟수를 초과했습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
         }
 
         if (!verification.getVerificationCode().equals(code)) {
             verification.recordFailedAttempt();
             verificationRepository.save(verification);
-            log.warn("Email verification code mismatch: email={}, attempt={}/{}",
-                    email, verification.getAttemptCount(), EmailVerification.MAX_VERIFY_ATTEMPTS);
+            log.warn("Email verification code mismatch: attempt={}/{}",
+                    verification.getAttemptCount(), EmailVerification.MAX_VERIFY_ATTEMPTS);
             // [수정] 잘못된 입력값이므로 400 Bad Request
             throw new EmailException("인증 코드가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
         }
@@ -93,7 +93,7 @@ public class EmailVerificationService {
         verification.setVerified(true);
         verificationRepository.save(verification);
 
-        log.info("Email verification completed: email={}", email);
+        log.info("Email verification completed");
         return true;
     }
 

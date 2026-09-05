@@ -187,10 +187,10 @@ public class QrCheckinTokenProvider {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            log.debug("Expired QR check-in token: {}", e.getMessage());
+            log.debug("Expired QR check-in token");
             throw new ReservationException("만료된 QR 코드입니다. 예약 상세에서 QR을 다시 열어주세요.");
         } catch (Exception e) {
-            log.debug("Invalid QR check-in token: {}", e.getMessage());
+            log.debug("Invalid QR check-in token: errorType={}", e.getClass().getSimpleName());
             throw new ReservationException("유효하지 않은 QR 코드입니다.");
         }
         // 짧은 클레임(신규)과 긴 클레임(기존 발급분)을 둘 다 받는다.

@@ -1,9 +1,11 @@
 package kr.it.reserve.chat.repository;
 
+import jakarta.persistence.LockModeType;
 import kr.it.reserve.chat.entity.ChatRoom;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,6 +14,18 @@ import java.util.Optional;
 public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
     Optional<ChatRoom> findByMemberIdAndType(Long memberId, ChatRoom.RoomType type);
+
+    /** 같은 회원의 방 생성·메시지·읽음 갱신을 직렬화한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ChatRoom r WHERE r.member.id = :memberId AND r.type = :type")
+    Optional<ChatRoom> findByMemberIdAndTypeForUpdate(
+            @Param("memberId") Long memberId,
+            @Param("type") ChatRoom.RoomType type);
+
+    /** 관리자 메시지·읽음 갱신도 같은 방 행 잠금을 사용한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ChatRoom r WHERE r.id = :id")
+    Optional<ChatRoom> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * 관리자 목록 — <b>안 읽은 방이 먼저, 그다음 최근 순.</b>

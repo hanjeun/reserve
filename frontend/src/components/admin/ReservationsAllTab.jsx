@@ -30,12 +30,14 @@ const RES_STATUS_CONFIG = {
     COMPLETED: { color: 'green',   label: '이용완료' },
     REJECTED:  { color: 'red',     label: '거절됨' },
     NO_SHOW:   { color: 'purple',  label: '노쇼' },
+    UNCONFIRMED: { color: 'gold', label: '미확인' },
 };
 
 const RES_STATUS_OPTIONS = [
     { value: 'ALL', label: '전체 상태' }, { value: 'PENDING', label: '대기 중' },
     { value: 'CONFIRMED', label: '승인됨' }, { value: 'CANCELLED', label: '취소됨' },
-    { value: 'COMPLETED', label: '이용완료' }, { value: 'REJECTED', label: '거절됨' }, { value: 'NO_SHOW', label: '노쇼' },
+    { value: 'COMPLETED', label: '이용완료' }, { value: 'REJECTED', label: '거절됨' },
+    { value: 'NO_SHOW', label: '노쇼' }, { value: 'UNCONFIRMED', label: '미확인' },
 ];
 
 // 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지 (2026-07 전수조사)
@@ -62,14 +64,28 @@ const ReservationsAllTab = () => {
     const page = Number(pageStr) || 1;
     const setPage = (p) => setQuery({ page: String(p) });
 
-    const { data: allReservations = [], isLoading: resLoading, isFetching, error: resError, refetch: loadReservations } = useQuery({
-        queryKey: adminKeys.reservations(),
+    const { data, isLoading: resLoading, isFetching, error: resError, refetch: loadReservations } = useQuery({
+        queryKey: [...adminKeys.reservations(), page, debouncedResSearch, resStatusFilter],
         queryFn: async () => {
-            const data = await api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, { params: { page: 0, size: 100 } });
-            return Array.isArray(data) ? data : (data?.content ?? []);
+            const result = await api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, {
+                params: {
+                    page: page - 1,
+                    size: PAGE_SIZE,
+                    ...(debouncedResSearch.trim() ? { search: debouncedResSearch.trim() } : {}),
+                    ...(resStatusFilter !== 'ALL' ? { status: resStatusFilter } : {}),
+                },
+            });
+            return {
+                reservations: Array.isArray(result) ? result : (result?.content ?? []),
+                totalElements: Array.isArray(result)
+                    ? result.length
+                    : (result?.page?.totalElements ?? result?.totalElements ?? 0),
+            };
         },
         placeholderData: keepPreviousData,
     });
+    const reservations = data?.reservations ?? [];
+    const totalElements = data?.totalElements ?? 0;
     useEffect(() => {
         if (resError) message.error('예약 목록을 불러오지 못했습니다.');
     }, [resError, message]);
@@ -89,16 +105,7 @@ const ReservationsAllTab = () => {
         onOk: () => deleteMutation.mutateAsync(r.id),
     });
 
-    const filteredReservations = React.useMemo(() => {
-        let list = resStatusFilter === 'ALL' ? allReservations : allReservations.filter(r => r.status === resStatusFilter);
-        if (debouncedResSearch.trim()) {
-            const kw = debouncedResSearch.toLowerCase();
-            list = list.filter(r => r.storeName?.toLowerCase().includes(kw) || r.memberName?.toLowerCase().includes(kw) || r.memberEmail?.toLowerCase().includes(kw));
-        }
-        return list;
-    }, [allReservations, resStatusFilter, debouncedResSearch]);
-
-    // 검색어/상태 필터로 결과가 줄면 존재하지 않는 페이지를 가리킬 수 있어 둘 다 1로 복귀
+    // 검색·상태는 서버 전체 집합에 적용한다. 조건이 바뀌면 페이지를 1로 복귀시킨다.
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
     const handleStatusFilterChange = (v) => setQuery({ status: v, page: '1' });
 
@@ -117,7 +124,7 @@ const ReservationsAllTab = () => {
         <>
             <FilterToolbar
                 selects={[{ value: resStatusFilter, onChange: handleStatusFilterChange, options: RES_STATUS_OPTIONS }]}
-                count={filteredReservations.length}
+                count={totalElements}
                 search={{ value: resSearch, onChange: handleSearchChange, placeholder: '가게명, 예약자로 검색', disabled: resLoading }}
                 onReload={loadReservations}
                 loading={resLoading || isFetching}
@@ -127,18 +134,18 @@ const ReservationsAllTab = () => {
                 (isLoading || isFetching)로 통일. pagination도 동일하게 제어(2026-07 추가) — MembersTab 참고. */}
             {(resLoading || isFetching) ? (
                 <AdminTableSkeleton
-                    rows={skeletonRowCount(filteredReservations.length, page, PAGE_SIZE)}
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}
                     headers={SKELETON_HEADERS}
                     actionBtns={1}
-                    pagination={filteredReservations.length ? { current: page, pageSize: PAGE_SIZE, total: filteredReservations.length } : null}
+                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
                 />
             ) : (
                 <DataTable
                     columns={reservationColumns}
-                    dataSource={filteredReservations}
+                    dataSource={reservations}
                     rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: filteredReservations.length, onChange: setPage }}
+                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
                     locale={{ emptyText: '예약 내역이 없습니다.' }}
                 />
             )}

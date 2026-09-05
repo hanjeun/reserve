@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
     CalendarOutlined, SafetyCertificateOutlined, IdcardOutlined, MailOutlined,
     DeleteOutlined, FileTextOutlined, BarChartOutlined, TeamOutlined, ShopOutlined,
-    NotificationOutlined, MessageOutlined,} from '@ant-design/icons';
+    NotificationOutlined, MessageOutlined, DollarOutlined,} from '@ant-design/icons';
 import { UnreadPill } from '../../components/common';
 import MailboxTab from '../../components/admin/MailboxTab';
 import ChatTab from '../../components/admin/ChatTab';
@@ -17,6 +17,7 @@ import StoresAdminTab from '../../components/admin/StoresAdminTab';
 import ReservationsAllTab from '../../components/admin/ReservationsAllTab';
 import AdminAdsTab from '../../components/admin/AdminAdsTab';
 import BusinessVerificationTab from '../../components/admin/BusinessVerificationTab';
+import PaymentOperationsTab from '../../components/admin/PaymentOperationsTab';
 import { PageContainer } from '../../components/common';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -107,6 +108,7 @@ const AdminPanel = () => {
         { key: 'members',       label: tabLabel(<TeamOutlined />,                '회원 관리'),   children: <MembersTab /> },
         { key: 'stores-admin',  label: tabLabel(<ShopOutlined />,                '가게 관리'),   children: <StoresAdminTab /> },
         { key: 'reservations',  label: tabLabel(<CalendarOutlined />,            '전체 예약'),   children: <ReservationsAllTab /> },
+        { key: 'payments',      label: tabLabel(<DollarOutlined />,              '결제 운영'),   children: <PaymentOperationsTab /> },
         { key: 'ads',           label: tabLabel(<NotificationOutlined />,        '광고 관리'),   children: <AdminAdsTab /> },
     ];
 

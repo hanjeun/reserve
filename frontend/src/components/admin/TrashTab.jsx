@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Typography, Tag } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DeleteOutlined, UndoOutlined } from '@ant-design/icons';
+import { UndoOutlined } from '@ant-design/icons';
 import { Button, FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -55,11 +55,11 @@ const SnapshotChips = ({ value }) => {
 // (헤더는 서버 데이터가 아닌 고정 텍스트라 Bone으로 가리지 않고 실제 글자로 노출한다)
 // '핵심 정보'는 실제 columns에서 width를 안 준 유동 컬럼이라 null — 남는 공간을 혼자 흡수한다.
 const SKELETON_HEADERS = ['유형', 'ID', '핵심 정보', '삭제한 관리자', '삭제일', '잔여', '처리'];
-const SKELETON_COLS    = [80, 55, null, 190, 100, 60, 150];
+const SKELETON_COLS    = [80, 55, null, 190, 100, 60, 90];
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { type: '', page: '1' };
 
-// 다른 관리자 탭들과 동일한 2026-07 전수조사 사유 — pagination 제어로 복구/영구삭제 뮤테이션 후
+// 다른 관리자 탭들과 동일한 2026-07 전수조사 사유 — pagination 제어로 복구 뮤테이션 후
 // 페이지 리셋 버그와, 스켈레톤 로딩 중 페이지 버튼 소멸 문제를 동시에 해결.
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
     if (!total) return Math.min(6, pageSize);
@@ -96,27 +96,12 @@ const TrashTab = () => {
         onError: () => message.error('복구에 실패했습니다.'),
     });
 
-    const hardDeleteMutation = useMutation({
-        mutationFn: (record) => api.delete(API_ENDPOINTS.TRASH.DELETE(record.entityType, record.entityId)),
-        onSuccess: () => { message.success('영구 삭제되었습니다.'); invalidateTrash(); },
-        onError: () => message.error('영구 삭제에 실패했습니다.'),
-    });
-
     const handleRestore = (record) => {
         confirm({
             title: '복구',
             content: '이 항목을 복구하시겠습니까?',
             okText: '복구', cancelText: '취소', centered: true,
             onOk: () => restoreMutation.mutateAsync(record),
-        });
-    };
-
-    const handleHardDelete = (record) => {
-        confirm({
-            title: '영구 삭제',
-            content: '이 항목을 영구 삭제하시겠습니까? 되돌릴 수 없습니다.',
-            okText: '영구 삭제', cancelText: '취소', okButtonProps: { danger: true }, centered: true,
-            onOk: () => hardDeleteMutation.mutateAsync(record),
         });
     };
 
@@ -130,8 +115,7 @@ const TrashTab = () => {
     };
 
     const isActingOn = (record) =>
-        (restoreMutation.isPending && restoreMutation.variables === record) ||
-        (hardDeleteMutation.isPending && hardDeleteMutation.variables === record);
+        restoreMutation.isPending && restoreMutation.variables === record;
 
     const columns = [
         { title: '유형', dataIndex: 'entityType', key: 'entityType', width: 80,
@@ -146,14 +130,11 @@ const TrashTab = () => {
             render: (v) => <Text style={{ fontSize: fontSize.sm }}>{v?.substring(0, 10) || '-'}</Text> },
         { title: '잔여', dataIndex: 'expiresAt', key: 'expiresAt', width: 60,
             render: (v) => <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>{daysLeft(v)}</Text> },
-        { title: '처리', key: 'actions', width: 150,
+        { title: '처리', key: 'actions', width: 90,
             render: (_, r) => (
                 <div style={{ display: 'inline-flex', gap: 8, whiteSpace: 'nowrap' }}>
                     <Button variant="ghost-sm-primary" loading={isActingOn(r)} onClick={() => handleRestore(r)}>
                         <UndoOutlined /> 복구
-                    </Button>
-                    <Button variant="ghost-sm-danger" loading={isActingOn(r)} onClick={() => handleHardDelete(r)}>
-                        <DeleteOutlined /> 영구삭제
                     </Button>
                 </div>
             ),
@@ -192,7 +173,7 @@ const TrashTab = () => {
                     rows={skeletonRowCount(items.length, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}
                     headers={SKELETON_HEADERS}
-                    actionBtns={2}
+                    actionBtns={1}
                     pagination={items.length ? { current: page, pageSize: PAGE_SIZE, total: items.length } : null}
                 />
             ) : (

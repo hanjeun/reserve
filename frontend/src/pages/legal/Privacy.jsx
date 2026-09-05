@@ -19,7 +19,7 @@ const Privacy = () => {
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
                 <Title level={2} style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary, marginBottom: 8 }}>개인정보 처리방침</Title>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 5월 17일</Text>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 9월 1일</Text>
             </div>
 
             <Section title="1. 수집하는 개인정보 항목">
@@ -45,14 +45,17 @@ const Privacy = () => {
                 <Paragraph>회원 탈퇴 또는 서비스 종료 시까지 보유합니다.</Paragraph>
                 <ul style={{ paddingLeft: 20 }}>
                     <li style={{ marginBottom: 6 }}>감사 로그(Audit Log): 90일 보관 후 파기</li>
-                    <li style={{ marginBottom: 6 }}>예약 정보: 탈퇴 시 즉시 파기</li>
+                    <li style={{ marginBottom: 6 }}>계정 식별정보(이메일, 비밀번호, 위치, 소셜 로그인 토큰): 탈퇴 처리 시 제거 또는 비식별 값으로 치환</li>
+                    <li style={{ marginBottom: 6 }}>예약·결제·환불·후기·문의·채팅 기록: 거래 대사와 분쟁 대응을 위해 비식별 회원 ID와 연결하여 보관</li>
+                    <li style={{ marginBottom: 6 }}>예약 자유 입력 요청사항 및 결제 구매자 이름·이메일·전화번호: 탈퇴 처리 시 제거 또는 비식별화</li>
                     <li style={{ marginBottom: 6 }}>법령에 따라 보존이 필요한 경우 해당 기간 동안 별도 보관</li>
                 </ul>
+                <Paragraph>거래·분쟁 기록의 구체적인 자동 파기 기간은 관련 의무와 운영상 복원 가능성을 함께 검토해 확정할 예정이며, 그 전까지는 탈퇴 회원을 직접 식별하는 계정 정보와 분리된 상태로 유지합니다.</Paragraph>
             </Section>
 
             <Section title="4. 개인정보 파기 절차 및 방법">
-                <Paragraph><strong>파기 절차:</strong> 이용자가 입력한 정보는 목적 달성 후 내부 정책에 따라 일정 기간 보관 후 즉시 파기됩니다. 법령에 의해 보존이 필요한 정보는 별도 DB에 분리 보관됩니다.</Paragraph>
-                <Paragraph><strong>파기 방법:</strong> 전자적 파일 형태의 정보는 복구 및 재생이 불가능한 기술적 방법(DB DELETE, 스토리지 영구 삭제 등)을 사용하여 파기합니다. S3에 저장된 이미지 파일(프로필 사진, 사업자등록증 등)은 탈퇴 또는 삭제 요청 시 즉시 영구 삭제됩니다.</Paragraph>
+                <Paragraph><strong>파기 절차:</strong> 탈퇴 전 운영 중인 가게와 미결 예약·환불·결제 상태를 확인합니다. 처리가 완료되면 계정 식별정보를 같은 트랜잭션에서 비식별화하고, 보존 목적이 없는 개인화·커뮤니티 데이터는 삭제합니다.</Paragraph>
+                <Paragraph><strong>파기 방법:</strong> 전자적 정보는 DB 삭제 또는 비식별 값 치환으로 처리합니다. S3의 프로필 사진·사업자등록증·폐업 가게 이미지는 DB에 삭제 작업을 먼저 기록한 뒤 별도 작업자가 영구 삭제하며, 일시적인 AWS 오류가 발생하면 완료될 때까지 재시도합니다.</Paragraph>
             </Section>
 
             <Section title="5. 개인정보의 안전성 확보 조치">

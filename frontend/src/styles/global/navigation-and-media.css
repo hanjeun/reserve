@@ -1,0 +1,369 @@
+/* ── Toss 스타일 라운드 사각형 탭 네비게이션 (2026-07 수정: 캡슐형에서 변경) ──
+   흰 배경 트랙 + 선택 시에만 pagination/date picker와 동일한 회색(var(--c-gray-200, #e5e8eb)),
+   radius도 pagination과 동일하게 완전한 원이 아닌 8~10px 라운드 사각형으로 통일,
+   선택 시 스프링 스케일 애니메이션 추가 */
+.reserve-pill-tabs .ant-tabs-nav::before {
+    border-bottom: none !important;
+}
+.reserve-pill-tabs .ant-tabs-ink-bar {
+    display: none !important;
+}
+/* 탭 간격은 CSS gap이 아니라 AntD의 tabBarGutter prop으로 준다 — rc-tabs는 탭 크기를 직접
+   측정해서 "오른쪽에 탭이 더 있는지"를 판단하고 그에 따라 가장자리 그림자를 띄우는데,
+   CSS gap은 그 측정에 잡히지 않아 실제 폭과 어긋나게 된다(넘치지 않는데도 그림자가 뜨는 원인).
+   AdminPanel / BusinessPanel / MyPage의 <Tabs tabBarGutter={4} /> 참고. */
+.reserve-pill-tabs .ant-tabs-tab {
+    padding: 8px 18px !important;
+    border-radius: 10px !important;
+    background-color: transparent !important;
+    transition: background-color 0.2s ease !important;
+}
+.reserve-pill-tabs .ant-tabs-tab:hover:not(.ant-tabs-tab-active) {
+    background-color: var(--c-gray-100, #f2f4f6) !important;
+}
+.reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn {
+    color: var(--c-text-tertiary, #8b95a1);
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+.reserve-pill-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn {
+    color: var(--c-text-primary, #1a1f27) !important;
+}
+.reserve-pill-tabs .ant-tabs-tab-active {
+    background-color: var(--c-gray-200, #e5e8eb) !important;
+}
+.reserve-pill-tabs .ant-tabs-tab-active:hover {
+    background-color: var(--c-gray-200, #e5e8eb) !important;
+}
+.reserve-pill-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--c-text-primary, #1a1f27) !important;
+    font-weight: 600 !important;
+}
+@media (max-width: 768px) {
+    /* 모바일에서 좌우 여백을 더 줄인다 — 마이페이지 탭(이름/사진/위치/사업자)가
+       iPhone 폭에서 카드 안쪽 폭을 몇 px 차이로 넘어서, rc-tabs가 정상적으로 "오른쪽에 더 있음"
+       그림자를 띄우는 상황이었다. 그림자를 가리는 대신 애초에 넘치지 않게 만든다.
+       (탭이 많은 관리자·파트너 패널은 여전히 넘치고, 그때는 그림자가 뜨는 게 맞다.) */
+    .reserve-pill-tabs .ant-tabs-tab {
+        padding: 7px 10px !important;
+    }
+}
+/* ── "…" 드롭다운을 스크롤 없이 다 보이게 (2026-08-25) ────────────────────
+   AntD 기본은 max-height 200px 이라, 관리자 패널처럼 접히는 탭이 7~8개면
+   5개쯤에서 잘리고 **드롭다운 안에서 또 스크롤**해야 했다.
+   접힌 목록을 보려고 연 건데 거기서 다시 스크롤하면 한눈에 보는 게 아니다.
+
+   ★ 왜 ConfigProvider 토큰이 아니라 CSS 인가 — 먼저 토큰으로 시도했다가 실패했다.
+     antd/es/tabs/style/index.js 끝부분이 이렇다:
+
+         mergeToken(token, { ..., tabsDropdownHeight: 200, ... })
+
+     merge() 는 뒤 객체의 키가 앞을 덮어쓴다(@ant-design/cssinjs-utils/es/util/statistic.js).
+     즉 이 200 은 **사용자가 theme.components.Tabs 에 무엇을 넣든 항상 마지막에 덮어쓴다.**
+     prepareComponentToken 에 있는 값들(itemColor 등)과 달리 공개 토큰이 아니다.
+     그래서 여기서는 CSS 가 유일한 경로다.
+
+   ★ !important 가 필요한 이유 — AntD 6 는 이 규칙을 런타임에 <head> 로 주입한다.
+     선택자 명시도가 같으면(둘 다 0,2,0) **나중에 삽입된 쪽**인 AntD 가 이긴다.
+
+   ★ px 고정이 아니라 뷰포트 기준인 이유 — 진짜 제약은 탭 개수가 아니라 화면 높이다.
+     탭이 늘어도 따라오고, 화면이 낮으면(폰 가로모드) 같이 줄어 화면 밖으로 안 나간다.
+     560px 상한은 데스크톱에서 드롭다운만 유난히 길어지는 걸 막는다.
+     min() 을 모르는 브라우저는 이 선언을 통째로 버리는데, 그러면 AntD 의 200px 이 남는다 —
+     망가지는 방향이 "예전과 같음"이라 안전하다. */
+.ant-tabs-dropdown .ant-tabs-dropdown-menu {
+    max-height: min(70vh, 560px) !important;
+}
+
+/* 더보기(∨) 버튼도 우리 톤으로 — 기본 AntD 파란 혹 테두리 없이 회색 계열 */
+.reserve-pill-tabs .ant-tabs-nav-more {
+    color: var(--c-text-tertiary, #8b95a1) !important;
+    background: transparent !important;
+    border-radius: 10px !important;
+    transition: background-color 0.15s ease, transform 0.15s ease !important;
+}
+.reserve-pill-tabs .ant-tabs-nav-more:hover {
+    background-color: var(--c-gray-100, #f2f4f6) !important;
+    color: var(--c-text-primary, #1a1f27) !important;
+}
+.reserve-pill-tabs .ant-tabs-nav-more:active {
+    transform: scale(0.94) !important;
+    background-color: var(--c-gray-100, #f2f4f6) !important;
+}
+/* 탭 더보기(…) 드롭다운 — 이 팝업은 body로 포털되어 나가기 때문에 .reserve-pill-tabs 하위가 아니다.
+   (예전에 .reserve-pill-tabs .ant-tabs-dropdown-menu-item-selected 로 쓰던 규칙이 아무 효과가 없던 이유)
+   ant-tabs-dropdown-menu-*는 탭 더보기 메뉴 전용 클래스라 전역으로 잡아도 다른 드롭다운에는 영향이 없다.
+   탭 자체와 같은 톤: 평소 투명, hover 시 회색 각진 네모, 선택된 항목은 더 진한 회색.
+   (rc-menu는 hover에 -active 클래스를 붙이므로 :hover와 함께 지정한다) */
+.ant-tabs-dropdown-menu-item {
+    border-radius: 10px !important;
+    margin: 2px 6px !important;
+    transition: background-color 0.15s ease !important;
+}
+.ant-tabs-dropdown-menu-item:hover,
+.ant-tabs-dropdown-menu-item-active {
+    background-color: var(--c-gray-100, #f2f4f6) !important;
+}
+.ant-tabs-dropdown-menu-item-selected {
+    background-color: var(--c-gray-200, #e5e8eb) !important;
+    color: var(--c-text-primary, #1a1f27) !important;
+    font-weight: 600 !important;
+}
+
+.reserve-segmented-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    cursor: pointer;
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--c-text-tertiary, #8b95a1);
+    font-family: inherit;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    white-space: nowrap;
+}
+/* 초소형 화면(359px 이하)에서만 페이지 좌우 패딩을 24px → 16px로 줄인다.
+   320px 기기에서 콘텐츠 폭이 272px밖에 안 되는데, 예약 카드 3줄이 요구하는 폭이 약 270px라
+   여유가 2px뿐이었다. 16px로 줄이면 304px가 되어 숨통이 트인다.
+
+   ★ 경계를 359px로 잡은 이유: 현행 아이폰 중 가장 좁은 SE(375px)보다 아래여야 한다.
+     400px 같은 값으로 잡으면 iPhone SE와 iPhone 13 mini(375)까지 패딩이 바뀌어서
+     "잘 되고 있는 폰은 건드리지 말라"는 요구를 어기게 된다. 359 이하는 구형 안드로이드 영역이다.
+   인라인 스타일(PageContainer의 containerStyle)이 우선하므로 !important가 필요하다. */
+@media (max-width: 359px) {
+    .reserve-page-container {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+    }
+}
+
+/* ── 광고 배너 캐러셀 (2026-08-05: AdBanner.jsx 에서 이관) ──────────────────
+   AntD Carousel(slick) 내부 클래스를 덮는 규칙이라 !important 가 필요하다.
+   닫기 버튼의 press 피드백은 Button 컴포넌트와 같은 감각으로 맞춘 것이다
+   (예전엔 raw button 이라 hover·active 반응이 전혀 없어 눌렀는지 알 수 없었다). */
+.ad-banner-carousel .ant-carousel  { line-height: 0; }
+.ad-banner-carousel .slick-slide   { line-height: 0; }
+.ad-banner-carousel .slick-dots    { bottom: 8px !important; margin: 0 !important; }
+.ad-banner-carousel .slick-dots li { margin: 0 3px !important; }
+.ad-banner-carousel .slick-dots li button {
+    width: 5px !important;
+    height: 5px !important;
+    border-radius: 50% !important;
+    background: #fff !important;
+    opacity: 0.6 !important;
+    padding: 0 !important;
+}
+.ad-banner-carousel .slick-dots li.slick-active button {
+    opacity: 1 !important;
+    width: 12px !important;
+    border-radius: 6px !important;
+}
+/* ── 공용 Carousel 톤 (.reserve-carousel) ─────────────────────────────────
+   2026-08-06 신설. 그동안 "점 인디케이터를 우리 톤으로"라는 규칙이
+   `.ad-banner-carousel` **한 곳에만** 있었고, 가게 상세의 Carousel 두 개는
+   클래스가 없어 AntD 기본(길쭉한 흰 막대 — 활성만 더 긴 막대)을 그대로 썼다.
+   그래서 같은 앱 안에서 광고 배너는 동그란 점, 가게 상세는 막대로 갈렸다.
+
+   점 모양은 "비활성 = 작은 원, 활성 = 알약"이 지금 트렌드다(인스타·토스·에어비앤비).
+   활성만 색을 바꾸는 것보다 **폭이 늘어나는** 쪽이 어느 배경 위에서도 읽힌다.
+
+   위치는 컨텍스트마다 달라야 해서 --dots-bottom 변수로 뺐다. */
+/* 점을 반투명 검정 캡슐 안에 담는다.
+   ★ 왜 캡슐인가 — 점만 흰색으로 띄우면 밝은 사진(흰 배경 로고 같은) 위에서 완전히 사라진다.
+     예전 방식(흰 점 + opacity)이 딱 그 상태였고, 그래서 "바뀐 것 같지 않다"고 보였다.
+     캡슐을 깔면 어떤 사진 위에서도 대비가 보장되고, 점 묶음이 하나의 컨트롤로 읽힌다.
+     인스타그램·에어비앤비가 같은 처리를 한다. */
+.reserve-carousel .slick-dots {
+    bottom: var(--dots-bottom, 14px) !important;
+    margin: 0 auto !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    line-height: 0 !important;
+    width: fit-content !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 6px 9px !important;
+    border-radius: 999px !important;
+    background: rgba(0, 0, 0, 0.28) !important;
+    backdrop-filter: blur(6px);
+}
+.reserve-carousel .slick-dots li {
+    margin: 0 3px !important;
+    width: auto !important;
+    height: auto !important;
+}
+.reserve-carousel .slick-dots li button {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.55) !important;
+    opacity: 1 !important;
+    padding: 0 !important;
+    transition: width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease !important;
+}
+.reserve-carousel .slick-dots li.slick-active button {
+    width: 20px !important;
+    border-radius: 999px !important;
+    background: #fff !important;
+}
+/* 점이 하나뿐이면(사진 1장) 캡슐 자체가 의미 없다 — 감춘다. */
+.reserve-carousel .slick-dots li:only-child { display: none !important; }
+/* 슬라이드 자체 — 이미지가 inline 요소라 아래 여백이 생기는 걸 막는다.
+   ★ 모서리가 각져 보이던 문제 (2026-08-06)
+     바깥 래퍼(styles.mobileImageWrapper / pcImageWrapper)에 borderRadius + overflow:hidden 이
+     분명히 있는데도 iOS Safari 에서만 사진 모서리가 직각으로 보였다.
+     원인은 Safari 의 오래된 클리핑 버그다 — **자식이 transform 을 쓰면 부모의 border-radius
+     클리핑이 무시된다.** react-slick 은 .slick-track 에 translate3d 를 걸어 슬라이드를 옮긴다.
+     → ① 캐러셀과 .slick-list 가 래퍼의 radius 를 물려받게 하고(inherit)
+       ② -webkit-mask-image 를 걸어 합성 단계에서 한 번 더 자른다(Safari 표준 회피법). */
+/* ★ 선택자 주의 — AntD Carousel 의 className 은 `.ant-carousel` 이 아니라
+     그 **안쪽 `.slick-slider`** 에 붙는다(DOM 실측 2026-08-06):
+       div(래퍼, radius 16) > div.ant-carousel > div.slick-slider.reserve-carousel > div.slick-list
+     그래서 `.reserve-carousel.ant-carousel` 로 적었던 규칙은 아무것도 매칭하지 않았고,
+     `border-radius: inherit` 도 중간의 .ant-carousel(0px)에서 체인이 끊겼다.
+     → 클리핑을 실제로 수행하는 `.slick-list` 에 **명시값**으로 건다.
+       .slick-list 는 자신이 transform 을 갖지 않으므로(transform 은 안쪽 .slick-track)
+       Safari 의 "자식 transform 이 부모 클리핑을 깨는" 버그도 여기서는 발생하지 않는다.
+       mask 해킹은 매칭도 안 됐고 매 프레임 재래스터화를 유발하므로 쓰지 않는다. */
+.reserve-carousel {
+    /* 값의 출처는 styles/tokens/spacing.js 의 radius.xl. CSS 쪽에서 참조할 변수가 없어
+       여기 한 곳에만 적는다 — 래퍼(mobileImageWrapper/pcImageWrapper)와 같은 값이어야 한다. */
+    --carousel-radius: 16px;
+}
+.reserve-carousel .slick-list {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: var(--carousel-radius) !important;
+    overflow: hidden !important;
+}
+/* 넘길 때 이미지가 "치지직" 거리는 것 — transform 으로 큰 이미지를 옮기는 동안
+   GPU 레이어가 없으면 매 프레임 리페인트가 일어나 가장자리에 티어링처럼 보인다.
+   트랙을 합성 레이어로 승격시키고 뒷면 렌더링을 끈다. */
+.reserve-carousel .slick-track {
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+.reserve-carousel .slick-slide img {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+
+    /* ★ PC 에서 마우스 드래그로 안 넘어가던 이유 (2026-08-09)
+       Carousel 에는 draggable·swipe·swipeToSlide 가 이미 전부 켜져 있다.
+       그런데 <img> 는 브라우저 기본값으로 **드래그 가능한 요소**라,
+       마우스를 누른 채 움직이면 브라우저의 **네이티브 이미지 드래그**(고스트 이미지)가
+       먼저 발동해 slick 이 받아야 할 mousemove 가 끊긴다.
+       터치에는 이 동작이 없어서 **모바일만 잘 되고 PC 만 안 되는** 증상이 된다.
+       → 이미지의 네이티브 드래그를 끈다. 화살표(< >)는 40×40 이라 가운데 드래그를 막지 않으므로
+         그대로 둔다.
+       ※ Firefox 는 -webkit-user-drag 를 모르므로 JSX 쪽에서 draggable={false} 도 함께 준다. */
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.reserve-carousel .slick-slide > div { line-height: 0 !important; font-size: 0 !important; }
+.reserve-carousel .slick-slide[aria-hidden='true'] { visibility: hidden; }
+.reserve-carousel .slick-slide[aria-hidden='true'] * { pointer-events: none; }
+
+/* 좌·우 화살표 — AntD 기본 화살표(::after 삼각형)를 지우고 얇은 꺾쇠를 직접 그린다.
+   톤은 프리뷰(닫기·화살표)와 같은 값을 쓴다. */
+.reserve-carousel .slick-prev::after,
+.reserve-carousel .slick-next::after { display: none !important; }
+.reserve-carousel .slick-prev,
+.reserve-carousel .slick-next {
+    z-index: 10 !important;
+    width: 40px !important;
+    height: 40px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(0, 0, 0, 0.12) !important;
+    border-radius: 8px !important;
+    transition: background-color 0.15s ease !important;
+}
+.reserve-carousel .slick-prev:hover,
+.reserve-carousel .slick-next:hover {
+    background: rgba(229, 232, 235, 0.28) !important;
+}
+.reserve-carousel .slick-prev::before,
+.reserve-carousel .slick-next::before {
+    content: '' !important;
+    display: block !important;
+    width: 12px !important;
+    height: 12px !important;
+    border-top: 2.5px solid rgba(255, 255, 255, 0.9) !important;
+    border-right: 2.5px solid rgba(255, 255, 255, 0.9) !important;
+    transition: all 0.2s ease !important;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) !important;
+}
+/* 닫힘 상태에도 각도를 명시한다 — `transform: none` 은 행렬 보간이라 방향이 뒤집힌다
+   (CLAUDE.md "아이콘 회전" 함정). */
+.reserve-carousel .slick-prev::before { transform: rotate(-135deg) !important; margin-left: 6px !important; }
+.reserve-carousel .slick-next::before { transform: rotate(45deg) !important; margin-right: 6px !important; }
+.reserve-carousel .slick-prev { left: 10px !important; }
+.reserve-carousel .slick-next { right: 10px !important; }
+/* 모바일에서는 화살표를 숨긴다 — Carousel 은 `draggable` 이 켜져 있어 스와이프로 넘어간다.
+   (이미지 프리뷰와 다른 점이다. rc-image 쪽은 스와이프가 없어서 화살표를 남겨뒀다.) */
+@media (max-width: 768px) {
+    .reserve-carousel .slick-arrow { display: none !important; }
+}
+
+.ad-banner-close-btn        { transition: transform 0.12s ease, background 0.12s ease; }
+.ad-banner-close-btn:hover  { background: #fff !important; }
+.ad-banner-close-btn:active { transform: scale(0.88); }
+.ad-banner-close-btn:focus,
+.ad-banner-click-area:focus { outline: none; }
+.ad-banner-close-btn:focus-visible,
+.ad-banner-click-area:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: -3px;
+}
+
+/* ── 푸터 저작권 줄 (2026-08-05: Footer.jsx 에서 이관) ──────────────────────
+   PC 는 copyright(왼쪽) | 대표자(오른쪽), 모바일은 대표자가 위로 올라간다.
+   order 로 순서를 뒤집는 이유: DOM 순서는 의미 순서(저작권 먼저)로 두고
+   시각 순서만 화면 폭에 따라 바꾼다. */
+.footer-copyright {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.footer-copyright-left  { order: 1; font-size: 12px; line-height: 1.8; }
+.footer-copyright-right { order: 2; font-size: 12px; line-height: 1.8; text-align: right; }
+@media (max-width: 767px) {
+    .footer-copyright       { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .footer-copyright-left  { order: 2; }
+    .footer-copyright-right { order: 1; text-align: left; }
+}
+
+/* ── 즐겨찾기 그리드 (2026-08-05: MyFavorites.jsx 에서 이관) ────────────────
+   브레이크포인트가 1079/815/551 인 이유: tokens/breakpoints.js 의 값에서 1을 뺀 것이다
+   (max-width 는 "미만"을 뜻한다). 값을 바꿀 때 그 파일과 함께 볼 것. */
+.rsv-fav-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+@media (max-width: 1079px) { .rsv-fav-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 815px)  { .rsv-fav-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 551px)  { .rsv-fav-grid { grid-template-columns: 1fr; } }
+
+/* 내 가게도 StoreList/MyFavorites와 같은 4→3→2→1열 경계를 쓴다.
+   페이지 내부 <style>에 두면 해당 컴포넌트가 렌더될 때만 정책이 생기므로 전역 관문으로 이동했다. */
+.rsv-mystore-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+@media (max-width: 1079px) { .rsv-mystore-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 815px)  { .rsv-mystore-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 551px)  { .rsv-mystore-grid { grid-template-columns: 1fr; } }

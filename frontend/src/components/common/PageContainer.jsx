@@ -20,6 +20,7 @@ const PageContainer = ({
     backgroundColor = colors.background.default,
     children,
     style,
+    className,
     ...rest 
 }) => {
     // size별 maxWidth 매핑
@@ -47,7 +48,11 @@ const PageContainer = ({
     // reserve-page-container: 359px 이하에서만 좌우 패딩을 줄이는 CSS 훅(index.css).
     // 인라인 스타일로는 미디어쿼리를 걸 수 없어 클래스로 뺐다.
     return (
-        <div className="reserve-page-container" style={containerStyle} {...rest}>
+        <div
+            {...rest}
+            className={['reserve-page-container', className].filter(Boolean).join(' ')}
+            style={containerStyle}
+        >
             {children}
         </div>
     );
@@ -62,6 +67,7 @@ PageContainer.propTypes = {
     backgroundColor: PropTypes.string,
     children: PropTypes.node,
     style: PropTypes.object,
+    className: PropTypes.string,
 };
 
 export default PageContainer;

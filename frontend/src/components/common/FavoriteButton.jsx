@@ -61,11 +61,17 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
     // 로그인하지 않은 사용자에게는 버튼 미표시
     if (!isLoggedIn) return null;
 
+    const accessibleLabel = isFavorite ? '즐겨찾기 삭제' : '즐겨찾기 추가';
+
     return (
         <button
             type="button"
             onClick={handleToggle}
             disabled={toggleMutation.isPending}
+            className="reserve-favorite-button"
+            aria-label={accessibleLabel}
+            aria-pressed={isFavorite}
+            aria-busy={toggleMutation.isPending || undefined}
             style={{
                 width:          btnSize,
                 height:         btnSize,
@@ -86,7 +92,7 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
                 flexShrink:     0,
                 ...style,
             }}
-            title={isFavorite ? '즐겨찾기 삭제' : '즐겨찾기 추가'}
+            title={accessibleLabel}
         >
             {isFavorite
                 ? <HeartFilled  style={{ fontSize: iconSize, color: colors.error.main }} />

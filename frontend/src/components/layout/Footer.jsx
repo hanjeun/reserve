@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Divider, Typography } from 'antd';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
-import { InquiryModal } from '../common';
+
+// 문의 폼은 푸터 링크를 누른 사용자만 필요하다. 첫 화면에서 Modal·Form 관련 코드를
+// 내려받지 않되, 한 번 연 뒤에는 계속 마운트해 AntD 닫힘 애니메이션을 보존한다.
+const InquiryModal = lazy(() => import('../common/InquiryModal'));
 
 const { Text } = Typography;
 
@@ -91,10 +94,20 @@ const ExternalLink = ({ href, label }) => (
 const AppFooter = () => {
     const navigate = useNavigate();
     const [inquiryOpen, setInquiryOpen] = useState(false);
+    const [inquiryLoaded, setInquiryLoaded] = useState(false);
+
+    const openInquiry = () => {
+        setInquiryLoaded(true);
+        setInquiryOpen(true);
+    };
 
     return (
         <>
-            <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} />
+            {inquiryLoaded && (
+                <Suspense fallback={null}>
+                    <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} />
+                </Suspense>
+            )}
 
             <footer style={{ backgroundColor: colors.background.surface, borderTop: `1px solid ${colors.border.light}`, padding: '0 24px 36px' }}>
                 <div style={{ maxWidth: 1100, margin: '0 auto', paddingTop: 48 }}>
@@ -136,7 +149,7 @@ const AppFooter = () => {
                                 <Text style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: colors.text.secondary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>개발자</Text>
                                 <ExternalLink href="https://velog.io/@hanjeun/series/RESERVE" label="개발 블로그 →" />
                                 <ExternalLink href="https://github.com/hanjeun/reserve" label="GitHub 저장소 →" />
-                                <FooterLink label="문의하기" onClick={() => setInquiryOpen(true)} />
+                                <FooterLink label="문의하기" onClick={openInquiry} />
                             </div>
                         </div>
                     </div>

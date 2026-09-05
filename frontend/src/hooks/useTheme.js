@@ -198,13 +198,6 @@ export default function useTheme() {
         emit();
     }, []);
 
-    // StrictMode 이중 마운트나 HMR로 DOM 속성이 어긋나는 경우를 대비한 보정.
-    useEffect(() => {
-        if (document.documentElement.getAttribute('data-theme') !== resolveTheme(snap.theme)) {
-            applyTheme(snap.theme, { animate: false });
-        }
-    }, [snap.theme]);
-
     const setAccent = useCallback((next) => {
         state = { ...state, accent: next };
         write(ACCENT_KEY, next);

@@ -24,7 +24,7 @@ function SectionTitle({ title, blue, style }) {
 }
 
 export default function FeatureSection({ sec, index, isMobile }) {
-    const { id, tag, title, blue, desc, points, Ui, UiMobile, reverse } = sec;
+    const { id, tag, title, blue, desc, points, Ui, reverse } = sec;
     const bgColor = index % 2 === 1 ? colors.background.subtle : colors.background.default;
 
     if (isMobile) {
@@ -64,10 +64,7 @@ export default function FeatureSection({ sec, index, isMobile }) {
                         380보다 좁아서 어차피 꽉 차 티가 안 났지만, 태블릿 세로(768px)에서는 부모가
                         728px라 380px 목업이 왼쪽에 쏠리고 오른쪽에 348px 여백이 생겼다.
                         justifyContent만 걸면 폰에서는 결과가 완전히 동일하고(이미 꽉 참) 태블릿만 고쳐진다.
-
-                        ※ sec에는 UiMobile(MockStoreListMobile 등)도 정의돼 있지만 지금 렌더에 쓰이지 않는다.
-                          여기서 Ui → UiMobile로 바꾸면 폰 화면까지 같이 바뀌므로 건드리지 않았다.
-                          모바일 전용 목업으로 갈지는 별도 판단이 필요하다. */}
+                        */}
                     <div className="reveal reveal-delayed" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                         <Ui />
                     </div>

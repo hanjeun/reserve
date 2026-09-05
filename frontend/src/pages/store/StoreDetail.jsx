@@ -26,56 +26,6 @@ const { Title, Text } = Typography;
 
 const BREAKPOINT = 900;
 
-const customStyles = `
-  .ant-picker-cell::before, .ant-picker-cell-inner::before { display: none !important; }
-  .ant-picker-cell .ant-picker-cell-inner {
-    width: 32px !important; height: 32px !important; border-radius: 8px !important;
-    display: flex !important; align-items: center !important; justify-content: center !important;
-  }
-  /* 2026-08-06 - Carousel 전역 규칙은 여기서 걷어내 index.css 의 .reserve-carousel 로 옮겼다.
-     이 style 블록은 컴포넌트 마운트 시 head 맨 뒤에 붙어 index.css 를 항상 덮는다.
-     그래서 index.css 에 점·화살표 규칙을 넣어도 이 화면에서만 반영되지 않았고,
-     모바일 화살표 숨김(display:none)도 여기 있던 display: flex !important 에 밀렸다.
-     CLAUDE.md 의 "전역 CSS 는 index.css 에" 가 정확히 이 사고를 막으려는 규칙이다.
-     주의: 이 문자열은 template literal 이라 주석 안에서도 백틱을 쓸 수 없다. */
-
-  /* 원본 비율을 유지하도록 두 번째 코드의 height: 100%와 object-fit 제거 */
-  .ant-image { width: 100% !important; }
-  .ant-image-img { width: 100% !important; height: auto !important; display: block !important; }
-  
-  .slick-slide[aria-hidden="true"] * { pointer-events: none; }
-  .rsv-tap-btn {
-    -webkit-tap-highlight-color: transparent;
-    outline: none;
-  }
-  .rsv-tap-btn:focus {
-    outline: none;
-  }
-  .rsv-tap-btn:focus-visible {
-    box-shadow: 0 0 0 2px ${colors.primary.light};
-  }
-  .rsv-time-pill {
-    background: transparent;
-    color: ${colors.text.secondary};
-    transition: background-color 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
-  }
-  .rsv-time-pill:hover:not(:disabled) {
-    background-color: ${colors.gray[100]};
-    color: ${colors.text.primary};
-  }
-  .rsv-time-pill.rsv-selected {
-    background-color: ${colors.gray[200]};
-    color: ${colors.text.primary};
-    font-weight: 600;
-    transform: scale(1.04);
-  }
-  .rsv-time-pill:disabled {
-    color: ${colors.text.disabled};
-    cursor: not-allowed;
-    text-decoration: line-through;
-  }
-`;
-
 // 인원 수 입력 스텝퍼
 const GuestCountInput = ({ value = 1, onChange }) => {
     const dec = () => { if (value > 1) onChange?.(value - 1); };
@@ -601,8 +551,7 @@ const StoreDetail = () => {
     const nearby = isNearby(nearbyUserLocation, store.latitude, store.longitude, store.nearbyRadiusKm ?? undefined);
 
     return (
-        <PageContainer size={containerSize} paddingTop={isPC ? '32px' : '20px'}>
-            <style>{customStyles}</style>
+        <PageContainer className="reserve-store-detail" size={containerSize} paddingTop={isPC ? '32px' : '20px'}>
 
             {backButton}
 

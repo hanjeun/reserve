@@ -160,7 +160,6 @@ const Button = ({
         width: block ? '100%' : undefined,
         transition: `all ${transitions.fast} ${transitions.easing}`,
         userSelect: 'none',
-        outline: 'none',
         padding: isGhostSm ? '2px 0' : undefined,
         ...v,
         ...style,
@@ -176,6 +175,7 @@ const Button = ({
             <button
                 type={htmlType}
                 disabled={disabled || loading}
+                aria-busy={loading || undefined}
                 onClick={handleClick}
                 className={`reserve-btn reserve-btn--${variant}`}
                 style={baseStyle}

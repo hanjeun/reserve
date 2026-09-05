@@ -81,9 +81,12 @@
 }
 
 [data-theme='dark'] {
-    --c-primary: #4b95ff;
-    --c-primary-light: #1c2c47;
-    --c-primary-dark: #6faaff;
+    /* 기본 블루 fallback은 hooks/useTheme.js ACCENT_OPTIONS.blue.darkMode와 동일하다.
+       앱 부팅 후에는 applyAccent의 인라인 변수가 정본이지만, 초기 CSS도 같은 값이어야
+       첫 페인트와 React 적용 뒤 사이에 색이 미세하게 바뀌지 않는다. */
+    --c-primary: #4c9aff;
+    --c-primary-light: #1b2a41;
+    --c-primary-dark: #3182f6;
 
     /* 회색 스케일 반전 — 50이 가장 어둡고 900이 가장 밝다.
        이래야 `colors.gray[100]`을 "옅은 선"으로 쓰던 기존 코드가 다크에서도 옅은 선이 된다. */

@@ -1,0 +1,645 @@
+/* ── 홈 진입·타이핑·스크롤 애니메이션 ───────────────────────────────────────
+   홈 컴포넌트 안 <style>에서 전역 정책을 주입하던 것을 이 관문으로 이동했다. */
+@keyframes reserve-home-slide-up {
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes reserve-home-cursor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+@keyframes reserve-home-bounce-appear {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes reserve-home-bounce-y {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(7px); }
+}
+.slide-up {
+    opacity: 0;
+    transform: translateY(16px);
+    animation: reserve-home-slide-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.cursor {
+    display: inline-block;
+    width: 4px;
+    height: 0.88em;
+    margin-left: 5px;
+    border-radius: 2.5px;
+    background: var(--c-text-primary, #1a1f27);
+    vertical-align: middle;
+    animation: reserve-home-cursor-blink 0.53s step-end infinite;
+}
+.bounce-arrow { animation: reserve-home-bounce-y 1.6s ease-in-out infinite; }
+.bounce-arrow:focus { outline: none; }
+.bounce-arrow:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6);
+    outline-offset: -3px;
+}
+.reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-delayed { transition-delay: 0.18s; }
+.rv { opacity: 1 !important; transform: translateY(0) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .slide-up,
+    .cursor,
+    .bounce-arrow,
+    .reveal,
+    .reveal-delayed {
+        animation: none !important;
+        transition: none !important;
+    }
+    .slide-up,
+    .bounce-arrow,
+    .reveal,
+    .reveal-delayed {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}
+/* ── 홈 기능 섹션: 태블릿에서 두 열이 양 끝으로 벌어지는 문제 ──────────────────
+   sectionText(flex 1 1 400px)와 sectionUI(flex 1 1 300px)가 둘 다 grow:1이라
+   1000px 컨테이너를 나눠 갖는다. 목업은 자체 maxWidth 380px라 넓어진 칸 안에서
+   가운데 정렬되고, 결과적으로 글은 왼쪽 끝 · 목업은 오른쪽 끝에 붙어 "따로 노는" 모양이 됐다.
+   (reverse 섹션은 좌우가 뒤집혀 회색 배경 쪽이 왼쪽으로 치우쳐 보였다)
+
+   ★★ 2026-08-06 — flex-grow: 0 은 이제 **Home.styles.js 에서 모든 폭에 적용**한다.
+     태블릿만의 문제가 아니었다. PC 에서도 목업 폭이 섹션마다 달라 남는 여유가 달라지면서
+     "간격이 섹션별로 다르다"가 됐다(사용자 지적). 근본 원인이 같으니 예외 구간을 두지 않는다.
+     자세한 근거는 Home.styles.js 의 sectionText/sectionUI 주석에 있다.
+
+   ★★ 2026-08-06 2차 — 태블릿 전용 gap 축소(48px)도 제거했다.
+     "아이패드에서도 PC 와 같은 비율로 보이게" 가 요구사항이다. 두 열의 폭이 이제
+     420px / 380px 로 고정이고 간격도 gap 그대로이므로, gap 을 건드리지 않으면
+     아이패드 가로(1024px)에서 PC 와 **완전히 같은 비율**이 된다
+     (420 + 80 + 380 = 880px — 1024px 뷰포트의 안쪽 폭에 여유롭게 들어간다).
+     폭이 부족해지면 sectionText 가 먼저 줄고, 그래도 안 되면 flexWrap 이 세로로 넘긴다.
+
+   ★★★ 2026-08-06 3차 — 태블릿 규칙을 **다시 넣었다. 이번엔 의도적인 결정이다.**
+
+     2차에서 지운 게 회귀를 만들었다. PC 기준으로 두 열을 420px / 380px 로 고정했더니
+     쌍의 총 폭이 420 + 80 + 380 = 880px 이 됐는데, 태블릿 구간의 안쪽 폭은
+       769px 뷰포트 → 769 - 48(섹션 좌우 패딩) = 721px
+     밖에 안 된다. 880 > 721 이라 flexWrap 이 발동해 **세로로 줄바꿈**되고,
+     섹션이 minHeight: 100svh + justifyContent: space-between 이라
+     줄바꿈된 두 덩어리가 위아래로 벌어져 "빈 화면에 덩그러니" 놓인 모양이 됐다.
+     (예전 값은 basis 합이 400 + 80 + 300 = 780 이라 아슬아슬하게 들어갔던 것이다)
+
+     880px 는 769px 화면에 물리적으로 들어갈 수 없다. 그래서 태블릿에서는 **비율을 유지하면서
+     함께 줄인다** — clamp 로 뷰포트에 따라 매끄럽게 커지므로 특정 폭에서 튀지 않는다.
+       769px  → 글 320 + gap 38 + 목업 300 = 658  (안쪽 721 안에 들어감)
+       1023px → 글 409 + gap 51 + 목업 348 = 808  (안쪽 975 안에 들어감)
+       1024px 이상 → 이 블록이 꺼지고 PC 값(420 / 80 / 380)으로 복귀
+
+     ★ 간격 균일성은 유지된다. 목업이 `width: 100%; maxWidth: 380` 이고 칸의 basis 가
+       380 이하이므로 목업이 칸을 **정확히 채운다** → 남는 여유 0 → 간격은 항상 gap 그대로다.
+       (섹션마다 달라 보였던 원인이 바로 그 "칸 안의 여유"였다)
+
+   ★ 모바일·PC 에 영향이 없는 이유 — 범위로 보장된다.
+     · ≤768px: Home 이 isMobile 분기라 .rsv-feature-* 마크업을 **아예 렌더하지 않는다**
+     · ≥1024px: 미디어쿼리 범위 밖
+     즉 이 블록은 769~1023px 에서만 존재한다. */
+@media (min-width: 769px) and (max-width: 1023px) {
+    .rsv-feature-inner {
+        gap: clamp(32px, 5vw, 80px) !important;
+    }
+    .rsv-feature-text {
+        flex: 0 1 clamp(300px, 40vw, 420px) !important;
+    }
+    .rsv-feature-ui {
+        /* shrink 0 — 좁아질 때 목업이 눌리면 기기 프레임이 찌그러진다. 글이 먼저 줄어야 한다. */
+        flex: 0 0 clamp(280px, 34vw, 380px) !important;
+    }
+}
+
+/* ── 카드 hover 채움 (하단 액션 / 새 가게 등록) ────────────────────────────
+   ★ 카드 본문(.ant-card-body)에는 hover 채움을 넣지 않는다 — 한 번 넣었다가 되돌렸다.
+     이미지가 있는 "탐색용 카드"의 hover 관용구는 그림자 상승 + 이미지 줌이지 면 채우기가 아니다
+     (에어비앤비·네이버 플레이스·야놀자·배민 전부 이 방식).
+     카드는 이미 회색 페이지 위의 흰 면이라, 그 면을 회색으로 칠하면 hover가 아니라
+     "선택됨" 또는 "비활성"으로 읽힌다. 실제로 가게 목록에서 그렇게 보였다.
+     면 채우기는 행(row)·메뉴 항목·버튼의 관용구다 — 그래서 아래 두 곳에만 남긴다:
+       - .ant-card-actions > li : 사실상 목록 행이자 버튼
+       - .reserve-card-add      : 점선 플레이스홀더 = 버튼
+
+   ★ 값에 var(--c-...)를 쓰지 않는다. 이 요소들에 var()로 배경을 주면 변수가 정의돼 있는데도
+     계산 결과가 투명(rgba(0,0,0,0))으로 나오는 현상을 브라우저에서 실측했다.
+     같은 선언을 다른 요소에 주면 정상이라 원인을 특정하지 못했고(이 프로젝트에서 세 번째),
+     테마별 리터럴 규칙으로 못 박는 쪽이 확실하다.
+
+   ★ !important가 필요한 이유: .reserve-card-add가 backgroundColor를 인라인으로 주므로
+     클래스 규칙이 밀린다. */
+.reserve-card .ant-card-actions > li,
+.reserve-card-add {
+    transition: background-color 0.15s ease;
+}
+
+/* 본문의 아래쪽 둥근 모서리 제거.
+   AntD가 .ant-card-body에 border-radius: 0 0 16px 16px를 준다(실측). 카드 자체는 radius 0인데
+   본문만 둥글어서, hover로 면을 채우면 아래쪽만 둥글게 잘려 보였다. */
+.reserve-card .ant-card-body {
+    border-radius: 0 !important;
+}
+
+/* 액션 바가 카드 폭을 다 쓰게 한다.
+   실측: ul이 95px로 쪼그라들어 있었고(카드 폭의 1/3), AntD가 li에 인라인 width:50%를 주므로
+   각 칸이 48px밖에 안 됐다. hover 배경이 적용돼도 그 48px만 칠해져서 "hover가 안 된다"로 보였다.
+   ul을 100%로 펴고 li는 flex로 균등 분할한다(인라인 width:50%를 auto로 덮어야 flex가 먹는다). */
+.reserve-card .ant-card-actions {
+    width: 100% !important;
+    display: flex !important;
+}
+.reserve-card .ant-card-actions > li {
+    flex: 1 1 0 !important;
+    width: auto !important;
+}
+.reserve-card .ant-card-actions > li:hover,
+.reserve-card-add:hover {
+    background-color: #f2f4f6 !important;
+}
+/* 다크는 카드 배경(#1e2126)보다 확실히 밝아야 "채워졌다"가 보인다.
+   gray-100(#23262b)으로 했다가 카드와 거의 같은 색이라 hover가 안 보였다. */
+[data-theme='dark'] .reserve-card .ant-card-actions > li:hover,
+[data-theme='dark'] .reserve-card-add:hover {
+    background-color: #333840 !important;
+}
+
+/* ── 복사 아이콘(AntD Typography copyable) 터치 영역 ────────────────────────
+   AntD는 copyable 아이콘을 12~14px짜리 <button>으로 렌더한다. 눈으로는 보이지만
+   손가락으로는 정확히 그 12px을 찍어야 해서 "눌리다 말다" 한다(예약 상세의 예약번호·이메일).
+
+   모바일 터치 영역 권장치는 44×44px다(Apple HIG / WCAG 2.5.8은 최소 24×24). 여기서는
+   **padding으로 눌리는 면적만 키우고, 같은 크기의 음수 margin으로 레이아웃을 되돌린다** —
+   아이콘 위치와 줄 간격은 그대로인데 누를 수 있는 범위만 넓어진다.
+   (width/height를 직접 키우면 아이콘이 커지고 텍스트 정렬이 밀린다)
+
+   ::before로 히트 영역을 만드는 방법도 있지만, AntD가 이 버튼 안에 아이콘을 직접 넣으므로
+   padding 방식이 덜 침습적이다. */
+.ant-typography-copy {
+    padding: 10px !important;
+    /* 위/아래/오른쪽만 되돌린다. 줄 높이와 뒤따르는 요소 간격이 그대로 유지된다. */
+    margin: -10px !important;
+    /* ★ 왼쪽은 되돌리지 않는다.
+       margin: -10px를 사방에 걸었더니 antd의 기본 좌측 간격(margin-inline-start)까지 지워져
+       아이콘이 글자에 딱 붙어버렸다(실제로 그렇게 보였다 — 고치려다 더 나빠진 케이스).
+       왼쪽 margin을 0으로 두면 버튼 박스가 글자 끝에서 시작하고, 그 안쪽 padding 10px이
+       그대로 시각적 간격이 된다. 즉 "간격 10px + 터치 영역 확대"가 동시에 성립한다. */
+    margin-left: 0 !important;
+    /* 늘어난 영역이 옆 글자를 덮어 클릭을 가로채지 않도록 겹침 순서를 낮춘다. */
+    position: relative;
+    z-index: 0;
+}
+
+/* ── 입력 지우기(X) 버튼 — 히트 영역만 키운다 ───────────────────────
+   2026-08-09 신설. 위 복사 아이콘과 같은 문제였다 — 브라우저 실측상
+   `.ant-input-clear-icon`(button)과 `.ant-select-clear`(div)가 **둘 다 12×12px** 이라
+   눈에는 보이는데 정확히 그 12px 을 찍어야 눌린다. WCAG 2.5.8 최소가 24×24 이다.
+
+   ★ 왜 관문을 CSS 로 두는가
+     allowClear 는 현재 5곳에 흩어져 있고(FilterToolbar 2 · StoreList · MailboxTab · ReviewList),
+     앞으로 늘어난다. 호출부마다 clearIcon prop 을 넘기게 하면 **반드시 샌다**
+     (이 프로젝트가 반복해서 깨진 지점이 전부 그 패턴이었다).
+     순수한 시각 속성은 index.css 에 한 번 적는 것이 진짜 관문이다.
+
+   ★ 왜 width/height 를 키우고 음수 margin 으로 되돌리는가 (브라우저 실측으로 결정)
+     그냥 24px 로 키우면 박스가 **오른쪽 모서리를 말뚝으로 왼쪽으로만 자라서**
+     X 글리프가 6px 안쪽으로 밀린다(실측: 중심 x 426 → 420).
+     늘어난 절반만큼 음수 margin 을 주면 중심이 원래 자리로 돌아온다(426 유지).
+     검증: Input·Select 둘 다 24×24, 중심 좌표 변화 0, 필드 오른쪽 끝에서 6px 안으로 여유 유지.
+
+   ★ 왜 원형을 유지하는가
+     원형은 "제거·닫기"의 관습이고(모달 X · 태그 삭제 · OS 창 닫기),
+     radius 네모는 이 디자인 시스템에서 "면·버튼"의 언어다(카드·입력칸·버튼).
+     둘을 섞으면 어포던스가 흐려진다. 네모로 가고 싶으면 --clear-radius 한 줄만 바꾸면 된다. */
+.ant-input-clear-icon,
+.ant-select-clear {
+    --clear-hit: 24px;        /* 히트 영역. WCAG 2.5.8 최소값 */
+    --clear-glyph: 14px;      /* X 글리프. 히트보다 작게 유지해야 버튼처럼 무거워지지 않는다 */
+    --clear-radius: 50%;      /* 네모로 바꾸려면 이 값을 8px 로 */
+
+    width: var(--clear-hit) !important;
+    height: var(--clear-hit) !important;
+    font-size: var(--clear-glyph) !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: var(--clear-radius) !important;
+
+    /* 늘어난 만큼의 절반을 되돌려 글리프 중심을 원래 위치에 고정한다. */
+    margin-inline-end: calc((var(--clear-hit) - 12px) / -2) !important;
+
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+/* Select 의 clear 는 absolute + top:50% 라 높이가 바뀌면 아래로 처진다.
+   절반만큼 올려 수직 중앙을 유지한다(Input 은 inline 이라 불필요). */
+.ant-select-clear {
+    margin-top: calc(var(--clear-hit) / -2) !important;
+}
+
+/* 눌리는 면이 보이게 — 히트 영역을 키워도 피드백이 없으면 그냥 헛바퀴가 된다. */
+.ant-input-clear-icon:hover,
+.ant-select-clear:hover {
+    background: var(--c-gray-100, rgba(0, 0, 0, 0.06)) !important;
+}
+
+/* ── 필터용 Select("○○순" 롤러) — 흰 배경 + 옅은 테두리 ────────────────────
+   ★ 이 프로젝트의 Select는 **두 종류**이고, 서로 다른 게 정상이다.
+
+     1) 폼 입력용 (FormSelect) — 채움형 회색(gray-50).
+        FormInput·FormTextArea·DatePicker·TimePicker와 같은 톤. "값을 적어 넣는 칸"의 언어다.
+     2) 필터용 (여기) — 흰 면 + 테두리.
+        가게 목록의 "별점순", 통계의 가게 선택처럼 **페이지 위에 놓인 조작 도구**다.
+        입력칸이 아니라 버튼·툴바에 가까우므로 채움형으로 칠하면 폼처럼 보여 위계가 무너진다.
+
+   예전엔 이 규칙이 FilterToolbar 안의 <style> 태그에만 있어서, 그 컴포넌트를 쓰지 않는
+   화면(StoreList의 별점순, StatisticsTab의 가게 선택)은 전역 Select 토큰(gray-50)을 그대로 받아
+   회색으로 떨어졌다. StatisticsTab 주석엔 "FilterToolbar와 정확히 일치하도록 맞춘다"고 적혀
+   있었지만 className을 안 붙여서 실제로는 맞지 않았다. 전역 규칙으로 올려 한곳에서 관리한다.
+
+   !important가 필요한 이유: AntD가 CSS-in-JS로 주입하는 토큰 스타일을 이겨야 한다.
+   (덤으로, 탭 재마운트 타이밍에 AntD가 전역 토큰을 반영하지 못하고 기본값 #d9d9d9로
+    떨어지던 현상도 이 규칙이 덮어준다 — 브라우저 실측으로 확인했던 건이다)
+
+   ★ 선택자 주의 — 배경은 **바깥 .ant-select 요소 자체**에 준다.
+     AntD 5는 안쪽에 .ant-select-selector 래퍼가 있었지만 **AntD 6에는 그 요소가 없다**
+     (자식은 -content / -suffix / -prefix / -input / -placeholder / -selection-item).
+     node_modules/@rc-component/select 에서 클래스 접미사를 전수 확인한 결과다.
+     .reserve-filter-select .ant-select-selector 로 쓰면 매칭되는 요소가 없어 규칙이 조용히 무시된다.
+
+   ★★ 2026-08-04 — 이 규칙이 "안 먹던" 진짜 원인은 AntD가 아니라 **바로 위 주석의 구문 오류**였다.
+     주석 블록이 중간에서 한 번 닫히고, 뒤이어 산문이 그대로 CSS 본문에 노출돼 있었다.
+     CSS 파서는 그 산문을 선택자로 해석하고, 에러 복구를 위해 **다음에 오는 중괄호 블록까지
+     통째로 삼켜서 버린다** — 즉 아래 라이트 모드 규칙이 문서에 아예 등록되지 않았다.
+     (postcss로 파싱해 확인: 선택자가 "★ 특이도를 올려 둔 이유 ..."로 잡혔다.)
+     다크 모드 규칙만 살아남아서 "다크는 되는데 라이트만 회색"이라는 증상이 나왔다.
+     → CSS 주석 안에는 주석 종료 기호를 절대 문자 그대로 적지 말 것. 적으면 거기서 주석이 끝난다.
+       (JSX template literal 안 주석에 백틱을 못 쓰는 것과 정확히 같은 종류의 함정이다)
+
+   ★ 특이도 — .reserve-filter-select 한 클래스(0,1,0)는 AntD의 variant 규칙
+     (.ant-select.ant-select-outlined = 0,2,0)에 밀린다. .ant-select를 함께 걸어 (0,2,0)으로 맞춘다.
+     참고: AntD 6은 최종 속성 대신 CSS 커스텀 프로퍼티(--ant-select-background-color 등)로
+     값을 흘려보낸다. 색만 바꿀 땐 그 변수를 덮는 편이 hover/focus 상태까지 자연스럽게 따라온다. */
+.ant-select.reserve-filter-select {
+    background-color: #ffffff !important;
+    border-color: #f2f4f6 !important;
+}
+[data-theme='dark'] .ant-select.reserve-filter-select {
+    background-color: #1e2126 !important;
+    border-color: #23262b !important;
+}
+
+/* ── 푸터 소셜 아이콘 hover ────────────────────────────────────────────────
+   JS 인라인 스타일로 색을 넣던 것을 CSS로 옮겼다 — 인라인에 var()를 넣으면
+   위와 같은 이유로 값이 무효가 되어 색이 아예 안 바뀌었다.
+   hover하면 원 전체가 채워지고 그 안의 아이콘이 반대 색이 된다.
+
+   ★ 규칙 하나로 통일한다 — hover하면 "밝은 원 + 브랜드 색 마크".
+       원(배경): 라이트 = 연한 회색 gray[100] #f2f4f6 / 다크 = 흰색 #ffffff
+       마크(아이콘): GitHub #181717(공식 검정), Velog #20C997(공식 민트)
+     라이트에서 순백을 쓰면 흰 페이지에 묻혀 "테두리만 바뀐 것"처럼 보이므로
+     디자인 시스템의 연한 회색을 쓴다.
+
+   ★ Velog 마크는 v가 뚫린 꽉 찬 사각형이다 — currentColor가 사각형을 칠하고
+     v 구멍으로 원의 배경이 비친다. 그래서 color를 흰색으로 두면 "흰 박스 + 민트 v"가 되고,
+     원하는 "민트 박스 + 흰 v"를 얻으려면 color를 민트로 두어야 한다. GitHub(실루엣)과 반대 감각이라
+     헷갈리기 쉬운 지점. 결과적으로 두 브랜드 모두 "밝은 원 + 브랜드 색 마크"로 규칙이 같아진다.
+
+   ★ !important 필수: SocialBtn의 a 태그가 color와 border를 인라인 style로 준다.
+     인라인 스타일은 클래스 규칙보다 우선이라, 이게 없으면 hover 규칙이 통째로 밀려서
+     색이 전혀 안 바뀐다(.reserve-card-add에서 겪은 것과 같은 함정). */
+.reserve-social:hover {
+    background-color: #f2f4f6 !important;   /* 연한 회색 원 (gray[100]) */
+    border-color: #f2f4f6 !important;
+    color: #181717 !important;              /* 검은 고양이 */
+}
+[data-theme='dark'] .reserve-social:hover {
+    background-color: #ffffff !important;   /* 흰 원 */
+    border-color: #ffffff !important;
+    color: #181717 !important;
+}
+.reserve-social--velog:hover,
+[data-theme='dark'] .reserve-social--velog:hover {
+    color: #20C997 !important;              /* 민트 박스 + (구멍으로 비치는) 흰 v */
+}
+
+/* 가게 카드 하단 액션(수정 연필 / 삭제 휴지통) — 두 아이콘의 hover 반응을 통일한다.
+   예전엔 둘 다 hover 피드백이 아예 없어서 "눌리는 것"인지 알 수 없었고, 휴지통만 빨간색이라
+   연필과 상태 표현이 어긋나 보였다. 색 구분(빨강 = 파괴적 동작)은 유지하고 반응만 맞춘다.
+
+   ★ 배경은 여기가 아니라 Card.jsx의 `.ant-card-actions > li:hover`가 칠한다 —
+     버튼에 칠하면 <li>의 위아래 여백이 남아 칸 일부만 회색이 되기 때문이다.
+     여기서는 눌림 피드백만 담당한다(둥근 모서리도 주지 않는다 — 칸 전체를 채우는 게 목표). */
+.reserve-card-action {
+    transition: transform 0.12s ease;
+}
+.reserve-card-action:active {
+    transform: scale(0.94);
+}
+
+/* 예약 카드 액션 버튼 — 모바일에서는 아이콘을 숨기고 글자만 남긴다.
+   버튼이 4개(결제하기·변경·QR·취소)가 되면 이 그룹이 3줄의 가용 폭 286px 중 216px을 차지해서
+   날짜 자리에 24px밖에 안 남았다("2026-07-31"이 "0…"으로 뭉개지던 원인).
+   아이콘 하나당 14px + gap 4px이라 4개면 72px이 돌아온다.
+   라벨은 그대로 두는 쪽을 골랐다 — 아이콘만 남기면 폭은 더 줄지만 "결제하기"인지 "변경"인지
+   알아보기 어려워 발견성이 크게 떨어진다. PC에서는 폭이 남으므로 아이콘을 유지한다. */
+@media (max-width: 575px) {
+    .reserve-reservation-actions .anticon {
+        display: none;
+    }
+}
+
+/* 줄바꿈 모드(SegmentedControl wrap) — 문의 유형처럼 라벨이 "예약"·"기타" 2글자인 경우.
+   flex:0 0 auto라 버튼 폭이 곧 글자 폭이 되어 44px 남짓한 칩이 됐다. 모바일 최소 터치 타깃
+   권장치(44x44)에 겨우 걸치는 크기라 눌러야 할 것으로 안 보인다.
+   min-width로 바닥을 깔고 세로 패딩을 키운다. grow는 주지 않는다 — 주면 줄이 바뀌어 혼자 남은
+   마지막 칩이 그 줄을 전부 차지한다(SegmentedControl.jsx의 2026-07 버그 주석 참고). */
+.reserve-segmented-btn--wrap {
+    min-width: 78px;
+    padding: 14px 18px;
+    font-size: 15px;
+}
+.reserve-segmented-btn:hover:not(:disabled):not(.reserve-segmented-btn--active) {
+    background-color: var(--c-gray-100, #f2f4f6);
+    color: var(--c-text-primary, #1a1f27);
+}
+.reserve-segmented-btn:active:not(:disabled) {
+    transform: scale(0.97);
+}
+.reserve-segmented-btn--active {
+    background-color: var(--c-gray-200, #e5e8eb);
+    color: var(--c-text-primary, #1a1f27) !important;
+    font-weight: 600;
+}
+.reserve-segmented-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+@media (max-width: 768px) {
+    .reserve-segmented-btn {
+        padding: 8px 10px;
+        font-size: 12.5px;
+    }
+}
+
+/* DataTable fitContent option.
+   AntD Table inlines min-width:100% on its <table> element whenever scroll.x is set,
+   so when the sum of column widths is less than the available space, every column
+   gets stretched proportionally instead of staying at its set width.
+   For tables where every column already has an explicit width (no flexible column
+   left to intentionally absorb the extra space), pass fitContent to DataTable so it
+   adds this class and the table only takes up the real sum of its column widths.
+   (2026-07-09: added after finding the store-name column in the ad management table
+   was growing well past its set width) */
+.reserve-table-fit-content .ant-table table {
+    min-width: max-content !important;
+}
+
+/* ── 모달 닫기(X) 버튼 톤 통일 ─────────────────────────────────────────────
+   증상: 모바일에서 모달을 처음 열면 X에 회색 배경(hover처럼)이, 다시 열면 파란 배경+외곽선이
+   뜨다가, 2~3번 뒤면 정상이 된다. 원인은 AntD 6이 Modal 스타일을 CSS-in-JS로 동적
+   주입하는데, 그 주입 시점이 index.css보다 늦어질 때가 있어 — 같은 specificity면
+   나중에 로드된 AntD 기본 focus 스타일(파란 아웃라인/그림자)가 이기고, 주입이 안정된
+   뒤에야 내 규칙이 이긴다(그래서 "처음 몇 번만 이상"). 부모 선택자(.ant-modal-root)를
+   붙여 specificity를 올려 주입 순서와 무관하게 항상 이기게 한다. 평소와 마우스 포커스는
+   투명하게 유지하고, 키보드 focus-visible 에만 일관된 접근성 링을 표시한다. */
+.ant-modal-root .ant-modal-close,
+.ant-modal-root .ant-modal-close:focus,
+.ant-modal-root .ant-modal-close:active {
+    outline: none !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+}
+.ant-modal-root .ant-modal-close:focus-visible {
+    outline: 3px solid var(--c-primary, #3182f6) !important;
+    outline-offset: 2px;
+    box-shadow: none !important;
+    background-color: transparent !important;
+}
+.ant-modal-root .ant-modal-close:hover {
+    background-color: var(--c-gray-100, #f2f4f6) !important;
+}
+
+/* ── 모달 박스(.ant-modal) 포커스 파란 테두리 제거 ──────────────────────
+   진짜 범인은 X 버튼이 아니라 모달 박스 자체였다. AntD 6 구조상 .ant-modal은
+   tabindex="-1" role="dialog"로 포커스 가능한 모달 컴테이너인데, 열릴 때 포커스 트랩이
+   여기에 포커스를 주면 브라우저 기본 focus-visible 아웃라인(하늘색)이 모달 박스 전체를
+   둠러싸다. 모달 박스는 이미 띄워져 있어 포커스 테두리가 필요 없으므로 아웃라인만
+   제거한다(container의 정상 그림자 box-shadow는 건드리지 않는다). specificity를 위해
+   .ant-modal-root를 앞에 붙인다. — 이것이 이미지에서 보이던 "모달 하늘색 테두리"의 진찢 원인. */
+.ant-modal-root .ant-modal,
+.ant-modal-root .ant-modal:focus,
+.ant-modal-root .ant-modal:focus-visible,
+.ant-modal-root .ant-modal-container:focus,
+.ant-modal-root .ant-modal-container:focus-visible {
+    outline: none !important;
+}
+
+/* ── 포커스 링 — 마우스 클릭엔 안 뜨고, 키보드 이동에만 우리 톤으로 뜬다 ──────
+   2026-08-06 실측: 관리자 대시보드에서 "누르면 파란/검은 테두리가 생긴다"의 정체.
+     · div.ant-tabs-tabpane-active  tabindex="0"  ← AntD가 붙인다 (파란 사각형)
+     · svg.recharts-surface         tabindex="0"  ← Recharts가 붙인다 (검은 사각형)
+   둘 다 키보드 접근성 목적이라 tabindex를 없애면 안 된다. 우리 쪽에 포커스 스타일이
+   전혀 없어서 브라우저 기본 링이 그대로 나온 것이고, 기본 링은 :focus 라서
+   **마우스 클릭에도** 그려진다.
+   → :focus 는 지우고 :focus-visible(키보드 이동)에만 우리 primary 링을 준다.
+     접근성은 유지되고 마우스 사용자에겐 안 보인다. */
+.ant-tabs-tabpane:focus,
+.recharts-wrapper:focus,
+.recharts-surface:focus,
+.recharts-layer:focus {
+    outline: none;
+}
+.ant-tabs-tabpane:focus-visible,
+.recharts-wrapper:focus-visible,
+.recharts-surface:focus-visible,
+.recharts-layer:focus-visible {
+    outline: 2px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* ── 선택기 접미 아이콘: 에러 상태 ────────────────────────────────────────
+   값 있음 → primary 는 `components/common/pickerSuffix.jsx` 가 인라인으로 칠한다.
+   에러는 여기서 처리한다 — AntD Form 은 에러 여부를 자식에게 prop 으로 내려주지 않고
+   래퍼 클래스(.ant-picker-status-error)로만 알려주기 때문이다.
+   인라인 색을 이겨야 하므로 !important 가 필요하다. */
+.ant-picker-status-error .ant-picker-suffix .anticon,
+.ant-picker-status-error.ant-picker .ant-picker-suffix .anticon {
+    color: var(--c-error, #f04452) !important;
+}
+/* 단, 비활성은 에러보다 우선한다 — 조작할 수 없는 칸을 빨갛게 칠하면
+   "지금 고치라"는 잘못된 지시가 된다(날짜를 먼저 골라야 열리는 시간 칸이 그 경우다). */
+.ant-picker-disabled .ant-picker-suffix .anticon {
+    color: var(--c-gray-400, #b5b8bd) !important;
+}
+
+/* ── 시간 롤러(TimePicker 패널) — 지금까지 손대지 않아 AntD 기본색이었다 ──────
+   달력 셀(.ant-picker-cell-*)만 우리 색으로 맞춰져 있었고, 시간 패널은 규칙이 0건이라
+   영업시간·브레이크타임에서 회색 선택 행 + AntD 기본 파랑 확인 버튼이 그대로 보였다.
+
+   ★ 선택자 주의 — 실제 클래스는 `@rc-component/picker` 소스에서 확인한 것이다:
+     `-time-panel-cell` / `-time-panel-cell-inner` / `-time-panel-cell-selected`.
+     처음엔 `.ant-picker-time-panel-column > li...` 로 적었는데, 자식이 li 라는 보장이 없어
+     규칙이 통째로 안 걸렸다. 구조(태그·자식 관계)를 가정하지 말고 클래스만으로 건다. */
+/* 위 Select 드롭다운과 같은 규칙 — 면만 primary, 글자는 본문색. */
+.ant-picker-time-panel-cell-selected .ant-picker-time-panel-cell-inner {
+    background: var(--c-primary-light, #e8f3ff) !important;
+    color: var(--c-text-primary, #1a1f27) !important;
+    font-weight: 600;
+}
+.ant-picker-time-panel-cell .ant-picker-time-panel-cell-inner:hover {
+    background: var(--c-gray-100, #f2f4f6) !important;
+}
+.ant-picker-time-panel-cell-selected .ant-picker-time-panel-cell-inner:hover {
+    background: var(--c-primary-light, #e8f3ff) !important;
+}
+/* 확인 버튼 — AntD 6 는 footer 안의 .ant-picker-ok 다(.ant-picker-ranges 는 v5 이름). */
+.ant-picker-dropdown .ant-picker-ok .ant-btn,
+.ant-picker-dropdown .ant-picker-ranges .ant-picker-ok .ant-btn {
+    border-radius: 8px;
+}
+
+/* ── 드롭다운 옵션(Select·Picker 공통) — 다크/라이트 둘 다 명시한다 ────────────
+   색을 적지 않으면 AntD 기본 토큰(고정 hex)이 남아 다크에서 검은 글자가 나온다.
+   hover 는 회색 면, 선택은 primary 면 + primary 글자 — 시간 롤러와 같은 언어. */
+.ant-select-dropdown .ant-select-item-option {
+    color: var(--c-text-primary, #1a1f27);
+    border-radius: 8px;
+}
+.ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+    background: var(--c-gray-100, #f2f4f6);
+}
+/* 선택된 항목: 면만 primary 톤으로 칠하고 **글자는 본문색을 유지**한다.
+   글자까지 파랗게 하면 ① 파란 면 위의 파란 글자라 대비가 떨어지고
+   ② 목록 안에서 그 항목만 다른 언어로 읽혀 "선택됨"보다 "링크"처럼 보인다.
+   본문색은 테마 변수라 라이트=검정, 다크=흰색으로 자동 전환된다. */
+.ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+    background: var(--c-primary-light, #e8f3ff);
+    color: var(--c-text-primary, #1a1f27);
+    font-weight: 600;
+}
+
+/* ── 이미지 미리보기 툴바 톤 통일 (useImagePreview가 rootClassName으로 거는 클래스) ──
+   AntD 기본 프리뷰 툴바(하단 아이콘들)은 우리 디자인 시스템과 이질적이라,
+   pagination/tabs/segmented와 같은 톤(평소엔 아이콘만, hover 시에만 각진 네모 박스)으로 맞춘다.
+
+   2026-07-22 수정 — AntD 6(@rc-component/image)에서 프리뷰 툴바 DOM이 통째로 바뀌었다:
+     v5: .ant-image-preview-operations > .ant-image-preview-operations-operation
+     v6: .ant-image-preview-footer > .ant-image-preview-actions > .ant-image-preview-actions-action
+   좌·우 화살표도 -switch-left/-right → -switch-prev/-next로 바뀌었다.
+   그래서 옛 선택자만 가지고 있던 이 규칙이 아무 요소에도 안 걸려 "각진 네모"가 적용되지 않았다.
+   구/신 선택자를 모두 적어 AntD 버전 차이에 영향받지 않게 한다. */
+/* ★ 2026-08-06 — 톤이 두 갈래로 갈라져 있던 것을 변수 하나로 묶었다.
+   예전엔 하단 툴바 아이콘만 흰색 계열(hover rgba(255,255,255,.15))이고
+   좌·우 화살표와 닫기(X)는 검정 계열(rgba(0,0,0,.2) → .45)이라, 같은 프리뷰 안에서
+   위아래 버튼이 서로 다른 색으로 반응했다. 규칙을 세 곳에 흩어 적었기 때문이다.
+   → 값을 변수로 올려 "여기 한 곳만 고치면 전부 따라온다"로 만든다.
+
+   기본을 완전 투명이 아니라 옅은 검정으로 두는 이유: 프리뷰 배경은 사진이라
+   밝은 사진 위에서는 흰 아이콘이 배경에 묻혀 안 보인다. 옅은 판을 깔아 최소 대비를 보장한다.
+   hover 는 우리 밝은 회색(gray-200) 기반 — 어두워지는 게 아니라 밝아지는 방향이라
+   "떠오르는" 느낌이 되고, 툴바·화살표·닫기가 같은 색으로 반응한다. */
+.reserve-image-preview {
+    --preview-btn-bg: rgba(0, 0, 0, 0.12);
+    --preview-btn-hover: rgba(229, 232, 235, 0.28);
+}
+
+/* ── 미리보기 "첫 열림"에서만 확대 애니메이션이 씹히던 문제 (2026-08-19) ──────────────
+   증상: 새로고침 후 맨 처음 사진을 클릭하면 확대 없이 툭 뜬다. 두 번째부터는 정상.
+
+   원인은 레이스지만 데이터 경합이 아니라 **스타일 주입과 애니메이션 시작의 프레임 경합**이다.
+   @rc-component/image 의 Preview 는 portalRender 게이팅 때문에 첫 클릭 전까지 DOM 에
+   존재하지 않는다. 첫 클릭 순간 Portal 이 처음 만들어지고, 바로 그때 AntD 6 가
+   .ant-image-preview-* 스타일을 CSS-in-JS 로 문서에 주입한다.
+   트랜지션은 "시작 상태가 한 프레임 그려진 뒤 끝 상태로 바뀌어야" 걸리는데, 스타일이 방금
+   주입돼 그 틈이 없으니 브라우저가 곧장 최종 상태로 점프한다. 클릭 지점에서 커지는
+   transformOrigin 효과도 같이 죽어서 "그냥 툭 뜬다"로 보인다.
+   두 번째부터 멀쩡한 이유가 이것이다 — 그때는 스타일이 이미 문서에 있다.
+
+   같은 규칙을 정적으로 선언해두면 주입을 기다릴 필요가 없어진다.
+   ※ AntD 가 나중에 같은 값을 주입하므로 충돌하지 않는다.
+      값은 antd/lib/image/style/index.js 의 genPreviewMotion 과 맞춰둘 것.
+   ※ 검증은 하드 리프레시(Ctrl+Shift+R) 후 **맨 처음 클릭**. 두 번째부터는 원래 정상이라
+      그것만 보면 고쳤는지 알 수 없다. */
+.ant-image-preview-fade { transition: opacity 0.3s; }
+.ant-image-preview-fade-appear,
+.ant-image-preview-fade-enter { opacity: 0; }
+.ant-image-preview-fade-appear .ant-image-preview-body,
+.ant-image-preview-fade-enter  .ant-image-preview-body { transform: scale(0); }
+.ant-image-preview-fade-appear-active,
+.ant-image-preview-fade-enter-active { opacity: 1; }
+.ant-image-preview-fade-appear-active .ant-image-preview-body,
+.ant-image-preview-fade-enter-active  .ant-image-preview-body {
+    transform: scale(1);
+    transition: transform 0.3s;
+}
+.reserve-image-preview .ant-image-preview-actions-action,
+.reserve-image-preview .ant-image-preview-operations-operation {
+    border-radius: 8px !important;
+    padding: 8px !important;
+    margin: 0 2px !important;
+    background-color: transparent !important;
+    transition: background-color 0.15s ease !important;
+}
+.reserve-image-preview .ant-image-preview-actions-action:hover,
+.reserve-image-preview .ant-image-preview-operations-operation:hover {
+    background-color: var(--preview-btn-hover) !important;
+}
+.reserve-image-preview .ant-image-preview-actions-action-disabled,
+.reserve-image-preview .ant-image-preview-operations-operation-disabled {
+    opacity: 0.35 !important;
+}
+.reserve-image-preview .ant-image-preview-actions-action-disabled:hover,
+.reserve-image-preview .ant-image-preview-operations-operation-disabled:hover {
+    background-color: transparent !important;
+}
+/* 툴바 컨테이너 — AntD 기본은 pill(긴 타원)이라 우리 "둥근 네모" 톤과 어긋난다.
+   안쪽 아이콘 버튼들과 같은 8px로 맞춰 하나의 각진 카드처럼 보이게 한다. */
+.reserve-image-preview .ant-image-preview-actions {
+    border-radius: 8px !important;
+}
+/* 좌·우 넘기기 화살표(여러 장일 때)도 같은 톤 */
+.reserve-image-preview .ant-image-preview-switch-prev,
+.reserve-image-preview .ant-image-preview-switch-next,
+.reserve-image-preview .ant-image-preview-switch-left,
+.reserve-image-preview .ant-image-preview-switch-right {
+    border-radius: 8px !important;
+    background-color: var(--preview-btn-bg) !important;
+    transition: background-color 0.15s ease !important;
+}
+.reserve-image-preview .ant-image-preview-switch-prev:hover,
+.reserve-image-preview .ant-image-preview-switch-next:hover,
+.reserve-image-preview .ant-image-preview-switch-left:hover,
+.reserve-image-preview .ant-image-preview-switch-right:hover {
+    background-color: var(--preview-btn-hover) !important;
+}
+
+/* 모바일에서 좌·우 화살표를 숨긴다.
+   ★ 선행 조건이 있었다 — rc-image 는 장 넘기기 스와이프를 제공하지 않는다
+   (1손가락 = 팬, 2손가락 = 핀치 줌). 그래서 이 규칙은 `useImagePreview` 에 스와이프
+   핸들러를 붙인 2026-08-06 이후에야 넣을 수 있었다. 순서가 뒤바뀌면 모바일에서
+   2번째 사진부터 도달할 방법이 사라진다. 핸들러를 지우면 이 규칙도 함께 지울 것. */
+@media (max-width: 768px) {
+    .reserve-image-preview .ant-image-preview-switch-prev,
+    .reserve-image-preview .ant-image-preview-switch-next,
+    .reserve-image-preview .ant-image-preview-switch-left,
+    .reserve-image-preview .ant-image-preview-switch-right {
+        display: none !important;
+    }
+}
+/* 닫기(X) 버튼 — AntD 6에서는 툴바(actions)가 아니라 별도 <button class="ant-image-preview-close">로
+   떨어져 있어서 위 규칙들에 해당되지 않았다 — 화살표와 같은 톤(각진 네모 + 반투명)으로 맞춘다. */
+.reserve-image-preview .ant-image-preview-close {
+    border-radius: 8px !important;
+    background-color: var(--preview-btn-bg) !important;
+    transition: background-color 0.15s ease !important;
+}
+.reserve-image-preview .ant-image-preview-close:hover {
+    background-color: var(--preview-btn-hover) !important;
+}

@@ -15,9 +15,9 @@ const useMyStores = () => {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: ({ storeId, force }) => storeService.deleteStore(storeId, force),
+        mutationFn: (storeId) => storeService.deleteStore(storeId),
         // 낙관적 업데이트 — 실패 시 원복
-        onMutate: async ({ storeId }) => {
+        onMutate: async (storeId) => {
             await queryClient.cancelQueries({ queryKey: storeKeys.my() });
             const prev = queryClient.getQueryData(storeKeys.my());
             queryClient.setQueryData(storeKeys.my(), (old) =>
@@ -25,10 +25,10 @@ const useMyStores = () => {
             );
             return { prev };
         },
-        onSuccess: () => message.success('가게가 삭제되었습니다.'),
+        onSuccess: () => message.success('가게 영업이 종료되었습니다.'),
         onError: (err, _, ctx) => {
             if (ctx?.prev) queryClient.setQueryData(storeKeys.my(), ctx.prev);
-            message.error(err?.message || '삭제에 실패했습니다.');
+            message.error(err?.message || '영업 종료에 실패했습니다.');
         },
     });
 
@@ -36,7 +36,7 @@ const useMyStores = () => {
         stores:      data || [],
         loading:     isLoading,
         error:       error?.message || null,
-        deleteStore: (id, force = false) => deleteMutation.mutateAsync({ storeId: id, force }),
+        deleteStore: (id) => deleteMutation.mutateAsync(id),
         refetch:     () => queryClient.invalidateQueries({ queryKey: storeKeys.my() }),
     };
 };

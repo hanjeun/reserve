@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Typography, Flex } from 'antd';
 import { StarFilled } from '@ant-design/icons';
 import { Card, FavoriteButton, Badge } from '../common';
@@ -22,7 +22,6 @@ const { Title, Text } = Typography;
  * isAdvertised가 true면 "광고" 배지도 함께 표시(배지형 광고 상품). adId가 함께 오면 노출 지표를 서버에 기록한다(2026-07 추가).
  */
 const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId }) => {
-    const navigate = useNavigate();
     const { id, name, category, mainImageUrl, mainImageWidth, mainImageHeight, rating, reviewCount, latitude, longitude, nearbyRadiusKm } = store;
     const nearby = isNearby(userLocation, latitude, longitude, nearbyRadiusKm ?? undefined);
 
@@ -34,10 +33,44 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId 
     }, [isAdvertised, adId]);
 
     return (
-        <Card hoverable onClick={() => navigate(`/store/${id}`)}>
-            {/* 이미지 + 찜 버튼 */}
+        <Card hoverable>
             <div style={{ position: 'relative' }}>
-                <Card.Cover src={getThumbnailUrl(mainImageUrl)} alt={name} width={mainImageWidth} height={mainImageHeight} />
+                <Link
+                    to={`/store/${id}`}
+                    className="reserve-card-link"
+                    aria-label={`${name} 상세 보기`}
+                >
+                    <Card.Cover src={getThumbnailUrl(mainImageUrl)} alt={name} width={mainImageWidth} height={mainImageHeight} />
+
+                    <div style={{ padding: '16px 16px 20px' }}>
+                        <Badge variant="category" style={{ marginBottom: 6 }}>
+                            {category || '기타'}
+                        </Badge>
+                        {isAdvertised && (
+                            <Badge variant="ad" style={{ marginBottom: 6 }}>
+                                광고
+                            </Badge>
+                        )}
+                        {nearby && (
+                            <Badge variant="nearby" style={{ marginBottom: 6 }}>
+                                우리동네
+                            </Badge>
+                        )}
+                        <Title level={5} style={{ margin: '0 0 4px', fontSize: fontSize.xl }}>
+                            {name}
+                        </Title>
+                        <Flex align="center" gap={4}>
+                            <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
+                            <Text strong style={{ fontSize: fontSize.sm }}>
+                                {rating?.toFixed(1) || '0.0'}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: fontSize.xs }}>
+                                ({reviewCount || 0})
+                            </Text>
+                        </Flex>
+                    </div>
+                </Link>
+
                 {/* 하트 버튼 — 이미지 우상단 */}
                 <div
                     style={{
@@ -46,38 +79,9 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId 
                         right: 10,
                         zIndex: 1,
                     }}
-                    onClick={e => e.stopPropagation()}
                 >
                     <FavoriteButton storeId={id} size="sm" />
                 </div>
-            </div>
-
-            <div style={{ padding: '16px 16px 20px' }}>
-                <Badge variant="category" style={{ marginBottom: 6 }}>
-                    {category || '기타'}
-                </Badge>
-                {isAdvertised && (
-                    <Badge variant="ad" style={{ marginBottom: 6 }}>
-                        광고
-                    </Badge>
-                )}
-                {nearby && (
-                    <Badge variant="nearby" style={{ marginBottom: 6 }}>
-                        우리동네
-                    </Badge>
-                )}
-                <Title level={5} style={{ margin: '0 0 4px', fontSize: fontSize.xl }}>
-                    {name}
-                </Title>
-                <Flex align="center" gap={4}>
-                    <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
-                    <Text strong style={{ fontSize: fontSize.sm }}>
-                        {rating?.toFixed(1) || '0.0'}
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: fontSize.xs }}>
-                        ({reviewCount || 0})
-                    </Text>
-                </Flex>
             </div>
         </Card>
     );

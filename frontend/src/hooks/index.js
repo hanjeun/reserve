@@ -4,6 +4,7 @@
 
 export { default as useMessage } from './useMessage';
 export { default as useDocumentTitle } from './useDocumentTitle';
+export { default as useRouteSeo } from './useRouteSeo';
 export { default as useDebounce } from './useDebounce';
 export { default as useStoreData } from './useStoreData';
 export { default as useMyStores } from './useMyStores';
@@ -23,6 +24,7 @@ export { default as useGeolocation } from './useGeolocation';
 export { default as useAdPayment } from './useAdPayment';
 export { default as useStoreImageHint } from './useStoreImageHint';
 export { default as useExitAnimation } from './useExitAnimation';
+export { default as useReducedMotion } from './useReducedMotion';
 export { useQueryParamsState } from './useQueryParamState';
 export { default as useImagePreviewSwipe } from './useImagePreviewSwipe';
 export { default as useBookingCalendar } from './useBookingCalendar';

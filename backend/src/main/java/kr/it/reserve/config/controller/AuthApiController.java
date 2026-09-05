@@ -10,8 +10,8 @@ import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.global.error.MemberSuspendedException;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
-import kr.it.reserve.member.dto.MemberDto;
 import kr.it.reserve.member.dto.MemberResponse;
+import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.MemberStatus;
 import kr.it.reserve.member.service.MemberService;
@@ -111,8 +111,8 @@ public class AuthApiController {
         if (!authenticated) {
             // 실패한 시도만 계정 카운터를 소모한다.
             boolean accountQuotaLeft = rateLimiter.tryConsume(email, RateLimiter.Policy.LOGIN_ACCOUNT);
-            // 로그는 영어(서버 로그 규칙). 이메일은 남기지만 비밀번호는 절대 남기지 않는다.
-            log.warn("Login failed: email={}, ip={}, accountQuotaLeft={}", email, ip, accountQuotaLeft);
+            // 알림 규칙이 쓰는 "Login failed" 문구는 유지하되 이메일·IP는 로그에 남기지 않는다.
+            log.warn("Login failed: accountQuotaLeft={}", accountQuotaLeft);
             if (!accountQuotaLeft) {
                 throw new AuthException(
                         "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
@@ -141,13 +141,13 @@ public class AuthApiController {
     }
 
     @PostMapping("/signup")
-    public ApiResponse<MemberResponse> signup(@RequestBody MemberDto memberDto,
+    public ApiResponse<MemberResponse> signup(@RequestBody MemberSignupRequest signupRequest,
                                               HttpServletRequest request, HttpServletResponse response) {
         String ip = IpExtractor.extract(request);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.SIGNUP)) {
             throw new AuthException("회원가입 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
-        Long memberId = memberService.join(memberDto);
+        Long memberId = memberService.join(signupRequest);
         Member newMember = memberService.findById(memberId);
         handleTokenIssue(response, newMember);
         return ApiResponse.success(MemberResponse.fromEntity(newMember), "회원가입 완료");

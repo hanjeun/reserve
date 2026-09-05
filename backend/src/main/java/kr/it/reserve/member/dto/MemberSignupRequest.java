@@ -1,18 +1,22 @@
 package kr.it.reserve.member.dto;
 
-import kr.it.reserve.member.entity.Role;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MemberDto {
+@JsonIgnoreProperties("role")
+public class MemberSignupRequest {
 
     @NotEmpty(message = "이름은 필수 항목입니다.")
     private String name;
@@ -28,10 +32,6 @@ public class MemberDto {
     @NotEmpty(message = "비밀번호 확인은 필수 항목입니다.")
     @Size(min = 8, message = "비밀번호는 8자 이상으로 입력해주세요.")
     private String passwordConfirm;
-
-    @NotNull(message = "사용자 유형을 선택해주세요.")
-    @Builder.Default
-    private Role role = Role.USER;
 
     // 필수 약관 동의 여부 (서비스 이용약관 + 개인정보 처리방침)
     @AssertTrue(message = "필수 약관에 동의해주세요.")

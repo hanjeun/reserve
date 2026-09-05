@@ -43,13 +43,4 @@ public class TrashController {
         return ResponseEntity.ok(ApiResponse.success(null, "복구 완료"));
     }
 
-    /** 영구 삭제 */
-    @DeleteMapping("/{type}/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> hardDelete(
-            @PathVariable String type,
-            @PathVariable Long id) {
-        auditLogService.hardDelete(type, id);
-        return ResponseEntity.ok(ApiResponse.success(null, "영구 삭제 완료"));
-    }
 }

@@ -2,10 +2,12 @@ package kr.it.reserve.member.repository;
 
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,6 +17,10 @@ import java.util.Optional;
 public interface MemberRepository extends JpaRepository<Member, Long> {
 
     Optional<Member> findByEmailAndDeletedAtIsNull(String email);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Member m WHERE m.id = :id AND m.deletedAt IS NULL")
+    Optional<Member> findActiveByIdForUpdate(@Param("id") Long id);
 
     // 관리자용 — 삭제되지 않은 전체 회원 목록
     Page<Member> findByDeletedAtIsNullOrderByIdDesc(Pageable pageable);
@@ -59,4 +65,3 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("DELETE FROM Member m WHERE m.deletedAt IS NOT NULL AND m.deletedAt < :cutoff")
     int hardDeleteByDeletedAtBefore(LocalDateTime cutoff);
 }
-

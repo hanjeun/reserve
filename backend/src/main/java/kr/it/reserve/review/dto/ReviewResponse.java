@@ -16,7 +16,6 @@ public class ReviewResponse {
     private String storeName;
     private Long memberId;
     private String memberName;
-    private String memberEmail;
     private Long reservationId;
     private Integer rating;
     private String title;
@@ -33,7 +32,6 @@ public class ReviewResponse {
                 .storeName(review.getStore().getName())
                 .memberId(review.getMember().getId())
                 .memberName(review.getMember().getName())
-                .memberEmail(review.getMember().getEmail())
                 .reservationId(review.getReservation() != null ? review.getReservation().getId() : null)
                 .rating(review.getRating())
                 .title(review.getTitle())

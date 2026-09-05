@@ -215,16 +215,6 @@ public class AuditLogService {
                 "HARD_DELETE", Map.of(), "TrashCleanupScheduler");
     }
 
-    // ── 영구 삭제 (예약/리뷰/메일만 해당) ──────────────────────────
-
-    @Transactional
-    public void hardDelete(String entityType, Long entityId) {
-        hardDeleteEntity(entityType, entityId);
-        auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);
-        saveAuditLog(entityType, entityId, "HARD_DELETE", Map.of());
-        log.info("Entity hard-deleted: type={}, id={}", entityType, entityId);
-    }
-
     // ── 목록 조회 ──────────────────────────────────────────────
 
     @Transactional(readOnly = true)

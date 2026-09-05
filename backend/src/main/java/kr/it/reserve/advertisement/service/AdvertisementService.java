@@ -11,6 +11,7 @@ import kr.it.reserve.advertisement.entity.Advertisement;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.error.AdvertisementException;
 import kr.it.reserve.global.error.StoreException;
@@ -62,6 +63,7 @@ public class AdvertisementService {
     private final AdvertisementRepository advertisementRepository;
     private final StoreRepository storeRepository;
     private final FileStorageService fileStorageService;
+    private final FileDeletionOutboxService fileDeletionOutboxService;
     private final PortoneService portoneService;
     private final AdCounterBuffer adCounterBuffer;
     private final AuditLogService auditLogService;
@@ -71,8 +73,17 @@ public class AdvertisementService {
      */
     @Transactional
     public AdPaymentPrepareResponse createAd(AdCreateRequest request, Member owner) {
-        Store store = storeRepository.findById(request.getStoreId())
+        // 영업 종료와 같은 가게 행 잠금을 쓴다. 준비도 확인 직후 새 광고가 끼어드는
+        // check-then-close 레이스를 막고, 이미 종료된 가게에는 신청을 만들지 않는다.
+        Store store = storeRepository.findByIdForUpdate(request.getStoreId())
                 .orElseThrow(StoreException::notFound);
+
+        if (store.isDeleted()) {
+            throw StoreException.notFound();
+        }
+        if (store.isSuspended()) {
+            throw StoreException.forbidden("운영이 중단된 가게에는 광고를 등록할 수 없습니다.");
+        }
 
         if (store.getOwner() == null || !store.getOwner().getId().equals(owner.getId())) {
             throw StoreException.forbidden("본인 가게에만 광고를 등록할 수 있습니다.");
@@ -168,10 +179,9 @@ public class AdvertisementService {
     /**
      * 결제창에 넘길 구매자 이름을 고른다.
      *
-     * <h3>★ {@code SecurityUtil.getCurrentMember()} 의 이름을 쓰면 안 된다</h3>
-     * 그 Member 는 DB 에서 온 게 아니라 <b>JWT 클레임으로 재조립한 것</b>이라
-     * {@code id}·{@code email}·{@code role} 만 채워져 있고 <b>{@code name} 은 항상 null</b> 이다
-     * ({@code TokenProvider.getMemberFromTokenWithoutDB} 참고).
+     * <h3>구매자 이름은 결제 대상 가게의 소유자 행에서 고른다</h3>
+     * 인증 principal도 현재는 탈퇴 즉시 차단을 위해 DB에서 읽지만, 결제 데이터는 인증 표현보다
+     * 결제 대상 도메인에서 가져오는 편이 경계가 분명하다.
      *
      * <p>그대로 넘기면 PortOne V2 가 <i>"data.customer.fullName 파라미터가 string 형식이 아닙니다"</i>
      * 로 거절해 <b>결제창이 아예 안 열린다.</b> V1 은 이 값을 느슨하게 받아 넘어갔지만
@@ -341,7 +351,7 @@ public class AdvertisementService {
                 .orElseThrow(AdvertisementException::notFound);
         ad.setStatus(AdStatus.SUSPENDED);
         ad.setSuspendReason(reason != null ? reason : "운영 정책 위반");
-        log.info("Advertisement suspended: adId={}, reason={}", adId, reason);
+        log.info("Advertisement suspended: adId={}", adId);
     }
 
     /**
@@ -404,11 +414,7 @@ public class AdvertisementService {
         }
 
         // images가 null이면 기존 이미지 유지 — 값이 있으면 통째로 교체(createAd와 동일한 검증/업로드 규칙).
-        // 2026-07 버그수정 — 교체만 하고 예전 이미지를 S3에서 지우지 않았다(StoreService.updateStoreImages는
-        // 교체/삭제된 파일을 항상 fileStorageService.deleteFile로 정리하는데 이 메소드만 빠져있었음) —
-        // 그대로 두면 사용자가 배너를 여러 번 고칠수록 고아(orphan) 파일이 버킷에 계속 쌓여 스토리지 비용만
-        // 늘어난다. 새 이미지가 실제로 업로드되고 난 다음(예외 발생 시 예전 파일은 그대로 남아있어야 하므로)
-        // 예전 URL을 먼저 지운다.
+        // 새 파일은 트랜잭션 롤백 시 보상 삭제되고, 기존 파일은 커밋 뒤 outbox worker가 삭제한다.
         List<MultipartFile> images = request.getImages();
         if (images != null && !images.isEmpty() && images.stream().anyMatch(f -> !f.isEmpty())) {
             if (images.size() > MAX_BANNER_IMAGES) {
@@ -424,7 +430,8 @@ public class AdvertisementService {
             List<String> oldImageUrls = ad.getImageUrlList();
             ad.setImageUrlList(newImageUrls);
             if (oldImageUrls != null) {
-                oldImageUrls.forEach(fileStorageService::deleteFile);
+                oldImageUrls.forEach(image -> fileDeletionOutboxService.enqueue(
+                        image, "ADVERTISEMENT_IMAGE", ad.getId()));
             }
         }
 

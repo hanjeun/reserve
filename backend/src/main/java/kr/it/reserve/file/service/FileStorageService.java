@@ -4,6 +4,8 @@ import kr.it.reserve.global.error.FileException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -109,12 +111,38 @@ public class FileStorageService {
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucket).key(key).contentType(file.getContentType()).contentLength(file.getSize()).build();
             s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            registerRollbackCleanup(key);
             log.info("S3 upload success: {}", key);
             return key;
         } catch (IOException e) {
             log.error("S3 upload failed", e);
             throw FileException.uploadFailed();
         }
+    }
+
+    /**
+     * S3 업로드는 DB 트랜잭션에 참여하지 않으므로, 현재 트랜잭션이 롤백되면 방금 만든 객체를 보상 삭제한다.
+     *
+     * <p>상세 이미지 병렬 업로드처럼 다른 스레드에서 업로드한 경우에는 그 스레드에 트랜잭션 문맥이 없다.
+     * 호출측이 결과를 join한 뒤 이 메서드를 다시 호출하면 바깥 트랜잭션에 cleanup을 등록할 수 있다.
+     */
+    public void registerRollbackCleanup(String fileUrlOrKey) {
+        if (fileUrlOrKey == null || fileUrlOrKey.isBlank()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == TransactionSynchronization.STATUS_COMMITTED) return;
+                try {
+                    deleteFileRequired(fileUrlOrKey);
+                } catch (RuntimeException e) {
+                    log.error("S3 rollback cleanup failed: errorType={}", e.getClass().getSimpleName());
+                }
+            }
+        });
     }
 
     /**
@@ -127,7 +155,7 @@ public class FileStorageService {
         try (javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(file.getInputStream())) {
             java.util.Iterator<javax.imageio.ImageReader> readers = javax.imageio.ImageIO.getImageReaders(iis);
             if (!readers.hasNext()) {
-                log.warn("No ImageReader available for uploaded file: {}", file.getOriginalFilename());
+                log.warn("No ImageReader available for uploaded file");
                 return null;
             }
             javax.imageio.ImageReader reader = readers.next();
@@ -140,7 +168,7 @@ public class FileStorageService {
                 reader.dispose();
             }
         } catch (Exception e) {
-            log.warn("Failed to read image dimensions for {}: {}", file.getOriginalFilename(), e.getMessage());
+            log.warn("Failed to read image dimensions: errorType={}", e.getClass().getSimpleName());
             return null;
         }
     }
@@ -175,21 +203,31 @@ public class FileStorageService {
     public void deleteFile(String fileUrlOrKey) {
         if (fileUrlOrKey == null || fileUrlOrKey.isEmpty()) return;
         try {
-            String key;
-            if (fileUrlOrKey.startsWith("http")) {
-                if (!fileUrlOrKey.contains(cloudfrontDomain)) {
-                    log.debug("Skipping external URL: {}", fileUrlOrKey);
-                    return;
-                }
-                key = fileUrlOrKey.substring(
-                        fileUrlOrKey.indexOf(cloudfrontDomain) + cloudfrontDomain.length() + 1);
-            } else {
-                key = fileUrlOrKey;
-            }
-            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
-            log.info("S3 delete success: {}", key);
+            deleteFileRequired(fileUrlOrKey);
         } catch (Exception e) {
-            log.error("S3 delete failed: {}", fileUrlOrKey, e);
+            log.error("S3 delete failed: errorType={}", e.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * 재시도 가능한 삭제함 전용 경로. 실패를 삼키지 않아 호출측이 FAILED 상태로 남길 수 있게 한다.
+     * 외부 소셜 프로필 URL은 관리 대상이 아니므로 성공적인 no-op으로 취급한다.
+     */
+    public void deleteFileRequired(String fileUrlOrKey) {
+        if (fileUrlOrKey == null || fileUrlOrKey.isEmpty()) return;
+
+        String key;
+        if (fileUrlOrKey.startsWith("http")) {
+            if (!fileUrlOrKey.contains(cloudfrontDomain)) {
+                return;
+            }
+            key = fileUrlOrKey.substring(
+                    fileUrlOrKey.indexOf(cloudfrontDomain) + cloudfrontDomain.length() + 1);
+        } else {
+            key = fileUrlOrKey;
+        }
+
+        s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+        log.info("S3 delete success");
     }
 }

@@ -1,10 +1,11 @@
 package kr.it.reserve.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
+import kr.it.reserve.payment.dto.PortoneWebhookSignal;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.payment.repository.RefundAttemptRepository;
 import kr.it.reserve.payment.service.PaymentService;
+import kr.it.reserve.payment.service.PaymentReconciliationIssueService;
 import kr.it.reserve.payment.service.PortoneService;
 import kr.it.reserve.payment.service.PortoneWebhookService;
 import kr.it.reserve.payment.service.RefundLedgerService;
@@ -18,12 +19,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.Spy;
 
-import java.util.Optional;
-
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * 웹훅 <b>본문 형식</b>에서 결제 식별자를 뽑아내는 부분.
@@ -42,8 +39,8 @@ import static org.mockito.Mockito.when;
  * 포트원 콘솔에는 "정상 전송"으로 찍히고 재전송도 오지 않는다 —
  * <b>어느 쪽 로그에도 에러가 남지 않는</b> 고장이다.
  *
- * <p>그래서 이 테스트는 "두 형식 모두에서 같은 결제를 조회하러 간다"를 계약으로 고정한다.
- * 설정 하나로 되살아나는 종류의 회귀라, 코드 주석만으로는 막을 수 없다.
+ * <p>그래서 이 테스트는 "두 형식 모두에서 같은 결제 ID를 inbox에 남긴다"를 계약으로 고정한다.
+ * 실제 PG 조회는 durable inbox에 저장된 뒤에만 일어나야 한다.
  *
  * <p>스프링 컨텍스트를 띄우지 않는다 — 검증 대상이 JSON 파싱뿐이다.
  * {@code getPaymentInfo} 가 <b>어떤 식별자로 호출됐는지</b>까지만 보고 멈춘다.
@@ -61,69 +58,57 @@ class PortoneWebhookBodyFormatTest {
     @Mock private PaymentRepository paymentRepository;
     @Mock private RefundAttemptRepository refundAttemptRepository;
     @Mock private RefundLedgerService refundLedgerService;
+    @Mock private PaymentReconciliationIssueService reconciliationIssueService;
 
     @InjectMocks
     private PortoneWebhookService webhookService;
 
-    /**
-     * 조회까지만 확인하고 멈추도록 — 그 뒤 반영 로직은
-     * {@code PaymentRefundAccountingTest} 가 따로 검증한다.
-     */
-    private void stubPgLookup() {
-        // DTO 에 세터가 없다(@Getter 만). 역직렬화로 만든다 —
-        // 덤으로 응답 DTO 가 이 모양을 실제로 받아들이는지도 함께 확인된다.
-        PortoneV2PaymentResponse pg;
-        try {
-            pg = new ObjectMapper().readValue("{\"status\":\"READY\"}", PortoneV2PaymentResponse.class);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-        when(portoneService.getPaymentInfo(anyString())).thenReturn(pg);
-        when(paymentRepository.findByMerchantUid(anyString())).thenReturn(Optional.empty());
-    }
-
     @Test
     @DisplayName("★ 2024-04-25 (권장) — data.paymentId 로 결제를 찾는다")
     void 신버전_본문() {
-        stubPgLookup();
-
-        webhookService.handle("""
+        PortoneWebhookSignal signal = webhookService.parseSignal("""
                 {"type":"Transaction.Cancelled","timestamp":"2026-08-24T10:00:00.000Z",
                  "data":{"paymentId":"%s","storeId":"store-x","transactionId":"tx-1"}}
                 """.formatted(PAYMENT_ID));
 
-        verify(portoneService).getPaymentInfo(PAYMENT_ID);
+        assertThat(signal.validJson()).isTrue();
+        assertThat(signal.eventType()).isEqualTo("Transaction.Cancelled");
+        assertThat(signal.merchantUid()).isEqualTo(PAYMENT_ID);
+        verifyNoInteractions(portoneService);
     }
 
     @Test
     @DisplayName("★ 2024-01-01 (구) — payment_id 로도 같은 결제를 찾는다. 콘솔 기본값이 이쪽이다")
     void 구버전_본문() {
-        stubPgLookup();
-
-        webhookService.handle("""
+        PortoneWebhookSignal signal = webhookService.parseSignal("""
                 {"payment_id":"%s","tx_id":"tx-1","status":"Ready"}
                 """.formatted(PAYMENT_ID));
 
-        // 신버전과 **같은 인자**로 조회한다 — 본문의 status 는 쓰지 않으므로
-        // 식별자만 확보되면 두 버전이 완전히 같은 경로를 탄다.
-        verify(portoneService).getPaymentInfo(PAYMENT_ID);
+        assertThat(signal.validJson()).isTrue();
+        assertThat(signal.merchantUid()).isEqualTo(PAYMENT_ID);
+        verifyNoInteractions(portoneService);
     }
 
     @Test
     @DisplayName("식별자가 없으면 조회하지 않는다 — 다른 상점·다른 이벤트의 웹훅일 수 있다")
     void 식별자_없음() {
-        webhookService.handle("""
+        PortoneWebhookSignal signal = webhookService.parseSignal("""
                 {"type":"BillingKey.Issued","data":{"billingKey":"bk-1"}}
                 """);
 
-        verify(portoneService, never()).getPaymentInfo(anyString());
+        assertThat(signal.validJson()).isTrue();
+        assertThat(signal.eventType()).isEqualTo("BillingKey.Issued");
+        assertThat(signal.merchantUid()).isNull();
+        verifyNoInteractions(portoneService);
     }
 
     @Test
     @DisplayName("JSON 이 아니면 예외를 밖으로 내보내지 않는다 — 재전송을 유발할 이유가 없다")
     void 깨진_본문() {
-        webhookService.handle("not json at all");
+        PortoneWebhookSignal signal = webhookService.parseSignal("not json at all");
 
-        verify(portoneService, never()).getPaymentInfo(anyString());
+        assertThat(signal.validJson()).isFalse();
+        assertThat(signal.merchantUid()).isNull();
+        verifyNoInteractions(portoneService);
     }
 }

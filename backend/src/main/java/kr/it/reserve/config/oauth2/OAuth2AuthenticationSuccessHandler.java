@@ -38,7 +38,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
         Member member = oAuth2User.getMember();
 
-        log.info("OAuth2 login success: email={}", member.getEmail());
+        log.info("OAuth2 login success: memberId={}", member.getId());
 
         // 정지 상태 체크
         // URL에 한국어 메시지를 인코딩하면 이상한 URL이 되므로
@@ -60,7 +60,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 + "&status=" + status
                 + (until.isEmpty() ? "" : "&until=" + until);
 
-            log.warn("OAuth2 login blocked: email={}, status={}, until={}", member.getEmail(), status, until);
+            log.warn("OAuth2 login blocked: memberId={}, status={}, until={}", member.getId(), status, until);
             getRedirectStrategy().sendRedirect(request, response, redirectUrl);
             return;
         }

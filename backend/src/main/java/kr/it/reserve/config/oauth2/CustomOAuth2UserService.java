@@ -50,8 +50,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 oAuth2User.getAttributes()
         );
 
-        log.info("OAuth2 로그인 - Provider: {}, ProviderId: {}, Email: {}, Name: {}",
-                provider, userInfo.getProviderId(), userInfo.getEmail(), userInfo.getName());
+        log.info("OAuth2 user info received: provider={}", provider);
 
         // 4. 회원 조회 또는 생성 (Access Token도 함께 저장)
         boolean isNewUser = false;
@@ -70,29 +69,30 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      */
     private Member processOAuth2User(AuthProvider provider, OAuth2UserInfo userInfo, String accessToken) {
         // 1순위: provider + providerId로 기존 회원 조회 (가장 정확한 방법)
-        Optional<Member> existingMember = memberRepository.findByProviderAndProviderId(
+        Optional<Member> existingMember = memberRepository.findByProviderAndProviderIdAndDeletedAtIsNull(
                 provider,
                 userInfo.getProviderId()
         );
 
         if (existingMember.isPresent()) {
             // 기존 OAuth 회원: 정보 업데이트
-            log.info("Existing OAuth2 member login: email={}, provider={}", userInfo.getEmail(), provider);
+            log.info("Existing OAuth2 member login: memberId={}, provider={}",
+                    existingMember.get().getId(), provider);
             return updateExistingMember(existingMember.get(), userInfo, accessToken);
         }
 
         // 2순위: 이메일로 기존 회원 조회
         String email = userInfo.getEmail();
         if (email != null && !email.isEmpty()) {
-            Optional<Member> memberByEmail = memberRepository.findByEmail(email);
+            Optional<Member> memberByEmail = memberRepository.findByEmailAndDeletedAtIsNull(email);
 
             if (memberByEmail.isPresent()) {
                 Member member = memberByEmail.get();
 
                 // 이미 다른 OAuth 제공자로 가입한 경우 → 에러
                 if (member.getProvider() != null && member.getProvider() != AuthProvider.LOCAL) {
-                    log.warn("Email already registered with different OAuth provider: email={}, existing={}, attempted={}",
-                            email, member.getProvider(), provider);
+                    log.warn("OAuth2 email conflict: existingProvider={}, attemptedProvider={}",
+                            member.getProvider(), provider);
                     String msg = "이미 " + member.getProvider().name() + " 계정으로 가입된 이메일입니다. "
                             + member.getProvider().name() + " 로그인을 이용해주세요.";
                     throw new OAuth2AuthenticationException(
@@ -102,7 +102,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
                 // LOCAL 회원인 경우 → 에러 (자동 연결 안 함)
                 if (member.getProvider() == null || member.getProvider() == AuthProvider.LOCAL) {
-                    log.warn("Email already registered: email={}, attempted provider={}", email, provider);
+                    log.warn("OAuth2 email conflict with local account: attemptedProvider={}", provider);
                     String msg = "이미 이메일로 가입된 계정이 있습니다. 기존 계정으로 로그인해주세요.";
                     throw new OAuth2AuthenticationException(
                             new org.springframework.security.oauth2.core.OAuth2Error("email_conflict"), msg
@@ -112,20 +112,25 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // 3순위: 신규 회원 생성
-        log.info("New OAuth2 member registered: email={}, provider={}", email, provider);
-        return createNewMember(provider, userInfo, accessToken);
+        Member created = createNewMember(provider, userInfo, accessToken);
+        log.info("New OAuth2 member registered: memberId={}, provider={}", created.getId(), provider);
+        return created;
     }
 
     /**
      * 기존 회원 정보 업데이트
      */
     private Member updateExistingMember(Member member, OAuth2UserInfo userInfo, String accessToken) {
+        // 탈퇴와 소셜 재로그인의 프로필/토큰 갱신을 같은 회원 행에서 직렬화한다.
+        member = memberRepository.findActiveByIdForUpdate(member.getId())
+                .orElseThrow(() -> new OAuth2AuthenticationException("invalid_user"));
+
         // 엔티티에 정의된 메서드 호출 (이름과 프로필 이미지 업데이트)
         member.updateOAuth(userInfo.getName(), userInfo.getProfileImage());
 
         // 이메일 변경 처리 로직 (이메일은 특수한 경우이므로 별도 처리)
         if (userInfo.getEmail() != null && !userInfo.getEmail().equals(member.getEmail())) {
-            Optional<Member> existingEmail = memberRepository.findByEmail(userInfo.getEmail());
+            Optional<Member> existingEmail = memberRepository.findByEmailAndDeletedAtIsNull(userInfo.getEmail());
             if (existingEmail.isEmpty()) {
                 member.setEmail(userInfo.getEmail());
             }
@@ -145,7 +150,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         String email = userInfo.getEmail();
 
         // 중복 체크 및 이메일 생성 로직
-        if (email == null || memberRepository.findByEmail(email).isPresent()) {
+        if (email == null || memberRepository.findByEmailAndDeletedAtIsNull(email).isPresent()) {
             email = generateUniqueEmail(provider, userInfo.getProviderId());
         }
 

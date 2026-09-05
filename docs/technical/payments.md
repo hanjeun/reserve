@@ -11,6 +11,49 @@
 화면이 깨지면 고치면 되고 로그가 사라지면 다시 쌓으면 되지만, 잘못 나간 환불은 되돌릴 수 없다.
 그래서 환불 경로만은 **"무엇을 시도했고 어떻게 끝났는지"가 항상 데이터로 남아야** 한다.
 
+같은 원칙을 결제 성립에도 적용한다. 브라우저가 결제 뒤 돌아오지 않거나 PG 조회가 잠시 실패해도
+"결제됐을 가능성이 있는 예약"을 미결제라고 단정해 취소하면 안 된다.
+
+결제·환불 미결 건이 회원 탈퇴와 가게 영업 종료를 어떻게 막는지는
+[`data-lifecycle.md`](data-lifecycle.md)에 정리한다.
+
+---
+
+## 결제 성립 — 브라우저와 웹훅이 같은 잠금 관문을 쓴다
+
+`PaymentService`의 브라우저 검증과 PortOne 웹훅 복구는 모두 `merchantUid`로 결제 행을
+`FOR UPDATE` 잠근 뒤 `READY → PAID`를 한 번만 수행한다. 먼저 도착한 경로가 완료하고,
+나중 경로는 이미 `PAID`인 것을 확인해 예약금 플래그만 보정한다.
+
+자동 복구 조건은 엄격하다.
+
+- PG 조회 결과가 실제 `PAID`
+- PG 결제액과 서버가 만든 `payment.amount`가 일치
+- 로컬 결제가 `READY` 또는 이미 `PAID`
+- 예약이 아직 `PENDING` 또는 `CONFIRMED`
+
+취소·거절·완료된 예약에서 뒤늦게 `PAID`가 확인되거나 금액이 다르면 예약을 임의로 되살리지 않는다.
+해당 건은 `payment_reconciliation_issue`의 관리자 대사 큐에 남기고 자동 처리를 멈춘다.
+
+### 예약 자동 만료 직전 재확인
+
+`ReservationExpiryScheduler`는 만료 시각이 지났다는 이유만으로 바로 취소하지 않는다.
+먼저 가장 최근 로컬 결제와 PortOne 권위 상태를 다시 확인한다.
+
+| 확인 결과 | 동작 |
+|---|---|
+| PG `PAID` | 결제와 예약금 플래그 복구, 예약 보존 |
+| PG `READY` · `FAILED` · `CANCELLED` | 로컬 결제를 `FAILED`로 닫고 예약 취소 허용 |
+| PG 조회 실패 · 모르는 상태 | **예약 취소 보류**, 수동 대사 큐 기록 |
+| 결제 행 자체가 없음 | 미결제 예약으로 취소 허용 |
+
+PG 조회 실패는 fail-closed다. 일시 장애 때 예약이 잠시 더 슬롯을 점유하는 비용보다
+돈을 받은 예약을 취소하는 피해가 훨씬 크기 때문이다.
+
+후보 전체를 한 트랜잭션으로 묶지 않는다. 예약 한 건마다 독립 트랜잭션을 열고,
+결제 행들을 먼저 잠근 뒤 예약 행을 잠가 최신 상태를 다시 읽는다. 한 PG 조회 장애가
+다른 후보를 롤백시키거나 첫 결제 잠금을 배치 끝까지 유지하지 않게 하기 위해서다.
+
 ---
 
 ## ★ 환불의 결말은 셋이 아니라 넷이다
@@ -108,6 +151,17 @@ PG 가 직접 알려주는 경로. **브라우저와 무관하다** — 손님�
 **웹훅 본문의 값을 그대로 믿지 않는다.** 서명이 맞아도 본문은 "무엇이 바뀌었다"는 신호로만 쓰고,
 실제 상태는 조회 API 로 **우리가 다시 물어본다.** 웹훅은 순서가 뒤바뀌어 도착할 수 있기 때문이다.
 
+서명 검증을 통과한 웹훅은 처리 전에 `payment_webhook_inbox`에 먼저 커밋한다.
+
+1. `webhook-id` unique 제약으로 중복 수신을 한 행으로 합친다
+2. 원문은 저장하지 않고 이벤트 종류·`merchantUid`·payload SHA-256만 저장한다
+3. PG 조회와 상태 반영에 실패하면 `FAILED`와 예외 **종류만** 남긴다
+4. 1분 스케줄러가 지수 backoff(최대 60분)로 재처리한다
+5. 처리 중 서버가 죽은 건 5분 lease가 지난 뒤 다시 claim한다
+
+payload SHA-256은 같은 `webhook-id`가 다른 본문으로 재사용되는 이상을 감지할 뿐,
+관리자 API에는 노출하지 않는다. 실제 결제 판단에는 언제나 PortOne 조회 응답만 쓴다.
+
 ---
 
 ## 웹훅 보안 — 이 엔드포인트의 인증은 서명 하나뿐이다
@@ -176,6 +230,66 @@ GET /api/admin/refunds/by-payment/{paymentId}
 
 ---
 
+## 운영 — 결제 대사 큐와 웹훅 inbox
+
+```bash
+# 자동 만료 대상에서 벗어나 7일 넘게 READY인 결제 조회
+GET /api/admin/payment-operations/stale-ready?olderThanDays=7&page=0&size=50
+
+# 선택한 READY 결제를 PortOne에서 재조회해 안전한 경우만 정리
+POST /api/admin/payment-operations/stale-ready/{paymentId}/reconcile
+
+# 자동으로 단정하지 못한 결제 건수 (0이 정상)
+GET /api/admin/payment-operations/issues/open-count
+
+# 열린 결제 대사 건 목록
+GET /api/admin/payment-operations/issues?openOnly=true&page=0&size=50
+
+# 아직 끝나지 않은 웹훅 건수와 목록
+GET /api/admin/payment-operations/webhooks/unfinished-count
+GET /api/admin/payment-operations/webhooks?unfinishedOnly=true&page=0&size=50
+
+# 선택한 inbox 건을 backoff 대기 없이 같은 멱등 관문으로 재처리
+POST /api/admin/payment-operations/webhooks/{inboxId}/retry
+```
+
+대사 큐에는 PII와 PG 원문이 없고 다음 원인 코드만 남는다.
+
+| 원인 | 의미 |
+|---|---|
+| `EXPIRY_RECHECK_FAILED` | 예약 만료 직전 PortOne 조회 자체가 실패 |
+| `EXPIRY_STATUS_UNCERTAIN` | 조회는 됐지만 자동 판정 대상이 아닌 PG 상태 |
+| `LOCAL_STATUS_UNCERTAIN` | 로컬 결제 상태가 만료 처리 계약과 맞지 않음 |
+| `STALE_READY_RECHECK_FAILED` | 오래된 READY 결제의 PortOne 조회 자체가 실패 |
+| `STALE_READY_STILL_PENDING` | PG도 아직 결제 대기 상태라 사람이 후속 판단해야 함 |
+| `STALE_READY_STATUS_UNCERTAIN` | 조회는 됐지만 오래된 READY 자동 정리 대상이 아닌 PG 상태 |
+| `LATE_PAID_RESERVATION` | 이미 취소·종료된 예약에서 PAID 확인 |
+| `PAID_STATE_CONFLICT` | PG는 PAID지만 로컬 결제가 READY/PAID가 아님 |
+| `PAID_AMOUNT_MISMATCH` | PG 결제액과 서버 결제액 불일치 |
+| `REFUND_LEDGER_MISSING` | 로컬 결제는 환불 미결인데 대응하는 미결 원장 행이 없음 |
+
+동일 결제·동일 범주의 문제는 행을 무한히 늘리지 않고 `occurrenceCount`, `lastSeenAt`,
+최신 원인 코드로 갱신한다. 결제가 안전하게 복구되거나 미결제가 확정되면 자동으로 `RESOLVED`가 된다.
+
+### 대응 순서
+
+1. 큐에서 `merchantUid`, `paymentId`, `reservationId`, 원인 코드를 확인한다
+2. PortOne 콘솔에서 `merchantUid`의 실제 결제·취소 상태와 금액을 확인한다
+3. `LATE_PAID_RESERVATION`과 금액 불일치는 **예약 자동 복원이나 DB 직접 수정 금지**
+4. 결제 유지·예약 복원 또는 전액 환불 중 어떤 조치가 맞는지 예약 상태와 고객 안내를 함께 판단한다
+5. 웹훅 전송 문제면 inbox 재처리를 실행하고 `PROCESSED` 또는 열린 대사 건을 다시 확인한다
+
+관리자 패널의 **결제 운영** 탭에서 오래된 READY·열린 대사 건·미완료 웹훅을 각각
+서버측 페이지네이션으로 조회하고, 선택한 READY 재확인과 웹훅 재처리를 실행할 수 있다.
+열린 대사 건·실패 웹훅·7일 넘은 READY 중 하나라도 있으면 15분마다
+`Payment operations queue requires attention` 로그가 남아 Grafana 알림 조건으로 쓸 수 있다.
+
+배포 직후 구조와 큐를 한 번에 확인할 때는 `scripts/verify-post-deploy-readonly.sh`를 쓴다.
+이 스크립트는 오래된 READY의 payment/reservation ID까지만 보여주며 PG 재조회나 상태 변경을
+하지 않는다. 종료 코드 `2`는 배포 구조 실패가 아니라 운영자 확인 항목이 있다는 뜻이다.
+
+---
+
 ## 사장님이 해야 할 설정 (아직 안 됨)
 
 1. **PortOne 콘솔에서 웹훅 등록**
@@ -187,7 +301,10 @@ GET /api/admin/refunds/by-payment/{paymentId}
      ★ 이 배선이 없던 동안에는 **시크릿을 등록해도 컨테이너에 안 들어가서 웹훅이 전부 거부**됐다 —
      앱이 정상 기동하기 때문에 아무 에러도 안 나는 종류의 고장이다
    - 값이 없으면 웹훅이 전부 거부된다(fail-closed). 앱은 정상 기동한다
-3. **등록 후 테스트 결제 1건으로 확인** — 로그에 `PortOne webhook received` 가 찍히는지
+3. **등록 후 테스트 결제 1건으로 확인**
+   - `GET /api/admin/payment-operations/webhooks?unfinishedOnly=false`에 새 행이 생기는지
+   - 최종 상태가 `PROCESSED`인지
+   - 브라우저를 닫은 테스트에서도 로컬 결제와 예약금 플래그가 `PAID`로 복구되는지
 
 ---
 
@@ -198,14 +315,20 @@ GET /api/admin/refunds/by-payment/{paymentId}
 | **행 잠금의 실제 동작** | H2 에서 쿼리가 실행되는 것만 확인했다. **MySQL InnoDB 의 실제 잠금은 미검증** — 동시 요청 두 개로 실기 확인 필요 |
 | **PG 취소 응답 금액 필드** | 응답의 금액 필드 구성을 문서로 확정하지 못해 **읽지 않는다.** 대신 원장의 `requestedAmount` 를 쓴다. 대사는 콘솔에서 |
 | **웹훅 실제 수신** | 시크릿 미등록이라 아직 한 번도 받아본 적 없다 |
+| **durable inbox·대사 큐의 운영 MySQL 구조** | H2에서 엔티티 생성과 잠금·페이지·재시도 쿼리만 확인했다. `ddl-auto: update`로 운영 재시작 시 테이블이 생긴 뒤 unique/index를 직접 확인해야 한다 |
+| **PAID 웹훅 복구·만료 재확인 실기** | Mockito/H2 회귀는 통과했지만 실제 PortOne TEST 웹훅 중복·브라우저 종료·일시 장애 조합은 아직 실행하지 않았다 |
 | **LIVE 채널** | 전부 TEST 원장이다 |
 
 ---
 
 ## LIVE 전환 전 체크리스트
 
-- [ ] 위 "아직 검증되지 않은 것" 네 줄을 전부 닫는다
+- [ ] 위 "아직 검증되지 않은 것" 항목을 전부 닫는다
 - [ ] 웹훅 등록 + 테스트 결제로 수신 확인
+- [ ] 운영 MySQL에서 `payment_webhook_inbox`, `payment_reconciliation_issue` 테이블과 unique/index 확인
+- [ ] 같은 `webhook-id` 2회 전송 시 결제가 한 번만 반영되는지 확인
+- [ ] 결제 직후 브라우저를 닫아도 웹훅으로 `PAID`와 예약금 플래그가 복구되는지 확인
+- [ ] PortOne 조회 장애를 모의해 예약 취소가 보류되고 대사 큐에 남는지 확인
 - [ ] MySQL 에서 동시 환불 2건을 실제로 쏴서 **한 건만 나가는지** 확인
 - [ ] 미결 건 알림(아래) 등록
 - [ ] 전액 환불 · 부분 환불 · 실패 각각 1회씩 실제로 돌려본다

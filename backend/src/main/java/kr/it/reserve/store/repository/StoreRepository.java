@@ -3,6 +3,7 @@ package kr.it.reserve.store.repository;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
+import kr.it.reserve.store.dto.StoreSitemapEntry;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,18 +12,15 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import org.springframework.data.jpa.repository.Modifying;
-
 import java.util.List;
 import java.util.Optional;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
 
     /**
-     * 예약 정원 체크용 비관적 락 조회.
-     * 같은 가게에 대한 동시 예약 요청(check-then-act: 잔여 인원 조회 → 저장)이
-     * 순서대로 처리되도록 트랜잭션 종료까지 row를 잠근다.
-     * 예약 생성(createReservation)에서만 사용 — 단순 조회에는 findById 그대로 사용.
+     * 예약 생성·수정·광고 신청·가게 영업 종료의 공통 비관적 락 조회.
+     * 같은 가게에 대한 운영 변경과 영업 종료가 순서대로 처리되도록 트랜잭션 종료까지 row를 잠근다.
+     * 단순 조회에는 findById 그대로 사용한다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Store s WHERE s.id = :id")
@@ -32,9 +30,31 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     List<Store> findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(Member owner);
     List<Store> findByOwnerOrderByCreatedAtDesc(Member owner); // 내부 로직용
     List<Store> findByOwnerId(Long ownerId);
+    long countByOwnerIdAndDeletedAtIsNull(Long ownerId);
 
     // 관리자용 — 삭제되지 않은 전체 가게 목록
     Page<Store> findByDeletedAtIsNullOrderByCreatedAtDesc(Pageable pageable);
+
+    /** 관리자 목록용 이름·주소·카테고리 검색. 공개 검색과 달리 제재된 가게도 포함한다. */
+    @Query(value = """
+            SELECT s FROM Store s
+              LEFT JOIN FETCH s.owner
+             WHERE s.deletedAt IS NULL
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(s.address) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(s.category) LIKE LOWER(CONCAT('%', :keyword, '%')))
+             ORDER BY s.createdAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(s) FROM Store s
+             WHERE s.deletedAt IS NULL
+               AND (:keyword = ''
+                    OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(s.address) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(s.category) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
+    Page<Store> searchForAdmin(@Param("keyword") String keyword, Pageable pageable);
     List<Store> findByNameContainingIgnoreCase(String keyword);
     List<Store> findByCategory(String category);
 
@@ -46,6 +66,18 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     // 거리순 정렬용 — 정렬 없이 전체 가져와 서비스 계층에서 Haversine 계산 후 인메모리 정렬/페이지네이션
     // (가게 수가 적은 현재 규모에서는 문제없음 — native SQL Haversine은 H2(test)/MySQL(prod) 호환성 리스크가 있어 의도적으로 피함)
     List<Store> findByDeletedAtIsNullAndStatus(StoreStatus status);
+
+    /**
+     * 공개 sitemap 전용 최소 투영. 목록과 같은 공개 정책(ACTIVE + 미삭제)을 사용한다.
+     * 개인정보와 이미지 필드를 엔티티째 읽지 않도록 id와 수정 시각만 가져온다.
+     */
+    @Query("""
+            SELECT new kr.it.reserve.store.dto.StoreSitemapEntry(s.id, s.updatedAt, s.createdAt)
+              FROM Store s
+             WHERE s.deletedAt IS NULL
+               AND s.status = kr.it.reserve.store.entity.StoreStatus.ACTIVE
+            """)
+    List<StoreSitemapEntry> findPublicSitemapEntries(Pageable pageable);
 
     @Query("SELECT s FROM Store s WHERE " +
            "LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -116,11 +148,4 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
            nativeQuery = true)
     Page<Store> searchStoresFulltextPaged(@Param("keyword") String keyword, Pageable pageable);
 
-    @Modifying
-    @Query("UPDATE Store s SET s.deletedAt = NULL WHERE s.id = :id")
-    void restoreById(Long id);
-
-    @Modifying
-    @Query("DELETE FROM Store s WHERE s.deletedAt IS NOT NULL AND s.deletedAt < :cutoff")
-    int hardDeleteByDeletedAtBefore(java.time.LocalDateTime cutoff);
 }

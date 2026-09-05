@@ -6,11 +6,19 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM AuditLog a WHERE a.id = :id")
+    Optional<AuditLog> findByIdForUpdate(@Param("id") Long id);
 
     Page<AuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
@@ -30,6 +38,6 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     void deleteSoftDeleteLog(String entityType, Long entityId);
 
     @Modifying
-    @Query("DELETE FROM AuditLog a WHERE a.expiresAt < :now")
-    int deleteExpired(LocalDateTime now);
+    @Query("DELETE FROM AuditLog a WHERE a.action <> 'SOFT_DELETE' AND a.expiresAt < :now")
+    int deleteExpiredNonTrash(LocalDateTime now);
 }

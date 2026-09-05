@@ -76,18 +76,19 @@ public class PortoneService {
         } catch (PaymentException e) {
             throw e;
         } catch (HttpClientErrorException e) {
-            log.error("Portone V2 payment retrieval failed: paymentId={}, status={}, body={}",
-                    merchantUid, e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("Portone V2 payment retrieval failed: paymentId={}, status={}",
+                    merchantUid, e.getStatusCode());
             if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
                 throw new PaymentException("결제 정보 조회 실패 (404 NOT_FOUND)", HttpStatus.NOT_FOUND);
             }
             throw new PaymentException("결제 정보 조회 실패 (" + e.getStatusCode() + ")", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (HttpServerErrorException e) {
-            log.error("Portone V2 server error: paymentId={}, status={}, body={}",
-                    merchantUid, e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("Portone V2 server error: paymentId={}, status={}",
+                    merchantUid, e.getStatusCode());
             throw new PaymentException("포트원 서버 오류 (" + e.getStatusCode() + ")", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            log.error("Portone V2 payment retrieval network error: paymentId={}, error={}", merchantUid, e.getMessage(), e);
+            log.error("Portone V2 payment retrieval network error: paymentId={}, errorType={}",
+                    merchantUid, e.getClass().getSimpleName());
             throw new PaymentException("결제 정보 조회 중 통신 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -148,12 +149,13 @@ public class PortoneService {
             throw e;
         } catch (HttpClientErrorException | HttpServerErrorException e) {
             // storeIdSent 를 같이 남긴다 — 위 404 원인 분석에 필요한 유일한 변수다.
-            log.error("Portone V2 payment cancellation failed: paymentId={}, storeIdSent={}, amount={}, status={}, body={}",
-                    merchantUid, body.containsKey("storeId"), amount, e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("Portone V2 payment cancellation failed: paymentId={}, storeIdSent={}, amount={}, status={}",
+                    merchantUid, body.containsKey("storeId"), amount, e.getStatusCode());
             // 사용자에게는 PG 상태코드를 노출하지 않는다. 원인은 로그·Sentry 에만 남긴다.
             throw new PaymentException("환불 처리에 실패했습니다. 잠시 후 다시 시도해주세요.", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            log.error("Portone V2 payment cancellation network error: paymentId={}, error={}", merchantUid, e.getMessage(), e);
+            log.error("Portone V2 payment cancellation network error: paymentId={}, errorType={}",
+                    merchantUid, e.getClass().getSimpleName());
             throw new PaymentException("환불 처리 중 통신 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

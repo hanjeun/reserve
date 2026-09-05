@@ -4,7 +4,6 @@ import kr.it.reserve.inquiry.entity.Inquiry;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -34,9 +33,4 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
     // 전체 미답변 개수 조희를 위한 메서드
     Long countByStatus(Inquiry.InquiryStatus status);
 
-
-    // 특정 회원의 모든 문의 삭제
-    @Modifying
-    @Query("DELETE FROM Inquiry i WHERE i.member.id = :memberId")
-    void deleteByMemberId(@Param("memberId") Long memberId);
 }

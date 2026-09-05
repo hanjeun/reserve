@@ -109,6 +109,13 @@ public class Reservation {
     @Builder.Default
     private Integer depositAmount = 0;
 
+    /**
+     * 실제 방문 QR 체크인 시각(KST 벽시계). 예약 승인 상태와 분리해 출석 사실만 기록한다.
+     * nullable 컬럼 추가라 {@code ddl-auto: update} 환경에서 기존 행은 자연스럽게 미체크인으로 남는다.
+     */
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

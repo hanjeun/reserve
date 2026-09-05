@@ -70,10 +70,12 @@ const ReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, onRevi
                         <EditOutlined /> 변경
                     </Button>
                 )}
-                <Button variant="ghost-sm-primary"
-                    onClick={(e) => { e.stopPropagation(); onQr(res); }}>
-                    <QrcodeOutlined /> QR
-                </Button>
+                {res.status === 'CONFIRMED' && (
+                    <Button variant="ghost-sm-primary"
+                        onClick={(e) => { e.stopPropagation(); onQr(res); }}>
+                        <QrcodeOutlined /> QR
+                    </Button>
+                )}
                 <Button variant="ghost-sm-danger"
                     onClick={(e) => { e.stopPropagation(); onCancel(res); }}>
                     <CloseOutlined /> 취소

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
@@ -42,6 +43,7 @@ public class ReservationResponse {
     private Boolean depositPaid;
     private Integer depositAmount;
     private Integer noShowDeposit;  // 가게의 노쇼방지금 설정 금액
+    private LocalDateTime checkedInAt;
 
     // 미결제 예약의 만료 안내에 필요한 가게 설정 (2026-07-29 추가).
     // 프론트가 "결제하기" 버튼을 그릴 때 이 값들이 없어서 depositPaid만 보고 판단했고,
@@ -84,6 +86,7 @@ public class ReservationResponse {
                 .depositPaid(reservation.getDepositPaid())
                 .depositAmount(reservation.getDepositAmount())
                 .noShowDeposit(reservation.getStore().getNoShowDeposit())
+                .checkedInAt(reservation.getCheckedInAt())
                 .allowLatePayment(reservation.getStore().getAllowLatePayment())
                 .paymentTimeoutMinutes(reservation.getStore().getPaymentTimeoutMinutes())
                 .reviewId(reviewId)

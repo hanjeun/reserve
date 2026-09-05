@@ -223,16 +223,14 @@ const QrScannerTab = () => {
         try { html5QrRef.current?.pause(false); } catch { /* 이미 멈춰 있으면 무시 */ }
 
         try {
-            // 응답이 { reservation, alreadyCheckedIn } 로 바뀌었다 (2026-08-11).
-            // 체크인은 멱등이라 같은 QR 을 다시 비춰도 성공하는데, 그때도 "승인되었습니다"가 뜨면
-            // 방금 내가 처리한 건지 아까 이미 된 건지 구분이 안 된다.
+            // 체크인은 승인 상태와 독립된 멱등 출석 기록이다.
             const { reservation, alreadyCheckedIn } = await reservationService.checkInByQr(decodedText);
             setLastResult({ ...reservation, alreadyCheckedIn });
             const who = reservation.memberName || '고객';
             if (alreadyCheckedIn) {
-                message.info(`${who}님은 이미 승인된 예약입니다.`);
+                message.info(`${who}님은 이미 체크인되었습니다.`);
             } else {
-                message.success(`${who}님 예약이 승인되었습니다.`);
+                message.success(`${who}님 체크인이 완료되었습니다.`);
             }
         } catch (err) {
             message.error(err?.message || 'QR 체크인에 실패했습니다.');
@@ -447,7 +445,7 @@ const QrScannerTab = () => {
             <div style={styles.card}>
                 <Text strong style={styles.cardTitle}>QR 체크인</Text>
                 <Text type="secondary" style={styles.hint}>
-                    고객의 예약 QR을 카메라로 비추면 자동으로 체크인(승인)됩니다.
+                    승인된 예약의 QR을 비추면 방문 시각이 기록됩니다.
                 </Text>
 
                 {/* 스캐너 프리뷰 박스 — 항상 렌더링(display:none 금지), 오버레이만 상태별로 전환.
@@ -543,7 +541,7 @@ const QrScannerTab = () => {
 
             {lastResult && (
                 <div style={styles.resultCard}>
-                    {/* 이미 승인된 건은 초록(성공)이 아니라 파랑(정보)으로 — 색만 봐도
+                    {/* 이미 체크인된 건은 초록(성공)이 아니라 파랑(정보)으로 — 색만 봐도
                         "방금 내가 처리했다"와 "원래 되어 있었다"가 구분돼야 한다. */}
                     <div style={{
                         ...styles.resultIconBadge,
@@ -552,7 +550,7 @@ const QrScannerTab = () => {
                         <CheckCircleFilled style={{ fontSize: 30, color: '#fff' }} />
                     </div>
                     <Text strong style={styles.resultTitle}>
-                        {lastResult.memberName || '고객'}님 {lastResult.alreadyCheckedIn ? '이미 승인됨' : '승인 완료'}
+                        {lastResult.memberName || '고객'}님 {lastResult.alreadyCheckedIn ? '이미 체크인됨' : '체크인 완료'}
                     </Text>
                     <Text type="secondary" style={{ fontSize: fontSize.sm }}>
                         {lastResult.reservationDate} {lastResult.reservationTime?.substring(0, 5) || ''} · {lastResult.guestCount}명

@@ -212,6 +212,26 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env \
 이 스크립트 결과는 실제 InnoDB 행 잠금의 증거지만, 동시에 들어온 두 환불 중 PG 호출이 한 번만
 나가는지까지 증명하지는 않는다. 그 마지막 검증은 PortOne TEST 결제 두 요청 시나리오로 별도 수행한다.
 
+### 2026-09-05 — v2.5.0 운영 검증 기록
+
+검증 기준 커밋은 `6e9dfdc69770d0f6af339cdb9e6d3d38ffa6698e`이며 `main`과 `v2.5.0` 태그가
+같은 커밋을 가리킨다. GitHub Actions run `33958795226`의 재실행 attempt 2에서 백엔드 배포와
+의존 build job이 모두 성공했고, Production deployment는 `2026-09-05T10:18:50Z`에 성공으로 끝났다.
+
+| 항목 | 실제 확인 결과 |
+|---|---|
+| 애플리케이션 | blue 컨테이너가 8080에서 활성, green/8081 비활성, nginx upstream은 blue |
+| 외부 상태 | `/`와 `/actuator/health` 모두 HTTP 200, HSTS·nosniff·CSP Report-Only 헤더 확인 |
+| DB 구조 | 세 운영 테이블, `reservation.checked_in_at`, 필수 인덱스, InnoDB 엔진 확인 |
+| 운영 큐 | 열린 대사 0, 미완료 웹훅 0, S3 삭제 pending/failed 0, 7일 넘은 `READY` 2건 |
+| MySQL 잠금 | 승인한 비활성 TEST 결제 행에서 두 번째 트랜잭션 timeout 및 양쪽 rollback 확인 |
+| 프론트 배포 | `current`가 위 커밋 SHA 디렉터리를 가리키는 원자 전환 확인 |
+| 미완료 | PortOne 콘솔 호출 테스트, 오래된 `READY` 2건의 관리자 재확인, CSP 7일 관측 |
+
+Sentry DSN은 실행 중이던 컨테이너의 유효 값을 화면·파일·명령 인자에 노출하지 않고 GitHub
+repository secret으로 갱신한 뒤 재배포했다. GitHub는 secret 값을 다시 보여주지 않으므로 갱신 시각과
+새 컨테이너의 정상 기동만 확인했고, 문서나 로그에는 값을 기록하지 않는다.
+
 ### 4-1. CSP 위반 관측 (배포 즉시)
 
 `nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.
@@ -301,7 +321,9 @@ sudo ln -sfn "releases/$ROLLBACK_SHA" /usr/share/nginx/html/current.next
 sudo mv -Tf /usr/share/nginx/html/current.next /usr/share/nginx/html/current
 ```
 
-워크플로와 롤백 명령은 코드에 반영했지만 **실제 서버 최초 전환과 롤백 훈련은 아직 검증하지 않았다.**
+2026-09-05 v2.5.0 배포에서 운영 `current`가 새 SHA 디렉터리를 가리키는 최초 원자 전환은 확인했다.
+다만 서버의 `releases` 아래 보존된 디렉터리가 현재 SHA 하나뿐이어서 **과거 버전으로 되돌리는 운영
+롤백 훈련은 실행할 대상이 없었다.** 다음 서로 다른 프론트 릴리스가 한 번 더 쌓인 뒤 수행한다.
 
 `bash scripts/test-frontend-release-swap.sh`는 CI에서 매번 임시 디렉터리로 배포와 롤백의
 symlink 원자 교체를 재현한다. 이 통과는 Linux 파일시스템 명령의 회귀를 막는 로컬 증거일 뿐,

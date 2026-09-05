@@ -257,6 +257,11 @@ stat 카드에는 미니 그래프를 넣지 않는다. 한 카드에서 instant
 `or vector(0)`으로 **실제 0건**을 만들고, 쿼리 실패는 Grafana 오류 배지로 남긴다. 하드웨어 값은
 최근 5분 표본이 없으면 0이 아니라 `수집 없음`으로 표시한다.
 
+> **2026-09-05 운영 상태:** 로컬 JSON은 검증 스크립트에서 로그 9/10, 서버 자원 5/6 쿼리 예산으로
+> 통과했다. 그러나 운영 Grafana DB의 대시보드는 각각 version 5와 version 1로, 새 JSON을 아직
+> overwrite import하지 않았다. 운영 Grafana 로그인 뒤 두 파일을 가져오고 실제 화면을 확인하기
+> 전까지는 새 디자인과 장기 범위 쿼리가 운영에 반영됐다고 보지 않는다.
+
 `로그 검색`은 빈 값으로 시작한다. 빈 정규식은 전체 로그와 일치하므로 예전 기본값 `.*`를 사용자가
 볼 필요가 없다. `레벨`과 `영역`의 `전체` 선택값은 내부적으로만 정규식을 사용한다.
 
@@ -484,6 +489,10 @@ sudo mkdir -p /var/log/reserve && sudo chown -R 1000:1000 /var/log/reserve
 
 - 백엔드: `SENTRY_DSN` (GitHub Secrets → docker-compose)
 - 프론트: `VITE_SENTRY_DSN` (GitHub Secrets → `.env.production`)
+
+2026-09-05 백엔드 DSN은 실행 중이던 운영 컨테이너의 유효 값을 노출하지 않는 stdin 경로로
+repository secret에 갱신했고, 같은 커밋 재배포 뒤 애플리케이션 정상 기동을 확인했다. GitHub는
+저장된 secret 원문을 다시 보여주지 않으므로 값 자체가 아니라 갱신 시각과 배포 결과를 증거로 남긴다.
 
 Loki 와 역할이 다르다. Sentry 는 **예외 하나의 스택과 맥락**, Loki 는 **시간에 따른 흐름**이다.
 

@@ -13,9 +13,9 @@ import kr.it.reserve.email.service.EmailVerificationService;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.security.PwnedPasswordChecker;
-import kr.it.reserve.member.dto.MemberDto;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
+import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
@@ -72,34 +72,34 @@ public class MemberService {
             "다른 사이트에서 유출된 적이 있는 비밀번호입니다. 다른 비밀번호를 사용해주세요.";
 
     @Transactional
-    public Long join(MemberDto memberDto) {
+    public Long join(MemberSignupRequest signupRequest) {
         // 서버 측 필수 약관 동의 검증 (프론트 우회 방어)
-        if (!memberDto.isTermsAgreed()) {
+        if (!signupRequest.isTermsAgreed()) {
             throw new MemberException("필수 약관에 동의해주세요.", HttpStatus.BAD_REQUEST);
         }
 
-        if (memberRepository.findByEmail(memberDto.getEmail()).isPresent()) {
+        if (memberRepository.findByEmail(signupRequest.getEmail()).isPresent()) {
             throw MemberException.conflict("이미 사용 중인 이메일입니다.");
         }
 
-        if (!emailVerificationService.isEmailVerified(memberDto.getEmail())) {
+        if (!emailVerificationService.isEmailVerified(signupRequest.getEmail())) {
             throw new MemberException("이메일 인증이 필요합니다.", HttpStatus.BAD_REQUEST);
         }
 
         // 유출 리스트 검사는 마지막에 둔다 — 이메일 중복·인증처럼 서버 안에서 끝나는 검증을
         // 먼저 통과시켜야, 어차피 거절될 요청에 외부 API 호출을 낭비하지 않는다.
-        if (pwnedPasswordChecker.isPwned(memberDto.getPassword())) {
+        if (pwnedPasswordChecker.isPwned(signupRequest.getPassword())) {
             throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
 
         return memberRepository.save(Member.builder()
-                .name(memberDto.getName())
-                .email(memberDto.getEmail())
-                .password(bCryptPasswordEncoder.encode(memberDto.getPassword()))
-                .role(memberDto.getRole())
+                .name(signupRequest.getName())
+                .email(signupRequest.getEmail())
+                .password(bCryptPasswordEncoder.encode(signupRequest.getPassword()))
+                .role(Role.USER)
                 .provider(AuthProvider.LOCAL)
                 .termsAgreed(true)
-                .marketingAgreed(memberDto.isMarketingAgreed())
+                .marketingAgreed(signupRequest.isMarketingAgreed())
                 .build()).getId();
     }
 
@@ -134,7 +134,8 @@ public class MemberService {
     @Transactional
     public MemberResponse updateMember(Long memberId, MemberUpdateRequest request) {
         log.info("Member updated: memberId={}", memberId);
-        Member member = findById(memberId);
+        Member member = memberRepository.findActiveByIdForUpdate(memberId)
+                .orElseThrow(MemberException::notFound);
 
         if (request.getName() != null && !request.getName().isEmpty()) {
             member.setName(request.getName());
@@ -163,15 +164,6 @@ public class MemberService {
                 throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
             }
             member.setPassword(bCryptPasswordEncoder.encode(request.getPassword()));
-        }
-
-        if (request.getRole() != null && !request.getRole().isEmpty()) {
-            try {
-                Role newRole = Role.valueOf(request.getRole().toUpperCase());
-                member.setRole(newRole);
-            } catch (IllegalArgumentException e) {
-                throw new MemberException("유효하지 않은 권한입니다: " + request.getRole(), HttpStatus.BAD_REQUEST);
-            }
         }
 
         if (request.getEmailNotificationEnabled() != null) {

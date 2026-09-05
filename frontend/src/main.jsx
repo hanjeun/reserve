@@ -16,8 +16,10 @@ Sentry.init({
   integrations: [
     Sentry.browserTracingIntegration(),
     Sentry.replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
+      // Replay is useful for diagnosing failures, but user-entered text and
+      // uploaded/store media must never be captured by default.
+      maskAllText: true,
+      blockAllMedia: true,
     }),
   ],
   tracesSampleRate: 0.1,

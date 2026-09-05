@@ -1,5 +1,8 @@
 # RESERVE Git 워크플로우
 
+현재 `local-preview-all-changes`의 대규모 미커밋 변경을 기능별 PR로 옮기는 순서와 제목은
+[`../technical/preview-release-plan.md`](../technical/preview-release-plan.md)를 따른다.
+
 ## 브랜치 구조
 
 ```

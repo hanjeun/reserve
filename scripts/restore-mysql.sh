@@ -63,6 +63,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$SOURCE" ]] || usage 1
+[[ "$TARGET_DB" =~ ^[A-Za-z0-9_]+$ ]] \
+    || die "target database must contain only letters, numbers, and underscores"
 
 # ─────────────────────────────────────────────────────────
 # 백업 파일 준비
@@ -103,6 +105,9 @@ DUMP_DATE="$(gunzip -c "$WORK_FILE" | grep -m1 -o 'Dump completed on .*' || echo
 echo "  tables : ${TABLE_COUNT}"
 echo "  ${DUMP_DATE}"
 
+[[ "$TABLE_COUNT" -ge 10 ]] \
+    || die "dump has only ${TABLE_COUNT} tables (expected at least 10)"
+
 if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "dry-run: dump is valid. nothing was changed."
     exit 0
@@ -142,9 +147,12 @@ echo "restoring... (크기에 따라 수 분 걸릴 수 있습니다)"
 set +e
 gunzip -c "$WORK_FILE" | docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" --default-character-set=utf8mb4 "$TARGET_DB"
-RESTORE_STATUS="${PIPESTATUS[1]}"
+PIPE_STATUSES=("${PIPESTATUS[@]}")
+GUNZIP_STATUS="${PIPE_STATUSES[0]}"
+RESTORE_STATUS="${PIPE_STATUSES[1]}"
 set -e
 
+[[ "$GUNZIP_STATUS" -eq 0 ]] || die "gunzip failed with status $GUNZIP_STATUS"
 [[ "$RESTORE_STATUS" -eq 0 ]] || die "restore failed with status $RESTORE_STATUS"
 
 # ─────────────────────────────────────────────────────────

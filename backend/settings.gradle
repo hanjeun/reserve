@@ -3,7 +3,7 @@
 pluginManagement {
     repositories {
         // 1. 차단 우회를 위한 Google 미러 저장소 우선 순위 배치
-        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+        maven { url = uri('https://maven-central.storage-download.googleapis.com/maven2/') }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         // 2. 의존성 다운로드 시에도 미러 사용
-        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+        maven { url = uri('https://maven-central.storage-download.googleapis.com/maven2/') }
         mavenCentral()
     }
 }

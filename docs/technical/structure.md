@@ -20,6 +20,12 @@ RESERVE/
 │   └── technical/
 │       ├── architecture.md       ← 인프라 구조 · 배포
 │       ├── monitoring.md         ← Grafana · Loki · Sentry · UptimeRobot
+│       ├── payments.md           ← 결제 · 환불 · 웹훅 inbox · 대사 큐
+│       ├── data-lifecycle.md      ← 탈퇴 · 폐업 · 파일 삭제 outbox · 보존 정책
+│       ├── backup.md             ← MySQL 백업 · 복원 훈련
+│       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
+│       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
+│       ├── preview-release-plan.md ← 대규모 프리뷰의 기능별 PR 분리 계획
 │       ├── structure.md          ← 코드 구조 (이 문서)
 │       └── design-system.md      ← 디자인 토큰 · 공통 컴포넌트
 ├── .github/
@@ -51,15 +57,16 @@ kr.it.reserve/
 │   ├── oauth2/                    ← OAuth2 핸들러, CustomOAuth2UserService
 │   └── service/                   ← TokenService, RefreshTokenService
 │
-├── member/                        ← 회원 관리 (프로필, 위치, 탈퇴), PasswordResetController 포함
-├── store/                         ← 가게 등록/수정/삭제/조회, AddressController(주소검색 프록시)
+├── member/                        ← 회원 관리 (프로필, 위치, 비식별 탈퇴), PasswordResetController 포함
+├── lifecycle/                     ← 탈퇴·영업 종료 전 미결 예약/결제 의무 단일 관문
+├── store/                         ← 가게 등록/수정/영업 종료/조회, AddressController(주소검색 프록시)
 │   └── service/StoreRepository    ← findByIdForUpdate() 비관적 락(PESSIMISTIC_WRITE) — 예약 동시성 제어
-├── file/                          ← FileStorageService (S3 업로드/삭제) — 독립 도메인
+├── file/                          ← S3 업로드 + 삭제 outbox/재시도 스케줄러
 ├── reservation/                   ← 예약 생성/승인/취소/완료/수정(PATCH), 실시간 availability
 │   ├── scheduler/                 ← 미결제 예약 자동 만료
 │   ├── util/                      ← ReservationCodeGenerator(R-날짜-XXXX), QrCheckinTokenProvider(HMAC)
 │   └── ReservationCodeBackfillRunner  ← 기존 예약에 코드 백필 (앱 기동 시 1회)
-├── payment/                       ← 포트원 V2 결제 준비/검증/환불 (PortoneService)
+├── payment/                       ← 포트원 V2 결제·환불 + 웹훅 inbox·오래된 READY 관리자 대사
 ├── advertisement/                 ← 유료 광고 (배지형/배너형), 포트원 결제 재사용        ★신규
 │   ├── scheduler/                 ← AdvertisementExpiryScheduler(만료), AdCounterFlushScheduler
 │   └── service/AdCounterBuffer    ← 노출/클릭 카운터 인메모리 버퍼링 후 주기적 flush
@@ -72,6 +79,8 @@ kr.it.reserve/
 ├── audit/                         ← 감사 로그 + 휴지통(소프트 삭제·복구),
 │                                     AdminManagementController(회원/가게 정지·차단),
 │                                     TrashCleanupScheduler
+├── security/                      ← CSP Report-Only 위반 보고 수집(PII 제거 로그)
+├── seo/                           ← 공개 정적 URL + 활성 가게 상세 동적 sitemap
 ├── email/                         ← 이메일 인증 코드 발송/검증
 ├── community/                     ← 게시판 — 프론트 미노출. Member/Store cascade 삭제가 참조해 존치
 ├── promotion/                     ← 가게 홍보 게시글 — 식당 시절 유물, 미노출.
@@ -114,7 +123,8 @@ src/
 │   ├── common/               ← 아래 "공용 컴포넌트 전체 목록" 참고
 │   ├── admin/                ← MembersTab, StoresAdminTab, ReservationsAllTab, DashboardTab,
 │   │                            AuditLogTab, TrashTab, MailboxTab, AdminAdsTab,
-│   │                            BusinessVerificationTab, SanctionModal (AdminPanel이 탭 위임)
+│   │                            BusinessVerificationTab, PaymentOperationsTab, SanctionModal
+│   │                            (AdminPanel이 탭 위임)
 │   ├── business/             ← 사장님 패널 탭 (예약 관리, 통계)                     ★신규
 │   ├── advertisement/        ← AdBanner(배너 노출), AdManageTab(광고 등록/결제)      ★신규
 │   ├── reservation/          ← ReservationStatusBadge, ReservationCard, ReservationRow,
@@ -132,6 +142,7 @@ src/
 │   ├── useImagePreview.jsx   ← Image.PreviewGroup 기반 미리보기 (닫힘 애니·멀티)
 │   ├── useExitAnimation.js   ← 닫힘 트랜지션 공통 훅                                ★신규
 │   ├── useQueryParamState.js ← 관리자 탭 URL 쿼리스트링 동기화                       ★신규
+│   ├── useRouteSeo.js        ← 공개 경로 allowlist·robots·query 없는 canonical/OG URL
 │   ├── useStoreImageHint.js  ← 상세 스켈레톤용 이미지 비율 힌트                       ★신규
 │   ├── useOnlineStatus.js    ← 온라인/오프라인 감지 (useSyncExternalStore)           ★신규
 │   ├── useAdPayment.js       ← 광고 결제 플로우                                       ★신규
@@ -160,20 +171,36 @@ src/
 │   ├── useAuthStore.js       ← Zustand (로그인 상태) — 401/403/세션만료 때만 로그아웃
 │   └── useLocationStore.js   ← 세션 한정 라이브 위치 (우리동네 배지용)                 ★신규
 ├── styles/
-│   └── tokens/               ← colors, typography, radius, shadows, animations, chart(★신규)
-│                               (구 theme.js는 제거됨 — App.jsx 인라인 themeConfig 사용)
+│   ├── global/               ← foundation, forms, navigation, interactions, feature surfaces
+│   ├── theme.css             ← 라이트/다크 CSS 변수
+│   └── tokens/               ← colors, typography, spacing, field, animations, chart
 ├── utils/                   ← image, form, errorHandler, validation, distance(★),
 │                               adAttribution(★), imageHintCache(★), paymentWindowGuard(★),
 │                               redirect(★), index
 ├── App.jsx                  ← 라우터(라우트 lazy 코드분할) + ConfigProvider + AntApp
+├── index.css                ← 전역 CSS 진입점(styles/global/*.css import)
 └── main.jsx
 ```
 
 ### 공용 컴포넌트 전체 목록 (`components/common/`)
 
-`Avatar, Badge, Button, Card, ChartCard, DataTable, FavoriteButton, FilterToolbar, FormDatePicker, FormInput, FormModal(+FormField), FormSelect, FormTextArea, FormTimePicker, InquiryModal, KakaoMap, Loading(+ArcSpinner/SpinIndicator), ModalLoading, PageContainer, PieLegend, SegmentedControl, Skeletons(Bone 외), StatCard, index.js`
+`Avatar, Badge, Button, Card, ChartCard, DataTable, FavoriteButton, FilterSelect, FilterToolbar,
+FormDatePicker, FormInput, FormModal(+FormField), FormSelect, FormTextArea, FormTimePicker,
+ImagePreviewPortal, InquiryModal, KakaoMap, Loading(+ArcSpinner/SpinIndicator), ModalLoading,
+PageContainer, PieLegend, RefreshButton, SegmentedControl, SegmentedGrid, Skeletons(Bone 외),
+StatCard, UnreadPill, pickerSuffix, index.js`
 
 공유 컴포넌트는 `docs/rules/code-conventions.md` 기준 **PropTypes 필수** 대상. 사용법은 `design-system.md` 참고.
+
+### 초기 번들 경계
+
+라우트는 `App.jsx`에서 lazy 로드하고, 비회원도 항상 보는 Header/Footer는 인증 계정 메뉴와
+`InquiryModal`을 필요할 때만 가져온다. 공통 `hooks/index.js`·`components/common/index.js` barrel을
+앱 셸에서 import하면 관리자·결제·AntD 코드가 초기 청크로 다시 합쳐질 수 있으므로 직접 import한다.
+
+`npm run build`의 postbuild가 `scripts/check-bundle-budget.mjs`를 실행한다. 예산은 단일 JS 600 KiB,
+HTML이 직접 preload하는 초기 JS 합계 350 KiB gzip이다. 2026-09-03 실측은 각각 최대 555.1 KiB,
+초기 318.1 KiB gzip이다.
 
 ---
 
@@ -198,6 +225,11 @@ src/
 | `/business` | 사업자 패널 (예약 · 통계 · 광고) | BUSINESS / ADMIN |
 | `/admin` | 관리자 패널 | ADMIN |
 | `/payment/result` | 결제 결과 (예약/광고) | 로그인 |
+
+`/sitemap.xml`은 SPA 라우트가 아니라 Nginx가 백엔드 `SitemapController`로 전달하는 공개 시스템
+엔드포인트다. 정적 URL과 활성·미삭제 가게 상세만 포함하며 최대 50,000 URL로 제한한다.
+프론트의 `useRouteSeo`도 같은 공개 집합(`/`, `/stores`, 숫자형 `/store/:id`, `/terms`, `/privacy`)만
+`index, follow`로 두고 나머지는 `noindex, nofollow`로 만든다. canonical과 `og:url`에는 쿼리·해시를 넣지 않는다.
 
 ---
 
@@ -227,6 +259,9 @@ spring:
 
 jwt:
   secret-key: YOUR_JWT_SECRET
+
+qr:
+  token-secret: YOUR_OPTIONAL_QR_SECRET # 비우면 JWT 키에서 용도별 HMAC 파생
 
 mail:
   username: resend

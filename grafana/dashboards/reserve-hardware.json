@@ -31,7 +31,7 @@
         "enable": true,
         "hide": false,
         "iconColor": "#9085e9",
-        "name": "배포",
+        "name": "배포 시점",
         "expr": "{job=\"reserve\"} |= `Starting ReserveApplication`",
         "titleFormat": "배포",
         "textFormat": "{{__line__}}"
@@ -42,7 +42,7 @@
   "graphTooltip": 1,
   "id": null,
   "links": [],
-  "refresh": "1m",
+  "refresh": "5m",
   "schemaVersion": 39,
   "tags": [
     "reserve",
@@ -64,7 +64,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "지금 상태",
+      "title": "현재 상태",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -77,14 +77,14 @@
     },
     {
       "type": "stat",
-      "title": "CPU",
+      "title": "CPU 사용률",
       "description": "2코어. 1분 간격 샘플이라 순간 스파이크는 잡히지 않습니다.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 6,
+        "h": 4,
         "w": 6,
         "x": 0,
         "y": 1
@@ -92,10 +92,10 @@
       "id": 1,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -106,7 +106,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "percent",
           "custom": {
             "fillOpacity": 18,
@@ -116,7 +116,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -144,15 +144,6 @@
           "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_pct` | unwrap value [5m]) by (metric)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_pct` | unwrap value [5m]) by (metric)",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
@@ -165,7 +156,7 @@
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 6,
+        "h": 4,
         "w": 6,
         "x": 6,
         "y": 1
@@ -173,10 +164,10 @@
       "id": 2,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -187,7 +178,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "percent",
           "custom": {
             "fillOpacity": 18,
@@ -197,7 +188,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -225,28 +216,19 @@
           "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`mem_used_pct` | unwrap value [5m]) by (metric)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`mem_used_pct` | unwrap value [5m]) by (metric)",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
     {
       "type": "stat",
-      "title": "스왑",
+      "title": "스왑 사용량",
       "description": "★ 0이 아니면 물리 메모리가 부족해 디스크로 밀려난 것입니다. 계속 늘어나면 서버를 키워야 한다는 신호입니다.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 6,
+        "h": 4,
         "w": 6,
         "x": 12,
         "y": 1
@@ -254,10 +236,10 @@
       "id": 3,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -268,7 +250,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "decmbytes",
           "custom": {
             "fillOpacity": 18,
@@ -278,7 +260,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -304,28 +286,19 @@
           "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`swap_used_mb` | unwrap value [5m]) by (metric)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`swap_used_mb` | unwrap value [5m]) by (metric)",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
     {
       "type": "stat",
-      "title": "디스크",
+      "title": "디스크 사용률",
       "description": "루트 파티션. 가득 차면 MySQL 쓰기와 로그 기록이 동시에 멈춥니다.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
       "gridPos": {
-        "h": 6,
+        "h": 4,
         "w": 6,
         "x": 18,
         "y": 1
@@ -333,10 +306,10 @@
       "id": 4,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "auto",
+        "textMode": "value",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -347,7 +320,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "0",
+          "noValue": "수집 없음",
           "unit": "percent",
           "custom": {
             "fillOpacity": 18,
@@ -357,7 +330,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
+                "color": "green",
                 "value": null
               },
               {
@@ -385,781 +358,775 @@
           "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`disk_used_pct` | unwrap value [5m]) by (metric)",
           "refId": "A",
           "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`disk_used_pct` | unwrap value [5m]) by (metric)",
-          "refId": "B",
-          "queryType": "range"
         }
       ]
     },
     {
       "type": "row",
-      "title": "메모리 — 이 서버에서 가장 중요한 축",
-      "collapsed": false,
+      "title": "메모리 추세 · 필요할 때 펼치기",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 101,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "여유 메모리와 스왑",
+          "description": "배포 시점의 세로선과 함께 여유 메모리·스왑 변화를 확인합니다. 여유 메모리가 0에 가까워지거나 스왑이 계속 늘면 대응이 필요합니다.",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 8
+          },
+          "id": 5,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": 180000,
+                "axisBorderShow": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              "unit": "decmbytes",
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "여유 메모리"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#199e70",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "스왑 사용"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#ec835a",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`mem_available_mb` | unwrap value [$__auto]) by (metric)",
+              "refId": "A",
+              "queryType": "range",
+              "legendFormat": "여유 메모리"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`swap_used_mb` | unwrap value [$__auto]) by (metric)",
+              "refId": "B",
+              "queryType": "range",
+              "legendFormat": "스왑 사용"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "컨테이너별 메모리",
+          "description": "컨테이너별 메모리 추세입니다. 배포 중 blue와 green이 함께 실행되는 구간을 확인합니다.",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 8
+          },
+          "id": 6,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 55,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": 180000,
+                "axisBorderShow": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                }
+              },
+              "unit": "decmbytes",
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "green"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3987e5",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "blue"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#d95926",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "mysql"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#199e70",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "grafana"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#c98500",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "loki"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#d55181",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "promtail"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#008300",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "nginxserver"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#9085e9",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`container` | metric=`mem_mb` | unwrap value [$__auto]) by (name)",
+              "refId": "A",
+              "queryType": "range",
+              "legendFormat": "{{name}}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "CPU · 부하 · 디스크 추세 · 필요할 때 펼치기",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 102,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "CPU 사용률",
+          "description": "2코어 서버의 CPU 사용률 추세입니다. 메모리·부하 지표와 함께 병목 여부를 판단합니다.",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 19
+          },
+          "id": 7,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": 180000,
+                "axisBorderShow": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3987e5",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_pct` | unwrap value [$__auto]) by (metric)",
+              "refId": "A",
+              "queryType": "range",
+              "legendFormat": "CPU"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "부하 평균",
+          "description": "코어가 2개이므로 빨간 선(2.0)을 넘으면 처리를 기다리는 작업이 쌓이고 있다는 뜻입니다.",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 19
+          },
+          "id": 8,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": 180000,
+                "axisBorderShow": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "line"
+                }
+              },
+              "unit": "short",
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "text",
+                    "value": null
+                  },
+                  {
+                    "color": "#d03b3b",
+                    "value": 2
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "1분"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3987e5",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "15분"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#898781",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`load1` | unwrap value [$__auto]) by (metric)",
+              "refId": "A",
+              "queryType": "range",
+              "legendFormat": "1분"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`load15` | unwrap value [$__auto]) by (metric)",
+              "refId": "B",
+              "queryType": "range",
+              "legendFormat": "15분"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "디스크 사용률",
+          "description": "천천히 오르는 게 정상입니다. 갑자기 꺾여 올라가면 로그나 백업 파일이 안 지워지고 있는 것입니다.",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 19
+          },
+          "id": 9,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 8,
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": 180000,
+                "axisBorderShow": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                }
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "디스크"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#3987e5",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`disk_used_pct` | unwrap value [$__auto]) by (metric)",
+              "refId": "A",
+              "queryType": "range",
+              "legendFormat": "디스크"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "컨테이너 상세 · 필요할 때 펼치기",
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 7
       },
-      "id": 101,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "여유 메모리와 스왑",
-      "description": "★ 세로선이 배포 시점입니다. 배포마다 여유 메모리가 얼마나 파이는지 보세요 — 그 골이 0에 가까워지면 다음 배포가 위험합니다. 스왑 선이 계단처럼 오르면 이미 한계입니다.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "id": 5,
-      "options": {
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": 180000,
-            "axisBorderShow": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            }
-          },
-          "unit": "decmbytes",
-          "min": 0
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "여유 메모리"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#199e70",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "스왑 사용"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#ec835a",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`mem_available_mb` | unwrap value [5m]) by (metric)",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "여유 메모리"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`swap_used_mb` | unwrap value [5m]) by (metric)",
-          "refId": "B",
-          "queryType": "range",
-          "legendFormat": "스왑 사용"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "컨테이너별 메모리",
-      "description": "누가 먹고 있는지. 배포 중에는 blue와 green 두 줄이 동시에 보이고, 그 순간이 하루 중 가장 위험합니다.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 6,
-      "options": {
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 55,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": 180000,
-            "axisBorderShow": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            }
-          },
-          "unit": "decmbytes",
-          "min": 0
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "green"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3987e5",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "blue"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#d95926",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "mysql"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#199e70",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "grafana"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#c98500",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "loki"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#d55181",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "promtail"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#008300",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "nginxserver"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#9085e9",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`container` | metric=`mem_mb` | unwrap value [5m]) by (name)",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "{{name}}"
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "CPU · 부하 · 디스크",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 18
-      },
-      "id": 102,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "CPU 사용률",
-      "description": "2코어 기준입니다. 이 서버는 평소 5% 안팎이라 CPU가 병목인 적이 거의 없습니다 — 이 그래프보다 위의 메모리 쪽을 먼저 보세요.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 19
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": 180000,
-            "axisBorderShow": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            }
-          },
-          "unit": "percent",
-          "min": 0,
-          "max": 100
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "CPU"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3987e5",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_pct` | unwrap value [5m]) by (metric)",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "CPU"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "부하 평균",
-      "description": "코어가 2개이므로 빨간 선(2.0)을 넘으면 처리를 기다리는 작업이 쌓이고 있다는 뜻입니다.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 19
-      },
-      "id": 8,
-      "options": {
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": 180000,
-            "axisBorderShow": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "unit": "short",
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              },
-              {
-                "color": "#d03b3b",
-                "value": 2
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "1분"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3987e5",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "15분"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#898781",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`load1` | unwrap value [5m]) by (metric)",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "1분"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`load15` | unwrap value [5m]) by (metric)",
-          "refId": "B",
-          "queryType": "range",
-          "legendFormat": "15분"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "디스크 사용률",
-      "description": "천천히 오르는 게 정상입니다. 갑자기 꺾여 올라가면 로그나 백업 파일이 안 지워지고 있는 것입니다.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 19
-      },
-      "id": 9,
-      "options": {
-        "legend": {
-          "calcs": [
-            "min",
-            "max",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "lineWidth": 2,
-            "showPoints": "never",
-            "spanNulls": 180000,
-            "axisBorderShow": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            }
-          },
-          "unit": "percent",
-          "min": 0,
-          "max": 100
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "디스크"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3987e5",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`disk_used_pct` | unwrap value [5m]) by (metric)",
-          "refId": "A",
-          "queryType": "range",
-          "legendFormat": "디스크"
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "컨테이너 현황",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 27
-      },
       "id": 103,
-      "panels": []
-    },
-    {
-      "type": "table",
-      "title": "지금 이 순간 컨테이너별 사용량",
-      "description": "비어 있으면 collect-metrics.sh가 안 돌고 있는 것입니다. 막대는 전체 메모리(1907MB) 대비 비율입니다.",
-      "datasource": {
-        "type": "loki",
-        "uid": "${DS_LOKI}"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 28
-      },
-      "id": 10,
-      "options": {
-        "cellHeight": "md",
-        "footer": {
-          "show": true,
-          "reducer": [
-            "sum"
-          ],
-          "fields": [
-            "메모리"
-          ]
-        },
-        "showHeader": true
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto"
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "메모리"
+      "panels": [
+        {
+          "type": "table",
+          "title": "컨테이너별 현재 사용량",
+          "description": "비어 있으면 collect-metrics.sh와 Promtail 수집 상태를 확인합니다. 막대는 전체 메모리(1907MB) 대비 비율입니다.",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 28
+          },
+          "id": 10,
+          "options": {
+            "cellHeight": "md",
+            "footer": {
+              "show": true,
+              "reducer": [
+                "sum"
+              ],
+              "fields": [
+                "메모리"
+              ]
             },
-            "properties": [
+            "showHeader": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto"
+              }
+            },
+            "overrides": [
               {
-                "id": "unit",
-                "value": "decmbytes"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              },
-              {
-                "id": "max",
-                "value": 1907
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "gauge",
-                  "mode": "gradient",
-                  "valueDisplayMode": "text"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "#3987e5",
-                      "value": null
-                    },
-                    {
-                      "color": "#fab219",
-                      "value": 500
-                    },
-                    {
-                      "color": "#d03b3b",
-                      "value": 900
+                "matcher": {
+                  "id": "byName",
+                  "options": "메모리"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "decmbytes"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 0
+                  },
+                  {
+                    "id": "max",
+                    "value": 1907
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "gauge",
+                      "mode": "gradient",
+                      "valueDisplayMode": "text"
                     }
-                  ]
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "#3987e5",
+                          "value": null
+                        },
+                        {
+                          "color": "#fab219",
+                          "value": 500
+                        },
+                        {
+                          "color": "#d03b3b",
+                          "value": 900
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percent"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 140
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "컨테이너"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 200
+                  }
+                ]
+              }
+            ]
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`container` | metric=`mem_mb` | unwrap value [5m]) by (name)",
+              "refId": "A",
+              "queryType": "instant"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${DS_LOKI}"
+              },
+              "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`container` | metric=`cpu_pct` | unwrap value [5m]) by (name)",
+              "refId": "B",
+              "queryType": "instant"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "joinByField",
+              "options": {
+                "byField": "name",
+                "mode": "outer"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Time 1": true,
+                  "Time 2": true
+                },
+                "renameByName": {
+                  "name": "컨테이너",
+                  "Value #A": "메모리",
+                  "Value #B": "CPU"
                 }
               }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "CPU"
             },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "percent"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              },
-              {
-                "id": "custom.width",
-                "value": 140
+            {
+              "id": "sortBy",
+              "options": {
+                "fields": {},
+                "sort": [
+                  {
+                    "desc": true,
+                    "field": "메모리"
+                  }
+                ]
               }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "컨테이너"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 200
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`container` | metric=`mem_mb` | unwrap value [5m]) by (name)",
-          "refId": "A",
-          "queryType": "instant"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "${DS_LOKI}"
-          },
-          "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`container` | metric=`cpu_pct` | unwrap value [5m]) by (name)",
-          "refId": "B",
-          "queryType": "instant"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "name",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Time 1": true,
-              "Time 2": true
-            },
-            "renameByName": {
-              "name": "컨테이너",
-              "Value #A": "메모리",
-              "Value #B": "CPU"
             }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "desc": true,
-                "field": "메모리"
-              }
-            ]
-          }
+          ]
         }
       ]
     }

@@ -59,13 +59,21 @@ kr.it.reserve
 ```java
 // ✅ 정석 — 동사+목적어, 주요 식별자 포함
 log.info("Reservation created: storeId={}, memberId={}", storeId, memberId);
-log.warn("Authentication failed: {}", e.getMessage());
-log.error("Payment cancellation failed: paymentId={}", paymentId, e);
+log.warn("Authentication failed: errorType={}", e.getClass().getSimpleName());
+log.error("Payment cancellation failed: paymentId={}, errorType={}",
+        paymentId, e.getClass().getSimpleName());
 
 // ❌ 지양 — 모호하거나 한국어
 log.info("완료");
 log.info("처리됨: " + id);  // 문자열 연결 금지, 파라미터 사용
 ```
+
+**개인정보·비밀정보 경계:**
+
+- 애플리케이션 로그에는 이메일, IP, 이름, 주소·검색어, 원본 파일명, 토큰, 외부 API 응답 본문을 직접 남기지 않는다.
+- 예외 메시지는 개인정보나 외부 응답을 포함할 수 있으므로 그대로 남기지 않고 `errorType`, 상태 enum, 내부 숫자 ID로 진단한다.
+- 보안·운영 알림이 문자열을 기준으로 동작할 때는 기준 문구만 유지한다. 문구 뒤에도 개인정보를 붙이지 않는다.
+- `audit_log`의 관리자 감사 기록은 일반 콘솔·파일 로그와 분리해 취급한다. 접근 통제와 보존 정책도 별도 운영 과제로 검증한다.
 
 ### 주석 컨벤션
 

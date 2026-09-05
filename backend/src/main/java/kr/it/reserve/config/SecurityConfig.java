@@ -81,6 +81,9 @@ public class SecurityConfig {
                         //   시크릿이 비어 있으면 전부 거부하는 fail-closed 다.
                         //   경로를 넓히지 말 것 — "/api/payment/**" 로 풀면 결제·환불 API 가 통째로 열린다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payment/webhook/portone").permitAll()
+                        // CSP Report-Only 브라우저 진단. 인증 쿠키가 없는 브라우저도 보낼 수 있어야 한다.
+                        // 본문은 CspReportController가 URL을 버리고 고정 범주만 기록한다.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/csp-reports").permitAll()
 
                         // 인증 관련 API
                         .requestMatchers("/api/auth/**", "/api/email/**", "/api/password-reset/**").permitAll()

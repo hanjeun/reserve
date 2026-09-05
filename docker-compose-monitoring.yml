@@ -6,8 +6,9 @@ services:
   loki:
     image: grafana/loki:2.9.0
     container_name: loki
-    ports:
-      - "3100:3100"
+    # Promtail은 app-network의 loki:3100으로 접근한다. 호스트에 publish할 이유가 없다.
+    expose:
+      - "3100"
     volumes:
       # Without this, all log history lives in the container layer and a single
       # `docker compose up --force-recreate` wipes it. That is how this stack
@@ -37,8 +38,9 @@ services:
   grafana:
     image: grafana/grafana:10.2.0
     container_name: grafana
-    ports:
-      - "3000:3000"
+    # nginx도 같은 app-network에서 grafana:3000으로 프록시한다. 외부 공개는 nginx만 담당한다.
+    expose:
+      - "3000"
     environment:
       # Not hardcoded: this seeds the password when grafana-data is first
       # created, so a literal value in a public repo IS the initial password.

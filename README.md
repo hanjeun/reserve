@@ -51,14 +51,14 @@ RESERVE는 업종에 구애받지 않고, 예약이 필요한 순간 누구나 �
 - 가게 검색 · 정렬 · 즐겨찾기, 가까운 가게 **우리동네 배지**(위치 기반)
 - 날짜 · 시간 · 인원 선택 후 예약, 예약 **수정**
 - 노쇼 예약금 카카오페이 결제
-- 방문 시 **QR 체크인**(예약 코드 · QR 표시)
+- 승인된 예약 방문 시 **QR 체크인**(예약 코드 · 출석 시각 기록)
 - 예약 내역 조회 · 취소
 - 리뷰 작성 · 수정 · 삭제
 - Google / Naver / Kakao 소셜 로그인
 
 ### 사장님 (파트너)
 - 가게 등록 · 수정 · 삭제
-- 예약 승인 / 거절 / 완료 / 노쇼 처리, **QR 스캔 체크인**
+- 예약 승인 / 거절 / 완료 / 노쇼 처리, **QR 스캔 출석 기록**
 - 자동 승인 · 예약금 · 환불 정책 설정
 - **광고 등록 · 결제**(배지형 · 배너형, 포트원 결제)
 - 예약/매출 **통계** 조회
@@ -100,7 +100,7 @@ RESERVE는 업종에 구애받지 않고, 예약이 필요한 순간 누구나 �
 
 ```
 build-backend  → Gradle 빌드 → Docker 이미지 → DockerHub push
-build-frontend → npm build → SCP → Nginx 정적 파일 교체
+build-frontend → 단위·브라우저 테스트 → npm build → SCP → Nginx release symlink 원자적 전환
 deploy-backend → Blue/Green 전환 → 헬스체크 → Nginx upstream 교체 → 구 컨테이너 종료
                                     └─ 실패 시 자동 롤백
 ```
@@ -116,6 +116,9 @@ deploy-backend → Blue/Green 전환 → 헬스체크 → Nginx upstream 교체 
 | [아키텍처](docs/technical/architecture.md) | 인프라 구조 · 배포 방식 · Git 브랜치 전략 |
 | [모니터링](docs/technical/monitoring.md) | Grafana · Loki · Sentry · UptimeRobot · SonarCloud |
 | [백업 · 복구](docs/technical/backup.md) | MySQL 백업 구성 · 복원 절차 · 복원 훈련 |
+| [결제 · 환불](docs/technical/payments.md) | PortOne 웹훅 · 환불 원장 · 미결 대사 절차 |
+| [데이터 생명주기](docs/technical/data-lifecycle.md) | 회원 탈퇴 · 가게 영업 종료 · 파일 삭제 outbox · 보존 정책 |
+| [배포 운영](docs/technical/deployments.md) | 릴리스 · 원자적 프론트 배포 · 배포 후 검증 |
 | [코드 구조](docs/technical/structure.md) | 폴더 구조 · 라우트 · 환경변수 |
 | [디자인 시스템](docs/technical/design-system.md) | 디자인 토큰 · 공통 컴포넌트 |
 | [코드 컨벤션](docs/rules/code-conventions.md) | 네이밍 규칙 · 패키지 구조 |

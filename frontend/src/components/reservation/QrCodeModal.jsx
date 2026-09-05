@@ -36,7 +36,7 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
 
     return (
         <Modal
-            title="예약 확인 QR"
+            title="방문 체크인 QR"
             open={open}
             onCancel={onClose}
             footer={null}

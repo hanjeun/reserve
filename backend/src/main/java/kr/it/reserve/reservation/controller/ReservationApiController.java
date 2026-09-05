@@ -225,9 +225,9 @@ public class ReservationApiController {
         return ResponseEntity.ok(ApiResponse.success(null, "노쇼 처리되었습니다."));
     }
 
-    // QR 스캔을 통한 자동 체크인 — 스캔 즉시 CONFIRMED로 자동 승인
+    // QR 스캔을 통한 실제 방문 기록 — 승인 상태는 바꾸지 않고 checkedInAt만 기록
     //
-    // ★ 2026-08-19 레이트리밋 추가. 이 엔드포인트는 예약을 CONFIRMED 로 바꾸는 상태 변경 API 인데
+    // ★ 2026-08-19 레이트리밋 추가. 이 엔드포인트는 실제 방문 시각을 기록하는 상태 변경 API 인데
     //   호출 횟수 제한이 전혀 없었다. 토큰 자체는 서명돼 있어 위조는 불가능하지만, 유출된 토큰을
     //   스크립트로 쏟아붓거나 응답 문구 차이로 예약 상태를 캐내는 건 막을 게 없었다.
     //   한도 근거는 RateLimiter.Policy#QR_CHECKIN 주석 참고.
@@ -247,7 +247,7 @@ public class ReservationApiController {
         }
         QrCheckinResponse result = reservationService.checkInByQrToken(token, member);
         return ResponseEntity.ok(ApiResponse.success(
-                result, result.isAlreadyCheckedIn() ? "이미 승인된 예약입니다." : "예약이 승인되었습니다."));
+                result, result.isAlreadyCheckedIn() ? "이미 체크인된 예약입니다." : "체크인되었습니다."));
     }
 
     private void validateBusinessAuth(Member member) {

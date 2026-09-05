@@ -60,7 +60,7 @@ import java.util.Date;
  * 토큰이 유출되면 방문일이 한참 지난 뒤에도 그 예약을 CONFIRMED 처리할 수 있는 약점이 있었다.
  * 이제 예약 방문일 다음 날 새벽(자정+GRACE)까지만 유효하도록 만료를 넣는다 — 방문일 당일 스캔은
  * 자정 넘어까지도 넉넉히 커버하면서, 지난 예약의 토큰은 자연 무효화된다.
- * (재사용 방지는 여전히 예약 상태 전이(PENDING → CONFIRMED)가 1차로 막아준다.)
+ * 재사용은 예약의 {@code checkedInAt} 멱등 기록이 막는다.
  */
 @Slf4j
 @RequiredArgsConstructor

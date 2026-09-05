@@ -13,8 +13,8 @@ import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationSearchDto;
-import kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
+import kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
@@ -636,18 +636,22 @@ public class ReservationService {
     public String generateQrCheckinToken(Long reservationId, Member member) {
         Reservation reservation = findByIdOrThrow(reservationId);
         validateOwnership(reservation, member);
+        if (!isApprovedForCheckIn(reservation)) {
+            throw new ReservationException("승인된 예약만 QR 체크인을 사용할 수 있습니다.",
+                    HttpStatus.BAD_REQUEST);
+        }
         return qrCheckinTokenProvider.generateToken(reservationId, reservation.getReservationDate());
     }
 
     /**
-     * QR 스캔을 통한 자동 체크인 (사업자용) — 스캔 즉시 CONFIRMED로 자동 승인.
-     * 이미 CONFIRMED인 예약을 재스캔해도 에러 대신 그대로 성공 처리(idempotent)해서
-     * 같은 QR을 여러 번 스캔해도 문제없음. CANCELLED/REJECTED/COMPLETED/NO_SHOW는 거부.
+     * QR 스캔을 통한 방문 체크인 (사업자용).
+     * 예약 승인 상태는 바꾸지 않고 별도 checkedInAt만 기록한다. 중복 스캔은 멱등 성공한다.
      */
     @Transactional
     public QrCheckinResponse checkInByQrToken(String token, Member owner) {
         Long reservationId = qrCheckinTokenProvider.parseReservationId(token);
-        Reservation reservation = findByIdOrThrow(reservationId);
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         validateStoreOwner(reservation, owner);
 
         // ★★ 방문 당일에만 체크인할 수 있다 (2026-08-19 신설).
@@ -672,56 +676,34 @@ public class ReservationService {
             );
         }
 
-        // ★ 이미 승인된 건은 "바뀐 게 없다"는 사실을 함께 돌려준다 (2026-08-11).
-        //   재스캔을 에러로 만들지 않는 건 그대로다(멱등) — 같은 QR 을 두 번 비추는 건 흔하고,
-        //   그때마다 빨간 에러가 뜨면 사장님이 뭘 잘못한 줄 안다.
-        //   다만 화면에는 "승인되었습니다"가 아니라 "이미 승인된 예약입니다"라고 나와야
-        //   방금 처리한 건지 아닌지를 헷갈리지 않는다.
-        if (reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED) {
-            log.info("QR check-in repeated (already confirmed): reservationId={}, storeId={}, ownerId={}",
+        if (reservation.getCheckedInAt() != null) {
+            log.info("QR check-in repeated: reservationId={}, storeId={}, ownerId={}",
                     reservation.getId(), reservation.getStore().getId(), owner.getId());
             return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), true);
         }
-        if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
+
+        // UNCONFIRMED도 원래 CONFIRMED였다가 예약 시각이 지나도록 마감되지 않은 상태다.
+        // 지각 도착 직전에 스케줄러가 상태를 바꿨다는 이유로 실제 출석 기록을 막지 않는다.
+        if (!isApprovedForCheckIn(reservation)) {
             log.warn("QR check-in rejected (bad status): reservationId={}, storeId={}, ownerId={}, status={}",
                     reservation.getId(), reservation.getStore().getId(), owner.getId(), reservation.getStatus());
             throw new ReservationException(
-                    "대기 중인 예약만 QR 체크인이 가능합니다. (현재 상태: " + reservation.getStatus() + ")",
+                    "승인된 예약만 QR 체크인이 가능합니다. (현재 상태: " + reservation.getStatus() + ")",
                     HttpStatus.BAD_REQUEST
             );
         }
 
-        reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
+        reservation.setCheckedInAt(ServiceTime.now());
 
-        // ★ 감사 로그 (2026-08-19 신설). QR 체크인은 사장님의 승인 클릭을 건너뛰고 예약을 확정시키는
-        //   유일한 경로인데, 성공했다는 기록이 어디에도 남지 않았다. 나중에 "승인한 적 없는데 확정돼 있다"는
-        //   문의가 오면 확인할 방법이 없다는 뜻이다. 개인정보(이름·연락처)는 넣지 않고 식별자만 남긴다.
+        // 개인정보 없이 출석 사실을 운영 로그에 남긴다. checkedInAt은 DB의 장기 근거다.
         //
         //   audit_log 테이블(AuditLogService)이 아니라 로그로 남기는 이유: 그 테이블은
         //   "휴지통 스냅샷 + 관리자 행위"용이고 90일 뒤 스케줄러가 지운다. 체크인은 영업 중 반복되는
         //   일반 동작이라 매 스캔마다 행을 쌓으면 성격이 다른 데이터가 섞이고 조회도 느려진다.
         //   Loki 가 이미 이 로그를 수집하고 level 라벨로 인덱싱하므로 조회는 그쪽이 낫다.
-        log.info("QR check-in confirmed: reservationId={}, storeId={}, ownerId={}, reservationDate={}, reservationTime={}",
+        log.info("QR check-in recorded: reservationId={}, storeId={}, ownerId={}, reservationDate={}, reservationTime={}",
                 reservation.getId(), reservation.getStore().getId(), owner.getId(),
                 reservation.getReservationDate(), reservation.getReservationTime());
-
-        // 유저에게 승인 알림 (약연 — approveReservation과 동일한 패턴)
-        if (reservation.getMember().isEmailNotificationEnabled()) {
-            try {
-                String memberName = reservation.getMember().getName() != null
-                        ? reservation.getMember().getName() : "고객";
-                emailService.sendReservationConfirmedEmail(
-                        reservation.getMember().getEmail(),
-                        memberName,
-                        reservation.getStore().getName(),
-                        reservation.getReservationDate().toString(),
-                        reservation.getReservationTime().toString().substring(0, 5),
-                        reservation.getGuestCount()
-                );
-            } catch (Exception e) {
-                log.warn("QR check-in approval email failed: errorType={}", e.getClass().getSimpleName());
-            }
-        }
 
         return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), false);
     }
@@ -1015,6 +997,9 @@ public class ReservationService {
         if (!isClosable(reservation)) {
             throw new ReservationException("승인된 예약만 노쇼 처리가 가능합니다.", HttpStatus.BAD_REQUEST);
         }
+        if (reservation.getCheckedInAt() != null) {
+            throw new ReservationException("체크인된 예약은 노쇼로 처리할 수 없습니다.", HttpStatus.BAD_REQUEST);
+        }
 
         reservation.setStatus(Reservation.ReservationStatus.NO_SHOW);
     }
@@ -1182,6 +1167,11 @@ public class ReservationService {
      * 나중에 상태가 하나 더 생겼을 때 한 곳만 고쳐지는 사고가 난다.
      */
     private boolean isClosable(Reservation reservation) {
+        return reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED
+                || reservation.getStatus() == Reservation.ReservationStatus.UNCONFIRMED;
+    }
+
+    private boolean isApprovedForCheckIn(Reservation reservation) {
         return reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED
                 || reservation.getStatus() == Reservation.ReservationStatus.UNCONFIRMED;
     }

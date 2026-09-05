@@ -12,6 +12,7 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
 import kr.it.reserve.file.util.FileStoragePaths;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class BusinessVerificationService {
     private final BusinessVerificationRepository verificationRepository;
     private final MemberRepository memberRepository;
     private final FileStorageService fileStorageService;
+    private final FileDeletionOutboxService fileDeletionOutboxService;
     private final EmailService emailService;
     private final AuditLogService auditLogService;
 
@@ -40,13 +42,16 @@ public class BusinessVerificationService {
      */
     @Transactional
     public BusinessVerificationResponse submitVerification(Member member, BusinessVerificationRequest request) {
+        Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
+                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
         // 1. 이미 사업자인지 확인
-        if (member.getRole() == Role.BUSINESS) {
+        if (activeMember.getRole() == Role.BUSINESS) {
             throw new BizVerificationException("이미 사업자로 등록되어 있습니다.");
         }
 
         // 2. 이미 대기중인 요청이 있는지 확인 (id만 사용)
-        if (verificationRepository.existsByMemberIdAndStatus(member.getId(), VerificationStatus.PENDING)) {
+        if (verificationRepository.existsByMemberIdAndStatus(activeMember.getId(), VerificationStatus.PENDING)) {
             throw new BizVerificationException("이미 대기 중인 사업자 인증 요청이 있습니다.");
         }
 
@@ -54,11 +59,12 @@ public class BusinessVerificationService {
         validateSubmitRequest(request);
 
         // 4. 이미지 저장 (파일이 아닌 key를 DB에 저장 → 조회 시 Pre-signed URL 생성)
-        String licenseImageKey = fileStorageService.storeFile(request.getLicenseImage(), FileStoragePaths.business(member.getId()));
+        String licenseImageKey = fileStorageService.storeFile(
+                request.getLicenseImage(), FileStoragePaths.business(activeMember.getId()));
 
         // 5. 인증 요청 생성
         BusinessVerification verification = BusinessVerification.builder()
-                .member(member)
+                .member(activeMember)
                 .licenseImageKey(licenseImageKey)
                 .businessName(request.getBusinessName().trim())
                 .businessNumber(request.getBusinessNumber())
@@ -66,7 +72,7 @@ public class BusinessVerificationService {
                 .status(VerificationStatus.PENDING)
                 .build();
 
-        log.info("Business verification submitted: memberId={}", member.getId());
+        log.info("Business verification submitted: memberId={}", activeMember.getId());
         return BusinessVerificationResponse.fromEntity(verificationRepository.save(verification));
     }
 
@@ -85,7 +91,8 @@ public class BusinessVerificationService {
         verification.approve(admin);
 
         // 회원 권한을 BUSINESS로 변경
-        Member member = verification.getMember();
+        Member member = memberRepository.findActiveByIdForUpdate(verification.getMember().getId())
+                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         member.setRole(Role.BUSINESS);
         memberRepository.save(member);
 
@@ -120,7 +127,8 @@ public class BusinessVerificationService {
         verification.reject(admin, reason.trim());
 
         // 거절 이메일 발송 (비동기)
-        Member member = verification.getMember();
+        Member member = memberRepository.findActiveByIdForUpdate(verification.getMember().getId())
+                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         emailService.sendBusinessRejectedEmail(
             member.getEmail(),
             member.getName(),
@@ -128,7 +136,7 @@ public class BusinessVerificationService {
             reason.trim()
         );
 
-        log.info("Business verification rejected: verificationId={}, reason={}", verificationId, reason);
+        log.info("Business verification rejected: verificationId={}", verificationId);
         auditLogService.logBusinessVerification(member.getId(), member.getEmail(), "REJECTED", reason.trim());
         return BusinessVerificationResponse.fromEntity(verification);
     }
@@ -138,7 +146,7 @@ public class BusinessVerificationService {
      */
     @Transactional
     public void revokeBusinessRole(Long memberId, Member admin) {
-        Member targetMember = memberRepository.findById(memberId)
+        Member targetMember = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         if (targetMember.getRole() != Role.BUSINESS) {
@@ -162,7 +170,7 @@ public class BusinessVerificationService {
     @Transactional
     public void resignBusinessRole(Member member) {
         // thin Member 대신 DB에서 fresh 로드 후 수정 (null 덮어쓰기 방지)
-        Member freshMember = memberRepository.findById(member.getId())
+        Member freshMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         if (freshMember.getRole() != Role.BUSINESS) {
@@ -180,7 +188,9 @@ public class BusinessVerificationService {
      */
     @Transactional
     public BusinessVerificationResponse updateVerification(Member member, BusinessVerificationRequest request) {
-        BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(member.getId())
+        Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
+                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(activeMember.getId())
                 .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
 
         if (verification.getStatus() != VerificationStatus.PENDING) {
@@ -198,15 +208,17 @@ public class BusinessVerificationService {
             verification.setMemo(request.getMemo());
         }
 
-        // 이미지 변경 시 기존 S3 파일 삭제 후 새 파일 업로드
+        // 새 파일을 먼저 올리고 DB 변경과 기존 파일 삭제 의도를 한 트랜잭션에 묶는다.
+        // 커밋이 실패하면 FileStorageService가 새 파일을 보상 삭제하고, 성공한 뒤에만 outbox가 보인다.
         if (request.getLicenseImage() != null && !request.getLicenseImage().isEmpty()) {
-            fileStorageService.deleteFile(verification.getLicenseImageKey());
+            String oldKey = verification.getLicenseImageKey();
             String newKey = fileStorageService.storeFile(
-                    request.getLicenseImage(), FileStoragePaths.business(member.getId()));
+                    request.getLicenseImage(), FileStoragePaths.business(activeMember.getId()));
             verification.setLicenseImageKey(newKey);
+            fileDeletionOutboxService.enqueue(oldKey, "BUSINESS_LICENSE_IMAGE", verification.getId());
         }
 
-        log.info("Business verification updated: memberId={}", member.getId());
+        log.info("Business verification updated: memberId={}", activeMember.getId());
         return BusinessVerificationResponse.fromEntity(verificationRepository.save(verification));
     }
 
@@ -215,18 +227,19 @@ public class BusinessVerificationService {
      */
     @Transactional
     public void cancelVerification(Member member) {
-        BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(member.getId())
+        Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
+                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+        BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(activeMember.getId())
                 .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
 
         if (verification.getStatus() != VerificationStatus.PENDING) {
             throw new BizVerificationException("이미 처리가 완료된 신청은 취소할 수 없습니다.");
         }
 
-        // S3 이미지 삭제 (취소 시 불필요한 파일 정리)
-        fileStorageService.deleteFile(verification.getLicenseImageKey());
-
         verificationRepository.delete(verification);
-        log.info("Business verification cancelled: memberId={}", member.getId());
+        fileDeletionOutboxService.enqueue(
+                verification.getLicenseImageKey(), "BUSINESS_LICENSE_IMAGE", verification.getId());
+        log.info("Business verification cancelled: memberId={}", activeMember.getId());
     }
 
     // --- 단순 조회 메서드 ---
@@ -248,6 +261,15 @@ public class BusinessVerificationService {
 
     public Page<BusinessVerificationResponse> getVerificationsByStatus(VerificationStatus status, Pageable pageable) {
         return verificationRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
+                .map(BusinessVerificationResponse::fromEntity);
+    }
+
+    public Page<BusinessVerificationResponse> searchAdminVerifications(
+            VerificationStatus status,
+            String search,
+            Pageable pageable) {
+        String keyword = search == null ? "" : search.trim();
+        return verificationRepository.searchForAdmin(status, keyword, pageable)
                 .map(BusinessVerificationResponse::fromEntity);
     }
 

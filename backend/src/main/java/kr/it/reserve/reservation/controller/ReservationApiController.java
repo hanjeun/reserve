@@ -12,6 +12,7 @@ import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
+import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.service.ReservationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -136,11 +137,24 @@ public class ReservationApiController {
     @GetMapping("/store")
     public ResponseEntity<ApiResponse<Page<ReservationResponse>>> getStoreReservations(
             @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "100") int size) {
+            @RequestParam(defaultValue = "100") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status) {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
-        Page<ReservationResponse> reservations = reservationService.getStoreReservations(member, page, size);
+        Page<ReservationResponse> reservations = reservationService.getStoreReservations(
+                member, page, size, search, parseReservationStatus(status));
         return ResponseEntity.ok(ApiResponse.success(reservations, "가게 예약 목록 조회 성공"));
+    }
+
+    @GetMapping("/store/status-summary")
+    public ResponseEntity<ApiResponse<kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse>>
+            getStoreReservationSummary() {
+        Member member = SecurityUtil.getCurrentMember();
+        validateBusinessAuth(member);
+        return ResponseEntity.ok(ApiResponse.success(
+                reservationService.getStoreReservationSummary(member),
+                "예약 상태 집계 조회 성공"));
     }
 
     @PatchMapping("/{id}/approve")
@@ -239,6 +253,15 @@ public class ReservationApiController {
     private void validateBusinessAuth(Member member) {
         if (!member.isBusiness() && !member.isAdmin()) {
             throw ReservationException.forbidden("사업자 권한이 없습니다.");
+        }
+    }
+
+    private Reservation.ReservationStatus parseReservationStatus(String status) {
+        if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status)) return null;
+        try {
+            return Reservation.ReservationStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ReservationException("올바르지 않은 예약 상태입니다.", HttpStatus.BAD_REQUEST);
         }
     }
 }

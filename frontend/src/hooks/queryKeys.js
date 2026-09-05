@@ -57,6 +57,7 @@ export const adminKeys = {
     chatRooms:            () => ['admin', 'chatRooms'],
     chatRoom:             (id) => ['admin', 'chatRoom', id],
     chatWaiting:          () => ['admin', 'chatWaiting'],
+    paymentOperations:    () => ['admin', 'paymentOperations'],
 };
 
 // 인앱 채팅 (손님 쪽). 방이 하나뿐이라 키에 ID 가 필요 없다.

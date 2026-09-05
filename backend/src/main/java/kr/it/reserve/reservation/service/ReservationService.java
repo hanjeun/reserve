@@ -13,6 +13,7 @@ import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationSearchDto;
+import kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.entity.Reservation;
@@ -1075,16 +1076,29 @@ public class ReservationService {
      * - BUSINESS: 본인 소유 가게 예약 (fetch join + 단일 쿼리)
      */
     @Transactional(readOnly = true)
-    public Page<ReservationResponse> getStoreReservations(Member owner, int page, int size) {
-        int safeSize = Math.min(size, 100); // 최대 100건으로 고정
-        Pageable pageable = PageRequest.of(page, safeSize);
+    public Page<ReservationResponse> getStoreReservations(
+            Member owner,
+            int page,
+            int size,
+            String search,
+            Reservation.ReservationStatus status) {
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize);
+        String keyword = search == null ? "" : search.trim();
         if (owner.isAdmin()) {
-            return reservationRepository.findAllWithStoreAndMemberPaged(pageable)
+            return reservationRepository.searchForAdmin(keyword, status, pageable)
                     .map(ReservationResponse::fromEntity);
         }
-        // BUSINESS: owner 기준으로 가게-예약 한 번에 조회
-        return reservationRepository.findByStoreOwnerOrderByCreatedAtDesc(owner, pageable)
+        return reservationRepository.searchForStoreOwner(owner, keyword, status, pageable)
                 .map(ReservationResponse::fromEntity);
+    }
+
+    @Transactional(readOnly = true)
+    public ReservationStatusSummaryResponse getStoreReservationSummary(Member owner) {
+        List<Object[]> rows = owner.isAdmin()
+                ? reservationRepository.countAdminReservationsGroupedByStatus()
+                : reservationRepository.countOwnerReservationsGroupedByStatus(owner);
+        return ReservationStatusSummaryResponse.fromRows(rows);
     }
 
     /**

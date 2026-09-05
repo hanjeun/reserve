@@ -13,18 +13,23 @@ import { colors } from '../styles/tokens';
 
 colors.primary.main      // #3182f6  — 브랜드 블루
 colors.primary.light     // #e8f3ff  — 연한 배경
-colors.primary.dark      // #1b64da  — 호버
+colors.primary.dark      // #2272eb  — 호버
 colors.gray[50]          // #f9fafb  — Input 배경
 colors.gray[100]         // #f2f4f6  — 비활성 배경
-colors.text.primary      // #191f28
+colors.text.primary      // #1a1f27
 colors.text.secondary    // #4e5968
 colors.text.tertiary     // #8b95a1
 colors.border.light      // #f2f4f6
 colors.border.default    // #e5e8eb
-colors.success.main      // #20c997
+colors.success.main      // #00c73c
 colors.error.main        // #f04452
-colors.warning.main      // #f59f00
+colors.warning.main      // #ffb800
 ```
+
+실제 `colors.*` 값은 위 hex 자체가 아니라 `var(--c-..., fallback)` 문자열이다. 포인트 색의 런타임
+정본은 `hooks/useTheme.js`의 `ACCENT_OPTIONS`이고, `theme.css`의 기본 블루는 첫 페인트용 fallback이다.
+두 기본값은 라이트·다크 모두 동일하게 유지한다. 사용자가 포인트 색을 바꾸면 `applyAccent`가 CSS 변수와
+AntD `colorPrimary`가 같은 리터럴 표를 보도록 함께 갱신한다.
 
 ### Typography
 
@@ -44,9 +49,9 @@ fontSize.base   // 15px
 fontSize.lg     // 16px
 fontSize.xl     // 17px
 fontSize['2xl'] // 18px
-fontSize['3xl'] // 20px
+fontSize['3xl'] // 22px
 fontSize['4xl'] // 24px
-fontSize['5xl'] // 32px
+fontSize['5xl'] // 28px
 ```
 
 ### Spacing / Radius / Heights
@@ -57,7 +62,7 @@ import { radius, heights, maxWidth, shadows } from '../styles/tokens';
 radius.sm     // 4px
 radius.md     // 10px
 radius.lg     // 14px   — Input
-radius.xl     // 16px   — Button, Card
+radius.xl     // 16px   — Button
 radius['2xl'] // 20px
 radius['3xl'] // 24px   — 히어로·지도·큰 패널 전용 (아래 규칙 참고)
 radius.full   // 50%
@@ -90,7 +95,7 @@ shadows.cardHover // 0 4px 20px rgba(0,0,0,0.08)
 | `radius.sm` (4px) | 태그·아주 작은 칩 | 높이 ~24px 이하 |
 | `radius.md` (10px) | 작은 버튼·인풋 내부 요소·썸네일 | 높이 ~40px |
 | `radius.lg` (14px) | **입력 필드** (`heights.input` 54px) | 폼 필드는 전부 여기 |
-| `radius.xl` (16px) | **Button, Card** | 손으로 만지는 표준 크기 |
+| `radius.xl` (16px) | **Button** | 손으로 만지는 표준 크기 |
 | `radius['2xl']` (20px) | 모달·시트·중간 패널 | 화면 폭의 일부를 차지 |
 | `radius['3xl']` (24px) | **히어로 섹션·지도·전폭 패널만** | 화면 폭을 거의 다 쓰는 것 |
 | `radius.full` (50%) | 아바타·원형 아이콘 버튼 | 정사각형 요소 |
@@ -103,8 +108,11 @@ shadows.cardHover // 0 4px 20px rgba(0,0,0,0.08)
    `16`·`4` 도 몇 군데 남아 있다. 새로 쓰는 코드에서는 하지 말 것.
 2. **`3xl` 은 큰 것에만.** 정의는 돼 있는데 **현재 사용처가 0곳**이다. 카드나 버튼에 24px 을 쓰면
    `xl`(16px)로 통일된 나머지 화면과 곡률이 어긋난다. "조금 더 둥글게" 가 필요하면 한 단계만 올린다.
-3. **한 화면 안에서 인접한 요소는 같은 단계이거나 한 단계 차이여야 한다.** 카드(16) 안의 썸네일(10)은
-   자연스럽지만, 카드(16) 안의 배지(24)는 어색하다 — 안쪽이 바깥쪽보다 더 둥글면 안 된다.
+3. **한 화면 안에서 인접한 요소는 같은 단계이거나 한 단계 차이여야 한다.** 패널(20) 안의 버튼(16)은
+   자연스럽지만, 작은 카드 안의 배지(24)는 어색하다 — 안쪽이 바깥쪽보다 더 둥글면 안 된다.
+
+`components/common/Card.jsx`의 목록 카드는 제품에서 의도적으로 `borderRadius: 0`인 각진 사각형이다.
+따라서 `radius.xl` 규칙의 예외가 아니라 별도 카드 형태이며, `Card.Add`도 같은 0을 사용한다.
 
 > **왜 문서에 적는가.** 이 프로젝트에서 반복된 회귀는 전부 "규칙이 사람 머릿속에만 있던" 경우였다
 > (필터 Select 색, 카드 hover 그림자, 확인 모달 줄바꿈). 반경은 관문 컴포넌트로 강제하기 어렵다 —
@@ -131,6 +139,9 @@ import { Button } from '../components/common';
 <Button variant="ghost-sm-success">리뷰 보기</Button>
 ```
 
+모든 `Button`은 `.reserve-btn:focus-visible` 공통 링을 사용한다. 호출부에서 `outline: none`을 추가하거나
+키보드 포커스 스타일을 덮지 않는다. 로딩 중에는 네이티브 `disabled`와 `aria-busy`가 함께 적용된다.
+
 ### Form 컴포넌트
 
 ```jsx
@@ -146,7 +157,7 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 <FormTimePicker.RangePicker />   // 영업시간 설정용
 ```
 
-모든 입력 필드: `variant="filled"`, `border: none`, `backgroundColor: colors.gray[50]`, `borderRadius: radius.lg`, `height: heights.input`, `fontSize: 16px`(호출부 `size` prop과 무관하게 항상 동일 — `.reserve-form-field` CSS 클래스로 전역 강제)
+모든 입력 필드: `variant="filled"`, `border: none`, `backgroundColor: colors.gray[50]`, `borderRadius: radius.lg`, `height: heights.input`, `fontSize: 16px`(호출부 `size` prop과 무관하게 항상 동일 — `.reserve-form-field` CSS 클래스로 전역 강제). `FormInput.WithButton`도 같은 클래스를 반드시 통과하며, 결합 버튼은 보이는 문구를 접근 가능한 이름으로 사용하고 로딩 중 `aria-busy`를 전달한다.
 
 ### FormModal
 
@@ -176,13 +187,30 @@ import { PageContainer } from '../components/common';
 
 ```jsx
 import { Card } from '../components/common';
+import { Link } from 'react-router-dom';
 
-<Card hoverable onClick={fn}>
-    <Card.Cover src={imageUrl} />
-    내용
+<Card hoverable>
+    <Link to="/store/1" className="reserve-card-link">
+        <Card.Cover src={imageUrl} alt="가게 이름" />
+        내용
+    </Link>
 </Card>
 <Card.Add onClick={fn}>새 가게 등록</Card.Add>
 ```
+
+페이지 이동은 카드 `onClick`이 아니라 실제 `Link`로 표현한다. 그래야 브라우저의 새 탭·주소 복사와
+스크린리더 링크 의미가 유지된다. `Card onClick`은 페이지 이동이 아닌 동작용 호환 경로이며 자동으로
+`role="button"`, `tabIndex`, Enter/Space 활성화를 제공한다. 그 안에는 다른 버튼이나 링크를 중첩하지 않는다.
+`Card.Add`는 네이티브 `<button>`이다.
+
+계정 메뉴·프로필 이미지 선택·모달/채팅 닫기처럼 동작을 실행하는 컨트롤도 네이티브 `<button>`을 쓴다.
+마우스 `:focus` 외형은 지울 수 있지만 `:focus-visible` 링은 반드시 복구한다. 행 안에 승인·취소 버튼이
+이미 있는 `ReservationRow`는 행 전체를 또 버튼으로 감싸지 않고, 같은 상세 열기 동작을 썸네일·가게명
+네이티브 버튼으로 제공한다.
+
+`AdBanner`의 캐러셀 점은 라이브러리가 실제 버튼으로 생성하므로 배너 전체를 네이티브 버튼으로 감쌀 수 없다.
+현재 `div role="button"` + Enter/Space + 명시적 포커스 링을 쓰는 **복합 컨트롤 예외**이며, 이 패턴을 일반
+카드에 복사하지 않는다. 구조를 바꿀 때는 캐러셀 컨트롤과 가게 링크를 형제 요소로 분리한다.
 
 ### Avatar
 
@@ -200,7 +228,7 @@ import { StoreCardSkeleton, MyReservationCardSkeleton } from '../components/comm
 if (isLoading) return <StoreCardSkeleton count={6} />;
 ```
 
-사용 가능한 Skeleton: `StoreCardSkeleton`, `ReservationCardSkeleton`, `MyReservationCardSkeleton`, `ReviewCardSkeleton`, `StoreDetailSkeleton`, `FavoriteCardSkeleton`, `AdminTableSkeleton`
+사용 가능한 Skeleton: `StoreCardSkeleton`, `ReservationCardSkeleton`, `MyReservationCardSkeleton`, `ReviewCardSkeleton`, `StoreDetailSkeleton`, `AdminTableSkeleton`, 저수준 `Bone`
 
 ### FavoriteButton
 
@@ -208,6 +236,16 @@ if (isLoading) return <StoreCardSkeleton count={6} />;
 <FavoriteButton storeId={id} />
 <FavoriteButton storeId={id} initialStatus={true} />
 ```
+
+`FavoriteButton`은 `aria-label`, `aria-pressed`, 로딩 중 `aria-busy`를 제공하는 토글 버튼이다.
+호출부는 `title`만으로 이름을 대신하지 않는다.
+
+### 모션 축소
+
+전역 `useReducedMotion` 훅과 `@media (prefers-reduced-motion: reduce)`를 함께 사용한다. CSS 이동·확대·깜빡임은
+미디어쿼리에서 끄고, 타이핑 루프나 부드러운 스크롤처럼 JavaScript가 만드는 움직임은 훅으로 중지한다.
+홈에서는 첫 문구를 완성된 상태로 고정하고 reveal 요소를 즉시 노출한다. 로딩 스피너처럼 진행 상태를
+전달하는 움직임은 없애지 않고 속도만 완화할 수 있다.
 
 ---
 
@@ -229,8 +267,8 @@ import { colors, radius, fontWeight, fontSize, heights } from '../styles/tokens'
 
 | 대상 | 구현 위치 | 회전 대상 |
 |---|---|---|
-| 드롭다운 꺾쇠 (Select) | `index.css` → `.ant-select-open .ant-select-suffix` | `span.ant-select-suffix` |
-| 아코디언 화살표 (FAQ) | `FaqSection.jsx` 안 `faqCollapseStyles` → `.ant-collapse-item-active .ant-collapse-arrow` | `span.ant-collapse-arrow` |
+| 드롭다운 꺾쇠 (Select) | `styles/global/foundation.css` → `.ant-select-open .ant-select-suffix` | `span.ant-select-suffix` |
+| 아코디언 화살표 (FAQ) | `styles/global/feature-surfaces.css` → `.ant-collapse-item-active .ant-collapse-arrow` | `span.ant-collapse-arrow` |
 
 둘 다 **span을 돌린다**(svg 아님). 상태는 AntD가 관리하고(`.ant-select-open` / `.ant-collapse-item-active`)
 우리 CSS가 그 클래스로 판정하므로 **React 상태가 필요 없다.**
@@ -359,15 +397,17 @@ const handleChange = (key) => {
 
 ### 전역 CSS는 컴포넌트 안에 두지 않는다
 
-`.reserve-form-select` / `.reserve-filter-select` 규칙은 **`index.css`에 있다.**
+`index.css`는 전역 CSS의 단일 진입점이며, cascade 순서를 고정한 `styles/global/*.css`를 한 번씩 import한다.
+`.reserve-form-select`는 `components-and-forms.css`, `.reserve-filter-select`는 `interactions.css`에 있다.
 컴포넌트 파일 안의 `<style>` 태그에 전역 규칙을 넣으면 **그 컴포넌트를 안 쓰는 화면에는
 규칙이 아예 존재하지 않는다.** 이 함정에 두 번 빠졌다(위 표의 1·2번).
 
-- **전역 정책**(색·높이·상태별 톤) → `index.css`
+- **전역 정책**(색·높이·상태별 톤) → `index.css`가 import하는 `styles/global/*.css`
 - **컴포넌트 지역 스타일**(그 인스턴스에만 적용되는 폭·간격) → 인라인 `style`
 
-> 아직 파일 안 `<style>`을 쓰는 곳이 남아 있다 — `Button`, `Card`, `AdBanner`, `Loading`,
-> `Footer`, `QrScannerTab`, `MyFavorites`, `FilterToolbar`. 전역 규칙이 섞여 있으면 옮기는 게 맞다.
+2026-09-02 기준 프로젝트 JSX가 직접 렌더하는 `<style>` 태그는 0개다. App·Home·StoreList·StoreDetail·
+QrScannerTab의 정적 규칙과 키프레임은 모두 전역 CSS 모듈에 있다. AntD의 CSS-in-JS 및 Vite 개발 서버가
+문서 `<head>`에 만드는 스타일 태그는 라이브러리 동작이므로 이 수치와 별개다.
 
 ---
 
@@ -385,7 +425,7 @@ const handleChange = (key) => {
 
 구현 위치 — 둘 다 같은 규격을 내야 한다.
 
-1. **AntD `Form.Item`** (가게 등록·광고 신청·제재 모달 등) → `index.css`의
+1. **AntD `Form.Item`** (가게 등록·광고 신청·제재 모달 등) → `styles/global/components-and-forms.css`의
    `.ant-form-item-explain` 전역 규칙이 크기·간격을 맞추고, 색은
    `App.jsx`의 `ConfigProvider token.colorError`가 맡는다.
 2. **`FormField`** (`components/common/FormModal.jsx`, 문의 모달 등) → 컴포넌트가 직접 렌더.

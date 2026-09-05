@@ -211,9 +211,13 @@ const ProfileImageTab = ({ user }) => {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
 
             {/* 원형 미리보기 — 클릭 시 파일 선택 */}
-            <div
+            <button
+                type="button"
+                className="reserve-profile-image-button"
                 style={{ cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}
-                onClick={() => !loading && fileInputRef.current?.click()}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+                aria-label="프로필 사진 변경"
             >
                 <Avatar
                     key={previewSrc ?? 'default'}
@@ -221,7 +225,7 @@ const ProfileImageTab = ({ user }) => {
                     size={80}
                     style={pending?.previewUrl ? { animation: animation.scaleSpringIn } : undefined}
                 />
-            </div>
+            </button>
 
             <input
                 ref={fileInputRef}
@@ -952,12 +956,29 @@ const MyPage = () => {
     // 마이페이지 진입 시 항상 최신 user 정보를 서버에서 재조회 (localStorage 캐시 신뢰하지 않음)
     useEffect(() => { checkAuth(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleDeleteAccount = () => {
+    const handleDeleteAccount = async () => {
+        let readiness;
+        try {
+            readiness = await memberService.getWithdrawalReadiness();
+        } catch (err) {
+            handleApiError(err, message, '탈퇴 준비 상태를 확인하지 못했습니다');
+            return;
+        }
+
+        if (!readiness?.canWithdraw) {
+            message.warning(
+                `먼저 처리할 항목이 있습니다. 운영 중 가게 ${readiness?.openStores ?? 0}곳, ` +
+                `예약 ${readiness?.unresolvedReservations ?? 0}건, 환불 ${readiness?.unresolvedRefunds ?? 0}건, ` +
+                `결제 확인 ${readiness?.openPaymentIssues ?? 0}건, 웹훅 ${readiness?.unfinishedWebhooks ?? 0}건`
+            );
+            return;
+        }
+
         confirm({
             title: '회원 탈퇴',
             icon: <ExclamationCircleOutlined style={{ color: colors.error.main }} />,
             // 문장 단위 줄바꿈은 useMessage의 confirm 래퍼가 처리한다 — 여기선 평범한 문자열이면 된다.
-            content: '탈퇴하면 모든 데이터가 삭제되며 복구할 수 없습니다. 정말 탈퇴하시겠습니까?',
+            content: '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 됩니다. 거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다. 정말 탈퇴하시겠습니까?',
             okText: '탈퇴하기',
             cancelText: '취소',
             okButtonProps: { danger: true },
@@ -1055,7 +1076,7 @@ const MyPage = () => {
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main }}>회원 탈퇴</Text>
                     <Text type="secondary" style={{ display: 'block', fontSize: fontSize.xs, marginTop: 2 }}>
-                        모든 예약·리뷰 데이터가 삭제되며 복구할 수 없습니다
+                        개인정보는 제거되며 필요한 거래 기록은 비식별 상태로 보존됩니다
                     </Text>
                 </div>
                 <Button variant="danger" size="sm" onClick={handleDeleteAccount}

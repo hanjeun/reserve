@@ -71,7 +71,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         // 정적 리소스 (랜딩페이지, favicon)
-                        .requestMatchers("/", "/index.html", "/favicon.svg").permitAll()
+                        .requestMatchers("/", "/index.html", "/favicon.svg", "/sitemap.xml").permitAll()
                         // Health Check & Environment
                         .requestMatchers("/hc", "/env").permitAll()
                         .requestMatchers("/actuator/health").permitAll()

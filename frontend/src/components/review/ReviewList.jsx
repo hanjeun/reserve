@@ -278,7 +278,7 @@ const ReviewList = ({
             ) : (
                 <div style={isPC ? styles.listGridPC : styles.list}>
                     {reviews.map(review => {
-                        const isOwner   = user && user.email === review.memberEmail;
+                        const isOwner   = user && user.id === review.memberId;
                         const isEditing = editingId === review.id;
                         const isFocused = focusReviewId === review.id;
 

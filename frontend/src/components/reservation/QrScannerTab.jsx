@@ -72,21 +72,6 @@ const ASPECT_TOLERANCE = 0.02;
 // 재시작 상한. 카메라가 비율을 흔들어도 무한 재시작에 빠지지 않게 한다.
 const MAX_ASPECT_FIXES = 3;
 
-// 라이브러리가 넣는 <video>가 컨테이너를 정확히 꽉 채우도록 강제 (검은 여백/크롭 방지) +
-// 스캔 대기 dot의 pulse 링 애니메이션 (2026-07 리디자인 — App.jsx 전역 keyframes와 동일한
-// 로컬 <style> 태그 패턴, 이 컴포넌트에서만 쓰는 애니메이션이라 전역에 안 얹고 여기 둠)
-const scannerVideoStyles = `
-  #${SCANNER_ELEMENT_ID} video {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-  }
-  @keyframes reserve-qr-pulse {
-    0%   { box-shadow: 0 0 0 0 ${colors.success.main}55; }
-    100% { box-shadow: 0 0 0 8px ${colors.success.main}00; }
-  }
-`;
-
 /**
  * QR 체크인 스캐너 (사업자용)
  *
@@ -440,8 +425,6 @@ const QrScannerTab = () => {
 
     return (
         <div style={styles.wrapper}>
-            <style>{scannerVideoStyles}</style>
-
             <div style={styles.card}>
                 <Text strong style={styles.cardTitle}>QR 체크인</Text>
                 <Text type="secondary" style={styles.hint}>
@@ -516,7 +499,7 @@ const QrScannerTab = () => {
 
                 {status === 'scanning' && (
                     <div style={styles.scanningFooter}>
-                        <span style={styles.scanningDot} />
+                        <span className="reserve-qr-scanning-dot" style={styles.scanningDot} />
                         <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary, flex: 1 }}>
                             스캔 대기 중…
                         </Text>

@@ -30,6 +30,9 @@ const memberService = {
     /** 회원 탈퇴 */
     deleteMember: () => api.delete(API_ENDPOINTS.MEMBER.DELETE),
 
+    /** 탈퇴 전 운영·결제 미결 상태 확인 */
+    getWithdrawalReadiness: () => api.get(API_ENDPOINTS.MEMBER.WITHDRAWAL_READINESS),
+
     /** 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경) */
     updateMarketingConsent: (marketingAgreed) =>
         api.patch(API_ENDPOINTS.MEMBER.MARKETING_CONSENT, { marketingAgreed }),

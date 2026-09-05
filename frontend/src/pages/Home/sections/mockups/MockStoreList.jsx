@@ -22,7 +22,6 @@ export default function MockStoreList() {
                             border: `1px solid ${colors.border.light}`,
                             boxShadow: shadows.card,
                             background: colors.background.paper,
-                            cursor: 'pointer',
                         }}
                     >
                         {/* Card.Cover 구조 완전 동일 */}
@@ -42,27 +41,27 @@ export default function MockStoreList() {
                                 />
                             </div>
                             {/* 하트 버튼 — top:10 right:10 (StoreCard 동일) */}
-                            <div
-                                style={{ position: 'absolute', top: 10, right: 10, zIndex: 1 }}
-                                onClick={e => {
-                                    e.stopPropagation();
-                                    setLiked(l => ({ ...l, [i]: !l[i] }));
-                                }}
-                            >
-                                <div style={{
+                            <button
+                                type="button"
+                                className="reserve-home-mock-favorite"
+                                aria-label={`${s.name} 즐겨찾기 ${liked[i] ? '삭제' : '추가'}`}
+                                aria-pressed={Boolean(liked[i])}
+                                style={{
+                                    position: 'absolute', top: 10, right: 10, zIndex: 1,
                                     width: 28, height: 28,
-                                    borderRadius: '50%',
+                                    padding: 0, border: 0, borderRadius: '50%',
                                     background: 'rgba(255,255,255,0.88)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     cursor: 'pointer',
                                     boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-                                }}>
-                                    {liked[i]
-                                        ? <HeartFilled style={{ fontSize: 12, color: colors.error?.main || '#f04452' }} />
-                                        : <HeartOutlined style={{ fontSize: 12, color: colors.text.secondary }} />
-                                    }
-                                </div>
-                            </div>
+                                }}
+                                onClick={() => setLiked(l => ({ ...l, [i]: !l[i] }))}
+                            >
+                                {liked[i]
+                                    ? <HeartFilled style={{ fontSize: 12, color: colors.error?.main || '#f04452' }} />
+                                    : <HeartOutlined style={{ fontSize: 12, color: colors.text.secondary }} />
+                                }
+                            </button>
                         </div>
 
                         {/* 카드 본문 */}
@@ -103,20 +102,6 @@ export default function MockStoreList() {
                     </div>
                 ))}
             </div>
-
-            {/* Card.jsx와 동일한 hover CSS — 이미지만 scale, 카드는 그대로.
-                클래스명은 Card.jsx의 .reserve-card-image와 겹치지 않게 mock- 접두사를 쓴다
-                (예전엔 둘 다 'card-image'였고, 부모 선택자가 달라서 우연히 안 부딪혔을 뿐이다). */}
-            <style>{`
-                .mock-card:hover .mock-card-image {
-                    transform: scale(1.05);
-                }
-                @media (prefers-reduced-motion: reduce) {
-                    .mock-card:hover .mock-card-image {
-                        transform: none;
-                    }
-                }
-            `}</style>
         </>
     );
 }

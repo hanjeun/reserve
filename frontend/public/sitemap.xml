@@ -1,47 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
-
-  <!-- 홈 -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://reserve.it.kr/</loc>
-    <lastmod>2026-04-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-
-  <!-- 가게 목록 (SEO 핵심 페이지) -->
   <url>
     <loc>https://reserve.it.kr/stores</loc>
-    <lastmod>2026-04-28</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
-
-  <!-- 로그인 / 회원가입 -->
   <url>
-    <loc>https://reserve.it.kr/login</loc>
-    <lastmod>2026-04-28</lastmod>
+    <loc>https://reserve.it.kr/terms</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.3</priority>
   </url>
-
   <url>
-    <loc>https://reserve.it.kr/signup</loc>
-    <lastmod>2026-04-28</lastmod>
+    <loc>https://reserve.it.kr/privacy</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.3</priority>
   </url>
-
-  <!--
-    가게 상세 페이지 (동적)
-    Next.js SSR 또는 서버사이드 sitemap 생성 도입 시 아래처럼 추가:
-    <url>
-      <loc>https://reserve.it.kr/store/1</loc>
-      <lastmod>2026-04-28</lastmod>
-      <changefreq>weekly</changefreq>
-      <priority>0.8</priority>
-    </url>
-  -->
-
 </urlset>

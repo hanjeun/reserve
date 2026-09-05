@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Flex } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { colors, radius, fontWeight, fontSize } from '../../../../styles/tokens';
@@ -10,7 +10,6 @@ export default function MockBookingForm() {
     const [count, setCount] = useState(1);
     const [text, setText] = useState('');
     const [pressed, setPressed] = useState(false);
-    const textareaRef = useRef(null);
     const pickerIcon = { color: colors.text.tertiary, fontSize: 14, flexShrink: 0 };
 
     return (
@@ -79,7 +78,7 @@ export default function MockBookingForm() {
 
             {/* 요청 사항 — 실제 입력 가능 */}
             <div style={{ marginBottom: 20 }}>
-                <label style={mockFormLabel}>요청 사항</label>
+                <label htmlFor="reserve-home-booking-request" style={mockFormLabel}>요청 사항</label>
                 <div
                     style={{
                         position: 'relative',
@@ -87,10 +86,9 @@ export default function MockBookingForm() {
                         borderRadius: radius.lg,
                         overflow: 'hidden',
                     }}
-                    onClick={() => textareaRef.current?.focus()}
                 >
                     <textarea
-                        ref={textareaRef}
+                        id="reserve-home-booking-request"
                         value={text}
                         onChange={e => setText(e.target.value)}
                         maxLength={200}

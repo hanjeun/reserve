@@ -2,9 +2,12 @@
  * RESERVE Design System - Card Component
  * 
  * 사용법:
- * <Card hoverable onClick={() => navigate('/store/1')}>
- *     <Card.Cover src={imageUrl} alt="가게 이미지" />
- *     <Card.Body>내용</Card.Body>
+ * 이동 카드에는 Card 자체 onClick 대신 내부에 실제 Link를 사용한다.
+ * <Card hoverable>
+ *     <Link to="/store/1" className="reserve-card-link">
+ *         <Card.Cover src={imageUrl} alt="가게 이미지" />
+ *         <Card.Body>내용</Card.Body>
+ *     </Link>
  * </Card>
  * 
  * <Card.Add onClick={() => navigate('/store/register')}>
@@ -24,6 +27,10 @@ const Card = ({
     children,
     style,
     onClick,
+    onKeyDown,
+    role,
+    tabIndex,
+    className,
     ...rest 
 }) => {
     // ★ boxShadow를 여기(인라인)에 두지 않는다 — hover 그림자가 죽는다.
@@ -37,17 +44,36 @@ const Card = ({
         border: `1px solid ${colors.border.light}`,
         ...style,
     };
+    const isInteractive = typeof onClick === 'function';
+    const cardClassName = [
+        'reserve-card',
+        isInteractive ? 'reserve-card--interactive' : '',
+        className,
+    ].filter(Boolean).join(' ');
+
+    const handleKeyDown = (event) => {
+        onKeyDown?.(event);
+        if (event.defaultPrevented || !isInteractive) return;
+
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick(event);
+        }
+    };
 
     return (
         <>
             <AntCard
+                {...rest}
                 hoverable={hoverable}
                 style={cardStyle}
                 styles={{ body: { padding: 0 } }}
                 actions={actions}
                 onClick={onClick}
-                className="reserve-card"
-                {...rest}
+                onKeyDown={handleKeyDown}
+                role={role ?? (isInteractive ? 'button' : undefined)}
+                tabIndex={tabIndex ?? (isInteractive ? 0 : undefined)}
+                className={cardClassName}
             >
                 {children}
             </AntCard>
@@ -115,16 +141,17 @@ Card.Add = ({ children, onClick, minHeight = '350px' }) => {
     };
 
     return (
-        <div 
+        <button
+            type="button"
             style={addCardStyle}
             onClick={onClick}
             className="reserve-card-add"
         >
-            <span style={{ fontSize: '40px', marginBottom: '10px' }}>+</span>
+            <span aria-hidden="true" style={{ fontSize: '40px', marginBottom: '10px' }}>+</span>
             <span style={{ fontSize: fontSize.lg, fontWeight: fontWeight.semibold }}>
                 {children}
             </span>
-        </div>
+        </button>
     );
 };
 
@@ -134,6 +161,10 @@ Card.propTypes = {
     children: PropTypes.node,
     style: PropTypes.object,
     onClick: PropTypes.func,
+    onKeyDown: PropTypes.func,
+    role: PropTypes.string,
+    tabIndex: PropTypes.number,
+    className: PropTypes.string,
 };
 
 Card.Cover.propTypes = {

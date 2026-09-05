@@ -8,7 +8,7 @@ import { colors } from '../../styles/tokens';
  * 2026-07 재작업: 기존 CSS border 링(등속 회전)을 Material Design 스타일 SVG 호 스피너로 교체.
  * 트랙(배경 원)은 그대로 두고, 그 위 호(arc)가 등속으로 돌면서 동시에 길이가 늘었다 줄었다 해서
  * "빨라졌다 느려지는" 완급 느낌을 준다. reserve-spin(전체 회전) + reserve-arc-dash(호 길이 변화)
- * 두 키프레임을 함께 쓰며, 둘 다 App.jsx <style>에 전역 주입돼 있다.
+ * 두 키프레임을 함께 쓰며, 둘 다 index.css에 전역 정의돼 있다.
  *
  * ArcSpinner    — 재사용 가능한 호 스피너 자체. size/stroke/color/track를 받는다.
  *                 (주소 검색창 등 인라인 스피너도 이걸 재사용 — 스피너 구현을 한 곳으로 통일)

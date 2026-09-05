@@ -1,0 +1,296 @@
+/* ── SUITE 글꼴 (self-host) ─────────────────────────────────────────────────
+   마이페이지 → 디자인 → 글꼴에서 고를 수 있는 선택지 중 하나(useTheme 의 FONT_OPTIONS).
+
+   Pretendard 는 npm 패키지라 위 @import 한 줄로 끝나지만, SUITE 는 npm 패키지가 없어서
+   폰트 파일을 레포에 직접 넣고 여기서 선언한다:
+     frontend/public/fonts/SUITE-Variable.woff2  (sun-typeface/SUITE 2.0.4)
+   라이선스는 OFL-1.1 — THIRD_PARTY_NOTICES.md 에 고지했다.
+
+   ★ font-display: swap
+     이 글꼴을 고른 사람만 다운로드가 필요한데, 받는 동안 글자가 안 보이면(기본 block 동작)
+     화면이 빈 것처럼 보인다. swap 이면 폴백 글꼴로 먼저 그리고 준비되면 교체한다.
+
+   ★ 가변 글꼴이라 weight 를 범위로 준다(300~900). 이렇게 두면 굵기별로 파일을 따로
+     받지 않고 한 파일이 모든 굵기를 담당한다 — 523KB 하나로 끝난다.
+
+   ⚠️ 경로가 /fonts/... 인 이유: public/ 아래 파일은 빌드 시 그대로 루트로 복사된다.
+     src/ 안에 두고 상대경로로 참조하면 Vite 가 해시 파일명으로 바꾸는데, 그건 이 선언에서는
+     이점이 없고 public 쪽이 CloudFront 캐시 정책과도 맞다. */
+@font-face {
+    font-family: 'SUITE Variable';
+    font-weight: 300 900;
+    font-display: swap;
+    src: url('/fonts/SUITE-Variable.woff2') format('woff2-variations');
+}
+:root {
+  /* --app-font는 useTheme가 <html>에 직접 세팅한다(글꼴 옵션).
+     아직 세팅되기 전이거나 localStorage를 못 읽는 환경에서는 기존 값으로 폴백한다. */
+  --app-font: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+  font-family: var(--app-font);
+}
+
+html {
+  /* iOS WebKit(Safari/Chrome) 수평 viewport 밀림 원천 차단 */
+  max-width: 100%;
+}
+
+body {
+  margin: 0;
+  display: block;
+  font-family: var(--app-font);
+  /* 하드코딩 hex → 테마 변수. 라이트 모드 값은 각각 var(--c-bg-subtle, #f8f9fa) / #333과 동일하다. */
+  background-color: var(--c-bg-subtle);
+  color: var(--c-text-primary);
+  /* iOS WebKit 수평 밀림 방지 — html과 함께 양쪽에 걸어야 확실히 막힘 */
+  max-width: 100%;
+}
+
+#root {
+  width: 100%;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* button/input은 브라우저 기본값이 폰트 상속을 안 받아서(웹 표준 동작) 전역으로 맞춰줌 */
+button, input, textarea, select {
+  font-family: inherit;
+}
+
+/* ── 드롭다운(Select/FormSelect 등 "롤러") 옵션 목록 — hover/선택 항목 사이 여백 ──
+   AntD 기본값은 옵션들이 서로 딱 붙어있는 하나의 긴 직사각형 리스트라, 마우스가 올라간
+   항목(hover)과 실제 선택된 항목(selected)이 이웃해 있으면 경계가 안 보여서 하나로
+   뭉쳐 보인다. 각 옵션에 살짝 마진 + 라운드를 줘서 필(pill) 하나하나로 분리되게 함 —
+   .reserve-pill-tabs/.reserve-segmented-btn과 같은 톤. 전역 클래스라 FormSelect를 쓰는
+   모든 드롭다운("롤러")에 한 번에 적용된다. */
+.ant-select-dropdown .ant-select-item {
+    border-radius: 8px !important;
+    margin: 1px 4px !important;
+    width: auto !important;
+}
+
+/* Ant Design v6: Select open 상태 화살표 회전 */
+.ant-select-suffix {
+    transition: transform 0.2s;
+}
+.ant-select-open .ant-select-suffix {
+    transform: rotate(180deg);
+}
+
+/* 관리자/사업자 패널 탭 — 탭이 좌우로 넘칠 때 AntD 자체 "더보기"(∨) 버튼으로 접근하게 둔.
+   (2026-07-08: 직접 구현한 PillTabBar로 교체해봤다가 오히려 더 이상해졌다고 해서, 검증된 AntD 기본 메커니즘(더보기 버튼)으로 다시 되돌림) */
+
+/* 모바일 input 자동 확대 방지 (iOS Safari: font-size < 16px 시 자동 줌) */
+@media (max-width: 768px) {
+    input, textarea, select {
+        font-size: 16px !important;
+    }
+}
+
+/* ── Toss 스타일 페이지네이션 글로벌 적용 ────────────────────────────────────────── */
+.ant-pagination {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important; /* 모바일에서 여러 줄로 꺾여 깨지는 레이아웃 방지 */
+    padding: 4px 0 !important;
+}
+
+/* ── 번호 아이템 ── */
+.ant-pagination .ant-pagination-item {
+    min-width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    background: transparent !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background-color 0.15s ease, transform 0.15s ease !important;
+}
+.ant-pagination .ant-pagination-item a {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--c-text-secondary, #4e5968) !important;
+    padding: 0 !important;
+    line-height: 32px !important;
+    display: block !important;
+    width: 100% !important;
+    text-align: center !important;
+}
+.ant-pagination .ant-pagination-item:hover {
+    background-color: var(--c-gray-100, #f2f4f6) !important;
+}
+.ant-pagination .ant-pagination-item:hover a {
+    color: var(--c-text-primary, #1a1f27) !important;
+}
+
+/* ── 선택된 번호 — 얕은 회색 배경 + 스프링 스케일 애니메이션 ── */
+.ant-pagination .ant-pagination-item-active {
+    background-color: var(--c-gray-200, #e5e8eb) !important; /* 토스 스타일 연한 회색 배경 */
+    border: none !important;
+    transform: scale(1.04) !important;
+    transition: background-color 0.2s ease,
+                transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+.ant-pagination .ant-pagination-item-active a {
+    color: var(--c-text-primary, #1a1f27) !important;
+    font-weight: 600 !important;
+}
+.ant-pagination .ant-pagination-item-active:hover {
+    background-color: var(--c-gray-200, #e5e8eb) !important;
+    opacity: 0.95 !important;
+}
+
+/* ── 이전 / 다음 버튼 ── */
+.ant-pagination .ant-pagination-prev,
+.ant-pagination .ant-pagination-next {
+    min-width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next .ant-pagination-item-link {
+    border-radius: 8px !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--c-text-secondary, #4e5968) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    transition: background-color 0.15s ease !important;
+}
+.ant-pagination .ant-pagination-prev:hover .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next:hover .ant-pagination-item-link {
+    background-color: var(--c-gray-100, #f2f4f6) !important;
+    color: var(--c-text-primary, #1a1f27) !important;
+}
+.ant-pagination .ant-pagination-disabled .ant-pagination-item-link {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    background: transparent !important;
+}
+
+/* ── 줄임표 (…) ── */
+.ant-pagination .ant-pagination-jump-prev,
+.ant-pagination .ant-pagination-jump-next {
+    min-width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    margin: 0 !important;
+    color: var(--c-text-secondary, #4e5968) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.ant-pagination .ant-pagination-jump-prev .ant-pagination-item-container,
+.ant-pagination .ant-pagination-jump-next .ant-pagination-item-container {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* ── 모바일: 버튼 크기 30px (모바일 화면 내에서 꺾임 없이 세련되고 콤팩트하게) ── */
+@media (max-width: 768px) {
+    .ant-pagination {
+        gap: 2px !important;
+    }
+    .ant-pagination .ant-pagination-item {
+        min-width: 30px !important;
+        height: 30px !important;
+        line-height: 30px !important;
+        border-radius: 6px !important;
+    }
+    .ant-pagination .ant-pagination-item a {
+        font-size: 13px !important;
+        line-height: 30px !important;
+    }
+    .ant-pagination .ant-pagination-prev,
+    .ant-pagination .ant-pagination-next,
+    .ant-pagination .ant-pagination-jump-prev,
+    .ant-pagination .ant-pagination-jump-next {
+        min-width: 30px !important;
+        height: 30px !important;
+    }
+}
+
+/* ── 폼 입력 필드 placeholder·입력 텍스트 크기 전역 통일(16px) ── */
+/* FormInput / FormTextArea가 붙이는 .reserve-form-field 클래스 — AntD의 Input/InputNumber/Password/TextArea 내부 <input>·<textarea>까지 강제 적용 */
+.reserve-form-field.ant-input,
+.reserve-form-field .ant-input,
+.reserve-form-field.ant-input-number .ant-input-number-input,
+.reserve-form-field textarea.ant-input {
+    font-size: 16px !important;
+}
+.reserve-form-field .ant-input::placeholder,
+.reserve-form-field.ant-input::placeholder,
+.reserve-form-field.ant-input-number .ant-input-number-input::placeholder,
+.reserve-form-field textarea.ant-input::placeholder {
+    font-size: 16px !important;
+}
+
+/* ── AddressSearch의 raw <input> — 표준 FormInput과 placeholder 톤 통일 ──
+   AddressSearch는 드롭다운/터치 스크롤 때문에 AntD Input 대신 raw <input>을 쓴다.
+   그래서 placeholder가 .reserve-form-field(=.ant-input 기준) 규칙의 적용을 받지 못해
+   브라우저 기본 placeholder(더 진하고 굵게) 색·굵기로 나와 다른 필드와 달라 보였다.
+   표준 filled input과 동일하게 tertiary(var(--c-text-tertiary, #8b95a1)) 색 + 기본 굵기 + 16px로 맞춘다. */
+.reserve-address-input::placeholder {
+    color: var(--c-text-tertiary, #8b95a1) !important;
+    font-weight: 400 !important;
+    font-size: 16px !important;
+    opacity: 1; /* Firefox는 placeholder에 기본 opacity 0.54를 걸어 더 연하게 만든다 — 명시적으로 1 */
+}
+.ant-picker-cell-selected .ant-picker-cell-inner,
+.ant-picker-cell-range-start .ant-picker-cell-inner,
+.ant-picker-cell-range-end .ant-picker-cell-inner {
+    background-color: var(--c-gray-200, #e5e8eb) !important;
+    color: var(--c-text-primary, #1a1f27) !important;
+    font-weight: 600 !important;
+}
+.ant-picker-cell-selected .ant-picker-cell-inner:hover {
+    background-color: var(--c-gray-200, #e5e8eb) !important;
+}
+/* 오늘 날짜 테두리도 파란색 대신 회색계로 */
+.ant-picker-cell-today .ant-picker-cell-inner::before {
+    border-color: var(--c-text-disabled, #b5b8bd) !important;
+}
+
+/* RangePicker (FormDatePicker.RangePicker) default layout shows two calendar months side by
+   side, which needs 550px+ of width. On a narrow phone screen (375-430px) the left month
+   overflows off the edge of the screen. Below 576px, show only ONE month panel at a time
+   (matching how most mobile date-range pickers work: tap 시작일, pick from the one visible
+   month; tap 종료일, pick from the one visible month again, navigating months as needed) --
+   the underlying start/end selection logic is driven by which input has focus, not by how
+   many panels are in the DOM, so hiding the second panel doesn't affect picking either date.
+   PC keeps the original two-month side-by-side view untouched.
+   (2026-07-10: found on a real device testing the ad banner's exposure-period date range field;
+   first tried stacking both months vertically, but that was still too tall for a mobile modal,
+   so switched to hiding the second panel entirely per feedback) */
+@media (max-width: 576px) {
+    .ant-picker-dropdown .ant-picker-panels {
+        flex-direction: column !important;
+    }
+    .ant-picker-dropdown .ant-picker-panels > .ant-picker-panel:nth-of-type(2) {
+        display: none !important;
+    }
+    .ant-picker-dropdown .ant-picker-panel-container {
+        width: auto !important;
+        max-width: calc(100vw - 24px) !important;
+    }
+    .ant-picker-dropdown .ant-picker-panel {
+        width: 100% !important;
+    }
+}

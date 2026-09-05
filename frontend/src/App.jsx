@@ -4,9 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore';
-import { colors, rawColors, animationKeyframes, field, fieldPx } from './styles/tokens';
+import { colors, rawColors, field, fieldPx } from './styles/tokens';
 import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
+import useRouteSeo from './hooks/useRouteSeo';
 
 // 라우트 단위 Code Splitting (2026-07): 예전엔 모든 페이지를 정적 import해서 첫 번들 JS에
 // 관리자 패널·예약 화면 등 무거운 페이지 코드까지 전부 번들링되었음. React.lazy로 쪼개서
@@ -31,13 +32,12 @@ const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 const Terms = lazy(() => import('./pages/legal/Terms'));
 const SocialAgreement = lazy(() => import('./pages/auth/SocialAgreement'));
 const Privacy = lazy(() => import('./pages/legal/Privacy'));
+// 로그인한 사용자만 쓰는 채팅 UI는 익명 랜딩의 초기 번들에서 제외한다.
+// 인증 초기화가 끝난 뒤 필요한 경우에만 별도 청크를 받아오며, 패널 자체의 폴링 규칙은 유지한다.
+const ChatLauncher = lazy(() => import('./components/chat/ChatLauncher'));
 
 import Header from './components/layout/Header';
 import AppFooter from './components/layout/Footer';
-// 인앱 채팅 런처 — 로그인 상태에서만 스스로 렌더한다(컴포넌트 안에서 판단).
-// 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다 — 붙이는 걸 잊는 페이지가 생기면
-// "어떤 화면에서는 문의가 안 되는" 상태가 된다.
-import ChatLauncher from './components/chat/ChatLauncher';
 import OfflineBanner from './components/layout/OfflineBanner';
 import Loading, { SpinIndicator } from './components/common/Loading';
 import PrivateRoute from './components/PrivateRoute';
@@ -176,6 +176,9 @@ function AppContent() {
 }
 
 function AppRoutes() {
+    const isLoggedIn = useAuthStore((state) => !!state.user);
+    useRouteSeo();
+
     return (
         <Layout style={{ minHeight: '100vh', backgroundColor: colors.background.default }}>
             <ScrollToTop />
@@ -221,7 +224,12 @@ function AppRoutes() {
             </Content>
 
             <AppFooter />
-            <ChatLauncher />
+            {/* 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다. 익명 사용자는 청크도 받지 않는다. */}
+            {isLoggedIn && (
+                <Suspense fallback={null}>
+                    <ChatLauncher />
+                </Suspense>
+            )}
         </Layout>
     );
 }
@@ -263,91 +271,6 @@ function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <BrowserRouter>
-                <style>{animationKeyframes}{`
-                    @keyframes reserve-spin { to { transform: rotate(360deg); } }
-
-                    @keyframes reserve-arc-dash {
-                        0%   { stroke-dasharray: 1 126;  stroke-dashoffset: 0; }
-                        50%  { stroke-dasharray: 90 126; stroke-dashoffset: -18; }
-                        100% { stroke-dasharray: 90 126; stroke-dashoffset: -124; }
-                    }
-
-                    /* AntD 기본 로딩 아이콘(Modal.confirm 비동기 onOk, Select loading 등)만 우리 링 스피너 스타일로 통일.
-                       .anticon-loading만 케이스(LoadingOutlined)로 한정 — SyncOutlined spin(새로고침 버튼 회전) 같은
-                       다른 의도적 애니메이션은 .anticon-spin만 가지고 있어서 건드리지 않음.
-                       2026-07 버그 수정: 예전엔 14px 고정값이라 Button(Modal.confirm OK 버튼)에서 우연히 맞았을 뿐,
-                       AntD Select의 suffix 아이콘처럼 font-size가 다른 곳(예: size="large")에서는 실제 아이콘
-                       슬롯 크기와 안 맞아서 스피너가 중앙에 고정 안 되고 미묘하게 밀려 보였음 — AntD 아이콘 자체가
-                       쓰는 관례대로 1em 기반(현재 font-size에 상대적)으로 바꿔서 어느 컴포넌트/사이즈에 붙어도
-                       실제 아이콘이 차지하던 자리와 정확히 같은 크기로 맞춰지도록 함.
-                       (브라우저 실측으로 정상 동작 확인 — 2026-07 전수조사) */
-                    .anticon-loading.anticon-spin {
-                        visibility: hidden !important;
-                        position: relative;
-                        display: inline-block;
-                        width: 1em; height: 1em;
-                    }
-                    .anticon-loading.anticon-spin::before {
-                        content: '';
-                        visibility: visible;
-                        position: absolute;
-                        inset: 0;
-                        border: 0.15em solid color-mix(in srgb, currentColor 30%, transparent);
-                        border-top-color: currentColor;
-                        border-radius: 50%;
-                        animation: reserve-spin 0.6s linear infinite;
-                    }
-
-                    /* NOTE: AntD <Spin>의 "점 4개" 인디케이터는 더 이상 CSS로 덮어쓰지 않는다.
-                       (예전 .ant-spin-dot::before 해킹은 antd 6에서 .ant-spin-dot이 0x0이라 무효였음 —
-                        브라우저 실측으로 확인) → ConfigProvider spin.indicator로 정식 교체함. 위 spinConfig 참고. */
-
-                    /* ── AntD 버튼에도 우리 Button 컴포넌트와 동일한 "눌리는" 피드백 부여 (2026-07 전수조사) ──
-                       우리 Button(.reserve-btn)은 :active에서 scale(0.96)+투명도로 눌리는 느낌을 주는데,
-                       Modal.confirm()이나 AntD <Modal>의 기본 footer는 우리 Button이 아니라 AntD 자체
-                       버튼(.ant-btn)을 쓰기 때문에 이 피드백이 전혀 없었음 — 확인/취소 모달 22곳 전부
-                       해당. .reserve-btn은 자체 규칙이 있으므로 :not()으로 제외해서 중복 적용 방지.
-                       (브라우저 실측으로 규칙 적용 + 셀렉터 매칭 확인 완료) */
-                    .ant-btn:not(.reserve-btn) {
-                        transition: transform 0.12s ease, opacity 0.12s ease, background-color 0.12s ease !important;
-                    }
-                    .ant-btn:not(.reserve-btn):active:not(:disabled):not(.ant-btn-loading) {
-                        transform: scale(0.96);
-                        opacity: 0.88;
-                    }
-
-                    /* ── 모달 취소/닫기 버튼 색상 통일 (2026-07 전수조사) ─────────────────────
-                       모달의 취소 버튼이 두 가지 경로로 그려진다:
-                         - 우리 Button variant="outline"  (FormModal, 사업자인증 닫기)
-                         - AntD 기본 footer의 .ant-btn-default (Modal.confirm 18곳, <Modal> 4곳)
-                       그런데 테두리 색과 글자색이 서로 달라서(전자는 #e5e8eb/진한 글자,
-                       후자는 테마의 colorBorder=#f2f4f6) "어떤 취소는 회색, 어떤 취소는 검정"으로 보였다.
-                       모달 footer의 기본 버튼만 우리 outline과 동일하게 맞춘다 — 전역 colorBorder를
-                       바꾸면 Input 등 다른 컴포넌트까지 영향을 받으므로 범위를 모달로 한정함. */
-                    .ant-modal-footer .ant-btn-default:not(.reserve-btn),
-                    .ant-modal-confirm-btns .ant-btn-default:not(.reserve-btn) {
-                        border-color: ${colors.border.default};
-                        color: ${colors.text.primary};
-                    }
-                    .ant-modal-footer .ant-btn-default:not(.reserve-btn):hover,
-                    .ant-modal-confirm-btns .ant-btn-default:not(.reserve-btn):hover {
-                        border-color: #adb5bd;
-                        color: ${colors.text.primary};
-                        background: rgba(0,0,0,0.02);
-                    }
-
-                    /* AntD Pagination(시스템 로그/광고 관리 등 테이블 페이지 버튼)도 동일한 눌림 피드백 */
-                    .ant-pagination-item:active,
-                    .ant-pagination-prev:active,
-                    .ant-pagination-next:active {
-                        transform: scale(0.94);
-                    }
-                    .ant-pagination-item,
-                    .ant-pagination-prev,
-                    .ant-pagination-next {
-                        transition: transform 0.12s ease, background-color 0.15s ease;
-                    }
-                `}</style>
                 <ConfigProvider
                     locale={koKR}
                     theme={themeConfig}

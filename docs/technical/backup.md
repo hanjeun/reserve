@@ -7,10 +7,15 @@ RESERVE의 MySQL 백업 구성과 복원 절차. **결제·예약 데이터가 �
 |---|---|
 | 대상 | MySQL 8 컨테이너 `mysql`, DB `reserve` |
 | 방식 | `mysqldump --single-transaction` (서비스 중단 없음) |
-| 주기 | 매일 03:10 KST (cron) |
-| 보관 | 로컬 7일 + S3 (라이프사이클로 30일/90일 관리) |
+| 목표 주기 | 매일 03:10 KST (cron) |
+| 목표 보관 | 로컬 7일 + S3 (라이프사이클로 30일/90일 관리) |
 | 스크립트 | `scripts/backup-mysql.sh`, `scripts/restore-mysql.sh` |
-| 로그 | `/var/log/reserve/backup.log` → Promtail → Loki → Grafana |
+| 목표 로그 | `/var/log/reserve/backup.log` → Promtail → Loki → Grafana |
+
+> **운영 상태 — 2026-09-02 읽기 전용 확인:** 저장소의 스크립트만 존재한다.
+> 서버에는 `/usr/local/bin/reserve-backup`·`reserve-restore`, `/etc/reserve-backup.env`, root cron,
+> `/var/backups/reserve` 백업 파일, `/var/log/reserve/backup.log`가 모두 없다. 복원 훈련도 미실시다.
+> 따라서 위 주기·보관·로그는 **현재 상태가 아니라 설치 후 목표 상태**다.
 
 ---
 
@@ -26,7 +31,8 @@ RESERVE의 MySQL 백업 구성과 복원 절차. **결제·예약 데이터가 �
 | 비용 | 디스크 크기 비례 | 덤프 크기(수십 MB) |
 
 둘 다 켜는 게 맞다. Lightsail 콘솔 → 인스턴스 → Snapshots → **Automatic snapshots 활성화**(보관 7일).
-이미 켜져 있는지부터 확인할 것 — 켜져 있다면 이 문서의 나머지는 "세밀한 복구 수단"을 추가하는 작업이 된다.
+2026-09-02 서버·GitHub 읽기 전용 감사만으로는 활성화 여부를 확인할 수 없었다. AWS 콘솔에서 직접
+확인해 증거 시각을 남길 것 — 켜져 있다면 이 문서의 나머지는 "세밀한 복구 수단"을 추가하는 작업이 된다.
 
 ---
 
@@ -101,11 +107,12 @@ sudo crontab -e
 
 ```cron
 # RESERVE MySQL 백업 — 매일 03:10 KST
-# 03:00에 TrashCleanupScheduler가 돌므로 10분 뒤로 밀어 겹치지 않게 한다.
-10 3 * * * /usr/local/bin/reserve-backup >/dev/null 2>&1
+# 운영 서버는 UTC이므로 전날 18:10 UTC에 실행한다.
+10 18 * * * /usr/local/bin/reserve-backup >/dev/null 2>&1
 ```
 
-> 서버 타임존이 UTC라면 `10 18 * * *`가 KST 03:10이다. `timedatectl`로 확인할 것.
+> 2026-09-02 확인 당시 서버와 JVM은 UTC였다. `TrashCleanupScheduler`의 `03:00`도 JVM 기준
+> 03:00 UTC(12:00 KST)이므로 백업과 겹치지 않는다. 타임존 정책을 바꾸면 cron도 함께 재검토한다.
 
 ### 1-5. 첫 실행 확인
 

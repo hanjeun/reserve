@@ -67,6 +67,8 @@ trap 'fail "unexpected failure at line $LINENO"' ERR
 log "=== backup start (db=${DB_NAME}) ==="
 
 [[ -n "${DB_PASSWORD:-}" ]] || fail "DB_PASSWORD is not set (check $CONFIG_FILE)"
+[[ "$LOCAL_RETENTION_DAYS" =~ ^[0-9]+$ ]] \
+    || fail "LOCAL_RETENTION_DAYS must be a non-negative integer"
 
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
     || fail "container '$MYSQL_CONTAINER' not found"
@@ -100,10 +102,13 @@ docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
         --set-gtid-purged=OFF \
         --default-character-set=utf8mb4 \
         "$DB_NAME" 2>>"$LOG_FILE" | gzip -c > "$DUMP_FILE"
-DUMP_STATUS="${PIPESTATUS[0]}"
+PIPE_STATUSES=("${PIPESTATUS[@]}")
+DUMP_STATUS="${PIPE_STATUSES[0]}"
+GZIP_STATUS="${PIPE_STATUSES[1]}"
 set -e
 
 [[ "$DUMP_STATUS" -eq 0 ]] || fail "mysqldump exited with status $DUMP_STATUS"
+[[ "$GZIP_STATUS" -eq 0 ]] || fail "gzip exited with status $GZIP_STATUS"
 
 # ─────────────────────────────────────────────────────────
 # 검증 — 여기가 이 스크립트의 핵심이다

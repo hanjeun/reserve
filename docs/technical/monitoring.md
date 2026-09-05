@@ -141,6 +141,12 @@ zgrep -c 'Email send failed' /var/log/reserve/app.*.log.gz
 ## 컨테이너 구성
 
 `docker-compose-monitoring.yml`. `app-network` 에 붙어 Spring Boot 컨테이너와 통신한다.
+Grafana와 Loki는 호스트 포트를 publish하지 않는다. nginx는 `grafana:3000`, Promtail은 `loki:3100`으로
+같은 Docker 네트워크에서 직접 접근하므로 3000·3100을 `0.0.0.0`에 열 필요가 없다.
+
+2026-09-02 읽기 전용 확인 당시 운영 컨테이너는 두 포트를 호스트 전체 인터페이스에 publish하고 있었지만
+Lightsail 외곽 방화벽이 외부 접속을 차단하고 있었다. 이 Compose 변경은 방화벽이 실수로 풀려도 직접
+노출되지 않게 하는 2차 방어선이며, **서버 파일 교체와 컨테이너 재생성 전까지 운영에는 반영되지 않는다.**
 
 ```bash
 docker compose -f ~/docker-compose-monitoring.yml up -d
@@ -232,15 +238,31 @@ avg_over_time({job="metrics"} | logfmt | kind=`container` | metric=`mem_mb`  | u
 
 | 파일 | 제목 | 구성 |
 |---|---|---|
-| `reserve-logs.json` | RESERVE 로그 | 지금 이상한가 → 서비스가 돌고 있는가 → 추세 → *예약·결제 흐름* → *인증·보안* → *스케줄러* → *무엇이 터지나* → 로그 보기 |
-| `reserve-hardware.json` | RESERVE 서버 자원 | 지금 상태 → 메모리 → CPU·부하·디스크 → 컨테이너 현황 |
+| `reserve-logs.json` | RESERVE 로그 | 이상 징후 → 서비스 활동 → *추세* → *예약·결제 흐름* → *인증·보안* → *스케줄러* → *오류 분석* → *로그 상세* |
+| `reserve-hardware.json` | RESERVE 서버 자원 | 현재 상태 → *메모리 추세* → *CPU·부하·디스크 추세* → *컨테이너 상세* |
 
-*기울임* 표시한 구역은 **접혀 있다.** 매일 볼 것과 파고들 때 볼 것을 나눈 것이다.
-평소에는 위 세 구역만 보면 되고, 이상을 발견하면 아래를 펼친다.
+*기울임* 표시한 구역은 **접혀 있다.** 기본 화면은 짧은 고정 구간을 읽는 stat 쿼리만 실행하고,
+긴 기간을 스캔하는 그래프·표·원문 로그는 사용자가 해당 구역을 펼쳤을 때만 실행한다.
+
+기본 동시 쿼리 예산은 annotation을 포함해 로그 10개 이하, 서버 자원 6개 이하다. 현재 JSON은 각각
+9개와 5개다. 아래 명령은 JSON 파싱, 패널 ID, 기본 쿼리 예산, stat 단일 instant 쿼리,
+접힌 상세 패널, `$__auto`, 데이터 없음 표현을 함께 검사한다. CI의 `build-frontend`에서도 실행한다.
+
+```bash
+node scripts/validate-grafana-dashboards.mjs
+```
+
+stat 카드에는 미니 그래프를 넣지 않는다. 한 카드에서 instant와 range를 함께 실행하면 같은 값을
+두 번 조회하고 `{metric="..."}`·`Value #A` 같은 내부 이름이 화면에 노출된다. 로그 건수 쿼리는
+`or vector(0)`으로 **실제 0건**을 만들고, 쿼리 실패는 Grafana 오류 배지로 남긴다. 하드웨어 값은
+최근 5분 표본이 없으면 0이 아니라 `수집 없음`으로 표시한다.
+
+`로그 검색`은 빈 값으로 시작한다. 빈 정규식은 전체 로그와 일치하므로 예전 기본값 `.*`를 사용자가
+볼 필요가 없다. `레벨`과 `영역`의 `전체` 선택값은 내부적으로만 정규식을 사용한다.
 
 ### ★ 배포 시점이 세로선으로 찍힌다
 
-두 대시보드 모두 `Starting ReserveApplication` 로그를 annotation 으로 잡는다.
+두 대시보드 모두 `Starting ReserveApplication` 로그를 `배포 시점` annotation 으로 잡는다.
 **모든 그래프에 배포 시각이 세로선으로 표시된다.**
 
 이게 있으면 "배포 직후부터 에러가 늘었다", "배포 때 여유 메모리가 여기까지 파인다" 를
@@ -256,7 +278,7 @@ avg_over_time({job="metrics"} | logfmt | kind=`container` | metric=`mem_mb`  | u
   순위로 색을 주면 재배치될 때마다 다른 컨테이너로 착각한다
 - stat 은 **숫자에만 색**을 넣는다(`colorMode: value`). 배경을 칠하면 여덟 칸이 전부 소리를 질러서
   **어디를 봐야 하는지가 사라진다**
-- 모든 stat 에 **미니 추세선**이 깔린다. 숫자 하나만으로는 "40이 많은 건가" 를 알 수 없다
+- stat은 현재값 확인에 집중하고, 추세선은 접힌 상세 구역에서 확인한다
 
 팔레트는 CVD(색각 이상) 검증을 통과한 조합이다. 색을 바꿀 때는 눈으로 고르지 말 것.
 
@@ -267,6 +289,11 @@ avg_over_time({job="metrics"} | logfmt | kind=`container` | metric=`mem_mb`  | u
 3. `docker exec loki wget -qO- 'http://localhost:3100/loki/api/v1/label/job/values'`
    → `["metrics","reserve"]` 가 나와야 한다
 4. `docker exec promtail cat /tmp/positions.yaml` 와 실제 파일 크기 비교
+
+`Status: 500`, `too many outstanding requests`가 보이면 데이터 없음이 아니라 Loki 쿼리 큐 과부하다.
+먼저 접힌 상세 구역을 모두 닫고 기본 화면을 확인한다. 긴 기간 그래프는 고정 `[5m]`/`[1h]` 대신
+`[$__auto]`를 사용해 Grafana가 화면 범위와 해상도에 맞는 구간을 고르게 한다. 그래도 반복되면
+한 패널씩 펼쳐 범인을 좁히고 Loki 처리량 조정은 마지막 수단으로 검토한다.
 
 ---
 
@@ -331,13 +358,55 @@ sum(count_over_time({job="reserve"} |= `Refund stuck unresolved` [1h]))
 가장 확실한 신호** — 손님 돈이 어디 있는지 아무도 모르는 상태다.
 대응 절차는 `docs/technical/payments.md` 의 "미결 환불이 생겼을 때".
 
-**6. 백업 미실행** — BELOW 1 / 1시간 주기. **백업 cron 등록 + 첫 수동 실행 뒤에 켤 것**
+**6. 결제 운영 큐 미결** — ABOVE 0 / 15분 주기 / pending 0m
+
+```logql
+sum(count_over_time({job="reserve"} |= `Payment operations queue requires attention` [20m]))
+```
+
+만료 전 PG 재확인 실패·늦은 PAID·금액 불일치·실패 웹훅 중 하나가 관리자 확인을 기다린다는 뜻이다.
+대응 절차와 조회 API는 `docs/technical/payments.md`의 "결제 대사 큐와 웹훅 inbox".
+
+**7. 백업 미실행** — BELOW 1 / 1시간 주기. **백업 cron 등록 + 첫 수동 실행 뒤에 켤 것**
 
 ```logql
 sum(count_over_time({job="reserve"} |~ `\[backup\] === backup done` [26h]))
 ```
 
 26시간인 이유: 백업은 매일 03:10 KST 1회다. 24시간이면 실행이 조금만 밀려도 오탐이 난다.
+
+**8. OAuth 탈퇴 연동 해제 실패** — ABOVE 0 / 15분 주기 / pending 0m
+
+```logql
+sum(count_over_time({job="reserve"} |= `OAuth unlink requires manual follow-up` [20m]))
+```
+
+DB 탈퇴는 커밋됐지만 외부 제공자 연동 해제는 확인이 필요한 상태다. member ID와 provider만 보고
+해당 제공자 콘솔에서 수동 확인한다. 토큰은 로그에 남지 않는다.
+
+**9. S3 삭제 outbox 실패** — ABOVE 0 / 1시간 주기
+
+```logql
+sum(count_over_time({job="reserve"} |= `Queued file deletion failed` [70m]))
+```
+
+일시 실패는 지수 backoff로 자동 재시도한다. 반복되면 `file_deletion_task`의 `FAILED` 건수와
+`last_error_type`을 확인한다. 경로 자체는 로그로 내보내지 않는다. 상세 런북은
+`docs/technical/data-lifecycle.md`의 "S3 파일 삭제 outbox"를 따른다.
+
+### CSP Report-Only 관측 쿼리 (알림 아님)
+
+```logql
+{job="reserve"} |= `CSP violation observed`
+```
+
+`RESERVE 로그` 대시보드의 접힌 **인증 · 보안 → 관리자 · 보안 이벤트** 패널에도 같은 이벤트의
+추세가 있다. 기본 화면에서는 실행되지 않으므로 7일 관측이나 원인 분석이 필요할 때만 펼친다.
+
+`CspReportController`는 브라우저가 보낸 전체 URL을 저장하지 않고 `directive`와
+`blockedScheme`만 남긴다. 배포 직후 수동 PC·모바일 시나리오와 최소 7일 관측을 함께 확인한다.
+Report-Only 기간에는 예상 위반도 생길 수 있으므로 이 쿼리를 즉시 호출 알림으로 만들지 않는다.
+강제 전환 기준은 `docs/technical/deployments.md`의 "CSP 위반 관측"을 따른다.
 
 ### 왜 "성공이 0건"이 아니라 "실패가 1건 이상"인가
 
@@ -358,15 +427,18 @@ cron 이나 promtail 이 죽으면 대시보드가 **옛날 값에서 조용히 
 
 ### 문구 의존성
 
-**로그 문구를 바꾸면 해당 알림은 사라지지 않고 영영 안 울린다.**
+**아래 알림 기준 문구를 바꾸면 해당 알림은 사라지지 않고 영영 안 울린다.**
 
-| 알림 | 문구가 있는 곳 |
-|---|---|
-| 로그인 실패 급증 | `AuthApiController` |
-| 메일 발송 실패 | `EmailService` |
-| 미결 환불 | `RefundReconciliationScheduler` (`Refund stuck unresolved`) |
+| 알림 | 유지할 기준 문구 | 문구가 있는 곳 |
+|---|---|---|
+| 로그인 실패 급증 | `Login failed` | `AuthApiController` |
+| 메일 발송 실패 | `email failed`, `Email send failed`, `Mail send failed` 중 하나 | `EmailService`, 비동기 발송 서비스 |
+| 미결 환불 | `Refund stuck unresolved` | `RefundReconciliationScheduler` |
+| 결제 운영 큐 미결 | `Payment operations queue requires attention` | `PaymentOperationsMonitorScheduler` |
+| CSP Report-Only 관측 | `CSP violation observed` | `CspReportController` |
 
-로그 문구를 고칠 때 이 문서를 같이 볼 것.
+기준 문구 뒤의 진단값은 바꿀 수 있지만 이메일·IP·이름·주소·검색어·원본 파일명·토큰·외부 응답
+본문·예외 메시지 원문은 붙이지 않는다. 로그 문구를 고칠 때 이 문서를 같이 볼 것.
 
 ---
 
@@ -378,6 +450,13 @@ cron 이나 promtail 이 죽으면 대시보드가 **옛날 값에서 조용히 
 - 로컬: 콘솔만
 - 패턴: `%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n`
   → **이 패턴을 바꾸면 `promtail-config.yml` 의 정규식도 같이 바꿔야 한다**
+
+### 로그 개인정보 경계
+
+- 콘솔·파일·Loki 로그에는 직접 식별 가능한 개인정보와 비밀정보를 남기지 않는다.
+- 문제 추적에는 `memberId`·도메인 엔티티 ID·상태 enum·`errorType`처럼 제한된 값을 사용한다.
+- `PiiLogBoundaryTest`가 Java의 일반 `log.*` 호출에서 대표적인 위험 인자와 원문 예외 메시지를 막는다.
+- 관리자 행위를 보존하는 `audit_log`는 일반 로그와 다른 제한 저장소다. 감사로그 트랜잭션·접근 통제·보존 정책은 별도 운영 과제로 검증한다.
 
 컨테이너가 non-root(`appuser`)로 돌므로 디렉토리 소유권이 필요하다:
 

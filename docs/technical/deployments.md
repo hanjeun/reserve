@@ -29,8 +29,14 @@ CHANGELOG를 고칠 때마다 다시 돌리면 릴리즈 설명이 최신 요약
 
 ### 지금 상태
 
-`.github/workflows/CICD.yml` 은 `main` push 시 블루-그린으로 배포하지만 **GitHub Deployment 객체를 만들지 않는다**
-(`permissions: contents: read` 뿐). 그래서 저장소 Environments 탭·커밋 화면에 "언제 무엇이 production 에 나갔는지" 기록이 없다.
+`.github/workflows/CICD.yml`의 `deploy-backend` 잡이 job-level `deployments: write` 권한과
+SHA로 고정한 `actions/github-script`를 사용해 **배포 시작 → 성공/실패**를 기록한다.
+2026-09-02 읽기 전용 확인에서 최신 production Deployment(`89420844…`, 2026-08-29)가 `success`였고,
+실제 Actions 로그의 blue→green 전환과 health check도 일치했다.
+
+`production` Environment 자체는 존재하지만 protection rule·deployment branch policy·environment secret은
+비어 있다. 현재 잡에는 `environment:` 선언이 없어 Environment 승인 관문이 배포를 막는 구조도 아니다.
+이 설정 변경은 저장소 코드 수정과 별개의 GitHub 원격 변경이므로 명시적 승인 후 진행한다.
 
 ### 2-1. 태그 백필
 
@@ -58,87 +64,40 @@ node scripts/backfill-deployments.mjs --tag v2.2.0 --apply   # 특정 태그만
 > node scripts/backfill-deployments.mjs --prune-backfilled --apply
 > ```
 
-> 실행 전, 저장소 Settings → Environments 에서 `production` 환경을 먼저 만들어 두면 깔끔하다(없어도 API가 자동 생성).
+> `production` environment는 2026-09-03 현재 존재한다. 다만 보호 규칙과 배포 브랜치 제한은
+> 비어 있으므로 별도 승인 뒤 `main` 전용 정책을 설정한다.
 
-### 2-2. 앞으로: CICD.yml 에 배포 기록 붙이기
+### 2-2. 현재 CICD 기록 검증
 
-`deploy-backend` 잡이 실제 production 배포다. 여기에 first-party `actions/github-script` 로
-"배포 시작 → 성공/실패" 상태를 남긴다. 외부 액션 의존성 없이 동작한다.
+코드와 GitHub 원격 상태를 둘 다 확인해야 한다. 워크플로에 스텝이 있다는 사실만으로 실제 기록 성공을
+증명할 수 없고, Deployment 객체만으로 서버 health check 성공을 증명할 수도 없다.
 
-**(a) 워크플로 상단 permissions 를 이렇게 확장:**
+```bash
+# 코드: job-level 최소 권한과 create/status 스텝
+rg -n "deployments: write|Create GitHub deployment|Mark deployment" .github/workflows/CICD.yml
 
-```yaml
-permissions:
-  contents: read
-  deployments: write
+# 원격: 최신 production 배포와 상태
+gh api --method GET repos/hanjeun/reserve/deployments -f environment=production \
+  --jq '.[0] | {id,sha,created_at}'
+gh api repos/hanjeun/reserve/deployments/<id>/statuses \
+  --jq '.[0] | {state,created_at,environment_url}'
 ```
 
-**(b) `deploy-backend` 잡의 `steps:` 맨 앞에 배포 생성 스텝 추가:**
-
-```yaml
-      - name: Create GitHub deployment
-        id: deployment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const dep = await github.rest.repos.createDeployment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: context.sha,
-              environment: 'production',
-              required_contexts: [],
-              auto_merge: false,
-              production_environment: true,
-              description: 'Blue/Green backend deploy',
-            });
-            core.setOutput('id', dep.data.id);
-```
-
-**(c) 잡의 맨 끝(현재 "Cleanup Docker resources" 뒤)에 성공/실패 상태 스텝 추가:**
-
-```yaml
-      - name: Mark deployment success
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ steps.deployment.outputs.id }},
-              state: 'success',
-              environment_url: 'https://reserve.it.kr',
-              description: 'Deployed to production',
-            });
-
-      - name: Mark deployment failure
-        if: failure() && steps.deployment.outputs.id
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ steps.deployment.outputs.id }},
-              state: 'failure',
-              description: 'Deploy failed (health check/rollback)',
-            });
-```
-
-> 적용은 프리뷰 브랜치(`local-preview-all-changes`)에서 먼저 검토 후 백포트. 원하면 이 블록을 CICD.yml 에 직접 넣어줄 수 있음.
+`actions/github-script`와 다른 Actions는 태그가 아니라 전체 커밋 SHA로 고정한다. 배포 기록 생성 실패는
+실제 배포를 막지 않도록 `continue-on-error`이고, id가 있을 때만 성공·실패 상태를 기록한다.
 
 ---
 
 ## 3. 저장소 보호 & PR/브랜치 정리
 
-### 3-1. 브랜치 보호 (main)
+### 3-1. 브랜치 보호 (main / dev)
 
 UI: Settings → Branches → Add rule. gh CLI (PowerShell here-string):
 
 ```powershell
 @'
 {
-  "required_status_checks": { "strict": true, "contexts": ["build-backend", "build-frontend"] },
+  "required_status_checks": { "strict": false, "contexts": ["build-backend", "build-frontend"] },
   "enforce_admins": false,
   "required_pull_request_reviews": { "required_approving_review_count": 0 },
   "restrictions": null,
@@ -149,7 +108,14 @@ UI: Settings → Branches → Add rule. gh CLI (PowerShell here-string):
 '@ | gh api --method PUT repos/hanjeun/reserve/branches/main/protection --input -
 ```
 
-> ✅ 적용됨(2026-07-26). 확인: `gh api repos/hanjeun/reserve/branches/main/protection --jq '.required_status_checks.contexts'`
+> 2026-09-03 읽기 전용 확인: `main`에는 위 두 체크, PR 필수, 선형 히스토리, 강제 push·삭제
+> 차단이 적용돼 있다. `strict=false`, 승인 리뷰 수 0이다. `dev`는 현재 보호되지 않았다.
+> 아래처럼 실제 값을 다시 읽고, `dev` 보호 추가는 별도 승인 뒤 진행한다.
+
+```bash
+gh api repos/hanjeun/reserve/branches/main/protection
+gh api repos/hanjeun/reserve/branches/dev/protection
+```
 
 > ⚠️ `contexts` 는 **PR에서 실제로 실행되는 잡**만 넣어야 한다. CICD.yml에서 `deploy-backend`는
 > `if: github.ref == 'refs/heads/main' && github.event_name == 'push'` 이라 **PR에선 안 돈다** →
@@ -175,7 +141,7 @@ git branch --merged main | grep -vE '^\*|main|dev|local-preview-all-changes' | x
 git push origin --delete <branch>   # 원격 브랜치 삭제(필요한 것만)
 ```
 
-### 3-3. Dependabot 메이저 무시 (#79, #76)
+### 3-3. Dependabot 메이저 무시 (과거 예시)
 
 메이저 업그레이드 PR은 닫지 말고 코멘트로 "이 메이저는 무시" 지시(향후 메이저 PR 재생성 방지):
 
@@ -193,11 +159,15 @@ gh pr merge <번호> -R $REPO --squash --delete-branch
 
 ---
 
-## 실행 순서 (권장)
+## 남은 GitHub 설정 순서 (별도 승인 필요)
 
-1. `sync-release-notes.mjs --apply` — 릴리즈 설명 정리 (브랜치 보호와 무관, 지금 가능)
-2. 3-1 브랜치 보호 → 3-2 자동 삭제 → 3-3 Dependabot 정리
-3. `production` 환경 생성 → `backfill-deployments.mjs --apply` → 2-2 CICD.yml 블록 적용(프리뷰 브랜치)
+1. `dev`에 PR·`build-backend`·`build-frontend`·강제 push/삭제 차단을 적용한다.
+2. 이미 존재하는 `production` environment를 `main` 배포만 허용하도록 제한하고 필요하면 수동 승인자를 둔다.
+3. `sync-release-notes.mjs --apply`와 `backfill-deployments.mjs --apply`는 외부 GitHub 기록을 바꾸므로
+   릴리스 작업 승인을 받은 뒤에만 실행한다.
+
+2026-09-03 현재 머지 후 head 브랜치 자동 삭제와 `protect-release-tags` ruleset은 적용돼 있다.
+`production` environment는 존재하지만 protection rule과 deployment branch policy가 없다.
 
 ---
 
@@ -206,16 +176,61 @@ gh pr merge <번호> -R $REPO --squash --delete-branch
 레포에는 들어가 있지만 **서버에서 손을 대야 비로소 동작하는 것들**이다.
 순서가 중요한 것만 모았고, 각 항목의 상세는 링크된 문서에 있다.
 
+### 4-0. DB 구조와 운영 큐 읽기 전용 점검
+
+앱이 새 버전으로 정상 기동한 뒤 `verify-post-deploy-readonly.sh`를 서버에 복사해 실행한다.
+백업 설정을 아직 만들지 않았다면 별도 root 전용 환경 파일에 `DB_PASSWORD`만 넣어도 된다.
+
+```bash
+scp scripts/verify-post-deploy-readonly.sh scripts/verify-mysql-row-lock.sh ubuntu@<server>:/tmp/
+ssh ubuntu@<server>
+sudo install -m 0755 /tmp/verify-post-deploy-readonly.sh /usr/local/bin/reserve-post-deploy-verify
+sudo install -m 0755 /tmp/verify-mysql-row-lock.sh /usr/local/bin/reserve-mysql-row-lock
+sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env /usr/local/bin/reserve-post-deploy-verify
+```
+
+이 점검은 다음만 읽는다.
+
+- `payment_webhook_inbox`, `payment_reconciliation_issue`, `file_deletion_task` 테이블과 필수 인덱스
+- `reservation.checked_in_at` 컬럼
+- 관련 테이블의 InnoDB 엔진 여부
+- 7일 넘은 `READY`, 열린 대사 건, 미완료 웹훅, 실패한 S3 삭제 outbox 건수
+
+종료 코드는 `0=구조와 큐 정상`, `1=구조 오류`, `2=구조는 정상이지만 수동 확인할 큐 존재`다.
+`2`가 나와도 스크립트는 아무 상태도 바꾸지 않는다. 특히 오래된 `READY`는 먼저 PortOne 콘솔과
+대조하고, 관리자 패널의 개별 **재확인** 동작은 별도 승인 뒤 실행한다.
+
+MySQL 잠금 실기는 일반 점검과 분리한다. `verify-mysql-row-lock.sh`는 선택한 결제 행을 약 5초간
+`FOR UPDATE`로 잠그므로, 트래픽이 없는 TEST 결제 ID와 승인된 점검 창에서만 실행한다. 두 세션은
+모두 `ROLLBACK`하며 두 번째 세션이 lock wait timeout으로 막혀야 통과한다.
+
+```bash
+sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env \
+  /usr/local/bin/reserve-mysql-row-lock <idle-test-payment-id>
+```
+
+이 스크립트 결과는 실제 InnoDB 행 잠금의 증거지만, 동시에 들어온 두 환불 중 PG 호출이 한 번만
+나가는지까지 증명하지는 않는다. 그 마지막 검증은 PortOne TEST 결제 두 요청 시나리오로 별도 수행한다.
+
 ### 4-1. CSP 위반 관측 (배포 즉시)
 
 `nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.
+브라우저 위반 보고는 `POST /api/csp-reports`로 들어오며, 서버는 URL·쿼리·문서 주소를 버리고
+지시문 종류와 차단된 URI의 scheme만 `CSP violation observed` 로그로 남긴다.
 
-1. 배포 후 https://reserve.it.kr 에서 개발자도구 콘솔을 열고 **주요 화면을 한 바퀴 돌면서**
-   `[Report Only]` 로 시작하는 경고를 모은다.
+1. 배포 후 https://reserve.it.kr 에서 개발자도구 콘솔을 열고 **PC와 실제 모바일에서 주요 화면을 한 바퀴 돌면서**
+   `[Report Only]` 경고를 모은다.
    → 홈 / 가게 목록 · 검색 / 가게 상세(**카카오맵이 뜨는 화면**) / 예약 · **결제** / 로그인(소셜 3사) /
      마이페이지 이미지 업로드 · 미리보기 / 관리자 패널
-2. 경고가 0건이면 헤더명에서 **`-Report-Only` 만 지우고** 재배포한다(값은 그대로).
-3. 경고가 있으면 그 출처를 해당 지시문에 추가한다. **절대 `unsafe-inline` 을 script-src 에 넣지 말 것**
+2. Grafana Explore에서 아래 쿼리로 배포 뒤 수집된 위반을 확인한다.
+
+   ```logql
+   {job="reserve"} |= `CSP violation observed`
+   ```
+
+3. 수동 시나리오를 모두 통과하고 **최소 7일** 동안 실제 트래픽에서도 설명되지 않는 위반이 없을 때만
+   헤더명에서 `-Report-Only`를 지우는 별도 PR을 만든다. 한 번의 콘솔 0건만으로 강제 전환하지 않는다.
+4. 경고가 있으면 필요한 출처만 해당 지시문에 추가한다. **절대 `unsafe-inline` 을 script-src 에 넣지 말 것**
    — 그순간 CSP 가 막아야 할 XSS 를 전부 통과시킨다(style-src 는 antd 때문에 어쩔 수 없다).
 
 > 결제는 PC 에서 popup(`window.open`)이라 CSP 대상이 아니지만 **모바일은 리다이렉트/iframe**
@@ -266,3 +281,30 @@ SMTP 가 안 묶여 있으면 알림은 **조용히 안 온다**.
 
 > 429 알림은 4-3 이, 백업 알림은 백업 cron 등록이 선행돼야 한다.
 > 선행 작업 없이 먼저 켜두면 부질없이 계속 울린다.
+
+---
+
+## 5. 프론트엔드 원자적 배포와 롤백
+
+`build-frontend`는 단위 테스트와 Playwright smoke test를 통과한 산출물을
+`/usr/share/nginx/html/releases/<commit-sha>`에 완성한 뒤, 같은 디렉터리의 `current.next`를
+`current`로 원자적 rename한다. Nginx root는 `/usr/share/nginx/html/current`이며 현재 릴리스와
+직전 두 릴리스만 보존한다. 따라서 파일을 한 개씩 덮어쓰는 동안 구·신 청크가 섞이지 않는다.
+
+문제가 생기면 보존된 40자리 커밋 SHA를 확인한 뒤 다음처럼 symlink만 되돌린다.
+
+```bash
+RELEASE_ROOT=/usr/share/nginx/html/releases
+ROLLBACK_SHA=<보존된-40자리-커밋-SHA>
+test -d "$RELEASE_ROOT/$ROLLBACK_SHA"
+sudo ln -sfn "releases/$ROLLBACK_SHA" /usr/share/nginx/html/current.next
+sudo mv -Tf /usr/share/nginx/html/current.next /usr/share/nginx/html/current
+```
+
+워크플로와 롤백 명령은 코드에 반영했지만 **실제 서버 최초 전환과 롤백 훈련은 아직 검증하지 않았다.**
+
+`bash scripts/test-frontend-release-swap.sh`는 CI에서 매번 임시 디렉터리로 배포와 롤백의
+symlink 원자 교체를 재현한다. 이 통과는 Linux 파일시스템 명령의 회귀를 막는 로컬 증거일 뿐,
+운영 Nginx 권한·마운트·보존 디렉터리를 증명하지 않는다. 첫 정식 배포 뒤에는 실제 서버에서
+`current`가 새 40자리 SHA를 가리키는지 확인하고, 보존된 직전 SHA로 한 번 되돌렸다가 다시
+현재 SHA로 복귀하는 훈련을 별도 승인 창에서 실행한다.

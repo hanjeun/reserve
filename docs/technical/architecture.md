@@ -54,7 +54,9 @@ app-network (bridge)
 ### Nginx 마운트
 ```
 /home/ubuntu/nginx          → /etc/nginx/conf.d
-/usr/share/nginx/html       → /usr/share/nginx/html (React SPA)
+/usr/share/nginx/html       → /usr/share/nginx/html (React SPA release root)
+  ├── current              → releases/<commit-sha> (atomic symlink)
+  └── releases/            → 현재 + 직전 2개 프론트 빌드
 /etc/letsencrypt            → /etc/letsencrypt:ro (SSL 인증서)
 ```
 
@@ -69,7 +71,7 @@ app-network (bridge)
    ├── build-backend
    │     └── Gradle 빌드 → Docker 이미지 → DockerHub push
    ├── build-frontend (needs: build-backend)
-   │     └── npm build → SCP로 서버 전송 → PRIVATE_IP 자동 치환 → Nginx 정적 파일 갱신
+   │     └── 단위·브라우저 테스트 → npm build → SCP → releases/<SHA> 완성 → current symlink 원자적 전환
    └── deploy-backend (needs: build-backend)
          ├── 현재 활성 컨테이너 확인 (Blue or Green)
          ├── 반대 컨테이너 새로 기동

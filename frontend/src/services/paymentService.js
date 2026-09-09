@@ -13,6 +13,8 @@ import api from '../api/axios';
 import { API_ENDPOINTS } from '../constants';
 
 const paymentService = {
+    /** 본인 결제의 서버 기록만 조회하며 PG 검증·환불을 실행하지 않는다. */
+    getStatus: (type, merchantUid) => api.get(API_ENDPOINTS.PAYMENT.STATUS, { params: { type, merchantUid } }),
     /** 포트원 설정 정보 (V2 storeId). 결제 준비 응답에도 storeId 가 실려 오므로 현재 호출처는 없다. */
     getConfig: () => api.get(API_ENDPOINTS.PAYMENT.CONFIG),
 

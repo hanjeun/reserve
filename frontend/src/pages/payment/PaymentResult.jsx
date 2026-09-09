@@ -1,86 +1,51 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { reservationKeys } from '../../hooks/queryKeys';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { adKeys, reservationKeys } from '../../hooks/queryKeys';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { Typography } from 'antd';
 import { PageContainer, Button, Loading } from '../../components/common';
 import paymentService from '../../services/paymentService';
+import useAuthStore from '../../store/useAuthStore';
 import { formatCurrency } from '../../utils';
 import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 
 const { Text } = Typography;
 
-/**
- * 결제 결과 페이지 — 예약금 결제(usePayment)와 광고 결제(useAdPayment) 둘 다 이 페이지로
- * 돌아온다. 데스크톱은 각 훅이 직접 navigate하고(success=true, imp_uid 없음 — 이미 검증
- * 완료된 상태), 모바일은 백엔드 리다이렉트(/api/payment/mobile-redirect,
- * /api/advertisements/mobile-redirect)가 검증까지 끝낸 뒤 여기로 리다이렉트한다
- * (2026-07 광고 모바일 결제 추가로 두 흐름이 이 페이지를 공유하게 됨).
- *
- * type 쿼리파라미터로 예약/광고를 구분 — 광고는 merchantUid가 Payment 테이블이 아니라
- * advertisement 테이블에 있어 paymentService.verify()로 검증할 수 없으므로(백엔드에서
- * 이미 끝내고 옴), 문구/버튼만 다르게 보여주고 재검증 로직 자체를 타지 않는다.
- */
+/** URL의 success/error 문구는 증거가 아니다. 본인 DB 기록을 읽고, 이 화면에서는 PG 쓰기를 실행하지 않는다. */
 const PaymentResult = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     useDocumentTitle('결제 결과');
 
-    const success       = searchParams.get('success') === 'true';
-    const type          = searchParams.get('type') || 'reservation'; // 'reservation' | 'ad'
-    const isAd           = type === 'ad';
-    const merchantUid   = searchParams.get('merchant_uid');
-    // imp_uid 는 PortOne V1 시절 파라미터다. V2 전환(2026-08-10) 이후 새 결제에는 실려 오지 않는다.
-    // 캐시된 옛 번들에서 넘어오는 요청을 위해 읽기만 남겨둔다 — 있으면 재검증(멱등), 없으면 검증 완료로 본다.
-    const impUid        = searchParams.get('imp_uid');
-    const errorMsg      = searchParams.get('error_msg');
-    const reservationId = searchParams.get('reservation_id');
-
-    const [verifying, setVerifying]       = useState(false);
-    const [verified, setVerified]         = useState(false);
-    const [verifyError, setVerifyError]   = useState(null);
-    const [paymentDetail, setPaymentDetail] = useState(null);
-    const [animate, setAnimate]           = useState(false);
+    const type = searchParams.get('type') || 'reservation';
+    const isAd = type === 'ad';
+    const merchantUid = searchParams.get('merchant_uid');
+    const memberId = useAuthStore(state => state.user?.id);
+    const canLookup = Boolean(memberId) && ['ad', 'reservation'].includes(type) && Boolean(merchantUid?.trim()) && merchantUid.length <= 255;
+    const result = useQuery({
+        queryKey: ['payment-result', memberId, type, merchantUid],
+        queryFn: () => paymentService.getStatus(type, merchantUid),
+        enabled: canLookup,
+        retry: false,
+        staleTime: 0,
+        refetchOnMount: 'always',
+    });
+    const paymentDetail = result.data;
+    const confirmed = canLookup && !result.isError && paymentDetail?.type === type
+        && paymentDetail?.merchantUid === merchantUid
+        && paymentDetail?.status === (isAd ? 'ACTIVE' : 'PAID');
+    const verifying = canLookup && (result.isPending || result.isFetching);
+    const goToRecords = () => navigate(isAd ? '/business?tab=ads' : '/my-reservations', { replace: true });
+    const [animate, setAnimate] = useState(false);
     const queryClient = useQueryClient();
 
     useEffect(() => {
-        // 광고는 백엔드 리다이렉트가 검증까지 이미 끝내고 온 것 — 여기서 재검증하지 않는다.
-        if (isAd) {
-            if (success) setTimeout(() => setAnimate(true), 100);
-            return;
-        }
-        if (success && impUid && merchantUid && !verified) {
-            verifyPayment();
-        } else if (success && !impUid) {
-            // 이미 검증된 케이스 — 모바일은 백엔드 리다이렉트가 검증까지 끝내고 오므로 imp_uid가 없다.
-            // ★ 2026-08-09: 이 분기에 캐시 무효화가 빠져 있었다. 무효화는 verifyPayment 안에만
-            //   있어서 PC(재검증을 타는 경로)에서만 돌았고, 모바일로 결제하면 "내 예약"이
-            //   결제 전 상태 그대로 보였다(수동 새로고침을 눌러야 갱신됨).
-            queryClient.invalidateQueries({ queryKey: reservationKeys.my() });
-            setTimeout(() => setAnimate(true), 100);
-        }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const verifyPayment = async () => {
-        setVerifying(true);
-        try {
-            const data = await paymentService.verify({
-                impUid,
-                merchantUid,
-                ...(reservationId && { reservationId: Number(reservationId) }),
-            });
-            setPaymentDetail(data);
-            setVerified(true);
-            // 결제 성공 → 예약 캐시 무효화 (내 예약 페이지 진입 시 업데이트된 데이터 표시)
-            queryClient.invalidateQueries({ queryKey: reservationKeys.my() });
-            setTimeout(() => setAnimate(true), 100);
-        } catch (err) {
-            setVerifyError(typeof err === 'string' ? err : '결제 검증에 실패했습니다.');
-        } finally {
-            setVerifying(false);
-        }
-    };
+        if (!confirmed) return;
+        queryClient.invalidateQueries({ queryKey: isAd ? adKeys.my() : reservationKeys.my() });
+        const timer = setTimeout(() => setAnimate(true), 100);
+        return () => clearTimeout(timer);
+    }, [confirmed, isAd, queryClient]);
 
     if (verifying) {
         return (
@@ -95,22 +60,24 @@ const PaymentResult = () => {
         );
     }
 
-    const isError = !success || verifyError;
-
-    if (isError) {
+    if (!confirmed) {
         return (
             <PageContainer size="sm" paddingTop="40px">
                 <div style={styles.wrapper}>
                     <div style={styles.iconWrap}>
-                        <div style={{ ...styles.iconCircle, background: colors.error.light }}>
+                        <div style={{ ...styles.iconCircle, background: colors.warning.light }}>
                             <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                                <path d="M18 6L6 18M6 6l12 12" stroke={colors.error.main} strokeWidth="2.5" strokeLinecap="round"/>
+                                <path d="M12 5v9m0 4v1" stroke={colors.warning.main} strokeWidth="2.5" strokeLinecap="round"/>
                             </svg>
                         </div>
                     </div>
 
-                    <Text style={styles.mainTitle}>결제 실패</Text>
-                    <Text style={styles.desc}>{verifyError || errorMsg || '결제 중 오류가 발생했습니다.'}</Text>
+                    <Text style={styles.mainTitle}>결제 상태 확인</Text>
+                    <Text style={styles.desc}>
+                        {result.isError ? '서버에서 결제 내역을 확인하지 못했습니다. 로그인 상태와 내역을 확인해주세요.'
+                            : '현재 완료된 결제로 확인되지 않습니다. 결제·취소·환불 내역을 확인해주세요.'}
+                        {' '}이미 금액이 결제됐다면 다시 결제하지 마세요.
+                    </Text>
 
                     {merchantUid && (
                         <div style={styles.infoCard}>
@@ -122,11 +89,13 @@ const PaymentResult = () => {
                     )}
 
                     <div style={styles.btnGroup}>
-                        <Button variant="primary" size="lg" block onClick={() => navigate(-1)}>
-                            다시 시도하기
-                        </Button>
-                        <Button variant="secondary" size="lg" block onClick={() => navigate(isAd ? '/business' : '/my-reservations')}>
-                            {isAd ? '파트너 패널로' : '내 예약 확인'}
+                        {canLookup && (
+                            <Button variant="primary" size="lg" block onClick={() => result.refetch()}>
+                                상태 다시 확인
+                            </Button>
+                        )}
+                        <Button variant="secondary" size="lg" block onClick={goToRecords}>
+                            {isAd ? '내 광고 확인하기' : '내 예약 확인'}
                         </Button>
                     </div>
                 </div>
@@ -144,7 +113,7 @@ const PaymentResult = () => {
             <div style={styles.wrapper}>
                 {/* 성공 아이콘 */}
                 <div style={{ ...styles.iconWrap, opacity: animate ? 1 : 0, transform: animate ? 'scale(1)' : 'scale(0.7)', transition: 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}>
-                    <div style={{ ...styles.iconCircle, background: '#e8f9ee' }}>
+                    <div style={{ ...styles.iconCircle, background: colors.success.light }}>
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
                             <path d="M5 12l5 5L19 7" stroke={colors.success.main} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
@@ -158,7 +127,7 @@ const PaymentResult = () => {
                     </Text>
                 </div>
 
-                {/* 결제 상세 — 광고는 모바일 리다이렉트로 오면 금액/결제수단 상세가 없어 주문번호만 표시 */}
+                {/* 서버 기록으로 확인한 결제 상세 */}
                 <div style={{ ...styles.infoCard, opacity: animate ? 1 : 0, transform: animate ? 'translateY(0)' : 'translateY(12px)', transition: 'all 0.35s ease 0.25s' }}>
                     {displayMerchantUid && (
                         <div style={styles.infoRow}>
@@ -194,7 +163,7 @@ const PaymentResult = () => {
                 <div style={{ ...styles.noticeBox, opacity: animate ? 1 : 0, transition: 'opacity 0.35s ease 0.35s' }}>
                     <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary, lineHeight: 1.6 }}>
                         {isAd
-                            ? '광고는 결제 즉시 활성화되어 바로 노출을 시작합니다.'
+                            ? '광고는 설정한 노출 기간과 가게 운영 상태에 따라 표시됩니다.'
                             : <>예약 확정 여부는 가게 승인 후 변경됩니다.{'\n'}취소 시 환불 정책에 따라 처리됩니다.</>
                         }
                     </Text>
@@ -203,7 +172,7 @@ const PaymentResult = () => {
                 {/* 버튼 */}
                 <div style={{ ...styles.btnGroup, opacity: animate ? 1 : 0, transform: animate ? 'translateY(0)' : 'translateY(8px)', transition: 'all 0.35s ease 0.4s' }}>
                     {isAd ? (
-                        <Button variant="primary" size="lg" block onClick={() => navigate('/business', { state: { activeTab: 'ads' } })}>
+                        <Button variant="primary" size="lg" block onClick={goToRecords}>
                             내 광고 확인하기
                         </Button>
                     ) : (

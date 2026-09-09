@@ -40,6 +40,7 @@ class PortoneWebhookPaymentRecoveryTest {
     private static final String MERCHANT_UID = "order-webhook-paid";
 
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
+    @Mock private kr.it.reserve.advertisement.service.AdPaymentService adPaymentService;
     @Mock private PortoneService portoneService;
     @Mock private PaymentService paymentService;
     @Mock private PaymentRepository paymentRepository;

@@ -153,8 +153,11 @@ const ReservationTab = () => {
 
 const BusinessPanel = () => {
     const location = useLocation();
-    // 결제 결과 페이지(PaymentResult.jsx)에서 "내 광고 확인하기" 누르면 광고 관리 탭으로 바로 열리게(2026-07)
-    const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'reservations');
+    // 결제 리다이렉트 뒤 새 문서에서도 광고 탭을 복원할 수 있게 URL을 지원한다.
+    const requestedTab = new URLSearchParams(location.search).get('tab') || location.state?.activeTab;
+    const [activeTab, setActiveTab] = useState(
+        ['reservations', 'qr-checkin', 'ads', 'analytics'].includes(requestedTab) ? requestedTab : 'reservations',
+    );
     useDocumentTitle('파트너 패널');
 
     const tabItems = [

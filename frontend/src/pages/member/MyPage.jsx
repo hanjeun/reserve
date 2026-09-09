@@ -20,6 +20,7 @@ import { useMessage } from '../../hooks';
 import { memberService, businessService } from '../../services';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { hasAdminAccess } from '../../constants/roles';
+import { canWithdrawMember } from '../../utils/lifecycleReadiness';
 import { handleApiError } from '../../utils/errorHandler';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
@@ -965,7 +966,11 @@ const MyPage = () => {
             return;
         }
 
-        if (!readiness?.canWithdraw) {
+        if (typeof readiness?.canWithdraw !== 'boolean') {
+            message.error('탈퇴 준비 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+        if (!canWithdrawMember(readiness)) {
             message.warning(
                 `먼저 처리할 항목이 있습니다. 운영 중 가게 ${readiness?.openStores ?? 0}곳, ` +
                 `예약 ${readiness?.unresolvedReservations ?? 0}건, 환불 ${readiness?.unresolvedRefunds ?? 0}건, ` +

@@ -8,6 +8,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { getThumbnailUrl } from '../../utils';
 import { colors, radius, fontWeight, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
+import { canCloseStore } from '../../utils/lifecycleReadiness';
 
 const { Title, Text } = Typography;
 
@@ -21,16 +22,23 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
     // 모달 열릴 때마다 예약·광고·환불·대사·웹훅을 한 번에 확인
     React.useEffect(() => {
         if (!open || !storeId) return;
+        let active = true;
         setLoadingReadiness(true);
         setReadiness(null);
         setReadinessError(false);
         storeService.getClosureReadiness(storeId)
-            .then(setReadiness)
-            .catch(() => setReadinessError(true))
-            .finally(() => setLoadingReadiness(false));
+            .then(value => {
+                if (!active) return;
+                setReadiness(value);
+                setReadinessError(typeof value?.canClose !== 'boolean');
+            })
+            .catch(() => { if (active) setReadinessError(true); })
+            .finally(() => { if (active) setLoadingReadiness(false); });
+        return () => { active = false; };
     }, [open, storeId]);
 
     const handleOk = async () => {
+        if (!canDelete || submitting) return;
         setSubmitting(true);
         try {
             await onConfirm();
@@ -39,14 +47,17 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
         }
     };
 
-    const canDelete = !loadingReadiness && !readinessError && readiness?.canClose === true;
+    // 합계는 설명용이며 허가 판정에는 쓰지 않는다. 누락된 서버 필드를 0건 허가로 해석하지 않는다.
     const blockerCount = readiness
-        ? readiness.unresolvedReservations
-            + readiness.activeAdvertisements
-            + readiness.unresolvedRefunds
-            + readiness.openPaymentIssues
-            + readiness.unfinishedWebhooks
+        ? (readiness.unresolvedReservations ?? 0)
+            + (readiness.activeAdvertisements ?? 0)
+            + (readiness.unresolvedRefunds ?? 0)
+            + (readiness.openPaymentIssues ?? 0)
+            + (readiness.unfinishedWebhooks ?? 0)
         : 0;
+    const canClose = canCloseStore(readiness);
+    const readinessUnavailable = readinessError || (readiness && typeof readiness.canClose !== 'boolean');
+    const canDelete = !loadingReadiness && !readinessUnavailable && canClose;
 
     return (
         <Modal
@@ -82,7 +93,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                 {/* 예약 수 로딩 */}
                 {loadingReadiness ? (
                     <ModalLoading text="예약·결제 상태 확인 중..." minHeight="120px" />
-                ) : readinessError ? (
+                ) : readinessUnavailable ? (
                     <div style={{ marginTop: 16, background: colors.error.light, borderRadius: radius.md, padding: '12px 14px' }}>
                         <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main, display: 'block', marginBottom: 2 }}>
                             영업 종료 준비 상태를 확인하지 못했습니다
@@ -93,7 +104,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                     </div>
                 ) : readiness && (
                     <div style={{ marginTop: 16 }}>
-                        {readiness.canClose && (
+                        {canClose && (
                             <div style={{ background: colors.success.light, borderRadius: radius.md, padding: '12px 14px' }}>
                                 <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
                                     미결 운영 항목이 없습니다
@@ -102,7 +113,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                             </div>
                         )}
 
-                        {!readiness.canClose && (
+                        {!canClose && (
                             <div style={{ background: colors.warning.light, borderRadius: radius.md, padding: '12px 14px' }}>
                                 <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
                                     먼저 처리해야 할 항목이 {blockerCount}건 있습니다

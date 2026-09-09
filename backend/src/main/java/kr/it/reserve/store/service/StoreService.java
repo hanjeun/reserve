@@ -301,8 +301,10 @@ public class StoreService {
     public StoreResponse updateStore(Long id, StoreUpdateRequest request, Member member) {
         log.info("Store update started: storeId={}", id);
 
-        Store store = storeRepository.findById(id)
+        // 전체 엔티티 갱신이 동시 폐업/제재 상태를 예전 값으로 덮어쓰지 않게 같은 행을 잠근다.
+        Store store = storeRepository.findByIdForUpdate(id)
                 .orElseThrow(StoreException::notFound);
+        if (store.isDeleted()) throw StoreException.notFound();
 
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
             log.error("Unauthorized store access: storeOwnerId={}, requestMemberId={}", store.getOwner().getId(), member.getId());
@@ -530,6 +532,11 @@ public class StoreService {
             ad.getImageUrlList().forEach(
                     image -> fileDeletionOutboxService.enqueue(image, "ADVERTISEMENT_IMAGE", ad.getId()));
             ad.setImageUrlList(List.of());
+            // Store 잠금 아래 DataLifecycleGuard가 미결 원장과 미이관 광고를 먼저 차단했다.
+            // 금융 기록은 보존하고 실패한 신청의 표시 상태만 닫는다.
+            if (ad.getStatus() == AdStatus.PAYMENT_FAILED) {
+                ad.setStatus(AdStatus.CANCELLED);
+            }
         });
 
         store.setMainImageUrl(null);

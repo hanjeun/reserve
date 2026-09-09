@@ -118,8 +118,11 @@ test('reservation: authenticated user can open the empty reservation list', asyn
     await expect(page.getByText('예약 내역이 없습니다.')).toBeVisible();
 });
 
-test('payment: verified redirect renders a successful reservation payment', async ({ page }) => {
+test('payment: server record confirms a reservation payment', async ({ page }) => {
     await mockApi(page, user);
+    await page.route('**/api/payment/status?**', route => ok(route, {
+        type: 'reservation', merchantUid: 'smoke-payment', status: 'PAID', amount: 1000,
+    }));
     await page.goto('/payment/result?success=true&merchant_uid=smoke-payment');
 
     await expect(page.getByText('결제 완료', { exact: true })).toBeVisible();

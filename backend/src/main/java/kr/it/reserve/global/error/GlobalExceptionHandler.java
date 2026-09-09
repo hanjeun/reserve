@@ -4,8 +4,14 @@ import kr.it.reserve.global.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -15,6 +21,26 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /** 요청 바인딩 오류는 서버 장애가 아니다. 거부한 원문 값·JSON을 로그나 응답에 복사하지 않는다. */
+    @ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class,
+            HttpMessageNotReadableException.class, BindException.class})
+    protected ResponseEntity<ApiResponse<Void>> handleInvalidRequest(Exception e) {
+        log.warn("Invalid request: errorType={}", e.getClass().getSimpleName());
+        return ResponseEntity.badRequest().body(ApiResponse.error("입력 형식과 필수 항목을 확인해주세요."));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    protected ResponseEntity<ApiResponse<Void>> handleUnsupportedMethod(HttpRequestMethodNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(e.getHeaders())
+                .body(ApiResponse.error("지원하지 않는 요청 방식입니다."));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    protected ResponseEntity<ApiResponse<Void>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).headers(e.getHeaders())
+                .body(ApiResponse.error("지원하지 않는 요청 형식입니다."));
+    }
 
     /**
      * 회원 정지/영구정지 로그인 차단
@@ -81,7 +107,7 @@ public class GlobalExceptionHandler {
      * NoHandlerFoundException : throw-exception-if-no-handler-found=true 일 때의 컨트롤러 미매핑
      *
      * 공격이 아닌 정상적인 오탈자·캐시된 옛 클라이언트도 여기 걸리므로 WARN 한 줄만 남긴다.
-     * 요청 경로는 남기되 예외 스택은 남기지 않는다(정보량 대비 노이즈가 크다).
+     * 요청 경로·예외 원문 대신 오류 종류만 남긴다.
      */
     @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
     protected ResponseEntity<ApiResponse<Void>> handleNotFound(Exception e) {
@@ -96,7 +122,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     protected ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
-        log.error("Unhandled exception occurred", e);
+        // Throwable 메시지에는 SQL·외부 응답·개인정보가 섞일 수 있다. 코드 위치만 진단용으로 남긴다.
+        String location = e.getStackTrace().length == 0 ? "unknown" : e.getStackTrace()[0].toString();
+        log.error("Unhandled exception occurred: errorType={}, location={}", e.getClass().getSimpleName(), location);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요."));

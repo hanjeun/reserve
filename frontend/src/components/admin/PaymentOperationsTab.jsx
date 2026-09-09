@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Tag, Typography } from 'antd';
+import AdPaymentOperations from './AdPaymentOperations';
 import { ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AdminTableSkeleton, Button, DataTable, FilterToolbar, SegmentedControl } from '../common';
@@ -16,6 +17,7 @@ const QUEUES = [
     { value: 'ready', label: '오래된 READY' },
     { value: 'issues', label: '수동 대사' },
     { value: 'webhooks', label: '웹훅 inbox' },
+    { value: 'ads', label: '광고 결제' },
 ];
 
 const AGE_OPTIONS = [
@@ -166,9 +168,9 @@ const PaymentOperationsTab = () => {
 
     const activeQuery = { ready: readyQuery, issues: issuesQuery, webhooks: webhooksQuery }[queue];
     const columns = { ready: readyColumns, issues: issueColumns, webhooks: webhookColumns }[queue];
-    const data = pageContent(activeQuery.data);
-    const total = pageTotal(activeQuery.data);
-    const loading = activeQuery.isLoading || activeQuery.isFetching;
+    const data = pageContent(activeQuery?.data);
+    const total = pageTotal(activeQuery?.data);
+    const loading = activeQuery?.isLoading || activeQuery?.isFetching;
 
     const descriptions = {
         ready: '오래된 READY 결제를 PG 원장과 다시 맞춥니다. PAID·금액 불일치처럼 자동 확정이 위험한 결과는 수동 대사 큐로 보냅니다.',
@@ -182,6 +184,7 @@ const PaymentOperationsTab = () => {
                 <SegmentedControl options={QUEUES} value={queue} onChange={handleQueueChange} />
             </div>
 
+            {queue === 'ads' ? <AdPaymentOperations /> : <>
             <div style={styles.notice}>{descriptions[queue]}</div>
 
             <FilterToolbar
@@ -212,6 +215,7 @@ const PaymentOperationsTab = () => {
                     }}
                 />
             )}
+            </>}
         </div>
     );
 };

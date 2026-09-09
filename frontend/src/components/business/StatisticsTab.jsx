@@ -10,8 +10,10 @@ import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } fro
 import { StatCard, ChartCard, SegmentedControl, PieLegend, FilterSelect } from '../common';
 import { Bone } from '../common/Skeletons';
 import { useMessage, useMyStores, useWindowWidth } from '../../hooks';
+import { storeKeys } from '../../hooks/queryKeys';
 import storeService from '../../services/storeService';
-import { colors, fontSize, chartPalette, chartGridProps, chartAxisTick, chartTooltipStyle, chartPieCornerRadius, chartAreaGradient } from '../../styles/tokens';
+import { RESERVATION_STATUS_LABELS } from '../../constants';
+import { colors, fontSize, chartPalette, chartGridProps, chartAxisTick, chartTooltipStyle, chartPieCornerRadius, chartAreaGradient, chartMargin, chartYAxisWidth } from '../../styles/tokens';
 
 const { Text } = Typography;
 
@@ -20,11 +22,6 @@ const RANGE_OPTIONS = [
     { value: '30d', label: '30일' },
     { value: '90d', label: '90일' },
 ];
-
-const STATUS_LABELS = {
-    PENDING: '대기 중', CONFIRMED: '승인됨', COMPLETED: '이용완료',
-    REJECTED: '거절됨', CANCELLED: '취소됨', NO_SHOW: '노쇼',
-};
 
 const AD_TYPE_LABELS = { BADGE: '배지형', BANNER: '배너형' };
 
@@ -78,7 +75,7 @@ const shortDate = (d) => {
 const useStoreStatistics = (storeId, range) => {
     const { message } = useMessage();
     const query = useQuery({
-        queryKey: ['stores', 'statistics', storeId, range],
+        queryKey: storeKeys.statistics(storeId, range),
         queryFn: () => storeService.getStatistics(storeId, range),
         enabled: !!storeId,
     });
@@ -122,7 +119,11 @@ const StatisticsTab = () => {
 
     const statusPieData = stats?.statusBreakdown
         ? Object.entries(stats.statusBreakdown)
-            .map(([k, v]) => ({ name: STATUS_LABELS[k] || k, value: v }))
+            // 라벨은 constants/status.js 한 곳에서만 온다. 여기서 사본을 두면
+            // UNCONFIRMED 처럼 나중에 늘어난 상태가 빠져 사용자에게 영어 enum 이 그대로 보인다.
+            // 모르는 상태가 둘 이상이면 이름이 '기타'로 겹치므로, 조각/범례의 React key 는
+            // 이름이 아니라 원래 enum(k)으로 만든다.
+            .map(([k, v]) => ({ key: k, name: RESERVATION_STATUS_LABELS[k] ?? '기타', value: v }))
             .filter((d) => d.value > 0)
         : [];
 
@@ -194,7 +195,7 @@ const StatisticsTab = () => {
                         </div>
                     ) : stats?.reservationTrend?.some((d) => d.value > 0) ? (
                         <ResponsiveContainer width="100%" height={260}>
-                            <AreaChart data={stats.reservationTrend} margin={{ top: 8, right: 8, bottom: 4, left: -20 }}>
+                            <AreaChart data={stats.reservationTrend} margin={chartMargin}>
                                 <defs>
                                     <linearGradient id={reservationGradient.id} x1="0" y1="0" x2="0" y2="1">
                                         {reservationGradient.stops.map((s) => (
@@ -204,7 +205,7 @@ const StatisticsTab = () => {
                                 </defs>
                                 <CartesianGrid {...chartGridProps} />
                                 <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
-                                <YAxis tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
+                                <YAxis width={chartYAxisWidth.count} tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
                                 <Tooltip labelFormatter={shortDate} formatter={(v) => [`${v}건`, '예약']} {...chartTooltipStyle} />
                                 <Area type="monotone" dataKey="value" stroke={colors.primary.main} strokeWidth={2} fill={`url(#${reservationGradient.id})`} />
                             </AreaChart>
@@ -242,7 +243,7 @@ const StatisticsTab = () => {
                                             cornerRadius={chartPieCornerRadius}
                                         >
                                             {statusPieData.map((entry, i) => (
-                                                <Cell key={entry.name} fill={chartPalette[i % chartPalette.length]} stroke="none" />
+                                                <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
                                             ))}
                                         </Pie>
                                         <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
@@ -267,7 +268,7 @@ const StatisticsTab = () => {
                         </div>
                     ) : stats?.revenueTrend?.some((d) => d.value > 0) ? (
                         <ResponsiveContainer width="100%" height={260}>
-                            <AreaChart data={stats.revenueTrend} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+                            <AreaChart data={stats.revenueTrend} margin={chartMargin}>
                                 <defs>
                                     <linearGradient id={revenueGradient.id} x1="0" y1="0" x2="0" y2="1">
                                         {revenueGradient.stops.map((s) => (
@@ -277,7 +278,7 @@ const StatisticsTab = () => {
                                 </defs>
                                 <CartesianGrid {...chartGridProps} />
                                 <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
-                                <YAxis tick={chartAxisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                                <YAxis width={chartYAxisWidth.currency} tick={chartAxisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                                 <Tooltip labelFormatter={shortDate} formatter={(v) => [`${Number(v).toLocaleString()}원`, '매출']} {...chartTooltipStyle} />
                                 <Area type="monotone" dataKey="value" stroke={colors.success.main} strokeWidth={2} fill={`url(#${revenueGradient.id})`} />
                             </AreaChart>

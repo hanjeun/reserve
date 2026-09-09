@@ -204,6 +204,9 @@ const AuditLogTab = () => {
                     columns={columns}
                     dataSource={logs}
                     rowKey="id"
+                    /* 모바일에서 오른쪽 열(로그 내용·처리자)을 보려고 밀면 "일시"가 사라져
+                       어느 행을 읽고 있는지 알 수 없었다 — 식별 열이므로 왼쪽에 고정한다. */
+                    stickyFirstColumn
                     pagination={{
                         current: page + 1,
                         pageSize: PAGE_SIZE,

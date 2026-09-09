@@ -14,7 +14,8 @@ const Section = ({ title, children }) => (
 );
 
 const Privacy = () => {
-    useDocumentTitle('개인정보 처리방침');
+    // 색인 대상 경로다 — 위 Terms.jsx 와 같은 이유로 설명을 직접 준다.
+    useDocumentTitle('개인정보 처리방침', 'RESERVE 개인정보 처리방침 — 수집하는 항목, 이용 목적, 보관 기간, 파기 절차와 이용자 권리를 안내합니다.');
     return (
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>

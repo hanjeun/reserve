@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Image, Typography, Form, Carousel, Divider } from 'antd';
 import {
@@ -11,7 +11,7 @@ import {
 import { PageContainer, Button, FormTextArea, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
 import { BookingCalendar } from '../../components/store';
 import { ReviewList } from '../../components/review';
-import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions, useStoreImageHint } from '../../hooks';
+import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions, useStoreImageHint, useGoBack } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { rememberImageHints } from '../../utils/imageHintCache';
 import { getDetailImageUrl } from '../../utils';
@@ -340,11 +340,15 @@ const TimeSlotPill = ({ slot, selected, onClick, delay }) => (
 const TimePlaceholder = ({ text }) => {
     const { status } = Form.Item.useStatus();
     const isError = status === 'error';
-    // 테두리는 그리지 않는다 — 날짜 칸(AntD DatePicker)이 filled variant 라 에러에도 선이
-    // 생기지 않는다. 여기만 선을 그리면 두 칸이 또 달라 보인다(그게 원래 문제였다).
-    // 에러 신호는 아이콘 색 + 아래 빨간 안내문으로 충분하다.
+    // 2026-09 수정 — 예전 주석은 "날짜 칸이 AntD DatePicker(filled)라 에러에도 선이 안 생기니
+    // 여기도 그리지 않는다"였다. 그런데 2026-08-25에 날짜 칸이 BookingCalendar 로 바뀌면서
+    // 그쪽은 빨간 링을 그리기 시작했고, 이 칸만 아이콘만 빨개져 같은 폼에서 두 칸이 다르게
+    // 반응했다(사용자 제보). 링은 field.errorRing 관문 하나를 같이 쓴다.
     return (
-        <div style={timeSlotStyles.placeholder}>
+        <div style={{
+            ...timeSlotStyles.placeholder,
+            ...(isError ? { boxShadow: field.errorRing } : null),
+        }}>
             <span>{text}</span>
             <ClockCircleOutlined style={{
                 ...timeSlotStyles.placeholderIcon,
@@ -423,7 +427,22 @@ const ReservationPanel = ({ store, form, onFinish, paying, isPC, isEditMode }) =
             <Form.Item
                 label={store?.bookingType === 'DAY' ? '예약 확인' : (store?.bookingType === 'SESSION' ? '회차 선택' : '예약 시간')}
                 name="reservationTime"
-                rules={[{ required: true, message: store?.bookingType === 'DAY' ? '날짜를 선택해주세요.' : '시간을 선택해주세요.' }]}>
+                // 날짜를 고르기 전에는 이 칸에 넣을 값 자체가 없다(슬롯을 날짜로 조회한다).
+                // 그런데도 required 를 걸어두면 아무것도 안 채우고 제출했을 때 날짜와 시간이
+                // 동시에 빨개져서, 지금 고칠 수 없는 칸까지 고치라고 지시하게 된다.
+                // 실제로 고쳐야 할 곳은 바로 위 날짜 칸 하나이고 그 칸이 이미 막고 있다.
+                // (interactions.css 의 "비활성은 에러보다 우선한다"와 같은 규칙이다)
+                //
+                // ⚠️ dependencies={['reservationDate']} 를 붙이면 안 된다 — rc-field-form 은
+                //    의존 필드가 바뀌는 즉시 이 칸을 재검증해서, 날짜를 고르자마자 아직 아무것도
+                //    안 한 시간 칸에 "시간을 선택해주세요"가 튀어나온다(2026-07에 이미 한 번
+                //    고쳤던 회귀다 — TimeSlotPicker 의 setFields 주석 참고).
+                //    함수형 rule 은 검증 시점에 getFieldValue 로 최신 날짜를 직접 읽으므로
+                //    dependencies 없이도 제출 때 올바르게 평가된다.
+                rules={[({ getFieldValue }) => ({
+                    required: !!getFieldValue('reservationDate'),
+                    message: store?.bookingType === 'DAY' ? '날짜를 선택해주세요.' : '시간을 선택해주세요.',
+                })]}>
                 <TimeSlotPicker store={store} dateValue={dateValue} form={form} />
             </Form.Item>
             <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
@@ -454,7 +473,6 @@ const pcFormStyles = {
 
 const StoreDetail = () => {
     const { id } = useParams();
-    const navigate = useNavigate();
     const { message } = useMessage();
     const { isLoggedIn, user } = useAuthStore();
     const { pay, paying } = usePayment();
@@ -500,12 +518,16 @@ const StoreDetail = () => {
             : undefined
     );
 
-    // "뒤로가기"는 store 데이터와 무관한 완전 정적 요소(그냥 navigate(-1))라 로딩 상태와
+    // 되감을 히스토리가 없으면(검색·공유 링크로 바로 들어온 경우) 가게 목록으로 보낸다.
+    // navigate(-1)만 쓰면 그 사용자에게는 버튼이 죽는다 — useGoBack 주석 참고.
+    const goBack = useGoBack('/stores');
+
+    // "뒤로가기"는 store 데이터와 무관한 완전 정적 요소라 로딩 상태와
     // 무관하게 항상 같은 실제 버튼으로 떠 있어야 함(2026-07 버그 수정) — 예전엔 loading일 때
     // StoreDetailSkeleton 안의 회색 막대(Bone)로 대체돼서, 페이지 로딩 중엔 뒤로 나갈 수 있는
     // 진짜 버튼이 아예 없었음. 로딩/데이터없음/로딩완료 세 갈래 모두에서 동일하게 렌더.
     const backButton = (
-        <Button variant="ghost" onClick={() => navigate(-1)} style={styles.backBtn}>
+        <Button variant="ghost" onClick={goBack} style={styles.backBtn}>
             <ArrowLeftOutlined style={{ fontSize: 14 }} /> 뒤로가기
         </Button>
     );

@@ -135,7 +135,8 @@ public class PaymentReconciliationIssue {
         LATE_PAID_RESERVATION,
         PAID_STATE_CONFLICT,
         PAID_AMOUNT_MISMATCH,
-        REFUND_LEDGER_MISSING
+        REFUND_LEDGER_MISSING,
+        REFUND_STATE_UNCERTAIN
     }
 
     public enum IssueStatus {

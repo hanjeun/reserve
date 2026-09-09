@@ -85,8 +85,17 @@ refundPayment(PaymentRefundDto)
 ③ 금액 검증 (남은 환불 가능액 이하)
 ④ 원장에 REQUESTED 기록 + 즉시 커밋 (REQUIRES_NEW)  ← 여기서 죽어도 흔적이 남는다
 ⑤ PortOne 취소 호출
-⑥ 응답 상태에 따라 분기 (위 표)
+⑥ `SUCCEEDED`도 개별 실제 취소액이 요청액과 같을 때만 확정
+⑦ 타임아웃·응답 유실·금액 불일치는 `REFUND_PENDING` + 원장·대사 큐
 ```
+
+`refund_attempt` 시작 행을 저장하지 못하면 ⑤의 PG 호출 자체를 보내지 않는다.
+PG가 즉시 성공을 응답해도 원장은 먼저 `PENDING`으로 두고 로컬 결제 트랜잭션이 커밋된 뒤에만
+`SUCCEEDED`로 닫는다. 로컬 커밋이 실패해 결제가 다시 `PAID`가 되어도 미결 원장이 남아 있으면
+새 환불 요청을 거부한다. 이 세 경계가 “PG에서 돈은 나갔는데 로컬은 PAID라 다시 환불”되는 재발신을 막는다.
+웹훅과 스케줄러가 동시에 같은 결말을 처리할 때도 결제 행을 다시 잠그고 **조회 당시의 기환불액**과
+현재 누적액을 비교한다. 같은 결말의 멱등 재진입만 허용하며, 상태나 금액이 달라졌다면 원장을 닫지 않고
+`REFUND_STATE_UNCERTAIN` 대사 건으로 남긴다.
 
 ### ① 왜 비관적 락인가 — 낙관적 락(@Version)으로는 못 막는다
 
@@ -117,8 +126,9 @@ DB 차원의 참조 무결성은 포기했지만, 어차피 이 원장의 목적
 같은 트랜잭션이면 환불이 실패해 롤백될 때 **"실패했다는 기록까지 같이 사라진다."**
 기록이 가장 필요한 순간에 기록이 없어지는 셈이다.
 
-그래서 이런 그림이 나올 수 있다 — **원장에는 REQUESTED 인데 결제는 여전히 PAID.**
-이건 버그가 아니라 **신호**다. "PG 를 부르다 끊겼으니 사람이 콘솔에서 확인하라"는 뜻이다.
+PG 호출 전에 프로세스가 종료되면 **원장에는 REQUESTED 인데 결제는 여전히 PAID**일 수 있다.
+정상 예외 경로에서는 이를 `REFUND_PENDING`으로 잠그지만, 어느 경우든 원장과 로컬 상태의 불일치는
+자동 재발신 근거가 아니라 **조회·대사가 필요한 신호**다.
 
 ---
 
@@ -131,15 +141,18 @@ DB 차원의 참조 무결성은 포기했지만, 어차피 이 원장의 목적
 > **취소를 다시 보내지 않는다.** 앞의 요청이 사실은 성공했을 수 있어서 재전송은 이중 환불 위험이다.
 > **상태만 읽는다.**
 
-| PG 결제 상태 | 판정 |
+| PG 조회 근거 | 판정 |
 |---|---|
-| `CANCELLED` · `PARTIAL_CANCELLED` | 환불 성공 확정 |
-| `PAID` | 취소가 반영 안 됨 → 실패 확정, 결제를 `PAID` 로 되돌림 |
-| 그 외 | 아직 판단하지 않음. 다음 회차에 다시 본다 |
+| 이번 취소 ID가 `SUCCEEDED`, 개별 취소액=요청액, 누적 취소액=기확정액+요청액, 다른 미결 취소 없음 | 환불 성공 확정 |
+| 이번 취소 ID가 명시적 `FAILED`, 누적 취소액 불변, 결제 상태도 기확정액과 일치 | 실패 확정 후 결제를 이전 상태로 되돌림 |
+| 이번 취소가 `REQUESTED`/미상이고 누적 취소액 불변 | `REFUND_PENDING` 유지, 다음 회차 재조회 |
+| 응답 유실로 취소 ID가 없지만 누적 취소액이 정확히 요청액만큼 증가했고 모든 취소가 종결·합계 일치 | 환불 성공 복구 |
+| 취소 ID 없이 위 조건도 불충족, 금액 누락/불일치, 동시 미결, 상태 충돌 | 자동 변경 없이 `REFUND_STATE_UNCERTAIN` 대사 큐 |
 
-**한계 (알고 감수함)**: 결제 **상태값**만 보므로, 한 결제에 미결 시도가 둘 이상이면
-어느 것이 끝났는지 구분하지 못한다. 그 경우는 건드리지 않고 ERROR 로그만 남긴다 —
-잘못 확정하는 것보다 미결로 두는 편이 낫다.
+취소 응답을 잃어 ID가 없는 경우에도 누적 취소액이 정확히 요청액만큼 늘었고 모든 취소가 종결됐을 때만
+성공을 복구한다. `PAID`라는 이유만으로 실패를 추측하지 않는다. 한 결제에 로컬 미결 시도가 둘 이상이면
+자동 판정을 중단하고 대사 큐에 남긴다. 필드 정의는 PortOne V2의
+[`PaymentAmount`와 `PaymentCancellation`](https://developers.portone.io/api/rest-v2/payment?v=v2)을 따른다.
 
 ### 2. 웹훅 (`POST /api/payment/webhook/portone`)
 
@@ -193,6 +206,10 @@ PG 서버가 부르므로 로그인 세션이 없다(`SecurityConfig` 에서 `pe
 | 5xx | 우리 쪽 일시 장애. **재전송을 받고 싶을 때만** |
 
 예외를 무조건 삼켜 200 을 주면, 일시 장애로 놓친 이벤트를 **영영 다시 받지 못한다.**
+
+단, 서명은 정상이어도 `merchantUid`에 대응하는 로컬 결제 행이 없으면 PortOne 호출 테스트나
+다른 환경의 신호일 수 있다. 이 경우에는 PG 조회를 보내지 않고 inbox를 `IGNORED`로 닫는다.
+로컬 결제 행이 있는 상태에서 PG 조회가 실패한 경우만 `FAILED`와 5xx로 남겨 재처리한다.
 
 ---
 
@@ -267,6 +284,7 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 | `PAID_STATE_CONFLICT` | PG는 PAID지만 로컬 결제가 READY/PAID가 아님 |
 | `PAID_AMOUNT_MISMATCH` | PG 결제액과 서버 결제액 불일치 |
 | `REFUND_LEDGER_MISSING` | 로컬 결제는 환불 미결인데 대응하는 미결 원장 행이 없음 |
+| `REFUND_STATE_UNCERTAIN` | PG 취소 ID·개별/누적 금액·상태 또는 처리 중 바뀐 로컬 상태가 서로 맞지 않음 |
 
 동일 결제·동일 범주의 문제는 행을 무한히 늘리지 않고 `occurrenceCount`, `lastSeenAt`,
 최신 원인 코드로 갱신한다. 결제가 안전하게 복구되거나 미결제가 확정되면 자동으로 `RESOLVED`가 된다.
@@ -290,13 +308,13 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 
 ---
 
-## 사장님이 해야 할 설정 (아직 안 됨)
+## 운영 설정과 실제 검증 상태
 
-1. **PortOne 콘솔에서 웹훅 등록**
+1. **PortOne 콘솔에서 웹훅 등록 확인**
    - URL: `https://reserve.it.kr/api/payment/webhook/portone`
-   - 시크릿 발급 → `whsec_...` 값 복사
-2. **`PORTONE_WEBHOOK_SECRET` 등록**
-   - GitHub Secrets 에 `PORTONE_WEBHOOK_SECRET` 추가 → **그 다음 배포 한 번**이면 컨테이너까지 들어간다
+   - PortOne 로그인 뒤 `호출 테스트`를 실행해 실제 PortOne 발신 요청이 도착하는지 확인한다
+2. **`PORTONE_WEBHOOK_SECRET` 배선**
+   - GitHub Secrets 의 `PORTONE_WEBHOOK_SECRET`은 배포 시 컨테이너로 전달된다
    - 배선은 이미 되어 있다(2026-08-23 추가): `CICD.yml` 의 export 목록 + `docker-compose-blue/green.yml` 의 environment.
      ★ 이 배선이 없던 동안에는 **시크릿을 등록해도 컨테이너에 안 들어가서 웹훅이 전부 거부**됐다 —
      앱이 정상 기동하기 때문에 아무 에러도 안 나는 종류의 고장이다
@@ -306,16 +324,26 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
    - 최종 상태가 `PROCESSED`인지
    - 브라우저를 닫은 테스트에서도 로컬 결제와 예약금 플래그가 `PAID`로 복구되는지
 
+2026-09-05에는 운영 서버에 설정된 시크릿으로 서명한 무결제 synthetic 요청을 같은
+`webhook-id`로 두 번 보내 두 응답이 모두 200이고 inbox 행은 하나, `attempt_count=1`, 최종 상태
+`IGNORED`, 미완료 웹훅 0임을 확인했다. 이는 공개 endpoint의 서명 검증·durable inbox·중복 멱등성을
+증명하지만 **PortOne 콘솔의 URL/시크릿 일치나 실제 결제 상태 복구를 증명하지 않는다.** 콘솔 호출
+테스트와 TEST 결제 실기는 운영자 로그인 뒤 별도로 해야 한다.
+
+같은 날 7일 넘은 `READY` 2건을 PortOne 조회 API와 읽기 전용으로 대조한 결과 PG도 모두
+`READY`였고, 연결 예약은 취소·soft delete 상태였다. 직접 DB를 고치지 않고 관리자 패널의 개별
+재확인 API로 닫아야 하며, 이 두 상태 변경은 아직 실행하지 않았다.
+
 ---
 
 ## 아직 검증되지 않은 것 — 반드시 읽을 것
 
 | 항목 | 상태 |
 |---|---|
-| **행 잠금의 실제 동작** | H2 에서 쿼리가 실행되는 것만 확인했다. **MySQL InnoDB 의 실제 잠금은 미검증** — 동시 요청 두 개로 실기 확인 필요 |
-| **PG 취소 응답 금액 필드** | 응답의 금액 필드 구성을 문서로 확정하지 못해 **읽지 않는다.** 대신 원장의 `requestedAmount` 를 쓴다. 대사는 콘솔에서 |
-| **웹훅 실제 수신** | 시크릿 미등록이라 아직 한 번도 받아본 적 없다 |
-| **durable inbox·대사 큐의 운영 MySQL 구조** | H2에서 엔티티 생성과 잠금·페이지·재시도 쿼리만 확인했다. `ddl-auto: update`로 운영 재시작 시 테이블이 생긴 뒤 unique/index를 직접 확인해야 한다 |
+| **행 잠금의 실제 동작** | 운영 InnoDB의 승인된 비활성 TEST 행에서 대기·timeout·양쪽 rollback을 확인했다. 두 환불 요청과 PG 호출까지 포함한 E2E는 미검증 |
+| **PG 취소 응답 금액 필드** | PortOne V2 문서의 결제 누적 취소액과 `PaymentCancellation.totalAmount`를 DTO·정책에서 읽는다. 로컬 JSON 회귀는 통과했으나 실제 TEST 취소 응답의 값 대조는 미검증 |
+| **웹훅 실제 수신** | 설정된 시크릿의 synthetic 서명 요청과 중복 멱등성은 통과. PortOne 콘솔 발신 호출 테스트와 실제 결제 이벤트는 미검증 |
+| **durable inbox·대사 큐의 운영 MySQL 구조** | 운영 MySQL에서 테이블·unique/index·InnoDB를 2026-09-05 읽기 전용으로 확인 |
 | **PAID 웹훅 복구·만료 재확인 실기** | Mockito/H2 회귀는 통과했지만 실제 PortOne TEST 웹훅 중복·브라우저 종료·일시 장애 조합은 아직 실행하지 않았다 |
 | **LIVE 채널** | 전부 TEST 원장이다 |
 
@@ -324,9 +352,9 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 ## LIVE 전환 전 체크리스트
 
 - [ ] 위 "아직 검증되지 않은 것" 항목을 전부 닫는다
-- [ ] 웹훅 등록 + 테스트 결제로 수신 확인
-- [ ] 운영 MySQL에서 `payment_webhook_inbox`, `payment_reconciliation_issue` 테이블과 unique/index 확인
-- [ ] 같은 `webhook-id` 2회 전송 시 결제가 한 번만 반영되는지 확인
+- [ ] PortOne 콘솔 웹훅 등록 확인 + 호출 테스트 + 테스트 결제로 수신 확인
+- [x] 운영 MySQL에서 `payment_webhook_inbox`, `payment_reconciliation_issue` 테이블과 unique/index 확인
+- [x] synthetic 서명 요청을 같은 `webhook-id`로 2회 전송해 inbox가 한 행만 생기는지 확인
 - [ ] 결제 직후 브라우저를 닫아도 웹훅으로 `PAID`와 예약금 플래그가 복구되는지 확인
 - [ ] PortOne 조회 장애를 모의해 예약 취소가 보류되고 대사 큐에 남는지 확인
 - [ ] MySQL 에서 동시 환불 2건을 실제로 쏴서 **한 건만 나가는지** 확인

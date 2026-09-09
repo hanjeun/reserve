@@ -24,6 +24,8 @@ public class PortoneV2PaymentResponse {
     // 결제 수단 정보
     private Method method;
 
+    private java.util.List<PortoneV2CancelResponse.Cancellation> cancellations;
+
     // PG사 거래번호 (V1의 imp_uid에 해당)
     private String pgTxId;
 
@@ -31,6 +33,7 @@ public class PortoneV2PaymentResponse {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Amount {
         private int total;
+        private Long cancelled;
     }
 
     @Getter
@@ -60,6 +63,8 @@ public class PortoneV2PaymentResponse {
     public int getAmount() {
         return amount != null ? amount.getTotal() : 0;
     }
+
+    public Long getCancelledAmount() { return amount == null ? null : amount.getCancelled(); }
 
     public String getPayMethod() {
         return method != null ? method.getType() : null;

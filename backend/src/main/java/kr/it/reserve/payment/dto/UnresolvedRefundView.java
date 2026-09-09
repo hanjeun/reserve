@@ -13,6 +13,7 @@ public record UnresolvedRefundView(
         Long paymentId,
         String merchantUid,
         Integer requestedAmount,
+        String cancellationId,
         String reason,
         int resolveAttempts
 ) {

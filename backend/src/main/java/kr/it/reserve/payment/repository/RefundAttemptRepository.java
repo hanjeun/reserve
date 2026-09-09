@@ -33,7 +33,8 @@ public interface RefundAttemptRepository extends JpaRepository<RefundAttempt, Lo
      */
     @Query("""
             SELECT new kr.it.reserve.payment.dto.UnresolvedRefundView(
-                       ra.id, ra.paymentId, ra.merchantUid, ra.requestedAmount, ra.reason, ra.resolveAttempts)
+                       ra.id, ra.paymentId, ra.merchantUid, ra.requestedAmount,
+                       ra.cancellationId, ra.reason, ra.resolveAttempts)
             FROM RefundAttempt ra
             WHERE ra.status IN :statuses AND ra.createdAt < :cutoff
             ORDER BY ra.createdAt ASC
@@ -54,6 +55,19 @@ public interface RefundAttemptRepository extends JpaRepository<RefundAttempt, Lo
 
     /** 알림·대시보드용 미결 건수. */
     long countByStatusIn(Collection<RefundAttempt.Status> statuses);
+
+    /** 결제 상태 커밋이 실패해 PAID로 남아도 앞선 미결 PG 요청의 재발신을 막는다. */
+    boolean existsByPaymentIdAndStatusIn(
+            Long paymentId,
+            Collection<RefundAttempt.Status> statuses);
+
+    /**
+     * 같은 결제에 미결 원장이 둘 이상인지 확인한다. 오래된 행만 조회하는 스케줄러 목록과 달리
+     * 방금 생긴 행도 포함해야, 과거 미결 건을 새 시도와 잘못 짝지어 자동 종결하지 않는다.
+     */
+    long countByPaymentIdAndStatusIn(
+            Long paymentId,
+            Collection<RefundAttempt.Status> statuses);
 
     @Query("""
             SELECT COUNT(ra) FROM RefundAttempt ra

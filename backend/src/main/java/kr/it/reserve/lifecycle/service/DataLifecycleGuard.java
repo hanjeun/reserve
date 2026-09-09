@@ -1,6 +1,8 @@
 package kr.it.reserve.lifecycle.service;
 
 import kr.it.reserve.advertisement.entity.AdStatus;
+import kr.it.reserve.advertisement.entity.AdPaymentAttempt;
+import kr.it.reserve.advertisement.repository.AdPaymentAttemptRepository;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.StoreException;
@@ -29,11 +31,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DataLifecycleGuard {
 
+    /** 노출 상태와 금융 상태를 함께 확인한다. 로컬 CANCELLED/FAILED는 PG 종결 증거가 아니다. */
     private static final List<AdStatus> CLOSURE_BLOCKING_AD_STATUSES = List.of(
-            AdStatus.PENDING_PAYMENT,
-            AdStatus.PAYMENT_FAILED,
-            AdStatus.ACTIVE);
+            AdStatus.PENDING_PAYMENT, AdStatus.ACTIVE, AdStatus.REFUND_PENDING, AdStatus.REVIEW_REQUIRED);
 
+    private final AdPaymentAttemptRepository adPaymentAttempts;
     private final StoreRepository storeRepository;
     private final ReservationRepository reservationRepository;
     private final AdvertisementRepository advertisementRepository;
@@ -49,7 +51,9 @@ public class DataLifecycleGuard {
                         storeId, CLOSURE_BLOCKING_AD_STATUSES),
                 refundAttemptRepository.countUnresolvedByStoreId(storeId, RefundAttempt.UNRESOLVED),
                 issueRepository.countOpenByStoreId(
-                        storeId, PaymentReconciliationIssue.IssueStatus.OPEN),
+                        storeId, PaymentReconciliationIssue.IssueStatus.OPEN)
+                        + adPaymentAttempts.countByStoreIdAndStateIn(storeId, AdPaymentAttempt.UNRESOLVED)
+                        + advertisementRepository.countUntrackedByStoreId(storeId),
                 webhookInboxRepository.countUnfinishedByStoreId(
                         storeId, PaymentWebhookInbox.UNFINISHED));
     }
@@ -61,7 +65,9 @@ public class DataLifecycleGuard {
                 reservationRepository.countLifecycleBlockingByMemberId(memberId),
                 refundAttemptRepository.countUnresolvedByMemberId(memberId, RefundAttempt.UNRESOLVED),
                 issueRepository.countOpenByMemberId(
-                        memberId, PaymentReconciliationIssue.IssueStatus.OPEN),
+                        memberId, PaymentReconciliationIssue.IssueStatus.OPEN)
+                        + adPaymentAttempts.countByOwnerIdAndStateIn(memberId, AdPaymentAttempt.UNRESOLVED)
+                        + advertisementRepository.countUntrackedByOwnerId(memberId),
                 webhookInboxRepository.countUnfinishedByMemberId(
                         memberId, PaymentWebhookInbox.UNFINISHED));
     }

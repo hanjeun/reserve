@@ -17,7 +17,28 @@ import java.util.Optional;
 
 public interface AdvertisementRepository extends JpaRepository<Advertisement, Long> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Advertisement a WHERE a.id = :id")
+    Optional<Advertisement> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("SELECT a.store.id FROM Advertisement a WHERE a.id = :id")
+    Optional<Long> findStoreId(@Param("id") Long id);
+
+    @Query("SELECT a.id FROM Advertisement a WHERE NOT EXISTS "
+            + "(SELECT p.id FROM AdPaymentAttempt p WHERE p.merchantUid = a.merchantUid) ORDER BY a.id")
+    List<Long> findWithoutPaymentAttempt(Pageable pageable);
+
+    @Query("SELECT COUNT(a) FROM Advertisement a WHERE a.store.id = :storeId AND NOT EXISTS "
+            + "(SELECT p.id FROM AdPaymentAttempt p WHERE p.merchantUid = a.merchantUid)")
+    long countUntrackedByStoreId(@Param("storeId") Long storeId);
+
+    @Query("SELECT COUNT(a) FROM Advertisement a WHERE a.store.owner.id = :ownerId AND NOT EXISTS "
+            + "(SELECT p.id FROM AdPaymentAttempt p WHERE p.merchantUid = a.merchantUid)")
+    long countUntrackedByOwnerId(@Param("ownerId") Long ownerId);
+
     Optional<Advertisement> findByMerchantUid(String merchantUid);
+    @Query("SELECT a.id FROM Advertisement a WHERE a.merchantUid = :uid")
+    Optional<Long> findIdByMerchantUid(@Param("uid") String uid);
     List<Advertisement> findByStoreId(Long storeId);
 
     // 2026-07 추가: 종료상태(만료/취소/환불/중단) 광고를 사업자가 직접 목록에서 숨길 수 있게(소프트삭제)

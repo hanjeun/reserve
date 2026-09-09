@@ -63,14 +63,16 @@ public class PaymentApiController {
             @RequestParam(value = "code", required = false) String code,
             @RequestParam(value = "message", required = false) String message) {
 
-        log.info("Mobile payment redirect received: paymentId={}, code={}", paymentId, code);
+        log.info("Mobile payment redirect received: hasPaymentId={}, hasErrorCode={}",
+                paymentId != null && !paymentId.isBlank(), code != null && !code.isBlank());
         boolean isSuccess = (code == null || code.isBlank());
         String redirectBase = frontendUrl + "/payment/result";
         // 프론트 결과 페이지는 merchant_uid 로 읽는다. 파라미터 이름은 그대로 두고 값만 V2 의 paymentId 를 싣는다.
         String merchantUid = paymentId;
 
         if (!isSuccess) {
-            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(message));
+            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
+                    + "&error_msg=" + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         }
 
         try {
@@ -85,14 +87,14 @@ public class PaymentApiController {
             paymentService.verifyAndCompletePayment(verifyDto);
             return redirect(redirectBase + "?success=true&merchant_uid=" + enc(merchantUid));
         } catch (BusinessException e) {
-            // 도메인 예외의 메시지는 애초에 사용자에게 보여줄 목적으로 쓴 한국어 문구라 그대로 전달한다.
-            log.warn("Mobile payment redirect failed: merchantUid={}, errorType={}",
-                    merchantUid, e.getClass().getSimpleName());
-            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid) + "&error_msg=" + enc(e.getMessage()));
+            // 외부 API 래퍼의 도메인 예외에도 원문이 섞일 수 있으므로 URL에 전달하지 않는다.
+            log.warn("Mobile payment redirect failed: errorType={}", e.getClass().getSimpleName());
+            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
+                    + "&error_msg=" + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
-            // 브라우저 주소창에 그대로 실려 나가므로 고정 문구로 대체하고, 원인은 로그·Sentry에만 남긴다.
-            log.error("Mobile payment redirect error: merchant_uid={}", merchantUid, e);
+            // URL과 일반 로그에는 원문 대신 고정 문구·오류 종류만 남긴다.
+            log.error("Mobile payment redirect error: errorType={}", e.getClass().getSimpleName());
             return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
                     + "&error_msg=" + enc("결제 처리 중 오류가 발생했습니다."));
         }
@@ -157,7 +159,10 @@ public class PaymentApiController {
         Member requester = SecurityUtil.getCurrentMember("환불을 위해 로그인이 필요합니다.");
         PaymentResponseDto response = paymentService.refundByMemberRequest(
                 refundDto.getReservationId(), refundDto.getRefundReason(), requester);
-        return ApiResponse.success(response, "환불 처리가 완료되었습니다.");
+        String message = Payment.PaymentStatus.REFUND_PENDING.name().equals(response.getStatus())
+                ? "환불 요청을 확인하고 있습니다. 처리 결과는 결제 내역에서 확인해주세요."
+                : "환불 처리가 완료되었습니다.";
+        return ApiResponse.success(response, message);
     }
 
     /**

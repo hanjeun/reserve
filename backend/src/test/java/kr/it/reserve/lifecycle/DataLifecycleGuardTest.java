@@ -1,5 +1,6 @@
 package kr.it.reserve.lifecycle;
 
+import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.StoreException;
@@ -14,19 +15,25 @@ import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DataLifecycleGuardTest {
 
+    @Mock private kr.it.reserve.advertisement.repository.AdPaymentAttemptRepository adPaymentAttempts;
     @Mock private StoreRepository storeRepository;
     @Mock private ReservationRepository reservationRepository;
     @Mock private AdvertisementRepository advertisementRepository;
@@ -35,6 +42,8 @@ class DataLifecycleGuardTest {
     @Mock private PaymentWebhookInboxRepository webhookInboxRepository;
 
     @InjectMocks private DataLifecycleGuard guard;
+
+    @Captor private ArgumentCaptor<Collection<AdStatus>> adStatusCaptor;
 
     @Test
     @DisplayName("가게 폐업 준비도는 예약·광고·환불·대사·웹훅을 한 관문에서 합산한다")
@@ -76,5 +85,28 @@ class DataLifecycleGuardTest {
                 .isInstanceOf(MemberException.class)
                 .hasMessageContaining("운영 중 가게 1곳")
                 .hasMessageContaining("결제 확인 1건");
+    }
+
+    @Test
+    @DisplayName("광고 표시 상태와 별개로 금융 미결 원장을 검사한다")
+    void onlyUndecidedOrLiveAdvertisementsBlockClosure() {
+        long storeId = 30L;
+        when(reservationRepository.countLifecycleBlockingByStoreId(storeId)).thenReturn(0);
+        when(advertisementRepository.countByStoreIdAndStatusInAndDeletedAtIsNull(eq(storeId), any()))
+                .thenReturn(0L);
+        when(refundAttemptRepository.countUnresolvedByStoreId(eq(storeId), any())).thenReturn(0L);
+        when(issueRepository.countOpenByStoreId(eq(storeId), any())).thenReturn(0L);
+        when(webhookInboxRepository.countUnfinishedByStoreId(eq(storeId), any())).thenReturn(0L);
+
+        StoreClosureReadiness result = guard.inspectStore(storeId);
+
+        assertThat(result.canClose()).isTrue();
+
+        verify(advertisementRepository)
+                .countByStoreIdAndStatusInAndDeletedAtIsNull(eq(storeId), adStatusCaptor.capture());
+
+        assertThat(adStatusCaptor.getValue())
+                .containsExactlyInAnyOrder(AdStatus.PENDING_PAYMENT, AdStatus.ACTIVE, AdStatus.REFUND_PENDING, AdStatus.REVIEW_REQUIRED)
+                .doesNotContain(AdStatus.PAYMENT_FAILED);
     }
 }

@@ -37,6 +37,12 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void invalidPublicAdvertisementTypeIsBadRequestRatherThanServerError() throws Exception {
+        mockMvc.perform(get("/api/advertisements/active").param("type", "invalid"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void publicReservationAvailabilityIsAccessibleWithoutAuth() throws Exception {
         mockMvc.perform(get("/api/reservations/availability")
                         .param("storeId", "1")
@@ -81,8 +87,29 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void paymentStatusRequiresAuth() throws Exception {
+        mockMvc.perform(get("/api/payment/status").param("type", "ad").param("merchantUid", "AD-TEST"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void adminManageRequiresAuth() throws Exception {
         mockMvc.perform(get("/api/admin/manage/members"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adPaymentOperationsRequireAuthForReadsAndWrites() throws Exception {
+        mockMvc.perform(get("/api/admin/ad-payments")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/admin/ad-payments/1/refund")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/admin/ad-payments/1/reconcile")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "BUSINESS")
+    void businessRoleCannotReadOrProcessTheAdminAdPaymentQueue() throws Exception {
+        mockMvc.perform(get("/api/admin/ad-payments")).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/admin/ad-payments/1/refund")).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/admin/ad-payments/1/reconcile")).andExpect(status().isForbidden());
     }
 }

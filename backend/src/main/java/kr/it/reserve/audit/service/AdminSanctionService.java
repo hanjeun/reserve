@@ -90,7 +90,7 @@ public class AdminSanctionService {
     }
 
     private Store findOpenStore(Long id) {
-        Store store = storeRepository.findById(id).orElseThrow(StoreException::notFound);
+        Store store = storeRepository.findByIdForUpdate(id).orElseThrow(StoreException::notFound);
         if (store.isDeleted()) throw StoreException.notFound();
         return store;
     }

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
  * 폴링은 messagesRef로 커서를 읽고 messages 변경만으로 타이머를 다시 만들지 않는다.
  * 폴링·전송 결과는 서버 id로 병합한다. 음수 임시 id는 폴링 커서에서 제외한다.
  * 전송 실패는 false를 반환하며 입력 원문 복원은 호출부가 맡는다.
- * 전송 응답도 현재 대화 세대가 맞을 때만 반영한다.
+ * 선택 이유와 전송 응답 격리: docs/technical/ui-decisions.md.
  */
 
 /** 서버 id 기준 병합. 이미 있는 id 는 버린다. 새 것이 없으면 **같은 배열을 그대로** 돌려준다. */

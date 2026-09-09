@@ -123,9 +123,8 @@ public class ReservationElapsedScheduler {
                         reservation.getId());
             }
         } catch (Exception e) {
-            // ⚠️ 환불 재시도 원장이 아직 없다 — 이 로그가 유일한 추적 수단이다.
-            log.error("[ElapsedScheduler] refund failed - reservation stays CANCELLED, refund needs manual action: reservationId={}",
-                    reservation.getId(), e);
+            log.error("[ElapsedScheduler] refund failed - reservation stays CANCELLED, refund needs manual action: reservationId={}, errorType={}",
+                    reservation.getId(), e.getClass().getSimpleName());
         }
     }
 }

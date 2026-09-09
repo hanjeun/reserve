@@ -3,11 +3,13 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import { rules as reserveRules } from './scripts/eslint-reserve-rules.mjs'
 
 export default defineConfig([
   globalIgnores(['dist']),
   {
     files: ['**/*.{js,jsx}'],
+    plugins: { reserve: { rules: reserveRules } },
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,
@@ -23,6 +25,8 @@ export default defineConfig([
       },
     },
     rules: {
+      'reserve/plain-jsdoc': 'error',
+      'reserve/no-jsx-style-tag': 'error',
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
 
       // ★ 폼 검증 오류를 토스트로 띄우는 것을 막는다.

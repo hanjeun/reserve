@@ -3,6 +3,9 @@
   "private": true,
   "version": "2.5.1",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "prebuild": "node scripts/generate-sitemap.mjs",
@@ -12,6 +15,7 @@
     "lint:ci": "eslint src --max-warnings 0",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:policy": "node --test scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs",
     "test:e2e": "playwright test",
     "preview": "vite preview",
     "postinstall": "patch-package"

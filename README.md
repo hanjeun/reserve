@@ -121,5 +121,7 @@ deploy-backend → Blue/Green 전환 → 헬스체크 → Nginx upstream 교체 
 | [배포 운영](docs/technical/deployments.md) | 릴리스 · 원자적 프론트 배포 · 배포 후 검증 |
 | [코드 구조](docs/technical/structure.md) | 폴더 구조 · 라우트 · 환경변수 |
 | [디자인 시스템](docs/technical/design-system.md) | 디자인 토큰 · 공통 컴포넌트 |
+| [UI 구현 결정](docs/technical/ui-decisions.md) | 공통 UI의 선택 이유 · 회귀 경계 |
+| [품질 로드맵](docs/technical/quality-roadmap.md) | 프리뷰 검증 결과 · 미해결 위험 · PR 정리 순서 |
 | [코드 컨벤션](docs/rules/code-conventions.md) | 네이밍 규칙 · 패키지 구조 |
 | [Git 워크플로우](docs/rules/git-workflow.md) | 브랜치 전략 · PR 방법 · 커밋 메시지 |

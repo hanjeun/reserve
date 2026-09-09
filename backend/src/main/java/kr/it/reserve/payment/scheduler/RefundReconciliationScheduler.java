@@ -2,11 +2,16 @@ package kr.it.reserve.payment.scheduler;
 
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.dto.UnresolvedRefundView;
+import kr.it.reserve.payment.entity.Payment;
+import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
 import kr.it.reserve.payment.entity.RefundAttempt;
+import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.payment.repository.RefundAttemptRepository;
+import kr.it.reserve.payment.service.PaymentReconciliationIssueService;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.payment.service.PortoneService;
 import kr.it.reserve.payment.service.RefundLedgerService;
+import kr.it.reserve.payment.service.RefundSettlementPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -15,8 +20,6 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 미결 환불 재조회 — 2026-08-23 신설.
@@ -32,15 +35,11 @@ import java.util.stream.Collectors;
  * 그래서 이 스케줄러는 절대 취소를 다시 보내지 않고 <b>상태만 읽는다.</b>
  * 실패로 확정되면 결제를 PAID 로 되돌려, 다시 보낼지는 <b>사람이나 손님이</b> 정하게 한다.
  *
- * <h2>알고 감수하는 한계</h2>
- * PG 의 결제 <b>상태값</b>(CANCELLED / PARTIAL_CANCELLED / PAID)만 보고 판정한다.
- * 그래서 <b>한 결제에 미결 시도가 둘 이상이면 어느 것이 끝났는지 구분하지 못한다</b> —
- * 그 경우는 건드리지 않고 로그만 남겨 사람이 보게 한다. 이 규모(예약당 환불 1회)에서는
- * 사실상 나오지 않는 경우이고, 잘못 확정하는 것보다 미결로 두는 편이 낫다.
- *
- * <p>취소 <b>금액</b>도 PG 응답에서 읽지 않는다 — 응답의 금액 필드 구성을 문서로 확정하지 못했다.
- * 대신 원장에 남긴 {@code requestedAmount}(우리가 요청한 값)를 쓴다. 추측한 필드명으로
- * 돈을 적느니, 우리가 확실히 아는 값을 쓰고 대사는 PortOne 콘솔에서 하는 편이 안전하다.
+ * <h2>자동 확정 조건</h2>
+ * 상태 문자열 하나로 단정하지 않는다. 누적 취소액, 개별 취소 ID·상태·금액을
+ * {@link RefundSettlementPolicy} 한 곳에서 대조하고, 모두 일치할 때만 성공 또는 실패로 닫는다.
+ * 한 결제에 미결 시도가 둘 이상이거나 PG 자료가 서로 충돌하면 자동 변경하지 않고
+ * 운영 대사 큐에 남긴다.
  */
 @Slf4j
 @Component
@@ -54,9 +53,11 @@ public class RefundReconciliationScheduler {
     private static final int GIVE_UP_AFTER_ATTEMPTS = 20;
 
     private final RefundAttemptRepository refundAttemptRepository;
+    private final PaymentRepository paymentRepository;
     private final PortoneService portoneService;
     private final PaymentService paymentService;
     private final RefundLedgerService refundLedgerService;
+    private final PaymentReconciliationIssueService reconciliationIssueService;
 
     /**
      * 5분마다. 미결 건이 없으면 아무 일도 하지 않는다(정상 상태).
@@ -74,12 +75,12 @@ public class RefundReconciliationScheduler {
         }
         log.info("Refund reconciliation started: unresolved={}", unresolved.size());
 
-        // 같은 결제에 미결이 둘 이상이면 어느 시도가 끝났는지 알 수 없다 — 위 "한계" 주석 참고.
-        Map<Long, Long> perPayment = unresolved.stream()
-                .collect(Collectors.groupingBy(UnresolvedRefundView::paymentId, Collectors.counting()));
-
         for (UnresolvedRefundView view : unresolved) {
-            if (perPayment.getOrDefault(view.paymentId(), 0L) > 1) {
+            // 목록은 2분 이전 행만 담지만, 중복 판정은 방금 생긴 미결까지 전부 센다.
+            // 그렇지 않으면 오래된 행 하나 + 진행 중인 새 행 하나를 단일 시도로 오인한다.
+            if (refundAttemptRepository.countByPaymentIdAndStatusIn(
+                    view.paymentId(), RefundAttempt.UNRESOLVED) > 1) {
+                recordIssue(view, "MULTIPLE_UNRESOLVED_REFUND_ATTEMPTS");
                 log.error("Refund reconciliation skipped - multiple unresolved attempts for one payment: "
                                 + "paymentId={}, merchantUid={}. Resolve manually in the PortOne console.",
                         view.paymentId(), view.merchantUid());
@@ -107,6 +108,7 @@ public class RefundReconciliationScheduler {
         String merchantUid = view.merchantUid();
         Integer requestedAmount = view.requestedAmount();
         String reason = view.reason();
+        String cancellationId = view.cancellationId();
         int priorAttempts = view.resolveAttempts();
 
         refundLedgerService.recordResolveAttempt(attemptId);
@@ -121,27 +123,90 @@ public class RefundReconciliationScheduler {
             return;
         }
 
+        Payment payment = paymentRepository.findById(paymentId).orElse(null);
+        if (payment == null) {
+            recordIssue(view, "LOCAL_PAYMENT_MISSING");
+            log.error("Refund reconciliation cannot find local payment: paymentId={}, merchantUid={}",
+                    paymentId, merchantUid);
+            warnIfStuck(attemptId, merchantUid, priorAttempts + 1);
+            return;
+        }
+        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING) {
+            recordIssue(view, "LOCAL_PAYMENT_STATUS_" + payment.getStatus());
+            log.error("Refund ledger and local payment status disagree: paymentId={}, localStatus={}",
+                    paymentId, payment.getStatus());
+            return;
+        }
+
+        RefundSettlementPolicy.Assessment assessment = RefundSettlementPolicy.assess(
+                payment.refundedSoFar(), requestedAmount, cancellationId, pgPayment);
         String pgStatus = pgPayment.getStatus();
-        switch (pgStatus == null ? "" : pgStatus) {
-            case "CANCELLED", "PARTIAL_CANCELLED" -> {
-                boolean changed = paymentService.confirmPendingRefund(paymentId, requestedAmount, reason);
-                refundLedgerService.succeeded(attemptId, null, requestedAmount);
-                log.info("Refund reconciled as succeeded: merchantUid={}, pgStatus={}, paymentChanged={}",
-                        merchantUid, pgStatus, changed);
+        switch (assessment.outcome()) {
+            case SUCCEEDED -> {
+                boolean accepted = paymentService.confirmPendingRefund(
+                        paymentId, payment.refundedSoFar(), assessment.confirmedAmount(), reason);
+                if (!accepted) {
+                    recordIssue(view, "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_SUCCESS");
+                    log.error("Refund success conflicts with current local state: merchantUid={}, detailCode={}",
+                            merchantUid, assessment.detailCode());
+                    return;
+                }
+                refundLedgerService.succeeded(
+                        attemptId, assessment.cancellationId(), assessment.confirmedAmount());
+                resolveIssues(paymentId);
+                log.info("Refund reconciled as succeeded: merchantUid={}, pgStatus={}, detailCode={}",
+                        merchantUid, pgStatus, assessment.detailCode());
             }
-            case "PAID" -> {
-                // PG 에서 결제가 여전히 살아 있다 = 취소가 반영되지 않았다.
-                String note = "PG still reports PAID after cancellation request";
-                boolean changed = paymentService.revertPendingRefund(paymentId, note);
+            case FAILED -> {
+                String note = "PG cancellation is explicitly FAILED";
+                boolean accepted = paymentService.revertPendingRefund(
+                        paymentId, payment.refundedSoFar(), note);
+                if (!accepted) {
+                    recordIssue(view, "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_FAILURE");
+                    log.error("Refund failure conflicts with current local state: merchantUid={}, detailCode={}",
+                            merchantUid, assessment.detailCode());
+                    return;
+                }
                 refundLedgerService.failed(attemptId, note);
-                log.error("Refund reconciled as failed: merchantUid={}, paymentReverted={}", merchantUid, changed);
+                resolveIssues(paymentId);
+                log.error("Refund reconciled as failed: merchantUid={}, detailCode={}",
+                        merchantUid, assessment.detailCode());
             }
-            default -> {
-                // FAILED/READY/PENDING/VIRTUAL_ACCOUNT_ISSUED/PAY_PENDING 등 — 아직 판단하지 않는다.
-                log.info("Refund still unresolved: merchantUid={}, pgStatus={}, attempts={}",
-                        merchantUid, pgStatus, priorAttempts + 1);
+            case PENDING -> {
+                log.info("Refund still unresolved: merchantUid={}, pgStatus={}, attempts={}, detailCode={}",
+                        merchantUid, pgStatus, priorAttempts + 1, assessment.detailCode());
                 warnIfStuck(attemptId, merchantUid, priorAttempts + 1);
             }
+            case REVIEW_REQUIRED -> {
+                recordIssue(view, assessment.detailCode());
+                log.error("Refund reconciliation requires manual review: merchantUid={}, pgStatus={}, detailCode={}",
+                        merchantUid, pgStatus, assessment.detailCode());
+                warnIfStuck(attemptId, merchantUid, priorAttempts + 1);
+            }
+        }
+    }
+
+    private void recordIssue(UnresolvedRefundView view, String detailCode) {
+        try {
+            reconciliationIssueService.record(
+                    "REFUND:" + view.paymentId(),
+                    PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
+                    view.paymentId(),
+                    null,
+                    view.merchantUid(),
+                    detailCode);
+        } catch (RuntimeException e) {
+            log.error("Refund reconciliation issue could not be persisted: paymentId={}, errorType={}",
+                    view.paymentId(), e.getClass().getSimpleName());
+        }
+    }
+
+    private void resolveIssues(Long paymentId) {
+        try {
+            reconciliationIssueService.resolveForPayment(paymentId);
+        } catch (RuntimeException e) {
+            log.error("Refund reconciliation issue could not be resolved: paymentId={}, errorType={}",
+                    paymentId, e.getClass().getSimpleName());
         }
     }
 

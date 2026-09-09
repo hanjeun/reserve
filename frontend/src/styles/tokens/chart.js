@@ -26,6 +26,25 @@ export const chartGridProps = {
 
 export const chartAxisTick = { fontSize: 11, fill: colors.text.tertiary };
 
+/**
+ * 차트 바깥 여백 — 모든 Recharts 차트가 이 하나만 쓴다.
+ *
+ * 관문 규칙: margin.left 는 절대 음수로 만들지 않는다. Y축 라벨 폭은 아래
+ * chartYAxisWidth 로만 조절한다. 음수 margin 은 Y축 전체를 카드 안쪽으로
+ * 끌어당겨 라벨이 잘리고, 차트마다 값이 달라지면(-20 vs 0) 같은 화면에
+ * 나란히 놓인 그래프들의 시작 위치가 서로 어긋나 제목과도 정렬이 안 맞는다.
+ */
+export const chartMargin = { top: 8, right: 12, bottom: 4, left: 0 };
+
+/**
+ * Y축이 차지하는 가로 폭. Recharts 기본값은 60px인데 "0~99" 같은 짧은 눈금엔
+ * 지나치게 넓어서 그래프 본문이 오른쪽으로 밀려 보인다(왼쪽 여백 40px vs 오른쪽 8px).
+ * 눈금 라벨 길이에 맞춰 고른다.
+ *   count    — 건수/개수 등 짧은 정수 눈금
+ *   currency — "120k" 같은 축약 금액 눈금
+ */
+export const chartYAxisWidth = { count: 30, currency: 42 };
+
 // Tooltip — 카드와 동일한 톤(둥근 모서리 + 은은한 그림자)
 export const chartTooltipStyle = {
   contentStyle: {

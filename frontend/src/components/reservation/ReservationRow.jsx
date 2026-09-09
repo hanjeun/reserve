@@ -47,27 +47,28 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
     const actionsNode = renderActions ? renderActions(isWide) : null;
     const hasActions = actionsNode != null && (!Array.isArray(actionsNode) || actionsNode.length > 0);
 
-    // 카드 전체가 상세로 가는 클릭 영역이다 — 가격이든 상태 라벨이든 빈 공간이든 어디를 눌러도 열린다.
-    // 액션 버튼 영역만 stopPropagation으로 제외한다(눌렀는데 상세가 같이 열리면 안 된다).
-    // 키보드·스크린리더 경로는 안쪽 썸네일/가게명 <button> 두 개가 담당하므로 이 div에는
-    // role/tabIndex를 주지 않는다 — 주면 같은 동작의 접근성 노드가 셋이 되어 중복이 된다.
+    // ── 카드 클릭 = 상세 열기. 클릭 경로는 "가게명 버튼" 하나뿐이다 ──────────────
+    // 예전에는 바깥 div·썸네일 <button>·가게명 <button> 세 곳이 각각 같은 onOpenDetail을 들고
+    // 있었다. 같은 동작인데 누른 자리에 따라 반응이 달라 보였고(가게명은 즉시 열리는데 그 주변을
+    // 누르면 글자가 파랗게 선택된 뒤 열림), 접근성 노드도 둘로 중복됐다.
+    // 지금은 가게명 <button> 하나만 진짜 클릭 타깃이고, 그 버튼의 ::after 가 카드 전체를 덮어
+    // (.reserve-tap-card__trigger, interactions.css) 어디를 눌러도 같은 한 번의 클릭이 된다.
+    // 액션 버튼은 z-index로 오버레이 위에 올려 자기 클릭을 지킨다 — stopPropagation이 필요 없다.
+    // user-select:none 은 같은 CSS 관문에 있다 — 이게 없으면 텍스트 위를 살짝 끌며 누른 탭이
+    // iOS/안드로이드에서 "글자 선택" 제스처로 해석돼 밑줄 같은 하이라이트가 먼저 뜬다.
     return (
-        <div role="presentation" style={styles.row} onClick={onOpenDetail}>
+        <div className="reserve-tap-card" style={styles.row}>
             <div style={styles.mainRow}>
-                <button
-                    type="button"
-                    style={isWide ? styles.imgWrapWide : styles.imgWrap}
-                    onClick={onOpenDetail}
-                    aria-label={`${storeName} 예약 상세 보기`}
-                >
-                    <img src={getThumbnailUrl(storeMainImageUrl)} alt={storeName} style={styles.img} />
-                </button>
+                <div style={isWide ? styles.imgWrapWide : styles.imgWrap}>
+                    <img src={getThumbnailUrl(storeMainImageUrl)} alt="" style={styles.img} />
+                </div>
 
                 <div style={styles.lines}>
                     {/* 줄1 — 가게명 | 상태 */}
                     <div style={isWide ? styles.line1Wide : styles.line1}>
                         <button
                             type="button"
+                            className="reserve-tap-card__trigger"
                             style={styles.nameBtn}
                             onClick={onOpenDetail}
                             aria-label={`${storeName} 예약 상세 보기`}
@@ -120,15 +121,14 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
                             <span style={styles.fixedText}>{formatTime(reservationTime)}</span>
                         </div>
                         {hasActions && (
-                            // 버튼 영역만 카드 클릭에서 제외한다 — 승인/취소를 눌렀는데
-                            // 상세 모달까지 같이 열리면 안 된다.
-                            // <button>으로 감싸면 버튼 중첩(무효 HTML)이 되므로 div + role="presentation".
-                            // 안쪽 실제 버튼들이 접근성 노드를 갖고 있어 이 래퍼는 순수 통과용이다.
+                            // 승인/취소를 눌렀는데 상세까지 열리면 안 된다. 예전엔 부모 onClick을
+                            // stopPropagation으로 막았지만, 지금은 부모에 onClick이 없고 카드 전체를
+                            // 덮는 건 가게명 버튼의 ::after 오버레이다. 오버레이는 조상이 아니라
+                            // 형제 레이어이므로 z-index로 이 그룹을 위에 올리기만 하면 된다
+                            // (.reserve-tap-card .reserve-reservation-actions, interactions.css).
                             <div
-                                role="presentation"
                                 className="reserve-reservation-actions"
                                 style={isWide ? styles.actionGroupWide : styles.actionGroup}
-                                onClick={(e) => e.stopPropagation()}
                             >
                                 {actionsNode}
                             </div>
@@ -154,10 +154,14 @@ const shrinkable = { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'el
 
 const styles = {
     // 카드 전체가 상세로 가는 클릭 영역이다(액션 버튼 영역만 제외).
+    // position/user-select/탭 하이라이트는 .reserve-tap-card(interactions.css)가 담당한다 —
+    // 오버레이 기준점과 선택 방지는 한 곳에서만 정의해야 카드마다 어긋나지 않는다.
     row:     { display: 'flex', flexDirection: 'column', gap: 8, padding: '18px 0', cursor: 'pointer' },
     mainRow: { display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'nowrap' },
-    imgWrap:      { ...btnReset, width: 56, height: 56, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0, cursor: 'pointer' },
-    imgWrapWide:  { ...btnReset, width: 72, height: 72, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0, cursor: 'pointer' },
+    // 썸네일은 <button>이 아니라 <div>다 — 가게명 버튼의 오버레이가 이 자리까지 덮으므로
+    // 여기에 또 버튼을 두면 같은 동작의 접근성 노드가 둘이 된다(alt=""로 이미지도 장식 처리).
+    imgWrap:      { width: 56, height: 56, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
+    imgWrapWide:  { width: 72, height: 72, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 },
     img:          { width: '100%', height: '100%', objectFit: 'cover' },
 
     // 3줄 스택 — 남는 폭을 전부 차지하고, 각 줄이 그 안에서 독립적으로 좌우를 나눈다
@@ -178,10 +182,15 @@ const styles = {
     line2:     { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, height: 18 },
     line3:     { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, height: 16 },
 
-    nameBtn:       { ...btnReset, ...shrinkable, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' },
+    // ⚠️ overflow:hidden 을 주면 안 된다 — 카드 전체를 덮는 ::after 오버레이가 버튼 상자 안으로
+    //    잘려서 가게명 위만 클릭 영역이 된다. 말줄임은 어차피 안쪽 storeName이 담당하고,
+    //    flex 컨테이너에는 text-overflow가 적용되지도 않는다.
+    nameBtn:       { ...btnReset, flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' },
     storeName:     { fontSize: fontSize.base, lineHeight: 1, color: colors.text.primary, ...shrinkable },
     storeNameWide: { fontSize: fontSize.lg, lineHeight: 1, color: colors.text.primary, fontWeight: fontWeight.semibold, ...shrinkable },
-    requestIcon:   { fontSize: 12, color: colors.text.tertiary, flexShrink: 0 },
+    // 오버레이(::after) 위로 올린다 — 안 올리면 Tooltip이 hover를 못 받는다.
+    // 클릭은 부모 <button>으로 버블링되므로 눌러도 상세가 열리는 동작은 그대로다.
+    requestIcon:   { fontSize: 12, color: colors.text.tertiary, flexShrink: 0, position: 'relative', zIndex: 1 },
 
     // 예약번호 줄 / 날짜·시간 줄 — 아이콘과 텍스트를 한 겹에 평평하게 나열한다.
     // ⚠️ text-overflow는 flex 컨테이너에 적용되지 않는다. 텍스트를 inline-flex 래퍼로 한 번 더 감싸면

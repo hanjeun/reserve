@@ -24,7 +24,7 @@ const PieLegend = ({ data, palette }) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0, flex: 1 }}>
             {data.map((d, i) => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <div key={d.key ?? d.name} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                     <span style={{
                         width: 8, height: 8, borderRadius: '50%',
                         background: palette[i % palette.length], flexShrink: 0,
@@ -59,6 +59,9 @@ PieLegend.propTypes = {
     data: PropTypes.arrayOf(PropTypes.shape({
         name: PropTypes.string.isRequired,
         value: PropTypes.number.isRequired,
+        /** 이름이 겹칠 수 있는 목록(알 수 없는 상태가 여럿이면 전부 '기타')에서 쓰는 안정적인 key.
+            없으면 name 으로 대체한다 — 기존 호출부는 그대로 동작한다. */
+        key: PropTypes.string,
     })).isRequired,
     palette: PropTypes.arrayOf(PropTypes.string).isRequired,
 };

@@ -14,8 +14,8 @@ import { Bone } from '../common/Skeletons';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
-import { API_ENDPOINTS } from '../../constants';
-import { colors, fontSize, chartPalette, chartGridProps, chartAxisTick, chartTooltipStyle, chartBarRadius, chartPieCornerRadius } from '../../styles/tokens';
+import { API_ENDPOINTS, RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS } from '../../constants';
+import { colors, fontSize, chartPalette, chartGridProps, chartAxisTick, chartTooltipStyle, chartBarRadius, chartPieCornerRadius, chartMargin, chartYAxisWidth } from '../../styles/tokens';
 
 const { Text } = Typography;
 
@@ -48,15 +48,13 @@ const useDashboardStats = () => {
                 ? (reservationSummary.value?.statusCounts ?? {})
                 : {};
 
-            const reservationPieData = Object.entries({
-                PENDING:   '대기 중',
-                CONFIRMED: '승인됨',
-                COMPLETED: '이용완료',
-                CANCELLED: '취소됨',
-                REJECTED:  '거절됨',
-                NO_SHOW:   '노쇼',
-            })
-                .map(([k, label]) => ({ name: label, value: statusCount[k] || 0 }))
+            // ⚠️ 여기에 상태 목록을 손으로 적으면 안 된다. 예전엔 6개를 직접 나열했는데
+            //    2026-08 에 추가된 UNCONFIRMED 가 빠져 있어서, 라벨이 틀린 정도가 아니라
+            //    **그 상태의 예약이 원형 차트에서 통째로 사라졌다** — 합계가 실제 예약 수보다
+            //    적게 나오는데 화면상으로는 아무 문제 없어 보였다.
+            //    상태 목록·순서·라벨은 constants/status.js 한 곳에서만 온다.
+            const reservationPieData = RESERVATION_STATUS_ORDER
+                .map((k) => ({ key: k, name: RESERVATION_STATUS_LABELS[k], value: statusCount[k] || 0 }))
                 .filter(d => d.value > 0);
 
             const entityCount = trashList.reduce((acc, r) => {
@@ -176,7 +174,7 @@ const DashboardTab = () => {
                                             cornerRadius={chartPieCornerRadius}
                                         >
                                             {stats.reservationPieData.map((entry, i) => (
-                                                <Cell key={entry.name} fill={chartPalette[i % chartPalette.length]} stroke="none" />
+                                                <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
                                             ))}
                                         </Pie>
                                         <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
@@ -203,10 +201,10 @@ const DashboardTab = () => {
                     )}
                     {!loading && stats?.trashBarData?.length > 0 && (
                         <ResponsiveContainer width="100%" height={240}>
-                            <BarChart data={stats.trashBarData} margin={{ top: 4, right: 8, bottom: 4, left: -20 }}>
+                            <BarChart data={stats.trashBarData} margin={chartMargin}>
                                 <CartesianGrid {...chartGridProps} />
                                 <XAxis dataKey="name" tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} />
-                                <YAxis tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
+                                <YAxis width={chartYAxisWidth.count} tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
                                 <Tooltip formatter={(v) => [`${v}건`, '항목 수']} {...chartTooltipStyle} />
                                 <Bar dataKey="count" fill={colors.warning.main} radius={chartBarRadius} maxBarSize={40} />
                             </BarChart>

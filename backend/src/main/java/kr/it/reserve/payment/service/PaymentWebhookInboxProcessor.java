@@ -79,8 +79,13 @@ public class PaymentWebhookInboxProcessor {
         }
 
         try {
-            webhookService.processMerchantUid(work.merchantUid());
-            inboxStateService.markProcessed(webhookId);
+            PortoneWebhookService.ProcessingResult result =
+                    webhookService.processMerchantUid(work.merchantUid());
+            if (result == PortoneWebhookService.ProcessingResult.IGNORED_UNKNOWN_PAYMENT) {
+                inboxStateService.markIgnored(webhookId);
+            } else {
+                inboxStateService.markProcessed(webhookId);
+            }
         } catch (RuntimeException e) {
             try {
                 inboxStateService.markFailed(webhookId, e.getClass().getSimpleName());

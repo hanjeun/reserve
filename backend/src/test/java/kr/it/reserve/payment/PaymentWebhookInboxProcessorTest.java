@@ -8,6 +8,7 @@ import kr.it.reserve.payment.service.PaymentWebhookInboxStateService;
 import kr.it.reserve.payment.service.PaymentWebhookInboxStateService.InboxSnapshot;
 import kr.it.reserve.payment.service.PaymentWebhookInboxStateService.InboxWork;
 import kr.it.reserve.payment.service.PortoneWebhookService;
+import kr.it.reserve.payment.service.PortoneWebhookService.ProcessingResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +56,8 @@ class PaymentWebhookInboxProcessorTest {
                         PaymentWebhookInbox.InboxStatus.RECEIVED));
         when(inboxStateService.claim(WEBHOOK_ID))
                 .thenReturn(Optional.of(new InboxWork(WEBHOOK_ID, MERCHANT_UID)));
+        when(webhookService.processMerchantUid(MERCHANT_UID))
+                .thenReturn(ProcessingResult.PROCESSED);
 
         processor.receive(WEBHOOK_ID, BODY);
 
@@ -116,10 +119,33 @@ class PaymentWebhookInboxProcessorTest {
     }
 
     @Test
+    @DisplayName("로컬 결제가 없는 호출 테스트 웹훅은 IGNORED로 닫는다")
+    void unknownPaymentIsRecordedAndIgnored() {
+        when(webhookService.parseSignal(BODY))
+                .thenReturn(new PortoneWebhookSignal("Transaction.Paid", MERCHANT_UID, true));
+        when(inboxStateService.register(anyString(), anyString(), anyString(), anyString()))
+                .thenAnswer(invocation -> new InboxSnapshot(
+                        WEBHOOK_ID,
+                        invocation.getArgument(3),
+                        PaymentWebhookInbox.InboxStatus.RECEIVED));
+        when(inboxStateService.claim(WEBHOOK_ID))
+                .thenReturn(Optional.of(new InboxWork(WEBHOOK_ID, MERCHANT_UID)));
+        when(webhookService.processMerchantUid(MERCHANT_UID))
+                .thenReturn(ProcessingResult.IGNORED_UNKNOWN_PAYMENT);
+
+        processor.receive(WEBHOOK_ID, BODY);
+
+        verify(inboxStateService).markIgnored(WEBHOOK_ID);
+        verify(inboxStateService, never()).markProcessed(WEBHOOK_ID);
+    }
+
+    @Test
     @DisplayName("관리자 즉시 재처리는 backoff용 claim 대신 force claim을 사용한다")
     void manualRetryBypassesBackoffGate() {
         when(inboxStateService.forceClaim(WEBHOOK_ID))
                 .thenReturn(Optional.of(new InboxWork(WEBHOOK_ID, MERCHANT_UID)));
+        when(webhookService.processMerchantUid(MERCHANT_UID))
+                .thenReturn(ProcessingResult.PROCESSED);
 
         processor.retryNow(WEBHOOK_ID);
 

@@ -287,8 +287,8 @@ const styles = {
     /**
      * ★ background 를 인라인에 두지 않는다 (2026-08-24 수정).
      *
-     * 여기엔 {@code .reserve-maillist-item} 클래스가 **같은 엘리먼트에** 붙는데,
-     * 인라인 style 이 클래스를 이기므로 {@code background:'none'} 이 있으면
+     * 여기엔 .reserve-maillist-item 클래스가 **같은 엘리먼트에** 붙는데,
+     * 인라인 style 이 클래스를 이기므로 background:'none' 이 있으면
      * hover 도 선택 표시(연한 파란 배경)도 **화면에 전혀 안 나타난다.**
      * 실제로 선택된 방이 왼쪽 세로줄(::before, 인라인의 영향을 안 받는 가상요소)만 보이고
      * 배경은 하얗게 남아 있었다. 기본 배경은 클래스가 transparent 로 준다.

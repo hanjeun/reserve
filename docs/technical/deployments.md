@@ -31,12 +31,11 @@ CHANGELOG를 고칠 때마다 다시 돌리면 릴리즈 설명이 최신 요약
 
 `.github/workflows/CICD.yml`의 `deploy-backend` 잡이 job-level `deployments: write` 권한과
 SHA로 고정한 `actions/github-script`를 사용해 **배포 시작 → 성공/실패**를 기록한다.
-2026-09-02 읽기 전용 확인에서 최신 production Deployment(`89420844…`, 2026-08-29)가 `success`였고,
-실제 Actions 로그의 blue→green 전환과 health check도 일치했다.
-
-`production` Environment 자체는 존재하지만 protection rule·deployment branch policy·environment secret은
-비어 있다. 현재 잡에는 `environment:` 선언이 없어 Environment 승인 관문이 배포를 막는 구조도 아니다.
-이 설정 변경은 저장소 코드 수정과 별개의 GitHub 원격 변경이므로 명시적 승인 후 진행한다.
+2026-09-09 읽기 전용 확인에서 `deploy-backend` 잡은 `environment: production`을 사용하고,
+`production` Environment의 배포 브랜치 정책은 `main` 하나만 허용한다. `dev`와 `main`은
+`build-backend`·`build-frontend`를 strict로 요구하며 두 브랜치 모두 관리자에게도 보호 규칙을 적용한다.
+`main`은 선형 히스토리도 강제한다. 단, production Environment의 `can_admins_bypass`는 여전히 true다.
+브랜치 보호와 Environment 우회는 서로 다른 설정이므로 변경 시 각각 확인한다.
 
 ### 2-1. 태그 백필
 
@@ -231,6 +230,28 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env \
 Sentry DSN은 실행 중이던 컨테이너의 유효 값을 화면·파일·명령 인자에 노출하지 않고 GitHub
 repository secret으로 갱신한 뒤 재배포했다. GitHub는 secret 값을 다시 보여주지 않으므로 갱신 시각과
 새 컨테이너의 정상 기동만 확인했고, 문서나 로그에는 값을 기록하지 않는다.
+
+### 2026-09-06 — 배포 후 운영 후속 확인
+
+- 새 Grafana 로그·서버 자원 JSON을 운영에 overwrite import하고 실제 패널을 확인했다.
+- PortOne TEST 웹훅 URL·시크릿이 설정되어 있고, 콘솔 `호출 테스트`가 endpoint의 서명 검증과 inbox
+  등록까지 도달함을 확인했다. 호출 테스트용 가짜 결제 ID가 404·`FAILED`로 남지 않게 하는 수정은
+  PR #186을 거쳐 v2.5.1에 배포됐다. 배포 전에 생성된 가짜 `FAILED` 행은 자동 재처리하지 않았다.
+- 7일 넘은 `READY` 결제 2건은 관리자 재확인으로 모두 `미결제로 종료`했다. 오래된 `READY`와 열린
+  대사 큐는 각각 0건이며 결제·환불 호출은 없었다.
+- CSP Report-Only의 최소 7일 관측과 실제 TEST 결제 웹훅 복구, 두 동시 환불의 단일 PG 호출,
+  이전 프론트 릴리스로의 운영 롤백 훈련은 계속 미완료다.
+
+### 2026-09-09 — v2.5.1과 SSH 지문 복구
+
+- PR #186의 미등록 결제 웹훅 처리와 환불 안전성 변경을 포함한 v2.5.1을 main에 squash merge하고
+  태그·GitHub Release를 생성했다. 릴리스 대상 커밋은 `253ac73`이다.
+- 최초 Actions 실행 `34319244608`은 서버 변경 전에 SSH 호스트 지문 검증에서 실패했다.
+  실패 실행은 원인·영향 범위·복구 연결을 보여주는 감사 증거이므로 삭제하지 않는다.
+- PR #190으로 RSA SHA256 지문을 복구한 뒤 실행 `34336480904`가 성공했고 공개 헬스체크를 확인했다.
+  동일 변경은 PR #191로 dev에 반영했고, PR #192로 v2.5.1 squash 계보를 dev에 연결했다.
+- 운영 DB 확인은 읽기 전용으로 수행했다. 기존 호출 테스트용 `FAILED` inbox 행의 재처리와
+  운영 DB·PortOne·S3 쓰기, TEST 결제, 운영 롤백은 이 작업 범위에 포함하지 않았다.
 
 ### 4-1. CSP 위반 관측 (배포 즉시)
 

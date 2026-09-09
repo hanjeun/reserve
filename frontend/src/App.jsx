@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import SessionQueryProvider from './components/common/SessionQueryProvider';
 import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore';
@@ -156,7 +156,7 @@ const buildThemeConfig = (isDark, accent) => ({
 const spinConfig = { indicator: <SpinIndicator /> };
 
 function AppContent() {
-    const { initializeAuth } = useAuthStore();
+    const { initializeAuth, sessionRevision } = useAuthStore();
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -172,7 +172,11 @@ function AppContent() {
 
     if (loading) return <Loading fullPage />;
 
-    return <AppRoutes />;
+    return (
+        <SessionQueryProvider key={sessionRevision}>
+            <AntApp message={{ maxCount: 3 }}><AppRoutes /></AntApp>
+        </SessionQueryProvider>
+    );
 }
 
 function AppRoutes() {
@@ -234,17 +238,6 @@ function AppRoutes() {
     );
 }
 
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 1000 * 60 * 3,
-            gcTime: 1000 * 60 * 10,
-            retry: 1,
-            refetchOnWindowFocus: false,
-        },
-    },
-});
-
 function App() {
     // 우리 컴포넌트 색은 CSS 변수라 자동으로 따라오지만, AntD는 JS로 파생색을 계산하므로
     // 여기서 resolvedTheme을 읽어 algorithm을 갈아끼워야 한다(buildThemeConfig 주석 참고).
@@ -269,7 +262,6 @@ function App() {
     );
 
     return (
-        <QueryClientProvider client={queryClient}>
             <BrowserRouter>
                 <ConfigProvider
                     locale={koKR}
@@ -277,12 +269,9 @@ function App() {
                     spin={spinConfig}
                     form={{ validateMessages }}
                 >
-                    <AntApp message={{ maxCount: 3 }}>
-                        <AppContent />
-                    </AntApp>
+                    <AppContent />
                 </ConfigProvider>
             </BrowserRouter>
-        </QueryClientProvider>
     );
 }
 

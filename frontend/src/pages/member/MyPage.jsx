@@ -44,7 +44,7 @@ const NameTab = ({ user }) => {
         setLoading(true);
         try {
             await memberService.updateMember({ name });
-            useAuthStore.getState().login({ ...user, name });
+            useAuthStore.getState().updateUser({ ...user, name });
             message.success('이름이 변경되었습니다');
         } catch (err) {
             handleApiError(err, message, '이름 변경에 실패했습니다');
@@ -794,7 +794,7 @@ const NotificationSection = ({ user }) => {
         try {
             await memberService.updateMember({ emailNotificationEnabled: checked });
             setNotiEnabled(checked);
-            useAuthStore.getState().login({ ...user, emailNotificationEnabled: checked });
+            useAuthStore.getState().updateUser({ ...user, emailNotificationEnabled: checked });
             message.success(checked ? '메일 알림에 동의했습니다' : '메일 알림 동의를 철회했습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');
@@ -808,7 +808,7 @@ const NotificationSection = ({ user }) => {
         try {
             await memberService.updateMarketingConsent(checked);
             setMarketingAgreed(checked);
-            useAuthStore.getState().login({ ...user, marketingAgreed: checked });
+            useAuthStore.getState().updateUser({ ...user, marketingAgreed: checked });
             message.success(checked ? '마케팅 수신에 동의했습니다' : '마케팅 수신 동의를 철회했습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');

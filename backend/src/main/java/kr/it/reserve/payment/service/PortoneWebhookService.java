@@ -69,8 +69,20 @@ public class PortoneWebhookService {
         return new PortoneWebhookSignal(type, merchantUid, true);
     }
 
-    /** inbox에 저장된 결제 ID를 사용해 PG 권위 상태를 조회하고 반영한다. */
-    public void processMerchantUid(String merchantUid) {
+    /**
+     * inbox에 저장된 결제 ID를 사용해 PG 권위 상태를 조회하고 반영한다.
+     *
+     * <p>로컬 결제 행이 없으면 PortOne 호출 테스트나 다른 환경의 신호이므로 종료한다.
+     * 반영할 로컬 상태가 없는데 PG를 먼저 조회하면 존재하지 않는 테스트 결제의 404가
+     * 정상 호출 테스트를 실패한 웹훅으로 남겨 불필요한 재시도를 만든다.
+     */
+    public ProcessingResult processMerchantUid(String merchantUid) {
+        Payment payment = paymentRepository.findByMerchantUid(merchantUid).orElse(null);
+        if (payment == null) {
+            log.info("PortOne webhook ignored - unknown merchantUid: {}", merchantUid);
+            return ProcessingResult.IGNORED_UNKNOWN_PAYMENT;
+        }
+
         PortoneV2PaymentResponse pgPayment;
         try {
             pgPayment = portoneService.getPaymentInfo(merchantUid);
@@ -82,21 +94,16 @@ public class PortoneWebhookService {
             throw e;
         }
 
-        applyPgState(merchantUid, pgPayment);
+        applyPgState(payment, pgPayment);
+        return ProcessingResult.PROCESSED;
     }
 
     /**
      * PG 가 말하는 현재 상태를 우리 쪽에 반영한다.
      * READY 결제의 PAID 복구와 REFUND_PENDING 결말 확정을 각각 기존 PaymentService 관문으로 보낸다.
      */
-    public void applyPgState(String merchantUid, PortoneV2PaymentResponse pgPayment) {
-        Payment payment = paymentRepository.findByMerchantUid(merchantUid).orElse(null);
-        if (payment == null) {
-            // 다른 상점·다른 환경(로컬 테스트)의 웹훅일 수 있다. 에러가 아니다.
-            log.info("PortOne webhook ignored - unknown merchantUid: {}", merchantUid);
-            return;
-        }
-
+    private void applyPgState(Payment payment, PortoneV2PaymentResponse pgPayment) {
+        String merchantUid = payment.getMerchantUid();
         String pgStatus = pgPayment.getStatus();
         if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING) {
             if (pgPayment.isPaid()) {
@@ -256,5 +263,10 @@ public class PortoneWebhookService {
             log.error("Webhook reconciliation issue could not be resolved: paymentId={}, errorType={}",
                     payment.getId(), e.getClass().getSimpleName());
         }
+    }
+
+    public enum ProcessingResult {
+        PROCESSED,
+        IGNORED_UNKNOWN_PAYMENT
     }
 }

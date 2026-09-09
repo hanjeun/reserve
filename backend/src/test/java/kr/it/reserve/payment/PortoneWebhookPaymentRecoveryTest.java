@@ -2,6 +2,7 @@ package kr.it.reserve.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
@@ -20,10 +21,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -263,6 +268,36 @@ class PortoneWebhookPaymentRecoveryTest {
                 null,
                 MERCHANT_UID,
                 "MULTIPLE_UNRESOLVED_REFUND_ATTEMPTS");
+    }
+
+    @Test
+    @DisplayName("로컬 결제가 없는 호출 테스트 신호는 PG 조회 없이 무시한다")
+    void unknownPaymentDoesNotCallPg() {
+        when(paymentRepository.findByMerchantUid(MERCHANT_UID)).thenReturn(Optional.empty());
+
+        assertThat(webhookService.processMerchantUid(MERCHANT_UID))
+                .isEqualTo(PortoneWebhookService.ProcessingResult.IGNORED_UNKNOWN_PAYMENT);
+
+        verify(portoneService, never()).getPaymentInfo(anyString());
+        verify(paymentService, never()).recoverPaidPaymentFromPg(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(PortoneV2PaymentResponse.class));
+    }
+
+    @Test
+    @DisplayName("로컬 결제가 있으면 PG 조회 404도 무시하지 않고 재시도 대상으로 남긴다")
+    void knownPaymentStillPropagatesPgLookupFailure() {
+        Payment payment = Payment.builder()
+                .merchantUid(MERCHANT_UID)
+                .status(Payment.PaymentStatus.READY)
+                .build();
+        when(paymentRepository.findByMerchantUid(MERCHANT_UID)).thenReturn(Optional.of(payment));
+        when(portoneService.getPaymentInfo(MERCHANT_UID))
+                .thenThrow(new PaymentException("not found", HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> webhookService.processMerchantUid(MERCHANT_UID))
+                .isInstanceOf(PaymentException.class)
+                .hasMessage("not found");
     }
 
     private PortoneV2PaymentResponse paidPgPayment() {

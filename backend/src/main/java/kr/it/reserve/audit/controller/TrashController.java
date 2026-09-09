@@ -6,7 +6,7 @@ import kr.it.reserve.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,7 +27,7 @@ public class TrashController {
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequests.bounded(page, size);
         Page<AuditLogResponse> result = auditLogService.getTrashItems(type, pageable)
                 .map(AuditLogResponse::from);
         return ResponseEntity.ok(ApiResponse.success(result, "휴지통 목록 조회 성공"));

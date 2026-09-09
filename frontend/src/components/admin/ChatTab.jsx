@@ -155,7 +155,7 @@ const ChatTab = () => {
         // 말풍선이 이미 떠 있는데 입력칸에도 같은 글이 남아 있으면 두 번 보낸 것처럼 보인다.
         setDraft('');
         const ok = await send(text);
-        if (!ok) setDraft(text);
+        if (ok === false) setDraft(text);
     };
 
     const conversation = (

@@ -45,6 +45,8 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
 
 @Slf4j
@@ -914,93 +916,67 @@ public class StoreService {
         return Math.min(rate, 100);
     }
 
-    /**
-     * 키워드로 가게 검색 및 정렬 (기존 유지)
-     */
-    /** 가게 목록 조회 — 페이지네이션 지원 */
+    /** 검색·공개 정책·전체 정렬 후 페이지를 자른다. 첫 페이지 안에서만 다시 정렬하지 않는다. */
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(String keyword, String sort, int page, int size, Double lat, Double lng) {
-        Pageable pageable = PageRequest.of(page, size);
-        if (keyword == null || keyword.trim().isEmpty()) {
-            Page<Store> storePage = getAllStoresSortedPaged(sort, pageable, lat, lng);
-            return storePage.map(StoreResponse::fromEntity);
-        } else {
-            Page<Store> storePage = searchStoreEntities(keyword.trim(), pageable);
-            // 인메모리 정렬 (키워드 검색 + 정렬 조합)
-            List<Store> sorted = sortStores(storePage.getContent(), sort, lat, lng);
-            return new PageImpl<>(
-                sorted.stream().map(StoreResponse::fromEntity).collect(Collectors.toList()),
-                pageable,
-                storePage.getTotalElements()
-            );
-        }
+        Pageable pageable = PageRequests.bounded(page, size);
+        return sortedSearch(keyword, sort, pageable, lat, lng).map(StoreResponse::fromEntity);
     }
 
-    /**
-     * 키워드 검색 실행 경로 선택 — FULLTEXT(빠름) vs LIKE(느리지만 어디서나 동작).
-     *
-     * <p>FULLTEXT를 쓰지 못하는 경우가 둘 있고, 둘 다 조용히 LIKE로 폴백한다.
-     * <ol>
-     *   <li>{@code search.store.fulltext-enabled=false} — 테스트(H2)·local 기본값</li>
-     *   <li>ngram 토큰 길이보다 짧은 검색어 — ngram 파서는 2글자 미만을 색인하지 않으므로
-     *       "김" 같은 1글자 검색이 FULLTEXT에서는 <b>0건</b>이 된다.
-     *       사용자 입장에선 검색이 고장난 것으로 보이므로 이 경우만 LIKE로 보낸다.</li>
-     * </ol>
-     */
-    private Page<Store> searchStoreEntities(String keyword, Pageable pageable) {
-        if (fulltextEnabled && keyword.length() >= NGRAM_TOKEN_SIZE) {
-            return storeRepository.searchStoresFulltextPaged(toBooleanModeQuery(keyword), pageable);
+    private Page<Store> sortedSearch(String keyword, String sort, Pageable pageable, Double lat, Double lng) {
+        boolean distance = "distance".equals(sort) && validCoordinates(lat, lng);
+        if (distance) {
+            // 기존 거리 계산 정책을 유지하되, 검색 결과 전체를 정렬한 다음 페이지를 자른다.
+            List<Store> matches = searchStoreEntities(keyword, "rating", Pageable.unpaged()).getContent();
+            return paginate(sortByDistance(matches, lat, lng), pageable);
         }
-        return storeRepository.searchStoresPaged(keyword, pageable);
+        return searchStoreEntities(keyword, normalizeSort(sort), pageable);
     }
 
-    /**
-     * 사용자 입력을 MySQL BOOLEAN MODE 검색식으로 안전하게 변환한다.
-     *
-     * <p><b>이 정제를 빼면 안 되는 이유:</b> BOOLEAN MODE는 {@code + - > < ( ) ~ * " @}를 연산자로 읽는다.
-     * 예를 들어 사용자가 {@code "강남 -맛집"}을 치면 "맛집을 제외"로 해석되고,
-     * 짝이 맞지 않는 따옴표나 괄호는 <b>SQL 에러(1064/1690)</b>를 낸다. 즉 정제 없이는
-     * 사용자가 검색창에 특수문자를 넣는 것만으로 500이 난다.
-     *
-     * <p>처리 방식: 연산자 문자를 공백으로 치환해 <b>평범한 단어들</b>로 만든 뒤,
-     * 각 토큰에 {@code +}를 붙여 AND 검색으로 만든다. LIKE 시절의 동작(입력한 말이 다 들어간 가게)과
-     * 가장 가깝기 때문이다. ({@code +} 없이 넘기면 OR가 되어 결과가 과하게 넓어진다)
-     */
+    private Page<Store> searchStoreEntities(String keyword, String sort, Pageable pageable) {
+        String field = switch (sort) { case "recent" -> "createdAt"; case "reviews" -> "reviewCount"; default -> "rating"; };
+        Sort order = Sort.by(Sort.Direction.DESC, field, "id");
+        Pageable ordered = pageable.isPaged() ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), order)
+                : Pageable.unpaged(order);
+        String normalized = keyword == null ? "" : keyword.trim();
+        if (normalized.isEmpty()) return storeRepository.findByDeletedAtIsNullAndStatus(StoreStatus.ACTIVE, ordered);
+        String booleanQuery = toBooleanModeQuery(normalized);
+        if (fulltextEnabled && !booleanQuery.isEmpty()) {
+            // 네이티브 컬럼명은 JPQL 속성명과 다르다. 허용한 sort를 명시적 CASE ORDER BY에 전달한다.
+            return storeRepository.searchStoresFulltextPaged(booleanQuery, sort, pageable);
+        }
+        String literal = normalized.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        return storeRepository.searchStoresPaged(literal, ordered);
+    }
+
+    private String normalizeSort(String sort) {
+        return "recent".equals(sort) || "reviews".equals(sort) ? sort : "rating";
+    }
+
+    /** 연산자만 있거나 색인되지 않는 짧은 토큰이 섞이면 원문 LIKE 검색으로 보낸다. */
     private String toBooleanModeQuery(String keyword) {
-        String cleaned = keyword.replaceAll("[+\\-><()~*\"@]", " ").trim();
-        if (cleaned.isEmpty()) {
-            return keyword;   // 특수문자만 입력한 경우 — 어차피 0건이지만 빈 검색식은 문법 오류라 원문을 넘긴다
-        }
-        StringBuilder sb = new StringBuilder();
+        String cleaned = keyword.replaceAll("[+\\-><()~*\\\"@]", " ").trim();
+        if (cleaned.isEmpty()) return "";
+        StringBuilder result = new StringBuilder();
         for (String token : cleaned.split("\\s+")) {
-            if (token.length() < NGRAM_TOKEN_SIZE) continue;   // ngram이 색인하지 않는 토큰은 조건에서 뺀다
-            if (sb.length() > 0) sb.append(' ');
-            sb.append('+').append(token);
+            if (token.length() < NGRAM_TOKEN_SIZE) return "";
+            if (!result.isEmpty()) result.append(' ');
+            result.append('+').append(token);
         }
-        return sb.length() > 0 ? sb.toString() : cleaned;
+        return result.toString();
     }
 
-    private Page<Store> getAllStoresSortedPaged(String sort, Pageable pageable, Double lat, Double lng) {
-        if (sort == null) sort = "rating";
-        // "distance": 좌표 없으면 rating으로 fallback (굴직하게 복귀)
-        if ("distance".equals(sort) && lat != null && lng != null) {
-            List<Store> all = storeRepository.findByDeletedAtIsNullAndStatus(StoreStatus.ACTIVE);
-            List<Store> sorted = sortByDistance(all, lat, lng);
-            return paginate(sorted, pageable);
-        }
-        // 공개 목록에서는 소프트 삭제 + 제재(정지/영구정지) 가게를 제외
-        return switch (sort) {
-            case "recent"  -> storeRepository.findByDeletedAtIsNullAndStatusOrderByCreatedAtDesc(StoreStatus.ACTIVE, pageable);
-            case "reviews" -> storeRepository.findByDeletedAtIsNullAndStatusOrderByReviewCountDesc(StoreStatus.ACTIVE, pageable);
-            default        -> storeRepository.findByDeletedAtIsNullAndStatusOrderByRatingDesc(StoreStatus.ACTIVE, pageable);
-        };
+    private static boolean validCoordinates(Double lat, Double lng) {
+        return lat != null && lng != null && Double.isFinite(lat) && Double.isFinite(lng)
+                && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
     }
 
     /** 이미 정렬된 리스트를 Pageable 기준으로 수동 페이지네이션 (native Haversine 미사용 대안) */
     private Page<Store> paginate(List<Store> sorted, Pageable pageable) {
+        if (pageable.isUnpaged()) return new PageImpl<>(sorted);
         int start = (int) pageable.getOffset();
         if (start >= sorted.size()) return new PageImpl<>(List.of(), pageable, sorted.size());
-        int end = Math.min(start + pageable.getPageSize(), sorted.size());
+        int end = (int) Math.min((long) start + pageable.getPageSize(), sorted.size());
         return new PageImpl<>(sorted.subList(start, end), pageable, sorted.size());
     }
 
@@ -1010,58 +986,33 @@ public class StoreService {
                 .sorted((a, b) -> {
                     Double da = distanceKm(lat, lng, a.getLatitude(), a.getLongitude());
                     Double db = distanceKm(lat, lng, b.getLatitude(), b.getLongitude());
-                    if (da == null && db == null) return 0;
+                    if (da == null && db == null) return Long.compare(b.getId(), a.getId());
                     if (da == null) return 1;   // a: 좌표 없음 → 뒤로
                     if (db == null) return -1;  // b: 좌표 없음 → a가 앞으로
-                    return Double.compare(da, db);
+                    int compared = Double.compare(da, db);
+                    return compared != 0 ? compared : Long.compare(b.getId(), a.getId());
                 })
                 .collect(Collectors.toList());
     }
 
     /** 두 좌표 간 거리(km). 둘 중 하나라도 좌표가 없으면 null 반환 */
     private static Double distanceKm(double lat1, double lng1, Double lat2, Double lng2) {
-        if (lat2 == null || lng2 == null) return null;
+        if (!validCoordinates(lat2, lng2)) return null;
         final double EARTH_RADIUS_KM = 6371.0;
         double dLat = Math.toRadians(lat2 - lat1);
         double dLng = Math.toRadians(lng2 - lng1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        a = Math.max(0, Math.min(1, a));
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return EARTH_RADIUS_KM * c;
     }
 
-    /** 하위 호환용 — 기존 전체 조회 (내부 로직용) */
+    /** 내부 전체 조회도 공개 정책과 안정 정렬을 공유한다. */
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort) {
-        List<Store> stores;
-        if (keyword == null || keyword.trim().isEmpty()) {
-            stores = getAllStoresSorted(sort);
-        } else {
-            stores = storeRepository.searchStores(keyword.trim());
-            stores = sortStores(stores, sort, null, null);
-        }
-        return stores.stream().map(StoreResponse::fromEntity).collect(Collectors.toList());
-    }
-
-    private List<Store> getAllStoresSorted(String sort) {
-        if (sort == null) sort = "rating";
-        return switch (sort) {
-            case "recent" -> storeRepository.findAllByOrderByCreatedAtDesc();
-            case "reviews" -> storeRepository.findAllByOrderByReviewCountDesc();
-            default -> storeRepository.findAllByOrderByRatingDesc();
-        };
-    }
-
-    private List<Store> sortStores(List<Store> stores, String sort, Double lat, Double lng) {
-        if (sort == null) sort = "rating";
-        if ("distance".equals(sort) && lat != null && lng != null) {
-            return sortByDistance(stores, lat, lng);
-        }
-        return switch (sort) {
-            case "recent" -> stores.stream().sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())).collect(Collectors.toList());
-            case "reviews" -> stores.stream().sorted((a, b) -> Integer.compare(b.getReviewCount(), a.getReviewCount())).collect(Collectors.toList());
-            default -> stores.stream().sorted((a, b) -> Double.compare(b.getRating() != null ? b.getRating() : 0.0, a.getRating() != null ? a.getRating() : 0.0)).collect(Collectors.toList());
-        };
+        return sortedSearch(keyword, sort, Pageable.unpaged(), null, null)
+                .map(StoreResponse::fromEntity).getContent();
     }
 }

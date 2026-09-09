@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
+@org.hibernate.annotations.DynamicUpdate
 public class Promotion {
 
     @Id

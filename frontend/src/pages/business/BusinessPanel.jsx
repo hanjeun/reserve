@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Empty, Typography, Tabs } from 'antd';
+import { Alert, Empty, Pagination, Typography, Tabs } from 'antd';
 import {
     CalendarOutlined,
     PartitionOutlined,
@@ -16,23 +16,18 @@ import useManageReservations from '../../hooks/useManageReservations';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
 import useMessage from '../../hooks/useMessage';
-import api from '../../api/axios';
-import { API_ENDPOINTS } from '../../constants';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
+import { RESERVATION_STATUS_FILTER_OPTIONS } from '../../constants';
+import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 import storeService from '../../services/storeService';
+import reservationService from '../../services/reservationService';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 
-const STATUS_OPTIONS = [
-    { value: 'ALL',       label: '전체 상태' },
-    { value: 'PENDING',   label: '승인 대기' },
-    { value: 'CONFIRMED', label: '확정' },
-    { value: 'UNCONFIRMED', label: '미확인' },
-    { value: 'COMPLETED', label: '완료' },
-    { value: 'REJECTED',  label: '거절' },
-    { value: 'CANCELLED', label: '취소' },
-    { value: 'NO_SHOW',   label: '노쇼' },
-];
+// 상태 필터 목록은 constants/status.js 하나에서만 온다 —
+// 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
+const STATUS_OPTIONS = RESERVATION_STATUS_FILTER_OPTIONS;
 
 const ReservationTab = () => {
     const [statusFilter, setStatusFilter] = useState('ALL');
@@ -40,8 +35,26 @@ const ReservationTab = () => {
     const debouncedKeyword = useDebounce(keyword, 300);
     const [storeFilter, setStoreFilter]   = useState('ALL');
     const [myStores, setMyStores]         = useState([]);
-    const { reservations, loading, refetching, actionLoading, approve, reject, storeCancel, complete, noShow, refetch } = useManageReservations();
+    const [page, setPage] = useState(1);
+    const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
+    const { reservations, total, totalPages, error, loading, refetching, actionLoading, approve, reject, storeCancel, complete, noShow, refetch } = useManageReservations({
+        page: page - 1,
+        size: DEFAULT_PAGE_SIZE,
+        search: debouncedKeyword.trim() || undefined,
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        storeId: storeFilter === 'ALL' ? undefined : Number(storeFilter),
+    });
     const { message, confirm } = useMessage();
+
+    // 마지막 행의 삭제·상태 변경으로 현재 페이지가 없어지면 마지막 유효 페이지로 이동한다.
+    if (!loading && !refetching && !error && page > Math.max(totalPages, 1)) {
+        setPage(Math.max(totalPages, 1));
+    }
+
+    const changeFilter = (setter, value) => {
+        setter(value);
+        setPage(1);
+    };
 
     const handleRemove = (id) => {
         confirm({
@@ -51,7 +64,7 @@ const ReservationTab = () => {
             okButtonProps: { danger: true }, centered: true,
             onOk: async () => {
                 try {
-                    await api.delete(API_ENDPOINTS.RESERVATION.REMOVE(id));
+                    await reservationService.removeReservation(id);
                     message.success('목록에서 제거되었습니다.');
                     refetch();
                 } catch { message.error('제거에 실패했습니다.'); }
@@ -65,29 +78,13 @@ const ReservationTab = () => {
             .catch(() => {});
     }, []);
 
-    const filtered = useMemo(() => {
-        let list = storeFilter !== 'ALL'
-            ? reservations.filter(r => r.storeId === Number(storeFilter))
-            : reservations;
-        if (statusFilter !== 'ALL') list = list.filter(r => r.status === statusFilter);
-        if (debouncedKeyword.trim()) {
-            const kw = debouncedKeyword.toLowerCase();
-            list = list.filter(r =>
-                r.storeName?.toLowerCase().includes(kw) ||
-                r.memberName?.toLowerCase().includes(kw) ||
-                r.specialRequest?.toLowerCase().includes(kw)
-            );
-        }
-        return list;
-    }, [reservations, statusFilter, storeFilter, debouncedKeyword]);
-
     return (
         <>
             <FilterToolbar
                 selects={[
                     {
                         value: storeFilter,
-                        onChange: setStoreFilter,
+                        onChange: value => changeFilter(setStoreFilter, value),
                         width: 140,
                         disabled: loading,
                         options: [
@@ -97,28 +94,23 @@ const ReservationTab = () => {
                     },
                     {
                         value: statusFilter,
-                        onChange: setStatusFilter,
+                        onChange: value => changeFilter(setStatusFilter, value),
                         options: STATUS_OPTIONS,
                         width: 140,
                         disabled: loading,
                     },
                 ]}
-                count={filtered.length}
-                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약자로 검색', disabled: loading || refetching }}
+                count={total}
+                search={{ value: keyword, onChange: e => changeFilter(setKeyword, e.target.value), placeholder: '가게명, 예약자로 검색' }}
                 onReload={refetch}
                 loading={loading || refetching}
-                /* 2026-07-30 — "승인 대기 N건" 배지를 제거했다.
-                   셀렉트 줄에 들어가기엔 폭이 부족해 항상 둘째 줄로 밀렸고, 그 때문에 탭과 검색창
-                   사이에 줄이 하나 더 끼어 레이아웃이 산만해졌다. 승인 대기 건수는 상태 필터와
-                   카드의 상태 라벨로 이미 알 수 있다. */
             />
 
-            {/* 코드리뷰 지적사항 반영(2026-07): 승인/거절/완료/노쇼 처리 후 onSettled로 백그라운드
-                재검증이 도는 동안(refetching)에도 최초 로딩과 동일하게 스켈레톤 노출 —
-                MyReservations.jsx/StoreList.jsx와 동일 컨벤션 */}
-            {(loading || refetching) ? (
+            {error ? (
+                <Alert type="error" showIcon title="예약을 불러오지 못했습니다. 새로고침으로 다시 시도해주세요." />
+            ) : (loading || refetching) ? (
                 <ReservationCardSkeleton count={5} />
-            ) : filtered.length === 0 ? (
+            ) : reservations.length === 0 ? (
                 <div style={{ marginTop: 80 }}>
                     <Empty description={
                         <span style={{ color: colors.text.tertiary }}>
@@ -130,7 +122,7 @@ const ReservationTab = () => {
                 </div>
             ) : (
                 <div style={styles.list}>
-                    {filtered.map((res, i) => (
+                    {reservations.map((res, i) => (
                         <React.Fragment key={res.id}>
                             <ReservationCard
                                 reservation={res}
@@ -142,10 +134,25 @@ const ReservationTab = () => {
                                 onStoreCancel={storeCancel}
                                 onRemove={handleRemove}
                             />
-                            {i < filtered.length - 1 && <div style={styles.divider} />}
+                            {i < reservations.length - 1 && <div style={styles.divider} />}
                         </React.Fragment>
                     ))}
                 </div>
+            )}
+            {!error && total > 0 && (
+                <nav aria-label="예약 목록 페이지" style={{ marginTop: 16 }}>
+                    <Pagination
+                        current={page}
+                        pageSize={DEFAULT_PAGE_SIZE}
+                        total={total}
+                        onChange={setPage}
+                        showSizeChanger={false}
+                        showLessItems={isMobile}
+                        size={isMobile ? 'small' : 'default'}
+                        align="end"
+                        disabled={loading || refetching || keyword !== debouncedKeyword}
+                    />
+                </nav>
             )}
         </>
     );
@@ -224,7 +231,7 @@ const BusinessPanel = () => {
 const styles = {
     title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
     list:    { display: 'flex', flexDirection: 'column', paddingBottom: 40 },
-    divider: { height: 1, background: colors.border?.light || '#f0f0f0' },
+    divider: { height: 1, background: colors.border.light },
 };
 
 export default BusinessPanel;

@@ -12,6 +12,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PromotionRepository extends JpaRepository<Promotion, Long> {
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Promotion p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
+    int incrementViewCount(@Param("id") Long id);
+
     // 전체 홍보글 조회 (최신순) - store, member fetch join으로 N+1 방지
     @Query(value = "SELECT p FROM Promotion p JOIN FETCH p.store JOIN FETCH p.member ORDER BY p.createdAt DESC",
            countQuery = "SELECT COUNT(p) FROM Promotion p")

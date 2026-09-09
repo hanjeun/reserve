@@ -12,7 +12,7 @@ import kr.it.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,7 +33,7 @@ public class PromotionService {
 
     // 전체 홍보글 조회 (향상된 switch 문 적용)
     public Page<PromotionDto.PromotionResponse> getAllPromotions(int page, int size, String sortBy) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequests.bounded(page, size);
 
         Page<Promotion> promotions = switch (sortBy) {
             case "popular" -> promotionRepository.findAllByOrderByViewCountDesc(pageable);
@@ -47,8 +47,10 @@ public class PromotionService {
     // 홍보글 상세 조회
     @Transactional
     public PromotionDto.PromotionResponse getPromotion(Long promotionId) {
+        if (promotionRepository.incrementViewCount(promotionId) == 0) {
+            throw new PromotionException("홍보글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        }
         Promotion promotion = findPromotionByIdOrThrow(promotionId);
-        promotion.increaseViewCount();
         return PromotionDto.PromotionResponse.fromEntity(promotion);
     }
 
@@ -138,7 +140,7 @@ public class PromotionService {
 
     // 내 홍보글 목록 조회
     public Page<PromotionDto.PromotionResponse> getMyPromotions(Long memberId, int page, int size) {
-        return promotionRepository.findByMemberIdOrderByCreatedAtDesc(memberId, PageRequest.of(page, size))
+        return promotionRepository.findByMemberIdOrderByCreatedAtDesc(memberId, PageRequests.bounded(page, size))
                 .map(PromotionDto.PromotionResponse::fromEntity);
     }
 

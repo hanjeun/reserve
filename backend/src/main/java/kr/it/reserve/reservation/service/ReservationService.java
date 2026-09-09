@@ -1067,9 +1067,7 @@ public class ReservationService {
     }
 
     /**
-     * 사업자/관리자 - 가게 예약 목록 조회 (최신순)
-     * - ADMIN: 페이지네이션 지원 (기본 100건/페이지)
-     * - BUSINESS: 본인 소유 가게 예약 (fetch join + 단일 쿼리)
+     * 소유권·가게·검색·상태 필터를 전체 예약에 적용한 뒤 페이지를 반환한다.
      */
     @Transactional(readOnly = true)
     public Page<ReservationResponse> getStoreReservations(
@@ -1077,15 +1075,16 @@ public class ReservationService {
             int page,
             int size,
             String search,
-            Reservation.ReservationStatus status) {
+            Reservation.ReservationStatus status,
+            Long storeId) {
         int safeSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize);
         String keyword = search == null ? "" : search.trim();
         if (owner.isAdmin()) {
-            return reservationRepository.searchForAdmin(keyword, status, pageable)
+            return reservationRepository.searchForAdmin(keyword, status, storeId, pageable)
                     .map(ReservationResponse::fromEntity);
         }
-        return reservationRepository.searchForStoreOwner(owner, keyword, status, pageable)
+        return reservationRepository.searchForStoreOwner(owner, keyword, status, storeId, pageable)
                 .map(ReservationResponse::fromEntity);
     }
 

@@ -20,10 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
  * 결제는 여전히 PAID. <b>이 어긋남은 버그가 아니라 신호다.</b> "PG 를 부르다가 끊겼으니
  * 사람이 PortOne 콘솔에서 확인하라"는 뜻이고, 그 확인 대상을 뽑을 수 있게 하는 게 원장의 목적이다.
  *
- * <h2>원장 기록이 실패해도 환불은 계속된다</h2>
- * 여기서 예외를 밖으로 던지면 <b>기록 실패가 환불 실패가 된다</b> — 손님 입장에서 훨씬 나쁘다.
- * 그래서 모든 메서드가 예외를 삼키고 {@code log.error} 로만 남긴다.
- * 이건 "조용히 실패해도 된다"는 뜻이 아니라 <b>우선순위</b>다: 돈 > 기록.
+ * <h2>원장 기록 실패와 PG 호출의 경계</h2>
+ * 각 메서드는 예외를 삼키고 {@code log.error}를 남기지만, {@link #start}가 {@code null}이면
+ * 호출자는 PG 취소를 보내지 않는다. 추적할 원장 없이 외부의 돈만 움직이는 것보다
+ * 요청을 안전하게 지연하고 다시 시도하게 하는 편이 낫다. 결말 기록 실패는 미결 원장을 남겨
+ * 재조회·대사할 수 있게 한다.
  */
 @Slf4j
 @Service
@@ -35,7 +36,7 @@ public class RefundLedgerService {
     /**
      * PG 를 부르기 <b>직전</b>에 원장 행을 만들고 <b>즉시 커밋</b>한다.
      *
-     * @return 원장 행 ID. 기록에 실패하면 {@code null} — 호출측은 null 을 받아도 환불을 계속해야 한다.
+     * @return 원장 행 ID. 기록에 실패하면 {@code null} — 호출측은 PG 요청 전에 중단해야 한다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Long start(Long paymentId, String merchantUid, Integer requestedAmount, String reason) {

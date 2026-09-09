@@ -615,16 +615,20 @@ public class ReservationService {
         //   실제로 PortOne 이 404 를 돌려주던 동안 예약금 결제 고객은 취소를 아예 못 했다.
         //   취소는 사용자의 권리이고 PG 장애로 막혀서는 안 된다. 환불은 별도 트랜잭션
         //   (refundByReservationCancel 의 REQUIRES_NEW)에서 시도하고, 실패하면 로그로 남긴다.
-        //   ⚠️ 아직 환불 재시도 원장이 없다 — 아래 ERROR 로그가 유일한 추적 수단이다.
-        //      운영에서 이 로그가 뜨면 포트원 콘솔에서 수동 취소해야 한다.
+        // 환불 요청과 미결 결말은 refund_attempt 원장과 결제 대사 큐에서 추적한다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
 
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
             try {
-                paymentService.refundByReservationCancel(id);
+                if (paymentService.refundByReservationCancel(id)) {
+                    // 환불은 REQUIRES_NEW라 바깥 영속성 컨텍스트의 예약 인스턴스에도
+                    // 같은 값을 써야 커밋 때 확정된 false가 다시 true로 덮이지 않는다.
+                    reservation.setDepositPaid(false);
+                    reservation.setDepositAmount(0);
+                }
             } catch (Exception e) {
-                log.error("Refund failed while cancelling - reservation stays CANCELLED, refund needs manual action: reservationId={}",
-                        id, e);
+                log.error("Refund failed while cancelling - reservation stays CANCELLED, refund needs manual action: reservationId={}, errorType={}",
+                        id, e.getClass().getSimpleName());
             }
         }
     }
@@ -867,8 +871,7 @@ public class ReservationService {
      * 플래그를 지우는 건 <b>실제로 환불이 일어났을 때뿐</b>이다 —
      * {@code depositPaid} 가 true 로 남아 있으면 최소한 "정산이 안 끝난 건"으로 눈에 띈다.
      *
-     * <p>⚠️ 환불 재시도 원장이 아직 없다 — 아래 로그가 유일한 추적 수단이고,
-     * 운영에서 이 로그가 뜨면 포트원 콘솔에서 수동 처리해야 한다.
+     * <p>환불이 미결이면 예약금 플래그를 유지하고 refund_attempt 원장과 결제 대사 큐에서 추적한다.
      */
     private void refundFullByStoreDecisionQuietly(Long reservationId, String reason, Reservation reservation) {
         if (!Boolean.TRUE.equals(reservation.getDepositPaid())) {
@@ -883,8 +886,8 @@ public class ReservationService {
                         reservationId);
             }
         } catch (Exception e) {
-            log.error("Store-side full refund failed - status change kept, refund needs manual action: reservationId={}",
-                    reservationId, e);
+            log.error("Store-side full refund failed - status change kept, refund needs manual action: reservationId={}, errorType={}",
+                    reservationId, e.getClass().getSimpleName());
         }
     }
 

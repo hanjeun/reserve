@@ -198,14 +198,30 @@
     to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
 @keyframes reserve-chat-out {
-    from { opacity: 1; transform: translateY(0)   scale(1); }
-    to   { opacity: 0; transform: translateY(8px) scale(0.96); }
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        visibility: visible;
+    }
+    65% {
+        opacity: 1;
+        transform: translateY(5px) scale(0.98);
+        visibility: visible;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+        visibility: hidden;
+    }
 }
 .reserve-chat-panel {
     transform-origin: 100% 100%;
     animation: reserve-chat-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.reserve-chat-panel.is-closing { animation: reserve-chat-out 0.15s ease-in both; }
+.reserve-chat-panel.is-closing {
+    pointer-events: none;
+    animation: reserve-chat-out 0.12s cubic-bezier(0.4, 0, 1, 1) both;
+}
 
 /* 입력 껍데기 — 포커스 표시는 안쪽 textarea 가 아니라 **껍데기 전체**에 나와야 한다.
    실제 포커스를 받는 건 textarea 이므로 :focus-within 이다. */

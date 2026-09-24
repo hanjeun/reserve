@@ -35,9 +35,11 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -526,13 +528,24 @@ public class StoreService {
         favoriteRepository.deleteByStoreId(id);
         promotionRepository.deleteByStoreId(id);
 
-        fileDeletionOutboxService.enqueue(store.getMainImageUrl(), "STORE_MAIN_IMAGE", id);
-        store.getDetailImageList().forEach(
-                image -> fileDeletionOutboxService.enqueue(image, "STORE_DETAIL_IMAGE", id));
+        Long ownerId = store.getOwner() != null ? store.getOwner().getId() : null;
+        enqueueManagedFileDeletion(
+                store.getMainImageUrl(),
+                ownerId != null ? FileStoragePaths.storeThumbnail(ownerId, id) : null,
+                "STORE_MAIN_IMAGE",
+                id);
+        store.getDetailImageList().forEach(image -> enqueueManagedFileDeletion(
+                image,
+                ownerId != null ? FileStoragePaths.storeImage(ownerId, id) : null,
+                "STORE_DETAIL_IMAGE",
+                id));
 
         advertisementRepository.findByStoreId(id).forEach(ad -> {
-            ad.getImageUrlList().forEach(
-                    image -> fileDeletionOutboxService.enqueue(image, "ADVERTISEMENT_IMAGE", ad.getId()));
+            ad.getImageUrlList().forEach(image -> enqueueManagedFileDeletion(
+                    image,
+                    ownerId != null ? FileStoragePaths.advertisement(ownerId, id) : null,
+                    "ADVERTISEMENT_IMAGE",
+                    ad.getId()));
             ad.setImageUrlList(List.of());
             // Store 잠금 아래 DataLifecycleGuard가 미결 원장과 미이관 광고를 먼저 차단했다.
             // 금융 기록은 보존하고 실패한 신청의 표시 상태만 닫는다.
@@ -557,16 +570,23 @@ public class StoreService {
     private void updateStoreImages(Store store, StoreUpdateRequest request) {
         Long memberId = store.getOwner().getId();
         Long storeId = store.getId();
+        String mainImagePrefix = FileStoragePaths.storeThumbnail(memberId, storeId);
+        String detailImagePrefix = FileStoragePaths.storeImage(memberId, storeId);
+
+        // 새 파일을 S3에 올리기 전에 기존 URL 참조를 전부 검증한다. 검증을 뒤로 미루면
+        // 잘못된 요청을 409로 거절하면서도 S3에는 새 객체가 남는 부분 성공이 생긴다.
+        validateExistingStoreImageReferences(store, request);
 
         if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
             String oldMainImage = store.getMainImageUrl();
             String key = fileStorageService.storeFile(
-                    request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId));
+                    request.getMainImage(), mainImagePrefix);
             store.setMainImageUrl(fileStorageService.getPublicUrl(key));
             int[] dim = fileStorageService.readImageDimensions(request.getMainImage());
             store.setMainImageWidth(dim != null ? dim[0] : null);
             store.setMainImageHeight(dim != null ? dim[1] : null);
-            fileDeletionOutboxService.enqueue(oldMainImage, "STORE_MAIN_IMAGE", storeId);
+            enqueueManagedFileDeletion(
+                    oldMainImage, mainImagePrefix, "STORE_MAIN_IMAGE", storeId);
         } else if (request.getExistingMainImageUrl() != null) {
             store.setMainImageUrl(request.getExistingMainImageUrl());
             // 기존 이미지를 그대로 유지하는 경우에는 width/height도 이미 저장된 값 그대로 유지된다(건드리지 않음)
@@ -601,12 +621,65 @@ public class StoreService {
         if (currentDetailImages != null) {
             for (String existingUrl : currentDetailImages) {
                 if (!finalDetailImages.contains(existingUrl)) {
-                    fileDeletionOutboxService.enqueue(existingUrl, "STORE_DETAIL_IMAGE", storeId);
+                    enqueueManagedFileDeletion(
+                            existingUrl, detailImagePrefix, "STORE_DETAIL_IMAGE", storeId);
                 }
             }
         }
         store.setDetailImageList(finalDetailImages);
         store.setDetailImagesMeta(toDetailImagesMetaJson(finalDetailDims));
+    }
+
+    /**
+     * 기존 이미지 URL은 이 가게에 지금 저장된 같은 역할의 값과 정확히 같을 때만 받는다.
+     *
+     * <p>URL은 공개값이라 요청자가 다른 가게 URL을 보낼 수 있지만, 저장값과 달라 여기서 막힌다.
+     * 소유자·가게 ID 경로 검사는 받을 때가 아니라 지울 때({@link #enqueueManagedFileDeletion}) 한다 —
+     * 2026-04-26 이전 옛 경로(stores/…)로 저장된 가게도 사진을 유지한 채 수정할 수 있어야 하고,
+     * 이미 심어진 남의 URL이 있어도 경계 밖이라 교체·폐업 때 지워지지 않는다.
+     */
+    private void validateExistingStoreImageReferences(Store store, StoreUpdateRequest request) {
+        String requestedMain = request.getExistingMainImageUrl();
+        if (requestedMain != null
+                && (requestedMain.isBlank() || !requestedMain.equals(store.getMainImageUrl()))) {
+            throw staleStoreImageReference();
+        }
+
+        List<String> requestedDetails = request.getExistingDetailImageUrls();
+        if (requestedDetails == null) return;
+
+        Set<String> currentDetails = new HashSet<>(store.getDetailImageList());
+        Set<String> uniqueRequestedDetails = new HashSet<>();
+        for (String requestedDetail : requestedDetails) {
+            if (requestedDetail == null
+                    || requestedDetail.isBlank()
+                    || !currentDetails.contains(requestedDetail)
+                    || !uniqueRequestedDetails.add(requestedDetail)) {
+                throw staleStoreImageReference();
+            }
+        }
+    }
+
+    private StoreException staleStoreImageReference() {
+        return new StoreException(
+                "가게 이미지가 다른 곳에서 변경되었습니다. 새로고침한 뒤 다시 시도해주세요.",
+                HttpStatus.CONFLICT);
+    }
+
+    /** 검증되지 않은 DB URL이 있어도 다른 리소스의 S3 객체를 삭제하지 않는다. */
+    private void enqueueManagedFileDeletion(
+            String target,
+            String expectedPrefix,
+            String sourceType,
+            Long sourceId) {
+        if (target == null || target.isBlank()) return;
+        if (expectedPrefix == null
+                || !fileStorageService.isManagedFileUnderPrefix(target, expectedPrefix)) {
+            log.warn("Skipped file deletion outside resource boundary: sourceType={}, sourceId={}",
+                    sourceType, sourceId);
+            return;
+        }
+        fileDeletionOutboxService.enqueue(target, sourceType, sourceId);
     }
 
     /**

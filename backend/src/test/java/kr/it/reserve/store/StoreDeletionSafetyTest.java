@@ -33,6 +33,7 @@ import java.util.concurrent.Executor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -116,17 +117,18 @@ class StoreDeletionSafetyTest {
         Store store = Store.builder()
                 .id(storeId)
                 .owner(owner)
-                .mainImageUrl("stores/8/main.png")
-                .detailImages("stores/8/detail-a.png,stores/8/detail-b.png")
+                .mainImageUrl("users/1/stores/8/thumbnails/main.png")
+                .detailImages("users/1/stores/8/images/detail-a.png,users/1/stores/8/images/detail-b.png")
                 .build();
         Advertisement ad = Advertisement.builder()
                 .id(30L)
                 .store(store)
-                .imageUrls("ads/30/banner.png")
+                .imageUrls("users/1/stores/8/advertisements/banner.png")
                 .build();
 
         when(storeRepository.findByIdForUpdate(storeId)).thenReturn(Optional.of(store));
         when(advertisementRepository.findByStoreId(storeId)).thenReturn(List.of(ad));
+        when(fileStorageService.isManagedFileUnderPrefix(anyString(), anyString())).thenReturn(true);
 
         storeService.deleteStore(storeId, owner);
 
@@ -134,11 +136,14 @@ class StoreDeletionSafetyTest {
         verify(favoriteRepository).deleteByStoreId(storeId);
         verify(promotionRepository).deleteByStoreId(storeId);
         verify(storeRepository, never()).delete(any(Store.class));
-        verify(fileDeletionOutboxService).enqueue("stores/8/main.png", "STORE_MAIN_IMAGE", storeId);
-        verify(fileDeletionOutboxService).enqueue("stores/8/detail-a.png", "STORE_DETAIL_IMAGE", storeId);
-        verify(fileDeletionOutboxService).enqueue("stores/8/detail-b.png", "STORE_DETAIL_IMAGE", storeId);
-        verify(fileDeletionOutboxService).enqueue("ads/30/banner.png", "ADVERTISEMENT_IMAGE", 30L);
-        verifyNoInteractions(fileStorageService);
+        verify(fileDeletionOutboxService).enqueue(
+                "users/1/stores/8/thumbnails/main.png", "STORE_MAIN_IMAGE", storeId);
+        verify(fileDeletionOutboxService).enqueue(
+                "users/1/stores/8/images/detail-a.png", "STORE_DETAIL_IMAGE", storeId);
+        verify(fileDeletionOutboxService).enqueue(
+                "users/1/stores/8/images/detail-b.png", "STORE_DETAIL_IMAGE", storeId);
+        verify(fileDeletionOutboxService).enqueue(
+                "users/1/stores/8/advertisements/banner.png", "ADVERTISEMENT_IMAGE", 30L);
 
         assertThat(store.isDeleted()).isTrue();
         assertThat(store.getMainImageUrl()).isNull();

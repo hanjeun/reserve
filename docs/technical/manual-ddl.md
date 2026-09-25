@@ -119,6 +119,57 @@ SHOW INDEX FROM ad_payment_attempt;
 
 ---
 
+## 3. 계정 보안·로그인 유지 (v2.6.1): 배포 전후 확인
+
+`ddl-auto: update`가 아래를 만든다. 모두 **추가만** 있고 삭제·타입 변경은 없다.
+
+| 대상 | 변경 | 쓰는 곳 |
+|---|---|---|
+| `member.auth_version` | `INT NOT NULL DEFAULT 0` 추가 | 비밀번호 변경·재설정 시 모든 세션 무효화 |
+| `refresh_token.previous_token_hash` | `VARCHAR(64) NULL` + `idx_refresh_token_previous_hash` | refresh 회전 직전 토큰 식별 |
+| `refresh_token.rotated_at` | `DATETIME(6) NULL` | 직전 토큰 유예(60초) 판정 |
+| `oauth_unlink_task` | 새 테이블 | 탈퇴 OAuth 연동 해제 outbox |
+| `marketing_consent_history` | 새 테이블 | 마케팅 동의·철회 이력(append-only) |
+
+로컬 H2에서 생성됐다는 사실은 운영 MySQL에 올바른 제약·기본값이 생겼다는 증거가 아니다.
+새 앱 기동 뒤 읽기 전용으로 확인한다(`scripts/verify-post-deploy-readonly.sh`가 같은 항목을 본다).
+
+```sql
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND ((TABLE_NAME = 'member' AND COLUMN_NAME = 'auth_version')
+    OR (TABLE_NAME = 'refresh_token' AND COLUMN_NAME IN ('previous_token_hash', 'rotated_at')));
+
+SELECT COUNT(*) AS invalid_auth_versions
+FROM member
+WHERE auth_version IS NULL OR auth_version < 0;
+
+SHOW INDEX FROM refresh_token;
+SHOW CREATE TABLE oauth_unlink_task;
+SHOW INDEX FROM oauth_unlink_task;
+SHOW CREATE TABLE marketing_consent_history;
+SHOW INDEX FROM marketing_consent_history;
+```
+
+- `auth_version`은 `INT NOT NULL DEFAULT 0`, 기존 회원은 모두 0이어야 한다.
+- `refresh_token`에 `idx_refresh_token_previous_hash`가 있어야 한다. 없으면 직전 토큰 조회가 풀스캔이 된다
+  (동작은 한다). Hibernate가 만들지 못했을 때만 백업 뒤 아래를 적용하고 이력에 남긴다.
+  ```sql
+  CREATE INDEX idx_refresh_token_previous_hash ON refresh_token (previous_token_hash);
+  ```
+- `oauth_unlink_task.task_key` unique(`uk_oauth_unlink_task_key`), `(status,next_attempt_at)` 인덱스,
+  nullable `lease_id`를 확인한다.
+- 마케팅 동의 이력은 `(member_id,created_at)` 인덱스를 확인한다.
+- 제약이 다르면 즉시 ALTER하지 말고 실제 `SHOW CREATE TABLE` 결과를 근거로 DDL을 별도 승인받는다.
+
+**롤백 경계.** v2.6.0으로 되돌려도 새 컬럼·테이블은 무시되고 로그인은 계속된다(회전된 refresh도
+구버전이 그대로 찾는다). 다만 구버전은 `auth_version`을 보지 않으므로, 비밀번호 변경 직후 남아 있던
+access 토큰이 만료(최대 30분) 전까지 다시 통과한다 — 보안 회귀이므로 롤백은 사고 절차로만 한다.
+탈퇴 뒤 `oauth_unlink_task`에 남은 작업은 구버전이 처리하지 않으므로 롤백 전에 미결 건수를 확인한다.
+
+---
+
 ## 이력
 
 | 날짜 | 대상 | DDL | 적용자 | 메모 |

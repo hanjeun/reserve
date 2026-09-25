@@ -89,16 +89,4 @@ public class EmailApiController {
         ));
     }
 
-    /**
-     * 이메일 인증 상태 확인
-     */
-    @GetMapping("/check-verified")
-    public ResponseEntity<Map<String, Object>> checkVerified(@RequestParam String email) {
-        boolean verified = verificationService.isEmailVerified(email);
-
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "verified", verified
-        ));
-    }
 }

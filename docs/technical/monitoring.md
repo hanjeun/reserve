@@ -380,14 +380,19 @@ sum(count_over_time({job="reserve"} |~ `\[backup\] === backup done` [26h]))
 
 26시간인 이유: 백업은 매일 03:10 KST 1회다. 24시간이면 실행이 조금만 밀려도 오탐이 난다.
 
-**8. OAuth 탈퇴 연동 해제 실패** — ABOVE 0 / 15분 주기 / pending 0m
+**8. OAuth 탈퇴 연동 해제 미결** — ABOVE 0 / 15분 주기 / pending 0m
 
 ```logql
-sum(count_over_time({job="reserve"} |= `OAuth unlink requires manual follow-up` [20m]))
+sum(count_over_time({job="reserve"} |= `OAuth unlink queue requires attention` [20m]))
 ```
 
-DB 탈퇴는 커밋됐지만 외부 제공자 연동 해제는 확인이 필요한 상태다. member ID와 provider만 보고
-해당 제공자 콘솔에서 수동 확인한다. 토큰은 로그에 남지 않는다.
+**v2.6.1에서 문구가 바뀌었다.** 예전 `OAuth unlink requires manual follow-up`은 삭제된 이벤트 리스너의
+문구라 더는 나오지 않는다. Grafana 규칙의 쿼리도 위 문구로 바꿔야 알림이 살아 있다.
+
+`FAILED`는 암호화된 토큰으로 자동 재시도하고, `BLOCKED`는 탈퇴 시점에 제공자 토큰이 없어
+수동 확인이 필요한 상태다. 개별 실패 로그가 아니라 15분 운영 집계 문구를 알림 정본으로 쓴다.
+어느 작업인지는 `oauth_unlink_task`의 status·provider·member_id·last_error_type으로 본다.
+토큰은 로그에 남지 않는다.
 
 **9. S3 삭제 outbox 실패** — ABOVE 0 / 1시간 주기
 
@@ -398,6 +403,27 @@ sum(count_over_time({job="reserve"} |= `Queued file deletion failed` [70m]))
 일시 실패는 지수 backoff로 자동 재시도한다. 반복되면 `file_deletion_task`의 `FAILED` 건수와
 `last_error_type`을 확인한다. 경로 자체는 로그로 내보내지 않는다. 상세 런북은
 `docs/technical/data-lifecycle.md`의 "S3 파일 삭제 outbox"를 따른다.
+
+### 로그인 유지(refresh) 거절 사유 관측 쿼리 (알림 아님)
+
+"로그인이 풀렸다"는 제보가 오면 먼저 여기를 본다(v2.6.1부터).
+
+```logql
+sum by (reason) (count_over_time({job="reserve"} |= `Refresh rejected` | regexp `reason=(?P<reason>[A-Z_]+)` [24h]))
+```
+
+| reason | 뜻 | 보통 원인 |
+|---|---|---|
+| `MISSING_COOKIE` | refresh 쿠키 자체가 없다 | 브라우저가 쿠키를 지웠다(Max-Age 만료·사용자 삭제), 이미 로그아웃 |
+| `EXPIRED_JWT` / `EXPIRED_SESSION` | 14일 동안 한 번도 쓰지 않았다 | 정상 만료 |
+| `UNKNOWN_TOKEN` | DB에 없는 토큰 | 다른 기기에서 비밀번호 변경, 기기 5개 초과로 오래된 기기 정리 |
+| `AUTH_VERSION_CHANGED` | 비밀번호 변경·재설정 전 토큰 | 정상(보안 의도) |
+| `REUSED_TOKEN` (WARN) | 유예(60초)가 지난 직전 토큰 | 탈취 의심 **또는** 응답을 못 받은 네트워크 끊김. 한 회원에 반복되면 확인 |
+| `INVALID_JWT` / `NOT_REFRESH_TOKEN` (WARN) | 서명 불일치·용도 위반 | 조작된 요청. JWT 키를 바꾼 직후에도 나온다 |
+
+성공은 `Refresh rotated`, 동시 요청 유예 경로는 `Refresh reused within grace`로 남는다. 로그에는
+memberId와 사유만 있고 토큰은 없다. 거절 자체는 정상 수명 주기에서도 나므로 알림으로 만들지 않는다.
+`REUSED_TOKEN`이 정상 사용자에게 자주 보이면 `TokenService.PREVIOUS_TOKEN_GRACE`를 다시 검토한다.
 
 ### CSP Report-Only 관측 쿼리 (알림 아님)
 
@@ -440,6 +466,8 @@ cron 이나 promtail 이 죽으면 대시보드가 **옛날 값에서 조용히 
 | 메일 발송 실패 | `email failed`, `Email send failed`, `Mail send failed` 중 하나 | `EmailService`, 비동기 발송 서비스 |
 | 미결 환불 | `Refund stuck unresolved` | `RefundReconciliationScheduler` |
 | 결제 운영 큐 미결 | `Payment operations queue requires attention` | `PaymentOperationsMonitorScheduler` |
+| OAuth 연동 해제 미결 | `OAuth unlink queue requires attention` | `OAuthUnlinkOperationsMonitorScheduler` |
+| refresh 거절 사유 관측 | `Refresh rejected: reason=` | `TokenService` |
 | CSP Report-Only 관측 | `CSP violation observed` | `CspReportController` |
 
 기준 문구 뒤의 진단값은 바꿀 수 있지만 이메일·IP·이름·주소·검색어·원본 파일명·토큰·외부 응답

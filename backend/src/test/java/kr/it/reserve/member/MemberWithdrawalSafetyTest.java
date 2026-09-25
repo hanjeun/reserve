@@ -6,6 +6,7 @@ import kr.it.reserve.community.repository.CommunityCommentRepository;
 import kr.it.reserve.community.repository.CommunityPostRepository;
 import kr.it.reserve.community.repository.PostLikeRepository;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
+import kr.it.reserve.config.oauth2.outbox.OAuthUnlinkOutboxService;
 import kr.it.reserve.email.repository.EmailVerificationRepository;
 import kr.it.reserve.email.service.EmailVerificationService;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
@@ -15,7 +16,7 @@ import kr.it.reserve.global.security.PwnedPasswordChecker;
 import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.member.event.MemberWithdrawalCommittedEvent;
+import kr.it.reserve.member.repository.MarketingConsentHistoryRepository;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.member.repository.PasswordResetTokenRepository;
 import kr.it.reserve.member.service.MemberService;
@@ -28,14 +29,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -60,8 +59,9 @@ class MemberWithdrawalSafetyTest {
     @Mock private PasswordResetTokenRepository passwordResetTokenRepository;
     @Mock private EmailVerificationRepository emailVerificationRepository;
     @Mock private DataLifecycleGuard dataLifecycleGuard;
-    @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private OAuthUnlinkOutboxService oAuthUnlinkOutboxService;
     @Mock private PwnedPasswordChecker pwnedPasswordChecker;
+    @Mock private MarketingConsentHistoryRepository marketingConsentHistoryRepository;
 
     @InjectMocks private MemberService memberService;
 
@@ -105,7 +105,7 @@ class MemberWithdrawalSafetyTest {
         verify(reservationRepository).clearSpecialRequestsByMemberId(memberId);
         verify(passwordResetTokenRepository).deleteByEmail("person@example.com");
         verify(emailVerificationRepository).deleteByEmail("person@example.com");
-        verify(eventPublisher).publishEvent(any(MemberWithdrawalCommittedEvent.class));
+        verify(oAuthUnlinkOutboxService).enqueue(memberId, AuthProvider.GOOGLE, "secret-token");
         verify(memberRepository, never()).deleteById(memberId);
 
         assertThat(member.isDeleted()).isTrue();

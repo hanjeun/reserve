@@ -83,6 +83,7 @@ export const API_ENDPOINTS = {
     MEMBER: {
         ME:                '/api/member/me',
         UPDATE:            '/api/member/update',
+        PASSWORD:          '/api/member/password',
         PROFILE_IMAGE:     '/api/member/profile-image',
         DELETE:            '/api/member/delete',
         WITHDRAWAL_READINESS: '/api/member/withdrawal-readiness',

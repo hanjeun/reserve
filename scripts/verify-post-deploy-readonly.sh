@@ -70,10 +70,14 @@ ATTENTION=0
 
 note "schema=${DB_NAME}, container=${MYSQL_CONTAINER}"
 
-for table in payment_webhook_inbox payment_reconciliation_issue file_deletion_task; do
+for table in payment_webhook_inbox payment_reconciliation_issue file_deletion_task oauth_unlink_task marketing_consent_history; do
     require_table "$table"
 done
 require_column reservation checked_in_at
+require_column member auth_version
+require_column oauth_unlink_task lease_id
+require_column refresh_token previous_token_hash
+require_column refresh_token rotated_at
 
 require_index payment_webhook_inbox uk_payment_webhook_inbox_webhook_id
 require_index payment_webhook_inbox idx_payment_webhook_inbox_retry
@@ -82,8 +86,12 @@ require_index payment_reconciliation_issue uk_payment_reconciliation_issue_key
 require_index payment_reconciliation_issue idx_payment_reconciliation_issue_status
 require_index file_deletion_task uk_file_deletion_target_hash
 require_index file_deletion_task idx_file_deletion_retry
+require_index oauth_unlink_task uk_oauth_unlink_task_key
+require_index oauth_unlink_task idx_oauth_unlink_retry
+require_index marketing_consent_history idx_marketing_consent_member_created
+require_index refresh_token idx_refresh_token_previous_hash
 
-NON_INNODB="$(mysql_query "SELECT CONCAT(table_name, ':', engine) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('payment','reservation','payment_webhook_inbox','payment_reconciliation_issue','file_deletion_task') AND engine <> 'InnoDB';")"
+NON_INNODB="$(mysql_query "SELECT CONCAT(table_name, ':', engine) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('payment','reservation','payment_webhook_inbox','payment_reconciliation_issue','file_deletion_task','oauth_unlink_task','marketing_consent_history','refresh_token') AND engine <> 'InnoDB';")"
 if [[ -n "$NON_INNODB" ]]; then
     die "row-lock tables must use InnoDB: $NON_INNODB"
 fi
@@ -94,6 +102,7 @@ OPEN_ISSUES="$(mysql_query "SELECT COUNT(*) FROM payment_reconciliation_issue WH
 UNFINISHED_WEBHOOKS="$(mysql_query "SELECT COUNT(*) FROM payment_webhook_inbox WHERE status IN ('RECEIVED','PROCESSING','FAILED');")"
 FAILED_DELETIONS="$(mysql_query "SELECT COUNT(*) FROM file_deletion_task WHERE status = 'FAILED';")"
 PENDING_DELETIONS="$(mysql_query "SELECT COUNT(*) FROM file_deletion_task WHERE status = 'PENDING';")"
+UNRESOLVED_OAUTH_UNLINKS="$(mysql_query "SELECT COUNT(*) FROM oauth_unlink_task WHERE status IN ('FAILED','BLOCKED') OR (status = 'PROCESSING' AND next_attempt_at <= NOW());")"
 CHECKED_IN="$(mysql_query "SELECT COUNT(*) FROM reservation WHERE checked_in_at IS NOT NULL;")"
 
 note "checked-in reservations: ${CHECKED_IN}"
@@ -101,6 +110,7 @@ note "stale READY payments (> ${STALE_READY_DAYS}d): ${STALE_READY}"
 note "open payment reconciliation issues: ${OPEN_ISSUES}"
 note "unfinished PortOne webhooks: ${UNFINISHED_WEBHOOKS}"
 note "file deletion outbox: pending=${PENDING_DELETIONS}, failed=${FAILED_DELETIONS}"
+note "OAuth unlink outbox: unresolved=${UNRESOLVED_OAUTH_UNLINKS}"
 
 if [[ "$STALE_READY" -gt 0 ]]; then
     warn "stale READY payments require PortOne-console comparison before any reconciliation"
@@ -109,6 +119,7 @@ fi
 [[ "$OPEN_ISSUES" -eq 0 ]] || warn "payment reconciliation queue is not empty"
 [[ "$UNFINISHED_WEBHOOKS" -eq 0 ]] || warn "PortOne webhook inbox has unfinished work"
 [[ "$FAILED_DELETIONS" -eq 0 ]] || warn "S3 deletion outbox has failed work"
+[[ "$UNRESOLVED_OAUTH_UNLINKS" -eq 0 ]] || warn "OAuth unlink outbox has failed or blocked work"
 
 echo
 if [[ "$ATTENTION" -eq 0 ]]; then

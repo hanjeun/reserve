@@ -71,15 +71,22 @@ const NameTab = ({ user }) => {
 
 const PasswordTab = () => {
     const { message } = useMessage();
+    const navigate = useNavigate();
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
 
     const onFinish = async ({ currentPassword, newPassword, confirmPassword }) => {
         setLoading(true);
         try {
-            await memberService.updateMember({ password: newPassword, passwordConfirm: confirmPassword, currentPassword });
-            message.success('비밀번호가 변경되었습니다');
-            form.resetFields();
+            await memberService.changePassword({
+                currentPassword,
+                newPassword,
+                newPasswordConfirm: confirmPassword,
+            });
+            // 서버가 모든 기기의 세션을 끊었다(authVersion 회전 + refresh 전부 삭제). 로컬 상태도 비운다.
+            useAuthStore.getState().logout();
+            message.success('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
+            navigate('/login', { replace: true });
         } catch (err) {
             handleApiError(err, message, '비밀번호 변경에 실패했습니다');
         } finally {
@@ -91,18 +98,14 @@ const PasswordTab = () => {
         <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
             <div style={styles.securityNotice}>
                 <Text style={{ fontSize: fontSize.xs, color: colors.text.secondary }}>
-                    영문+숫자 조합 8자 이상을 권장해요
+                    영문과 숫자를 포함해 8~64자로 입력해주세요
                 </Text>
             </div>
             <Form.Item name="currentPassword" style={{ marginBottom: 16 }}
                 rules={[{ required: true, message: '현재 비밀번호를 입력해주세요' }]}>
                 <FormInput type="password" placeholder="현재 비밀번호" />
             </Form.Item>
-            <Form.Item name="newPassword" style={{ marginBottom: 16 }} rules={[
-                { required: true, message: '새 비밀번호를 입력해주세요' },
-                { min: 8, message: '8자 이상 입력해주세요' },
-                { pattern: /^(?=.*[a-zA-Z])(?=.*\d)/, message: '영문과 숫자를 포함해야 합니다' },
-            ]}>
+            <Form.Item name="newPassword" style={{ marginBottom: 16 }} rules={VALIDATION_RULES.password}>
                 <FormInput type="password" placeholder="새 비밀번호 (영문+숫자 8자 이상)" />
             </Form.Item>
             <Form.Item name="confirmPassword" style={{ marginBottom: 16 }} dependencies={['newPassword']} rules={[

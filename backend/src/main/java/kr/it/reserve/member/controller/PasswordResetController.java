@@ -4,7 +4,9 @@ import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.service.PasswordResetService;
+import kr.it.reserve.member.dto.PasswordResetRequest;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -85,12 +87,12 @@ public class PasswordResetController {
     /** 비밀번호 재설정 */
     @PostMapping("/reset")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody PasswordResetRequest body,
             HttpServletRequest request) {
 
-        String email       = body.get("email");
-        String code        = body.get("code");
-        String newPassword = body.get("newPassword");
+        String email       = body.getEmail();
+        String code        = body.getCode();
+        String newPassword = body.getNewPassword();
 
         // ★ verify-code 뿐 아니라 여기도 막는다. 이 엔드포인트도 코드를 대조하므로
         //   verify-code 를 건너뛰고 여기만 두드리는 우회가 가능하다(서비스 주석 참고).

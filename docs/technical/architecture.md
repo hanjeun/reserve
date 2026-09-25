@@ -12,12 +12,18 @@
 
 | 서비스 | 용도 | 세부 |
 |---|---|---|
-| **Lightsail** | 애플리케이션 서버 | $10/월, 2GB RAM, 서울(ap-northeast-2) |
+| **Lightsail** | 애플리케이션 서버 | `small_3_0` — $12/월(부가세 별도), 2 vCPU · 2GB RAM · 60GB SSD · 전송 3TB/월, 서울(ap-northeast-2). 2026-09-25 `get-bundles` 조회 |
 | **Route 53** | DNS 호스팅 | reserve.it.kr 호스팅 영역 |
 | **S3** | 이미지 스토리지 | reserve-it-kr-bucket, 서울 |
+| **S3** | DB 백업 | reserve-it-kr-backup, 서울 — 비공개·기본 암호화·버전 관리, 90일 보관(`backup.md`) |
 | **CloudFront** | 이미지 CDN | cdn.reserve.it.kr (E1VOAW2W8K0VA4) |
 | **ACM** | SSL 인증서 | CloudFront용, us-east-1 리전 필수 |
-| **IAM** | S3 접근 제어 | reserve-s3-user (AmazonS3FullAccess) |
+| **IAM** | S3 접근 제어 | `reserve-s3-user`: 이미지 버킷 올리기·보기·지우기만(인라인 `reserve-app-images-rw`) · `reserve-backup-uploader`: 백업 버킷 `mysql/` 올리기만 — 2026-09-25 |
+| **Budgets** | 요금 알림 | `reserve-monthly` 월 $20 — 실제 80%·예상 100% 초과 시 운영 Gmail로 메일 |
+
+> **계정 운영(2026-09-25 결정):** root는 MFA가 켜져 있고 액세스 키가 없다. 혼자 쓰는 계정이라 관리용 IAM 사용자는
+> 두지 않고 root로 로그인하되, 작업이 끝나면 로그아웃하고 root 키는 만들지 않는다. 요금 알림을 이상 사용의 보완 신호로 둔다.
+> 가입 이메일과 대체 연락처(결제·운영·보안)는 운영 Gmail(푸터·개인정보처리방침과 같은 주소)이다.
 
 ---
 

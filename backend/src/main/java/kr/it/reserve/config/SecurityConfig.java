@@ -85,8 +85,17 @@ public class SecurityConfig {
                         // 본문은 CspReportController가 URL을 버리고 고정 범주만 기록한다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/csp-reports").permitAll()
 
-                        // 인증 관련 API
-                        .requestMatchers("/api/auth/**", "/api/email/**", "/api/password-reset/**").permitAll()
+                        // 인증 진입점만 공개한다. agree-terms는 로그인 직후의 회원 상태를 바꾸므로
+                        // /api/auth/**로 함께 열면 @AuthenticationPrincipal null 경로가 생긴다.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/auth/login", "/api/auth/signup", "/api/auth/refresh", "/api/auth/logout")
+                                .permitAll()
+                        // 가입 전 이메일 인증에 필요한 두 요청만 공개한다. 인증 상태를 이메일로
+                        // 조회하는 공개 API는 계정·인증 진행 여부를 추측하게 하므로 두지 않는다.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/email/send-code", "/api/email/verify-code").permitAll()
+                        .requestMatchers("/api/password-reset/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/agree-terms").authenticated()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/login/**").permitAll()
 
                         // 공개 API (인증 불필요) - GET만 허용, CUD는 인증 필요

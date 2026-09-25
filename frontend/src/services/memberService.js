@@ -3,7 +3,8 @@
  *
  * 백엔드 엔드포인트:
  *   GET    /api/member/me             내 정보 조회
- *   PUT    /api/member/update         회원 정보 수정 (이름, 비밀번호)
+ *   PUT    /api/member/update         일반 회원 정보 수정
+ *   PUT    /api/member/password       현재 비밀번호 재인증 후 비밀번호 변경
  *   POST   /api/member/profile-image  프로필 이미지 업로드
  *   DELETE /api/member/delete         회원 탈퇴
  */
@@ -14,8 +15,11 @@ const memberService = {
     /** 내 정보 조회 */
     getMe: () => api.get(API_ENDPOINTS.MEMBER.ME),
 
-    /** 회원 정보 수정 (이름, 비밀번호) */
+    /** 일반 회원 정보 수정 (비밀번호는 전용 관문 사용) */
     updateMember: (data) => api.put(API_ENDPOINTS.MEMBER.UPDATE, data),
+
+    /** 현재 비밀번호 재인증 후 변경. 성공하면 authVersion 회전 + refresh token 폐기로 모든 세션을 끊는다. */
+    changePassword: (data) => api.put(API_ENDPOINTS.MEMBER.PASSWORD, data),
 
     /** 프로필 이미지 업로드 */
     uploadProfileImage: (file) => {

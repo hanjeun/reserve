@@ -5,20 +5,24 @@ import kr.it.reserve.community.repository.CommunityCommentRepository;
 import kr.it.reserve.community.repository.CommunityPostRepository;
 import kr.it.reserve.community.repository.PostLikeRepository;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
+import kr.it.reserve.config.oauth2.outbox.OAuthUnlinkOutboxService;
 import kr.it.reserve.email.service.EmailVerificationService;
 import kr.it.reserve.email.repository.EmailVerificationRepository;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.security.PwnedPasswordChecker;
+import kr.it.reserve.global.security.PasswordPolicy;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
+import kr.it.reserve.member.dto.PasswordChangeRequest;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.MarketingConsentHistory;
 import kr.it.reserve.member.entity.Role;
-import kr.it.reserve.member.event.MemberWithdrawalCommittedEvent;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.repository.MarketingConsentHistoryRepository;
 import kr.it.reserve.member.repository.PasswordResetTokenRepository;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
@@ -33,7 +37,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -61,8 +64,9 @@ public class MemberService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final DataLifecycleGuard dataLifecycleGuard;
-    private final ApplicationEventPublisher eventPublisher;
+    private final OAuthUnlinkOutboxService oAuthUnlinkOutboxService;
     private final PwnedPasswordChecker pwnedPasswordChecker;
+    private final MarketingConsentHistoryRepository marketingConsentHistoryRepository;
 
     /**
      * 유출 비밀번호 거부 문구. 회원가입·비밀번호 변경에서 같은 문구를 쓴다.
@@ -79,6 +83,11 @@ public class MemberService {
             throw new MemberException("필수 약관에 동의해주세요.", HttpStatus.BAD_REQUEST);
         }
 
+        requireValidPassword(signupRequest.getPassword());
+        if (!PasswordPolicy.matches(signupRequest.getPassword(), signupRequest.getPasswordConfirm())) {
+            throw new MemberException(PasswordPolicy.MISMATCH_MESSAGE, HttpStatus.BAD_REQUEST);
+        }
+
         if (memberRepository.findByEmail(signupRequest.getEmail()).isPresent()) {
             throw MemberException.conflict("이미 사용 중인 이메일입니다.");
         }
@@ -93,7 +102,7 @@ public class MemberService {
             throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
 
-        return memberRepository.save(Member.builder()
+        Member member = memberRepository.save(Member.builder()
                 .name(signupRequest.getName())
                 .email(signupRequest.getEmail())
                 .password(bCryptPasswordEncoder.encode(signupRequest.getPassword()))
@@ -101,7 +110,10 @@ public class MemberService {
                 .provider(AuthProvider.LOCAL)
                 .termsAgreed(true)
                 .marketingAgreed(signupRequest.isMarketingAgreed())
-                .build()).getId();
+                .build());
+        recordMarketingConsent(member, signupRequest.isMarketingAgreed(),
+                MarketingConsentHistory.Source.LOCAL_SIGNUP);
+        return member.getId();
     }
 
     public Member findById(Long id) {
@@ -146,31 +158,6 @@ public class MemberService {
             member.setName(request.getName());
         }
 
-        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
-            if (!member.getEmail().equals(request.getEmail())) {
-                if (memberRepository.findByEmail(request.getEmail()).isPresent()) {
-                    throw new MemberException("이미 사용 중인 이메일입니다.", HttpStatus.CONFLICT);
-                }
-                member.setEmail(request.getEmail());
-            }
-        }
-
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            if (member.isOAuthUser()) {
-                throw new MemberException("소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.", HttpStatus.FORBIDDEN);
-            }
-            if (request.getPassword().length() < 8) {
-                throw new MemberException("비밀번호는 8자 이상이어야 합니다.", HttpStatus.BAD_REQUEST);
-            }
-            if (!request.getPassword().equals(request.getPasswordConfirm())) {
-                throw new MemberException("비밀번호가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
-            }
-            if (pwnedPasswordChecker.isPwned(request.getPassword())) {
-                throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
-            }
-            member.setPassword(bCryptPasswordEncoder.encode(request.getPassword()));
-        }
-
         if (request.getEmailNotificationEnabled() != null) {
             member.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
         }
@@ -179,6 +166,39 @@ public class MemberService {
         log.info("Member update completed: memberId={}", memberId);
 
         return MemberResponse.fromEntity(updated);
+    }
+
+    @Transactional
+    public void changePassword(Long memberId, PasswordChangeRequest request) {
+        Member member = findByIdForUpdate(memberId);
+        if (member.isOAuthUser() || member.getPassword() == null) {
+            throw new MemberException("소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.", HttpStatus.FORBIDDEN);
+        }
+        if (!bCryptPasswordEncoder.matches(request.getCurrentPassword(), member.getPassword())) {
+            throw new MemberException("현재 비밀번호가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+        }
+        requireValidPassword(request.getNewPassword());
+        if (!PasswordPolicy.matches(request.getNewPassword(), request.getNewPasswordConfirm())) {
+            throw new MemberException(PasswordPolicy.MISMATCH_MESSAGE, HttpStatus.BAD_REQUEST);
+        }
+        if (bCryptPasswordEncoder.matches(request.getNewPassword(), member.getPassword())) {
+            throw new MemberException("현재 비밀번호와 다른 비밀번호를 사용해주세요.", HttpStatus.BAD_REQUEST);
+        }
+        if (pwnedPasswordChecker.isPwned(request.getNewPassword())) {
+            throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
+        }
+
+        member.setPassword(bCryptPasswordEncoder.encode(request.getNewPassword()));
+        member.rotateAuthVersion();
+        refreshTokenRepository.deleteByMemberId(memberId);
+        log.info("Member password changed and sessions invalidated: memberId={}", memberId);
+    }
+
+    private void requireValidPassword(String password) {
+        String violation = PasswordPolicy.violation(password);
+        if (violation != null) {
+            throw new MemberException(violation, HttpStatus.BAD_REQUEST);
+        }
     }
 
     @Transactional
@@ -212,14 +232,18 @@ public class MemberService {
 
     /**
      * 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경 가능).
-     * PIPA 준수: 동의/철회 시각을 별도 로그 테이블에 남겨야 하지만
-     * 현재는 단순 플래그 업데이트. 필요 시 AuditLog와 연동 예정.
+     * 현재 상태는 Member 플래그에, 변경 증거는 append-only marketing_consent_history에 남긴다.
      */
     @Transactional
     public MemberResponse updateMarketingConsent(Long memberId, boolean marketingAgreed) {
         Member member = findByIdForUpdate(memberId);
+        if (member.isMarketingAgreed() == marketingAgreed) {
+            return MemberResponse.fromEntity(member);
+        }
         member.setMarketingAgreed(marketingAgreed);
-        return MemberResponse.fromEntity(memberRepository.save(member));
+        Member updated = memberRepository.save(member);
+        recordMarketingConsent(updated, marketingAgreed, MarketingConsentHistory.Source.SETTINGS);
+        return MemberResponse.fromEntity(updated);
     }
 
     /**
@@ -264,8 +288,20 @@ public class MemberService {
     @Transactional
     public void agreeTerms(Long memberId, boolean marketingAgreed) {
         Member member = findByIdForUpdate(memberId);
+        boolean firstAgreement = !member.isTermsAgreed();
+        boolean marketingChanged = member.isMarketingAgreed() != marketingAgreed;
         member.setTermsAgreed(true);
         member.setMarketingAgreed(marketingAgreed);
+        if (firstAgreement || marketingChanged) {
+            recordMarketingConsent(member, marketingAgreed, MarketingConsentHistory.Source.SOCIAL_SIGNUP);
+        }
+    }
+
+    private void recordMarketingConsent(
+            Member member,
+            boolean agreed,
+            MarketingConsentHistory.Source source) {
+        marketingConsentHistoryRepository.save(MarketingConsentHistory.record(member, agreed, source));
     }
 
     @Transactional(readOnly = true)
@@ -284,8 +320,8 @@ public class MemberService {
         String profileImage = member.getProfileImage();
 
         if (member.isOAuthUser()) {
-            eventPublisher.publishEvent(new MemberWithdrawalCommittedEvent(
-                    member.getId(), member.getProvider(), member.getOauthAccessToken()));
+            oAuthUnlinkOutboxService.enqueue(
+                    member.getId(), member.getProvider(), member.getOauthAccessToken());
         }
 
         fileDeletionOutboxService.enqueue(profileImage, "MEMBER_PROFILE_IMAGE", memberId);

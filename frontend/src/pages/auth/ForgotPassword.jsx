@@ -157,6 +157,7 @@ const ForgotPassword = () => {
                 email,
                 code,
                 newPassword: values.newPassword,
+                newPasswordConfirm: values.confirmNewPassword,
             });
             message.success('비밀번호가 변경되었습니다.');
             navigate('/login');

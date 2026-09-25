@@ -12,7 +12,7 @@
 
 | 서비스 | 용도 | 세부 |
 |---|---|---|
-| **Lightsail** | 애플리케이션 서버 | $10/월, 2GB RAM, 서울(ap-northeast-2) |
+| **Lightsail** | 애플리케이션 서버 | `small_3_0` — $12/월(부가세 별도), 2 vCPU · 2GB RAM · 60GB SSD · 전송 3TB/월, 서울(ap-northeast-2). 2026-09-25 `get-bundles` 조회 |
 | **Route 53** | DNS 호스팅 | reserve.it.kr 호스팅 영역 |
 | **S3** | 이미지 스토리지 | reserve-it-kr-bucket, 서울 |
 | **S3** | DB 백업 | reserve-it-kr-backup, 서울 — 비공개·기본 암호화·버전 관리, 90일 보관(`backup.md`) |

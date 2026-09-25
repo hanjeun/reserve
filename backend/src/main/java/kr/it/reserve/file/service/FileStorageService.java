@@ -19,12 +19,16 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Service
 public class FileStorageService {
+
+    private static final Set<String> MANAGED_ROOTS = Set.of("users", "notices", "system");
 
     @Value("${s3.bucket}")
     private String bucket;
@@ -216,18 +220,122 @@ public class FileStorageService {
     public void deleteFileRequired(String fileUrlOrKey) {
         if (fileUrlOrKey == null || fileUrlOrKey.isEmpty()) return;
 
-        String key;
-        if (fileUrlOrKey.startsWith("http")) {
-            if (!fileUrlOrKey.contains(cloudfrontDomain)) {
-                return;
-            }
-            key = fileUrlOrKey.substring(
-                    fileUrlOrKey.indexOf(cloudfrontDomain) + cloudfrontDomain.length() + 1);
-        } else {
-            key = fileUrlOrKey;
+        String key = resolveManagedKey(fileUrlOrKey);
+        if (key == null) {
+            log.warn("S3 delete skipped: target is outside the managed environment boundary");
+            return;
         }
 
         s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
         log.info("S3 delete success");
+    }
+
+    /**
+     * URL 또는 key가 현재 환경의 특정 저장 경로 아래에 있는지 확인한다.
+     *
+     * <p>가게 수정처럼 클라이언트가 기존 이미지 URL을 다시 보내는 경로는 단순히
+     * "우리 CloudFront URL인가"만 확인하면 안 된다. 호출측이 소유자·가게 ID로 만든
+     * {@link kr.it.reserve.file.util.FileStoragePaths} prefix를 넘겨 같은 리소스 경계까지 확인한다.
+     */
+    public boolean isManagedFileUnderPrefix(String fileUrlOrKey, String expectedPrefix) {
+        String key = resolveManagedKey(fileUrlOrKey);
+        String scopedPrefix = withEnvironmentPrefix(expectedPrefix);
+        return key != null
+                && scopedPrefix != null
+                && key.startsWith(scopedPrefix + "/");
+    }
+
+    /** 현재 환경에서 이 서비스가 만든 URL/key만 canonical S3 key로 바꾼다. */
+    private String resolveManagedKey(String fileUrlOrKey) {
+        if (fileUrlOrKey == null || fileUrlOrKey.isBlank()) return null;
+
+        String value = fileUrlOrKey.trim();
+        String key;
+        if (value.regionMatches(true, 0, "http://", 0, 7)
+                || value.regionMatches(true, 0, "https://", 0, 8)) {
+            key = keyFromCloudfrontUrl(value);
+        } else {
+            if (value.contains("://")) return null;
+            key = value;
+        }
+
+        if (!isSafeObjectKey(key)) return null;
+
+        String environment = normalizedEnvironmentPrefix();
+        String withoutEnvironment = key;
+        if (!environment.isEmpty()) {
+            String requiredPrefix = environment + "/";
+            if (!key.startsWith(requiredPrefix)) return null;
+            withoutEnvironment = key.substring(requiredPrefix.length());
+        }
+
+        int firstSlash = withoutEnvironment.indexOf('/');
+        if (firstSlash <= 0 || !MANAGED_ROOTS.contains(withoutEnvironment.substring(0, firstSlash))) {
+            return null;
+        }
+        return key;
+    }
+
+    private String keyFromCloudfrontUrl(String value) {
+        try {
+            URI uri = new URI(value);
+            if (!"https".equalsIgnoreCase(uri.getScheme())
+                    || uri.getUserInfo() != null
+                    || uri.getPort() != -1
+                    || uri.getQuery() != null
+                    || uri.getFragment() != null
+                    || uri.getHost() == null
+                    || !uri.getHost().equalsIgnoreCase(configuredCloudfrontHost())) {
+                return null;
+            }
+            String rawPath = uri.getRawPath();
+            if (rawPath == null || rawPath.length() <= 1 || rawPath.charAt(0) != '/') return null;
+            return rawPath.substring(1);
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    private String configuredCloudfrontHost() {
+        if (cloudfrontDomain == null || cloudfrontDomain.isBlank()) return "";
+        try {
+            String value = cloudfrontDomain.trim();
+            URI uri = new URI(value.contains("://") ? value : "https://" + value);
+            return uri.getHost() != null ? uri.getHost() : "";
+        } catch (Exception exception) {
+            return "";
+        }
+    }
+
+    private String withEnvironmentPrefix(String prefix) {
+        if (!isSafeObjectKey(prefix)) return null;
+        String environment = normalizedEnvironmentPrefix();
+        return environment.isEmpty() ? prefix : environment + "/" + prefix;
+    }
+
+    private String normalizedEnvironmentPrefix() {
+        if (envPrefix == null) return "";
+        String value = envPrefix.trim();
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value;
+    }
+
+    private boolean isSafeObjectKey(String key) {
+        if (key == null || key.isBlank()
+                || key.startsWith("/")
+                || key.endsWith("/")
+                || key.contains("\\")
+                || key.contains("//")
+                || key.contains("%")
+                || key.contains("?")
+                || key.contains("#")) {
+            return false;
+        }
+        for (String segment : key.split("/", -1)) {
+            if (segment.isBlank() || ".".equals(segment) || "..".equals(segment)) return false;
+        }
+        return true;
     }
 }

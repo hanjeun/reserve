@@ -15,6 +15,8 @@ RESERVE의 MySQL 백업 구성과 복원 절차. **결제·예약 데이터가 �
 > **운영 상태 — 2026-09-25 적용 완료:** 서버에 `/usr/local/bin/reserve-backup`·`reserve-restore`(v2.6.0 태그 버전,
 > SHA-256 대조), `/etc/reserve-backup.env`(600 root), root cron, `/var/backups/reserve`를 설치했다.
 > 첫 백업 `reserve-20260925-095532.sql.gz`(26 tables, 9.8 KiB)가 S3에 올라갔고, 별도 DB 복원 훈련을 통과했다(맨 아래 이력).
+> 2026-09-26 v2.6.1 배포 뒤 `reserve-backup`만 v2.6.1 태그 버전(SHA-256 `f2434537…8845`, AWS 값 export 수정 포함)으로
+> 교체하고 수동 실행으로 업로드를 확인했다(28 tables, 11 KiB). `reserve-restore`는 바뀐 게 없어 v2.6.0 버전 그대로다.
 > 로그 → Grafana 연결과 실패 알림은 아직 목표 상태다(5장).
 
 ---

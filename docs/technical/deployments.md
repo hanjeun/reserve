@@ -279,6 +279,29 @@ repository secret으로 갱신한 뒤 재배포했다. GitHub는 secret 값을 �
 (`c7596d83…d704`)을 확인한 뒤 `/usr/local/bin/reserve-post-deploy-verify`로 설치했다. 백업 설정 파일이 없어
 DB 비밀번호는 MySQL 컨테이너의 환경 변수에서 그 자리에서 읽어 넘겼다(화면·명령 기록에 남기지 않음).
 
+### 2026-09-26 — v2.6.1 운영 배포 기록
+
+`dev → main` squash 커밋은 `888f06ac3b61b7f3bf802c437ebde7066f2e2334`(PR #212)이고, `main`과 `v2.6.1` 태그가
+같은 커밋을 가리킨다. GitHub Actions run `36163869763`에서 build-backend·build-frontend·deploy-backend가 모두
+성공했고, Production deployment `6665945055`는 `2026-09-25T17:03:00Z`에 성공으로 끝났다(KST 9월 26일 새벽).
+GitHub 릴리즈 v2.6.1을 만들고 CHANGELOG 요약을 얹었다.
+
+| 항목 | 운영 확인 결과 |
+|---|---|
+| 외부 접속 | `/`·`/login` HTTP 200. `/login`에 `noindex, nofollow`·HSTS·CSP Report-Only 헤더 유지 |
+| 프론트 교체 | index 스크립트가 `index-B6hHEiaX.js`에서 `index-C3SyTwa3.js`로 바뀜 |
+| 백엔드 | 공개 가게 목록 API HTTP 200, `success=true` |
+| 새 코드 동작 | 쿠키 없는 `POST /api/auth/refresh`가 새 문구로 401. 비로그인 `GET /api/email/check-verified`(삭제)·`POST /api/auth/agree-terms`·`PUT /api/member/password` 모두 401 |
+| 거절 사유 로그 | 위 확인 요청이 `Refresh rejected: reason=MISSING_COOKIE, memberId=null`(INFO)로 남음. 토큰은 로그에 없음 |
+| 서버 DB 확인 | v2.6.1 태그의 검증 스크립트(SHA-256 `2014fc15…cfe4`)로 교체 후 PASS(exit 0). 테이블 5개, 컬럼 5개(`member.auth_version`, `refresh_token.previous_token_hash`·`rotated_at`, `oauth_unlink_task.lease_id`, `reservation.checked_in_at`), 인덱스 11개, InnoDB 확인 |
+| 새 스키마 | `ddl-auto: update`가 컬럼 3개·테이블 2개·`idx_refresh_token_previous_hash`를 모두 만들어 수동 DDL은 필요 없었다 |
+| 운영 큐 | 7일 넘은 `READY` 0, 열린 대사 0, 미완료 웹훅 0, 파일 삭제 outbox pending 0·failed 0, OAuth 연동 해제 미결 0 |
+| 백업 | `reserve-backup`을 v2.6.1 버전(SHA-256 `f2434537…8845`)으로 교체하고 수동 실행 — 28 tables, 11 KiB, S3 업로드 성공 |
+| 남은 일 | 로그인한 기기에서 30분 뒤 `Refresh rotated` 로그 확인, Grafana 알림 8번 쿼리를 `OAuth unlink queue requires attention`으로 교체, 서버 OS 업데이트(46건)·재부팅 필요 표시 처리 |
+
+배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`41f8b85915`)을 확인하고, PR #213으로 v2.6.1 squash 계보를
+`dev`에 연결했다. DB 비밀번호는 `/etc/reserve-backup.env`에서 스크립트가 직접 읽었다(화면·명령 기록에 남기지 않음).
+
 ### 4-1. CSP 위반 관측 (배포 즉시)
 
 `nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.

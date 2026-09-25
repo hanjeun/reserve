@@ -267,10 +267,17 @@ repository secret으로 갱신한 뒤 재배포했다. GitHub는 secret 값을 �
 | 프론트 교체 | index 스크립트가 `index-CpbA8aJA.js`에서 `index-B6hHEiaX.js`로 바뀜 |
 | 백엔드 | 공개 가게 목록 API(`/api/stores?page=0&size=1`) HTTP 200, `success=true` |
 | 배포 전 점검 | 새 환경 변수·비밀값 없음. 새 테이블 `ad_payment_attempt`는 `ddl-auto: update`로 생성. FULLTEXT 설정은 계속 꺼짐 |
-| 미완료 | 서버 안 읽기 전용 확인(`reserve-post-deploy-verify`: blue/green 컨테이너 상태, `ad_payment_attempt` 테이블·인덱스 생성, 운영 큐)은 운영자 실행 대기 |
+| 서버 DB 확인 | `reserve-post-deploy-verify` PASS. 필수 테이블 3개(`payment_webhook_inbox`·`payment_reconciliation_issue`·`file_deletion_task`), `reservation.checked_in_at`, 인덱스 7개 존재. 결제·생명주기 테이블 InnoDB |
+| 새 테이블 | `ad_payment_attempt` InnoDB, 0행. 인덱스 `PRIMARY`·`idx_ad_payment_due`·`idx_ad_payment_store`·`idx_ad_payment_owner`·`idx_ad_payment_ad`·주문번호 유일 인덱스 존재. 검증 스크립트가 이 테이블을 모르므로 `information_schema`로 따로 확인 |
+| 운영 큐 | 7일 넘은 `READY` 0, 열린 결제 대사 이슈 0, 처리 안 된 PortOne 웹훅 0, 파일 삭제 outbox pending 0·failed 0 |
+| 남은 일 | `/etc/reserve-backup.env`가 없어 운영 DB 자동 백업이 설정돼 있지 않다(백업 문서 절차 미적용). 검증 스크립트에 `ad_payment_attempt` 확인 추가 필요 |
 
 배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`edaede8ec9`)을 확인하고, PR #204로 v2.6.0 squash 계보를
 `dev`에 연결했다.
+
+서버에는 검증 스크립트가 설치돼 있지 않아, `v2.6.0` 태그의 `scripts/verify-post-deploy-readonly.sh`를 받아 SHA-256
+(`c7596d83…d704`)을 확인한 뒤 `/usr/local/bin/reserve-post-deploy-verify`로 설치했다. 백업 설정 파일이 없어
+DB 비밀번호는 MySQL 컨테이너의 환경 변수에서 그 자리에서 읽어 넘겼다(화면·명령 기록에 남기지 않음).
 
 ### 4-1. CSP 위반 관측 (배포 즉시)
 

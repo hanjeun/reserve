@@ -253,6 +253,25 @@ repository secret으로 갱신한 뒤 재배포했다. GitHub는 secret 값을 �
 - 운영 DB 확인은 읽기 전용으로 수행했다. 기존 호출 테스트용 `FAILED` inbox 행의 재처리와
   운영 DB·PortOne·S3 쓰기, TEST 결제, 운영 롤백은 이 작업 범위에 포함하지 않았다.
 
+### 2026-09-25 — v2.6.0 운영 배포 기록
+
+`dev → main` squash 커밋은 `3abc26d2d1d211c69e9ce4a5b248519786a22583`(PR #203)이고, `main`과 `v2.6.0` 태그가
+같은 커밋을 가리킨다. GitHub Actions run `36096322397`에서 build-backend·build-frontend·deploy-backend가 모두
+성공했고, Production deployment `6654056579`는 `2026-09-25T05:01:27Z`에 성공으로 끝났다. 새 서버 상태 확인을
+통과해 자동 되돌리기는 실행되지 않았고, nginx upstream 전환과 이전 서버 정지까지 마쳤다.
+
+| 항목 | 운영 확인 결과 |
+|---|---|
+| 외부 접속 | `/`·`/stores`·`/store/1`·`/login`·`/my-page` 모두 HTTP 200. HSTS·`X-Frame-Options: DENY`·nosniff·CSP Report-Only 헤더 유지 |
+| 검색 노출 헤더 | `/`·`/stores`·`/store/1`에는 `X-Robots-Tag` 없음, `/login`·`/my-page`에는 `noindex, nofollow` — PR #196 정책대로 동작 |
+| 프론트 교체 | index 스크립트가 `index-CpbA8aJA.js`에서 `index-B6hHEiaX.js`로 바뀜 |
+| 백엔드 | 공개 가게 목록 API(`/api/stores?page=0&size=1`) HTTP 200, `success=true` |
+| 배포 전 점검 | 새 환경 변수·비밀값 없음. 새 테이블 `ad_payment_attempt`는 `ddl-auto: update`로 생성. FULLTEXT 설정은 계속 꺼짐 |
+| 미완료 | 서버 안 읽기 전용 확인(`reserve-post-deploy-verify`: blue/green 컨테이너 상태, `ad_payment_attempt` 테이블·인덱스 생성, 운영 큐)은 운영자 실행 대기 |
+
+배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`edaede8ec9`)을 확인하고, PR #204로 v2.6.0 squash 계보를
+`dev`에 연결했다.
+
 ### 4-1. CSP 위반 관측 (배포 즉시)
 
 `nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.

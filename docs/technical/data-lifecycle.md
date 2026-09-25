@@ -1,6 +1,6 @@
 # 데이터 생명주기
 
-> 최종 코드 검증: 2026-09-03, `local-preview-all-changes` 로컬 프리뷰 브랜치.
+> 광고 원장·잠금 경계 갱신: 2026-09-07, `local-preview-all-changes` 로컬 프리뷰 브랜치.
 > 이 문서는 **아직 배포되지 않은 코드의 계약**이다. 운영 MySQL·S3·OAuth 제공자에서의 실기 검증은 아래 체크리스트가 남아 있다.
 
 ---
@@ -26,13 +26,16 @@
 | 항목 | 차단 상태 |
 |---|---|
 | 예약 | `PENDING`, `CONFIRMED`, `UNCONFIRMED` |
-| 광고 | `PENDING_PAYMENT`, `PAYMENT_FAILED`, `ACTIVE` |
+| 광고 노출 | `PENDING_PAYMENT`, `ACTIVE`, `REFUND_PENDING`, `REVIEW_REQUIRED` |
+| 광고 금융 | 미결 `AdPaymentAttempt` (`READY`, `REFUND_PENDING`, `REVIEW_REQUIRED`) 및 현재 UID 미이관 광고 |
 | 환불 | 미해결 `RefundAttempt` |
-| 결제 대사 | `OPEN` 이슈 |
+| 결제 대사 | 예약 `OPEN` 이슈 + 광고 미결/미이관 건수 |
 | 웹훅 | 미완료 inbox |
 
 가게 행은 예약 생성·수정과 같은 비관적 잠금으로 읽는다. 준비 상태를 확인한 직후 새 예약이 끼어드는
-check-then-close 경합을 줄이기 위한 경계다. 광고 생성도 같은 가게 잠금과 삭제 여부 검사를 지난다.
+check-then-close 경합을 줄이기 위한 경계다. 광고 생성·금융 전이·가게 수정·제재도 같은 가게 잠금을 지난다.
+광고 원장은 숨김 상태와 관계없이 검사한다. 로컬 `PAYMENT_FAILED`나 `CANCELLED`만으로 종결을 인정하지 않는다.
+PG 증거와 이관/수동 복구 절차는 [광고 결제 런북](ad-payments.md)을 따른다.
 
 ### 종료 시 처리
 
@@ -61,7 +64,7 @@ API:
 | 소유 가게 | `deletedAt IS NULL`인 가게 |
 | 예약 | `PENDING`, `CONFIRMED`, `UNCONFIRMED` |
 | 환불 | 미해결 `RefundAttempt` |
-| 결제 대사 | `OPEN` 이슈 |
+| 결제 대사 | 예약 `OPEN` 이슈 + 광고 미결/미이관 건수 |
 | 웹훅 | 미완료 inbox |
 
 ### 탈퇴 시 처리
@@ -133,7 +136,8 @@ ORDER BY next_attempt_at ASC;
 - `SOFT_DELETE` 휴지통 보존 기간: 30일
 - 복구/영구삭제/제재 등 일반 감사로그 보존 기간: 90일
 - 만료 항목은 별도 `AuditCleanupWorker`가 항목별 `REQUIRES_NEW` 트랜잭션으로 처리한다.
-- 결제가 있거나 리뷰가 연결된 예약, 금전 상태의 광고는 자동 영구삭제하지 않고 `RETENTION_HOLD`를 남긴다.
+- 결제가 있거나 리뷰가 연결된 예약 및 모든 광고는 자동 영구삭제하지 않고 `RETENTION_HOLD`를 남긴다.
+  과거 광고 표시 상태만으로 이전 UID의 결제를 배제할 수 없기 때문이다. 광고 원장도 자동 파기하지 않는다.
 - 실패한 `SOFT_DELETE` 로그는 일괄 로그 정리에서 제외해 다음 실행에서 다시 시도한다.
 
 30일/90일은 현재 애플리케이션 동작의 정본이다. 거래·분쟁 행의 최종 보존 기간과 자동 파기 기준은
@@ -159,7 +163,7 @@ ORDER BY next_attempt_at ASC;
 
 ## 로컬 검증 증거
 
-2026-09-03 현재:
+아래는 **2026-09-03 당시 기록**이다. 2026-09-07 실행 수치는 [품질 로드맵](quality-roadmap.md)에 둔다:
 
 - `backend/gradlew.bat test`: 166 tests, failures 0, errors 0, skipped 0
 - `frontend/npm.cmd run lint:ci`: 성공

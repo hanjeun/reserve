@@ -20,6 +20,7 @@ import { useMessage } from '../../hooks';
 import { memberService, businessService } from '../../services';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { hasAdminAccess } from '../../constants/roles';
+import { canWithdrawMember } from '../../utils/lifecycleReadiness';
 import { handleApiError } from '../../utils/errorHandler';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
@@ -43,7 +44,7 @@ const NameTab = ({ user }) => {
         setLoading(true);
         try {
             await memberService.updateMember({ name });
-            useAuthStore.getState().login({ ...user, name });
+            useAuthStore.getState().updateUser({ ...user, name });
             message.success('이름이 변경되었습니다');
         } catch (err) {
             handleApiError(err, message, '이름 변경에 실패했습니다');
@@ -793,7 +794,7 @@ const NotificationSection = ({ user }) => {
         try {
             await memberService.updateMember({ emailNotificationEnabled: checked });
             setNotiEnabled(checked);
-            useAuthStore.getState().login({ ...user, emailNotificationEnabled: checked });
+            useAuthStore.getState().updateUser({ ...user, emailNotificationEnabled: checked });
             message.success(checked ? '메일 알림에 동의했습니다' : '메일 알림 동의를 철회했습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');
@@ -807,7 +808,7 @@ const NotificationSection = ({ user }) => {
         try {
             await memberService.updateMarketingConsent(checked);
             setMarketingAgreed(checked);
-            useAuthStore.getState().login({ ...user, marketingAgreed: checked });
+            useAuthStore.getState().updateUser({ ...user, marketingAgreed: checked });
             message.success(checked ? '마케팅 수신에 동의했습니다' : '마케팅 수신 동의를 철회했습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');
@@ -965,7 +966,11 @@ const MyPage = () => {
             return;
         }
 
-        if (!readiness?.canWithdraw) {
+        if (typeof readiness?.canWithdraw !== 'boolean') {
+            message.error('탈퇴 준비 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+        if (!canWithdrawMember(readiness)) {
             message.warning(
                 `먼저 처리할 항목이 있습니다. 운영 중 가게 ${readiness?.openStores ?? 0}곳, ` +
                 `예약 ${readiness?.unresolvedReservations ?? 0}건, 환불 ${readiness?.unresolvedRefunds ?? 0}건, ` +

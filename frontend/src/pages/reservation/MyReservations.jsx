@@ -16,26 +16,19 @@ import useAuthStore from '../../store/useAuthStore';
 import paymentService from '../../services/paymentService';
 import api from '../../api/axios';
 import { formatCurrency } from '../../utils';
-import { API_ENDPOINTS } from '../../constants';
+import { API_ENDPOINTS, RESERVATION_STATUS_FILTER_OPTIONS } from '../../constants';
 import { colors, fontWeight, fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
 
-const STATUS_OPTIONS = [
-    { value: 'ALL',       label: '전체 상태' },
-    { value: 'PENDING',   label: '승인 대기' },
-    { value: 'CONFIRMED', label: '확정' },
-    { value: 'UNCONFIRMED', label: '미확인' },
-    { value: 'COMPLETED', label: '완료' },
-    { value: 'REJECTED',  label: '거절' },
-    { value: 'CANCELLED', label: '취소' },
-    { value: 'NO_SHOW',   label: '노쇼' },
-];
+// 상태 필터 목록은 constants/status.js 하나에서만 온다 —
+// 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
+const STATUS_OPTIONS = RESERVATION_STATUS_FILTER_OPTIONS;
 
 /**
  * 카드 맨 아래 사유 문구. 상태에 따라 읽는 필드와 라벨이 다르다 (2026-08-11).
  *
- * <p>{@code rejectionReason} 하나로 뭉뚱그리지 않는다 — 취소된 예약에 "거절 사유"라는 라벨이
+ * <p>rejectionReason 하나로 뭉뚱그리지 않는다 — 취소된 예약에 "거절 사유"라는 라벨이
  * 붙으면 이용자가 무슨 일이 있었는지 오해한다. 백엔드도 같은 이유로 컬럼을 따로 뒀다.
  */
 const reasonNote = (res) => {

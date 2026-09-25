@@ -14,7 +14,9 @@ const Section = ({ title, children }) => (
 );
 
 const Terms = () => {
-    useDocumentTitle('서비스 이용약관');
+    // 색인 대상 경로다 — 설명을 비워두면 크롤러가 본문 DOM을 긁어 만든 문장이
+    // 검색 결과에 실린다(네이버에서 실제로 그렇게 나왔다).
+    useDocumentTitle('서비스 이용약관', 'RESERVE 서비스 이용약관 — 회원 자격, 예약과 결제, 취소·환불, 책임 범위를 안내합니다.');
     return (
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>

@@ -69,26 +69,26 @@ public class AdvertisementApiController {
         // 프론트 결과 페이지는 merchant_uid 로 읽는다. 이름은 그대로 두고 값만 V2 의 paymentId 를 싣는다.
         String merchantUid = paymentId;
 
-        log.info("Ad mobile redirect received: paymentId={}, code={}", paymentId, code);
+        log.info("Ad mobile redirect received: hasPaymentId={}, hasErrorCode={}",
+                paymentId != null && !paymentId.isBlank(), code != null && !code.isBlank());
 
         if (!isSuccess) {
             return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc(message));
+                    + "&error_msg=" + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         }
 
         try {
             advertisementService.verifyPaymentByMerchantUid(merchantUid);
             return redirect(redirectBase + "?success=true&type=ad&merchant_uid=" + enc(merchantUid));
         } catch (BusinessException e) {
-            // 도메인 예외의 메시지는 애초에 사용자에게 보여줄 목적으로 쓴 한국어 문구라 그대로 전달한다.
-            log.warn("Ad mobile redirect verification failed: merchantUid={}, errorType={}",
-                    merchantUid, e.getClass().getSimpleName());
+            // 외부 API 래퍼의 도메인 예외에도 원문이 섞일 수 있으므로 URL에 전달하지 않는다.
+            log.warn("Ad mobile redirect verification failed: errorType={}", e.getClass().getSimpleName());
             return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc(e.getMessage()));
+                    + "&error_msg=" + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
-            // 브라우저 주소창에 그대로 실려 나가므로 고정 문구로 대체하고, 원인은 로그·Sentry에만 남긴다.
-            log.error("Ad mobile redirect error: merchantUid={}", merchantUid, e);
+            // URL과 일반 로그에는 원문 대신 고정 문구·오류 종류만 남긴다.
+            log.error("Ad mobile redirect error: errorType={}", e.getClass().getSimpleName());
             return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
                     + "&error_msg=" + enc("광고 결제 처리 중 오류가 발생했습니다."));
         }
@@ -143,9 +143,8 @@ public class AdvertisementApiController {
 
     // 노출용 — 공개 API (StoreList 배지/배너 위젯)
     @GetMapping("/active")
-    public ApiResponse<List<AdvertisementResponse>> getActiveAds(@RequestParam String type) {
-        AdType adType = AdType.valueOf(type);
-        return ApiResponse.success(advertisementService.getActiveAds(adType), "조회 성공");
+    public ApiResponse<List<AdvertisementResponse>> getActiveAds(@RequestParam AdType type) {
+        return ApiResponse.success(advertisementService.getActiveAds(type), "조회 성공");
     }
 
     // 광고 성과 지표(2026-07 추가) — 셋 다 공개 API(로그인 불필요). 장식적 요소라 실패해도 500을 터뜨리지 않고
@@ -242,7 +241,7 @@ public class AdvertisementApiController {
         Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         validateBusinessAuth(member);
         advertisementService.cancelAd(id, member);
-        return ApiResponse.success(null, "광고가 취소되었습니다.");
+        return ApiResponse.success(null, "광고 취소 요청을 접수했습니다. 환불 여부는 광고 내역에서 확인해주세요.");
     }
 
     // 종료상태(만료/취소/환불/중단) 광고를 목록에서 숨기기(소프트삭제) — 2026-07 추가, 사업자용

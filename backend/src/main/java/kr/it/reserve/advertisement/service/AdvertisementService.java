@@ -16,14 +16,13 @@ import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.error.AdvertisementException;
 import kr.it.reserve.global.error.StoreException;
 import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.service.PortoneService;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,8 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -44,17 +41,16 @@ import java.util.stream.Collectors;
 /**
  * 가게 광고 서비스.
  *
- * 결제는 예약금 결제(PaymentService/Payment)와 완전히 분리된 독립 흐름 —
- * PortoneService(순수 Portone API 래퍼)만 재사용하고, 기존 결제 코드는 건드리지 않는다.
- *
- * 가격은 예시값(placeholder) — 실제 서비스 오픈 전 사업 판단으로 조정 필요.
+ * 광고 콘텐츠·노출을 관리한다. 금융 상태는 AdPaymentService/AdPaymentLedgerService의 관문을 거친다.
+ * 예약 결제 원장과 광고 시도 원장은 분리하고 PortOne 통신·웹훅 inbox만 공유한다.
+ * 단계별 실패 복구와 수동 확인 경계는 docs/technical/ad-payments.md를 따른다.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdvertisementService {
 
-    // 가격 정책 (예시값 — 나중에 조정)
+    // 현재 적용 중인 일 단위 가격 정책. 변경 시 결제 금액·사용자 안내를 함께 검토한다.
     private static final int BADGE_PRICE_PER_DAY  = 1_000;
     private static final int BANNER_PRICE_PER_DAY = 5_000;
     // 배너 이미지 최대 장수 — Store 상세 이미지(최대 5장)와 동일하게 통일
@@ -65,6 +61,8 @@ public class AdvertisementService {
     private final FileStorageService fileStorageService;
     private final FileDeletionOutboxService fileDeletionOutboxService;
     private final PortoneService portoneService;
+    private final AdPaymentService adPaymentService;
+    private final AdPaymentLedgerService adPaymentLedgerService;
     private final AdCounterBuffer adCounterBuffer;
     private final AuditLogService auditLogService;
 
@@ -120,6 +118,8 @@ public class AdvertisementService {
         }
 
         long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
+        int amount = calculateAmount(adType, days);
+        validateContentLength(request.getTitle(), request.getDescription());
 
         List<String> imageUrls = new java.util.ArrayList<>();
         if (adType == AdType.BANNER) {
@@ -141,11 +141,7 @@ public class AdvertisementService {
             }
         }
 
-        int pricePerDay = adType == AdType.BADGE ? BADGE_PRICE_PER_DAY : BANNER_PRICE_PER_DAY;
-        int amount = (int) (pricePerDay * days);
-
-        String merchantUid = "AD-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-                + "-" + UUID.randomUUID().toString().substring(0, 6);
+        String merchantUid = "AD-" + UUID.randomUUID();
 
         Advertisement ad = Advertisement.builder()
                 .store(store)
@@ -161,6 +157,7 @@ public class AdvertisementService {
         ad.setImageUrlList(imageUrls);
 
         advertisementRepository.save(ad);
+        adPaymentLedgerService.registerNew(ad);
         log.info("Advertisement created (pending payment): adId={}, storeId={}, type={}, amount={}",
                 ad.getId(), store.getId(), adType, amount);
 
@@ -174,6 +171,24 @@ public class AdvertisementService {
                 .buyerTel("")
                 .storeId(portoneService.getStoreId())
                 .build();
+    }
+
+    static int calculateAmount(AdType adType, long days) {
+        int pricePerDay = adType == AdType.BADGE ? BADGE_PRICE_PER_DAY : BANNER_PRICE_PER_DAY;
+        // int로 잘라 음수·다른 금액을 만들지 않는다. 파일 업로드나 PG 호출 전에 거부한다.
+        if (days <= 0 || days > Integer.MAX_VALUE / pricePerDay) {
+            throw new AdvertisementException("광고 기간이 결제 가능한 범위를 벗어났습니다.", HttpStatus.BAD_REQUEST);
+        }
+        return Math.toIntExact(pricePerDay * days);
+    }
+
+    private static void validateContentLength(String title, String description) {
+        if (title != null && title.length() > 100) {
+            throw new AdvertisementException("광고 제목은 100자 이내로 입력해주세요.", HttpStatus.BAD_REQUEST);
+        }
+        if (description != null && description.length() > 300) {
+            throw new AdvertisementException("광고 설명은 300자 이내로 입력해주세요.", HttpStatus.BAD_REQUEST);
+        }
     }
 
     /**
@@ -206,102 +221,21 @@ public class AdvertisementService {
         return "고객";
     }
 
-    /**
-     * 결제 재시도 준비 (사업자용, 본인 가게만).
-     * PENDING_PAYMENT(팝업을 닫거나 이탈해 결제를 안 한 경우) 또는 PAYMENT_FAILED 상태에서만 가능.
-     * 포트원은 결제 시도마다 새 merchantUid가 필요하므로 재발급 후 저장한다 (가게/이미지/기간 등 기존 신청 내용은 그대로 유지).
-     */
-    @Transactional
+    /** PG 상태를 재확인한 뒤 동일 READY를 재사용하거나 확정 실패 시도만 교체한다. */
     public AdPaymentPrepareResponse preparePayment(Long adId, Member owner) {
-        Advertisement ad = advertisementRepository.findById(adId)
-                .orElseThrow(AdvertisementException::notFound);
-
-        if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
-            throw AdvertisementException.forbidden("본인 광고만 결제할 수 있습니다.");
-        }
-        if (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED) {
-            throw new AdvertisementException("결제할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
-        }
-        // ★ 노출 시작일이 지났으면 결제를 막는다 — createAd 와 같은 규칙이다.
-        //
-        // 예전엔 이 검사가 없어서 **신규 신청은 막으면서 재결제는 통과하는 비대칭**이 있었다.
-        // 그 결과 2026-07-17~18 짜리 광고를 8월에 결제할 수 있었고, 결제하면 ACTIVE 가 됐다가
-        // 다음 스케줄러에서 곧바로 EXPIRED 로 넘어갔다 — **돈만 내고 노출은 0일**이었다.
-        //
-        // endDate 가 아니라 startDate 를 기준으로 삼는다: 기간이 일부만 남은 경우에도
-        // 결제한 만큼 노출되지 않으므로, 부분 소진 자체를 허용하지 않는다(사용자 결정 2026-08-18).
-        if (ad.getStartDate() != null && ad.getStartDate().isBefore(ServiceTime.today())) {
-            throw new AdvertisementException(
-                    "노출 시작일이 지난 광고는 결제할 수 없습니다. 새로 신청해주세요.", HttpStatus.BAD_REQUEST);
-        }
-
-        String merchantUid = "AD-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-                + "-" + UUID.randomUUID().toString().substring(0, 6);
-        ad.setMerchantUid(merchantUid);
-        ad.setStatus(AdStatus.PENDING_PAYMENT);
-
-        log.info("Advertisement payment re-prepared: adId={}, merchantUid={}", ad.getId(), merchantUid);
-
-        return AdPaymentPrepareResponse.builder()
-                .adId(ad.getId())
-                .merchantUid(merchantUid)
-                .amount(ad.getAmount())
-                .productName(ad.getStore().getName() + " " + (ad.getAdType() == AdType.BADGE ? "광고 배지" : "배너 광고"))
-                .buyerName(resolveBuyerName(ad.getStore().getOwner(), owner.getEmail()))
-                .buyerEmail(owner.getEmail())
-                .buyerTel("")
-                .storeId(portoneService.getStoreId())
-                .build();
+        return adPaymentService.prepare(adId, owner.getId());
     }
 
-    /**
-     * 결제 검증 + 광고 활성화 (사업자용) — 결제 완료 즉시 ACTIVE(사전 승인 없음, 사후 제재 방식)
-     */
-    @Transactional
     public AdvertisementResponse verifyPayment(String merchantUid, Member owner) {
-        Advertisement ad = advertisementRepository.findByMerchantUid(merchantUid)
-                .orElseThrow(AdvertisementException::notFound);
-
-        if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
-            throw AdvertisementException.forbidden("본인 광고만 결제할 수 있습니다.");
-        }
-
-        return doVerifyAndActivate(ad);
+        return adPaymentService.verify(merchantUid, owner.getId());
     }
 
-    /**
-     * 모바일 결제 리다이렉트 전용 검증 (2026-07 추가).
-     * 포트원이 결제 후 돌려보내는 GET 콜백은 인증 헤더(JWT) 없이 브라우저가 직접
-     * 마지막으로 이동해서 오는 것이라 owner를 알 방법이 없다 — 예약 결제의
-     * /api/payment/mobile-redirect와 동일한 보안 모델(merchantUid 자체가 포트원에서만
-     * 발급되는 유일 식별자라 이것으로 충분하다고 본다)을 따른다 — 소유자 검증만 생략하고
-     * 결제 검증/활성화 로직은 완전히 동일하다.
-     */
-    @Transactional
+    /** 모바일 콜백은 인증 증거가 아니다. PG 재조회와 원장 상태 전이는 동일한 관문을 거친다. */
     public AdvertisementResponse verifyPaymentByMerchantUid(String merchantUid) {
-        Advertisement ad = advertisementRepository.findByMerchantUid(merchantUid)
-                .orElseThrow(AdvertisementException::notFound);
-        return doVerifyAndActivate(ad);
+        return adPaymentService.verify(merchantUid, null);
     }
 
-    private AdvertisementResponse doVerifyAndActivate(Advertisement ad) {
-        PortoneV2PaymentResponse payment = portoneService.getPaymentInfo(ad.getMerchantUid());
-
-        if (payment.getAmount() != ad.getAmount()) {
-            ad.setStatus(AdStatus.PAYMENT_FAILED);
-            throw new AdvertisementException("결제 금액이 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
-        }
-        if (!payment.isPaid()) {
-            ad.setStatus(AdStatus.PAYMENT_FAILED);
-            throw new AdvertisementException("결제가 완료되지 않았습니다.", HttpStatus.BAD_REQUEST);
-        }
-
-        ad.setStatus(AdStatus.ACTIVE);
-        log.info("Advertisement activated: adId={}, merchantUid={}", ad.getId(), ad.getMerchantUid());
-        return AdvertisementResponse.fromEntity(ad);
-    }
-
-    /** 노출용 — 공개 API, 타입별 ACTIVE + 기간 내 광고 목록 (최근 결제순 — 배너 독점 방지) */
+    /** 공개 노출 — 타입별 ACTIVE + 기간 내 광고를 생성일 역순으로 조회하고 삭제·정지 가게를 제외한다. */
     @Transactional(readOnly = true)
     public List<AdvertisementResponse> getActiveAds(AdType adType) {
         LocalDate today = ServiceTime.today();
@@ -309,6 +243,7 @@ public class AdvertisementService {
                 .findByStatusAndAdTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByCreatedAtDesc(
                         AdStatus.ACTIVE, adType, today, today)
                 .stream()
+                .filter(ad -> !ad.isDeleted() && !ad.getStore().isDeleted() && !ad.getStore().isSuspended())
                 .map(AdvertisementResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -338,7 +273,7 @@ public class AdvertisementService {
      * 공백만 입력한 경우도 "검색 안 함"으로 취급하는 게 사용자 기대에 맞다.
      */
     public Page<AdvertisementResponse> getAllAds(int page, int size, String keyword) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequests.bounded(page, size);
         String normalized = (keyword == null) ? "" : keyword.trim();
         return advertisementRepository.searchForAdmin(normalized, pageable)
                 .map(AdvertisementResponse::fromEntity);
@@ -347,38 +282,15 @@ public class AdvertisementService {
     /** 광고 강제 중단 (관리자용) — 사전 승인 대신 사후 제재 */
     @Transactional
     public void suspendAd(Long adId, String reason) {
-        Advertisement ad = advertisementRepository.findById(adId)
-                .orElseThrow(AdvertisementException::notFound);
+        Advertisement ad = adPaymentLedgerService.lockAdvertisement(adId);
         ad.setStatus(AdStatus.SUSPENDED);
         ad.setSuspendReason(reason != null ? reason : "운영 정책 위반");
         log.info("Advertisement suspended: adId={}", adId);
     }
 
-    /**
-     * 광고 취소 (사업자용, 본인 가게만).
-     * 결제 대기 중(PENDING_PAYMENT)이면 실제로 결제된 돈이 없으므로 그냥 취소 처리만 함.
-     * 이미 결제 완료(ACTIVE)면 PortoneService로 전액 환불 후 상태 전환.
-     */
-    @Transactional
+    /** 취소 의도를 먼저 커밋한다. 환불 완료는 별도 PG 대사가 확인한다. */
     public void cancelAd(Long adId, Member owner) {
-        Advertisement ad = advertisementRepository.findById(adId)
-                .orElseThrow(AdvertisementException::notFound);
-
-        if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
-            throw AdvertisementException.forbidden("본인 광고만 취소할 수 있습니다.");
-        }
-
-        if (ad.getStatus() == AdStatus.PENDING_PAYMENT || ad.getStatus() == AdStatus.PAYMENT_FAILED) {
-            AdStatus previousStatus = ad.getStatus();
-            ad.setStatus(AdStatus.CANCELLED);
-            log.info("Advertisement cancelled before payment: adId={}, previousStatus={}", adId, previousStatus);
-        } else if (ad.getStatus() == AdStatus.ACTIVE) {
-            portoneService.cancelPayment(ad.getMerchantUid(), null, "사업자 요청 광고 취소");
-            ad.setStatus(AdStatus.REFUNDED);
-            log.info("Advertisement refunded: adId={}, merchantUid={}", adId, ad.getMerchantUid());
-        } else {
-            throw new AdvertisementException("취소할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
-        }
+        adPaymentService.cancel(adId, owner.getId());
     }
 
     /**
@@ -389,8 +301,7 @@ public class AdvertisementService {
      */
     @Transactional
     public AdvertisementResponse updateAd(Long adId, AdUpdateRequest request, Member owner) {
-        Advertisement ad = advertisementRepository.findById(adId)
-                .orElseThrow(AdvertisementException::notFound);
+        Advertisement ad = adPaymentLedgerService.lockAdvertisement(adId);
 
         if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
             throw AdvertisementException.forbidden("본인 광고만 수정할 수 있습니다.");
@@ -403,6 +314,7 @@ public class AdvertisementService {
             throw new AdvertisementException("수정할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
         }
 
+        validateContentLength(request.getTitle(), request.getDescription());
         if (request.getTitle() != null) {
             if (request.getTitle().trim().isEmpty()) {
                 throw new AdvertisementException("배너 광고는 제목이 필수입니다.", HttpStatus.BAD_REQUEST);
@@ -439,39 +351,21 @@ public class AdvertisementService {
         return AdvertisementResponse.fromEntity(ad);
     }
 
-    /** 매일 자정 스케줄러 — endDate 지난 ACTIVE 광고를 EXPIRED로 전환 */
-    @Transactional
+    /** 광고별 독립 잠금으로 결제·취소와 직렬화한다. */
     public void expireOverdueAds() {
         List<Advertisement> overdue = advertisementRepository
                 .findByStatusAndEndDateBefore(AdStatus.ACTIVE, ServiceTime.today());
-        overdue.forEach(ad -> ad.setStatus(AdStatus.EXPIRED));
+        overdue.forEach(ad -> adPaymentLedgerService.expire(ad.getId()));
         if (!overdue.isEmpty()) {
             log.info("Expired {} overdue advertisements", overdue.size());
         }
     }
 
-    /**
-     * 결제되지 않은 채 노출 시작일이 지난 광고를 <b>취소</b>로 정리한다.
-     *
-     * <h3>왜 필요한가</h3>
-     * {@link #expireOverdueAds} 는 {@code ACTIVE} 만 보기 때문에, 결제하지 않은 신청은
-     * 기간이 아무리 지나도 <b>"결제 대기" 상태로 목록에 영원히 남아 있었다.</b>
-     * 거기 붙은 결제 버튼이 계속 살아 있어서 이미 지나간 기간에 돈을 낼 수 있었다.
-     * {@code preparePayment} 에 시작일 검사를 넣어 결제 자체는 막았지만, 그것만으로는
-     * 누를 수 없는 버튼이 계속 보인다 — 원인은 <b>죽은 신청이 정리되지 않는 것</b>이다.
-     *
-     * <h3>왜 EXPIRED 가 아니라 CANCELLED 인가</h3>
-     * {@code EXPIRED} 는 "노출을 마치고 끝났다"는 뜻이라, 한 번도 노출된 적 없는 건에 붙이면
-     * 통계와 이력이 거짓말을 한다. 돈이 오간 적도 없으므로 환불 경로도 필요 없다.
-     * 예약에서 승인되지 않은 채 시간이 지난 건을 취소로 정리하는 것과 같은 성격이다.
-     *
-     * <p>돈을 건드리지 않는다 — 애초에 결제되지 않은 건만 대상이다.
-     */
-    @Transactional
+    /** 지난 신청은 숨기되 결제 결과는 원장 대사가 끝날 때까지 미결로 보존한다. */
     public void cancelUnpaidOverdueAds() {
         List<Advertisement> stale = advertisementRepository.findByStatusInAndStartDateBefore(
                 List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED), ServiceTime.today());
-        stale.forEach(ad -> ad.setStatus(AdStatus.CANCELLED));
+        stale.forEach(ad -> adPaymentLedgerService.expire(ad.getId()));
         if (!stale.isEmpty()) {
             log.info("Cancelled {} unpaid advertisements past their start date", stale.size());
         }
@@ -482,12 +376,11 @@ public class AdvertisementService {
      * 종료상태(EXPIRED/CANCELLED/REFUNDED/SUSPENDED)인 본인 가게 광고만 가능 — cancelAd와 동일하게
      * 관리자 우회 없이 본인 확인만(기존 서비스 메서드들과 일관성 유지).
      * 예약(ReservationService.removeReservation)과 동일한 패턴 — 결제/노출 이력은 그대로
-     * 보존하고 목록에서만 숨김(30일 휴지통 보관 후 자동 영구삭제).
+     * 보존하고 목록에서만 숨긴다. 금융 이력은 승인된 보존 정책 없이 영구삭제하지 않는다.
      */
     @Transactional
     public void removeAd(Long adId, Member owner) {
-        Advertisement ad = advertisementRepository.findById(adId)
-                .orElseThrow(AdvertisementException::notFound);
+        Advertisement ad = adPaymentLedgerService.lockAdvertisement(adId);
 
         if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
             throw AdvertisementException.forbidden("본인 광고만 삭제할 수 있습니다.");
@@ -502,6 +395,7 @@ public class AdvertisementService {
             throw new AdvertisementException("만료·취소·환불·중단 상태의 광고만 삭제할 수 있습니다.", HttpStatus.BAD_REQUEST);
         }
 
+        adPaymentLedgerService.requireResolvedForRemoval(adId);
         auditLogService.softDeleteAdvertisement(adId);
         log.info("Advertisement removed: adId={}, ownerId={}", adId, owner.getId());
     }

@@ -4,7 +4,8 @@ import { API_ENDPOINTS } from '../constants';
 const reservationService = {
     getMyReservations:   ()             => api.get(API_ENDPOINTS.RESERVATION.MY_RESERVATIONS),
     getMyCompletedForStore: (storeId)   => api.get(API_ENDPOINTS.RESERVATION.MY_COMPLETED_FOR_STORE(storeId)),
-    getStoreReservations:()             => api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS),
+    getStoreReservations:(params = {})  => api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, { params }),
+    removeReservation:   (id)           => api.delete(API_ENDPOINTS.RESERVATION.REMOVE(id)),
     getReservation:      (id)           => api.get(API_ENDPOINTS.RESERVATION.DETAIL(id)),
     createReservation:   (data)         => api.post(API_ENDPOINTS.RESERVATION.CREATE, data),
     updateReservation:   (id, data)     => api.patch(API_ENDPOINTS.RESERVATION.UPDATE(id), data),

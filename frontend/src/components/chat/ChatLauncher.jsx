@@ -126,7 +126,7 @@ const ChatLauncher = () => {
         // 두 번 보낸 것처럼 보인다. 실패하면 그대로 되돌린다.
         setDraft('');
         const ok = await send(text);
-        if (!ok) setDraft(text);
+        if (ok === false) setDraft(text);
     };
 
     /**

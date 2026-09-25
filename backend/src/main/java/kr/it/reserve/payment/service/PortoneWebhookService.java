@@ -2,6 +2,7 @@ package kr.it.reserve.payment.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.advertisement.service.AdPaymentService;
 import kr.it.reserve.payment.dto.PortoneWebhookSignal;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.entity.Payment;
@@ -41,6 +42,7 @@ import java.util.List;
 public class PortoneWebhookService {
 
     private final ObjectMapper objectMapper;
+    private final AdPaymentService adPaymentService;
     private final PortoneService portoneService;
     private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
@@ -78,6 +80,12 @@ public class PortoneWebhookService {
      */
     public ProcessingResult processMerchantUid(String merchantUid) {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid).orElse(null);
+        if (payment == null && adPaymentService.isKnown(merchantUid)) {
+            if (!adPaymentService.reconcile(merchantUid, null)) {
+                throw new IllegalStateException("Advertisement payment reconciliation deferred");
+            }
+            return ProcessingResult.PROCESSED;
+        }
         if (payment == null) {
             log.info("PortOne webhook ignored - unknown merchantUid: {}", merchantUid);
             return ProcessingResult.IGNORED_UNKNOWN_PAYMENT;

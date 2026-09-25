@@ -59,12 +59,14 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
               JOIN FETCH r.member m
              WHERE r.deletedAt IS NULL
                AND (:status IS NULL OR r.status = :status)
+               AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
-             ORDER BY r.createdAt DESC
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
+             ORDER BY r.createdAt DESC, r.id DESC
             """,
             countQuery = """
             SELECT COUNT(r) FROM Reservation r
@@ -72,15 +74,18 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
               JOIN r.member m
              WHERE r.deletedAt IS NULL
                AND (:status IS NULL OR r.status = :status)
+               AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
     Page<Reservation> searchForAdmin(
             @Param("keyword") String keyword,
             @Param("status") Reservation.ReservationStatus status,
+            @Param("storeId") Long storeId,
             Pageable pageable);
 
     /** 사업자 예약 목록에도 같은 검색 계약을 적용하되 소유 가게 경계를 쿼리에서 강제한다. */
@@ -91,12 +96,14 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
              WHERE s.owner = :owner
                AND r.deletedAt IS NULL
                AND (:status IS NULL OR r.status = :status)
+               AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
-             ORDER BY r.createdAt DESC
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
+             ORDER BY r.createdAt DESC, r.id DESC
             """,
             countQuery = """
             SELECT COUNT(r) FROM Reservation r
@@ -105,16 +112,19 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
              WHERE s.owner = :owner
                AND r.deletedAt IS NULL
                AND (:status IS NULL OR r.status = :status)
+               AND (:storeId IS NULL OR s.id = :storeId)
                AND (:keyword = ''
                     OR LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                    OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                    OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
     Page<Reservation> searchForStoreOwner(
             @Param("owner") Member owner,
             @Param("keyword") String keyword,
             @Param("status") Reservation.ReservationStatus status,
+            @Param("storeId") Long storeId,
             Pageable pageable);
 
     @Query("SELECT r.status, COUNT(r) FROM Reservation r WHERE r.deletedAt IS NULL GROUP BY r.status")

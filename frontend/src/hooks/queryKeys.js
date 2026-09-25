@@ -7,12 +7,15 @@ export const storeKeys = {
     list:   (params) => ['stores', 'list', params],
     detail: (id)     => ['stores', 'detail', id],
     my:     ()       => ['stores', 'my'],
+    // 사업자 통계 탭 — 가게와 기간이 모두 바뀌면 다른 응답이라 둘 다 키에 들어간다.
+    statistics: (storeId, range) => ['stores', 'statistics', storeId, range],
 };
 
 export const reservationKeys = {
     all:    () => ['reservations'],
     my:     () => ['reservations', 'my'],
     manage: () => ['reservations', 'manage'],
+    managePage: (params) => ['reservations', 'manage', params],
     qrToken: (id) => ['reservations', 'qrToken', id],
     // 달력 — 달을 넘길 때마다 다른 응답이므로 month 가 키에 들어가야 한다.
     // 그래야 뒤로 갔을 때 캐시에서 즉시 그려지고, 같은 달을 두 번 안 부른다.

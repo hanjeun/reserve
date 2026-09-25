@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { currentSession, assertCurrentSession, StaleSessionError } from './sessionScope';
 import { skeletonDelayInterceptor } from '../utils/skeletonDelay';
 
 const instance = axios.create({
@@ -7,16 +8,7 @@ const instance = axios.create({
     timeout: 30000,         // 30초 (이미지 업로드 등 대용량 요청 대비)
 });
 
-let isRefreshing = false;
-let failedQueue  = [];
-
-const processQueue = (error, token = null) => {
-    failedQueue.forEach(prom => {
-        if (error) prom.reject(error);
-        else prom.resolve(token);
-    });
-    failedQueue = [];
-};
+let refreshFlight = null;
 
 // 세션 만료 전용 에러 클래스
 class SessionExpiredError extends Error {
@@ -49,40 +41,39 @@ const getStatusMessage = (status) => {
 
 // 401 처리: 토큰 재발급 또는 대기열 처리
 const handle401 = async (originalRequest) => {
-    if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-            failedQueue.push({ resolve, reject });
-        })
-            .then(() => instance(originalRequest))
-            .catch(err => { throw err; });
-    }
-
+    const scope = originalRequest._sessionEpoch;
+    assertCurrentSession(scope);
     originalRequest._retry = true;
-    isRefreshing = true;
-
+    if (!refreshFlight || refreshFlight.scope !== scope) {
+        refreshFlight = { scope, promise: instance.post('/api/auth/refresh', undefined, { _sessionEpoch: scope }) };
+    }
+    const flight = refreshFlight;
     try {
-        await instance.post('/api/auth/refresh');
-        processQueue(null);
+        await flight.promise;
+        assertCurrentSession(scope);
         return instance(originalRequest);
-    } catch (refreshError) {
-        processQueue(refreshError);
-        const isInitCall = originalRequest.url?.includes('/api/member/me');
-        if (!isInitCall) {
+    } catch {
+        // 이전 계정의 refresh 실패가 새 계정을 로그아웃시키거나 요청을 재전송하면 안 된다.
+        assertCurrentSession(scope);
+        if (!originalRequest.url?.includes('/api/member/me')) {
             localStorage.removeItem('auth-storage');
-            if (!globalThis.location.pathname.includes('/login')) {
-                globalThis.location.href = '/login';
-            }
+            if (!globalThis.location.pathname.includes('/login')) globalThis.location.href = '/login';
         }
         throw new SessionExpiredError();
     } finally {
-        isRefreshing = false;
+        if (refreshFlight === flight) refreshFlight = null;
     }
 };
 
 // Request Interceptor: Content-Type 자동 설정 + 개발 환경 스켈레톤 딜레이
 instance.interceptors.request.use(
     async (config) => {
+        const session = currentSession();
+        config._sessionEpoch ??= session.epoch;
+        assertCurrentSession(config._sessionEpoch);
+        config.signal = config.signal ? AbortSignal.any([config.signal, session.signal]) : session.signal;
         await skeletonDelayInterceptor(config);
+        assertCurrentSession(config._sessionEpoch);
         if (!(config.data instanceof FormData)) {
             config.headers['Content-Type'] = 'application/json';
         }
@@ -94,15 +85,20 @@ instance.interceptors.request.use(
 // Response Interceptor: ApiResponse 처리 + 토큰 자동 재발급
 instance.interceptors.response.use(
     (response) => {
+        assertCurrentSession(response.config._sessionEpoch);
         const res = response.data;
         if (res.success) return res.data;
         throw new Error(res.message ?? '요청에 실패했습니다.');
     },
     async (error) => {
+        if (error instanceof StaleSessionError) throw error;
         const originalRequest = error.config;
+        if (originalRequest?._sessionEpoch != null) assertCurrentSession(originalRequest._sessionEpoch);
+        if (axios.isCancel(error)) throw error;
 
         if (
             error.response?.status === 401 &&
+            originalRequest &&
             !originalRequest._retry &&
             !originalRequest.url?.includes('/api/auth/refresh') &&
             !isAuthEndpoint(originalRequest.url)
@@ -148,4 +144,15 @@ instance.interceptors.response.use(
     }
 );
 
-export default instance;
+// async 인터셉터가 실행되기 전(같은 tick의 계정 전환 포함)에 호출 세대를 고정한다.
+const scopedConfig = (config = {}) => ({ ...config, _sessionEpoch: config._sessionEpoch ?? currentSession().epoch });
+const api = Object.assign(config => instance(scopedConfig(config)), instance);
+for (const method of ['get', 'delete', 'head', 'options']) {
+    api[method] = (url, config) => instance[method](url, scopedConfig(config));
+}
+for (const method of ['post', 'put', 'patch']) {
+    api[method] = (url, data, config) => instance[method](url, data, scopedConfig(config));
+}
+api.request = config => instance(scopedConfig(config));
+
+export default api;

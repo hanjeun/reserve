@@ -6,7 +6,7 @@ import { reservationKeys } from './queryKeys';
 /**
  * 예약 달력 한 달치 — `GET /api/reservations/calendar`.
  *
- * <h3>왜 서버가 사유까지 주는가 (2026-08-25)</h3>
+ * 왜 서버가 사유까지 주는가 (2026-08-25)
  * 예전 날짜 칸은 AntD `DatePicker` 의 `disabledDate` 였고, 그건 **회색으로 막는 것밖에 못 한다.**
  * 정기휴무·임시휴무·운영기간 밖·예약범위 초과·정원 마감이 전부 같은 회색이 돼서
  * 손님은 "왜 안 눌리지"를, 사장님은 "왜 예약이 안 들어오지"를 알 방법이 없었다.

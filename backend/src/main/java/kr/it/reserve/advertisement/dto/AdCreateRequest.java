@@ -15,7 +15,7 @@ public class AdCreateRequest {
 
     private Long storeId;
 
-    // BADGE | BANNER (entity.advertisement.kr.it.reserve.AdType)
+    // BADGE | BANNER (advertisement.entity.AdType)
     private String adType;
 
     // BANNER 타입만 사용

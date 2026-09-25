@@ -76,17 +76,18 @@ const useAdPayment = () => {
         }
 
         try {
-            const ad = await adService.verifyPayment(payment.paymentId);
+            const ad = await adService.verifyPayment(merchantUid);
             message.success('광고가 등록되었습니다.');
             return { success: true, ad };
         } catch (err) {
-            message.error(err instanceof Error ? err.message : '결제 검증에 실패했습니다.');
+            message.error(err instanceof Error ? err.message : '결제 결과 확인이 필요합니다. 이미 결제됐다면 다시 결제하지 마세요.');
             return { success: false };
         }
     }, [message]);
 
-    const invalidateMyAds = useCallback((result) => {
-        if (result?.success) queryClient.invalidateQueries({ queryKey: adKeys.my() });
+    const invalidateMyAds = useCallback(() => {
+        // SDK 취소·오류여도 신청과 미결 원장이 생성됐을 수 있다.
+        queryClient.invalidateQueries({ queryKey: adKeys.my() });
     }, [queryClient]);
 
     const createMutation = useMutation({

@@ -1,4 +1,8 @@
 # 테스트용 설정
+advertisement:
+  payments:
+    reconciliation-enabled: false
+
 spring:
   application:
     name: reserve-test

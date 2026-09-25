@@ -1,6 +1,7 @@
 package kr.it.reserve.payment.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
@@ -13,7 +14,9 @@ import lombok.Getter;
 public class PortoneV2PaymentResponse {
 
     // V2 paymentId = merchant_uid (우리가 생성한 주문번호)
+    @JsonAlias("id")
     private String paymentId;
+    private String currency;
 
     // V2 status: READY, PAID, FAILED, CANCELLED, PARTIAL_CANCELLED
     private String status;
@@ -25,6 +28,12 @@ public class PortoneV2PaymentResponse {
     private Method method;
 
     private java.util.List<PortoneV2CancelResponse.Cancellation> cancellations;
+
+    /** 접수 중이거나 해석할 수 없는 취소가 있으면 새 취소를 발신하지 않는다. */
+    public boolean hasUnsettledCancellation() {
+        return cancellations != null && cancellations.stream().anyMatch(value -> value == null
+                || (!"SUCCEEDED".equals(value.getStatus()) && !"FAILED".equals(value.getStatus())));
+    }
 
     // PG사 거래번호 (V1의 imp_uid에 해당)
     private String pgTxId;

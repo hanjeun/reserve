@@ -107,6 +107,14 @@ public class PortoneService {
      * @return 취소 결과. 예외를 던지지 않았다면 최소한 PG 가 요청을 받긴 한 것이다.
      */
     public PortoneV2CancelResponse cancelPayment(String merchantUid, Integer amount, String reason) {
+        return cancelPayment(merchantUid, amount, reason, null);
+    }
+
+    /** 광고 전액 환불은 저장한 키와 예상 잔액을 보내 중복/외부 취소 경합을 방어한다. */
+    public PortoneV2CancelResponse cancelPayment(String merchantUid, Integer amount, String reason, String idempotencyKey) {
+        if (idempotencyKey != null && (!idempotencyKey.matches("[A-Za-z0-9_-]{16,256}") || amount == null || amount <= 0)) {
+            throw new IllegalArgumentException("Invalid cancellation command");
+        }
         String url = V2_API_URL + "/payments/" + merchantUid + "/cancel";
 
         Map<String, Object> body = new HashMap<>();
@@ -123,11 +131,13 @@ public class PortoneService {
         if (amount != null) {
             body.put("amount", amount);  // null이면 전액 환불
         }
+        if (idempotencyKey != null) body.put("currentCancellableAmount", amount);
 
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "PortOne " + v2Secret);
             headers.setContentType(MediaType.APPLICATION_JSON);
+            if (idempotencyKey != null) headers.set("Idempotency-Key", "\"" + idempotencyKey + "\"");
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
             ResponseEntity<PortoneV2CancelResponse> response =

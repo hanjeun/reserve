@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Table } from 'antd';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
+import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 
 /**
  * RESERVE Design System - DataTable Component
@@ -35,16 +36,25 @@ import { useWindowWidth } from '../../hooks/useWindowWidth';
  *   - 모바일(<576) : showLessItems(현재 ±1로 버튼 수 축소) + size="small"(컨트롤 축소)
  * simple 모드("‹ 1/3 ›" 입력형)는 페이지 번호를 직접 누를 수 없어 오히려 불편하므로 쓰지 않는다.
  *
+ * ── stickyFirstColumn (2026-09 추가) ─────────────────────────────────────────
+ * 모바일에서만 첫 열을 왼쪽에 고정한다. 좁은 화면에서 테이블은 가로로 스크롤되는데,
+ * 오른쪽 열을 보려고 밀면 "이 행이 어느 건이었는지"를 알려주던 식별 열(일시·번호 등)이
+ * 화면 밖으로 나가버려서 무엇을 보고 있는지 알 수 없게 된다(감사 로그 제보).
+ *
+ * 기본값이 false 인 이유 — 첫 열이 곧 식별 열인 테이블에서만 도움이 된다.
+ * 첫 열이 220px 짜리 가게명인 테이블에 켜면 375px 화면의 6할을 고정 열이 차지해서
+ * 정작 봐야 할 나머지가 안 보인다. 켤 때는 첫 열에 반드시 width 가 있어야 한다
+ * (tableLayout="fixed" + fixed 열은 폭을 모르면 계산이 어긋난다).
+ *
  * 사용법:
  * <DataTable columns={columns} dataSource={data} rowKey="id" />                    // 기본 페이지네이션
  * <DataTable columns={columns} dataSource={data} rowKey="id" pagination={false} />  // 페이지네이션 없음
  * <DataTable columns={columns} dataSource={data} rowKey="id" pageSize={20} />       // 페이지 크기만 변경
  * <DataTable columns={columns} dataSource={data} rowKey="id" fitContent />          // 모든 열이 고정폭, 늘어나지 않음
+ * <DataTable columns={columns} dataSource={data} rowKey="id" stickyFirstColumn />   // 모바일에서 첫 열 고정
  */
-const MOBILE_BREAKPOINT = 576;
-
-const DataTable = ({ pageSize = 15, pagination, size = 'middle', fitContent = false, className, ...rest }) => {
-    const isMobile = useWindowWidth() < MOBILE_BREAKPOINT;
+const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', fitContent = false, stickyFirstColumn = false, columns, className, ...rest }) => {
+    const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
 
     const paginationConfig = pagination === false ? false : {
         pageSize,
@@ -54,6 +64,12 @@ const DataTable = ({ pageSize = 15, pagination, size = 'middle', fitContent = fa
         ...pagination,
     };
 
+    // PC 에서는 고정하지 않는다 — 가로 스크롤이 없어 고정할 이유가 없고,
+    // 고정하면 경계 그림자만 생겨 오히려 지저분해진다.
+    const resolvedColumns = stickyFirstColumn && isMobile && Array.isArray(columns) && columns.length > 0
+        ? [{ ...columns[0], fixed: 'left' }, ...columns.slice(1)]
+        : columns;
+
     return (
         <Table
             size={size}
@@ -61,6 +77,7 @@ const DataTable = ({ pageSize = 15, pagination, size = 'middle', fitContent = fa
             scroll={{ x: 'max-content' }}
             className={[fitContent ? 'reserve-table-fit-content' : '', className].filter(Boolean).join(' ') || undefined}
             pagination={paginationConfig}
+            columns={resolvedColumns}
             {...rest}
         />
     );
@@ -78,6 +95,10 @@ DataTable.propTypes = {
     size: PropTypes.oneOf(['small', 'middle', 'large']),
     /** 모든 열이 고정폭일 때 true — 테이블이 컨테이너 전체 폭을 차지하지 않게 함 */
     fitContent: PropTypes.bool,
+    /** 모바일(<576px)에서 첫 열을 왼쪽에 고정 — 첫 열이 식별 열인 테이블에만 켠다 */
+    stickyFirstColumn: PropTypes.bool,
+    /** AntD Table columns — stickyFirstColumn 처리를 위해 직접 받는다 */
+    columns: PropTypes.array,
     className: PropTypes.string,
 };
 

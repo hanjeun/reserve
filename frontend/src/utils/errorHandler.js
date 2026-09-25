@@ -13,7 +13,7 @@
  */
 export const handleApiError = (error, messageApi, defaultMessage = '잠시 후 다시 시도해주세요.') => {
     // 토큰 만료 → axios가 이미 /login으로 이동했으므로 메시지 중복 표시 안 함
-    if (error?.isSessionExpired) return;
+    if (error?.isSessionExpired || error?.isStaleSession) return;
 
     const msg = typeof error === 'string' ? error : error?.message;
 

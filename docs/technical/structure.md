@@ -26,10 +26,12 @@ RESERVE/
 │       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
 │       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
 │       ├── preview-release-plan.md ← 대규모 프리뷰의 기능별 PR 분리 계획
+│       ├── quality-roadmap.md     ← 프리뷰 검증 · 미해결 위험 · PR 정리 순서
+│       ├── ui-decisions.md        ← 공통 UI의 선택 이유 · 회귀 경계
 │       ├── structure.md          ← 코드 구조 (이 문서)
 │       └── design-system.md      ← 디자인 토큰 · 공통 컴포넌트
 ├── .github/
-│   ├── workflows/CICD.yml        ← Blue/Green 자동 배포 (main push/PR에만 트리거)
+│   ├── workflows/CICD.yml        ← dev/main PR 검사 · main push Blue/Green 배포
 │   ├── ISSUE_TEMPLATE/           ← 버그/기능 이슈 폼
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── dependabot.yml            ← 의존성 자동 업데이트 (npm · gradle · actions)

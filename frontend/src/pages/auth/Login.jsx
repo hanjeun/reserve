@@ -67,7 +67,8 @@ const Login = () => {
 
     useEffect(() => {
         if (hasHandledRef.current) return;
-        if (isLoggedIn) { navigate('/', { replace: true }); return; }
+        // 계정 경계에서 재마운트돼도 원래 요청한 경로로 돌아간다.
+        if (isLoggedIn) { navigate(fromRef.current || consumeRedirect() || '/', { replace: true }); return; }
 
         if (location.state?.signupSuccess) {
             hasHandledRef.current = true;

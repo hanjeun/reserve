@@ -13,9 +13,8 @@ import java.time.LocalDateTime;
 /**
  * 가게 광고.
  *
- * 결제(Portone)는 예약금 결제(Payment/PaymentService)와 완전히 분리된 독립 흐름 —
- * 기존 예약 결제 코드는 전혀 건드리지 않고, PortoneService(순수 API 래퍼)만 재사용한다.
- * 그래서 merchantUid/결제 상태를 이 엔티티가 자체적으로 갖고 있다.
+ * 현재 노출 상태와 현재 merchantUid를 갖는다. 금융 판단의 정본은 AdPaymentAttempt이며,
+ * 기존 결제 시도는 새 UID가 생겨도 보존한다. 예약 결제 원장과는 별개다.
  *
  * 노출 방식: 결제 완료 즉시 ACTIVE(사전 관리자 승인 없음) — 문제가 생기면
  * 관리자가 사후에 SUSPENDED로 내린다(Store의 정지 패턴과 동일한 철학).

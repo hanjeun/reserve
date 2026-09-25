@@ -16,8 +16,8 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
            countQuery = "SELECT COUNT(i) FROM Inquiry i WHERE i.member.id = :memberId")
     Page<Inquiry> findByMemberIdOrderByCreatedAtDesc(@Param("memberId") Long memberId, Pageable pageable);
 
-    // 전체 문의 조회 (관리자용, 페이징) - member fetch join으로 N+1 방지
-    @Query(value = "SELECT i FROM Inquiry i JOIN FETCH i.member ORDER BY i.createdAt DESC",
+    // 전체 문의 조회 (관리자용, 페이징) - 비회원 문의(member=null)도 보존하면서 회원 N+1을 방지
+    @Query(value = "SELECT i FROM Inquiry i LEFT JOIN FETCH i.member ORDER BY i.createdAt DESC",
            countQuery = "SELECT COUNT(i) FROM Inquiry i")
     Page<Inquiry> findAllByOrderByCreatedAtDesc(Pageable pageable);
 

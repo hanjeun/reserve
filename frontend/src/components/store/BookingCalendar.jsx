@@ -1,18 +1,18 @@
 /**
  * 예약 날짜 선택 — **필드는 그대로 두고, 누르면 달력 모달이 뜬다.**
  *
- * <h3>왜 AntD DatePicker 를 안 쓰나 (2026-08-25)</h3>
+ * 왜 AntD DatePicker 를 안 쓰나 (2026-08-25)
  * `disabledDate` 는 **회색으로 막는 것밖에 못 한다.** 그래서 정기휴무·임시휴무·운영기간 밖·
  * 예약 범위 초과·정원 마감이 **전부 같은 회색 하나**로 뭉개졌다.
  * 손님은 "왜 안 눌리지"를, 사장님은 "왜 예약이 안 들어오지"를 알 방법이 없었다.
  *
- * <h3>★★ 이 컴포넌트는 판정하지 않는다. 그리기만 한다.</h3>
+ * ★★ 이 컴포넌트는 판정하지 않는다. 그리기만 한다.
  * 각 날짜의 상태·사유는 **서버가 준다**(`GET /api/reservations/calendar`).
  * 여기서 휴무나 기간을 다시 계산하면 서버 `Store.isBookableOn` 과 언젠가 어긋나고,
  * 그 순간 이 프로젝트가 반복해서 당한 **"달력엔 눌리는데 예약하면 거절"** 이 돌아온다.
  * → 새 규칙을 넣고 싶으면 `ReservationService.describeDay` 에 넣을 것. 여기가 아니다.
  *
- * <h3>★★ 왜 인라인이 아니라 모달인가 (2026-08-25, 세 번 갈아엎고 내린 결론)</h3>
+ * ★★ 왜 인라인이 아니라 모달인가 (2026-08-25, 세 번 갈아엎고 내린 결론)
  * 인라인으로 펼치는 안을 두 번 만들었고 둘 다 같은 벽에 부딪혔다 —
  *
  *   필드 아래에 펼치기   같은 정보(고른 날짜)가 위아래로 두 번 나오고 폼이 한 줄 길어진다
@@ -25,7 +25,7 @@
  * <p>원래 팝업을 버린 이유는 **"AntD 가 사유를 못 그린다"** 와 **"드롭다운이 잘린다"** 였다.
  * 둘 다 모달로 가도 그대로 해결된다 — 사유는 우리가 그리고, 가운데 뜨는 모달은 잘릴 자리가 없다.
  *
- * <h3>색은 "예약 시간" pill 과 같은 언어</h3>
+ * 색은 "예약 시간" pill 과 같은 언어
  *   모달 바탕  흰색 + 검은 글자          ← 시간 pill 이 놓인 배경과 같다
  *   hover     둥근 연한 회색 gray[100]   ← `.rsv-time-pill:hover`
  *   선택      둥근 회색 gray[200] + 600  ← `.rsv-time-pill.rsv-selected`
@@ -34,7 +34,7 @@
  *
  * ⚠️ **파란색(primary)을 쓰지 않는다.** 예약 폼 전체가 무채색이라 파랑이 하나 끼면 그 칸만 튄다.
  *
- * <h3>값 규약</h3>
+ * 값 규약
  * `value`/`onChange` 는 **dayjs** 다 — 기존 `FormDatePicker` 와 같아서 호출부(`StoreDetail`)의
  * `dateValue` 계산과 제출 로직이 한 줄도 안 바뀐다. 고르면 모달이 닫히고 필드에 날짜가 뜨며,
  * 그 값 변화가 그대로 시간 슬롯 조회를 깨운다.
@@ -305,8 +305,9 @@ const styles = {
         border: 'none', borderRadius: field.radius, background: field.bg,
         cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
     },
-    // 시간 칸이 에러일 때 아이콘이 빨개지는 것과 같은 언어로 반응한다.
-    triggerError: { boxShadow: `inset 0 0 0 1px ${colors.error.main}` },
+    // 에러 링은 field.errorRing 관문 하나에서만 온다 —
+    // 바로 아래 "예약 시간" 자리표시자와 같은 값을 써야 두 칸이 같은 말을 한다.
+    triggerError: { boxShadow: field.errorRing },
     triggerText: {
         fontSize: fontSize.lg, fontWeight: fontWeight.regular,
         color: colors.text.primary,

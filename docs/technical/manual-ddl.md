@@ -37,8 +37,8 @@ docker exec -it -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -u root reserve
 SHOW VARIABLES LIKE 'ngram_token_size';        -- 기본 2. 이 값이 최소 검색어 길이가 된다.
 
 -- ② 인덱스 생성
---    ★ 컬럼 순서가 중요하다 — MATCH()의 컬럼 목록과 **순서까지 정확히 일치**해야 한다.
---      StoreRepository.searchStoresFulltextPaged 의 MATCH(...) 와 반드시 같게 유지할 것.
+--    MATCH() 대상 컬럼 목록과 FULLTEXT 인덱스 정의가 일치해야 한다.
+--    StoreRepository.searchStoresFulltextPaged 의 MATCH(...) 와 함께 관리한다.
 ALTER TABLE store
   ADD FULLTEXT INDEX ft_store_search (store_name, description, address, category, keywords)
   WITH PARSER ngram;
@@ -71,17 +71,50 @@ EXPLAIN SELECT * FROM store
        AGAINST('+강남' IN BOOLEAN MODE);
 ```
 
-### 알려진 한계
+### 2026-09-07 코드 변경과 남은 확인
 
-- **1글자 검색은 FULLTEXT로 잡히지 않는다**(ngram 최소 2글자).
-  `StoreService.searchStoreEntities`가 이 경우만 LIKE로 폴백한다.
-- **BOOLEAN MODE 연산자**(`+ - > < ( ) ~ * " @`)는 `StoreService.toBooleanModeQuery`가
-  공백으로 치환해 무력화한다. 이 정제를 빼면 사용자가 검색창에 `-`만 넣어도 결과가 뒤집히거나
-  짝 안 맞는 따옴표로 SQL 에러(500)가 난다.
-- **삭제·정지 가게 필터가 없다.** 기존 LIKE 쿼리도 마찬가지였다(`deleted_at`/`status` 조건 없음).
-  같은 동작을 유지하려고 일부러 맞췄다 — 고칠 때는 두 경로를 **함께** 고쳐야 결과가 갈라지지 않는다.
-- 검색 결과 정렬은 여전히 서비스 계층 인메모리 정렬이다(`sortStores`). 관련성(relevance) 순 정렬은
-  적용하지 않았다 — 지금 UI가 별점·리뷰·거리순만 제공한다.
+- LIKE와 FULLTEXT 모두 `deleted_at IS NULL AND status = 'ACTIVE'`를 적용한다. 내용 쿼리와 count 조건을 일치시킨다.
+- 별점·리뷰·최신순은 **DB 전체 정렬 후 페이지**다. 동점은 `store_id DESC`로 고정한다.
+- 거리순만 전체 검색 일치 집합을 가져와 거리/id 순 정렬 후 페이지를 만든다. 순서 정확성은 고쳤지만 메모리·시간 비용은 남아 있다.
+- 1글자 토큰·BOOLEAN 연산자 제거 후 빈 검색어는 LIKE로 돌아간다. 정제 결과가 비었다고 원문을 BOOLEAN 연산자로 다시 전달하지 않는다.
+- LIKE의 `%`·`_`·escape 문자는 문자 그대로 검색한다. FULLTEXT와 LIKE의 단어 해석이 완전히 같다는 뜻은 아니다.
+- 이 코드의 짧은 토큰 분기는 `ngram_token_size=2`를 전제로 한다. 설정 변경 시 분기/테스트도 함께 바꾼다.
+
+기본 파서와 ngram의 분절 방식은 다르며, ngram은 CJK 검색을 지원한다.
+MATCH 컬럼 목록과 FULLTEXT 인덱스 정의의 일치를 확인한다.
+[MySQL FULLTEXT 제한](https://dev.mysql.com/doc/refman/8.0/en/fulltext-restrictions.html),
+[ngram 파서](https://dev.mysql.com/doc/refman/8.0/en/fulltext-search-ngram.html).
+
+H2에서는 LIKE·전체 정렬·205건 페이지 경계를 확인했고, FULLTEXT는 Mockito로 호출 계약만 확인했다.
+**실제 MySQL SQL 실행·인덱스·EXPLAIN 검증은 미완료**다. 운영 DDL은 실행하지 않았다.
+승인된 별도 검증 DB에서 커밋된 fixture로 검색어·연산자·삭제/정지·동점·깊은 페이지와 count를 대조한 뒤 적용한다.
+
+---
+
+## 2. 광고 금융 원장: 배포 전후 스키마 확인
+
+코드의 새 테이블은 `ad_payment_attempt`다. 기존 `advertisement.status`에는
+`REFUND_PENDING`, `REVIEW_REQUIRED` 상태가 추가된다. 코드가 기대하는 타입은 `varchar(20)`이다.
+
+아래는 **조회 예시**이며 이번에는 실행하지 않았다. 승인된 DB 연결에서 먼저 확인한다.
+비밀번호를 명령 인자나 출력에 복사하지 않는다.
+
+```sql
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'advertisement'
+  AND COLUMN_NAME = 'status';
+
+-- 새 코드의 스키마 생성 후 확인
+SHOW CREATE TABLE ad_payment_attempt;
+SHOW INDEX FROM ad_payment_attempt;
+```
+
+- 현재 status가 충분한 VARCHAR면 enum 값 추가를 위한 ALTER는 필요하지 않을 수 있다.
+- 구 ENUM/좁은 길이/다른 제약이면 자동 반영을 기대하지 말고 실제 스키마를 근거로 별도 DDL을 승인받는다.
+- 새 원장의 merchant_uid UNIQUE, 식별자/원금 NOT NULL, due/store/owner/ad 인덱스를 확인한다.
+- 신규 테이블 생성 자체도 운영 스키마 변경이다. 로컬 H2 자동 생성 성공을 운영 적용으로 기록하지 않는다.
+- 새 상태를 쓴 뒤 구버전 백엔드로 되돌리는 호환성은 [광고 결제 런북](ad-payments.md)의 롤백 경계를 따른다.
 
 ---
 

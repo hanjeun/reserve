@@ -17,28 +17,15 @@ import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
-import { API_ENDPOINTS } from '../../constants';
+import { API_ENDPOINTS, RESERVATION_STATUS_LABELS, RESERVATION_STATUS_COLORS,
+         RESERVATION_STATUS_FILTER_OPTIONS } from '../../constants';
 import { colors, fontSize } from '../../styles/tokens';
 import { formatTime, formatCurrency } from '../../utils';
 
 const { Text } = Typography;
 
-const RES_STATUS_CONFIG = {
-    PENDING:   { color: 'orange',  label: '대기 중' },
-    CONFIRMED: { color: 'blue',    label: '승인됨' },
-    CANCELLED: { color: 'default', label: '취소됨' },
-    COMPLETED: { color: 'green',   label: '이용완료' },
-    REJECTED:  { color: 'red',     label: '거절됨' },
-    NO_SHOW:   { color: 'purple',  label: '노쇼' },
-    UNCONFIRMED: { color: 'gold', label: '미확인' },
-};
-
-const RES_STATUS_OPTIONS = [
-    { value: 'ALL', label: '전체 상태' }, { value: 'PENDING', label: '대기 중' },
-    { value: 'CONFIRMED', label: '승인됨' }, { value: 'CANCELLED', label: '취소됨' },
-    { value: 'COMPLETED', label: '이용완료' }, { value: 'REJECTED', label: '거절됨' },
-    { value: 'NO_SHOW', label: '노쇼' }, { value: 'UNCONFIRMED', label: '미확인' },
-];
+// 상태 라벨·색·필터 목록은 constants/status.js 하나에서만 온다.
+// 여기 있던 사본 두 벌은 같은 상태를 다른 말로 불렀다('대기 중' vs 정본 '승인 대기').
 
 // 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지 (2026-07 전수조사)
 // 예전엔 cols를 7개만 넘겨서 실제 8컬럼 테이블과 안 맞았고, headers는 아예 안 넘겨서
@@ -116,14 +103,18 @@ const ReservationsAllTab = () => {
         { title: '시간',  dataIndex: 'reservationTime', key: 'reservationTime', width: 80,  render: v => <Text style={{ fontSize: fontSize.sm }}>{formatTime(v)}</Text> },
         { title: '인원',  dataIndex: 'guestCount',      key: 'guestCount',      width: 60,  render: v => <Text style={{ fontSize: fontSize.sm }}>{v}명</Text> },
         { title: '예약금', dataIndex: 'depositAmount',  key: 'depositAmount',   width: 90,  render: (v, r) => <Text style={{ fontSize: fontSize.sm, color: r.depositPaid ? colors.primary?.main : colors.text.tertiary }}>{v > 0 ? formatCurrency(v) : '-'}{r.depositPaid ? ' ✓' : ''}</Text> },
-        { title: '상태', dataIndex: 'status', key: 'status', width: 90, render: status => { const cfg = RES_STATUS_CONFIG[status] || { color: 'default', label: status }; return <Tag color={cfg.color}>{cfg.label}</Tag>; } },
+        { title: '상태', dataIndex: 'status', key: 'status', width: 90, render: status => (
+            <Tag color={RESERVATION_STATUS_COLORS[status] ?? 'default'}>
+                {RESERVATION_STATUS_LABELS[status] ?? '기타'}
+            </Tag>
+        ) },
         { title: '처리', key: 'actions', width: 80, render: (_, r) => <Button variant="ghost-sm-danger" loading={deleteMutation.isPending && deleteMutation.variables === r.id} onClick={() => handleSoftDeleteReservation(r)}><DeleteOutlined /> 삭제</Button> },
     ];
 
     return (
         <>
             <FilterToolbar
-                selects={[{ value: resStatusFilter, onChange: handleStatusFilterChange, options: RES_STATUS_OPTIONS }]}
+                selects={[{ value: resStatusFilter, onChange: handleStatusFilterChange, options: RESERVATION_STATUS_FILTER_OPTIONS }]}
                 count={totalElements}
                 search={{ value: resSearch, onChange: handleSearchChange, placeholder: '가게명, 예약자로 검색', disabled: resLoading }}
                 onReload={loadReservations}

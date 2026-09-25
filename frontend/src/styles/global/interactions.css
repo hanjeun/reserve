@@ -342,6 +342,42 @@
     transform: scale(0.94);
 }
 
+/* ── 카드 전체가 하나의 클릭 타깃인 목록 행 (관문) ──────────────────────────────
+   ReservationRow 처럼 "카드 아무 데나 누르면 상세가 열리는" 행의 공통 규칙.
+
+   문제였던 것 — 카드 안에 같은 동작의 클릭 핸들러가 여러 개(바깥 div + 썸네일 버튼 +
+   가게명 버튼) 있으면, 누른 자리에 따라 반응이 달라 보인다. 특히 모바일에서 글자 위를
+   아주 조금 끌면서 누르면 브라우저가 "텍스트 선택" 제스처로 해석해 파란 하이라이트가
+   먼저 뜨고 나서 상세가 열려, 같은 카드인데 동작이 두 가지처럼 느껴졌다.
+
+   규칙 —
+   1) 카드 안 진짜 클릭 타깃은 <button> 하나뿐이다. 그 버튼에 __trigger 를 주면
+      ::after 가 카드 전체를 덮어 어디를 눌러도 그 버튼 한 번의 클릭이 된다.
+      (키보드·스크린리더도 이 버튼 하나만 읽으므로 중복 노드가 생기지 않는다)
+   2) 카드 전체에서 텍스트 선택과 탭 하이라이트를 끈다 → 어느 자리를 눌러도 반응이 같다.
+   3) 오버레이 위에 있어야 하는 요소(액션 버튼 등)만 z-index로 올린다.
+      오버레이는 조상이 아니라 형제 레이어라서 stopPropagation은 필요 없다.
+
+   ⚠️ __trigger 를 단 버튼과 카드 사이의 어떤 조상에도 overflow:hidden 이나 position 을
+      주면 안 된다. 주는 순간 오버레이가 그 상자 안으로 잘려 클릭 영역이 좁아진다. */
+.reserve-tap-card {
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.reserve-tap-card__trigger::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+.reserve-tap-card .reserve-reservation-actions {
+    position: relative;
+    z-index: 1;
+}
+
 /* 예약 카드 액션 버튼 — 모바일에서는 아이콘을 숨기고 글자만 남긴다.
    버튼이 4개(결제하기·변경·QR·취소)가 되면 이 그룹이 3줄의 가용 폭 286px 중 216px을 차지해서
    날짜 자리에 24px밖에 안 남았다("2026-07-31"이 "0…"으로 뭉개지던 원인).

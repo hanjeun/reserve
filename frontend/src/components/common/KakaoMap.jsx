@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { colors, rawColors, fontSize, radius } from '../../styles/tokens';
+import { createStoreOverlayContent } from './kakaoMapOverlay';
 import { Bone } from './Skeletons';
 
 /**
@@ -10,16 +11,6 @@ import { Bone } from './Skeletons';
  * - 좌표 있으면 바로, 없으면 주소 Geocoding (저장된 좌표 없는 기존 가게 폴백)
  */
 // XSS 방지: storeName 등 외부 입력값을 HTML에 삽입 전 이스케이프
-const escapeHtml = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-};
-
 const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => {
     const containerRef = useRef(null);
     const mapRef       = useRef(null);
@@ -79,39 +70,8 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
             });
 
             if (storeName) {
-                const safeStoreName = escapeHtml(storeName);
-                const safeMapUrl = encodeURI(kakaoMapUrl ?? '');
-                const content = `
-                    <div style="
-                        position: relative;
-                        display: inline-flex;
-                        align-items: center;
-                        background: #fff;
-                        color: #111;
-                        font-size: 12px;
-                        font-weight: 600;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                        padding: 6px 12px;
-                        border-radius: 8px;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                        white-space: nowrap;
-                        cursor: pointer;
-                        border: 1px solid rgba(0,0,0,0.08);
-                    " onclick="globalThis.open('${safeMapUrl}', '_blank')">
-                        ${safeStoreName}
-                        <div style="
-                            position: absolute;
-                            bottom: -6px;
-                            left: 50%;
-                            transform: translateX(-50%);
-                            width: 0; height: 0;
-                            border-left: 5px solid transparent;
-                            border-right: 5px solid transparent;
-                            border-top: 6px solid #fff;
-                            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.08));
-                        "></div>
-                    </div>
-                `;
+                // 라벨은 HTML 문자열이 아니라 DOM 노드로 만든다 — 가게 이름·주소가 스크립트로 해석될 수 없다(저장형 XSS 차단).
+                const content = createStoreOverlayContent(storeName, kakaoMapUrl ?? '');
                 const overlay = new globalThis.kakao.maps.CustomOverlay({
                     map, position: center, content, yAnchor: 1.4,
                 });

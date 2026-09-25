@@ -15,7 +15,7 @@ const { Title, Text } = Typography;
 const SocialAgreement = () => {
     const navigate = useNavigate();
     const { message } = useMessage();
-    const { logout, login, user } = useAuthStore();
+    const { logout, updateUser, user } = useAuthStore();
     useDocumentTitle('서비스 이용 동의');
 
     const [agreements, setAgreements] = useState({ terms: false, privacy: false, marketing: false });
@@ -37,7 +37,7 @@ const SocialAgreement = () => {
                 marketingAgreed: agreements.marketing,
             });
             // 로컬 스토어도 동기화 (termsAgreed + marketingAgreed 반영)
-            login({ ...user, termsAgreed: true, marketingAgreed: agreements.marketing });
+            updateUser({ ...user, termsAgreed: true, marketingAgreed: agreements.marketing });
             message.success('환영합니다! RESERVE를 시작해보세요.');
             // 2026-07: 신규 소셜 가입자도 약관 동의까지 마치면 원래 가려던 페이지로 보낸다.
             // (OAuthCallback은 신규 가입자의 복귀 경로를 일부러 소비하지 않고 남겨둔다)

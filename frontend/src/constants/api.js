@@ -103,6 +103,7 @@ export const API_ENDPOINTS = {
         ADMIN_REVOKE:   (memberId) => `/api/business-verification/admin/${memberId}/revoke`,
     },
     PAYMENT: {
+        STATUS:         '/api/payment/status',
         CONFIG:         '/api/payment/config',
         PREPARE:        '/api/payment/prepare',
         VERIFY:         '/api/payment/verify',

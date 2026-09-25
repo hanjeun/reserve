@@ -26,12 +26,14 @@ const STATUS_LABELS = {
     SUSPENDED:       { label: '중단됨',    color: 'error' },
     CANCELLED:       { label: '취소됨',    color: 'default' },
     REFUNDED:        { label: '환불됨',    color: 'default' },
+    REFUND_PENDING:  { label: '환불 확인 중', color: 'warning' },
+    REVIEW_REQUIRED: { label: '결제 확인 필요', color: 'warning' },
 };
 
 // 결제 가능한 상태 — 아직 결제 전(대기)이거나 결제가 실패한 경우
 const PAYABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED']);
 
-// 취소 가능한 상태 — 결제 전(돈 안 나감) 또는 결제 실패(돈 안 나감)이거나 이미 결제된 노출 중(전액 환불)만
+// 취소 요청 가능 여부다. 완료 여부는 서버 원장과 PG 대사가 결정한다.
 const CANCELLABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTIVE']);
 
 // 수정 가능한 상태 — 백엔드 updateAd와 동일한 규칙(CANCELLED/EXPIRED/SUSPENDED/REFUNDED는 수정 불가)
@@ -110,12 +112,9 @@ const AdManageTab = () => {
 
     const cancelMutation = useMutation({
         mutationFn: (adId) => adService.cancelAd(adId),
-        onSuccess: (_, adId) => {
-            const cancelled = ads.find((a) => a.id === adId);
-            message.success(cancelled?.status === 'ACTIVE' ? '환불 처리되었습니다.' : '광고가 취소되었습니다.');
-            queryClient.invalidateQueries({ queryKey: adKeys.my() });
-        },
-        onError: () => message.error('취소에 실패했습니다.'),
+        onSuccess: () => message.success('취소 요청을 접수했습니다. 환불 여부는 광고 내역에서 확인해주세요.'),
+        onError: (err) => message.error(err instanceof Error ? err.message : '결과를 확인하지 못했습니다. 내역을 다시 확인해주세요.'),
+        onSettled: () => queryClient.invalidateQueries({ queryKey: adKeys.my() }),
     });
 
     // 종료상태 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가, 예약 쪽 "삭제"와 동일한 패턴
@@ -239,8 +238,8 @@ const AdManageTab = () => {
         confirm({
             title: '광고 취소',
             content: isPaid
-                ? `결제된 ${ad.amount?.toLocaleString()}원이 전액 환불됩니다. 즉시 노출이 중단되며 되돌릴 수 없습니다.`
-                : '아직 결제되지 않은 신청입니다. 목록에서 바로 삭제됩니다.',
+                ? `노출을 중단하고 ${ad.amount?.toLocaleString()}원 전액 환불을 요청합니다. 환불 완료는 PG 확인 후 표시됩니다.`
+                : '신청을 취소하고 결제 상태를 확인합니다. 결제 중이었다면 미결 내역이 남을 수 있으며, 확인 후 환불을 처리합니다.',
             okText: isPaid ? '환불하기' : '취소하기', cancelText: '닫기',
             okButtonProps: { danger: true }, centered: true,
             onOk: () => cancelMutation.mutateAsync(ad.id),

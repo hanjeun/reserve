@@ -1,6 +1,5 @@
 package kr.it.reserve.audit.service;
 
-import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.audit.entity.AuditLog;
 import kr.it.reserve.audit.repository.AuditLogRepository;
@@ -15,8 +14,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.Set;
 
 /**
  * 휴지통 항목 하나를 독립 트랜잭션으로 처리한다.
@@ -25,12 +22,6 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class AuditCleanupWorker {
-
-    private static final Set<AdStatus> FINANCIAL_AD_STATUSES = EnumSet.of(
-            AdStatus.ACTIVE,
-            AdStatus.EXPIRED,
-            AdStatus.SUSPENDED,
-            AdStatus.REFUNDED);
 
     private final AuditLogRepository auditLogRepository;
     private final AdminSentMailRepository adminSentMailRepository;
@@ -70,9 +61,8 @@ public class AuditCleanupWorker {
                     || reviewRepository.existsByReservationId(item.getEntityId());
         }
         if ("ADVERTISEMENT".equalsIgnoreCase(item.getEntityType())) {
-            return advertisementRepository.findById(item.getEntityId())
-                    .map(ad -> FINANCIAL_AD_STATUSES.contains(ad.getStatus()))
-                    .orElse(false);
+            // 과거에 덮어쓴 UID도 있어 로컬 취소/실패만으로 무결제임을 입증할 수 없다.
+            return true;
         }
         return false;
     }

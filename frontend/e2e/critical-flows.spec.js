@@ -118,8 +118,11 @@ test('reservation: authenticated user can open the empty reservation list', asyn
     await expect(page.getByText('예약 내역이 없습니다.')).toBeVisible();
 });
 
-test('payment: verified redirect renders a successful reservation payment', async ({ page }) => {
+test('payment: server record confirms a reservation payment', async ({ page }) => {
     await mockApi(page, user);
+    await page.route('**/api/payment/status?**', route => ok(route, {
+        type: 'reservation', merchantUid: 'smoke-payment', status: 'PAID', amount: 1000,
+    }));
     await page.goto('/payment/result?success=true&merchant_uid=smoke-payment');
 
     await expect(page.getByText('결제 완료', { exact: true })).toBeVisible();
@@ -191,4 +194,58 @@ test('accessibility: guest header has keyboard focus and inquiry loads on demand
     await inquiry.click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('문의 유형')).toBeVisible();
+});
+
+test('chat: close motion avoids a translucent ghost and still unmounts with reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await mockApi(page, user);
+    await page.goto('/');
+
+    const launcher = page.locator('.reserve-chat-launcher');
+    await expect(launcher).toHaveAttribute('aria-label', '문의하기');
+    await launcher.click();
+
+    const panel = page.locator('.reserve-chat-panel');
+    await expect(panel).toBeVisible();
+    await panel.getByRole('button', { name: '닫기' }).click();
+    await expect(panel).toHaveClass(/is-closing/);
+
+    const closingFrames = await panel.evaluate((element) => {
+        const animation = element.getAnimations()[0];
+        if (!animation) throw new Error('채팅 닫힘 애니메이션을 찾지 못했습니다.');
+
+        animation.pause();
+        const duration = Number(animation.effect.getComputedTiming().duration);
+        animation.currentTime = duration * 0.58;
+        const middleStyle = getComputedStyle(element);
+        const middle = {
+            opacity: Number(middleStyle.opacity),
+            pointerEvents: middleStyle.pointerEvents,
+            visibility: middleStyle.visibility,
+        };
+
+        animation.currentTime = duration;
+        const finalStyle = getComputedStyle(element);
+        const final = {
+            opacity: Number(finalStyle.opacity),
+            visibility: finalStyle.visibility,
+        };
+
+        return { duration, middle, final };
+    });
+
+    expect(closingFrames.duration).toBe(120);
+    expect(closingFrames.middle.opacity).toBeGreaterThanOrEqual(0.99);
+    expect(closingFrames.middle.pointerEvents).toBe('none');
+    expect(closingFrames.middle.visibility).toBe('visible');
+    expect(closingFrames.final.opacity).toBe(0);
+    expect(closingFrames.final.visibility).toBe('hidden');
+
+    await expect(panel).toHaveCount(0);
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await launcher.click();
+    await expect(panel).toBeVisible();
+    await panel.getByRole('button', { name: '닫기' }).click();
+    await expect(panel).toHaveCount(0);
 });

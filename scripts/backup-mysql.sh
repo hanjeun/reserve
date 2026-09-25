@@ -26,6 +26,9 @@ if [[ -f "$CONFIG_FILE" ]]; then
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"
 fi
+# docker 폴백 업로드는 `-e AWS_ACCESS_KEY_ID` 처럼 이름만 넘겨 **환경 변수**에서 값을 읽는다.
+# 설정 파일을 `.` 으로 읽기만 하면 셸 변수라 전달되지 않으므로 내보낸다(2026-09-25 운영 설치 때 발견).
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
 
 MYSQL_CONTAINER="${MYSQL_CONTAINER:-mysql}"
 DB_NAME="${DB_NAME:-reserve}"

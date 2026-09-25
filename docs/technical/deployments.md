@@ -270,7 +270,7 @@ repository secret으로 갱신한 뒤 재배포했다. GitHub는 secret 값을 �
 | 서버 DB 확인 | `reserve-post-deploy-verify` PASS. 필수 테이블 3개(`payment_webhook_inbox`·`payment_reconciliation_issue`·`file_deletion_task`), `reservation.checked_in_at`, 인덱스 7개 존재. 결제·생명주기 테이블 InnoDB |
 | 새 테이블 | `ad_payment_attempt` InnoDB, 0행. 인덱스 `PRIMARY`·`idx_ad_payment_due`·`idx_ad_payment_store`·`idx_ad_payment_owner`·`idx_ad_payment_ad`·주문번호 유일 인덱스 존재. 검증 스크립트가 이 테이블을 모르므로 `information_schema`로 따로 확인 |
 | 운영 큐 | 7일 넘은 `READY` 0, 열린 결제 대사 이슈 0, 처리 안 된 PortOne 웹훅 0, 파일 삭제 outbox pending 0·failed 0 |
-| 남은 일 | `/etc/reserve-backup.env`가 없어 운영 DB 자동 백업이 설정돼 있지 않다(백업 문서 절차 미적용). 검증 스크립트에 `ad_payment_attempt` 확인 추가 필요 |
+| 남은 일 | 검증 스크립트에 `ad_payment_attempt` 확인 추가 필요. 운영 DB 자동 백업은 같은 날 설정·복원 훈련까지 마쳤다(`backup.md`) |
 
 배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`edaede8ec9`)을 확인하고, PR #204로 v2.6.0 squash 계보를
 `dev`에 연결했다.

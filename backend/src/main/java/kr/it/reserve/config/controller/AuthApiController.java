@@ -2,7 +2,6 @@ package kr.it.reserve.config.controller;
 
 import kr.it.reserve.config.jwt.JwtProperties;
 import kr.it.reserve.config.jwt.TokenProvider;
-import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.config.service.TokenService;
 import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.global.common.ApiResponse;
@@ -15,7 +14,9 @@ import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.MemberStatus;
 import kr.it.reserve.member.service.MemberService;
+import jakarta.validation.Valid;
 import java.util.Map;
+import java.util.Locale;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,6 @@ public class AuthApiController {
     private final TokenProvider tokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final JwtProperties jwtProperties;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final TokenService tokenService;
     private final RateLimiter rateLimiter;
 
@@ -66,7 +66,7 @@ public class AuthApiController {
      * 안 하면 {@code A@x.com} 과 {@code a@x.com} 이 서로 다른 버킷이 되어 계정 단위 제한을 우회한다.
      */
     private static String normalizeEmail(String email) {
-        return email == null ? "" : email.trim().toLowerCase();
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     @PostMapping("/login")
@@ -78,7 +78,7 @@ public class AuthApiController {
         }
 
         String email = normalizeEmail(loginRequest.get("email"));
-        String rawPassword = loginRequest.get("password");
+        String rawPassword = loginRequest.getOrDefault("password", "");
 
         // ── 계정 단위 제한 ────────────────────────────────────────────────
         // IP 기준(위)만으로는 공격자가 프록시로 IP 를 돌리면 한 계정에 무제한 시도가 된다.
@@ -141,7 +141,7 @@ public class AuthApiController {
     }
 
     @PostMapping("/signup")
-    public ApiResponse<MemberResponse> signup(@RequestBody MemberSignupRequest signupRequest,
+    public ApiResponse<MemberResponse> signup(@Valid @RequestBody MemberSignupRequest signupRequest,
                                               HttpServletRequest request, HttpServletResponse response) {
         String ip = IpExtractor.extract(request);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.SIGNUP)) {
@@ -154,18 +154,23 @@ public class AuthApiController {
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<String> createNewAccessToken(HttpServletRequest request, HttpServletResponse response) {
+    public ApiResponse<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = CookieUtil.getCookie(request, "refresh_token");
-        if (refreshToken == null) {
-            throw new AuthException("리프레시 토큰이 쿠키에 존재하지 않습니다.");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw tokenService.rejectMissingCookie();
         }
 
-        String newAccessToken = tokenService.createNewAccessToken(refreshToken);
+        // refresh도 매번 새로 받는다(회전). 쿠키 Max-Age도 함께 다시 잡아야 브라우저가
+        // 로그인 14일째에 쿠키를 지우지 않는다 — 토큰만 바꾸고 쿠키를 안 바꾸면 연장이 의미 없다.
+        TokenService.RefreshResult result = tokenService.refresh(refreshToken);
 
-        CookieUtil.addCookie(response, "access_token", newAccessToken,
+        CookieUtil.addCookie(response, "access_token", result.accessToken(),
                 (int) jwtProperties.getAccessTokenExpiration().toSeconds());
+        CookieUtil.addCookie(response, "refresh_token", result.refreshToken(),
+                (int) result.refreshMaxAge().toSeconds());
 
-        return ApiResponse.success(newAccessToken, "토큰 재발급 성공");
+        // 토큰은 HttpOnly 쿠키로만 전달한다. 응답 본문에 복제하면 XSS 노출면만 넓어진다.
+        return ApiResponse.success(null, "토큰 재발급 성공");
     }
 
     /**
@@ -185,8 +190,8 @@ public class AuthApiController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = CookieUtil.getCookie(request, "refresh_token");
-        if (refreshToken != null) {
-            refreshTokenRepository.deleteByRefreshToken(refreshToken);
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            tokenService.revoke(refreshToken);
         }
         CookieUtil.deleteCookie(request, response, "access_token");
         CookieUtil.deleteCookie(request, response, "refresh_token");

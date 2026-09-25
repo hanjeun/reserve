@@ -10,11 +10,8 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties("role")
+@JsonIgnoreProperties({"role", "email"})
 public class MemberUpdateRequest {
     private String name;
-    private String email;
-    private String password;
-    private String passwordConfirm;
     private Boolean emailNotificationEnabled;
 }

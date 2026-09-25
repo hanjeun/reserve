@@ -122,12 +122,21 @@ ORDER BY next_attempt_at ASC;
 
 ## OAuth 연동 해제
 
-외부 OAuth 해제는 DB 트랜잭션보다 먼저 실행하지 않는다. 탈퇴 이벤트를 발행하고
-`AFTER_COMMIT` 리스너가 제공자 해제를 시도한다. 실패하면 토큰을 로그에 남기지 않고
-`OAuth unlink requires manual follow-up` 오류를 남긴다.
+외부 OAuth 해제는 DB 트랜잭션보다 먼저 실행하지 않는다. 회원 비식별화와 같은 트랜잭션에서
+`oauth_unlink_task`에 제공자·회원·암호화 토큰을 저장하고, 커밋 뒤 스케줄러가 제공자를 호출한다.
+앱이 DB 커밋 직후 종료되거나 제공자 호출이 실패해도 작업은 남아 지수 backoff로 재시도한다.
+(v2.6.1에서 예전 `AFTER_COMMIT` 이벤트 리스너를 이 outbox로 바꿨다.)
 
-현재 이 외부 호출에는 durable retry 저장소가 없다. 앱이 DB 커밋 직후 종료되거나 제공자 호출이 실패하면
-운영자가 로그를 보고 수동 확인해야 한다. 정식 배포 전에는 outbox 기반 재시도 도입 여부를 결정한다.
+- `task_key` unique로 회원·provider별 중복 enqueue를 막는다.
+- access token은 목적 분리 AES-GCM 암호문만 저장하고 완료 즉시 NULL로 지운다.
+- 짧은 `PROCESSING` lease 앞뒤에서만 DB 행을 잠그고, 제공자 HTTP 호출 중에는 트랜잭션을 열어두지 않는다.
+- 토큰이 없던 탈퇴는 `BLOCKED`, 제공자 실패는 `FAILED`, 성공은 `COMPLETED`다.
+- 로그에 토큰·제공자 응답 본문을 남기지 않는다.
+- `FAILED/BLOCKED`가 하나라도 있으면 15분마다 `OAuth unlink queue requires attention` 집계 로그가 난다
+  (Grafana 알림 8번, `docs/technical/monitoring.md`).
+
+키·상태·운영 절차는 [계정 보안 계약](account-security.md)을 따른다. 이 구조는 로컬/H2 테스트 증거이며,
+각 제공자 콘솔에서 실제 연동 해제됐다는 운영 증거는 아직 별도 확인이 필요하다.
 
 ---
 
@@ -148,11 +157,12 @@ ORDER BY next_attempt_at ASC;
 ## 배포 전 운영 검증
 
 - [ ] 운영 백업이 존재하고 별도 빈 DB로 복원 가능한지 먼저 확인
-- [ ] 재시작 후 운영 MySQL에 `file_deletion_task`와 결제 inbox/대사 테이블이 생성됐는지 확인
+- [ ] 재시작 후 운영 MySQL에 `file_deletion_task`, OAuth unlink·마케팅 동의 이력, 결제 inbox/대사 테이블이 생성됐는지 확인
 - [ ] `SHOW CREATE TABLE file_deletion_task`와 `SHOW INDEX`로 unique/index 확인
 - [ ] S3 IAM이 대상 객체 삭제만 허용하는지 확인
 - [ ] S3 삭제 실패를 한 번 만들고 `FAILED → COMPLETED` 재시도를 실기 확인
 - [ ] 각 OAuth 제공자에서 탈퇴 후 연동이 실제 해제되는지 확인
+- [ ] OAuth unlink의 `FAILED → COMPLETED`와 `BLOCKED` 운영 알림 확인
 - [ ] 예약 생성과 가게 종료 동시 요청, 광고 생성과 가게 종료 동시 요청을 MySQL에서 실기 확인
 - [ ] 예약 생성·회원정보 수정·비밀번호 재설정과 회원 탈퇴 동시 요청을 MySQL에서 실기 확인
 - [ ] 회원/가게 준비 상태 API의 차단 건수와 운영 DB 원장을 표본 대조

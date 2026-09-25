@@ -64,6 +64,20 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus()));
     }
 
+    @Test
+    void emailVerificationOnlyExposesTheExplicitSignupActions() throws Exception {
+        mockMvc.perform(post("/api/email/send-code")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/email/verify-code")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/email/check-verified").param("email", "person@example.test"))
+                .andExpect(status().isUnauthorized());
+    }
+
     // ── 보호된 API — 비로그인 상태에서는 반드시 401이어야 함 ──
 
     @Test
@@ -84,6 +98,41 @@ class SecurityConfigAuthorizationTest {
     void memberMeRequiresAuth() throws Exception {
         mockMvc.perform(get("/api/member/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void passwordChangeRequiresAuth() throws Exception {
+        mockMvc.perform(put("/api/member/password")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void socialTermsAgreementRequiresAuth() throws Exception {
+        mockMvc.perform(post("/api/auth/agree-terms")
+                        .contentType("application/json")
+                        .content("{\"marketingAgreed\":false}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void unknownLoginUsesAValidDummyHashAndReturnsUnauthorizedInsteadOfServerError() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType("application/json")
+                        .content("{\"email\":\"missing-account@example.com\",\"password\":\"Unknown123!\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void signupRejectsAnInvalidPasswordBeforeEnteringTheService() throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType("application/json")
+                        .content("""
+                                {"name":"가입자","email":"new@example.com","password":"letters-only",
+                                 "passwordConfirm":"letters-only","termsAgreed":true}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

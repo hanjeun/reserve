@@ -8,8 +8,10 @@ import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
 import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.MarketingConsentHistory;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.repository.MarketingConsentHistoryRepository;
 import kr.it.reserve.member.service.MemberService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +45,7 @@ class MemberRoleBoundaryTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private EmailVerificationService emailVerificationService;
     @Mock private PwnedPasswordChecker pwnedPasswordChecker;
+    @Mock private MarketingConsentHistoryRepository marketingConsentHistoryRepository;
 
     @InjectMocks
     private MemberService memberService;
@@ -77,6 +80,7 @@ class MemberRoleBoundaryTest {
 
         ArgumentCaptor<Member> savedMember = ArgumentCaptor.forClass(Member.class);
         verify(memberRepository).save(savedMember.capture());
+        verify(marketingConsentHistoryRepository).save(any(MarketingConsentHistory.class));
         assertThat(savedMember.getValue().getRole()).isEqualTo(Role.USER);
     }
 
@@ -93,7 +97,7 @@ class MemberRoleBoundaryTest {
                 .provider(AuthProvider.LOCAL)
                 .build();
         MemberUpdateRequest request = objectMapper.readValue("""
-                {"name":"수정 후","role":"ADMIN"}
+                {"name":"수정 후","email":"attacker@example.com","role":"ADMIN"}
                 """, MemberUpdateRequest.class);
 
         when(memberRepository.findActiveByIdForUpdate(1L)).thenReturn(Optional.of(member));
@@ -102,7 +106,9 @@ class MemberRoleBoundaryTest {
         MemberResponse response = memberService.updateMember(1L, request);
 
         assertThat(member.getName()).isEqualTo("수정 후");
+        assertThat(member.getEmail()).isEqualTo(EMAIL);
         assertThat(member.getRole()).isEqualTo(existingRole);
+        assertThat(response.getEmail()).isEqualTo(EMAIL);
         assertThat(response.getRole()).isEqualTo(existingRole);
         verify(memberRepository).save(member);
     }

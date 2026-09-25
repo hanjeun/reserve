@@ -6,6 +6,7 @@ import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
+import kr.it.reserve.member.dto.PasswordChangeRequest;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.service.MemberService;
 import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 
 @RequiredArgsConstructor
 @RestController
@@ -36,6 +38,19 @@ public class MemberApiController {
         Member member = SecurityUtil.getCurrentMember("수정 권한이 없습니다.");
         MemberResponse updated = memberService.updateMember(member.getId(), request);
         return ApiResponse.success(updated, "회원 정보가 성공적으로 수정되었습니다.");
+    }
+
+    // 비밀번호 변경은 일반 프로필 수정과 분리한다. 현재 비밀번호 재인증과 전체 세션 폐기가 필수다.
+    @PutMapping("/password")
+    public ApiResponse<Void> changePassword(
+            @Valid @RequestBody PasswordChangeRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response) {
+        Member member = SecurityUtil.getCurrentMember("비밀번호 변경 권한이 없습니다.");
+        memberService.changePassword(member.getId(), request);
+        CookieUtil.deleteCookie(httpRequest, response, "access_token");
+        CookieUtil.deleteCookie(httpRequest, response, "refresh_token");
+        return ApiResponse.success(null, "비밀번호가 변경되었습니다. 다시 로그인해주세요.");
     }
 
     // 프로필 이미지 업로드

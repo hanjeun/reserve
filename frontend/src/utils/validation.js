@@ -183,10 +183,12 @@ export const VALIDATION_RULES = {
         { required: true, message: '비밀번호를 입력해주세요' },
         {
             validator: skipIfEmpty((v) => {
-                if (v.length < 8)
-                    return Promise.reject(new Error('비밀번호는 8자 이상이어야 합니다'));
+                if (v.length < 8 || v.length > 64)
+                    return Promise.reject(new Error('비밀번호는 8~64자로 입력해주세요'));
                 if (!/^(?=.*[a-zA-Z])(?=.*\d)/.test(v))
                     return Promise.reject(new Error('영문과 숫자를 포함해야 합니다'));
+                if (new TextEncoder().encode(v).length > 72)
+                    return Promise.reject(new Error('비밀번호가 너무 깁니다. 영문 기준 72자 이내로 입력해주세요'));
                 return Promise.resolve();
             }),
         },

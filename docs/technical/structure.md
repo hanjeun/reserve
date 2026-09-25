@@ -22,6 +22,7 @@ RESERVE/
 │       ├── monitoring.md         ← Grafana · Loki · Sentry · UptimeRobot
 │       ├── payments.md           ← 결제 · 환불 · 웹훅 inbox · 대사 큐
 │       ├── data-lifecycle.md      ← 탈퇴 · 폐업 · 파일 삭제 outbox · 보존 정책
+│       ├── account-security.md    ← 비밀번호 · 세션 세대 · 로그인 유지(refresh 회전) · 동의 이력 · OAuth unlink outbox
 │       ├── backup.md             ← MySQL 백업 · 복원 훈련
 │       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
 │       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
@@ -54,12 +55,13 @@ kr.it.reserve/
 │   ├── WebMvcConfig.java          ← MVC 설정
 │   ├── AsyncConfig.java           ← 비동기 스레드풀 (이미지 병렬 업로드 등)
 │   ├── controller/                ← AuthApiController (로그인/회원가입/토큰)
-│   ├── jwt/                       ← TokenProvider, JwtAuthenticationFilter
+│   ├── jwt/                       ← TokenProvider, JwtAuthenticationFilter, authVersion 세션 세대
 │   │   └── scheduler/             ← RefreshTokenCleanupScheduler (만료 refresh 토큰 정리)
-│   ├── oauth2/                    ← OAuth2 핸들러, CustomOAuth2UserService
-│   └── service/                   ← TokenService, RefreshTokenService
+│   ├── oauth2/                    ← OAuth2 핸들러, CustomOAuth2UserService, 탈퇴 연동 해제 outbox
+│   └── service/                   ← TokenService (refresh 회전·거절 사유 로그), RefreshRejectedException
 │
-├── member/                        ← 회원 관리 (프로필, 위치, 비식별 탈퇴), PasswordResetController 포함
+├── member/                        ← 회원 관리 (프로필, 위치, 비식별 탈퇴, 비밀번호 변경), PasswordResetController,
+│                                     마케팅 동의 이력
 ├── lifecycle/                     ← 탈퇴·영업 종료 전 미결 예약/결제 의무 단일 관문
 ├── store/                         ← 가게 등록/수정/영업 종료/조회, AddressController(주소검색 프록시)
 │   └── service/StoreRepository    ← findByIdForUpdate() 비관적 락(PESSIMISTIC_WRITE) — 예약 동시성 제어

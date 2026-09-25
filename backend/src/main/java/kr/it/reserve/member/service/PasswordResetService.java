@@ -4,6 +4,8 @@ import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.error.BusinessException;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.security.PwnedPasswordChecker;
+import kr.it.reserve.global.security.PasswordPolicy;
+import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.PasswordResetToken;
 import kr.it.reserve.member.repository.MemberRepository;
@@ -30,6 +32,7 @@ public class PasswordResetService {
     private final EmailService emailService;
     private final BCryptPasswordEncoder passwordEncoder;
     private final PwnedPasswordChecker pwnedPasswordChecker;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     /**
      * 비밀번호 재설정 코드 발송
@@ -144,6 +147,11 @@ public class PasswordResetService {
         Member member = memberRepository.findActiveByEmailForUpdate(email)
                 .orElseThrow(MemberException::notFound);
 
+        String policyViolation = PasswordPolicy.violation(newPassword);
+        if (policyViolation != null) {
+            throw new MemberException(policyViolation, HttpStatus.BAD_REQUEST);
+        }
+
         // 재설정 경로에도 같은 검사를 건다. 여기를 빼면 "가입은 막히는데 재설정으로는 들어간다"는
         // 우회로가 생긴다 — 정책은 반드시 모든 진입로에 같이 걸려야 의미가 있다.
         // 토큰 검증을 먼저 통과한 뒤에 두었으므로 임의의 외부인이 이 경로로 외부 API 를 두드릴 수 없다.
@@ -154,6 +162,8 @@ public class PasswordResetService {
         }
 
         member.setPassword(passwordEncoder.encode(newPassword));
+        member.rotateAuthVersion();
+        refreshTokenRepository.deleteByMemberId(member.getId());
         tokenRepository.deleteByEmail(email);
         log.info("Password reset completed: memberId={}", member.getId());
     }

@@ -1,11 +1,14 @@
 package kr.it.reserve.config.oauth2;
 
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.AuthProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -40,15 +43,27 @@ public class OAuthUnlinkService {
             return false;
         }
 
+        return unlink(member.getProvider(), accessToken, member.getId());
+    }
+
+    /** 영속 outbox 작업에 저장된 최소 스냅샷으로 OAuth 연동을 해제한다. */
+    public boolean unlink(AuthProvider provider, String accessToken, Long memberId) {
+        if (provider == null || provider == AuthProvider.LOCAL) return true;
+        if (accessToken == null || accessToken.isBlank()) {
+            log.warn("OAuth unlink failed: no access token. memberId={}", memberId);
+            return false;
+        }
+
         try {
-            return switch (member.getProvider()) {
+            return switch (provider) {
                 case NAVER -> unlinkNaver(accessToken);
                 case KAKAO -> unlinkKakao(accessToken);
                 case GOOGLE -> unlinkGoogle(accessToken);
-                default -> true;
+                case LOCAL -> true;
             };
         } catch (Exception e) {
-            log.error("OAuth unlink error: errorType={}", e.getClass().getSimpleName());
+            log.error("OAuth unlink error: memberId={}, provider={}, errorType={}",
+                    memberId, provider, e.getClass().getSimpleName());
             return false;
         }
     }
@@ -58,13 +73,16 @@ public class OAuthUnlinkService {
      * https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke
      */
     private boolean unlinkGoogle(String accessToken) {
-        String revokeUrl = "https://oauth2.googleapis.com/revoke?token=" + accessToken;
+        String revokeUrl = "https://oauth2.googleapis.com/revoke";
 
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("token", accessToken);
 
-            HttpEntity<String> entity = new HttpEntity<>("", headers);
+            // 토큰을 URL query에 넣으면 프록시·접근 로그에 남을 수 있다. 표준 form body로만 보낸다.
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(form, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(
                     revokeUrl,

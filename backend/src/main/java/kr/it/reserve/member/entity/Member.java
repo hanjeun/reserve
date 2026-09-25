@@ -29,6 +29,14 @@ public class Member {
     @Column(name = "password")  // OAuth 사용자는 password가 null일 수 있음
     private String password;
 
+    /**
+     * 비밀번호가 바뀔 때 증가하는 세션 세대. JWT claim과 다르면 서명이 유효해도 인증하지 않는다.
+     * 기존 운영 행과 구버전 JWT는 모두 0으로 호환되도록 DB 기본값도 0이다.
+     */
+    @Builder.Default
+    @Column(name = "auth_version", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
+    private int authVersion = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     @Builder.Default
@@ -135,6 +143,10 @@ public class Member {
     // OAuth 사용자인지 확인
     public boolean isOAuthUser() {
         return this.provider != null && this.provider != AuthProvider.LOCAL;
+    }
+
+    public void rotateAuthVersion() {
+        this.authVersion = this.authVersion == Integer.MAX_VALUE ? 1 : this.authVersion + 1;
     }
 
     public void softDelete() {

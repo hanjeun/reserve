@@ -16,6 +16,7 @@
 
 접속:
 ```bash
+export DB_PASSWORD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"   # 비밀번호 기준: /etc/reserve-backup.env (backup.md 7장)
 docker exec -it -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -u root reserve
 ```
 

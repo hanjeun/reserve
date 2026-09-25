@@ -63,12 +63,14 @@ sudo install -m 0755 /tmp/reserve-backup /tmp/reserve-restore /usr/local/bin/
 
 ### 1-2. 설정 파일
 
-키는 **화면·명령 기록에 남지 않게** 입력받고, DB 비밀번호는 MySQL 컨테이너 환경 변수에서 바로 읽는다.
+키는 **화면·명령 기록에 남지 않게** 입력받는다. DB 비밀번호는 **실행 중인 앱 컨테이너**(blue/green)에서 읽는다 —
+앱은 배포 때 GitHub Secret `DB_PASSWORD`를 받으므로 그게 현재 값이다. MySQL 컨테이너의 `MYSQL_ROOT_PASSWORD`는
+컨테이너를 처음 만들 때의 값이라, 비밀번호를 한 번이라도 바꾼 뒤에는 틀린 값이다(7장).
 서버에는 aws CLI가 없어 업로드는 스크립트의 docker 폴백(`amazon/aws-cli`)이 한다.
 
 ```bash
 read -rp 'AWS_ACCESS_KEY_ID: ' AK; read -rsp 'AWS_SECRET_ACCESS_KEY: ' SK; echo
-DBPW="$(sudo docker exec mysql printenv MYSQL_ROOT_PASSWORD)"; echo "lengths: ${#DBPW} ${#AK} ${#SK}"   # 셋 다 0이 아니어야 한다
+C=$(sudo docker ps --format '{{.Names}}' | grep -E '^(blue|green)$'); DBPW="$(sudo docker exec "$C" printenv DB_PASSWORD)"; echo "lengths: ${#DBPW} ${#AK} ${#SK}"   # 셋 다 0이 아니어야 한다
 sudo install -m 600 -o root -g root /dev/null /etc/reserve-backup.env
 printf 'DB_PASSWORD=%q\nBACKUP_S3_BUCKET=reserve-it-kr-backup\nBACKUP_S3_PREFIX=mysql\nLOCAL_RETENTION_DAYS=7\nAWS_ACCESS_KEY_ID=%q\nAWS_SECRET_ACCESS_KEY=%q\nAWS_DEFAULT_REGION=ap-northeast-2\n' \
   "$DBPW" "$AK" "$SK" | sudo tee /etc/reserve-backup.env >/dev/null
@@ -203,19 +205,24 @@ sudo reserve-restore --dry-run /var/backups/reserve/reserve-20260731-031000.sql.
 
 **한 번도 복원해보지 않은 백업은 대개 필요할 때 안 된다.** 운영 DB를 건드리지 않고 확인한다.
 
-DB 비밀번호는 root 전용 설정 파일에 있어 운영자 셸에는 없다. 비교·정리는 MySQL 컨테이너 안의 환경 변수를 쓴다.
+DB 비밀번호의 기준은 root 전용 설정 파일 `/etc/reserve-backup.env`다. 운영자 셸로 한 번 읽어 와서 쓰고, 끝나면 지운다.
+MySQL 컨테이너의 `MYSQL_ROOT_PASSWORD`는 2026-09-25 교체 전의 옛 값이라 쓰면 안 된다(7장).
 
 ```bash
+# DB 접속 준비 — 비밀번호의 기준은 /etc/reserve-backup.env (7장)
+export DB_PASSWORD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"; echo "length: ${#DB_PASSWORD}"
+
 # 검증 → 별도 DB로 복원 (운영 DB는 건드리지 않는다)
 F=$(ls -t /var/backups/reserve/reserve-*.sql.gz | head -1); echo "$F"
 sudo reserve-restore --dry-run "$F"
 sudo reserve-restore --target reserve_restore_test "$F"    # "restored tables" 가 덤프 테이블 수와 같아야 한다
 
 # 전체 테이블 행 수 대조 — 백업 시각 이후 바뀐 테이블만 DIFF가 날 수 있다
-sudo docker exec mysql sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; for t in $(mysql -uroot -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema=\"reserve\""); do a=$(mysql -uroot -N -e "SELECT COUNT(*) FROM reserve.$t"); b=$(mysql -uroot -N -e "SELECT COUNT(*) FROM reserve_restore_test.$t"); [ "$a" = "$b" ] && echo "same $t $a" || echo "DIFF $t prod=$a restored=$b"; done'
+sudo docker exec -e MYSQL_PWD="$DB_PASSWORD" mysql sh -c 'for t in $(mysql -uroot -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema=\"reserve\""); do a=$(mysql -uroot -N -e "SELECT COUNT(*) FROM reserve.$t"); b=$(mysql -uroot -N -e "SELECT COUNT(*) FROM reserve_restore_test.$t"); [ "$a" = "$b" ] && echo "same $t $a" || echo "DIFF $t prod=$a restored=$b"; done'
 
 # 정리 — 이름이 reserve_restore_test 인지 확인하고 실행한다
-sudo docker exec mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "DROP DATABASE reserve_restore_test; SHOW DATABASES;"'
+sudo docker exec -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -uroot -e "DROP DATABASE reserve_restore_test; SHOW DATABASES;"
+unset DB_PASSWORD
 ```
 
 훈련 결과는 이 문서 맨 아래 이력에 한 줄 남긴다.
@@ -229,6 +236,12 @@ sudo docker exec mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "
 > ⚠️ **기존 서버에 그대로 `up -d` 하지 말 것.** 볼륨 이름이 실제와 다르면
 > 데이터가 없는 새 볼륨으로 떠서 "DB가 텅 빈" 상태가 된다.
 > 파일 상단 주석의 `docker inspect` 대조 절차를 먼저 수행한다.
+
+> **지금 운영 MySQL 컨테이너(2026-09-25 확인)** 는 compose가 아니라 `docker run`으로 만든 것이다.
+> 상태 검사(healthcheck)가 없고, 데이터는 볼륨 `mysql-data`(`/var/lib/mysql`)에 있다.
+> 컨테이너 설정의 `MYSQL_ROOT_PASSWORD`는 처음 만들 때 값이라 지금 비밀번호와 다르다 — 비밀번호를 읽는 데 쓰지 말 것.
+> 컨테이너를 다시 만들 일이 생기면 그때 현재 비밀번호를 `DB_PASSWORD`로 넘긴다
+> (데이터가 이미 있으면 MySQL은 `MYSQL_ROOT_PASSWORD`를 무시하므로 설정 값만 맞춰진다).
 
 신규 서버라면:
 
@@ -266,6 +279,89 @@ Grafana에서 그대로 보인다.
   binlog 관리 비용이 이득보다 크다고 판단했다. 필요해지면 `--log-bin` + binlog S3 동기화로 확장한다.
 - `--single-transaction`은 **InnoDB 전제**다. MyISAM 테이블이 섞이면 그 테이블은 일관성이 보장되지 않는다.
   확인: `SELECT table_name, engine FROM information_schema.tables WHERE table_schema='reserve' AND engine <> 'InnoDB';`
+
+---
+
+## 7. DB root 비밀번호 무중단 교체
+
+2026-09-25에 4자리였던 root 비밀번호를 32자(영문·숫자)로 바꾸며 쓴 절차다. **서비스는 한순간도 멈추지 않았다.**
+MySQL 8의 이중 비밀번호(`RETAIN CURRENT PASSWORD`)로 옛 값과 새 값이 잠시 둘 다 통하게 해 두고,
+쓰는 곳을 하나씩 옮긴 뒤 옛 값을 폐기한다.
+
+### 비밀번호를 쓰는 곳
+
+| 쓰는 곳 | 계정 | 값이 들어가는 경로 |
+|---|---|---|
+| 앱(blue/green) | root (`DB_USERNAME` 미설정 → 기본값 root) | GitHub Secret `DB_PASSWORD` → 배포 때 컨테이너 환경 변수 |
+| 백업·복원 스크립트 | root | `/etc/reserve-backup.env` |
+| 개발 PC IntelliJ `reserve-prod` 데이터 소스 | root | IntelliJ 저장값(SSH 터널) |
+| MySQL 컨테이너 설정 `MYSQL_ROOT_PASSWORD` | — | 처음 만들 때 값. 교체 뒤에는 틀린 값이라 쓰지 않는다 |
+
+### 원칙
+
+- 새 비밀번호는 **영문·숫자만** 쓴다. `$`·`!`·따옴표는 compose·YAML·셸에서 다르게 해석된다(`docs/rules/git-workflow.md`).
+- 값은 채팅·로그·명령 인자·문서에 남기지 않는다. 서버에서는 `read -rsp`로 받고, `docker exec`에는 환경 변수 **이름만** 넘긴다.
+- GitHub Secret은 다시 읽을 수 없으므로, 넣기 전에 **SHA-256 지문(앞 12자)** 으로 서버 값과 같은지 대조한다.
+  지문은 공유해도 비밀번호를 알아낼 수 없다.
+- 터미널에서 비밀번호를 복사할 때는 **더블클릭**으로 선택한다(영문·숫자 한 단어라 정확히 잡힌다).
+  복사한 뒤 지문 대조가 끝날 때까지 다른 것을 복사하지 않는다 — 2026-09-25에도 그 사이 클립보드가 바뀌어 한 번 멈췄다.
+
+### 순서
+
+```bash
+# 1. 서버 — 새 비밀번호를 두 root 계정에 추가한다(옛 비밀번호는 유지). 이 SSH 창은 끝날 때까지 닫지 않는다.
+read -rsp 'NEW DB PASSWORD: ' NEWPW; echo; echo "length: ${#NEWPW}"
+export NEWPW MYSQL_PWD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"   # MYSQL_PWD = 지금(옛) 비밀번호
+sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -c 'mysql -uroot -e "ALTER USER \"root\"@\"%\" IDENTIFIED BY \"$NEWPW\" RETAIN CURRENT PASSWORD; ALTER USER \"root\"@\"localhost\" IDENTIFIED BY \"$NEWPW\" RETAIN CURRENT PASSWORD;"'
+sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -c 'mysql -uroot -N -e "SELECT \"old ok\""; MYSQL_PWD="$NEWPW" mysql -uroot -N -e "SELECT \"new ok\""'
+printf '%s' "$NEWPW" | sha256sum | cut -c1-12   # 지문
+```
+
+```powershell
+# 2. 개발 PC — 클립보드 값의 지문이 서버 지문과 같을 때만 GitHub Secret 을 바꾼다
+$cb = (Get-Clipboard | Out-String).Trim(); $h = [Security.Cryptography.SHA256]::Create()
+(($h.ComputeHash([Text.Encoding]::UTF8.GetBytes($cb)) | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0,12)
+$cb | gh secret set DB_PASSWORD -R hanjeun/reserve; Remove-Variable cb
+
+# 3. 재배포 — main 의 최신 CICD 실행을 다시 실행한다(빌드·배포 세 단계뿐, 태그·릴리즈 없음)
+gh run list -R hanjeun/reserve --branch main --workflow CICD.yml --limit 1
+gh run rerun <run id> -R hanjeun/reserve
+```
+
+```bash
+# 3-확인 — 새 앱이 새 비밀번호로 떴는지 (지문이 같고, Access denied 가 없고, 200)
+C=$(sudo docker ps --format '{{.Names}}' | grep -E '^(blue|green)$'); echo "active: $C"
+sudo docker exec "$C" sh -c 'printf %s "$DB_PASSWORD"' | sha256sum | cut -c1-12
+sudo docker logs --since 20m "$C" 2>&1 | grep -iE "Access denied|Started ReserveApplication" | tail -3
+curl -s -o /dev/null -w '%{http_code}\n' 'https://reserve.it.kr/api/stores?size=1'
+
+# 4. 백업 설정 — 값을 바꾸고 지문·권한 확인 후 백업을 한 번 돌린다
+sudo --preserve-env=NEWPW sh -c 'sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$NEWPW/" /etc/reserve-backup.env'
+sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"' | sha256sum | cut -c1-12; sudo stat -c '%a %U' /etc/reserve-backup.env
+sudo /usr/local/bin/reserve-backup
+
+# 5. IntelliJ — Database 창 → reserve-prod → 데이터 소스 속성 → 비밀번호 교체 → 연결 테스트 → 확인
+
+# 6. 옛 비밀번호 폐기 — 2~5 가 전부 확인된 뒤에만
+sudo --preserve-env=NEWPW docker exec -e NEWPW mysql sh -c 'MYSQL_PWD="$NEWPW" mysql -uroot -e "ALTER USER \"root\"@\"%\" DISCARD OLD PASSWORD; ALTER USER \"root\"@\"localhost\" DISCARD OLD PASSWORD;"'
+sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -c 'MYSQL_PWD="$NEWPW" mysql -uroot -N -e "SELECT \"new ok\""; mysql -uroot -N -e "SELECT \"old still ok\"" 2>&1 | head -1'   # old 는 Access denied 여야 한다
+curl -s -o /dev/null -w '%{http_code}\n' 'https://reserve.it.kr/api/stores?size=1'
+unset NEWPW MYSQL_PWD
+```
+
+### 주의
+
+- **1단계 뒤에 `RETAIN CURRENT PASSWORD`를 다시 쓰지 말 것.** 그러면 새 값이 보조로 밀리고 옛 값(앱이 쓰는 값)이 사라져
+  앱이 끊긴다. 새 값을 잃어버렸다면 `RETAIN` 없이 `IDENTIFIED BY`만 다시 실행한다 — 보조(옛) 비밀번호는 그대로 남는다.
+- 폐기(6단계)는 2~5단계를 모두 확인한 뒤에만 한다. 그 전까지는 무엇이 잘못돼도 옛 값으로 계속 돈다.
+- 앱 전용 DB 계정(`reserve.*` 권한만)을 따로 두면 root 비밀번호를 앱과 분리할 수 있다. `application-prod.yml`이
+  `DB_USERNAME`을 이미 받으므로 compose·CICD에 값만 추가하면 된다(미적용).
+
+### 교체 이력
+
+| 날짜 | 내용 | 메모 |
+|---|---|---|
+| 2026-09-25 | 4자리 → 32자 영문·숫자 | GitHub Secret 교체 후 CICD `36096322397` 재실행(green), 백업 설정·IntelliJ 교체, 옛 값 폐기. 무중단 |
 
 ---
 

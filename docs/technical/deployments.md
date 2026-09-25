@@ -312,6 +312,7 @@ DB 비밀번호는 MySQL 컨테이너의 환경 변수에서 그 자리에서 �
 /usr/local/bin/reserve-backup
 
 # ② DDL 적용
+export DB_PASSWORD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"   # 비밀번호 기준: /etc/reserve-backup.env (backup.md 7장)
 docker exec -it -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -u root reserve -e "
 ALTER TABLE store ADD FULLTEXT INDEX ft_store_search
   (store_name, description, address, category, keywords) WITH PARSER ngram;

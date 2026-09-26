@@ -4,6 +4,7 @@ import reservationService from '../services/reservationService';
 import { handleApiError } from '../utils/errorHandler';
 import useMessage from './useMessage';
 import { reservationKeys } from './queryKeys';
+import { invalidateReservationData } from './invalidateAfterWrite';
 import { colors } from '../styles/tokens';
 
 const useManageReservations = (params) => {
@@ -19,7 +20,9 @@ const useManageReservations = (params) => {
     const onError = (err) => handleApiError(err, message);
 
     // 상태 변경은 필터 결과·전체 건수도 바꾼다. 부분적인 낙관 갱신 대신 모든 관리 페이지를 재조회한다.
-    const onSettled = () => queryClient.invalidateQueries({ queryKey: reservationKeys.manage() });
+    // 2026-09: 거절·취소는 달력의 빈자리를, 모든 상태 변경은 통계의 상태 분포를 바꾼다 —
+    // 관리 목록뿐 아니라 그쪽도 무효화한다(invalidateAfterWrite.js).
+    const onSettled = () => invalidateReservationData(queryClient);
 
     // ── Undo (2026-08-11) ────────────────────────────────────────────────────
     // 승인·완료는 확인 모달 없이 한 번에 확정된다. 목록에서 바로 옆 줄을 누르는 오조작이 잦은데,

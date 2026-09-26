@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import PortOne from '@portone/browser-sdk/v2';
 import adService from '../services/adService';
 import useMessage from './useMessage';
-import { adKeys } from './queryKeys';
+import { invalidateAdData } from './invalidateAfterWrite';
 
 /**
  * 광고 결제 훅 — usePayment(예약금 결제)와 동일한 패턴, 완전히 독립된 흐름.
@@ -87,7 +87,8 @@ const useAdPayment = () => {
 
     const invalidateMyAds = useCallback(() => {
         // SDK 취소·오류여도 신청과 미결 원장이 생성됐을 수 있다.
-        queryClient.invalidateQueries({ queryKey: adKeys.my() });
+        // 결제가 끝나면 공개 배너·배지와 통계의 광고 요약도 바뀐다(invalidateAfterWrite.js).
+        invalidateAdData(queryClient);
     }, [queryClient]);
 
     const createMutation = useMutation({

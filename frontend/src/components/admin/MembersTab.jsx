@@ -39,6 +39,7 @@ import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
+import { invalidateAdminData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize } from '../../styles/tokens';
@@ -136,7 +137,8 @@ const MembersTab = () => {
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
     const setPage = (p) => setQuery({ page: String(p) });
 
-    const invalidateMembers = () => queryClient.invalidateQueries({ queryKey: adminKeys.members() });
+    // 제재는 회원 목록뿐 아니라 감사 로그·대시보드도 바꾼다.
+    const invalidateMembers = () => invalidateAdminData(queryClient);
 
     const suspendMutation = useMutation({
         mutationFn: ({ id, days, reason }) => api.post(API_ENDPOINTS.ADMIN_MANAGE.MEMBER_SUSPEND(id), { days: String(days), reason: reason || '' }),

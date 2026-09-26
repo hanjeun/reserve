@@ -160,6 +160,7 @@ src/
 - 상태관리: 인증 등 클라이언트 상태는 Zustand, 서버 데이터(목록/상세/뮤테이션)는 TanStack Query, 로컬 UI 상태는 useState
 - 새 API 호출은 `services/` 레이어로. 기존 직접 호출은 해당 기능을 수정할 때 이전하며 이미 모두 완료됐다고 가정하지 않음
 - query key에 페이지·검색·필터 포함. 필터 변경 시 첫 페이지로 복귀하고 뮤테이션 후 관련 목록 캐시 무효화
+- 뮤테이션 후 무효화는 `hooks/invalidateAfterWrite.js`에서 고름. 버튼을 누른 화면의 목록이 아니라 그 쓰기가 바꾸는 서버 데이터 기준(예: 리뷰 작성 → 가게 별점·내 예약의 리뷰 버튼까지). 전역 staleTime이 3분이라 빠뜨린 키는 그동안 옛 값이 보임
 - Page 전체 건수는 `result?.page?.totalElements ?? result?.totalElements ?? 0`. 첫 페이지 배열 길이를 총합으로 사용하지 않음
 - 로딩·정상 0건·조회 실패를 구분. 삭제 준비도 같은 허가 값은 명시적인 `true`만 허용
 - 전역 CSS는 `index.css` 또는 여기서 import하는 `styles/global/` 모듈. JSX 전역 `<style>` 금지

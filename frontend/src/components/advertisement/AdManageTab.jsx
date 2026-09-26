@@ -6,6 +6,7 @@ import { Button, FormModal, FormField, FormInput, FormTextArea, FormSelect, Form
 import { useAdPayment, useMessage, useImagePreview, useMyStores, useFormErrors } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
+import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import adService from '../../services/adService';
 import { getDetailImageUrl } from '../../utils/image';
 import { colors, fontSize } from '../../styles/tokens';
@@ -114,10 +115,12 @@ const AdManageTab = () => {
         mutationFn: (adId) => adService.cancelAd(adId),
         onSuccess: () => message.success('취소 요청을 접수했습니다. 환불 여부는 광고 내역에서 확인해주세요.'),
         onError: (err) => message.error(err instanceof Error ? err.message : '결과를 확인하지 못했습니다. 내역을 다시 확인해주세요.'),
-        onSettled: () => queryClient.invalidateQueries({ queryKey: adKeys.my() }),
+        // 노출 중이던 광고를 취소하면 공개 배너·배지와 통계의 광고 요약도 바뀐다.
+        onSettled: () => invalidateAdData(queryClient),
     });
 
     // 종료상태 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가, 예약 쪽 "삭제"와 동일한 패턴
+    // 이미 끝난 광고를 내 목록에서만 감춘다 — 공개 노출·통계에는 영향이 없어 my() 만 무효화한다.
     const removeMutation = useMutation({
         mutationFn: (adId) => adService.removeAd(adId),
         onSuccess: () => {
@@ -133,7 +136,8 @@ const AdManageTab = () => {
         mutationFn: ({ adId, formData }) => adService.updateAd(adId, formData),
         onSuccess: () => {
             message.success('광고가 수정되었습니다.');
-            queryClient.invalidateQueries({ queryKey: adKeys.my() });
+            // 배너 문구·이미지는 공개 목록의 배너에도 보인다.
+            invalidateAdData(queryClient);
             setEditTarget(null);
         },
         onError: (err) => message.error(err instanceof Error ? err.message : '수정에 실패했습니다.'),

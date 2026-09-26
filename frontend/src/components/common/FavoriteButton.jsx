@@ -6,6 +6,7 @@ import favoriteService from '../../services/favoriteService';
 import useAuthStore from '../../store/useAuthStore';
 import { useMessage } from '../../hooks';
 import { favoriteKeys } from '../../hooks/queryKeys';
+import { invalidateFavoriteData } from '../../hooks/invalidateAfterWrite';
 import { colors } from '../../styles/tokens';
 
 /**
@@ -43,6 +44,8 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', style = {} }) => 
         onSuccess: (res) => {
             const added = res?.isFavorite ?? res?.favorite;
             queryClient.setQueryData(favoriteKeys.status(storeId), added);
+            // 하트만 바꾸면 '내 즐겨찾기' 목록은 staleTime(3분) 동안 옛 목록이 남는다.
+            invalidateFavoriteData(queryClient);
             message.success(added ? '즐겨찾기에 추가되었습니다.' : '즐겨찾기에서 삭제되었습니다.');
         },
         onError: (_err, _vars, ctx) => {

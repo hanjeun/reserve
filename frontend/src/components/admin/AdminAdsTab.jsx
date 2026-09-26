@@ -7,6 +7,7 @@ import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
+import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import adService from '../../services/adService';
 import { colors, fontSize } from '../../styles/tokens';
 
@@ -106,7 +107,8 @@ const AdminAdsTab = () => {
         mutationFn: ({ adId, reason }) => adService.suspendAd(adId, reason),
         onSuccess: () => {
             message.success('광고가 중단되었습니다.');
-            queryClient.invalidateQueries({ queryKey: adKeys.admin() });
+            // 관리자 광고 목록(adKeys.admin)뿐 아니라 공개 배너·배지에서도 빠져야 한다.
+            invalidateAdData(queryClient);
             setSuspendTarget(null);
         },
         onError: () => message.error('중단 처리에 실패했습니다.'),

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { adKeys, reservationKeys } from '../../hooks/queryKeys';
+import { invalidateAdData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { Typography } from 'antd';
 import { PageContainer, Button, Loading } from '../../components/common';
@@ -42,7 +42,8 @@ const PaymentResult = () => {
 
     useEffect(() => {
         if (!confirmed) return;
-        queryClient.invalidateQueries({ queryKey: isAd ? adKeys.my() : reservationKeys.my() });
+        // 내 목록뿐 아니라 예약 달력의 빈자리·공개 광고·통계도 결제로 바뀐다(invalidateAfterWrite.js).
+        (isAd ? invalidateAdData : invalidateReservationData)(queryClient);
         const timer = setTimeout(() => setAnimate(true), 100);
         return () => clearTimeout(timer);
     }, [confirmed, isAd, queryClient]);

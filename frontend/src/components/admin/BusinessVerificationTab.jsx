@@ -37,6 +37,7 @@ import {
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
+import { invalidateAdminData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
@@ -204,8 +205,9 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
         if (error) message.error('목록을 불러오는데 실패했습니다.');
     }, [error, message]);
 
+    // 승인·거절·취소는 회원의 권한(회원 탭)과 감사 로그도 바꾼다 — 관리자 캐시 전체를 무효화한다.
     const invalidateBiz = useCallback(
-        () => queryClient.invalidateQueries({ queryKey: adminKeys.businessVerifications() }),
+        () => invalidateAdminData(queryClient),
         [queryClient]
     );
 

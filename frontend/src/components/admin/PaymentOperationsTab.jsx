@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import { AdminTableSkeleton, Button, DataTable, FilterToolbar, SegmentedControl } from '../common';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
+import { invalidateAdminData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
@@ -72,6 +73,13 @@ const PaymentOperationsTab = () => {
         placeholderData: keepPreviousData,
     });
 
+    // PG 재확인·웹훅 재처리는 이 탭의 큐뿐 아니라 예약의 결제 상태(결제 완료 복구·미결제 종료)를 바꾼다.
+    // 관리자 전체 예약·대시보드(관리자 캐시)와 예약 목록·달력·통계를 함께 무효화한다.
+    const invalidatePaymentOutcome = () => Promise.all([
+        invalidateAdminData(queryClient),
+        invalidateReservationData(queryClient),
+    ]);
+
     const reconcileMutation = useMutation({
         mutationFn: (paymentId) => api.post(
             API_ENDPOINTS.PAYMENT_OPERATIONS.RECONCILE_READY(paymentId),
@@ -79,7 +87,7 @@ const PaymentOperationsTab = () => {
         onSuccess: (result) => {
             const label = OUTCOME_LABELS[result?.outcome] ?? result?.outcome ?? '처리 완료';
             message.success(`PG 재확인 결과: ${label}`);
-            queryClient.invalidateQueries({ queryKey: adminKeys.paymentOperations() });
+            invalidatePaymentOutcome();
         },
         onError: () => message.error('PG 재확인에 실패했습니다.'),
     });
@@ -90,7 +98,7 @@ const PaymentOperationsTab = () => {
         ),
         onSuccess: () => {
             message.success('웹훅 재처리를 요청했습니다.');
-            queryClient.invalidateQueries({ queryKey: adminKeys.paymentOperations() });
+            invalidatePaymentOutcome();
         },
         onError: () => message.error('웹훅 재처리 요청에 실패했습니다.'),
     });

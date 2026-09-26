@@ -1,7 +1,7 @@
 import React from 'react';
 import { Empty, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { PageContainer, StoreCardSkeleton } from '../../components/common';
+import { PageContainer, StoreCardSkeleton, FilterToolbar } from '../../components/common';
 import { StoreCard } from '../../components/store';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -25,13 +25,17 @@ const MyFavorites = () => {
     const { message } = useMessage();
     useDocumentTitle('즐겨찾기');
 
-    const { data: favorites = [], isLoading: loading, error } = useQuery({
+    const { data: favorites = [], isLoading: loading, isFetching, error, refetch } = useQuery({
         queryKey: favoriteKeys.my(),
         queryFn: async () => {
             const data = await favoriteService.getMyFavorites();
             return data || [];
         },
     });
+    // 2026-09: 하트를 끄면 목록이 무효화돼 다시 불린다(invalidateAfterWrite.js). 예전엔 그 재조회가
+    // 화면에 안 보여서 카드가 아무 예고 없이 번쩍 빠졌다. '내 예약'·'가게 목록'과 같은 규칙으로
+    // 백그라운드 재조회 동안에도 새로고침 버튼을 돌리고 스켈레톤을 보여준다.
+    const refetching = isFetching && !loading;
     React.useEffect(() => {
         if (error) message.error('즐겨찾기 목록을 불러오지 못했습니다.');
     }, [error, message]);
@@ -58,10 +62,14 @@ const MyFavorites = () => {
                 </Text>
             </div>
 
-            {/* 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다. */}
-            {loading ? (
+            <FilterToolbar onReload={refetch} loading={loading || refetching} />
+
+            {/* 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다.
+                재조회 중 스켈레톤은 지금 보이는 카드 수만큼(최소 1개) 그린다 — 개수가 튀면 레이아웃이
+                출렁인다. 개수를 모르는 첫 로딩만 8개로 그린다. */}
+            {(loading || refetching) ? (
                 <div className="rsv-fav-grid">
-                    <StoreCardSkeleton count={8} />
+                    <StoreCardSkeleton count={loading ? 8 : Math.max(favorites.length, 1)} />
                 </div>
             ) : favorites.length === 0 ? (
                 <Empty description="아직 즐겨찾기한 가게가 없습니다." style={{ marginTop: 100 }} />
@@ -79,7 +87,8 @@ const MyFavorites = () => {
 };
 
 const styles = {
-    header: { marginBottom: 40 },
+    // 아래 새로고침 툴바가 생겨 '내 예약' 화면과 같은 간격(32)으로 맞춘다.
+    header: { marginBottom: 32 },
     title:  { margin: '0 0 8px', fontWeight: fontWeight.extrabold },
 };
 

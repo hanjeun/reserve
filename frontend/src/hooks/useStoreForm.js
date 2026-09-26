@@ -6,7 +6,7 @@ import useMessage from './useMessage';
 import { buildStoreFormData } from '../utils/form';
 import { handleApiError } from '../utils/errorHandler';
 import { getDetailImageUrl } from '../utils/image';
-import { storeKeys } from './queryKeys';
+import { invalidateStoreData } from './invalidateAfterWrite';
 import dayjs from 'dayjs';
 
 /** StoreRegister, StoreEdit에서 공유하는 폼 공통 로직 */
@@ -79,7 +79,8 @@ export const useStoreForm = ({
                 : await storeService.updateStore(storeId, formData);
 
             // 내 가게 목록 + 공개 가게 목록 캐시 무효화 (storeKeys.all = ['stores'] prefix 전체)
-            await queryClient.invalidateQueries({ queryKey: storeKeys.all() });
+            // 2026-09: 가게 이름·대표 사진이 보이는 즐겨찾기·광고 목록도 함께 — invalidateAfterWrite.js 참고.
+            await invalidateStoreData(queryClient);
 
             message.success(mode === 'create' ? '가게가 등록되었습니다' : '가게 정보가 수정되었습니다');
             navigate('/my-stores');

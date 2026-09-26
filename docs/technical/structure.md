@@ -143,6 +143,7 @@ src/
 │
 ├── hooks/
 │   ├── queryKeys.js          ← TanStack Query 키 팩토리 (신규 쿼리는 여기부터)
+│   ├── invalidateAfterWrite.js ← 쓰기 후 캐시 무효화 규칙 (신규 mutation은 여기서 고름)
 │   ├── useImagePreview.jsx   ← Image.PreviewGroup 기반 미리보기 (닫힘 애니·멀티)
 │   ├── useExitAnimation.js   ← 닫힘 트랜지션 공통 훅                                ★신규
 │   ├── useQueryParamState.js ← 관리자 탭 URL 쿼리스트링 동기화                       ★신규
@@ -205,6 +206,9 @@ StatCard, UnreadPill, pickerSuffix, index.js`
 `npm run build`의 postbuild가 `scripts/check-bundle-budget.mjs`를 실행한다. 예산은 단일 JS 600 KiB,
 HTML이 직접 preload하는 초기 JS 합계 350 KiB gzip이다. 2026-09-03 실측은 각각 최대 555.1 KiB,
 초기 318.1 KiB gzip이다.
+
+예산은 gzip 기준이다. 2026-09 전까지 nginx 는 gzip 이 꺼져 있어 실제 전송은 원본 크기였다.
+지금은 `nginx/default.conf` 의 "전송 압축" 절에서 JS·CSS·HTML·JSON 을 압축해 보낸다.
 
 ---
 

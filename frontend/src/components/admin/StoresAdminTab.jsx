@@ -21,6 +21,7 @@ import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
+import { invalidateAdminData, invalidateStoreData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize } from '../../styles/tokens';
@@ -94,7 +95,11 @@ const StoresAdminTab = () => {
     // 검색은 서버 전체 집합에 적용한다. 검색어가 바뀌면 존재하지 않을 수 있는 페이지를 초기화한다.
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
 
-    const invalidateStores = () => queryClient.invalidateQueries({ queryKey: adminKeys.stores() });
+    // 제재는 감사 로그·대시보드(관리자 쪽)와 공개 가게 목록·상세를 함께 바꾼다.
+    const invalidateStores = () => Promise.all([
+        invalidateAdminData(queryClient),
+        invalidateStoreData(queryClient),
+    ]);
 
     const suspendMutation = useMutation({
         mutationFn: ({ id, days, reason }) => api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_SUSPEND(id), { days: String(days), reason: reason || '' }),

@@ -4,6 +4,7 @@ import reservationService from '../services/reservationService';
 import { handleApiError } from '../utils/errorHandler';
 import useMessage from './useMessage';
 import { reservationKeys } from './queryKeys';
+import { invalidateReservationData } from './invalidateAfterWrite';
 
 const useReservations = () => {
     const { message } = useMessage();
@@ -43,7 +44,8 @@ const useReservations = () => {
         // 같이 계산하는 다른 필드(환불 여부 등)는 반영이 안 될 수 있음 — 성공/실패 관계없이 마지막에
         // 한 번 더 실제 서버 데이터로 재검증(refetching만 true가 되고 loading은 안 바뀌므로 스켈레톤
         // 깜빡임 없이 조용히 정정됨).
-        onSettled: () => queryClient.invalidateQueries({ queryKey: reservationKeys.my() }),
+        // 2026-09: my() 만이 아니라 예약 달력(빈자리)까지 같이 무효화한다 — invalidateAfterWrite.js 참고.
+        onSettled: () => invalidateReservationData(queryClient),
     });
 
     return {

@@ -16,6 +16,7 @@ import { Button, FilterToolbar, AdminTableSkeleton, DataTable } from '../common'
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
+import { invalidateAdminData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS, RESERVATION_STATUS_LABELS, RESERVATION_STATUS_COLORS,
          RESERVATION_STATUS_FILTER_OPTIONS } from '../../constants';
@@ -81,7 +82,9 @@ const ReservationsAllTab = () => {
         mutationFn: (id) => api.delete(API_ENDPOINTS.ADMIN_MANAGE.RESERVATION_DELETE(id)),
         onSuccess: () => {
             message.success('휴지통으로 이동되었습니다.');
-            queryClient.invalidateQueries({ queryKey: adminKeys.reservations() });
+            // 휴지통 탭·대시보드·감사 로그와 예약 달력까지 함께 바뀐다.
+            invalidateAdminData(queryClient);
+            invalidateReservationData(queryClient);
         },
         onError: () => message.error('삭제에 실패했습니다.'),
     });

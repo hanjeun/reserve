@@ -5,6 +5,7 @@ import { UndoOutlined } from '@ant-design/icons';
 import { Button, FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
+import { invalidateAdminData, invalidateReservationData, invalidateStoreData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
@@ -88,7 +89,12 @@ const TrashTab = () => {
         if (itemsError) message.error('휴지통 목록을 불러오지 못했습니다.');
     }, [itemsError, message]);
 
-    const invalidateTrash = () => queryClient.invalidateQueries({ queryKey: adminKeys.trash() });
+    // 복구된 항목은 휴지통에서 빠지고 원래 탭(회원·가게·예약 등)과 공개 화면에 다시 나타난다.
+    const invalidateTrash = () => Promise.all([
+        invalidateAdminData(queryClient),
+        invalidateStoreData(queryClient),
+        invalidateReservationData(queryClient),
+    ]);
 
     const restoreMutation = useMutation({
         mutationFn: (record) => api.post(API_ENDPOINTS.TRASH.RESTORE(record.entityType, record.entityId)),

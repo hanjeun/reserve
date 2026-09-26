@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import storeService from '../services/storeService';
 import useMessage from './useMessage';
 import { storeKeys } from './queryKeys';
+import { invalidateStoreData } from './invalidateAfterWrite';
 
 const useMyStores = () => {
     const { message } = useMessage();
@@ -30,6 +31,10 @@ const useMyStores = () => {
             if (ctx?.prev) queryClient.setQueryData(storeKeys.my(), ctx.prev);
             message.error(err?.message || '영업 종료에 실패했습니다.');
         },
+        // 내 가게 목록만 낙관 갱신하면 공개 목록·상세와 즐겨찾기에 닫은 가게가 남고,
+        // 서버가 함께 정리한 광고 상태도 늦게 보인다.
+        // 성공·실패와 관계없이 서버 값으로 다시 맞춘다.
+        onSettled: () => invalidateStoreData(queryClient),
     });
 
     return {

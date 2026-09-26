@@ -12,7 +12,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import reservationService from '../services/reservationService';
-import { reservationKeys } from './queryKeys';
+import { invalidateReservationData } from './invalidateAfterWrite';
 import adService from '../services/adService';
 import { consumeAdClickAttribution } from '../utils/adAttribution';
 import { formatDate, formatTimeForApi, formatTime } from '../utils/date';
@@ -46,9 +46,9 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     //
     // reservationKeys.all()로 넓게 지운다: 손님 목록(my)뿐 아니라, 사업자 계정이 자기 가게에
     // 직접 예약을 넣는 경우의 관리 목록(manage)까지 한 번에 덮기 위해서다.
+    // (2026-09: 무효화 범위는 invalidateAfterWrite.js 로 모았다 — 달력·통계도 함께 지운다.)
     // ※ 다른 사용자(가게 주인)의 화면은 이 방법으로 갱신할 수 없다 — 별도 논의 대상.
-    const invalidateReservations = () =>
-        queryClient.invalidateQueries({ queryKey: reservationKeys.all() });
+    const invalidateReservations = () => invalidateReservationData(queryClient);
 
     const stateOpenWrite    = location.state?.openWrite    ?? false;
     const stateOpenReviewId = location.state?.openReviewId ?? null;

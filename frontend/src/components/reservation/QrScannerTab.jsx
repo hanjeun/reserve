@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Typography } from 'antd';
+import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircleFilled, ReloadOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Button, Bone } from '../common';
 import reservationService from '../../services/reservationService';
 import { useMessage } from '../../hooks';
+import { invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import { colors, radius, shadows, fontSize, fontWeight, withAlpha } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -97,6 +99,7 @@ const MAX_ASPECT_FIXES = 3;
  */
 const QrScannerTab = () => {
     const { message } = useMessage();
+    const queryClient = useQueryClient();
     const html5QrRef = useRef(null);
     // 같은 프레임에서 같은 QR이 연속으로 감지되어 중복 요청되는 것을 막는 락
     const processingRef = useRef(false);
@@ -216,6 +219,9 @@ const QrScannerTab = () => {
                 message.info(`${who}님은 이미 체크인되었습니다.`);
             } else {
                 message.success(`${who}님 체크인이 완료되었습니다.`);
+                // 예약 관리 탭은 이 탭으로 오면서 언마운트됐지만 캐시는 남아 있다.
+                // 무효화하지 않으면 돌아갔을 때 상세 모달에 체크인 시각이 빠진 목록이 보인다.
+                invalidateReservationData(queryClient);
             }
         } catch (err) {
             message.error(err?.message || 'QR 체크인에 실패했습니다.');
@@ -227,7 +233,7 @@ const QrScannerTab = () => {
                 try { html5QrRef.current?.resume(); } catch { /* 이미 중지됐으면 무시 */ }
             }, 2000);
         }
-    }, [message]);
+    }, [message, queryClient]);
 
     /**
      * 카메라 해상도가 확정되는 시점에 컨테이너 비율을 맞춘다.

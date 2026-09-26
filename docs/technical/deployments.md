@@ -323,6 +323,24 @@ GitHub 릴리즈 v2.6.2를 만들고 CHANGELOG 요약을 얹었다.
 배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`43e37dda9c`)을 확인하고, PR #218로 v2.6.2 squash 계보를
 `dev`에 연결했다.
 
+### 2026-09-26 — v2.6.3 운영 배포 기록
+
+`dev → main` squash 커밋은 `b478ae8d732afa1e35642d790bfc39972556f885`(PR #222)이고, `main`과 `v2.6.3` 태그가
+같은 커밋을 가리킨다. GitHub Actions run `36238175151`에서 build-backend·build-frontend·deploy-backend가 모두
+성공했고, Production deployment `6678168550`는 `2026-09-26T11:20:05Z`에 성공으로 끝났다(KST 20시 20분).
+GitHub 릴리즈 v2.6.3을 만들고 CHANGELOG 요약을 얹었다.
+
+| 항목 | 운영 확인 결과 |
+|---|---|
+| 변경 범위 | 관리자 결제 운영 탭 두 곳의 캐시 무효화(PR #220)와 버전 숫자만. 스키마·비밀값·nginx 변경 없음 |
+| 외부 접속 | `/` HTTP 200, 공개 가게 목록 API HTTP 200, 비로그인 `GET /api/admin/ad-payments` HTTP 401 |
+| 프론트 교체 | index 스크립트가 `index-Cg3Y5ovN.js`에서 `index-USDcEPVp.js`로 바뀜 |
+| v2.6.2 유지 | 메인 JS·`/login` gzip, `immutable`·`no-cache`·HSTS·`X-Robots-Tag` 그대로 |
+| 실제 동작 | 운영 PG 대사·환불은 실제 돈이 오가는 작업이라 돌리지 않았다. 다음에 처리할 일이 생기면 광고·전체 예약 탭이 바로 바뀌는지 확인 |
+
+배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`e886df73bf`)을 확인하고, PR #223으로 v2.6.3 squash 계보를
+`dev`에 연결했다.
+
 ### 4-1. CSP 위반 관측 (배포 즉시)
 
 `nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.

@@ -302,6 +302,27 @@ GitHub 릴리즈 v2.6.1을 만들고 CHANGELOG 요약을 얹었다.
 배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`41f8b85915`)을 확인하고, PR #213으로 v2.6.1 squash 계보를
 `dev`에 연결했다. DB 비밀번호는 `/etc/reserve-backup.env`에서 스크립트가 직접 읽었다(화면·명령 기록에 남기지 않음).
 
+### 2026-09-26 — v2.6.2 운영 배포 기록
+
+`dev → main` squash 커밋은 `481e9b6907f0d5c55f424115e245e739cca92a20`(PR #217)이고, `main`과 `v2.6.2` 태그가
+같은 커밋을 가리킨다. GitHub Actions run `36216975292`에서 build-backend·build-frontend(프론트·nginx 설정 배포 포함)·
+deploy-backend가 모두 성공했고, Production deployment `6674525049`는 `2026-09-26T04:16:36Z`에 성공으로 끝났다(KST 13시 16분).
+GitHub 릴리즈 v2.6.2를 만들고 CHANGELOG 요약을 얹었다.
+
+| 항목 | 운영 확인 결과 |
+|---|---|
+| 외부 접속 | `/`·`/favorites` HTTP 200, 공개 가게 목록 API HTTP 200 |
+| 프론트 교체 | index 스크립트가 `index-C3SyTwa3.js`에서 `index-Cg3Y5ovN.js`로 바뀜 |
+| gzip — 메인 JS | `Accept-Encoding: gzip` 요청에 `Content-Encoding: gzip`·`Vary: Accept-Encoding`. 전송량 571,142 → 189,537 bytes. `Cache-Control: public, max-age=31536000, immutable` 유지 |
+| gzip — HTML | `/login`에 gzip 적용, `no-cache`·HSTS·`X-Robots-Tag: noindex, nofollow`·CSP Report-Only 유지 |
+| gzip — API JSON | 공개 가게 목록 응답 2,792 → 1,136 bytes, API의 `no-store` 유지 |
+| 미지원 클라이언트 | `Accept-Encoding` 없는 요청은 압축 없이 `Content-Length: 571142` |
+| 스키마·비밀값 | 변경 없음. 서버 DB 검증 스크립트는 돌리지 않았다(백엔드는 버전 숫자만 바뀜) |
+| 남은 일 | 즐겨찾기 페이지에서 하트를 끄면 새로고침 버튼 회전·스켈레톤 뒤 카드가 빠지는지 PC·모바일에서 확인 |
+
+배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`43e37dda9c`)을 확인하고, PR #218로 v2.6.2 squash 계보를
+`dev`에 연결했다.
+
 ### 4-1. CSP 위반 관측 (배포 즉시)
 
 `nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.

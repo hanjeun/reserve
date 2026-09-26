@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import { AdminTableSkeleton, Button, DataTable, FilterToolbar, SegmentedControl } from '../common';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
+import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { formatCurrency } from '../../utils';
 
@@ -29,7 +30,11 @@ const AdPaymentOperations = () => {
         mutationFn: ({ id, operation }) => api.post(`/api/admin/ad-payments/${id}/${operation}`),
         onSuccess: result => message.info(`현재 상태: ${LABELS[result.state] ?? '확인 필요'}`),
         onError: err => message.error(err instanceof Error ? err.message : '처리 결과를 확인하지 못했습니다.'),
-        onSettled: () => client.invalidateQueries({ queryKey: adminKeys.paymentOperations() }),
+        // 대사·환불은 광고 상태(노출 중 → 환불 등)도 바꾼다 — 광고 목록·공개 배너도 함께 무효화한다.
+        onSettled: () => Promise.all([
+            client.invalidateQueries({ queryKey: adminKeys.paymentOperations() }),
+            invalidateAdData(client),
+        ]),
     });
     const run = (record, operation) => confirm({
         title: operation === 'refund' ? '광고 결제 전액 환불 요청' : '광고 결제 대사·미결 처리',

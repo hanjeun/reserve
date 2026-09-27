@@ -11,6 +11,7 @@ const frontend = workflow.jobs['build-frontend'];
 const deployment = workflow.jobs['deploy-backend'];
 const backendTests = workflow.jobs['test-backend'];
 const frontendTests = workflow.jobs['test-frontend'];
+const staging = workflow.jobs['stage-release'];
 const step = (job, id) => job.steps.find(entry => entry.id === id);
 
 test('required checks remain present and deployment waits for both builds', () => {
@@ -19,7 +20,12 @@ test('required checks remain present and deployment waits for both builds', () =
     assert.equal(frontendTests.if, undefined);
     assert.equal(backend.needs, 'test-backend');
     assert.deepEqual(frontend.needs, ['build-backend', 'test-frontend']);
-    assert.deepEqual(deployment.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend']);
+    assert.deepEqual(deployment.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend', 'stage-release']);
+    assert.deepEqual(staging.needs, ['build-backend', 'build-frontend']);
+    assert.equal(staging.if, deployment.if);
+    assert.equal(staging.environment, undefined);
+    assert.deepEqual(deployment.environment, { name: 'production', url: 'https://reserve.it.kr' });
+    assert.ok(!deployment.steps.some(entry => /Create GitHub deployment|Mark deployment/.test(entry.name ?? '')));
     for (const job of [backend, frontend]) {
         assert.equal(job.if, '${{ always() && !cancelled() }}');
         assert.match(job.steps[0].run, /test "\$TEST_RESULT" = success/);
@@ -76,7 +82,7 @@ test('PC and mobile browser checks use separate projects and failure evidence', 
     assert.ok(pc && mobile);
     assert.equal(pc.run, 'npm run test:e2e -- --project=chromium --output=test-results/pc');
     assert.equal(mobile.run, 'npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile');
-    assert.equal(mobile.if, "!cancelled() && (success() || (failure() && steps.browser_pc.outcome == 'failure'))");
+    assert.equal(mobile.if, "!cancelled() && steps.evidence.outputs.reused != 'true' && (success() || (failure() && steps.browser_pc.outcome == 'failure'))");
     assert.ok(frontendTests.steps.indexOf(pc) < frontendTests.steps.indexOf(mobile));
     for (const entry of [pc, mobile]) assert.equal(entry['continue-on-error'], undefined);
     assert.ok(frontendTests.steps.some(entry => entry.run === 'npm run test:run'));
@@ -84,7 +90,9 @@ test('PC and mobile browser checks use separate projects and failure evidence', 
 });
 
 test('image publication and frontend staging remain main-push-only', () => {
-    for (const job of [backend, frontend]) {
+    assert.ok(!frontend.steps.some(entry => /^appleboy\//.test(entry.uses ?? '')));
+    assert.match(staging.steps.find(entry => entry.name === "Download this run's frontend").run, /GITHUB_RUN_ID/);
+    for (const job of [backend, staging]) {
         const writes = job.steps.filter(entry => /^docker\/login-action@|^appleboy\/(scp|ssh)-action@/.test(entry.uses ?? '')
             || /docker (build|push)\b/.test(entry.run ?? ''));
         assert.ok(writes.length > 0);
@@ -92,6 +100,47 @@ test('image publication and frontend staging remain main-push-only', () => {
             assert.equal(entry.if, "github.ref == 'refs/heads/main' && github.event_name == 'push'", entry.name);
         }
     }
+});
+
+test('only verified successful evidence can skip tests; records and required checks fail closed', () => {
+    for (const job of [backendTests, frontendTests]) {
+        const restore = step(job, 'evidence');
+        const record = step(job, 'record');
+        assert.match(restore.run, /ci-evidence\.mjs restore/);
+        assert.match(restore.env.CI_FORCE_TESTS, /workflow_dispatch/);
+        assert.match(record.run, /ci-evidence\.mjs record/);
+        assert.equal(record['continue-on-error'], undefined);
+        assert.equal(record.if, undefined);
+        assert.equal(job.permissions.actions, 'read');
+        for (const entry of job.steps.filter(entry => /gradlew test|npm run test:run|npm run test:e2e/.test(entry.run ?? ''))) {
+            assert.match(entry.if, /steps\.evidence\.outputs\.reused != 'true'/);
+            assert.equal(entry['continue-on-error'], undefined);
+        }
+    }
+    const script = read('scripts/ci-evidence.mjs');
+    assert.match(script, /keyAt\(component, run\.head_sha, runtime\) !== key/);
+    assert.match(script, /artifact\.digest/);
+    assert.match(script, /proof\?\.version !== VERSION/);
+    assert.match(script, /execute tests normally/);
+});
+
+test('public API readiness precedes cutover and never writes data', () => {
+    const ready = deployment.steps.find(entry => entry.name === 'Public API readiness (before cutover)');
+    const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
+    assert.ok(deployment.steps.indexOf(ready) < deployment.steps.indexOf(cutover));
+    assert.match(ready.with.script, /api\/stores\?page=0&size=48&sort=rating/);
+    assert.match(ready.with.script, /READY.*-ge 2/);
+    assert.match(ready.with.script, /seconds < 2\.5/);
+    assert.doesNotMatch(ready.with.script, /--request|--data|Authorization|INSERT|UPDATE|DELETE/);
+});
+
+test('latency logs contain coarse routes and durations, never request identifiers or secrets', () => {
+    const config = read('nginx/default.conf');
+    const format = config.match(/log_format reserve_timing[\s\S]*?;/)?.[0];
+    assert.ok(format);
+    assert.match(format, /\$request_time/);
+    assert.match(format, /\$upstream_header_time/);
+    assert.doesNotMatch(format, /\$request_uri|\$args|\$remote_addr|\$http_|\$request_body|\$uri\b|\$request\b/);
 });
 
 test('the actual fallback backend must be schema and refund compatible', () => {

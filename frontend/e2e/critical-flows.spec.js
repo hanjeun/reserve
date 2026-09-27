@@ -430,9 +430,10 @@ test('messenger: every internal view keeps a close X and shared refresh feedback
     const checkClose = async () => {
         await expect(close).toHaveCount(1);
         await expect(close).toBeVisible();
-        const box = await close.boundingBox();
-        expect(box.width).toBe(44);
-        expect(box.height).toBe(44);
+        await expect(close).toHaveCSS('width', '44px');
+        await expect(close).toHaveCSS('height', '44px');
+        await expect.poll(async () => (await close.boundingBox())?.width ?? 0).toBeCloseTo(44, 1);
+        await expect.poll(async () => (await close.boundingBox())?.height ?? 0).toBeCloseTo(44, 1);
     };
     await checkClose();
     await surface.getByRole('button', { name: '설정', exact: true }).click();

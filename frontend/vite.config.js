@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import process from 'node:process';
 
 export default defineConfig({
     plugins: [
@@ -15,7 +16,7 @@ export default defineConfig({
                 // 첫 HTML의 modulepreload 대상이 된다. Rollup이 라우트 그래프에 맞춰 나누게 두면
                 // 관리자·결제·스캐너 코드는 해당 화면에 들어갈 때만 내려받는다.
                 manualChunks: {
-                    'vendor-react': ['react', 'react-dom', 'react-dom/client', 'react-router-dom'],
+                    'vendor-react': ['react', 'react-dom', 'react-router-dom'],
                     'vendor-sentry': ['@sentry/react'],
                     'vendor-state': ['axios', '@tanstack/react-query', 'zustand'],
                 },
@@ -43,9 +44,9 @@ export default defineConfig({
         clearMocks: true,
         css: true,
         // AntD/jsdom 테스트를 Windows에서 동시에 여러 워커로 띄우면 초기화가 크게 지연된다.
-        // 작은 공통 컴포넌트 회귀 묶음은 단일 fork가 더 빠르고 CI에서도 예측 가능하다.
+        // 로컬은 단일 fork, Linux CI에서는 격리된 두 fork로만 병렬화한다.
         pool: 'forks',
-        maxWorkers: 1,
-        fileParallelism: false,
+        maxWorkers: process.env.CI ? 2 : 1,
+        fileParallelism: Boolean(process.env.CI),
     },
 });

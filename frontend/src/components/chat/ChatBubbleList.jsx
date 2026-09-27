@@ -28,14 +28,11 @@
  * 여러 개를 연달아 보내면 화면에 스피너가 여러 개 돈다. 글자는 그런 소란이 없다.
  */
 import React from 'react';
-import { Typography } from 'antd';
 import { colors, fontSize, radius } from '../../styles/tokens';
 import { SupportAvatar, SupportName } from './SupportIdentity';
 import ChatImage from './ChatImage';
 import useChatPreferences from '../../hooks/useChatPreferences';
 import ChatMessageActions from './ChatMessageActions';
-
-const { Text } = Typography;
 
 /** 이보다 더 벌어지면 같은 사람이 보냈어도 새 덩어리로 본다. */
 const GROUP_GAP_MS = 5 * 60 * 1000;
@@ -65,6 +62,8 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
             const isMine = m.senderRole === mine;
             const first = !inSameGroup(messages[i - 1], m);
             const last = !inSameGroup(m, messages[i + 1]);
+            const timestamp = last ? formatTime(m.createdAt) : '';
+            const ownTimestamp = m.pending ? '보내는 중' : timestamp;
 
             const corner = first
                 ? (isMine ? { borderTopRightRadius: 6 } : { borderTopLeftRadius: 6 })
@@ -80,15 +79,11 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                         // 덩어리 사이만 벌린다. 첫 줄 위에는 여백을 주지 않는다.
                         marginTop: i === 0 ? 0 : (first ? 10 : 2),
                     }}>
-                    {isMine && (m.pending || last) && (
-                        <Text style={styles.stamp}>
-                            {m.pending ? '보내는 중' : formatTime(m.createdAt)}
-                        </Text>
-                    )}
                     {!isMine && m.senderRole === 'ADMIN' && <span className="reserve-chat-sender-avatar-slot">
                         {first && <SupportAvatar />}
                     </span>}
-                    {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted} />}
+                    {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted}
+                        timestamp={ownTimestamp} />}
                     <div className="reserve-chat-bubble-group" style={{ maxWidth: m.senderRole === 'ADMIN' && !isMine ? '72%' : '78%' }}>
                         {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
                         <div style={{
@@ -103,8 +98,8 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                             {m.content && <span style={m.imageUrl ? { display: 'block', marginTop: 8 } : undefined}>{m.content}</span>}
                         </div>
                     </div>
-                    {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole} />}
-                    {!isMine && last && <Text style={styles.stamp}>{formatTime(m.createdAt)}</Text>}
+                    {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole}
+                        timestamp={timestamp} />}
                 </div>
             );
         })}
@@ -124,7 +119,6 @@ const styles = {
     // 확정되지 않은 말풍선. 색을 바꾸지 않고 투명도만 낮춘다 — 색을 바꾸면
     // "실패했다"로 읽히는데, 대부분은 곧 성공한다.
     bubblePending: { opacity: 0.55 },
-    stamp: { fontSize: 10, color: colors.text.tertiary, flexShrink: 0, whiteSpace: 'nowrap' },
 };
 
 export default ChatBubbleList;

@@ -33,6 +33,25 @@ test('backend tests are explicit, required, and run before packaging', () => {
     assert.doesNotMatch(tests.run + packaging.run, /-x\s+test|--exclude-task[=\s]+test/);
 });
 
+test('rollback compatibility is tested and packaged before main-only image publication', () => {
+    const bridge = step(backend, 'rollback_bridge');
+    assert.ok(bridge);
+    assert.equal(bridge.run, 'bash scripts/test-v270-rollback.sh');
+    assert.equal(bridge['continue-on-error'], undefined);
+    assert.ok(backend.steps.indexOf(bridge) > backend.steps.indexOf(step(backend, 'backend_package')));
+    const script = read('scripts/test-v270-rollback.sh');
+    assert.match(script, /git archive "\$BASE"/);
+    assert.match(script, /ChatRollbackCompatibilityTest/);
+    assert.doesNotMatch(script, /rm -rf|git reset|git clean|-x test/);
+    const image = backend.steps.find(entry => entry.name === 'Build rollback compatibility image');
+    const publish = backend.steps.find(entry => entry.name === 'Push rollback compatibility image');
+    assert.ok(image && publish);
+    assert.match(image.run, /\$BRIDGE_DIR\/backend/);
+    assert.match(publish.run, /rollback-v263-v270-\$COMMIT_SHA/);
+    assert.doesNotMatch(image.run + publish.run, /:latest|continue-on-error/);
+    assert.ok(backend.steps.indexOf(image) < backend.steps.indexOf(publish));
+});
+
 test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
     const snapshot = frontend.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
     assert.equal(snapshot.run, './scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard');

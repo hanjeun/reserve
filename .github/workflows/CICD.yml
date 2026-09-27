@@ -69,6 +69,17 @@ jobs:
         working-directory: backend
         run: ./gradlew bootJar --console=plain
 
+      - name: Verify rollback schema compatibility
+        id: rollback_bridge
+        run: bash scripts/test-v270-rollback.sh
+
+      - name: Upload verified rollback backend
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rollback-backend
+          path: ${{ steps.rollback_bridge.outputs.bridge_jar }}
+          retention-days: 7
+
       # 테스트가 깨졌을 때 Actions 로그만으로는 원인 파악이 어려워 리포트를 첨부한다.
       # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
       - name: Upload test report on failure
@@ -109,6 +120,28 @@ jobs:
             -t "$DOCKERHUB_USERNAME/reserve:latest" \
             -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
+
+      # 원본 v2.6.3 이미지는 OWNER/취소/사진 데이터를 안전하게 읽지 못한다.
+      # 위 격리 검사에서 만든 호환 서버만 별도 불변 태그로 보관한다. latest는 건드리지 않는다.
+      - name: Build rollback compatibility image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRIDGE_DIR: ${{ steps.rollback_bridge.outputs.bridge_dir }}
+        run: |
+          test -s "$BRIDGE_DIR/backend/build/libs/reserve-2.6.3.jar"
+          docker build --platform linux/amd64 \
+            --label reserve.rollback-base=b478ae8d732afa1e35642d790bfc39972556f885 \
+            -t "$DOCKERHUB_USERNAME/reserve:rollback-v263-v270-$COMMIT_SHA" \
+            "$BRIDGE_DIR/backend"
+
+      - name: Push rollback compatibility image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: docker push "$DOCKERHUB_USERNAME/reserve:rollback-v263-v270-$COMMIT_SHA"
 
       - name: Push Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'

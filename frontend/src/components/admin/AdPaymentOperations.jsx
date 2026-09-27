@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Alert, Tag } from 'antd';
+import { Tag } from 'antd';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { AdminTableSkeleton, Button, DataTable, FilterToolbar, SegmentedControl } from '../common';
+import { AdminTableSkeleton, Button, DataState, DataTable, FilterToolbar, SegmentedControl } from '../common';
+import CopyableText from '../common/CopyableText';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { formatCurrency } from '../../utils';
+import { fontSize } from '../../styles/tokens';
 
 const PAGE_SIZE = 20;
 const LABELS = {
@@ -48,7 +50,8 @@ const AdPaymentOperations = () => {
     const columns = [
         { title: '시도', dataIndex: 'id', width: 80, fixed: 'left' },
         { title: '광고', dataIndex: 'adId', width: 80 },
-        { title: '주문번호', dataIndex: 'merchantUid', width: 320 },
+        { title: '주문번호', dataIndex: 'merchantUid', width: 320, className: 'reserve-table-code',
+            render: value => <CopyableText value={value} label="주문번호" style={{ fontSize: fontSize.sm }} /> },
         { title: '금액', dataIndex: 'amount', width: 110, render: formatCurrency },
         { title: '상태', dataIndex: 'state', width: 150,
             render: state => <Tag color={state === 'REFUNDED' ? 'success' : 'default'}>{LABELS[state] ?? '확인 필요'}</Tag> },
@@ -69,8 +72,10 @@ const AdPaymentOperations = () => {
             <SegmentedControl options={FILTERS} value={openOnly ? 'open' : 'all'} onChange={value => { setOpenOnly(value === 'open'); setPage(1); }} />
             <FilterToolbar count={query.data?.page?.totalElements ?? query.data?.totalElements ?? 0}
                 onReload={query.refetch} loading={query.isFetching} />
-            {query.isError ? <Alert type="error" showIcon title="광고 결제 원장을 불러오지 못했습니다. 새로고침해주세요." />
-                : query.isPending ? <AdminTableSkeleton rows={6} headers={columns.map(column => column.title)} cols={columns.map(column => column.width)} />
+            {query.isError ? <DataState state="error" kind="payment" subject="광고 결제 원장" error={query.error}
+                onRetry={query.refetch} retrying={query.isFetching} compact />
+                : query.isPending ? <AdminTableSkeleton rows={6} headers={columns.map(column => column.title)}
+                    cols={columns.map(column => column.width)} actionBtns={2} />
                     : <DataTable columns={columns} dataSource={query.data?.content ?? []} rowKey="id"
                         locale={{ emptyText: '표시할 광고 결제 시도가 없습니다.' }}
                         pagination={{ current: page, pageSize: PAGE_SIZE,

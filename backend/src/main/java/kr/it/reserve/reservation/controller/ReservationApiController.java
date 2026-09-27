@@ -140,11 +140,12 @@ public class ReservationApiController {
             @RequestParam(defaultValue = "100") int size,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Long storeId) {
+            @RequestParam(required = false) Long storeId,
+            @RequestParam(defaultValue = "recent") String sort) {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         Page<ReservationResponse> reservations = reservationService.getStoreReservations(
-                member, page, size, search, parseReservationStatus(status), storeId);
+                member, page, size, search, parseReservationStatus(status), storeId, sort);
         return ResponseEntity.ok(ApiResponse.success(reservations, "가게 예약 목록 조회 성공"));
     }
 

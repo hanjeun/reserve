@@ -29,6 +29,16 @@ class FileStorageDeletionBoundaryTest {
     }
 
     @Test
+    void supportAvatarUsesTheSameManagedPrefixForSaveAndDeletion() {
+        String prefix = kr.it.reserve.file.util.FileStoragePaths.supportAvatar();
+        String key = "local/" + prefix + "/avatar.png";
+        assertThat(fileStorageService.isManagedFileUnderPrefix(key, prefix)).isTrue();
+        assertThat(fileStorageService.isManagedFileUnderPrefix("local/support/chat/avatar.png", prefix)).isFalse();
+        fileStorageService.deleteFileRequired(key);
+        verify(s3Client).deleteObject(org.mockito.ArgumentMatchers.<DeleteObjectRequest>argThat(request -> key.equals(request.key())));
+    }
+
+    @Test
     @DisplayName("현재 환경의 정확한 CloudFront URL만 canonical key로 삭제한다")
     void deletesOnlyExactCloudfrontHostInCurrentEnvironment() {
         fileStorageService.deleteFileRequired(

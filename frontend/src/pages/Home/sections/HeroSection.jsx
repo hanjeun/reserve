@@ -55,11 +55,18 @@ export default function HeroSection({ isMobile, prefersReducedMotion }) {
                     가장 쉬운 예약 경험
                 </div>
                 <div className="slide-up" style={{ ...styles.titleContainer, animationDelay: '0.18s' }}>
-                    <Title style={styles.mainTitle}>
-                        <div style={styles.lineWrapper}>예약이 필요한 순간,</div>
-                        <div style={styles.lineWrapper}>
-                            {renderParts(current, LINES[lineIdx])}
-                            <span className="cursor" />
+                    <Title
+                        level={1}
+                        style={styles.mainTitle}
+                        aria-label="예약이 필요한 순간, 원하는 곳을 예약하세요"
+                    >
+                        {/* 타이핑 중인 글자를 매 프레임 새 제목으로 낭독하지 않도록 정적 접근성 이름과 분리한다. */}
+                        <div aria-hidden="true">
+                            <div style={styles.lineWrapper}>예약이 필요한 순간,</div>
+                            <div style={styles.lineWrapper}>
+                                {renderParts(current, LINES[lineIdx])}
+                                <span className="cursor" />
+                            </div>
                         </div>
                     </Title>
                 </div>

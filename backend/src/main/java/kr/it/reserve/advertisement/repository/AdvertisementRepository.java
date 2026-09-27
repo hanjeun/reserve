@@ -44,8 +44,20 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
     // 2026-07 추가: 종료상태(만료/취소/환불/중단) 광고를 사업자가 직접 목록에서 숨길 수 있게(소프트삭제)
     // 되면서, 데리베이션 쿼리로는 WHERE를 추가할 수 없어 명시적 @Query로 바꿈 —
     // 예약(ReservationRepository)의 동일한 패턴.
-    @Query("SELECT a FROM Advertisement a JOIN FETCH a.store WHERE a.store.owner = :owner AND a.deletedAt IS NULL ORDER BY a.createdAt DESC")
-    List<Advertisement> findByStoreOwnerOrderByCreatedAtDesc(@Param("owner") Member owner);
+    @Query(value = "SELECT a FROM Advertisement a JOIN FETCH a.store s "
+                 + "WHERE s.owner = :owner AND a.deletedAt IS NULL "
+                 + "AND (:storeId = 0 OR s.id = :storeId) "
+                 + "AND LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!' "
+                 + "ORDER BY a.createdAt DESC, a.id DESC",
+           countQuery = "SELECT COUNT(a) FROM Advertisement a JOIN a.store s "
+                      + "WHERE s.owner = :owner AND a.deletedAt IS NULL "
+                      + "AND (:storeId = 0 OR s.id = :storeId) "
+                      + "AND LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'")
+    Page<Advertisement> findMyAds(
+            @Param("owner") Member owner,
+            @Param("storeId") long storeId,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 
     // 노출용 — ACTIVE 상태 + 기간 내, 타입별로 조회 (StoreList 배지 / 배너 위젯)
     // 배너는 AdBanner.jsx가 첫 원소(ads[0])만 보여주므로, 여러 건이 동시에 ACTIVE일 때 가장 최근에
@@ -56,7 +68,8 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
             AdStatus status, AdType adType, LocalDate today1, LocalDate today2);
 
     // 중복 신청 방지용(2026-07 추가) — 같은 가게+타입으로 결제 대기/실패 상태인 신청이 이미 있는지 확인
-    Optional<Advertisement> findFirstByStoreIdAndAdTypeAndStatusIn(Long storeId, AdType adType, List<AdStatus> statuses);
+    Optional<Advertisement> findFirstByStoreIdAndAdTypeAndStatusInAndStartDateGreaterThanEqual(
+            Long storeId, AdType adType, List<AdStatus> statuses, LocalDate earliestStartDate);
 
     long countByStoreIdAndStatusInAndDeletedAtIsNull(Long storeId, java.util.Collection<AdStatus> statuses);
 
@@ -108,8 +121,10 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
     @Query("UPDATE Advertisement a SET a.deletedAt = NULL WHERE a.id = :id")
     void restoreById(@Param("id") Long id);
 
-    // 사업자 통계 탭 — 현재 활성(ACTIVE) 광고 요약용, 종료일 가까운 순으로 1건만
-    Optional<Advertisement> findFirstByStoreIdAndStatusOrderByEndDateDesc(Long storeId, AdStatus status);
+    // 사업자 통계 탭 — 상태뿐 아니라 실제 날짜 범위도 확인하고, 종료일 가까운 순으로 1건만 고른다.
+    Optional<Advertisement>
+    findFirstByStoreIdAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByEndDateAscIdAsc(
+            Long storeId, AdStatus status, LocalDate startBoundary, LocalDate endBoundary);
 
     // 광고 성과 카운터 버퍼 flush 전용(2026-07 추가) — AdCounterFlushScheduler가 주기적으로 호출한다.
     // 엔티티를 findById로 읽어서 dirty checking으로 저장하는 대신, DB 레벨에서 바로

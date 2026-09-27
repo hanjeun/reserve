@@ -7,11 +7,18 @@
 export const storeKeys = {
     all:    () => ['stores'],
     list:   (params) => ['stores', 'list', params],
+    regions: ()      => ['stores', 'regions'],
     detail: (id)     => ['stores', 'detail', id],
     my:     ()       => ['stores', 'my'],
     // 사업자 통계 탭 — 가게와 기간이 모두 바뀌면 다른 응답이라 둘 다 키에 들어간다.
     statistics: (storeId, range) => ['stores', 'statistics', storeId, range],
     statisticsAll: () => ['stores', 'statistics'],
+};
+
+export const benefitKeys = {
+    all: () => ['public-promotions'],
+    list: params => ['public-promotions', 'list', params],
+    detail: id => ['public-promotions', 'detail', id],
 };
 
 export const reservationKeys = {
@@ -32,7 +39,8 @@ export const memberKeys = {
 // 광고 도메인 — 사업자 본인 광고 목록 / 관리자 전체 광고 목록 / 공개 활성 광고(런딩 위젯, 유형별)
 export const adKeys = {
     all:   () => ['ads'],
-    my:    () => ['ads', 'my'],
+    // params를 생략한 키는 모든 내 광고 페이지를 한 번에 무효화하는 prefix다.
+    my:    (params) => params ? ['ads', 'my', params] : ['ads', 'my'],
     admin: () => ['ads', 'admin'],
     active: (type) => ['ads', 'active', type],
 };
@@ -64,11 +72,26 @@ export const adminKeys = {
     chatRooms:            () => ['admin', 'chatRooms'],
     chatRoom:             (id) => ['admin', 'chatRoom', id],
     chatWaiting:          () => ['admin', 'chatWaiting'],
+    chatReports:          (status = 'ALL') => ['admin', 'chatReports', status],
+    chatReportContext:    (id) => ['admin', 'chatReportContext', id],
     paymentOperations:    () => ['admin', 'paymentOperations'],
 };
 
-// 인앱 채팅 (손님 쪽). 방이 하나뿐이라 키에 ID 가 필요 없다.
+// 통합 메신저. 고객지원·가게 문의·사장님 받은 문의는 권한과 목록 캐시를 분리한다.
 export const chatKeys = {
+    all:           () => ['chat'],
     my:     () => ['chat', 'my'],
-    unread: () => ['chat', 'unread'],
+    conversations: () => ['chat', 'conversations'],
+    inbox:         () => ['chat', 'store-inbox'],
+    adminInbox:    () => ['chat', 'admin-support-inbox'],
+    thread:        (key) => ['chat', 'thread', key],
+    unread:        () => ['chat', 'unread'],
+    // 채팅 첫 안내 — scope: 'support' | 'store:{id}'. 설정 화면과 손님 메신저가 같은 키를 쓴다.
+    intro:         (scope) => ['chat', 'intro', scope],
+};
+
+// 지역 대표 사진은 서버가 공공누리 제1유형만 선별한 시도 단위 카탈로그다.
+export const tourismKeys = {
+    regionPhotos: (regions) => ['tourism', 'region-photos', [...regions]],
+    catalog: () => ['tourism', 'region-photo-catalog'],
 };

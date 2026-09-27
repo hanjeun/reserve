@@ -32,6 +32,8 @@ const PageContainer = ({
     };
 
     const containerStyle = {
+        // 100% includes the gutters. Otherwise mobile pages exceed the viewport and the browser zooms out.
+        boxSizing: 'border-box',
         width: '100%',
         maxWidth: sizeMap[size] || sizeMap.md,
         margin: '0 auto',

@@ -8,6 +8,8 @@ import kr.it.reserve.advertisement.dto.AdvertisementResponse;
 import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.entity.AdType;
 import kr.it.reserve.advertisement.entity.Advertisement;
+import kr.it.reserve.advertisement.entity.BannerCopyPreset;
+import kr.it.reserve.advertisement.entity.BannerMotionPreset;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.file.service.FileStorageService;
@@ -17,6 +19,8 @@ import kr.it.reserve.global.error.AdvertisementException;
 import kr.it.reserve.global.error.StoreException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.payment.service.PortoneService;
+import kr.it.reserve.reservation.entity.Reservation;
+import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,13 +31,18 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -53,10 +62,13 @@ public class AdvertisementService {
     // 현재 적용 중인 일 단위 가격 정책. 변경 시 결제 금액·사용자 안내를 함께 검토한다.
     private static final int BADGE_PRICE_PER_DAY  = 1_000;
     private static final int BANNER_PRICE_PER_DAY = 5_000;
-    // 배너 이미지 최대 장수 — Store 상세 이미지(최대 5장)와 동일하게 통일
-    private static final int MAX_BANNER_IMAGES = 5;
+    // 한 줄 제목·내용 + 정사각 썸네일인 가로형 위젯이므로 신규 배너는 대표 이미지 한 장만 받는다.
+    private static final int MAX_BANNER_IMAGES = 1;
+
+    record BannerCopyContent(String title, String description) {}
 
     private final AdvertisementRepository advertisementRepository;
+    private final ReservationRepository reservationRepository;
     private final StoreRepository storeRepository;
     private final FileStorageService fileStorageService;
     private final FileDeletionOutboxService fileDeletionOutboxService;
@@ -98,11 +110,13 @@ public class AdvertisementService {
         // 마무리지으면 모달을 닫고 "새 광고 신청"을 다시 누를 수 있어, 같은 가게+타입으로 결제 대기/실패
         // 상태인 신청이 이미 쌓이는 버그가 있었다 — 같은 건이 있으면 새로 만들지 않고 기존 신청을 재사용하게 막는다.
         advertisementRepository
-                .findFirstByStoreIdAndAdTypeAndStatusIn(store.getId(), adType,
-                        List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED))
+                .findFirstByStoreIdAndAdTypeAndStatusInAndStartDateGreaterThanEqual(
+                        store.getId(), adType,
+                        List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED),
+                        ServiceTime.today())
                 .ifPresent(existing -> {
                     throw new AdvertisementException(
-                            "이미 결제 대기 중인 " + (adType == AdType.BADGE ? "배지형" : "배너형") +
+                            "이미 결제 대기 중인 " + (adType == AdType.BADGE ? "노출형" : "배너형") +
                             " 신청이 있습니다. 기존 신청을 결제하거나 취소한 후 다시 시도해주세요.",
                             HttpStatus.CONFLICT);
                 });
@@ -119,7 +133,12 @@ public class AdvertisementService {
 
         long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
         int amount = calculateAmount(adType, days);
-        validateContentLength(request.getTitle(), request.getDescription());
+        BannerCopyContent bannerCopy = adType == AdType.BANNER
+                ? resolveBannerContent(request.getBannerCopyKey(), request.getTitle(), request.getDescription())
+                : null;
+        BannerMotionPreset bannerMotion = adType == AdType.BANNER
+                ? resolveBannerMotion(request.getBannerMotionKey())
+                : null;
 
         List<String> imageUrls = new java.util.ArrayList<>();
         if (adType == AdType.BANNER) {
@@ -129,9 +148,6 @@ public class AdvertisementService {
             }
             if (images.size() > MAX_BANNER_IMAGES) {
                 throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
-            }
-            if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
-                throw new AdvertisementException("배너 광고는 제목이 필수입니다.", HttpStatus.BAD_REQUEST);
             }
             for (MultipartFile image : images) {
                 if (image.isEmpty()) continue;
@@ -146,8 +162,9 @@ public class AdvertisementService {
         Advertisement ad = Advertisement.builder()
                 .store(store)
                 .adType(adType)
-                .title(request.getTitle())
-                .description(request.getDescription())
+                .title(bannerCopy != null ? bannerCopy.title() : null)
+                .description(bannerCopy != null ? bannerCopy.description() : null)
+                .bannerMotion(bannerMotion)
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .amount(amount)
@@ -165,7 +182,7 @@ public class AdvertisementService {
                 .adId(ad.getId())
                 .merchantUid(merchantUid)
                 .amount(amount)
-                .productName(store.getName() + " " + (adType == AdType.BADGE ? "광고 배지" : "배너 광고"))
+                .productName(store.getName() + " " + (adType == AdType.BADGE ? "노출형 광고" : "배너 광고"))
                 .buyerName(resolveBuyerName(store.getOwner(), owner.getEmail()))
                 .buyerEmail(owner.getEmail())
                 .buyerTel("")
@@ -182,12 +199,56 @@ public class AdvertisementService {
         return Math.toIntExact(pricePerDay * days);
     }
 
-    private static void validateContentLength(String title, String description) {
-        if (title != null && title.length() > 100) {
-            throw new AdvertisementException("광고 제목은 100자 이내로 입력해주세요.", HttpStatus.BAD_REQUEST);
+    private static BannerCopyPreset resolveBannerCopy(String key) {
+        if (key == null || key.isBlank()) return BannerCopyPreset.AVAILABLE_NOW;
+        try {
+            return BannerCopyPreset.valueOf(key.trim());
+        } catch (IllegalArgumentException exception) {
+            throw new AdvertisementException("배너 문구 선택이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
-        if (description != null && description.length() > 300) {
-            throw new AdvertisementException("광고 설명은 300자 이내로 입력해주세요.", HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * 추천 문구와 사용자 수정 문구가 모두 이 관문을 지난다. 제목·내용을 둘 다 보내면 사용자 문구를,
+     * 둘 다 비우면 추천 문구를 사용한다. DB 컬럼 한도보다 긴 값은 파일 업로드 전에 거부한다.
+     */
+    static BannerCopyContent resolveBannerContent(String key, String title, String description) {
+        BannerCopyPreset preset = resolveBannerCopy(key);
+        boolean hasTitle = title != null && !title.isBlank();
+        boolean hasDescription = description != null && !description.isBlank();
+
+        if (!hasTitle && !hasDescription) {
+            return new BannerCopyContent(preset.title(), preset.description());
+        }
+        if (!hasTitle || !hasDescription) {
+            throw new AdvertisementException("배너 제목과 내용을 모두 입력해주세요.", HttpStatus.BAD_REQUEST);
+        }
+
+        String normalizedTitle = normalizeBannerText(title);
+        String normalizedDescription = normalizeBannerText(description);
+        if (normalizedTitle.length() > Advertisement.BANNER_TITLE_MAX_LENGTH) {
+            throw new AdvertisementException(
+                    "배너 제목은 " + Advertisement.BANNER_TITLE_MAX_LENGTH + "자 이내로 입력해주세요.",
+                    HttpStatus.BAD_REQUEST);
+        }
+        if (normalizedDescription.length() > Advertisement.BANNER_DESCRIPTION_MAX_LENGTH) {
+            throw new AdvertisementException(
+                    "배너 내용은 " + Advertisement.BANNER_DESCRIPTION_MAX_LENGTH + "자 이내로 입력해주세요.",
+                    HttpStatus.BAD_REQUEST);
+        }
+        return new BannerCopyContent(normalizedTitle, normalizedDescription);
+    }
+
+    private static String normalizeBannerText(String value) {
+        return value.strip().replaceAll("\\s+", " ");
+    }
+
+    static BannerMotionPreset resolveBannerMotion(String key) {
+        if (key == null || key.isBlank()) return BannerMotionPreset.SOFT_RISE;
+        try {
+            return BannerMotionPreset.valueOf(key.trim());
+        } catch (IllegalArgumentException exception) {
+            throw new AdvertisementException("배너 모션 선택이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -248,13 +309,19 @@ public class AdvertisementService {
                 .collect(Collectors.toList());
     }
 
-    /** 내 광고 신청 내역 (사업자용) */
+    /** 내 광고 신청 내역 (사업자용) — 사용자 입력 페이지 크기는 공통 관문에서 최대 100으로 제한한다. */
     @Transactional(readOnly = true)
-    public List<AdvertisementResponse> getMyAds(Member owner) {
-        return advertisementRepository.findByStoreOwnerOrderByCreatedAtDesc(owner)
-                .stream()
-                .map(AdvertisementResponse::fromEntity)
-                .collect(Collectors.toList());
+    public Page<AdvertisementResponse> getMyAds(
+            Member owner, int page, int size, Long storeId, String keyword) {
+        long normalizedStoreId = storeId == null ? 0L : storeId;
+        String normalizedKeyword = escapeLikeKeyword(keyword == null ? "" : keyword.trim());
+        return advertisementRepository.findMyAds(
+                        owner, normalizedStoreId, normalizedKeyword, PageRequests.bounded(page, size))
+                .map(AdvertisementResponse::fromEntity);
+    }
+
+    private static String escapeLikeKeyword(String keyword) {
+        return keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     /** 전체 광고 목록 (관리자용) */
@@ -307,22 +374,21 @@ public class AdvertisementService {
             throw AdvertisementException.forbidden("본인 광고만 수정할 수 있습니다.");
         }
         if (ad.getAdType() != AdType.BANNER) {
-            throw new AdvertisementException("배지형 광고는 수정할 내용이 없습니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("노출형 광고는 수정할 내용이 없습니다.", HttpStatus.BAD_REQUEST);
         }
         if (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED
                 && ad.getStatus() != AdStatus.ACTIVE) {
             throw new AdvertisementException("수정할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
         }
 
-        validateContentLength(request.getTitle(), request.getDescription());
-        if (request.getTitle() != null) {
-            if (request.getTitle().trim().isEmpty()) {
-                throw new AdvertisementException("배너 광고는 제목이 필수입니다.", HttpStatus.BAD_REQUEST);
-            }
-            ad.setTitle(request.getTitle());
+        if (request.getBannerCopyKey() != null || request.getTitle() != null || request.getDescription() != null) {
+            BannerCopyContent copy = resolveBannerContent(
+                    request.getBannerCopyKey(), request.getTitle(), request.getDescription());
+            ad.setTitle(copy.title());
+            ad.setDescription(copy.description());
         }
-        if (request.getDescription() != null) {
-            ad.setDescription(request.getDescription());
+        if (request.getBannerMotionKey() != null) {
+            ad.setBannerMotion(resolveBannerMotion(request.getBannerMotionKey()));
         }
 
         // images가 null이면 기존 이미지 유지 — 값이 있으면 통째로 교체(createAd와 동일한 검증/업로드 규칙).
@@ -403,41 +469,129 @@ public class AdvertisementService {
     /**
      * 광고 성과 지표 기록(2026-07 추가) — 누구나 볼 수 있는 공개 엔드포인트(로그인 불필요).
      * 광고는 장식적 요소라 실패해도 조용히 무시 — 호출측에서는 에러를 사용자에게 노출하지 않는다.
-     * 봇/중복 집계 방지용 rate limiting은 현재 미구현 — 지금 규모에서는 허용 가능한 트레이드오프로 남겨둔다.
+     * 공개 컨트롤러의 {@code RateLimiter.Policy.AD_METRIC}이 IP별 호출량을 제한한다.
+     * 이 서비스는 광고·가게 상태와 기간·지표별 허용 타입을 확인하는 단일 정책 관문이다.
      *
      * 2026-07 추가 개선 — 예전엔 여기서 바로 findById + save(dirty checking)로 DB를 즉시 건드려서,
-     * 노출 하나마다 SELECT + UPDATE가 나갔다. 지금은 AdCounterBuffer에 인메모리로만 쌓아두고,
+     * 노출 하나마다 SELECT + UPDATE가 나갔다. 지금은 유효성 SELECT 뒤 AdCounterBuffer에 쌓아두고,
      * 실제 DB 반영은 AdCounterFlushScheduler가 30초마다 한 번에 처리한다(RateLimiter와 동일한
-     * in-memory 패턴). 그래서 이 메서드들엔 더 이상 @Transactional이 필요 없다 — DB를 안 건드리니까.
+     * in-memory 패턴). 조회 중 LAZY 가게 상태도 검증하므로 read-only 트랜잭션을 유지한다.
      */
+    @Transactional(readOnly = true)
     public void recordImpression(Long adId) {
-        adCounterBuffer.increment(adId, AdCounterBuffer.CounterType.IMPRESSION);
+        recordMetricIfEligible(adId, AdCounterBuffer.CounterType.IMPRESSION);
     }
 
     /** 배너 클릭 기록(2026-07 추가) — BANNER만 호출(BADGE는 프론트에서 자체적으로 호출 안 함) */
+    @Transactional(readOnly = true)
     public void recordClick(Long adId) {
-        adCounterBuffer.increment(adId, AdCounterBuffer.CounterType.CLICK);
+        recordMetricIfEligible(adId, AdCounterBuffer.CounterType.CLICK);
+    }
+
+    private void recordMetricIfEligible(Long adId, AdCounterBuffer.CounterType counterType) {
+        if (adId == null || adId <= 0) {
+            return;
+        }
+        advertisementRepository.findById(adId)
+                .filter(ad -> isMetricEligible(ad, counterType))
+                .ifPresent(ad -> adCounterBuffer.increment(ad.getId(), counterType));
+    }
+
+    /** 공개 호출이 실제 지표에 반영되기 위한 단일 정책 관문. */
+    private boolean isMetricEligible(Advertisement ad, AdCounterBuffer.CounterType counterType) {
+        if (ad.isDeleted()
+                || ad.getStatus() != AdStatus.ACTIVE
+                || !ad.isWithinDateRange()
+                || ad.getStore() == null
+                || ad.getStore().isDeleted()
+                || ad.getStore().isSuspended()) {
+            return false;
+        }
+        return switch (counterType) {
+            case IMPRESSION -> ad.getAdType() == AdType.BADGE || ad.getAdType() == AdType.BANNER;
+            case CLICK -> ad.getAdType() == AdType.BANNER;
+        };
     }
 
     /**
-     * 전환 기록(2026-07 추가) — 프론트가 sessionStorage로 "이 예약이 배너 클릭에서 이어졌다"를 판단해서
-     * 예약 생성 직후에 호출한다. 서버에서 귀속 윈도를 재검증하지 않는다(단순 지표용 카운터라 적당한
-     * 수준의 신뢰도로 충분 — 결제/정산과 무관한 단순 참고용 지표이므로 서버 측 재검증은 과잉이라 생략).
+     * 예약 한 건을 배너 광고 한 건에 귀속한다.
+     *
+     * <p>클릭 기록은 브라우저의 sessionStorage에만 있으므로 이것만으로 클릭 사실을 완전히 증명할 수는 없다.
+     * 대신 공개 카운터 증가를 막고, 현재 로그인 회원의 최근 예약·같은 가게·현재 노출 중인 배너만
+     * 원자적으로 한 번 귀속한다. 예약 전환 지표의 최소 신뢰 경계다.
      */
-    public void recordConversion(Long adId) {
-        adCounterBuffer.increment(adId, AdCounterBuffer.CounterType.CONVERSION);
+    @Transactional
+    public void recordConversion(Long adId, Long reservationId, Member member) {
+        Advertisement ad = advertisementRepository.findByIdForUpdate(adId)
+                .orElseThrow(AdvertisementException::notFound);
+
+        if (ad.isDeleted()
+                || ad.getAdType() != AdType.BANNER
+                || ad.getStatus() != AdStatus.ACTIVE
+                || !ad.isWithinDateRange()) {
+            throw new AdvertisementException("현재 노출 중인 배너 광고만 전환으로 기록할 수 있습니다.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // createdAt은 UTC 저장값이므로 ServiceTime.now()가 아니라 같은 저장 시계(LocalDateTime.now)를 쓴다.
+        int claimed = reservationRepository.claimAdvertisementConversion(
+                reservationId,
+                member.getId(),
+                ad.getStore().getId(),
+                ad.getId(),
+                LocalDateTime.now().minus(Duration.ofHours(24)),
+                List.of(Reservation.ReservationStatus.PENDING, Reservation.ReservationStatus.CONFIRMED));
+
+        if (claimed == 1) {
+            // 전환은 귀속 UPDATE가 성공한 경우에만 바로 반영한다. 버퍼에 넣으면 귀속 실패 여부와
+            // 카운터 증가를 같은 트랜잭션으로 묶을 수 없다.
+            advertisementRepository.addConversionCount(ad.getId(), 1);
+            return;
+        }
+
+        log.debug("Advertisement conversion ignored: adId={}, reservationId={}, memberId={}",
+                adId, reservationId, member.getId());
     }
 
     /**
-     * AdCounterBuffer에 쌓인 노출/클릭/전환 카운터를 DB에 일괄 반영 (AdCounterFlushScheduler 전용).
+     * AdCounterBuffer에 쌓인 노출/클릭 카운터를 DB에 일괄 반영 (AdCounterFlushScheduler 전용).
      * adId별로 델타(누적 증가분)만 계산해서 "UPDATE ... SET count = count + delta" 한 방으로 처리 —
      * 광고 개수만큼만 UPDATE가 나가지, 이벤트 개수만큼 나가지 않는다.
      */
     @Transactional
     public void flushCounters() {
-        flushBucket(adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.IMPRESSION), advertisementRepository::addImpressionCount);
-        flushBucket(adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.CLICK), advertisementRepository::addClickCount);
-        flushBucket(adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.CONVERSION), advertisementRepository::addConversionCount);
+        Map<Long, LongAdder> impressions =
+                adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.IMPRESSION);
+        Map<Long, LongAdder> clicks =
+                adCounterBuffer.swapAndGet(AdCounterBuffer.CounterType.CLICK);
+        AtomicBoolean restored = new AtomicBoolean(false);
+        Runnable restoreOnce = () -> {
+            if (restored.compareAndSet(false, true)) {
+                adCounterBuffer.restore(AdCounterBuffer.CounterType.IMPRESSION, impressions);
+                adCounterBuffer.restore(AdCounterBuffer.CounterType.CLICK, clicks);
+            }
+        };
+        try {
+            // UPDATE 호출 뒤 실제 commit 단계에서 연결 오류나 deadlock victim 롤백이 발생할 수도 있다.
+            // 메서드 안의 catch만으로는 그 시점을 볼 수 없으므로 트랜잭션 최종 상태까지 확인한다.
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                            restoreOnce.run();
+                        }
+                    }
+                });
+            }
+            flushBucket(impressions, advertisementRepository::addImpressionCount);
+            flushBucket(clicks, advertisementRepository::addClickCount);
+        } catch (RuntimeException e) {
+            // 이 메서드의 트랜잭션은 전부 롤백된다. 교체한 두 버킷도 함께 되돌려야
+            // 다음 주기에 정확히 한 번 다시 반영되고, 부분 성공처럼 보이지 않는다.
+            restoreOnce.run();
+            throw e;
+        }
     }
 
     private void flushBucket(Map<Long, LongAdder> bucket, BiConsumer<Long, Long> updater) {

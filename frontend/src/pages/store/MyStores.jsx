@@ -1,16 +1,36 @@
 import React, { useState, useCallback } from 'react';
-import { Typography, Empty, Modal, Flex } from 'antd';
-import { StarFilled, EditOutlined, DeleteOutlined, ExclamationCircleFilled } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
-import { PageContainer, Card, StoreCardSkeleton, Badge, ModalLoading } from '../../components/common';
+import { Typography, Modal, Flex } from 'antd';
+import { EditOutlined, DeleteOutlined, ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PageContainer, Button, Card, DataState, StoreCardSkeleton, ModalLoading } from '../../components/common';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
-import { getThumbnailUrl } from '../../utils';
+import useViewModeParam from '../../hooks/useViewModeParam';
 import { colors, radius, fontWeight, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
 import { canCloseStore } from '../../utils/lifecycleReadiness';
+import StoreListingToolbar from '../../components/store/StoreListingToolbar';
+import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
+import StoreCard from '../../components/store/StoreCard';
+import StoreListRow from '../../components/store/StoreListRow';
+import { OWNER_STORE_SORT_OPTIONS } from '../../constants';
+import { filterAndSortOwnedStores } from './ownedStoreFilters';
 
 const { Title, Text } = Typography;
+const OWNER_SORT_OPTIONS = OWNER_STORE_SORT_OPTIONS;
+
+const managedActions = (store, onEdit, onDelete, inRow = false) => [
+    <button key="edit" type="button" aria-label={`${store.name} 수정`}
+        onClick={event => { event.stopPropagation(); onEdit(store); }}
+        className={'reserve-card-action' + (inRow ? ' reserve-mystore-list-action' : '')} style={styles.cardAction}>
+        <EditOutlined style={{ fontSize: '18px' }} />
+    </button>,
+    <button key="delete" type="button" aria-label={`${store.name} 삭제`}
+        onClick={event => onDelete(event, store)}
+        className={'reserve-card-action' + (inRow ? ' reserve-mystore-list-action' : '')} style={styles.cardAction}>
+        <DeleteOutlined style={{ fontSize: '18px', color: colors.error.main }} />
+    </button>,
+];
 
 // ─── 영업 종료 확인 모달 ──────────────────────────────────────────────────────
 const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => {
@@ -146,10 +166,38 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
 // ─── MyStores 메인 ──────────────────────────────────────────────────────────
 const MyStores = () => {
     const navigate = useNavigate();
-    const { stores, loading, deleteStore } = useMyStores();
+    const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+    const { stores, loading, error, refetch, deleteStore } = useMyStores();
     useDocumentTitle('내 가게');
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [targetStore, setTargetStore] = useState(null); // { id, name }
+    const [retrying, setRetrying] = useState(false);
+    const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'cards');
+    const domain = urlSearchParams.get('domain') || '';
+    const sort = OWNER_SORT_OPTIONS.some(option => option.value === urlSearchParams.get('sort'))
+        ? urlSearchParams.get('sort') : 'recent';
+    const visibleStores = filterAndSortOwnedStores(stores, { domain, sort });
+
+    const setToolbarParam = (key, value) => setUrlSearchParams(current => {
+        const next = new URLSearchParams(current);
+        if (value && !(key === 'sort' && value === 'recent')) next.set(key, value);
+        else next.delete(key);
+        return next;
+    });
+    const resetOwnedFilters = () => setUrlSearchParams(current => {
+        const next = new URLSearchParams(current);
+        next.delete('region'); // 예전 지역 필터 링크로 들어온 경우 URL의 낡은 값도 함께 없앤다.
+        next.delete('domain');
+        next.delete('sort');
+        return next;
+    });
+
+    const handleRetry = async () => {
+        setRetrying(true);
+        try { await refetch(); }
+        catch { /* 조회 오류는 목록의 오류 상태에 표시한다. */ }
+        finally { setRetrying(false); }
+    };
 
     const handleDeleteClick = useCallback((e, store) => {
         e.stopPropagation();
@@ -172,8 +220,10 @@ const MyStores = () => {
         setTargetStore(null);
     }, []);
 
+    const handleEdit = store => navigate(`/store/${store.id}/edit`);
+
     return (
-        <PageContainer size="xl" paddingTop="40px">
+        <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page" aria-busy={loading || retrying}>
             {/* 헤더 */}
             <div style={{ marginBottom: '40px' }}>
                 <Title level={2} style={{ margin: '0 0 8px 0', fontWeight: fontWeight.extrabold }}>
@@ -184,79 +234,75 @@ const MyStores = () => {
                 </Text>
             </div>
 
+            <StoreListingToolbar
+                view={view}
+                onViewChange={setView}
+                count={!loading && !error ? visibleStores.length : undefined}
+                domain={domain}
+                onDomainChange={nextDomain => setToolbarParam('domain', nextDomain)}
+                sort={sort}
+                onSortChange={nextSort => setToolbarParam('sort', nextSort)}
+                sortOptions={OWNER_SORT_OPTIONS}
+                disabled={loading || retrying}
+                sortDisabled={loading || retrying}
+                label="내 가게 목록 필터"
+            />
+
             {/* 카드 영역 — 2026-07 수정: 고정 4열 그리드(rsv-mystore-grid)로 통일(위 GRID_STYLE 참고).
                 Card.Add도 같은 시점에 borderRadius를 0(각짐)으로 맞춰서 실제 가게 카드와 모서리가 일치한다. */}
             {loading ? (
-                <div className="rsv-mystore-grid">
-                    <StoreCardSkeleton count={4} withActions />
-                </div>
-            ) : stores.length > 0 ? (
-                <div className="rsv-mystore-grid">
-                    {stores.map(store => (
-                        <div key={store.id}>
-                            <Card
-                                hoverable
-                                actions={[
-                                    /* onClick을 아이콘이 아니라 li 전체를 채우는 wrapper에 건다 — 예전에는
-                                       아이콘 자체에만 onClick이 있어 아이콘 픽셀만 눌러야 동작하고 주위 네모
-                                       여백은 안 눌렸다. 각 li를 꿉 채우는 클릭 영역으로 감싸 네모 전체가 눌리게 한다. */
-                                    <button
-                                        key="edit"
-                                        type="button"
-                                        aria-label={`${store.name} 수정`}
-                                        onClick={(e) => { e.stopPropagation(); navigate(`/store/${store.id}/edit`); }}
-                                        className="reserve-card-action"
-                                        style={styles.cardAction}
-                                    >
-                                        <EditOutlined style={{ fontSize: '18px' }} />
-                                    </button>,
-                                    <button
-                                        key="delete"
-                                        type="button"
-                                        aria-label={`${store.name} 삭제`}
-                                        onClick={(e) => handleDeleteClick(e, store)}
-                                        className="reserve-card-action"
-                                        style={styles.cardAction}
-                                    >
-                                        <DeleteOutlined style={{ fontSize: '18px', color: colors.error.main }} />
-                                    </button>,
-                                ]}
-                            >
-                                <Link
-                                    to={`/store/${store.id}`}
-                                    className="reserve-card-link"
-                                    aria-label={`${store.name} 상세 보기`}
-                                >
-                                    <Card.Cover src={getThumbnailUrl(store.mainImageUrl)} alt={store.name} />
-                                    <div style={{ padding: '16px 16px 20px 16px' }}>
-                                        <Badge variant="category" style={{ marginBottom: 6 }}>
-                                            {store.category || '기타'}
-                                        </Badge>
-                                        <Title level={5} style={{ margin: '0 0 2px 0', fontSize: fontSize.xl }}>
-                                            {store.name}
-                                        </Title>
-                                        <Flex align="center" gap={4}>
-                                            <StarFilled style={{ color: '#fadb14', fontSize: '14px' }} />
-                                            <Text strong style={{ fontSize: fontSize.sm }}>
-                                                {store.rating?.toFixed(1) || '0.0'}
-                                            </Text>
-                                        </Flex>
-                                    </div>
-                                </Link>
-                            </Card>
-                        </div>
-                    ))}
-                    <div>
-                        <Card.Add onClick={() => navigate('/store/register')} minHeight="350px">
-                            새 가게 등록하기
-                        </Card.Add>
+                <div className={view === 'list' ? 'reserve-store-list-rows' : 'rsv-mystore-grid'} role="status" aria-label="내 가게를 불러오는 중">
+                    <div style={{ display: 'contents' }} aria-hidden="true">
+                        {view === 'list' ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
                     </div>
                 </div>
+            ) : error && stores.length === 0 ? (
+                // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
+                <DataState state="error" kind="store" subject="가게 목록" error={error}
+                    onRetry={handleRetry} retrying={retrying} style={{ marginTop: 100 }} />
             ) : (
-                <Empty
-                    description="등록된 가게가 없습니다."
-                    style={{ marginTop: '100px' }}
-                />
+                <>
+                    {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
+                    {error && (
+                        <DataState state="error" kind="store" subject="가게 목록" error={error}
+                            title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                            onRetry={handleRetry} retrying={retrying} compact style={{ marginBottom: 16 }} />
+                    )}
+                    {visibleStores.length > 0 && view === 'list' ? (
+                        <>
+                            <div className="reserve-store-list-rows reserve-mystore-list-rows">
+                                {visibleStores.map(store => (
+                                    <StoreListRow key={store.id} store={store} className="reserve-mystore-list-row"
+                                        actions={managedActions(store, handleEdit, handleDeleteClick, true)} />
+                                ))}
+                            </div>
+                            <button type="button" className="reserve-mystore-add-row" onClick={() => navigate('/store/register')}>
+                                <PlusOutlined aria-hidden="true" /> 새 가게 등록하기
+                            </button>
+                        </>
+                    ) : visibleStores.length > 0 ? (
+                        <div className="rsv-mystore-grid">
+                            {/* 가게 전체보기와 같은 StoreCard 를 재사용한다. 관리 화면이라 하트 대신 수정·삭제 줄을 붙인다. */}
+                            {visibleStores.map(store => (
+                                <div key={store.id}>
+                                    <StoreCard store={store} showFavorite={false}
+                                        actions={managedActions(store, handleEdit, handleDeleteClick)} />
+                                </div>
+                            ))}
+                            <div>
+                                <Card.Add onClick={() => navigate('/store/register')} minHeight="350px">
+                                    새 가게 등록하기
+                                </Card.Add>
+                            </div>
+                        </div>
+                    ) : (
+                        <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
+                            title={stores.length > 0 ? '조건에 맞는 내 가게가 없습니다.' : '등록된 가게가 없습니다.'}
+                            action={stores.length > 0
+                                ? <Button variant="secondary" size="sm" onClick={resetOwnedFilters}>필터 초기화</Button>
+                                : <Button variant="secondary" size="sm" onClick={() => navigate('/store/register')}>새 가게 등록하기</Button>} />
+                    )}
+                </>
             )}
 
             {/* 삭제 모달 */}

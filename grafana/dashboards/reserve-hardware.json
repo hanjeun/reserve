@@ -77,7 +77,7 @@
     },
     {
       "type": "stat",
-      "title": "CPU 사용률",
+      "title": "CPU 실행률",
       "description": "2코어. 1분 간격 샘플이라 순간 스파이크는 잡히지 않습니다.",
       "datasource": {
         "type": "loki",
@@ -141,7 +141,7 @@
             "type": "loki",
             "uid": "${DS_LOKI}"
           },
-          "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_pct` | unwrap value [5m]) by (metric)",
+          "expr": "last_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_exec_pct` | unwrap value [5m]) by (metric)",
           "refId": "A",
           "queryType": "instant"
         }
@@ -662,8 +662,8 @@
       "panels": [
         {
           "type": "timeseries",
-          "title": "CPU 사용률",
-          "description": "2코어 서버의 CPU 사용률 추세입니다. 메모리·부하 지표와 함께 병목 여부를 판단합니다.",
+          "title": "CPU 실행 · 대기 · 회수",
+          "description": "실행은 us+sy, I/O 대기는 wa, 가상 서버 회수는 st입니다. 기존 cpu_pct(100-idle)와 섞지 않습니다. 새 collector를 먼저 적용해야 데이터가 표시됩니다.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
@@ -713,7 +713,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "CPU"
+                  "options": "실행"
                 },
                 "properties": [
                   {
@@ -733,10 +733,20 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_pct` | unwrap value [$__auto]) by (metric)",
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_exec_pct` | unwrap value [$__auto]) by (metric)",
               "refId": "A",
               "queryType": "range",
-              "legendFormat": "CPU"
+              "legendFormat": "실행"
+            },
+            {
+              "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_iowait_pct` | unwrap value [$__auto]) by (metric)",
+              "refId": "B", "queryType": "range", "legendFormat": "I/O 대기"
+            },
+            {
+              "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+              "expr": "avg_over_time({job=\"metrics\"} | logfmt | kind=`host` | metric=`cpu_steal_pct` | unwrap value [$__auto]) by (metric)",
+              "refId": "C", "queryType": "range", "legendFormat": "가상 서버 회수"
             }
           ]
         },

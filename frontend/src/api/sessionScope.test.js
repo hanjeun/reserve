@@ -66,4 +66,31 @@ describe('HTTP session boundary', () => {
         expect(configs.every(c => c._sessionEpoch === currentSession().epoch)).toBe(true);
         expect(configs.filter(c => c.url === '/one')).toHaveLength(2);
     });
+
+    it('public read failure never refreshes or changes the current login state', async () => {
+        const calls = [];
+        localStorage.setItem('auth-storage', 'preserved');
+        api.defaults.adapter = config => {
+            calls.push(config.url);
+            return Promise.reject({ config, response: { status: 401, data: { message: 'public endpoint unavailable' } } });
+        };
+        await expect(api.get('/api/promotions/public', { skipAuthRefresh: true })).rejects.toMatchObject({ status: 401 });
+        expect(calls).toEqual(['/api/promotions/public']);
+        expect(localStorage.getItem('auth-storage')).toBe('preserved');
+        localStorage.removeItem('auth-storage');
+    });
+
+    it('returns authenticated image blobs without JSON unwrapping and rejects old-session blobs', async () => {
+        const blob = new Blob(['photo'], { type: 'image/png' });
+        api.defaults.adapter = config => Promise.resolve({ status: 200, headers: {}, config, data: blob });
+        expect(await api.get('/api/chat/images/1', { responseType: 'blob' })).toBe(blob);
+        const pending = deferred();
+        let captured;
+        api.defaults.adapter = config => { captured = config; return pending.promise; };
+        const request = api.get('/api/chat/images/1', { responseType: 'blob' }).catch(error => error);
+        await vi.waitFor(() => expect(captured).toBeDefined());
+        advanceSession();
+        pending.resolve({ status: 200, headers: {}, config: captured, data: blob });
+        expect((await request).isStaleSession).toBe(true);
+    });
 });

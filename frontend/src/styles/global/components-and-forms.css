@@ -22,16 +22,21 @@
     display: block;
     color: inherit;
     text-decoration: none;
+    transition: transform 0.12s ease, opacity 0.12s ease;
+    -webkit-tap-highlight-color: transparent;
 }
 .reserve-card-link:hover { color: inherit; }
+/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+.reserve-card-link:active { color: inherit; }
+.reserve-card-link:active { transform: scale(0.98); opacity: 0.88; }
 .reserve-card-link:focus { outline: none; }
 .reserve-card-link:focus-visible {
-    outline: 3px solid var(--c-primary, #3182f6);
-    outline-offset: -3px;
+    outline: 2px solid var(--c-text-secondary, #4e5968);
+    outline-offset: -2px;
 }
 .reserve-card--interactive:focus { outline: none; }
 .reserve-card--interactive:focus-visible {
-    outline: 3px solid var(--c-primary, #3182f6);
+    outline: 2px solid var(--c-text-secondary, #4e5968);
     outline-offset: 2px;
 }
 .reserve-card.ant-card-hoverable:hover {
@@ -45,7 +50,9 @@
    전역 * 리셋으로 한 번에 끄지 않는 이유: 이 프로젝트는 antd rc-motion 이 트랜지션
    타이밍에 민감한 이력이 있어 대상을 좁혀서 끈다. */
 @media (prefers-reduced-motion: reduce) {
-    .reserve-card { transition: none; }
+    .reserve-card,
+    .reserve-card-link { transition: none; }
+    .reserve-card-link:active { transform: none; }
     .reserve-card.ant-card-hoverable:hover .reserve-card-image { transform: none; }
 }
 /* Card actions(가게 카드 하단 수정·삭제 줄).
@@ -65,11 +72,12 @@
     padding: 12px 0 !important;
     transition: background-color 0.15s ease;
 }
-/* 가게 추가 카드(점선 테두리) hover — primary 색으로 강조. */
+/* 가게 추가 카드도 중립 회색 면·테두리와 진한 글자로 강조한다. */
 .reserve-card-add:hover {
-    border-color: var(--c-primary, #3182f6);
-    color: var(--c-primary, #3182f6);
+    border-color: var(--c-border-default, #e5e8eb) !important;
+    color: var(--c-text-primary, #1a1f27) !important;
 }
+.reserve-card-add:active { transform: scale(0.97); }
 .reserve-card-add {
     width: 100%;
     padding: 0;
@@ -80,7 +88,7 @@
 .reserve-card-action:focus { outline: none; }
 .reserve-card-add:focus-visible,
 .reserve-card-action:focus-visible {
-    outline: 3px solid var(--c-primary, #3182f6);
+    outline: 2px solid var(--c-text-secondary, #4e5968);
     outline-offset: 2px;
 }
 /* ── Button 상호작용 상태 (2026-08-05: Button.jsx 에서 이관) ────────────────
@@ -98,7 +106,7 @@
 }
 .reserve-btn:focus { outline: none; }
 .reserve-btn:focus-visible {
-    outline: 3px solid var(--c-primary, #3182f6);
+    outline: 2px solid var(--c-text-secondary, #4e5968);
     outline-offset: 2px;
 }
 .reserve-btn--primary:active:not(:disabled),
@@ -121,6 +129,200 @@
 .reserve-btn--ghost-sm-danger:hover:not(:disabled)   { opacity: 0.7; }
 .reserve-btn--ghost-sm-danger:active:not(:disabled)  { opacity: 0.5; transform: scale(0.95); }
 
+/* ── 조회 결과의 빈 상태 · 오류 상태 ───────────────────────────────────────
+   빈 결과와 통신 실패는 다르지만, 일반 조회 실패를 빨간 경고 배지로 쌓으면 같은 서버
+   장애가 화면에서 과장된다. DataState는 무채색 아이콘·본문·재시도로 통일하고,
+   role=alert로 실패 의미만 보존한다. 폼 검증·파괴적 작업 실패에는 쓰지 않는다. */
+.reserve-data-state {
+    min-height: 148px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 28px 20px;
+    color: var(--c-text-secondary, #4e5968);
+    text-align: center;
+}
+.reserve-data-state__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--c-text-tertiary, #8b95a1);
+    font-size: 30px;
+    line-height: 1;
+}
+.reserve-data-state__copy { max-width: 560px; }
+.reserve-data-state__title,
+.reserve-data-state__description { margin: 0; color: var(--c-text-secondary, #4e5968); }
+.reserve-data-state__title { font-size: 14px; line-height: 1.55; }
+.reserve-data-state__description { margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-data-state__retry { margin-top: 2px; }
+.reserve-data-state--compact {
+    min-height: 0;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 18px 16px;
+    text-align: left;
+}
+.reserve-data-state--compact .reserve-data-state__icon { flex: 0 0 auto; font-size: 20px; }
+.reserve-data-state--compact .reserve-data-state__copy { min-width: 0; }
+.reserve-data-state--compact .reserve-data-state__retry { margin: 0 0 0 auto; flex: 0 0 auto; }
+@media (max-width: 479px) {
+    .reserve-data-state--compact { align-items: flex-start; flex-wrap: wrap; }
+    .reserve-data-state--compact .reserve-data-state__retry { margin-left: 28px; }
+}
+
+/* 결제 결과는 일반 목록 오류가 아니라 거래의 확정 여부를 보여 주는 화면이다.
+   URL 파라미터가 아니라 서버 상태를 읽은 결과만 이 면에 넣는다. */
+.reserve-payment-result {
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+}
+.reserve-payment-result__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0 56px;
+    color: var(--c-text-primary, #1a1f27);
+    text-align: center;
+}
+.reserve-payment-result__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    font-size: 27px;
+}
+.reserve-payment-result__icon--success {
+    color: var(--c-success, #00c73c);
+    background: var(--c-success-light, #e8f9ee);
+}
+.reserve-payment-result__icon--progress {
+    color: var(--c-primary, #3182f6);
+    background: var(--c-primary-light, #e8f3ff);
+}
+.reserve-payment-result__icon--neutral {
+    color: var(--c-text-secondary, #4e5968);
+    background: var(--c-gray-100, #f2f4f6);
+}
+.reserve-payment-result__title {
+    margin: 8px 0 -4px;
+    color: var(--c-text-primary, #1a1f27);
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.7px;
+    line-height: 1.3;
+}
+.reserve-payment-result__description {
+    max-width: 368px;
+    margin: 0;
+    color: var(--c-text-secondary, #4e5968);
+    font-size: 15px;
+    line-height: 1.65;
+}
+.reserve-payment-result__hint {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 2px 0 0;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--c-bg-subtle, #f8f9fa);
+    color: var(--c-text-tertiary, #8b95a1);
+    font-size: 13px;
+    line-height: 1.55;
+    text-align: left;
+}
+.reserve-payment-result__recovery {
+    margin: 0;
+    color: var(--c-text-tertiary, #8b95a1);
+    font-size: 13px;
+    line-height: 1.55;
+}
+.reserve-payment-result__recovery button {
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.reserve-payment-result__recovery button:hover { color: var(--c-text-secondary, #4e5968); }
+.reserve-payment-result__recovery button:active { opacity: 0.65; }
+.reserve-payment-result__recovery button:focus { outline: none; }
+.reserve-payment-result__recovery button:focus-visible {
+    outline: 2px solid var(--c-text-secondary, #4e5968);
+    outline-offset: 3px;
+    border-radius: 3px;
+}
+.reserve-payment-result__summary {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 10px 0 0;
+    overflow: hidden;
+    border: 1px solid var(--c-border-default, #e5e8eb);
+    border-radius: 16px;
+    background: var(--c-bg-subtle, #f8f9fa);
+    text-align: left;
+}
+.reserve-payment-result__summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    min-height: 50px;
+    padding: 0 18px;
+}
+.reserve-payment-result__summary-row + .reserve-payment-result__summary-row {
+    border-top: 1px solid var(--c-border-light, #f2f4f6);
+}
+.reserve-payment-result__summary dt {
+    flex: 0 0 auto;
+    color: var(--c-text-tertiary, #8b95a1);
+    font-size: 13px;
+}
+.reserve-payment-result__summary dd {
+    min-width: 0;
+    margin: 0;
+    color: var(--c-text-primary, #1a1f27);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.reserve-payment-result__summary-value--muted {
+    color: var(--c-text-tertiary, #8b95a1) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    overflow-wrap: anywhere;
+}
+.reserve-payment-result__summary-value--strong {
+    color: var(--c-primary, #3182f6) !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+}
+.reserve-payment-result__actions {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+    margin-top: 10px;
+}
+@media (max-width: 479px) {
+    .reserve-payment-result__content { padding-bottom: 40px; }
+    .reserve-payment-result__title { font-size: 24px; }
+    .reserve-payment-result__summary-row { gap: 12px; padding: 0 15px; }
+}
+
 /* outline: hover 시 테두리만 진해지고 글자는 진한 색 그대로 유지
    (예전엔 hover에서 color를 회색으로 바꿔서 더 흐릿해졌다) */
 .reserve-btn--outline:hover:not(:disabled)  { border-color: #adb5bd; background: rgba(0, 0, 0, 0.02); }
@@ -128,6 +330,7 @@
 .reserve-btn--ghost:hover:not(:disabled)    { opacity: 0.7; }
 .reserve-btn--ghost:active:not(:disabled)   { opacity: 0.5; transform: scale(0.94); }
 .reserve-btn--link:hover:not(:disabled)     { opacity: 0.75; }
+.reserve-btn--link:active:not(:disabled)    { opacity: 0.5; transform: scale(0.96); }
 
 .reserve-btn-spin {
     display: inline-block;
@@ -138,11 +341,20 @@
     border-radius: 50%;
     animation: reserve-spin 0.6s linear infinite;
 }
+.reserve-btn-loading-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9em;
+}
 
 /* 즐겨찾기는 토글 버튼이다. JSX의 aria-pressed와 함께 키보드 포커스를 공통 정책으로 보인다. */
+.reserve-favorite-button:hover:not(:disabled) { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.16) !important; }
+.reserve-favorite-button--plain:hover:not(:disabled) { box-shadow: none !important; }
+.reserve-favorite-button:active:not(:disabled) { transform: scale(0.94); }
 .reserve-favorite-button:focus { outline: none; }
 .reserve-favorite-button:focus-visible {
-    outline: 3px solid var(--c-primary, #3182f6);
+    outline: 2px solid var(--c-text-secondary, #4e5968);
     outline-offset: 2px;
 }
 
@@ -154,10 +366,11 @@
     transition: opacity 0.15s ease;
 }
 .reserve-form-field-button:hover:not(:disabled) { opacity: 0.9; }
+.reserve-form-field-button:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
 .reserve-form-field-button:disabled { cursor: not-allowed; }
 .reserve-form-field-button:focus { outline: none; }
 .reserve-form-field-button:focus-visible {
-    outline: 3px solid var(--c-primary, #3182f6);
+    outline: 2px solid var(--c-text-secondary, #4e5968);
     outline-offset: 2px;
     position: relative;
     z-index: 1;
@@ -284,6 +497,381 @@
     align-items: center;
 }
 
+/* 광고 신청 첫 줄의 가게 선택은 짧은 SegmentedControl과 나란히 놓이므로 한 단계 낮춘다. */
+.ant-select.reserve-form-select.reserve-ad-store-select {
+    --ant-select-height: 46px;
+    --ant-select-font-height: 24px;
+    --ant-select-border-radius: 12px;
+}
+
+.reserve-ad-motion-picker {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.reserve-ad-motion-option {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--c-border-light);
+    border-radius: 14px;
+    background: var(--c-bg-paper);
+    color: var(--c-text-primary);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.reserve-ad-motion-option:hover {
+    border-color: var(--c-border-default);
+}
+
+.reserve-ad-motion-option:focus-visible {
+    outline: 2px solid var(--c-text-secondary, #4e5968);
+    outline-offset: 2px;
+}
+
+.reserve-ad-motion-option.is-selected { border-color: var(--c-gray-400, #b5b8bd); background: var(--c-gray-50, #f9fafb); box-shadow: none; }
+
+.reserve-ad-motion-option > strong,
+.reserve-ad-motion-option > span:last-child {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reserve-ad-motion-option > strong {
+    margin-top: 7px;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: nowrap;
+}
+
+.reserve-ad-motion-option > span:last-child {
+    color: var(--c-text-tertiary);
+    font-size: 10px;
+    line-height: 15px;
+    white-space: normal;
+}
+
+.reserve-ad-motion-stage {
+    position: relative;
+    display: block;
+    height: 56px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--c-bg-subtle);
+    perspective: 600px;
+}
+
+.reserve-ad-motion-demo {
+    position: absolute;
+    right: 7px;
+    bottom: 6px;
+    left: 7px;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 5px;
+    box-sizing: border-box;
+    border: 1px solid var(--c-border-light);
+    border-radius: 9px;
+    background: var(--c-bg-paper);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+    transform-origin: 50% 100%;
+    backface-visibility: hidden;
+}
+
+.reserve-ad-motion-option:not(.is-selected) .reserve-ad-motion-demo {
+    opacity: 0.58;
+    transform: scale(0.96);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+.reserve-ad-motion-demo--soft-rise {
+    animation: reserve-ad-motion-preview-soft 900ms cubic-bezier(0.16, 1.2, 0.3, 1) both;
+}
+
+.reserve-ad-motion-demo--tilt-up-3d {
+    animation: reserve-ad-motion-preview-tilt 1100ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
+}
+
+.reserve-ad-motion-demo-image {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--c-primary-light), var(--c-primary));
+}
+
+.reserve-ad-motion-demo-copy {
+    display: grid;
+    gap: 5px;
+}
+
+.reserve-ad-motion-demo-copy i {
+    display: block;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--c-text-primary);
+    opacity: 0.72;
+}
+
+.reserve-ad-motion-demo-copy i:last-child {
+    width: 72%;
+    background: var(--c-primary);
+}
+
+@keyframes reserve-ad-motion-preview-soft {
+    0% { opacity: 0; transform: translateY(16px) scale(0.9); }
+    72% { opacity: 1; transform: translateY(-1px) scale(1.015); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes reserve-ad-motion-preview-tilt {
+    0% { opacity: 0; transform: translateY(12px) rotateX(80deg) scale(0.94); }
+    72% { opacity: 1; transform: translateY(-1px) rotateX(-4deg) scale(1.01); }
+    100% { opacity: 1; transform: translateY(0) rotateX(0deg) scale(1); }
+}
+
+@keyframes reserve-ad-banner-tilt-up {
+    0% { opacity: 0; transform: perspective(900px) translate3d(0, 30px, 0) rotateX(78deg) scale(0.94); }
+    72% { opacity: 1; transform: perspective(900px) translate3d(0, -2px, 0) rotateX(-4deg) scale(1.012); }
+    100% { opacity: 1; transform: perspective(900px) translate3d(0, 0, 0) rotateX(0deg) scale(1); }
+}
+
+.reserve-ad-create-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: reserve-ad-create-page-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── 광고 결제 전 미리보기 (2026-09-23 개편) ─────────────────────────────
+   1) 광고가 보일 모습은 실제 가게 목록과 **같은 컴포넌트**를 preview 로 그린다
+      (StoreCard·StoreListRow·AdBannerSurface). 예전엔 회색 판 안에 흰 카드를 한 겹 더 씌워서
+      실제 목록과 다르게 보였다. 이제 "화면" 테두리 하나만 두고, 그 안은 실제 목록과 같은 흰 바탕이다.
+   2) 결제 정보는 영수증 목록: 왼쪽 항목·오른쪽 값, 계산식(하루 금액 × 일수), 합계만 크게.
+      파란색은 결제 버튼 하나에만 둔다. */
+.reserve-ad-create-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.reserve-ad-placement-preview {
+    display: grid;
+    gap: 16px;
+}
+
+.reserve-ad-preview-section {
+    display: grid;
+    min-width: 0;
+    gap: 8px;
+}
+
+.reserve-ad-preview-section__head {
+    display: flex;
+    min-height: 32px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.reserve-ad-preview-section h4 {
+    margin: 0;
+    color: var(--c-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 20px;
+}
+
+.reserve-ad-preview-screen {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--c-border-light);
+    border-radius: 16px;
+    background: var(--c-bg-paper);
+}
+
+.reserve-ad-preview-screen__card { width: min(100%, 240px); }
+
+.reserve-ad-preview-caption {
+    margin: 0;
+    color: var(--c-text-tertiary);
+    font-size: 12px;
+    line-height: 18px;
+}
+
+.reserve-ad-final-preview-stage {
+    position: relative;
+    min-height: 260px;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 1px solid var(--c-border-light);
+    border-radius: 16px;
+    background: var(--c-bg-paper);
+    isolation: isolate;
+}
+
+.reserve-ad-final-preview-stage__content {
+    position: absolute;
+    inset: 20px;
+    display: grid;
+    align-content: start;
+    gap: 12px;
+}
+
+.reserve-ad-final-preview-stage__content i {
+    display: block;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--c-gray-100);
+}
+
+.reserve-ad-final-preview-stage__content i:nth-child(2) { width: 84%; }
+.reserve-ad-final-preview-stage__content i:nth-child(3) { width: 92%; }
+
+.reserve-ad-final-banner {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2;
+    width: min(360px, calc(100% - 32px));
+    min-height: 100px;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 1px solid var(--c-border-light);
+    border-radius: 20px;
+    background: var(--c-bg-paper);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.16);
+    transform-origin: 50% 100%;
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+}
+
+.reserve-ad-final-banner--soft-rise {
+    animation: reserve-ad-final-preview-soft 520ms cubic-bezier(0.16, 1.32, 0.3, 1) both;
+}
+
+.reserve-ad-final-banner--tilt-up-3d {
+    animation: reserve-ad-banner-tilt-up 620ms cubic-bezier(0.18, 0.82, 0.24, 1) both;
+}
+
+.reserve-ad-final-banner .ad-banner-close-btn { cursor: default !important; }
+
+.reserve-ad-final-preview-loading {
+    display: flex;
+    min-height: 100px;
+    align-items: center;
+    justify-content: center;
+    color: var(--c-text-tertiary);
+    font-size: 12px;
+}
+
+/* 결제 정보 — 토스 결제 확인 화면 방식: 금액이 먼저, 근거는 아래 목록 (2026-09-23) */
+.reserve-ad-checkout {
+    padding: 20px;
+    border-radius: 16px;
+    background: var(--c-bg-subtle);
+}
+
+.reserve-ad-checkout__amount {
+    display: grid;
+    gap: 2px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--c-gray-200, #e5e8eb);
+}
+
+.reserve-ad-checkout__amount h4 {
+    margin: 0;
+    color: var(--c-text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+}
+
+.reserve-ad-checkout__amount strong {
+    color: var(--c-text-primary);
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 34px;
+    font-variant-numeric: tabular-nums;
+}
+
+.reserve-ad-checkout__rows {
+    display: grid;
+    gap: 12px;
+    margin: 16px 0 0;
+}
+
+.reserve-ad-checkout__row {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.reserve-ad-checkout__row dt {
+    flex: 0 0 auto;
+    color: var(--c-text-secondary);
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.reserve-ad-checkout__row dd {
+    min-width: 0;
+    margin: 0;
+    color: var(--c-text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    text-align: right;
+    word-break: keep-all;
+}
+
+.reserve-ad-checkout__note {
+    margin: 16px 0 0;
+    color: var(--c-text-tertiary);
+    font-size: 12px;
+    line-height: 18px;
+}
+
+@keyframes reserve-ad-create-page-enter {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+@keyframes reserve-ad-create-page-enter-back {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+.reserve-ad-create-page--back { animation-name: reserve-ad-create-page-enter-back; }
+
+@keyframes reserve-ad-final-preview-soft {
+    0% { opacity: 0; transform: translateY(28px) scale(0.92); }
+    72% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 599px) {
+    .reserve-ad-final-preview-stage { min-height: 240px; }
+    .reserve-ad-final-banner { right: 12px; bottom: 12px; width: calc(100% - 24px); }
+    .reserve-ad-preview-screen { padding: 12px; }
+    .reserve-ad-checkout { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reserve-ad-motion-demo,
+    .reserve-ad-banner,
+    .reserve-ad-create-page,
+    .reserve-ad-final-banner {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
 /* ── 폼 Select 는 색을 갖지 않는다 (2026-08-05 확정) ────────────────────────
    한때 값 글자를 500 으로 굵히고 꺾쇠·포커스 테두리에 브랜드 색을 넣어봤다가 **전부 되돌렸다.**
 
@@ -397,3 +985,23 @@ input:disabled {
     -webkit-text-fill-color: rgba(255, 255, 255, 0.42) !important;
     color: rgba(255, 255, 255, 0.42) !important;
 }
+
+/* 입력칸 포커스 (2026-09-21) — 입력 면의 포커스는 중립색, 브랜드 파랑은 결과를 바꾸는 행동에만(디자인 시스템).
+   공통 입력은 filled + border:none 이라 AntD 의 파란 포커스 테두리가 가려져 포커스가 아예 보이지 않았고,
+   주소 검색만 파란 테두리·halo 를 따로 칠해 칸마다 달랐다. 검색창·채팅 입력과 같은 1px 중립 테두리로 맞춘다.
+   테두리가 없는 칸이라 안쪽 그림자로 그려 레이아웃이 흔들리지 않게 하고, 오류 상태의 빨간 링은 덮지 않는다.
+   2026-09-23: 진한 회색(#4e5968)이 검은 테두리처럼 부담스럽다는 피드백 → 중간 회색(gray-500)으로 낮췄다.
+   흰 면 대비 3:1 을 넘겨 어느 칸이 입력 중인지는 여전히 보인다. */
+.reserve-form-field:focus-within:not([class*="status-error"]),
+.ant-picker-filled.ant-picker-focused:not([class*="status-error"]),
+.ant-select.reserve-form-select.ant-select-focused:not([class*="status-error"]),
+.reserve-form-date-trigger:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--c-gray-500, #8b95a1);
+}
+/* 날짜 선택은 입력칸처럼 보이는 버튼이다. 버튼 공통의 굵은 외곽선 대신 입력칸과 같은 표시만 쓴다.
+   오류 상태의 빨간 링은 인라인 스타일이라 위 규칙보다 우선해 그대로 남는다. */
+.reserve-form-date-trigger:focus-visible { outline: none; }
+
+/* 표의 코드 칸(주문번호처럼 글자 + 복사 아이콘): 아이콘이 다음 줄로 꺾이지 않게 한 줄로 둔다.
+   칸 폭은 호출부가 실측값으로 준다. 표는 모바일에서 가로로 스크롤한다(2026-09-21). */
+.ant-table .reserve-table-code { white-space: nowrap; }

@@ -1,0 +1,389 @@
+/* A shared location surface: desktop dialog, mobile bottom sheet. */
+@keyframes reserve-region-dialog-enter {
+    from { opacity: 0; transform: translateY(8px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes reserve-region-dialog-leave {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(8px) scale(0.985); }
+}
+@keyframes reserve-region-sheet-enter {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+@keyframes reserve-region-sheet-leave {
+    from { transform: translateY(0); }
+    to { transform: translateY(100%); }
+}
+@keyframes reserve-region-sheet-fade-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes reserve-region-sheet-fade-leave {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+.reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-enter,
+.reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-appear {
+    animation: reserve-region-dialog-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both paused;
+}
+.reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-leave {
+    animation: reserve-region-dialog-leave 180ms ease-in both paused;
+}
+.reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-enter-active,
+.reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-appear-active,
+.reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-leave-active {
+    animation-play-state: running;
+}
+.reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-leave-active { pointer-events: none; }
+.reserve-region-sheet-root .ant-modal-wrap {
+    box-sizing: border-box;
+    padding: 24px;
+}
+.reserve-region-sheet-root .reserve-region-sheet {
+    max-width: min(600px, calc(100vw - 48px));
+    top: 0;
+    margin: min(8svh, 72px) auto 24px;
+    padding-bottom: 0;
+}
+.reserve-region-sheet-root .reserve-region-sheet .ant-modal-container {
+    display: flex;
+    flex-direction: column;
+    height: min(700px, calc(100svh - 96px));
+    overflow: hidden;
+    border-radius: 24px;
+    padding: 0;
+}
+.reserve-region-sheet-root .reserve-region-sheet .ant-modal-header {
+    flex: none;
+    margin: 0;
+    padding: 24px 24px 0;
+}
+.reserve-region-sheet-root .reserve-region-sheet .ant-modal-title {
+    color: var(--c-text-primary);
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 700;
+}
+.reserve-region-sheet-root .reserve-region-sheet .ant-modal-close {
+    top: 18px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    color: var(--c-text-secondary);
+}
+.reserve-region-sheet-root .reserve-region-sheet .ant-modal-close:hover {
+    color: var(--c-text-primary);
+    background: var(--c-hover-surface);
+}
+.reserve-region-sheet-root .reserve-region-sheet .ant-modal-body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+    padding: 0;
+}
+.reserve-qr-sheet-root .reserve-qr-sheet .ant-modal-body {
+    overflow-x: clip;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.reserve-qr-sheet .reserve-qr-scanner {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 460px !important;
+    margin-inline: auto !important;
+    padding: 16px 20px max(28px, env(safe-area-inset-bottom, 0px)) !important;
+}
+.reserve-qr-scanner-actions {
+    display: grid;
+    grid-template-columns: minmax(96px, 1fr) minmax(0, 2fr);
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--c-border-light);
+}
+.reserve-qr-scanner-actions button { width: 100%; }
+.reserve-region-sheet-intro {
+    flex: none;
+    margin: 8px 24px 0;
+    color: var(--c-text-secondary);
+    font-size: 14px;
+    line-height: 20px;
+}
+.reserve-region-sheet-feedback {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 16px 24px 0;
+    color: var(--c-text-secondary);
+    font-size: 13px;
+}
+.reserve-region-sheet-popular {
+    flex: none;
+    min-height: 140px;
+    margin: 24px 24px 16px;
+}
+.reserve-region-sheet-popular h3 {
+    margin: 0 0 12px;
+    color: var(--c-text-primary);
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 700;
+}
+.reserve-region-sheet-popular-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+.reserve-region-sheet-popular-list::-webkit-scrollbar { display: none; }
+.reserve-region-sheet-popular-placeholder {
+    display: flex;
+    flex: 0 0 96px;
+    min-height: 94px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.reserve-region-sheet-popular-placeholder .ant-skeleton-input { width: 64px !important; min-width: 0 !important; }
+.reserve-region-sheet-popular-empty { margin: 12px 0 0; color: var(--c-text-secondary); font-size: 13px; }
+.reserve-region-sheet-popular-item {
+    display: flex;
+    flex: 0 0 96px;
+    min-height: 94px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--c-text-secondary);
+    font: inherit;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+    cursor: pointer;
+}
+.reserve-region-sheet-popular-item:hover { background: var(--c-hover-surface); }
+.reserve-region-sheet-popular-item > span:last-child { word-break: keep-all; }
+.reserve-region-sheet-popular-item.is-selected { color: var(--c-text-primary); font-weight: 700; }
+.reserve-region-sheet-popular-icon {
+    display: grid;
+    position: relative;
+    width: 52px;
+    height: 52px;
+    overflow: hidden;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--c-gray-100);
+    color: var(--c-text-secondary);
+    font-size: 20px;
+}
+.reserve-region-sheet-popular-icon img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.reserve-region-sheet-popular-item.is-selected .reserve-region-sheet-popular-icon {
+    background: var(--c-gray-200);
+    color: var(--c-text-primary);
+    box-shadow: 0 0 0 2px var(--c-bg-paper), 0 0 0 3px var(--c-gray-400, #b5b8bd);
+}
+.reserve-region-sheet-attribution-link {
+    display: inline-block;
+    margin: 8px 0 0;
+    padding: 2px 0;
+    color: var(--c-text-tertiary);
+    font-size: 11px;
+    line-height: 16px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.reserve-region-sheet-attribution-link:hover { color: var(--c-text-secondary); }
+/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+.reserve-region-sheet-attribution-link:active { color: var(--c-text-secondary); }
+.reserve-region-sheet-regions {
+    display: grid;
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-columns: minmax(156px, 34%) minmax(0, 1fr);
+    border-top: 1px solid var(--c-border-light);
+}
+.reserve-region-sheet-groups,
+.reserve-region-sheet-areas {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.reserve-region-sheet-groups { background: var(--c-bg-subtle); }
+.reserve-region-sheet-groups button,
+.reserve-region-sheet-areas button {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 20px;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-primary);
+    font: inherit;
+    font-size: 14px;
+    line-height: 20px;
+    text-align: left;
+    cursor: pointer;
+}
+.reserve-region-sheet-groups button:hover,
+.reserve-region-sheet-areas button:hover { background: var(--c-hover-surface); }
+.reserve-region-sheet-groups button.is-selected,
+.reserve-region-sheet-areas button.is-selected {
+    background: var(--c-bg-paper);
+    color: var(--c-text-primary);
+    font-weight: 700;
+}
+.reserve-region-sheet-areas button.is-selected { background: var(--c-gray-100); }
+.reserve-region-sheet-count { color: var(--c-text-tertiary); font-size: 12px; font-weight: 400; }
+.reserve-region-sheet-areas p {
+    margin: 20px;
+    color: var(--c-text-secondary);
+    font-size: 13px;
+    line-height: 20px;
+}
+/* 전국 선택 시 오른쪽 패널 — 안내 글만 안쪽 여백을 두고, 바로가기는 다른 시군구 줄처럼 꽉 찬 사각형이다(2026-09-23). */
+.reserve-region-sheet-country { padding: 20px 0 0; }
+.reserve-region-sheet-country > strong { display: block; padding-inline: 20px; font-size: 15px; line-height: 22px; }
+.reserve-region-sheet-country p { margin: 6px 0 12px; padding-inline: 20px; }
+.reserve-region-sheet-loading { margin: 20px; }
+.reserve-region-sheet-actions {
+    display: grid;
+    flex: none;
+    grid-template-columns: minmax(96px, 1fr) minmax(0, 2fr);
+    gap: 10px;
+    padding: 14px 24px max(20px, env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--c-border-light);
+    background: var(--c-bg-paper);
+}
+.reserve-region-sheet-actions button { min-height: 48px; }
+.reserve-region-sheet-actions button:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reserve-region-sheet-root button:focus-visible,
+.reserve-discovery-location-link:focus-visible,
+.reserve-explore-region-trigger:focus-visible {
+    outline: 2px solid var(--c-text-secondary);
+    outline-offset: 2px;
+}
+.reserve-discovery-location-link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+}
+.reserve-explore-region-trigger {
+    display: inline-flex;
+    position: relative;
+    flex: 0 0 44px;
+    width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--c-text-secondary);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+}
+.reserve-explore-region-trigger::before {
+    content: '';
+    position: absolute;
+    inset: 6px 2px;
+    border-radius: 8px;
+    background: var(--c-hover-surface);
+    opacity: 0;
+    pointer-events: none;
+}
+.reserve-explore-region-trigger > * { position: relative; }
+.reserve-explore-region-trigger.is-active { color: var(--c-primary); }
+.reserve-explore-region-trigger:disabled {
+    color: var(--c-text-tertiary);
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+@media (hover: hover) and (pointer: fine) {
+    .reserve-explore-region-trigger:hover { color: var(--c-text-primary); }
+    .reserve-explore-region-trigger.is-active:hover { color: var(--c-primary); }
+    .reserve-explore-region-trigger:hover::before { opacity: 1; }
+    .reserve-explore-region-trigger:disabled:hover {
+        color: var(--c-text-tertiary);
+    }
+    .reserve-explore-region-trigger:disabled:hover::before { opacity: 0; }
+}
+@media (max-width: 575px) {
+    .reserve-region-sheet-root .ant-modal-wrap {
+        display: flex;
+        align-items: flex-end;
+        padding: 0;
+        /* AntD focuses a control during entry; auto/hidden allow the wrapper to scroll upward and snap back. */
+        overflow: clip;
+    }
+    .reserve-region-sheet-root .reserve-region-sheet {
+        width: 100% !important;
+        max-width: 100%;
+        margin: 0;
+    }
+    .reserve-region-sheet-root .reserve-region-sheet .ant-modal-container {
+        height: min(86svh, calc(100svh - max(16px, env(safe-area-inset-top, 0px))));
+        border-radius: 24px 24px 0 0;
+    }
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-enter,
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-appear {
+        animation-name: reserve-region-sheet-fade-enter;
+        animation-duration: 260ms;
+    }
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-leave {
+        animation-name: reserve-region-sheet-fade-leave;
+        animation-duration: 220ms;
+    }
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-enter .ant-modal-container,
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-appear .ant-modal-container {
+        animation: reserve-region-sheet-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both paused;
+    }
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-leave .ant-modal-container {
+        animation: reserve-region-sheet-leave 220ms ease-in both paused;
+    }
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-enter-active .ant-modal-container,
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-appear-active .ant-modal-container,
+    .reserve-region-sheet-root .ant-modal.reserve-region-sheet-motion-leave-active .ant-modal-container {
+        animation-play-state: running;
+    }
+    .reserve-region-sheet-root .reserve-region-sheet .ant-modal-header { padding: 22px 20px 0; }
+    .reserve-region-sheet-intro { margin-inline: 20px; }
+    .reserve-region-sheet-popular { margin: 18px 20px 12px; }
+    .reserve-region-sheet-popular-item,
+    .reserve-region-sheet-popular-placeholder { flex-basis: 92px; }
+    .reserve-region-sheet-popular-placeholder:nth-child(n + 5) { display: none; }
+    .reserve-region-sheet-regions { grid-template-columns: minmax(116px, 35%) minmax(0, 1fr); }
+    .reserve-region-sheet-groups button,
+    .reserve-region-sheet-areas button { padding-inline: 14px; }
+    .reserve-region-sheet-country > strong,
+    .reserve-region-sheet-country p { padding-inline: 14px; }
+    .reserve-region-sheet-actions { padding-inline: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .reserve-region-sheet-root .ant-modal,
+    .reserve-region-sheet-root .ant-modal-mask,
+    .reserve-region-sheet-root .ant-modal * { animation-duration: 0s !important; transition-duration: 0s !important; }
+}

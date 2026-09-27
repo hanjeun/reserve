@@ -38,6 +38,8 @@ class SitemapServiceTest {
                 .contains("<loc>https://reserve.it.kr/stores</loc>")
                 .contains("<loc>https://reserve.it.kr/terms</loc>")
                 .contains("<loc>https://reserve.it.kr/privacy</loc>")
+                .contains("<loc>https://reserve.it.kr/content-sources</loc>")
+                .contains("<loc>https://reserve.it.kr/operation-guide</loc>")
                 .contains("<loc>https://reserve.it.kr/store/7</loc>")
                 .contains("<lastmod>2026-09-02</lastmod>")
                 .doesNotContain("/login")

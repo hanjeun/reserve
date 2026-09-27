@@ -70,7 +70,8 @@ const Signup = () => {
                 const { login } = useAuthStore.getState();
                 login(res);
                 message.success(`${res.name || ''}님, 환영합니다!`);
-                navigate('/', { replace: true });
+                // 가입 완료 → 홈. 홈으로 가는 다른 이동(로고·로그아웃)과 같은 방향.
+                navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
             } else {
                 navigate('/login', { state: { signupSuccess: true } });
             }

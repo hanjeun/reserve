@@ -9,14 +9,14 @@
  * 1) StoreSuspendModal/StoreBanModal 로컬 정의를 공용 SanctionModal로 통합 +
  *    key={open ? 'x-open' : 'x-closed'} 강제 remount 제거(닫힘 애니메이션이 죽던 원인).
  * 2) AdminTableSkeleton에 실제 headers/cols 배선.
- * 3) 로딩 조건을 (isLoading || isFetching)으로 통일.
+ * 3) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고, 수동 새로고침은 기존 행을 유지.
  * 4) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab과 동일한 이유.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Typography, Tag, Tooltip } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PauseCircleOutlined, StopOutlined, UndoOutlined } from '@ant-design/icons';
-import { Button, FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
+import { PauseCircleOutlined, StopOutlined, UndoOutlined, StarFilled } from '@ant-design/icons';
+import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
 import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
@@ -25,6 +25,7 @@ import { invalidateAdminData, invalidateStoreData } from '../../hooks/invalidate
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize } from '../../styles/tokens';
+import { normalizeStoreRating } from '../../utils/storeRating';
 
 const { Text } = Typography;
 
@@ -42,7 +43,7 @@ const getStoreSuspendTooltip = (r) => {
 
 // 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 자리에서 관리
 const SKELETON_HEADERS = ['ID', '가게명', '카테고리', '주소', '평점', '상태', '처리'];
-const SKELETON_COLS    = [60, 180, 100, 200, 70, 90, 230];
+const SKELETON_COLS    = [60, 180, 100, 200, 140, 90, 230];
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', page: '1' };
 
@@ -68,7 +69,7 @@ const StoresAdminTab = () => {
     const [storeBanOpen, setStoreBanOpen]               = useState(false);
 
     const {
-        data, isLoading: storeLoading, isFetching, error: storesError, refetch,
+        data, isLoading: storeLoading, isFetching, isPlaceholderData, error: storesError, refetch,
     } = useQuery({
         queryKey: [...adminKeys.stores(), page, debouncedStoreSearch],
         queryFn: async () => {
@@ -88,9 +89,6 @@ const StoresAdminTab = () => {
     });
     const stores = data?.stores ?? [];
     const totalElements = data?.totalElements ?? 0;
-    useEffect(() => {
-        if (storesError) message.error('가게 목록을 불러오지 못했습니다.');
-    }, [storesError, message]);
 
     // 검색은 서버 전체 집합에 적용한다. 검색어가 바뀌면 존재하지 않을 수 있는 페이지를 초기화한다.
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
@@ -155,7 +153,12 @@ const StoresAdminTab = () => {
         { title: '가게명', dataIndex: 'name', key: 'name', width: 180, ellipsis: true, render: v => <Text style={{ fontSize: fontSize.sm }}>{v}</Text> },
         { title: '카테고리', dataIndex: 'category', key: 'category', width: 100, render: v => <Tag>{v || '-'}</Tag> },
         { title: '주소', dataIndex: 'address', key: 'address', width: 200, ellipsis: true, render: v => <Text style={{ fontSize: fontSize.sm }}>{v || '-'}</Text> },
-        { title: '평점', dataIndex: 'rating', key: 'rating', width: 70, render: v => <Text style={{ fontSize: fontSize.sm }}>{v?.toFixed(1) || '0.0'}</Text> },
+        { title: '평점', dataIndex: 'rating', key: 'rating', width: 140, render: (value, store) => {
+            const { rating, reviewCount } = normalizeStoreRating(value, store.reviewCount);
+            return <Text style={{ fontSize: fontSize.sm, whiteSpace: 'nowrap' }}>
+                <StarFilled aria-hidden="true" style={{ color: colors.warning.main }} /> {rating.toFixed(1)} ({reviewCount.toLocaleString('ko-KR')})
+            </Text>;
+        } },
         { title: '상태', dataIndex: 'status', key: 'status', width: 90, render: (v, r) => {
             const cfg = STORE_STATUS_CONFIG[v] || STORE_STATUS_CONFIG.ACTIVE;
             return <Tooltip title={getStoreSuspendTooltip(r)}><Tag color={cfg.color}>{cfg.label}</Tag></Tooltip>;
@@ -183,7 +186,10 @@ const StoresAdminTab = () => {
                 onReload={refetch}
                 loading={storeLoading || isFetching}
             />
-            {(storeLoading || isFetching) ? (
+            {storesError ? (
+                <DataState state="error" kind="store" subject="가게 목록" error={storesError}
+                    onRetry={refetch} retrying={isFetching} compact />
+            ) : (storeLoading || isPlaceholderData) ? (
                 <AdminTableSkeleton
                     rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}

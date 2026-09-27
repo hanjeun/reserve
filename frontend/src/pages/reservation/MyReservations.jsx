@@ -1,22 +1,25 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Empty, Typography } from 'antd';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Typography } from 'antd';
 import {
     CreditCardOutlined, DeleteOutlined, QrcodeOutlined,
     CloseOutlined, StarOutlined, EditOutlined,
 } from '@ant-design/icons';
-import { PageContainer, Button, FilterToolbar, MyReservationCardSkeleton, SpinIndicator } from '../../components/common';
+import { PageContainer, Button, DataState, FilterToolbar, MyReservationCardSkeleton, ReservationSummaryCardSkeleton, SpinIndicator } from '../../components/common';
 import ReservationRow from '../../components/reservation/ReservationRow';
+import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
+import ReservationSummaryCard from '../../components/reservation/ReservationSummaryCard';
 import ReservationDetailModal from '../../components/reservation/ReservationDetailModal';
 import QrCodeModal from '../../components/reservation/QrCodeModal';
 import { useReservations, useMessage, usePayment } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useViewModeParam from '../../hooks/useViewModeParam';
 import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
 import paymentService from '../../services/paymentService';
 import api from '../../api/axios';
 import { formatCurrency } from '../../utils';
-import { API_ENDPOINTS, RESERVATION_STATUS_FILTER_OPTIONS } from '../../constants';
+import { API_ENDPOINTS, RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import { colors, fontWeight, fontSize } from '../../styles/tokens';
 
 const { Title, Text } = Typography;
@@ -24,6 +27,7 @@ const { Title, Text } = Typography;
 // 상태 필터 목록은 constants/status.js 하나에서만 온다 —
 // 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
 const STATUS_OPTIONS = RESERVATION_STATUS_FILTER_OPTIONS;
+const SORT_OPTIONS = RESERVATION_SORT_OPTIONS;
 
 /**
  * 카드 맨 아래 사유 문구. 상태에 따라 읽는 필드와 라벨이 다르다 (2026-08-11).
@@ -47,73 +51,91 @@ const reasonNote = (res) => {
  * 2026-07: 감싸는 flex wrapper(정렬/간격)는 ReservationRow가 담당하므로
  * 여기선 버튼 자체만 반환한다 — 사업자 쪽(ReservationCard.jsx)과 배치 로직을 공유하기 위함.
  */
-const ReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, onReview, onRemove }) => (
-    <>
-        {res.status === 'PENDING' && res.depositAmount > 0 && !res.depositPaid && (
-            <Button variant="ghost-sm-primary" loading={paying}
+const createReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, onReview, onRemove }) => {
+    const actions = [];
+    if (res.status === 'PENDING' && res.depositAmount > 0 && !res.depositPaid) {
+        actions.push(
+            <Button key="pay" variant="ghost-sm-primary" loading={paying}
                 onClick={(e) => { e.stopPropagation(); onPay(res); }}>
                 <CreditCardOutlined /> 결제하기
-            </Button>
-        )}
-        {(res.status === 'PENDING' || res.status === 'CONFIRMED') && (
-            <>
-                {!res.depositPaid && (
-                    <Button variant="ghost-sm-primary"
-                        onClick={(e) => { e.stopPropagation(); onEdit(res); }}>
-                        <EditOutlined /> 변경
-                    </Button>
-                )}
-                {res.status === 'CONFIRMED' && (
-                    <Button variant="ghost-sm-primary"
-                        onClick={(e) => { e.stopPropagation(); onQr(res); }}>
-                        <QrcodeOutlined /> QR
-                    </Button>
-                )}
-                <Button variant="ghost-sm-danger"
-                    onClick={(e) => { e.stopPropagation(); onCancel(res); }}>
-                    <CloseOutlined /> 취소
-                </Button>
-            </>
-        )}
-        {res.status === 'COMPLETED' && (
-            <>
-                {res.reviewId
-                    ? <Button variant="ghost-sm-success"
-                        onClick={(e) => { e.stopPropagation(); onReview(res, true); }}>
-                        <StarOutlined /> 리뷰 보기
-                      </Button>
-                    : <Button variant="ghost-sm-primary"
-                        onClick={(e) => { e.stopPropagation(); onReview(res, false); }}>
-                        <StarOutlined /> 리뷰 쓰기
-                      </Button>
-                }
-                <Button variant="ghost-sm" size="sm"
-                    onClick={(e) => { e.stopPropagation(); onRemove(res); }}
-                    style={{ color: colors.text.tertiary }}>
-                    <DeleteOutlined /> 삭제
-                </Button>
-            </>
-        )}
-        {['CANCELLED', 'REJECTED', 'NO_SHOW'].includes(res.status) && (
-            <Button variant="ghost-sm" size="sm"
+            </Button>,
+        );
+    }
+    if (res.status === 'PENDING' || res.status === 'CONFIRMED') {
+        if (!res.depositPaid) {
+            actions.push(
+                <Button key="edit" variant="ghost-sm-primary"
+                    onClick={(e) => { e.stopPropagation(); onEdit(res); }}>
+                    <EditOutlined /> 변경
+                </Button>,
+            );
+        }
+        if (res.status === 'CONFIRMED') {
+            actions.push(
+                <Button key="qr" variant="ghost-sm-primary"
+                    onClick={(e) => { e.stopPropagation(); onQr(res); }}>
+                    <QrcodeOutlined /> QR
+                </Button>,
+            );
+        }
+        actions.push(
+            <Button key="cancel" variant="ghost-sm-danger"
+                onClick={(e) => { e.stopPropagation(); onCancel(res); }}>
+                <CloseOutlined /> 취소
+            </Button>,
+        );
+    }
+    if (res.status === 'COMPLETED') {
+        actions.push(res.reviewId
+            ? <Button key="review" variant="ghost-sm-success"
+                onClick={(e) => { e.stopPropagation(); onReview(res, true); }}>
+                <StarOutlined /> 리뷰 보기
+              </Button>
+            : <Button key="review" variant="ghost-sm-primary"
+                onClick={(e) => { e.stopPropagation(); onReview(res, false); }}>
+                <StarOutlined /> 리뷰 쓰기
+              </Button>);
+        actions.push(
+            <Button key="remove" variant="ghost-sm" size="sm"
                 onClick={(e) => { e.stopPropagation(); onRemove(res); }}
                 style={{ color: colors.text.tertiary }}>
                 <DeleteOutlined /> 삭제
-            </Button>
-        )}
-    </>
-);
+            </Button>,
+        );
+    }
+    if (['CANCELLED', 'REJECTED', 'NO_SHOW'].includes(res.status)) {
+        actions.push(
+            <Button key="remove" variant="ghost-sm" size="sm"
+                onClick={(e) => { e.stopPropagation(); onRemove(res); }}
+                style={{ color: colors.text.tertiary }}>
+                <DeleteOutlined /> 삭제
+            </Button>,
+        );
+    }
+    return actions;
+};
 
 const MyReservations = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const { message, confirm } = useMessage();
-    const { reservations, loading, refetching, cancelReservation, refetch } = useReservations();
+    const { reservations, loading, refetching, error, cancelReservation, refetch } = useReservations();
     const { user } = useAuthStore();
     const { pay, paying } = usePayment();
     useDocumentTitle('내 예약');
 
-    const [statusFilter, setStatusFilter] = useState('ALL');
+    const statusFilter = STATUS_OPTIONS.some(option => option.value === urlSearchParams.get('status'))
+        ? urlSearchParams.get('status') : 'ALL';
+    const sort = SORT_OPTIONS.some(option => option.value === urlSearchParams.get('sort'))
+        ? urlSearchParams.get('sort') : 'recent';
+    const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'list');
+    const setToolbarParam = (key, value) => setUrlSearchParams(current => {
+        const next = new URLSearchParams(current);
+        if (value && !(key === 'sort' && value === 'recent') && !(key === 'status' && value === 'ALL')) next.set(key, value);
+        else next.delete(key);
+        return next;
+    });
     const [keyword, setKeyword] = useState('');
     const debouncedKeyword = useDebounce(keyword, 300);
     const [qrReservationId, setQrReservationId] = useState(null);
@@ -145,8 +167,16 @@ const MyReservations = () => {
                 r.reservationCode?.toLowerCase().includes(kw)
             );
         }
+        // 서버 응답은 생성 최신순이며 응답 DTO에는 생성 시각이 없다. 이 순서만 뒤집고,
+        // 방문일은 응답의 예약 날짜·시간 필드를 사용한다.
+        if (sort === 'oldest') return [...list].reverse();
+        if (sort === 'visit') return [...list].sort((a, b) => {
+            const aDate = a.reservationDate ? `${a.reservationDate}T${a.reservationTime || ''}` : '9999';
+            const bDate = b.reservationDate ? `${b.reservationDate}T${b.reservationTime || ''}` : '9999';
+            return aDate.localeCompare(bDate);
+        });
         return list;
-    }, [reservations, statusFilter, debouncedKeyword]);
+    }, [reservations, statusFilter, debouncedKeyword, sort]);
 
     const handlePay = async (res) => {
         await pay(
@@ -244,21 +274,21 @@ const MyReservations = () => {
         onCancel: handleCancel, onReview: handleReview, onRemove: handleRemove,
     };
 
-    const renderReservationRow = (res) => (
-        <ReservationRow
-            reservation={res}
-            onOpenDetail={() => setDetailReservation(res)}
-            renderActions={() => <ReservationActions res={res} {...actionHandlers} />}
-            // 사유 문구 — 거절(REJECTED)과 취소(CANCELLED)는 서로 다른 필드를 읽는다.
-            // CANCELLED 의 cancelReason 은 **가게가 취소했을 때만** 채워진다(2026-08-11 신설).
-            // 본인이 취소한 건에는 값이 없어 이 줄이 그대로 사라진다 — 자기가 누른 걸 다시
-            // 설명할 필요는 없으니 의도한 동작이다.
-            extraNote={reasonNote(res)}
-        />
-    );
+    const renderReservationItem = (res) => {
+        const actions = createReservationActions({ res, ...actionHandlers });
+        const itemProps = {
+            reservation: res,
+            onOpenDetail: () => setDetailReservation(res),
+            extraNote: reasonNote(res),
+        };
+        if (view === 'cards') {
+            return <ReservationSummaryCard {...itemProps} actions={actions} />;
+        }
+        return <ReservationRow {...itemProps} renderActions={() => actions} />;
+    };
 
     return (
-        <PageContainer size="xl" paddingTop="40px">
+        <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page" aria-busy={loading || refetching}>
             <div style={{ marginBottom: 32 }}>
                 <Title level={2} style={styles.title}>내 예약 확인</Title>
                 <Text type="secondary" style={{ fontSize: fontSize.lg }}>
@@ -266,43 +296,54 @@ const MyReservations = () => {
                 </Text>
             </div>
 
+            <ReservationListingToolbar view={view}
+                onViewChange={setView}
+                status={statusFilter} onStatusChange={nextStatus => setToolbarParam('status', nextStatus)}
+                statusOptions={STATUS_OPTIONS} sort={sort}
+                onSortChange={nextSort => setToolbarParam('sort', nextSort)} sortOptions={SORT_OPTIONS}
+                count={loading || (error && reservations.length === 0) ? undefined : filtered.length} disabled={loading || refetching} />
             <FilterToolbar
-                selects={[{
-                    value: statusFilter,
-                    onChange: setStatusFilter,
-                    options: STATUS_OPTIONS,
-                    width: 140,
-                    disabled: loading || refetching,
-                }]}
-                count={filtered.length}
                 search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약번호로 검색', disabled: loading || refetching }}
                 onReload={refetch}
                 loading={loading || refetching}
             />
 
-            {/* 최초 로딩뿐 아니라 백그라운드 재조회(refetching) 중에도 동일하게 스켈레톤 노출 —
-                StoreList.jsx와 동일한 컨벤션(이 목록도 원래 스켈레톤이 자체 로딩 관례이므로) */}
-            {(loading || refetching) ? (
-                <MyReservationCardSkeleton count={4} />
-            ) : filtered.length === 0 ? (
-                <div style={{ marginTop: 100 }}>
-                    <Empty description={
-                        <span style={{ color: colors.text.tertiary }}>
-                            {statusFilter === 'ALL' && !debouncedKeyword.trim()
-                                ? '예약 내역이 없습니다.'
-                                : '조건에 맞는 예약이 없습니다.'}
-                        </span>
-                    } />
-                </div>
+            {/* 첫 조회에만 스켈레톤을 표시한다. 폴링·창 포커스·수동 새로고침은 현재 예약과
+                읽던 위치를 유지하고 툴바에서만 진행 상태를 알린다. */}
+            {loading ? (
+                <div role="status" aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
+                    {view === 'cards'
+                        ? <ReservationSummaryCardSkeleton count={4} />
+                        : <MyReservationCardSkeleton count={4} />}
+                </div></div>
+            ) : error && reservations.length === 0 ? (
+                // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
+                <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                    onRetry={refetch} retrying={loading || refetching} style={{ marginTop: 100 }} />
             ) : (
-                <div>
-                    {filtered.map((res, i) => (
-                        <React.Fragment key={res.id}>
-                            {renderReservationRow(res)}
-                            {i < filtered.length - 1 && <div style={styles.divider} />}
-                        </React.Fragment>
-                    ))}
-                </div>
+                <>
+                    {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
+                    {error && (
+                        <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                            title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                            onRetry={refetch} retrying={loading || refetching} compact style={{ marginBottom: 16 }} />
+                    )}
+                    {filtered.length === 0 ? (
+                        <DataState state="empty" kind="reservation" style={{ marginTop: 100 }}
+                            title={statusFilter === 'ALL' && !debouncedKeyword.trim()
+                                ? '예약 내역이 없습니다.'
+                                : '조건에 맞는 예약이 없습니다.'} />
+                    ) : (
+                        <div className={view === 'cards' ? 'reserve-reservation-card-grid' : 'reserve-myreservation-rows'}>
+                            {filtered.map((res, i) => (
+                                <div key={res.id} className={view === 'cards' ? 'reserve-myreservation-card-item' : 'reserve-myreservation-row'}>
+                                    {renderReservationItem(res)}
+                                    {view === 'list' && i < filtered.length - 1 && <div style={styles.divider} />}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
             )}
             <QrCodeModal
                 reservationId={qrReservationId}

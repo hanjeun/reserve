@@ -8,6 +8,7 @@ import kr.it.reserve.community.repository.CommunityCommentRepository;
 import kr.it.reserve.community.repository.CommunityPostRepository;
 import kr.it.reserve.community.repository.PostLikeRepository;
 import kr.it.reserve.global.error.CommunityException;
+import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class CommunityService {
 
     // 공통 페이징 생성
     private Pageable getPageable(int page, int size) {
-        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return PageRequests.bounded(page, size).withSort(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
     public Page<CommunityDto.PostResponse> getPosts(String category, int page, int size) {
@@ -73,16 +74,17 @@ public class CommunityService {
         return new PageImpl<>(responses, pageable, postPage.getTotalElements());
     }
 
-    @Transactional
     public CommunityDto.PostResponse getPost(Long postId, Long memberId) {
-        if (postRepository.incrementViewCount(postId) == 0) {
-            throw new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
-        }
         CommunityPost post = postRepository.findByIdWithAuthorAndComments(postId)
                 .orElseThrow(() -> new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         boolean isLiked = memberId != null && postLikeRepository.existsByPostIdAndMemberId(postId, memberId);
         return CommunityDto.PostResponse.fromEntity(post, memberId != null ? memberId : -1L, isLiked);
+    }
+
+    @Transactional
+    public void recordView(Long postId) {
+        postRepository.incrementViewCount(postId);
     }
 
     @Transactional

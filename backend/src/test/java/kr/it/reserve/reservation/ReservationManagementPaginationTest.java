@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -34,12 +35,25 @@ class ReservationManagementPaginationTest {
         Fixture fixture = fixture(count);
         List<Long> actual = new ArrayList<>();
         for (int page = 0; page * 15 < count; page++) {
-            var result = repository.searchForStoreOwner(fixture.owner(), "", null, null, PageRequest.of(page, 15));
+            var result = repository.searchForStoreOwner(fixture.owner(), "", null, null,
+                    PageRequest.of(page, 15, Sort.by(Sort.Direction.DESC, "createdAt", "id")));
             assertThat(result.getTotalElements()).isEqualTo(count);
             actual.addAll(result.map(Reservation::getId).getContent());
         }
         assertThat(actual).hasSize(count).doesNotHaveDuplicates();
         assertThat(actual).isSortedAccordingTo(java.util.Comparator.reverseOrder());
+    }
+
+    @Test
+    void managementQueryHonorsRequestedSortInsteadOfHardCodingRecentOrder() {
+        Fixture fixture = fixture(3);
+        var recent = repository.searchForStoreOwner(fixture.owner(), "", null, null,
+                PageRequest.of(0, 15, Sort.by(Sort.Direction.DESC, "createdAt", "id")));
+        var oldest = repository.searchForStoreOwner(fixture.owner(), "", null, null,
+                PageRequest.of(0, 15, Sort.by(Sort.Direction.ASC, "createdAt", "id")));
+
+        assertThat(recent.getContent()).extracting(Reservation::getId)
+                .containsExactlyElementsOf(oldest.getContent().stream().map(Reservation::getId).toList().reversed());
     }
 
     @Test

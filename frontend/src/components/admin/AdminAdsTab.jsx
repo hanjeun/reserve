@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Tag, Typography } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { StopOutlined } from '@ant-design/icons';
-import { Button, AdminTableSkeleton, DataTable, FilterToolbar } from '../common';
+import { Button, AdminTableSkeleton, DataState, DataTable, FilterToolbar } from '../common';
 import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
 import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import adService from '../../services/adService';
+import { AD_TYPE_LABELS } from '../../constants';
 import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -81,7 +82,7 @@ const AdminAdsTab = () => {
     //   서버는 페이지네이션만 하는데 프론트가 그 페이지 안에서만 filter를 걸어서
     //   **검색이 현재 페이지 안에서만 동작**했다(2페이지의 광고는 1페이지에서 검색해도 안 나옴).
     //   검색을 서버로 넘기고, 검색어를 캐시 키에 포함시켜 해결한다.
-    const { data, isLoading: loading, isFetching, error: adsError, refetch } = useQuery({
+    const { data, isLoading: loading, isFetching, isPlaceholderData, error: adsError, refetch } = useQuery({
         queryKey: [...adKeys.admin(), page, debouncedSearch],
         queryFn: async () => {
             const result = await adService.getAllAds(page, PAGE_SIZE, debouncedSearch);
@@ -92,17 +93,12 @@ const AdminAdsTab = () => {
                 totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
             };
         },
-        // 2026-07 전수조사: keepPreviousData가 없어서 페이지를 넘길 때마다 data가 잠시 undefined가 되며
-        // 스켈레톤이 띄었다 사라졌다(깜빡임) — AuditLogTab과 동일하게 이전 페이지 데이터를
-        // 유지하도록 변경. 로딩 신호는 아래 (loading || isFetching) 조건이 담당한다.
+        // 페이지·검색 전환에는 이전 결과를 유지한다. 표 본문은 placeholder 상태에서만 스켈레톤으로
+        // 바꾸고, 같은 조건의 수동 새로고침은 기존 행을 유지한 채 툴바에만 진행 상태를 표시한다.
         placeholderData: keepPreviousData,
     });
     const ads = data?.ads ?? EMPTY_ADS;
     const totalElements = data?.totalElements ?? 0;
-    useEffect(() => {
-        if (adsError) message.error('광고 목록을 불러오지 못했습니다.');
-    }, [adsError, message]);
-
     const suspendMutation = useMutation({
         mutationFn: ({ adId, reason }) => adService.suspendAd(adId, reason),
         onSuccess: () => {
@@ -121,7 +117,7 @@ const AdminAdsTab = () => {
 
     const columns = [
         { title: '가게', dataIndex: 'storeName', key: 'storeName', width: 220, ellipsis: true },
-        { title: '유형', dataIndex: 'adType', key: 'adType', width: 90, render: (v) => (v === 'BADGE' ? '배지형' : '배너형') },
+        { title: '유형', dataIndex: 'adType', key: 'adType', width: 90, render: (v) => AD_TYPE_LABELS[v] || v },
         { title: '기간', key: 'period', width: 190, render: (_, r) => `${r.startDate} ~ ${r.endDate}` },
         { title: '금액', dataIndex: 'amount', key: 'amount', width: 100, render: (v) => `${v?.toLocaleString()}원` },
         {
@@ -151,7 +147,10 @@ const AdminAdsTab = () => {
                 onReload={refetch}
                 loading={loading || isFetching}
             />
-            {(loading || isFetching) ? (
+            {adsError ? (
+                <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
+                    onRetry={refetch} retrying={isFetching} compact />
+            ) : (loading || isPlaceholderData) ? (
                 <AdminTableSkeleton
                     rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}

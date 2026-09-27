@@ -134,6 +134,12 @@ public class RateLimiter {
          */
         CHAT_SEND(30, Duration.ofMinutes(1)),
         /**
+         * 채팅 신고 — 로그인 회원 ID 축. 같은 대상은 DB 멱등 키로 한 번만 저장하지만, 서로 다른 메시지를
+         * 자동 제출해 관리자 큐를 부풀리는 경로는 별도로 제한한다. 정상 신고가 10분에 5건을 넘는 경우는
+         * 드물고, IP 대신 회원 축을 써 회사·통신사 NAT의 다른 사용자를 함께 막지 않는다.
+         */
+        CHAT_REPORT(5, Duration.ofMinutes(10)),
+        /**
          * 문의하기 작성 — IP 축 (2026-08-25 신설).
          *
          * <h3>이게 왜 급했나</h3>
@@ -154,7 +160,9 @@ public class RateLimiter {
          * 정상 사용자가 10분 안에 5건을 쓰는 경우는 사실상 없고, 카페·회사 NAT 를 감안해도
          * 문의는 한 IP 에서 동시에 여러 명이 쏟아내는 종류가 아니다.
          */
-        INQUIRY_CREATE(5, Duration.ofMinutes(10));
+        INQUIRY_CREATE(5, Duration.ofMinutes(10)),
+        // 공개 지역 선택 화면이 외부 관광 API·이미지 프록시를 비용 없이 소진하지 않도록 IP 기준으로 제한한다.
+        TOURISM_REGION_PHOTO(60, Duration.ofMinutes(1));
 
         final int capacity;
         final Duration refillDuration;

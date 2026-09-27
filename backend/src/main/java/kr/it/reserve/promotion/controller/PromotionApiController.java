@@ -17,6 +17,19 @@ public class PromotionApiController {
 
     private final PromotionService promotionService;
 
+    @GetMapping("/public")
+    public ApiResponse<Page<PromotionDto.PublicPromotionSummaryResponse>> getPublicPromotions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return ApiResponse.success(promotionService.getPublicPromotions(page, size), "가게 소식 목록 조회 성공");
+    }
+
+    @GetMapping("/public/{promotionId}")
+    public ApiResponse<PromotionDto.PublicPromotionDetailResponse> getPublicPromotion(
+            @PathVariable Long promotionId) {
+        return ApiResponse.success(promotionService.getPublicPromotion(promotionId), "가게 소식 상세 조회 성공");
+    }
+
     // 전체 홍보글 목록 조회
     @GetMapping
     public ApiResponse<Page<PromotionDto.PromotionResponse>> getAllPromotions(

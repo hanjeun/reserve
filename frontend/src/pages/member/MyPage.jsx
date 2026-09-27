@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Typography, Divider, Form, Switch, Upload, Input, Tabs } from 'antd';
 import {
     LockOutlined,
@@ -13,7 +13,7 @@ import {
     SunOutlined,
     MoonOutlined,
 } from '@ant-design/icons';
-import { PageContainer, Button, FormInput, Avatar, Bone, SegmentedControl, FormSelect } from '../../components/common';
+import { PageContainer, Button, DataState, FormInput, Avatar, Bone, SegmentedControl, FormSelect } from '../../components/common';
 import useTheme, { FONT_OPTIONS, ACCENT_OPTIONS } from '../../hooks/useTheme';
 import AddressSearch from '../../components/store/StoreForm/AddressSearch';
 import { useMessage } from '../../hooks';
@@ -23,6 +23,7 @@ import { hasAdminAccess } from '../../constants/roles';
 import { canWithdrawMember } from '../../utils/lifecycleReadiness';
 import { handleApiError } from '../../utils/errorHandler';
 import { VALIDATION_RULES } from '../../utils/validation';
+import { IMAGE_ACCEPT, imageFileError } from '../../utils/imageUploadPolicy';
 import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
 import useAuthStore from '../../store/useAuthStore';
 import useExitAnimation from '../../hooks/useExitAnimation';
@@ -32,6 +33,7 @@ import { colors, radius, shadows, fontSize, fontWeight, animation, breakpoints }
 import { useWindowWidth } from '../../hooks';
 
 const { Text } = Typography;
+const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 // ─── 이름 변경 탭 ─────────────────────────────────────────────────────────────
 
@@ -83,10 +85,10 @@ const PasswordTab = () => {
                 newPassword,
                 newPasswordConfirm: confirmPassword,
             });
-            // 서버가 모든 기기의 세션을 끊었다(authVersion 회전 + refresh 전부 삭제). 로컬 상태도 비운다.
             useAuthStore.getState().logout();
             message.success('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
-            navigate('/login', { replace: true });
+            // 비밀번호 변경 → 다시 로그인: 흐름이 이어지는 이동(오른쪽에서)
+            navigate('/login', { replace: true, state: { reserveRouteMotion: 'from-right' } });
         } catch (err) {
             handleApiError(err, message, '비밀번호 변경에 실패했습니다');
         } finally {
@@ -150,14 +152,8 @@ const ProfileImageTab = ({ user }) => {
     const handleFileChange = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            message.error('이미지 파일만 업로드 가능합니다');
-            return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-            message.error('파일 크기는 5MB 이하만 가능합니다');
-            return;
-        }
+        const imageError = imageFileError(file, PROFILE_IMAGE_MAX_BYTES);
+        if (imageError) { message.error(imageError); return; }
         if (pending?.previewUrl) URL.revokeObjectURL(pending.previewUrl);
         setPending({ file, previewUrl: URL.createObjectURL(file) });
     };
@@ -234,7 +230,7 @@ const ProfileImageTab = ({ user }) => {
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept={IMAGE_ACCEPT}
                 style={{ display: 'none' }}
                 onChange={handleFileChange}
             />
@@ -289,6 +285,10 @@ const ProfileImageTab = ({ user }) => {
 const LocationTab = ({ user }) => {
     const { message } = useMessage();
     const [form] = Form.useForm();
+    // 우편번호·상세주소는 폼의 현재 값을 넘긴다(가게 폼과 같은 방식). 저장된 회원 값을 넘기면 주소를 다시 골라도
+    // AddressSearch 의 동기화가 옛 우편번호·상세주소로 되돌린다(2026-09-24).
+    const watchedZipCode = Form.useWatch('zipCode', form);
+    const watchedAddressDetail = Form.useWatch('addressDetail', form);
 
     const hasSaved = user?.latitude != null && user?.longitude != null;
 
@@ -373,8 +373,8 @@ const LocationTab = ({ user }) => {
                     필수로 강제하지 않는다. */}
                 <Form.Item name="address" rules={VALIDATION_RULES.address} style={{ marginBottom: 12 }}>
                     <AddressSearch
-                        zipCode={user?.locationZipCode || ''}
-                        addressDetail={user?.locationAddressDetail || ''}
+                        zipCode={watchedZipCode ?? ''}
+                        addressDetail={watchedAddressDetail ?? ''}
                         onMeta={(meta) => {
                             // 2026-07 추가 — 좀 있으면 setCoords를 건너뛰고 이전 좌표가 그대로 남았다.
                             // AddressSearch가 주소를 고치려고 재포커스할 때 onMeta({ latitude: null, ... })를
@@ -412,27 +412,42 @@ const BusinessTab = ({ user }) => {
     const [cancelLoading, setCancelLoading] = useState(false);
     const [resignLoading, setResignLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [statusError, setStatusError] = useState(false);
+    const [editState, setEditState] = useState({ scope: null, status: 'idle' });
+    const editRequestRef = useRef(null);
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
+    const editScope = `${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
+    const editLoading = editState.scope === editScope && editState.status === 'loading';
+    const editError = editState.scope === editScope && editState.status === 'error';
+
+    useLayoutEffect(() => () => { editRequestRef.current = null; }, [editScope]);
 
     const isBusiness = user?.role === 'BUSINESS';
 
-    useEffect(() => {
-        if (isBusiness) { setStatusLoading(false); return; }
-        businessService.getMyStatus()
+    const loadStatus = useCallback(() => {
+        setStatusLoading(true);
+        setStatusError(false);
+        return businessService.getMyStatus()
             .then(res => {
                 setStatus(res?.status ?? null);
                 setRejectionReason(res?.rejectionReason ?? null);
             })
-            .catch(() => setStatus(null))
+            .catch(() => { setStatus(null); setStatusError(true); })
             .finally(() => setStatusLoading(false));
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (isBusiness) { setStatusLoading(false); return; }
+        void loadStatus();
+    }, [isBusiness, loadStatus]);
 
     // 사업자 등록증도 가게 이미지와 동일한 picture-card Upload + 공유 useImagePreview로 통일.
     // AntD Upload가 fileList/썸네일을 관리하므로 별도 blob URL 관리가 필요 없다.
     const licenseFile = licenseList[0]?.originFileObj ?? null;
     const handleLicenseChange = ({ fileList }) => setLicenseList(fileList);
     const beforeUploadLicense = (file) => {
-        if (!file.type.startsWith('image/')) { message.error('이미지 파일만 업로드 가능합니다'); return Upload.LIST_IGNORE; }
-        if (file.size > 5 * 1024 * 1024) { message.error('5MB 이하 파일만 가능합니다'); return Upload.LIST_IGNORE; }
+        const imageError = imageFileError(file, PROFILE_IMAGE_MAX_BYTES);
+        if (imageError) { message.error(imageError); return Upload.LIST_IGNORE; }
         return false;
     };
 
@@ -455,17 +470,40 @@ const BusinessTab = ({ user }) => {
 
     // 수정 모드 진입 시 기존 데이터 자동 채우기
     const handleStartEdit = async () => {
+        if (cancelLoading || editRequestRef.current?.scope === editScope) return;
+        const request = { scope: editScope, sessionRevision, memberId: user?.id, role: user?.role };
+        editRequestRef.current = request;
+        setEditState({ scope: editScope, status: 'loading' });
+        const isCurrent = () => {
+            const auth = useAuthStore.getState();
+            return editRequestRef.current === request
+                && auth.sessionRevision === request.sessionRevision
+                && auth.user?.id === request.memberId && auth.user?.role === request.role;
+        };
         try {
             const current = await businessService.getMyStatus();
+            if (!isCurrent()) return;
+            // 조회 실패·사라진 신청·불완전 응답으로 빈 수정 폼을 열지 않는다.
+            if (current?.status !== 'PENDING'
+                || typeof current.businessName !== 'string' || !current.businessName.trim()) {
+                throw new Error('Pending business verification is unavailable');
+            }
             setForm({
-                businessName: current?.businessName || '',
-                businessNumber: current?.businessNumber || '',
-                memo: current?.memo || '',
+                businessName: current.businessName,
+                businessNumber: current.businessNumber || '',
+                memo: current.memo || '',
             });
+            setEditState({ scope: editScope, status: 'ready' });
+            setIsEditing(true);
         } catch {
-            // 실패 시 빈 폼으로 시작
+            if (isCurrent()) setEditState({ scope: editScope, status: 'error' });
+        } finally {
+            if (isCurrent()) {
+                editRequestRef.current = null;
+                setEditState(state => state.status === 'loading'
+                    ? { scope: editScope, status: 'idle' } : state);
+            }
         }
-        setIsEditing(true);
     };
 
     // 상호명·등록증 검사도 BusinessForm 의 rules / license validator 가 담당한다(위 handleUpdate 주석 참고).
@@ -487,6 +525,9 @@ const BusinessTab = ({ user }) => {
             title: '신청 취소', content: '사업자 인증 신청을 취소하시겠습니까?',
             okText: '취소하기', cancelText: '닫기', okButtonProps: { danger: true }, centered: true,
             onOk: async () => {
+                // 취소 중 뒤늦게 도착한 프리필이 편집창을 다시 열지 못하게 한다.
+                editRequestRef.current = null;
+                setEditState({ scope: editScope, status: 'idle' });
                 setCancelLoading(true);
                 try {
                     await businessService.cancel();
@@ -524,15 +565,22 @@ const BusinessTab = ({ user }) => {
     };
 
     if (statusLoading) return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Bone height={36} borderRadius={radius.lg} />
-            <Bone height={44} borderRadius={radius.lg} />
-            <Bone height={44} borderRadius={radius.lg} />
-            <Bone height={44} borderRadius={radius.lg} />
-            <Bone height={100} borderRadius={radius.lg} />
-            <Bone height={46} borderRadius={radius.xl} />
+        <div role="status" aria-label="사업자 인증 상태를 불러오는 중" aria-busy="true">
+            <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Bone height={36} borderRadius={radius.lg} />
+                <Bone height={44} borderRadius={radius.lg} />
+                <Bone height={44} borderRadius={radius.lg} />
+                <Bone height={44} borderRadius={radius.lg} />
+                <Bone height={100} borderRadius={radius.lg} />
+                <Bone height={46} borderRadius={radius.xl} />
+            </div>
         </div>
     );
+
+    if (statusError && !isBusiness) return <DataState state="error" kind="member"
+        title="사업자 인증 상태를 불러오지 못했습니다."
+        description="신청 상태를 확인한 뒤 인증 신청을 진행할 수 있습니다."
+        onRetry={loadStatus} />;
 
     // ── 사업자 이미 완료 ──
     if (isBusiness) return (
@@ -561,7 +609,7 @@ const BusinessTab = ({ user }) => {
     // ── 심사 대기중 ──
     if (status === 'PENDING') {
         // 수정 모드일 때는 폼 표시
-        if (isEditing) return (
+        if (isEditing && editState.scope === editScope && editState.status === 'ready') return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={bizStyles.statusCard('warning')}>
                     <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
@@ -592,9 +640,16 @@ const BusinessTab = ({ user }) => {
                         <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>관리자 검토 후 승인 여부를 알려드립니다</Text>
                     </div>
                 </div>
+                {editLoading && <div role="status" aria-label="사업자 신청 내용을 불러오는 중" aria-busy="true">
+                    기존 신청 내용을 확인하고 있습니다.
+                </div>}
+                {editError && <DataState state="error" kind="member"
+                    title="사업자 신청 내용을 불러오지 못했습니다."
+                    description="기존 신청은 변경되지 않았습니다. 다시 확인한 뒤 수정할 수 있습니다."
+                    onRetry={handleStartEdit} compact />}
                 <div style={{ display: 'flex', gap: 8 }}>
                     <Button variant="secondary" loading={cancelLoading} onClick={handleCancel} style={{ flex: 1 }}>신청 취소</Button>
-                    <Button variant="primary" onClick={handleStartEdit} style={{ flex: 1 }}>수정하기</Button>
+                    <Button variant="primary" loading={editLoading} disabled={cancelLoading} onClick={handleStartEdit} style={{ flex: 1 }}>수정하기</Button>
                 </div>
             </div>
         );
@@ -726,7 +781,7 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
                     onPreview={onPreview}
                     onClickCapture={onPreviewClickCapture}
                     beforeUpload={beforeUpload}
-                    accept="image/*"
+                    accept={IMAGE_ACCEPT}
                     maxCount={1}
                 >
                     {fileList.length === 0 && (
@@ -953,55 +1008,97 @@ const AppearanceSection = () => {
 
 const MyPage = () => {
     const navigate = useNavigate();
-    const { user, logout, checkAuth } = useAuthStore();
+    const { user, logout, checkAuth, sessionRevision } = useAuthStore();
     const { message, confirm } = useMessage();
     useDocumentTitle('마이페이지');
+    const [withdrawState, setWithdrawState] = useState({ scope: null, checking: false });
+    const withdrawRequestRef = useRef(null);
+    const withdrawalMountedRef = useRef(false);
+    const withdrawScope = `${user?.id}:${user?.role}:${sessionRevision}`;
+    const withdrawChecking = withdrawState.scope === withdrawScope && withdrawState.checking;
+
+    useLayoutEffect(() => {
+        withdrawalMountedRef.current = true;
+        return () => {
+            withdrawalMountedRef.current = false;
+            withdrawRequestRef.current = null;
+        };
+    }, [withdrawScope]);
 
     // 마이페이지 진입 시 항상 최신 user 정보를 서버에서 재조회 (localStorage 캐시 신뢰하지 않음)
     useEffect(() => { checkAuth(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleDeleteAccount = async () => {
-        let readiness;
+        const auth = useAuthStore.getState();
+        if (!withdrawalMountedRef.current || !auth.isLoggedIn || user?.id == null || !user?.role
+            || auth.sessionRevision !== sessionRevision || auth.user?.id !== user.id || auth.user?.role !== user.role
+            || withdrawRequestRef.current?.scope === withdrawScope) return;
+        const request = { scope: withdrawScope, sessionRevision, memberId: user.id, role: user.role, phase: 'checking' };
+        withdrawRequestRef.current = request;
+        setWithdrawState({ scope: withdrawScope, checking: true });
+        const isCurrent = () => {
+            const current = useAuthStore.getState();
+            return withdrawalMountedRef.current && withdrawRequestRef.current === request && current.isLoggedIn
+                && current.sessionRevision === request.sessionRevision
+                && current.user?.id === request.memberId && current.user?.role === request.role;
+        };
         try {
-            readiness = await memberService.getWithdrawalReadiness();
+            const readiness = await memberService.getWithdrawalReadiness();
+            if (!isCurrent()) return;
+            if (typeof readiness?.canWithdraw !== 'boolean') {
+                message.error('탈퇴 준비 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+                return;
+            }
+            if (!canWithdrawMember(readiness)) {
+                message.warning(
+                    `먼저 처리할 항목이 있습니다. 운영 중 가게 ${readiness?.openStores ?? 0}곳, ` +
+                    `예약 ${readiness?.unresolvedReservations ?? 0}건, 환불 ${readiness?.unresolvedRefunds ?? 0}건, ` +
+                    `결제 확인 ${readiness?.openPaymentIssues ?? 0}건, 웹훅 ${readiness?.unfinishedWebhooks ?? 0}건`
+                );
+                return;
+            }
+
+            request.phase = 'confirm';
+            confirm({
+                title: '회원 탈퇴',
+                icon: <ExclamationCircleOutlined style={{ color: colors.error.main }} />,
+                // 문장 단위 줄바꿈은 useMessage의 confirm 래퍼가 처리한다 — 여기선 평범한 문자열이면 된다.
+                content: '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 됩니다. 거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다. 정말 탈퇴하시겠습니까?',
+                okText: '탈퇴하기',
+                cancelText: '취소',
+                okButtonProps: { danger: true },
+                centered: true,
+                onCancel: () => {
+                    if (isCurrent() && request.phase === 'confirm') withdrawRequestRef.current = null;
+                },
+                onOk: async () => {
+                    // 이전 세션에서 열린 확인창은 현재 계정의 탈퇴 요청을 보낼 수 없다.
+                    if (!isCurrent() || request.phase !== 'confirm') return;
+                    request.phase = 'deleting';
+                    try {
+                        await memberService.deleteMember();
+                        if (!isCurrent()) return;
+                        withdrawRequestRef.current = null;
+                        logout();
+                        // 탈퇴 → 홈: 로그아웃과 같은 방향(왼쪽에서)
+                        navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
+                        message.success('탈퇴가 완료되었습니다');
+                    } catch (err) {
+                        if (isCurrent()) handleApiError(err, message, '탈퇴에 실패했습니다');
+                    } finally {
+                        if (isCurrent()) withdrawRequestRef.current = null;
+                    }
+                },
+            });
         } catch (err) {
-            handleApiError(err, message, '탈퇴 준비 상태를 확인하지 못했습니다');
-            return;
+            request.phase = 'failed';
+            if (isCurrent()) handleApiError(err, message, '탈퇴 준비 상태를 확인하지 못했습니다');
+        } finally {
+            if (isCurrent()) {
+                setWithdrawState({ scope: withdrawScope, checking: false });
+                if (request.phase !== 'confirm') withdrawRequestRef.current = null;
+            }
         }
-
-        if (typeof readiness?.canWithdraw !== 'boolean') {
-            message.error('탈퇴 준비 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
-            return;
-        }
-        if (!canWithdrawMember(readiness)) {
-            message.warning(
-                `먼저 처리할 항목이 있습니다. 운영 중 가게 ${readiness?.openStores ?? 0}곳, ` +
-                `예약 ${readiness?.unresolvedReservations ?? 0}건, 환불 ${readiness?.unresolvedRefunds ?? 0}건, ` +
-                `결제 확인 ${readiness?.openPaymentIssues ?? 0}건, 웹훅 ${readiness?.unfinishedWebhooks ?? 0}건`
-            );
-            return;
-        }
-
-        confirm({
-            title: '회원 탈퇴',
-            icon: <ExclamationCircleOutlined style={{ color: colors.error.main }} />,
-            // 문장 단위 줄바꿈은 useMessage의 confirm 래퍼가 처리한다 — 여기선 평범한 문자열이면 된다.
-            content: '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 됩니다. 거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다. 정말 탈퇴하시겠습니까?',
-            okText: '탈퇴하기',
-            cancelText: '취소',
-            okButtonProps: { danger: true },
-            centered: true,
-            onOk: async () => {
-                try {
-                    await memberService.deleteMember();
-                    logout();
-                    navigate('/', { replace: true });
-                    message.success('탈퇴가 완료되었습니다');
-                } catch (err) {
-                    handleApiError(err, message, '탈퇴에 실패했습니다');
-                }
-            },
-        });
     };
 
     const isSocialUser = user?.provider && user.provider !== 'LOCAL';
@@ -1087,7 +1184,7 @@ const MyPage = () => {
                         개인정보는 제거되며 필요한 거래 기록은 비식별 상태로 보존됩니다
                     </Text>
                 </div>
-                <Button variant="danger" size="sm" onClick={handleDeleteAccount}
+                <Button variant="danger" size="sm" loading={withdrawChecking} onClick={handleDeleteAccount}
                     style={{ flexShrink: 0, padding: '0 16px', minWidth: 72 }}>
                     탈퇴하기
                 </Button>

@@ -19,6 +19,15 @@ RESERVE의 MySQL 백업 구성과 복원 절차. **결제·예약 데이터가 �
 > 교체하고 수동 실행으로 업로드를 확인했다(28 tables, 11 KiB). `reserve-restore`는 바뀐 게 없어 v2.6.0 버전 그대로다.
 > 로그 → Grafana 연결과 실패 알림은 아직 목표 상태다(5장).
 
+> **2026-09-27 정정:** 9/25 Claude 공개 세션과 현재 `origin/dev` 런북에는 서버 설치·cron·S3 업로드와
+> 격리 DB 복원 26/26 테이블 및 전 테이블 행 수 일치 증거가 있다. 9/26에는 28테이블·약 11KiB 수동 백업 업로드를 확인했다.
+> 이번 대화에서 운영 DB/S3를 다시 쓰거나 복원한 것은 아니다. 첫 복원과 이후 백업 성공을 서로 구분한다.
+
+> 자동 Lightsail 스냅샷은 사용자의 9/25 결정으로 끈 상태를 유지한다. 기존 백업 S3/IAM/cron을 새로 만들지 않는다.
+> root DB 비밀번호는 회전됐다. 복원 시 오래된 컨테이너 `MYSQL_ROOT_PASSWORD` 값을 믿지 말고
+> `/etc/reserve-backup.env`의 보호된 `DB_PASSWORD`를 정본으로 사용한다(값을 출력하지 않는다).
+> 아래 설치 명령은 재설치 참고 자료이며 실행 지시가 아니다. 로컬 강화 스크립트는 운영 설치본과 별개다.
+
 ---
 
 ## 0. 먼저 확인할 것 — Lightsail 자동 스냅샷
@@ -49,8 +58,7 @@ sudo cp scripts/backup-mysql.sh  /usr/local/bin/reserve-backup
 sudo cp scripts/restore-mysql.sh /usr/local/bin/reserve-restore
 sudo chmod +x /usr/local/bin/reserve-backup /usr/local/bin/reserve-restore
 
-sudo mkdir -p /var/backups/reserve
-sudo chown ubuntu:ubuntu /var/backups/reserve
+sudo install -d -m 700 -o root -g root /var/backups/reserve
 ```
 
 서버에 레포가 없으면 **배포된 태그 버전**을 받아, 같은 태그의 파일 해시와 대조한 뒤 설치한다.
@@ -85,7 +93,63 @@ sudo stat -c '%a %U %n' /etc/reserve-backup.env   # 600 root
 
 > ⚠️ **이미지용 `reserve-s3-user` 키를 백업에 쓰지 말 것.** 백업 버킷은 별도 사용자(`reserve-backup-uploader`)만 쓴다.
 
-### 1-3. 백업 전용 IAM 정책
+### 1-3. 백업 전용 S3·IAM 설계
+
+버킷은 이미지 버킷과 분리한 `reserve-it-kr-backup`(서울 리전)을 사용한다. 실제 생성·정책 변경은
+운영 변경 승인 뒤에만 한다.
+
+- Object Ownership: **Bucket owner enforced**(ACL 사용 안 함)
+- Block Public Access: 네 항목 전부 활성화
+- Versioning: 활성화
+- 기본 암호화: SSE-S3. 스크립트도 `AES256`을 명시
+- 버킷 정책: `aws:SecureTransport=false` 요청 거부(TLS 강제), 공개 Allow 없음
+- 객체명: `mysql/reserve-YYYYMMDD-HHMMSS.sql.gz` — append-only 이름이며 `If-None-Match: *`로 충돌 덮어쓰기 거부
+- Lifecycle: 현재 버전은 Standard에 유지하고 **90일 뒤 만료 표시**
+- Versioning 복구 여유: 비현재 버전은 비현재가 된 뒤 7일 보존 후 삭제
+- 미완료 multipart upload: 7일 뒤 중단(다른 도구가 만든 고아 part 비용 방어)
+
+작은 현재 덤프에는 Glacier 전환을 추가하지 않는다. 이전 30일 전환·120일 만료 설계는 운영 정책이 아니다.
+S3 저장·요청에는 기존 소액 사용량 요금이 있을 수 있다. 새 자원·권한·lifecycle 변경은 별도 승인 대상이다.
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "archive-reserve-mysql-backups",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "mysql/" },
+      "Expiration": { "Days": 90 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 7 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    },
+    {
+      "ID": "cleanup-expired-delete-markers",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "mysql/" },
+      "Expiration": { "ExpiredObjectDeleteMarker": true }
+    }
+  ]
+}
+```
+
+버킷 정책은 전송 중 TLS만 강제한다. writer 권한은 아래 IAM 정책에서 별도로 제한한다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "DenyInsecureTransport",
+    "Effect": "Deny",
+    "Principal": "*",
+    "Action": "s3:*",
+    "Resource": [
+      "arn:aws:s3:::reserve-it-kr-backup",
+      "arn:aws:s3:::reserve-it-kr-backup/*"
+    ],
+    "Condition": { "Bool": { "aws:SecureTransport": "false" } }
+  }]
+}
+```
 
 사용자 `reserve-backup-uploader`, 인라인 정책 `reserve-backup-put-only`(2026-09-25 생성).
 액세스 키에는 설명 태그로 "어디에 넣었나 · 용도"를 남긴다(`lightsail mysql backup upload only - /etc/reserve-backup.env`).
@@ -106,7 +170,9 @@ sudo stat -c '%a %U %n' /etc/reserve-backup.env   # 600 root
 }
 ```
 
-복원할 때 필요한 `s3:GetObject`/`ListBucket`은 **그때 관리자 자격증명으로** 한다.
+스크립트는 5GB 이하 파일을 `s3api put-object` 한 번으로 올리므로 writer에 multipart·목록·읽기·삭제 권한이
+필요 없다. 5GB를 넘으면 스크립트가 실패하고, 그때 별도 multipart 설계와 `AbortMultipartUpload` 권한을
+검토한다. 복원에 필요한 `s3:GetObject`/`ListBucket`은 **그때 관리자 또는 단기 복원 자격증명으로** 쓰고
 서버에 상시로 두지 않는다.
 
 버킷 설정(`reserve-it-kr-backup`, 서울, 2026-09-25 CloudShell로 생성):
@@ -261,14 +327,16 @@ sudo reserve-restore /var/backups/reserve/<최신파일>
 ## 5. 모니터링
 
 백업 로그가 `/var/log/reserve/backup.log`에 쌓이고 Promtail이 그 디렉토리를 수집하므로
-Grafana에서 그대로 보인다.
+9/25 Claude 세션에서 Loki `{job="reserve"}`의 백업 성공 로그 1건을 확인했다. 이번에 서버 수집을 재검증한 것은 아니다.
 
 ```logql
 {job="reserve"} |= "[backup]"
-{job="reserve"} |= "[backup] ERROR"
+{job="reserve"} |= "ERROR [backup]"
 ```
 
-알림 규칙(권장): **"최근 26시간 동안 `[backup] === backup done` 이 0건"** 이면 알림.
+알림 규칙(아직 운영 적용 증거 없음): **"최근 26시간 동안 백업 완료가 0건"** 이면 알림.
+기존 설치본과 로컬 강화본의 로그 구분자는 다르므로 `[backup]`과 `=== backup done`을 따로 필터한다.
+Grafana 규칙은 [모니터링](monitoring.md)의 7번과 함께 승인 후 적용·실제 수신을 확인한다.
 실패 알림보다 이쪽이 낫다 — 스크립트가 아예 실행되지 않은 경우(cron 죽음, 디스크 풀)까지 잡히기 때문이다.
 
 ---
@@ -372,3 +440,4 @@ unset NEWPW MYSQL_PWD
 | 날짜 | 대상 백업 | 결과 | 메모 |
 |---|---|---|---|
 | 2026-09-25 | `reserve-20260925-095532.sql.gz` (9.8 KiB) | 통과 — 26/26 테이블 복원, 26개 테이블 행 수 운영과 일치 | 별도 DB `reserve_restore_test`로 복원 후 삭제. 다음 훈련 2026-12 |
+| 2026-09-26 | v2.6.1 이후 28 tables·약 11KiB | S3 업로드 성공 | 이후 백업 증거이며 새 복원 훈련 증거가 아님 |

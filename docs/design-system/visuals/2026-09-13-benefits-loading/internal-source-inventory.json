@@ -1,0 +1,121 @@
+{
+  "scope": "Admin/business direct-read loading audit, including existing supporting tests; overlaps two route files",
+  "file_count": 23,
+  "files": [
+    {
+      "path": "frontend/src/components/admin/AdminAdsTab.jsx",
+      "lines": 190,
+      "sha256": "405fadc6959f8564dddb4aac7abe4916a8ba38d0e971565a04e197082d9ddcc8"
+    },
+    {
+      "path": "frontend/src/components/admin/adminConstants.js",
+      "lines": 35,
+      "sha256": "3e93f88a2aa214f45391bd369dcb1ef60669a2ef6ba916b718b686ff9abdcf96"
+    },
+    {
+      "path": "frontend/src/components/admin/AdPaymentOperations.jsx",
+      "lines": 77,
+      "sha256": "6991ac26af4f66f6451e1af486cbaca9e964b673de549bb830d1c85f71074c64"
+    },
+    {
+      "path": "frontend/src/components/admin/AuditLogTab.jsx",
+      "lines": 226,
+      "sha256": "8bda880a72e3878b6ad64ea255bfb7c21532bbb89897b99b794a63b751d7217a"
+    },
+    {
+      "path": "frontend/src/components/admin/BusinessVerificationTab.jsx",
+      "lines": 448,
+      "sha256": "a63252e03206057fd44937084154d73430b941f64090c6f7ea20e1051d2064f4"
+    },
+    {
+      "path": "frontend/src/components/admin/ChatReportsPanel.jsx",
+      "lines": 218,
+      "sha256": "6d7f07ab532b31b6d9442967687bdf4e9dc174879c5ea708e1c6a3fc8c1fc6cc"
+    },
+    {
+      "path": "frontend/src/components/admin/ChatReportsPanel.test.jsx",
+      "lines": 82,
+      "sha256": "f88b9a82c2e8779c477110c16ee47e111af61fc763b254a363cabf6a2e61969b"
+    },
+    {
+      "path": "frontend/src/components/admin/ChatTab.jsx",
+      "lines": 332,
+      "sha256": "ad34f0a3328aff1ae0e4ff7338406913798f3827b4c060b926b735e5b78075dc"
+    },
+    {
+      "path": "frontend/src/components/admin/dashboardStats.js",
+      "lines": 81,
+      "sha256": "6869bbbdc61ef6b79ab0fd4b41f0d9c46a445c1eecea8f17e8e57e51e9096e22"
+    },
+    {
+      "path": "frontend/src/components/admin/DashboardTab.jsx",
+      "lines": 234,
+      "sha256": "ae2ac5471453340d3747390bcbc9f4204b4da1648e02b668d8285a3180f69c34"
+    },
+    {
+      "path": "frontend/src/components/admin/DashboardTab.test.js",
+      "lines": 34,
+      "sha256": "93ebabc2e31d525bc6cc5790dbcc8b9028e8959cb1a685488509db04407e8f54"
+    },
+    {
+      "path": "frontend/src/components/admin/MailboxTab.jsx",
+      "lines": 488,
+      "sha256": "5f8eab2ce5de95d3409ce7e0d61193ce033ebe5f6f2fa76f522595c655f6b666"
+    },
+    {
+      "path": "frontend/src/components/admin/MembersTab.jsx",
+      "lines": 267,
+      "sha256": "78c6343c2c8eaee3f7997a2e5b4e85c0d3252136ca63e2803c301273fa03ec54"
+    },
+    {
+      "path": "frontend/src/components/admin/PaymentOperationsTab.jsx",
+      "lines": 238,
+      "sha256": "69dbcf8c0d315fc18dbf1a7955d2d3c2ebadbf6c759791a52c9faf759b9657ec"
+    },
+    {
+      "path": "frontend/src/components/admin/ReservationsAllTab.jsx",
+      "lines": 149,
+      "sha256": "ad3db9a7b8999be62018a2f5b06c9e25d77358a3f537164d929144c03dedcb65"
+    },
+    {
+      "path": "frontend/src/components/admin/SanctionModal.jsx",
+      "lines": 189,
+      "sha256": "97419acc1d4bbe45d2ec3789a872070a7aa09c034c7825b80b233356509bc399"
+    },
+    {
+      "path": "frontend/src/components/admin/StoresAdminTab.jsx",
+      "lines": 223,
+      "sha256": "437735e5f66f4d6329c276634b57d1a153cc0b51c1411f44e64b409f0746621d"
+    },
+    {
+      "path": "frontend/src/components/admin/TrashTab.jsx",
+      "lines": 194,
+      "sha256": "3f024eca9f15dfd5db25dbfaabfe01c48fbbb54d0c82bec6e49170b7e5c3719a"
+    },
+    {
+      "path": "frontend/src/components/advertisement/AdManageTab.jsx",
+      "lines": 499,
+      "sha256": "0d032e8cf94cfee93abc958ee647f6e11fe4e5f754444cd2b393f18d8ad8a956"
+    },
+    {
+      "path": "frontend/src/components/business/StatisticsTab.jsx",
+      "lines": 425,
+      "sha256": "761d939a922f3a02a6ba041d55705639965e6f3b9b4df2ea026f8577fd644271"
+    },
+    {
+      "path": "frontend/src/components/reservation/QrScannerTab.jsx",
+      "lines": 662,
+      "sha256": "e0ca7a0b0417c3e0344ea7a10f9521b63ebd133e22d66abf34fb9dd137ab379a"
+    },
+    {
+      "path": "frontend/src/pages/admin/AdminPanel.jsx",
+      "lines": 142,
+      "sha256": "156fbfae1583f94d65598a2b796776539d66e439a9d6fb7c7144c87a04df89ce"
+    },
+    {
+      "path": "frontend/src/pages/business/BusinessPanel.jsx",
+      "lines": 257,
+      "sha256": "c1b7d97ec980570d4735557620a44deb541ee6cee7c42f3b80a4f0bb71b22562"
+    }
+  ]
+}

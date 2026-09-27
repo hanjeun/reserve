@@ -30,7 +30,10 @@ test('ad payment queue separates reading, explicit processing, and refund comple
         await page.getByRole('button', { name: 'ellipsis' }).click();
         await page.getByRole('option', { name: /결제 운영/ }).click();
     } else {
-        await page.getByRole('tab', { name: /결제 운영/ }).click();
+        const paymentTab = page.getByRole('tab', { name: /결제 운영/ });
+        await paymentTab.focus();
+        await paymentTab.press('Enter');
+        await expect(paymentTab).toHaveAttribute('aria-selected', 'true');
     }
     await page.getByRole('radio', { name: '광고 결제', exact: true }).click();
     await expect(page.getByText('AD-LOCAL-REVIEW', { exact: true })).toBeVisible();

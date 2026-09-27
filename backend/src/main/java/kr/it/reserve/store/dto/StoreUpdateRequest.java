@@ -23,6 +23,7 @@ public class StoreUpdateRequest {
     private Double longitude;
     private String phone;
     private String category;
+    private String serviceDomain;
     
     // 키워드 (콤마 구분 문자열 또는 리스트)
     private List<String> keywords;

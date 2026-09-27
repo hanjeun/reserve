@@ -7,7 +7,7 @@ const { Title, Text } = Typography;
 
 function SectionTitle({ title, blue, style }) {
     return (
-        <Title style={style}>
+        <Title level={2} style={style}>
             {title.map((line, j) => {
                 const idx = line.indexOf(blue);
                 if (idx === -1) return <div key={j}>{line}</div>;

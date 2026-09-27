@@ -7,7 +7,11 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.notice.dto.NoticeDTO;
 import kr.it.reserve.notice.dto.NoticeRequestDTO;
+import kr.it.reserve.notice.dto.NoticeSummaryDTO;
 import kr.it.reserve.notice.service.NoticeService;
+import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.global.ratelimit.IpExtractor;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +24,7 @@ import java.util.List;
 public class NoticeApiController {
 
     private final NoticeService noticeService;
+    private final RateLimiter rateLimiter;
 
     // 관리자 권한 검증 공통 로직
     private void validateAdmin() {
@@ -34,9 +39,24 @@ public class NoticeApiController {
         return ApiResponse.success(noticeService.getAllNotices(), "공지사항 목록 조회 성공");
     }
 
+    @GetMapping("/highlights")
+    public ApiResponse<List<NoticeSummaryDTO>> getHighlights(
+            @RequestParam(defaultValue = "3") int limit) {
+        return ApiResponse.success(noticeService.getHighlights(limit), "홈 공지 조회 성공");
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<NoticeDTO> getNotice(@PathVariable Long id) {
         return ApiResponse.success(noticeService.getNoticeById(id), "공지사항 상세 조회 성공");
+    }
+
+    /** 공개 표시 지표일 뿐이다. 제한 초과·없는 공지는 정보 노출 없는 no-op이다. */
+    @PostMapping("/{id}/view")
+    public ApiResponse<Void> recordView(@PathVariable Long id, HttpServletRequest request) {
+        if (id > 0 && rateLimiter.tryConsume("notice-view:" + IpExtractor.extract(request), RateLimiter.Policy.AD_METRIC)) {
+            noticeService.recordView(id);
+        }
+        return ApiResponse.success(null, "조회 처리 완료");
     }
 
     @PostMapping

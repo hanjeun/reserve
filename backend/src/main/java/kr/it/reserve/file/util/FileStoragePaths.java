@@ -46,6 +46,15 @@ public final class FileStoragePaths {
         return "users/" + memberId + "/stores/" + storeId + "/advertisements";
     }
 
+    /** 비공개 대화 사진. 공개 CDN에 보관되는 바이트도 암호문이며 조회는 인증 API만 사용한다. */
+    public static String chatImage(Long memberId, Long roomId) {
+        return "users/" + memberId + "/chat/" + roomId;
+    }
+
+    public static String supportAvatar() {
+        return system("chat/support");
+    }
+
     // ========== 시스템 영역 (향후 확장) ==========
 
     /** 공지사항 이미지: notices/{noticeId}/images */

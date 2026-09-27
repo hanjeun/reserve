@@ -1,6 +1,7 @@
 package kr.it.reserve.file.service;
 
 import kr.it.reserve.global.error.FileException;
+import kr.it.reserve.file.util.ImageFileValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,10 +15,12 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import jakarta.annotation.PostConstruct;
+import java.net.URI;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
@@ -65,35 +68,6 @@ public class FileStorageService {
         this.s3Presigner = S3Presigner.builder().region(awsRegion).credentialsProvider(credentials).build();
     }
 
-    // ─── 허용 파일 타입 화이트리스트 ────────────────────────────────────────────
-    private static final java.util.Set<String> ALLOWED_TYPES = java.util.Set.of(
-            "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"
-    );
-    private static final java.util.Set<String> ALLOWED_EXTS = java.util.Set.of(
-            ".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"
-    );
-    private static final long MAX_FILE_BYTES = 10L * 1024 * 1024; // 10 MB
-
-    private void validateFile(MultipartFile file) {
-        if (file.getSize() > MAX_FILE_BYTES) {
-            throw new FileException("파일 크기는 10MB를 초과할 수 없습니다.",
-                    org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE);
-        }
-        String ct = file.getContentType();
-        if (ct == null || !ALLOWED_TYPES.contains(ct.toLowerCase())) {
-            throw new FileException("허용되지 않는 파일 형식입니다. (jpg/png/webp/gif/avif 만 허용)",
-                    org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        }
-        String original = file.getOriginalFilename();
-        if (original != null && original.contains(".")) {
-            String ext = original.substring(original.lastIndexOf(".")).toLowerCase();
-            if (!ALLOWED_EXTS.contains(ext)) {
-                throw new FileException("허용되지 않는 파일 확장자입니다.",
-                        org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-            }
-        }
-    }
-
     /**
      * S3에 파일 업로드 후 S3 key 반환 (URL이 아닌 key)
      * - Public 파일: getPublicUrl(key) 로 CloudFront URL 생성
@@ -101,26 +75,66 @@ public class FileStorageService {
      */
     public String storeFile(MultipartFile file, String prefixPath) {
         if (file == null || file.isEmpty()) return null;
-        validateFile(file); // 파일 타입 · 확장자 · 크기 검증
+        ImageFileValidator.ValidatedImage image = ImageFileValidator.inspect(file);
         try {
-            String ext = "";
-            String original = file.getOriginalFilename();
-            if (original != null && original.contains(".")) {
-                ext = original.substring(original.lastIndexOf("."));
-            }
             String fullPrefix = (envPrefix == null || envPrefix.isEmpty())
                     ? prefixPath
                     : envPrefix + "/" + prefixPath;
-            String key = fullPrefix + "/" + UUID.randomUUID() + ext;
+            String key = fullPrefix + "/" + UUID.randomUUID() + image.extension();
             PutObjectRequest request = PutObjectRequest.builder()
-                    .bucket(bucket).key(key).contentType(file.getContentType()).contentLength(file.getSize()).build();
-            s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+                    .bucket(bucket).key(key).contentType(image.contentType()).contentLength((long) image.bytes().length)
+                    .cacheControl(prefixPath.matches("users/[0-9]+/businesses") ? "no-store" : "public, max-age=86400, must-revalidate")
+                    .build();
+            s3Client.putObject(request, RequestBody.fromBytes(image.bytes()));
             registerRollbackCleanup(key);
             log.info("S3 upload success: {}", key);
             return key;
-        } catch (IOException e) {
-            log.error("S3 upload failed", e);
+        } catch (RuntimeException exception) {
+            log.error("S3 upload failed: errorType={}", exception.getClass().getSimpleName());
             throw FileException.uploadFailed();
+        }
+    }
+
+    /** 대화 사진 암호문 전용. 일반 이미지 업로드/공개 URL 경로와 섞지 않는다. */
+    public String storeEncryptedChatImage(byte[] encrypted, String prefixPath) {
+        if (encrypted == null || encrypted.length == 0
+                || encrypted.length > ImageFileValidator.MAX_FILE_BYTES + 28
+                || prefixPath == null || !prefixPath.matches("users/[0-9]+/chat/[0-9]+")) {
+            throw FileException.invalid("올바른 대화 사진이 아닙니다.");
+        }
+        String key = withEnvironmentPrefix(prefixPath) + "/" + UUID.randomUUID() + ".bin";
+        try {
+            s3Client.putObject(PutObjectRequest.builder().bucket(bucket).key(key)
+                    .contentType("application/octet-stream").cacheControl("no-store")
+                    .contentLength((long) encrypted.length).build(), RequestBody.fromBytes(encrypted));
+            registerRollbackCleanup(key);
+            return key;
+        } catch (RuntimeException exception) {
+            log.error("Chat image upload failed: errorType={}", exception.getClass().getSimpleName());
+            throw FileException.uploadFailed();
+        }
+    }
+
+    /** 객체를 읽기 전에 현재 환경·발신자·방 경계를 검증하고, 8 MiB + GCM overhead에서 중단한다. */
+    public byte[] readEncryptedChatImage(String key, String prefixPath) {
+        if (prefixPath == null || !prefixPath.matches("users/[0-9]+/chat/[0-9]+") || !isManagedFileUnderPrefix(key, prefixPath)) {
+            throw FileException.invalid("올바른 대화 사진이 아닙니다.");
+        }
+        int limit = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
+        try (var stream = s3Client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+            if (stream.response().contentLength() != null && stream.response().contentLength() > limit) {
+                stream.abort();
+                throw FileException.invalid("사진 크기가 허용 범위를 초과했습니다.");
+            }
+            byte[] bytes = stream.readNBytes(limit + 1);
+            if (bytes.length > limit) {
+                stream.abort(); // close만 호출하면 HTTP 클라이언트가 남은 대용량 본문을 drain할 수 있다.
+                throw FileException.invalid("사진 크기가 허용 범위를 초과했습니다.");
+            }
+            return bytes;
+        } catch (IOException | software.amazon.awssdk.core.exception.SdkException exception) {
+            log.error("Chat image read failed: errorType={}", exception.getClass().getSimpleName());
+            throw new FileException("사진을 불러오지 못했습니다.");
         }
     }
 
@@ -150,31 +164,13 @@ public class FileStorageService {
     }
 
     /**
-     * 업로드된 이미지의 원본 너비/높이를 전체 디코딩 없이 헤더만 파싱해서 읽어온다.
+     * 업로드 전에 검증된 이미지의 원본 너비/높이를 읽는다.
      * 스토어/상세 이미지 업로드 시 원본 비율을 미리 저장해두면 프론트 스켈레톤이 그 비율대로 미리 그려져 CLS를 줄일 수 있다.
-     * 측정에 실패해도(지원하지 않는 포맷 등) 업로드 자체는 막지 않고 null 반환해서 호출부가 그냥 생략하게 함.
+     * 비어 있는 선택 입력은 null이고, 변조·손상·과대 이미지는 ImageFileValidator가 업로드 전에 거부한다.
      */
     public int[] readImageDimensions(MultipartFile file) {
         if (file == null || file.isEmpty()) return null;
-        try (javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(file.getInputStream())) {
-            java.util.Iterator<javax.imageio.ImageReader> readers = javax.imageio.ImageIO.getImageReaders(iis);
-            if (!readers.hasNext()) {
-                log.warn("No ImageReader available for uploaded file");
-                return null;
-            }
-            javax.imageio.ImageReader reader = readers.next();
-            try {
-                reader.setInput(iis, true); // seekForwardOnly=true — 전체 디코딩 없이 헤더만 읽음
-                int width = reader.getWidth(0);
-                int height = reader.getHeight(0);
-                return new int[]{width, height};
-            } finally {
-                reader.dispose();
-            }
-        } catch (Exception e) {
-            log.warn("Failed to read image dimensions: errorType={}", e.getClass().getSimpleName());
-            return null;
-        }
+        return ImageFileValidator.readDimensions(file);
     }
 
     /** Public 파일용 CloudFront URL 생성 (프로필, 가게 이미지 등) */

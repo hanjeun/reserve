@@ -40,6 +40,7 @@ class AdPaymentLifecycleTest {
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired AdPaymentService payments;
+    @Autowired AdvertisementService advertisementService;
     @Autowired AdPaymentLedgerService ledger;
     @Autowired AdPaymentAttemptRepository attempts;
     @Autowired AdvertisementRepository ads;
@@ -77,6 +78,29 @@ class AdPaymentLifecycleTest {
         return json.readValue("{\"id\":\"" + id + "\",\"status\":\"" + state
                 + "\",\"currency\":\"KRW\",\"amount\":{\"total\":1000,\"cancelled\":" + cancelled + "}}",
                 PortoneV2PaymentResponse.class);
+    }
+
+    @Test
+    void unpaidAdPastItsStartDateIsCancelledAndCannotBlockOrRestartPayment() {
+        tx.executeWithoutResult(ignored -> {
+            Advertisement ad = ads.findByIdForUpdate(adId).orElseThrow();
+            ad.setStartDate(ServiceTime.today().minusDays(1));
+            ad.setEndDate(ServiceTime.today().plusDays(1));
+            ad.setStatus(AdStatus.PENDING_PAYMENT);
+        });
+
+        assertThat(ads.findFirstByStoreIdAndAdTypeAndStatusInAndStartDateGreaterThanEqual(
+                storeId, AdType.BADGE,
+                java.util.List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED),
+                ServiceTime.today())).isEmpty();
+
+        advertisementService.cancelUnpaidOverdueAds();
+
+        AdStatus persistedStatus = tx.execute(
+                ignored -> ads.findById(adId).orElseThrow().getStatus());
+        assertThat(persistedStatus).isEqualTo(AdStatus.CANCELLED);
+        assertThatThrownBy(() -> payments.prepare(adId, ownerId))
+                .isInstanceOf(AdvertisementException.class);
     }
     private void reports(String state, long cancelled) throws Exception {
         var result = payment(uid, state, cancelled);

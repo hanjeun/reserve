@@ -1,0 +1,16 @@
+{
+  "verified_at_utc": "2026-09-13T13:40:24.2196047Z",
+  "preserved_sources": 108,
+  "source_bytes": 1504790.0,
+  "zip_entries": 117,
+  "zip_bytes": 926207,
+  "zip_sha256": "02d5809dabf319ed1778140210e4303862b5f5a37b0b5ef6dd5d880514af536e",
+  "copied_source_hashes_match": true,
+  "zip_payload_hashes_match": true,
+  "narrow_known_secret_pattern_check": "passed-not-universal-secret-absence-proof",
+  "current_source_divergence": [
+    "frontend/src/components/layout/Header.jsx",
+    "frontend/src/styles/global/feature-surfaces.css"
+  ],
+  "divergence_is_not_snapshot_corruption": true
+}

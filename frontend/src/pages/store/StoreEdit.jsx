@@ -1,8 +1,9 @@
 import React, { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Form } from 'antd';
-import Loading from "../../components/common/Loading";
+import StoreFormSkeleton from "../../components/store/StoreFormSkeleton";
 import StoreForm from "../../components/store/StoreForm";
+import { DataState, PageContainer } from '../../components/common';
 import { useStoreData, useMessage, useFormReady, useImagePreview, useStoreForm } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useAuthStore from '../../store/useAuthStore';
@@ -16,7 +17,7 @@ import useAuthStore from '../../store/useAuthStore';
  * - 상세 이미지 변경 (최대 5장)
  * - 영업 시간 수정
  * 
- * @route /store/edit/:id
+ * @route /store/:id/edit
  * @auth OWNER (본인 가게만), ADMIN
  */
 const StoreEdit = () => {
@@ -33,7 +34,7 @@ const StoreEdit = () => {
     // 가게 수정용 데이터 로딩 — /api/stores/{id}/edit (인증 + 소유자 검증)
     // 공개 GET /api/stores/{id} 대신 인증된 엔드포인트를 주으로서
     // URL 조작시 다른 사람의 가게 운영 설정이 노출되지 않도록 차단
-    const { store, loading, error } = useStoreData(id, { forEdit: true });
+    const { store, loading, error, refetch } = useStoreData(id, { forEdit: true });
 
     // 소유자 검증 — store 로딩 후 본인 가게가 아니면 리다이렉트
     useEffect(() => {
@@ -55,45 +56,37 @@ const StoreEdit = () => {
         handleMainImageChange,
         handleDetailImagesChange,
         getInitialValues,
+        draftState,
+        handleValuesChange,
+        saveDraftNow,
     } = useStoreForm({ 
         mode: 'edit', 
         initialData: store,
-        storeId: id 
+        storeId: id,
+        form,
+        formReady,
     });
 
-    /**
-     * 에러 발생 시 처리
-     */
-    useEffect(() => {
-        if (error) {
-            message.error(error);
-            navigate('/my-stores');
-        }
-    }, [error, message, navigate]);
-
-    /**
-     * Form 초기값 설정
-     * getInitialValues는 store에 의존하므로 store/formReady 변경 시만 실행
-     * (getInitialValues를 dependency에 넣으면 매 렌더마다 폼 값이 초기화됨)
-     */
-    useEffect(() => {
-        if (store && formReady) {
-            form.setFieldsValue(getInitialValues());
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [store, formReady]);
-
-    /**
-     * 취소 버튼 핸들러
-     */
-    const handleCancel = () => {
-        navigate('/my-stores');
-    };
-
-    // 가게 데이터 로딩 중 또는 아직 store가 없으면 스피너 유지
+    // 가게 데이터 로딩 중에는 폼의 골격을 유지한다.
     // (initialValues는 Form 최초 마운트 시 1회만 읽히므로 store가 준비된 후 렌더해야 함)
-    if (loading || !store) {
-        return <Loading fullPage />;
+    if (loading) {
+        return <section className="reserve-route-skeleton reserve-route-skeleton--store-form" role="status" aria-label="가게 정보를 불러오는 중" aria-busy="true"><div aria-hidden="true"><StoreFormSkeleton /></div></section>;
+    }
+
+    if (!store) {
+        return (
+            <PageContainer size="lg" paddingTop="32px">
+                <DataState
+                    state={error ? 'error' : 'empty'}
+                    kind="store"
+                    subject="내 가게 정보"
+                    error={error}
+                    title={error ? undefined : '수정할 가게를 찾을 수 없습니다.'}
+                    onRetry={error ? refetch : undefined}
+                    style={{ marginTop: 100 }}
+                />
+            </PageContainer>
+        );
     }
 
     return (
@@ -110,7 +103,9 @@ const StoreEdit = () => {
                 onDetailImagesChange={handleDetailImagesChange}
                 onPreview={handlePreview}
                 onPreviewClickCapture={suppressLinkNavigation}
-                onCancel={handleCancel}
+                onValuesChange={handleValuesChange}
+                onSaveDraft={saveDraftNow}
+                draftState={draftState}
                 initialValues={store ? getInitialValues() : undefined}
             />
             

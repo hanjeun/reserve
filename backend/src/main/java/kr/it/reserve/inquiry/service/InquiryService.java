@@ -1,6 +1,7 @@
 package kr.it.reserve.inquiry.service;
 
 import kr.it.reserve.email.service.EmailService;
+import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.global.error.InquiryException;
 import kr.it.reserve.inquiry.dto.InquiryDto;
 import kr.it.reserve.inquiry.entity.Inquiry;
@@ -24,7 +25,7 @@ public class InquiryService {
 
     // 공통 페이징 생성 유틸
     private Pageable getPageable(int page, int size) {
-        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return PageRequests.bounded(page, size).withSort(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
     public Page<InquiryDto.InquiryResponse> getMyInquiries(Long memberId, int page, int size) {

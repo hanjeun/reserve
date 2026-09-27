@@ -5,6 +5,7 @@ import {
     CheckCircleOutlined,
 } from '@ant-design/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
+import CopyableText from '../common/CopyableText';
 import { formatTime, formatCurrency } from '../../utils';
 import { colors, fontSize } from '../../styles/tokens';
 
@@ -49,12 +50,11 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
                 <ReservationStatusBadge status={status} />
             </Flex>
             {reservationCode && (
-                <Text
-                    copyable={{ text: reservationCode }}
+                <CopyableText
+                    value={reservationCode}
+                    label="예약번호"
                     style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}
-                >
-                    {reservationCode}
-                </Text>
+                />
             )}
             <Divider style={{ margin: '12px 0' }} />
             <div style={styles.detailRow}>
@@ -66,7 +66,7 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
                 <div style={styles.detailRow}>
                     <MailOutlined style={styles.detailIcon} />
                     <Text style={styles.detailLabel}>이메일</Text>
-                    <Text style={styles.detailValue} copyable={{ text: memberEmail }}>{memberEmail}</Text>
+                    <CopyableText value={memberEmail} label="이메일" style={styles.detailValue} />
                 </div>
             )}
             <div style={styles.detailRow}>

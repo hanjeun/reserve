@@ -1,6 +1,7 @@
 package kr.it.reserve.advertisement.controller;
 
 import kr.it.reserve.advertisement.dto.AdCreateRequest;
+import kr.it.reserve.advertisement.dto.AdConversionRequest;
 import kr.it.reserve.advertisement.dto.AdPaymentPrepareResponse;
 import kr.it.reserve.advertisement.dto.AdUpdateRequest;
 import kr.it.reserve.advertisement.dto.AdvertisementResponse;
@@ -14,6 +15,7 @@ import kr.it.reserve.global.ratelimit.IpExtractor;
 import kr.it.reserve.global.ratelimit.RateLimiter;
 import kr.it.reserve.member.entity.Member;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -147,42 +149,41 @@ public class AdvertisementApiController {
         return ApiResponse.success(advertisementService.getActiveAds(type), "조회 성공");
     }
 
-    // 광고 성과 지표(2026-07 추가) — 셋 다 공개 API(로그인 불필요). 장식적 요소라 실패해도 500을 터뜨리지 않고
-    // 항상 200을 돌려줌(프론트에서도 실패를 사용자에게 노출하지 않음).
+    // 광고 성과 지표(2026-07 추가) — 노출·클릭만 공개 API(로그인 불필요)다. 두 지표는 장식적 요소라
+    // 실패해도 500을 터뜨리지 않고 항상 200을 돌려준다. 전환은 아래에서 로그인 회원의 예약을 검증한다.
     @PatchMapping("/{id}/impression")
     public ApiResponse<Void> recordImpression(@PathVariable Long id, HttpServletRequest request) {
-        if (allowMetric(request)) {
-            advertisementService.recordImpression(id);
-        }
+        recordMetricQuietly(id, request, () -> advertisementService.recordImpression(id));
         return ApiResponse.success(null, "기록됨");
     }
 
     // 배너 클릭 기록(2026-07 추가) — 공개 API
     @PatchMapping("/{id}/click")
     public ApiResponse<Void> recordClick(@PathVariable Long id, HttpServletRequest request) {
-        if (allowMetric(request)) {
-            advertisementService.recordClick(id);
-        }
+        recordMetricQuietly(id, request, () -> advertisementService.recordClick(id));
         return ApiResponse.success(null, "기록됨");
     }
 
-    // 전환 기록(2026-07 추가) — 공개 API, 예약 생성 직후 프론트가 호출(귀속 판단은 sessionStorage 기반)
+    // 전환 기록 — 예약 생성 직후 로그인 회원이 호출한다. 서비스가 예약·광고·가게 귀속을 다시 검증한다.
     @PatchMapping("/{id}/conversion")
-    public ApiResponse<Void> recordConversion(@PathVariable Long id, HttpServletRequest request) {
-        if (allowMetric(request)) {
-            advertisementService.recordConversion(id);
-        }
+    public ApiResponse<Void> recordConversion(
+            @PathVariable Long id,
+            @Valid @RequestBody AdConversionRequest request) {
+        advertisementService.recordConversion(
+                id,
+                request.reservationId(),
+                SecurityUtil.getCurrentMember("로그인이 필요합니다."));
         return ApiResponse.success(null, "기록됨");
     }
 
     /**
-     * 광고 지표(노출·클릭·전환) 기록을 받아줄지 판단한다 — 2026-08 추가.
+     * 공개 광고 지표(노출·클릭) 기록을 받아줄지 판단한다 — 2026-08 추가.
      *
-     * <p><b>왜 필요했나.</b> 위 세 엔드포인트는 로그인이 필요 없고 카운터를 그냥 올려준다.
+     * <p><b>왜 필요했나.</b> 위 두 엔드포인트는 로그인이 필요 없고 카운터를 그냥 올려준다.
      * 백엔드 상한이 없어서 {@code curl} 반복만으로 노출수·클릭수를 임의로 부풀릴 수 있었다.
      * 광고는 <b>돈을 받고 파는 상품</b>이라 지표가 왜곡되면 청구와 성과 보고의 신뢰가 통째로 흔들린다.
      *
-     * <p><b>왜 429 를 던지지 않는가.</b> 이 세 엔드포인트의 계약은 "무슨 일이 있어도 200"이다
+     * <p><b>왜 429 를 던지지 않는가.</b> 이 두 엔드포인트의 계약은 "무슨 일이 있어도 200"이다
      * (프론트가 실패를 사용자에게 노출하지 않는다). 한도를 넘기면 <b>조용히 기록만 건너뛰고</b>
      * 응답은 그대로 성공으로 돌려준다. 덤으로, 429 를 돌려주면 자동화 스크립트에 "여기가 한도다"라고
      * 알려주는 셈이라 한도 바로 아래로 맞춰 계속 긁게 만든다.
@@ -194,12 +195,32 @@ public class AdvertisementApiController {
         return rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.AD_METRIC);
     }
 
+    /**
+     * 공개 지표는 광고 화면의 보조 신호라 유효하지 않은 ID·한도 초과·일시적인 저장소 장애를
+     * 사용자 요청 실패로 바꾸지 않는다. 실제 집계 가능 여부는 서비스가 광고 상태까지 확인한다.
+     */
+    private void recordMetricQuietly(Long adId, HttpServletRequest request, Runnable recorder) {
+        try {
+            if (allowMetric(request)) {
+                recorder.run();
+            }
+        } catch (RuntimeException e) {
+            log.debug("Advertisement metric ignored: adId={}, errorType={}",
+                    adId, e.getClass().getSimpleName());
+        }
+    }
+
     // 내 광고 신청 내역 (사업자용)
     @GetMapping("/my")
-    public ApiResponse<List<AdvertisementResponse>> getMyAds() {
+    public ApiResponse<Page<AdvertisementResponse>> getMyAds(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long storeId,
+            @RequestParam(required = false) String search) {
         Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         validateBusinessAuth(member);
-        return ApiResponse.success(advertisementService.getMyAds(member), "조회 성공");
+        return ApiResponse.success(
+                advertisementService.getMyAds(member, page, size, storeId, search), "조회 성공");
     }
 
     // 전체 광고 목록 (관리자용)

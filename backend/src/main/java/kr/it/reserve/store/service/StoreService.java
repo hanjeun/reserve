@@ -14,14 +14,19 @@ import kr.it.reserve.lifecycle.dto.StoreClosureReadiness;
 import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.repository.StoreRepository;
+import kr.it.reserve.store.repository.StoreSearchSpecification;
 import kr.it.reserve.store.dto.StoreCreateRequest;
 import kr.it.reserve.store.dto.StoreResponse;
+import kr.it.reserve.store.dto.StoreRegionGroup;
 import kr.it.reserve.store.dto.StoreStatisticsResponse;
 import kr.it.reserve.store.dto.StoreUpdateRequest;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.entity.ServiceDomain;
 import kr.it.reserve.store.entity.StoreStatus;
+import kr.it.reserve.store.util.StoreRegionNames;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,9 +50,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
 
@@ -64,14 +66,15 @@ public class StoreService {
     private final FavoriteRepository favoriteRepository;
     private final PromotionRepository promotionRepository;
     private final AdvertisementRepository advertisementRepository;
+    private final PaymentRepository paymentRepository;
     private final ObjectMapper objectMapper;
 
     /**
      * 가게 검색에 MySQL FULLTEXT(ngram)를 쓸지 여부.
      *
-     * <p>prod에서만 true다. 테스트는 H2로 돌고 H2에는 {@code MATCH ... AGAINST}가 없어서,
-     * 무조건 켜면 CI가 깨진다. local도 개발용 MySQL에 FULLTEXT 인덱스를 만들어 두지 않았으면
-     * 에러가 나므로 기본값을 false로 둔다.
+     * <p>별도 MySQL에서 DDL·EXPLAIN·LIKE 결과 동등성을 확인한 뒤에만 true로 바꿀 수 있다.
+     * 현재 prod·local·test 기본값은 모두 false다. 테스트 H2에는 {@code MATCH ... AGAINST}가 없고,
+     * MySQL도 FULLTEXT 인덱스 없이 켜면 검색 전체가 실패한다.
      *
      * <p>★ 이 필드는 <b>final이 아니어야 한다.</b> 이 클래스는 Lombok {@code @RequiredArgsConstructor}를
      * 쓰는데, final 필드는 생성자 파라미터가 되고 그때 {@code @Value}는 (copyableAnnotations 설정 없이는)
@@ -84,6 +87,8 @@ public class StoreService {
 
     /** ngram 파서의 최소 토큰 길이. 이보다 짧은 검색어는 FULLTEXT로 잡히지 않아 LIKE로 폴백한다. */
     private static final int NGRAM_TOKEN_SIZE = 2;
+    /** 국내 서비스 전체를 포함하면서 좌표 없는/비정상 원거리 행을 거리 계산에서 배제하는 1차 후보 범위. */
+    private static final double DISTANCE_CANDIDATE_RADIUS_KM = 1_000.0;
     // 이름을 "imageUploadExecutor"로 맞춰서 AsyncConfig의 @Bean(name = "imageUploadExecutor")와
     // 매칭시킴 — Lombok의 @RequiredArgsConstructor는 @Qualifier를 생성자로 복사해주지 않아서
     // (IDE 경고 확인함), 대신 Spring의 "타입이 여러 개면 파라미터명=빈이름으로 매칭" 폴백에 의존.
@@ -177,6 +182,7 @@ public class StoreService {
                 .longitude(request.getLongitude())
                 .phone(request.getPhone())
                 .category(request.getCategory())
+                .serviceDomain(parseServiceDomain(request.getServiceDomain(), request.getCategory()))
                 .rating(0.0)
                 .reviewCount(0)
                 // 옵션 값은 전부 clamp/normalize 를 거친다 — 아래 "가게 옵션 정규화" 절 참고.
@@ -325,6 +331,12 @@ public class StoreService {
             if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
             if (request.getPhone() != null) store.setPhone(request.getPhone());
             if (request.getCategory() != null) store.setCategory(request.getCategory());
+            if (request.getServiceDomain() != null && !request.getServiceDomain().isBlank()) {
+                store.setServiceDomain(parseServiceDomain(request.getServiceDomain(), store.getCategory()));
+            } else if (store.getServiceDomain() == null) {
+                // 구버전 클라이언트가 기존 행을 수정해도 이후 탐색 결과가 안정되도록 한 번만 고정한다.
+                store.setServiceDomain(ServiceDomain.inferFromCategory(store.getCategory()));
+            }
             // 옵션 값은 전부 clamp/normalize 를 거친다(생성 경로와 동일) — "가게 옵션 정규화" 절 참고.
             if (request.getNoShowDeposit() != null) store.setNoShowDeposit(clampDeposit(request.getNoShowDeposit()));
             if (request.getFullRefundDays() != null) store.setFullRefundDays(clampFullRefundDays(request.getFullRefundDays()));
@@ -461,9 +473,10 @@ public class StoreService {
             statusBreakdown.put(row[0].toString(), (Long) row[1]);
         }
 
-        // 예약금 매출 추이 (결제 완료건만)
+        // 예약금 순결제액 추이. 결제 완료일 기준이며 확정 환불액은 차감한다.
         Map<LocalDate, Long> revenueMap = new HashMap<>();
-        for (Object[] row : reservationRepository.sumDepositGroupedByDate(storeId, start, end)) {
+        for (Object[] row : paymentRepository.sumNetDepositByPaidDate(
+                storeId, start.atStartOfDay(), end.plusDays(1).atStartOfDay())) {
             revenueMap.put((LocalDate) row[0], row[1] != null ? ((Number) row[1]).longValue() : 0L);
         }
         List<StoreStatisticsResponse.DailyValue> revenueTrend = new ArrayList<>();
@@ -475,12 +488,14 @@ public class StoreService {
         }
 
         // 현재 활성 광고 요약 (없으면 null)
+        LocalDate today = ServiceTime.today();
         StoreStatisticsResponse.AdSummary adSummary = advertisementRepository
-                .findFirstByStoreIdAndStatusOrderByEndDateDesc(storeId, AdStatus.ACTIVE)
+                .findFirstByStoreIdAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByEndDateAscIdAsc(
+                        storeId, AdStatus.ACTIVE, today, today)
                 .map(ad -> StoreStatisticsResponse.AdSummary.builder()
                         .adType(ad.getAdType().name())
                         .status(ad.getStatus().name())
-                        .daysRemaining((int) ChronoUnit.DAYS.between(ServiceTime.today(), ad.getEndDate()))
+                        .daysRemaining((int) ChronoUnit.DAYS.between(today, ad.getEndDate()))
                         .impressionCount(ad.getImpressionCount())
                         .clickCount(ad.getClickCount())
                         .conversionCount(ad.getConversionCount())
@@ -773,6 +788,15 @@ public class StoreService {
         }
     }
 
+    private ServiceDomain parseServiceDomain(String raw, String category) {
+        if (raw == null || raw.isBlank()) return ServiceDomain.inferFromCategory(category);
+        ServiceDomain parsed = ServiceDomain.parseOrNull(raw);
+        if (parsed == null) {
+            throw new StoreException("올바른 서비스 분야를 선택해주세요.", HttpStatus.BAD_REQUEST);
+        }
+        return parsed;
+    }
+
     /**
      * 회차 시각 정규화 — 형식이 깨진 값은 버리고, 중복을 없애고, 정렬한다.
      * 상한 {@value #MAX_SESSION_TIMES} 개 — 그 이상은 SLOT 방식으로 다뤄야 할 규모다.
@@ -992,38 +1016,60 @@ public class StoreService {
     /** 검색·공개 정책·전체 정렬 후 페이지를 자른다. 첫 페이지 안에서만 다시 정렬하지 않는다. */
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(String keyword, String sort, int page, int size, Double lat, Double lng) {
+        return searchStoresPaged(keyword, sort, page, size, lat, lng, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<StoreResponse> searchStoresPaged(
+            String keyword, String sort, int page, int size, Double lat, Double lng, String domain) {
+        return searchStoresPaged(keyword, sort, page, size, lat, lng, domain, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<StoreResponse> searchStoresPaged(
+            String keyword, String sort, int page, int size, Double lat, Double lng, String domain, String region) {
         Pageable pageable = PageRequests.bounded(page, size);
-        return sortedSearch(keyword, sort, pageable, lat, lng).map(StoreResponse::fromEntity);
+        return sortedSearch(keyword, sort, pageable, lat, lng, domain, region).map(StoreResponse::fromEntity);
     }
 
-    private Page<Store> sortedSearch(String keyword, String sort, Pageable pageable, Double lat, Double lng) {
-        boolean distance = "distance".equals(sort) && validCoordinates(lat, lng);
-        if (distance) {
-            // 기존 거리 계산 정책을 유지하되, 검색 결과 전체를 정렬한 다음 페이지를 자른다.
-            List<Store> matches = searchStoreEntities(keyword, "rating", Pageable.unpaged()).getContent();
-            return paginate(sortByDistance(matches, lat, lng), pageable);
+    private Page<Store> sortedSearch(
+            String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
+        String normalizedSort = normalizeSort(sort);
+        if ("distance".equals(normalizedSort) && !validCoordinates(lat, lng)) {
+            normalizedSort = "rating";
         }
-        return searchStoreEntities(keyword, normalizeSort(sort), pageable);
-    }
-
-    private Page<Store> searchStoreEntities(String keyword, String sort, Pageable pageable) {
-        String field = switch (sort) { case "recent" -> "createdAt"; case "reviews" -> "reviewCount"; default -> "rating"; };
-        Sort order = Sort.by(Sort.Direction.DESC, field, "id");
-        Pageable ordered = pageable.isPaged() ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), order)
-                : Pageable.unpaged(order);
+        ServiceDomain domainFilter = ServiceDomain.parseOrNull(domain);
+        String regionFilter = region == null ? "" : region.trim();
         String normalized = keyword == null ? "" : keyword.trim();
-        if (normalized.isEmpty()) return storeRepository.findByDeletedAtIsNullAndStatus(StoreStatus.ACTIVE, ordered);
         String booleanQuery = toBooleanModeQuery(normalized);
-        if (fulltextEnabled && !booleanQuery.isEmpty()) {
+        boolean fulltextCompatible = domainFilter == null
+                && regionFilter.isEmpty()
+                && !"recommended".equals(normalizedSort)
+                && !"distance".equals(normalizedSort);
+        if (fulltextEnabled && fulltextCompatible && !booleanQuery.isEmpty()) {
             // 네이티브 컬럼명은 JPQL 속성명과 다르다. 허용한 sort를 명시적 CASE ORDER BY에 전달한다.
-            return storeRepository.searchStoresFulltextPaged(booleanQuery, sort, pageable);
+            return storeRepository.searchStoresFulltextPaged(booleanQuery, normalizedSort, ServiceTime.today(), pageable);
         }
-        String literal = normalized.replace("!", "!!").replace("%", "!%").replace("_", "!_");
-        return storeRepository.searchStoresPaged(literal, ordered);
+
+        // 공개 상태·검색·분야(legacy null 추론)·지역·노출형 우선순위·거리 후보를 같은 DB 쿼리/count에 적용한다.
+        // Pageable은 그대로 전달하되 정렬은 Specification이 허용 목록으로만 구성한다.
+        return storeRepository.findAll(
+                StoreSearchSpecification.publicSearch(
+                        normalized,
+                        normalizedSort,
+                        domainFilter,
+                        regionFilter,
+                        lat,
+                        lng,
+                        DISTANCE_CANDIDATE_RADIUS_KM,
+                        ServiceTime.today()),
+                pageable);
     }
 
     private String normalizeSort(String sort) {
-        return "recent".equals(sort) || "reviews".equals(sort) ? sort : "rating";
+        if ("reviewCount".equals(sort)) return "reviews";
+        return "recommended".equals(sort) || "recent".equals(sort) || "reviews".equals(sort)
+                || "distance".equals(sort) ? sort : "rating";
     }
 
     /** 연산자만 있거나 색인되지 않는 짧은 토큰이 섞이면 원문 LIKE 검색으로 보낸다. */
@@ -1044,48 +1090,54 @@ public class StoreService {
                 && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
     }
 
-    /** 이미 정렬된 리스트를 Pageable 기준으로 수동 페이지네이션 (native Haversine 미사용 대안) */
-    private Page<Store> paginate(List<Store> sorted, Pageable pageable) {
-        if (pageable.isUnpaged()) return new PageImpl<>(sorted);
-        int start = (int) pageable.getOffset();
-        if (start >= sorted.size()) return new PageImpl<>(List.of(), pageable, sorted.size());
-        int end = (int) Math.min((long) start + pageable.getPageSize(), sorted.size());
-        return new PageImpl<>(sorted.subList(start, end), pageable, sorted.size());
-    }
-
-    /** 하버사인(Haversine) 공식으로 거리순 정렬 — 좌표 없는 가게는 맨 뒤로 (제외하지 않고 노출만 뒤로 미룸) */
-    private List<Store> sortByDistance(List<Store> stores, double lat, double lng) {
-        return stores.stream()
-                .sorted((a, b) -> {
-                    Double da = distanceKm(lat, lng, a.getLatitude(), a.getLongitude());
-                    Double db = distanceKm(lat, lng, b.getLatitude(), b.getLongitude());
-                    if (da == null && db == null) return Long.compare(b.getId(), a.getId());
-                    if (da == null) return 1;   // a: 좌표 없음 → 뒤로
-                    if (db == null) return -1;  // b: 좌표 없음 → a가 앞으로
-                    int compared = Double.compare(da, db);
-                    return compared != 0 ? compared : Long.compare(b.getId(), a.getId());
-                })
-                .collect(Collectors.toList());
-    }
-
-    /** 두 좌표 간 거리(km). 둘 중 하나라도 좌표가 없으면 null 반환 */
-    private static Double distanceKm(double lat1, double lng1, Double lat2, Double lng2) {
-        if (!validCoordinates(lat2, lng2)) return null;
-        final double EARTH_RADIUS_KM = 6371.0;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLng = Math.toRadians(lng2 - lng1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        a = Math.max(0, Math.min(1, a));
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return EARTH_RADIUS_KM * c;
-    }
-
     /** 내부 전체 조회도 공개 정책과 안정 정렬을 공유한다. */
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort) {
-        return sortedSearch(keyword, sort, Pageable.unpaged(), null, null)
+        return searchStores(keyword, sort, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoreResponse> searchStores(String keyword, String sort, String domain) {
+        return searchStores(keyword, sort, domain, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoreResponse> searchStores(String keyword, String sort, String domain, String region) {
+        return sortedSearch(keyword, sort, Pageable.unpaged(), null, null, domain, region)
                 .map(StoreResponse::fromEntity).getContent();
+    }
+
+    /** 현재 가게가 실제로 있는 시도·시군구만 모아 인기 지역과 계층 목록에 공유한다. */
+    @Transactional(readOnly = true)
+    public List<StoreRegionGroup> getAvailableRegions() {
+        Map<String, Long> regionCounts = new HashMap<>();
+        Map<String, Map<String, Long>> areaCounts = new HashMap<>();
+        for (String address : storeRepository.findPublicAddresses()) {
+            String[] parts = StoreRegionNames.addressParts(address);
+            if (parts.length == 0) continue;
+            String region = parts[0];
+            regionCounts.merge(region, 1L, Long::sum);
+            if (parts.length > 1) {
+                areaCounts.computeIfAbsent(region, ignored -> new HashMap<>())
+                        .merge(parts[1], 1L, Long::sum);
+            }
+        }
+        return regionCounts.entrySet().stream()
+                .sorted((a, b) -> {
+                    int byCount = Long.compare(b.getValue(), a.getValue());
+                    return byCount != 0 ? byCount : a.getKey().compareTo(b.getKey());
+                })
+                .map(entry -> {
+                    List<StoreRegionGroup.Area> areas = areaCounts
+                            .getOrDefault(entry.getKey(), Map.of()).entrySet().stream()
+                            .sorted((a, b) -> {
+                                int byCount = Long.compare(b.getValue(), a.getValue());
+                                return byCount != 0 ? byCount : a.getKey().compareTo(b.getKey());
+                            })
+                            .map(area -> new StoreRegionGroup.Area(area.getKey(), area.getValue()))
+                            .toList();
+                    return new StoreRegionGroup(entry.getKey(), entry.getValue(), areas);
+                })
+                .toList();
     }
 }

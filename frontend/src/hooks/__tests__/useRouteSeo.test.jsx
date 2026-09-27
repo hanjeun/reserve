@@ -33,6 +33,8 @@ describe('route SEO policy', () => {
         expect(isIndexablePath('/store/42')).toBe(true);
         expect(isIndexablePath('/terms')).toBe(true);
         expect(isIndexablePath('/privacy')).toBe(true);
+        expect(isIndexablePath('/content-sources')).toBe(true);
+        expect(isIndexablePath('/operation-guide')).toBe(true);
 
         expect(isIndexablePath('/signup')).toBe(false);
         expect(isIndexablePath('/payment/result')).toBe(false);
@@ -84,6 +86,22 @@ describe('route SEO policy', () => {
         expect(data.itemListElement[1].item).toBe('https://reserve.it.kr/stores');
         // 마지막 항목(현재 페이지)에는 item 을 주지 않는다 — schema.org 권장.
         expect(data.itemListElement[2].item).toBeUndefined();
+    });
+
+    it('indexes the public operation guide with its own breadcrumb', () => {
+        renderAt('/operation-guide');
+
+        expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://reserve.it.kr/operation-guide');
+        expect(breadcrumb().itemListElement.map((item) => item.name)).toEqual(['RESERVE', '운영 안내']);
+    });
+
+    it('indexes the linked content-source notice with its own breadcrumb', () => {
+        renderAt('/content-sources');
+
+        expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://reserve.it.kr/content-sources');
+        expect(breadcrumb().itemListElement.map((item) => item.name)).toEqual(['RESERVE', '콘텐츠 출처·권리 안내']);
     });
 
     it('omits the breadcrumb on the root and on noindex paths', () => {

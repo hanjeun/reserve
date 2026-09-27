@@ -40,7 +40,8 @@ const useGoBack = (fallback = '/') => {
             navigate(-1);
             return;
         }
-        navigate(fallback, { replace: true });
+        // 히스토리가 없는 직접 진입에서는 fallback도 "뒤로"의 의미를 유지한다.
+        navigate(fallback, { replace: true, state: { reserveRouteMotion: 'from-left' } });
     }, [navigate, fallback]);
 };
 

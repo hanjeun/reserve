@@ -19,7 +19,9 @@ const useStoreData = (storeId, { forEdit = false } = {}) => {
         enabled: !!storeId,
     });
 
-    return { store: store ?? null, loading, error: error?.message || null, refetch };
+    // 화면이 404·권한·일시 장애를 서로 다른 아이콘과 다음 행동으로 구분할 수 있도록
+    // 메시지 문자열 대신 Axios가 정규화한 오류 객체를 그대로 전달한다.
+    return { store: store ?? null, loading, error: error ?? null, refetch };
 };
 
 export default useStoreData;

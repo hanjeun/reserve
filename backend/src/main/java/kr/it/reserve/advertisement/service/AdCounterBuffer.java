@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * 광고 노출/클릭/전환 카운터의 인메모리 버퍼 (2026-07 추가).
+ * 광고 노출/클릭 카운터의 인메모리 버퍼.
  *
  * 예전엔 배너/배지가 렌더될 때마다 recordImpression() 한 번에 SELECT + UPDATE가 즉시 나갔다 —
  * 트래픽이 늘면 이 장식적인 지표 하나 때문에 DB 쓰기가 병목이 될 수 있어서, RateLimiter.java와
@@ -25,17 +25,20 @@ import java.util.concurrent.atomic.LongAdder;
 @Component
 public class AdCounterBuffer {
 
-    public enum CounterType { IMPRESSION, CLICK, CONVERSION }
+    public enum CounterType { IMPRESSION, CLICK }
 
     private final AtomicReference<ConcurrentHashMap<Long, LongAdder>> impressions =
             new AtomicReference<>(new ConcurrentHashMap<>());
     private final AtomicReference<ConcurrentHashMap<Long, LongAdder>> clicks =
             new AtomicReference<>(new ConcurrentHashMap<>());
-    private final AtomicReference<ConcurrentHashMap<Long, LongAdder>> conversions =
-            new AtomicReference<>(new ConcurrentHashMap<>());
 
     public void increment(Long adId, CounterType type) {
-        bucketRef(type).get().computeIfAbsent(adId, k -> new LongAdder()).increment();
+        AtomicReference<ConcurrentHashMap<Long, LongAdder>> ref = bucketRef(type);
+        // ref.get()과 increment 사이에 swap이 끼면 이미 배출된 버킷에 늦게 더해져 유실될 수 있다.
+        // 타입별 짧은 임계구역으로 그 틈을 닫는다.
+        synchronized (ref) {
+            ref.get().computeIfAbsent(adId, k -> new LongAdder()).increment();
+        }
     }
 
     /**
@@ -44,14 +47,36 @@ public class AdCounterBuffer {
      * 다음 버킷(새로 교체된 쪽)에 쌓여 다음 flush 대상이 된다.
      */
     public Map<Long, LongAdder> swapAndGet(CounterType type) {
-        return bucketRef(type).getAndSet(new ConcurrentHashMap<>());
+        AtomicReference<ConcurrentHashMap<Long, LongAdder>> ref = bucketRef(type);
+        synchronized (ref) {
+            return ref.getAndSet(new ConcurrentHashMap<>());
+        }
+    }
+
+    /**
+     * DB flush가 롤백된 경우 교체했던 델타를 현재 버킷에 합친다.
+     * flush 중 새로 들어온 증가분과 더하므로 다음 시도에서 어느 쪽도 유실되지 않는다.
+     */
+    void restore(CounterType type, Map<Long, LongAdder> drained) {
+        if (drained == null || drained.isEmpty()) {
+            return;
+        }
+        AtomicReference<ConcurrentHashMap<Long, LongAdder>> ref = bucketRef(type);
+        synchronized (ref) {
+            ConcurrentHashMap<Long, LongAdder> current = ref.get();
+            drained.forEach((adId, adder) -> {
+                long delta = adder.sum();
+                if (delta > 0) {
+                    current.computeIfAbsent(adId, ignored -> new LongAdder()).add(delta);
+                }
+            });
+        }
     }
 
     private AtomicReference<ConcurrentHashMap<Long, LongAdder>> bucketRef(CounterType type) {
         return switch (type) {
             case IMPRESSION -> impressions;
             case CLICK -> clicks;
-            case CONVERSION -> conversions;
         };
     }
 }

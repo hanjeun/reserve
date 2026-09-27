@@ -3,6 +3,7 @@ package kr.it.reserve.global.common;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 /**
  * 서비스 기준 시각(KST). <b>달력·벽시계 의미를 갖는 "지금"은 전부 여기를 거친다.</b>
@@ -59,5 +60,11 @@ public final class ServiceTime {
     /** 한국 기준 현재 시각. 사용자가 고른 날짜·시각과 비교할 때 쓴다. */
     public static LocalDateTime now() {
         return LocalDateTime.now(ZONE);
+    }
+
+    /** DB에 UTC로 저장한 타임스탬프를 API 표시용 한국 시각으로 바꾼다. */
+    public static LocalDateTime toServiceZone(LocalDateTime storedUtc) {
+        if (storedUtc == null) return null;
+        return storedUtc.atZone(ZoneOffset.UTC).withZoneSameInstant(ZONE).toLocalDateTime();
     }
 }

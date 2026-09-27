@@ -16,11 +16,11 @@ import java.util.List;
 @Entity
 /*
  * 인덱스는 StoreRepository의 실제 쿼리에서 역산했다. (근거는 Reservation 엔티티 주석 참고)
- * ※ 거리순 정렬은 Haversine 인메모리 계산이라(StoreService.distanceKm) 인덱스로 못 돕는다 —
- *   latitude/longitude에 인덱스를 넣어봐야 쓰이지 않으므로 넣지 않았다.
+ * ※ 거리순은 DB bounding-box 후보와 구면 거리 순서를 쓴다.
+ *   좌표 인덱스는 운영 MySQL EXPLAIN을 확인한 뒤 수동 DDL 이력으로 적용한다.
  */
 @Table(name = "store", indexes = {
-    // findByDeletedAtIsNullAndStatusOrderBy… — 가게 목록(평점순·리뷰순·최신순 전부 이 조합)
+    // 공개 Specification의 공통 상태 필터와 최신순, 관리자 미삭제 목록의 앞 조건
     @Index(name = "idx_store_deleted_status", columnList = "deleted_at, status, created_at"),
     // findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc — 내 가게 목록
     @Index(name = "idx_store_owner", columnList = "owner_id, deleted_at, created_at")
@@ -69,6 +69,14 @@ public class Store {
 
     @Column(name = "category")
     private String category;
+
+    /**
+     * 공개 탐색용 정규화 분류. 예약 방식과 독립적이며, 기존 행의 null은
+     * {@link #resolveServiceDomain()}이 자유 카테고리에서 읽기 호환한다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "service_domain", length = 30)
+    private ServiceDomain serviceDomain;
 
     @Column(name = "main_image_url")
     private String mainImageUrl;
@@ -332,6 +340,11 @@ public class Store {
         } else {
             this.keywords = String.join(",", keywordList);
         }
+    }
+
+    /** 기존 행의 null을 흡수하는 공개 탐색 분류. 직접 필드를 읽지 말 것. */
+    public ServiceDomain resolveServiceDomain() {
+        return serviceDomain != null ? serviceDomain : ServiceDomain.inferFromCategory(category);
     }
 
     // 상세 이미지 편의 메서드

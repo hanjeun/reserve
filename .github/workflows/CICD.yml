@@ -36,17 +36,110 @@ permissions:
   contents: read
 
 env:
-  # appleboy의 Go SSH 클라이언트가 이 서버에서 협상하는 ECDSA 호스트 키 지문이다(시크릿 아님).
-  # 로컬 OpenSSH가 주로 표시하는 ED25519 지문으로 바꾸면 같은 서버여도 fingerprint mismatch가 난다.
+  # appleboy가 협상하는 ECDSA 호스트 키 지문이다. OpenSSH의 ED25519 지문과 구분한다.
   RESERVE_SSH_FINGERPRINT: SHA256:xUTdx0pKa31pVIYhaJyo8fEOekQbzTss15GxZbrT1Iw
 
 jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Test backend (unit and Spring/H2 integration)
+        id: backend_tests
+        working-directory: backend
+        run: |
+          chmod +x ./gradlew
+          ./gradlew test --console=plain
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-test-report
+          path: |
+            backend/build/reports/tests/test/
+            backend/build/test-results/test/
+          retention-days: 7
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Validate Grafana dashboards
+        run: node scripts/validate-grafana-dashboards.mjs
+      - name: Validate documentation links
+        run: node scripts/check-doc-links.mjs
+      - name: Verify immutable design-system snapshot
+        shell: pwsh
+        run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
+      - name: Validate operations scripts
+        run: |
+          bash -n scripts/backup-mysql.sh
+          bash -n scripts/restore-mysql.sh
+          bash -n scripts/verify-post-deploy-readonly.sh
+          bash -n scripts/verify-mysql-row-lock.sh
+          bash -n scripts/test-frontend-release-swap.sh
+          bash -n scripts/preserve-frontend-assets.sh
+          bash -n scripts/test-frontend-assets.sh
+          bash scripts/test-frontend-assets.sh
+          bash scripts/test-frontend-release-swap.sh
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint:ci
+      - name: Test repository quality policies
+        working-directory: frontend
+        run: npm run test:policy
+      - name: Test frontend (unit and React components)
+        working-directory: frontend
+        run: npm run test:run
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test PC browser (Chromium)
+        id: browser_pc
+        working-directory: frontend
+        run: npm run test:e2e -- --project=chromium --output=test-results/pc
+      - name: Test mobile browser (Pixel 7 Chromium)
+        id: browser_mobile
+        if: "!cancelled() && (success() || (failure() && steps.browser_pc.outcome == 'failure'))"
+        working-directory: frontend
+        run: npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-browser-failures
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   # ─────────────────────────────────────────────────────────
   # 1. 백엔드 빌드 + Docker 이미지 푸시
   # ─────────────────────────────────────────────────────────
   build-backend:
+    needs: test-backend
+    # 필수 build 체크가 의존 테스트 실패를 skipped/success로 숨기지 않게 직접 실패시킨다.
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require backend test success
+        env:
+          TEST_RESULT: ${{ needs.test-backend.result }}
+        run: test "$TEST_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install JDK 21
@@ -54,22 +147,25 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: gradle
 
-      # build에 H2·외부 서비스 mock 테스트를 포함한다. -x test로 보안 회귀 검증을 생략하지 않는다.
-      - name: Build with Gradle
+      # 앞 단계가 성공해야 패키징한다. test를 다시 실행하거나 -x test로 우회하지 않는다.
+      - name: Package backend bootJar
+        id: backend_package
         working-directory: backend
         run: |
           chmod +x ./gradlew
-          ./gradlew clean build
+          ./gradlew bootJar --console=plain
 
-      # 테스트가 깨졌을 때 Actions 로그만으로는 원인 파악이 어려워 리포트를 첨부한다.
-      # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
-      - name: Upload test report on failure
-        if: failure()
+      - name: Verify rollback schema compatibility
+        id: rollback_bridge
+        run: bash scripts/test-v270-rollback.sh
+
+      - name: Upload verified rollback backend
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: backend-test-report
-          path: backend/build/reports/tests/test/
+          name: rollback-backend
+          path: ${{ steps.rollback_bridge.outputs.bridge_jar }}
           retention-days: 7
 
       # ── 여기부터는 main push에서만 실행한다 ──────────────────────────────
@@ -97,9 +193,33 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           docker build --platform linux/amd64 \
+            --label reserve.schema-compat=v270-refund-v1 \
             -t "$DOCKERHUB_USERNAME/reserve:latest" \
             -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
+
+      # 원본 v2.6.3 이미지는 OWNER/취소/사진 데이터를 안전하게 읽지 못한다.
+      # 위 격리 검사에서 만든 호환 서버만 별도 불변 태그로 보관한다. latest는 건드리지 않는다.
+      - name: Build rollback compatibility image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRIDGE_DIR: ${{ steps.rollback_bridge.outputs.bridge_dir }}
+        run: |
+          test -s "$BRIDGE_DIR/backend/build/libs/reserve-2.6.3.jar"
+          docker build --platform linux/amd64 \
+            --label reserve.rollback-base=b478ae8d732afa1e35642d790bfc39972556f885 \
+            --label reserve.schema-compat=v270-refund-v1 \
+            -t "$DOCKERHUB_USERNAME/reserve:rollback-v263-v270-$COMMIT_SHA" \
+            "$BRIDGE_DIR/backend"
+
+      - name: Push rollback compatibility image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: docker push "$DOCKERHUB_USERNAME/reserve:rollback-v263-v270-$COMMIT_SHA"
 
       - name: Push Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -111,13 +231,22 @@ jobs:
           docker push "$DOCKERHUB_USERNAME/reserve:latest"
 
   # ─────────────────────────────────────────────────────────
-  # 2. 프론트엔드 빌드 + Lightsail Nginx로 정적 파일 배포
-  # build-backend 완료 후 실행. deploy-backend는 이 잡까지 끝난 뒤 시작해 버전 엇갈림을 막는다.
+  # 2. 프론트엔드 빌드 + Lightsail 릴리스 디렉터리 staging
+  # build-backend 완료 후 실행한다. 여기서는 live symlink나 nginx를 바꾸지 않는다.
+  # 새 백엔드 health 확인 뒤 deploy-backend 잡이 프론트와 upstream을 한 번에 전환한다.
   # ─────────────────────────────────────────────────────────
   build-frontend:
-    needs: build-backend
+    needs: [build-backend, test-frontend]
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require backend build and frontend test success
+        env:
+          BACKEND_RESULT: ${{ needs.build-backend.result }}
+          TEST_RESULT: ${{ needs.test-frontend.result }}
+        run: |
+          test "$BACKEND_RESULT" = success
+          test "$TEST_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
@@ -127,44 +256,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Validate Grafana dashboards
-        run: node scripts/validate-grafana-dashboards.mjs
-
-      - name: Validate operations scripts
-        run: |
-          bash -n scripts/backup-mysql.sh
-          bash -n scripts/restore-mysql.sh
-          bash -n scripts/verify-post-deploy-readonly.sh
-          bash -n scripts/verify-mysql-row-lock.sh
-          bash -n scripts/test-frontend-release-swap.sh
-          bash scripts/test-frontend-release-swap.sh
-
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
-
-      # npx 대신 package.json의 lint:ci 스크립트를 호출한다 — npx는 로컬에 없으면 레지스트리에서
-      # 즉석으로 받아 실행할 수 있어(그 패키지의 lifecycle 스크립트까지) 공급망 관점에서 위험하다.
-      # npm ci로 설치된 로컬 eslint만 쓰도록 고정. 실행되는 명령 자체는 이전과 동일하다.
-      - name: Run ESLint
-        working-directory: frontend
-        run: npm run lint:ci
-
-      - name: Test repository quality policies
-        working-directory: frontend
-        run: npm run test:policy
-
-      - name: Run frontend unit tests
-        working-directory: frontend
-        run: npm run test:run
-
-      - name: Install Playwright Chromium
-        working-directory: frontend
-        run: npx --no-install playwright install --with-deps chromium
-
-      - name: Run critical browser smoke tests
-        working-directory: frontend
-        run: npm run test:e2e
 
       # .env.production 파일을 GitHub Secrets로 생성
       - name: Create .env.production
@@ -215,13 +309,13 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "nginx/default.conf"
+          source: "nginx/default.conf,scripts/preserve-frontend-assets.sh"
           target: "/home/ubuntu/"
           strip_components: 1
 
-      # Nginx가 서빙하는 폴더로 이동 + 권한 설정
-      # PRIVATE_IP 플레이스홀더를 서버 사설 IP로 치환 후 Nginx에 적용
-      - name: Reload Nginx static files
+      # SHA별 정적 파일과 nginx 템플릿만 staging한다. live 전환은 새 백엔드가
+      # 정상 기동한 뒤 deploy-backend 잡에서 한 번의 nginx reload로 수행한다.
+      - name: Stage frontend release
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
@@ -233,58 +327,48 @@ jobs:
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
           envs: FRONTEND_RELEASE
           script: |
-            set -eu
+            bash -Eeuo pipefail <<'RESERVE_STAGE'
             case "$FRONTEND_RELEASE" in
               ''|*[!0-9a-f]*) echo "Invalid frontend release id"; exit 1 ;;
             esac
+            if [ ${#FRONTEND_RELEASE} -ne 40 ]; then
+              echo "Frontend release id must be a full commit SHA"
+              exit 1
+            fi
 
             RELEASE_ROOT=/usr/share/nginx/html/releases
             RELEASE_DIR="$RELEASE_ROOT/$FRONTEND_RELEASE"
             INCOMING_DIR="$RELEASE_ROOT/.incoming-$FRONTEND_RELEASE"
             UPLOAD_DIR="/home/ubuntu/reserve-frontend-$FRONTEND_RELEASE"
+            NGINX_TEMPLATE="/home/ubuntu/default-$FRONTEND_RELEASE.conf"
 
             sudo mkdir -p "$RELEASE_ROOT"
             if [ ! -d "$RELEASE_DIR" ]; then
               sudo rm -rf -- "$INCOMING_DIR"
               sudo mkdir -p "$INCOMING_DIR"
               sudo cp -a "$UPLOAD_DIR/." "$INCOMING_DIR/"
+              test -f "$INCOMING_DIR/index.html"
+              sudo bash /home/ubuntu/preserve-frontend-assets.sh "$INCOMING_DIR" "$RELEASE_ROOT" /usr/share/nginx/html/current
               sudo chown -R nginx:nginx "$INCOMING_DIR" 2>/dev/null || true
               sudo mv "$INCOMING_DIR" "$RELEASE_DIR"
             fi
+            # smoke가 단순 200/SPA fallback이 아니라 이 SHA의 정적 root를 읽었는지 판별한다.
+            printf '%s\n' "$FRONTEND_RELEASE" | sudo tee "$RELEASE_DIR/release-id.txt" >/dev/null
+            sudo chown nginx:nginx "$RELEASE_DIR/release-id.txt" 2>/dev/null || true
 
-            # 같은 디렉터리 안의 symlink rename은 원자적이다. 요청 중간에 빈 root가 생기지 않는다.
-            sudo ln -sfn "releases/$FRONTEND_RELEASE" /usr/share/nginx/html/current.next
-            sudo mv -Tf /usr/share/nginx/html/current.next /usr/share/nginx/html/current
-
-            PRIVATE_IP=$(hostname -I | awk '{print $1}')
-            sed -i "s/PRIVATE_IP/${PRIVATE_IP}/g" /home/ubuntu/default.conf
-            sudo docker cp /home/ubuntu/default.conf nginxserver:/etc/nginx/conf.d/default.conf
-            sudo docker exec nginxserver nginx -t
-            sudo docker exec nginxserver nginx -s reload
+            # 공용 default.conf 이름을 그대로 두면 재실행 때 다른 SHA 템플릿과 섞일 수 있다.
+            # 배포 SHA에 묶인 읽기 전용 후보로 고정하고, 아직 nginx에는 적용하지 않는다.
+            test -f /home/ubuntu/default.conf
+            install -m 0644 /home/ubuntu/default.conf "$NGINX_TEMPLATE"
+            rm -f /home/ubuntu/default.conf
 
             case "$UPLOAD_DIR" in
               /home/ubuntu/reserve-frontend-*) sudo rm -rf -- "$UPLOAD_DIR" ;;
               *) echo "Unexpected upload directory"; exit 1 ;;
             esac
 
-            # 현재 릴리스와 그 외 최신 두 개를 남긴다. 과거 workflow를 재실행해 current가 오래된
-            # 디렉터리를 가리켜도 현재 서빙 중인 대상을 정리 루프가 지우면 안 된다.
-            RESOLVED_RELEASE_ROOT=$(readlink -f "$RELEASE_ROOT")
-            RESOLVED_CURRENT_RELEASE=$(readlink -f /usr/share/nginx/html/current)
-            find "$RELEASE_ROOT" -mindepth 1 -maxdepth 1 -type d \
-              -regextype posix-extended -regex '.*/[0-9a-f]{40}' -printf '%T@ %p\n' \
-              | sort -rn \
-              | awk -v current="$RESOLVED_CURRENT_RELEASE" '$2 != current { seen++; if (seen > 2) print $2 }' \
-              | while IFS= read -r OLD_RELEASE; do
-                  RESOLVED_OLD_RELEASE=$(readlink -f "$OLD_RELEASE")
-                  if [ "$RESOLVED_OLD_RELEASE" = "$RESOLVED_CURRENT_RELEASE" ]; then
-                    continue
-                  fi
-                  case "$RESOLVED_OLD_RELEASE" in
-                    "$RESOLVED_RELEASE_ROOT"/*) sudo rm -rf -- "$RESOLVED_OLD_RELEASE" ;;
-                    *) echo "Refusing to remove unexpected path: $RESOLVED_OLD_RELEASE"; exit 1 ;;
-                  esac
-                done
+            echo "Frontend staged at $RELEASE_DIR; live configuration is unchanged"
+            RESERVE_STAGE
 
   # ─────────────────────────────────────────────────────────
   # 3. Blue/Green 백엔드 배포 (프론트엔드 배포까지 완료된 뒤 실행)
@@ -295,7 +379,7 @@ jobs:
     permissions:
       contents: read
       deployments: write
-    needs: build-frontend
+    needs: [build-backend, build-frontend, test-backend, test-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: production
@@ -322,7 +406,7 @@ jobs:
             });
             core.setOutput('id', dep.data.id);
 
-      # ★ 판별은 반드시 서버 안에서 한다.
+      # ★ live 판별은 반드시 서버 안의 nginx routing 정본에서 한다.
       #
       # 예전엔 GitHub 러너에서 `http://<SERVER_IP>:8080|8081/actuator/health` 를 외부망으로 쳤다.
       # 그런데 8080·8081은 Lightsail 방화벽에서 막혀 있어 항상 연결 실패였다.
@@ -331,6 +415,9 @@ jobs:
       # 결과적으로 **매 배포가 CURRENT_UPSTREAM=none → 항상 blue로 배포 + `docker stop none`** 이었다.
       # 즉 무중단 배포가 작동한 적이 없고 green은 영영 쓰이지 않았다.
       # 아래 Health check 스텝이 이미 SSH 내부 curl 패턴이므로 같은 방식으로 맞춘다.
+      # 단, 이전 컨테이너 정리가 실패하면 blue·green이 둘 다 200일 수 있다. 이때 health 순서로
+      # 현재 대상을 추측하면 실제 live 컨테이너를 덮어쓴다. nginx의 service-env.inc를 정본으로 읽고,
+      # 그 컨테이너의 health가 200인지 교차 확인한 뒤에만 반대편을 배포 대상으로 고른다.
       #
       # (`000000` 이 찍혔던 이유: curl이 -w로 "000"을 출력하고 exit≠0이라 `|| echo "000"`까지 실행돼
       #  두 번 붙었다. 아래에서는 명령 치환 밖에서 폴백을 주어 값이 겹치지 않게 한다.)
@@ -344,16 +431,33 @@ jobs:
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
           capture_stdout: true
           script: |
-            STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 http://localhost:8080/actuator/health) || STATUS_BLUE="000"
-            STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 http://localhost:8081/actuator/health) || STATUS_GREEN="000"
-            echo "blue=$STATUS_BLUE green=$STATUS_GREEN"
-            if [ "$STATUS_BLUE" = "200" ]; then
-              echo "DETECTED_UPSTREAM=blue"
-            elif [ "$STATUS_GREEN" = "200" ]; then
-              echo "DETECTED_UPSTREAM=green"
-            else
-              echo "DETECTED_UPSTREAM=none"
+            set -eu
+            SERVICE_ENV_LINE=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc \
+              | tr -d '\r\n')
+            case "$SERVICE_ENV_LINE" in
+              'set $service_url blue;') CURRENT_UPSTREAM=blue ;;
+              'set $service_url green;') CURRENT_UPSTREAM=green ;;
+              *)
+                echo "Invalid nginx service-env.inc; refusing to guess the live upstream"
+                exit 1
+                ;;
+            esac
+
+            STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-time 10 http://localhost:8080/actuator/health) || STATUS_BLUE="000"
+            STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-time 10 http://localhost:8081/actuator/health) || STATUS_GREEN="000"
+            echo "routed=$CURRENT_UPSTREAM blue=$STATUS_BLUE green=$STATUS_GREEN"
+            ACTIVE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$CURRENT_UPSTREAM")
+            SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$ACTIVE_IMAGE")
+            if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ]; then
+              echo "Active rollback backend is not schema/refund compatible; prepare the bridge before deployment"
+              exit 1
             fi
+            if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
+               || { [ "$CURRENT_UPSTREAM" = "green" ] && [ "$STATUS_GREEN" != "200" ]; }; then
+              echo "Nginx points to an unhealthy upstream; refusing automatic deployment"
+              exit 1
+            fi
+            echo "DETECTED_UPSTREAM=$CURRENT_UPSTREAM"
 
       - name: Set target IP
         env:
@@ -373,15 +477,22 @@ jobs:
           echo "Current upstream: $CURRENT_UPSTREAM"
           echo CURRENT_UPSTREAM=$CURRENT_UPSTREAM >> $GITHUB_ENV
 
-          if [ "$CURRENT_UPSTREAM" = "blue" ]; then
+          case "$CURRENT_UPSTREAM" in
+          blue)
             echo "CURRENT_PORT=8080"    >> $GITHUB_ENV
             echo "STOPPED_PORT=8081"   >> $GITHUB_ENV
             echo "TARGET_UPSTREAM=green" >> $GITHUB_ENV
-          else
+            ;;
+          green)
             echo "CURRENT_PORT=8081"   >> $GITHUB_ENV
             echo "STOPPED_PORT=8080"   >> $GITHUB_ENV
             echo "TARGET_UPSTREAM=blue" >> $GITHUB_ENV
-          fi
+            ;;
+          *)
+            echo "::error::Unexpected live upstream: $CURRENT_UPSTREAM"
+            exit 1
+            ;;
+          esac
 
   # SSH 접속 정보 (AWS Lightsail — 변수명은 EC2 시절 레거시, 실제론 Lightsail)
       - name: Deploy docker-compose files to EC2
@@ -420,12 +531,14 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
           HOLIDAY_API_KEY: ${{ secrets.HOLIDAY_API_KEY }}
+          TOURISM_API_SERVICE_KEY: ${{ secrets.TOURISM_API_SERVICE_KEY }}
+          CHAT_IMAGE_ENCRYPTION_KEY: ${{ secrets.CHAT_IMAGE_ENCRYPTION_KEY }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY
+          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY
           script: |
             set -e
             # 커밋 SHA로 고정된 이미지를 배포한다. :latest는 언제든 다른 커밋으로 바뀔 수 있어
@@ -454,33 +567,254 @@ jobs:
             echo "Health check failed after 10 attempts"
             exit 1
 
-      - name: Rollback on health check failure
-        if: failure()
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
-        with:
-          username: ubuntu
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          script: |
-            echo "Health check failed. Rolling back..."
-            sudo docker stop ${{ env.TARGET_UPSTREAM }} || true
-            sudo docker rm ${{ env.TARGET_UPSTREAM }} || true
-            echo "Rollback complete. Keeping ${{ env.CURRENT_UPSTREAM }}"
-
-      - name: Switch Nginx upstream
+      # 새 프론트의 절대 경로와 새 백엔드 upstream을 함께 설치하고 nginx를 한 번만 reload한다.
+      # 중간 명령이 실패하면 ERR trap이 default.conf, service-env.inc, current symlink를 함께 복구한다.
+      - name: Cut over frontend and backend
         if: success()
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          FRONTEND_RELEASE: ${{ github.sha }}
+          TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
+          DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
+          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,DEPLOY_ATTEMPT
           script: |
-            sudo docker exec -i nginxserver bash -c \
-              'echo "set \$service_url ${{ env.TARGET_UPSTREAM }};" > /etc/nginx/conf.d/service-env.inc && nginx -s reload'
+            bash -Eeuo pipefail <<'RESERVE_CUTOVER'
 
-      - name: Stop old server
+            case "$FRONTEND_RELEASE" in
+              ''|*[!0-9a-f]*) echo "Invalid frontend release id"; exit 1 ;;
+            esac
+            if [ ${#FRONTEND_RELEASE} -ne 40 ]; then
+              echo "Frontend release id must be a full commit SHA"
+              exit 1
+            fi
+            case "$TARGET_UPSTREAM" in
+              blue|green) ;;
+              *) echo "Invalid target upstream"; exit 1 ;;
+            esac
+            [[ "$DEPLOY_ATTEMPT" =~ ^[0-9]+-[0-9]+$ ]] || {
+              echo "Invalid deployment attempt id"
+              exit 1
+            }
+
+            RELEASE_ROOT=/usr/share/nginx/html/releases
+            RELEASE_DIR="$RELEASE_ROOT/$FRONTEND_RELEASE"
+            NGINX_TEMPLATE="/home/ubuntu/default-$FRONTEND_RELEASE.conf"
+            NGINX_CANDIDATE="/home/ubuntu/default-$FRONTEND_RELEASE-$DEPLOY_ATTEMPT.candidate.conf"
+            ROLLBACK_DIR="/home/ubuntu/release-rollback-$FRONTEND_RELEASE-$DEPLOY_ATTEMPT"
+            ROLLBACK_TMP="$ROLLBACK_DIR.tmp"
+
+            test -f "$RELEASE_DIR/index.html"
+            test -f "$NGINX_TEMPLATE"
+
+            rollback_cutover() {
+              trap - ERR INT TERM HUP
+              echo "Cutover failed; restoring frontend and backend routing"
+
+              if [ -f "$ROLLBACK_DIR/previous-release" ]; then
+                PREVIOUS_RELEASE=$(cat "$ROLLBACK_DIR/previous-release")
+                case "$PREVIOUS_RELEASE" in
+                  releases/*)
+                    sudo ln -sfn "$PREVIOUS_RELEASE" /usr/share/nginx/html/current.next
+                    sudo mv -Tf /usr/share/nginx/html/current.next /usr/share/nginx/html/current
+                    ;;
+                  none)
+                    sudo rm -f /usr/share/nginx/html/current
+                    ;;
+                  *)
+                    echo "Refusing unexpected previous release: $PREVIOUS_RELEASE"
+                    ;;
+                esac
+              fi
+
+              if [ -f "$ROLLBACK_DIR/default.conf" ] && [ -f "$ROLLBACK_DIR/service-env.inc" ]; then
+                sudo docker cp "$ROLLBACK_DIR/default.conf" nginxserver:/etc/nginx/conf.d/default.conf
+                sudo docker cp "$ROLLBACK_DIR/service-env.inc" nginxserver:/etc/nginx/conf.d/service-env.inc
+                sudo docker exec nginxserver nginx -t
+                sudo docker exec nginxserver nginx -s reload
+              fi
+
+              sudo rm -f "$ROLLBACK_DIR/cutover-started" "$ROLLBACK_DIR/cutover-complete"
+              sudo rm -rf -- "$ROLLBACK_TMP"
+              sudo rm -f "$NGINX_CANDIDATE"
+              exit 1
+            }
+            trap rollback_cutover ERR INT TERM HUP
+
+            PREVIOUS_RELEASE=$(readlink /usr/share/nginx/html/current 2>/dev/null || printf 'none')
+            if [ "$PREVIOUS_RELEASE" != "none" ]; then
+              PREVIOUS_ID=${PREVIOUS_RELEASE#releases/}
+              if [ "$PREVIOUS_RELEASE" = "$PREVIOUS_ID" ] \
+                 || [ ${#PREVIOUS_ID} -ne 40 ] \
+                 || printf '%s' "$PREVIOUS_ID" | grep -q '[^0-9a-f]'; then
+                echo "Unexpected current frontend symlink: $PREVIOUS_RELEASE"
+                exit 1
+              fi
+            fi
+
+            sudo rm -rf -- "$ROLLBACK_TMP"
+            sudo mkdir -p "$ROLLBACK_TMP"
+            printf '%s\n' "$PREVIOUS_RELEASE" | sudo tee "$ROLLBACK_TMP/previous-release" >/dev/null
+            sudo docker cp nginxserver:/etc/nginx/conf.d/default.conf "$ROLLBACK_TMP/default.conf"
+            sudo docker cp nginxserver:/etc/nginx/conf.d/service-env.inc "$ROLLBACK_TMP/service-env.inc"
+            sudo rm -rf -- "$ROLLBACK_DIR"
+            sudo mv "$ROLLBACK_TMP" "$ROLLBACK_DIR"
+            sudo touch "$ROLLBACK_DIR/cutover-started"
+
+            PRIVATE_IP=$(hostname -I | awk '{print $1}')
+            test -n "$PRIVATE_IP"
+            cp "$NGINX_TEMPLATE" "$NGINX_CANDIDATE"
+            sed -i "s/PRIVATE_IP/${PRIVATE_IP}/g" "$NGINX_CANDIDATE"
+            sed -i "s#root /usr/share/nginx/html/current;#root $RELEASE_DIR;#" "$NGINX_CANDIDATE"
+            if grep -q 'PRIVATE_IP' "$NGINX_CANDIDATE"; then
+              echo "Unresolved PRIVATE_IP placeholder"
+              exit 1
+            fi
+            if ! grep -Fqx "    root $RELEASE_DIR;" "$NGINX_CANDIDATE"; then
+              echo "Candidate nginx config does not pin the staged frontend release"
+              exit 1
+            fi
+            if ! sudo docker exec nginxserver nginx -V 2>&1 | grep -q -- '--with-http_sub_module'; then
+              echo "nginx is missing ngx_http_sub_module"
+              exit 1
+            fi
+
+            sudo docker cp "$NGINX_CANDIDATE" nginxserver:/etc/nginx/conf.d/default.conf
+            sudo docker exec -e RESERVE_TARGET_UPSTREAM="$TARGET_UPSTREAM" nginxserver sh -eu -c \
+              'printf "set \$service_url %s;\n" "$RESERVE_TARGET_UPSTREAM" > /etc/nginx/conf.d/service-env.inc'
+            sudo docker exec nginxserver nginx -t
+
+            # current는 운영 도구가 보는 포인터이고, 실제 nginx root는 위 후보의 SHA 절대 경로다.
+            sudo ln -sfn "releases/$FRONTEND_RELEASE" /usr/share/nginx/html/current.next
+            sudo mv -Tf /usr/share/nginx/html/current.next /usr/share/nginx/html/current
+            sudo docker exec nginxserver nginx -s reload
+            sudo touch "$ROLLBACK_DIR/cutover-complete"
+            sudo rm -f "$NGINX_CANDIDATE"
+            trap - ERR INT TERM HUP
+            RESERVE_CUTOVER
+
+      # 새 nginx 경로를 통해 정적 자산과 공개 API가 모두 응답한 뒤에만 이전 백엔드를 정지한다.
+      - name: Post-deploy smoke
+        if: success()
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          FRONTEND_RELEASE: ${{ github.sha }}
+          TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
+        with:
+          username: ubuntu
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
+          envs: FRONTEND_RELEASE,TARGET_UPSTREAM
+          script: |
+            bash -Eeuo pipefail <<'RESERVE_SMOKE'
+            RELEASE_DIR="/usr/share/nginx/html/releases/$FRONTEND_RELEASE"
+            SMOKE_DIR=$(mktemp -d)
+            cleanup() { rm -rf "$SMOKE_DIR"; }
+            trap cleanup EXIT
+
+            curl --fail --silent --show-error --max-time 20 \
+              --resolve reserve.it.kr:443:127.0.0.1 \
+              https://reserve.it.kr/ -o "$SMOKE_DIR/index.html"
+            grep -q '<div id="root">' "$SMOKE_DIR/index.html"
+
+            curl --fail --silent --show-error --max-time 20 \
+              --resolve reserve.it.kr:443:127.0.0.1 \
+              https://reserve.it.kr/release-id.txt -o "$SMOKE_DIR/release-id.txt"
+            test "$(tr -d '\r\n' < "$SMOKE_DIR/release-id.txt")" = "$FRONTEND_RELEASE"
+
+            ASSET_PATH=$(grep -oE '/assets/[^" ]+\.(js|css)' "$RELEASE_DIR/index.html" | sed -n '1p')
+            test -n "$ASSET_PATH"
+            curl --fail --silent --show-error --max-time 20 \
+              --resolve reserve.it.kr:443:127.0.0.1 \
+              "https://reserve.it.kr$ASSET_PATH" -o "$SMOKE_DIR/asset"
+            test -s "$SMOKE_DIR/asset"
+
+            curl --fail --silent --show-error --max-time 20 \
+              --resolve reserve.it.kr:443:127.0.0.1 \
+              'https://reserve.it.kr/api/stores?page=0&size=1' -o "$SMOKE_DIR/stores.json"
+            test -s "$SMOKE_DIR/stores.json"
+
+            SERVICE_ENV_LINE=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc \
+              | tr -d '\r\n')
+            test "$SERVICE_ENV_LINE" = "set \$service_url $TARGET_UPSTREAM;"
+            RUNNING_IMAGE=$(sudo docker inspect --format '{{.Config.Image}}' "$TARGET_UPSTREAM")
+            case "$RUNNING_IMAGE" in
+              *":sha-$FRONTEND_RELEASE") ;;
+              *) echo "Target backend image does not match the deployed commit"; exit 1 ;;
+            esac
+            echo "Post-deploy smoke passed through nginx"
+            RESERVE_SMOKE
+
+      # health, cutover, smoke 중 어디서 실패해도 새 백엔드를 내리고, 실제 전환이 시작됐다면
+      # 저장한 nginx 두 파일과 프론트 포인터를 함께 복구한다.
+      - name: Roll back failed deployment
+        if: failure() || cancelled()
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          FRONTEND_RELEASE: ${{ github.sha }}
+          TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
+          DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
+        with:
+          username: ubuntu
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
+          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,DEPLOY_ATTEMPT
+          script: |
+            bash -Eeuo pipefail <<'RESERVE_ROLLBACK'
+            [[ "$DEPLOY_ATTEMPT" =~ ^[0-9]+-[0-9]+$ ]] || exit 1
+            ROLLBACK_DIR="/home/ubuntu/release-rollback-$FRONTEND_RELEASE-$DEPLOY_ATTEMPT"
+            ROLLBACK_TMP="$ROLLBACK_DIR.tmp"
+            NGINX_CANDIDATE="/home/ubuntu/default-$FRONTEND_RELEASE-$DEPLOY_ATTEMPT.candidate.conf"
+
+            if [ -f "$ROLLBACK_DIR/cutover-started" ]; then
+              PREVIOUS_RELEASE=$(cat "$ROLLBACK_DIR/previous-release")
+              case "$PREVIOUS_RELEASE" in
+                releases/*)
+                  sudo ln -sfn "$PREVIOUS_RELEASE" /usr/share/nginx/html/current.next
+                  sudo mv -Tf /usr/share/nginx/html/current.next /usr/share/nginx/html/current
+                  ;;
+                none)
+                  sudo rm -f /usr/share/nginx/html/current
+                  ;;
+                *)
+                  echo "Refusing unexpected previous release: $PREVIOUS_RELEASE"
+                  exit 1
+                  ;;
+              esac
+              sudo docker cp "$ROLLBACK_DIR/default.conf" nginxserver:/etc/nginx/conf.d/default.conf
+              sudo docker cp "$ROLLBACK_DIR/service-env.inc" nginxserver:/etc/nginx/conf.d/service-env.inc
+              sudo docker exec nginxserver nginx -t
+              sudo docker exec nginxserver nginx -s reload
+              sudo rm -f "$ROLLBACK_DIR/cutover-started" "$ROLLBACK_DIR/cutover-complete"
+              echo "Frontend and nginx upstream restored"
+            else
+              echo "No completed nginx cutover to restore"
+            fi
+            sudo rm -rf -- "$ROLLBACK_TMP"
+            sudo rm -f "$NGINX_CANDIDATE"
+
+            case "${TARGET_UPSTREAM:-}" in
+              blue|green)
+                sudo docker stop "$TARGET_UPSTREAM" || true
+                sudo docker rm "$TARGET_UPSTREAM" || true
+                ;;
+              *)
+                echo "Target upstream was not selected; no backend container to remove"
+                ;;
+            esac
+            RESERVE_ROLLBACK
+
+      # 새 릴리스는 이미 smoke를 통과했다. 여기서 SSH가 끊겨도 live를 되돌리기보다
+      # 이전 컨테이너를 남겨 다음 운영 점검에서 정리하는 편이 안전하다.
+      - name: Stop old server (best effort)
+        if: success()
+        continue-on-error: true
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           username: ubuntu
@@ -493,20 +827,62 @@ jobs:
             if [ "${{ env.CURRENT_UPSTREAM }}" = "none" ]; then
               echo "No previous container to stop (first deploy or both were down)"
             else
+              OLD_IMAGE=$(sudo docker inspect --format '{{.Image}}' ${{ env.CURRENT_UPSTREAM }})
+              OLD_BASE=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.rollback-base"}}' "$OLD_IMAGE")
+              if [ "$OLD_BASE" = 'b478ae8d732afa1e35642d790bfc39972556f885' ]; then
+                echo "Keeping the compatible rollback backend available"
+                exit 0
+              fi
               sudo docker stop ${{ env.CURRENT_UPSTREAM }} || true
               sudo docker rm   ${{ env.CURRENT_UPSTREAM }} || true
             fi
 
-      - name: Cleanup Docker resources
+      - name: Cleanup release resources (best effort)
+        if: success()
+        continue-on-error: true
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          FRONTEND_RELEASE: ${{ github.sha }}
+          DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
+          envs: FRONTEND_RELEASE,DEPLOY_ATTEMPT
           script: |
-            sudo docker image prune -af --filter "until=24h" || true
-            sudo docker system prune -f || true
+            bash -Eeuo pipefail <<'RESERVE_CLEANUP'
+            case "$FRONTEND_RELEASE" in
+              ''|*[!0-9a-f]*) echo "Invalid frontend release id"; exit 1 ;;
+            esac
+            if [ ${#FRONTEND_RELEASE} -ne 40 ]; then
+              echo "Frontend release id must be a full commit SHA"
+              exit 1
+            fi
+            [[ "$DEPLOY_ATTEMPT" =~ ^[0-9]+-[0-9]+$ ]] || exit 1
+
+            RELEASE_ROOT=/usr/share/nginx/html/releases
+            RESOLVED_RELEASE_ROOT=$(readlink -f "$RELEASE_ROOT")
+            RESOLVED_CURRENT_RELEASE=$(readlink -f /usr/share/nginx/html/current)
+            find "$RELEASE_ROOT" -mindepth 1 -maxdepth 1 -type d \
+              -regextype posix-extended -regex '.*/[0-9a-f]{40}' -printf '%T@ %p\n' \
+              | sort -rn \
+              | awk -v current="$RESOLVED_CURRENT_RELEASE" '$2 != current { seen++; if (seen > 2) print $2 }' \
+              | while IFS= read -r OLD_RELEASE; do
+                  RESOLVED_OLD_RELEASE=$(readlink -f "$OLD_RELEASE")
+                  case "$RESOLVED_OLD_RELEASE" in
+                    "$RESOLVED_RELEASE_ROOT"/*)
+                      if [ "$RESOLVED_OLD_RELEASE" != "$RESOLVED_CURRENT_RELEASE" ]; then
+                        sudo rm -rf -- "$RESOLVED_OLD_RELEASE"
+                      fi
+                      ;;
+                    *) echo "Refusing to remove unexpected path: $RESOLVED_OLD_RELEASE"; exit 1 ;;
+                  esac
+                done
+
+            sudo rm -rf -- "/home/ubuntu/release-rollback-$FRONTEND_RELEASE-$DEPLOY_ATTEMPT"
+            rm -f "/home/ubuntu/default-$FRONTEND_RELEASE.conf"
+            RESERVE_CLEANUP
 
       # 배포 결과 기록. deployment 생성이 실패했으면(id 없음) 조용히 건너뛴다.
       - name: Mark deployment success
@@ -524,8 +900,8 @@ jobs:
               description: 'Deployed to production',
             });
 
-      - name: Mark deployment failure
-        if: failure() && steps.deployment.outputs.id
+      - name: Mark deployment failure or cancellation
+        if: (failure() || cancelled()) && steps.deployment.outputs.id
         continue-on-error: true
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
@@ -535,5 +911,5 @@ jobs:
               repo: context.repo.repo,
               deployment_id: ${{ steps.deployment.outputs.id }},
               state: 'failure',
-              description: 'Deploy failed (health check/rollback)',
+              description: 'Deploy failed or was cancelled; rollback was attempted',
             });

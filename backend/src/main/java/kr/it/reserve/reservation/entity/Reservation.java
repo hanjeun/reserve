@@ -116,6 +116,15 @@ public class Reservation {
     @Column(name = "checked_in_at")
     private LocalDateTime checkedInAt;
 
+    /**
+     * 이 예약으로 한 번만 귀속한 배너 광고 ID.
+     *
+     * <p>광고는 삭제·환불 이력을 독립적으로 보관하므로 관계를 물리지 않고 ID만 남긴다.
+     * nullable 신규 컬럼이라 ddl-auto:update 환경에서 기존 예약은 자연스럽게 미귀속 상태로 남는다.
+     */
+    @Column(name = "attributed_ad_id")
+    private Long attributedAdId;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

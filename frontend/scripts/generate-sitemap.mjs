@@ -6,6 +6,8 @@ const publicPages = [
     { path: '/stores', changefreq: 'daily', priority: '0.9' },
     { path: '/terms', changefreq: 'monthly', priority: '0.3' },
     { path: '/privacy', changefreq: 'monthly', priority: '0.3' },
+    { path: '/content-sources', changefreq: 'monthly', priority: '0.3' },
+    { path: '/operation-guide', changefreq: 'monthly', priority: '0.3' },
 ];
 
 const urls = publicPages.map(({ path, changefreq, priority }) => `  <url>

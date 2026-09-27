@@ -23,12 +23,19 @@ RESERVE/
 │       ├── payments.md           ← 결제 · 환불 · 웹훅 inbox · 대사 큐
 │       ├── data-lifecycle.md      ← 탈퇴 · 폐업 · 파일 삭제 outbox · 보존 정책
 │       ├── account-security.md    ← 비밀번호 · 세션 세대 · 로그인 유지(refresh 회전) · 동의 이력 · OAuth unlink outbox
+│       ├── api-versioning.md      ← v1 전환 기준 · 호환성 · 단계적 폐기
+│       ├── store-drafts.md        ← 가게 등록·수정 IndexedDB 임시저장
+│       ├── messaging.md          ← 고객지원·가게 문의 권한 · 전송 안정성 · 확장 관문
+│       ├── region-photo-assets.md ← 지역 대표 사진 · 공공누리 출처 · 가공 기준
 │       ├── backup.md             ← MySQL 백업 · 복원 훈련
 │       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
 │       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
-│       ├── preview-release-plan.md ← 대규모 프리뷰의 기능별 PR 분리 계획
+│       ├── current-status.md      ← 코드·로컬·dev·production·외부 실증 상태 정본
+│       ├── preview-release-plan.md ← 과거 계획의 보관 위치 안내
 │       ├── quality-roadmap.md     ← 프리뷰 검증 · 미해결 위험 · PR 정리 순서
 │       ├── ui-decisions.md        ← 공통 UI의 선택 이유 · 회귀 경계
+│       ├── README.md              ← 현재 문서와 과거 작업 기록의 구분
+│       ├── history/2026-09-preview/ ← 날짜별 프리뷰 계획 · 구현 · 실측 · 인수인계 이력
 │       ├── structure.md          ← 코드 구조 (이 문서)
 │       └── design-system.md      ← 디자인 토큰 · 공통 컴포넌트
 ├── .github/
@@ -37,7 +44,7 @@ RESERVE/
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── dependabot.yml            ← 의존성 자동 업데이트 (npm · gradle · actions)
 ├── docker-compose-blue.yml       ← Blue 컨테이너 (8080:8080)
-├── docker-compose-green.yml      ← Green 컨테이너 (8081:8080)
+├── docker-compose-green.yml      ← Green 컨테이너 (8081:8081)
 ├── THIRD_PARTY_NOTICES.md        ← 서드파티 라이선스 고지
 └── README.md
 ```
@@ -65,13 +72,13 @@ kr.it.reserve/
 ├── lifecycle/                     ← 탈퇴·영업 종료 전 미결 예약/결제 의무 단일 관문
 ├── store/                         ← 가게 등록/수정/영업 종료/조회, AddressController(주소검색 프록시)
 │   └── service/StoreRepository    ← findByIdForUpdate() 비관적 락(PESSIMISTIC_WRITE) — 예약 동시성 제어
-├── file/                          ← S3 업로드 + 삭제 outbox/재시도 스케줄러
+├── file/                          ← 실바이트 이미지 검증 + S3 업로드 + 삭제 outbox/재시도 스케줄러
 ├── reservation/                   ← 예약 생성/승인/취소/완료/수정(PATCH), 실시간 availability
 │   ├── scheduler/                 ← 미결제 예약 자동 만료
 │   ├── util/                      ← ReservationCodeGenerator(R-날짜-XXXX), QrCheckinTokenProvider(HMAC)
 │   └── ReservationCodeBackfillRunner  ← 기존 예약에 코드 백필 (앱 기동 시 1회)
 ├── payment/                       ← 포트원 V2 결제·환불 + 웹훅 inbox·오래된 READY 관리자 대사
-├── advertisement/                 ← 유료 광고 (배지형/배너형), 포트원 결제 재사용        ★신규
+├── advertisement/                 ← 유료 광고 (노출형/BADGE·배너형/BANNER), 포트원 결제 재사용
 │   ├── scheduler/                 ← AdvertisementExpiryScheduler(만료), AdCounterFlushScheduler
 │   └── service/AdCounterBuffer    ← 노출/클릭 카운터 인메모리 버퍼링 후 주기적 flush
 ├── review/                        ← 리뷰 작성/수정/삭제
@@ -149,6 +156,7 @@ src/
 │   ├── useQueryParamState.js ← 관리자 탭 URL 쿼리스트링 동기화                       ★신규
 │   ├── useRouteSeo.js        ← 공개 경로 allowlist·robots·query 없는 canonical/OG URL
 │   ├── useStoreImageHint.js  ← 상세 스켈레톤용 이미지 비율 힌트                       ★신규
+│   ├── useStoreForm.js       ← 등록·수정 공통 폼 + IndexedDB 자동/수동 임시저장
 │   ├── useOnlineStatus.js    ← 온라인/오프라인 감지 (useSyncExternalStore)           ★신규
 │   ├── useAdPayment.js       ← 광고 결제 플로우                                       ★신규
 │   ├── usePayment.js         ← 예약 결제 플로우 (포트원)
@@ -179,7 +187,8 @@ src/
 │   ├── global/               ← foundation, forms, navigation, interactions, feature surfaces
 │   ├── theme.css             ← 라이트/다크 CSS 변수
 │   └── tokens/               ← colors, typography, spacing, field, animations, chart
-├── utils/                   ← image, form, errorHandler, validation, distance(★),
+├── utils/                   ← image, form, errorHandler, validation, storeDraftStorage,
+│                               imageUploadPolicy, distance(★),
 │                               adAttribution(★), imageHintCache(★), paymentWindowGuard(★),
 │                               redirect(★), index
 ├── App.jsx                  ← 라우터(라우트 lazy 코드분할) + ConfigProvider + AntApp
@@ -217,16 +226,22 @@ HTML이 직접 preload하는 초기 JS 합계 350 KiB gzip이다. 2026-09-03 실
 | 경로 | 페이지 | 권한 |
 |---|---|---|
 | `/` | 홈 | 공개 |
+| `/search` | 검색 전용 화면 | 공개 |
 | `/stores` | 가게 목록 | 공개 |
+| `/benefits` | 공개 가게 소식 목록·상세 | 공개 |
+| `/waiting` `/feed` | 디자인용 준비 중 화면 | 공개 |
 | `/store/:id` | 가게 상세 · 예약 · 리뷰 | 공개 |
 | `/login` `/signup` | 인증 | 비로그인 |
 | `/forgot-password` | 비밀번호 재설정 | 비로그인 |
 | `/oauth2/callback` | 소셜 로그인 콜백 | 비로그인 |
 | `/signup/social` | 소셜 회원가입 추가 동의 | 비로그인 |
 | `/terms` `/privacy` | 약관/개인정보 | 공개 |
+| `/content-sources` | 콘텐츠 출처·권리 안내 | 공개 |
+| `/operation-guide` | 예약·가게 운영 흐름 안내 | 공개 |
 | `/my-reservations` | 내 예약 | 로그인 |
 | `/my-favorites` | 즐겨찾기 | 로그인 |
 | `/my-page` | 마이페이지 | 로그인 |
+| `/messages` | 메시지 | 로그인 |
 | `/my-stores` | 내 가게 관리 | BUSINESS / ADMIN |
 | `/store/register` | 가게 등록 | BUSINESS / ADMIN |
 | `/store/:id/edit` | 가게 수정 | BUSINESS / ADMIN |
@@ -236,7 +251,8 @@ HTML이 직접 preload하는 초기 JS 합계 350 KiB gzip이다. 2026-09-03 실
 
 `/sitemap.xml`은 SPA 라우트가 아니라 Nginx가 백엔드 `SitemapController`로 전달하는 공개 시스템
 엔드포인트다. 정적 URL과 활성·미삭제 가게 상세만 포함하며 최대 50,000 URL로 제한한다.
-프론트의 `useRouteSeo`도 같은 공개 집합(`/`, `/stores`, 숫자형 `/store/:id`, `/terms`, `/privacy`)만
+프론트의 `useRouteSeo`도 같은 공개 집합(`/`, `/stores`, 숫자형 `/store/:id`, `/terms`, `/privacy`,
+`/content-sources`, `/operation-guide`)만
 `index, follow`로 두고 나머지는 `noindex, nofollow`로 만든다. canonical과 `og:url`에는 쿼리·해시를 넣지 않는다.
 
 ---
@@ -280,6 +296,10 @@ portone:
   store-id: ...         # PORTONE_STORE_ID   — 상점 ID (결제창·취소 양쪽에서 쓴다)
   webhook-secret: ...   # PORTONE_WEBHOOK_SECRET — 웹훅 서명 검증용 (whsec_ + base64)
 
+tourism:
+  api:
+    service-key: ...    # TOURISM_API_SERVICE_KEY — 지역 대표 관광 사진 서버 조회 전용
+
 S3_BUCKET_NAME: YOUR_S3_BUCKET
 CLOUDFRONT_DOMAIN: YOUR_CLOUDFRONT_DOMAIN
 AWS_REGION: ap-northeast-2
@@ -293,3 +313,19 @@ AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 > **`PORTONE_WEBHOOK_SECRET` 은 비워도 앱이 뜬다.** 대신 웹훅이 **전부 거부**된다(fail-closed).
 > 이 값이 없으면 "결제는 됐는데 브라우저가 안 돌아온" 건을 PG 가 알려줄 수 없다 —
 > 설정 절차는 `docs/technical/payments.md` 참고.
+
+> **`TOURISM_API_SERVICE_KEY` 가 비어도 앱은 기동한다.** 지역 사진 API는 외부 호출을 생략하고,
+> 이전에 확인한 카탈로그가 있으면 그 항목을 유지하며 없으면 핀 아이콘을 표시한다. 실제 키는 서버 프로세스 환경변수와 GitHub Secret에만 둔다.
+> 상세 경계와 공개 카탈로그는 [지역 사진 자산](region-photo-assets.md)을 참고한다.
+
+> **`CHAT_IMAGE_ENCRYPTION_KEY`** — 표준 Base64로 인코딩한 32바이트 AES 키. 비어 있으면 텍스트 채팅은
+> 유지하고 대화 사진만 비활성이다. 잘못된 키는 기동을 실패시킨다. GitHub Secret → SSH 환경 → blue/green
+> compose → `chat.images.encryption-key`로 전달하며 저장소/CLI 인자/로그에 키를 넣지 않는다.
+> 운영 활성화 전에 보호된 별도 키 보관과 복구를 검증한다. 키를 덮어쓰면 기존 사진을 잃으므로 무계획 회전은 금지한다.
+> 외부 발급 키가 아니다. [PC에서 직접 생성·GitHub/IntelliJ 등록하는 절차](chat-images.md)를 따른다.
+> API·스키마·IAM 경로 목록은 [릴리스 후보 체크리스트](release-candidate-2026-09-27.md)를 따른다.
+
+> **`CHAT_RETENTION_ENABLED`** — 일반 채팅 원문/사진의 90일 파기 worker이며 기본값은 `false`다.
+> 환경변수 → `chat.retention.enabled`로 바인딩된다. 운영 compose/CI에서는 아직 켜지 않으며,
+> 추가 DDL·정책 고지·기존 신고 보류/백업/복구 검증 뒤 별도 활성화한다. 신고 증거는 자동 파기하지 않는다.
+> [채팅 계약](chat-controls.md)을 따른다. 이미 만료된 일반 원문은 이후 신고로 복구할 수 없다.

@@ -22,6 +22,24 @@ export const STORE_CATEGORIES = [
 // STORE_CATEGORIES에서 파생 — 별도 상수 불필요
 export const CATEGORY_VALUES = STORE_CATEGORIES.map(c => c.value);
 
+/**
+ * 공개 탐색 분류. 자유 입력 category 및 예약 방식(BOOKING_TYPE_OPTIONS)과 다른 축이다.
+ * 값은 백엔드 ServiceDomain enum과 정확히 같아야 한다.
+ */
+export const SERVICE_DOMAIN_OPTIONS = [
+    { value: 'FOOD',          label: '맛집 · 카페', shortLabel: '맛집' },
+    { value: 'BEAUTY_CLINIC', label: '뷰티 · 클리닉', shortLabel: '뷰티' },
+    { value: 'SPORTS',        label: '운동 · 웰니스', shortLabel: '운동' },
+    { value: 'PERFORMANCE',   label: '공연 · 클래스', shortLabel: '클래스' },
+    { value: 'POPUP',         label: '팝업 · 대관', shortLabel: '팝업' },
+    { value: 'OTHER',         label: '기타 예약', shortLabel: '기타' },
+];
+
+export const SERVICE_DOMAIN_FILTER_OPTIONS = [
+    { value: '', label: '전체 분야' },
+    ...SERVICE_DOMAIN_OPTIONS.map(({ value, label }) => ({ value, label })),
+];
+
 // 전액 환불 기준일 옵션 (제한 없음 계열 → 맨 아래)
 export const FULL_REFUND_DAYS_OPTIONS = [
     { value: 1,  label: '1일 전' },

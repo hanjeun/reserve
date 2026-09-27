@@ -19,13 +19,24 @@ export const API_ENDPOINTS = {
     },
     STORE: {
         LIST:            '/api/stores',
+        REGIONS:         '/api/stores/regions',
         DETAIL:          (id) => `/api/stores/${id}`,
+        EDIT:            (id) => `/api/stores/${id}/edit`,
         MY_STORES:       '/api/stores/my',
         CREATE:          '/api/stores',
         UPDATE:          (id) => `/api/stores/${id}`,
         DELETE:          (id) => `/api/stores/${id}`,
+        ACTIVE_RESERVATIONS_COUNT: (id) => `/api/stores/${id}/active-reservations-count`,
+        CLOSURE_READINESS: (id) => `/api/stores/${id}/closure-readiness`,
         AUTO_APPROVAL:   (id) => `/api/stores/${id}/auto-approval`,
         STATISTICS:      (id) => `/api/stores/${id}/statistics`,
+    },
+    ADDRESS: {
+        SEARCH: '/api/address/search',
+    },
+    TOURISM: {
+        REGION_PHOTOS: '/api/tourism/region-photos',
+        REGION_PHOTO_CATALOG: '/api/tourism/region-photos/catalog',
     },
     RESERVATION: {
         LIST:                '/api/reservations',
@@ -136,9 +147,22 @@ export const API_ENDPOINTS = {
         NAVER:  '/oauth2/authorization/naver',
         KAKAO:  '/oauth2/authorization/kakao',
     },
-    // 인앱 채팅 (2026-08-24). 손님은 방 ID 를 고르지 않는다 — 서버가 회원으로부터 찾거나 만든다.
-    // 폴링 경로(MY_MESSAGES)만 roomId 를 받는데, 그때도 서버가 소유를 확인한다.
+    // 통합 메시지. roomId를 받는 폴링·과거 내역·차단·신고는 모두 서버가 참가자를 다시 확인한다.
     CHAT: {
+        CONVERSATIONS: '/api/chat/conversations',
+        SUPPORT:       '/api/chat/support',
+        SUPPORT_SEND:  '/api/chat/support/messages',
+        STORE:         (storeId) => `/api/chat/stores/${storeId}`,
+        STORE_SEND:    (storeId) => `/api/chat/stores/${storeId}/messages`,
+        STORE_INBOX:   '/api/chat/store-inbox',
+        STORE_INBOX_ROOM: (roomId) => `/api/chat/store-inbox/${roomId}`,
+        STORE_INBOX_SEND: (roomId) => `/api/chat/store-inbox/${roomId}/messages`,
+        ROOM_MESSAGES: (roomId) => `/api/chat/rooms/${roomId}/messages`,
+        ROOM_HISTORY:  (roomId) => `/api/chat/rooms/${roomId}/history`,
+        ROOM_READ:     (roomId) => `/api/chat/rooms/${roomId}/read`,
+        ROOM_BLOCK:    (roomId) => `/api/chat/rooms/${roomId}/block`,
+        ROOM_REPORTS:  (roomId) => `/api/chat/rooms/${roomId}/reports`,
+        UNREAD:        '/api/chat/unread',
         MY:            '/api/chat/my',
         MY_SEND:       '/api/chat/my/messages',
         MY_MESSAGES:   '/api/chat/my/messages',
@@ -147,7 +171,16 @@ export const API_ENDPOINTS = {
         ADMIN_ROOM:    (id) => `/api/admin/chat/rooms/${id}`,
         ADMIN_POLL:    (id) => `/api/admin/chat/rooms/${id}/messages`,
         ADMIN_REPLY:   (id) => `/api/admin/chat/rooms/${id}/messages`,
+        ADMIN_READ:    (id) => `/api/admin/chat/rooms/${id}/read`,
         ADMIN_WAITING: '/api/admin/chat/waiting-count',
+        ADMIN_REPORTS: '/api/admin/chat/reports',
+        ADMIN_REPORT:  (id) => `/api/admin/chat/reports/${id}`,
+        ADMIN_REPORT_CONTEXT: (id) => `/api/admin/chat/reports/${id}/context`,
+        // 채팅 첫 안내(인사말 + 자동 문답) — 조회는 로그인 사용자, 저장은 가게 사장님 / 관리자
+        INTRO_SUPPORT: '/api/chat/intro/support',
+        INTRO_STORE:   (storeId) => `/api/chat/intro/stores/${storeId}`,
+        ADMIN_INTRO:   '/api/admin/chat/intro',
+        ADMIN_INTRO_AVATAR: '/api/admin/chat/intro/avatar',
     },
     MAIL: {
         COMPOSE:      '/api/admin/mail/compose',
@@ -186,9 +219,18 @@ export const API_ENDPOINTS = {
     },
 };
 
-export const SORT_OPTIONS = [
+export const PUBLIC_STORE_SORT_OPTIONS = [
+    { value: 'recommended', label: '추천순' },
     { value: 'rating',      label: '별점순' },
     { value: 'reviewCount', label: '리뷰순' },
-    { value: 'name',        label: '이름순' },
     { value: 'distance',    label: '거리순' },
 ];
+
+export const OWNER_STORE_SORT_OPTIONS = [
+    { value: 'recent',      label: '최신 등록순' },
+    { value: 'rating',      label: '별점순' },
+    { value: 'reviewCount', label: '리뷰순' },
+];
+
+// 공개 가게 탐색의 기존 import 호환. 관리자·사업자 화면은 전용 옵션을 사용한다.
+export const SORT_OPTIONS = PUBLIC_STORE_SORT_OPTIONS;

@@ -4,7 +4,22 @@
 아래는 런북이며 실행 승인이 아니다. 작업 시작은 `git status --short --branch`다.
 
 수정은 `local-preview-all-changes`에서 먼저 확인한다. 사용자·다른 도구의 미커밋 변경을 보존하고 snapshot과 기능별 파일/hunk 분리를 별도로 검토한다.
-[프리뷰 릴리스 계획](../technical/preview-release-plan.md)의 7개 PR은 v2.5.0 당시 기록이며 새 릴리스의 미완료 작업으로 재사용하지 않는다.
+[2026-09-03 프리뷰 릴리스 계획](../technical/history/2026-09-preview/preview-release-plan-2026-09-03.md)의
+7개 PR은 당시 기록이며 새 릴리스의 미완료 작업이나 현재 Git 명령으로 재사용하지 않는다.
+
+## v2.6 혼합 프리뷰 통합 원칙
+
+현재 혼합 작업트리에는 tracked·untracked 파일과 삭제가 함께 있어 일반적인 브랜치 전환 절차를 바로
+적용하지 않는다. 별도 승인을 받은 뒤 당시 최신 `origin/dev`에서 깨끗한
+`feature/v2.6-integration` 작업공간을 만들고, 원본 경로·상태·SHA-256·기능 묶음을 외부 manifest로
+고정한 다음 검토한 경로만 기능 순서대로 옮긴다.
+
+- 원본 작업트리는 rebase/reset/clean/stash하지 않는다.
+- `git add -A`, `git add -u`, 대형 snapshot commit, 현재 preview commit의 통째 cherry-pick을 쓰지 않는다.
+- 신규 untracked 클래스가 기존 tracked 코드의 필수 의존성인지 묶음별로 검사한다.
+- 배포·백업 → 계정·세션 → 결제·광고 → 메시징 → 검색·사진·SEO → 공통 UI·문서 순으로 통합하고,
+  각 묶음의 표적 검사와 전체 검사를 구분해 기록한다.
+- 브랜치 생성, stage, commit, push, PR, merge는 각각 현재 대화의 명시적 승인 뒤에만 실행한다.
 
 ## 브랜치 구조
 
@@ -149,13 +164,25 @@ docs: add code conventions and git workflow rules
 release: home page mobile/PC layout improvements
 ```
 
-### Description 예시
+### 본문 예시 (한국어 고정 형식)
 
 ```
-- Add category badge matching StoreCard style (radius.sm, no border)
-- Show rating and review count always (0.0 when no reviews)
-- Remove price range from header
+## 요약
+가게 상세 헤더에 카테고리 배지와 평점·리뷰 수를 보여 줘요.
+
+## 변경 사항
+- 가게 카드와 같은 모양(radius.sm, 테두리 없음)의 카테고리 배지를 추가했어요.
+- 평점과 리뷰 수를 항상 보여 줘요(리뷰가 없으면 0.0).
+- 헤더에서 가격대를 뺐어요.
+
+## 검증
+- 프론트 lint·빌드를 통과했어요.
+
+## 배포
+- 다음 릴리즈에 포함될 예정이에요.
 ```
+
+배포 PR(`release: deploy vX.Y.Z`)은 `요약 → 주요 변경 → 포함된 PR → 배포 전 검증 → 배포 절차와 배포 후 확인 → 배포` 순서로 쓴다.
 
 ---
 

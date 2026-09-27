@@ -14,7 +14,7 @@ public class ChatMessageResponse {
 
     private Long id;
     private String senderRole;
-    private Long senderMemberId;
+    private boolean canRetract;
     private String senderName;
     private String senderProfileImage;
     private String content;
@@ -27,22 +27,27 @@ public class ChatMessageResponse {
     private Long retractionRevision;
 
     public static ChatMessageResponse from(ChatMessage m) {
-        return build(m, false);
+        return from(m, null);
+    }
+
+    /** 신원 ID를 직렬화하지 않고, 인증된 조회자의 본인 메시지 여부만 내려준다. */
+    public static ChatMessageResponse from(ChatMessage m, Long viewerId) {
+        return build(m, false, viewerId);
     }
 
     /** 신고 컨텍스트 전용. 일반 참가자 응답에는 원문/사진을 다시 노출하지 않는다. */
     public static ChatMessageResponse forReport(ChatMessage m) {
-        return build(m, true);
+        return build(m, true, null);
     }
 
-    private static ChatMessageResponse build(ChatMessage m, boolean reportContext) {
+    private static ChatMessageResponse build(ChatMessage m, boolean reportContext, Long viewerId) {
         // 지원 대화의 담당자는 계정이 바뀌어도 같은 브랜드로 표시하고 개인 프로필은 노출하지 않는다.
         boolean supportAdmin = m.getSenderRole() == SenderRole.ADMIN
                 && m.getRoom() != null && m.getRoom().getType() == ChatRoom.RoomType.SUPPORT;
         return ChatMessageResponse.builder()
                 .id(m.getId())
                 .senderRole(m.getSenderRole().name())
-                .senderMemberId(m.getSenderMemberId())
+                .canRetract(!reportContext && !m.isRetracted() && viewerId != null && viewerId.equals(m.getSenderMemberId()))
                 .senderName(supportAdmin ? ConversationSummaryResponse.SUPPORT_NAME : null)
                 .content(m.isRetracted() && !reportContext ? "전송이 취소된 메시지입니다." : m.getContent())
                 .clientMessageId(m.getClientMessageId())

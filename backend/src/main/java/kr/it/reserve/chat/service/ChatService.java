@@ -92,7 +92,7 @@ public class ChatService {
     public List<ChatMessageResponse> readMyMessages(Member member) {
         ChatRoom room = openMyRoom(member);
         room.markRead(SenderRole.MEMBER);
-        return recentWindow(room.getId()).messages();
+        return recentWindow(room.getId(), member.getId()).messages();
     }
 
     @Transactional
@@ -129,7 +129,7 @@ public class ChatService {
         assertNotBlocked(room);
         var existing = messageRepository.findByRoomIdAndSenderMemberIdAndClientMessageId(
                 roomId, member.getId(), clientMessageId);
-        if (existing.isPresent()) return ChatMessageResponse.from(existing.get());
+        if (existing.isPresent()) return ChatMessageResponse.from(existing.get(), member.getId());
         ChatImagePayload image = upload.get();
         String caption = content == null ? "" : content.trim();
         ChatMessage saved = messageRepository.save(ChatMessage.builder().room(room).senderRole(sender)
@@ -137,7 +137,7 @@ public class ChatService {
                 .imageKey(image.key()).imageContentType(image.contentType()).imageWidth(image.width())
                 .imageHeight(image.height()).imageBytes(image.bytes()).build());
         room.onMessageSent(sender, LocalDateTime.now(), caption.isEmpty() ? "사진" : "사진 · " + caption);
-        return ChatMessageResponse.from(saved);
+        return ChatMessageResponse.from(saved, member.getId());
     }
 
     /** 관리자는 고객지원 사진만 직접 조회한다. 가게 대화는 실제 참가자만 통과한다. */
@@ -162,7 +162,7 @@ public class ChatService {
     public ConversationThreadResponse openSupportConversation(Member member) {
         ChatRoom room = openMyRoom(member);
         room.markRead(SenderRole.MEMBER);
-        MessageWindow window = recentWindow(room.getId());
+        MessageWindow window = recentWindow(room.getId(), member.getId());
         return ConversationThreadResponse.from(
                 room, ConversationSummaryResponse.SUPPORT_NAME, "MEMBER", true,
                 window.messages(), window.hasOlder(), window.nextBeforeId());
@@ -184,14 +184,18 @@ public class ChatService {
     public ConversationThreadResponse getRoomAsOwner(Member owner, Long roomId) {
         ChatRoom room = findRoom(roomId);
         assertStoreOwner(room, owner);
-        MessageWindow window = recentWindow(roomId);
+        MessageWindow window = recentWindow(roomId, owner.getId());
         return ConversationThreadResponse.from(room, room.getMember().getName(), "OWNER", isStoreMessageable(room.getStoreId()),
                 window.messages(), window.hasOlder(), window.nextBeforeId());
     }
 
     public List<ChatMessageResponse> getRoomAsAdmin(Long roomId) {
+        return getRoomAsAdmin(roomId, null);
+    }
+
+    public List<ChatMessageResponse> getRoomAsAdmin(Long roomId, Long viewerId) {
         requireType(findRoom(roomId), ChatRoom.RoomType.SUPPORT);
-        return recentWindow(roomId).messages();
+        return recentWindow(roomId, viewerId).messages();
     }
 
     /** 가게 문의방은 손님·가게 조합마다 하나다. 회원 행 잠금이 첫 동시 생성을 직렬화한다. */
@@ -261,7 +265,7 @@ public class ChatService {
         assertStoreOwner(room, owner);
         room.markRead(SenderRole.OWNER);
         String title = room.getMember().getName();
-        MessageWindow window = recentWindow(roomId);
+        MessageWindow window = recentWindow(roomId, owner.getId());
         return ConversationThreadResponse.from(
                 room, title, "OWNER", isStoreMessageable(room.getStoreId()),
                 window.messages(), window.hasOlder(), window.nextBeforeId());
@@ -289,10 +293,15 @@ public class ChatService {
 
     @Transactional
     public List<ChatMessageResponse> readRoomAsAdmin(Long roomId) {
+        return readRoomAsAdmin(roomId, null);
+    }
+
+    @Transactional
+    public List<ChatMessageResponse> readRoomAsAdmin(Long roomId, Long viewerId) {
         ChatRoom room = findRoomForUpdate(roomId);
         requireType(room, ChatRoom.RoomType.SUPPORT);
         room.markRead(SenderRole.ADMIN);
-        return recentWindow(roomId).messages();
+        return recentWindow(roomId, viewerId).messages();
     }
 
     /** 열린 관리자 메신저에 새 문의가 도착한 경우 별도 POST로 읽음 축을 맞춘다. */
@@ -305,8 +314,12 @@ public class ChatService {
 
     /** 관리자 고객지원의 증분 조회. 가게 대화는 신고 문맥 조회로만 검토하고 읽음 수는 바꾸지 않는다. */
     public List<ChatMessageResponse> getNewMessagesAsAdmin(Long roomId, Long afterId) {
+        return getNewMessagesAsAdmin(roomId, afterId, null);
+    }
+
+    public List<ChatMessageResponse> getNewMessagesAsAdmin(Long roomId, Long afterId, Long viewerId) {
         requireType(findRoom(roomId), ChatRoom.RoomType.SUPPORT);
-        return getNewMessages(roomId, afterId);
+        return getNewMessages(roomId, afterId, viewerId);
     }
 
     @Transactional
@@ -338,19 +351,27 @@ public class ChatService {
      * 사람이 보고 있다는 뜻이 아니다. 탭을 띄워만 놓아도 안 읽은 수가 0이 되면 배지가 거짓말을 한다.
      */
     public List<ChatMessageResponse> getNewMessages(Long roomId, Long afterId) {
+        return getNewMessages(roomId, afterId, null);
+    }
+
+    public List<ChatMessageResponse> getNewMessages(Long roomId, Long afterId, Long viewerId) {
         return messageResponses(messageRepository
-                .findByRoomIdAndIdGreaterThanOrderByIdAsc(roomId, afterId == null ? 0L : afterId));
+                .findByRoomIdAndIdGreaterThanOrderByIdAsc(roomId, afterId == null ? 0L : afterId), viewerId);
     }
 
     /** 위로 스크롤할 때만 부르는 오래된 메시지 cursor 조회. 전체 건수 집계는 하지 않는다. */
     public ChatHistoryResponse getOlderMessages(Long roomId, Long beforeId, int requestedSize) {
+        return getOlderMessages(roomId, beforeId, requestedSize, null);
+    }
+
+    public ChatHistoryResponse getOlderMessages(Long roomId, Long beforeId, int requestedSize, Long viewerId) {
         if (beforeId == null || beforeId <= 0) {
             throw new ChatException("메시지 기준값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
         int size = Math.max(10, Math.min(requestedSize, PAGE_SIZE));
         var slice = messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(
                 roomId, beforeId, PageRequest.of(0, size));
-        List<ChatMessageResponse> messages = messageResponses(slice.getContent()).reversed();
+        List<ChatMessageResponse> messages = messageResponses(slice.getContent(), viewerId).reversed();
         Long nextBeforeId = messages.isEmpty() ? null : messages.getFirst().getId();
         return ChatHistoryResponse.of(messages, slice.hasNext(), nextBeforeId);
     }
@@ -401,10 +422,10 @@ public class ChatService {
                 .orElseThrow(() -> new ChatException("대화를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
     }
 
-    private MessageWindow recentWindow(Long roomId) {
+    private MessageWindow recentWindow(Long roomId, Long viewerId) {
         var slice = messageRepository.findByRoomIdOrderByIdDesc(
                 roomId, PageRequest.of(0, PAGE_SIZE));
-        List<ChatMessageResponse> desc = messageResponses(slice.getContent());
+        List<ChatMessageResponse> desc = messageResponses(slice.getContent(), viewerId);
         // 저장소는 최신부터 주고 화면은 오래된 것부터 그린다 — 뒤집는 곳을 한 군데로 모은다.
         List<ChatMessageResponse> messages = desc.reversed();
         Long nextBeforeId = messages.isEmpty() ? null : messages.getFirst().getId();
@@ -432,7 +453,7 @@ public class ChatService {
         if (normalizedClientId != null) {
             var existing = messageRepository.findByRoomIdAndSenderMemberIdAndClientMessageId(
                     room.getId(), senderId, normalizedClientId);
-            if (existing.isPresent()) return messageResponses(List.of(existing.get())).getFirst();
+            if (existing.isPresent()) return messageResponses(List.of(existing.get()), senderId).getFirst();
         }
 
         ChatMessage saved = messageRepository.save(ChatMessage.builder()
@@ -445,12 +466,12 @@ public class ChatService {
 
         room.onMessageSent(sender, LocalDateTime.now(), trimmed);
         log.info("Chat message sent: roomId={}, sender={}", room.getId(), sender);
-        return messageResponses(List.of(saved)).getFirst();
+        return messageResponses(List.of(saved), senderId).getFirst();
     }
 
     /** 한 메시지 창의 발신 역할만 표시한다. 지원 담당자의 개인 계정 정보는 조회하지 않는다. */
-    private List<ChatMessageResponse> messageResponses(List<ChatMessage> messages) {
-        return messages.stream().map(ChatMessageResponse::from).toList();
+    private List<ChatMessageResponse> messageResponses(List<ChatMessage> messages, Long viewerId) {
+        return messages.stream().map(item -> ChatMessageResponse.from(item, viewerId)).toList();
     }
 
     /** 기존 방의 요약 칼럼이 비어 있을 때만, 이미 권한 확인한 한 페이지의 마지막 실제 메시지를 읽는다. */
@@ -486,7 +507,7 @@ public class ChatService {
     private ConversationThreadResponse threadForMember(ChatRoom room) {
         String title = room.getType() == ChatRoom.RoomType.SUPPORT
                 ? ConversationSummaryResponse.SUPPORT_NAME : room.getStoreNameSnapshot();
-        MessageWindow window = recentWindow(room.getId());
+        MessageWindow window = recentWindow(room.getId(), room.getMember().getId());
         Store store = room.getType() == ChatRoom.RoomType.STORE
                 ? storeRepository.findById(room.getStoreId()).orElse(null) : null;
         return ConversationThreadResponse.from(

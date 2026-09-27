@@ -22,8 +22,8 @@ async function mockApi(page, user, memberRows, ownerRows = []) {
                 roomId: 1, type: 'SUPPORT', title: 'RESERVE 고객지원',
                 counterpartName: '한재은', counterpartProfileImage: 'https://example.test/admin.png',
                 viewerRole: 'MEMBER', canSend: true, messages: [
-                    { id: 11, senderRole: 'MEMBER', senderMemberId: 41, content: '문의합니다', createdAt: '2026-09-15T10:00:00' },
-                    { id: 12, senderRole: 'ADMIN', senderMemberId: 9, senderName: '한재은', content: '확인했습니다', createdAt: '2026-09-15T10:01:00' },
+                    { id: 11, senderRole: 'MEMBER', canRetract: true, content: '문의합니다', createdAt: '2026-09-15T10:00:00' },
+                    { id: 12, senderRole: 'ADMIN', canRetract: false, senderName: '한재은', content: '확인했습니다', createdAt: '2026-09-15T10:01:00' },
                 ],
             });
         }
@@ -76,7 +76,7 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     await page.route('**/api/chat/rooms/1/messages/11/retract', route => {
         retracts++;
         expect(route.request().method()).toBe('POST');
-        return ok(route, { id: 11, senderRole: 'MEMBER', senderMemberId: 41, content: '전송이 취소된 메시지입니다.', retracted: true, retractionRevision: 1 });
+        return ok(route, { id: 11, senderRole: 'MEMBER', canRetract: false, content: '전송이 취소된 메시지입니다.', retracted: true, retractionRevision: 1 });
     });
     if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
     else {

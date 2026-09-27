@@ -45,7 +45,7 @@ public class ChatRetractionService {
             }
             log.info("Chat message retracted: roomId={}, messageId={}, actorId={}", roomId, messageId, actor.getId());
         }
-        return ChatMessageResponse.from(message);
+        return ChatMessageResponse.from(message, actor.getId());
     }
 
     public Retractions changes(Member actor, Long roomId, long afterRevision) {
@@ -53,7 +53,7 @@ public class ChatRetractionService {
         chats.assertImageReader(roomId, actor);
         var page = messages.findByRoomIdAndRetractionRevisionGreaterThanOrderByRetractionRevisionAsc(
                 roomId, afterRevision, PageRequest.of(0, 100));
-        var updates = page.getContent().stream().map(ChatMessageResponse::from).toList();
+        var updates = page.getContent().stream().map(item -> ChatMessageResponse.from(item, actor.getId())).toList();
         long next = updates.isEmpty() ? afterRevision : updates.getLast().getRetractionRevision();
         return new Retractions(updates, next, page.hasNext());
     }

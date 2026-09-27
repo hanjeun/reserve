@@ -153,7 +153,7 @@ public class ChatApiController {
         Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         chatService.assertParticipant(roomId, me);
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.getNewMessages(roomId, afterId), "조회 성공"));
+                chatService.getNewMessages(roomId, afterId, me.getId()), "조회 성공"));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -165,7 +165,7 @@ public class ChatApiController {
         Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         chatService.assertParticipant(roomId, me);
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.getOlderMessages(roomId, beforeId, size), "이전 대화 조회 성공"));
+                chatService.getOlderMessages(roomId, beforeId, size, me.getId()), "이전 대화 조회 성공"));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -256,7 +256,7 @@ public class ChatApiController {
         Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         chatService.assertOwnedBy(roomId, me);
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.getNewMessages(roomId, afterId), "조회 성공"));
+                chatService.getNewMessages(roomId, afterId, me.getId()), "조회 성공"));
     }
 
     /** 배지용 — 패널이 닫혀 있을 때 훨씬 긴 주기로 부른다. */

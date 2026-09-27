@@ -7,10 +7,9 @@ import chatService from '../../services/chatService';
 import useAuthStore from '../../store/useAuthStore';
 
 export default function ChatMessageActions({ message: item, roomId, onRetracted }) {
-    const userId = useAuthStore(state => state.user?.id);
     const { message, confirm } = useMessage();
     const [busy, setBusy] = useState(false);
-    if (!roomId || item.pending || item.retracted || item.senderMemberId !== userId || !onRetracted) return null;
+    if (!roomId || item.pending || item.retracted || item.canRetract !== true || !onRetracted) return null;
     const retract = () => {
         const revision = useAuthStore.getState().sessionRevision;
         confirm({ title: '메시지 전송을 취소할까요?',

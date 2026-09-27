@@ -43,13 +43,15 @@ public class AdminChatController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/rooms/{roomId}")
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> messages(@PathVariable Long roomId) {
-        return ResponseEntity.ok(ApiResponse.success(chatService.getRoomAsAdmin(roomId), "조회 성공"));
+        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        return ResponseEntity.ok(ApiResponse.success(chatService.getRoomAsAdmin(roomId, admin.getId()), "조회 성공"));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/rooms/{roomId}/open")
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> openRoom(@PathVariable Long roomId) {
-        return ResponseEntity.ok(ApiResponse.success(chatService.readRoomAsAdmin(roomId), "조회 성공"));
+        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        return ResponseEntity.ok(ApiResponse.success(chatService.readRoomAsAdmin(roomId, admin.getId()), "조회 성공"));
     }
 
     /** 증분 폴링 — 관리자가 방을 열어둔 동안. */
@@ -58,7 +60,8 @@ public class AdminChatController {
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> poll(
             @PathVariable Long roomId,
             @RequestParam(required = false) Long afterId) {
-        return ResponseEntity.ok(ApiResponse.success(chatService.getNewMessagesAsAdmin(roomId, afterId), "조회 성공"));
+        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        return ResponseEntity.ok(ApiResponse.success(chatService.getNewMessagesAsAdmin(roomId, afterId, admin.getId()), "조회 성공"));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

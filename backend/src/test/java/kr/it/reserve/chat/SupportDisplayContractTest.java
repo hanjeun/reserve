@@ -284,6 +284,22 @@ class SupportDisplayContractTest {
                 .endsWith("…");
     }
 
+    @Test
+    void retractionCapabilityUsesViewerIdentityWithoutExposingSenderId() throws Exception {
+        ChatMessage reply = message(88L, supportRoom(21L), SenderRole.ADMIN, 912345L, "답변");
+        var mine = ChatMessageResponse.from(reply, 912345L);
+        assertThat(mine.isCanRetract()).isTrue();
+        assertThat(ChatMessageResponse.from(reply, 1L).isCanRetract()).isFalse();
+        assertThat(ChatMessageResponse.from(reply).isCanRetract()).isFalse();
+        assertThat(ChatMessageResponse.forReport(reply).isCanRetract()).isFalse();
+        var json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(mine));
+        assertThat(json.get("canRetract").asBoolean()).isTrue();
+        assertThat(json.has("senderMemberId")).isFalse();
+        assertThat(json.toString()).doesNotContain("912345");
+        reply.retract(java.time.LocalDateTime.now(), 1L);
+        assertThat(ChatMessageResponse.from(reply, 912345L).isCanRetract()).isFalse();
+    }
+
     private ChatRoom supportRoom(Long id) {
         return ChatRoom.builder().id(id).member(customer).type(ChatRoom.RoomType.SUPPORT)
                 .memberUnread(3).adminUnread(2).build();

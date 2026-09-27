@@ -50,3 +50,16 @@ MySQL 8 잠금/쿼리, TEST PG, 실제 S3·두 계정·Safari, 실제 nginx cuto
 각각 별도 커밋으로 반영했다. 마지막 릴리스 문서 커밋 뒤 dev PR의 최종 헤드 CI를 확인한다.
 라우팅 rollback은 DB나 새 OWNER/사진 데이터를 되돌리지 않는다. 이전 백엔드의 새 데이터 읽기 호환성은
 격리 MySQL/이전 버전 관문에서 따로 검증하며, 스키마를 삭제하거나 발신자 역할을 임의로 다시 쓰지 않는다.
+
+## 원격 PR 검사와 운영 읽기 전용 재확인
+
+- dev 초안 PR #225, 최초 head `78abba7f…`. CI `36308059940`에서 백엔드 테스트·패키징은 통과했다.
+  프론트는 Linux PowerShell의 숨김 `.gitattributes` Get-Item 단계에서 실패했고 이후 프론트 검사는 실행되지 않았다.
+  현재 snapshot 검증 스크립트의 파일 조회에 `-Force`를 명시한다. 보존 snapshot/ZIP/hash는 변경하지 않는다.
+  정책에 숨김 파일 조회 계약을 추가하며, 수정 head의 원격 CI를 다시 확인한다.
+- 같은 운영 MySQL 8.0.45에서 chat_room/chat_message는 InnoDB, 각각 1개/5개 행이다.
+  sender_role은 여전히 ADMIN/MEMBER ENUM이고 새 컬럼은 없다. checked_in_at UTC 백필 조건의 대상은 0개다.
+  이 재확인은 SELECT/SHOW만 수행했고 데이터·스키마를 바꾸지 않았다.
+- v2.6.3 main의 SenderRole에는 OWNER가 없고, 관리자 방 목록은 SUPPORT 필터가 없다.
+  새 가게 대화/OWNER 메시지 저장 이후 구버전으로 되돌리면 메시지 해석과 고객지원 범위가 호환되지 않는다.
+  단순 nginx rollback 성공은 이 호환성의 증거가 아니며, 실배포 전 별도 해결 관문이다.

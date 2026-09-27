@@ -38,6 +38,8 @@ test('snapshot verification installs a scoped Git byte guard without changing th
     assert.equal(snapshot.run, './scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard');
     assert.match(read('.gitattributes'), /^docs\/design-system\/snapshots\/\*\* -text -eol$/m);
     assert.match(read('scripts/design-system-snapshot.ps1'), /rev-parse --git-path info\/attributes/);
+    assert.match(read('scripts/design-system-snapshot.ps1'), /Get-Item -LiteralPath \$saved -Force/);
+    assert.match(read('scripts/design-system-snapshot.ps1'), /Get-ChildItem -LiteralPath \$snapshotRoot -Recurse -File -Force/);
 });
 
 test('PC and mobile browser checks use separate projects and failure evidence', () => {

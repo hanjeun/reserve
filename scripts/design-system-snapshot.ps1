@@ -63,7 +63,7 @@ function Save-Source([string]$relative, [string]$category, [string]$snapshotRela
         source_relative_path = $relative.Replace('\', '/')
         snapshot_relative_path = $snapshotRelative.Replace('\', '/')
         category = $category
-        bytes = (Get-Item -LiteralPath $target).Length
+        bytes = (Get-Item -LiteralPath $target -Force).Length
         sha256 = $copyHash
         captured_at_utc = [DateTime]::UtcNow.ToString('o')
     }
@@ -217,7 +217,7 @@ if ($Stage -eq 'Finalize') {
 }
 
 $secretPattern = '(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|https?://[^\s/"''@]+:[^\s/"''@]+@'
-$payloadFiles = @(Get-ChildItem -LiteralPath $snapshotRoot -Recurse -File | Where-Object {
+$payloadFiles = @(Get-ChildItem -LiteralPath $snapshotRoot -Recurse -File -Force | Where-Object {
     $_.Name -notin @('reserve-design-system-2026-09-13-baseline.zip', 'archive.sha256', 'verification.json', 'payload-manifest.json')
 } | Sort-Object FullName)
 foreach ($item in $payloadFiles) {
@@ -242,7 +242,7 @@ if ($Stage -eq 'Finalize') {
     Write-Json 'payload-manifest.json' @($payload)
     $zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
     try {
-        foreach ($item in @($payloadFiles) + (Get-Item -LiteralPath (Join-Path $snapshotRoot 'payload-manifest.json'))) {
+        foreach ($item in @($payloadFiles) + (Get-Item -LiteralPath (Join-Path $snapshotRoot 'payload-manifest.json') -Force)) {
             $name = [IO.Path]::GetRelativePath($snapshotRoot, $item.FullName).Replace('\', '/')
             [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $item.FullName, $name, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
         }
@@ -255,7 +255,7 @@ $manifest = @(Get-Content -LiteralPath (Join-Path $snapshotRoot 'manifest.json')
 $diverged = @()
 foreach ($record in $manifest) {
     $saved = Join-Path $snapshotRoot $record.snapshot_relative_path
-    if ((Get-Item -LiteralPath $saved).Length -ne $record.bytes -or (Get-FileHash -LiteralPath $saved -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record.sha256) {
+    if ((Get-Item -LiteralPath $saved -Force).Length -ne $record.bytes -or (Get-FileHash -LiteralPath $saved -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record.sha256) {
         throw "Preserved source failed hash check: $($record.source_relative_path)"
     }
     $current = Join-Path $repoRoot $record.source_relative_path
@@ -282,7 +282,7 @@ if ($zipHash -ne $expectedZip) { throw 'ZIP archive digest differs from archive.
 $result = [ordered]@{
     verified_at_utc = [DateTime]::UtcNow.ToString('o')
     preserved_sources = $manifest.Count; source_bytes = ($manifest | Measure-Object bytes -Sum).Sum
-    zip_entries = $entryCount; zip_bytes = (Get-Item -LiteralPath $zipPath).Length; zip_sha256 = $zipHash
+    zip_entries = $entryCount; zip_bytes = (Get-Item -LiteralPath $zipPath -Force).Length; zip_sha256 = $zipHash
     copied_source_hashes_match = $true; zip_payload_hashes_match = $true
     narrow_known_secret_pattern_check = 'passed-not-universal-secret-absence-proof'
     current_source_divergence = @($diverged)

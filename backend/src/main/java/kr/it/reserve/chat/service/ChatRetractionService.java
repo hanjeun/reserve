@@ -37,6 +37,7 @@ public class ChatRetractionService {
         if (actor.getId() == null || !Objects.equals(message.getSenderMemberId(), actor.getId())) {
             throw new ChatException("본인이 보낸 메시지만 취소할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
+        if (message.isPurged()) throw new ChatException("보존 기간이 지난 메시지입니다.", HttpStatus.GONE);
         if (!message.isRetracted()) {
             message.retract(LocalDateTime.now(), room.nextRetractionRevision());
             var latest = messages.findLatestByRoomIds(List.of(roomId));

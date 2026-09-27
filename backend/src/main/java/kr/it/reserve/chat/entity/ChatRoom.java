@@ -115,6 +115,25 @@ public class ChatRoom {
     @Column(name = "owner_blocked_at")
     private LocalDateTime ownerBlockedAt;
 
+    @Column(name = "member_hidden_at")
+    private LocalDateTime memberHiddenAt;
+
+    @Column(name = "owner_hidden_at")
+    private LocalDateTime ownerHiddenAt;
+
+    @Column(name = "owner_hidden_by_member_id")
+    private Long ownerHiddenByMemberId;
+
+    /** 목록에서만 숨긴다. 참가 권한·원장·차단 상태는 바꾸지 않는다. */
+    public void setHidden(SenderRole role, boolean hidden, Long actorId, LocalDateTime at) {
+        if (role == SenderRole.MEMBER) memberHiddenAt = hidden ? at : null;
+        else if (role == SenderRole.OWNER) {
+            ownerHiddenAt = hidden ? at : null;
+            ownerHiddenByMemberId = hidden ? actorId : null;
+        } else throw new IllegalArgumentException("Only participants can hide their conversations");
+        if (hidden) markRead(role);
+    }
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -133,6 +152,10 @@ public class ChatRoom {
      * 이걸 빼면 답장을 보낸 관리자에게 자기가 방금 읽은 방이 계속 "안 읽음"으로 남는다.
      */
     public void onMessageSent(SenderRole sender, LocalDateTime at, String content) {
+        // 새 메시지는 다시 목록에 나타난다. 취소 이벤트나 단순 조회로는 복원하지 않는다.
+        memberHiddenAt = null;
+        ownerHiddenAt = null;
+        ownerHiddenByMemberId = null;
         this.lastMessageAt = at;
         this.lastMessagePreview = previewContent(content);
         switch (sender) {

@@ -13,8 +13,12 @@ import kr.it.reserve.chat.entity.SenderRole;
 import kr.it.reserve.chat.repository.ChatMessageRepository;
 import kr.it.reserve.chat.repository.ChatReportRepository;
 import kr.it.reserve.chat.repository.ChatRoomRepository;
+import kr.it.reserve.chat.repository.ChatReportEvidenceRepository;
+import kr.it.reserve.chat.entity.ChatReportEvidence;
+import kr.it.reserve.chat.entity.ChatReportAccessAudit;
 import kr.it.reserve.global.error.ChatException;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +44,20 @@ public class ChatModerationService {
     private final ChatMessageRepository messageRepository;
     private final ChatReportRepository reportRepository;
     private final StoreRepository storeRepository;
+    private final ChatReportEvidenceRepository evidenceRepository;
+    private final ChatReportAuditService auditService;
+
+    @Transactional
+    public void setHidden(Member actor, Long roomId, String viewerRole, boolean hidden) {
+        ChatRoom room = findRoomForUpdate(roomId);
+        SenderRole role = participantRole(viewerRole);
+        if (role == SenderRole.MEMBER && room.getMember().getId().equals(actor.getId())) {
+            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now());
+        } else {
+            assertStoreParticipant(room, actor, role);
+            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now());
+        }
+    }
 
     @Transactional
     public ConversationModerationStateResponse setBlocked(
@@ -82,7 +100,11 @@ public class ChatModerationService {
                 .reason(reason)
                 .details(details)
                 .reportKey(reportKey)
+                .evidenceCapturedAt(LocalDateTime.now())
                 .build());
+        List<ChatMessage> context = captureWindow(room.getId(), messageId);
+        evidenceRepository.saveAll(context.stream().filter(item -> !item.isPurged())
+                .map(item -> ChatReportEvidence.capture(report.getId(), item, LocalDateTime.now())).toList());
         log.info("Chat report created: reportId={}, roomId={}", report.getId(), roomId);
         return ChatReportResponse.from(report);
     }
@@ -96,10 +118,26 @@ public class ChatModerationService {
     }
 
     /** 신고를 처리할 관리자가 최근 대화와 특정 신고 메시지를 읽는다. 읽음 수에는 손대지 않는다. */
-    public ChatReportContextResponse reportContext(Long reportId) {
+    public ChatReportContextResponse reportContext(Member admin, Long reportId) {
+        assertAdmin(admin);
+        ChatReportContextResponse context = contextForImage(admin, reportId);
+        auditService.record(admin, reportId, null, ChatReportAccessAudit.Action.CONTEXT);
+        return context;
+    }
+
+    /** 사진 관문은 반환될 ID를 검증한 뒤 별도 IMAGE 감사만 기록한다. */
+    public ChatReportContextResponse contextForImage(Member admin, Long reportId) {
+        assertAdmin(admin);
         ChatReport report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new ChatException("신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         Long roomId = report.getRoom().getId();
+        List<ChatReportEvidence> evidence = evidenceRepository.findByReportIdOrderByMessageIdAsc(reportId);
+        if (report.getEvidenceCapturedAt() != null) {
+            List<ChatMessageResponse> captured = evidence.stream().map(ChatMessageResponse::forEvidence).toList();
+            return ChatReportContextResponse.builder().report(ChatReportResponse.from(report))
+                    .reportedMessage(captured.stream().filter(item -> item.getId().equals(report.getMessageId())).findFirst().orElse(null))
+                    .recentMessages(captured).build();
+        }
         List<ChatMessageResponse> recent = messageRepository.findByRoomIdOrderByIdDesc(
                         roomId, PageRequest.of(0, 50))
                 .getContent().stream()
@@ -119,6 +157,7 @@ public class ChatModerationService {
 
     @Transactional
     public ChatReportResponse reviewReport(Member admin, Long reportId, ReviewChatReportRequest request) {
+        assertAdmin(admin);
         ChatReport report = reportRepository.findByIdForUpdate(reportId)
                 .orElseThrow(() -> new ChatException("신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         ChatReport.Status status = request.getStatus();
@@ -166,6 +205,21 @@ public class ChatModerationService {
         if (message.getSenderRole() == reporterRole) {
             throw new ChatException("상대방이 보낸 메시지만 신고할 수 있습니다.");
         }
+        if (message.isPurged()) throw new ChatException("보존 기간이 지난 메시지입니다.", HttpStatus.GONE);
+    }
+
+    private List<ChatMessage> captureWindow(Long roomId, Long messageId) {
+        if (messageId == null) return messageRepository.findByRoomIdOrderByIdDesc(roomId, PageRequest.of(0, 50)).getContent();
+        List<ChatMessage> context = new java.util.ArrayList<>(messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(
+                roomId, messageId, PageRequest.of(0, 10)).getContent());
+        messageRepository.findByIdAndRoomId(messageId, roomId).ifPresent(context::add);
+        context.addAll(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(roomId, messageId, PageRequest.of(0, 10)).getContent());
+        return context;
+    }
+
+    private void assertAdmin(Member admin) {
+        if (admin == null || admin.getId() == null || admin.getRole() != Role.ADMIN)
+            throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
     }
 
     private String normalize(String value) {

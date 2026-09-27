@@ -124,6 +124,11 @@ management:
     health:
       show-details: never   # 운영 환경에서 내부 정보 비노출
 
+chat:
+  retention:
+    # 90일 파기 worker. 스키마/기존 신고 보류/개인정보 고지 확인 전에는 켜지 않는다.
+    enabled: ${CHAT_RETENTION_ENABLED:false}
+
 # Sentry 에러 모니터링
 sentry:
   dsn: ${SENTRY_DSN:}

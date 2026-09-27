@@ -11,6 +11,13 @@ import java.util.List;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
+    @Query("""
+            SELECT m FROM ChatMessage m WHERE m.purgedAt IS NULL AND m.createdAt < :cutoff
+              AND NOT EXISTS (SELECT r.id FROM ChatReport r WHERE r.room.id = m.room.id AND r.evidenceCapturedAt IS NULL)
+             ORDER BY m.createdAt, m.id
+            """)
+    List<ChatMessage> findExpired(@Param("cutoff") java.time.LocalDateTime cutoff, Pageable pageable);
+
     Slice<ChatMessage> findByRoomIdAndRetractionRevisionGreaterThanOrderByRetractionRevisionAsc(
             Long roomId, Long revision, Pageable pageable);
 
@@ -44,4 +51,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     /** 폴링용 — 이 ID 보다 뒤에 온 메시지만. 전체를 다시 받지 않기 위한 것이다. */
     java.util.List<ChatMessage> findByRoomIdAndIdGreaterThanOrderByIdAsc(Long roomId, Long afterId);
+
+    Slice<ChatMessage> findByRoomIdAndIdGreaterThanOrderByIdAsc(Long roomId, Long afterId, Pageable pageable);
 }

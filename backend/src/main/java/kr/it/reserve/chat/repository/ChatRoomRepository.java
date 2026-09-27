@@ -74,10 +74,29 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             SELECT r FROM ChatRoom r
              WHERE r.member.id = :memberId
                AND r.lastMessageAt IS NOT NULL
+               AND r.memberHiddenAt IS NULL
              ORDER BY CASE WHEN r.memberUnread > 0 THEN 0 ELSE 1 END,
                       r.lastMessageAt DESC NULLS LAST, r.id DESC
             """)
     Page<ChatRoom> findForMember(@Param("memberId") Long memberId, Pageable pageable);
+
+    @Query("SELECT r FROM ChatRoom r WHERE r.member.id = :memberId AND r.memberHiddenAt IS NOT NULL ORDER BY r.lastMessageAt DESC, r.id DESC")
+    Page<ChatRoom> findHiddenForMember(@Param("memberId") Long memberId, Pageable pageable);
+
+    @Query(value = """
+            SELECT r FROM ChatRoom r JOIN FETCH r.member
+             WHERE r.type = :type AND r.storeId IN :storeIds AND r.lastMessageAt IS NOT NULL
+               AND ((:hidden = true AND r.ownerHiddenAt IS NOT NULL AND r.ownerHiddenByMemberId = :ownerId)
+                 OR (:hidden = false AND (r.ownerHiddenAt IS NULL OR r.ownerHiddenByMemberId <> :ownerId)))
+             ORDER BY CASE WHEN r.ownerUnread > 0 THEN 0 ELSE 1 END, r.lastMessageAt DESC, r.id DESC
+            """, countQuery = """
+            SELECT COUNT(r) FROM ChatRoom r
+             WHERE r.type = :type AND r.storeId IN :storeIds AND r.lastMessageAt IS NOT NULL
+               AND ((:hidden = true AND r.ownerHiddenAt IS NOT NULL AND r.ownerHiddenByMemberId = :ownerId)
+                 OR (:hidden = false AND (r.ownerHiddenAt IS NULL OR r.ownerHiddenByMemberId <> :ownerId)))
+            """)
+    Page<ChatRoom> findVisibleStoreInbox(@Param("type") ChatRoom.RoomType type, @Param("storeIds") List<Long> storeIds,
+                                        @Param("ownerId") Long ownerId, @Param("hidden") boolean hidden, Pageable pageable);
 
     @Query(value = """
             SELECT r FROM ChatRoom r

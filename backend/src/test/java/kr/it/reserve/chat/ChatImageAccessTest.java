@@ -28,7 +28,9 @@ class ChatImageAccessTest {
     private final FileStorageService storage = mock(FileStorageService.class);
     private final ChatModerationService moderation = mock(ChatModerationService.class);
     private final ChatImageCipher cipher = new ChatImageCipher(Base64.getEncoder().encodeToString(new byte[32]));
-    private final ChatImageService images = new ChatImageService(chats, messages, storage, cipher, moderation);
+    private final ChatReportEvidenceRepository evidence = mock(ChatReportEvidenceRepository.class);
+    private final ChatReportAuditService audit = mock(ChatReportAuditService.class);
+    private final ChatImageService images = new ChatImageService(chats, messages, storage, cipher, moderation, evidence, audit);
     private final Member customer = Member.builder().id(1L).role(Role.USER).build();
     private final Member admin = Member.builder().id(9L).role(Role.ADMIN).build();
     private final ChatRoom room = ChatRoom.builder().id(10L).member(customer).storeId(5L).type(ChatRoom.RoomType.STORE).build();
@@ -43,7 +45,7 @@ class ChatImageAccessTest {
 
     @Test void reportAllowsOnlyItsReturnedContextAndRejectsUnrelatedMessageBeforeS3() {
         var photo = photo();
-        when(moderation.reportContext(20L)).thenReturn(ChatReportContextResponse.builder()
+        when(moderation.contextForImage(admin, 20L)).thenReturn(ChatReportContextResponse.builder()
                 .reportedMessage(ChatMessageResponse.from(photo)).recentMessages(List.of()).build());
         assertThatThrownBy(() -> images.readForReport(customer, 20L, 33L)).isInstanceOf(ChatException.class);
         verifyNoInteractions(moderation);
@@ -64,7 +66,7 @@ class ChatImageAccessTest {
         assertThatThrownBy(() -> images.read(customer, 33L)).isInstanceOf(ChatException.class)
                 .extracting("status").isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND);
         verifyNoInteractions(storage);
-        when(moderation.reportContext(20L)).thenReturn(ChatReportContextResponse.builder()
+        when(moderation.contextForImage(admin, 20L)).thenReturn(ChatReportContextResponse.builder()
                 .reportedMessage(ChatMessageResponse.forReport(photo)).recentMessages(List.of()).build());
         byte[] plaintext = {1, 2, 3};
         when(storage.readEncryptedChatImage(photo.getImageKey(), "users/1/chat/10"))
@@ -79,6 +81,36 @@ class ChatImageAccessTest {
         Supplier<kr.it.reserve.chat.dto.ChatImagePayload> upload = mock(Supplier.class);
         assertThatThrownBy(() -> chats.sendImage(customer, 10L, "", "photo-id", upload)).isInstanceOf(ChatException.class);
         verifyNoInteractions(upload);
+    }
+
+    @Test void reportedPhotoRemainsReadableFromTheSnapshotAfterOrdinaryContentExpires() {
+        var photo = photo();
+        var captured = kr.it.reserve.chat.entity.ChatReportEvidence.capture(20L, photo, java.time.LocalDateTime.now());
+        photo.purge(java.time.LocalDateTime.now(), 2);
+        when(moderation.contextForImage(admin, 20L)).thenReturn(ChatReportContextResponse.builder()
+                .reportedMessage(ChatMessageResponse.forEvidence(captured)).recentMessages(List.of()).build());
+        when(evidence.findByReportIdAndMessageId(20L, 33L)).thenReturn(Optional.of(captured));
+        byte[] plaintext = {1, 2, 3};
+        when(storage.readEncryptedChatImage(captured.getImageKey(), "users/1/chat/10"))
+                .thenReturn(cipher.encrypt(plaintext, "users/1/chat/10"));
+
+        assertThat(images.readForReport(admin, 20L, 33L).bytes()).isEqualTo(plaintext);
+        verifyNoInteractions(messages);
+        verify(audit).record(admin, 20L, 33L, kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.IMAGE);
+        assertThat(photo.getImageKey()).isNull();
+    }
+
+    @Test void failedPhotoAccessAuditDoesNotReturnTheOriginal() {
+        var captured = kr.it.reserve.chat.entity.ChatReportEvidence.capture(20L, photo(), java.time.LocalDateTime.now());
+        when(moderation.contextForImage(admin, 20L)).thenReturn(ChatReportContextResponse.builder()
+                .reportedMessage(ChatMessageResponse.forEvidence(captured)).recentMessages(List.of()).build());
+        when(evidence.findByReportIdAndMessageId(20L, 33L)).thenReturn(Optional.of(captured));
+        when(storage.readEncryptedChatImage(captured.getImageKey(), "users/1/chat/10"))
+                .thenReturn(cipher.encrypt(new byte[] {1}, "users/1/chat/10"));
+        doThrow(new IllegalStateException("audit unavailable")).when(audit)
+                .record(admin, 20L, 33L, kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.IMAGE);
+
+        assertThatThrownBy(() -> images.readForReport(admin, 20L, 33L)).hasMessageContaining("audit unavailable");
     }
 
     @Test void supportGetDoesNotCreateRoomOrClearUnread() {

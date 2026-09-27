@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 채팅 메시지 한 줄 (2026-08-24 신설).
  *
- * <p>원본은 수정·삭제하지 않는다. 전송 취소는 별도 tombstone으로 표시하며 신고 검토에만 원본을 제공한다.
+ * <p>전송 취소와 90일 파기는 구분한다. 신고 증거는 별도 불변 원장으로 고정한다.
  */
 @Entity
 @Table(
@@ -22,7 +22,8 @@ import java.time.LocalDateTime;
                 // 방 하나의 메시지를 시간순으로 읽는다 — 사실상 유일한 조회 패턴이다.
                 @Index(name = "idx_chat_message_room", columnList = "room_id, id"),
                 @Index(name = "idx_chat_message_idempotency", columnList = "room_id, sender_member_id, client_message_id"),
-                @Index(name = "idx_chat_message_retraction", columnList = "room_id, retraction_revision")
+                @Index(name = "idx_chat_message_retraction", columnList = "room_id, retraction_revision"),
+                @Index(name = "idx_chat_message_retention", columnList = "purged_at, created_at, id")
         }
 )
 @EntityListeners(AuditingEntityListener.class)
@@ -86,6 +87,24 @@ public class ChatMessage {
 
     @Column(name = "retraction_revision")
     private Long retractionRevision;
+
+    @Column(name = "purged_at")
+    private LocalDateTime purgedAt;
+
+    public boolean isPurged() { return purgedAt != null; }
+
+    /** 메시지 ID·시간·발신 축은 유지하고 일반 원문/사진 참조만 비운다. */
+    public void purge(LocalDateTime at, long revision) {
+        if (isPurged()) return;
+        content = "";
+        imageKey = null;
+        imageContentType = null;
+        imageWidth = null;
+        imageHeight = null;
+        imageBytes = null;
+        purgedAt = at;
+        retractionRevision = revision;
+    }
 
     public boolean isRetracted() { return retractedAt != null; }
 

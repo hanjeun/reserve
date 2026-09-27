@@ -53,6 +53,10 @@ public class ChatReport {
     @Column(name = "report_key", length = 128, nullable = false, updatable = false)
     private String reportKey;
 
+    /** null인 이전 신고는 증거 backfill 전 원문 파기를 보류한다. 빈 스냅샷과 구분한다. */
+    @Column(name = "evidence_captured_at", updatable = false)
+    private LocalDateTime evidenceCapturedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     @Builder.Default

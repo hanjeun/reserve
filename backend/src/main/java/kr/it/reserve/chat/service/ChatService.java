@@ -149,8 +149,13 @@ public class ChatService {
 
     /** 내 고객지원·가게 문의를 하나의 메신저 목록으로 반환한다. */
     public Page<ConversationSummaryResponse> listMyConversations(Member member, int page) {
-        Page<ChatRoom> rooms = roomRepository.findForMember(
-                member.getId(), PageRequest.of(Math.max(page, 0), ROOM_PAGE_SIZE));
+        return listMyConversations(member, page, false);
+    }
+
+    public Page<ConversationSummaryResponse> listMyConversations(Member member, int page, boolean hidden) {
+        var pageable = PageRequest.of(Math.max(page, 0), ROOM_PAGE_SIZE);
+        Page<ChatRoom> rooms = hidden ? roomRepository.findHiddenForMember(member.getId(), pageable)
+                : roomRepository.findForMember(member.getId(), pageable);
         Map<Long, String> previews = missingPreviewFallbacks(rooms.getContent());
         Map<Long, String> storeImages = storeImageUrls(rooms.getContent());
         return rooms.map(room -> ConversationSummaryResponse.forMember(
@@ -248,11 +253,15 @@ public class ChatService {
 
     /** 사장님 받은 문의. 가게가 폐업해도 과거 대화를 읽을 수 있어 전체 소유 가게를 사용한다. */
     public Page<ConversationSummaryResponse> listStoreInbox(Member owner, int page) {
+        return listStoreInbox(owner, page, false);
+    }
+
+    public Page<ConversationSummaryResponse> listStoreInbox(Member owner, int page, boolean hidden) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), ROOM_PAGE_SIZE);
         List<Long> storeIds = ownedStoreIds(owner);
         if (storeIds.isEmpty()) return Page.empty(pageable);
-        Page<ChatRoom> rooms = roomRepository.findStoreInbox(
-                ChatRoom.RoomType.STORE, storeIds, pageable);
+        Page<ChatRoom> rooms = roomRepository.findVisibleStoreInbox(
+                ChatRoom.RoomType.STORE, storeIds, owner.getId(), hidden, pageable);
         Map<Long, String> previews = missingPreviewFallbacks(rooms.getContent());
         Map<Long, String> storeImages = storeImageUrls(rooms.getContent());
         return rooms.map(room -> ConversationSummaryResponse.forOwner(

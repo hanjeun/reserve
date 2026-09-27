@@ -103,7 +103,7 @@ public class AdminChatController {
     public ResponseEntity<ApiResponse<ChatReportContextResponse>> reportContext(
             @PathVariable Long reportId) {
         return ResponseEntity.ok(ApiResponse.success(
-                moderationService.reportContext(reportId), "채팅 신고 문맥 조회 성공"));
+                moderationService.reportContext(SecurityUtil.getCurrentMember("로그인이 필요합니다."), reportId), "채팅 신고 문맥 조회 성공"));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

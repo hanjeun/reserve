@@ -46,10 +46,11 @@ public class ChatApiController {
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/conversations")
     public ResponseEntity<ApiResponse<Page<ConversationSummaryResponse>>> conversations(
-            @RequestParam(defaultValue = "0") int page) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "false") boolean hidden) {
         Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.listMyConversations(me, page), "대화 목록 조회 성공"));
+                chatService.listMyConversations(me, page, hidden), "대화 목록 조회 성공"));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -110,10 +111,11 @@ public class ChatApiController {
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/store-inbox")
     public ResponseEntity<ApiResponse<Page<ConversationSummaryResponse>>> storeInbox(
-            @RequestParam(defaultValue = "0") int page) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "false") boolean hidden) {
         Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.listStoreInbox(me, page), "가게 받은 문의 조회 성공"));
+                chatService.listStoreInbox(me, page, hidden), "가게 받은 문의 조회 성공"));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -188,6 +190,14 @@ public class ChatApiController {
         return ResponseEntity.ok(ApiResponse.success(
                 moderationService.setBlocked(me, roomId, viewerRole, blocked),
                 blocked ? "대화를 차단했습니다." : "대화 차단을 해제했습니다."));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PutMapping("/rooms/{roomId}/visibility")
+    public ResponseEntity<ApiResponse<Void>> setVisibility(@PathVariable Long roomId,
+            @RequestParam String viewerRole, @RequestParam boolean hidden) {
+        moderationService.setHidden(SecurityUtil.getCurrentMember("로그인이 필요합니다."), roomId, viewerRole, hidden);
+        return ResponseEntity.ok(ApiResponse.success(null, hidden ? "내 목록에서 숨겼습니다." : "대화를 복원했습니다."));
     }
 
     @PreAuthorize("isAuthenticated()")

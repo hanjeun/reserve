@@ -13,6 +13,13 @@ import java.util.Optional;
 
 public interface ChatReportRepository extends JpaRepository<ChatReport, Long> {
 
+    /** 스냅샷이 없는 이전 신고는 backfill 완료 전까지 방 원문을 보수적으로 보류한다. */
+    @Query("""
+            SELECT COUNT(r) FROM ChatReport r WHERE r.room.id = :roomId
+              AND r.evidenceCapturedAt IS NULL
+            """)
+    long countLegacyEvidenceHolds(@Param("roomId") Long roomId);
+
     Optional<ChatReport> findByReportKey(String reportKey);
 
     @Query(value = """

@@ -139,8 +139,8 @@ class SupportDisplayContractTest {
         Store store = Store.builder().id(31L).owner(owner).name("가게31").build();
         ChatRoom room = storeRoom(31L);
         when(storeRepository.findByOwnerId(9L)).thenReturn(List.of(store));
-        when(roomRepository.findStoreInbox(
-                ChatRoom.RoomType.STORE, List.of(31L), PageRequest.of(0, 20)))
+        when(roomRepository.findVisibleStoreInbox(
+                ChatRoom.RoomType.STORE, List.of(31L), 9L, false, PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of(room)));
         when(messageRepository.findLatestByRoomIds(List.of(31L)))
                 .thenReturn(List.of(message(93L, room, SenderRole.MEMBER, 7L, "예약 가능한가요?")));

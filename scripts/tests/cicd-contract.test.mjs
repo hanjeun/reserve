@@ -33,6 +33,13 @@ test('backend tests are explicit, required, and run before packaging', () => {
     assert.doesNotMatch(tests.run + packaging.run, /-x\s+test|--exclude-task[=\s]+test/);
 });
 
+test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
+    const snapshot = frontend.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
+    assert.equal(snapshot.run, './scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard');
+    assert.match(read('.gitattributes'), /^docs\/design-system\/snapshots\/\*\* -text -eol$/m);
+    assert.match(read('scripts/design-system-snapshot.ps1'), /rev-parse --git-path info\/attributes/);
+});
+
 test('PC and mobile browser checks use separate projects and failure evidence', () => {
     const pc = step(frontend, 'browser_pc');
     const mobile = step(frontend, 'browser_mobile');

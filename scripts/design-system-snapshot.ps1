@@ -1,4 +1,7 @@
-param([ValidateSet('Header', 'Finalize', 'Verify')][string]$Stage = 'Header')
+param(
+    [ValidateSet('Header', 'Finalize', 'Verify')][string]$Stage = 'Header',
+    [switch]$InstallGitGuard
+)
 
 $minimumPowerShellMajor = 7
 if ($PSVersionTable.PSVersion.Major -lt $minimumPowerShellMajor) {
@@ -11,6 +14,29 @@ $snapshotRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'docs/design-system/
 $sourceRoot = Join-Path $snapshotRoot 'source'
 if (!$snapshotRoot.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Snapshot target must stay inside this repository.'
+}
+
+if ($InstallGitGuard) {
+    if ($Stage -ne 'Verify') { throw 'The Git byte guard is only available with Verify.' }
+    # A captured .gitattributes is itself immutable, but Git still applies its rules.
+    # info/attributes has higher precedence without editing any snapshot member.
+    $attributeRule = 'docs/design-system/snapshots/** -text -eol'
+    $attributePath = (& git -C $repoRoot rev-parse --git-path info/attributes).Trim()
+    if ($LASTEXITCODE -ne 0 -or !$attributePath) { throw 'Cannot resolve repository Git attributes.' }
+    if (![IO.Path]::IsPathRooted($attributePath)) { $attributePath = Join-Path $repoRoot $attributePath }
+    $attributePath = [IO.Path]::GetFullPath($attributePath)
+    $existingAttributes = if (Test-Path -LiteralPath $attributePath) { [IO.File]::ReadAllText($attributePath) } else { '' }
+    $lastRule = @($existingAttributes -split '\r?\n' | Where-Object { $_.Trim() -and !$_.Trim().StartsWith('#') }) | Select-Object -Last 1
+    if ($lastRule -ne $attributeRule) {
+        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($attributePath)) | Out-Null
+        [IO.File]::AppendAllText($attributePath, "`n# RESERVE immutable snapshot byte guard`n$attributeRule`n", [Text.UTF8Encoding]::new($false))
+    }
+    $probe = 'docs/design-system/snapshots/2026-09-13-baseline/source/frontend/public/icons/favicon.svg'
+    $attributes = @(& git -C $repoRoot check-attr text eol -- $probe)
+    if ($LASTEXITCODE -ne 0 -or @($attributes | Where-Object { $_ -notmatch ': unset$' }).Count) {
+        throw 'Immutable snapshot byte guard is not effective.'
+    }
+    Write-Output 'Repository-local snapshot byte guard is active; snapshot files were not modified.'
 }
 
 function Write-Json([string]$name, $value) {

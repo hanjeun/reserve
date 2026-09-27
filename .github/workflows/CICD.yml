@@ -145,7 +145,7 @@ jobs:
 
       - name: Verify immutable design-system snapshot
         shell: pwsh
-        run: ./scripts/design-system-snapshot.ps1 -Stage Verify
+        run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
 
       - name: Validate operations scripts
         run: |

@@ -1,5 +1,6 @@
 package kr.it.reserve.reservation.dto;
 
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.reservation.entity.Reservation;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -86,7 +87,7 @@ public class ReservationResponse {
                 .depositPaid(reservation.getDepositPaid())
                 .depositAmount(reservation.getDepositAmount())
                 .noShowDeposit(reservation.getStore().getNoShowDeposit())
-                .checkedInAt(reservation.getCheckedInAt())
+                .checkedInAt(ServiceTime.toServiceZone(reservation.getCheckedInAt()))
                 .allowLatePayment(reservation.getStore().getAllowLatePayment())
                 .paymentTimeoutMinutes(reservation.getStore().getPaymentTimeoutMinutes())
                 .reviewId(reviewId)

@@ -25,6 +25,32 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     java.util.Optional<Reservation> findByIdForUpdate(@Param("id") Long id);
 
     /**
+     * 한 예약은 한 광고에만 한 번 귀속한다.
+     *
+     * <p>예약 ID만으로 먼저 조회한 뒤 값을 쓰면 동시 요청 두 개가 모두 통과할 수 있다.
+     * 조건과 대입을 같은 UPDATE에 두어 첫 요청만 1을 받고, 나머지는 0을 받게 한다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Reservation r
+               SET r.attributedAdId = :adId
+             WHERE r.id = :reservationId
+               AND r.member.id = :memberId
+               AND r.store.id = :storeId
+               AND r.attributedAdId IS NULL
+               AND r.deletedAt IS NULL
+               AND r.createdAt >= :createdAfter
+               AND r.status IN :eligibleStatuses
+            """)
+    int claimAdvertisementConversion(
+            @Param("reservationId") Long reservationId,
+            @Param("memberId") Long memberId,
+            @Param("storeId") Long storeId,
+            @Param("adId") Long adId,
+            @Param("createdAfter") LocalDateTime createdAfter,
+            @Param("eligibleStatuses") List<Reservation.ReservationStatus> eligibleStatuses);
+
+    /**
      * 특정 회원의 예약 내역 조회 (최신순) - store, member fetch join으로 N+1 방지
      */
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store JOIN FETCH r.member WHERE r.member = :member AND r.deletedAt IS NULL ORDER BY r.createdAt DESC")
@@ -66,7 +92,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                     OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
-             ORDER BY r.createdAt DESC, r.id DESC
             """,
             countQuery = """
             SELECT COUNT(r) FROM Reservation r
@@ -103,7 +128,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                     OR LOWER(m.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.reservationCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
                     OR LOWER(r.specialRequest) LIKE LOWER(CONCAT('%', :keyword, '%')))
-             ORDER BY r.createdAt DESC, r.id DESC
             """,
             countQuery = """
             SELECT COUNT(r) FROM Reservation r
@@ -390,12 +414,4 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
            "GROUP BY r.status")
     List<Object[]> countGroupedByStatus(@Param("storeId") Long storeId, @Param("start") LocalDate start, @Param("end") LocalDate end);
 
-    /**
-     * 사업자 통계 탭 — 기간 내 일별 예약금 매출(결제 완료건만) 추이
-     * 반환: [reservationDate, sum(depositAmount)] 쌍의 Object[] 리스트
-     */
-    @Query("SELECT r.reservationDate, SUM(r.depositAmount) FROM Reservation r " +
-           "WHERE r.store.id = :storeId AND r.depositPaid = true AND r.reservationDate BETWEEN :start AND :end AND r.deletedAt IS NULL " +
-           "GROUP BY r.reservationDate")
-    List<Object[]> sumDepositGroupedByDate(@Param("storeId") Long storeId, @Param("start") LocalDate start, @Param("end") LocalDate end);
 }

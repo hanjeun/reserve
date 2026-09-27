@@ -65,6 +65,7 @@ const ForgotPassword = () => {
     const [submitLoading, setSubmitLoading] = useState(false);
     const [timeLeft, setTimeLeft]       = useState(0);
     const timerRef = useRef(null);
+    const returnToLogin = () => navigate('/login', { state: { reserveRouteMotion: 'from-left' } });
 
     useEffect(() => () => clearInterval(timerRef.current), []);
 
@@ -160,7 +161,7 @@ const ForgotPassword = () => {
                 newPasswordConfirm: values.confirmNewPassword,
             });
             message.success('비밀번호가 변경되었습니다.');
-            navigate('/login');
+            returnToLogin();
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
             message.error(msg || '변경에 실패했습니다.');
@@ -263,7 +264,7 @@ const ForgotPassword = () => {
 
                 <Flex justify="center" style={{ marginTop: 20 }}>
                     <button
-                        onClick={() => navigate('/login')}
+                        onClick={returnToLogin}
                         style={{
                             background: 'none',
                             border: 'none',

@@ -6,6 +6,7 @@ import {
     DeleteOutlined, ExclamationCircleFilled, StopOutlined,
 } from '@ant-design/icons';
 import ReservationRow from './ReservationRow';
+import ReservationSummaryCard from './ReservationSummaryCard';
 import ReservationDetailModal from './ReservationDetailModal';
 import { Button, FormTextArea } from '../common';
 import useMessage from '../../hooks/useMessage';
@@ -43,7 +44,7 @@ const REASON_MODALS = {
     },
 };
 
-const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow, onStoreCancel, onRemove }) => {
+const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow, onStoreCancel, onRemove, view = 'list' }) => {
     // null | 'reject' | 'cancel'
     const [reasonModal, setReasonModal] = useState(null);
     const [reason, setReason] = useState('');
@@ -84,63 +85,63 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
         closeReasonModal();
     };
 
-    const renderActions = () => {
+    const createActions = () => {
         if (hasAction) {
-            return (
-                <>
-                    {status === 'PENDING' && (
-                        <>
-                            <Button variant="ghost-sm-primary" loading={isActing('approve')} onClick={() => onApprove(id)}>
-                                <CheckOutlined /> 승인
-                            </Button>
-                            <Button variant="ghost-sm-danger" loading={isActing('reject')} onClick={() => setReasonModal('reject')}>
-                                <CloseOutlined /> 거절
-                            </Button>
-                        </>
-                    )}
-                    {/* CONFIRMED 는 버튼이 3개다. 모바일 폭 계산은 ReservationRow의 actionGroup 주석 참고 —
-                        2글자 ghost-sm 버튼 3개(≈22.5px)에 gap 6이면 79.5px이라, 손님 쪽 최대치인
-                        4버튼 125.6px보다 한참 여유가 있어 날짜가 잘리지 않는다. */}
-                    {isOpenConfirmed && (
-                        <>
-                            <Button variant="ghost-sm-success" loading={isActing('complete')} onClick={() => onComplete(id)}>
-                                <CheckCircleOutlined /> 완료
-                            </Button>
-                            <Button variant="ghost-sm-danger" loading={isActing('noshow')} onClick={handleNoShow}>
-                                <WarningOutlined /> 노쇼
-                            </Button>
-                            {/* 2026-08-11 신설 — 그 전까지 가게에는 예약을 취소할 수단이 아예 없었다.
-                                손님 쪽 취소 API는 예약자 본인만 통과해서(가게는 403) 사장님이 할 수 있는 게
-                                "노쇼 처리"뿐이었고, 그건 오지 않은 손님을 벌하는 상태라 사실과 정반대로 기록된다. */}
-                            <Button variant="ghost-sm" size="sm" loading={isActing('storecancel')}
-                                onClick={() => setReasonModal('cancel')} style={{ color: colors.text.tertiary }}>
-                                <StopOutlined /> 취소
-                            </Button>
-                        </>
-                    )}
-                </>
-            );
+            if (status === 'PENDING') {
+                return [
+                    <Button key="approve" variant="ghost-sm-primary" loading={isActing('approve')} onClick={() => onApprove(id)}>
+                        <CheckOutlined /> 승인
+                    </Button>,
+                    <Button key="reject" variant="ghost-sm-danger" loading={isActing('reject')} onClick={() => setReasonModal('reject')}>
+                        <CloseOutlined /> 거절
+                    </Button>,
+                ];
+            }
+            // 확정 예약은 완료·노쇼·가게 취소 세 칸을 같은 폭으로 둔다.
+            return [
+                <Button key="complete" variant="ghost-sm-success" loading={isActing('complete')} onClick={() => onComplete(id)}>
+                    <CheckCircleOutlined /> 완료
+                </Button>,
+                <Button key="noshow" variant="ghost-sm-danger" loading={isActing('noshow')} onClick={handleNoShow}>
+                    <WarningOutlined /> 노쇼
+                </Button>,
+                <Button key="cancel" variant="ghost-sm" size="sm" loading={isActing('storecancel')}
+                    onClick={() => setReasonModal('cancel')} style={{ color: colors.text.tertiary }}>
+                    <StopOutlined /> 취소
+                </Button>,
+            ];
         }
         if (onRemove) {
-            return (
-                <Button variant="ghost-sm" size="sm" onClick={() => onRemove(id)} style={{ color: colors.text.tertiary }}>
+            return [
+                <Button key="remove" variant="ghost-sm" size="sm" onClick={() => onRemove(id)} style={{ color: colors.text.tertiary }}>
                     <DeleteOutlined /> 삭제
-                </Button>
-            );
+                </Button>,
+            ];
         }
-        return null;
+        return [];
     };
+
+    const actions = createActions();
 
     return (
         <>
-            <ReservationRow
-                reservation={reservation}
-                onOpenDetail={() => setDetailOpen(true)}
-                // 사업자는 누가 예약했는지가 중요하므로 PC에서 이름·인원을 날짜 줄에 함께 보여준다.
-                // 모바일은 폭이 없어 날짜·시간만 — 이름은 카드를 눌러 상세에서 확인한다.
-                showMemberInfo
-                renderActions={renderActions}
-            />
+            {view === 'cards' ? (
+                <ReservationSummaryCard
+                    reservation={reservation}
+                    onOpenDetail={() => setDetailOpen(true)}
+                    showMemberInfo
+                    actions={actions}
+                />
+            ) : (
+                <ReservationRow
+                    reservation={reservation}
+                    onOpenDetail={() => setDetailOpen(true)}
+                    // 사업자는 누가 예약했는지가 중요하므로 PC에서 이름·인원을 날짜 줄에 함께 보여준다.
+                    // 모바일은 폭이 없어 날짜·시간만 — 이름은 카드를 눌러 상세에서 확인한다.
+                    showMemberInfo
+                    renderActions={() => actions}
+                />
+            )}
 
             <ReservationDetailModal
                 reservation={reservation}

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import reservationService from '../../services/reservationService';
 import { reservationKeys } from '../../hooks/queryKeys';
-import { ModalLoading } from '../common';
+import { DataState, ModalLoading } from '../common';
 import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -22,7 +22,7 @@ const { Text } = Typography;
  */
 const QrCodeModal = ({ reservationId, open, onClose }) => {
     const enabled = !!open && reservationId != null;
-    const { data: token, isLoading, isError } = useQuery({
+    const { data: token, error, isLoading, isError, isFetching, refetch } = useQuery({
         queryKey: reservationKeys.qrToken(reservationId),
         queryFn: async () => {
             const data = await reservationService.getQrToken(reservationId);
@@ -67,11 +67,21 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
                         />
                     </div>
                 )}
-                {!isLoading && !token && (
-                    <Text type="secondary">
-                        {isError ? 'QR 코드를 불러오지 못했습니다.' : 'QR 코드를 불러올 수 없습니다.'}
-                    </Text>
-                )}
+                {!isLoading && !token && (isError ? (
+                    <DataState
+                        state="error"
+                        kind="reservation"
+                        subject="QR 코드"
+                        error={error}
+                        title="QR 코드를 불러오지 못했습니다."
+                        onRetry={refetch}
+                        retrying={isFetching}
+                        compact
+                        style={styles.errorState}
+                    />
+                ) : (
+                    <Text type="secondary">QR 코드를 불러올 수 없습니다.</Text>
+                ))}
                 <Text style={styles.hint}>
                     가게에 도착하면 이 QR을 사장님께 보여주세요
                 </Text>
@@ -85,6 +95,7 @@ const styles = {
     // 다크 모드에서도 QR 뒤는 항상 흰색이어야 한다 — 토큰 색이 아니라 고정색이다.
     qrPlate:    { background: '#FFFFFF', borderRadius: 12, lineHeight: 0, padding: 0 },
     spinnerBox: { width: 260, height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    errorState: { width: '100%', minHeight: 148, margin: 0 },
     hint:       { fontSize: fontSize.sm, color: colors.text.secondary, textAlign: 'center' },
 };
 

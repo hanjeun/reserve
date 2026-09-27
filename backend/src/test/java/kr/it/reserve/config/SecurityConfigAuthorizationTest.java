@@ -43,11 +43,49 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void advertisementImpressionAndClickRemainPublicSuccessfulNoOpsForUnknownIds() throws Exception {
+        mockMvc.perform(patch("/api/advertisements/999999/impression"))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/advertisements/999999/click"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void publicReservationAvailabilityIsAccessibleWithoutAuth() throws Exception {
         mockMvc.perform(get("/api/reservations/availability")
                         .param("storeId", "1")
                         .param("date", "2026-07-10"))
                 .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus()));
+    }
+
+    // ── 2026-09-21: 통째 공개(/api/stores/**·/api/reviews/**·/api/notices/**)를 공개 화면이 쓰는 GET 만으로 좁혔다 ──
+
+    @Test
+    void narrowedPublicGetEndpointsStayOpen() throws Exception {
+        for (String url : new String[] {
+                "/api/stores/regions", "/api/stores/1",
+                "/api/reviews/store/1/stats", "/api/reviews/1",
+                "/api/notices", "/api/notices/highlights", "/api/notices/1" }) {
+            mockMvc.perform(get(url))
+                    .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus(), url + " 는 공개여야 한다"));
+        }
+    }
+
+    @Test
+    void personalGetEndpointsUnderFormerlyOpenPrefixesRequireLogin() throws Exception {
+        for (String url : new String[] {
+                "/api/stores/my", "/api/stores/1/edit", "/api/stores/1/statistics",
+                "/api/reviews/my", "/api/reviews/reservation/1", "/api/reviews/can-write/1" }) {
+            mockMvc.perform(get(url)).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void chatPhotosAndOpenWritesRequireLoginWhileNoticeViewIsPublic() throws Exception {
+        mockMvc.perform(get("/api/chat/images/1")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/admin/chat/reports/1/images/1")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/chat/support/open")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/notices/999999/view")).andExpect(status().isOk());
     }
 
     @Test
@@ -57,11 +95,36 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void publicTourismRegionPhotosAreAccessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/tourism/region-photos").param("regions", "서울"))
+                .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus()));
+    }
+
+    @Test
     void inquiryCreateIsAccessibleWithoutAuth() throws Exception {
         mockMvc.perform(post("/api/inquiries")
                         .contentType("application/json")
                         .content("{\"category\":\"ETC\",\"title\":\"t\",\"content\":\"c\",\"guestName\":\"g\",\"guestEmail\":\"g@test.com\"}"))
                 .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus()));
+    }
+
+    @Test
+    void inquiryCreateRejectsInvalidGuestEmailBeforePersistingOrSendingEmail() throws Exception {
+        mockMvc.perform(post("/api/inquiries")
+                        .contentType("application/json")
+                        .content("{\"category\":\"ETC\",\"title\":\"t\",\"content\":\"c\",\"guestName\":\"g\",\"guestEmail\":\"not-an-email\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void legacyHealthCheckDoesNotExposeHostOrEnvironmentDetails() throws Exception {
+        mockMvc.perform(get("/hc"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.status").value("UP"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.serverName").doesNotExist())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.env").doesNotExist());
+        mockMvc.perform(get("/env")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -91,6 +154,16 @@ class SecurityConfigAuthorizationTest {
         mockMvc.perform(post("/api/reservations")
                         .contentType("application/json")
                         .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void qrTokenAndAdvertisementConversionRequireAuth() throws Exception {
+        mockMvc.perform(get("/api/reservations/1/qr-token"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(patch("/api/advertisements/1/conversion")
+                        .contentType("application/json")
+                        .content("{\"reservationId\":1}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -152,6 +225,24 @@ class SecurityConfigAuthorizationTest {
         mockMvc.perform(get("/api/admin/ad-payments")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/admin/ad-payments/1/refund")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/admin/ad-payments/1/reconcile")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void chatReportsRequireAuthenticationForBothSubmissionAndAdministration() throws Exception {
+        mockMvc.perform(post("/api/chat/rooms/1/reports")
+                        .param("viewerRole", "MEMBER")
+                        .contentType("application/json")
+                        .content("{\"reason\":\"SPAM\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/admin/chat/reports"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "BUSINESS")
+    void businessRoleCannotReadTheAdminChatReportQueue() throws Exception {
+        mockMvc.perform(get("/api/admin/chat/reports"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

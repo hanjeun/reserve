@@ -112,8 +112,9 @@ Blue/Green 전환 중 구버전이 요청을 받아도 구버전은 행의 현�
 
 access token은 AES-GCM 암호화한다. `OAuthUnlinkTokenCipher`는 `oauth.unlink.encryption-key`
 (`OAUTH_UNLINK_ENCRYPTION_KEY`)가 비어 있으면 JWT secret에 목적 문자열을 더해 유도한 키를 사용한다.
-**v2.6.1 운영은 이 유도 키 상태다.** compose·CI에는 별도 키 배선이 아직 없다 — 별도 키로 바꾸려면
-`docker-compose-blue/green.yml`의 environment와 `CICD.yml`의 `envs`에 함께 넣고, 아래 교체 주의를 따른다.
+**v2.6.1 당시 운영은 이 유도 키 상태였다.** 통합 후보의 blue/green compose는 별도 키 환경 변수를
+선택적으로 받지만, CI는 아직 이 키를 전달하지 않는다. 운영 키 변경이 완료됐다는 뜻은 아니다.
+별도 키 활성화에는 보호된 보관·복구 방법과 CI 전달 경로를 함께 확정하고 아래 교체 주의를 따른다.
 JWT 키를 교체할 때도 이 키가 비어 있다면 같은 주의가 필요하다.
 JWT 키와 별도인 충분히 긴 무작위 키를 사용하는 것이 목표다. fallback으로 저장한 기존
 `PENDING/FAILED/PROCESSING` 작업은 새 키로 복호화되지 않을 수 있으므로 즉시 교체/시작 실패 강제는 하지 않는다.

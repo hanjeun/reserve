@@ -1,0 +1,2 @@
+export const DEFAULT_PAGE_SIZE = 15;
+export const MOBILE_PAGINATION_BREAKPOINT = 576;

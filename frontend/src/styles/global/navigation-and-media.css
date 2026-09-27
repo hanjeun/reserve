@@ -22,12 +22,18 @@
     background-color: var(--c-gray-100, #f2f4f6) !important;
 }
 .reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn {
-    color: var(--c-text-tertiary, #8b95a1);
+    color: var(--c-text-tertiary, #8b95a1) !important;
     font-weight: 500;
     transition: color 0.2s ease;
 }
 .reserve-pill-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn {
     color: var(--c-text-primary, #1a1f27) !important;
+}
+.reserve-pill-tabs .ant-tabs-tab:focus-within .ant-tabs-tab-btn,
+.reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn:focus,
+.reserve-pill-tabs .ant-tabs-tab .ant-tabs-tab-btn:focus-visible {
+    color: var(--c-text-primary, #1a1f27) !important;
+    text-shadow: none !important;
 }
 .reserve-pill-tabs .ant-tabs-tab-active {
     background-color: var(--c-gray-200, #e5e8eb) !important;
@@ -38,6 +44,11 @@
 .reserve-pill-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
     color: var(--c-text-primary, #1a1f27) !important;
     font-weight: 600 !important;
+}
+/* QR 시트를 여는 순간 선택 면도 함께 바뀐다. 배경 전환이 남으면 직전 탭과 QR 탭이
+   짧게 동시에 선택된 것처럼 보여 파트너 패널에서만 면 전환을 즉시 처리한다. */
+.reserve-business-tabs .ant-tabs-tab {
+    transition: none !important;
 }
 @media (max-width: 768px) {
     /* 모바일에서 좌우 여백을 더 줄인다 — 마이페이지 탭(이름/사진/위치/사업자)가
@@ -140,27 +151,10 @@
     }
 }
 
-/* ── 광고 배너 캐러셀 (2026-08-05: AdBanner.jsx 에서 이관) ──────────────────
-   AntD Carousel(slick) 내부 클래스를 덮는 규칙이라 !important 가 필요하다.
-   닫기 버튼의 press 피드백은 Button 컴포넌트와 같은 감각으로 맞춘 것이다
-   (예전엔 raw button 이라 hover·active 반응이 전혀 없어 눌렀는지 알 수 없었다). */
-.ad-banner-carousel .ant-carousel  { line-height: 0; }
-.ad-banner-carousel .slick-slide   { line-height: 0; }
-.ad-banner-carousel .slick-dots    { bottom: 8px !important; margin: 0 !important; }
-.ad-banner-carousel .slick-dots li { margin: 0 3px !important; }
-.ad-banner-carousel .slick-dots li button {
-    width: 5px !important;
-    height: 5px !important;
-    border-radius: 50% !important;
-    background: #fff !important;
-    opacity: 0.6 !important;
-    padding: 0 !important;
-}
-.ad-banner-carousel .slick-dots li.slick-active button {
-    opacity: 1 !important;
-    width: 12px !important;
-    border-radius: 6px !important;
-}
+/* 광고 배너는 대표 이미지 한 장을 쓰는 가로형 카드다. */
+.ad-banner-click-area { transition: background-color 0.14s ease, transform 0.14s ease; }
+.ad-banner-click-area:hover { background: var(--c-hover-surface) !important; }
+.ad-banner-click-area:active { transform: scale(0.985); }
 /* ── 공용 Carousel 톤 (.reserve-carousel) ─────────────────────────────────
    2026-08-06 신설. 그동안 "점 인디케이터를 우리 톤으로"라는 규칙이
    `.ad-banner-carousel` **한 곳에만** 있었고, 가게 상세의 Carousel 두 개는
@@ -315,15 +309,15 @@
     .reserve-carousel .slick-arrow { display: none !important; }
 }
 
-.ad-banner-close-btn        { transition: transform 0.12s ease, background 0.12s ease; }
+.ad-banner-close-btn        { transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.12s ease; }
 .ad-banner-close-btn:hover  { background: #fff !important; }
-.ad-banner-close-btn:active { transform: scale(0.88); }
+.ad-banner-close-btn:active { transform: scale(0.9); }
 .ad-banner-close-btn:focus,
 .ad-banner-click-area:focus { outline: none; }
 .ad-banner-close-btn:focus-visible,
 .ad-banner-click-area:focus-visible {
-    outline: 3px solid var(--c-primary, #3182f6);
-    outline-offset: -3px;
+    outline: 2px solid var(--c-text-secondary, #4e5968);
+    outline-offset: -2px;
 }
 
 /* ── 푸터 저작권 줄 (2026-08-05: Footer.jsx 에서 이관) ──────────────────────
@@ -339,10 +333,95 @@
 }
 .footer-copyright-left  { order: 1; font-size: 12px; line-height: 1.8; }
 .footer-copyright-right { order: 2; font-size: 12px; line-height: 1.8; text-align: right; }
+/* 서비스·법적 고지·개발자 세 칸 (2026-09-21).
+   칸 폭은 글자 길이대로 두고, 칸 사이 틈을 같게 해서 한쪽으로 모은다(원래 인라인 flex gap 48 모양).
+   세 칸을 같은 폭으로 벌렸더니 글자가 짧은 "서비스" 칸 뒤에만 빈자리가 생겨 서비스만 떨어져 보였다.
+   grid max-content 는 줄바꿈 없이 한 줄로 두면서 틈을 column-gap 하나로 관리하려고 쓴다. */
+.reserve-app-footer-links {
+    display: grid;
+    grid-template-columns: repeat(3, max-content);
+    justify-content: start;
+    column-gap: 48px;
+}
+.reserve-app-footer-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+.reserve-app-footer-heading {
+    display: inline-flex;
+    min-height: 20px;
+    align-items: center;
+    color: var(--c-text-secondary, #4e5968) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em;
+    line-height: 20px;
+    text-transform: uppercase;
+}
+.reserve-app-footer-link,
+.reserve-app-footer-email {
+    display: inline-flex;
+    min-height: 20px;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-tertiary, #8b95a1);
+    font: inherit;
+    font-size: 13px;
+    line-height: 20px;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+.reserve-app-footer-link { cursor: pointer; }
+.reserve-app-footer-link--external .anticon { font-size: 11px; }
+.reserve-app-footer-link:hover,
+.reserve-app-footer-link:focus-visible,
+.reserve-app-footer-email:hover,
+.reserve-app-footer-email:focus-visible {
+    color: var(--c-text-primary, #1a1f27);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+.reserve-app-footer-email:active { color: var(--c-text-primary, #1a1f27); }
+/* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
+.reserve-app-footer-link:active { color: var(--c-text-primary, #1a1f27); }
 @media (max-width: 767px) {
+    .reserve-header-inner { padding-inline: 20px !important; }
+    .reserve-header-logo { font-size: 20px !important; }
+    .reserve-header-guest-actions { gap: 4px !important; }
+    .reserve-header-guest-actions .reserve-btn {
+        height: 40px !important;
+        min-height: 40px !important;
+        padding-inline: 13px !important;
+        font-size: 13px !important;
+    }
     .footer-copyright       { flex-direction: column; align-items: flex-start; gap: 10px; }
     .footer-copyright-left  { order: 2; }
     .footer-copyright-right { order: 1; text-align: left; }
+    .reserve-app-footer-links { column-gap: 24px; }
+    .reserve-app-footer-section { min-width: 0; }
+    .reserve-app-footer-link,
+    .reserve-app-footer-email {
+        min-width: 0;
+        white-space: normal;
+        word-break: keep-all;
+    }
+}
+/* 푸터 세 칸: 좁은 폰(320~359px)은 세 칸 글자 폭 합(약 234px)에 틈 24 두 개가 안 들어간다.
+   모양은 그대로 두고 틈만 12 로 줄인다. 360 부터는 24 가 들어간다 (2026-09-21 실측). */
+@media (max-width: 359px) {
+    .reserve-app-footer-links { column-gap: 12px; }
+}
+@media (max-width: 359px) {
+    .reserve-header-inner { padding-inline: 16px !important; }
+    .reserve-header-guest-actions .reserve-btn { padding-inline: 10px !important; }
 }
 
 /* ── 즐겨찾기 그리드 (2026-08-05: MyFavorites.jsx 에서 이관) ────────────────

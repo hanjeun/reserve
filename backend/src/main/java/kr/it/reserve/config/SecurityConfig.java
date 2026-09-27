@@ -72,8 +72,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 정적 리소스 (랜딩페이지, favicon)
                         .requestMatchers("/", "/index.html", "/favicon.svg", "/sitemap.xml").permitAll()
-                        // Health Check & Environment
-                        .requestMatchers("/hc", "/env").permitAll()
+                        // 기존 상태 확인 경로는 최소 상태만 공개한다. 환경 정보 경로는 공개하지 않는다.
+                        .requestMatchers("/hc").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
 
                         // PortOne 웹훅 — PG 서버가 부르므로 로그인 세션이 없다. permitAll 이 맞다.
@@ -98,9 +98,24 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/agree-terms").authenticated()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/login/**").permitAll()
 
-                        // 공개 API (인증 불필요) - GET만 허용, CUD는 인증 필요
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/stores/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/**").permitAll()
+                        // 공개 API — 공개 화면이 실제로 쓰는 GET 만 연다(2026-09-21).
+                        // 예전엔 /api/stores/**·/api/reviews/**·/api/notices/** 를 통째로 열어서 새 GET 을 추가하는 순간
+                        // 자동으로 공개됐다. /my·/{id}/edit·/{id}/statistics 같은 개인 조회는 컨트롤러 코드 한 겹에만 기댔고,
+                        // /api/reviews/reservation/{id} 는 그 한 겹조차 없어 예약 번호만으로 남의 리뷰를 꺼낼 수 있었다.
+                        // 상세 경로는 숫자만 받는다 — /my 같은 경로가 {id} 로 잘못 매칭돼 공개되지 않게.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/stores", "/api/stores/regions", "/api/stores/{id:\\d+}").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/reviews/store/{storeId:\\d+}", "/api/reviews/store/{storeId:\\d+}/stats",
+                                "/api/reviews/{id:\\d+}").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/notices", "/api/notices/highlights", "/api/notices/{id:\\d+}").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/notices/{id:\\d+}/view").permitAll()
+                        // 지역 사진은 공개 탐색 보조 정보다. 키·원본 URL은 서버 안에서만 처리한다.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/tourism/region-photos/**").permitAll()
+                        // 가게 소식 v1의 최소 공개 응답만 허용한다. 기존 /my·/my-stores·CUD는 인증 유지.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/promotions/public", "/api/promotions/public/{promotionId}").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/favorites/status/**").permitAll()
                         // 실시간 잔여 슬롯 조회 — 로그인 여부와 무관하게 누구나 시간대만 볼 수 있어야 함
                         // (실제 예약 생성은 여전히 아래 "/api/reservations/**" 규칙에 걸려 인증 필요 — 미로그인 사용자는
@@ -111,11 +126,10 @@ public class SecurityConfig {
 
                         // 광고 노출 목록 — 공개 API (StoreList 배지/배너 위젯이 로그인 여부와 무관하게 보여야 함)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/advertisements/active").permitAll()
-                        // 광고 성과 지표 기록(2026-07 추가) — 노출/클릭/전환 세 개 모두 공개 API. 전환은 로그인된
-                        // 사용자가 예약을 마친 직후에 프론트가 호출하지만, 이 호출 자체는 단순 카운터 증가라
-                        // 인증이 굳이 필요없다(광고 노출/클릭도 비로그인 방문자에게도 일어나는 이벤트라 동일 기준).
+                        // 노출·클릭은 비로그인 방문자에게도 일어나므로 공개·IP 제한을 유지한다.
+                        // 전환은 회원 본인의 예약과 광고 가게를 대조해야 하므로 아래 anyRequest 인증 규칙을 탄다.
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH,
-                                "/api/advertisements/*/impression", "/api/advertisements/*/click", "/api/advertisements/*/conversion")
+                                "/api/advertisements/*/impression", "/api/advertisements/*/click")
                                 .permitAll()
 
                         // 예약 - 공개 조회만 허용, 나머지는 인증 필요

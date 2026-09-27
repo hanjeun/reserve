@@ -21,10 +21,10 @@
  * 3) RejectModal의 key={rejectOpen ? 'reject-open' : 'reject-closed'} 강제 remount 제거 —
  *    닫는 순간 key가 바뀌며 언마운트돼서 닫힘 애니메이션이 죽던 원인. antd 6의 destroyOnHidden은
  *    "닫힘 애니메이션이 끝난 뒤에" children을 파괴하므로 입력값 초기화 + 애니메이션을 둘 다 얻는다.
- * 4) 로딩 조건을 (isLoading || isFetching)으로 통일
+ * 4) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고 수동 새로고침에는 기존 행을 유지
  * 5) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab 등과 동일한 이유.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Typography, Tag, Modal, Image, Flex } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -32,7 +32,7 @@ import {
     CheckOutlined, CloseOutlined, StopOutlined, EyeOutlined, ExclamationCircleFilled,
 } from '@ant-design/icons';
 import {
-    Button, AdminTableSkeleton, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
+    Button, AdminTableSkeleton, DataState, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
 } from '../common';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
@@ -172,6 +172,9 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const [detailItem, setDetailItem]       = useState(null);
     const [detailOpen, setDetailOpen]       = useState(false);
     const [detailLoading, setDetailLoading] = useState(false);
+    const [detailError, setDetailError]     = useState(null);
+    const [detailRequestId, setDetailRequestId] = useState(null);
+    const detailRequestRef = React.useRef(0);
     const [rejectTarget, setRejectTarget]   = useState(null);
     const [rejectOpen, setRejectOpen]       = useState(false);
     const [{ search, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
@@ -179,7 +182,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const page = Number(pageStr) || 1;
     const setPage = (p) => setQuery({ page: String(p) });
 
-    const { data, isLoading, isFetching, error, refetch } = useQuery({
+    const { data, isLoading, isFetching, isPlaceholderData, error, refetch } = useQuery({
         queryKey: [...adminKeys.businessVerifications(), mode, page, debouncedSearch],
         queryFn: async () => {
             const endpoint = mode === 'pending'
@@ -201,9 +204,6 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     });
     const items = data?.items ?? [];
     const totalElements = data?.totalElements ?? 0;
-    useEffect(() => {
-        if (error) message.error('목록을 불러오는데 실패했습니다.');
-    }, [error, message]);
 
     // 승인·거절·취소는 회원의 권한(회원 탭)과 감사 로그도 바꾼다 — 관리자 캐시 전체를 무효화한다.
     const invalidateBiz = useCallback(
@@ -256,17 +256,33 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
         });
     };
 
-    // 코드리뷰 지적사항 반영(2026-07): 예전엔 API 응답을 기다린 뒤에야 모달을 열어서 버튼을 눌러도
-    // 몇 초간 아무 반응이 없다가 갑자기 모달이 튀어나왔음 — 모달을 먼저 즉시 열고 내부에 로딩
-    // 스피너를 보여준 뒤 데이터가 오면 채우는 방식으로 변경.
+    const loadDetail = useCallback((id, { retainError = false } = {}) => {
+        const requestId = ++detailRequestRef.current;
+        setDetailLoading(true);
+        if (!retainError) setDetailError(null);
+        return api.get(API_ENDPOINTS.BUSINESS.ADMIN_DETAIL(id))
+            .then((detail) => {
+                if (requestId !== detailRequestRef.current) return;
+                setDetailItem(detail);
+                setDetailError(null);
+            })
+            .catch((error) => {
+                if (requestId !== detailRequestRef.current) return;
+                setDetailItem(null);
+                setDetailError(error);
+            })
+            .finally(() => {
+                if (requestId === detailRequestRef.current) setDetailLoading(false);
+            });
+    }, []);
+
+    // 모달을 먼저 열어 기다리는 상태를 즉시 보여 주고, 실패해도 닫지 않는다. 그래야 왜 실패했는지
+    // 확인하고 같은 대상만 다시 조회할 수 있다.
     const openDetail = (record) => {
         setDetailItem(null);
+        setDetailRequestId(record.id);
         setDetailOpen(true);
-        setDetailLoading(true);
-        api.get(API_ENDPOINTS.BUSINESS.ADMIN_DETAIL(record.id))
-            .then((detail) => setDetailItem(detail))
-            .catch(() => { message.error('상세 정보를 불러오지 못했습니다.'); setDetailOpen(false); })
-            .finally(() => setDetailLoading(false));
+        loadDetail(record.id);
     };
 
     // 검색은 서버 전체 신청 집합에서 수행한다. 검색어 변경 시 페이지를 초기화한다.
@@ -340,7 +356,10 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 loading={isLoading || isFetching}
             />
 
-            {(isLoading || isFetching) ? (
+            {error ? (
+                <DataState state="error" kind="member" subject="사업자 인증 신청" error={error}
+                    onRetry={refetch} retrying={isFetching} compact />
+            ) : (isLoading || isPlaceholderData) ? (
                 <AdminTableSkeleton
                     rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}
@@ -390,8 +409,20 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 width={560}
                 centered
             >
-                {detailLoading ? (
+                {detailLoading && !detailError ? (
                     <ModalLoading text="상세 정보를 불러오는 중..." minHeight="160px" />
+                ) : detailError ? (
+                    <DataState
+                        state="error"
+                        kind="member"
+                        subject="사업자 인증 상세"
+                        error={detailError}
+                        title="상세 정보를 불러오지 못했습니다."
+                        onRetry={detailRequestId ? () => loadDetail(detailRequestId, { retainError: true }) : undefined}
+                        retrying={detailLoading}
+                        compact
+                        style={{ minHeight: 160, margin: 0 }}
+                    />
                 ) : detailItem && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
                         <DetailRow label="신청자">{`${detailItem.memberName} (${detailItem.memberEmail})`}</DetailRow>

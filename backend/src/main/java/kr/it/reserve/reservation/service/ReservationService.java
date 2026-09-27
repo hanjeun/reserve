@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -697,7 +698,9 @@ public class ReservationService {
             );
         }
 
-        reservation.setCheckedInAt(ServiceTime.now());
+        // DB timestamp는 createdAt과 같은 JVM(운영 컨테이너 UTC) 시계를 사용하고,
+        // 사용자에게 내보낼 때 ReservationResponse에서 한국 시각으로 바꾼다.
+        reservation.setCheckedInAt(LocalDateTime.now());
 
         // 개인정보 없이 출석 사실을 운영 로그에 남긴다. checkedInAt은 DB의 장기 근거다.
         //
@@ -1076,9 +1079,10 @@ public class ReservationService {
             int size,
             String search,
             Reservation.ReservationStatus status,
-            Long storeId) {
+            Long storeId,
+            String sort) {
         int safeSize = Math.min(Math.max(size, 1), 100);
-        Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize, reservationManagementSort(sort));
         String keyword = search == null ? "" : search.trim();
         if (owner.isAdmin()) {
             return reservationRepository.searchForAdmin(keyword, status, storeId, pageable)
@@ -1086,6 +1090,15 @@ public class ReservationService {
         }
         return reservationRepository.searchForStoreOwner(owner, keyword, status, storeId, pageable)
                 .map(ReservationResponse::fromEntity);
+    }
+
+    /** 예약 관리 세 화면의 정렬 계약. 알 수 없는 값은 기존 동작인 최신순으로 되돌린다. */
+    private Sort reservationManagementSort(String value) {
+        return switch (value == null ? "recent" : value) {
+            case "oldest" -> Sort.by(Sort.Direction.ASC, "createdAt", "id");
+            case "visit" -> Sort.by(Sort.Direction.ASC, "reservationDate", "reservationTime", "id");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt", "id");
+        };
     }
 
     @Transactional(readOnly = true)

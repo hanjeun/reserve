@@ -1,0 +1,75 @@
+/* 이 DEV 문서만 불러오는 프리뷰 프레임. 제품 컴포넌트의 색·간격은 기존 CSS를 사용한다. */
+.reserve-messenger-preview {
+    box-sizing: border-box;
+    min-height: 100svh;
+    background: var(--c-bg-default);
+    color: var(--c-text-primary);
+}
+.reserve-messenger-preview-header {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 60px;
+    padding-inline: 20px;
+    background: var(--c-header-bg);
+    border-bottom: 1px solid var(--c-border-light);
+}
+.reserve-messenger-preview-header .reserve-header-logo-wordmark { color: var(--c-primary); font-size: 22px; }
+.reserve-messenger-preview-header > span:last-child { color: var(--c-text-secondary); font-size: 11px; white-space: nowrap; }
+.reserve-messenger-preview-guide { max-width: 440px; padding: 28px 24px; }
+.reserve-messenger-preview-guide h1 { margin: 0 0 12px; font-size: 20px; }
+.reserve-messenger-preview-guide p { color: var(--c-text-secondary); font-size: 13px; line-height: 1.7; }
+.reserve-messenger-preview-control {
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--c-border-default);
+    border-radius: 12px;
+    background: var(--c-bg-paper);
+    color: var(--c-text-primary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+.reserve-messenger-preview-control:focus-visible { outline: 2px solid var(--c-text-secondary); outline-offset: 3px; }
+.reserve-messenger-preview .reserve-messenger-preview-panel {
+    width: 420px;
+    max-width: calc(100vw - 40px);
+    height: 620px;
+    max-height: calc(100svh - 100px);
+    right: 20px;
+    bottom: 20px;
+}
+.reserve-messenger-preview-disabled-control {
+    display: block;
+    min-height: 44px;
+    margin-top: 12px;
+    padding: 0 12px;
+    border: 1px solid var(--c-border-default);
+    border-radius: 10px;
+    background: var(--c-gray-50);
+    color: var(--c-text-tertiary);
+    font: inherit;
+    font-size: 12px;
+}
+.reserve-messenger-preview--page { height: 100svh; min-height: 0; overflow: hidden; }
+.reserve-messenger-preview--page .reserve-messenger--page {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: calc(100svh - 60px);
+    min-height: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+.reserve-messenger-preview--page .reserve-messenger > .reserve-messenger-home,
+.reserve-messenger-preview--page .reserve-messenger > .reserve-messenger-list,
+.reserve-messenger-preview--page .reserve-messenger > .reserve-messenger-settings,
+.reserve-messenger-preview--page .reserve-messenger > .reserve-messenger-thread { flex: 1; min-height: 0; }
+.reserve-messenger-preview--page .reserve-messenger > .reserve-messenger-footer { flex-shrink: 0; }
+.reserve-messenger-preview--page .reserve-messenger-thread { display: flex; }
+.reserve-messenger-preview--page .reserve-messenger-mobile-back { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }

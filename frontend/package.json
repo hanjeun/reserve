@@ -1,7 +1,7 @@
 {
   "name": "reserve",
   "private": true,
-  "version": "2.6.3",
+  "version": "2.7.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -15,8 +15,9 @@
     "lint:ci": "eslint src --max-warnings 0",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:policy": "node --test scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs",
+    "test:policy": "node --test scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs ../scripts/tests/cicd-contract.test.mjs ../scripts/tests/audit-preview-release.test.mjs",
     "test:e2e": "playwright test",
+    "generate:readme-assets": "node scripts/generate-readme-assets.mjs",
     "preview": "vite preview",
     "postinstall": "patch-package"
   },

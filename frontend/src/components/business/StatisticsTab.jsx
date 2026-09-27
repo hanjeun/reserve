@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
-import { Typography, Empty } from 'antd';
+import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import {
     AreaChart, Area, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '@ant-design/icons';
-import { StatCard, ChartCard, SegmentedControl, PieLegend, FilterSelect } from '../common';
+import { DataState, StatCard, ChartCard, SegmentedControl, PieLegend, FilterToolbar } from '../common';
 import { Bone } from '../common/Skeletons';
-import { useMessage, useMyStores, useWindowWidth } from '../../hooks';
+import { useMyStores, useQueryParamsState } from '../../hooks';
 import { storeKeys } from '../../hooks/queryKeys';
 import storeService from '../../services/storeService';
-import { RESERVATION_STATUS_LABELS } from '../../constants';
+import { AD_TYPE_LABELS, RESERVATION_STATUS_LABELS } from '../../constants';
 import { colors, fontSize, chartPalette, chartGridProps, chartAxisTick, chartTooltipStyle, chartPieCornerRadius, chartAreaGradient, chartMargin, chartYAxisWidth } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -23,7 +23,33 @@ const RANGE_OPTIONS = [
     { value: '90d', label: '90일' },
 ];
 
-const AD_TYPE_LABELS = { BADGE: '배지형', BANNER: '배너형' };
+const STATISTICS_QUERY_DEFAULTS = Object.freeze({
+    statisticsStore: '',
+    statisticsRange: '30d',
+});
+
+const DATE_COUNT_COLUMNS = [
+    { key: 'date', label: '날짜' },
+    { key: 'value', label: '예약', render: (value) => `${value}건` },
+];
+
+const STATUS_COUNT_COLUMNS = [
+    { key: 'name', label: '상태' },
+    { key: 'value', label: '예약', render: (value) => `${value}건` },
+];
+
+const DATE_REVENUE_COLUMNS = [
+    { key: 'date', label: '결제 완료일' },
+    { key: 'value', label: '순결제액', render: (value) => `${Number(value).toLocaleString()}원` },
+];
+
+const summarizeDaily = (rows, unit) => {
+    if (!rows?.length) return undefined;
+    const total = rows.reduce((sum, row) => sum + Number(row.value || 0), 0);
+    if (total === 0) return `선택한 기간의 합계는 0${unit}입니다.`;
+    const peak = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
+    return `기간 합계 ${total.toLocaleString()}${unit}, 가장 높은 날은 ${peak.date}의 ${Number(peak.value).toLocaleString()}${unit}입니다.`;
+};
 
 // 광고 성과 지표 하나를 보여주는 작은 박스 — DashboardTab의 "최근 감사 로그 요약"과 동일한 인라인 패턴(2026-07 추가)
 const AdStatItem = ({ label, value, suffix, color }) => (
@@ -73,16 +99,11 @@ const shortDate = (d) => {
 };
 
 const useStoreStatistics = (storeId, range) => {
-    const { message } = useMessage();
-    const query = useQuery({
+    return useQuery({
         queryKey: storeKeys.statistics(storeId, range),
         queryFn: () => storeService.getStatistics(storeId, range),
         enabled: !!storeId,
     });
-    useEffect(() => {
-        if (query.error) message.error('통계를 불러오지 못했습니다.');
-    }, [query.error, message]);
-    return query;
 };
 
 /**
@@ -92,24 +113,65 @@ const useStoreStatistics = (storeId, range) => {
  * DB에서 GROUP BY로 집계해서 내려받음)
  */
 const StatisticsTab = () => {
-    const { stores: myStores, loading: storesLoading } = useMyStores();
-    const [storeId, setStoreId] = useState(undefined);
-    const [range, setRange] = useState('30d');
-    // 2026-07 추가 — 모바일에서 가게 셀렉터와 기간 세그먼트가 각자 줄이 나뉘어 서로 따로 놀던 문제 —
-    // 좁은 화면에서도 항상 한 줄에 놓이도록 nowrap + 가게 셀렉터 폭을 줄인다.
-    const isMobile = useWindowWidth() < 768;
+    const { stores: myStores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();
+    const [{ statisticsStore, statisticsRange }, setStatisticsParams] = useQueryParamsState(STATISTICS_QUERY_DEFAULTS);
+    const requestedStoreId = Number(statisticsStore);
+    const storeId = myStores.some(store => store.id === requestedStoreId)
+        ? requestedStoreId
+        : myStores[0]?.id;
+    const range = RANGE_OPTIONS.some(option => option.value === statisticsRange)
+        ? statisticsRange
+        : '30d';
 
-    // 가게 목록이 다 로드된 뒤 첫 번째 가게를 기본 선택하는 로직 — useEffect 대신 렌더 중 직접
-    // 비교해서 조정(React 공식 권장 패턴), react-hooks/set-state-in-effect에 걸리지 않음
-    if (!storeId && !storesLoading && myStores.length > 0) {
-        setStoreId(myStores[0].id);
+    const { data: stats, isLoading: statsLoading, isFetching, error: statsError, refetch } = useStoreStatistics(storeId, range);
+    const loading = storesLoading || statsLoading;
+    const toolbarLoading = loading || isFetching;
+    // 처음 가게 목록을 받는 동안에도 툴바의 자리를 유지한다. storeId가 생긴 뒤에는
+    // 통계만 다시 조회하고, 그 전에는 가게 목록 조회 함수를 넘겨 RefreshButton이 사라지지 않게 한다.
+    const handleReload = storeId ? refetch : refetchStores;
+
+    // 가게 목록을 못 받아도 툴바(가게 선택·기간·새로고침)는 제자리에 두고, 오류는 통계가 나올 자리에 띄운다.
+    // 예전엔 툴바째 사라지고 오류만 탭 바로 아래에 붙었다(오류 위치 규칙 위반, 2026-09-21).
+    const toolbar = (
+        <FilterToolbar
+            selects={[{
+                key: 'store',
+                ariaLabel: '통계 가게 필터',
+                value: storeId,
+                onChange: value => setStatisticsParams({ statisticsStore: String(value) }),
+                disabled: storesLoading || Boolean(storesError),
+                loading: storesLoading,
+                width: 148,
+                mobileWidth: 112,
+                options: myStores.map((store) => ({ value: store.id, label: store.name })),
+            }]}
+            extra={(
+                <SegmentedControl
+                    value={range}
+                    onChange={nextRange => setStatisticsParams({ statisticsRange: nextRange })}
+                    options={RANGE_OPTIONS}
+                    block={false}
+                    disabled={toolbarLoading}
+                />
+            )}
+            onReload={handleReload}
+            loading={toolbarLoading}
+            style={{ marginBottom: 0 }}
+        />
+    );
+
+    if (storesError) {
+        return (
+            <div className="reserve-statistics-tab" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {toolbar}
+                <DataState state="error" kind="store" subject="가게 목록" error={storesError}
+                    onRetry={refetchStores} retrying={storesLoading} style={{ marginTop: 80 }} />
+            </div>
+        );
     }
 
-    const { data: stats, isLoading: statsLoading } = useStoreStatistics(storeId, range);
-    const loading = storesLoading || statsLoading;
-
     if (!storesLoading && myStores.length === 0) {
-        return <Empty description="등록된 가게가 없습니다." style={{ marginTop: 80 }} />;
+        return <DataState state="empty" kind="store" title="등록된 가게가 없습니다." style={{ marginTop: 80 }} />;
     }
 
     const areaGradientId = 'stats-reservation-gradient';
@@ -128,22 +190,16 @@ const StatisticsTab = () => {
         : [];
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* 가게 선택 + 기간 선택 */}
-            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-                {/* 이 셀렉터는 "폼 입력"이 아니라 예약관리·광고관리 탭의 가게 필터와 같은 "필터" 역할이다.
-                    2026-08-04 — 순수 <Select> + className 조합에서 FilterSelect로 교체.
-                    예전 주석에 "FilterToolbar와 정확히 일치하도록 맞춘다"고 적어뒀는데 className을
-                    붙이지 않아 **의도만 있고 구현이 없던** 상태였다. 컴포넌트가 강제하니 이제 어긋날 수 없다.
-                    모바일에서도 기간 세그먼트와 같은 줄에 남도록 flexShrink 허용 + 폭 축소. */}
-                <FilterSelect
-                    value={storeId}
-                    onChange={setStoreId}
-                    options={myStores.map((s) => ({ value: s.id, label: s.name }))}
-                    style={{ width: isMobile ? 138 : 180, minWidth: 0, flexShrink: 1 }}
-                />
-                <SegmentedControl value={range} onChange={setRange} options={RANGE_OPTIONS} block={false} />
-            </div>
+        <div className="reserve-statistics-tab" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {toolbar}
+            {statsError && (
+                <DataState state="error" subject="통계" error={statsError}
+                    title={stats
+                        ? '통계를 갱신하지 못했습니다. 이전 조회 결과를 표시하고 있습니다.'
+                        : '통계를 불러오지 못했습니다.'}
+                    onRetry={refetch} retrying={isFetching} compact={Boolean(stats)} />
+            )}
+            {(!statsError || stats) && <>
             {/* 요약 카드 - 최소폭을 200에서 150으로 줄여 좁은 모바일 화면에서도 2열이 유지되게 함
                 (DashboardTab과 동일한 이유로 통일했다. 예전 최소폭이 넓어 모바일에서 카드들이 세로로 쌓였다) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
@@ -151,7 +207,6 @@ const StatisticsTab = () => {
                     icon={<StarFilled />}
                     label="평균 별점"
                     value={stats?.averageRating != null ? stats.averageRating.toFixed(1) : '0.0'}
-                    color="#fadb14"
                     loading={loading}
                 />
                 <StatCard
@@ -159,15 +214,13 @@ const StatisticsTab = () => {
                     label="리뷰 수"
                     value={stats?.reviewCount ?? 0}
                     suffix="전체 누적"
-                    color={colors.primary.main}
                     loading={loading}
                 />
                 <StatCard
                     icon={<WalletOutlined />}
-                    label="예약금 매출"
+                    label="예약금 순결제액"
                     value={(stats?.totalDepositRevenue ?? 0).toLocaleString()}
                     suffix={`원 · 최근 ${range === '7d' ? '7' : range === '90d' ? '90' : '30'}일`}
-                    color={colors.success.main}
                     loading={loading}
                 />
                 <StatCard
@@ -175,7 +228,6 @@ const StatisticsTab = () => {
                     label="광고 노출"
                     value={stats?.adSummary ? `${AD_TYPE_LABELS[stats.adSummary.adType] || stats.adSummary.adType}` : '없음'}
                     suffix={stats?.adSummary ? `${stats.adSummary.daysRemaining}일 남음` : '진행 중인 광고 없음'}
-                    color="#8b5cf6"
                     loading={loading}
                 />
             </div>
@@ -186,7 +238,14 @@ const StatisticsTab = () => {
                 안 보이다가 데이터 도착 순간 한꺼번에 나타났음 — DashboardTab에서 이미 고친 것과 동일한
                 문제라 같은 패턴을 그대로 재사용) */}
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <ChartCard title="예약 추이" height={260} minWidth={340}>
+                <ChartCard
+                    title="예약 추이"
+                    height={260}
+                    minWidth={340}
+                    summary={!loading ? summarizeDaily(stats?.reservationTrend, '건') : undefined}
+                    tableColumns={DATE_COUNT_COLUMNS}
+                    tableRows={!loading ? (stats?.reservationTrend ?? []) : []}
+                >
                     {loading ? (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
                             {[60, 100, 75, 130, 95, 150].map((h, i) => (
@@ -217,7 +276,16 @@ const StatisticsTab = () => {
                     )}
                 </ChartCard>
 
-                <ChartCard title="상태별 분포" height={260} minWidth={280}>
+                <ChartCard
+                    title="상태별 분포"
+                    height={260}
+                    minWidth={280}
+                    summary={!loading && stats
+                        ? `선택한 기간의 예약 ${statusPieData.reduce((sum, row) => sum + row.value, 0)}건을 상태별로 나눴습니다.`
+                        : undefined}
+                    tableColumns={STATUS_COUNT_COLUMNS}
+                    tableRows={!loading ? statusPieData : []}
+                >
                     {loading ? (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <div style={{ position: 'relative', width: 180, height: 180 }}>
@@ -259,7 +327,16 @@ const StatisticsTab = () => {
                     )}
                 </ChartCard>
 
-                <ChartCard title="예약금 매출 추이" height={260} minWidth={340}>
+                <ChartCard
+                    title="예약금 순결제액 추이"
+                    height={260}
+                    minWidth={340}
+                    summary={!loading && stats?.revenueTrend?.length
+                        ? `확정 환불을 차감한 결제 완료일 기준입니다. ${summarizeDaily(stats.revenueTrend, '원')}`
+                        : undefined}
+                    tableColumns={DATE_REVENUE_COLUMNS}
+                    tableRows={!loading ? (stats?.revenueTrend ?? []) : []}
+                >
                     {loading ? (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
                             {[90, 60, 120, 80, 140, 100].map((h, i) => (
@@ -279,13 +356,13 @@ const StatisticsTab = () => {
                                 <CartesianGrid {...chartGridProps} />
                                 <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
                                 <YAxis width={chartYAxisWidth.currency} tick={chartAxisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                                <Tooltip labelFormatter={shortDate} formatter={(v) => [`${Number(v).toLocaleString()}원`, '매출']} {...chartTooltipStyle} />
+                                <Tooltip labelFormatter={shortDate} formatter={(v) => [`${Number(v).toLocaleString()}원`, '순결제액']} {...chartTooltipStyle} />
                                 <Area type="monotone" dataKey="value" stroke={colors.success.main} strokeWidth={2} fill={`url(#${revenueGradient.id})`} />
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text type="secondary">해당 기간 매출이 없습니다.</Text>
+                            <Text type="secondary">해당 기간 순결제액이 없습니다.</Text>
                         </div>
                     )}
                 </ChartCard>
@@ -294,7 +371,7 @@ const StatisticsTab = () => {
             {/* 광고 성과(2026-07 추가) — 현재 활성 광고가 있을 때만 보여줌(로딩 중엔 낙관적으로 보여주다가 데이터
                 도착 후 정말 광고가 없으면 숨김 — DashboardTab의 "최근 감사 로그 요약"와 동일한 판단).
                 누적 카운터만 있고 일별 추이는 아직 없음(Advertisement 엔티티에 카운터 컬럼만 있는 구조이라) —
-                배지형은 클릭 개념이 없어서 노출수만, 배너형은 클릭/전환까지 함께 보여준다. */}
+                노출형은 클릭 개념이 없어서 노출수만, 배너형은 클릭/전환까지 함께 보여준다. */}
             {(loading || stats?.adSummary) && (
                 <ChartCard title="광고 성과" height="auto">
                     {loading ? (
@@ -315,7 +392,7 @@ const StatisticsTab = () => {
                                     suffix="회"
                                     color={colors.primary.main}
                                 />
-                                {/* 배지형은 클릭 개념이 애매해서(카드 자체 클릭과 구별 불가) 클릭/전환 지표는 배너형만 표시 */}
+                                {/* 노출형은 클릭 개념이 애매해서(카드 자체 클릭과 구별 불가) 클릭/전환 지표는 배너형만 표시 */}
                                 {stats.adSummary.adType === 'BANNER' && (
                                     <>
                                         <AdStatItem label="클릭수" value={stats.adSummary.clickCount ?? 0} suffix="회" color={colors.success.main} />
@@ -334,7 +411,7 @@ const StatisticsTab = () => {
                                 )}
                             </div>
 
-                            {/* 노출 → 클릭 → 전환 퍼널 — 배너형만(배지형은 클릭/전환 개념 자체가 없으므로 생략) */}
+                            {/* 노출 → 클릭 → 전환 퍼널 — 배너형만(노출형은 클릭/전환 개념 자체가 없으므로 생략) */}
                             {stats.adSummary.adType === 'BANNER' && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 420 }}>
                                     <AdFunnelBar
@@ -361,6 +438,7 @@ const StatisticsTab = () => {
                     )}
                 </ChartCard>
             )}
+            </>}
         </div>
     );
 };

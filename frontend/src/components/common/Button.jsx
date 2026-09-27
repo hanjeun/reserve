@@ -110,6 +110,13 @@ const SIZE_HEIGHT = {
     hero: heights.buttonHero,
 };
 
+/**
+ * sm(36px) 채움·테두리 버튼의 좌우 여백 — 공통 폼 모달 푸터(취소 20px · 확인 24px)의 값을 여기로 옮겼다(2026-09-23).
+ * 예전엔 모달만 인라인으로 여백을 줬고, 모달 밖의 sm 버튼(메일 작성·광고 신청·QR·날짜 적용·자동 응답 저장 등)은
+ * 브라우저 기본 6px 라 글자가 테두리에 붙어 보였다. 호출부 style 이 있으면 그쪽이 이긴다.
+ */
+const SM_PADDING_X = { primary: 24, danger: 24, outline: 20, secondary: 20 };
+
 const SIZE_FONT = {
     sm:   fontSize.sm,
     md:   fontSize.base,
@@ -125,9 +132,11 @@ const Button = ({
     disabled = false,
     htmlType = 'button',
     icon,
+    loadingIcon,
     children,
     style,
     onClick,
+    className,
     ...rest
 }) => {
     const isGhostSm = variant.startsWith('ghost-sm');
@@ -153,14 +162,15 @@ const Button = ({
         justifyContent: 'center',
         gap: '5px',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
+        // 평상시 인라인 opacity를 넣으면 전역 hover/active 규칙을 이겨 피드백이 사라진다.
+        opacity: disabled ? 0.45 : undefined,
         fontWeight: isGhostSm ? fontWeight.medium : fontWeight.bold,
         fontSize: buttonFontSize,
         height: buttonHeight,
         width: block ? '100%' : undefined,
         transition: `all ${transitions.fast} ${transitions.easing}`,
         userSelect: 'none',
-        padding: isGhostSm ? '2px 0' : undefined,
+        padding: isGhostSm ? '2px 0' : (size === 'sm' && SM_PADDING_X[variant] ? `0 ${SM_PADDING_X[variant]}px` : undefined),
         ...v,
         ...style,
     };
@@ -177,7 +187,7 @@ const Button = ({
                 disabled={disabled || loading}
                 aria-busy={loading || undefined}
                 onClick={handleClick}
-                className={`reserve-btn reserve-btn--${variant}`}
+                className={['reserve-btn', `reserve-btn--${variant}`, className].filter(Boolean).join(' ')}
                 style={baseStyle}
                 {...rest}
             >
@@ -187,9 +197,11 @@ const Button = ({
                     (StoreFormActions 등 8곳). 버튼이 빈 채로 도는 것보다 무엇을 기다리는지 보이는 게 낫다.
                     관문이 여기 하나라 이 세 줄로 8곳이 같이 살아난다. */}
                 {loading ? (
-                    <span style={spinStyle} className="reserve-btn-spin" />
+                    loadingIcon ? (
+                        <span className="reserve-btn-loading-icon" aria-hidden="true">{loadingIcon}</span>
+                    ) : <span style={spinStyle} className="reserve-btn-spin" />
                 ) : icon && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }}>{icon}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }} aria-hidden={children ? 'true' : undefined}>{icon}</span>
                 )}
                 {children}
             </button>
@@ -214,9 +226,11 @@ Button.propTypes = {
     disabled: PropTypes.bool,
     htmlType: PropTypes.oneOf(['button', 'submit', 'reset']),
     icon: PropTypes.node,
+    loadingIcon: PropTypes.node,
     children: PropTypes.node,
     style: PropTypes.object,
     onClick: PropTypes.func,
+    className: PropTypes.string,
 };
 
 export default Button;

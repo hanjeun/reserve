@@ -10,16 +10,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Typography, Pagination } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { SendOutlined, MessageOutlined, LoadingOutlined } from '@ant-design/icons';
-import { Button, UnreadPill, RefreshButton } from '../common';
+import { MessageOutlined } from '@ant-design/icons';
+import { Button, DataState, UnreadPill, RefreshButton } from '../common';
 import { Bone } from '../common/Skeletons';
 import ChatBubbleList from '../chat/ChatBubbleList';
 import useChatThread from '../../hooks/useChatThread';
+import useChatImageDraft from '../../hooks/useChatImageDraft';
+import ChatComposer from '../chat/ChatComposer';
+import chatService from '../../services/chatService';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { adminKeys } from '../../hooks/queryKeys';
 import { useMessage, useWindowWidth } from '../../hooks';
-import { colors, fontSize, fontWeight, radius, field } from '../../styles/tokens';
+import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 
 const { Text } = Typography;
 
@@ -63,7 +66,7 @@ const ChatTab = () => {
     const [draft, setDraft] = useState('');
     const bottomRef = useRef(null);
 
-    const { data, isLoading, isFetching, refetch } = useQuery({
+    const { data, isLoading, isFetching, error: roomsError, refetch } = useQuery({
         queryKey: [...adminKeys.chatRooms(), page],
         queryFn: () => api.get(API_ENDPOINTS.CHAT.ADMIN_ROOMS, { params: { page: page - 1 } }),
     });
@@ -73,16 +76,17 @@ const ChatTab = () => {
     const total = data?.page?.totalElements ?? data?.totalElements ?? 0;
 
     /*
-     * 대화의 불러오기·폴링·전송은 useChatThread 가 맡는다 — 손님 패널(ChatLauncher)과 **같은 훅**이다.
+     * 대화의 불러오기·폴링·전송은 useChatThread 가 맡는다 — 통합 메신저와 **같은 훅**이다.
      * 예전엔 두 화면이 각자 짜서 폴링 타이머 리셋·중복 붙임 버그가 양쪽에 똑같이 들어 있었다.
      *
      * 방을 바꿀 때 목록을 비우는 것도 훅이 한다(threadKey 가 바뀌면 렌더 도중 초기화) —
      * 이펙트에서 비우면 한 프레임 동안 **이전 방 내용이 새 방에 비친다.**
      */
     const roomIdSel = selected?.id ?? null;
+    const imageDraft = useChatImageDraft(roomIdSel);
 
     const load = useCallback(
-        () => api.get(API_ENDPOINTS.CHAT.ADMIN_ROOM(roomIdSel))
+        () => chatService.getAdminSupportRoom(roomIdSel)
             .then((list) => ({ roomId: roomIdSel, messages: list ?? [] })),
         [roomIdSel],
     );
@@ -91,7 +95,9 @@ const ChatTab = () => {
         [],
     );
     const sendFn = useCallback(
-        (rid, content) => api.post(API_ENDPOINTS.CHAT.ADMIN_REPLY(rid), { content }),
+        (rid, content, clientMessageId, file, config) => file
+            ? chatService.sendImage(rid, file, content, clientMessageId, config)
+            : api.post(API_ENDPOINTS.CHAT.ADMIN_REPLY(rid), { content, clientMessageId }, config),
         [],
     );
     /**
@@ -136,11 +142,12 @@ const ChatTab = () => {
     );
     const onError = useCallback((msg) => message.error(msg), [message]);
 
-    const { messages, sending, send } = useChatThread({
+    const { messages, loading: threadLoading, loadError, reload, sending, send, cancelSend, updateMessage } = useChatThread({
         threadKey: roomIdSel,
         myRole: 'ADMIN',
         load, poll, send: sendFn,
-        onLoaded, onSent, onError,
+        pollChanges: chatService.pollRetractions, cancellable: true,
+        onLoaded, onSent, onChanged: onSent, onError,
         pollMs: POLL_MS,
     });
 
@@ -151,11 +158,14 @@ const ChatTab = () => {
 
     const handleSend = async () => {
         const text = draft.trim();
-        if (!text || !selected || sending) return;
+        const file = imageDraft.file;
+        if ((!text && !file) || !selected || sending) return;
         // 말풍선이 이미 떠 있는데 입력칸에도 같은 글이 남아 있으면 두 번 보낸 것처럼 보인다.
         setDraft('');
-        const ok = await send(text);
-        if (ok === false) setDraft(text);
+        imageDraft.clear();
+        const ok = await send(text, file);
+        if (ok === false && file) imageDraft.restore(file);
+        if (ok === false) setDraft(current => current || text);
     };
 
     const conversation = (
@@ -173,38 +183,27 @@ const ChatTab = () => {
                         {/* 손님 패널과 **같은 컴포넌트**다 — 두 화면이 같은 대화를 그리는데
                             각자 map 을 돌리면 한쪽만 고쳐지고 다른 쪽이 남는다.
                             다른 건 "내 말풍선이 어느 쪽인가" 하나뿐이라 그것만 넘긴다. */}
-                        <ChatBubbleList messages={messages} mine="ADMIN" />
+                        {threadLoading ? (
+                            <div role="status" aria-label="대화를 불러오는 중" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                                <Bone width="70%" height={48} borderRadius={radius.lg} />
+                                <Bone width="60%" height={48} borderRadius={radius.lg} style={{ alignSelf: 'flex-end' }} />
+                                <Bone width="50%" height={48} borderRadius={radius.lg} />
+                            </div>
+                        ) : loadError ? (
+                            <DataState state="error" kind="message" subject="대화" title="대화를 불러오지 못했습니다."
+                                onRetry={reload} compact />
+                        ) : (
+                            <ChatBubbleList messages={messages} mine="ADMIN" roomId={roomIdSel} onRetracted={updateMessage} />
+                        )}
                         <div ref={bottomRef} />
                     </div>
                     <div style={styles.composer}>
-                        {/* 손님 쪽 ChatLauncher 와 같은 구조 — 껍데기 하나가 테두리·모서리·포커스링을
+                        {/* 통합 메신저와 같은 구조 — 껍데기 하나가 테두리·모서리·포커스링을
                             갖고, 전송 버튼은 그 안에 들어간다. 두 화면의 입력칸이 달라 보이면
                             "같은 기능인데 왜 다르지"가 된다. */}
-                        <div style={styles.composerShell} className="reserve-chat-composer">
-                            <textarea
-                                value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
-                                onKeyDown={(e) => {
-                                    // IME 조합 중(한글) Enter 는 확정이라 전송으로 보면 안 된다.
-                                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
-                                placeholder="답장을 입력하세요 (Enter 전송 / Shift+Enter 줄바꿈)"
-                                maxLength={2000}
-                                rows={2}
-                                style={styles.textarea}
-                            />
-                            {/* 전송 중에는 아이콘이 스피너로 바뀌고 버튼이 잠긴다.
-                                손님 쪽 ChatLauncher 와 같은 규칙이다. */}
-                            <button type="button" onClick={handleSend}
-                                disabled={!draft.trim() || sending}
-                                style={styles.sendBtn} className="reserve-chat-send"
-                                aria-label={sending ? '보내는 중' : '보내기'} aria-busy={sending}>
-                                {sending ? <LoadingOutlined /> : <SendOutlined />}
-                            </button>
-                        </div>
+                        <ChatComposer value={draft} onChange={setDraft} onSend={handleSend}
+                            file={imageDraft.file} onFileChange={imageDraft.choose} imageEnabled={imageDraft.enabled}
+                            sending={sending} disabled={threadLoading || loadError} onCancel={cancelSend} />
                     </div>
                 </>
             )}
@@ -217,7 +216,10 @@ const ChatTab = () => {
                 <RefreshButton onReload={refetch} loading={isFetching} />
             </div>
 
-            {isLoading ? (
+            {roomsError ? (
+                <DataState state="error" kind="message" subject="문의 목록" error={roomsError}
+                    onRetry={refetch} retrying={isFetching} compact />
+            ) : isLoading ? (
                 <div style={styles.listPanel}>
                     {['s0', 's1', 's2'].map((k) => (
                         <div key={k} style={{ padding: '14px 16px', borderBottom: `1px solid ${colors.border.light}` }}>
@@ -301,15 +303,9 @@ const styles = {
     roomEmail:   { fontSize: fontSize.xs, color: colors.text.tertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     roomWhen:    { fontSize: fontSize.xs, color: colors.text.tertiary, flexShrink: 0 },
     thread:      { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: colors.background.paper, minHeight: 360 },
-    threadBody:  { flex: 1, overflowY: 'auto', padding: '18px 20px', background: colors.background.subtle },
+    threadBody:  { flex: 1, overflowY: 'auto', padding: '18px 20px', background: colors.background.paper },
     emptyDetail: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
     composer:    { padding: 12, borderTop: `1px solid ${colors.border.light}`, background: colors.background.paper },
-    // 껍데기가 곧 입력칸이다 — radius 는 field 토큰에서 온다(숫자를 두 번 적지 않는다).
-    // border(:focus-within) 와 sendBtn 의 background(:hover) 는 index.css 가 갖는다 —
-    // 인라인에 두면 인라인이 이겨서 상태 변화가 화면에 안 나타난다.
-    composerShell: { display: 'flex', alignItems: 'flex-end', gap: 6, padding: 6, borderRadius: field.radius, background: colors.background.paper },
-    textarea:    { flex: 1, minWidth: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', padding: '7px 4px 7px 8px', margin: 0, maxHeight: 120, overflowY: 'auto', fontSize: fontSize.sm, lineHeight: 1.5, fontFamily: 'inherit', color: colors.text.primary },
-    sendBtn:     { flexShrink: 0, width: 34, height: 34, borderRadius: radius.md, border: 'none', cursor: 'pointer', color: '#fff', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
     paginationBar: { display: 'flex', justifyContent: 'center', padding: '10px 8px', borderTop: `1px solid ${colors.border.light}` },
 };
 

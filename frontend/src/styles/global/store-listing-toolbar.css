@@ -1,0 +1,332 @@
+/* 목록 툴바는 같은 중립 hover 면을 쓴다. 버튼 동작 영역은 44px 유지. */
+.reserve-explore-filters {
+    --reserve-toolbar-hover-surface: var(--c-gray-50, #f9fafb);
+}
+.reserve-explore-filters .reserve-explore-region-trigger::before {
+    inset: 6px 4px;
+    border-radius: 8px;
+    background: var(--reserve-toolbar-hover-surface);
+}
+.reserve-explore-filters .reserve-filter-menu--plain .reserve-filter-menu-surface {
+    min-height: 32px;
+    padding-inline: 5px;
+    gap: 4px;
+    border-radius: 8px;
+}
+.reserve-explore-filters .reserve-filter-menu--plain:not(:disabled):hover .reserve-filter-menu-surface,
+.reserve-explore-filters .reserve-filter-menu--plain[aria-expanded='true'] .reserve-filter-menu-surface {
+    background: var(--reserve-toolbar-hover-surface);
+}
+@media (hover: none) {
+    .reserve-explore-filters .reserve-filter-menu--plain:not(:disabled):not([aria-expanded='true']):hover .reserve-filter-menu-surface {
+        background: transparent;
+    }
+}
+
+.reserve-mystore-page .reserve-explore-filters { width: 100%; }
+.reserve-reservation-filters { width: 100%; }
+.reserve-reservation-store-filter { max-width: min(180px, 34vw); }
+
+/* 관리자·사업자 목록도 탐색/예약과 같은 입력 없는 메뉴형 툴바를 쓴다. */
+.reserve-filter-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.reserve-filter-toolbar-primary {
+    width: 100%;
+    margin-bottom: 0;
+    justify-content: flex-start;
+}
+.reserve-filter-toolbar-controls {
+    margin-left: 0;
+}
+.reserve-filter-toolbar-count {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    min-height: 32px;
+    /* 탐색·예약 목록의 보기 아이콘과 건수 사이 gap(8px)을 따른다.
+       필터 표면의 안쪽 여백까지 더하면 글자와 건수가 너무 붙지 않는다. */
+    margin-left: 8px;
+    color: var(--c-text-tertiary, #8b95a1);
+    font-size: 13px;
+    white-space: nowrap;
+}
+.reserve-filter-toolbar-extra {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+}
+.reserve-filter-toolbar-refresh {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-left: auto;
+    padding-left: 8px;
+}
+.reserve-filter-toolbar-secondary {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: 12px;
+}
+/* 새로고침만 있는 툴바(가게가 1개인 사장님 화면, 관리자 설정 화면)는 메뉴가 있는 툴바 줄과 같은 치수로 둔다 —
+   높이 44px + 아래 8px + 구분선. 탭을 오가도 새로고침이 같은 자리·같은 구분선 아래에 있다(2026-09-24, 예전엔 40px·선 없음). */
+.reserve-filter-toolbar-secondary--refresh-only {
+    box-sizing: content-box;
+    min-height: 44px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--c-border-light, #f2f4f6);
+}
+.reserve-filter-toolbar-secondary--spread { width: 100%; }
+/* 사업자 통계만: PC에서는 가게 선택을 왼쪽에 두고, 기간과 새로고침을 하나의
+   오른쪽 조작 묶음으로 붙인다. 공용 FilterToolbar나 다른 관리자 목록의 배치는 바꾸지 않는다. */
+@media (min-width: 900px) {
+    .reserve-statistics-tab .reserve-filter-toolbar-controls {
+        flex: 1 1 auto;
+        width: auto;
+        gap: 2px;
+    }
+    .reserve-statistics-tab .reserve-filter-toolbar-extra { margin-left: auto; }
+    .reserve-statistics-tab .reserve-filter-toolbar-refresh { margin-left: 0; }
+}
+.reserve-ad-manage-heading {
+    margin-bottom: 14px;
+}
+.reserve-ad-manage-intro { min-width: 0; }
+.reserve-ad-manage-primary-row {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.reserve-ad-manage-store-summary {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+.reserve-ad-manage-store-summary .reserve-filter-menu--plain {
+    max-width: min(220px, 38vw);
+}
+.reserve-ad-manage-count {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 13px;
+}
+@media (max-width: 767px) {
+    .reserve-ad-manage-primary-row { gap: 8px; }
+    .reserve-ad-manage-store-summary { gap: 4px; }
+    .reserve-ad-manage-tab .ant-table-content { overscroll-behavior-x: contain; }
+}
+@media (max-width: 479px) {
+    .reserve-filter-toolbar-primary { flex-wrap: nowrap; }
+    .reserve-filter-toolbar-controls { flex: 0 1 auto; }
+    .reserve-filter-toolbar-extra { flex: 1 1 auto; }
+}
+
+/* 예약 카드형: 내 가게 카드와 같은 이미지 → 본문 → 균등 액션 바 구조. */
+.reserve-reservation-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    padding-bottom: 40px;
+}
+.reserve-reservation-card-grid > * { min-width: 0; }
+.reserve-reservation-summary-card {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+}
+.reserve-reservation-summary-card > .ant-card-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+.reserve-reservation-summary-card-content {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    cursor: pointer;
+}
+.reserve-reservation-summary-card-cover {
+    height: 148px;
+    overflow: hidden;
+    background: var(--c-gray-100, #f2f4f6);
+    line-height: 0;
+}
+.reserve-reservation-summary-card-cover img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+.reserve-reservation-summary-card-body {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px 16px;
+}
+.reserve-reservation-summary-card-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+}
+.reserve-reservation-summary-card-trigger {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.reserve-reservation-summary-card-trigger strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+}
+.reserve-reservation-summary-card-trigger:focus { outline: none; }
+.reserve-reservation-summary-card-trigger:focus-visible::after {
+    outline: 2px solid var(--c-text-secondary, #4e5968);
+    outline-offset: -2px;
+}
+.reserve-reservation-summary-card-request {
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto;
+    color: var(--c-text-tertiary);
+    font-size: 12px;
+}
+.reserve-reservation-summary-card-code,
+.reserve-reservation-summary-card-meta {
+    overflow: hidden;
+    color: var(--c-text-secondary);
+    font-size: 13px;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.reserve-reservation-summary-card-details {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 4px;
+    padding-top: 2px;
+}
+.reserve-reservation-summary-card-meta {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+}
+.reserve-reservation-summary-card-party {
+    max-width: min(42vw, 150px);
+    justify-self: end;
+}
+.reserve-reservation-summary-card-party > span:first-child {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+}
+.reserve-reservation-summary-card-price {
+    justify-self: end;
+    color: var(--c-text-primary);
+    font-size: 14px;
+    line-height: 20px;
+    white-space: nowrap;
+}
+.reserve-reservation-summary-card-timeout {
+    grid-column: 1 / -1;
+    color: var(--c-warning);
+    font-size: 12px;
+    line-height: 18px;
+}
+.reserve-reservation-summary-card-note {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    color: var(--c-text-secondary);
+    font-size: 12px;
+}
+.reserve-reservation-summary-card-note > * {
+    width: auto !important;
+    text-align: left !important;
+}
+.reserve-reservation-card-action {
+    width: 100% !important;
+    min-height: 24px;
+    padding-inline: 8px !important;
+}
+.reserve-reservation-card-skeleton {
+    min-height: 300px;
+    overflow: hidden;
+    border: 1px solid var(--c-border-light);
+    background: var(--c-bg-paper);
+}
+.reserve-reservation-card-skeleton-cover {
+    height: 148px;
+    background: var(--c-gray-100, #f2f4f6);
+}
+.reserve-reservation-card-skeleton-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+}
+@media (max-width: 1079px) {
+    .reserve-reservation-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 551px) {
+    .reserve-reservation-card-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .reserve-reservation-summary-card-cover,
+    .reserve-reservation-card-skeleton-cover { height: 156px; }
+}
+.reserve-mystore-list-row { padding-block: 10px; border-bottom: 1px solid var(--c-border-light); }
+.reserve-store-list-row-actions { display: flex; flex: 0 0 auto; gap: 2px; align-items: center; }
+.reserve-mystore-list-action { width: 44px !important; height: 44px; border-radius: 10px !important; }
+.reserve-mystore-add-row {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--c-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+    .reserve-mystore-list-action:hover,
+    .reserve-mystore-add-row:hover { background: var(--c-gray-50, #f9fafb); }
+}
+.reserve-mystore-add-row:focus-visible,
+.reserve-mystore-list-action:focus-visible { outline: 2px solid var(--c-text-secondary); outline-offset: 2px; }
+
+@media (max-width: 551px) {
+    .reserve-store-list-row-actions { gap: 0; }
+    .reserve-mystore-list-row .reserve-store-list-row-link { gap: 8px; }
+}

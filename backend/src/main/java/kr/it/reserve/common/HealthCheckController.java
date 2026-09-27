@@ -1,47 +1,20 @@
 package kr.it.reserve.common;
 
 import kr.it.reserve.global.common.ApiResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
-import java.util.TreeMap;
 
 @RestController
 public class HealthCheckController {
 
-    @Value("${server.env}")
-    private String env;
-
-    @Value("${server.port}")
-    private String serverPort;
-
-    @Value("${server.serverAddress}")
-    private String serverAddress;
-
-    @Value("${serverName}")
-    private String serverName;
-
     /**
-     * 서버 상태 확인 (Health Check)
+     * 이전 경로를 쓰는 외부 상태 확인과의 호환용 최소 응답.
+     * 상세 환경·호스트·포트 확인은 인증 없이 공개하지 않는다.
      */
     @GetMapping("/hc")
     public ApiResponse<Map<String, String>> healthCheck() {
-        Map<String, String> responseData = new TreeMap<>();
-        responseData.put("serverName", serverName);
-        responseData.put("serverAddress", serverAddress);
-        responseData.put("serverPort", serverPort);
-        responseData.put("env", env);
-
-        return ApiResponse.success(responseData, "Server is running");
-    }
-
-    /**
-     * 현재 실행 환경 확인
-     */
-    @GetMapping("/env")
-    public String getEnv() {
-        return env;
+        return ApiResponse.success(Map.of("status", "UP"), "Server is running");
     }
 }

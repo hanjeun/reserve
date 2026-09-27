@@ -1,12 +1,14 @@
-import React, { useReducer, useState, useRef, useEffect, useCallback } from 'react';
+import React, { useReducer, useState, useRef, useEffect, useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import api from '../../../api/axios';
 import useDebounce from '../../../hooks/useDebounce';
-import { colors, fontSize, radius, heights, withAlpha } from '../../../styles/tokens';
+import { colors, fontSize, radius, heights } from '../../../styles/tokens';
 import { animation } from '../../../styles/tokens/animations';
 import useExitAnimation from '../../../hooks/useExitAnimation';
 import { ArcSpinner } from '../../common/Loading';
+import DataState from '../../common/DataState';
+import { API_ENDPOINTS } from '../../../constants';
 
 // ─── 검색/선택 상태 리듀서 ─────────────────────────────────────────────────
 // 원래 query/detail/zipCode/selected/results/open/loading/activeIdx 8개 useState로
@@ -19,6 +21,7 @@ const initialState = {
     results: [],
     open: false,
     loading: false,
+    searchStatus: 'idle',
     activeIdx: -1,
     // ② 블록(우편번호+상세주소) 등장 시 slideUpIn 애니메이션을 재생할지.
     // 사용자가 드롭다운에서 직접 선택했을 때만 true — 마이페이지 처음 열 때의 초기
@@ -30,21 +33,22 @@ function reducer(state, action) {
     switch (action.type) {
         case 'RESET_FOR_VALUE':
             // value prop 주입(부모 폼 초기화) — 이미 있던 값이므로 애니메이션 없이.
-            return { ...state, query: action.query, selected: true, animateSection: false };
+            return { ...state, query: action.query, selected: true, results: [], open: false, loading: false, searchStatus: 'idle', activeIdx: -1, animateSection: false };
         case 'CLEAR_ALL':
-            return { ...state, query: '', detail: '', zipCode: '', selected: false, animateSection: false };
+            return { ...initialState };
         case 'SET_ZIPCODE':
             // 초기 프리필 — 애니메이션 없이 바로 표시.
             return { ...state, zipCode: action.zipCode, animateSection: false };
         case 'SET_DETAIL_VALUE':
             return { ...state, detail: action.detail };
         case 'SEARCH_LOADING':
-            return { ...state, loading: true };
+            return { ...state, results: [], open: false, activeIdx: -1, loading: true, searchStatus: 'loading' };
         case 'SEARCH_RESULTS':
-            return { ...state, results: action.results, open: action.results.length > 0, activeIdx: action.results.length > 0 ? 0 : -1, loading: false };
+            return { ...state, results: action.results, open: action.results.length > 0, activeIdx: action.results.length > 0 ? 0 : -1, loading: false, searchStatus: 'success' };
         case 'SEARCH_EMPTY':
+            return { ...state, results: [], open: false, activeIdx: -1, loading: false, searchStatus: 'idle' };
         case 'SEARCH_ERROR':
-            return { ...state, results: [], open: false, loading: false };
+            return { ...state, results: [], open: false, activeIdx: -1, loading: false, searchStatus: 'error' };
         case 'QUERY_CHANGE':
             // 선택된 주소를 사용자가 직접 고치기 시작하면(편집 시작) 우편번호/상세주소를 함께 비운다.
             // 새 주소를 드롭다운에서 다시 선택할 때까지 아래 ② 블록(우편번호+상세주소)이 노출되지
@@ -53,8 +57,8 @@ function reducer(state, action) {
                 ...state,
                 query: action.value,
                 selected: false,
+                results: [], open: false, activeIdx: -1, loading: false, searchStatus: 'idle',
                 ...(action.wasSelected ? { zipCode: '', detail: '' } : {}),
-                ...(action.value === '' ? { results: [], open: false } : {}),
             };
         case 'DETAIL_CHANGE':
             return { ...state, detail: action.value };
@@ -64,6 +68,7 @@ function reducer(state, action) {
                 ...state,
                 query: action.road, zipCode: action.zone, detail: action.building,
                 selected: true, results: [], open: false, activeIdx: -1,
+                loading: false, searchStatus: 'idle',
                 animateSection: true,
             };
         case 'CLOSE_DROPDOWN':
@@ -94,6 +99,9 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     // search()는 useCallback([]) 로 고정되어 클로저가 최초 상태를 캡처하므로,
     // 매 검색 시점의 최신 selected 값을 동기적으로 읽기 위한 ref 미러 (state.selected와 effect로 동기화)
     const selectedRef    = useRef(false);
+    const queryRef       = useRef('');
+    const searchRequestRef = useRef(0);
+    const searchStatusId = useId();
     const touchState     = useRef({ startX: 0, scrollStart: 0 });
     const debouncedQuery = useDebounce(state.query, 400);
 
@@ -130,6 +138,9 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     useEffect(() => { selectedRef.current = state.selected; }, [state.selected]);
 
     useEffect(() => {
+        searchRequestRef.current += 1;
+        queryRef.current = value?.trim() || '';
+        selectedRef.current = !!value?.trim();
         if (value?.trim()) {
             dispatch({ type: 'RESET_FOR_VALUE', query: value.trim() });
             isEditMode.current = true;
@@ -139,27 +150,40 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         }
     }, [value]);
 
-    useEffect(() => { if (zipCodeProp)       dispatch({ type: 'SET_ZIPCODE', zipCode: zipCodeProp }); },       [zipCodeProp]);
-    useEffect(() => { if (addressDetailProp) dispatch({ type: 'SET_DETAIL_VALUE', detail: addressDetailProp }); }, [addressDetailProp]);
+    // 서버값뿐 아니라 form.setFieldsValue로 복원한 초안도 동기화한다. 빈 문자열도 반영해야
+    // "새로 작성"이나 주소 재선택 뒤에 예전 우편번호가 화면에 남지 않는다.
+    useEffect(() => {
+        if (zipCodeProp !== state.zipCode) dispatch({ type: 'SET_ZIPCODE', zipCode: zipCodeProp });
+    }, [state.zipCode, zipCodeProp]);
+    useEffect(() => {
+        if (addressDetailProp !== state.detail) dispatch({ type: 'SET_DETAIL_VALUE', detail: addressDetailProp });
+    }, [addressDetailProp, state.detail]);
 
     const emitChange = useCallback((road) => { onChange?.(road); }, [onChange]);
 
     const search = useCallback(async (q) => {
-        if (!q || q.trim().length < 3 || selectedRef.current) {
+        const query = q?.trim() || '';
+        if (query !== queryRef.current.trim()) return;
+        const requestId = ++searchRequestRef.current;
+        if (query.length < 3 || selectedRef.current) {
             if (!selectedRef.current) dispatch({ type: 'SEARCH_EMPTY' });
             return;
         }
         dispatch({ type: 'SEARCH_LOADING' });
         try {
-            const data = await api.get('/api/address/search', { params: { query: q.trim() } });
+            const data = await api.get(API_ENDPOINTS.ADDRESS.SEARCH, { params: { query } });
+            if (requestId !== searchRequestRef.current || selectedRef.current) return;
             const docs = data?.documents ?? [];
+            if (!Array.isArray(docs)) throw new Error('Invalid address results');
             dispatch({ type: 'SEARCH_RESULTS', results: docs });
         } catch {
+            if (requestId !== searchRequestRef.current || selectedRef.current) return;
             dispatch({ type: 'SEARCH_ERROR' });
         }
     }, []);
 
     useEffect(() => { search(debouncedQuery); }, [debouncedQuery, search]);
+    useEffect(() => () => { searchRequestRef.current += 1; }, []);
 
     useEffect(() => {
         const handler = (e) => {
@@ -176,6 +200,9 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     }, [state.selected]);
 
     const handleSelect = (doc) => {
+        if (!state.open || !state.results.includes(doc)) return;
+        searchRequestRef.current += 1;
+        selectedRef.current = true;
         skipBlurRef.current = false;
         const road     = doc?.road_address?.address_name || doc?.address?.address_name || doc?.address_name;
         const zone     = doc?.road_address?.zone_no || '';
@@ -190,12 +217,15 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 
     const handleQueryChange = (e) => {
         const v = e.target.value;
+        searchRequestRef.current += 1;
+        queryRef.current = v;
         // 2026-07 재작업 — 이전엔 주소 필드에 "포커스만 해도"(커서만 올려도) 우편번호/상세주소/좌표를
         // 싹 비웠다(FOCUS_RESET_FOR_EDIT). 커서만 올렸다 뗐을 뿐인데 기존 값이 다 날아가 사용자 경험이
         // 나빴다. 이제 포커스로는 아무것도 안 지우고, 사용자가 실제로 주소를 "고치기 시작할 때"(=이미
         // 선택된 상태에서 타이핑) 그 시점에만 이전 우편번호/상세주소/좌표를 무효화한다.
         // wasSelected 플래그로 리듀서가 zipCode/detail을 함께 비우고, 여기서 부모의 메타도 비운다.
         const wasSelected = selectedRef.current;
+        selectedRef.current = false;
         if (wasSelected) {
             onMeta?.({ zipCode: '', addressDetail: '', latitude: null, longitude: null });
             isEditMode.current = false;
@@ -223,15 +253,14 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
     const boxStyle = (isFocused) => ({
         display: 'flex', alignItems: 'center',
         background: colors.gray[50],
-        // 표준 FormInput(variant="filled")과 동일하게 — 평소에는 테두리 없이 배경색으로만
-        // 경계를 나타내고, 포커스 시에만 파란 테두리. transparent 1px로 두어 포커스
-        // 전후 레이아웃 시프트(1px 밀림)가 없게 한다.
-        border: `1px solid ${isFocused ? colors.primary.main : 'transparent'}`,
+        // 공통 입력칸과 같은 포커스 — 평소에는 테두리 없이 배경색으로만 경계를 나타내고,
+        // 포커스 때만 1px 중립 테두리(검색창·채팅 입력과 같은 색). 브랜드 파랑은 결과를 바꾸는
+        // 행동에만 쓴다(디자인 시스템). transparent 1px 로 두어 포커스 전후 1px 밀림이 없게 한다.
+        border: `1px solid ${isFocused ? colors.gray[500] : 'transparent'}`,
         borderRadius: radius.lg,
         boxSizing: 'border-box',
         padding: '0 12px', height: heights.input,
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-        boxShadow: isFocused ? `0 0 0 2px ${withAlpha(colors.primary.main, 20)}` : 'none',
+        transition: 'border-color 0.2s',
     });
 
     return (
@@ -239,7 +268,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
 
             {/* ① 도로명 주소 검색창 */}
             <div style={{ position: 'relative' }}>
-                <div style={boxStyle(activeField === 'query')}>
+                <div className="reserve-store-form-address-box" style={boxStyle(activeField === 'query')}>
                     <EnvironmentOutlined style={{ color: state.selected ? colors.primary.main : colors.text.tertiary, fontSize: 14, marginRight: 8, flexShrink: 0, transition: 'color 0.2s' }} />
                     {/* id: Form.Item label for 연결 / name: 브라우저 자동완성 식별 */}
                     <input
@@ -247,6 +276,8 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                         name={id || 'address'}
                         className="reserve-address-input"
                         autoComplete="off"
+                        aria-busy={state.loading}
+                        aria-describedby={state.searchStatus === 'error' || (state.searchStatus === 'success' && state.results.length === 0) ? searchStatusId : undefined}
                         value={state.query}
                         onChange={handleQueryChange}
                         onKeyDown={handleKeyDown}
@@ -295,6 +326,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                             boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
                             overflow: 'hidden', maxHeight: 280, overflowY: 'auto',
                             animation: dropdownClosing ? animation.slideUpOut : animation.slideUpIn,
+                            pointerEvents: dropdownClosing ? 'none' : undefined,
                         }}
                     >
                         {lastResults.map((doc, i) => {
@@ -344,6 +376,14 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                 )}
             </div>
 
+            {state.searchStatus === 'error' && (
+                <DataState id={searchStatusId} state="error" title="주소 검색에 실패했어요."
+                    onRetry={() => search(state.query)} compact />
+            )}
+            {state.searchStatus === 'success' && state.results.length === 0 && (
+                <p id={searchStatusId} role="status" style={{ margin: 0, fontSize: fontSize.sm, color: colors.text.tertiary }}>검색 결과가 없어요. 도로명이나 지번을 확인해 주세요.</p>
+            )}
+
             {/* ② 선택 후 — 우편번호 + 상세주소. 사용자가 드롭다운에서 직접 선택했을 때만
                 slideUpIn으로 등장하고, 마이페이지 초기 프리필(이미 있던 주소)에서는 애니메이션 없이 바로 보인다. */}
             {sectionShouldRender && (
@@ -355,7 +395,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                 }}>
                     {section.zipCode && (
                         // 우편번호: readOnly → div 기반 터치 스크롤 컨테이너
-                        <div style={{ ...boxStyle(false), width: 82, flexShrink: 0, cursor: 'default', overflow: 'hidden' }}>
+                        <div className="reserve-store-form-address-box" style={{ ...boxStyle(false), width: 82, flexShrink: 0, cursor: 'default', overflow: 'hidden' }}>
                             <div style={{
                                 width: '100%',
                                 overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none',
@@ -370,6 +410,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                     )}
                     {/* 상세주소: 터치 드래그로 스크롤 — onTouchStart/Move로 scrollLeft 조작 */}
                     <div
+                        className="reserve-store-form-address-box"
                         style={{ ...boxStyle(activeField === 'detail'), flex: 1, minWidth: 0, overflow: 'hidden', touchAction: 'pan-y' }}
                         onTouchStart={(e) => {
                             touchState.current.startX = e.touches[0].clientX;

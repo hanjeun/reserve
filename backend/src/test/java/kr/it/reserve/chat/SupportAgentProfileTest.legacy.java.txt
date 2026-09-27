@@ -1,0 +1,428 @@
+package kr.it.reserve.chat;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.chat.dto.ChatMessageResponse;
+import kr.it.reserve.chat.dto.ConversationSummaryResponse;
+import kr.it.reserve.chat.dto.ConversationThreadResponse;
+import kr.it.reserve.chat.entity.ChatMessage;
+import kr.it.reserve.chat.entity.ChatRoom;
+import kr.it.reserve.chat.entity.SenderRole;
+import kr.it.reserve.chat.repository.ChatMessageRepository;
+import kr.it.reserve.chat.repository.ChatRoomRepository;
+import kr.it.reserve.chat.service.ChatService;
+import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.MemberStatus;
+import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.store.repository.StoreRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.SliceImpl;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+/** 실제 DB/인증/계정 변경 없이 내 고객지원의 표시용 정보 경계만 검증한다. */
+@ExtendWith(MockitoExtension.class)
+class SupportAgentProfileTest {
+    @Mock ChatRoomRepository roomRepository;
+    @Mock ChatMessageRepository messageRepository;
+    @Mock MemberRepository memberRepository;
+    @Mock StoreRepository storeRepository;
+    @InjectMocks ChatService chatService;
+
+    private final Member customer = Member.builder().id(7L).name("손님").build();
+
+    @Test
+    void noConversationDoesNotSelectAnAdminCreateRoomOrMarkRead() {
+        when(roomRepository.findForMember(eq(7L), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        assertThat(chatService.listMyConversations(customer, 0)).isEmpty();
+
+        verifyNoInteractions(messageRepository, memberRepository, storeRepository);
+        verify(roomRepository, never()).findByMemberIdAndTypeForUpdate(any(), any());
+        verify(roomRepository, never()).save(any());
+    }
+
+    @Test
+    void unansweredSupportUsesBrandWithoutAnAdminDirectoryLookupOrWrites() {
+        ChatRoom room = supportRoom(21L);
+        stubSummary(room, List.of());
+
+        var response = chatService.listMyConversations(customer, 0).getContent().getFirst();
+
+        assertThat(response.getCounterpartName()).isEqualTo("RESERVE 고객지원");
+        assertThat(response.getCounterpartProfileImage()).isNull();
+        assertThat(room.getMemberUnread()).isEqualTo(3);
+        assertThat(room.getAdminUnread()).isEqualTo(2);
+        verifyNoInteractions(memberRepository, storeRepository);
+        verify(roomRepository, never()).save(any());
+        verify(roomRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void summaryLooksUpOnlyLastActualAdminForThisMembersSupportPage() {
+        ChatRoom support = supportRoom(21L);
+        ChatRoom store = storeRoom(31L);
+        ChatMessage reply = message(88L, support, SenderRole.ADMIN, 1L);
+        ChatMessage unrelated = message(89L, supportRoom(99L), SenderRole.ADMIN, 2L);
+        when(roomRepository.findForMember(7L, PageRequest.of(2, 20)))
+                .thenReturn(new PageImpl<>(List.of(support, store), PageRequest.of(2, 20), 42));
+        when(messageRepository.findLatestByRoomIdsAndSenderRole(List.of(21L), SenderRole.ADMIN))
+                .thenReturn(List.of(reply, unrelated));
+        Member admin = admin(1L);
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(List.of(admin));
+
+        var response = chatService.listMyConversations(customer, 2);
+
+        assertThat(response.getNumber()).isEqualTo(2);
+        assertThat(response.getTotalElements()).isEqualTo(42);
+        assertThat(response.getContent().getFirst().getCounterpartName()).isEqualTo("관리자1");
+        assertThat(response.getContent().getFirst().getCounterpartProfileImage())
+                .isEqualTo("https://images.example.com/admin-1.png");
+        assertThat(response.getContent().getLast().getCounterpartName()).isEqualTo("가게31");
+        assertThat(response.getContent().getLast().getCounterpartProfileImage()).isNull();
+        verify(memberRepository).findAllById(List.of(1L));
+        assertThat(support.getMemberUnread()).isEqualTo(3);
+        assertThat(support.getAdminUnread()).isEqualTo(2);
+        verify(roomRepository, never()).save(any());
+        verify(roomRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void storeOnlyPageDoesNotQuerySupportAdminProfiles() {
+        when(roomRepository.findForMember(eq(7L), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(storeRoom(31L))));
+
+        var response = chatService.listMyConversations(customer, -1).getContent().getFirst();
+
+        assertThat(response.getCounterpartName()).isEqualTo("가게31");
+        assertThat(response.getCounterpartProfileImage()).isNull();
+        verify(roomRepository).findForMember(7L, PageRequest.of(0, 20));
+        verifyNoInteractions(messageRepository, memberRepository, storeRepository);
+    }
+
+    @Test
+    void aSupportPageBatchesRoomsAndDistinctRespondersRatherThanLookingUpEachRow() {
+        ChatRoom first = supportRoom(21L);
+        ChatRoom second = supportRoom(22L);
+        ChatRoom third = supportRoom(23L);
+        when(roomRepository.findForMember(eq(7L), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(first, second, third)));
+        when(messageRepository.findLatestByRoomIdsAndSenderRole(List.of(21L, 22L, 23L), SenderRole.ADMIN))
+                .thenReturn(List.of(message(88L, first, SenderRole.ADMIN, 1L),
+                        message(89L, second, SenderRole.ADMIN, 2L), message(90L, third, SenderRole.ADMIN, 1L)));
+        when(memberRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(admin(2L), admin(1L)));
+
+        var response = chatService.listMyConversations(customer, 0);
+
+        assertThat(response.getContent()).extracting(ConversationSummaryResponse::getCounterpartName)
+                .containsExactly("관리자1", "관리자2", "관리자1");
+        verify(messageRepository).findLatestByRoomIdsAndSenderRole(List.of(21L, 22L, 23L), SenderRole.ADMIN);
+        verify(memberRepository).findAllById(List.of(1L, 2L));
+        verify(memberRepository, never()).findById(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"deleted", "missing", "user", "business", "banned", "suspended", "indefinite"})
+    void unavailableLastResponderFallsBackToBrandRatherThanAnOlderOrArbitraryAdmin(String state) {
+        ChatRoom room = supportRoom(21L);
+        stubSummary(room, List.of(message(88L, room, SenderRole.ADMIN, 1L)));
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(
+                state.equals("missing") ? List.of() : List.of(adminInState(1L, state)));
+
+        var response = chatService.listMyConversations(customer, 0).getContent().getFirst();
+
+        assertThat(response.getCounterpartName()).isEqualTo("RESERVE 고객지원");
+        assertThat(response.getCounterpartProfileImage()).isNull();
+        verify(messageRepository).findLatestByRoomIdsAndSenderRole(List.of(21L), SenderRole.ADMIN);
+        verify(memberRepository).findAllById(List.of(1L));
+        verify(memberRepository, never()).findById(any());
+        verify(memberRepository, never()).findByDeletedAtIsNullOrderByIdDesc(any());
+    }
+
+    @Test
+    void expiredSuspensionUsesExistingMemberActiveSemanticsWithoutMutatingStatus() {
+        ChatRoom room = supportRoom(21L);
+        Member admin = admin(1L);
+        admin.setStatus(MemberStatus.SUSPENDED);
+        admin.setSuspendedUntil(LocalDateTime.now().minusDays(1));
+        stubSummary(room, List.of(message(88L, room, SenderRole.ADMIN, 1L)));
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(List.of(admin));
+
+        var response = chatService.listMyConversations(customer, 0).getContent().getFirst();
+
+        assertThat(response.getCounterpartName()).isEqualTo("관리자1");
+        assertThat(admin.getStatus()).isEqualTo(MemberStatus.SUSPENDED);
+        verify(memberRepository, never()).save(any());
+    }
+
+    @Test
+    void legacyAdminReplyWithoutSenderIdDoesNotGuessAProfile() {
+        ChatRoom room = supportRoom(21L);
+        stubSummary(room, List.of(message(88L, room, SenderRole.ADMIN, null)));
+
+        var response = chatService.listMyConversations(customer, 0).getContent().getFirst();
+
+        assertThat(response.getCounterpartName()).isEqualTo("RESERVE 고객지원");
+        assertThat(response.getCounterpartProfileImage()).isNull();
+        verifyNoInteractions(memberRepository);
+    }
+
+    @Test
+    void blankStoredNameAndPhotoUseNullAndBrandFallback() {
+        ChatRoom room = supportRoom(21L);
+        Member admin = admin(1L);
+        admin.setName(" \t ");
+        admin.setProfileImage(" \n ");
+        stubSummary(room, List.of(message(88L, room, SenderRole.ADMIN, 1L)));
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(List.of(admin));
+
+        var response = chatService.listMyConversations(customer, 0).getContent().getFirst();
+
+        assertThat(response.getCounterpartName()).isEqualTo("RESERVE 고객지원");
+        assertThat(response.getCounterpartProfileImage()).isNull();
+    }
+
+    @Test
+    void nullPhotoKeepsKnownRespondersName() {
+        ChatRoom room = supportRoom(21L);
+        Member admin = admin(1L);
+        admin.setProfileImage(null);
+        stubSummary(room, List.of(message(88L, room, SenderRole.ADMIN, 1L)));
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(List.of(admin));
+
+        var response = chatService.listMyConversations(customer, 0).getContent().getFirst();
+
+        assertThat(response.getCounterpartName()).isEqualTo("관리자1");
+        assertThat(response.getCounterpartProfileImage()).isNull();
+    }
+
+    @Test
+    void pollBatchesUniqueActualAdminSendersAndPreservesOrderCursorAndUnread() {
+        ChatRoom room = supportRoom(21L);
+        List<ChatMessage> messages = List.of(
+                message(51L, room, SenderRole.MEMBER, 7L),
+                message(52L, room, SenderRole.ADMIN, 1L),
+                message(53L, room, SenderRole.ADMIN, 2L),
+                message(54L, room, SenderRole.ADMIN, 1L));
+        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 50L)).thenReturn(messages);
+        when(memberRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(admin(2L), admin(1L)));
+
+        var response = chatService.getNewMessages(21L, 50L);
+
+        assertThat(response).extracting(ChatMessageResponse::getId).containsExactly(51L, 52L, 53L, 54L);
+        assertThat(response).extracting(ChatMessageResponse::getSenderName)
+                .containsExactly(null, "관리자1", "관리자2", "관리자1");
+        assertThat(response).extracting(ChatMessageResponse::getSenderProfileImage).containsExactly(
+                null, "https://images.example.com/admin-1.png", "https://images.example.com/admin-2.png",
+                "https://images.example.com/admin-1.png");
+        verify(memberRepository).findAllById(List.of(1L, 2L));
+        verify(memberRepository, never()).findById(any());
+        assertThat(room.getMemberUnread()).isEqualTo(3);
+        assertThat(room.getAdminUnread()).isEqualTo(2);
+        verifyNoInteractions(roomRepository, storeRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"deleted", "missing", "user", "business", "banned", "suspended", "indefinite"})
+    void messageProfileDoesNotExposeInactiveOrNoLongerAdminSenders(String state) {
+        ChatRoom room = supportRoom(21L);
+        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 0L))
+                .thenReturn(List.of(message(88L, room, SenderRole.ADMIN, 1L)));
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(
+                state.equals("missing") ? List.of() : List.of(adminInState(1L, state)));
+
+        var response = chatService.getNewMessages(21L, null).getFirst();
+
+        assertThat(response.getSenderRole()).isEqualTo("ADMIN");
+        assertThat(response.getSenderName()).isNull();
+        assertThat(response.getSenderProfileImage()).isNull();
+        assertThat(response.getContent()).isEqualTo("내용88");
+    }
+
+    @Test
+    void storeMemberOwnerAndLegacySenderMessagesNeverResolveAdminProfiles() {
+        ChatRoom support = supportRoom(21L);
+        ChatRoom store = storeRoom(31L);
+        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(31L, 0L)).thenReturn(List.of(
+                message(51L, store, SenderRole.MEMBER, 7L),
+                message(52L, store, SenderRole.OWNER, 1L),
+                message(53L, store, SenderRole.ADMIN, 1L),
+                message(54L, support, SenderRole.ADMIN, null)));
+
+        var response = chatService.getNewMessages(31L, null);
+
+        assertThat(response).allSatisfy(item -> {
+            assertThat(item.getSenderName()).isNull();
+            assertThat(item.getSenderProfileImage()).isNull();
+        });
+        verifyNoInteractions(memberRepository);
+    }
+
+    @Test
+    void olderHistoryKeepsCursorAndDisplayOrderWithPerSenderProfiles() {
+        ChatRoom room = supportRoom(21L);
+        var messages = List.of(message(53L, room, SenderRole.ADMIN, 2L),
+                message(52L, room, SenderRole.ADMIN, 1L));
+        when(messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(21L, 54L, PageRequest.of(0, 50)))
+                .thenReturn(new SliceImpl<>(messages, PageRequest.of(0, 50), true));
+        when(memberRepository.findAllById(List.of(2L, 1L))).thenReturn(List.of(admin(1L), admin(2L)));
+
+        var response = chatService.getOlderMessages(21L, 54L, 99);
+
+        assertThat(response.getMessages()).extracting(ChatMessageResponse::getId).containsExactly(52L, 53L);
+        assertThat(response.getMessages()).extracting(ChatMessageResponse::getSenderName)
+                .containsExactly("관리자1", "관리자2");
+        assertThat(response.getNextBeforeId()).isEqualTo(52L);
+        assertThat(response.isHasMore()).isTrue();
+        verify(memberRepository).findAllById(List.of(2L, 1L));
+    }
+
+    @Test
+    void supportThreadKeepsBrandTitleAndExistingReadSemanticsEvenIfReplyIsOutsideRecentWindow() {
+        ChatRoom room = supportRoom(21L);
+        when(memberRepository.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(customer));
+        when(roomRepository.findByMemberIdAndTypeForUpdate(7L, ChatRoom.RoomType.SUPPORT))
+                .thenReturn(Optional.of(room));
+        when(messageRepository.findByRoomIdOrderByIdDesc(21L, PageRequest.of(0, 50)))
+                .thenReturn(new SliceImpl<>(List.of(message(99L, room, SenderRole.MEMBER, 7L))));
+        when(messageRepository.findLatestByRoomIdsAndSenderRole(List.of(21L), SenderRole.ADMIN))
+                .thenReturn(List.of(message(33L, room, SenderRole.ADMIN, 1L)));
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(List.of(admin(1L)));
+
+        var response = chatService.openSupportConversation(customer);
+
+        assertThat(response.getTitle()).isEqualTo("RESERVE 고객지원");
+        assertThat(response.getCounterpartName()).isEqualTo("관리자1");
+        assertThat(response.getCounterpartProfileImage()).isEqualTo("https://images.example.com/admin-1.png");
+        assertThat(response.getViewerRole()).isEqualTo("MEMBER");
+        assertThat(response.isCanSend()).isTrue();
+        assertThat(response.getMessages()).extracting(ChatMessageResponse::getId).containsExactly(99L);
+        assertThat(response.getNextBeforeId()).isEqualTo(99L);
+        assertThat(room.getMemberUnread()).isZero();
+        assertThat(room.getAdminUnread()).isEqualTo(2);
+        verify(roomRepository, never()).save(any());
+    }
+
+    @Test
+    void freshAdminReplyAndIdempotentRetryReturnSameCurrentDisplayProfileWithoutExtraWrites() {
+        ChatRoom room = supportRoom(21L);
+        Member admin = admin(1L);
+        when(roomRepository.findByIdForUpdate(21L)).thenReturn(Optional.of(room));
+        when(messageRepository.findByRoomIdAndSenderMemberIdAndClientMessageId(21L, 1L, "client-1"))
+                .thenReturn(Optional.empty()).thenReturn(Optional.of(message(88L, room, SenderRole.ADMIN, 1L)));
+        when(messageRepository.save(any(ChatMessage.class))).thenAnswer(call -> call.getArgument(0));
+        when(memberRepository.findAllById(List.of(1L))).thenReturn(List.of(admin));
+
+        var sent = chatService.sendAsAdmin(admin, 21L, "답변", "client-1");
+        var retried = chatService.sendAsAdmin(admin, 21L, "답변", "client-1");
+
+        assertThat(sent.getSenderName()).isEqualTo("관리자1");
+        assertThat(retried.getSenderName()).isEqualTo("관리자1");
+        assertThat(sent.getSenderProfileImage()).isEqualTo(retried.getSenderProfileImage());
+        assertThat(room.getMemberUnread()).isEqualTo(4);
+        assertThat(room.getAdminUnread()).isZero();
+        verify(messageRepository).save(any(ChatMessage.class));
+        verify(memberRepository, never()).save(any());
+    }
+
+    @Test
+    void dtoBoundaryNeverAppliesAnAdminProfileToStoreMemberOrOwnerMessages() {
+        for (SenderRole role : List.of(SenderRole.MEMBER, SenderRole.OWNER, SenderRole.ADMIN)) {
+            var response = ChatMessageResponse.from(message(88L, storeRoom(31L), role, 1L),
+                    "관리자1", "https://images.example.com/admin-1.png");
+            assertThat(response.getSenderName()).isNull();
+            assertThat(response.getSenderProfileImage()).isNull();
+        }
+        var response = ChatMessageResponse.from(message(89L, supportRoom(21L), SenderRole.MEMBER, 7L),
+                "관리자1", "https://images.example.com/admin-1.png");
+        assertThat(response.getSenderName()).isNull();
+        assertThat(response.getSenderProfileImage()).isNull();
+    }
+
+    @Test
+    void serializedDisplayDtosNeverAddMemberIdentifiersEmailOrPrivateAccountFields() throws Exception {
+        ChatRoom room = supportRoom(21L);
+        Member admin = admin(912345L);
+        var summary = ConversationSummaryResponse.forMember(room, admin.getName(), admin.getProfileImage());
+        var item = ChatMessageResponse.from(message(88L, room, SenderRole.ADMIN, admin.getId()),
+                admin.getName(), admin.getProfileImage());
+        var thread = ConversationThreadResponse.from(room, "RESERVE 고객지원", "MEMBER", true,
+                List.of(item), false, 88L, admin.getName(), admin.getProfileImage());
+        var mapper = new ObjectMapper();
+
+        for (var dto : List.of(summary, item, thread)) {
+            var json = mapper.readTree(mapper.writeValueAsString(dto));
+            assertThat(json.has("senderMemberId")).isFalse();
+            assertThat(json.has("memberId")).isFalse();
+            assertThat(json.has("adminId")).isFalse();
+            assertThat(json.has("email")).isFalse();
+            assertThat(json.has("password")).isFalse();
+            assertThat(json.has("oauthAccessToken")).isFalse();
+            assertThat(json.toString()).doesNotContain("private-admin-email", "private-password", "private-token");
+        }
+    }
+
+    private void stubSummary(ChatRoom room, List<ChatMessage> lastReplies) {
+        when(roomRepository.findForMember(eq(7L), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(room)));
+        when(messageRepository.findLatestByRoomIdsAndSenderRole(List.of(room.getId()), SenderRole.ADMIN))
+                .thenReturn(lastReplies);
+    }
+
+    private ChatRoom supportRoom(Long id) {
+        return ChatRoom.builder().id(id).member(customer).type(ChatRoom.RoomType.SUPPORT)
+                .memberUnread(3).adminUnread(2).build();
+    }
+
+    private ChatRoom storeRoom(Long id) {
+        return ChatRoom.builder().id(id).member(customer).type(ChatRoom.RoomType.STORE)
+                .storeId(id).storeNameSnapshot("가게" + id).build();
+    }
+
+    private ChatMessage message(Long id, ChatRoom room, SenderRole role, Long senderId) {
+        return ChatMessage.builder().id(id).room(room).senderRole(role).senderMemberId(senderId)
+                .clientMessageId("client-" + id).content("내용" + id).build();
+    }
+
+    private Member admin(Long id) {
+        return Member.builder().id(id).name("관리자" + id).role(Role.ADMIN)
+                .profileImage("https://images.example.com/admin-" + id + ".png")
+                .email("private-admin-email").password("private-password").oauthAccessToken("private-token").build();
+    }
+
+    private Member adminInState(Long id, String state) {
+        Member member = admin(id);
+        switch (state) {
+            case "deleted" -> member.setDeletedAt(LocalDateTime.now().minusDays(1));
+            case "user" -> member.setRole(Role.USER);
+            case "business" -> member.setRole(Role.BUSINESS);
+            case "banned" -> member.setStatus(MemberStatus.BANNED);
+            case "suspended" -> {
+                member.setStatus(MemberStatus.SUSPENDED);
+                member.setSuspendedUntil(LocalDateTime.now().plusDays(1));
+            }
+            case "indefinite" -> member.setStatus(MemberStatus.SUSPENDED);
+            default -> throw new IllegalArgumentException(state);
+        }
+        return member;
+    }
+}

@@ -11,11 +11,11 @@
  *   들어 있어서 시간이 지날수록 이 화면만 눈에 띄게 느려진다.
  *   백엔드 GET /api/admin/mail/sent 의 **응답 형식도 배열 → Page 로 바뀌었다**(같이 배포할 것).
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Typography, Input, Divider, Pagination, Checkbox } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Button, FormTextArea, FormInput, FormModal, FormField, RefreshButton } from '../common';
+import { Button, DataState, FormTextArea, FormInput, FormModal, FormField, RefreshButton } from '../common';
 import { Bone } from '../common/Skeletons';
 import useDebounce from '../../hooks/useDebounce';
 import { useMessage, useWindowWidth, useQueryParamsState, useFormErrors } from '../../hooks';
@@ -79,14 +79,11 @@ const useSentMailData = (message, page, search) => {
         },
         placeholderData: keepPreviousData,
     });
-    useEffect(() => {
-        if (error) message.error('보낸 메일을 불러오지 못했습니다.');
-    }, [error, message]);
 
     return {
         sentMails: data?.mails ?? EMPTY_MAILS,
         totalElements: data?.totalElements ?? 0,
-        loading, isFetching, selectedSent, setSelectedSent, loadSentMails,
+        loading, isFetching, error, selectedSent, setSelectedSent, loadSentMails,
     };
 };
 
@@ -175,11 +172,13 @@ const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
                     style={{ height: 40, borderRadius: 20, paddingLeft: 20, paddingRight: 20, flexShrink: 0, gap: 6 }}>
                     <SendOutlined /> 새 메일
                 </Button>
+            </div>
+            <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 12, minHeight: 40 }}>
+                <Input prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
+                    placeholder="받는 사람, 제목 검색" value={value} onChange={onChange}
+                    allowClear size="large" style={{ width: '100%', maxWidth: 480 }} />
                 <RefreshButton onReload={onReload} loading={loading} style={{ marginLeft: 'auto' }} />
             </div>
-            <Input prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
-                placeholder="받는 사람, 제목 검색" value={value} onChange={onChange}
-                allowClear size="large" style={{ maxWidth: 480 }} />
         </div>
     );
 };
@@ -212,18 +211,10 @@ const SentMailSkeleton = () => (
 );
 
 /**
- * 목록 한 줄.
- *
- * ★ 휴지통 버튼을 행 안에 넣으면서 구조가 바뀌었다 — 예전엔 행 전체가 하나의 <button>
- *   이었는데, <button> 안에 <button> 은 HTML 상 허용되지 않는다(중첩 금지).
- *   그래서 바깥을 div 로 바꾸고, "본문 선택"과 "휴지통"을 **형제 버튼 둘**로 나눴다.
- *   각각이 진짜 버튼이라 키보드 Tab·Enter·스크린리더가 그대로 동작한다.
- *
- * ★ hover/active/선택 상태는 index.css 의 .reserve-maillist-item 이 담당한다.
- *   인라인 style 로는 :hover 를 표현할 수 없어서, 예전엔 transition 만 걸어놓고
- *   정작 바뀌는 값이 없어 **눌리는 느낌이 전혀 없었다.**
+ * 목록 한 줄. 목록은 메일 선택만 맡고, 삭제는 상세 화면 오른쪽의 단일 동작으로 둔다.
+ * 행마다 휴지통 아이콘을 반복하면 날짜와 제목보다 삭제가 먼저 보여 목록을 읽기 어려웠다.
  */
-const SentMailItem = ({ mail, isSelected, onClick, onTrash, trashing }) => (
+const SentMailItem = ({ mail, isSelected, onClick }) => (
     <div className={`reserve-maillist-item${isSelected ? ' is-selected' : ''}`} style={styles.mailItem}>
         <button type="button" onClick={() => onClick(mail)} className="reserve-maillist-main" style={styles.mailItemMain}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
@@ -239,11 +230,6 @@ const SentMailItem = ({ mail, isSelected, onClick, onTrash, trashing }) => (
                 {mail.bodyPreview || ''}
             </Text>
         </button>
-        <button type="button" className="reserve-maillist-trash" style={styles.mailItemTrash}
-            onClick={() => onTrash(mail)} disabled={trashing}
-            aria-label={`${mail.subject || '제목 없음'} 메일을 휴지통으로`} title="휴지통으로">
-            <DeleteOutlined />
-        </button>
     </div>
 );
 
@@ -253,7 +239,7 @@ const SentDetailContent = ({ mail, onTrash, trashing }) => (
             <Title level={4} style={{ flex: 1, minWidth: 0, fontWeight: fontWeight.bold, color: colors.text.primary, margin: 0, lineHeight: 1.4 }}>
                 {mail.subject || '(제목 없음)'}
             </Title>
-            {/* 목록에서도 지울 수 있지만, 읽고 나서 지우는 게 자연스러운 순서라 여기에도 둔다. */}
+            {/* 목록에서 반복하지 않고, 내용을 확인한 뒤 여기서 한 번만 삭제한다. */}
             <Button variant="ghost-sm" size="md" onClick={() => onTrash(mail)} disabled={trashing}
                 style={{ flexShrink: 0, gap: 6 }}>
                 <DeleteOutlined /> 휴지통
@@ -323,10 +309,11 @@ const MailboxTab = () => {
     // 검색 결과가 0건인 건 목록 패널 안의 "검색 결과가 없습니다"가 담당한다.
     const isEmpty = mail.totalElements === 0 && !debouncedSearch.trim();
     const showLoading = mail.loading;
-    const showEmpty = !mail.loading && isEmpty;
-    const showMobDetail = !showLoading && !showEmpty && isMobile && !!mail.selectedSent;
-    const showMobList = !showLoading && !showEmpty && isMobile && !mail.selectedSent;
-    const showDesktop = !showLoading && !showEmpty && !isMobile;
+    const showError = !showLoading && Boolean(mail.error);
+    const showEmpty = !showLoading && !showError && isEmpty;
+    const showMobDetail = !showLoading && !showError && !showEmpty && isMobile && !!mail.selectedSent;
+    const showMobList = !showLoading && !showError && !showEmpty && isMobile && !mail.selectedSent;
+    const showDesktop = !showLoading && !showError && !showEmpty && !isMobile;
 
     return (
         <div>
@@ -335,6 +322,11 @@ const MailboxTab = () => {
                 onCompose={() => send.setComposing(true)} />
 
             {showLoading && <SentMailSkeleton />}
+
+            {showError && (
+                <DataState state="error" kind="mail" subject="보낸 메일" error={mail.error}
+                    onRetry={mail.loadSentMails} retrying={mail.isFetching} compact />
+            )}
 
             {showEmpty && (
                 <div style={styles.emptyPanel}>
@@ -371,8 +363,7 @@ const MailboxTab = () => {
                                 <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
                             </div>
                         ) : filteredSent.map(m => (
-                            <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent}
-                                onTrash={trash.askAndTrash} trashing={trash.trashing} />
+                            <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent} />
                         ))}
                     </div>
                     {/* 모바일은 폭이 좁아 simple 모드("1 / 5") — 번호 버튼을 다 깔면 줄바꿈이 난다. */}
@@ -389,8 +380,7 @@ const MailboxTab = () => {
                                     <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
                                 </div>
                             ) : filteredSent.map(m => (
-                                <SentMailItem key={m.id} mail={m} isSelected={m.id === mail.selectedSent?.id} onClick={mail.setSelectedSent}
-                                    onTrash={trash.askAndTrash} trashing={trash.trashing} />
+                                <SentMailItem key={m.id} mail={m} isSelected={m.id === mail.selectedSent?.id} onClick={mail.setSelectedSent} />
                             ))}
                         </div>
                         {/* 목록 패널 바닥에 고정 — flex:1 인 스크롤 영역 밖에 두어야 항상 보인다. */}
@@ -457,23 +447,8 @@ const styles = {
     // 행 껍데기. 배경·hover·선택 표시는 index.css 의 .reserve-maillist-item 이 갖는다 —
     // 인라인 style 로는 :hover 를 쓸 수 없어서 여기에 두면 눌리는 느낌이 안 난다.
     mailItem:     { display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${colors.border.light}` },
-    // 왼쪽 22 → 16 (2026-08-24). 22 는 선택 표시용 세로줄(4px) 자리를 비우려던 값인데
-    // 그 줄을 없앴다 — 연한 파란 배경만으로 충분하고, 목록마다 세로선이 생겨 어긋나 보였다.
-    // 위 SentMailSkeleton 과 같은 값을 유지할 것.
-    mailItemMain: { flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 4px 14px 16px' },
-    /**
-     * ★ 휴지통 버튼 위치 (2026-08-24 2차 수정).
-     *
-     * 전에는 3줄짜리 행의 **세로 한가운데**에 떠 있었다. 그런데 오른쪽 열에서 눈에 먼저
-     * 들어오는 기준선은 같은 열 맨 위의 보낸 시각("3일 전")이다. 아이콘만 한 줄 아래에
-     * 있으니 오른쪽 정렬이 어긋난 것처럼 보였다.
-     * alignSelf 로 위에 붙이고 marginTop 으로 **첫 줄의 중심**에 맞춘다
-     * (본문 상단 패딩 14 + 첫 줄 높이 절반 ≈ 23 → 32px 판의 중심이 그 지점에 온다).
-     *
-     * 크기를 32×32 로 고정한 이유 — 아이콘만 있으면 어디를 눌러야 하는지가 안 보이고
-     * 손가락 목표로도 작다. 둥근 네모 판은 index.css 가 hover 에서 드러낸다.
-     */
-    mailItemTrash:{ alignSelf: 'flex-start', flexShrink: 0, width: 32, height: 32, margin: '7px 14px 0 0', padding: 0, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    // 목록의 읽기 영역은 좌우 16px으로 맞춘다. 삭제 버튼을 빼면 오른쪽만 4px인 여백은 필요 없다.
+    mailItemMain: { flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px' },
     // 가게 상세(StoreDetail)의 backBtn 과 같은 값 — 두 화면의 뒤로가기가 달라 보이면 안 된다.
     backBtn:      { marginBottom: 12, padding: '4px 8px', fontSize: fontSize.sm, color: colors.text.secondary },
     // 데스크톱은 목록 패널 안쪽 바닥(위 경계선 있음), 모바일은 카드 바로 아래에 떨어져 놓인다.

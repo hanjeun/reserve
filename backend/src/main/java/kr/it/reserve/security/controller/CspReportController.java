@@ -60,8 +60,9 @@ public class CspReportController {
                 "violated-directive", "violatedDirective"
         );
         String blockedUri = firstText(report, "blocked-uri", "blockedURL", "blockedUrl");
-        log.warn("CSP violation observed: directive={}, blockedScheme={}",
-                directiveCategory(directive), blockedScheme(blockedUri));
+        String sourceFile = firstText(report, "source-file", "sourceFile");
+        log.warn("CSP violation observed: directive={}, blockedScheme={}, sourceCategory={}",
+                directiveCategory(directive), blockedScheme(blockedUri), sourceCategory(sourceFile));
     }
 
     private String firstText(JsonNode node, String... fields) {
@@ -92,6 +93,36 @@ public class CspReportController {
                 case "http", "https", "data", "blob" -> scheme.toLowerCase(Locale.ROOT);
                 default -> "other";
             };
+        } catch (IllegalArgumentException ignored) {
+            return "invalid";
+        }
+    }
+
+    /**
+     * 원본 URL·확장 ID·경로는 버리되, 제품 코드인지 브라우저 확장 주입인지 구분할 만큼만 남긴다.
+     * 기존 {@code directive=script, blockedScheme=eval}만으로는 원인을 안전하게 좁힐 수 없었다.
+     */
+    private String sourceCategory(String sourceFile) {
+        if (sourceFile == null || sourceFile.isBlank()) return "unknown";
+        try {
+            URI uri = URI.create(sourceFile);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            if (Set.of("chrome-extension", "moz-extension", "safari-web-extension", "edge-extension")
+                    .contains(scheme)) {
+                return "browser-extension";
+            }
+            if (!scheme.equals("http") && !scheme.equals("https")) {
+                return scheme.isBlank() ? "relative" : "other";
+            }
+
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            if (host.equals("reserve.it.kr") || host.endsWith(".reserve.it.kr")) return "first-party";
+            if (host.equals("cdn.portone.io") || host.endsWith(".portone.io")
+                    || host.endsWith(".iamport.kr")) return "portone";
+            if (host.equals("dapi.kakao.com") || host.endsWith(".kakao.com")
+                    || host.endsWith(".kakaocdn.net") || host.endsWith(".daumcdn.net")) return "kakao";
+            if (host.endsWith(".sentry.io")) return "sentry";
+            return "external-web";
         } catch (IllegalArgumentException ignored) {
             return "invalid";
         }

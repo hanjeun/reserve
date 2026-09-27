@@ -194,6 +194,29 @@ class RefundReconciliationSchedulerTest {
                 0);
     }
 
+    @Test
+    @DisplayName("PG 성공 뒤 로컬 PAID로 남은 종료 예약은 원장 검증 경로로만 복구한다")
+    void paidAfterLostCommitUsesExactLedgerRecoveryWithoutCancelResubmission() throws Exception {
+        UnresolvedRefundView view = view("cancel-1");
+        Payment payment = pendingPayment(0);
+        payment.setStatus(Payment.PaymentStatus.PAID);
+        PortoneV2PaymentResponse pgPayment = payment("""
+                {"status":"PARTIAL_CANCELLED","amount":{"total":10000,"cancelled":3000},
+                 "cancellations":[{"id":"cancel-1","status":"SUCCEEDED","totalAmount":3000}]}
+                """);
+        when(portoneService.getPaymentInfo(MERCHANT_UID)).thenReturn(pgPayment);
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(payment));
+        when(paymentService.confirmLedgerBackedRefund(view, 0, 3_000, "cancel-1")).thenReturn(true);
+
+        scheduler.reconcileOne(view);
+
+        verify(paymentService).confirmLedgerBackedRefund(view, 0, 3_000, "cancel-1");
+        verify(paymentService, never()).confirmPendingRefund(anyLong(), anyInt(), anyInt(), anyString());
+        verify(refundLedgerService).succeeded(20L, "cancel-1", 3_000);
+        verify(reconciliationIssueService).resolveForPayment(10L);
+        verify(portoneService, never()).cancelPayment(anyString(), anyInt(), anyString());
+    }
+
     private Payment pendingPayment(int refundedAmount) {
         return Payment.builder()
                 .id(10L)

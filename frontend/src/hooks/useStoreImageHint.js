@@ -32,8 +32,8 @@ const useStoreImageHint = (storeId) => {
     const queries = queryClient.getQueriesData({ queryKey: storeKeys.all() });
     for (const [key, data] of queries) {
         if (!Array.isArray(key) || key[1] !== 'list') continue;
-        const pages = data?.pages;
-        if (!pages) continue;
+        // 새 서버 페이지네이션과 프리뷰 중 남아 있을 이전 무한스크롤 캐시를 모두 읽는다.
+        const pages = data?.pages ?? (Array.isArray(data?.content) ? [data] : []);
         for (const page of pages) {
             const found = page?.content?.find((s) => String(s.id) === String(storeId));
             if (!found) continue;

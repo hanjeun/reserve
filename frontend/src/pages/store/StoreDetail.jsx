@@ -1,23 +1,27 @@
 import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Image, Typography, Form, Carousel, Divider } from 'antd';
 import {
-    PlusOutlined, MinusOutlined, ArrowLeftOutlined,
+    PlusOutlined, MinusOutlined,
     ClockCircleOutlined, CreditCardOutlined, FieldTimeOutlined,
     ThunderboltOutlined, RollbackOutlined, HourglassOutlined, TeamOutlined,
-    FileTextOutlined, StarFilled, EnvironmentOutlined,
+    StarFilled, EnvironmentOutlined, MessageOutlined, PhoneOutlined,
 } from '@ant-design/icons';
-import { PageContainer, Button, FormTextArea, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton } from '../../components/common';
+import { PageContainer, Button, DataState, FormTextArea, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton, Bone } from '../../components/common';
 import { BookingCalendar } from '../../components/store';
+import StoreIdentityText from '../../components/store/StoreIdentityText';
 import { ReviewList } from '../../components/review';
-import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions, useStoreImageHint, useGoBack } from '../../hooks';
+import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions, useStoreImageHint } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { rememberImageHints } from '../../utils/imageHintCache';
 import { getDetailImageUrl } from '../../utils';
+import { formatTime } from '../../utils/date';
 import { isNearby } from '../../utils/distance';
+import { normalizeStoreRating } from '../../utils/storeRating';
 import useLocationStore from '../../store/useLocationStore';
-import { colors, radius, fontWeight, fontSize, heights, animation, field } from '../../styles/tokens';
+import useMessengerStore from '../../store/useMessengerStore';
+import { breakpoints, colors, radius, fontWeight, fontSize, heights, animation, field } from '../../styles/tokens';
 import { VALIDATION_RULES } from '../../utils/validation';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -132,9 +136,8 @@ const RowValue = ({ row }) => {
     if (row.link) {
         return (
             <a href={row.link} target="_blank" rel="noopener noreferrer"
-                style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}
-                onMouseEnter={e => e.target.style.color = colors.primary.main}
-                onMouseLeave={e => e.target.style.color = colors.text.secondary}>
+                className="reserve-store-info-link"
+                style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}>
                 {row.value}
             </a>
         );
@@ -143,7 +146,7 @@ const RowValue = ({ row }) => {
 };
 
 // 가게 상세 정보 섹션 — Cognitive Complexity: 30 → ~5
-const StoreInfoSection = ({ store, description }) => {
+const StoreInfoSection = ({ store }) => {
     const rows = [
         buildAddressRow(store),
         buildHoursRow(store),
@@ -155,20 +158,10 @@ const StoreInfoSection = ({ store, description }) => {
         buildCapacityRow(store),
     ].filter(Boolean);
 
-    if (rows.length === 0 && !description) return null;
+    if (rows.length === 0) return null;
 
     return (
         <div style={infoStyles.card}>
-            {description && (
-                <>
-                    <div style={infoStyles.row}>
-                        <FileTextOutlined style={infoStyles.icon} />
-                        <span style={infoStyles.label}>소개</span>
-                        <div style={infoStyles.value}>{description}</div>
-                    </div>
-                    {rows.length > 0 && <div style={infoStyles.divider} />}
-                </>
-            )}
             {rows.map((row, i) => (
                 <React.Fragment key={row.label}>
                     <div style={infoStyles.row}>
@@ -189,29 +182,122 @@ const infoStyles = {
     card: { padding: '4px 0' },
     row:  { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 0' },
     icon: { fontSize: 14, color: colors.text.tertiary, flexShrink: 0, marginTop: 3 },
-    label: { fontSize: fontSize.sm, color: colors.text.tertiary, flexShrink: 0, width: 90, lineHeight: '22px' },
+    label: { fontSize: fontSize.sm, color: colors.text.tertiary, flexShrink: 0, width: 'var(--reserve-store-info-label-width, 80px)', lineHeight: '22px' },
     value: { fontSize: fontSize.sm, color: colors.text.secondary, flex: 1, lineHeight: '22px' },
     highlight: { color: colors.primary.main, fontWeight: fontWeight.medium },
     divider: { height: 1, background: colors.border.light },
 };
 
+const storePreviewClassNames = { popup: { root: 'reserve-image-preview reserve-store-detail-preview' } };
+
+const rememberStorePreviewOrigin = event => {
+    const source = event.target?.closest?.('.ant-image') ?? event.currentTarget;
+    const rect = source?.getBoundingClientRect?.();
+    if (!rect || typeof document === 'undefined') return;
+    document.documentElement.style.setProperty('--reserve-store-preview-origin-x', `${rect.left + rect.width / 2}px`);
+    document.documentElement.style.setProperty('--reserve-store-preview-origin-y', `${rect.top + rect.height / 2}px`);
+};
+
+// PC·모바일의 가게명/평점/소개/빠른 연락은 같은 구조를 사용한다.
+export const StoreIdentity = ({ store, nearby, canContact, onContact }) => {
+    const { rating, reviewCount } = normalizeStoreRating(store.rating, store.reviewCount);
+    const dialNumber = String(store.phone ?? '').replace(/[^+\d]/g, '');
+    return (
+        <div className="reserve-store-identity">
+            <div className="reserve-store-identity-title-row">
+                <Title level={1}>{store.name}</Title>
+                <div className="reserve-store-identity-actions" role="group" aria-label="가게 빠른 작업">
+                    <FavoriteButton storeId={store.id} size="md" appearance="plain" />
+                    {canContact && onContact && (
+                        <button type="button" className="reserve-store-contact-action"
+                            onClick={onContact} aria-label="가게에 채팅 문의하기" title="채팅 문의">
+                            <MessageOutlined aria-hidden="true" />
+                        </button>
+                    )}
+                    {canContact && dialNumber && (
+                        <a className="reserve-store-contact-action" href={`tel:${dialNumber}`}
+                            aria-label={`가게에 전화하기 ${store.phone}`} title={`전화 ${store.phone}`}>
+                            <PhoneOutlined aria-hidden="true" />
+                        </a>
+                    )}
+                </div>
+            </div>
+            <div className="reserve-store-identity-rating">
+                <StarFilled aria-hidden="true" />
+                <strong>{rating.toFixed(1)}</strong>
+                <span>({reviewCount.toLocaleString('ko-KR')})</span>
+            </div>
+            <div className="reserve-store-identity-summary">
+                <StoreIdentityText category={store.category} nearby={nearby} />
+                {store.description && <><span className="reserve-store-identity-separator" aria-hidden="true">·</span><p className="reserve-store-identity-description">{store.description}</p></>}
+            </div>
+            {store.keywords?.length > 0 && (
+                <div className="reserve-store-identity-tags">
+                    {store.keywords.map(kw => <Badge key={kw} variant="keyword" style={styles.identityBadge}>{kw}</Badge>)}
+                </div>
+            )}
+        </div>
+    );
+};
+
 // 예약 시간 선택 — 날짜 선택 시 GET /api/reservations/availability 조회해서 슬롯별 실시간 잔여 인원을 반영한 필 그리드로 보여준다.
 // AntD FormTimePicker(시/분 스크롤 휠) 대신 네이버 예약 스타일의 pill 그리드 + scaleSpringIn 토큰으로 대체.
-const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
-    const [slots, setSlots] = React.useState([]);
-    const [loading, setLoading] = React.useState(false);
+// Public availability includes the current reservation in capacity totals. Only the already-validated
+// edit's original store/date/time may ignore that flag; the time must still exist in a successful response.
+const isExistingReservationSlot = (slot, storeId, dateKey, editingReservation) => Boolean(
+    editingReservation?.id != null
+    && String(editingReservation.storeId) === String(storeId)
+    && editingReservation.reservationDate === dateKey
+    && formatTime(editingReservation.reservationTime) === slot.time
+);
+const isSelectableSlot = (slot, storeId, dateKey, editingReservation) =>
+    slot.available === true || isExistingReservationSlot(slot, storeId, dateKey, editingReservation);
+
+const ExistingTimeNotice = () => (
+    <p style={{ margin: '0 0 8px', fontSize: fontSize.sm, color: colors.text.tertiary }}>
+        기존 예약 시간이에요. 저장할 때 예약 가능 여부를 다시 확인해요.
+    </p>
+);
+
+export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvailabilityChange, editingReservation }) => {
+    const [availability, setAvailability] = React.useState({ key: null, status: 'idle', slots: [] });
+    const [retryCount, setRetryCount] = React.useState(0);
     const dateKey = dateValue ? dateValue.format('YYYY-MM-DD') : null;
+    const storeId = store?.id;
+    const requestKey = dateKey && storeId ? `${storeId}:${dateKey}` : null;
+    const isCurrent = requestKey != null && availability.key === requestKey;
+    const loading = requestKey != null && (!isCurrent || availability.status === 'loading');
+    const slots = isCurrent && availability.status === 'success' ? availability.slots : [];
+    const failed = isCurrent && availability.status === 'error';
+    // The displayed state and submit validator must observe the same lookup transition.
+    const commitAvailability = React.useCallback(next => {
+        onAvailabilityChange?.(next);
+        setAvailability(next);
+    }, [onAvailabilityChange]);
 
     React.useEffect(() => {
-        if (!dateKey || !store?.id) { setSlots([]); return; }
+        if (!requestKey) return;
         let cancelled = false;
-        setLoading(true);
-        api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId: store.id, date: dateKey } })
-            .then((data) => { if (!cancelled) setSlots(data || []); })
-            .catch(() => { if (!cancelled) setSlots([]); })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
-    }, [dateKey, store?.id]);
+        const controller = new AbortController();
+        commitAvailability({ key: requestKey, status: 'loading', slots: [] });
+        api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal: controller.signal })
+            .then((data) => {
+                if (cancelled) return;
+                if (!Array.isArray(data)) throw new Error('Invalid availability results');
+                // An edit prefill survives a successful lookup only if the server still offers that time.
+                const selectedTime = form?.getFieldValue('reservationTime');
+                if (selectedTime && !data.some(slot => slot.time === selectedTime && isSelectableSlot(slot, storeId, dateKey, editingReservation))) {
+                    form?.setFields([{ name: 'reservationTime', value: undefined, errors: [] }]);
+                }
+                commitAvailability({ key: requestKey, status: 'success', slots: data });
+            })
+            .catch(() => {
+                if (cancelled) return;
+                form?.setFields([{ name: 'reservationTime', value: undefined, errors: [] }]);
+                commitAvailability({ key: requestKey, status: 'error', slots: [] });
+            });
+        return () => { cancelled = true; controller.abort(); };
+    }, [dateKey, storeId, requestKey, retryCount, form, editingReservation, commitAvailability]);
 
     // 날짜가 바뀌면 이전에 고른 시간은 무조건 초기화.
     // 2026-07 버그 수정: 예전엔 "새 날짜에 그 시간이 없거나 마감된 경우에만" 초기화해서,
@@ -250,9 +336,9 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
     const onlySlot = isDayBooking ? slots[0] : null;
 
     React.useEffect(() => {
-        if (!onlySlot || value === onlySlot.time) return;
+        if (!onlySlot || !isSelectableSlot(onlySlot, storeId, dateKey, editingReservation) || value === onlySlot.time) return;
         onChange?.(onlySlot.time);
-    }, [onlySlot, value, onChange]);
+    }, [onlySlot, value, onChange, storeId, dateKey, editingReservation]);
 
     if (!dateKey) {
         return (
@@ -261,8 +347,16 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
     }
     if (loading) {
         return (
-            <TimePlaceholder text="불러오는 중..." />
+            <div role="status" aria-label="예약 가능한 시간을 불러오는 중" aria-busy="true">
+                <div style={timeSlotStyles.grid} aria-hidden="true">
+                    {[1, 2, 3, 4].map(key => <Bone key={key} height={38} borderRadius={radius.md} />)}
+                </div>
+            </div>
         );
+    }
+    if (failed) {
+        return <DataState state="error" title="예약 가능한 시간을 불러오지 못했어요"
+            onRetry={() => setRetryCount(count => count + 1)} compact />;
     }
     if (slots.length === 0) {
         return (
@@ -270,12 +364,17 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
         );
     }
 
+    const existingSelection = slots.some(slot => !slot.available && slot.time === value && isExistingReservationSlot(slot, storeId, dateKey, editingReservation));
     if (isDayBooking) {
         return (
-            <TimePlaceholder
-                text={onlySlot?.available === false
+            <div>
+                {existingSelection && <ExistingTimeNotice />}
+                <TimePlaceholder text={existingSelection
+                    ? '기존 예약 날짜를 선택했어요'
+                    : onlySlot?.available === false
                     ? '이 날은 예약이 마감됐어요'
                     : '이 가게는 날짜만 선택하면 돼요'} />
+            </div>
         );
     }
 
@@ -284,12 +383,14 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
 
     return (
         <div>
+            {existingSelection && <ExistingTimeNotice />}
             {am.length > 0 && (
                 <>
                     <div style={timeSlotStyles.groupLabel}>오전</div>
                     <div style={timeSlotStyles.grid}>
                         {am.map((s, i) => (
                             <TimeSlotPill key={s.time} slot={s} selected={value === s.time}
+                                selectable={isSelectableSlot(s, storeId, dateKey, editingReservation)}
                                 onClick={() => onChange?.(s.time)} delay={i * 40} />
                         ))}
                     </div>
@@ -301,6 +402,7 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
                     <div style={timeSlotStyles.grid}>
                         {pm.map((s, i) => (
                             <TimeSlotPill key={s.time} slot={s} selected={value === s.time}
+                                selectable={isSelectableSlot(s, storeId, dateKey, editingReservation)}
                                 onClick={() => onChange?.(s.time)} delay={i * 40} />
                         ))}
                     </div>
@@ -310,10 +412,10 @@ const TimeSlotPicker = ({ store, dateValue, value, onChange, form }) => {
     );
 };
 
-const TimeSlotPill = ({ slot, selected, onClick, delay }) => (
+const TimeSlotPill = ({ slot, selected, selectable, onClick, delay }) => (
     <button type="button"
         className={`rsv-tap-btn rsv-time-pill${selected ? ' rsv-selected' : ''}`}
-        disabled={!slot.available} onClick={onClick}
+        disabled={!selectable} onClick={onClick}
         style={{
             ...timeSlotStyles.pill,
             animation: animation.scaleSpringIn,
@@ -329,13 +431,11 @@ const TimeSlotPill = ({ slot, selected, onClick, delay }) => (
  * ★ 2026-08-06 — 왜 컴포넌트로 뺐나
  *   이 칸은 AntD TimePicker 가 아니라 커스텀 div 다(시간은 pill 그리드로 고르므로).
  *   그래서 Form.Item 이 붙여주는 `ant-picker-status-error` 클래스가 존재하지 않았고,
- *   바로 위 "예약 날짜"(진짜 DatePicker)는 미입력 시 아이콘이 빨개지는데
+ *   바로 위 "예약 날짜"(BookingCalendar)는 미입력 시 아이콘과 링이 빨개지는데
  *   "예약 시간"만 회색으로 남아 **같은 폼에서 두 칸이 다르게 반응**했다.
  *   → Form.Item.useStatus() 로 에러 상태를 직접 읽어 같은 언어로 반응시킨다.
  *
- *   타이포도 함께 맞췄다. DatePicker 의 placeholder 는 실제 <input> 의 ::placeholder 라
- *   폰트·크기가 AntD 토큰을 따르는데, 이쪽은 <span> 이라 상속 경로가 달랐다.
- *   fontFamily: inherit 를 명시하고 아이콘 크기를 AntD suffix(16px)에 맞춘다.
+ *   타이포도 field 토큰으로 함께 맞춘다. 두 커스텀 표면 모두 글자와 아이콘 크기를 같은 값에서 읽는다.
  */
 const TimePlaceholder = ({ text }) => {
     const { status } = Form.Item.useStatus();
@@ -366,7 +466,7 @@ const timeSlotStyles = {
         //   배경만 어두워지고 글자는 검은색 그대로라 "날짜를 먼저 선택해주세요"가 안 보였다.
         //   colors.*는 var(--c-...) 문자열이라 브라우저가 페인트 시점에 테마별로 해석한다.
         //   colors.text.placeholder는 AntD의 colorTextPlaceholder와 같은 값이라
-        //   바로 옆 FormDatePicker의 "날짜 선택"과 톤이 정확히 일치한다.
+        //   바로 옆 BookingCalendar의 "날짜 선택"과 톤이 정확히 일치한다.
         fontSize: fontSize.lg, fontWeight: fontWeight.regular, color: colors.text.placeholder,
         fontFamily: 'inherit',
         background: colors.gray[50], borderRadius: radius.lg,
@@ -401,61 +501,93 @@ const bookingRangeHint = (store) => {
     );
 };
 
-const ReservationPanel = ({ store, form, onFinish, paying, isPC, isEditMode }) => {
+export const ReservationPanel = ({
+    store, form, onFinish, paying, isPC, isEditMode, editingReservation,
+    editLoadError = null, editRetrying = false, onRetryEditLoad,
+}) => {
     const dateValue = Form.useWatch('reservationDate', form);
+    const timeAvailabilityRef = React.useRef({ key: null, status: 'idle', slots: [] });
+    // DAY auto-fill runs in the same effect batch as lookup completion. Validation must see that
+    // completion immediately, rather than the previous render's pending state.
+    const handleAvailabilityChange = React.useCallback(next => { timeAvailabilityRef.current = next; }, []);
     return (
     <div style={isPC ? pcFormStyles.panel : {}}>
         <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
-            {isEditMode ? '예약 수정하기' : '예약하기'}
+            {isEditMode ? '예약 변경하기' : '예약하기'}
         </Title>
         <Form form={form} layout="vertical" onFinish={onFinish}
             initialValues={{ guestCount: 1 }} requiredMark={false}
             style={{ fontWeight: fontWeight.medium }}>
-            <Form.Item label="예약 날짜" name="reservationDate"
-                rules={[{ required: true, message: '날짜를 선택해주세요.' }]}
-                extra={bookingRangeHint(store)}>
-                {/* ★ 2026-08-25 — AntD DatePicker 팝업에서 인라인 BookingCalendar 로 교체.
-                    예전에는 disabledDate 로 막았는데 그건 **회색밖에 못 칠한다** — 정기휴무,
-                    임시휴무, 운영기간 밖, 예약범위 초과, 정원 마감이 전부 같은 회색이라
-                    "왜 안 눌리지"를 알 방법이 없었다. 게다가 그 다섯 판정이 서버(isBookableOn)와
-                    **프론트에도 따로**(makeDisabledDate) 있어서 언젠가 어긋날 자리였다.
-                    이제 사유는 서버가 내려주고 달력은 그리기만 한다. */}
-                <BookingCalendar storeId={store?.id} />
-            </Form.Item>
-            {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
-                "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
-            <Form.Item
-                label={store?.bookingType === 'DAY' ? '예약 확인' : (store?.bookingType === 'SESSION' ? '회차 선택' : '예약 시간')}
-                name="reservationTime"
-                // 날짜를 고르기 전에는 이 칸에 넣을 값 자체가 없다(슬롯을 날짜로 조회한다).
-                // 그런데도 required 를 걸어두면 아무것도 안 채우고 제출했을 때 날짜와 시간이
-                // 동시에 빨개져서, 지금 고칠 수 없는 칸까지 고치라고 지시하게 된다.
-                // 실제로 고쳐야 할 곳은 바로 위 날짜 칸 하나이고 그 칸이 이미 막고 있다.
-                // (interactions.css 의 "비활성은 에러보다 우선한다"와 같은 규칙이다)
-                //
-                // ⚠️ dependencies={['reservationDate']} 를 붙이면 안 된다 — rc-field-form 은
-                //    의존 필드가 바뀌는 즉시 이 칸을 재검증해서, 날짜를 고르자마자 아직 아무것도
-                //    안 한 시간 칸에 "시간을 선택해주세요"가 튀어나온다(2026-07에 이미 한 번
-                //    고쳤던 회귀다 — TimeSlotPicker 의 setFields 주석 참고).
-                //    함수형 rule 은 검증 시점에 getFieldValue 로 최신 날짜를 직접 읽으므로
-                //    dependencies 없이도 제출 때 올바르게 평가된다.
-                rules={[({ getFieldValue }) => ({
-                    required: !!getFieldValue('reservationDate'),
-                    message: store?.bookingType === 'DAY' ? '날짜를 선택해주세요.' : '시간을 선택해주세요.',
-                })]}>
-                <TimeSlotPicker store={store} dateValue={dateValue} form={form} />
-            </Form.Item>
-            <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
-                <GuestCountInput />
-            </Form.Item>
-            <Form.Item label="요청 사항" name="specialRequest">
-                <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." />
-            </Form.Item>
-            <div style={{ marginTop: 24 }}>
-                <Button variant="primary" htmlType="submit" block loading={paying}>
-                    {paying ? '처리 중...' : (isEditMode ? '예약 수정하기' : '예약 신청하기')}
-                </Button>
-            </div>
+            {/* 수정할 예약을 못 불러왔으면 빈 폼을 보여 주지 않는다. 채워지지 않은 폼에서 "변경하기"를
+                누르면 새 예약을 만드는 것처럼 보인다. 재시도 뒤 prefill 이 붙도록 Form 요소는 남긴다. */}
+            {isEditMode && editLoadError ? (
+                <DataState state="error" kind="reservation" subject="변경할 예약 정보" error={editLoadError}
+                    title="변경할 예약 정보를 불러오지 못했습니다." onRetry={onRetryEditLoad} retrying={editRetrying} />
+            ) : (
+                <>
+                    <Form.Item label="예약 날짜" name="reservationDate"
+                        rules={[{ required: true, message: '날짜를 선택해주세요.' }]}
+                        extra={bookingRangeHint(store)}>
+                        {/* ★ 2026-08-25 — AntD DatePicker 팝업에서 인라인 BookingCalendar 로 교체.
+                            예전에는 disabledDate 로 막았는데 그건 **회색밖에 못 칠한다** — 정기휴무,
+                            임시휴무, 운영기간 밖, 예약범위 초과, 정원 마감이 전부 같은 회색이라
+                            "왜 안 눌리지"를 알 방법이 없었다. 게다가 그 다섯 판정이 서버(isBookableOn)와
+                            **프론트에도 따로**(makeDisabledDate) 있어서 언젠가 어긋날 자리였다.
+                            이제 사유는 서버가 내려주고 달력은 그리기만 한다. */}
+                        <BookingCalendar storeId={store?.id} />
+                    </Form.Item>
+                    {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
+                        "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
+                    <Form.Item
+                        label={store?.bookingType === 'DAY' ? '예약 확인' : (store?.bookingType === 'SESSION' ? '회차 선택' : '예약 시간')}
+                        name="reservationTime"
+                        // 날짜를 고르기 전에는 이 칸에 넣을 값 자체가 없다(슬롯을 날짜로 조회한다).
+                        // 그런데도 required 를 걸어두면 아무것도 안 채우고 제출했을 때 날짜와 시간이
+                        // 동시에 빨개져서, 지금 고칠 수 없는 칸까지 고치라고 지시하게 된다.
+                        // 실제로 고쳐야 할 곳은 바로 위 날짜 칸 하나이고 그 칸이 이미 막고 있다.
+                        // (interactions.css 의 "비활성은 에러보다 우선한다"와 같은 규칙이다)
+                        //
+                        // ⚠️ dependencies={['reservationDate']} 를 붙이면 안 된다 — rc-field-form 은
+                        //    의존 필드가 바뀌는 즉시 이 칸을 재검증해서, 날짜를 고르자마자 아직 아무것도
+                        //    안 한 시간 칸에 "시간을 선택해주세요"가 튀어나온다(2026-07에 이미 한 번
+                        //    고쳤던 회귀다 — TimeSlotPicker 의 setFields 주석 참고).
+                        //    함수형 rule 은 검증 시점에 getFieldValue 로 최신 날짜를 직접 읽으므로
+                        //    dependencies 없이도 제출 때 올바르게 평가된다.
+                        rules={[({ getFieldValue }) => ({
+                            required: !!getFieldValue('reservationDate'),
+                            message: store?.bookingType === 'DAY' ? '날짜를 선택해주세요.' : '시간을 선택해주세요.',
+                        }), ({ getFieldValue }) => ({
+                            validator: (_, time) => {
+                                const date = getFieldValue('reservationDate');
+                                if (!date) return Promise.resolve();
+                                const timeAvailability = timeAvailabilityRef.current;
+                                const key = `${store?.id}:${date.format('YYYY-MM-DD')}`;
+                                if (timeAvailability.key !== key || timeAvailability.status !== 'success') {
+                                    return Promise.reject(new Error(timeAvailability.status === 'error' && timeAvailability.key === key
+                                        ? '예약 가능한 시간을 다시 불러와 주세요.'
+                                        : '예약 가능한 시간을 확인하는 중이에요. 잠시 후 다시 시도해 주세요.'));
+                                }
+                                if (time && !timeAvailability.slots.some(slot => slot.time === time && isSelectableSlot(slot, store?.id, date.format('YYYY-MM-DD'), editingReservation))) {
+                                    return Promise.reject(new Error('예약 가능한 시간을 다시 선택해주세요.'));
+                                }
+                                return Promise.resolve();
+                            },
+                        })]}>
+                        <TimeSlotPicker store={store} dateValue={dateValue} form={form} onAvailabilityChange={handleAvailabilityChange} editingReservation={editingReservation} />
+                    </Form.Item>
+                    <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
+                        <GuestCountInput />
+                    </Form.Item>
+                    <Form.Item label="요청 사항" name="specialRequest">
+                        <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." />
+                    </Form.Item>
+                    <div style={{ marginTop: 24 }}>
+                        <Button variant="primary" htmlType="submit" block loading={paying}>
+                            {paying ? '처리 중...' : (isEditMode ? '예약 변경하기' : '예약 신청하기')}
+                        </Button>
+                    </div>
+                </>
+            )}
         </Form>
     </div>
     );
@@ -473,10 +605,11 @@ const pcFormStyles = {
 
 const StoreDetail = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
     const { message } = useMessage();
     const { isLoggedIn, user } = useAuthStore();
     const { pay, paying } = usePayment();
-    const { store, loading, error } = useStoreData(id);
+    const { store, loading, error, refetch } = useStoreData(id);
     const imageHint = useStoreImageHint(id);
 
     // 상세 데이터가 도착하면 이 가게의 커버 이미지 비율도 적어둔다 (2026-07 추가).
@@ -486,7 +619,17 @@ const StoreDetail = () => {
         if (store) rememberImageHints(store);
     }, [store]);
     const [form] = Form.useForm();
-    const isPC = useWindowWidth() >= BREAKPOINT;
+    const windowWidth = useWindowWidth();
+    const isPC = windowWidth >= BREAKPOINT;
+    const openStoreMessenger = useMessengerStore((state) => state.openStore);
+
+    const handleStoreContact = () => {
+        const target = `/messages?storeId=${id}`;
+        // 모바일은 브라우저 뒤로가기가 자연스러운 전체 페이지, 태블릿 이상은 현재 맥락을
+        // 유지하는 오른쪽 패널을 쓴다. 비로그인은 PrivateRoute를 거쳐 로그인 뒤 돌아온다.
+        if (!isLoggedIn || windowWidth < breakpoints.tablet) navigate(target);
+        else openStoreMessenger(Number(id));
+    };
 
     // "우리동네" 배지 — StoreCard/StoreList와 동일한 원칙 및 우선순위(2026-07 수정):
     // 마이페이지에 저장된 위치가 있으면 그게 최우선이고, 없을 때만 이 세션에서 얻은 라이브 위치로
@@ -501,16 +644,20 @@ const StoreDetail = () => {
 
     const {
         completedReservation,
+        reviewEligibilityError,
+        reviewEligibilityLoading,
+        refetchReviewEligibility,
         stateOpenWrite,
         stateOpenReviewId,
         reviewSectionRef,
         onFinish,
         isEditMode,
+        editingReservation,
+        editLoadError,
+        editRetrying,
+        retryEditLoad,
     } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message });
 
-    React.useEffect(() => {
-        if (error) message.error(error);
-    }, [error, message]);
     useDocumentTitle(
         store?.name ?? null,
         store
@@ -518,42 +665,24 @@ const StoreDetail = () => {
             : undefined
     );
 
-    // 되감을 히스토리가 없으면(검색·공유 링크로 바로 들어온 경우) 가게 목록으로 보낸다.
-    // navigate(-1)만 쓰면 그 사용자에게는 버튼이 죽는다 — useGoBack 주석 참고.
-    const goBack = useGoBack('/stores');
-
-    // "뒤로가기"는 store 데이터와 무관한 완전 정적 요소라 로딩 상태와
-    // 무관하게 항상 같은 실제 버튼으로 떠 있어야 함(2026-07 버그 수정) — 예전엔 loading일 때
-    // StoreDetailSkeleton 안의 회색 막대(Bone)로 대체돼서, 페이지 로딩 중엔 뒤로 나갈 수 있는
-    // 진짜 버튼이 아예 없었음. 로딩/데이터없음/로딩완료 세 갈래 모두에서 동일하게 렌더.
-    const backButton = (
-        <Button variant="ghost" onClick={goBack} style={styles.backBtn}>
-            <ArrowLeftOutlined style={{ fontSize: 14 }} /> 뒤로가기
-        </Button>
-    );
+    // PC·모바일 뒤로가기는 데이터 로딩과 무관하게 공통 Header에서 제공한다.
 
     if (loading) return (
         <PageContainer size={isPC ? 'xl' : 'md'} paddingTop={isPC ? '32px' : '20px'}>
-            {backButton}
             <StoreDetailSkeleton imageHint={imageHint} isPC={isPC} />
         </PageContainer>
     );
     if (!store) return (
         <PageContainer size={isPC ? 'xl' : 'md'} paddingTop={isPC ? '32px' : '20px'}>
-            {backButton}
-                        {/*
-              * ★ "불러오기 실패" 와 "가게가 없음" 을 같은 문장으로 말하지 않는다(2026-08-29).
-              *   예전엔 둘 다 "데이터가 없습니다." 였다. 그래서 서버가 잠깐 내려간 것뿐인데
-              *   손님에게 **사실이 아닌 말**을 했고 — 다시 열면 될 상황을 가게가 사라진 것으로
-              *   읽게 만들었다. 되돌아올 수 있는 상태를 되돌아올 수 없는 것처럼 말한 셈이다.
-              *
-              *   `error` 는 axios 인터셉터가 만든 완성된 문장이라 사유와 다음 행동이 이미 들어 있다
-              *   ("서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요." / "정보를 찾을 수 없습니다.").
-              *   그대로 쓰면 문구가 한 군데(axios.js)에서만 관리된다.
-              */}
-            <div style={{ textAlign: 'center', marginTop: 100 }}>
-                {error ?? '요청하신 가게를 찾을 수 없습니다.'}
-            </div>
+            <DataState
+                state={error ? 'error' : 'empty'}
+                kind="store"
+                subject="가게 정보"
+                error={error}
+                title={error ? undefined : '요청하신 가게를 찾을 수 없습니다.'}
+                onRetry={error ? refetch : undefined}
+                style={{ marginTop: 100 }}
+            />
         </PageContainer>
     );
 
@@ -575,15 +704,13 @@ const StoreDetail = () => {
     return (
         <PageContainer className="reserve-store-detail" size={containerSize} paddingTop={isPC ? '32px' : '20px'}>
 
-            {backButton}
-
             {isPC ? (
                 <>
                     <div style={styles.pcGrid}>
                         <div style={styles.pcLeft}>
                             <div style={{ position: 'relative' }}>
-                                <div style={styles.pcImageWrapper}>
-                                    <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={{ popup: { root: 'reserve-image-preview' } }}><Carousel className="reserve-carousel" infinite
+                                <div style={styles.pcImageWrapper} onClickCapture={rememberStorePreviewOrigin}>
+                                    <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={storePreviewClassNames}><Carousel className="reserve-carousel" infinite
                                         /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
                                            swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
                                            짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.
@@ -602,29 +729,17 @@ const StoreDetail = () => {
                                         ))}
                                     </Carousel></Image.PreviewGroup>
                                 </div>
-                                <div style={styles.imgFavBtn}>
-                                    <FavoriteButton storeId={Number(id)} size="sm" />
-                                </div>
                             </div>
-                            <div style={{ marginTop: 20, marginBottom: 4 }}>
-                                {store.category && <Badge variant="category">{store.category}</Badge>}
-                                {nearby && <Badge variant="nearby">우리동네</Badge>}
-                                {store.keywords?.map((kw) => <Badge key={kw} variant="keyword">{kw}</Badge>)}
-                            </div>
-                            <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
-                            <div style={headerStyles.metaRow}>
-                                <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
-                                <Text strong style={{ fontSize: fontSize.sm }}>{store.rating?.toFixed(1) || '0.0'}</Text>
-                                <Text type="secondary" style={{ fontSize: fontSize.xs }}>({store.reviewCount || 0})</Text>
-                            </div>
-                            <StoreInfoSection store={store} description={store.description} />
+                            <StoreIdentity store={store} nearby={nearby}
+                                canContact={user?.id !== store.ownerId} onContact={handleStoreContact} />
+                            <StoreInfoSection store={store} />
                             <div style={{ marginTop: 20, marginBottom: 8 }}>
                                 <KakaoMap latitude={store.latitude} longitude={store.longitude}
                                     address={store.address} storeName={store.name} height={220} />
                             </div>
                         </div>
                         <div style={styles.pcRight}>
-                            <ReservationPanel store={store} form={form} onFinish={onFinish} paying={paying} isPC={true} isEditMode={isEditMode} />
+                            <ReservationPanel store={store} form={form} onFinish={onFinish} paying={paying} isPC={true} isEditMode={isEditMode} editingReservation={editingReservation} editLoadError={editLoadError} editRetrying={editRetrying} onRetryEditLoad={retryEditLoad} />
                         </div>
                     </div>
                     {/* 리뷰 섹션을 2단 레이아웃(pcGrid) 밖으로 분리(2026-07) — 예전엔 pcLeft 안에 있어서
@@ -636,6 +751,9 @@ const StoreDetail = () => {
                     <section ref={reviewSectionRef}>
                         <Title level={3} style={styles.sectionTitle}>리뷰</Title>
                         <ReviewList storeId={Number(id)} completedReservation={completedReservation}
+                            completedReservationError={reviewEligibilityError}
+                            completedReservationRetrying={reviewEligibilityLoading}
+                            onCompletedReservationRetry={refetchReviewEligibility}
                             autoOpenWrite={stateOpenWrite} focusReviewId={stateOpenReviewId} isPC />
                     </section>
                 </>
@@ -643,8 +761,8 @@ const StoreDetail = () => {
                 <>
                     <section style={{ padding: 0 }}>
                         <div style={{ position: 'relative' }}>
-                            <div style={styles.mobileImageWrapper}>
-                                <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={{ popup: { root: 'reserve-image-preview' } }}><Carousel className="reserve-carousel" infinite
+                            <div style={styles.mobileImageWrapper} onClickCapture={rememberStorePreviewOrigin}>
+                                <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={storePreviewClassNames}><Carousel className="reserve-carousel" infinite
                                         /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
                                            swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
                                            짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.
@@ -660,39 +778,30 @@ const StoreDetail = () => {
                                     ))}
                                 </Carousel></Image.PreviewGroup>
                             </div>
-                            <div style={styles.imgFavBtn}>
-                                <FavoriteButton storeId={Number(id)} size="sm" />
-                            </div>
                         </div>
-                        <div style={{ padding: '0 16px' }}>
-                            <div style={{ marginTop: 20, marginBottom: 4 }}>
-                                {store.category && <Badge variant="category">{store.category}</Badge>}
-                                {nearby && <Badge variant="nearby">우리동네</Badge>}
-                                {store.keywords?.map((kw) => <Badge key={kw} variant="keyword">{kw}</Badge>)}
-                            </div>
-                            <Title level={1} style={{ ...styles.storeTitle, marginTop: 8 }}>{store.name}</Title>
-                            <div style={headerStyles.metaRow}>
-                                <StarFilled style={{ color: '#fadb14', fontSize: 14 }} />
-                                <Text strong style={{ fontSize: fontSize.sm }}>{store.rating?.toFixed(1) || '0.0'}</Text>
-                                <Text type="secondary" style={{ fontSize: fontSize.xs }}>({store.reviewCount || 0})</Text>
-                            </div>
+                        <div>
+                            <StoreIdentity store={store} nearby={nearby}
+                                canContact={user?.id !== store.ownerId} onContact={handleStoreContact} />
                         </div>
                     </section>
-                    <div style={{ padding: '0 16px' }}>
-                        <StoreInfoSection store={store} description={store.description} />
+                    <div>
+                        <StoreInfoSection store={store} />
                         <div style={{ marginTop: 16, marginBottom: 8 }}>
                             <KakaoMap latitude={store.latitude} longitude={store.longitude}
                                 address={store.address} storeName={store.name} height={200} />
                         </div>
                     </div>
                     <Divider style={styles.divider} />
-                    <section style={{ padding: '0 16px' }}>
-                        <ReservationPanel store={store} form={form} onFinish={onFinish} paying={paying} isPC={false} isEditMode={isEditMode} />
+                    <section>
+                        <ReservationPanel store={store} form={form} onFinish={onFinish} paying={paying} isPC={false} isEditMode={isEditMode} editingReservation={editingReservation} editLoadError={editLoadError} editRetrying={editRetrying} onRetryEditLoad={retryEditLoad} />
                     </section>
                     <Divider style={styles.divider} />
-                    <section ref={reviewSectionRef} style={{ padding: '0 16px' }}>
+                    <section ref={reviewSectionRef}>
                         <Title level={3} style={styles.sectionTitle}>리뷰</Title>
                         <ReviewList storeId={Number(id)} completedReservation={completedReservation}
+                            completedReservationError={reviewEligibilityError}
+                            completedReservationRetrying={reviewEligibilityLoading}
+                            onCompletedReservationRetry={refetchReviewEligibility}
                             autoOpenWrite={stateOpenWrite} focusReviewId={stateOpenReviewId} />
                     </section>
                 </>
@@ -701,19 +810,8 @@ const StoreDetail = () => {
     );
 };
 
-const headerStyles = {
-    metaRow: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-        flexWrap: 'wrap',
-        marginBottom: 16,
-    },
-};
-
 const styles = {
-    backBtn:          { marginBottom: 12, padding: '4px 8px', fontSize: fontSize.sm, color: colors.text.secondary },
-    storeTitle:       { fontSize: fontSize['5xl'], fontWeight: fontWeight.extrabold, marginBottom: 12, marginTop: 20 },
+    identityBadge:    { marginRight: 0, marginBottom: 0 },
     divider:          { margin: '24px 0' },
     sectionTitle:     { marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold },
     mainImg:          { width: '100%', height: 'auto', display: 'block' },
@@ -724,7 +822,6 @@ const styles = {
     pcMainImg:        { width: '100%', height: 'auto', display: 'block' },
     mobileImageWrapper: { width: '100%', overflow: 'hidden', marginBottom: 0, lineHeight: 0, borderRadius: radius.xl }, 
     
-    imgFavBtn:        { position: 'absolute', top: 12, right: 12, zIndex: 5 },
 };
 
 export default StoreDetail;

@@ -8,18 +8,21 @@
  * 2026-07 전수조사 — 검색어/상태 필터/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) —
  * 새로고침해도 필터가 유지되고 링크 공유도 가능해짐(MembersTab과 동일한 이유).
  */
-import React, { useEffect } from 'react';
-import { Typography, Tag } from 'antd';
+import React, { useState } from 'react';
+import { Pagination, Typography, Tag } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { DeleteOutlined } from '@ant-design/icons';
-import { Button, FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
+import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable, ReservationSummaryCardSkeleton } from '../common';
+import ReservationListingToolbar from '../reservation/ReservationListingToolbar';
+import ReservationSummaryCard from '../reservation/ReservationSummaryCard';
+import ReservationDetailModal from '../reservation/ReservationDetailModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
 import { invalidateAdminData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS, RESERVATION_STATUS_LABELS, RESERVATION_STATUS_COLORS,
-         RESERVATION_STATUS_FILTER_OPTIONS } from '../../constants';
+         RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import { colors, fontSize } from '../../styles/tokens';
 import { formatTime, formatCurrency } from '../../utils';
 
@@ -34,7 +37,7 @@ const { Text } = Typography;
 const SKELETON_HEADERS = ['가게', '예약자', '날짜', '시간', '인원', '예약금', '상태', '처리'];
 const SKELETON_COLS    = [130, 100, 110, 80, 60, 90, 90, 80];
 const PAGE_SIZE = 20;
-const QUERY_DEFAULTS = { search: '', status: 'ALL', page: '1' };
+const QUERY_DEFAULTS = { search: '', status: 'ALL', sort: 'recent', view: 'list', page: '1' };
 
 // MembersTab/StoresAdminTab과 동일한 2026-07 전수조사 사유 — pagination 제어로 삭제 뮤테이션 후
 // 페이지 리셋 버그와 스켈레톤 로딩 중 페이지 버튼 소멸 문제를 동시에 해결.
@@ -47,13 +50,16 @@ const skeletonRowCount = (total, pageIdx1, pageSize) => {
 const ReservationsAllTab = () => {
     const { message, confirm } = useMessage();
     const queryClient = useQueryClient();
-    const [{ search: resSearch, status: resStatusFilter, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
+    const [{ search: resSearch, status: resStatusFilter, sort, view, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
     const debouncedResSearch = useDebounce(resSearch, 300);
     const page = Number(pageStr) || 1;
+    const sortValue = RESERVATION_SORT_OPTIONS.some(option => option.value === sort) ? sort : 'recent';
+    const viewMode = view === 'cards' ? 'cards' : 'list';
+    const [detailReservation, setDetailReservation] = useState(null);
     const setPage = (p) => setQuery({ page: String(p) });
 
-    const { data, isLoading: resLoading, isFetching, error: resError, refetch: loadReservations } = useQuery({
-        queryKey: [...adminKeys.reservations(), page, debouncedResSearch, resStatusFilter],
+    const { data, isLoading: resLoading, isFetching, isPlaceholderData, error: resError, refetch: loadReservations } = useQuery({
+        queryKey: [...adminKeys.reservations(), page, debouncedResSearch, resStatusFilter, sortValue],
         queryFn: async () => {
             const result = await api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATIONS, {
                 params: {
@@ -61,6 +67,7 @@ const ReservationsAllTab = () => {
                     size: PAGE_SIZE,
                     ...(debouncedResSearch.trim() ? { search: debouncedResSearch.trim() } : {}),
                     ...(resStatusFilter !== 'ALL' ? { status: resStatusFilter } : {}),
+                    sort: sortValue,
                 },
             });
             return {
@@ -74,9 +81,6 @@ const ReservationsAllTab = () => {
     });
     const reservations = data?.reservations ?? [];
     const totalElements = data?.totalElements ?? 0;
-    useEffect(() => {
-        if (resError) message.error('예약 목록을 불러오지 못했습니다.');
-    }, [resError, message]);
 
     const deleteMutation = useMutation({
         mutationFn: (id) => api.delete(API_ENDPOINTS.ADMIN_MANAGE.RESERVATION_DELETE(id)),
@@ -98,6 +102,7 @@ const ReservationsAllTab = () => {
     // 검색·상태는 서버 전체 집합에 적용한다. 조건이 바뀌면 페이지를 1로 복귀시킨다.
     const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
     const handleStatusFilterChange = (v) => setQuery({ status: v, page: '1' });
+    const handleSortChange = (v) => setQuery({ sort: v, page: '1' });
 
     const reservationColumns = [
         { title: '가게',  dataIndex: 'storeName',       key: 'storeName',       width: 130, render: v => <Text style={{ fontSize: fontSize.sm }}>{v}</Text> },
@@ -116,24 +121,74 @@ const ReservationsAllTab = () => {
 
     return (
         <>
-            <FilterToolbar
-                selects={[{ value: resStatusFilter, onChange: handleStatusFilterChange, options: RESERVATION_STATUS_FILTER_OPTIONS }]}
+            <ReservationListingToolbar
+                view={viewMode}
+                onViewChange={nextView => setQuery({ view: nextView })}
+                status={resStatusFilter}
+                onStatusChange={handleStatusFilterChange}
+                statusOptions={RESERVATION_STATUS_FILTER_OPTIONS}
+                sort={sortValue}
+                onSortChange={handleSortChange}
+                sortOptions={RESERVATION_SORT_OPTIONS}
                 count={totalElements}
+                disabled={resLoading || isFetching}
+                label="관리자 예약 목록 필터"
+            />
+            <FilterToolbar
                 search={{ value: resSearch, onChange: handleSearchChange, placeholder: '가게명, 예약자로 검색', disabled: resLoading }}
                 onReload={loadReservations}
                 loading={resLoading || isFetching}
             />
-            {/* 로딩 조건 통일(2026-07 전수조사): 예전엔 allReservations.length === 0 조건 때문에
-                새로고침 시엔 아무 로딩 신호도 없이 조용히 있다가 휙 바뀌었다 — 다른 탭들과 동일하게
-                (isLoading || isFetching)로 통일. pagination도 동일하게 제어(2026-07 추가) — MembersTab 참고. */}
-            {(resLoading || isFetching) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={1}
-                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
+            {/* 본문 스켈레톤은 첫 조회·쿼리 전환에만 표시한다. 수동 새로고침은 기존 행을 유지하고
+                툴바의 진행 상태만 바뀌므로, 읽던 목록과 페이지 위치가 사라지지 않는다. */}
+            {resError ? (
+                <DataState state="error" kind="reservation" subject="예약 목록" error={resError}
+                    onRetry={loadReservations} retrying={isFetching} compact />
+            ) : (resLoading || isPlaceholderData) ? (
+                viewMode === 'cards' ? (
+                    <ReservationSummaryCardSkeleton count={Math.min(PAGE_SIZE, Math.max(totalElements, 4))} />
+                ) : (
+                    <AdminTableSkeleton
+                        rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                        cols={SKELETON_COLS}
+                        headers={SKELETON_HEADERS}
+                        actionBtns={1}
+                        pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
+                    />
+                )
+            ) : viewMode === 'cards' ? (
+                reservations.length === 0 ? (
+                    <DataState state="empty" kind="reservation" title="예약 내역이 없습니다." style={{ marginTop: 80 }} />
+                ) : (
+                    <>
+                        <div className="reserve-reservation-card-grid">
+                            {reservations.map(reservation => (
+                                <ReservationSummaryCard
+                                    key={reservation.id}
+                                    reservation={reservation}
+                                    showMemberInfo
+                                    onOpenDetail={() => setDetailReservation(reservation)}
+                                    actions={[
+                                        <Button key="delete" variant="ghost-sm-danger"
+                                            loading={deleteMutation.isPending && deleteMutation.variables === reservation.id}
+                                            onClick={() => handleSoftDeleteReservation(reservation)}>
+                                            <DeleteOutlined /> 삭제
+                                        </Button>,
+                                    ]}
+                                />
+                            ))}
+                        </div>
+                        <Pagination
+                            current={page}
+                            pageSize={PAGE_SIZE}
+                            total={totalElements}
+                            onChange={setPage}
+                            showSizeChanger={false}
+                            align="end"
+                            style={{ marginTop: 16 }}
+                        />
+                    </>
+                )
             ) : (
                 <DataTable
                     columns={reservationColumns}
@@ -143,6 +198,11 @@ const ReservationsAllTab = () => {
                     locale={{ emptyText: '예약 내역이 없습니다.' }}
                 />
             )}
+            <ReservationDetailModal
+                reservation={detailReservation}
+                open={detailReservation != null}
+                onClose={() => setDetailReservation(null)}
+            />
         </>
     );
 };

@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Typography } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircleFilled, ReloadOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { ReloadOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Button, Bone } from '../common';
 import reservationService from '../../services/reservationService';
 import { useMessage } from '../../hooks';
 import { invalidateReservationData } from '../../hooks/invalidateAfterWrite';
-import { colors, radius, shadows, fontSize, fontWeight, withAlpha } from '../../styles/tokens';
+import { colors, radius, shadows, fontSize, withAlpha } from '../../styles/tokens';
 
 const { Text } = Typography;
 const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
@@ -97,7 +98,7 @@ const MAX_ASPECT_FIXES = 3;
  * [중요 - 탭 전환해도 카메라 안 꺼지던 버그] BusinessPanel의 Tabs에 destroyInactiveTabPane을
  * 켜서, 다른 탭으로 이동하면 이 컴포넌트가 언마운트되고 아래 cleanup useEffect가 카메라를 끔.
  */
-const QrScannerTab = () => {
+const QrScannerTab = ({ sheet = false, onClose }) => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
     const html5QrRef = useRef(null);
@@ -106,7 +107,6 @@ const QrScannerTab = () => {
 
     const [status, setStatus] = useState('idle'); // idle | starting | scanning | error
     const [errorMsg, setErrorMsg] = useState('');
-    const [lastResult, setLastResult] = useState(null);
 
     // 디코딩 루프가 실제로 도는지 확인하는 유일한 신호 (아래 startScanning 주석 참고)
     const decodeTickRef = useRef(0);
@@ -213,13 +213,12 @@ const QrScannerTab = () => {
         try {
             // 체크인은 승인 상태와 독립된 멱등 출석 기록이다.
             const { reservation, alreadyCheckedIn } = await reservationService.checkInByQr(decodedText);
-            setLastResult({ ...reservation, alreadyCheckedIn });
             const who = reservation.memberName || '고객';
             if (alreadyCheckedIn) {
                 message.info(`${who}님은 이미 체크인되었습니다.`);
             } else {
                 message.success(`${who}님 체크인이 완료되었습니다.`);
-                // 예약 관리 탭은 이 탭으로 오면서 언마운트됐지만 캐시는 남아 있다.
+                // 예약 관리 목록은 이 탭(또는 시트)으로 오면서 가려졌지만 캐시는 남아 있다.
                 // 무효화하지 않으면 돌아갔을 때 상세 모달에 체크인 시각이 빠진 목록이 보인다.
                 invalidateReservationData(queryClient);
             }
@@ -397,7 +396,6 @@ const QrScannerTab = () => {
             try { await scanner.stop(); } catch { /* 아직 시작 전이거나 이미 멈춤 */ }
         }
         setStatus('idle');
-        setLastResult(null);
     }, []);
 
     // 컴포넌트가 언마운트될 때(다른 탭으로 이동 등) 카메라를 반드시 끔
@@ -417,8 +415,14 @@ const QrScannerTab = () => {
     // 탭 마운트 직후 짧게 보여주는 카드 모양 skeleton (위 ready 관련 주석 참고)
     if (!ready) {
         return (
-            <div style={styles.wrapper}>
-                <div style={styles.card}>
+            <div
+                className="reserve-qr-scanner"
+                style={styles.wrapper}
+                role="status"
+                aria-label="QR 스캐너를 준비하는 중"
+                aria-busy="true"
+            >
+                <div style={{ ...styles.card, ...(sheet ? styles.sheetCard : {}) }}>
                     <Bone width={90} height={18} style={{ marginBottom: 8 }} />
                     <Bone width="85%" height={13} style={{ marginBottom: 16 }} />
                     {/* 프리뷰 박스와 같은 비율이어야 스켈레톤이 사라질 때 카드 높이가 안 튄다 */}
@@ -430,9 +434,9 @@ const QrScannerTab = () => {
     }
 
     return (
-        <div style={styles.wrapper}>
-            <div style={styles.card}>
-                <Text strong style={styles.cardTitle}>QR 체크인</Text>
+        <div className="reserve-qr-scanner" style={styles.wrapper}>
+            <div style={{ ...styles.card, ...(sheet ? styles.sheetCard : {}) }}>
+                {!sheet && <Text strong style={styles.cardTitle}>QR 체크인</Text>}
                 <Text type="secondary" style={styles.hint}>
                     승인된 예약의 QR을 비추면 방문 시각이 기록됩니다.
                 </Text>
@@ -471,9 +475,11 @@ const QrScannerTab = () => {
                             {status === 'idle' && (
                                 <>
                                     <Text strong style={styles.overlayTitle}>카메라를 켜고 스캔을 시작하세요</Text>
-                                    <Button variant="primary" size="sm" onClick={startScanning}>
-                                        QR 스캔 시작
-                                    </Button>
+                                    {!sheet && (
+                                        <Button variant="primary" size="sm" onClick={startScanning}>
+                                            QR 스캔 시작
+                                        </Button>
+                                    )}
                                 </>
                             )}
                             {/* 2026-07: 순수 CSS 스피너 링 대신 앱 전체가 쓰는 shimmer Bone 스켈레톤으로 통일 —
@@ -494,9 +500,11 @@ const QrScannerTab = () => {
                                     <Text style={{ color: colors.error.main, textAlign: 'center', padding: '0 20px', fontSize: fontSize.sm }}>
                                         {errorMsg}
                                     </Text>
-                                    <Button variant="secondary" size="sm" onClick={startScanning}>
-                                        <ReloadOutlined /> 다시 시도
-                                    </Button>
+                                    {!sheet && (
+                                        <Button variant="secondary" size="sm" onClick={startScanning} icon={<ReloadOutlined aria-hidden="true" />}>
+                                            다시 시도
+                                        </Button>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -509,7 +517,6 @@ const QrScannerTab = () => {
                         <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary, flex: 1 }}>
                             스캔 대기 중…
                         </Text>
-                        <Button variant="ghost-sm" onClick={stopScanning}>스캔 중지</Button>
                     </div>
                 )}
 
@@ -526,26 +533,25 @@ const QrScannerTab = () => {
                         <div>ticks {debugInfo.ticks} · 보정 {debugInfo.fixes}회</div>
                     </div>
                 )}
-            </div>
 
-            {lastResult && (
-                <div style={styles.resultCard}>
-                    {/* 이미 체크인된 건은 초록(성공)이 아니라 파랑(정보)으로 — 색만 봐도
-                        "방금 내가 처리했다"와 "원래 되어 있었다"가 구분돼야 한다. */}
-                    <div style={{
-                        ...styles.resultIconBadge,
-                        background: lastResult.alreadyCheckedIn ? colors.primary.main : colors.success.main,
-                    }}>
-                        <CheckCircleFilled style={{ fontSize: 30, color: '#fff' }} />
+                {sheet && (
+                    <div className="reserve-qr-scanner-actions">
+                        <Button variant="secondary" size="md" onClick={onClose}>닫기</Button>
+                        <Button
+                            variant="primary"
+                            size="md"
+                            onClick={status === 'scanning' ? stopScanning : startScanning}
+                            loading={status === 'starting'}
+                            loadingIcon={<ReloadOutlined spin aria-hidden="true" />}
+                            icon={status === 'error' ? <ReloadOutlined aria-hidden="true" /> : undefined}
+                        >
+                            {status === 'scanning' && '스캔 중지'}
+                            {status === 'error' && '다시 시도'}
+                            {(status === 'idle' || status === 'starting') && 'QR 스캔 시작'}
+                        </Button>
                     </div>
-                    <Text strong style={styles.resultTitle}>
-                        {lastResult.memberName || '고객'}님 {lastResult.alreadyCheckedIn ? '이미 체크인됨' : '체크인 완료'}
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                        {lastResult.reservationDate} {lastResult.reservationTime?.substring(0, 5) || ''} · {lastResult.guestCount}명
-                    </Text>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };
@@ -559,6 +565,7 @@ const styles = {
         boxShadow: shadows.card,
         padding: 20,
     },
+    sheetCard: { border: 'none', boxShadow: 'none', padding: 0 },
     cardTitle: { display: 'block', fontSize: fontSize.base, color: colors.text.primary, marginBottom: 4 },
     hint:     { display: 'block', marginBottom: 16, fontSize: fontSize.sm, lineHeight: 1.5 },
     // aspectRatio 는 렌더에서 카메라 실측값으로 덮는다 — 여기 고정값을 두지 않는다.
@@ -644,25 +651,11 @@ const styles = {
         lineHeight: 1.6,
         color: colors.text.secondary,
     },
-    resultCard: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 6,
-        textAlign: 'center',
-        background: colors.background.paper,
-        border: `1px solid ${colors.border.light}`,
-        borderRadius: radius['2xl'],
-        boxShadow: shadows.card,
-        padding: '28px 20px',
-    },
-    resultIconBadge: {
-        width: 64, height: 64, borderRadius: '50%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: colors.success.main,
-        marginBottom: 4,
-    },
-    resultTitle: { fontSize: fontSize.base, color: colors.text.primary, fontWeight: fontWeight.bold },
+};
+
+QrScannerTab.propTypes = {
+    sheet: PropTypes.bool,
+    onClose: PropTypes.func,
 };
 
 export default QrScannerTab;

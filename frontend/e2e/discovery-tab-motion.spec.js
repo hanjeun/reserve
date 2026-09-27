@@ -1,0 +1,162 @@
+import { expect, test } from '@playwright/test';
+
+test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+test.beforeEach(async ({ page }) => {
+    await page.route('**/api/member/me', route => route.fulfill({
+        status: 401,
+        json: { success: false, message: '인증이 필요합니다.' },
+    }));
+    await page.route('**/api/auth/refresh', route => route.fulfill({
+        status: 401,
+        json: { success: false, message: '세션이 없습니다.' },
+    }));
+});
+
+test('top tabs move only their content in the selected direction, including browser back', async ({ page }) => {
+    await page.goto('/');
+    const content = page.locator('.ant-layout-content');
+    const header = page.locator('.reserve-header-inner');
+    const tabs = page.locator('.reserve-discovery-top-nav');
+    const waitingTab = page.getByRole('link', { name: '웨이팅', exact: true });
+    const feedTab = page.getByRole('link', { name: '피드', exact: true });
+    const initialHeader = await header.boundingBox();
+    const initialTabs = await tabs.boundingBox();
+    for (const line of await page.locator('.reserve-discovery-banner--current .reserve-discovery-banner-copy > *').all()) {
+        await expect(line).toHaveCSS('animation-name', 'none');
+    }
+
+    await waitingTab.click();
+    await expect(waitingTab).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: '웨이팅은 아직 준비 중이에요' })).toBeVisible();
+    await expect(content).toHaveClass(/reserve-route-entry--from-right/);
+    const destination = page.locator('.reserve-discovery-coming-soon');
+    await expect(content).toHaveCSS('animation-name', 'none');
+    await expect(destination).toHaveCSS('animation-name', 'reserve-discovery-page-from-right');
+    await expect(header).toHaveCSS('animation-name', 'none');
+    await expect(tabs).toHaveCSS('animation-name', 'none');
+
+    await feedTab.click();
+    await expect(feedTab).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: '새로운 이야기를 준비하고 있어요' })).toBeVisible();
+    await expect(destination).toHaveCSS('animation-name', 'reserve-discovery-page-from-right');
+    await page.goBack();
+    await expect(waitingTab).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: '웨이팅은 아직 준비 중이에요' })).toBeVisible();
+    await expect(content).toHaveClass(/reserve-route-entry--from-left/);
+    await expect(destination).toHaveCSS('animation-name', 'reserve-discovery-page-from-left');
+    await expect(destination).toHaveCSS('transform', 'none');
+    expect(await header.boundingBox()).toEqual(initialHeader);
+    expect(await tabs.boundingBox()).toEqual(initialTabs);
+});
+
+test('the header logo stays still and only the home page slides in from outside the tabs', async ({ page }) => {
+    await page.goto('/terms');
+    const content = page.locator('.ant-layout-content');
+    const logo = page.getByRole('link', { name: 'RESERVE 홈' });
+    await logo.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(logo).not.toHaveClass(/reserve-header-logo--home-motion/);
+    await expect(logo).toHaveCSS('animation-name', 'none');
+    await expect(content).toHaveClass(/reserve-route-entry--from-left/);
+    await expect(page.locator('.reserve-discovery-home')).toHaveCSS('animation-name', 'reserve-discovery-page-from-left');
+});
+
+test('rapid header back presses produce one collapse and one history move', async ({ page }) => {
+    await page.addInitScript(() => {
+        const go = window.history.go.bind(window.history);
+        // 실제 비동기 POP의 커밋 대기를 늘려 빠른 입력 경쟁을 결정적으로 검사한다.
+        window.history.go = delta => window.setTimeout(() => go(delta), 120);
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: '로그인', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
+    const back = page.getByRole('button', { name: '이전 화면으로 돌아가기' });
+    await expect(back).toHaveCSS('animation-name', 'reserve-header-back-enter');
+    await page.evaluate(async () => {
+        const button = document.querySelector('.reserve-header-back');
+        await Promise.all(button.getAnimations().map(animation => animation.finished));
+        window.__reserveHeaderBackAnimations = [];
+        document.addEventListener('animationstart', event => {
+            if (event.target.classList.contains('reserve-header-back')) {
+                window.__reserveHeaderBackAnimations.push(event.animationName);
+            }
+        });
+        // DOM click을 연달아 보내 React/POP 커밋 사이의 입력도 재현한다.
+        button.click();
+        button.click();
+        setTimeout(() => button.click(), 185);
+    });
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('.reserve-header-back')).toHaveCount(0);
+    expect(await page.evaluate(() => window.__reserveHeaderBackAnimations)).toEqual(['reserve-header-back-leave']);
+    await page.goForward();
+    await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '이전 화면으로 돌아가기' })).toBeEnabled();
+});
+
+test('ordinary routes and the password return use the same content-only directions', async ({ page }) => {
+    await page.goto('/');
+    const content = page.locator('.ant-layout-content');
+    await page.getByRole('button', { name: '로그인', exact: true }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(content).toHaveClass(/reserve-route-entry--from-right/);
+    await expect(page.locator('.reserve-header-inner')).toHaveCSS('animation-name', 'none');
+
+    await page.getByRole('button', { name: '이전 화면으로 돌아가기' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(content).toHaveClass(/reserve-route-entry--from-left/);
+
+    await page.goto('/login');
+    await page.getByRole('button', { name: '비밀번호를 잊으셨나요?' }).click();
+    await expect(page).toHaveURL(/\/forgot-password$/);
+    await expect(content).toHaveClass(/reserve-route-entry--from-right/);
+    await page.getByRole('button', { name: '로그인으로 돌아가기' }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(content).toHaveClass(/reserve-route-entry--from-left/);
+});
+
+test('top tab switch is immediate with reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await page.getByRole('link', { name: '웨이팅', exact: true }).click();
+    const content = page.locator('.ant-layout-content');
+    await expect(content).toHaveClass(/reserve-route-entry--from-right/);
+    await expect(content).toHaveCSS('animation-name', 'none');
+    await expect(page.locator('.reserve-discovery-coming-soon')).toHaveCSS('animation-name', 'none');
+});
+
+test('a slow lazy tab shows a still loading skeleton and animates only the resolved page', async ({ page }) => {
+    let lazyModuleRequested = false;
+    let releaseLazyModule;
+    const lazyModuleGate = new Promise(resolve => {
+        releaseLazyModule = resolve;
+    });
+    await page.route('**/src/pages/discovery/ComingSoon.jsx*', async route => {
+        lazyModuleRequested = true;
+        await lazyModuleGate;
+        await route.continue();
+    });
+    await page.goto('/');
+    const home = page.locator('.reserve-discovery-home');
+    const waitingTab = page.getByRole('link', { name: '웨이팅', exact: true });
+    const skeleton = page.locator('.reserve-route-skeleton');
+    await expect(home).toBeVisible();
+
+    try {
+        // Playwright의 click 완료 대기는 lazy import가 풀릴 때까지 밀릴 수 있다.
+        // React Link의 이벤트만 동기적으로 dispatch해 fallback이 남아 있는 순간을 읽는다.
+        await waitingTab.evaluate(link => link.click());
+        await expect.poll(() => lazyModuleRequested).toBe(true);
+        await expect(page).toHaveURL(/\/waiting$/);
+        await expect(waitingTab).toHaveAttribute('aria-current', 'page');
+        await expect(home).toBeHidden();
+        await expect(skeleton).toBeVisible();
+        await expect(skeleton).toHaveCSS('animation-name', 'none');
+    } finally {
+        releaseLazyModule();
+    }
+
+    await expect(page.getByRole('heading', { name: '웨이팅은 아직 준비 중이에요' })).toBeVisible();
+    await expect(page.locator('.reserve-discovery-coming-soon')).toHaveCSS('animation-name', 'reserve-discovery-page-from-right');
+});

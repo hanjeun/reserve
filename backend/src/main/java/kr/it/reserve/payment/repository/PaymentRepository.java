@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -111,6 +112,61 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             Pageable pageable);
 
     long countByStatusAndCreatedAtBefore(Payment.PaymentStatus status, LocalDateTime cutoff);
+
+    /**
+     * 사업자 통계용 일별 예약금 순결제액.
+     *
+     * <p>예약 방문일이나 {@code reservation.depositPaid}가 아니라 실제 결제 완료 시각을 쓴다.
+     * 확정 환불액만 차감하므로 {@code REFUND_PENDING}은 돈이 돌아오기 전까지 기존 순액을 유지한다.
+     * 숨긴 예약도 금융 원장에서는 사라지면 안 되므로 {@code deletedAt} 조건을 두지 않는다.
+     */
+    @Query("""
+            SELECT CAST(p.paidAt AS LocalDate), SUM(p.amount - COALESCE(p.refundAmount, 0))
+              FROM Payment p
+             WHERE p.reservation.store.id = :storeId
+               AND p.paidAt >= :startInclusive
+               AND p.paidAt < :endExclusive
+               AND p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
+             GROUP BY CAST(p.paidAt AS LocalDate)
+             ORDER BY CAST(p.paidAt AS LocalDate)
+            """)
+    List<Object[]> sumNetDepositByPaidDate(
+            @Param("storeId") Long storeId,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive);
+
+    /** 결제 상태·금액·확정 환불액 사이의 장부 불변식 위반 건수. 자동 보정하지 않는다. */
+    @Query("""
+            SELECT COUNT(p) FROM Payment p
+             WHERE p.amount IS NULL OR p.amount <= 0
+                OR COALESCE(p.refundAmount, 0) < 0
+                OR COALESCE(p.refundAmount, 0) > p.amount
+                OR (p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
+                    AND p.paidAt IS NULL)
+                OR (p.status IN ('READY', 'FAILED', 'CANCELLED')
+                    AND (p.paidAt IS NOT NULL OR COALESCE(p.refundAmount, 0) <> 0))
+                OR (p.status = 'PAID' AND COALESCE(p.refundAmount, 0) <> 0)
+                OR (p.status = 'PARTIAL_REFUNDED'
+                    AND (COALESCE(p.refundAmount, 0) <= 0 OR p.refundAmount >= p.amount))
+                OR (p.status = 'REFUNDED' AND COALESCE(p.refundAmount, 0) < p.amount)
+            """)
+    long countLedgerInvariantViolations();
+
+    /** 예약의 결제 플래그와 결제 원장의 확정 순잔액이 어긋난 건수. 자동 보정하지 않는다. */
+    @Query("""
+            SELECT COUNT(r) FROM Reservation r
+             WHERE (r.depositPaid = true AND NOT EXISTS (
+                        SELECT p.id FROM Payment p
+                         WHERE p.reservation = r AND p.paidAt IS NOT NULL
+                           AND p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
+                           AND p.amount - COALESCE(p.refundAmount, 0) > 0))
+                OR ((r.depositPaid = false OR r.depositPaid IS NULL) AND EXISTS (
+                        SELECT p.id FROM Payment p
+                         WHERE p.reservation = r AND p.paidAt IS NOT NULL
+                           AND p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
+                           AND p.amount - COALESCE(p.refundAmount, 0) > 0))
+            """)
+    long countReservationDepositInvariantViolations();
     
     // 회원 ID와 결제 상태로 조회
     List<Payment> findByMemberIdAndStatus(Long memberId, Payment.PaymentStatus status);

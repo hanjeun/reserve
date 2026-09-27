@@ -42,7 +42,7 @@ export default function FaqSection({ isMobile }) {
         >
             <div style={{ maxWidth: 800, margin: '0 auto', width: '100%' }}>
                 <div className="reveal" style={{ marginBottom: isMobile ? 28 : 40, textAlign: 'left' }}>
-                    <Title style={{ fontSize: 'clamp(22px, 4vw, 40px)', fontWeight: fontWeight.extrabold, color: colors.text.primary, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
+                    <Title level={2} style={{ fontSize: 'clamp(22px, 4vw, 40px)', fontWeight: fontWeight.extrabold, color: colors.text.primary, margin: '0 0 8px', letterSpacing: '-0.5px' }}>
                         자주 묻는 질문
                     </Title>
                     <Text style={{ fontSize: 15, color: colors.text.secondary }}>궁금한 점이 있으신가요?</Text>

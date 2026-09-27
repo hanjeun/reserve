@@ -21,7 +21,7 @@ const useManageReservations = (params) => {
 
     // 상태 변경은 필터 결과·전체 건수도 바꾼다. 부분적인 낙관 갱신 대신 모든 관리 페이지를 재조회한다.
     // 2026-09: 거절·취소는 달력의 빈자리를, 모든 상태 변경은 통계의 상태 분포를 바꾼다 —
-    // 관리 목록뿐 아니라 그쪽도 무효화한다(invalidateAfterWrite.js).
+    // 관리 목록·내 예약뿐 아니라 그쪽도 무효화한다(invalidateAfterWrite.js).
     const onSettled = () => invalidateReservationData(queryClient);
 
     // ── Undo (2026-08-11) ────────────────────────────────────────────────────

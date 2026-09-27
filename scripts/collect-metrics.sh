@@ -18,8 +18,12 @@ exec 2>>"$LOG_DIR/collector.err"
 emit_host() { printf 'kind=host metric=%s value=%s\n' "$1" "$2" >> "$LOG_FILE"; }
 
 # vmstat's FIRST sample is an average since boot and is useless; the second is real.
-CPU_IDLE=$(vmstat 1 2 | tail -1 | awk '{print $15}')
+read -r CPU_EXEC CPU_IDLE CPU_WAIT CPU_STEAL <<<"$(vmstat 1 2 | tail -1 | awk '{print $13+$14, $15, $16, $17}')"
+# 기존 cpu_pct 시계열의 의미(100-idle)는 바꾸지 않는다. 실제 실행·I/O 대기·호스트 회수는 새 지표다.
 emit_host cpu_pct "$(awk -v i="${CPU_IDLE:-100}" 'BEGIN{printf "%.1f", 100-i}')"
+emit_host cpu_exec_pct   "${CPU_EXEC:-0}"
+emit_host cpu_iowait_pct "${CPU_WAIT:-0}"
+emit_host cpu_steal_pct  "${CPU_STEAL:-0}"
 
 # mem_used_pct from `available`, not `used` -- Linux counts page cache as used.
 read -r MEM_USED MEM_AVAIL MEM_PCT <<<"$(free -m | awk '/^Mem:/{printf "%d %d %.1f", $3, $7, ($2-$7)/$2*100}')"

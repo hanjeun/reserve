@@ -13,6 +13,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 /**
  * 메일 발송. 모든 발송 메서드는 {@code @Async} 다.
@@ -186,23 +187,31 @@ public class EmailService {
                                                   String reservationDate, String reservationTime,
                                                   int guestCount, String statusLabel, String statusColor,
                                                   String statusMessage, String reason, String reasonLabel) {
+        String safeMemberName = escapeHtml(memberName);
+        String safeStoreName = escapeHtml(storeName);
+        String safeReservationDate = escapeHtml(reservationDate);
+        String safeReservationTime = escapeHtml(reservationTime);
+        String safeStatusLabel = escapeHtml(statusLabel);
+        String safeStatusMessage = escapeHtml(statusMessage);
+        String safeReason = escapeHtmlWithLineBreaks(reason);
+        String safeReasonLabel = escapeHtml(reasonLabel != null ? reasonLabel : "사유");
         String reasonRow = reason != null
-                ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">" + (reasonLabel != null ? reasonLabel : "사유")
-                  + "</td><td style=\"color:#191f28;font-weight:600;\">" + reason + "</td></tr>"
+                ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">" + safeReasonLabel
+                  + "</td><td style=\"color:#191f28;font-weight:600;\">" + safeReason + "</td></tr>"
                 : "";
         return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
             + "<div style=\"width:100%;background:#f9fafb;padding:40px 0;\">"
             + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
             + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
-            + "    <div style=\"display:inline-block;background:" + statusColor + ";color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">" + statusLabel + "</div>"
-            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;font-family:" + FONT_FAMILY + ";\">" + memberName + "님, " + statusMessage + "</h1>"
+            + "    <div style=\"display:inline-block;background:" + statusColor + ";color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">" + safeStatusLabel + "</div>"
+            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;font-family:" + FONT_FAMILY + ";\">" + safeMemberName + "님, " + safeStatusMessage + "</h1>"
             + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">예약 정보를 확인해주세요.</p>"
             + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:28px;\">"
             + "      <table style=\"width:100%;border-collapse:collapse;font-family:" + FONT_FAMILY + ";\">"
-            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">가게</td><td style=\"color:#191f28;font-weight:600;\">" + storeName + "</td></tr>"
-            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">날짜</td><td style=\"color:#191f28;font-weight:600;\">" + reservationDate + "</td></tr>"
-            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">시간</td><td style=\"color:#191f28;font-weight:600;\">" + reservationTime + "</td></tr>"
+            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">가게</td><td style=\"color:#191f28;font-weight:600;\">" + safeStoreName + "</td></tr>"
+            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">날짜</td><td style=\"color:#191f28;font-weight:600;\">" + safeReservationDate + "</td></tr>"
+            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">시간</td><td style=\"color:#191f28;font-weight:600;\">" + safeReservationTime + "</td></tr>"
             + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">인원</td><td style=\"color:#191f28;font-weight:600;\">" + guestCount + "명</td></tr>"
             + reasonRow
             + "      </table>"
@@ -214,8 +223,14 @@ public class EmailService {
 
     private String buildOwnerAlertContent(String ownerName, String storeName, String memberName, String memberEmail,
                                            String reservationDate, String reservationTime, int guestCount) {
+        String safeOwnerName = escapeHtml(ownerName);
+        String safeStoreName = escapeHtml(storeName);
+        String safeMemberName = escapeHtml(memberName);
+        String safeMemberEmail = escapeHtml(memberEmail);
+        String safeReservationDate = escapeHtml(reservationDate);
+        String safeReservationTime = escapeHtml(reservationTime);
         String emailRow = (memberEmail != null && !memberEmail.isBlank())
-            ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">고객 이메일</td><td style=\"color:#191f28;font-weight:600;\"><a href=\"mailto:" + memberEmail + "\" style=\"color:#3182f6;text-decoration:none;\">" + memberEmail + "</a></td></tr>"
+            ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">고객 이메일</td><td style=\"color:#191f28;font-weight:600;\"><a href=\"mailto:" + safeMemberEmail + "\" style=\"color:#3182f6;text-decoration:none;\">" + safeMemberEmail + "</a></td></tr>"
             : "";
         return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
@@ -223,14 +238,14 @@ public class EmailService {
             + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
             + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
             + "    <div style=\"display:inline-block;background:#3182f6;color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">새 예약</div>"
-            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;font-family:" + FONT_FAMILY + ";\">" + ownerName + "님, 새로운 예약이 들어왔어요!</h1>"
-            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + storeName + "에 예약 요청이 접수되었습니다. 확인 후 승인해주세요.</p>"
+            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;font-family:" + FONT_FAMILY + ";\">" + safeOwnerName + "님, 새로운 예약이 들어왔어요!</h1>"
+            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + safeStoreName + "에 예약 요청이 접수되었습니다. 확인 후 승인해주세요.</p>"
             + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:28px;\">"
             + "      <table style=\"width:100%;border-collapse:collapse;font-family:" + FONT_FAMILY + ";\">"
-            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">고객명</td><td style=\"color:#191f28;font-weight:600;\">" + memberName + "</td></tr>"
+            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">고객명</td><td style=\"color:#191f28;font-weight:600;\">" + safeMemberName + "</td></tr>"
             + emailRow
-            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">날짜</td><td style=\"color:#191f28;font-weight:600;\">" + reservationDate + "</td></tr>"
-            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">시간</td><td style=\"color:#191f28;font-weight:600;\">" + reservationTime + "</td></tr>"
+            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">날짜</td><td style=\"color:#191f28;font-weight:600;\">" + safeReservationDate + "</td></tr>"
+            + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">시간</td><td style=\"color:#191f28;font-weight:600;\">" + safeReservationTime + "</td></tr>"
             + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">인원</td><td style=\"color:#191f28;font-weight:600;\">" + guestCount + "명</td></tr>"
             + "      </table>"
             + "    </div>"
@@ -310,7 +325,7 @@ public class EmailService {
             if (memberEmail != null && !memberEmail.isBlank()) {
                 helper.setReplyTo(memberEmail);  // 관리자가 이 메일에 바로 "답장" 누르면 문의자에게 감
             }
-            helper.setSubject("[RESERVE 문의] " + title);
+            helper.setSubject("[RESERVE 문의] " + sanitizeSubject(title));
             helper.setText(buildInquiryAlertContent(memberName, memberEmail, categoryDisplayName, title, content), true);
             mailSender.send(message);
             log.info("New inquiry alert email sent to admin");
@@ -320,9 +335,13 @@ public class EmailService {
     }
 
     private String buildInquiryAlertContent(String memberName, String memberEmail, String category, String title, String content) {
-        String safeContent = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>");
+        String safeMemberName = escapeHtml(memberName);
+        String safeMemberEmail = escapeHtml(memberEmail);
+        String safeCategory = escapeHtml(category);
+        String safeTitle = escapeHtml(title);
+        String safeContent = escapeHtmlWithLineBreaks(content);
         String emailRow = (memberEmail != null && !memberEmail.isBlank())
-            ? "<p style=\"font-size:14px;color:#4e5968;margin:0 0 24px;\">회신 이메일: <a href=\"mailto:" + memberEmail + "\" style=\"color:#3182f6;text-decoration:none;\">" + memberEmail + "</a></p>"
+            ? "<p style=\"font-size:14px;color:#4e5968;margin:0 0 24px;\">회신 이메일: <a href=\"mailto:" + safeMemberEmail + "\" style=\"color:#3182f6;text-decoration:none;\">" + safeMemberEmail + "</a></p>"
             : "";
         return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
@@ -330,8 +349,8 @@ public class EmailService {
             + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
             + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;\">RESERVE</span></div>"
             + "    <div style=\"display:inline-block;background:#3182f6;color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">새 문의</div>"
-            + "    <h1 style=\"font-size:20px;font-weight:700;color:#191f28;margin:0 0 8px;\">" + title + "</h1>"
-            + "    <p style=\"font-size:14px;color:#8b95a1;margin:0 0 4px;\">" + memberName + " · " + category + "</p>"
+            + "    <h1 style=\"font-size:20px;font-weight:700;color:#191f28;margin:0 0 8px;\">" + safeTitle + "</h1>"
+            + "    <p style=\"font-size:14px;color:#8b95a1;margin:0 0 4px;\">" + safeMemberName + " · " + safeCategory + "</p>"
             + emailRow
             + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:20px;\">"
             + "      <p style=\"font-size:15px;color:#191f28;line-height:1.8;white-space:pre-wrap;margin:0;\">" + safeContent + "</p>"
@@ -345,30 +364,49 @@ public class EmailService {
                                                String statusLabel, String statusColor,
                                                String title, String subtitle,
                                                String rejectionReason) {
+        String safeMemberName = escapeHtml(memberName);
+        String safeBusinessName = escapeHtml(businessName);
+        String safeStatusLabel = escapeHtml(statusLabel);
+        String safeTitle = escapeHtml(title);
+        String safeSubtitle = escapeHtml(subtitle);
+        String safeRejectionReason = escapeHtmlWithLineBreaks(rejectionReason);
+        String safeFromName = escapeHtml(fromName);
         String reasonBlock = rejectionReason != null
             ? "<div style=\"background:#fff3f3;border-radius:12px;padding:16px 20px;margin-bottom:20px;border-left:3px solid #ff4d4f;\">"
               + "<span style=\"font-size:13px;color:#ff4d4f;font-weight:700;\">반려 사유</span>"
-              + "<p style=\"font-size:14px;color:#4e5968;margin:6px 0 0;line-height:1.6;\">" + rejectionReason + "</p>"
+              + "<p style=\"font-size:14px;color:#4e5968;margin:6px 0 0;line-height:1.6;\">" + safeRejectionReason + "</p>"
               + "</div>"
             : "";
         return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
             + "<div style=\"width:100%;background:#f9fafb;padding:40px 0;\">"
             + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
-            + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;\">" + fromName + "</span></div>"
-            + "    <div style=\"display:inline-block;background:" + statusColor + ";color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">" + statusLabel + "</div>"
-            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;\">" + memberName + "님, " + title + "</h1>"
-            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + subtitle + "</p>"
+            + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;\">" + safeFromName + "</span></div>"
+            + "    <div style=\"display:inline-block;background:" + statusColor + ";color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">" + safeStatusLabel + "</div>"
+            + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;\">" + safeMemberName + "님, " + safeTitle + "</h1>"
+            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + safeSubtitle + "</p>"
             + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:20px;\">"
             + "      <table style=\"width:100%;border-collapse:collapse;\">"
             + "        <tr><td style=\"color:#8b95a1;padding:8px 0;font-size:14px;\">상호명</td>"
-            + "            <td style=\"color:#191f28;font-weight:600;font-size:14px;\">" + businessName + "</td></tr>"
+            + "            <td style=\"color:#191f28;font-weight:600;font-size:14px;\">" + safeBusinessName + "</td></tr>"
             + "      </table>"
             + "    </div>"
             + reasonBlock
             + "    <div style=\"font-size:13px;color:#b0b8c1;border-top:1px solid #f2f4f6;padding-top:20px;\">© 2026 RESERVE. All rights reserved.</div>"
             + "  </div>"
             + "</div></body></html>";
+    }
+
+    private static String escapeHtml(String value) {
+        return HtmlUtils.htmlEscape(value == null ? "" : value);
+    }
+
+    private static String escapeHtmlWithLineBreaks(String value) {
+        return escapeHtml(value).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>");
+    }
+
+    private static String sanitizeSubject(String value) {
+        return (value == null ? "" : value).replaceAll("[\\r\\n]+", " ").trim();
     }
 
     @Async

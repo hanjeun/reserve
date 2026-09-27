@@ -41,5 +41,7 @@ class PaymentOperationsMonitorSchedulerTest {
         verify(paymentRepository).countByStatusAndCreatedAtBefore(
                 eq(Payment.PaymentStatus.READY),
                 any(LocalDateTime.class));
+        verify(paymentRepository).countLedgerInvariantViolations();
+        verify(paymentRepository).countReservationDepositInvariantViolations();
     }
 }

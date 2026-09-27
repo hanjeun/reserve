@@ -15,16 +15,26 @@ public class ChatRoomResponse {
     private Long memberId;
     private String memberName;
     private String memberEmail;
+    private String memberProfileImage;
     private int adminUnread;
+    private String lastMessagePreview;
     private LocalDateTime lastMessageAt;
 
     public static ChatRoomResponse from(ChatRoom r) {
+        return from(r, null);
+    }
+
+    public static ChatRoomResponse from(ChatRoom r, String fallbackPreview) {
+        String preview = r.getLastMessagePreview();
+        if (preview == null || preview.isBlank()) preview = fallbackPreview;
         return ChatRoomResponse.builder()
                 .id(r.getId())
                 .memberId(r.getMember().getId())
                 .memberName(r.getMember().getName())
                 .memberEmail(r.getMember().getEmail())
+                .memberProfileImage(r.getMember().getProfileImage())
                 .adminUnread(r.getAdminUnread())
+                .lastMessagePreview(preview)
                 .lastMessageAt(r.getLastMessageAt())
                 .build();
     }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -9,100 +9,56 @@ import {
     ShopOutlined, CalendarOutlined,
     DeleteOutlined, AuditOutlined,
 } from '@ant-design/icons';
-import { FilterToolbar, StatCard, ChartCard, PieLegend } from '../common';
+import { DataState, FilterToolbar, StatCard, ChartCard, PieLegend } from '../common';
 import { Bone } from '../common/Skeletons';
-import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
-import api from '../../api/axios';
-import { API_ENDPOINTS, RESERVATION_STATUS_ORDER, RESERVATION_STATUS_LABELS } from '../../constants';
 import { colors, fontSize, chartPalette, chartGridProps, chartAxisTick, chartTooltipStyle, chartBarRadius, chartPieCornerRadius, chartMargin, chartYAxisWidth } from '../../styles/tokens';
+import { fetchDashboardStats } from './dashboardStats';
 
 const { Text } = Typography;
 
-/**
- * 2026-07-09: TanStack Query로 전환 (adminKeys.dashboardStats()) — 4개 병렬 조회 +
- * 집계 로직을 queryFn 안에 그대로 옮김. 새로고침 버튼은 그대로 refetch()에 연결.
- *
- * 2026-07-10: 비주얼을 StatCard/ChartCard + chart 토큰 기반으로 리디자인 (기본 AntD
- * Card+Statistic, CartesianGrid 격자선 노출 등 각진 느낌 → 둥근 카드 + 컬러 아이콘 배지 +
- * 부드러운 차트). 5월에 한 번 이런 방향으로 만들었다가 "최대한 AntD 쓰는 방향으로"
- * 되돌린 이력이 있음 — 이번엔 피그마 레퍼런스 + 통계 탭 재사용 목적으로 다시 진행.
- * 데이터/집계 로직은 그대로 두고 비주얼만 교체 — 리스크를 낮추기 위해 이 화면에서 먼저 검증.
- */
+const COUNT_TABLE_COLUMNS = [
+    { key: 'name', label: '구분' },
+    { key: 'value', label: '건수', render: (value) => `${value}건` },
+];
+
+const TRASH_TABLE_COLUMNS = [
+    { key: 'name', label: '유형' },
+    { key: 'count', label: '건수', render: (value) => `${value}건` },
+];
+
 const useDashboardStats = () => {
-    const { message } = useMessage();
-
-    const query = useQuery({
+    return useQuery({
         queryKey: adminKeys.dashboardStats(),
-        queryFn: async () => {
-            const [bizAll, reservationSummary, trash, auditLogs] = await Promise.allSettled([
-                api.get(API_ENDPOINTS.BUSINESS.ADMIN_LIST,           { params: { page: 0, size: 1 } }),
-                api.get(API_ENDPOINTS.RESERVATION.STORE_RESERVATION_SUMMARY),
-                api.get(API_ENDPOINTS.TRASH.LIST,                    { params: { page: 0, size: 50 } }),
-                api.get(API_ENDPOINTS.AUDIT_LOG.LIST,                { params: { page: 0, size: 50 } }),
-            ]);
-
-            const trashList = trash.status === 'fulfilled'  ? (trash.value?.content ?? [])   : [];
-            const logList  = auditLogs.status === 'fulfilled'  ? (auditLogs.value?.content ?? []) : [];
-            const statusCount = reservationSummary.status === 'fulfilled'
-                ? (reservationSummary.value?.statusCounts ?? {})
-                : {};
-
-            // ⚠️ 여기에 상태 목록을 손으로 적으면 안 된다. 예전엔 6개를 직접 나열했는데
-            //    2026-08 에 추가된 UNCONFIRMED 가 빠져 있어서, 라벨이 틀린 정도가 아니라
-            //    **그 상태의 예약이 원형 차트에서 통째로 사라졌다** — 합계가 실제 예약 수보다
-            //    적게 나오는데 화면상으로는 아무 문제 없어 보였다.
-            //    상태 목록·순서·라벨은 constants/status.js 한 곳에서만 온다.
-            const reservationPieData = RESERVATION_STATUS_ORDER
-                .map((k) => ({ key: k, name: RESERVATION_STATUS_LABELS[k], value: statusCount[k] || 0 }))
-                .filter(d => d.value > 0);
-
-            const entityCount = trashList.reduce((acc, r) => {
-                const label = {
-                    MAIL: '수신메일', SENT_MAIL: '발송메일',
-                    MEMBER: '회원', STORE: '가게',
-                    RESERVATION: '예약', REVIEW: '리뷰',
-                }[r.entityType] || r.entityType;
-                acc[label] = (acc[label] || 0) + 1;
-                return acc;
-            }, {});
-            const trashBarData = Object.entries(entityCount).map(([name, count]) => ({ name, count }));
-
-            const actionCount = logList.reduce((acc, l) => {
-                acc[l.action] = (acc[l.action] || 0) + 1;
-                return acc;
-            }, {});
-
-            // Spring Boot 3.5부터 Page 응답의 totalElements가 page:{} 하위로 이동해서(2026-07 버그 수정),
-            // 아래 두 값이 항상 0으로 보였음 — 신버전(page.totalElements)을 우선 읽고 구버전도 폴백으로 허용.
-            return {
-                totalBiz:  bizAll.status === 'fulfilled' ? (bizAll.value?.page?.totalElements ?? bizAll.value?.totalElements ?? 0) : '-',
-                totalRes:  reservationSummary.status === 'fulfilled'
-                    ? (reservationSummary.value?.total ?? 0)
-                    : '-',
-                trashCount: trashList.length,
-                logCount:  auditLogs.status === 'fulfilled' ? (auditLogs.value?.page?.totalElements ?? auditLogs.value?.totalElements ?? 0) : '-',
-                reservationPieData,
-                trashBarData,
-                actionCount,
-            };
-        },
+        queryFn: fetchDashboardStats,
     });
-
-    useEffect(() => {
-        if (query.error) message.error('대시보드 데이터를 불러오지 못했습니다.');
-    }, [query.error, message]);
-
-    return query;
 };
 
 const DashboardTab = () => {
-    const { data: stats, isLoading: loading, refetch } = useDashboardStats();
+    const { data: stats, isLoading: loading, isFetching, error, refetch } = useDashboardStats();
+    const sourceAvailable = (name) => stats?.sources?.[name] === true;
+    const sourceFailed = (name) => Boolean(error || stats?.sources?.[name] === false);
+    const reservationSummary = sourceAvailable('reservations')
+        ? `전체 ${stats.totalRes}건의 상태 분포입니다.`
+        : undefined;
+    const trashSummary = sourceAvailable('trash')
+        ? `전체 ${stats.trashCount}개 중 최근 50개를 유형별로 집계했습니다.`
+        : undefined;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* 툴바 — 다른 탭과 동일한 FilterToolbar */}
-            <FilterToolbar onReload={refetch} loading={loading} />
+            <FilterToolbar onReload={refetch} loading={isFetching} />
+
+            {error && (
+                <DataState state="error" subject="대시보드 데이터" error={error}
+                    title="대시보드 데이터를 모두 불러오지 못했습니다." onRetry={refetch} retrying={isFetching} compact />
+            )}
+            {!error && stats?.failedSources?.length > 0 && (
+                <DataState state="error"
+                    title={`${stats.failedSources.join(' · ')} 데이터만 불러오지 못했습니다. 나머지 결과는 정상 표시 중입니다.`}
+                    onRetry={refetch} retrying={isFetching} compact />
+            )}
 
             {/* 요약 카드 - 2026-07 수정: 최소폭을 200에서 150으로 줄여 좁은 모바일 화면에서도 2열이 유지되게 함
                 (예전 최소폭이 넓어 모바일에서 카드 4장이 한 줄씩 세로로 쌓여 허전해 보였다) */}
@@ -111,32 +67,28 @@ const DashboardTab = () => {
                     icon={<ShopOutlined />}
                     label="사업자 신청"
                     value={stats?.totalBiz ?? '-'}
-                    suffix="전체 누적"
-                    color={colors.primary.main}
+                    suffix={sourceFailed('business') ? '조회 실패' : '전체 누적'}
                     loading={loading}
                 />
                 <StatCard
                     icon={<CalendarOutlined />}
-                    label="조회된 예약"
+                    label="전체 예약"
                     value={stats?.totalRes ?? '-'}
-                    suffix="최근 100건"
-                    color={colors.success.main}
+                    suffix={sourceFailed('reservations') ? '조회 실패' : '전체 누적'}
                     loading={loading}
                 />
                 <StatCard
                     icon={<DeleteOutlined />}
                     label="휴지통"
                     value={stats?.trashCount ?? '-'}
-                    suffix="복구 가능"
-                    color={colors.warning.main}
+                    suffix={sourceFailed('trash') ? '조회 실패' : '복구 가능'}
                     loading={loading}
                 />
                 <StatCard
                     icon={<AuditOutlined />}
                     label="감사 로그"
                     value={stats?.logCount ?? '-'}
-                    suffix="전체 누적"
-                    color="#8b5cf6"
+                    suffix={sourceFailed('audit') ? '조회 실패' : '전체 누적'}
                     loading={loading}
                 />
             </div>
@@ -147,7 +99,13 @@ const DashboardTab = () => {
                 포함)는 항상 그리고, 본문만 loading/데이터있음/데이터없음 3단으로 분기해서 실제
                 차트 모양(도넛/막대)에 가까운 스켈레톤을 넣음 */}
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <ChartCard title="예약 상태 분포" height={240}>
+                <ChartCard
+                    title="예약 상태 분포"
+                    height={240}
+                    summary={reservationSummary}
+                    tableColumns={COUNT_TABLE_COLUMNS}
+                    tableRows={sourceAvailable('reservations') ? stats.reservationPieData : []}
+                >
                     {loading && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <div style={{ position: 'relative', width: 180, height: 180 }}>
@@ -161,7 +119,7 @@ const DashboardTab = () => {
                             </div>
                         </div>
                     )}
-                    {!loading && stats?.reservationPieData?.length > 0 && (
+                    {!loading && sourceAvailable('reservations') && stats?.reservationPieData?.length > 0 && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 16 }}>
                             <div style={{ width: 130, height: 130, flexShrink: 0 }}>
                                 <ResponsiveContainer width="100%" height="100%">
@@ -184,14 +142,22 @@ const DashboardTab = () => {
                             <PieLegend data={stats.reservationPieData} palette={chartPalette} />
                         </div>
                     )}
-                    {!loading && !stats?.reservationPieData?.length && (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text type="secondary">데이터가 없습니다.</Text>
-                        </div>
+                    {!loading && sourceAvailable('reservations') && !stats?.reservationPieData?.length && (
+                        <DataState state="empty" kind="reservation" title="데이터가 없습니다." compact style={{ height: '100%' }} />
+                    )}
+                    {!loading && sourceFailed('reservations') && (
+                        <DataState state="error" kind="reservation" title="예약 집계를 불러오지 못했습니다."
+                            onRetry={refetch} retrying={isFetching} compact style={{ height: '100%' }} />
                     )}
                 </ChartCard>
 
-                <ChartCard title="휴지통 유형별 현황" height={240}>
+                <ChartCard
+                    title="최근 50개 휴지통 유형"
+                    height={240}
+                    summary={trashSummary}
+                    tableColumns={TRASH_TABLE_COLUMNS}
+                    tableRows={sourceAvailable('trash') ? stats.trashBarData : []}
+                >
                     {loading && (
                         <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 24, paddingBottom: 24 }}>
                             {[70, 110, 55, 90].map((h) => (
@@ -199,7 +165,7 @@ const DashboardTab = () => {
                             ))}
                         </div>
                     )}
-                    {!loading && stats?.trashBarData?.length > 0 && (
+                    {!loading && sourceAvailable('trash') && stats?.trashBarData?.length > 0 && (
                         <ResponsiveContainer width="100%" height={240}>
                             <BarChart data={stats.trashBarData} margin={chartMargin}>
                                 <CartesianGrid {...chartGridProps} />
@@ -210,17 +176,19 @@ const DashboardTab = () => {
                             </BarChart>
                         </ResponsiveContainer>
                     )}
-                    {!loading && !stats?.trashBarData?.length && (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text type="secondary">휴지통이 비어있습니다.</Text>
-                        </div>
+                    {!loading && sourceAvailable('trash') && !stats?.trashBarData?.length && (
+                        <DataState state="empty" title="휴지통이 비어있습니다." compact style={{ height: '100%' }} />
+                    )}
+                    {!loading && sourceFailed('trash') && (
+                        <DataState state="error" title="휴지통 데이터를 불러오지 못했습니다."
+                            onRetry={refetch} retrying={isFetching} compact style={{ height: '100%' }} />
                     )}
                 </ChartCard>
             </div>
 
             {/* 감사 로그 요약 — 로딩 중엔 낙관적으로 스켈레톤을 보여주고(대부분 로그가 있는 게
                 일반적이므로), 데이터 도착 후 실제로 로그가 하나도 없으면 기존처럼 카드 자체를 숨김 */}
-            {(loading || (stats?.actionCount && Object.keys(stats.actionCount).length > 0)) && (
+            {(loading || sourceFailed('audit') || (stats?.actionCount && Object.keys(stats.actionCount).length > 0)) && (
                 <ChartCard title="최근 감사 로그 요약" height="auto">
                     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                         {loading ? (
@@ -230,6 +198,9 @@ const DashboardTab = () => {
                                     <Bone width={40} height={26} />
                                 </div>
                             ))
+                        ) : sourceFailed('audit') ? (
+                            <DataState state="error" title="감사 로그를 불러오지 못했습니다."
+                                onRetry={refetch} retrying={isFetching} compact />
                         ) : (
                             [
                                 { key: 'SOFT_DELETE', label: '소프트 삭제', color: colors.warning.main },

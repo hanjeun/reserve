@@ -1,63 +1,69 @@
 /**
- * useStoreList — 가게 목록 조회 훅 (서버사이드 offset 무한스크롤)
- *
- * 이전: 백엔드에서 전체 목록을 한 번에 받아 클라이언트에서 slice → "가짜 무한스크롤"
- * 현재: useInfiniteQuery + ?page=N&size=12 → 서버가 실제로 나눠서 줌
- *
- * [offset vs cursor 선택 이유]
- * - 정렬 기준이 rating / reviewCount (가변값) → cursor 키가 불안정
- * - RESERVE 규모에서 offset 성능 문제 없음
- * - 동시에 새 가게가 추가되는 빈도가 낮아 데이터 shift 문제도 미미
+ * 공개 가게 목록 — URL은 1부터, 서버 offset 페이지는 0부터 시작한다.
+ * 한 번에 12건만 표시하며 검색·필터 변경은 첫 페이지로 돌아간다.
  */
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import storeService from '../services/storeService';
 import { storeKeys } from './queryKeys';
 import { rememberImageHints } from '../utils/imageHintCache';
+import { hasDistanceCoordinates } from '../utils/distanceSort';
+import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 
-const PAGE_SIZE = 12;
+export { STORE_LIST_PAGE_SIZE };
+const FILTER_KEYS = ['keyword', 'domain', 'region', 'sort', 'lat', 'lng'];
+
+const readPage = (value) => {
+    if (!/^[1-9]\d*$/.test(value ?? '')) return 1;
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number <= 2147483647 ? number : 1;
+};
+
+const readCount = (value, fallback) =>
+    Number.isSafeInteger(value) && value >= 0 ? value : fallback;
 
 const useStoreList = () => {
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
 
     const keyword = urlSearchParams.get('keyword') || '';
-    const sort    = urlSearchParams.get('sort')    || 'rating';
+    const sort    = urlSearchParams.get('sort')    || 'recommended';
     const lat     = urlSearchParams.get('lat');
     const lng     = urlSearchParams.get('lng');
+    const domain  = urlSearchParams.get('domain') || '';
+    const region  = urlSearchParams.get('region') || '';
+    const rawPage = urlSearchParams.get('page');
+    const page = readPage(rawPage);
 
     const {
         data,
         isLoading,
         isFetching,
-        isFetchingNextPage,
-        hasNextPage,
-        fetchNextPage,
+        isPlaceholderData,
+        isSuccess,
         error,
-    } = useInfiniteQuery({
-        queryKey: storeKeys.list({ keyword, sort, lat, lng }),
-        queryFn: ({ pageParam = 0 }) =>
+        refetch,
+    } = useQuery({
+        // 페이지·크기도 키에 포함한다. 늦게 도착한 이전 페이지 응답은 현재 목록을 덮지 않는다.
+        queryKey: storeKeys.list({ keyword, sort, lat, lng, domain, region, page: page - 1, size: STORE_LIST_PAGE_SIZE }),
+        queryFn: () =>
             storeService.getStores({
-                keyword, sort, page: pageParam, size: PAGE_SIZE,
-                ...(sort === 'distance' && lat && lng ? { lat, lng } : {}),
+                keyword, sort, page: page - 1, size: STORE_LIST_PAGE_SIZE,
+                ...(sort === 'distance' && hasDistanceCoordinates(lat, lng) ? { lat, lng } : {}),
+                ...(domain ? { domain } : {}),
+                ...(region ? { region } : {}),
             }),
-        // Spring Boot 3.5부터 Page 응답이 { content, page: { number, size, totalElements, totalPages } } 형태로
-        // 바뀜(이전 버전은 { content, number, totalPages, totalElements, last } 평탄 형태였음 —
-        // 이 변경을 몰라서 아래 둘 다 top-level로 읽다가 totalElements=0/hasNextPage가 항상 true로 조용히 망가져 있었음(2026-07 버그 수정).
-        getNextPageParam: (lastPage) => {
-            const pageInfo = lastPage?.page ?? lastPage; // 구버전 평탄 형태도 폴백으로 계속 허용
-            const number = pageInfo?.number ?? 0;
-            const totalPages = pageInfo?.totalPages ?? 1;
-            return number + 1 < totalPages ? number + 1 : undefined;
-        },
         staleTime: 1000 * 60 * 3,
-        // 검색어/정렬 바꿀 때 직전 결과(실제 가게 카드, 이미지 비율 포함)가 새 데이터 도착까지 그대로 남아있어서
-        // 전체 그리드가 스켈레톤으로 돌아가지 않음
+        // 이동 중 건수·페이지 컨트롤은 유지하고 화면은 기존 스켈레톤으로 진행 상태를 표시한다.
         placeholderData: keepPreviousData,
     });
 
-    // 모든 페이지의 content를 단일 배열로 평탄화
-    const stores        = data?.pages?.flatMap(page => page?.content ?? []) ?? [];
+    const stores = useMemo(() => Array.isArray(data?.content) ? data.content : [], [data]);
+    // Spring Boot 3.5의 page 하위 메타와 이전 평탄 응답을 모두 허용한다.
+    const totalElements = readCount(data?.page?.totalElements ?? data?.totalElements, stores.length);
+    const totalPages = readCount(data?.page?.totalPages ?? data?.totalPages, Math.ceil(totalElements / STORE_LIST_PAGE_SIZE));
+    const lastPage = Math.max(1, totalPages);
+    const pageOutOfRange = isSuccess && !isPlaceholderData && !error && page > lastPage;
 
     // 가게 목록을 받을 때마다 각 가게의 커버 이미지 "비율"만 따로 적어둔다 (2026-07 추가).
     // 상세 페이지 스켈레톤이 커버 자리를 실제 비율로 그려야 이미지 도착 시 레이아웃이 안 튀는데,
@@ -65,38 +71,54 @@ const useStoreList = () => {
     // 흔해서(상세 URL 직접 진입 / 상세에서 새로고침 / 홈·찜 목록에서 클릭 / gcTime 만료)
     // "어떤 땐 비율이 딱 맞고 어떤 땐 큰 정사각형이 뜨는" 들쭉날쭉한 증상이 있었다.
     // 비율은 몇 바이트짜리 메타데이터라 따로 오래 들고 있어도 안전하다 — utils/imageHintCache.js 참고.
-    rememberImageHints(stores);
-    const totalElements = data?.pages?.[0]?.page?.totalElements ?? data?.pages?.[0]?.totalElements ?? 0;
+    useEffect(() => {
+        rememberImageHints(stores);
+    }, [stores]);
 
-    // 검색·정렬 파라미터 변경 (queryKey 변경 → TanStack Query가 자동으로 첫 페이지부터 재조회)
+    useEffect(() => {
+        // 잘못된 공유 URL·삭제로 줄어든 결과를 복구한다. 이전 결과의 메타로 보정하지 않는다.
+        if (!pageOutOfRange && (rawPage == null || rawPage === String(page))) return;
+        setUrlSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            const corrected = pageOutOfRange ? lastPage : page;
+            if (corrected === 1) next.delete('page');
+            else next.set('page', String(corrected));
+            return next;
+        }, { replace: true });
+    }, [pageOutOfRange, rawPage, page, lastPage, setUrlSearchParams]);
+
+    // 필터와 페이지를 한 번의 URL 갱신으로 바꿔 검색어 유실을 막는다.
     const setSearchParams = useCallback((newParams) => {
         setUrlSearchParams(prev => {
             const next = new URLSearchParams(prev);
+            let filtersChanged = false;
             Object.entries(newParams).forEach(([key, value]) => {
                 if (value === '' || value == null) next.delete(key);
-                else next.set(key, value);
+                else next.set(key, String(value));
+                if (FILTER_KEYS.includes(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
             });
+            if (filtersChanged || readPage(next.get('page')) === 1) next.delete('page');
             return next;
         });
     }, [setUrlSearchParams]);
 
-    // 검색어/정렬을 바꾸면(placeholderData: keepPreviousData 덕에) 직전 목록이 그대로 남아있다가
-    // 새 데이터가 도착하는 순간 스켈레톤 없이 갑자기 휙 바뀌어서, 그 사이엔 아무 피드백도 없었음
-    // (2026-07 버그 수정) — isLoading(최초 로딩)도 아니고 isFetchingNextPage(무한스크롤 다음 페이지,
-    // 이건 이미 하단 스피너로 표시 중)도 아닌 "그 외의 백그라운드 재조회"만 별도로 노출해서,
-    // StoreList.jsx가 이 구간에 옅은 오버레이 스피너를 보여줄 수 있게 함.
-    const isRefetching = isFetching && !isLoading && !isFetchingNextPage;
+    const setPage = useCallback((nextPage) => {
+        const bounded = Math.min(readPage(String(nextPage)), lastPage);
+        setSearchParams({ page: bounded === 1 ? null : bounded });
+    }, [lastPage, setSearchParams]);
 
     return {
         stores,
         totalElements,
-        loading:      isLoading,
-        refetching:   isRefetching,
-        fetchingNext: isFetchingNextPage,
-        hasNextPage:  hasNextPage ?? false,
-        fetchNextPage,
+        totalPages,
+        page,
+        pageSize: STORE_LIST_PAGE_SIZE,
+        loading: isLoading || pageOutOfRange || isPlaceholderData,
+        refetching: isFetching && !isLoading,
         error:        error?.message || null,
-        searchParams: { keyword, sort, lat, lng },
+        refetch,
+        setPage,
+        searchParams: { keyword, sort, lat, lng, domain, region },
         setSearchParams,
     };
 };

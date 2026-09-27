@@ -18,6 +18,7 @@ import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -26,6 +27,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class QrCheckinAttendanceTest {
@@ -62,7 +65,8 @@ class QrCheckinAttendanceTest {
         assertThat(response.isAlreadyCheckedIn()).isFalse();
         assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
         assertThat(reservation.getCheckedInAt()).isNotNull();
-        assertThat(response.getReservation().getCheckedInAt()).isEqualTo(reservation.getCheckedInAt());
+        assertThat(response.getReservation().getCheckedInAt())
+                .isEqualTo(ServiceTime.toServiceZone(reservation.getCheckedInAt()));
     }
 
     @Test
@@ -95,6 +99,44 @@ class QrCheckinAttendanceTest {
                 .hasMessageContaining("승인된 예약");
         assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.PENDING);
         assertThat(reservation.getCheckedInAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("다른 회원의 예약 QR은 403이며 토큰 제공자를 호출하지 않는다")
+    void anotherMemberCannotIssueQrToken() {
+        Reservation reservation = reservation(member(1L), Reservation.ReservationStatus.CONFIRMED);
+        when(reservationRepository.findById(20L)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> reservationService.generateQrCheckinToken(20L, member(8L)))
+                .isInstanceOfSatisfying(ReservationException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+
+        verify(tokenProvider, never()).generateToken(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("예약자 본인의 승인된 예약은 QR 토큰을 발급한다")
+    void ownerCanIssueQrTokenForConfirmedReservation() {
+        Reservation reservation = reservation(member(1L), Reservation.ReservationStatus.CONFIRMED);
+        when(reservationRepository.findById(20L)).thenReturn(Optional.of(reservation));
+        when(tokenProvider.generateToken(20L, reservation.getReservationDate())).thenReturn("qr-token");
+
+        assertThat(reservationService.generateQrCheckinToken(20L, member(7L))).isEqualTo("qr-token");
+        verify(tokenProvider).generateToken(20L, reservation.getReservationDate());
+    }
+
+    @Test
+    @DisplayName("예약자 본인이어도 승인 전 예약은 QR 토큰을 발급하지 않는다")
+    void ownerCannotIssueQrTokenBeforeConfirmation() {
+        Reservation reservation = reservation(member(1L), Reservation.ReservationStatus.PENDING);
+        when(reservationRepository.findById(20L)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> reservationService.generateQrCheckinToken(20L, member(7L)))
+                .isInstanceOf(ReservationException.class)
+                .hasMessageContaining("승인된 예약");
+        verify(tokenProvider, never()).generateToken(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any());
     }
 
     @Test

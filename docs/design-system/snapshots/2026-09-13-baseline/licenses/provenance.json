@@ -1,0 +1,13 @@
+[
+  {
+    "file": "licenses/Pretendard-LICENSE.txt",
+    "source": "frontend/node_modules/pretendard/dist/LICENSE.txt",
+    "handling": "byte-identical local installed package copy"
+  },
+  {
+    "file": "licenses/SUITE-OFL-1.1.txt",
+    "source": "https://raw.githubusercontent.com/sun-typeface/SUITE/main/LICENSE",
+    "accessed_date": "2026-09-13",
+    "handling": "official license text transcribed with LF line endings; not binary upstream-version verification"
+  }
+]

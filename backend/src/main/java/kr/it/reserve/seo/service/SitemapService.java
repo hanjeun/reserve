@@ -46,6 +46,8 @@ public class SitemapService {
         appendUrl(xml, ORIGIN + "/stores", storesLastModified, "daily", "0.9");
         appendUrl(xml, ORIGIN + "/terms", null, "monthly", "0.3");
         appendUrl(xml, ORIGIN + "/privacy", null, "monthly", "0.3");
+        appendUrl(xml, ORIGIN + "/content-sources", null, "monthly", "0.3");
+        appendUrl(xml, ORIGIN + "/operation-guide", null, "monthly", "0.3");
 
         for (StoreSitemapEntry store : stores) {
             LocalDate lastModified = store.lastModifiedAt() == null

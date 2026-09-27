@@ -15,9 +15,13 @@ public class AdvertisementExpiryScheduler {
 
     /**
      * endDate 지난 ACTIVE 광고를 EXPIRED로 자동 전환
-     * 매일 새벽 4시 30분 실행 (RefreshToken 정리 4시와 겹치지 않게)
+     * 10분마다 실행하고 기동 30초 뒤에도 한 번 실행한다.
+     * 일일 cron은 그 시각에 서버가 내려가 있으면 다음 날까지 놓치므로, 재기동 뒤에도 곧바로 따라잡는다.
+     * 날짜 판정은 서비스 내부의 {@code ServiceTime.today()}가 KST로 고정한다.
      */
-    @Scheduled(cron = "0 30 4 * * *")
+    @Scheduled(
+            fixedDelayString = "${advertisement.expiry-scan-delay-ms:600000}",
+            initialDelayString = "${advertisement.expiry-scan-initial-delay-ms:30000}")
     public void expireOverdueAds() {
         advertisementService.expireOverdueAds();
         // 결제되지 않은 채 시작일이 지난 신청도 같은 시각에 정리한다.

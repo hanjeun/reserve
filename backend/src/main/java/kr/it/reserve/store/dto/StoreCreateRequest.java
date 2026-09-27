@@ -24,6 +24,7 @@ public class StoreCreateRequest {
     private Double longitude;
     private String phone;
     private String category;
+    private String serviceDomain;
     
     // 키워드 리스트
     private List<String> keywords = new ArrayList<>();

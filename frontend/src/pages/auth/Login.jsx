@@ -50,6 +50,8 @@ const Login = () => {
         ? `${location.state.from.pathname || ''}${location.state.from.search || ''}`
         : null;
     const fromRef = useRef(fromState);
+    // 로그인 필요 페이지에서 넘어왔는지 — 성공 후 전환 방향을 정한다. 아래 effect 가 state 를 비우므로 렌더 시점에 잡는다.
+    const preventedRef = useRef(Boolean(location.state?.prevented));
     const hasHandledRef = useRef(false);
     const [loading, setLoading] = useState(false);
     // 정지/영구정지 안내 모달 상태 — 앱 전반 모달 스타일(큰색 제목 + 텍스트 본문 + 단일 버튼)과 통일하기 위해
@@ -122,7 +124,9 @@ const Login = () => {
                 message.success(`${res.name}님, 로그인되었습니다!`);
                 // router state → sessionStorage → '/' 순으로 복귀 경로 결정
                 const target = fromRef.current || consumeRedirect() || '/';
-                navigate(target, { replace: true });
+                // 로그인 필요로 막혔던 곳이면 가려던 길을 계속 간다(오른쪽에서). 스스로 로그인했으면 있던 곳으로 돌아간다(왼쪽에서).
+                const direction = preventedRef.current && target !== '/' ? 'from-right' : 'from-left';
+                navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
             }
         } catch (err) {
             if (err?.isSessionExpired) return;

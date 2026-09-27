@@ -5,10 +5,12 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.notice.dto.NoticeDTO;
 import kr.it.reserve.notice.dto.NoticeRequestDTO;
+import kr.it.reserve.notice.dto.NoticeSummaryDTO;
 import kr.it.reserve.notice.entity.Notice;
 import kr.it.reserve.notice.repository.NoticeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,12 +33,24 @@ public class NoticeService {
                 .collect(Collectors.toList());
     }
 
-    // 공지사항 상세 조회 (조회수 증가 포함)
-    @Transactional
+    /** 홈에 표시할 중요·최신 공지를 최대 5개까지만 반환한다. */
+    public List<NoticeSummaryDTO> getHighlights(int requestedLimit) {
+        int limit = Math.max(1, Math.min(requestedLimit, 5));
+        return noticeRepository.findHighlights(PageRequest.of(0, limit))
+                .stream()
+                .map(NoticeSummaryDTO::fromEntity)
+                .toList();
+    }
+
+    // GET 상세 조회는 읽기 전용이다. 조회수는 명시적인 POST에서만 증가시킨다.
     public NoticeDTO getNoticeById(Long id) {
         Notice notice = findNoticeOrThrow(id);
-        notice.incrementViewCount();
         return NoticeDTO.fromEntity(notice);
+    }
+
+    @Transactional
+    public void recordView(Long id) {
+        noticeRepository.incrementViewCount(id);
     }
 
     // 공지사항 작성

@@ -6,20 +6,22 @@ RESERVE(https://reserve.it.kr)의 보안 취약점 제보 방법을 안내합니
 
 | 버전 | 보안 업데이트 |
 |---|---|
-| 최신 릴리즈 | ✅ |
+| 현재 운영 릴리즈(v2.5.1) | ✅ |
 | 그 이전 | ❌ |
 
-운영 서비스는 항상 최신 릴리즈 한 버전만 배포됩니다. 이전 버전에 대한 백포트는 제공하지 않습니다.
+운영 서비스는 한 릴리즈만 지원하며 이전 버전에 대한 백포트는 제공하지 않습니다. 저장소의 로컬
+v2.6 변경은 아직 지원 버전이나 운영 배포로 표시하지 않습니다.
 
 ## 취약점 제보
 
 **공개 이슈로 올리지 말아주세요.** 아직 고쳐지지 않은 취약점이 공개되면 이용자가 위험해집니다.
 
-아래 두 방법 중 하나로 알려주세요.
+현재 수신이 확인된 비공개 채널은 **GitHub Private Vulnerability Reporting**뿐입니다.
 
-1. **GitHub Private Vulnerability Reporting** (권장)
-   [Security → Report a vulnerability](https://github.com/hanjeun/reserve/security/advisories/new)
-2. **이메일** — reserve@reserve.it.kr
+[Security → Report a vulnerability](https://github.com/hanjeun/reserve/security/advisories/new)
+
+이메일 주소는 실제 수신·회신 경로가 검증되기 전까지 보안 제보 채널로 안내하지 않습니다. 공개 Issue,
+Discussion, PR 댓글에는 취약점 상세나 개인정보를 적지 말아주세요.
 
 ### 함께 보내주시면 좋은 것
 

@@ -7,7 +7,7 @@
 #   설치:  sudo cp scripts/backup-mysql.sh /usr/local/bin/reserve-backup
 #          sudo chmod +x /usr/local/bin/reserve-backup
 #   설정:  /etc/reserve-backup.env  (600, root 소유)
-#   실행:  reserve-backup
+#   실행:  sudo /usr/local/bin/reserve-backup
 #
 # 설계 메모
 #  - 로그를 /var/log/reserve/backup.log 로 보낸다. Promtail이 그 디렉토리를 수집하므로
@@ -17,6 +17,7 @@
 #    이 검증이 없으면 디스크가 찼을 때 0바이트 파일이 매일 S3에 쌓이고, 정작 필요할 때 알게 된다.
 
 set -euo pipefail
+umask 077
 
 # ─────────────────────────────────────────────────────────
 # 설정
@@ -42,22 +43,33 @@ S3_PREFIX="${BACKUP_S3_PREFIX:-mysql}"
 
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 DUMP_FILE="${BACKUP_DIR}/reserve-${TIMESTAMP}.sql.gz"
+DUMP_VERIFIED=0
 
 # ─────────────────────────────────────────────────────────
 # 로깅
 # ─────────────────────────────────────────────────────────
 mkdir -p "$(dirname "$LOG_FILE")" "$BACKUP_DIR"
+touch "$LOG_FILE"
+chmod 640 "$LOG_FILE"
 
-log() {
-    # app.log와 같은 형식으로 맞춰 Grafana에서 함께 보기 쉽게 한다.
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [backup] $*" | tee -a "$LOG_FILE"
+write_log() {
+    local level="$1"
+    shift
+    # Promtail의 Logback 파서가 실제 시각과 level을 읽을 수 있는 같은 앞부분을 쓴다.
+    echo "$(date '+%Y-%m-%d %H:%M:%S') ${level} [backup] - $*" | tee -a "$LOG_FILE"
 }
 
+log() { write_log INFO "$@"; }
+warn() { write_log WARN "$@"; }
+
 fail() {
-    log "ERROR $*"
+    write_log ERROR "$*"
     # 실패한 부분 파일은 남기지 않는다. 남기면 다음 복원 때 후보로 잡혀 위험하다.
-    if [[ -f "$DUMP_FILE" ]]; then
+    # 다만 검증까지 끝난 덤프는 S3 장애 때의 유일한 복구본일 수 있으므로 지우지 않는다.
+    if [[ -f "$DUMP_FILE" && "$DUMP_VERIFIED" -ne 1 ]]; then
         rm -f "$DUMP_FILE"
+    elif [[ -f "$DUMP_FILE" ]]; then
+        write_log WARN "retaining verified local backup after failure: $(basename "$DUMP_FILE")"
     fi
     exit 1
 }
@@ -70,6 +82,7 @@ trap 'fail "unexpected failure at line $LINENO"' ERR
 log "=== backup start (db=${DB_NAME}) ==="
 
 [[ -n "${DB_PASSWORD:-}" ]] || fail "DB_PASSWORD is not set (check $CONFIG_FILE)"
+[[ -n "$S3_BUCKET" ]] || fail "BACKUP_S3_BUCKET is not set; off-site backup is required"
 [[ "$LOCAL_RETENTION_DAYS" =~ ^[0-9]+$ ]] \
     || fail "LOCAL_RETENTION_DAYS must be a non-negative integer"
 
@@ -126,42 +139,52 @@ fi
 
 DUMP_SIZE="$(stat -c %s "$DUMP_FILE")"
 [[ "$DUMP_SIZE" -gt 1024 ]] || fail "dump suspiciously small (${DUMP_SIZE} bytes)"
+# 백업 writer를 s3:PutObject 하나로 제한하기 위해 multipart가 아닌 단일 PutObject를 쓴다.
+# PutObject 상한을 넘는 규모가 되면 조용히 권한을 넓히지 말고 백업 구조를 다시 설계한다.
+[[ "$DUMP_SIZE" -le 5368709120 ]] \
+    || fail "dump exceeds the 5GB single PutObject limit; configure controlled multipart upload"
 
 TABLE_COUNT="$(gunzip -c "$DUMP_FILE" | grep -c '^CREATE TABLE' || true)"
 log "verified: $(numfmt --to=iec "$DUMP_SIZE" 2>/dev/null || echo "${DUMP_SIZE}B"), ${TABLE_COUNT} tables"
 
 # 테이블이 갑자기 줄었다면 뭔가 잘못된 것이다(권한 변경, DB 지정 실수 등).
 if [[ "$TABLE_COUNT" -lt 10 ]]; then
-    log "WARN only ${TABLE_COUNT} tables in dump — expected ~20. Check DB_NAME and grants."
+    fail "only ${TABLE_COUNT} tables in dump — expected at least 10. Check DB_NAME and grants."
 fi
+DUMP_VERIFIED=1
 
 # ─────────────────────────────────────────────────────────
 # S3 업로드
 # ─────────────────────────────────────────────────────────
-if [[ -n "$S3_BUCKET" ]]; then
-    S3_URI="s3://${S3_BUCKET}/${S3_PREFIX}/$(basename "$DUMP_FILE")"
-    log "uploading to ${S3_URI}"
+OBJECT_KEY="${S3_PREFIX:+${S3_PREFIX%/}/}$(basename "$DUMP_FILE")"
+S3_URI="s3://${S3_BUCKET}/${OBJECT_KEY}"
+log "uploading to ${S3_URI}"
 
-    if command -v aws >/dev/null 2>&1; then
-        aws s3 cp "$DUMP_FILE" "$S3_URI" \
-            --only-show-errors \
-            --sse AES256 \
-            || fail "S3 upload failed"
-    else
-        # AWS CLI 미설치 서버 폴백. 자격증명은 환경변수로만 넘긴다.
-        docker run --rm \
-            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
-            -v "${BACKUP_DIR}:/backup:ro" \
-            amazon/aws-cli:latest \
-            s3 cp "/backup/$(basename "$DUMP_FILE")" "$S3_URI" \
-            --only-show-errors --sse AES256 \
-            || fail "S3 upload failed (docker fallback)"
-    fi
-    log "upload ok"
+if command -v aws >/dev/null 2>&1; then
+    aws s3api put-object \
+        --bucket "$S3_BUCKET" \
+        --key "$OBJECT_KEY" \
+        --body "$DUMP_FILE" \
+        --if-none-match "*" \
+        --server-side-encryption AES256 \
+        --output text >/dev/null \
+        || fail "S3 upload failed"
 else
-    # 로컬에만 남는 백업은 "서버가 죽으면 같이 죽는" 백업이다. 조용히 넘어가지 않는다.
-    log "WARN BACKUP_S3_BUCKET is not set — backup exists only on this server"
+    # AWS CLI 미설치 서버 폴백. 자격증명은 환경변수로만 넘긴다.
+    docker run --rm \
+        -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+        -v "${BACKUP_DIR}:/backup:ro" \
+        amazon/aws-cli:latest \
+        s3api put-object \
+        --bucket "$S3_BUCKET" \
+        --key "$OBJECT_KEY" \
+        --body "/backup/$(basename "$DUMP_FILE")" \
+        --if-none-match "*" \
+        --server-side-encryption AES256 \
+        --output text >/dev/null \
+        || fail "S3 upload failed (docker fallback)"
 fi
+log "upload ok"
 
 # ─────────────────────────────────────────────────────────
 # 로컬 보관 정리

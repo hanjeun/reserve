@@ -32,6 +32,7 @@ public class StoreResponse {
     private Double longitude;
     private String phone;
     private String category;
+    private String serviceDomain;
     private String mainImageUrl;
     private Integer mainImageWidth;
     private Integer mainImageHeight;
@@ -156,6 +157,7 @@ public class StoreResponse {
                 .longitude(store.getLongitude())
                 .phone(store.getPhone())
                 .category(store.getCategory())
+                .serviceDomain(store.resolveServiceDomain().name())
                 .mainImageUrl(store.getMainImageUrl())
                 .mainImageWidth(store.getMainImageWidth())
                 .mainImageHeight(store.getMainImageHeight())

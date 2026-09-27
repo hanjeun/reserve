@@ -4,6 +4,7 @@ Disallow: /my-page
 Disallow: /my-reservations
 Disallow: /my-favorites
 Disallow: /my-stores
+Disallow: /messages
 Disallow: /store/register
 Disallow: /business
 Disallow: /admin

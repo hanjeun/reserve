@@ -34,6 +34,20 @@ html {
   max-width: 100%;
 }
 
+/* 스크롤바 자리를 항상 확보한다 (2026-09-23 실측).
+   모달이 열리면 AntD 가 body 스크롤을 잠그며 스크롤바가 사라지고, 고정 위치 요소(채팅 패널·메신저 버튼)가
+   스크롤바 폭(15px)만큼 오른쪽으로 밀렸다 — AntD 의 body 폭 보정은 일반 흐름 요소만 붙잡는다.
+   자리를 늘 확보하면 잠가도 폭이 그대로라 보정이 필요 없어져 끈다(겹쳐 보정하면 본문이 15px 줄어든다).
+   덤으로 스크롤이 있는 페이지와 없는 페이지를 오갈 때 화면이 좌우로 튀던 것도 사라진다.
+   이 속성을 모르는 브라우저는 AntD 의 기존 보정을 그대로 쓴다. */
+/* 앱 첫 로딩(로그인 확인) 동안의 틀 — 헤더와 같은 64px 자리와 아래 구분선만 둔다. */
+.reserve-boot-shell-header { height: 64px; box-shadow: inset 0 -1px 0 var(--c-border-light, #f2f4f6); }
+
+@supports (scrollbar-gutter: stable) {
+  html { scrollbar-gutter: stable; }
+  html body { width: auto !important; }
+}
+
 body {
   margin: 0;
   display: block;
@@ -253,44 +267,16 @@ button, input, textarea, select {
     font-size: 16px !important;
     opacity: 1; /* Firefox는 placeholder에 기본 opacity 0.54를 걸어 더 연하게 만든다 — 명시적으로 1 */
 }
-.ant-picker-cell-selected .ant-picker-cell-inner,
-.ant-picker-cell-range-start .ant-picker-cell-inner,
-.ant-picker-cell-range-end .ant-picker-cell-inner {
-    background-color: var(--c-gray-200, #e5e8eb) !important;
-    color: var(--c-text-primary, #1a1f27) !important;
-    font-weight: 600 !important;
-}
-.ant-picker-cell-selected .ant-picker-cell-inner:hover {
-    background-color: var(--c-gray-200, #e5e8eb) !important;
-}
-/* 오늘 날짜 테두리도 파란색 대신 회색계로 */
-.ant-picker-cell-today .ant-picker-cell-inner::before {
-    border-color: var(--c-text-disabled, #b5b8bd) !important;
-}
 
-/* RangePicker (FormDatePicker.RangePicker) default layout shows two calendar months side by
-   side, which needs 550px+ of width. On a narrow phone screen (375-430px) the left month
-   overflows off the edge of the screen. Below 576px, show only ONE month panel at a time
-   (matching how most mobile date-range pickers work: tap 시작일, pick from the one visible
-   month; tap 종료일, pick from the one visible month again, navigating months as needed) --
-   the underlying start/end selection logic is driven by which input has focus, not by how
-   many panels are in the DOM, so hiding the second panel doesn't affect picking either date.
-   PC keeps the original two-month side-by-side view untouched.
-   (2026-07-10: found on a real device testing the ad banner's exposure-period date range field;
-   first tried stacking both months vertically, but that was still too tall for a mobile modal,
-   so switched to hiding the second panel entirely per feedback) */
-@media (max-width: 576px) {
-    .ant-picker-dropdown .ant-picker-panels {
-        flex-direction: column !important;
-    }
-    .ant-picker-dropdown .ant-picker-panels > .ant-picker-panel:nth-of-type(2) {
-        display: none !important;
-    }
-    .ant-picker-dropdown .ant-picker-panel-container {
-        width: auto !important;
-        max-width: calc(100vw - 24px) !important;
-    }
-    .ant-picker-dropdown .ant-picker-panel {
-        width: 100% !important;
-    }
+/* 화면에는 안 보이고 화면 낭독기만 읽는 글자 (2026-09-23, AdMark 의 "광고" 등) */
+.reserve-sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }

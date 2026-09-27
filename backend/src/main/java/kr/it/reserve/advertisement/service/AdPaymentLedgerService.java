@@ -125,7 +125,7 @@ public class AdPaymentLedgerService {
         ad.setStatus(AdStatus.PENDING_PAYMENT);
         var owner = ad.getStore().getOwner();
         return AdPaymentPrepareResponse.builder().adId(adId).merchantUid(ad.getMerchantUid()).amount(ad.getAmount())
-                .productName(ad.getStore().getName() + (ad.getAdType() == AdType.BADGE ? " 광고 배지" : " 배너 광고"))
+                .productName(ad.getStore().getName() + (ad.getAdType() == AdType.BADGE ? " 노출형 광고" : " 배너 광고"))
                 .buyerName(owner.getName() == null || owner.getName().isBlank() ? "고객" : owner.getName())
                 .buyerEmail(owner.getEmail()).buyerTel("").storeId(portoneStoreId).build();
     }

@@ -17,7 +17,14 @@ const adService = {
         headers: { 'Content-Type': 'multipart/form-data' },
     }),
     getActiveAds: (adType) => api.get(API_ENDPOINTS.ADVERTISEMENT.ACTIVE, { params: { type: adType } }),
-    getMyAds: () => api.get(API_ENDPOINTS.ADVERTISEMENT.MY_ADS),
+    getMyAds: (page = 0, size = 20, storeId, search) => api.get(API_ENDPOINTS.ADVERTISEMENT.MY_ADS, {
+        params: {
+            page,
+            size,
+            ...(storeId ? { storeId } : {}),
+            ...(search?.trim() ? { search: search.trim() } : {}),
+        },
+    }),
     // search: 가게 이름 부분 일치(관리자 광고 목록). 빈 문자열이면 파라미터를 아예 보내지 않는다 —
     // 서버는 null과 ""를 같게 취급하지만, 쿼리스트링에 빈 값이 남으면 React Query 캐시 키와
     // 요청 URL이 불필요하게 갈라진다.
@@ -28,12 +35,13 @@ const adService = {
     suspendAd: (id, reason) => api.patch(API_ENDPOINTS.ADVERTISEMENT.ADMIN_SUSPEND(id), { reason }),
 
     /**
-     * 광고 성과 지표(2026-07 추가) — 셋 다 장식적 요소라 실패해도 호출측(UI)을 깨뜨리면 안 된다.
-     * catch로 조용히 무시 — 사용자에게 에러 토스트를 띄우지 않는다(목록 지연/실패 등을 막으면 안 됨).
+     * 노출·클릭은 장식적 지표라 실패해도 화면을 깨뜨리지 않는다.
+     * 전환은 서버가 로그인 회원의 실제 예약을 확인한다. 예약 성공 결과는 이 기록 실패와 분리한다.
      */
     recordImpression: (id) => api.patch(API_ENDPOINTS.ADVERTISEMENT.IMPRESSION(id)).catch(() => {}),
     recordClick: (id) => api.patch(API_ENDPOINTS.ADVERTISEMENT.CLICK(id)).catch(() => {}),
-    recordConversion: (id) => api.patch(API_ENDPOINTS.ADVERTISEMENT.CONVERSION(id)).catch(() => {}),
+    recordConversion: (id, reservationId) =>
+        api.patch(API_ENDPOINTS.ADVERTISEMENT.CONVERSION(id), { reservationId }).catch(() => {}),
 };
 
 export default adService;

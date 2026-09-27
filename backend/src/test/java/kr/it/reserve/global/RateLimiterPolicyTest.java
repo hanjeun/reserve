@@ -82,4 +82,15 @@ class RateLimiterPolicyTest {
                 .as("그 이상은 자동화로 본다")
                 .isFalse();
     }
+
+    @Test
+    @DisplayName("채팅 신고는 전송 한도와 분리되고 회원별로 제한된다")
+    void 채팅_신고는_전송과_다른_회원에게_영향을_주지_않는다() {
+        RateLimiter limiter = new RateLimiter();
+        String reporter = "member-7";
+
+        assertThat(drainThenTryOnceMore(limiter, RateLimiter.Policy.CHAT_REPORT, reporter)).isFalse();
+        assertThat(limiter.tryConsume(reporter, RateLimiter.Policy.CHAT_SEND)).isTrue();
+        assertThat(limiter.tryConsume("member-8", RateLimiter.Policy.CHAT_REPORT)).isTrue();
+    }
 }

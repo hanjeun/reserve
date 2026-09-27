@@ -1,13 +1,14 @@
 import React from 'react';
 import dayjs from 'dayjs';
-import { Form, Flex, Input, Switch, Typography, Checkbox, DatePicker } from 'antd';
-import { FormInput, FormTextArea, FormSelect, FormTimePicker } from '../../common';
+import { Form, Flex, Input, Switch, Typography, Checkbox } from 'antd';
+import { FormDatePicker, FormInput, FormTextArea, FormSelect, FormTimePicker } from '../../common';
 import AddressSearch from './AddressSearch';
 import {
     RESERVATION_SLOT_OPTIONS, NEARBY_RADIUS_OPTIONS,
     FULL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_DAYS_OPTIONS, PARTIAL_REFUND_RATE_OPTIONS,
     BOOKING_DEADLINE_OPTIONS, PAYMENT_TIMEOUT_OPTIONS,
     BOOKING_TYPE_OPTIONS, BOOKING_TYPE_HINTS,
+    SERVICE_DOMAIN_OPTIONS,
 } from '../../../constants';
 import { VALIDATION_RULES } from '../../../utils/validation';
 import { useWindowWidth } from '../../../hooks';
@@ -15,8 +16,8 @@ import { colors, fontSize, fontWeight } from '../../../styles/tokens';
 
 const { Text } = Typography;
 
-// Form.Item marginBottom: PC에서는 오른쪽 컬럼과 간격 맞추기 위해 12px, 모바일은 18px
-const MB     = { marginBottom: 18 }; // 모바일/기본
+// 모바일·PC 필드 간격을 같은 작업 폼 기준으로 맞춘다. Core 폼 자체는 변경하지 않는다.
+const MB     = { marginBottom: 12 }; // 모바일/기본
 const MB_PC  = { marginBottom: 12 }; // PC 왼쪽 컬럼 (오른쪽 기준 맞춤)
 
 // 섹션 헤더
@@ -35,7 +36,7 @@ const Divider = ({ top = 4, bottom = 16 }) => (
 
 // 토글 행
 const ToggleItem = ({ label, desc, name }) => (
-    <div style={toggleStyles.row}>
+    <div className="reserve-store-form-toggle" style={toggleStyles.row}>
         <Text style={toggleStyles.label}>{label}</Text>
         <Text style={toggleStyles.desc}>{desc}</Text>
         <Form.Item name={name} valuePropName="checked" noStyle>
@@ -51,31 +52,32 @@ const toggleStyles = {
 };
 
 /**
- * 한 줄에 2~3개를 나란히 놓는 행. **모바일에서는 세로로 쌓는다.**
+ * 긴 입력·시간 범위는 모바일에서 세로로 쌓는다. 짧은 정책 Select만 compact 2열을 쓴다.
  *
  * ★ 예전에는 폭과 무관하게 항상 가로였다. 이 컴포넌트를 쓰는 7곳이 전부 같은 문제를 겪었고,
  *   그중 최악은 영업시간이었다 — 360px 화면에서 칸 하나가 약 160px 인데 그 안에
  *   `[시작] → [종료]` 와 시계 아이콘이 다 들어가야 했다. 환불 정책은 3열이라 칸당 100px 미만.
  *   숫자 입력은 그럭저럭 보여도 RangePicker·Select 는 글자가 잘렸다.
  *
- * 세로로 쌓으면 스크롤이 조금 길어지는 대신 모든 칸이 제 폭을 갖는다.
- * 모바일에서 세로 스크롤은 값싸고, 잘린 글자는 비싸다.
+ * 시간 범위·긴 힌트는 여전히 한 칸의 폭을 보장한다. 짧은 환불·마감 기준만
+ * compact로 표시하며 모바일 밀도는 작업 폼 전용 CSS 관문에서 정한다.
  *
  * 폭 판정을 호출부에서 prop 으로 받지 않고 여기서 하는 이유: 이 파일의 SettingsSection 은
  * isMobile 을 안 받는다. 관문 한 곳에서 정해야 7곳이 어긋나지 않는다(CLAUDE.md 설계 원칙).
  */
-const FieldRow = ({ children, style }) => {
+const FieldRow = ({ children, style, compact = false, className = '' }) => {
     const isMobile = useWindowWidth() < 768;
     // 간격은 Flex 의 gap 으로만 준다 — 자식에 marginBottom 을 쓰면 마지막 칸 뒤에도
     // 여백이 붙어 행 자신의 marginBottom 과 겹친다(아래 cloneElement 가 0 으로 덮는 이유).
     return (
         <Flex
+            className={`reserve-store-form-row${compact ? ' reserve-store-form-row--compact' : ''}${className ? ` ${className}` : ''}`}
             vertical={isMobile}
-            gap={isMobile ? 18 : 12}
-            style={{ marginBottom: 18, ...style }}
+            gap={12}
+            style={{ marginBottom: isMobile ? 12 : 18, ...style }}
         >
             {React.Children.map(children, child =>
-                React.cloneElement(child, { style: { flex: 1, marginBottom: 0, ...child.props.style } })
+                React.cloneElement(child, { style: { flex: 1, minWidth: 0, marginBottom: 0, ...child.props.style } })
             )}
         </Flex>
     );
@@ -93,18 +95,25 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                 <FormInput placeholder="가게 이름" />
             </Form.Item>
 
-            {/* 예약 방식 (2026-08-24 신설). 이 값 하나가 아래 칸들의 의미를 바꾼다 —
-                SLOT 이면 "예약 단위"가, SESSION 이면 "회차 목록"이 실제로 쓰인다.
-                그래서 두 칸보다 위에 둔다. */}
-            <Form.Item
-                label="예약 방식" name="bookingType"
-                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                    {BOOKING_TYPE_HINTS[bookingType] ?? BOOKING_TYPE_HINTS.SLOT}
-                </Text>}
-                style={mb}
-            >
-                <FormSelect options={BOOKING_TYPE_OPTIONS} placeholder="시간대 (기본)" />
-            </Form.Item>
+            {/* 짧은 분류 두 칸은 모바일에서도 한 줄에 둔다. 둘 다 직접 문장을 쓰는 칸이 아니고,
+                가게가 어떤 방식·분야로 예약을 받는지 함께 결정하는 구조화된 선택값이다. */}
+            <FieldRow compact style={isMobile ? {} : { marginBottom: 12 }}>
+                <Form.Item
+                    label="예약 방식" name="bookingType"
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                        {BOOKING_TYPE_HINTS[bookingType] ?? BOOKING_TYPE_HINTS.SLOT}
+                    </Text>}
+                >
+                    <FormSelect options={BOOKING_TYPE_OPTIONS} placeholder="시간대 (기본)" />
+                </Form.Item>
+                <Form.Item
+                    label="서비스 분야" name="serviceDomain"
+                    rules={[{ required: true, message: '서비스 분야를 선택해주세요.' }]}
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>손님이 찾을 때 쓰는 큰 분류예요</Text>}
+                >
+                    <FormSelect options={SERVICE_DOMAIN_OPTIONS} placeholder="분야 선택" />
+                </Form.Item>
+            </FieldRow>
 
             {/* 회차 목록은 SESSION 일 때만 의미가 있다. 항상 보여주면 "적었는데 안 쓰이는" 칸이 된다 —
                 이 프로젝트가 죽은 검사·죽은 옵션으로 여러 번 데인 패턴이다. */}
@@ -122,32 +131,33 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                 </Form.Item>
             )}
 
-            <FieldRow style={isMobile ? {} : { marginBottom: 12 }}>
-                <Form.Item
-                    label="카테고리" name="category" rules={VALIDATION_RULES.category}
-                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>업종에 맞게 자유롭게 입력하세요</Text>}
-                >
-                    <FormInput placeholder="예: 필라테스, 네일샵, 한식 등" maxLength={30} />
-                </Form.Item>
+            <Form.Item
+                label="카테고리" name="category" rules={VALIDATION_RULES.category}
+                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>업종에 맞게 자유롭게 입력하세요</Text>}
+                style={mb}
+            >
+                <FormInput placeholder="예: 필라테스, 네일샵, 한식 등" maxLength={30} />
+            </Form.Item>
+
+            <FieldRow compact style={isMobile ? {} : { marginBottom: 12 }}>
                 <Form.Item
                     label="예약 단위" name="reservationSlotMinutes"
                     rules={[{ required: true, message: '예약 단위를 선택해주세요.' }]}
                     extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                        {bookingType === 'SLOT' ? '시간 선택 시 간격 단위' : '지금 방식에서는 쓰이지 않아요'}
+                        {bookingType === 'SLOT' ? '시간 선택 간격' : '시간대 방식에서 사용'}
                     </Text>}
                 >
-                    {/* 값은 그대로 저장한다 — SLOT 으로 되돌렸을 때 예전 설정이 살아 있어야 한다.
-                        다만 "지금은 안 쓰인다"는 걸 말해준다. 말 안 하면 고쳐놓고 왜 안 먹는지 찾게 된다. */}
+                    {/* 값은 그대로 저장한다 — SLOT 으로 되돌렸을 때 예전 설정이 살아 있어야 한다. */}
                     <FormSelect options={RESERVATION_SLOT_OPTIONS} placeholder="선택" />
+                </Form.Item>
+
+                <Form.Item label="연락처" name="phone" rules={VALIDATION_RULES.phone}>
+                    {/* placeholder·에러문구·정규식이 서로 다른 말을 하면 안 된다. 셋 다 같은 예시로 맞춰둘 것. */}
+                    <FormInput placeholder="02-1234-5678" />
                 </Form.Item>
             </FieldRow>
 
-            <Form.Item label="연락처" name="phone" rules={VALIDATION_RULES.phone} style={mb}>
-                {/* placeholder·에러문구·정규식이 서로 다른 말을 하면 안 된다. 셋 다 같은 예시로 맞춰둘 것. */}
-                <FormInput placeholder="02-1234-5678" />
-            </Form.Item>
-
-            <FieldRow style={isMobile ? {} : { marginBottom: 12 }}>
+            <FieldRow className="reserve-store-form-row--time" style={isMobile ? {} : { marginBottom: 12 }}>
                 <Form.Item label="영업 시간" name="times" rules={VALIDATION_RULES.businessHours}>
                     <FormTimePicker.RangePicker
                         placeholder={['시작 시간', '종료 시간']}
@@ -192,7 +202,7 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
 // 운영 설정 (오른쪽 컬럼)
 const SettingsSection = () => (
     <>
-        <FieldRow>
+        <FieldRow compact>
             <Form.Item
                 label="최대 예약 인원" name="maxCapacityPerSlot"
                 rules={VALIDATION_RULES.maxCapacityPerSlot}
@@ -268,9 +278,8 @@ const SettingsSection = () => (
                 팝업스토어처럼 기간이 정해진 경우에만. 비워두면 계속 운영해요 (종료일 당일까지 예약 가능)
             </Text>}
         >
-            <DatePicker.RangePicker
+            <FormDatePicker.RangePicker
                 placeholder={['시작일', '종료일']}
-                style={{ width: '100%' }}
                 allowEmpty={[true, true]}
             />
         </Form.Item>
@@ -282,11 +291,9 @@ const SettingsSection = () => (
                     명절·개인 사정 등 특정 날짜만 쉴 때. 지난 날짜는 저장 시 자동으로 정리돼요
                 </Text>}
             >
-                <DatePicker
+                <FormDatePicker
                     multiple
                     placeholder="날짜 선택"
-                    style={{ width: '100%' }}
-                    maxTagCount="responsive"
                     disabledDate={(d) => d && d.isBefore(dayjs().startOf('day'))}
                 />
             </Form.Item>
@@ -303,7 +310,7 @@ const SettingsSection = () => (
 
         <Divider />
         <SectionLabel>환불 정책</SectionLabel>
-        <FieldRow style={{ marginBottom: 12 }}>
+        <FieldRow compact style={{ marginBottom: 12 }}>
             <Form.Item label="전액 환불"   name="fullRefundDays"    rules={[{ required: true, message: '전액 환불 기준을 선택해주세요.' }]}>
                 <FormSelect options={FULL_REFUND_DAYS_OPTIONS}    placeholder="환불 없음" />
             </Form.Item>
@@ -315,7 +322,7 @@ const SettingsSection = () => (
             </Form.Item>
         </FieldRow>
 
-        <FieldRow style={{ marginBottom: 0 }}>
+        <FieldRow compact style={{ marginBottom: 0 }}>
             <Form.Item label="예약 마감" name="bookingDeadlineHours"    rules={[{ required: true, message: '예약 마감을 선택해주세요.' }]}>
                 <FormSelect options={BOOKING_DEADLINE_OPTIONS}  placeholder="제한 없음" />
             </Form.Item>
@@ -331,10 +338,17 @@ const SettingsSection = () => (
  * @param {boolean} isMobile - PC: 2컬럼 / 모바일: 단일 컬럼
  */
 const StoreBasicInfo = ({ isMobile = true, form, zipCode = '', addressDetail = '' }) => {
+    // 초안 복원은 Form 인스턴스에 값을 주입하므로 최초 initialValues prop만 보면 주소의
+    // 보조 필드가 갱신되지 않는다. 등록·수정 모두 실제 폼 값을 구독해 AddressSearch에 전달한다.
+    const watchedZipCode = Form.useWatch('zipCode', form);
+    const watchedAddressDetail = Form.useWatch('addressDetail', form);
+    const currentZipCode = watchedZipCode === undefined ? zipCode : watchedZipCode;
+    const currentAddressDetail = watchedAddressDetail === undefined ? addressDetail : watchedAddressDetail;
+
     if (!isMobile) {
         return (
             <div style={pcStyles.grid}>
-                <div style={pcStyles.col}><BasicSection isMobile={false} form={form} zipCode={zipCode} addressDetail={addressDetail} /></div>
+                <div style={pcStyles.col}><BasicSection isMobile={false} form={form} zipCode={currentZipCode} addressDetail={currentAddressDetail} /></div>
                 <div style={pcStyles.dividerVertical} />
                 <div style={pcStyles.col}><SettingsSection /></div>
             </div>
@@ -342,7 +356,7 @@ const StoreBasicInfo = ({ isMobile = true, form, zipCode = '', addressDetail = '
     }
     return (
         <>
-            <BasicSection form={form} zipCode={zipCode} addressDetail={addressDetail} />
+            <BasicSection form={form} zipCode={currentZipCode} addressDetail={currentAddressDetail} />
             <Divider top={8} bottom={16} />
             <SettingsSection />
         </>

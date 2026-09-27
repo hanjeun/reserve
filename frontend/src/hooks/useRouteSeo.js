@@ -10,6 +10,8 @@ const INDEXABLE_PATHS = [
     /^\/store\/\d+$/,
     /^\/terms$/,
     /^\/privacy$/,
+    /^\/content-sources$/,
+    /^\/operation-guide$/,
 ];
 
 export const normalizeSeoPath = (pathname) => {
@@ -30,6 +32,8 @@ const BREADCRUMB_LABELS = [
     { pattern: /^\/store\/\d+$/, trail: [{ name: '가게 찾기', path: '/stores' }, { name: '가게 상세', path: null }] },
     { pattern: /^\/terms$/, trail: [{ name: '서비스 이용약관', path: '/terms' }] },
     { pattern: /^\/privacy$/, trail: [{ name: '개인정보 처리방침', path: '/privacy' }] },
+    { pattern: /^\/content-sources$/, trail: [{ name: '콘텐츠 출처·권리 안내', path: '/content-sources' }] },
+    { pattern: /^\/operation-guide$/, trail: [{ name: '운영 안내', path: '/operation-guide' }] },
 ];
 
 const BREADCRUMB_SCRIPT_ID = 'reserve-breadcrumb-jsonld';

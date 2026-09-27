@@ -9,8 +9,29 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface PromotionRepository extends JpaRepository<Promotion, Long> {
+
+    /** 공개 노출과 total에 같은 가게 상태 조건을 적용한다. 작성자는 fetch하지 않는다. */
+    @Query(value = """
+            SELECT p FROM Promotion p JOIN FETCH p.store s
+             WHERE s.deletedAt IS NULL AND s.status = kr.it.reserve.store.entity.StoreStatus.ACTIVE
+             ORDER BY p.createdAt DESC, p.id DESC
+            """,
+            countQuery = """
+            SELECT COUNT(p) FROM Promotion p JOIN p.store s
+             WHERE s.deletedAt IS NULL AND s.status = kr.it.reserve.store.entity.StoreStatus.ACTIVE
+            """)
+    Page<Promotion> findAllPublic(Pageable pageable);
+
+    @Query("""
+            SELECT p FROM Promotion p JOIN FETCH p.store s
+             WHERE p.id = :id AND s.deletedAt IS NULL
+               AND s.status = kr.it.reserve.store.entity.StoreStatus.ACTIVE
+            """)
+    Optional<Promotion> findPublicById(@Param("id") Long id);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Promotion p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")

@@ -71,3 +71,10 @@ export const RESERVATION_STATUS_FILTER_OPTIONS = [
     { value: 'ALL', label: '전체 상태' },
     ...RESERVATION_STATUS_ORDER.map((value) => ({ value, label: RESERVATION_STATUS_LABELS[value] })),
 ];
+
+/** 내 예약·사업자 예약·관리자 예약 목록이 공유하는 정렬 메뉴. */
+export const RESERVATION_SORT_OPTIONS = [
+    { value: 'recent', label: '최신 예약순' },
+    { value: 'oldest', label: '오래된 예약순' },
+    { value: 'visit', label: '방문일 빠른순' },
+];

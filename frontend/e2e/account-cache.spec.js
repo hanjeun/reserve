@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const menuItem = (page, label) => page.locator('[role="menuitem"]').filter({ hasText: label });
+
 test('switching A to B in the same SPA cannot reuse A favorites', async ({ page }) => {
     let account = { id: 1, name: 'A 사용자', email: 'a@example.test', role: 'USER', termsAgreed: true };
     let releaseB;
@@ -26,14 +28,16 @@ test('switching A to B in the same SPA cannot reuse A favorites', async ({ page 
     await page.goto('/my-favorites');
     await expect(page.getByText('A만의 즐겨찾기', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '내 계정 메뉴 열기' }).click();
-    await page.getByRole('menuitem', { name: /로그아웃/ }).click();
+    await menuItem(page, '로그아웃').click();
+    // 세션 전환으로 QueryProvider가 바뀌어도 AntD 메시지 공급자는 남아야 한다.
+    await expect(page.getByText('성공적으로 로그아웃되었습니다.')).toBeVisible();
     await expect(page.getByText('A만의 즐겨찾기', { exact: true })).not.toBeVisible();
     await page.getByRole('button', { name: '로그인', exact: true }).first().click();
     await page.getByPlaceholder('이메일 주소').fill('b@example.test');
     await page.getByPlaceholder('비밀번호').fill('local-test-password');
     await page.getByRole('main').getByRole('button', { name: '로그인', exact: true }).click();
     await page.getByRole('button', { name: '내 계정 메뉴 열기' }).click();
-    await page.getByRole('menuitem', { name: /즐겨찾기/ }).click();
+    await menuItem(page, '즐겨찾기').click();
     await expect.poll(() => bRequested).toBe(true);
     // B의 느린 응답을 기다리는 동안에도 A 캐시가 placeholder로 비치면 안 된다.
     await expect(page.getByText('A만의 즐겨찾기', { exact: true })).not.toBeVisible();
@@ -68,4 +72,34 @@ test('an account change in another tab discards the first tab private cache', as
     await expect(page.getByText('B 비공개 목록', { exact: true })).toBeVisible();
     await expect(page.getByText('A 비공개 목록', { exact: true })).not.toBeVisible();
     await otherTab.close();
+});
+
+test('logout reports a server failure but clears this device session without trying token refresh', async ({ page }) => {
+    const account = { id: 1, name: 'A 사용자', email: 'a@example.test', role: 'USER', termsAgreed: true };
+    const requestedPaths = [];
+
+    await page.route('**/api/**', async route => {
+        const path = new URL(route.request().url()).pathname;
+        if (!path.startsWith('/api/')) return route.continue();
+        requestedPaths.push(path);
+        if (path === '/api/member/me') {
+            return route.fulfill({ json: { success: true, data: account } });
+        }
+        if (path === '/api/auth/logout') {
+            return route.fulfill({
+                status: 503,
+                json: { success: false, message: '서버 연결을 확인하지 못했습니다.' },
+            });
+        }
+        return route.fulfill({ json: { success: true, data: [] } });
+    });
+
+    await page.goto('/my-favorites');
+    await page.getByRole('button', { name: '내 계정 메뉴 열기' }).click();
+    await menuItem(page, '로그아웃').click();
+
+    await expect(page.getByText('이 기기에서 로그아웃했습니다. 서버 연결은 확인하지 못했습니다.')).toBeVisible();
+    await expect(page.getByRole('button', { name: '로그인', exact: true }).first()).toBeVisible();
+    expect(requestedPaths).toContain('/api/auth/logout');
+    expect(requestedPaths).not.toContain('/api/auth/refresh');
 });

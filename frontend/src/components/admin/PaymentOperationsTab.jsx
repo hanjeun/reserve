@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Tag, Typography } from 'antd';
+import { Tag } from 'antd';
 import AdPaymentOperations from './AdPaymentOperations';
 import { ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { AdminTableSkeleton, Button, DataTable, FilterToolbar, SegmentedControl } from '../common';
+import { AdminTableSkeleton, Button, DataState, DataTable, FilterToolbar, SegmentedControl } from '../common';
+import CopyableText from '../common/CopyableText';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import { invalidateAdminData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
@@ -11,7 +12,6 @@ import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
 
-const { Text } = Typography;
 const PAGE_SIZE = 20;
 
 const QUEUES = [
@@ -38,6 +38,8 @@ const OUTCOME_LABELS = {
 };
 
 const pageContent = (data) => data?.content ?? [];
+// 주문번호(13px, 약 189px) + 복사 아이콘(약 20) + 칸 좌우 여백(16) 이 한 줄에 들어가는 폭 (2026-09-21 실측).
+const ORDER_NO_COLUMN_WIDTH = 232;
 const pageTotal = (data) => data?.page?.totalElements ?? data?.totalElements ?? pageContent(data).length;
 const shortDateTime = (value) => value ? value.replace('T', ' ').substring(0, 16) : '-';
 
@@ -123,8 +125,9 @@ const PaymentOperationsTab = () => {
 
     const readyColumns = [
         { title: '결제 ID', dataIndex: 'paymentId', width: 90 },
-        { title: '주문번호', dataIndex: 'merchantUid', width: 210,
-            render: (value) => <Text copyable={{ text: value }} style={{ fontSize: fontSize.sm }}>{value}</Text> },
+        // 주문번호 + 복사 아이콘이 한 줄에 들어가는 폭. 좁으면 아이콘만 다음 줄로 꺾여 모바일에서 행이 두 배로 높아졌다.
+        { title: '주문번호', dataIndex: 'merchantUid', width: ORDER_NO_COLUMN_WIDTH, className: 'reserve-table-code',
+            render: (value) => <CopyableText value={value} label="주문번호" style={{ fontSize: fontSize.sm }} /> },
         { title: '예약', dataIndex: 'reservationId', width: 80, render: (value) => value ?? '-' },
         { title: '예약 상태', dataIndex: 'reservationStatus', width: 110,
             render: (value) => <Tag>{value ?? '-'}</Tag> },
@@ -135,10 +138,12 @@ const PaymentOperationsTab = () => {
             render: (_, record) => (
                 <Button
                     variant="ghost-sm-primary"
+                    icon={<ReloadOutlined aria-hidden="true" />}
+                    loadingIcon={<ReloadOutlined spin aria-hidden="true" />}
                     loading={reconcileMutation.isPending && reconcileMutation.variables === record.paymentId}
                     onClick={() => confirmReconcile(record)}
                 >
-                    <ReloadOutlined /> PG 재확인
+                    PG 재확인
                 </Button>
             ) },
     ];
@@ -147,8 +152,8 @@ const PaymentOperationsTab = () => {
         { title: '유형', dataIndex: 'issueType', width: 190, render: (value) => <Tag color="orange">{value}</Tag> },
         { title: '결제 ID', dataIndex: 'paymentId', width: 90, render: (value) => value ?? '-' },
         { title: '예약 ID', dataIndex: 'reservationId', width: 90, render: (value) => value ?? '-' },
-        { title: '주문번호', dataIndex: 'merchantUid', width: 210,
-            render: (value) => value ? <Text copyable={{ text: value }}>{value}</Text> : '-' },
+        { title: '주문번호', dataIndex: 'merchantUid', width: ORDER_NO_COLUMN_WIDTH, className: 'reserve-table-code',
+            render: (value) => <CopyableText value={value} label="주문번호" style={{ fontSize: fontSize.sm }} /> },
         { title: '원인 코드', dataIndex: 'detailCode', width: 180, render: (value) => value ?? '-' },
         { title: '발생', dataIndex: 'occurrenceCount', width: 70, render: (value) => `${value}회` },
         { title: '마지막 감지', dataIndex: 'lastSeenAt', width: 145, render: shortDateTime },
@@ -156,8 +161,8 @@ const PaymentOperationsTab = () => {
 
     const webhookColumns = [
         { title: '이벤트', dataIndex: 'eventType', width: 180, render: (value) => value ?? '-' },
-        { title: '주문번호', dataIndex: 'merchantUid', width: 210,
-            render: (value) => value ? <Text copyable={{ text: value }}>{value}</Text> : '-' },
+        { title: '주문번호', dataIndex: 'merchantUid', width: ORDER_NO_COLUMN_WIDTH, className: 'reserve-table-code',
+            render: (value) => <CopyableText value={value} label="주문번호" style={{ fontSize: fontSize.sm }} /> },
         { title: '상태', dataIndex: 'status', width: 110, render: (value) => <Tag color="orange">{value}</Tag> },
         { title: '시도', dataIndex: 'attemptCount', width: 70, render: (value) => `${value}회` },
         { title: '오류', dataIndex: 'lastErrorType', width: 170, render: (value) => value ?? '-' },
@@ -166,10 +171,12 @@ const PaymentOperationsTab = () => {
             render: (_, record) => (
                 <Button
                     variant="ghost-sm-primary"
+                    icon={<ReloadOutlined aria-hidden="true" />}
+                    loadingIcon={<ReloadOutlined spin aria-hidden="true" />}
                     loading={retryWebhookMutation.isPending && retryWebhookMutation.variables === record.id}
                     onClick={() => retryWebhookMutation.mutate(record.id)}
                 >
-                    <ReloadOutlined /> 재처리
+                    재처리
                 </Button>
             ) },
     ];
@@ -178,7 +185,9 @@ const PaymentOperationsTab = () => {
     const columns = { ready: readyColumns, issues: issueColumns, webhooks: webhookColumns }[queue];
     const data = pageContent(activeQuery?.data);
     const total = pageTotal(activeQuery?.data);
-    const loading = activeQuery?.isLoading || activeQuery?.isFetching;
+    // 수동 새로고침은 이미 보이는 결제 표를 유지한다. 페이지·기간 전환에서 남아 있는
+    // placeholder만 스켈레톤으로 바꿔 이전 조건의 기록을 새 결과로 오인하지 않게 한다.
+    const loading = activeQuery?.isLoading || activeQuery?.isPlaceholderData;
 
     const descriptions = {
         ready: '오래된 READY 결제를 PG 원장과 다시 맞춥니다. PAID·금액 불일치처럼 자동 확정이 위험한 결과는 수동 대사 큐로 보냅니다.',
@@ -200,15 +209,25 @@ const PaymentOperationsTab = () => {
                     value: olderThanDays,
                     onChange: handleAgeChange,
                     options: AGE_OPTIONS,
-                    width: 130,
+                    // 가장 긴 선택지("30일 이상"·"90일 이상")와 화살표가 들어가는 최대 폭.
+                    // 건수가 있을 때 FilterToolbar는 실제 선택값 폭으로 줄여 건수와 붙인다.
+                    width: 76,
                 }] : []}
                 count={total}
                 onReload={activeQuery.refetch}
-                loading={loading}
+                loading={activeQuery?.isFetching}
             />
 
-            {loading ? (
-                <AdminTableSkeleton rows={6} cols={columns.map((column) => column.width ?? null)} headers={columns.map((column) => column.title)} />
+            {activeQuery.isError ? (
+                <DataState state="error" kind="payment" subject="결제 운영 목록" error={activeQuery.error}
+                    onRetry={activeQuery.refetch} retrying={activeQuery.isFetching} compact />
+            ) : loading ? (
+                <AdminTableSkeleton
+                    rows={6}
+                    cols={columns.map((column) => column.width ?? null)}
+                    headers={columns.map((column) => column.title)}
+                    actionBtns={queue === 'issues' ? 0 : 1}
+                />
             ) : (
                 <DataTable
                     columns={columns}

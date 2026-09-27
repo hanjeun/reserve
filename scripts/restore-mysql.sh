@@ -2,11 +2,11 @@
 #
 # RESERVE MySQL 복원 — 백업 파일을 실제로 되돌린다.
 #
-#   reserve-restore /var/backups/reserve/reserve-20260731-030000.sql.gz
-#   reserve-restore s3://reserve-it-kr-backup/mysql/reserve-20260731-030000.sql.gz
-#   reserve-restore --list                     # 복원 가능한 백업 목록
-#   reserve-restore --dry-run <file>           # 덤프 검증만 (DB 건드리지 않음)
-#   reserve-restore --target reserve_restore_test <file>   # 별도 DB로 복원(복원 훈련용)
+#   sudo reserve-restore /var/backups/reserve/reserve-20260731-030000.sql.gz
+#   sudo reserve-restore s3://reserve-it-kr-backup/mysql/reserve-20260731-030000.sql.gz
+#   sudo reserve-restore --list                     # 복원 가능한 백업 목록
+#   sudo reserve-restore --dry-run <file>           # 덤프 검증만 (DB 건드리지 않음)
+#   sudo reserve-restore --target reserve_restore_test <file>   # 별도 DB로 복원(복원 훈련용)
 #
 # ★ 백업은 "복원해본 적 있는 백업"만 백업이다.
 #   한 번도 복원해보지 않은 백업은 대개 필요할 때 안 된다.
@@ -14,12 +14,14 @@
 #   절차는 docs/technical/backup.md 의 "복원 훈련" 참고.
 
 set -euo pipefail
+umask 077
 
 CONFIG_FILE="${RESERVE_BACKUP_ENV:-/etc/reserve-backup.env}"
 if [[ -f "$CONFIG_FILE" ]]; then
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"
 fi
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION
 
 MYSQL_CONTAINER="${MYSQL_CONTAINER:-mysql}"
 DB_NAME="${DB_NAME:-reserve}"
@@ -65,12 +67,22 @@ done
 [[ -n "$SOURCE" ]] || usage 1
 [[ "$TARGET_DB" =~ ^[A-Za-z0-9_]+$ ]] \
     || die "target database must contain only letters, numbers, and underscores"
+if [[ "$TARGET_DB" != "$DB_NAME" && ! "$TARGET_DB" =~ ^reserve_restore_[A-Za-z0-9_]+$ ]]; then
+    die "target must be the configured database or start with reserve_restore_"
+fi
 
 # ─────────────────────────────────────────────────────────
 # 백업 파일 준비
 # ─────────────────────────────────────────────────────────
 WORK_FILE=""
 CLEANUP_WORK=0
+
+cleanup() {
+    if [[ "$CLEANUP_WORK" -eq 1 && -n "$WORK_FILE" ]]; then
+        rm -f "$WORK_FILE"
+    fi
+}
+trap cleanup EXIT
 
 case "$SOURCE" in
     s3://*)
@@ -84,13 +96,6 @@ case "$SOURCE" in
         WORK_FILE="$SOURCE"
         ;;
 esac
-
-cleanup() {
-    if [[ "$CLEANUP_WORK" -eq 1 ]]; then
-        rm -f "$WORK_FILE"
-    fi
-}
-trap cleanup EXIT
 
 # ─────────────────────────────────────────────────────────
 # 검증 — 복원 전에 반드시. 깨진 덤프를 밀어넣으면 상황이 더 나빠진다.
@@ -119,6 +124,14 @@ fi
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 || die "container '$MYSQL_CONTAINER' not found"
 [[ -n "${DB_PASSWORD:-}" ]] || die "DB_PASSWORD is not set (check $CONFIG_FILE)"
 
+container_running() {
+    [[ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]]
+}
+
+if [[ "$TARGET_DB" = "$DB_NAME" ]] && (container_running blue || container_running green); then
+    die "stop both blue and green app containers before restoring the production database"
+fi
+
 echo
 echo "  source : ${SOURCE}"
 echo "  target : ${TARGET_DB} (container: ${MYSQL_CONTAINER})"
@@ -138,10 +151,10 @@ fi
 # ─────────────────────────────────────────────────────────
 # 복원
 # ─────────────────────────────────────────────────────────
-echo "creating database if needed..."
+echo "recreating target database..."
 docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" \
-    -e "CREATE DATABASE IF NOT EXISTS \`${TARGET_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    -e "DROP DATABASE IF EXISTS \`${TARGET_DB}\`; CREATE DATABASE \`${TARGET_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 echo "restoring... (크기에 따라 수 분 걸릴 수 있습니다)"
 set +e

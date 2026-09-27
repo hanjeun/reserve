@@ -46,6 +46,8 @@ import { LeftOutlined, RightOutlined, DoubleLeftOutlined, DoubleRightOutlined, C
 import dayjs from 'dayjs';
 import { useBookingCalendar } from '../../hooks';
 import { colors, radius, fontSize, fontWeight, animation, field } from '../../styles/tokens';
+import { DataState } from '../common';
+import { Bone } from '../common/Skeletons';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -217,7 +219,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                                animation: animation.slideUpIn }}>
                     {value ? `${value.format('YYYY. M. D.')} (${WEEKDAYS[value.day()]})` : '날짜 선택'}
                 </span>
-                <CalendarOutlined style={{
+                <CalendarOutlined aria-hidden="true" style={{
                     fontSize: field.iconSize,
                     color: isError && !value ? colors.error.main : colors.text.placeholder,
                 }} />
@@ -230,7 +232,8 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                 centered
                 width={332}
                 destroyOnHidden
-                title={null}
+                title={<span style={styles.visuallyHidden}>예약 날짜 선택</span>}
+                styles={{ header: styles.visuallyHiddenHeader }}
                 /*
                  * 닫기 X 를 없앤다 — 332px 폭에서 오른쪽 위는 "다음 달" 화살표 자리다.
                  * 둘을 같이 두면 겹친다(실제로 겹쳤다). 닫는 길은 이미 셋이다:
@@ -276,12 +279,15 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
 
                 <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
                 {error ? (
-                    <div style={styles.message}>
-                        {error}{' '}
-                        <button type="button" onClick={refetch} style={styles.retry}>다시 시도</button>
+                    <DataState state="error" title={error} onRetry={refetch} compact />
+                ) : loading || fetching ? (
+                    <div role="status" aria-label="예약 가능한 날짜를 불러오는 중" aria-busy="true">
+                        <div style={styles.grid} aria-hidden="true">
+                            {cells.map(cell => cell.blank ? <span key={cell.key} /> : <Bone key={cell.date.format('YYYY-MM-DD')} height={40} borderRadius={radius.md} />)}
+                        </div>
                     </div>
                 ) : (
-                    <div style={{ ...styles.grid, opacity: loading || fetching ? 0.45 : 1 }}>
+                    <div style={styles.grid}>
                         {cells.map((cell, i) => (cell.blank
                             ? <span key={cell.key} />
                             : renderDay(cell.date, i)))}
@@ -352,10 +358,13 @@ const styles = {
         pointerEvents: 'none',
     },
     navGroup: { display: 'flex', gap: 2 },
-    message: { padding: '24px 0', textAlign: 'center', fontSize: fontSize.sm, color: colors.text.tertiary },
-    retry: {
-        border: 'none', background: 'transparent', color: colors.primary.main,
-        cursor: 'pointer', fontSize: fontSize.sm, fontFamily: 'inherit', padding: 0,
+    visuallyHidden: {
+        position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+        overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0,
+    },
+    visuallyHiddenHeader: {
+        position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+        overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0,
     },
 };
 

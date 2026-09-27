@@ -1,0 +1,8 @@
+/* RESERVE global styles — import order is part of the cascade contract. */
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+@import './styles/theme.css';
+@import './styles/global/foundation.css';
+@import './styles/global/navigation-and-media.css';
+@import './styles/global/components-and-forms.css';
+@import './styles/global/interactions.css';
+@import './styles/global/feature-surfaces.css';

@@ -4,6 +4,9 @@ import kr.it.reserve.community.dto.CommunityDto;
 import kr.it.reserve.community.service.CommunityService;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.ratelimit.RateLimiter;
+import kr.it.reserve.global.ratelimit.IpExtractor;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +19,7 @@ import java.util.List;
 public class CommunityApiController {
 
     private final CommunityService communityService;
+    private final RateLimiter rateLimiter;
 
     // 게시글 목록 조회 (비로그인 가능)
     @GetMapping("/posts")
@@ -40,6 +44,15 @@ public class CommunityApiController {
     public ApiResponse<CommunityDto.PostResponse> getPost(@PathVariable Long postId) {
         Long memberId = SecurityUtil.isLoggedIn() ? SecurityUtil.getCurrentMemberId() : null;
         return ApiResponse.success(communityService.getPost(postId, memberId), "게시글 상세 조회 성공");
+    }
+
+    // 인가 범위는 기존 community API와 같다. GET은 더 이상 조회수를 쓰지 않는다.
+    @PostMapping("/posts/{postId}/view")
+    public ApiResponse<Void> recordView(@PathVariable Long postId, HttpServletRequest request) {
+        if (postId > 0 && rateLimiter.tryConsume("community-view:" + IpExtractor.extract(request), RateLimiter.Policy.AD_METRIC)) {
+            communityService.recordView(postId);
+        }
+        return ApiResponse.success(null, "조회 처리 완료");
     }
 
     // 게시글 작성

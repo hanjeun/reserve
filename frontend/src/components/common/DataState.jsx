@@ -1,0 +1,126 @@
+import PropTypes from 'prop-types';
+import {
+    CalendarOutlined,
+    ClockCircleOutlined,
+    CloudServerOutlined,
+    ExclamationCircleOutlined,
+    FileUnknownOutlined,
+    HeartOutlined,
+    InboxOutlined,
+    LockOutlined,
+    MailOutlined,
+    MessageOutlined,
+    NotificationOutlined,
+    ShopOutlined,
+    StarOutlined,
+    SyncOutlined,
+    TeamOutlined,
+    WalletOutlined,
+    WifiOutlined,
+} from '@ant-design/icons';
+import Button from './Button';
+import { listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
+
+const EMPTY_ICON_BY_KIND = {
+    advertisement: NotificationOutlined,
+    favorite: HeartOutlined,
+    mail: MailOutlined,
+    member: TeamOutlined,
+    message: MessageOutlined,
+    news: NotificationOutlined,
+    payment: WalletOutlined,
+    reservation: CalendarOutlined,
+    review: StarOutlined,
+    store: ShopOutlined,
+};
+
+const ERROR_ICON_BY_KIND = {
+    forbidden: LockOutlined,
+    missing: FileUnknownOutlined,
+    offline: WifiOutlined,
+    rateLimited: ClockCircleOutlined,
+    retry: SyncOutlined,
+    unavailable: CloudServerOutlined,
+    unknown: ExclamationCircleOutlined,
+};
+
+/**
+ * 조회 결과가 비었을 때와 조회 자체가 실패했을 때를 한 형태로 보여 주는 관문이다.
+ * 폼 검증·결제 제출처럼 사용자의 입력을 다시 보내는 오류에는 쓰지 않는다.
+ */
+const DataState = ({
+    state = 'empty',
+    kind = 'generic',
+    subject,
+    error,
+    title,
+    description,
+    onRetry,
+    retrying = false,
+    retryLabel = '다시 불러오기',
+    action,
+    compact = false,
+    className,
+    style,
+    ...rest
+}) => {
+    const isError = state === 'error';
+    const errorKind = isError ? listRequestErrorKind(error) : null;
+    const Icon = isError
+        ? (ERROR_ICON_BY_KIND[errorKind] ?? ERROR_ICON_BY_KIND.unknown)
+        : (EMPTY_ICON_BY_KIND[kind] ?? InboxOutlined);
+    const message = title ?? (isError ? listRequestErrorMessage(error, subject ?? '목록') : '표시할 항목이 없습니다.');
+
+    return (
+        <section
+            className={[
+                'reserve-data-state',
+                compact && 'reserve-data-state--compact',
+                isError && 'reserve-data-state--error',
+                className,
+            ].filter(Boolean).join(' ')}
+            style={style}
+            role={isError ? 'alert' : undefined}
+            aria-live={isError ? 'assertive' : undefined}
+            {...rest}
+        >
+            <span className="reserve-data-state__icon" aria-hidden="true"><Icon /></span>
+            <div className="reserve-data-state__copy">
+                <p className="reserve-data-state__title">{message}</p>
+                {description && <p className="reserve-data-state__description">{description}</p>}
+            </div>
+            {action ?? (onRetry && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<SyncOutlined aria-hidden="true" />}
+                    loadingIcon={<SyncOutlined spin aria-hidden="true" />}
+                    loading={retrying}
+                    onClick={onRetry}
+                    className="reserve-data-state__retry"
+                >
+                    {retryLabel}
+                </Button>
+            ))}
+        </section>
+    );
+};
+
+DataState.propTypes = {
+    state: PropTypes.oneOf(['empty', 'error']),
+    kind: PropTypes.oneOf(['advertisement', 'favorite', 'generic', 'mail', 'member', 'message', 'news', 'payment', 'reservation', 'review', 'store']),
+    subject: PropTypes.string,
+    // Axios 오류뿐 아니라 훅이 정규화한 문자열도 받을 수 있다.
+    error: PropTypes.any,
+    title: PropTypes.string,
+    description: PropTypes.string,
+    onRetry: PropTypes.func,
+    retrying: PropTypes.bool,
+    retryLabel: PropTypes.string,
+    action: PropTypes.node,
+    compact: PropTypes.bool,
+    className: PropTypes.string,
+    style: PropTypes.object,
+};
+
+export default DataState;

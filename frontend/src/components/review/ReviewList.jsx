@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Rate, Typography, Empty } from 'antd';
+import { Rate, Typography } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ReviewCardSkeleton } from '../common';
+import { Button, DataState, ReviewCardSkeleton } from '../common';
 import {
     UserOutlined, EditOutlined, DeleteOutlined,
     CheckOutlined, CloseOutlined,
@@ -111,6 +111,9 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
 const ReviewList = ({
     storeId,
     completedReservation = null,
+    completedReservationError = null,
+    completedReservationRetrying = false,
+    onCompletedReservationRetry,
     focusReviewId = null,
     onRatingLoad,
     isPC = false,
@@ -134,7 +137,7 @@ const ReviewList = ({
 
     // 2026-07-09: TanStack Query로 전환 (reviewKeys.byStore) — 생성/수정/삭제는
     // 다시 불러오기 대신 setQueryData로 캐시를 직접 수정해서(기존 로컬 state 스플라이싱과 동일한 체감) 즉시 반영된다.
-    const { data: reviews = [], isLoading: loading } = useQuery({
+    const { data: reviews = [], isLoading: loading, isError, error, isFetching, refetch } = useQuery({
         queryKey: reviewKeys.byStore(storeId),
         queryFn: async () => {
             const data = await reviewService.getReviewsByStore(storeId);
@@ -236,7 +239,9 @@ const ReviewList = ({
 
     // 2026-07 추가: PC에서는 2열 그리드라 한 화면에 더 많이 채워지는 게 자연스러워서 개수를 4로 늘림
     // (3개면 2열 그리드에서 한 칸이 어중간하게 비어 보인다). 모바일은 기존과 동일하게 3.
-    if (loading) return <ReviewCardSkeleton count={isPC ? 4 : 3} isPC={isPC} />;
+    if (loading) return <div role="status" aria-label="리뷰를 불러오는 중" aria-busy="true"><ReviewCardSkeleton count={isPC ? 4 : 3} isPC={isPC} /></div>;
+    if (isError) return <DataState state="error" kind="review" subject="리뷰" error={error}
+        onRetry={refetch} retrying={isFetching} />;
 
     const submitting = createMutation.isPending;
     const editLoading = updateMutation.isPending;
@@ -246,6 +251,19 @@ const ReviewList = ({
 
     return (
         <div>
+            {completedReservationError && (
+                <DataState
+                    state="error"
+                    kind="review"
+                    subject="리뷰 작성 가능 예약"
+                    error={completedReservationError}
+                    title="리뷰 작성 가능 예약을 확인하지 못했습니다."
+                    onRetry={onCompletedReservationRetry}
+                    retrying={completedReservationRetrying}
+                    compact
+                    style={{ marginBottom: 20 }}
+                />
+            )}
             {canWrite && (
                 <div style={{ marginBottom: 20 }}>
                     <ReviewForm
@@ -272,13 +290,10 @@ const ReviewList = ({
 
             {reviews.length === 0 ? (
                 // 2026-07 수정 — 리뷰 섹션이 풀와이드가 된 만큼, 안내 문구도 그 풀와이드 폭 전체를
-                // 기준으로 진짜 중앙에 오도록 flex 중앙정렬로 감쌌다(예전엔 Empty 자체는 좌우 중앙이지만
+                // 기준으로 진짜 중앙에 오도록 flex 중앙정렬로 감쌌다(예전엔 상태 컴포넌트 자체는 좌우 중앙이지만
                 // 그 바깥을 감싼 섹션이 좁은 폭에 고정되어 있어서 화면 전체 기준으로는 왼쪽에 쏠려 보였다).
                 <div style={styles.emptyWrap}>
-                    <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description={<span style={{ color: colors.text.tertiary }}>아직 리뷰가 없습니다. 첫 번째 리뷰를 남겨보세요!</span>}
-                    />
+                    <DataState state="empty" kind="review" title="아직 리뷰가 없습니다. 첫 번째 리뷰를 남겨보세요!" />
                 </div>
             ) : (
                 <div style={isPC ? styles.listGridPC : styles.list}>

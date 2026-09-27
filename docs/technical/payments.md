@@ -1,7 +1,62 @@
 # 결제 · 환불
 
-> PortOne V2 (구 아임포트) + KakaoPay. **채널은 아직 `TEST` 다** — 실제 돈이 오가지 않는다.
+> PortOne V2 (구 아임포트) + KakaoPay. 마지막 운영 확인 기록(2026-09-06)은 `TEST` 채널이다.
+> 2026-09-07 코드 점검에서는 콘솔 채널·운영 원장을 다시 조회하지 않았다. 실제 결제 작업 전에는 현재 채널을 재확인한다.
 > LIVE 전환 전 체크리스트는 맨 아래.
+
+## 2026-09-07 프리뷰 점검 범위
+
+광고는 별도 `AdPaymentAttempt` 원장과 단계별 처리 관문을 추가했다.
+예약과 광고의 상태기계는 같지 않으므로, 광고 절차는 **[광고 결제 런북](ad-payments.md)**을 따른다.
+아래 예약 원장의 규칙을 광고에 그대로 적용하지 않는다. 로컬 구현과 운영 증거는 [품질 로드맵](quality-roadmap.md)에서 구분한다.
+
+예약 환불도 프리뷰에서 `RefundSettlementPolicy` 단일 관문으로 보강했다. 웹훅과 5분 재조회가
+PG 상태 문자열만으로 성공·실패를 확정하지 않고, 누적 취소액·취소 ID·개별 취소 상태와 금액을 함께 대조한다.
+PG 호출 응답을 잃은 경우도 실패로 닫아 재시도를 허용하지 않고 `REFUND_PENDING`과 원장·대사 큐에 남긴다.
+이는 로컬 구현이며 실제 TEST 취소 응답·웹훅·운영 MySQL에서 아직 검증하지 않았다.
+
+### 결제 결과 화면의 근거
+
+`GET /api/payment/status?type=reservation|ad&merchantUid=...`는 로그인한 본인의 DB 기록만 읽는다.
+다른 사람의 주문과 없는 주문은 동일한 404, 응답은 `Cache-Control: no-store`이며 구매자 PII를 포함하지 않는다.
+이 API는 PG 결제·환불·재검증을 실행하지 않으며 상태를 변경하지 않는다.
+
+프론트는 URL의 `success`, `error_msg`, `imp_uid`로 완료를 판정하지 않는다.
+예약 `PAID` / 광고 원장의 `PAID`와 현재 광고 상태가 함께 확인된 경우에만 완료를 표시하고, 나머지는 내역 확인으로 안내한다.
+광고의 과거 UID·미이관 원장·환불 진행 중을 이전 `ACTIVE` 표시만으로 성공 처리하지 않는다.
+이는 **DB에 기록된 현재 상태**이지 별도의 PG 대사 증거가 아니다. 이미 결제된 불확실 건에 재결제를 유도하지 않는다.
+광고 내역은 `/business?tab=ads`로 이동해 새 문서·새로고침에서도 광고 탭을 연다.
+
+### 결과 화면과 모바일 리다이렉트
+
+모바일 `redirectUrl`은 프런트 결과 화면이 아니라 서버의 `/api/payment/mobile-redirect`를 가리킨다.
+서버는 PortOne 결과를 받은 뒤 기존 검증 관문을 통과시킨 다음에만 `/payment/result`로 302 이동시킨다.
+광고도 같은 원칙으로 전용 모바일 리다이렉트와 원장 검증을 거친다. 이 방식은
+[Toss Payments의 successUrl 처리 방식](https://docs.tosspayments.com/blog/what-is-successurl) 중 서버가 승인·검증을
+마친 뒤 결과 화면으로 넘기는 형태와 같다.
+
+결과 화면은 네 가지를 분리한다.
+
+| 서버 기록 | 화면 | 허용 행동 |
+|---|---|---|
+| 조회 요청 중 | `결제 처리 중` | 기다리기와 `결제창으로 이동하지 못하셨나요?` 내역 복귀 링크만 둔다. 동일 주문의 재결제·자동 재시도 버튼을 두지 않는다. |
+| 예약 `PAID` / 광고 `ACTIVE` | `결제 완료` | 내 예약 또는 광고 관리로 이동한다. |
+| 예약 `FAILED`·`CANCELLED` / 광고 `PAYMENT_FAILED`·`CANCELLED` | 완료되지 않음 | 내역 화면으로 이동해 그 화면의 기존 결제 가능 상태에서 다시 시작한다. |
+| 조회 실패·`READY`·광고 `PENDING_PAYMENT` 등 미확정 | 상태 확인 | 읽기 전용 상태 재조회와 내역 이동만 둔다. |
+
+즉 카카오페이 등 외부 결제창에서 돌아왔을 때도, 완료 확인 전에는 "다시 결제"를 바로 노출하지 않는다.
+`결제창으로 이동하지 못하셨나요?` 링크는 내 예약 또는 광고 관리의 기존 결제 가능 상태로 돌아갈 뿐,
+결과 화면에서 기존 주문번호의 PG 결제창을 다시 열지 않는다. 네트워크 오류·창 닫힘·PG 응답 지연에서 이미
+결제됐을 가능성을 보존하기 위해서다. 이 화면의 상태 조회는 읽기 전용이며 PG 승인·환불 호출을 다시 보내지 않는다.
+
+### 광고 결제의 현재 경계
+
+시도 이력 보존, 알려진 광고 웹훅 라우팅, PG 재조회, 환불 발신 전 원장 커밋, 미결 대사 화면,
+폐업/탈퇴 차단까지 프리뷰에서 구현했다. 환불 API의 응답 유실·부분 취소는 완료가 아니다.
+
+다만 **과거 덮어쓴 UID 복원, 결과 미상 환불의 안전한 수동 복구, 실제 MySQL·TEST PG 검증**은 남아 있다.
+자동으로 모든 환불을 재시도하는 구현이 아니다. 운영 PG 호출·실제 환불·기존 FAILED 웹훅 재처리는 실행하지 않았다.
+구체적인 상태와 승인 절차는 [광고 결제 런북](ad-payments.md)에만 둔다.
 
 ---
 
@@ -312,7 +367,8 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 
 1. **PortOne 콘솔에서 웹훅 등록 확인**
    - URL: `https://reserve.it.kr/api/payment/webhook/portone`
-   - PortOne 로그인 뒤 `호출 테스트`를 실행해 실제 PortOne 발신 요청이 도착하는지 확인한다
+   - TEST 모드의 URL·시크릿과 PortOne 발신 `호출 테스트` 도착은 2026-09-06 확인했다
+   - 실연동 모드는 아직 비어 있다. LIVE 전환 전에는 TEST와 별도로 등록해야 한다
 2. **`PORTONE_WEBHOOK_SECRET` 배선**
    - GitHub Secrets 의 `PORTONE_WEBHOOK_SECRET`은 배포 시 컨테이너로 전달된다
    - 배선은 이미 되어 있다(2026-08-23 추가): `CICD.yml` 의 export 목록 + `docker-compose-blue/green.yml` 의 environment.
@@ -327,12 +383,17 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 2026-09-05에는 운영 서버에 설정된 시크릿으로 서명한 무결제 synthetic 요청을 같은
 `webhook-id`로 두 번 보내 두 응답이 모두 200이고 inbox 행은 하나, `attempt_count=1`, 최종 상태
 `IGNORED`, 미완료 웹훅 0임을 확인했다. 이는 공개 endpoint의 서명 검증·durable inbox·중복 멱등성을
-증명하지만 **PortOne 콘솔의 URL/시크릿 일치나 실제 결제 상태 복구를 증명하지 않는다.** 콘솔 호출
-테스트와 TEST 결제 실기는 운영자 로그인 뒤 별도로 해야 한다.
+증명하지만 **PortOne 콘솔 발신이나 실제 결제 상태 복구를 증명하지 않는다.**
 
-같은 날 7일 넘은 `READY` 2건을 PortOne 조회 API와 읽기 전용으로 대조한 결과 PG도 모두
-`READY`였고, 연결 예약은 취소·soft delete 상태였다. 직접 DB를 고치지 않고 관리자 패널의 개별
-재확인 API로 닫아야 하며, 이 두 상태 변경은 아직 실행하지 않았다.
+2026-09-06 PortOne TEST 모드의 `호출 테스트`가 실제 endpoint에 도착했고 서명 검증과 inbox 등록을
+통과했다. 호출 테스트의 가짜 결제 ID에는 로컬 결제 행이 없었지만, 배포된 v2.5.0은 PortOne 조회를
+먼저 시도해 404를 받고 `FAILED`로 남겼다. 로컬 프리뷰에서는 **로컬 결제 행이 없는 검증된 신호만**
+PG 조회 없이 `IGNORED`로 닫고, 로컬 결제가 있는 조회 장애는 계속 5xx·재시도하도록 수정했다.
+이 수정은 아직 운영에 배포하지 않았다.
+
+같은 점검에서 7일 넘은 `READY` 2건은 관리자 패널의 개별 재확인으로 모두 `미결제로 종료`했다.
+PG도 `READY`였고 연결 예약은 취소·soft delete 상태였으며, 결제·환불 호출 없이 오래된 `READY`가
+2건에서 0건으로 줄고 열린 대사 큐는 0건을 유지했다.
 
 ---
 
@@ -341,8 +402,8 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 | 항목 | 상태 |
 |---|---|
 | **행 잠금의 실제 동작** | 운영 InnoDB의 승인된 비활성 TEST 행에서 대기·timeout·양쪽 rollback을 확인했다. 두 환불 요청과 PG 호출까지 포함한 E2E는 미검증 |
-| **PG 취소 응답 금액 필드** | PortOne V2 문서의 결제 누적 취소액과 `PaymentCancellation.totalAmount`를 DTO·정책에서 읽는다. 로컬 JSON 회귀는 통과했으나 실제 TEST 취소 응답의 값 대조는 미검증 |
-| **웹훅 실제 수신** | 설정된 시크릿의 synthetic 서명 요청과 중복 멱등성은 통과. PortOne 콘솔 발신 호출 테스트와 실제 결제 이벤트는 미검증 |
+| **PG 취소 응답 금액 필드** | PortOne V2 문서의 `PaymentAmount.cancelled`와 `PaymentCancellation.totalAmount`를 DTO·정책에서 읽는다. 로컬 JSON 회귀는 통과했으나 실제 TEST 취소 응답의 값 대조는 미검증 |
+| **웹훅 실제 수신** | synthetic 중복 멱등성과 PortOne 콘솔 발신 호출 테스트 도착·서명 검증은 확인. 실제 TEST 결제 이벤트는 미검증 |
 | **durable inbox·대사 큐의 운영 MySQL 구조** | 운영 MySQL에서 테이블·unique/index·InnoDB를 2026-09-05 읽기 전용으로 확인 |
 | **PAID 웹훅 복구·만료 재확인 실기** | Mockito/H2 회귀는 통과했지만 실제 PortOne TEST 웹훅 중복·브라우저 종료·일시 장애 조합은 아직 실행하지 않았다 |
 | **LIVE 채널** | 전부 TEST 원장이다 |
@@ -352,7 +413,8 @@ POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 ## LIVE 전환 전 체크리스트
 
 - [ ] 위 "아직 검증되지 않은 것" 항목을 전부 닫는다
-- [ ] PortOne 콘솔 웹훅 등록 확인 + 호출 테스트 + 테스트 결제로 수신 확인
+- [x] PortOne TEST 콘솔 URL·시크릿 등록과 `호출 테스트` 실제 수신 확인
+- [ ] 실제 TEST 결제로 결제 이벤트 수신 확인
 - [x] 운영 MySQL에서 `payment_webhook_inbox`, `payment_reconciliation_issue` 테이블과 unique/index 확인
 - [x] synthetic 서명 요청을 같은 `webhook-id`로 2회 전송해 inbox가 한 행만 생기는지 확인
 - [ ] 결제 직후 브라우저를 닫아도 웹훅으로 `PAID`와 예약금 플래그가 복구되는지 확인

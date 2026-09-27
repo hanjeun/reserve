@@ -1,5 +1,18 @@
 # 모니터링
 
+## 2026-09-27 적용 경계
+
+- 기존 백업 cron·S3 업로드·격리 복원은 9/25~26 증거가 있다. 백업 Loki 로그도 9/25 확인됐다.
+  이 때문에 수집 전체를 "미구성"으로 표시하지 않는다. 백업/Grafana 실패 알림 7번은 아직 승인·발화·수신 확인이 남았다.
+- 로컬 `collect-metrics.sh`는 `cpu_exec_pct`(us+sy), `cpu_iowait_pct`(wa), `cpu_steal_pct`(st)를 추가한다.
+  기존 `cpu_pct`(100-idle)는 호환용으로 유지한다. 새 collector 설치·새 시계열 확인 **후에** 새 하드웨어 대시보드를 적용한다.
+  `reserve-hardware.json`은 로컬 후보이며 현재 서버에 import하지 않았다.
+- OAuth 알림 정본은 현재 코드의 `OAuth unlink queue requires attention`다. 이것은 연동 해제 **완료**가 아니라
+  미결 집계다. 토큰 없는 `BLOCKED`와 재시도 가능한 `FAILED`를 구분하고 완료 문구로 안내하지 않는다.
+- CSP는 Report-Only를 유지한다. 앱 로그·Promtail positions·level/시각·Loki 스트림을 확인한 뒤
+  결제·지도·Sentry를 포함한 7일 관측을 진행한다. 백업 로그 1건은 CSP 정상 수집 7일의 증거가 아니다.
+  쿼리 0건과 스트림 부재를 구분하며 Unsplash 허용을 제거하거나 enforcement를 켜지 않는다.
+
 ---
 
 ## 구성 요약
@@ -375,10 +388,12 @@ sum(count_over_time({job="reserve"} |= `Payment operations queue requires attent
 **7. 백업 미실행** — BELOW 1 / 1시간 주기. **백업 cron 등록 + 첫 수동 실행 뒤에 켤 것**
 
 ```logql
-sum(count_over_time({job="reserve"} |~ `\[backup\] === backup done` [26h]))
+sum(count_over_time({job="reserve"} |= `[backup]` |= `=== backup done` [26h])) or vector(0)
 ```
 
 26시간인 이유: 백업은 매일 03:10 KST 1회다. 24시간이면 실행이 조금만 밀려도 오탐이 난다.
+NoData/Error를 정상으로 무시하지 않고 수집 장애로 알린다. 별도로 `[backup]`·`ERROR` 로그 1건 이상도
+실패 신호로 확인한다. 규칙·contact point·routing policy 적용은 운영 쓰기 승인 후, 제어된 실패로 실제 수신을 검증한다.
 
 **8. OAuth 탈퇴 연동 해제 미결** — ABOVE 0 / 15분 주기 / pending 0m
 

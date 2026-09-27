@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "purpose": "README images generated from the local v2.6 candidate with fixed synthetic data",
+  "productionEvidence": false,
+  "realCredentialsUsed": false,
+  "realCustomerDataUsed": false,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "generator": "frontend/scripts/generate-readme-assets.mjs",
+  "files": [
+    {
+      "path": "home.png",
+      "bytes": 599260,
+      "sha256": "47a3b3bc9389011134daab29bbb130bc94364e58d220865882ec334bfc8508bd"
+    },
+    {
+      "path": "stores.png",
+      "bytes": 127470,
+      "sha256": "ce9ef7ed3353e6eca9c35045b6091cf8512fa129656e704306f2fbe01f9a2829"
+    },
+    {
+      "path": "store-detail.png",
+      "bytes": 159165,
+      "sha256": "029b468386daa9c0bdd2267ecf0cfbd357dde7e01d587f1398df125181b4b181"
+    },
+    {
+      "path": "business.png",
+      "bytes": 103977,
+      "sha256": "9ecdb4be598e91e357bac8c556cd35afe12eabc779adf92a6d3a4c61f318f4ef"
+    },
+    {
+      "path": "admin.png",
+      "bytes": 72838,
+      "sha256": "0acb71fe2086de4117f3326e45129da3c968d4a8453904d9b399739571d63909"
+    },
+    {
+      "path": "monitoring.png",
+      "bytes": 102599,
+      "sha256": "afccfdd96de1c45554b7001038592ac26d72d7aae30fe4d601cef21ea6797363"
+    },
+    {
+      "path": "architecture.png",
+      "bytes": 143108,
+      "sha256": "60621c735e0b36ef499e7a857422b5d74ecfb047248ae1a89912f87577c0d0af"
+    }
+  ]
+}

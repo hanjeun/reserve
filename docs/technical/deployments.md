@@ -5,17 +5,25 @@ RESERVE의 릴리즈 노트 동기화, GitHub Deployments 기록, 저장소 보�
 
 ## 현재 경계
 
-- 2026-09-28 확인된 production 기준선은 **v2.7.0**(`68334e5d…`)이며 `dev` 계보 복원 PR #229는 병합됐다.
-- 아래 **CI 증거 재사용·stage-release 분리·지연 로그·공개 API 준비 관문**은 후속 후보다.
-  이 후속 수정의 PR 생성은 승인됐지만 병합·운영 반영은 아직 실행하지 않았다.
+- 2026-09-28 확인된 production 기준선은 **v2.7.1**,
+  main `99a7b2fc77082cdb0960d4fc0df79af6a10ab102`다.
+  [수정 PR #230](https://github.com/hanjeun/reserve/pull/230)은 dev에 merge,
+  [릴리스 PR #231](https://github.com/hanjeun/reserve/pull/231)은 main에 squash했다.
+- [운영 CI 36344845434](https://github.com/hanjeun/reserve/actions/runs/36344845434)는 성공(5분 4초)이고,
+  이 SHA의 production Deployment는 자동 기록 `6696905203` 한 건이며 success다.
+  green upstream·서버 이미지·nginx 정적 루트·공개 release-id가 같은 SHA임을 대조했다.
+  활성 health와 공개 가게 목록은 HTTP 200, 브라우저에는 가게 2개가 표시됐다.
+- PR #230/#231의 Sonar 새 이슈는 0이고 PR Quality Gate는 OK다. dev 전체 분석에는 기존
+  `githubactions:S6505` npm lifecycle 경고 2건이 남는다. rc-tabs postinstall에 필요한 기존
+  트레이드오프를 유지했으며 경고 무시·분석 설정 변경·보호 규칙 우회는 하지 않았다.
 - 기능별 상태는 [현재 상태](current-status.md)를 따른다. 아래 날짜가 붙은 GitHub·서버 결과는 그
   날짜의 증거이며 현재 설정을 대신하지 않는다.
 - 배포 직전에는 실제 서버 SSH fingerprint를 신뢰 가능한 별도 경로로 다시 확인한다. 커밋, PR, merge,
   tag, 배포, GitHub 설정과 운영 쓰기는 각각 현재 대화의 별도 승인이 필요하다.
 - v2.4.0·v2.4.1은 2026-09-28 승인 후 기존 태그와 한국어 CHANGELOG로 Release를 보완했다.
-  새 배포나 새 태그가 아니며 최신 Release는 v2.7.0으로 유지했다. 의존성 PR과 제품 통합은 분리한다.
+  새 배포나 새 태그가 아니며 당시 최신 Release는 v2.7.0으로 유지했다. 의존성 PR과 제품 통합은 분리한다.
 
-### 2026-09-28 후속 후보: 테스트 재사용과 배포 책임 분리
+### 2026-09-28 운영 반영: 테스트 재사용과 배포 책임 분리
 
 `test-backend`/`test-frontend`와 필수 `build-backend`/`build-frontend` 이름은 유지한다.
 `scripts/ci-evidence.mjs`는 7일 이내 성공한 같은 저장소 CICD 실행의 증거만 사용한다.
@@ -23,6 +31,12 @@ RESERVE의 릴리즈 노트 동기화, GitHub Deployments 기록, 저장소 보�
 일치해야 하며, 이전 실행의 실제 Git tree를 다시 계산하고 다운로드 ZIP의 SHA-256도 검증한다.
 fork·실패·취소·오래된 실행, API/권한/다운로드 오류는 모두 **정상 테스트 실행으로 복귀**한다.
 첫 후보처럼 워크플로가 변경되면 증거가 무효화되므로 전체 CI가 한 번 실행되는 것은 의도된 것이다.
+
+최종 후보 [36343883632](https://github.com/hanjeun/reserve/actions/runs/36343883632)는 전체 CI 성공:
+Vitest 104파일/904개, PC 70개(기존 3 skip), 모바일 73개다. 프론트 테스트 잡은 9분 34초였다.
+[릴리스 CI 36344601422](https://github.com/hanjeun/reserve/actions/runs/36344601422)와 main 운영 CI는
+이 원본 실행의 backend/frontend 증거를 모두 재사용했다. 테스트 잡의 실제 시간은 각각
+18초/40초, 11초/45초였다. 빌드와 운영 관문은 새로 실행했다.
 
 CLI의 component는 `backend`·`frontend` 고정 설정만 선택하고 파일 경로로 이어 붙이지 않는다.
 Git은 절대 설치 경로, JDK는 setup-java의 절대 `JAVA_HOME`, ZIP 조회는 Ubuntu의 `/usr/bin/unzip`을
@@ -44,9 +58,15 @@ Git은 절대 설치 경로, JDK는 setup-java의 절대 `JAVA_HOME`, ZIP 조회
 `production` Environment는 이 실제 활성화 잡 하나에만 두고 수동 `createDeployment`/상태 쓰기를 제거해
 자동 기록과 이중 생성되지 않게 한다. 준비 확인 실패는 구 운영 경로를 유지한다.
 
+이번 main 실행의 stage-release는 38초, deploy-backend는 1분 43초였다.
+컷오버 전 공개 가게 준비 확인은 0.252초·0.047초로 연속 성공했고, 컷오버 후 smoke도 통과했다.
+DB ALTER·새 PG/S3 쓰기·실제 Safari 검사·파기 worker 활성화는 이 후속 배포에서 하지 않았다.
+
 nginx 지연 로그는 정해진 route 종류·HTTP 상태·전체/연결/헤더/상류 응답 시간만 기록한다.
-IP·동적 ID·쿼리·쿠키·토큰·본문은 새 로그 형식에 넣지 않는다. 현재 로컬 Promtail 설정에는
-nginx 수집 job이 없으므로 Loki 수집 성공을 주장하지 않는다. 배포 후 실제 로그 경로/수집을 확인한 뒤
+IP·동적 ID·쿼리·쿠키·토큰·본문은 새 로그 형식에 넣지 않는다. 이번 운영 nginx 출력에서
+`store_list` HTTP 200과 전체/상류 응답 0.024초·0.026초를 확인했다.
+별도 공개 GET 한 건은 약 67ms였으며 전체 사용자의 지연 분포를 뜻하지 않는다.
+Promtail에 nginx 수집 job은 없으므로 Loki 수집 성공을 주장하지 않는다.
 `request_time`과 `upstream_*_time`으로 브라우저/CDN 대기와 앱/DB 대기를 구분한다.
 지금 빨라졌다는 관측만으로 기존 지연의 원인을 확정하지 않는다.
 
@@ -122,8 +142,8 @@ node scripts/backfill-deployments.mjs --tag v2.2.0 --apply   # 특정 태그만
 증명할 수 없고, Deployment 객체만으로 서버 health check 성공을 증명할 수도 없다.
 
 ```bash
-# 코드: job-level 최소 권한과 create/status 스텝
-rg -n "deployments: write|Create GitHub deployment|Mark deployment" .github/workflows/CICD.yml
+# 코드: main 전용 stage/활성화와 자동 Environment 기록
+rg -n "stage-release:|deploy-backend:|environment:|production|deployments:" .github/workflows/CICD.yml
 
 # 원격: 최신 production 배포와 상태
 gh api --method GET repos/hanjeun/reserve/deployments -f environment=production \
@@ -132,8 +152,9 @@ gh api repos/hanjeun/reserve/deployments/<id>/statuses \
   --jq '.[0] | {state,created_at,environment_url}'
 ```
 
-`actions/github-script`와 다른 Actions는 태그가 아니라 전체 커밋 SHA로 고정한다. 배포 기록 생성 실패는
-실제 배포를 막지 않도록 `continue-on-error`이고, id가 있을 때만 성공·실패 상태를 기록한다.
+Actions는 태그가 아니라 전체 커밋 SHA로 고정한다. 현재는 production Environment가 실제 활성화 잡의
+Deployment와 상태를 자동 생성하며, 별도 수동 create/status 스텝은 없다.
+위 2026-09-06 절의 수동 기록 방식은 과거 증거이지 현재 절차가 아니다.
 
 ---
 

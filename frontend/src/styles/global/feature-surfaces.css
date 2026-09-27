@@ -203,14 +203,11 @@
        이 그림자가 범인이었다.) 값은 shadows.cardHover 계열의 무채색 톤을 따른다. */
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     opacity: 1;
-    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
-                opacity 0.14s ease, box-shadow 0.18s ease, background 0.15s ease;
+    transition: opacity 0.14s ease, box-shadow 0.18s ease, background 0.15s ease;
 }
 .reserve-chat-launcher:hover {
-    transform: translateY(-2px);
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
 }
-.reserve-chat-launcher:active { transform: scale(0.93); }
 .reserve-chat-launcher:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 3px; }
 /* 아이콘이 뚝 바뀌지 않게 — 닫기로 바뀔 때 살짝 돈다. */
 .reserve-chat-launcher .anticon { transition: transform 0.2s ease; }
@@ -397,7 +394,11 @@
     right: 20px;
     bottom: 20px;
     z-index: 1001;
+    /* 버튼과 읽지 않은 숫자를 같은 좌표계에서 움직인다. */
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
+.reserve-messenger-launcher-wrap:hover { transform: translateY(-2px); }
+.reserve-messenger-launcher-wrap:active { transform: scale(0.93); }
 .reserve-messenger-launcher {
     width: 56px;
     height: 56px;
@@ -1091,6 +1092,7 @@
     .reserve-messenger.is-returning-to-list > .reserve-messenger-list,
     .reserve-messenger.is-returning-to-list > .reserve-messenger-thread { animation-duration: 0.01ms; }
     .reserve-messenger-list-refresh.is-refreshing .anticon { animation: none; }
+    .reserve-messenger-launcher-wrap,
     .reserve-chat-launcher,
     .reserve-chat-launcher .anticon,
     .reserve-chat-composer,
@@ -1101,8 +1103,8 @@
     .reserve-messenger-row,
     .reserve-messenger-footer-icon,
     .reserve-form-cal-part { transition: none; }
-    .reserve-chat-launcher:hover,
-    .reserve-chat-launcher:active,
+    .reserve-messenger-launcher-wrap:hover,
+    .reserve-messenger-launcher-wrap:active,
     .reserve-chat-send:active:not(:disabled),
     .reserve-messenger-primary-action:active { transform: none; }
 }

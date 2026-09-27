@@ -100,7 +100,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                             ...(m.retracted || m.expired ? { background: colors.background.subtle, color: colors.text.secondary, border: `1px solid ${colors.border.default}` } : null),
                         }}>
                             {m.imageUrl && <ChatImage url={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />}
-                            {m.content && <span>{m.content}</span>}
+                            {m.content && <span style={m.imageUrl ? { display: 'block', marginTop: 8 } : undefined}>{m.content}</span>}
                         </div>
                     </div>
                     {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole} />}

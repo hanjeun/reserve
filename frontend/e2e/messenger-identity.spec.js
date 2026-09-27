@@ -40,15 +40,56 @@ test.beforeEach(async ({ page, context }) => {
     });
 });
 
+test('launcher unread badge moves with the logo on hover and press', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await mockApi(page, account, []);
+    await page.route('**/api/chat/unread', route => ok(route, 2));
+    await page.goto('/');
+    const launcher = page.getByRole('button', { name: '메시지, 읽지 않은 메시지 2개 열기' });
+    const wrapper = page.locator('.reserve-messenger-launcher-wrap');
+    const badge = wrapper.locator('.ant-badge-count');
+    await expect(badge).toHaveText('2');
+    await expect.poll(() => badge.evaluate(el => el.getAnimations({ subtree: true }).some(animation => animation.playState === 'running'))).toBe(false);
+    const beforeLogo = await launcher.boundingBox();
+    const beforeBadge = await badge.boundingBox();
+    await launcher.hover();
+    await expect(wrapper).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
+    const hoveredLogo = await launcher.boundingBox();
+    const hoveredBadge = await badge.boundingBox();
+    expect(hoveredLogo.y - beforeLogo.y).toBeCloseTo(-2, 1);
+    expect(hoveredBadge.y - beforeBadge.y).toBeCloseTo(-2, 1);
+    await expect(launcher).toHaveCSS('transform', 'none');
+    try {
+        await page.mouse.down();
+        await expect(wrapper).toHaveCSS('transform', 'matrix(0.93, 0, 0, 0.93, 0, 0)');
+        expect((await launcher.boundingBox()).width / beforeLogo.width).toBeCloseTo(0.93, 2);
+        expect((await badge.boundingBox()).width / beforeBadge.width).toBeCloseTo(0.93, 2);
+    } finally {
+        await page.mouse.move(0, 0);
+        await page.mouse.up();
+    }
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await launcher.hover();
+    await expect(wrapper).toHaveCSS('transform', 'none');
+});
+
 test('thread entry uses the same calm easing and duration as returning to the list', async ({ page }, testInfo) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '모션 확인' }]);
     await page.addInitScript(() => {
         window.__threadMotion = [];
+        window.__listMotion = [];
         document.addEventListener('animationstart', event => {
-            if (!event.target.matches('.reserve-messenger-thread')) return;
+            const isThread = event.target.matches('.reserve-messenger-thread');
+            const isList = event.target.matches('.reserve-messenger-list');
+            if (!isThread && !isList) return;
             const style = getComputedStyle(event.target);
-            window.__threadMotion.push({ name: event.animationName, duration: style.animationDuration, easing: style.animationTimingFunction, direction: style.animationDirection });
+            const motion = { name: event.animationName, duration: style.animationDuration, easing: style.animationTimingFunction, direction: style.animationDirection };
+            if (isThread) window.__threadMotion.push(motion);
+            else {
+                const animation = event.target.getAnimations().find(item => item.animationName === event.animationName);
+                window.__listMotion.push({ ...motion, finalOpacity: animation?.effect.getKeyframes().at(-1).opacity });
+            }
         });
     });
     if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
@@ -58,15 +99,19 @@ test('thread entry uses the same calm easing and duration as returning to the li
     }
     await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화', exact: true }).click();
     await page.locator('.reserve-messenger-row').click();
-    await expect.poll(() => page.evaluate(() => window.__threadMotion.some(event => event.direction === 'reverse'))).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__threadMotion.some(event => event.name === 'reserve-messenger-thread-in'))).toBe(true);
     await expect(page.locator('.reserve-messenger')).not.toHaveClass(/is-opening-thread/);
+    await expect(page.locator('.reserve-messenger-list')).toHaveCount(0);
     await page.getByRole('button', { name: '대화 목록으로 돌아가기' }).click();
     await expect(page.locator('.reserve-messenger-row')).toBeVisible();
     await expect(page.locator('.reserve-messenger')).not.toHaveClass(/is-returning-to-list/);
     const motions = await page.evaluate(() => window.__threadMotion);
     expect(motions).toEqual([
-        { name: 'reserve-messenger-thread-back-out', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)', direction: 'reverse' },
+        { name: 'reserve-messenger-thread-in', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)', direction: 'normal' },
         { name: 'reserve-messenger-thread-back-out', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)', direction: 'normal' },
+    ]);
+    expect(await page.evaluate(() => window.__listMotion.filter(event => event.name === 'reserve-messenger-list-out'))).toEqual([
+        { name: 'reserve-messenger-list-out', duration: '0.26s', easing: 'cubic-bezier(0.22, 1, 0.36, 1)', direction: 'normal', finalOpacity: '0' },
     ]);
 });
 
@@ -156,6 +201,31 @@ test('owner inbox uses the customer name while the member side uses the store na
     await expect(rows.nth(1)).toContainText('문의 고객');
     await expect(rows.nth(1)).toContainText('몇 시까지 하나요?');
     await expect(rows.nth(1)).not.toContainText('스케줄 청담');
+});
+
+test('photo captions stay below the image in narrow chat bubbles', async ({ page }, testInfo) => {
+    await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '릴리스 검증용' }]);
+    const png = readFileSync(new URL('../public/icons/RESERVE_logo.png', import.meta.url));
+    await page.route('**/api/chat/support/open', route => ok(route, {
+        roomId: 1, type: 'SUPPORT', title: 'RESERVE 고객지원', viewerRole: 'MEMBER', canSend: true,
+        messages: [{ id: 33, senderRole: 'MEMBER', content: '릴리스 검증용', imageUrl: '/api/chat/images/33', imageWidth: 512, imageHeight: 512 }],
+    }));
+    await page.route('**/api/chat/images/33', route => route.fulfill({ contentType: 'image/png', body: png }));
+    if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
+    else {
+        await page.goto('/');
+        await page.getByRole('button', { name: '메시지 열기' }).click();
+    }
+    await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화', exact: true }).click();
+    await page.locator('.reserve-messenger-row').click();
+    const photo = page.getByAltText('대화에 첨부한 사진');
+    await expect(photo).toBeVisible();
+    await expect(photo).toHaveJSProperty('naturalWidth', 512);
+    const imageBox = await photo.boundingBox();
+    const captionBox = await page.getByText('릴리스 검증용', { exact: true }).boundingBox();
+    expect(captionBox.y).toBeGreaterThanOrEqual(imageBox.y + imageBox.height + 7);
+    expect(captionBox.width).toBeGreaterThanOrEqual(imageBox.width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('photo-only messages use multipart upload and an authenticated preview', async ({ page }, testInfo) => {

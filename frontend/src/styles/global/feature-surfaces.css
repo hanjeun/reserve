@@ -1060,6 +1060,10 @@
     border: 0; background: transparent; color: var(--c-text-secondary, #4e5968); cursor: pointer;
     border-radius: 10px; width: 44px; min-width: 44px; height: 44px; padding: 0;
 }
+.reserve-chat-message-actions::before {
+    content: ''; position: absolute; inset: 8px; border-radius: 8px; pointer-events: none;
+}
+.reserve-chat-message-actions > .anticon { position: relative; }
 .reserve-chat-message-meta { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
 .reserve-chat-message-time { font-size: 10px; color: var(--c-text-tertiary, #8b95a1); white-space: nowrap; flex-shrink: 0; }
 .reserve-chat-message-meta > .reserve-chat-message-time { position: absolute; bottom: 2px; inset-inline: 0; text-align: center; pointer-events: none; }
@@ -1077,7 +1081,7 @@
     .reserve-chat-message-row:focus-within .reserve-chat-message-meta > .reserve-chat-message-time,
     .reserve-chat-message-meta[data-menu-open="true"] > .reserve-chat-message-time { visibility: hidden; }
 }
-.reserve-chat-message-actions:hover { background: var(--c-gray-100, #f2f4f6); }
+.reserve-chat-message-actions:hover::before { background: var(--c-gray-100, #f2f4f6); }
 .reserve-chat-message-actions:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
 
 /* ⚠️ animation: none 으로 끄면 안 된다 — 패널을 DOM 에서 내리는 신호가 animationend 라

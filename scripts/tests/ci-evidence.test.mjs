@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { eligibleRun, evidenceKey, freshProof } from '../ci-evidence.mjs';
+import { eligibleRun, evidenceKey, freshProof, main } from '../ci-evidence.mjs';
 
 const entries = '100644 blob aaaa\tfrontend/src/App.jsx\0' +
     '100644 blob bbbb\tfrontend/package-lock.json\0' +
     '100644 blob cccc\tfrontend/src/App.test.jsx\0' +
     '100644 blob dddd\t.github/workflows/CICD.yml\0';
 const runtime = { node: 'v22.21.0', image: 'ubuntu24', imageVersion: '1', configRevision: '1' };
+test('CLI rejects unsupported modes and path-like components before executing tools or writing files', async () => {
+    await assert.rejects(main('unsupported', 'frontend'), /Expected restore or record/);
+    for (const component of ['../outside', '/tmp/outside', 'C:\\outside', 'frontend/../outside', '__proto__', 'constructor', '', undefined]) {
+        await assert.rejects(main('record', component), /Unknown test component/);
+        assert.throws(() => evidenceKey(component, entries, runtime), /Unknown test component/);
+    }
+});
 test('reuse identity ignores commit ancestry and input ordering, not code or tests', () => {
     const key = evidenceKey('frontend', entries, runtime);
     assert.equal(key, evidenceKey('frontend', entries.split('\0').reverse().join('\0'), runtime));

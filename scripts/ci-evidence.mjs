@@ -1,20 +1,33 @@
 // Reuse successful tests, never a dependency-cache hit. No production builds/secrets are cached here.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { resolveBin } from './resolve-bin.mjs';
 
 const VERSION = 1;
-const MAX_AGE_MS = 7 * 86400_000;
+const MAX_AGE_MS = 7 * 86_400_000;
 const scopes = {
     backend: ['backend', 'scripts', '.github', '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml'],
     frontend: ['frontend', 'backend/src/main', 'scripts', '.github', '.gitattributes', 'nginx', 'monitoring', 'docs/design-system/snapshots'],
 };
-const git = args => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+function componentConfig(requested) {
+    // CLI input selects a literal configuration; it never becomes a filesystem path.
+    switch (requested) {
+        case 'backend': return { component: 'backend', directory: resolve('.ci-evidence/backend') };
+        case 'frontend': return { component: 'frontend', directory: resolve('.ci-evidence/frontend') };
+        default: throw new Error('Unknown test component');
+    }
+}
+const git = args => {
+    const executable = resolveBin('git');
+    if (!isAbsolute(executable)) throw new Error('GIT_BIN must be an absolute installation path');
+    return execFileSync(executable, args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+};
 export function evidenceKey(component, entries, runtime) {
-    if (!scopes[component]) throw new Error('Unknown test component');
+    componentConfig(component);
     // Markdown is checked afresh by the documentation step; executable/lock/test blobs remain inputs.
     const tree = entries.split('\0').filter(Boolean).filter(entry => !entry.split('\t')[1]?.endsWith('.md')).sort();
     return createHash('sha256').update(JSON.stringify({ version: VERSION, component, tree, runtime })).digest('hex');
@@ -32,13 +45,20 @@ export function freshProof(proof, now = Date.now()) {
         && age >= 0 && age < MAX_AGE_MS;
 }
 function runtimeIdentity(component) {
+    let java;
+    if (component === 'backend') {
+        // setup-java supplies the trusted JDK installation; never search the caller's PATH.
+        const javaHome = process.env.JAVA_HOME;
+        if (!javaHome || !isAbsolute(javaHome)) throw new Error('JAVA_HOME must be an absolute JDK installation path');
+        java = execFileSync(join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java'), ['--version'], {
+            encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+        }).toString();
+    }
     return { node: process.version, platform: process.platform, arch: process.arch,
         image: process.env.ImageOS, imageVersion: process.env.ImageVersion,
         configRevision: process.env.CI_TEST_CONFIG_REVISION || '1',
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, locale: process.env.LANG,
-        ...(component === 'backend' ? { java: execFileSync('java', ['--version'], {
-            encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-        }).toString() } : {}) };
+        ...(java ? { java } : {}) };
 }
 function keyAt(component, ref, runtime) {
     return evidenceKey(component, git(['ls-tree', '-r', '-z', ref, '--', ...scopes[component]]), runtime);
@@ -76,7 +96,8 @@ async function readProof(artifact) {
     try {
         const file = join(directory, 'proof.zip');
         writeFileSync(file, archive);
-        return JSON.parse(execFileSync('unzip', ['-p', file, 'evidence.json'], {
+        // Evidence restoration runs only on the workflow's Ubuntu runners.
+        return JSON.parse(execFileSync('/usr/bin/unzip', ['-p', file, 'evidence.json'], {
             encoding: 'utf8', maxBuffer: 4096, stdio: ['ignore', 'pipe', 'pipe'],
         }));
     } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -100,7 +121,9 @@ async function restore(component, key, runtime) {
     }
     return null;
 }
-export async function main(mode, component) {
+export async function main(mode, requestedComponent) {
+    if (mode !== 'restore' && mode !== 'record') throw new Error('Expected restore or record');
+    const { component, directory } = componentConfig(requestedComponent);
     const runtime = runtimeIdentity(component);
     const key = keyAt(component, 'HEAD', runtime);
     if (mode === 'restore') {
@@ -115,13 +138,12 @@ export async function main(mode, component) {
     } else if (mode === 'record') {
         const originRunId = process.env.EVIDENCE_ORIGIN || process.env.GITHUB_RUN_ID;
         if (!/^\d+$/.test(originRunId || '')) throw new Error('Missing evidence run ID');
-        const directory = resolve('.ci-evidence', component);
-        mkdirSync(directory, { recursive: true });
         const executedAt = process.env.EVIDENCE_EXECUTED_AT || new Date().toISOString();
         if (!freshProof({ executedAt })) throw new Error('Expired or invalid original test timestamp');
+        mkdirSync(directory, { recursive: true });
         writeFileSync(join(directory, 'evidence.json'), JSON.stringify({ version: VERSION, component, key, originRunId, executedAt }));
         output({ key });
-    } else throw new Error('Expected restore or record');
+    }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
     await main(process.argv[2], process.argv[3]);

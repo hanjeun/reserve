@@ -24,6 +24,11 @@ RESERVE의 릴리즈 노트 동기화, GitHub Deployments 기록, 저장소 보�
 fork·실패·취소·오래된 실행, API/권한/다운로드 오류는 모두 **정상 테스트 실행으로 복귀**한다.
 첫 후보처럼 워크플로가 변경되면 증거가 무효화되므로 전체 CI가 한 번 실행되는 것은 의도된 것이다.
 
+CLI의 component는 `backend`·`frontend` 고정 설정만 선택하고 파일 경로로 이어 붙이지 않는다.
+Git은 절대 설치 경로, JDK는 setup-java의 절대 `JAVA_HOME`, ZIP 조회는 Ubuntu의 `/usr/bin/unzip`을
+사용한다. 잘못된 mode/component는 명령 실행·파일 생성 전에 거부한다. 헤더 간격 E2E는 진입
+애니메이션 종료 후 실제 CSS gap과 subpixel 좌표를 확인해 재시도 성공에 기대지 않는다.
+
 - 재사용 대상은 백엔드 unit/Spring-H2 및 프론트 unit/PC·모바일 Chromium 검사다.
   문서·운영 스크립트·스냅샷·lint·품질 정책은 매번 짧게 확인한다.
 - build와 운영 smoke는 재사용하지 않는다. 생산 빌드는 현재 설정으로 만들며,

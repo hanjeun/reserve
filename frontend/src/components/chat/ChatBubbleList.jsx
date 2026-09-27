@@ -62,6 +62,8 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
             const isMine = m.senderRole === mine;
             const first = !inSameGroup(messages[i - 1], m);
             const last = !inSameGroup(m, messages[i + 1]);
+            const timestamp = last ? formatTime(m.createdAt) : '';
+            const ownTimestamp = m.pending ? '보내는 중' : timestamp;
 
             const corner = first
                 ? (isMine ? { borderTopRightRadius: 6 } : { borderTopLeftRadius: 6 })
@@ -81,7 +83,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                         {first && <SupportAvatar />}
                     </span>}
                     {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted}
-                        timestamp={m.pending ? '보내는 중' : last ? formatTime(m.createdAt) : ''} />}
+                        timestamp={ownTimestamp} />}
                     <div className="reserve-chat-bubble-group" style={{ maxWidth: m.senderRole === 'ADMIN' && !isMine ? '72%' : '78%' }}>
                         {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
                         <div style={{
@@ -97,7 +99,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                         </div>
                     </div>
                     {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole}
-                        timestamp={last ? formatTime(m.createdAt) : ''} />}
+                        timestamp={timestamp} />}
                 </div>
             );
         })}

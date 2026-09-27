@@ -154,7 +154,18 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     await expect(input).toHaveValue('☕');
     await expect(page.getByRole('button', { name: '보내기', exact: true })).toHaveCSS('background-color', 'rgb(242, 244, 246)');
     await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(1);
-    await page.getByRole('button', { name: '메시지 관리' }).click();
+    const messageMenu = page.getByRole('button', { name: '메시지 관리' });
+    await expect(messageMenu).toHaveCSS('width', '44px');
+    await expect(messageMenu).toHaveCSS('height', '44px');
+    if (testInfo.project.name === 'chromium') {
+        await messageMenu.hover();
+        expect(await messageMenu.evaluate(element => {
+            const visibleBox = getComputedStyle(element, '::before');
+            return { width: visibleBox.width, height: visibleBox.height, background: visibleBox.backgroundColor };
+        })).toEqual({ width: '28px', height: '28px', background: 'rgb(242, 244, 246)' });
+        await expect(messageMenu).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    }
+    await messageMenu.click();
     await page.getByRole('menuitem', { name: '전송 취소' }).click();
     await page.getByRole('button', { name: '전송 취소', exact: true }).click();
     await expect(page.locator('.reserve-chat-bubble-group')).toContainText(['전송이 취소된 메시지입니다.', '확인했습니다']);

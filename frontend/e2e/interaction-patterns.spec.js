@@ -104,8 +104,11 @@ test('contextual header back stays beside RESERVE on desktop and mobile', async 
     await expect(back).toBeVisible();
     await expect(logo).toBeVisible();
     await expect(page.locator('.reserve-header-brand')).toHaveCSS('gap', '4px');
-    await expect.poll(() => back.evaluate(element =>
-        element.getAnimations().some(animation => animation.playState === 'running'))).toBe(false);
+    await expect.poll(() => page.locator('.reserve-header-brand').evaluate(brand => {
+        const backBox = brand.querySelector('.reserve-header-back').getBoundingClientRect();
+        const logoBox = brand.querySelector('.reserve-header-logo').getBoundingClientRect();
+        return logoBox.left - backBox.right;
+    })).toBeCloseTo(4, 1);
 
     const positions = await page.locator('.reserve-header-brand').evaluate((brand) => {
         const backBox = brand.querySelector('.reserve-header-back')?.getBoundingClientRect();

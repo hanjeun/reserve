@@ -166,6 +166,8 @@ test('messenger uses neutral controls, a clear composer focus, and reduced press
     await expect(composer).toHaveCSS('box-shadow', 'none');
     await input.fill('브라우저 상호작용 검사 초안');
     await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: '이모지 선택' })).toBeFocused();
+    await page.keyboard.press('Tab');
     const send = page.getByRole('button', { name: '보내기' });
     await expect(send).toBeFocused();
     await expect(send).toHaveCSS('outline-color', 'rgb(78, 89, 104)');

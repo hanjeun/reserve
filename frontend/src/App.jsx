@@ -169,6 +169,7 @@ const buildThemeConfig = (isDark, accent) => ({
 const spinConfig = { indicator: <SpinIndicator /> };
 
 function AppContent() {
+    const { pathname } = useLocation();
     const { initializeAuth, sessionRevision } = useAuthStore();
     const [loading, setLoading] = useState(true);
 
@@ -188,7 +189,7 @@ function AppContent() {
     if (loading) {
         return (
             <div className="reserve-boot-shell">
-                <div className="reserve-boot-shell-header" aria-hidden="true" />
+                {!/^\/search\/?$/.test(pathname) && <div className="reserve-boot-shell-header" aria-hidden="true" />}
                 <RouteLoadingSkeleton />
             </div>
         );

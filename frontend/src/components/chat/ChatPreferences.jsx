@@ -7,7 +7,7 @@ export default function ChatPreferences() {
     const { color, setColor } = useChatPreferences();
     return <div className="reserve-chat-preferences">
         <label id={id}>내 말풍선 색</label>
-        <p>이 기기에 적용됩니다. 채팅 설정과 마이페이지가 함께 바뀝니다.</p>
+        <p>이 기기의 채팅에만 적용됩니다. 앱의 포인트 색은 바뀌지 않습니다.</p>
         <FormSelect aria-labelledby={id} value={color} onChange={setColor}
             options={CHAT_COLOR_OPTIONS.map(option => ({ value: option.value, label: <span className="reserve-chat-color-option">
                 <span aria-hidden="true" style={{ background: option.background }} />{option.label}

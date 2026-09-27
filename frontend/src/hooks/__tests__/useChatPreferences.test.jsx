@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import useChatPreferences, { CHAT_COLOR_OPTIONS } from '../useChatPreferences';
 
-describe('one chat preference source for settings and my page', () => {
+describe('one chat preference source for settings and bubbles', () => {
     afterEach(() => {
         const hook = renderHook(() => useChatPreferences());
         act(() => hook.result.current.setColor('blue'));

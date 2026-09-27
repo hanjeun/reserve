@@ -6,14 +6,29 @@ import RouteLoadingSkeleton, { RouteSkeletonPreview } from './RouteLoadingSkelet
 import { getRouteSkeletonKind } from './routeSkeletonKind';
 
 const routes = {
-    '/': 'discovery', '/search': 'document', '/benefits': 'benefits', '/benefits/1': 'document', '/waiting': 'document', '/feed': 'document',
+    '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'document', '/waiting': 'document', '/feed': 'document',
     '/login': 'form', '/signup': 'form', '/forgot-password': 'form', '/oauth2/callback': 'document', '/signup/social': 'form',
     '/stores': 'store-list', '/store/12': 'detail', '/terms': 'document', '/privacy': 'document', '/operation-guide': 'document',
     '/my-stores': 'cards', '/store/register': 'store-form', '/store/12/edit': 'store-form', '/business': 'workspace', '/admin': 'workspace',
-    '/my-reservations': 'reservations', '/my-favorites': 'cards', '/payment/result': 'document', '/my-page': 'form', '/messages': 'workspace',
+    '/my-reservations': 'reservations', '/my-favorites': 'cards', '/payment/result': 'document', '/my-page': 'my-page', '/messages': 'workspace',
 };
 
 describe('route chunk loading patterns', () => {
+    it('mirrors the search header, six domains and quick choices without a text input', () => {
+        const { container } = render(<RouteSkeletonPreview pathname="/search" />);
+        expect(container.querySelector('.reserve-search-header')).toBeInTheDocument();
+        expect(container.querySelectorAll('.reserve-route-search-domain')).toHaveLength(6);
+        expect(container.querySelectorAll('.reserve-search-keywords > div')).toHaveLength(6);
+        expect(container.querySelector('input,button,a,form')).toBeNull();
+    });
+
+    it('mirrors my page profile, account editing and three app settings cards', () => {
+        const { container } = render(<RouteSkeletonPreview pathname="/my-page" />);
+        expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth: '1000px', padding: '48px 24px 80px' });
+        expect(container.querySelectorAll('.reserve-my-page-skeleton-card')).toHaveLength(5);
+        expect(container.querySelector('.reserve-my-page-skeleton-grid')).toHaveStyle({ flexDirection: 'row' });
+        expect(container.querySelector('input,button,a')).toBeNull();
+    });
     it.each(Object.entries(routes))('covers %s without mounting interactive controls', (path, kind) => {
         expect(getRouteSkeletonKind(path)).toBe(kind);
         const { container } = render(<RouteSkeletonPreview pathname={path} />);

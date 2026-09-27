@@ -13,6 +13,8 @@ import { field } from '../../styles/tokens/field';
 import { fontWeight, fontSize } from '../../styles/tokens';
 import { getRouteSkeletonKind } from './routeSkeletonKind';
 import { resolveViewMode } from '../../utils/viewMode';
+import MyPageSkeleton from './MyPageSkeleton';
+import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 
 const ROWS = ['one', 'two', 'three', 'four'];
 const HOME_SHORTCUTS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
@@ -162,7 +164,33 @@ function WorkspaceSkeleton() {
     );
 }
 
+function SearchSkeleton() {
+    return <div className="reserve-search-page">
+        <div className="reserve-search-header">
+            <div className="reserve-search-field"><Bone width="65%" height={16} style={{ marginLeft: 16 }} /></div>
+            <Bone width={44} height={16} />
+        </div>
+        <div className="reserve-search-content">
+            <Bone width={180} height={26} style={{ marginBottom: 20 }} />
+            <div className="reserve-search-domain-grid">
+                {SERVICE_DOMAIN_OPTIONS.map(domain => <div key={domain.value} className="reserve-search-domain reserve-route-search-domain">
+                    <Bone width={64} height={60} borderRadius={12} /><Bone width={68} height={14} />
+                </div>)}
+            </div>
+            <div className="reserve-search-quick">
+                <Bone width={88} height={26} style={{ marginBottom: 20 }} />
+                <div className="reserve-search-keywords">
+                    {SERVICE_DOMAIN_OPTIONS.map(domain => <Bone key={domain.value} width={68} height={44} borderRadius={100} />)}
+                </div>
+            </div>
+            <Bone width={130} height={20} style={{ marginTop: 28 }} />
+        </div>
+    </div>;
+}
+
 const KINDS = {
+    search: SearchSkeleton,
+    'my-page': MyPageSkeleton,
     discovery: DiscoverySkeleton,
     'store-form': StoreFormSkeleton,
     // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 스켈레톤

@@ -1599,6 +1599,8 @@
 .reserve-route-skeleton--reservations,
 .reserve-route-skeleton--cards,
 .reserve-route-skeleton--benefits { padding: 0; }
+.reserve-route-skeleton.reserve-route-skeleton--search { max-width: none; padding: 0; }
+.reserve-route-skeleton.reserve-route-skeleton--my-page { padding: 0; }
 .reserve-route-skeleton--form { max-width: 420px; }
 .reserve-route-skeleton--store-form { max-width: 1000px; }
 .reserve-route-skeleton--discovery { max-width: 1248px; --reserve-route-banner-ratio: 3 / 2; padding-top: 12px; }

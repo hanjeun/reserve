@@ -30,16 +30,18 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Select } from 'antd';
+import ChoiceSelectInput from './ChoiceSelectInput';
 
 const FILTER_CLASS = 'reserve-filter-select';
 
-const FilterSelect = ({ className, size, ...rest }) => (
+const FilterSelect = ({ className, size, components, ...rest }) => (
     <Select
         // 호출측이 준 className 을 버리지 않고 뒤에 이어 붙인다 —
         // 폭·정렬용 유틸 클래스를 함께 쓰는 경우가 있다.
         className={[FILTER_CLASS, className].filter(Boolean).join(' ')}
         size={size ?? 'large'}
         {...rest}
+        components={{ ...components, input: ChoiceSelectInput }}
     />
 );
 
@@ -48,6 +50,7 @@ FilterSelect.Option = Select.Option;
 FilterSelect.propTypes = {
     className: PropTypes.string,
     size: PropTypes.oneOf(['small', 'middle', 'large']),
+    components: PropTypes.object,
 };
 
 export default FilterSelect;

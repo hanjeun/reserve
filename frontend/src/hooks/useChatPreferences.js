@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-// 마이페이지와 메신저가 같은 기기별 설정을 구독한다. 대화/계정 정보는 저장하지 않는다.
+// 채팅 설정과 말풍선이 같은 기기별 설정을 구독한다. 대화/계정 정보는 저장하지 않는다.
 const STORAGE_KEY = 'reserve:chat-color';
 export const CHAT_COLOR_OPTIONS = [
     { value: 'blue', label: '블루', background: '#2563eb', foreground: '#fff' },

@@ -106,4 +106,18 @@ class RefundLockQuerySmokeTest {
         assertThat(paymentReconciliationIssueRepository
                 .countByStatus(PaymentReconciliationIssue.IssueStatus.OPEN)).isZero();
     }
+
+    @Test
+    @Transactional
+    @DisplayName("순결제액 집계와 결제·예약금 불변식 쿼리가 SQL로 실행된다")
+    void depositStatisticsAndInvariantQueriesExecute() {
+        LocalDateTime now = LocalDateTime.now();
+        assertThatCode(() -> paymentRepository.sumNetDepositByPaidDate(
+                -1L, now.minusDays(30), now.plusDays(1)))
+                .doesNotThrowAnyException();
+        assertThatCode(paymentRepository::countLedgerInvariantViolations)
+                .doesNotThrowAnyException();
+        assertThatCode(paymentRepository::countReservationDepositInvariantViolations)
+                .doesNotThrowAnyException();
+    }
 }

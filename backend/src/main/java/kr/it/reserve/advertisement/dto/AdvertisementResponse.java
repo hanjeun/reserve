@@ -21,6 +21,7 @@ public class AdvertisementResponse {
     private List<String> imageUrls;
     private String title;
     private String description;
+    private String bannerMotionKey;
     private LocalDate startDate;
     private LocalDate endDate;
     private Integer amount;
@@ -37,6 +38,7 @@ public class AdvertisementResponse {
                 .imageUrls(ad.getImageUrlList())
                 .title(ad.getTitle())
                 .description(ad.getDescription())
+                .bannerMotionKey(ad.getResolvedBannerMotion().name())
                 .startDate(ad.getStartDate())
                 .endDate(ad.getEndDate())
                 .amount(ad.getAmount())

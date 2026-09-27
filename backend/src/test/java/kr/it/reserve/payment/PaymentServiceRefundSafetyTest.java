@@ -1,6 +1,9 @@
 package kr.it.reserve.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.global.error.PaymentException;
+import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.dto.PaymentRefundDto;
 import kr.it.reserve.payment.dto.PaymentResponseDto;
@@ -25,9 +28,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -251,6 +256,132 @@ class PaymentServiceRefundSafetyTest {
         assertThat(paymentService.confirmPendingRefund(11L, 2_000, 3_000, "예약 취소"))
                 .isTrue();
         assertThat(alreadyApplied.refundedSoFar()).isEqualTo(5_000);
+    }
+
+    @Test
+    @DisplayName("사용자 환불 API는 취소되지 않은 예약의 PG 환불을 시작하지 않는다")
+    void memberRefundRequiresCancelledReservation() {
+        Member requester = Member.builder().id(200L).role(Role.USER).build();
+        Reservation reservation = Reservation.builder()
+                .id(100L)
+                .member(requester)
+                .status(Reservation.ReservationStatus.CONFIRMED)
+                .build();
+        when(memberRepository.findActiveByIdForUpdate(200L)).thenReturn(Optional.of(requester));
+        when(reservationRepository.findById(100L)).thenReturn(Optional.of(reservation));
+
+        assertThatThrownBy(() -> paymentService.refundByMemberRequest(100L, "이용자 요청", requester))
+                .isInstanceOf(PaymentException.class)
+                .hasMessageContaining("예약을 취소한 후");
+
+        verify(paymentRepository, never()).findPaidByReservationIdForUpdate(100L);
+        verify(portoneService, never()).cancelPayment(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    @DisplayName("환불 재시도는 정책을 다시 계산하지 않고 원장의 마지막 실패 금액을 그대로 보낸다")
+    void memberRetryReusesLastFailedAmount() {
+        // 예약에 방문일·가게 정책이 없다. 재시도가 정책을 다시 계산하려 들면 여기서 터진다.
+        Member requester = requester();
+        stubFinishedReservation(requester, Reservation.ReservationStatus.CANCELLED);
+        Payment payment = paidPayment();
+        String originalReason = "예약 취소에 따른 자동 환불 (7일 전 취소 - 전액 환불)";
+        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
+        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L))
+                .thenReturn(List.of(failedAttempt(7_000, originalReason)));
+        when(paymentRepository.findPaidByReservationIdForUpdate(100L)).thenReturn(Optional.of(payment));
+        when(refundLedgerService.start(10L, MERCHANT_UID, 7_000, originalReason)).thenReturn(21L);
+        when(portoneService.cancelPayment(MERCHANT_UID, 7_000, originalReason))
+                .thenThrow(new IllegalStateException("connection reset"));
+
+        paymentService.refundByMemberRequest(100L, null, requester);
+
+        verify(portoneService).cancelPayment(MERCHANT_UID, 7_000, originalReason);
+    }
+
+    @Test
+    @DisplayName("가게가 거절한 예약도 재시도할 수 있고, 전액 환불이 위약금 정책으로 깎이지 않는다")
+    void rejectedReservationRetryKeepsFullAmount() {
+        Member requester = requester();
+        stubFinishedReservation(requester, Reservation.ReservationStatus.REJECTED);
+        Payment payment = paidPayment();
+        String originalReason = "가게의 예약 거절에 따른 전액 환불";
+        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
+        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L))
+                .thenReturn(List.of(failedAttempt(10_000, originalReason)));
+        when(paymentRepository.findPaidByReservationIdForUpdate(100L)).thenReturn(Optional.of(payment));
+        when(refundLedgerService.start(10L, MERCHANT_UID, 10_000, originalReason)).thenReturn(22L);
+        when(portoneService.cancelPayment(MERCHANT_UID, 10_000, originalReason))
+                .thenThrow(new IllegalStateException("connection reset"));
+
+        paymentService.refundByMemberRequest(100L, null, requester);
+
+        verify(portoneService).cancelPayment(MERCHANT_UID, 10_000, originalReason);
+    }
+
+    @Test
+    @DisplayName("원장에 실패한 시도가 없으면 금액을 새로 만들어 환불하지 않는다")
+    void memberRetryWithoutFailedAttemptIsRefused() {
+        Member requester = requester();
+        stubFinishedReservation(requester, Reservation.ReservationStatus.CANCELLED);
+        Payment payment = paidPayment();
+        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
+        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> paymentService.refundByMemberRequest(100L, null, requester))
+                .isInstanceOf(PaymentException.class)
+                .hasMessageContaining("다시 시도할 환불 요청이 없습니다");
+
+        verify(paymentRepository, never()).findPaidByReservationIdForUpdate(100L);
+        verify(portoneService, never()).cancelPayment(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    @DisplayName("직전 환불 시도가 아직 미결이면 재시도를 보내지 않는다")
+    void memberRetryWhilePreviousAttemptUnresolvedIsRefused() {
+        Member requester = requester();
+        stubFinishedReservation(requester, Reservation.ReservationStatus.CANCELLED);
+        RefundAttempt pending = RefundAttempt.start(10L, MERCHANT_UID, 3_000, "예약 취소");
+        pending.markPending(null, "PG cancellation not final: REQUESTED");
+        Payment payment = paidPayment();
+        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
+        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L))
+                .thenReturn(List.of(failedAttempt(3_000, "예약 취소"), pending));
+
+        assertThatThrownBy(() -> paymentService.refundByMemberRequest(100L, null, requester))
+                .isInstanceOf(PaymentException.class)
+                .hasMessageContaining("처리 결과를 확인하는 중");
+
+        verify(portoneService, never()).cancelPayment(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    private Member requester() {
+        return Member.builder().id(200L).role(Role.USER).build();
+    }
+
+    private void stubFinishedReservation(Member requester, Reservation.ReservationStatus status) {
+        Reservation reservation = Reservation.builder()
+                .id(100L)
+                .member(requester)
+                .status(status)
+                .build();
+        when(memberRepository.findActiveByIdForUpdate(200L)).thenReturn(Optional.of(requester));
+        when(reservationRepository.findById(100L)).thenReturn(Optional.of(reservation));
+    }
+
+    private RefundAttempt failedAttempt(int amount, String reason) {
+        RefundAttempt attempt = RefundAttempt.start(10L, MERCHANT_UID, amount, reason);
+        attempt.markFailed("PG rejected");
+        return attempt;
     }
 
     private void stubLockedPayment(Payment payment) {

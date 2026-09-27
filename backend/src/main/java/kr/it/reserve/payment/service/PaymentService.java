@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -64,7 +63,7 @@ public class PaymentService {
             throw new PaymentException("본인의 예약만 결제할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        if (!canReceivePayment(reservation)) {
+        if (isPaymentClosedFor(reservation)) {
             throw new PaymentException("취소되거나 종료된 예약은 결제할 수 없습니다.", HttpStatus.CONFLICT);
         }
 
@@ -85,7 +84,7 @@ public class PaymentService {
         // 기존 READY 상태 Payment가 있으면 재사용 (결제창 재시도 지원)
         // findReadyByReservationId 사용 → 여러 레코드 있어도 안전 (첫 번째만 사용)
         List<Payment> readyPayments = paymentRepository.findReadyByReservationId(reservation.getId());
-        Payment existingReady = readyPayments.isEmpty() ? null : readyPayments.get(0);
+        Payment existingReady = readyPayments.isEmpty() ? null : readyPayments.getFirst();
 
         if (existingReady != null) {
             // 재사용 시에도 금액을 현재 정책 값으로 다시 맞춘다 — 예전 READY 행에는
@@ -260,7 +259,7 @@ public class PaymentService {
             return ExpiryPaymentDecision.NO_PAYMENT;
         }
         if (payment == null) {
-            Payment latest = payments.get(0);
+            Payment latest = payments.getFirst();
             if (latest.getStatus() == Payment.PaymentStatus.FAILED
                     || latest.getStatus() == Payment.PaymentStatus.CANCELLED) {
                 resolveIssues(latest);
@@ -333,7 +332,7 @@ public class PaymentService {
         try {
             pgPayment = portoneService.getPaymentInfo(payment.getMerchantUid());
         } catch (PaymentException e) {
-            if (e.getStatus() == HttpStatus.NOT_FOUND && !canReceivePayment(payment.getReservation())) {
+            if (e.getStatus() == HttpStatus.NOT_FOUND && isPaymentClosedFor(payment.getReservation())) {
                 payment.failPayment("Closed reservation has no payment at PG");
                 resolveIssues(payment);
                 return staleReadyResult(
@@ -364,7 +363,7 @@ public class PaymentService {
 
         String pgStatus = pgPayment.getStatus();
         if (pgPayment.isPaid()) {
-            if (!canReceivePayment(payment.getReservation())) {
+            if (isPaymentClosedFor(payment.getReservation())) {
                 recordIssue(
                         "STALE_READY",
                         PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
@@ -395,7 +394,7 @@ public class PaymentService {
         }
 
         if ("FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)
-                || ("READY".equals(pgStatus) && !canReceivePayment(payment.getReservation()))) {
+                || ("READY".equals(pgStatus) && isPaymentClosedFor(payment.getReservation()))) {
             payment.failPayment("Stale payment reconciled from PG status: " + pgStatus);
             resolveIssues(payment);
             return staleReadyResult(
@@ -462,7 +461,7 @@ public class PaymentService {
             Payment payment,
             PortoneV2PaymentResponse portonePayment,
             String fallbackImpUid) {
-        if (!canReceivePayment(payment.getReservation())) {
+        if (isPaymentClosedFor(payment.getReservation())) {
             recordIssue(
                     "PAID",
                     PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
@@ -499,7 +498,7 @@ public class PaymentService {
 
     private void ensureReservationPaidState(Payment payment) {
         Reservation reservation = payment.getReservation();
-        if (!canReceivePayment(reservation)) {
+        if (isPaymentClosedFor(reservation)) {
             recordIssue(
                     "PAID",
                     PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
@@ -521,9 +520,10 @@ public class PaymentService {
         }
     }
 
-    private boolean canReceivePayment(Reservation reservation) {
-        return reservation.getStatus() == Reservation.ReservationStatus.PENDING
-                || reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED;
+    /** 결제를 더 받을 수 없는 예약인지 — 대기·확정 상태만 결제를 받는다. */
+    private boolean isPaymentClosedFor(Reservation reservation) {
+        return reservation.getStatus() != Reservation.ReservationStatus.PENDING
+                && reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED;
     }
 
     private void recordIssue(
@@ -857,9 +857,27 @@ public class PaymentService {
      * </ol>
      * 다행히 프론트는 이 엔드포인트를 호출하지 않고 있었다(상수만 정의되고 호출처 0건).
      *
-     * <h3>지금 규칙</h3>
-     * 예약 본인 또는 ADMIN 만 요청할 수 있고, 환불액은 <b>항상 가게 정책으로 계산한 값</b>을 쓴다.
+     * <h3>지금 규칙 (2026-09-21 정정)</h3>
+     * 예약 본인 또는 ADMIN 만, <b>이미 끝난 예약</b>(취소 또는 가게 거절)에 대해서만,
+     * <b>마지막으로 실패한 환불 시도와 같은 금액</b>을 다시 보낸다.
      * 요청 본문의 금액은 <b>무시한다</b> — 받아서 검증하는 것보다 아예 안 받는 게 안전하다.
+     *
+     * <h3>★ 왜 정책으로 다시 계산하지 않나</h3>
+     * 이 엔드포인트는 취소·거절 흐름의 환불이 PG 에서 실패한 뒤의 <b>재시도</b>다. 금액은 그 흐름이
+     * 돌던 순간에 이미 정해졌고, 원장({@link RefundAttempt#getRequestedAmount()})에 남아 있다.
+     * 재시도 시점에 {@link #calculateRefundAmount} 를 다시 부르면 세 가지가 틀어진다.
+     * <ol>
+     *   <li><b>날짜가 밀린다</b> — 정책은 "오늘부터 방문일까지 며칠 남았나"로 매긴다. 7일 전에 취소해
+     *       전액 대상이던 건을 3일 뒤 재시도하면 부분 환불로 깎이고, 방문일이 지나면 0원이 되어
+     *       <b>취소는 됐는데 돈은 영영 못 받는다.</b></li>
+     *   <li><b>가게 귀책 전액 환불이 위약금으로 바뀐다</b> — 가게가 취소·거절한 건은
+     *       {@link #refundFullByStoreDecision} 이 정책 없이 전액을 보낸다. 그게 실패한 뒤
+     *       재시도가 이용자 변심 정책을 태우면 약관(가게 사정 취소는 전액)을 어긴다.</li>
+     *   <li><b>거절된 예약은 재시도조차 못 한다</b> — 가게 거절은 {@code REJECTED} 로 끝나는데,
+     *       {@code CANCELLED} 만 허용하면 전액 환불이 실패한 손님은 돌려받을 길이 없다.</li>
+     * </ol>
+     * 원장에 실패한 시도가 없으면(정책상 0원이었거나 PG 까지 가지도 못한 경우) 여기서 금액을
+     * 새로 만들지 않는다. 돈 액수를 사후에 추정하는 건 사람이 원장을 보고 할 일이다.
      */
     public PaymentResponseDto refundByMemberRequest(Long reservationId, String reason, Member requester) {
         if (reservationId == null) {
@@ -883,22 +901,58 @@ public class PaymentService {
             throw new PaymentException("본인의 예약만 환불할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        // ★ 금액은 정책에서만 나온다. 요청 본문의 refundAmount 는 쓰지 않는다.
-        RefundCalculationResult calculation = calculateRefundAmount(reservationId);
-        if (calculation.getRefundAmount() <= 0) {
-            throw new PaymentException("환불할 수 없습니다. (" + calculation.getReason() + ")", HttpStatus.BAD_REQUEST);
+        // 예약 상태 전환과 결제 취소는 취소·거절 흐름이 한 번에 관리한다.
+        // 이 엔드포인트는 그 흐름의 환불이 실패로 끝났을 때의 재시도만 허용한다.
+        // 예약이 살아 있는데 환불만 나가면 "예약은 유지, 돈은 환불"이라는 불일치가 생긴다.
+        if (!REFUND_RETRYABLE_RESERVATION_STATUSES.contains(reservation.getStatus())) {
+            throw new PaymentException("환불은 예약을 취소한 후에 요청할 수 있습니다.", HttpStatus.CONFLICT);
         }
+
+        Payment payment = paymentRepository.findPaidByReservationId(reservationId)
+                .orElseThrow(() -> new PaymentException("다시 환불할 결제가 없습니다.", HttpStatus.CONFLICT));
+
+        // ★ 금액은 원장의 마지막 실패 시도에서만 가져온다. 정책을 다시 태우지 않는다(위 주석 참고).
+        RefundAttempt lastAttempt = lastRefundAttempt(payment.getId());
+        if (lastAttempt == null || lastAttempt.getStatus() != RefundAttempt.Status.FAILED) {
+            log.warn("Refund retry refused - no failed attempt to retry: reservationId={}, paymentId={}, lastStatus={}",
+                    reservationId, payment.getId(), lastAttempt == null ? "NONE" : lastAttempt.getStatus());
+            throw new PaymentException(
+                    lastAttempt != null && lastAttempt.isUnresolved()
+                            ? "직전 환불 요청의 처리 결과를 확인하는 중입니다. 잠시 후 다시 시도해주세요."
+                            : "다시 시도할 환불 요청이 없습니다. 고객센터로 문의해주세요.",
+                    HttpStatus.CONFLICT);
+        }
+
+        Integer retryAmount = lastAttempt.getRequestedAmount();
+        String retryReason = reason != null && !reason.isBlank()
+                ? reason
+                : (lastAttempt.getReason() != null ? lastAttempt.getReason() : "환불 재시도");
 
         PaymentRefundDto safeDto = PaymentRefundDto.builder()
                 .reservationId(reservationId)
-                .refundAmount(calculation.getRefundAmount())
-                .refundReason(reason != null && !reason.isBlank() ? reason : "이용자 요청 환불 (" + calculation.getReason() + ")")
+                .refundAmount(retryAmount)
+                .refundReason(retryReason)
                 .build();
 
-        log.info("Refund requested by member: reservationId={}, requesterId={}, admin={}, amount={}",
-                reservationId, currentRequester.getId(), isAdmin, calculation.getRefundAmount());
+        log.info("Refund retry requested: reservationId={}, requesterId={}, admin={}, amount={}, previousAttemptId={}",
+                reservationId, currentRequester.getId(), isAdmin, retryAmount, lastAttempt.getId());
 
         return refundPayment(safeDto);
+    }
+
+    /**
+     * 환불 재시도를 받을 수 있는 예약 상태. 이용자·가게 취소({@code CANCELLED})와 가게 거절({@code REJECTED}).
+     * 노쇼·이용완료는 환불 대상이 아니고, 대기·승인 상태는 아직 예약이 살아 있다.
+     */
+    private static final java.util.Set<Reservation.ReservationStatus> REFUND_RETRYABLE_RESERVATION_STATUSES =
+            java.util.Collections.unmodifiableSet(java.util.EnumSet.of(
+                    Reservation.ReservationStatus.CANCELLED,
+                    Reservation.ReservationStatus.REJECTED));
+
+    /** 결제의 가장 최근 환불 시도. 원장 조회가 생성 순 오름차순이라 마지막 행이 최신이다. */
+    private RefundAttempt lastRefundAttempt(Long paymentId) {
+        List<RefundAttempt> attempts = refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(paymentId);
+        return attempts.isEmpty() ? null : attempts.getLast();
     }
 
     /**
@@ -914,8 +968,7 @@ public class PaymentService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean refundByReservationCancel(Long reservationId) {
-        Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(ReservationException::notFound);
+        if (!reservationRepository.existsById(reservationId)) throw ReservationException.notFound();
 
         Payment payment = paymentRepository.findPaidByReservationId(reservationId).orElse(null);
 

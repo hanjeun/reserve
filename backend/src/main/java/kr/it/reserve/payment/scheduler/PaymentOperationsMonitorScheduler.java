@@ -34,10 +34,14 @@ public class PaymentOperationsMonitorScheduler {
         long staleReadyPayments = paymentRepository.countByStatusAndCreatedAtBefore(
                 kr.it.reserve.payment.entity.Payment.PaymentStatus.READY,
                 LocalDateTime.now().minusDays(STALE_READY_DAYS));
+        long ledgerInvariantViolations = paymentRepository.countLedgerInvariantViolations();
+        long depositInvariantViolations = paymentRepository.countReservationDepositInvariantViolations();
 
-        if (openIssues > 0 || failedWebhooks > 0 || staleReadyPayments > 0) {
-            log.error("Payment operations queue requires attention: openIssues={}, failedWebhooks={}, staleReadyPayments={}",
-                    openIssues, failedWebhooks, staleReadyPayments);
+        if (openIssues > 0 || failedWebhooks > 0 || staleReadyPayments > 0
+                || ledgerInvariantViolations > 0 || depositInvariantViolations > 0) {
+            log.error("Payment operations queue requires attention: openIssues={}, failedWebhooks={}, staleReadyPayments={}, ledgerInvariantViolations={}, depositInvariantViolations={}",
+                    openIssues, failedWebhooks, staleReadyPayments,
+                    ledgerInvariantViolations, depositInvariantViolations);
         }
     }
 }

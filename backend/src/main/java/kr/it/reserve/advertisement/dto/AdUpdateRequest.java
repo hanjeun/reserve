@@ -16,15 +16,17 @@ import java.util.List;
  * 범위 밖으로 뒀다 — 바꾸고 싶으면 취소 후 재신청). 그래서 AdCreateRequest를 그대로 재사용하면
  * "이 필드들은 여기선 무시됨"을 호출부가 알아야 하는데, 별도 DTO가 그 자체로 계약을 명확히 한다.
  *
- * images가 null이면 "이미지는 그대로 유지"를 의미하고, 빈 리스트가 아닌 실제 파일 목록이 오면
- * 기존 이미지를 통째로 교체한다(부분 추가/삭제 없음 — StoreImages처럼 개별 이미지 삭제 UI까지
- * 만들기엔 배너는 최대 5장으로 범위가 작아, "새로 다 올리기"가 충분히 단순하고 안전하다).
+ * images가 null이면 "이미지는 그대로 유지"를 의미하고, 실제 파일이 오면 기존 대표 이미지를
+ * 통째로 교체한다. 신규 배너는 정사각 대표 이미지 한 장만 받는다.
  */
 @Getter
 @Setter
 @NoArgsConstructor
 public class AdUpdateRequest {
 
+    private String bannerCopyKey;
+    private String bannerMotionKey;
+    // 둘 다 입력하면 최종 문구로 저장한다. 비어 있으면 bannerCopyKey의 추천 문구를 사용한다.
     private String title;
     private String description;
 

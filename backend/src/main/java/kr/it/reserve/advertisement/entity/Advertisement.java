@@ -41,6 +41,9 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 public class Advertisement {
 
+    public static final int BANNER_TITLE_MAX_LENGTH = 100;
+    public static final int BANNER_DESCRIPTION_MAX_LENGTH = 300;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ad_id")
@@ -59,11 +62,17 @@ public class Advertisement {
     private String imageUrls;
 
     // BANNER 타입만 사용 — 배너에 표시할 문구
-    @Column(name = "title", length = 100)
+    @Column(name = "title", length = BANNER_TITLE_MAX_LENGTH)
     private String title;
 
-    @Column(name = "description", length = 300)
+    @Column(name = "description", length = BANNER_DESCRIPTION_MAX_LENGTH)
     private String description;
+
+    // BANNER 타입만 사용. 기존 광고의 NULL은 응답 경계에서 SOFT_RISE로 해석한다.
+    // nullable로 추가해야 ddl-auto:update가 이미 데이터가 있는 운영 테이블에도 안전하게 컬럼을 더할 수 있다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "banner_motion", columnDefinition = "varchar(24)")
+    private BannerMotionPreset bannerMotion;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
@@ -112,8 +121,8 @@ public class Advertisement {
     @Builder.Default
     private Integer clickCount = 0;
 
-    // 배너 클릭 후 24시간 이내 같은 가게에 예약이 생성되면 프론트에서 이 카운터를 증가시킴(sessionStorage 기반
-    // 귀속 — 서버 측에서는 단순히 "이 adId의 전환이 하나 더 생겨있다"만 데이터로 남김).
+    // 배너 클릭 뒤 생성된 같은 가게의 예약을 서버가 한 번만 귀속해 증가시킨다.
+    // 클릭 자체를 이벤트 테이블로 보관하지 않으므로 완전한 마케팅 어트리뷰션이 아니라 예약 전환 참고 지표다.
     @Column(name = "conversion_count", nullable = false)
     @Builder.Default
     private Integer conversionCount = 0;
@@ -159,6 +168,10 @@ public class Advertisement {
         } else {
             this.imageUrls = String.join(",", urlList);
         }
+    }
+
+    public BannerMotionPreset getResolvedBannerMotion() {
+        return bannerMotion == null ? BannerMotionPreset.SOFT_RISE : bannerMotion;
     }
 
     public void increaseImpressionCount() {

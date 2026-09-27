@@ -50,6 +50,8 @@ test('past unpaid ads cannot be paid and both ad previews keep the shared modal 
     await page.getByRole('button', { name: '새 광고 신청' }).click();
     const dialog = page.getByRole('dialog', { name: '새 광고 신청' });
     await expect(dialog).toBeVisible();
+    await expect.poll(() => dialog.evaluate(element => element.getAnimations({ subtree: true })
+        .some(animation => animation.playState === 'running'))).toBe(false);
     await expect(dialog.getByRole('radio', { name: '노출형' })).toHaveAttribute('aria-checked', 'true');
     await expect(dialog.getByText(/1 \/ 2/)).toHaveCount(0);
     const modalLayer = await page.locator('.ant-modal-wrap:visible').evaluate(
@@ -65,7 +67,11 @@ test('past unpaid ads cannot be paid and both ad previews keep the shared modal 
     expect(storeBox.height).toBeLessThanOrEqual(48);
 
     await storeSelect.click();
-    await page.locator('.ant-select-dropdown:visible').getByText('광고 검증 가게').click();
+    const storeDropdown = page.locator('.ant-select-dropdown:visible');
+    await expect.poll(() => storeDropdown.evaluate(element => element.getAnimations({ subtree: true })
+        .some(animation => animation.playState === 'running'))).toBe(false);
+    await storeDropdown.locator('.ant-select-item-option').filter({ hasText: '광고 검증 가게' }).click();
+    await expect(storeSelect).toContainText('광고 검증 가게');
 
     await dialog.locator('.reserve-form-date-trigger').click();
     const dateDialog = page.locator('.reserve-form-cal-modal');

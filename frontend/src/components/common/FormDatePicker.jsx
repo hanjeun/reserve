@@ -344,7 +344,7 @@ const FormDatePickerBase = ({
                     ))}
                 </div>
                 <div style={styles.grid} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-                    {cells.map(renderCell)}
+                    {cells.map((cell, index) => renderCell(cell, index))}
                 </div>
 
                 {mode !== 'single' && (

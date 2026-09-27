@@ -2,12 +2,17 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { resolveBin } from './resolve-bin.mjs';
 
 // Read-only inventory: never stage, reset, fetch, or change either checkout.
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+const gitBinary = resolveBin('git');
+const git = (...args) => execFileSync(gitBinary, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true });
 const base = process.argv[2] || 'origin/dev';
+if (process.argv.length > 3 || !/^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(base)) {
+    throw new Error('Use one safe branch name or commit SHA, not options or expressions.');
+}
 const root = git('rev-parse', '--show-toplevel').trim();
-const baseSha = git('rev-parse', base).trim();
+const baseSha = git('rev-parse', '--verify', '--end-of-options', `${base}^{commit}`).trim();
 const baseline = new Map(git('ls-tree', '-rz', baseSha).split('\0').filter(Boolean).map(row => {
     const [metadata, path] = row.split('\t');
     return [path, metadata.split(' ')[2]];
@@ -31,7 +36,10 @@ for (let index = 0; index < rows.length; index += 1) {
     const oldPath = /R|C/.test(status) ? rows[++index] : undefined;
     const absolute = resolve(root, path);
     const bytes = existsSync(absolute) ? readFileSync(absolute) : null;
-    const blob = bytes && createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+    // Git's native object ID is metadata, not a security checksum. The manifest uses SHA-256.
+    // --no-filters retains raw byte identity; without -w this command writes no Git object.
+    const blob = bytes && execFileSync(gitBinary, ['hash-object', '--stdin', '--no-filters'],
+        { input: bytes, encoding: 'utf8', windowsHide: true }).trim();
     records.push({ path, status, ...(oldPath ? { oldPath } : {}), group: groupOf(path),
         sha256: bytes ? createHash('sha256').update(bytes).digest('hex') : null,
         bytes: bytes?.length ?? 0, baseBlob: baseline.get(path) ?? null,

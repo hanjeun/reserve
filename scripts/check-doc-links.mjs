@@ -112,7 +112,7 @@ function extractTargets(markdown) {
   return targets;
 }
 
-const markdownFiles = collectMarkdownFiles(repoRoot).sort();
+const markdownFiles = collectMarkdownFiles(repoRoot).sort((a, b) => a.localeCompare(b, 'en'));
 const failures = [];
 let checkedLinks = 0;
 

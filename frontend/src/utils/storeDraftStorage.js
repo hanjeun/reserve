@@ -173,7 +173,8 @@ export const hydrateDraftImages = (records = []) => {
 const stableValue = value => {
     if (Array.isArray(value)) return value.map(stableValue);
     if (value && typeof value === 'object') {
-        return Object.keys(value).sort().reduce((result, key) => {
+        // 기존 UTF-16 정렬을 유지해야 저장된 초안의 fingerprint가 달라지지 않는다.
+        return Object.keys(value).sort((a, b) => a < b ? -1 : a > b ? 1 : 0).reduce((result, key) => {
             result[key] = stableValue(value[key]);
             return result;
         }, {});

@@ -1,0 +1,230 @@
+[
+  {
+    "category": "core-style-entry",
+    "count": 1,
+    "source_relative_paths": [
+      "frontend/src/index.css"
+    ]
+  },
+  {
+    "category": "core-token",
+    "count": 9,
+    "source_relative_paths": [
+      "frontend/src/styles/tokens/agreement.js",
+      "frontend/src/styles/tokens/animations.js",
+      "frontend/src/styles/tokens/breakpoints.js",
+      "frontend/src/styles/tokens/chart.js",
+      "frontend/src/styles/tokens/colors.js",
+      "frontend/src/styles/tokens/field.js",
+      "frontend/src/styles/tokens/index.js",
+      "frontend/src/styles/tokens/spacing.js",
+      "frontend/src/styles/tokens/typography.js"
+    ]
+  },
+  {
+    "category": "dependency-and-rule-reference",
+    "count": 6,
+    "source_relative_paths": [
+      ".gitattributes",
+      "frontend/package-lock.json",
+      "frontend/package.json",
+      "frontend/scripts/eslint-reserve-rules.mjs",
+      "frontend/scripts/eslint-reserve-rules.test.mjs",
+      "THIRD_PARTY_NOTICES.md"
+    ]
+  },
+  {
+    "category": "dependency-patch-reference",
+    "count": 1,
+    "source_relative_paths": [
+      "frontend/patches/@rc-component+tabs+1.7.0.patch"
+    ]
+  },
+  {
+    "category": "design-document",
+    "count": 5,
+    "source_relative_paths": [
+      "docs/rules/code-conventions.md",
+      "docs/technical/design-measurements-2026-09-13.md",
+      "docs/technical/design-system.md",
+      "docs/technical/home-visual-assets.md",
+      "docs/technical/interaction-audit-2026-09-13.md"
+    ]
+  },
+  {
+    "category": "font-asset",
+    "count": 1,
+    "source_relative_paths": [
+      "frontend/public/fonts/SUITE-Variable.woff2"
+    ]
+  },
+  {
+    "category": "font-dependency-reference",
+    "count": 1,
+    "source_relative_paths": [
+      "frontend/node_modules/pretendard/package.json"
+    ]
+  },
+  {
+    "category": "font-license-reference",
+    "count": 1,
+    "source_relative_paths": [
+      "frontend/node_modules/pretendard/dist/LICENSE.txt"
+    ]
+  },
+  {
+    "category": "generic-adapter-needed",
+    "count": 4,
+    "source_relative_paths": [
+      "frontend/src/components/common/Avatar.jsx",
+      "frontend/src/components/common/FilterToolbar.jsx",
+      "frontend/src/components/common/index.js",
+      "frontend/src/utils/image.js"
+    ]
+  },
+  {
+    "category": "generic-ui-component",
+    "count": 31,
+    "source_relative_paths": [
+      "frontend/src/components/common/__tests__/Button.test.jsx",
+      "frontend/src/components/common/__tests__/Card.test.jsx",
+      "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "frontend/src/components/common/__tests__/FormInput.test.jsx",
+      "frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+      "frontend/src/components/common/Badge.jsx",
+      "frontend/src/components/common/Button.jsx",
+      "frontend/src/components/common/Card.jsx",
+      "frontend/src/components/common/ChartCard.jsx",
+      "frontend/src/components/common/ChartCard.test.jsx",
+      "frontend/src/components/common/DataTable.jsx",
+      "frontend/src/components/common/FilterMenu.jsx",
+      "frontend/src/components/common/FilterSelect.jsx",
+      "frontend/src/components/common/FormDatePicker.jsx",
+      "frontend/src/components/common/FormInput.jsx",
+      "frontend/src/components/common/FormModal.jsx",
+      "frontend/src/components/common/FormSelect.jsx",
+      "frontend/src/components/common/FormTextArea.jsx",
+      "frontend/src/components/common/FormTimePicker.jsx",
+      "frontend/src/components/common/ImagePreviewPortal.jsx",
+      "frontend/src/components/common/Loading.jsx",
+      "frontend/src/components/common/ModalLoading.jsx",
+      "frontend/src/components/common/PageContainer.jsx",
+      "frontend/src/components/common/pickerSuffix.jsx",
+      "frontend/src/components/common/PieLegend.jsx",
+      "frontend/src/components/common/RefreshButton.jsx",
+      "frontend/src/components/common/SegmentedControl.jsx",
+      "frontend/src/components/common/SegmentedGrid.jsx",
+      "frontend/src/components/common/SessionQueryProvider.jsx",
+      "frontend/src/components/common/StatCard.jsx",
+      "frontend/src/components/common/UnreadPill.jsx"
+    ]
+  },
+  {
+    "category": "generic-ui-helper",
+    "count": 3,
+    "source_relative_paths": [
+      "frontend/src/constants/pagination.js",
+      "frontend/src/utils/form.js",
+      "frontend/src/utils/validation.js"
+    ]
+  },
+  {
+    "category": "integration-reference-not-entrypoint",
+    "count": 5,
+    "source_relative_paths": [
+      "frontend/eslint.config.js",
+      "frontend/src/App.jsx",
+      "frontend/src/main.jsx",
+      "frontend/src/test/setup.js",
+      "frontend/vite.config.js"
+    ]
+  },
+  {
+    "category": "mixed-generic-and-reserve-pattern",
+    "count": 1,
+    "source_relative_paths": [
+      "frontend/src/components/common/Skeletons.jsx"
+    ]
+  },
+  {
+    "category": "mixed-global-style",
+    "count": 6,
+    "source_relative_paths": [
+      "frontend/src/styles/global/components-and-forms.css",
+      "frontend/src/styles/global/feature-surfaces.css",
+      "frontend/src/styles/global/foundation.css",
+      "frontend/src/styles/global/interactions.css",
+      "frontend/src/styles/global/navigation-and-media.css",
+      "frontend/src/styles/theme.css"
+    ]
+  },
+  {
+    "category": "owned-brand-asset",
+    "count": 4,
+    "source_relative_paths": [
+      "frontend/public/icons/apple-touch-icon.png",
+      "frontend/public/icons/favicon.svg",
+      "frontend/public/icons/R_logo.png",
+      "frontend/public/icons/RESERVE_logo.png"
+    ]
+  },
+  {
+    "category": "reproduction-script",
+    "count": 1,
+    "source_relative_paths": [
+      "scripts/design-system-snapshot.ps1"
+    ]
+  },
+  {
+    "category": "reserve-coupled-pattern",
+    "count": 5,
+    "source_relative_paths": [
+      "frontend/src/components/common/FavoriteButton.jsx",
+      "frontend/src/components/common/InquiryModal.jsx",
+      "frontend/src/components/common/KakaoMap.jsx",
+      "frontend/src/components/common/KakaoMap.test.jsx",
+      "frontend/src/components/common/kakaoMapOverlay.js"
+    ]
+  },
+  {
+    "category": "reserve-pattern-reference",
+    "count": 3,
+    "source_relative_paths": [
+      "frontend/src/constants/discovery.js",
+      "frontend/src/constants/roles.js",
+      "frontend/src/hooks/queryKeys.js"
+    ]
+  },
+  {
+    "category": "reserve-shell-baseline",
+    "count": 6,
+    "source_relative_paths": [
+      "frontend/src/components/layout/DiscoveryNav.jsx",
+      "frontend/src/components/layout/Footer.jsx",
+      "frontend/src/components/layout/Header.jsx",
+      "frontend/src/components/layout/Header.test.jsx",
+      "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "frontend/src/components/layout/OfflineBanner.jsx"
+    ]
+  },
+  {
+    "category": "shared-ui-hook",
+    "count": 14,
+    "source_relative_paths": [
+      "frontend/src/hooks/__tests__/useGoBack.test.jsx",
+      "frontend/src/hooks/useDebounce.js",
+      "frontend/src/hooks/useExitAnimation.js",
+      "frontend/src/hooks/useFormErrors.js",
+      "frontend/src/hooks/useFormReady.js",
+      "frontend/src/hooks/useGoBack.js",
+      "frontend/src/hooks/useImagePreview.jsx",
+      "frontend/src/hooks/useImagePreviewSwipe.js",
+      "frontend/src/hooks/useMessage.js",
+      "frontend/src/hooks/useOnlineStatus.js",
+      "frontend/src/hooks/useQueryParamState.js",
+      "frontend/src/hooks/useReducedMotion.js",
+      "frontend/src/hooks/useTheme.js",
+      "frontend/src/hooks/useWindowWidth.js"
+    ]
+  }
+]

@@ -1,0 +1,56 @@
+import { radius, heights } from './spacing';
+import { colors } from './colors';
+
+/**
+ * 폼 컨트롤 껍데기 토큰 — 입력칸처럼 보이는 모든 것의 단일 출처.
+ *
+ * ★ 왜 따로 두나 (2026-08-06)
+ *   "예약 날짜"(BookingCalendar), 폼 날짜(FormDatePicker), "예약 시간"(커스텀 div),
+ *   시간 범위(AntD TimePicker)는 렌더러가 달라도 같은 입력 언어를 써야 한다.
+ *
+ *   같아 보여야 하는 것들이 서로 다른 렌더러를 가질 때, **관문은 컴포넌트가 아니라 값이다.**
+ *   렌더러는 둘로 두되 숫자가 코드에 두 번 나타나지 않게 한다.
+ *
+ *        field  ─┬─→ App.jsx ConfigProvider (AntD 입력)
+ *                ├─→ FormDatePicker/BookingCalendar
+ *                ├─→ pickerSuffix/TimeSlotPicker
+ *                └─→ Skeletons.jsx
+ *
+ *   전에는 54 와 14 가 App.jsx·Skeletons·홈 목업에 **리터럴로 흩어져 있었다.**
+ *   heights.input 을 55 로 바꾸면 그 셋만 54 로 남는 상태였다 —
+ *   이 프로젝트의 반복 회귀가 전부 이 형태였다(CLAUDE.md "설계 원칙" 참고).
+ *
+ * ⚠️ 새 폼 컨트롤을 만들 때 높이·radius·아이콘 크기를 숫자로 적지 말 것. 여기서 가져온다.
+ */
+export const field = {
+    /** 입력칸 높이. AntD size="large" 와 커스텀 자리표시자가 공유한다. */
+    height: heights.input,          // '54px'
+    /** 입력칸 모서리. AntD borderRadius 토큰과 같은 값이어야 한다. */
+    radius: radius.lg,              // '14px'
+    /** 채움형 배경. 비활성일 때는 한 단계 진하게. */
+    bg: colors.gray[50],
+    bgDisabled: colors.gray[100],
+    /** 자리표시자 글자색 — AntD colorTextPlaceholder 와 같은 값. */
+    placeholderColor: colors.text.placeholder,
+    /**
+     * 접미 아이콘 크기(px).
+     * AntD 기본값을 그냥 두면 커스텀 자리표시자와 1~2px 어긋나는데,
+     * 두 칸이 나란히 놓이므로 그 차이가 눈에 띈다("디자인이 미묘하게 다르다"의 정체).
+     */
+    iconSize: 16,
+    /**
+     * 에러 표시(관문) — 커스텀 입력칸이 "에러"를 말하는 유일한 방법.
+     *
+     * 이 앱 입력칸은 채움형이라 테두리가 없다. 그래서 에러도 border 가 아니라
+     * inset box-shadow 한 줄로 그린다(레이아웃이 1px도 안 움직인다).
+     * BookingCalendar 트리거와 TimeSlotPicker 자리표시자가 **같은 폼에 나란히** 놓이므로
+     * 한 곳에서만 정의한다 — 예전에 각자 정하다가 날짜 칸만 빨간 상자가 되고
+     * 시간 칸은 아이콘만 빨개져서 같은 폼에서 두 칸이 다른 말을 했다.
+     */
+    errorRing: `inset 0 0 0 1px ${colors.error.main}`,
+};
+
+/** 숫자만 필요한 곳(Bone height 등)을 위한 px 제거 헬퍼. */
+export const fieldPx = (v) => parseInt(v, 10);
+
+export default field;

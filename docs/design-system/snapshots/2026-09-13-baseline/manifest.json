@@ -1,0 +1,866 @@
+[
+  {
+    "source_relative_path": ".gitattributes",
+    "snapshot_relative_path": "source/.gitattributes",
+    "category": "dependency-and-rule-reference",
+    "bytes": 612,
+    "sha256": "19c4933390f4e48b82f634c416681244e9680c3be6f61544348144528674db10",
+    "captured_at_utc": "2026-09-13T13:40:18.3133602Z"
+  },
+  {
+    "source_relative_path": "docs/rules/code-conventions.md",
+    "snapshot_relative_path": "source/docs/rules/code-conventions.md",
+    "category": "design-document",
+    "bytes": 9109,
+    "sha256": "6ac030b27af26accde58af46662997c41759cea7cfe9fa83f90d0496c0f33bb5",
+    "captured_at_utc": "2026-09-13T13:40:18.5022173Z"
+  },
+  {
+    "source_relative_path": "docs/technical/design-measurements-2026-09-13.md",
+    "snapshot_relative_path": "source/docs/technical/design-measurements-2026-09-13.md",
+    "category": "design-document",
+    "bytes": 12458,
+    "sha256": "d43346b4ad175a6552ac0ce82a1c9fa973c822607e3abdb9611043e9ad505cea",
+    "captured_at_utc": "2026-09-13T13:40:18.4193781Z"
+  },
+  {
+    "source_relative_path": "docs/technical/design-system.md",
+    "snapshot_relative_path": "source/docs/technical/design-system.md",
+    "category": "design-document",
+    "bytes": 42667,
+    "sha256": "263af9f897f8e788c58ef6f6d6a28b2dc408c91a7975ce472ba015e19227dffc",
+    "captured_at_utc": "2026-09-13T13:34:52.7549092Z"
+  },
+  {
+    "source_relative_path": "docs/technical/home-visual-assets.md",
+    "snapshot_relative_path": "source/docs/technical/home-visual-assets.md",
+    "category": "design-document",
+    "bytes": 17851,
+    "sha256": "0a7accea233c3c5a2bfe75245162e22268b4896f44cdc07387520cd33259cb81",
+    "captured_at_utc": "2026-09-13T13:40:18.4563066Z"
+  },
+  {
+    "source_relative_path": "docs/technical/interaction-audit-2026-09-13.md",
+    "snapshot_relative_path": "source/docs/technical/interaction-audit-2026-09-13.md",
+    "category": "design-document",
+    "bytes": 83695,
+    "sha256": "2ef6a87e1364a60f64f8415241ea01682dbce9b062f193dd99ac57b5bd51e488",
+    "captured_at_utc": "2026-09-13T13:40:18.3780398Z"
+  },
+  {
+    "source_relative_path": "frontend/eslint.config.js",
+    "snapshot_relative_path": "source/frontend/eslint.config.js",
+    "category": "integration-reference-not-entrypoint",
+    "bytes": 3373,
+    "sha256": "c79ff18ce1ab4b646bcd4966d40c3bf72004bb0005a01ff3f53060aa0a49dc62",
+    "captured_at_utc": "2026-09-13T13:40:18.0567078Z"
+  },
+  {
+    "source_relative_path": "frontend/node_modules/pretendard/dist/LICENSE.txt",
+    "snapshot_relative_path": "licenses/Pretendard-LICENSE.txt",
+    "category": "font-license-reference",
+    "bytes": 4419,
+    "sha256": "b04538c9abec39a3db75108cf0af0fd9c77032fe8aa2cf38345b4d250e98e38e",
+    "captured_at_utc": "2026-09-13T13:40:21.165445Z"
+  },
+  {
+    "source_relative_path": "frontend/node_modules/pretendard/package.json",
+    "snapshot_relative_path": "licenses/Pretendard-package.json",
+    "category": "font-dependency-reference",
+    "bytes": 570,
+    "sha256": "912a9eecb0a168a2676dece8890218dbb88fba9cc52ff7adfba52aa16f325d08",
+    "captured_at_utc": "2026-09-13T13:40:21.204447Z"
+  },
+  {
+    "source_relative_path": "frontend/package-lock.json",
+    "snapshot_relative_path": "source/frontend/package-lock.json",
+    "category": "dependency-and-rule-reference",
+    "bytes": 231427,
+    "sha256": "3faca213be9ff7b05f91fb2c20f293c441692cd6073c9b96bcde76d49619ae87",
+    "captured_at_utc": "2026-09-13T13:40:18.1943265Z"
+  },
+  {
+    "source_relative_path": "frontend/package.json",
+    "snapshot_relative_path": "source/frontend/package.json",
+    "category": "dependency-and-rule-reference",
+    "bytes": 1738,
+    "sha256": "ced024c4a43d2bfc2db38aae8c8bb73cdb09c283825ebdb19a53559e75ffbd8c",
+    "captured_at_utc": "2026-09-13T13:40:18.1327742Z"
+  },
+  {
+    "source_relative_path": "frontend/patches/@rc-component+tabs+1.7.0.patch",
+    "snapshot_relative_path": "source/frontend/patches/@rc-component+tabs+1.7.0.patch",
+    "category": "dependency-patch-reference",
+    "bytes": 1535,
+    "sha256": "07aba08bc0c82a5f7039dfbfa98ed01da0d58938d050970b693146c49fdaa8ba",
+    "captured_at_utc": "2026-09-13T13:40:21.1279666Z"
+  },
+  {
+    "source_relative_path": "frontend/public/fonts/SUITE-Variable.woff2",
+    "snapshot_relative_path": "source/frontend/public/fonts/SUITE-Variable.woff2",
+    "category": "font-asset",
+    "bytes": 535788,
+    "sha256": "fc5e0648d5413b55b79ebbab0f50de561a026574cba3a9c8eb03d5bddd432263",
+    "captured_at_utc": "2026-09-13T13:40:18.6834416Z"
+  },
+  {
+    "source_relative_path": "frontend/public/icons/apple-touch-icon.png",
+    "snapshot_relative_path": "source/frontend/public/icons/apple-touch-icon.png",
+    "category": "owned-brand-asset",
+    "bytes": 4742,
+    "sha256": "9f0a08b47e5881bb4ecc2acb88e234925eca3baceea9e729261c3446aa580ec1",
+    "captured_at_utc": "2026-09-13T13:40:18.644682Z"
+  },
+  {
+    "source_relative_path": "frontend/public/icons/favicon.svg",
+    "snapshot_relative_path": "source/frontend/public/icons/favicon.svg",
+    "category": "owned-brand-asset",
+    "bytes": 854,
+    "sha256": "d7486febb4e6ec113252fc4e39c6a585a49f7af5b06b00b9286e9360e09172d9",
+    "captured_at_utc": "2026-09-13T13:40:18.6097678Z"
+  },
+  {
+    "source_relative_path": "frontend/public/icons/R_logo.png",
+    "snapshot_relative_path": "source/frontend/public/icons/R_logo.png",
+    "category": "owned-brand-asset",
+    "bytes": 8021,
+    "sha256": "2fd9c39d554c9ce20e210321619f6ec76dad233a1dc64ac910e7c4eb19bce43f",
+    "captured_at_utc": "2026-09-13T13:40:18.5395698Z"
+  },
+  {
+    "source_relative_path": "frontend/public/icons/RESERVE_logo.png",
+    "snapshot_relative_path": "source/frontend/public/icons/RESERVE_logo.png",
+    "category": "owned-brand-asset",
+    "bytes": 8634,
+    "sha256": "a7b115f8b601d364615300e25461f2e9e53e02b9e87873b6a55334474ae2fb5c",
+    "captured_at_utc": "2026-09-13T13:40:18.574365Z"
+  },
+  {
+    "source_relative_path": "frontend/scripts/eslint-reserve-rules.mjs",
+    "snapshot_relative_path": "source/frontend/scripts/eslint-reserve-rules.mjs",
+    "category": "dependency-and-rule-reference",
+    "bytes": 1496,
+    "sha256": "c39269f8680a91aab909341267c1fc4f8b6606f3da9f0b88f0da2b27ee7a876a",
+    "captured_at_utc": "2026-09-13T13:40:18.2372439Z"
+  },
+  {
+    "source_relative_path": "frontend/scripts/eslint-reserve-rules.test.mjs",
+    "snapshot_relative_path": "source/frontend/scripts/eslint-reserve-rules.test.mjs",
+    "category": "dependency-and-rule-reference",
+    "bytes": 1216,
+    "sha256": "9b69cceb8ead9d120c175f213935e2ece382ffae3358bafe37cb93e61a849e2c",
+    "captured_at_utc": "2026-09-13T13:40:18.2773763Z"
+  },
+  {
+    "source_relative_path": "frontend/src/App.jsx",
+    "snapshot_relative_path": "source/frontend/src/App.jsx",
+    "category": "integration-reference-not-entrypoint",
+    "bytes": 16541,
+    "sha256": "d3216942ec926b072f5410a06c410da223a3195a48e6683c658ef11e26e48212",
+    "captured_at_utc": "2026-09-13T13:40:17.9316267Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/__tests__/Button.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/__tests__/Button.test.jsx",
+    "category": "generic-ui-component",
+    "bytes": 1207,
+    "sha256": "c347cf66ca24b26f195d498fe9527e99be788accbd433f49f7ea99e6880018d5",
+    "captured_at_utc": "2026-09-13T13:40:19.2787101Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/__tests__/Card.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/__tests__/Card.test.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2061,
+    "sha256": "9df52c213f877f4a026760eda44c7b6c32c8961c4c157885b48234b0fb170c52",
+    "captured_at_utc": "2026-09-13T13:40:19.320229Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+    "category": "generic-ui-component",
+    "bytes": 3022,
+    "sha256": "7571806e0830316f953fd015cb1b9c0c40f109a62dd79888b04ea5bfc1a0091b",
+    "captured_at_utc": "2026-09-13T13:40:19.3616159Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/__tests__/FormInput.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/__tests__/FormInput.test.jsx",
+    "category": "generic-ui-component",
+    "bytes": 1937,
+    "sha256": "cb3458f468ac92d6fbcdab6cfd6a846b90f6722418f79772f172d7ad0926ea8d",
+    "captured_at_utc": "2026-09-13T13:40:19.4247987Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+    "category": "generic-ui-component",
+    "bytes": 1305,
+    "sha256": "4e9268f9677f2e4280cb3217d15bdb8d39eba742540a839de115eafa47f94d63",
+    "captured_at_utc": "2026-09-13T13:40:19.4687997Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/Avatar.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/Avatar.jsx",
+    "category": "generic-adapter-needed",
+    "bytes": 2391,
+    "sha256": "4f512efc956f27c018b7dd00d658501e312f17d7b816ad7f4fcdf146913ca6d5",
+    "captured_at_utc": "2026-09-13T13:40:19.4956739Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/Badge.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/Badge.jsx",
+    "category": "generic-ui-component",
+    "bytes": 3479,
+    "sha256": "c649ea1b96961d938521b999580a92b168d4c2383dcb04b2907ae2b58d930320",
+    "captured_at_utc": "2026-09-13T13:40:19.5357253Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/Button.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/Button.jsx",
+    "category": "generic-ui-component",
+    "bytes": 7330,
+    "sha256": "d93889b1a5c9f9f4dfdeff5d165396cb8413c59e37ec9d7f65019cc68c8ad6e2",
+    "captured_at_utc": "2026-09-13T13:40:19.5758154Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/Card.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/Card.jsx",
+    "category": "generic-ui-component",
+    "bytes": 6172,
+    "sha256": "8941d77ad0ccabf28644a6b01dc98fff2368627564c2b98736131df385bce557",
+    "captured_at_utc": "2026-09-13T13:40:19.6065324Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/ChartCard.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/ChartCard.jsx",
+    "category": "generic-ui-component",
+    "bytes": 5411,
+    "sha256": "52bc17106684714d89c07cb53c904378542c0928917aa24e589340d281db8b42",
+    "captured_at_utc": "2026-09-13T13:40:19.6474583Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/ChartCard.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/ChartCard.test.jsx",
+    "category": "generic-ui-component",
+    "bytes": 1363,
+    "sha256": "2806ca1e515bec74f52bc918f7e06eda40f17eb2c027543f7adbcc9a59d48e45",
+    "captured_at_utc": "2026-09-13T13:40:19.6854918Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/DataTable.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/DataTable.jsx",
+    "category": "generic-ui-component",
+    "bytes": 7176,
+    "sha256": "55fcc96174ee58e8c57e991ffa39deb6a8b7125298405c71cace7f8f851b48ea",
+    "captured_at_utc": "2026-09-13T13:40:19.7227999Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FavoriteButton.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FavoriteButton.jsx",
+    "category": "reserve-coupled-pattern",
+    "bytes": 5010,
+    "sha256": "6813e719dd383208947784a0108d95c0b8076f8336e75bbff4f3393e91064eeb",
+    "captured_at_utc": "2026-09-13T13:40:19.7699643Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FilterMenu.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FilterMenu.jsx",
+    "category": "generic-ui-component",
+    "bytes": 3916,
+    "sha256": "1dba6974f1e8a5e760e73959406f6c98d2145b9cd04458026264667121ed2236",
+    "captured_at_utc": "2026-09-13T13:40:19.8170923Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FilterSelect.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FilterSelect.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2948,
+    "sha256": "4a3ae3edfb6317c7e853e72983766225854ad7165ef5c8f91cfda95cffcf9a43",
+    "captured_at_utc": "2026-09-13T13:40:19.8539465Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FilterToolbar.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FilterToolbar.jsx",
+    "category": "generic-adapter-needed",
+    "bytes": 8261,
+    "sha256": "8e7bb6d2b466a5d772bcb802d2634378cfc1aa4ffd33b435c1bbe85b19d6b143",
+    "captured_at_utc": "2026-09-13T13:40:19.8901941Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FormDatePicker.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FormDatePicker.jsx",
+    "category": "generic-ui-component",
+    "bytes": 18784,
+    "sha256": "539e16c840010e830fb315491d76fe68a0d1a5328096ebd25ee25ea23c5fc175",
+    "captured_at_utc": "2026-09-13T13:40:19.9461986Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FormInput.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FormInput.jsx",
+    "category": "generic-ui-component",
+    "bytes": 5909,
+    "sha256": "5dadd2058e2964d145944ce0757036eeb5f27a108cd3c8af96c903744ecc21d6",
+    "captured_at_utc": "2026-09-13T13:40:19.9744737Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FormModal.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FormModal.jsx",
+    "category": "generic-ui-component",
+    "bytes": 6107,
+    "sha256": "74c501c91c5169c1fff7d5c3f5f7bb1241c65746aeb6df9c7e4a59513f50e3e9",
+    "captured_at_utc": "2026-09-13T13:40:20.0130306Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FormSelect.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FormSelect.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2150,
+    "sha256": "9a1d2faa2ffb57f1ed6ad0c1d739e4033182040f7d865cb45aa1e550990b8d4e",
+    "captured_at_utc": "2026-09-13T13:40:20.0527365Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FormTextArea.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FormTextArea.jsx",
+    "category": "generic-ui-component",
+    "bytes": 1915,
+    "sha256": "65c550350480916ab108af65814348e24f7b0e8178f2a88e764e02c9645b0ddc",
+    "captured_at_utc": "2026-09-13T13:40:20.0817969Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/FormTimePicker.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/FormTimePicker.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2209,
+    "sha256": "bd1faba652aafe26813627a592fbc17658ab58b24a8b8a2d98a5f07209226b4a",
+    "captured_at_utc": "2026-09-13T13:40:20.1328234Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/ImagePreviewPortal.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/ImagePreviewPortal.jsx",
+    "category": "generic-ui-component",
+    "bytes": 3154,
+    "sha256": "d443cf5917507049c9ae451c6ece522ddc083bee96524494c52826c2109d3e01",
+    "captured_at_utc": "2026-09-13T13:40:20.1735569Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/index.js",
+    "snapshot_relative_path": "source/frontend/src/components/common/index.js",
+    "category": "generic-adapter-needed",
+    "bytes": 2343,
+    "sha256": "4295c0f1f0c80e9f245b5e635d76d97f425d1281822126430977a91f6fb4e50c",
+    "captured_at_utc": "2026-09-13T13:40:20.2214172Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/InquiryModal.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/InquiryModal.jsx",
+    "category": "reserve-coupled-pattern",
+    "bytes": 7582,
+    "sha256": "9c1f200dc304ff951bc2f8b7f6f892bcb6446394b7ce6010769af445d915d49a",
+    "captured_at_utc": "2026-09-13T13:40:20.2885436Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/KakaoMap.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/KakaoMap.jsx",
+    "category": "reserve-coupled-pattern",
+    "bytes": 8240,
+    "sha256": "0b40b92ab9a791d58729dad43d8d9db9ea9cf866854317423ed3283c272ef5c7",
+    "captured_at_utc": "2026-09-13T13:40:20.3501597Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/KakaoMap.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/KakaoMap.test.jsx",
+    "category": "reserve-coupled-pattern",
+    "bytes": 932,
+    "sha256": "6ec5e26f45bf258c3bb4fe844b0716c69de24f58818932591fce2f02847c0aa8",
+    "captured_at_utc": "2026-09-13T13:40:20.3911666Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/kakaoMapOverlay.js",
+    "snapshot_relative_path": "source/frontend/src/components/common/kakaoMapOverlay.js",
+    "category": "reserve-coupled-pattern",
+    "bytes": 1615,
+    "sha256": "4b7bf8900e6be1d5d74ef332bcf6b291f0dd9214c115c9a9ae1aa9a1268ee649",
+    "captured_at_utc": "2026-09-13T13:40:20.4448381Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/Loading.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/Loading.jsx",
+    "category": "generic-ui-component",
+    "bytes": 4301,
+    "sha256": "fec50834a267b3c17ae3936bf824c457b9822cb964ebc8c2c5052d58ffd18680",
+    "captured_at_utc": "2026-09-13T13:40:20.4893734Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/ModalLoading.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/ModalLoading.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2065,
+    "sha256": "509992c3bbd92f3a2237618568951d7d088ae535b2a5bba1fe046af8fc9894af",
+    "captured_at_utc": "2026-09-13T13:40:20.5245289Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/PageContainer.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/PageContainer.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2546,
+    "sha256": "0da2f107bc6b55984d1c299854df2329bb43a4833466bcc653a8e089af120830",
+    "captured_at_utc": "2026-09-13T13:40:20.5688424Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/pickerSuffix.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/pickerSuffix.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2437,
+    "sha256": "2a619c850ed66299b062dcca8ecf04157dbfccd514abb010bc32b5e8a53e7bd1",
+    "captured_at_utc": "2026-09-13T13:40:20.6117475Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/PieLegend.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/PieLegend.jsx",
+    "category": "generic-ui-component",
+    "bytes": 3866,
+    "sha256": "498633d165844ba280a918c607841341d3f2f691420c8849b0e77f66e3a8bcc3",
+    "captured_at_utc": "2026-09-13T13:40:20.6462973Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/RefreshButton.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/RefreshButton.jsx",
+    "category": "generic-ui-component",
+    "bytes": 1836,
+    "sha256": "40b279d0ad13fb02387846808f71525d474e0181c5e9418b99f11ff786e600f4",
+    "captured_at_utc": "2026-09-13T13:40:20.6848021Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/SegmentedControl.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/SegmentedControl.jsx",
+    "category": "generic-ui-component",
+    "bytes": 3909,
+    "sha256": "b703d6456177e10af3b07ba608c0766bb550ee232c6622bcaf3b6949db6dd796",
+    "captured_at_utc": "2026-09-13T13:40:20.7652616Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/SegmentedGrid.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/SegmentedGrid.jsx",
+    "category": "generic-ui-component",
+    "bytes": 3255,
+    "sha256": "0fe07a77c96b4f58c24ded3d015aaf3dd6b4b843c4f9857859cdd96d2b318794",
+    "captured_at_utc": "2026-09-13T13:40:20.7961373Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/SessionQueryProvider.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/SessionQueryProvider.jsx",
+    "category": "generic-ui-component",
+    "bytes": 701,
+    "sha256": "93381a7783103294a3b0c148b4269505ed7b2a9b1a88f14f1e583b9ee384d43a",
+    "captured_at_utc": "2026-09-13T13:40:20.8406372Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/Skeletons.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/Skeletons.jsx",
+    "category": "mixed-generic-and-reserve-pattern",
+    "bytes": 33015,
+    "sha256": "5b23ca42512f964706bef6a141d1e0ffb52491f8122eeeb7fa3fb0ed6294d0a0",
+    "captured_at_utc": "2026-09-13T13:40:20.8903359Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/StatCard.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/StatCard.jsx",
+    "category": "generic-ui-component",
+    "bytes": 5590,
+    "sha256": "f736f387a6542b449b92baee7318e5f08f25b49913fbad51dd037a846477a923",
+    "captured_at_utc": "2026-09-13T13:40:20.931598Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/common/UnreadPill.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/common/UnreadPill.jsx",
+    "category": "generic-ui-component",
+    "bytes": 2013,
+    "sha256": "66708d76c7ae62f129644e140aa4fad1d81d0322cce296545a1af0d9a46540b7",
+    "captured_at_utc": "2026-09-13T13:40:20.9666498Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/layout/DiscoveryNav.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/layout/DiscoveryNav.jsx",
+    "category": "reserve-shell-baseline",
+    "bytes": 723,
+    "sha256": "551c3d314e2ac70376452311c5460c6d3c7878cd0ae0d26e559c037955f3dbed",
+    "captured_at_utc": "2026-09-13T13:34:52.4412073Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/layout/Footer.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/layout/Footer.jsx",
+    "category": "reserve-shell-baseline",
+    "bytes": 11346,
+    "sha256": "771d36bba154b0319309b2d28b7bfb9e1648f58427a30e7204a2b7d61ddfb225",
+    "captured_at_utc": "2026-09-13T13:34:52.4712226Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/layout/Header.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/layout/Header.jsx",
+    "category": "reserve-shell-baseline",
+    "bytes": 4826,
+    "sha256": "2e3c4a9eca1dd9d6d7a929720d3f66988038f5497ea36f417bd88096563a87f7",
+    "captured_at_utc": "2026-09-13T13:34:52.3129659Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/layout/Header.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/layout/Header.test.jsx",
+    "category": "reserve-shell-baseline",
+    "bytes": 2915,
+    "sha256": "254b9f86d9c5f9dee11389ffa566521f7b21a4b3ed7f580322c4c0c468c6f38f",
+    "captured_at_utc": "2026-09-13T13:40:21.0234702Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/layout/HeaderAccountMenu.jsx",
+    "category": "reserve-shell-baseline",
+    "bytes": 5901,
+    "sha256": "7cbe7bfb8daa7745777ffe3e482db527a2d1031658db2b34be0c6be46fb0abdd",
+    "captured_at_utc": "2026-09-13T13:34:52.3933196Z"
+  },
+  {
+    "source_relative_path": "frontend/src/components/layout/OfflineBanner.jsx",
+    "snapshot_relative_path": "source/frontend/src/components/layout/OfflineBanner.jsx",
+    "category": "reserve-shell-baseline",
+    "bytes": 2585,
+    "sha256": "fd1c6f7002337c7c0b50a56933df0829fa73a37383253cb1cd5198552c3c4baf",
+    "captured_at_utc": "2026-09-13T13:40:21.083497Z"
+  },
+  {
+    "source_relative_path": "frontend/src/constants/discovery.js",
+    "snapshot_relative_path": "source/frontend/src/constants/discovery.js",
+    "category": "reserve-pattern-reference",
+    "bytes": 1390,
+    "sha256": "0095f91cefcca2eed546619167ba42bba17cc21d3c1621cbe34c1cac64cccacc",
+    "captured_at_utc": "2026-09-13T13:40:17.7353495Z"
+  },
+  {
+    "source_relative_path": "frontend/src/constants/pagination.js",
+    "snapshot_relative_path": "source/frontend/src/constants/pagination.js",
+    "category": "generic-ui-helper",
+    "bytes": 86,
+    "sha256": "6b05ddfffa0260279aa3a395619aa73f505f80bfdc3e1036c3c675830048f845",
+    "captured_at_utc": "2026-09-13T13:40:17.6761484Z"
+  },
+  {
+    "source_relative_path": "frontend/src/constants/roles.js",
+    "snapshot_relative_path": "source/frontend/src/constants/roles.js",
+    "category": "reserve-pattern-reference",
+    "bytes": 623,
+    "sha256": "f6f38ef7ebff88e7ab38b8bbc8bf60e08617266e0af307d4bb16b255d91233d0",
+    "captured_at_utc": "2026-09-13T13:40:17.8315278Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/__tests__/useGoBack.test.jsx",
+    "snapshot_relative_path": "source/frontend/src/hooks/__tests__/useGoBack.test.jsx",
+    "category": "shared-ui-hook",
+    "bytes": 2294,
+    "sha256": "ba89f5d0273db821b6d874b117ff63540ed40f1b35aaa76787e612e1405469d9",
+    "captured_at_utc": "2026-09-13T13:40:17.4601248Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/queryKeys.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/queryKeys.js",
+    "category": "reserve-pattern-reference",
+    "bytes": 3450,
+    "sha256": "2d1745a8928b660f28342d1ef17c386b9049b99664294f3e416e5d8129a75572",
+    "captured_at_utc": "2026-09-13T13:40:17.8547302Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useDebounce.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useDebounce.js",
+    "category": "shared-ui-hook",
+    "bytes": 938,
+    "sha256": "ed4e22c6a649150b14e35eb918b6ab7938750a781a9712ff00648080c9289485",
+    "captured_at_utc": "2026-09-13T13:40:17.2704549Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useExitAnimation.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useExitAnimation.js",
+    "category": "shared-ui-hook",
+    "bytes": 3324,
+    "sha256": "fe4736f65550fc6f963c3f2adcd959eb2c9870b5844f73197b5cce75070c3461",
+    "captured_at_utc": "2026-09-13T13:40:17.0958998Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useFormErrors.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useFormErrors.js",
+    "category": "shared-ui-hook",
+    "bytes": 1814,
+    "sha256": "768cb2696bac2eb80bc3cd9de55a091fffa26fd30bf83a1996a107610cdf39e4",
+    "captured_at_utc": "2026-09-13T13:40:17.2442233Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useFormReady.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useFormReady.js",
+    "category": "shared-ui-hook",
+    "bytes": 661,
+    "sha256": "6ca133977987fe9eaa063caa6ddf2421df943a326382f90ceb4f6d8b61ef9800",
+    "captured_at_utc": "2026-09-13T13:40:17.2052308Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useGoBack.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useGoBack.js",
+    "category": "shared-ui-hook",
+    "bytes": 2537,
+    "sha256": "b8ba022cc03875f7f18ebea2be2505fbd4972ae82281d966b3659f1ec258da18",
+    "captured_at_utc": "2026-09-13T13:40:17.3244921Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useImagePreview.jsx",
+    "snapshot_relative_path": "source/frontend/src/hooks/useImagePreview.jsx",
+    "category": "shared-ui-hook",
+    "bytes": 11765,
+    "sha256": "e983bcb67102c6824255634ccdd743ec7c4cd77aa32c22e4df1b9956f6f9ec3b",
+    "captured_at_utc": "2026-09-13T13:40:17.1253426Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useImagePreviewSwipe.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useImagePreviewSwipe.js",
+    "category": "shared-ui-hook",
+    "bytes": 5155,
+    "sha256": "42ef0b0252bffcc63233194b124239b2c2645f2e7119d3b89716122b7232af12",
+    "captured_at_utc": "2026-09-13T13:40:17.1648466Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useMessage.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useMessage.js",
+    "category": "shared-ui-hook",
+    "bytes": 3826,
+    "sha256": "cd0ef30c96ec1e7deff6667614765a31eedca9f8d82d94448fb9ec7dd4ff4b7f",
+    "captured_at_utc": "2026-09-13T13:40:16.8957354Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useOnlineStatus.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useOnlineStatus.js",
+    "category": "shared-ui-hook",
+    "bytes": 1444,
+    "sha256": "e6a944c15ab3a5d968a04f98b6add088dd925cf35d691cf943052e7aef0f01c9",
+    "captured_at_utc": "2026-09-13T13:40:17.2991695Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useQueryParamState.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useQueryParamState.js",
+    "category": "shared-ui-hook",
+    "bytes": 3514,
+    "sha256": "b55da48c4a82e6951b504a04172f31cb63db1e51d969aec693671503ce849419",
+    "captured_at_utc": "2026-09-13T13:40:17.3767579Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useReducedMotion.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useReducedMotion.js",
+    "category": "shared-ui-hook",
+    "bytes": 856,
+    "sha256": "d6b3adf786f328cacf1fecafa623d2e63ec365f0b13ff1086c88a130d252e4e2",
+    "captured_at_utc": "2026-09-13T13:40:16.979457Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useTheme.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useTheme.js",
+    "category": "shared-ui-hook",
+    "bytes": 12329,
+    "sha256": "2e9e3a0ca4453b0fee972a4c4ced6e658f3695ef459f3264b423d92499fdb749",
+    "captured_at_utc": "2026-09-13T13:40:17.0417066Z"
+  },
+  {
+    "source_relative_path": "frontend/src/hooks/useWindowWidth.js",
+    "snapshot_relative_path": "source/frontend/src/hooks/useWindowWidth.js",
+    "category": "shared-ui-hook",
+    "bytes": 922,
+    "sha256": "58936b14adc876380fa7bf84bc4d67f90319a3426a919b6da831843db79e0ecf",
+    "captured_at_utc": "2026-09-13T13:40:17.0005877Z"
+  },
+  {
+    "source_relative_path": "frontend/src/index.css",
+    "snapshot_relative_path": "source/frontend/src/index.css",
+    "category": "core-style-entry",
+    "bytes": 424,
+    "sha256": "00e45ca6c5e94f840a6ee054f658fcd35f8c65788bd5045734856c047f1f162a",
+    "captured_at_utc": "2026-09-13T13:34:52.4987139Z"
+  },
+  {
+    "source_relative_path": "frontend/src/main.jsx",
+    "snapshot_relative_path": "source/frontend/src/main.jsx",
+    "category": "integration-reference-not-entrypoint",
+    "bytes": 1099,
+    "sha256": "e3b4b77f0e0e19ebc198f4b8d98435a813cce5e5415750152d796b5bbabfa043",
+    "captured_at_utc": "2026-09-13T13:40:17.9781393Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/global/components-and-forms.css",
+    "snapshot_relative_path": "source/frontend/src/styles/global/components-and-forms.css",
+    "category": "mixed-global-style",
+    "bytes": 24403,
+    "sha256": "81caaa2ddf1296def898f157a0c51fd6fd63738ab8539d31e46c12072233a16a",
+    "captured_at_utc": "2026-09-13T13:34:52.6506913Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/global/feature-surfaces.css",
+    "snapshot_relative_path": "source/frontend/src/styles/global/feature-surfaces.css",
+    "category": "mixed-global-style",
+    "bytes": 76247,
+    "sha256": "5426ee504e9c54ac8e94939d837f73a2108043e53d00d2601ac4504362ebe37d",
+    "captured_at_utc": "2026-09-13T13:34:52.7190453Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/global/foundation.css",
+    "snapshot_relative_path": "source/frontend/src/styles/global/foundation.css",
+    "category": "mixed-global-style",
+    "bytes": 10668,
+    "sha256": "b56dc431f054dae0336ca0bd544188b3f67116c26fd3fc89a59ab1d00ff4ea6c",
+    "captured_at_utc": "2026-09-13T13:34:52.566004Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/global/interactions.css",
+    "snapshot_relative_path": "source/frontend/src/styles/global/interactions.css",
+    "category": "mixed-global-style",
+    "bytes": 44449,
+    "sha256": "f2d9c93d36f47b855c5603080dd5cb0855632cfa53fd1b0cf87c3e94c0c11dea",
+    "captured_at_utc": "2026-09-13T13:34:52.6024571Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/global/navigation-and-media.css",
+    "snapshot_relative_path": "source/frontend/src/styles/global/navigation-and-media.css",
+    "category": "mixed-global-style",
+    "bytes": 20379,
+    "sha256": "70b4b5936cae09509c9a567a747ff3820d85d03437c2751562fe0c295e6eaccf",
+    "captured_at_utc": "2026-09-13T13:34:52.6816401Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/theme.css",
+    "snapshot_relative_path": "source/frontend/src/styles/theme.css",
+    "category": "mixed-global-style",
+    "bytes": 6823,
+    "sha256": "2d93868b591b7ef1c0d014e9e05a320cc15518a490cc0d474fd20ceb4309648b",
+    "captured_at_utc": "2026-09-13T13:34:52.5271171Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/agreement.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/agreement.js",
+    "category": "core-token",
+    "bytes": 2063,
+    "sha256": "2f0eb0c796644ee3cbab71c0c826a61dc111c497ef1820c638bf8f3d71c47eba",
+    "captured_at_utc": "2026-09-13T13:40:18.8856364Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/animations.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/animations.js",
+    "category": "core-token",
+    "bytes": 675,
+    "sha256": "9317698f982c200ddffc7a6290a7fe6c2bdc225c5677a8dce48a8c2d7299dad7",
+    "captured_at_utc": "2026-09-13T13:40:18.9119552Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/breakpoints.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/breakpoints.js",
+    "category": "core-token",
+    "bytes": 1571,
+    "sha256": "2e12e48632d0334ef990a45579b7d0d6b89e92947d9d57a5db6cbf544103aeea",
+    "captured_at_utc": "2026-09-13T13:40:18.9530965Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/chart.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/chart.js",
+    "category": "core-token",
+    "bytes": 2841,
+    "sha256": "9585a62f2b6ca6700581b5873201afa5b2a3bdf3fbfe641614894ff030af8294",
+    "captured_at_utc": "2026-09-13T13:40:18.9986092Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/colors.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/colors.js",
+    "category": "core-token",
+    "bytes": 5789,
+    "sha256": "c2f104cba17dff47c03903f1f1419223430cda9ee7f198f70abb8d639b6c856d",
+    "captured_at_utc": "2026-09-13T13:40:19.0272544Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/field.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/field.js",
+    "category": "core-token",
+    "bytes": 2959,
+    "sha256": "9f6e67abe101fd432f52c4d8152c9e7674558bc19e6b6e4c1b76d13ef1d4e6a1",
+    "captured_at_utc": "2026-09-13T13:40:19.0531483Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/index.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/index.js",
+    "category": "core-token",
+    "bytes": 284,
+    "sha256": "11939ac96dfbe86ca03fd99c1a0eeae520b6cb10d0aec7054eddcea5439b4ef5",
+    "captured_at_utc": "2026-09-13T13:40:19.0799985Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/spacing.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/spacing.js",
+    "category": "core-token",
+    "bytes": 1208,
+    "sha256": "c10f901d3479f8701197b601e60200ed8336d2cf334a3e6c5670d68118f37b12",
+    "captured_at_utc": "2026-09-13T13:40:19.1560798Z"
+  },
+  {
+    "source_relative_path": "frontend/src/styles/tokens/typography.js",
+    "snapshot_relative_path": "source/frontend/src/styles/tokens/typography.js",
+    "category": "core-token",
+    "bytes": 586,
+    "sha256": "bcc8005d0cc67ba5f156c351062d4ea4f53fd29940f3f7dd0d275e741522b061",
+    "captured_at_utc": "2026-09-13T13:40:19.2137803Z"
+  },
+  {
+    "source_relative_path": "frontend/src/test/setup.js",
+    "snapshot_relative_path": "source/frontend/src/test/setup.js",
+    "category": "integration-reference-not-entrypoint",
+    "bytes": 768,
+    "sha256": "a862bdfadb1aed5e9db33f809260205f073be307ec778b6eb3525bae33025fad",
+    "captured_at_utc": "2026-09-13T13:40:18.0863754Z"
+  },
+  {
+    "source_relative_path": "frontend/src/utils/form.js",
+    "snapshot_relative_path": "source/frontend/src/utils/form.js",
+    "category": "generic-ui-helper",
+    "bytes": 6530,
+    "sha256": "8d210807a3602cd8ed76c439b6444c11462596f647e6c9bb31aad8409ecee4c1",
+    "captured_at_utc": "2026-09-13T13:40:17.639099Z"
+  },
+  {
+    "source_relative_path": "frontend/src/utils/image.js",
+    "snapshot_relative_path": "source/frontend/src/utils/image.js",
+    "category": "generic-adapter-needed",
+    "bytes": 1266,
+    "sha256": "d04ae3bcf7927ef26dfbc2bd1fe443e2ca805eefe43ad09b7f9e1d4324b24c84",
+    "captured_at_utc": "2026-09-13T13:40:17.5187716Z"
+  },
+  {
+    "source_relative_path": "frontend/src/utils/validation.js",
+    "snapshot_relative_path": "source/frontend/src/utils/validation.js",
+    "category": "generic-ui-helper",
+    "bytes": 11737,
+    "sha256": "1346d742dd1f6efcd9a38e12d4e538ed75d2fb399f4149a3119ddb0e1a178ced",
+    "captured_at_utc": "2026-09-13T13:40:17.5622674Z"
+  },
+  {
+    "source_relative_path": "frontend/vite.config.js",
+    "snapshot_relative_path": "source/frontend/vite.config.js",
+    "category": "integration-reference-not-entrypoint",
+    "bytes": 1768,
+    "sha256": "771788d61d878d9493f7d268c94436088f664fc692458a22cd566d5f9ec71fd6",
+    "captured_at_utc": "2026-09-13T13:40:18.0036693Z"
+  },
+  {
+    "source_relative_path": "scripts/design-system-snapshot.ps1",
+    "snapshot_relative_path": "source/scripts/design-system-snapshot.ps1",
+    "category": "reproduction-script",
+    "bytes": 17022,
+    "sha256": "a47442122a50be8fbffc6132b2e0e4321ea26236af93025cb7e456c303a31427",
+    "captured_at_utc": "2026-09-13T13:40:18.7356921Z"
+  },
+  {
+    "source_relative_path": "THIRD_PARTY_NOTICES.md",
+    "snapshot_relative_path": "source/THIRD_PARTY_NOTICES.md",
+    "category": "dependency-and-rule-reference",
+    "bytes": 1798,
+    "sha256": "b162ed51b14b35bdd64fb6e327dd8390d6802aeb6913783973cea10a1ffcc8ff",
+    "captured_at_utc": "2026-09-13T13:40:18.3367075Z"
+  }
+]

@@ -22,6 +22,3 @@
 *.java text eol=lf
 *.gradle text eol=lf
 *.properties text eol=lf
-
-# 불변 증거는 ZIP/manifest와 바이트가 같아야 하므로 원래 줄바꿈도 보존한다.
-docs/design-system/snapshots/** -text -eol

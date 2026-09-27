@@ -1,0 +1,3039 @@
+{
+  "method": "static-import-export-regex-not-runtime-or-complete-module-graph",
+  "edges": [
+    {
+      "source": "frontend/eslint.config.js",
+      "specifier": "@eslint/js",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/eslint.config.js",
+      "specifier": "globals",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/eslint.config.js",
+      "specifier": "eslint-plugin-react-hooks",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/eslint.config.js",
+      "specifier": "eslint-plugin-react-refresh",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/eslint.config.js",
+      "specifier": "eslint/config",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/eslint.config.js",
+      "specifier": "./scripts/eslint-reserve-rules.mjs",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/scripts/eslint-reserve-rules.mjs",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/common/SessionQueryProvider",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/SessionQueryProvider.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "antd/locale/ko_KR",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./hooks/useTheme",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useTheme.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./hooks/useImagePreviewSwipe",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useImagePreviewSwipe.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./hooks/useRouteSeo",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useRouteSeo.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/Home",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/Home/index.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/Search",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/Search/index.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/discovery/ComingSoon",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/discovery/ComingSoon.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/Login",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/Login.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/Signup",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/Signup.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/ForgotPassword",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/ForgotPassword.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/OAuthCallback",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/OAuthCallback.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreList",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreList.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreDetail",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreDetail.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreRegister",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreRegister.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreEdit",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreEdit.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/MyStores",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/MyStores.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/reservation/MyReservations",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/reservation/MyReservations.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/business/BusinessPanel",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/business/BusinessPanel.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/member/MyPage",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/member/MyPage.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/favorite/MyFavorites",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/favorite/MyFavorites.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/payment/PaymentResult",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/payment/PaymentResult.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/admin/AdminPanel",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/admin/AdminPanel.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/legal/Terms",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/legal/Terms.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/SocialAgreement",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/SocialAgreement.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/legal/Privacy",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/legal/Privacy.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/member/MessagesPage",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/member/MessagesPage.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/chat/MessengerShell",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/chat/MessengerShell.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/layout/Header",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/layout/Header.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/layout/DiscoveryNav",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/layout/DiscoveryNav.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./constants/discovery",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/discovery.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/layout/Footer",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/layout/Footer.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/layout/OfflineBanner",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/layout/OfflineBanner.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/common/Loading",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Loading.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/PrivateRoute",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/PrivateRoute.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/ScrollToTop",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/ScrollToTop.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Button.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Button.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Button.test.jsx",
+      "specifier": "@testing-library/user-event",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Button.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Button.test.jsx",
+      "specifier": "../Button",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Button.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Card.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Card.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Card.test.jsx",
+      "specifier": "@testing-library/user-event",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Card.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Card.test.jsx",
+      "specifier": "../Card",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Card.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/Card.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "specifier": "@testing-library/user-event",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "specifier": "dayjs",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "specifier": "../FormDatePicker",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormDatePicker.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormDatePicker.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormInput.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormInput.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormInput.test.jsx",
+      "specifier": "@testing-library/user-event",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormInput.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormInput.test.jsx",
+      "specifier": "../FormInput",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormInput.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/FormInput.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+      "specifier": "@tanstack/react-query",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/__tests__/SessionQueryProvider.test.jsx",
+      "specifier": "../SessionQueryProvider",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/SessionQueryProvider.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Avatar.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Avatar.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Avatar.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Avatar.jsx",
+      "specifier": "../../utils/image",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/utils/image.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Avatar.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Badge.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Badge.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Badge.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Button.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Button.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Button.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Card.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Card.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Card.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Card.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ChartCard.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ChartCard.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ChartCard.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ChartCard.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ChartCard.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ChartCard.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ChartCard.test.jsx",
+      "specifier": "./ChartCard",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/ChartCard.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/DataTable.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/DataTable.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/DataTable.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/DataTable.jsx",
+      "specifier": "../../hooks/useWindowWidth",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useWindowWidth.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/DataTable.jsx",
+      "specifier": "../../constants/pagination",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/pagination.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "@tanstack/react-query",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../services/favoriteService",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/services/favoriteService.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../hooks",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../hooks/queryKeys",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/queryKeys.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterMenu.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterMenu.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterMenu.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterMenu.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterSelect.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterSelect.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterSelect.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "./FilterSelect",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FilterSelect.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "./RefreshButton",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/RefreshButton.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "../../hooks",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormDatePicker.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormDatePicker.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormDatePicker.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormDatePicker.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormDatePicker.jsx",
+      "specifier": "dayjs",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormDatePicker.jsx",
+      "specifier": "./Button",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Button.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormDatePicker.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormInput.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormInput.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormInput.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormInput.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormInput.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormModal.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormModal.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormModal.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormModal.jsx",
+      "specifier": "./Button",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Button.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormModal.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormSelect.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormSelect.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormSelect.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTextArea.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTextArea.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTextArea.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTextArea.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTimePicker.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTimePicker.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTimePicker.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTimePicker.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTimePicker.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/FormTimePicker.jsx",
+      "specifier": "./pickerSuffix",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/pickerSuffix.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ImagePreviewPortal.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ImagePreviewPortal.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ImagePreviewPortal.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "../components/common",
+      "kind": "relative",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./Loading",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Loading.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./ModalLoading",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/ModalLoading.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./Button",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Button.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./Badge",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Badge.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FormInput",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormInput.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FormTextArea",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormTextArea.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FormSelect",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormSelect.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FilterSelect",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FilterSelect.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FilterMenu",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FilterMenu.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FormDatePicker",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormDatePicker.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FormTimePicker",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormTimePicker.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./PageContainer",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/PageContainer.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./Card",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Card.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./Avatar",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Avatar.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./Skeletons",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Skeletons.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./KakaoMap",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/KakaoMap.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FavoriteButton",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FavoriteButton.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FilterToolbar",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FilterToolbar.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./InquiryModal",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/InquiryModal.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./FormModal",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormModal.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./SegmentedControl",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/SegmentedControl.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./SegmentedGrid",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/SegmentedGrid.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./DataTable",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/DataTable.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./StatCard",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/StatCard.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./ChartCard",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/ChartCard.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./PieLegend",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/PieLegend.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./UnreadPill",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/UnreadPill.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "./RefreshButton",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/RefreshButton.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "./FormModal",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormModal.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "./FormInput",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormInput.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "./FormTextArea",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/FormTextArea.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "./SegmentedGrid",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/SegmentedGrid.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../hooks",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../api/axios",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/api/axios.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../constants",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../utils/validation",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/utils/validation.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.jsx",
+      "specifier": "./kakaoMapOverlay",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/kakaoMapOverlay.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.jsx",
+      "specifier": "./Skeletons",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Skeletons.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/KakaoMap.test.jsx",
+      "specifier": "./kakaoMapOverlay",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/kakaoMapOverlay.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Loading.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Loading.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Loading.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ModalLoading.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ModalLoading.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ModalLoading.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ModalLoading.jsx",
+      "specifier": "./Loading",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Loading.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/ModalLoading.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/PageContainer.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/PageContainer.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/PageContainer.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/pickerSuffix.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/pickerSuffix.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/PieLegend.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/PieLegend.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/PieLegend.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/PieLegend.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/RefreshButton.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/RefreshButton.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/RefreshButton.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/RefreshButton.jsx",
+      "specifier": "./Button",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Button.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/SegmentedControl.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/SegmentedControl.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/SegmentedGrid.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/SegmentedGrid.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/SessionQueryProvider.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/SessionQueryProvider.jsx",
+      "specifier": "@tanstack/react-query",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Skeletons.jsx",
+      "specifier": "../components/common",
+      "kind": "relative",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/Skeletons.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Skeletons.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Skeletons.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/Skeletons.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/StatCard.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/StatCard.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/StatCard.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/StatCard.jsx",
+      "specifier": "./Skeletons",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Skeletons.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/UnreadPill.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/UnreadPill.jsx",
+      "specifier": "prop-types",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/common/UnreadPill.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/DiscoveryNav.jsx",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/DiscoveryNav.jsx",
+      "specifier": "../../constants/discovery",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/discovery.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Footer.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Footer.jsx",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Footer.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Footer.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Footer.jsx",
+      "specifier": "../common/InquiryModal",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/InquiryModal.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "../../hooks/useReducedMotion",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useReducedMotion.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "../../hooks/useGoBack",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useGoBack.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "../../constants/discovery",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/discovery.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.jsx",
+      "specifier": "./HeaderAccountMenu",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.test.jsx",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/Header.test.jsx",
+      "specifier": "./Header",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/layout/Header.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../api/axios",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/api/axios.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../hooks/useMessage",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useMessage.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../constants",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../constants/roles",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/roles.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../common/Avatar",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/Avatar.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/OfflineBanner.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/OfflineBanner.jsx",
+      "specifier": "@ant-design/icons",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/OfflineBanner.jsx",
+      "specifier": "../../hooks/useOnlineStatus",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useOnlineStatus.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/components/layout/OfflineBanner.jsx",
+      "specifier": "../../styles/tokens",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/index.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/__tests__/useGoBack.test.jsx",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/__tests__/useGoBack.test.jsx",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/__tests__/useGoBack.test.jsx",
+      "specifier": "@testing-library/user-event",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/__tests__/useGoBack.test.jsx",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/__tests__/useGoBack.test.jsx",
+      "specifier": "../useGoBack",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useGoBack.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useDebounce.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useExitAnimation.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useFormErrors.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useFormReady.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useGoBack.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useGoBack.js",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useImagePreview.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useImagePreview.jsx",
+      "specifier": "../components/common/ImagePreviewPortal",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/common/ImagePreviewPortal.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useImagePreviewSwipe.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useMessage.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useMessage.js",
+      "specifier": "antd",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useOnlineStatus.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useQueryParamState.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useQueryParamState.js",
+      "specifier": "react-router-dom",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useReducedMotion.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useTheme.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/hooks/useWindowWidth.js",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/index.css",
+      "specifier": "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/index.css",
+      "specifier": "./styles/theme.css",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/theme.css",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/index.css",
+      "specifier": "./styles/global/foundation.css",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/global/foundation.css",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/index.css",
+      "specifier": "./styles/global/navigation-and-media.css",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/global/navigation-and-media.css",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/index.css",
+      "specifier": "./styles/global/components-and-forms.css",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/global/components-and-forms.css",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/index.css",
+      "specifier": "./styles/global/interactions.css",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/global/interactions.css",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/index.css",
+      "specifier": "./styles/global/feature-surfaces.css",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/global/feature-surfaces.css",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/main.jsx",
+      "specifier": "react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/main.jsx",
+      "specifier": "react-dom/client",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/main.jsx",
+      "specifier": "@sentry/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/main.jsx",
+      "specifier": "./index.css",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/index.css",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/main.jsx",
+      "specifier": "./App.jsx",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/App.jsx",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/main.jsx",
+      "specifier": "./hooks/useTheme",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useTheme.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/agreement.js",
+      "specifier": "./colors",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/colors.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/agreement.js",
+      "specifier": "./typography",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/typography.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/chart.js",
+      "specifier": "./colors",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/colors.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/field.js",
+      "specifier": "./spacing",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/spacing.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/field.js",
+      "specifier": "./colors",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/colors.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./colors",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/colors.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./breakpoints",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/breakpoints.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./typography",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/typography.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./spacing",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/spacing.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./animations",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/animations.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./chart",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/chart.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./agreement",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/agreement.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/styles/tokens/index.js",
+      "specifier": "./field",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/styles/tokens/field.js",
+      "included_in_snapshot": true,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/test/setup.js",
+      "specifier": "@testing-library/jest-dom/vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/test/setup.js",
+      "specifier": "@testing-library/react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/test/setup.js",
+      "specifier": "vitest",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/src/utils/image.js",
+      "specifier": "../constants/api",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/api.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/utils/validation.js",
+      "specifier": "@/utils/validation",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/vite.config.js",
+      "specifier": "vite",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    },
+    {
+      "source": "frontend/vite.config.js",
+      "specifier": "@vitejs/plugin-react",
+      "kind": "external-package",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": ""
+    }
+  ],
+  "omitted_relative_edges": [
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./hooks/useRouteSeo",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/useRouteSeo.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/Home",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/Home/index.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/Search",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/Search/index.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/discovery/ComingSoon",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/discovery/ComingSoon.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/Login",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/Login.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/Signup",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/Signup.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/ForgotPassword",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/ForgotPassword.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/OAuthCallback",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/OAuthCallback.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreList",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreList.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreDetail",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreDetail.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreRegister",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreRegister.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/StoreEdit",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/StoreEdit.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/store/MyStores",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/store/MyStores.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/reservation/MyReservations",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/reservation/MyReservations.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/business/BusinessPanel",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/business/BusinessPanel.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/member/MyPage",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/member/MyPage.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/favorite/MyFavorites",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/favorite/MyFavorites.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/payment/PaymentResult",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/payment/PaymentResult.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/admin/AdminPanel",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/admin/AdminPanel.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/legal/Terms",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/legal/Terms.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/auth/SocialAgreement",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/auth/SocialAgreement.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/legal/Privacy",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/legal/Privacy.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./pages/member/MessagesPage",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/pages/member/MessagesPage.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/chat/MessengerShell",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/chat/MessengerShell.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/PrivateRoute",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/PrivateRoute.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/App.jsx",
+      "specifier": "./components/ScrollToTop",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/components/ScrollToTop.jsx",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../services/favoriteService",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/services/favoriteService.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FavoriteButton.jsx",
+      "specifier": "../../hooks",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/FilterToolbar.jsx",
+      "specifier": "../../hooks",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/index.js",
+      "specifier": "../components/common",
+      "kind": "relative",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../hooks",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/hooks/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../api/axios",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/api/axios.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/InquiryModal.jsx",
+      "specifier": "../../constants",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/common/Skeletons.jsx",
+      "specifier": "../components/common",
+      "kind": "relative",
+      "resolved_source_relative_path": null,
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../api/axios",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/api/axios.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../store/useAuthStore",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/store/useAuthStore.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/components/layout/HeaderAccountMenu.jsx",
+      "specifier": "../../constants",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/index.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    },
+    {
+      "source": "frontend/src/utils/image.js",
+      "specifier": "../constants/api",
+      "kind": "relative",
+      "resolved_source_relative_path": "frontend/src/constants/api.js",
+      "included_in_snapshot": false,
+      "note": "Adapter or app implementation intentionally not preserved; not a runnable-package claim."
+    }
+  ]
+}

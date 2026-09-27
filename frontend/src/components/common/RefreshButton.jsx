@@ -35,7 +35,7 @@ const RefreshButton = ({ onReload, loading = false, label = '새로고침', styl
             style={{ flexShrink: 0, ...style }}
             {...rest}
         >
-            <SyncOutlined spin={loading} />
+            <SyncOutlined spin={loading} aria-hidden="true" />
             {label ? ` ${label}` : null}
         </Button>
     );

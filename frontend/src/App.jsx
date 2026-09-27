@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 import SessionQueryProvider from './components/common/SessionQueryProvider';
 import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore';
-import { colors, rawColors, field, fieldPx } from './styles/tokens';
+import { colors, rawColors, field, fieldPx, zIndex } from './styles/tokens';
 import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
 import useRouteSeo from './hooks/useRouteSeo';
@@ -14,6 +14,10 @@ import useRouteSeo from './hooks/useRouteSeo';
 // 각 페이지 청크를 처음 방문할 때만 다운로드하도록 함(초기 번들 크기 감소). Header/Footer/
 // OfflineBanner는 항상 필요하므로 정적 import 유지.
 const Home = lazy(() => import('./pages/Home'));
+const SearchPage = lazy(() => import('./pages/Search'));
+const DiscoveryComingSoon = lazy(() => import('./pages/discovery/ComingSoon'));
+const Benefits = lazy(() => import('./pages/discovery/Benefits'));
+const BenefitDetail = lazy(() => import('./pages/discovery/BenefitDetail'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const Signup = lazy(() => import('./pages/auth/Signup'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
@@ -32,14 +36,20 @@ const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 const Terms = lazy(() => import('./pages/legal/Terms'));
 const SocialAgreement = lazy(() => import('./pages/auth/SocialAgreement'));
 const Privacy = lazy(() => import('./pages/legal/Privacy'));
-// 로그인한 사용자만 쓰는 채팅 UI는 익명 랜딩의 초기 번들에서 제외한다.
-// 인증 초기화가 끝난 뒤 필요한 경우에만 별도 청크를 받아오며, 패널 자체의 폴링 규칙은 유지한다.
-const ChatLauncher = lazy(() => import('./components/chat/ChatLauncher'));
+const ContentSources = lazy(() => import('./pages/legal/ContentSources'));
+const OperationGuide = lazy(() => import('./pages/legal/OperationGuide'));
+const MessagesPage = lazy(() => import('./pages/member/MessagesPage'));
+// 로그인한 사용자만 쓰는 통합 메신저는 익명 랜딩의 초기 번들에서 제외한다.
+const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
 
 import Header from './components/layout/Header';
+import DiscoveryNav from './components/layout/DiscoveryNav';
+import RouteLoadingSkeleton from './components/layout/RouteLoadingSkeleton';
+import { getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
+import { DISCOVERY_NAV_ITEMS, isDiscoveryRootPath } from './constants/discovery';
 import AppFooter from './components/layout/Footer';
 import OfflineBanner from './components/layout/OfflineBanner';
-import Loading, { SpinIndicator } from './components/common/Loading';
+import { SpinIndicator } from './components/common/Loading';
 import PrivateRoute from './components/PrivateRoute';
 import ScrollToTop from './components/ScrollToTop';
 
@@ -85,6 +95,9 @@ const buildThemeConfig = (isDark, accent) => ({
         colorBgContainer: isDark ? '#1e2126' : '#ffffff',
         colorBorder: isDark ? '#2d3138' : rawColors.gray[100],
         borderRadius: fieldPx(field.radius),
+        // 앱 고정 UI(헤더 1000, 메신저 1001)보다 모달이 위에 있어야 결제·폼 동작을 가리지 않는다.
+        // spacing.js의 레이어 정본을 AntD popup 관문에 연결한다.
+        zIndexPopupBase: zIndex.modal,
         // 2026-08-04 — AntD 기본 에러색(#ff4d4f)과 이 프로젝트 색(#f04452)이 달라서
         // "AntD Form.Item 이 그린 빨강"과 "FormField 가 그린 빨강"이 미묘하게 다른 색이었다.
         // 여기서 한 번 맞추면 Form 검증 메시지·에러 상태 테두리·경고 아이콘까지 전부 따라온다.
@@ -170,29 +183,92 @@ function AppContent() {
         initAuth();
     }, [initializeAuth]);
 
-    if (loading) return <Loading fullPage />;
+    // 로그인 확인 중에도 빈 화면 + 스피너 대신 헤더 자리와 그 페이지 모양의 스켈레톤을 바로 그린다(2026-09-24).
+    // 진짜 헤더·메신저는 확인이 끝난 뒤 그린다 — 확인 전에 그들이 API 를 부르면 토큰 재발급이 겹칠 수 있다.
+    if (loading) {
+        return (
+            <div className="reserve-boot-shell">
+                <div className="reserve-boot-shell-header" aria-hidden="true" />
+                <RouteLoadingSkeleton />
+            </div>
+        );
+    }
 
     return (
-        <SessionQueryProvider key={sessionRevision}>
-            <AntApp message={{ maxCount: 3 }}><AppRoutes /></AntApp>
-        </SessionQueryProvider>
+        <AntApp message={{ maxCount: 3 }}>
+            <SessionQueryProvider key={sessionRevision}>
+                <AppRoutes />
+            </SessionQueryProvider>
+        </AntApp>
     );
 }
 
 function AppRoutes() {
     const isLoggedIn = useAuthStore((state) => !!state.user);
+    const { pathname, search, state: locationState } = useLocation();
+    const navigationType = useNavigationType();
+    const isSearchPage = /^\/search\/?$/.test(pathname);
+    const routeContentRef = useRef(null);
+    const previousPathnameRef = useRef(null);
+    const previousDiscoveryTabRef = useRef(null);
+    const previousHistoryIndexRef = useRef(null);
     useRouteSeo();
 
+    useLayoutEffect(() => {
+        const content = routeContentRef.current;
+        const normalizedPath = pathname.replace(/\/$/, '') || '/';
+        const currentTabIndex = isDiscoveryRootPath(pathname, search)
+            ? DISCOVERY_NAV_ITEMS.findIndex(item => item.to === normalizedPath)
+            : -1;
+        const previousPathname = previousPathnameRef.current;
+        const previousTabIndex = previousDiscoveryTabRef.current;
+        const historyIndex = getRouteHistoryIndex();
+        const resolvedRouteMotion = resolveRouteEntryMotion({
+            previousPathname,
+            pathname,
+            previousDiscoveryTabIndex: previousTabIndex,
+            currentDiscoveryTabIndex: currentTabIndex,
+            previousHistoryIndex: previousHistoryIndexRef.current,
+            historyIndex,
+            navigationType,
+            explicitDirection: locationState?.reserveRouteMotion,
+        });
+        // 검색은 헤더를 고정하는 전용 진입·닫힘 모션이 이미 있어, 부모 전환을 겹치지 않는다.
+        const routeMotion = isSearchPage ? null : resolvedRouteMotion;
+
+        if (content && previousPathname !== null && previousPathname !== pathname) {
+            // 헤더·탭은 정지한 채 도착한 화면만 움직인다. 같은 pathname의 필터·보기 전환은 제외한다.
+            content.classList.remove('reserve-route-entry--from-right', 'reserve-route-entry--from-left');
+            if (routeMotion) {
+                // 같은 방향을 연달아 재생할 때도 브라우저가 새 애니메이션으로 인식하게 한다.
+                content.getBoundingClientRect();
+                content.classList.add('reserve-route-entry--' + routeMotion);
+            }
+        }
+        previousPathnameRef.current = pathname;
+        previousDiscoveryTabRef.current = currentTabIndex;
+        previousHistoryIndexRef.current = historyIndex;
+    }, [pathname, search, locationState, navigationType, isSearchPage]);
+
     return (
-        <Layout style={{ minHeight: '100vh', backgroundColor: colors.background.default }}>
+        <Layout
+            className={pathname === '/' ? 'reserve-app-layout reserve-app-layout--home' : isSearchPage ? 'reserve-app-layout reserve-app-layout--search' : 'reserve-app-layout'}
+            style={{ minHeight: '100vh', backgroundColor: colors.background.default }}
+        >
             <ScrollToTop />
             <OfflineBanner />
-            <Header />
-            <Content>
-                <Suspense fallback={<Loading fullPage />}>
+            {!isSearchPage && <Header />}
+            {isDiscoveryRootPath(pathname, search) && <DiscoveryNav />}
+            <Content ref={routeContentRef}>
+                <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
                     {/* 공용 페이지 */}
                     <Route path="/" element={<Home />} />
+                    <Route path="/search" element={<SearchPage />} />
+                    <Route path="/benefits" element={<Benefits />} />
+                    <Route path="/benefits/:id" element={<BenefitDetail />} />
+                    <Route path="/waiting" element={<DiscoveryComingSoon />} />
+                    <Route path="/feed" element={<DiscoveryComingSoon />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -202,6 +278,8 @@ function AppRoutes() {
                     <Route path="/store/:id" element={<StoreDetail />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
+                    <Route path="/content-sources" element={<ContentSources />} />
+                    <Route path="/operation-guide" element={<OperationGuide />} />
 
                     {/* OWNER / ADMIN 전용 */}
                     <Route element={<PrivateRoute allowedRoles={['ADMIN', 'BUSINESS']} />}>
@@ -222,16 +300,17 @@ function AppRoutes() {
                         <Route path="/my-favorites" element={<MyFavorites />} />
                         <Route path="/payment/result" element={<PaymentResult />} />
                         <Route path="/my-page" element={<MyPage />} />
+                        <Route path="/messages" element={<MessagesPage />} />
                     </Route>
                 </Routes>
                 </Suspense>
             </Content>
 
-            <AppFooter />
+            {pathname !== '/messages' && !isSearchPage && <AppFooter />}
             {/* 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다. 익명 사용자는 청크도 받지 않는다. */}
             {isLoggedIn && (
                 <Suspense fallback={null}>
-                    <ChatLauncher />
+                    <MessengerShell launcherImageSrc="/icons/R_logo.png" />
                 </Suspense>
             )}
         </Layout>
@@ -262,7 +341,7 @@ function App() {
     );
 
     return (
-            <BrowserRouter>
+            <BrowserRouter useTransitions={false}>
                 <ConfigProvider
                     locale={koKR}
                     theme={themeConfig}

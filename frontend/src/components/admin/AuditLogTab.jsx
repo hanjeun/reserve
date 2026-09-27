@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Typography, Tag } from 'antd';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
-import { useMessage, useQueryParamsState } from '../../hooks';
+import { FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
+import { useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -91,12 +91,11 @@ const skeletonRowCount = (total, pageIdx, pageSize) => {
  * 새로고침해도 유지되고 링크 공유도 가능해짐(MembersTab 등과 동일한 이유).
  */
 const AuditLogTab = () => {
-    const { message } = useMessage();
     const [{ type: typeFilter, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
     const page = Number(pageStr) || 0;
     const setPage = (p) => setQuery({ page: String(p) });
 
-    const { data, isLoading: loading, isFetching, error, refetch } = useQuery({
+    const { data, isLoading: loading, isFetching, isPlaceholderData, error, refetch } = useQuery({
         queryKey: [...adminKeys.auditLogs(), typeFilter, page],
         queryFn: async () => {
             const params = { page, size: PAGE_SIZE };
@@ -109,9 +108,6 @@ const AuditLogTab = () => {
         },
         placeholderData: keepPreviousData,
     });
-    useEffect(() => {
-        if (error) message.error('시스템 로그를 불러오지 못했습니다.');
-    }, [error, message]);
     const logs = data?.logs ?? [];
     const totalElements = data?.totalElements ?? 0;
 
@@ -176,7 +172,7 @@ const AuditLogTab = () => {
                 }]}
                 count={totalElements}
                 onReload={refetch}
-                loading={loading}
+                loading={loading || isFetching}
             />
 
             <div style={{
@@ -191,7 +187,10 @@ const AuditLogTab = () => {
                 소프트 삭제, 복구, 영구 삭제 등 관리자 행위가 기록됩니다. 로그는 90일 후 자동 삭제됩니다.
             </div>
 
-            {(loading || isFetching) ? (
+            {error ? (
+                <DataState state="error" subject="시스템 로그" error={error}
+                    onRetry={refetch} retrying={isFetching} compact />
+            ) : (loading || isPlaceholderData) ? (
                 <AdminTableSkeleton
                     rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}

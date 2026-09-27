@@ -44,7 +44,10 @@ describe('useGoBack', () => {
 
         await userEvent.click(getByRole('button', { name: '뒤로가기' }));
 
-        expect(navigateSpy).toHaveBeenCalledWith('/stores', { replace: true });
+        expect(navigateSpy).toHaveBeenCalledWith('/stores', {
+            replace: true,
+            state: { reserveRouteMotion: 'from-left' },
+        });
         expect(navigateSpy).not.toHaveBeenCalledWith(-1);
     });
 
@@ -54,6 +57,9 @@ describe('useGoBack', () => {
 
         await userEvent.click(getByRole('button', { name: '뒤로가기' }));
 
-        expect(navigateSpy).toHaveBeenCalledWith('/stores', { replace: true });
+        expect(navigateSpy).toHaveBeenCalledWith('/stores', {
+            replace: true,
+            state: { reserveRouteMotion: 'from-left' },
+        });
     });
 });

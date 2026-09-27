@@ -37,6 +37,7 @@ export const buildStoreFormData = (values) => {
     // 필수 필드
     fd.append('name',        values.name);
     fd.append('category',    values.category);
+    fd.append('serviceDomain', values.serviceDomain);
     fd.append('address',     values.address);
     fd.append('phone',       values.phone);
     fd.append('description', values.description || '');

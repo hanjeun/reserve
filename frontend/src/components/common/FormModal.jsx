@@ -24,7 +24,7 @@
  *   <FormField label="내용"><FormTextArea ... /></FormField>
  * </FormModal>
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Typography } from 'antd';
 import Button from './Button';
@@ -71,6 +71,7 @@ const FormModal = ({
     title,
     open,
     onClose,
+    onCancelAction,
     onSubmit,
     submitting = false,
     submitText = '보내기',
@@ -78,44 +79,62 @@ const FormModal = ({
     submitDisabled = false,
     width = 520,
     footer,
+    rootClassName,
+    scrollResetKey,
     children,
-}) => (
-    <Modal
-        title={<Text style={{ fontSize: fontSize.base, fontWeight: 700 }}>{title}</Text>}
-        open={open}
-        onCancel={onClose}
-        /* maskClosable={false}: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
-           컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
-           (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
-        maskClosable={false}
-        footer={
-            footer !== undefined ? footer : (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-                    {/* 취소 = 테두리 있는 outline (위 컨벤션 주석 참고) */}
-                    <Button variant="outline" size="sm" onClick={onClose} disabled={submitting}
-                        style={{ borderRadius: radius.xl, paddingLeft: 20, paddingRight: 20 }}>
-                        {cancelText}
-                    </Button>
-                    <Button variant="primary" size="sm" loading={submitting} disabled={submitDisabled} onClick={onSubmit}
-                        style={{ borderRadius: radius.xl, paddingLeft: 24, paddingRight: 24 }}>
-                        {submitText}
-                    </Button>
-                </div>
-            )
-        }
-        width={width}
-        centered
-    >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
-            {children}
-        </div>
-    </Modal>
-);
+}) => {
+    const contentRef = useRef(null);
+
+    /* 다단계 폼에서 본문만 바뀌면 AntD의 같은 .ant-modal-body 노드를 재사용한다.
+       이전 단계의 scrollTop까지 남겨두면 다음 단계 제목이 잘린 채 열린다. Modal에 key를 주면
+       닫힘 애니메이션이 깨지므로, 단계 키가 바뀔 때 공용 본문 스크롤만 되돌린다. */
+    useEffect(() => {
+        if (!open) return;
+        const modalBody = contentRef.current?.closest('.ant-modal-body');
+        if (modalBody) modalBody.scrollTop = 0;
+    }, [open, scrollResetKey]);
+
+    return (
+        <Modal
+            title={<Text style={{ fontSize: fontSize.base, fontWeight: 700 }}>{title}</Text>}
+            open={open}
+            onCancel={onClose}
+            rootClassName={rootClassName}
+            /* maskClosable={false}: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
+               컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
+               (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
+            maskClosable={false}
+            footer={
+                footer !== undefined ? footer : (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+                        {/* 취소 = 테두리 있는 outline (위 컨벤션 주석 참고) */}
+                        <Button variant="outline" size="sm" onClick={onCancelAction || onClose} disabled={submitting}
+                            style={{ borderRadius: radius.xl }}>
+                            {cancelText}
+                        </Button>
+                        <Button variant="primary" size="sm" loading={submitting} disabled={submitDisabled} onClick={onSubmit}
+                            style={{ borderRadius: radius.xl }}>
+                            {submitText}
+                        </Button>
+                    </div>
+                )
+            }
+            width={width}
+            centered
+        >
+            <div ref={contentRef} style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
+                {children}
+            </div>
+        </Modal>
+    );
+};
 
 FormModal.propTypes = {
     title: PropTypes.node,
     open: PropTypes.bool,
     onClose: PropTypes.func,
+    /** 닫기 X와 별개인 footer 보조 동작. 다단계 폼의 이전 버튼 등에 사용한다. */
+    onCancelAction: PropTypes.func,
     onSubmit: PropTypes.func,
     submitting: PropTypes.bool,
     submitText: PropTypes.string,
@@ -123,6 +142,9 @@ FormModal.propTypes = {
     submitDisabled: PropTypes.bool,
     width: PropTypes.number,
     footer: PropTypes.node,
+    rootClassName: PropTypes.string,
+    /** 값이 바뀌면 재사용 중인 모달 본문의 scrollTop을 0으로 되돌린다. */
+    scrollResetKey: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     children: PropTypes.node,
 };
 

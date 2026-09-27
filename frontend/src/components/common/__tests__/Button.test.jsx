@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { EyeOutlined } from '@ant-design/icons';
 import Button from '../Button';
 
 describe('Button', () => {
@@ -28,5 +29,10 @@ describe('Button', () => {
         expect(button).toHaveAttribute('aria-busy', 'true');
         await user.click(button);
         expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('keeps a labeled icon decorative in the button name', () => {
+        render(<Button icon={<EyeOutlined />}>상세보기</Button>);
+        expect(screen.getByRole('button', { name: '상세보기' })).toBeInTheDocument();
     });
 });

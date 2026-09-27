@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Typography, Tag } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { UndoOutlined } from '@ant-design/icons';
-import { Button, FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
+import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import { invalidateAdminData, invalidateReservationData, invalidateStoreData } from '../../hooks/invalidateAfterWrite';
@@ -37,8 +37,8 @@ const SnapshotChips = ({ value }) => {
 };
 
 /**
- * 2026-07-09: TanStack Query로 전환 — typeFilter가 서버 사이드 파라미터라 쿼리 키에 포함시킴
- * (adminKeys.trash() + typeFilter). placeholderData: keepPreviousData로 필터 변경 시에도
+ * 2026-07-09: TanStack Query로 전환 — typeFilter와 page가 서버 사이드 파라미터라 쿼리 키에 포함시킴.
+ * placeholderData: keepPreviousData로 필터·페이지 변경 시에도
  * 이전 실제 데이터가 유지되다가 교체되어 스켈레톤이 다시 뜨지 않음.
  *
  * 2026-07 버그 수정(1차): keepPreviousData 덕에 필터를 바꿔도 스켈레톤은 안 뜨지만, 그 대신
@@ -75,19 +75,21 @@ const TrashTab = () => {
     const page = Number(pageStr) || 1;
     const setPage = (p) => setQuery({ page: String(p) });
 
-    const { data: items = [], isLoading: loading, isFetching, error: itemsError, refetch } = useQuery({
-        queryKey: [...adminKeys.trash(), typeFilter],
+    const { data, isLoading: loading, isFetching, isPlaceholderData, error: itemsError, refetch } = useQuery({
+        queryKey: [...adminKeys.trash(), typeFilter, page],
         queryFn: async () => {
-            const params = { page: 0, size: 50 };
+            const params = { page: page - 1, size: PAGE_SIZE };
             if (typeFilter) params.type = typeFilter;
-            const data = await api.get(API_ENDPOINTS.TRASH.LIST, { params });
-            return data?.content ?? [];
+            const result = await api.get(API_ENDPOINTS.TRASH.LIST, { params });
+            return {
+                items: result?.content ?? [],
+                totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
+            };
         },
         placeholderData: keepPreviousData,
     });
-    useEffect(() => {
-        if (itemsError) message.error('휴지통 목록을 불러오지 못했습니다.');
-    }, [itemsError, message]);
+    const items = data?.items ?? [];
+    const totalElements = data?.totalElements ?? 0;
 
     // 복구된 항목은 휴지통에서 빠지고 원래 탭(회원·가게·예약 등)과 공개 화면에 다시 나타난다.
     const invalidateTrash = () => Promise.all([
@@ -157,7 +159,7 @@ const TrashTab = () => {
                     options: ENTITY_TYPE_OPTIONS,
                     width: 140,
                 }]}
-                count={items.length}
+                count={totalElements}
                 onReload={refetch}
                 loading={loading || isFetching}
             />
@@ -174,20 +176,23 @@ const TrashTab = () => {
                 소프트 삭제된 항목은 30일 후 자동으로 영구 삭제됩니다. 복구가 필요한 항목은 기간 내에 복구하세요.
             </div>
 
-            {(loading || isFetching) ? (
+            {itemsError ? (
+                <DataState state="error" subject="휴지통 목록" error={itemsError}
+                    onRetry={refetch} retrying={isFetching} compact />
+            ) : (loading || isPlaceholderData) ? (
                 <AdminTableSkeleton
-                    rows={skeletonRowCount(items.length, page, PAGE_SIZE)}
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}
                     headers={SKELETON_HEADERS}
                     actionBtns={1}
-                    pagination={items.length ? { current: page, pageSize: PAGE_SIZE, total: items.length } : null}
+                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
                 />
             ) : (
                 <DataTable
                     columns={columns}
                     dataSource={items}
                     rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: items.length, onChange: setPage }}
+                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
                     locale={{ emptyText: '휴지통에 항목이 없습니다.' }}
                 />
             )}

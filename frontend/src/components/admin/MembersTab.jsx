@@ -15,8 +15,7 @@
  * 2) AdminTableSkeleton에 실제 컬럼 제목(headers)과 실제 컬럼 너비(cols)를 넘김 —
  *    헤더는 고정 텍스트라 가릴 이유가 없고, cols가 없으면 기본 6칸이라 실제 7칸과 안 맞아
  *    로딩 종료 시 열이 재배치되며 화면이 튀었다.
- * 3) 로딩 조건을 다른 탭들과 동일하게 (isLoading || isFetching)으로 통일 —
- *    예전엔 members.length === 0 조건 때문에 새로고침 시엔 아무 로딩 신호도 없었다.
+ * 3) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고 수동 새로고침에는 기존 행을 유지.
  * 2026-08-09: ★ 페이지네이션·검색을 서버로 올렸다.
  *    예전에는 size: 100 을 하드코딩해 한 번에 받아온 뒤 그 배열을 filter 했다.
  *    그래서 **101번째 회원부터는 검색은커녕 목록에 뜨지도 않았다**.
@@ -30,11 +29,11 @@
  *    뒤에 실행된 페이지 갱신이 검색어 갱신을 덮어써 버리는 버그가 실제로 있었다(브라우저
  *    실측으로 확인). 반드시 하나의 setQuery({ search, page }) 호출로 묶어야 한다.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Typography, Tag, Tooltip } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PauseCircleOutlined, StopOutlined, UndoOutlined } from '@ant-design/icons';
-import { Button, FilterToolbar, AdminTableSkeleton, DataTable } from '../common';
+import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
 import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
@@ -100,7 +99,7 @@ const MembersTab = () => {
     const [banOpen, setBanOpen]               = useState(false);
 
     const {
-        data, isLoading: memberLoading, isFetching, error: membersError, refetch,
+        data, isLoading: memberLoading, isFetching, isPlaceholderData, error: membersError, refetch,
     } = useQuery({
         // ★ page·검색어가 쿼리키에 들어가야 한다. 서버가 페이지네이션·검색을 하므로
         //   이 둘이 바뀌면 결과가 달라진다 — 키에 없으면 이전 응답을 그대로 재사용해버린다.
@@ -124,9 +123,6 @@ const MembersTab = () => {
     });
     const members = data?.members ?? EMPTY_MEMBERS;
     const totalElements = data?.totalElements ?? 0;
-    useEffect(() => {
-        if (membersError) message.error('회원 목록을 불러오지 못했습니다.');
-    }, [membersError, message]);
 
     // 클라이언트 filter 는 제거했다 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
     // useDebounce 는 그대로 둔다. 이젠 "리렌더 억제"가 아니라 **타이핑 한 글자마다 서버를
@@ -224,7 +220,10 @@ const MembersTab = () => {
                 onReload={refetch}
                 loading={memberLoading || isFetching}
             />
-            {(memberLoading || isFetching) ? (
+            {membersError ? (
+                <DataState state="error" kind="member" subject="회원 목록" error={membersError}
+                    onRetry={refetch} retrying={isFetching} compact />
+            ) : (memberLoading || isPlaceholderData) ? (
                 <AdminTableSkeleton
                     rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
                     cols={SKELETON_COLS}

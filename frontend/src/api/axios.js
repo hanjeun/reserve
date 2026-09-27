@@ -86,7 +86,13 @@ instance.interceptors.request.use(
 instance.interceptors.response.use(
     (response) => {
         assertCurrentSession(response.config._sessionEpoch);
+        // DELETE/목록 조회가 정상적으로 204를 반환하면 본문 자체가 없다.
+        // 예전에는 아래 res.success 접근에서 TypeError가 나 정상 빈 결과를 네트워크 오류처럼 보였다.
+        if (response.status === 204) return null;
+        // 인증·세션 관문을 통과한 사진 다운로드만 binary 본문을 반환한다.
+        if (response.config.responseType === 'blob' && response.data instanceof Blob) return response.data;
         const res = response.data;
+        if (!res || typeof res !== 'object') throw new Error('서버 응답 형식을 확인할 수 없습니다.');
         if (res.success) return res.data;
         throw new Error(res.message ?? '요청에 실패했습니다.');
     },
@@ -100,6 +106,7 @@ instance.interceptors.response.use(
             error.response?.status === 401 &&
             originalRequest &&
             !originalRequest._retry &&
+            !originalRequest.skipAuthRefresh &&
             !originalRequest.url?.includes('/api/auth/refresh') &&
             !isAuthEndpoint(originalRequest.url)
         ) {

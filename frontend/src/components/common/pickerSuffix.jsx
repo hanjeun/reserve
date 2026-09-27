@@ -7,10 +7,9 @@
  *
  *     <EnvironmentOutlined style={{ color: selected ? primary.main : text.tertiary }} />
  *
- *   FormDatePicker·FormTimePicker 는 suffixIcon 을 아예 지정하지 않아 AntD 기본을 썼고,
- *   그래서 같은 폼 안에서 주소 아이콘만 파랗게 변하고 날짜·시간 아이콘은 회색으로 남았다.
- *   규칙을 컴포넌트 밖(주석·복붙)에 두면 반드시 새는 사례라, 함수 하나를 지나가게 만든다.
- *   → 새 선택기를 추가하는 사람은 이 함수를 쓰기만 하면 색 규칙을 기억할 필요가 없다.
+ *   예전 FormDatePicker·FormTimePicker는 AntD 기본 suffix를 써서 같은 폼 안에서 주소 아이콘만
+ *   파랗게 변했다. 지금 이 함수는 AntD TimePicker의 관문이고, 커스텀 FormDatePicker도 같은
+ *   field 토큰과 아래 상태 순서를 직접 적용한다.
  *
  * 색 규칙
  *   disabled : gray[400]        — 조작 불가라는 신호가 우선한다

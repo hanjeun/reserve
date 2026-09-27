@@ -28,6 +28,16 @@ export default defineConfig([
       'reserve/plain-jsdoc': 'error',
       'reserve/no-jsx-style-tag': 'error',
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // 목록/상세의 cold read 상태는 DataState 한 곳에서 아이콘·문구·재시도를 고른다.
+      // AntD Alert/Empty를 각 화면에서 직접 쓰면 같은 장애가 빨간 배지, 텍스트 링크,
+      // 빈 상자 등으로 갈라진다. 폼 검증·mutation·결제 결과는 각 동작 경계의 상태를 쓴다.
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: 'antd',
+          importNames: ['Alert', 'Empty'],
+          message: '조회 결과의 빈 상태·오류 상태는 DataState를 사용하세요. 폼 검증·mutation·결제 결과는 각 동작 경계를 사용합니다.',
+        }],
+      }],
 
       // ★ 폼 검증 오류를 토스트로 띄우는 것을 막는다.
       //

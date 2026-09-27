@@ -1,41 +1,69 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Alert, Empty, Pagination, Typography, Tabs } from 'antd';
+import React, { useEffect, useRef } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Pagination, Typography, Tabs } from 'antd';
 import {
     CalendarOutlined,
     PartitionOutlined,
     QrcodeOutlined,
     NotificationOutlined,
+    MessageOutlined,
 } from '@ant-design/icons';
-import { PageContainer, ReservationCardSkeleton, FilterToolbar } from '../../components/common';
+import { PageContainer, ReservationCardSkeleton, ReservationSummaryCardSkeleton, DataState, FilterToolbar, Button } from '../../components/common';
 import ReservationCard from '../../components/reservation/ReservationCard';
-import QrScannerTab from '../../components/reservation/QrScannerTab';
+import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
+import QrScannerSheet from '../../components/reservation/QrScannerSheet';
 import AdManageTab from '../../components/advertisement/AdManageTab';
 import StatisticsTab from '../../components/business/StatisticsTab';
+import ChatIntroTab from '../../components/business/ChatIntroTab';
 import useManageReservations from '../../hooks/useManageReservations';
+import { useMyStores, useQueryParamsState } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
 import useMessage from '../../hooks/useMessage';
+import useViewModeParam from '../../hooks/useViewModeParam';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
-import { RESERVATION_STATUS_FILTER_OPTIONS } from '../../constants';
+import { RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
-import storeService from '../../services/storeService';
 import reservationService from '../../services/reservationService';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
+import businessTabSearch from './businessTabQuery';
 
 const { Title, Text } = Typography;
 
 // 상태 필터 목록은 constants/status.js 하나에서만 온다 —
 // 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
 const STATUS_OPTIONS = RESERVATION_STATUS_FILTER_OPTIONS;
+const SORT_OPTIONS = RESERVATION_SORT_OPTIONS;
+const RESERVATION_QUERY_DEFAULTS = Object.freeze({
+    reservationStatus: 'ALL',
+    reservationSort: 'recent',
+    reservationStore: 'ALL',
+    reservationSearch: '',
+    reservationPage: '1',
+});
+
+const optionValueOr = (options, value, fallback) => (
+    options.some(option => option.value === value) ? value : fallback
+);
+
+const positivePageOrOne = (value) => {
+    const page = Number.parseInt(value, 10);
+    return Number.isSafeInteger(page) && page > 0 ? page : 1;
+};
 
 const ReservationTab = () => {
-    const [statusFilter, setStatusFilter] = useState('ALL');
-    const [keyword, setKeyword] = useState('');
+    const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+    const [reservationParams, setReservationParams] = useQueryParamsState(RESERVATION_QUERY_DEFAULTS);
+    const statusFilter = optionValueOr(STATUS_OPTIONS, reservationParams.reservationStatus, 'ALL');
+    const sort = optionValueOr(SORT_OPTIONS, reservationParams.reservationSort, 'recent');
+    const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'list');
+    const keyword = reservationParams.reservationSearch;
     const debouncedKeyword = useDebounce(keyword, 300);
-    const [storeFilter, setStoreFilter]   = useState('ALL');
-    const [myStores, setMyStores]         = useState([]);
-    const [page, setPage] = useState(1);
+    const storeFilter = reservationParams.reservationStore;
+    // 광고·통계 탭과 같은 키를 쓰므로, 같은 사업자 패널 안에서 이미 받은 가게 목록은
+    // 다시 기다리지 않는다. 예약 데이터와 별개 요청인 점은 아래의 부분 오류 처리로 유지한다.
+    const { stores: myStores, loading: myStoresLoading, error: myStoresError, refetch: refetchStores } = useMyStores();
+    const page = positivePageOrOne(reservationParams.reservationPage);
     const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
     const { reservations, total, totalPages, error, loading, refetching, actionLoading, approve, reject, storeCancel, complete, noShow, refetch } = useManageReservations({
         page: page - 1,
@@ -43,17 +71,22 @@ const ReservationTab = () => {
         search: debouncedKeyword.trim() || undefined,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
         storeId: storeFilter === 'ALL' ? undefined : Number(storeFilter),
+        sort,
     });
     const { message, confirm } = useMessage();
+    const retryStores = () => refetchStores();
+    const retryAll = () => {
+        retryStores();
+        refetch();
+    };
 
     // 마지막 행의 삭제·상태 변경으로 현재 페이지가 없어지면 마지막 유효 페이지로 이동한다.
     if (!loading && !refetching && !error && page > Math.max(totalPages, 1)) {
-        setPage(Math.max(totalPages, 1));
+        setReservationParams({ reservationPage: String(Math.max(totalPages, 1)) });
     }
 
-    const changeFilter = (setter, value) => {
-        setter(value);
-        setPage(1);
+    const changeFilter = (patch) => {
+        setReservationParams({ ...patch, reservationPage: '1' });
     };
 
     const handleRemove = (id) => {
@@ -72,72 +105,81 @@ const ReservationTab = () => {
         });
     };
 
-    useEffect(() => {
-        storeService.getMyStores()
-            .then(list => setMyStores(Array.isArray(list) ? list : []))
-            .catch(() => {});
-    }, []);
-
     return (
         <>
-            <FilterToolbar
-                selects={[
-                    {
-                        value: storeFilter,
-                        onChange: value => changeFilter(setStoreFilter, value),
-                        width: 140,
-                        disabled: loading,
-                        options: [
-                            { value: 'ALL', label: '전체 가게' },
-                            ...myStores.map(s => ({ value: String(s.id), label: s.name }))
-                        ],
-                    },
-                    {
-                        value: statusFilter,
-                        onChange: value => changeFilter(setStatusFilter, value),
-                        options: STATUS_OPTIONS,
-                        width: 140,
-                        disabled: loading,
-                    },
+            <ReservationListingToolbar
+                view={view}
+                onViewChange={setView}
+                store={storeFilter}
+                onStoreChange={value => changeFilter({ reservationStore: value })}
+                storeOptions={[
+                    { value: 'ALL', label: '전체 가게' },
+                    ...myStores.map(s => ({ value: String(s.id), label: s.name })),
                 ]}
+                storeDisabled={myStoresLoading || Boolean(myStoresError)}
+                storeLoading={myStoresLoading}
+                status={statusFilter}
+                onStatusChange={value => changeFilter({ reservationStatus: value })}
+                statusOptions={STATUS_OPTIONS}
+                sort={sort}
+                onSortChange={value => changeFilter({ reservationSort: value })}
+                sortOptions={SORT_OPTIONS}
                 count={total}
-                search={{ value: keyword, onChange: e => changeFilter(setKeyword, e.target.value), placeholder: '가게명, 예약자로 검색' }}
+                disabled={loading || refetching}
+                label="사업자 예약 목록 필터"
+            />
+            <FilterToolbar
+                search={{ value: keyword, onChange: e => changeFilter({ reservationSearch: e.target.value }), placeholder: '가게명, 예약자로 검색' }}
                 onReload={refetch}
                 loading={loading || refetching}
             />
 
-            {error ? (
-                <Alert type="error" showIcon title="예약을 불러오지 못했습니다. 새로고침으로 다시 시도해주세요." />
-            ) : (loading || refetching) ? (
-                <ReservationCardSkeleton count={5} />
-            ) : reservations.length === 0 ? (
-                <div style={{ marginTop: 80 }}>
-                    <Empty description={
-                        <span style={{ color: colors.text.tertiary }}>
-                            {statusFilter === 'ALL' && !debouncedKeyword.trim()
-                                ? '예약 내역이 없습니다.'
-                                : '조건에 맞는 예약이 없습니다.'}
-                        </span>
-                    } />
-                </div>
+            {/* 가게 필터 목록과 예약 목록은 서로 독립 요청이다. 예약은 가게 목록 없이도 '전체 가게'로
+                조회된다. 그래서 가게 목록만 실패했을 때 예약까지 가리면 멀쩡히 받아 온 예약을 버리는 셈이다.
+                그때는 목록 위에 좁은 오류만 얹고, 둘 다 실패했을 때만 하나의 오류로 합친다. */}
+            {error && myStoresError ? (
+                <DataState state="error" kind="reservation" subject="예약 관리 데이터"
+                    title="예약 관리 데이터를 불러오지 못했습니다." error={error}
+                    onRetry={retryAll} retrying={loading || refetching} />
+            ) : error ? (
+                <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                    onRetry={refetch} retrying={loading || refetching} />
             ) : (
-                <div style={styles.list}>
-                    {reservations.map((res, i) => (
-                        <React.Fragment key={res.id}>
-                            <ReservationCard
-                                reservation={res}
-                                actionLoading={actionLoading}
-                                onApprove={approve}
-                                onReject={reject}
-                                onComplete={complete}
-                                onNoShow={noShow}
-                                onStoreCancel={storeCancel}
-                                onRemove={handleRemove}
-                            />
-                            {i < reservations.length - 1 && <div style={styles.divider} />}
-                        </React.Fragment>
-                    ))}
-                </div>
+                <>
+                    {myStoresError && (
+                        <DataState state="error" kind="store" subject="가게별 필터용 가게 목록" error={myStoresError}
+                            onRetry={retryStores} retrying={myStoresLoading} compact style={{ marginBottom: 16 }} />
+                    )}
+                    {loading ? (
+                        view === 'cards'
+                            ? <ReservationSummaryCardSkeleton count={5} />
+                            : <ReservationCardSkeleton count={5} />
+                    ) : reservations.length === 0 ? (
+                        <DataState state="empty" kind="reservation" style={{ marginTop: 80 }}
+                            title={statusFilter === 'ALL' && !debouncedKeyword.trim()
+                                ? '예약 내역이 없습니다.'
+                                : '조건에 맞는 예약이 없습니다.'} />
+                    ) : (
+                        <div className={view === 'cards' ? 'reserve-reservation-card-grid' : undefined} style={view === 'list' ? styles.list : undefined}>
+                            {reservations.map((res, i) => (
+                                <React.Fragment key={res.id}>
+                                    <ReservationCard
+                                        view={view}
+                                        reservation={res}
+                                        actionLoading={actionLoading}
+                                        onApprove={approve}
+                                        onReject={reject}
+                                        onComplete={complete}
+                                        onNoShow={noShow}
+                                        onStoreCancel={storeCancel}
+                                        onRemove={handleRemove}
+                                    />
+                                    {view === 'list' && i < reservations.length - 1 && <div style={styles.divider} />}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    )}
+                </>
             )}
             {!error && total > 0 && (
                 <nav aria-label="예약 목록 페이지" style={{ marginTop: 16 }}>
@@ -145,7 +187,7 @@ const ReservationTab = () => {
                         current={page}
                         pageSize={DEFAULT_PAGE_SIZE}
                         total={total}
-                        onChange={setPage}
+                        onChange={nextPage => setReservationParams({ reservationPage: String(nextPage) })}
                         showSizeChanger={false}
                         showLessItems={isMobile}
                         size={isMobile ? 'small' : 'default'}
@@ -160,12 +202,25 @@ const ReservationTab = () => {
 
 const BusinessPanel = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     // 결제 리다이렉트 뒤 새 문서에서도 광고 탭을 복원할 수 있게 URL을 지원한다.
     const requestedTab = new URLSearchParams(location.search).get('tab') || location.state?.activeTab;
-    const [activeTab, setActiveTab] = useState(
-        ['reservations', 'qr-checkin', 'ads', 'analytics'].includes(requestedTab) ? requestedTab : 'reservations',
-    );
+    const initialContentTab = ['reservations', 'ads', 'analytics', 'chat-intro'].includes(requestedTab)
+        ? requestedTab
+        : 'reservations';
+    const activeTab = requestedTab === 'qr-checkin' ? 'qr-checkin' : initialContentTab;
+    const lastContentTabRef = useRef(initialContentTab);
     useDocumentTitle('파트너 패널');
+
+    const writeTabToUrl = (tab) => {
+        navigate('?' + businessTabSearch(location.search, tab), { replace: true });
+    };
+
+    useEffect(() => {
+        const current = location.search.replace(/^\?/, '');
+        const normalized = businessTabSearch(location.search, activeTab);
+        if (normalized !== current) navigate('?' + normalized, { replace: true });
+    }, [activeTab, location.search, navigate]);
 
     const tabItems = [
         {
@@ -184,7 +239,7 @@ const BusinessPanel = () => {
                     <QrcodeOutlined />QR 체크인
                 </span>
             ),
-            children: <QrScannerTab />,
+            children: null,
         },
         {
             key: 'ads',
@@ -204,6 +259,15 @@ const BusinessPanel = () => {
             ),
             children: <StatisticsTab />,
         },
+        {
+            key: 'chat-intro',
+            label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <MessageOutlined />채팅 관리
+                </span>
+            ),
+            children: <ChatIntroTab />,
+        },
     ];
 
     return (
@@ -216,13 +280,27 @@ const BusinessPanel = () => {
             </div>
             <Tabs
                 activeKey={activeTab}
-                onChange={setActiveTab}
+                onChange={key => {
+                    if (key === 'qr-checkin') {
+                        if (activeTab !== 'qr-checkin') lastContentTabRef.current = activeTab;
+                        writeTabToUrl(key);
+                        return;
+                    }
+                    lastContentTabRef.current = key;
+                    writeTabToUrl(key);
+                }}
                 items={tabItems}
-                className="reserve-pill-tabs"
+                className="reserve-pill-tabs reserve-business-tabs"
                 tabBarGutter={4}
                 animated={{ inkBar: true, tabPane: false }}
                 destroyOnHidden
                 style={{ marginBottom: 8 }}
+            />
+            <QrScannerSheet
+                open={activeTab === 'qr-checkin'}
+                onClose={() => {
+                    writeTabToUrl(lastContentTabRef.current);
+                }}
             />
         </PageContainer>
     );

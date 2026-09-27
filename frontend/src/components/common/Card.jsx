@@ -20,6 +20,7 @@ import PropTypes from 'prop-types';
 import { Card as AntCard } from 'antd';
 // shadows 는 더 이상 쓰지 않는다 — 그림자 값은 index.css 의 "Card 그림자·hover" 블록에 있다.
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
+import { getThumbnailUrl } from '../../utils';
 
 const Card = ({ 
     hoverable = false,
@@ -95,6 +96,13 @@ const Card = ({
  * className은 `reserve-` 접두사를 지킨다. 전역 CSS라, 접두사 없는 이름(예전 'card-image')은
  * 다른 라이브러리나 목업 컴포넌트와 충돌할 여지가 있었다.
  */
+// 사진 주소가 404 등으로 실패하면 깨진 이미지 아이콘 대신 공통 대체 이미지를 보인다 —
+// StoreListRow 와 같은 동작이다(2026-09-23: 카드만 깨진 아이콘이 보이던 불일치).
+const handleCoverError = (event) => {
+    const fallback = getThumbnailUrl();
+    if (event.currentTarget.src !== new URL(fallback, window.location.href).href) event.currentTarget.src = fallback;
+};
+
 Card.Cover = ({ src, alt, width, height }) => (
     <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
         <img
@@ -102,6 +110,7 @@ Card.Cover = ({ src, alt, width, height }) => (
             src={src}
             width={width}
             height={height}
+            onError={handleCoverError}
             style={{ width: '100%', height: 'auto', objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
             className="reserve-card-image"
         />

@@ -30,7 +30,7 @@ const PrivateRoute = ({ allowedRoles }) => {
         }
     }, [roleBlocked, message]);
 
-    if (isLoggingOut) return <Navigate to="/" replace />;
+    if (isLoggingOut) return <Navigate to="/" replace state={{ reserveRouteMotion: 'from-left' }} />;
 
     if (!isLoggedIn) {
         // 로그인 후 원래 가려던 페이지로 돌아가기 위해 경로를 저장해둔다.
@@ -38,7 +38,8 @@ const PrivateRoute = ({ allowedRoles }) => {
         // 전체 페이지를 넘기므로 React Router의 state가 살아남지 못한다 — 그래서
         // sessionStorage에도 같이 저장해서 이메일/소셜 둘 다 같은 경로를 쓰게 한다.
         saveRedirect(pathFromLocation(location));
-        return <Navigate to="/login" replace state={{ from: location, prevented: true }} />;
+        // 사용자가 가려던 방향 그대로 로그인 화면이 이어진다(오른쪽에서). 주소로 바로 연 경우엔 이전 화면이 없어 전환도 없다.
+        return <Navigate to="/login" replace state={{ from: location, prevented: true, reserveRouteMotion: 'from-right' }} />;
     }
 
     // 약관 미동의 유저 — 소셜 동의 페이지로 강제 이동

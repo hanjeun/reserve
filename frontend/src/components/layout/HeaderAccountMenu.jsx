@@ -24,18 +24,31 @@ const { Text } = Typography;
 /** 로그인한 사용자에게만 필요한 Dropdown·메뉴·아이콘 묶음. Header에서 지연 로딩한다. */
 const HeaderAccountMenu = () => {
     const navigate = useNavigate();
-    const { user } = useAuthStore();
+    const { user, isLoggingOut, setLoggingOut } = useAuthStore();
     const { message } = useMessage();
 
     const handleLogout = async () => {
+        if (isLoggingOut) return;
+        setLoggingOut(true);
+        const dismissProgress = message.loading('로그아웃하는 중입니다.', 0);
+        let serverLogoutFailed = false;
         try {
-            await api.post(API_ENDPOINTS.AUTH.LOGOUT);
+            // 로그아웃은 더 이상 토큰이 필요 없는 단방향 요청이다. 401 refresh를 시도하거나
+            // 공용 30초 제한까지 기다리면 사용자에게 "로그아웃이 멈춘 것"처럼 보인다.
+            await api.post(API_ENDPOINTS.AUTH.LOGOUT, undefined, { timeout: 8000, skipAuthRefresh: true });
         } catch {
-            // logout API 실패해도 클라이언트 상태는 정리
+            // 서버 응답이 없더라도 이 기기의 세션·개인 캐시는 즉시 정리한다.
+            serverLogoutFailed = true;
         } finally {
+            dismissProgress?.();
             useAuthStore.getState().logout();
-            navigate('/', { replace: true });
-            message.success('성공적으로 로그아웃되었습니다.');
+            // 로그아웃 → 홈. 로고로 홈에 갈 때와 같은 방향(왼쪽에서)으로 돌아간다.
+            navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
+            if (serverLogoutFailed) {
+                message.warning('이 기기에서 로그아웃했습니다. 서버 연결은 확인하지 못했습니다.');
+            } else {
+                message.success('성공적으로 로그아웃되었습니다.');
+            }
         }
     };
 
@@ -49,7 +62,7 @@ const HeaderAccountMenu = () => {
                     onClick: () => navigate('/signup/social'),
                 },
                 { type: 'divider' },
-                { key: 'logout', icon: <LogoutOutlined />, label: '로그아웃', danger: true, onClick: handleLogout },
+                { key: 'logout', icon: <LogoutOutlined />, label: isLoggingOut ? '로그아웃 중…' : '로그아웃', danger: true, disabled: isLoggingOut, onClick: handleLogout },
             ];
         }
 
@@ -87,7 +100,7 @@ const HeaderAccountMenu = () => {
 
         items.push(
             { type: 'divider' },
-            { key: 'logout', icon: <LogoutOutlined />, label: '로그아웃', danger: true, onClick: handleLogout },
+            { key: 'logout', icon: <LogoutOutlined />, label: isLoggingOut ? '로그아웃 중…' : '로그아웃', danger: true, disabled: isLoggingOut, onClick: handleLogout },
         );
         return items;
     };
@@ -105,6 +118,7 @@ const HeaderAccountMenu = () => {
                 className="reserve-header-avatar-trigger"
                 style={styles.trigger}
                 aria-label="내 계정 메뉴 열기"
+                aria-haspopup="menu"
             >
                 <Avatar src={user?.profileImageUrl || user?.profileImage} size={36} />
             </button>

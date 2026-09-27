@@ -18,6 +18,13 @@ const useReservations = () => {
         queryKey: reservationKeys.my(),
         queryFn: () => reservationService.getMyReservations(),
         select: (data) => (Array.isArray(data) ? data : []),
+        // 사업자 승인은 서버에서 즉시 확정된다. 대기 예약이 화면에 있을 때만 짧게 재검증해
+        // 다른 계정/기기에서 승인한 결과도 열린 "내 예약" 화면에 10초 안에 반영한다.
+        refetchInterval: query => Array.isArray(query.state.data)
+            && query.state.data.some(reservation => reservation.status === 'PENDING')
+            ? 10000 : false,
+        refetchIntervalInBackground: false,
+        refetchOnWindowFocus: 'always',
     });
 
     React.useEffect(() => {
@@ -52,6 +59,7 @@ const useReservations = () => {
         reservations: data || [],
         loading: isLoading,
         refetching: isFetching && !isLoading,
+        error: error ?? null,
         cancelReservation: cancelMutation.mutateAsync,
         refetch,
     };

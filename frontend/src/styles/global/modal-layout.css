@@ -1,0 +1,117 @@
+/* Scoped confirmation layout. AntD 6 uses ant-modal-container, not ant-modal-content.
+   Keep AntD portal/mask/focus/motion behavior; only bound the visible panel and body. */
+.reserve-confirm-root {
+    --reserve-confirm-available-height: calc(100svh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+.reserve-confirm-root .ant-modal-wrap.ant-modal-centered {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+}
+
+/* AntD's inline-block centering spacer is redundant in the flex wrapper. */
+.reserve-confirm-root .ant-modal-wrap.ant-modal-centered::before {
+    display: none;
+}
+
+.reserve-confirm-root .ant-modal-confirm {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+    max-height: var(--reserve-confirm-available-height);
+    margin-block: 0;
+    padding-bottom: 0;
+}
+
+.reserve-confirm-root .ant-modal-confirm .ant-modal-container {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    max-height: var(--reserve-confirm-available-height);
+    min-height: 0;
+}
+
+.reserve-confirm-root .ant-modal-confirm .ant-modal-body,
+.reserve-confirm-root .ant-modal-confirm-body-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.reserve-confirm-root .ant-modal-confirm-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.reserve-confirm-root .ant-modal-confirm-paragraph {
+    min-width: 0;
+}
+
+.reserve-confirm-root .ant-modal-confirm-title,
+.reserve-confirm-root .ant-modal-confirm-content {
+    overflow-wrap: anywhere;
+}
+
+.reserve-confirm-root .ant-modal-confirm-content > div + div {
+    margin-top: 0;
+}
+
+.reserve-confirm-root .ant-modal-confirm-btns {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.reserve-confirm-root .ant-modal-confirm-btns .ant-btn {
+    /* AntD 확인 버튼의 원래 32px 높이를 유지하고, 긴 문구는 줄바꿈만 허용한다. */
+    min-height: 32px;
+    margin: 0;
+    white-space: normal;
+    height: auto;
+}
+
+.reserve-confirm-root .ant-modal-confirm-btns .ant-btn + .ant-btn {
+    margin-inline-start: 0;
+}
+
+/* 광고 작성은 입력과 실제 표면 미리보기를 한 모달에서 전환한다. 낮은 데스크톱·모바일에서도
+   제목과 footer가 화면 밖으로 밀리지 않게 본문만 스크롤한다. */
+.reserve-ad-create-modal {
+    --reserve-ad-modal-available-height: calc(100svh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+.reserve-ad-create-modal .ant-modal-wrap.ant-modal-centered {
+    box-sizing: border-box;
+    padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+}
+
+.reserve-ad-create-modal .ant-modal {
+    max-width: calc(100vw - 32px);
+    max-height: var(--reserve-ad-modal-available-height);
+    margin-block: 0;
+    padding-bottom: 0;
+}
+
+.reserve-ad-create-modal .ant-modal-container {
+    display: flex;
+    max-height: var(--reserve-ad-modal-available-height);
+    min-height: 0;
+    flex-direction: column;
+}
+
+.reserve-ad-create-modal .ant-modal-header,
+.reserve-ad-create-modal .ant-modal-footer {
+    flex: none;
+}
+
+.reserve-ad-create-modal .ant-modal-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}

@@ -177,7 +177,13 @@ export const initTheme = () => {
     // 'light'/'dark'를 명시했으면 OS가 바뀌어도 그대로 둔다.
     window.matchMedia?.('(prefers-color-scheme: dark)')
         .addEventListener('change', () => {
-            if (state.theme === 'system') { applyTheme('system'); emit(); }
+            if (state.theme === 'system') {
+                // useSyncExternalStore는 같은 snapshot이면 다시 렌더하지 않는다.
+                // OS 테마 변경도 새 snapshot을 전달해야 AntD algorithm이 함께 바뀐다.
+                state = { ...state };
+                applyTheme('system');
+                emit();
+            }
         });
 };
 

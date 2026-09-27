@@ -67,6 +67,9 @@ const useMessage = () => {
              */
             centered: true,
             ...options,
+            // Portal 안에서도 확인 모달의 좁은 화면·긴 본문 레이아웃을 한 관문에서 적용한다.
+            // 호출부의 rootClassName과 안전 조건/onOk 등은 그대로 보존한다.
+            rootClassName: ['reserve-confirm-root', options?.rootClassName].filter(Boolean).join(' '),
             // ...options 뒤에 와야 한다 — 앞에 두면 options.content가 원본 문자열로 덮어쓴다.
             content: splitIntoSentenceLines(options?.content),
         }),

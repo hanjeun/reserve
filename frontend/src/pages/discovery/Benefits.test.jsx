@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Benefits from './Benefits';
@@ -41,11 +41,12 @@ describe('public store news and benefit guidance', () => {
         benefitService.getList.mockResolvedValue({ content: [], page: { totalElements: 0 } });
         renderPage('/benefits?page=2&domain=SPORTS&sort=recent&storePage=3');
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
+        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12 }, expect.any(AbortSignal)));
         const link = await screen.findByRole('link', { name: '가게 둘러보기' });
         expect(link).toHaveAttribute('href', '/stores');
         expect(document.querySelector('.reserve-benefits-empty img')).toBeNull();
         fireEvent.click(link);
-        expect(screen.getByTestId('store-route')).toHaveTextContent('/stores');
+        expect(await screen.findByTestId('store-route')).toHaveTextContent('/stores');
         expect(benefitService.getDetail).not.toHaveBeenCalled();
     });
     it('shows skeleton until the real list resolves, then navigates to the detail', async () => {

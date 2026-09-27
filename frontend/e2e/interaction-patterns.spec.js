@@ -103,6 +103,12 @@ test('contextual header back stays beside RESERVE on desktop and mobile', async 
     const logo = page.getByRole('link', { name: 'RESERVE 홈' });
     await expect(back).toBeVisible();
     await expect(logo).toBeVisible();
+    await expect(page.locator('.reserve-header-brand')).toHaveCSS('gap', '4px');
+    await expect.poll(() => page.locator('.reserve-header-brand').evaluate(brand => {
+        const backBox = brand.querySelector('.reserve-header-back').getBoundingClientRect();
+        const logoBox = brand.querySelector('.reserve-header-logo').getBoundingClientRect();
+        return logoBox.left - backBox.right;
+    })).toBeCloseTo(4, 1);
 
     const positions = await page.locator('.reserve-header-brand').evaluate((brand) => {
         const backBox = brand.querySelector('.reserve-header-back')?.getBoundingClientRect();
@@ -111,7 +117,8 @@ test('contextual header back stays beside RESERVE on desktop and mobile', async 
     });
     expect(positions.backBox).not.toBeNull();
     expect(positions.logoBox).not.toBeNull();
-    expect(positions.logoBox.left - positions.backBox.right).toBe(4);
+    // Bounding rectangles retain subpixel rounding; a whole-pixel spacing regression must still fail.
+    expect(positions.logoBox.left - positions.backBox.right).toBeCloseTo(4, 1);
 });
 
 test('messenger uses neutral controls, a clear composer focus, and reduced press motion', async ({ page, isMobile }) => {

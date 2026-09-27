@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { PaperClipOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button } from '../common';
-import { colors, radius } from '../../styles/tokens';
+import { animation, colors, radius } from '../../styles/tokens';
 import useImagePreview from '../../hooks/useImagePreview';
+import useExitAnimation from '../../hooks/useExitAnimation';
 import useAuthStore from '../../store/useAuthStore';
 
 function AttachmentThumbnail({ file, url }) {
@@ -25,17 +25,34 @@ function AttachmentThumbnail({ file, url }) {
 }
 AttachmentThumbnail.propTypes = { file: PropTypes.object.isRequired, url: PropTypes.string.isRequired };
 
+function AnimatedAttachment({ file, active, closing, disabled, onRemove }) {
+    const [url, setUrl] = useState(null);
+    useEffect(() => {
+        const objectUrl = URL.createObjectURL(file);
+        let mounted = true;
+        Promise.resolve().then(() => { if (mounted) setUrl(objectUrl); });
+        return () => { mounted = false; URL.revokeObjectURL(objectUrl); };
+    }, [file]);
+    return <div className="reserve-chat-attachment" aria-hidden={!active || undefined}
+        inert={!active ? true : undefined}
+        style={{ display: 'flex', alignItems: 'center', gap: 4,
+            animation: closing ? animation.slideUpOut : animation.slideUpIn }}>
+        {url && (active ? <AttachmentThumbnail key={url} file={file} url={url} />
+            : <img src={url} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: radius.md }} />)}
+        <button type="button" className="reserve-chat-tool" aria-label="첨부 사진 제거"
+            disabled={disabled || !active} onClick={onRemove}><CloseOutlined /></button>
+    </div>;
+}
+AnimatedAttachment.propTypes = { file: PropTypes.object.isRequired, active: PropTypes.bool.isRequired,
+    closing: PropTypes.bool.isRequired, disabled: PropTypes.bool, onRemove: PropTypes.func.isRequired };
+
 export default function ChatImagePicker({ file, onChange, disabled, enabled }) {
     const revision = useAuthStore(state => state.sessionRevision);
     const input = useRef(null);
     const [error, setError] = useState('');
-    const [preview, setPreview] = useState(null);
-    useEffect(() => {
-        if (!file) return undefined;
-        const url = URL.createObjectURL(file);
-        Promise.resolve().then(() => setPreview({ file, url }));
-        return () => URL.revokeObjectURL(url);
-    }, [file]);
+    const [retained, setRetained] = useState({ file, revision });
+    if (revision !== retained.revision || (file && file !== retained.file)) setRetained({ file, revision });
+    const { shouldRender, isClosing } = useExitAnimation(Boolean(file), 200);
     const select = event => {
         const selected = event.target.files?.[0];
         event.target.value = '';
@@ -55,11 +72,9 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled }) {
             onChange={select} disabled={disabled} hidden aria-label="첨부할 사진 선택" />
         <button type="button" className="reserve-chat-tool" aria-label="사진 첨부"
             disabled={disabled} onClick={() => input.current?.click()}><PaperClipOutlined /></button>
-        {file && <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {preview?.file === file && <AttachmentThumbnail key={revision} file={file} url={preview.url} />}
-            <Button variant="ghost" size="sm" style={{ width: 32, height: 32, padding: 0 }} icon={<CloseOutlined />} aria-label="첨부 사진 제거"
-                disabled={disabled} onClick={() => { setError(''); onChange(null); }} />
-        </div>}
+        {shouldRender && retained.file && retained.revision === revision && <AnimatedAttachment key={revision}
+            file={retained.file} active={Boolean(file) && !isClosing} closing={isClosing || !file}
+            disabled={disabled} onRemove={() => { setError(''); onChange(null); }} />}
         {error && <span role="alert" style={{ color: colors.error.main, fontSize: 12, flexBasis: '100%' }}>{error}</span>}
     </div>;
 }

@@ -369,12 +369,16 @@ describe('MessengerContent', () => {
         expect(screen.queryByRole('button', { name: '고객지원에 문의' })).not.toBeInTheDocument();
         await user.click(await screen.findByRole('button', { name: /RESERVE 고객지원/ }));
         await waitFor(() => expect(chatService.getSupport).toHaveBeenCalledTimes(1));
+        expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1);
+        expect(screen.getByRole('button', { name: '홈', exact: true })).toBeDisabled();
+        expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
         fireEvent.animationEnd(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }).closest('.reserve-messenger-thread'));
         await waitFor(() => expect(screen.queryByLabelText('대화 목록')).not.toBeInTheDocument());
         expect(screen.queryByRole('navigation', { name: '메신저 화면' })).not.toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
         const messenger = screen.getByRole('button', { name: '대화 목록으로 돌아가기' }).closest('.reserve-messenger');
         expect(messenger).toHaveClass('is-returning-to-list', 'has-thread');
+        expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1);
         fireEvent.animationEnd(messenger.querySelector('.reserve-messenger-thread'));
         await waitFor(() => expect(screen.getAllByRole('navigation', { name: '메신저 화면' })).toHaveLength(1));
         expect(chatService.getSupport).toHaveBeenCalledTimes(1);

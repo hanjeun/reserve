@@ -370,7 +370,6 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     }, [queryClient, reload]);
 
     const draft = useMessengerStore((state) => state.drafts[selectionKey] ?? '');
-    const bottomRef = useRef(null);
     const threadBodyRef = useRef(null);
     const historyScrollRef = useRef(null);
     const historyScopeRef = useRef(null);
@@ -391,7 +390,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
             historyScrollRef.current = null;
             return;
         }
-        if (showThread) bottomRef.current?.scrollIntoView({ block: 'end' });
+        // scrollIntoView는 전환 중 바깥 페이지/패널까지 움직인다. 본문만 스크롤한다.
+        if (showThread && body) body.scrollTop = body.scrollHeight;
     }, [messages, showThread]);
 
     const currentHistory = history.key === selectionKey
@@ -518,7 +518,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
             : '현재 운영 상태에서는 새 메시지를 보낼 수 없지만 이전 대화는 계속 볼 수 있습니다.';
 
     const navigation = (
-        <MessengerFooter view={isHome ? 'home' : isSettings ? 'settings' : 'conversations'}
+        <MessengerFooter view={isHome ? 'home' : isSettings ? 'settings' : 'conversations'} disabled={openingThread || returningToList}
             onChange={value => {
                 if (routeSelection) navigate('/messages', { replace: true });
                 setMobileThreadOpen(false);
@@ -763,7 +763,6 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                             <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
                                 roomId={thread?.roomId} onRetracted={updateMessage}
                                 reportRole={thread?.type === 'STORE' ? thread.viewerRole : undefined} />
-                            <div ref={bottomRef} />
                         </div>
                     )}
                 </div>
@@ -803,7 +802,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                     <span>왼쪽에서 확인할 대화를 선택하세요.</span>
                 </section>
             )}
-            {!showThread && navigation}
+            {(!showThread || openingThread || returningToList) && !(surface === 'page' && isWide && showThread) && navigation}
         </div>
     );
 };

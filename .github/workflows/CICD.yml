@@ -41,21 +41,49 @@ env:
 
 jobs:
   test-backend:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
       - name: Install JDK 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: gradle
+      - name: Restore verified backend test evidence
+        id: evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs restore backend
       - name: Test backend (unit and Spring/H2 integration)
         id: backend_tests
+        if: steps.evidence.outputs.reused != 'true'
         working-directory: backend
         run: |
           chmod +x ./gradlew
           ./gradlew test --console=plain
+      - name: Record successful backend test evidence
+        id: record
+        env:
+          EVIDENCE_ORIGIN: ${{ steps.evidence.outputs.origin_run }}
+          EVIDENCE_EXECUTED_AT: ${{ steps.evidence.outputs.executed_at }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs record backend
+      - name: Upload successful backend test evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-evidence-backend-${{ steps.record.outputs.key }}
+          overwrite: true
+          path: .ci-evidence/backend/evidence.json
+          retention-days: 7
       - name: Upload test report on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -67,6 +95,9 @@ jobs:
           retention-days: 7
 
   test-frontend:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -76,6 +107,13 @@ jobs:
           node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Restore verified frontend test evidence
+        id: evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_FORCE_TESTS: ${{ github.event_name == 'workflow_dispatch' || vars.CI_FORCE_TESTS == 'true' }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs restore frontend
       - name: Validate Grafana dashboards
         run: node scripts/validate-grafana-dashboards.mjs
       - name: Validate documentation links
@@ -104,20 +142,37 @@ jobs:
         working-directory: frontend
         run: npm run test:policy
       - name: Test frontend (unit and React components)
+        if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
         run: npm run test:run
       - name: Install Playwright Chromium
+        if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
         run: npx --no-install playwright install --with-deps chromium
       - name: Test PC browser (Chromium)
         id: browser_pc
+        if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
         run: npm run test:e2e -- --project=chromium --output=test-results/pc
       - name: Test mobile browser (Pixel 7 Chromium)
         id: browser_mobile
-        if: "!cancelled() && (success() || (failure() && steps.browser_pc.outcome == 'failure'))"
+        if: "!cancelled() && steps.evidence.outputs.reused != 'true' && (success() || (failure() && steps.browser_pc.outcome == 'failure'))"
         working-directory: frontend
         run: npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile
+      - name: Record successful frontend test evidence
+        id: record
+        env:
+          EVIDENCE_ORIGIN: ${{ steps.evidence.outputs.origin_run }}
+          EVIDENCE_EXECUTED_AT: ${{ steps.evidence.outputs.executed_at }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+        run: node scripts/ci-evidence.mjs record frontend
+      - name: Upload successful frontend test evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-evidence-frontend-${{ steps.record.outputs.key }}
+          overwrite: true
+          path: .ci-evidence/frontend/evidence.json
+          retention-days: 7
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -165,6 +220,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rollback-backend
+          overwrite: true
           path: ${{ steps.rollback_bridge.outputs.bridge_jar }}
           retention-days: 7
 
@@ -231,9 +287,7 @@ jobs:
           docker push "$DOCKERHUB_USERNAME/reserve:latest"
 
   # ─────────────────────────────────────────────────────────
-  # 2. 프론트엔드 빌드 + Lightsail 릴리스 디렉터리 staging
-  # build-backend 완료 후 실행한다. 여기서는 live symlink나 nginx를 바꾸지 않는다.
-  # 새 백엔드 health 확인 뒤 deploy-backend 잡이 프론트와 upstream을 한 번에 전환한다.
+  # 2. 프론트엔드 빌드 + 실행 ID에 묶인 dist 아티팩트. 서버 쓰기는 stage-release에만 둔다.
   # ─────────────────────────────────────────────────────────
   build-frontend:
     needs: [build-backend, test-frontend]
@@ -281,12 +335,31 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      # ── 여기부터는 main push에서만 실행한다 ──────────────────────────────
-      # ★ job 레벨에 if를 걸면 안 된다. build-frontend는 main 브랜치 보호의 "필수 상태 체크"라,
-      #   job이 스킵되면 체크가 보고되지 않아 모든 PR이 영영 머지 불가가 된다.
-      #   (deployments.md에 적어둔 deploy-backend 함정의 반대 방향 사례)
-      #   그래서 job은 그대로 돌리고 배포 스텝 3개에만 조건을 건다 —
-      #   PR에서는 npm ci·lint·build까지만 돌아 검증은 유지되고 서버는 건드리지 않는다.
+      - name: Upload built frontend
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-release-${{ github.sha }}
+          overwrite: true
+          path: frontend/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  #  서버로 전송만 한다. production Environment/Deployment는 실제 활성화 잡 하나에만 둔다.
+  stage-release:
+    permissions:
+      contents: read
+      actions: read
+    needs: [build-backend, build-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download this run's frontend
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "frontend-release-$GITHUB_SHA" --dir frontend/dist
+
+      # main-push-only staging 잡이므로 PR에서는 서버에 접근하지 않는다.
       # 빌드 결과물(dist/)을 EC2로 전송
       - name: Deploy frontend to EC2
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -374,37 +447,20 @@ jobs:
   # 3. Blue/Green 백엔드 배포 (프론트엔드 배포까지 완료된 뒤 실행)
   # ─────────────────────────────────────────────────────────
   deploy-backend:
-    # 이 잡만 GitHub Deployment 객체를 만든다. 잡 레벨 permissions 는 워크플로 레벨을
+    # production Environment의 자동 기록만 사용한다. 수동 createDeployment는 중복을 만든다.
+    # 잡 레벨 permissions 는 워크플로 레벨을
     # **대체**하므로, 체크아웃에 필요한 contents: read 를 함께 적어줘야 한다.
     permissions:
       contents: read
       deployments: write
-    needs: [build-backend, build-frontend, test-backend, test-frontend]
+    needs: [build-backend, build-frontend, test-backend, test-frontend, stage-release]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: production
+      url: https://reserve.it.kr
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # 배포 이력 기록 — first-party 액션만 쓴다(외부 액션 의존성 추가 없음).
-      # 이 스텝이 실패해도 배포 자체는 막지 않도록 continue-on-error를 둔다.
-      - name: Create GitHub deployment
-        id: deployment
-        continue-on-error: true
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
-        with:
-          script: |
-            const dep = await github.rest.repos.createDeployment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: context.sha,
-              environment: 'production',
-              required_contexts: [],
-              auto_merge: false,
-              production_environment: true,
-              description: 'Blue/Green backend deploy',
-            });
-            core.setOutput('id', dep.data.id);
 
       # ★ live 판별은 반드시 서버 안의 nginx routing 정본에서 한다.
       #
@@ -566,6 +622,37 @@ jobs:
             done
             echo "Health check failed after 10 attempts"
             exit 1
+
+      - name: Public API readiness (before cutover)
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          TARGET_PORT: ${{ env.STOPPED_PORT }}
+        with:
+          username: ubuntu
+          host: ${{ secrets.RESERVE_SERVER_IP }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
+          envs: TARGET_PORT
+          script: |
+            bash -Eeuo pipefail <<'RESERVE_READY'
+            case "$TARGET_PORT" in 8080|8081) ;; *) exit 1 ;; esac
+            BODY=$(mktemp /tmp/reserve-public-ready-XXXXXX)
+            trap 'rm -f -- "$BODY"' EXIT
+            READY=0
+            for attempt in 1 2 3 4 5; do
+              ELAPSED=$(curl --fail --silent --show-error --connect-timeout 2 --max-time 5 \
+                -o "$BODY" -w '%{time_total}' "http://127.0.0.1:$TARGET_PORT/api/stores?page=0&size=48&sort=rating") || ELAPSED=99
+              if jq -e '.success == true and (.data.content | type == "array")' "$BODY" >/dev/null 2>&1 \
+                 && awk -v seconds="$ELAPSED" 'BEGIN { exit !(seconds < 2.5) }'; then
+                READY=$((READY + 1))
+              else READY=0; fi
+              echo "Public store readiness attempt=$attempt elapsed=$ELAPSED consecutive=$READY"
+              if [ "$READY" -ge 2 ]; then exit 0; fi
+              sleep 1
+            done
+            echo "Public store API is not ready; live routing remains unchanged"
+            exit 1
+            RESERVE_READY
 
       # 새 프론트의 절대 경로와 새 백엔드 upstream을 함께 설치하고 nginx를 한 번만 reload한다.
       # 중간 명령이 실패하면 ERR trap이 default.conf, service-env.inc, current symlink를 함께 복구한다.
@@ -883,33 +970,3 @@ jobs:
             sudo rm -rf -- "/home/ubuntu/release-rollback-$FRONTEND_RELEASE-$DEPLOY_ATTEMPT"
             rm -f "/home/ubuntu/default-$FRONTEND_RELEASE.conf"
             RESERVE_CLEANUP
-
-      # 배포 결과 기록. deployment 생성이 실패했으면(id 없음) 조용히 건너뛴다.
-      - name: Mark deployment success
-        if: success() && steps.deployment.outputs.id
-        continue-on-error: true
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
-        with:
-          script: |
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ steps.deployment.outputs.id }},
-              state: 'success',
-              environment_url: 'https://reserve.it.kr',
-              description: 'Deployed to production',
-            });
-
-      - name: Mark deployment failure or cancellation
-        if: (failure() || cancelled()) && steps.deployment.outputs.id
-        continue-on-error: true
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
-        with:
-          script: |
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ steps.deployment.outputs.id }},
-              state: 'failure',
-              description: 'Deploy failed or was cancelled; rollback was attempted',
-            });

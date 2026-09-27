@@ -14,6 +14,7 @@ async function mockApi(page, user, memberRows, ownerRows = []) {
         if (path === '/api/chat/conversations') return ok(route, pageOf(memberRows));
         if (path === '/api/chat/store-inbox') return ok(route, pageOf(ownerRows));
         if (/^\/api\/chat\/rooms\/\d+\/messages$/.test(path)) return ok(route, []);
+        if (/^\/api\/chat\/rooms\/\d+\/retractions$/.test(path)) return ok(route, { messages: [], nextRevision: 0, hasMore: false });
         if (/^\/api\/chat\/rooms\/\d+\/read$/.test(path)) return ok(route, null);
         if (path === '/api/chat/support/open') {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -21,8 +22,8 @@ async function mockApi(page, user, memberRows, ownerRows = []) {
                 roomId: 1, type: 'SUPPORT', title: 'RESERVE 고객지원',
                 counterpartName: '한재은', counterpartProfileImage: 'https://example.test/admin.png',
                 viewerRole: 'MEMBER', canSend: true, messages: [
-                    { id: 11, senderRole: 'MEMBER', content: '문의합니다', createdAt: '2026-09-15T10:00:00' },
-                    { id: 12, senderRole: 'ADMIN', senderName: '한재은', content: '확인했습니다', createdAt: '2026-09-15T10:01:00' },
+                    { id: 11, senderRole: 'MEMBER', senderMemberId: 41, content: '문의합니다', createdAt: '2026-09-15T10:00:00' },
+                    { id: 12, senderRole: 'ADMIN', senderMemberId: 9, senderName: '한재은', content: '확인했습니다', createdAt: '2026-09-15T10:01:00' },
                 ],
             });
         }
@@ -47,7 +48,7 @@ test('thread entry uses the same calm easing and duration as returning to the li
         document.addEventListener('animationstart', event => {
             if (!event.target.matches('.reserve-messenger-thread')) return;
             const style = getComputedStyle(event.target);
-            window.__threadMotion.push({ name: event.animationName, duration: style.animationDuration, easing: style.animationTimingFunction });
+            window.__threadMotion.push({ name: event.animationName, duration: style.animationDuration, easing: style.animationTimingFunction, direction: style.animationDirection });
         });
     });
     if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
@@ -57,16 +58,55 @@ test('thread entry uses the same calm easing and duration as returning to the li
     }
     await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화', exact: true }).click();
     await page.locator('.reserve-messenger-row').click();
-    await expect.poll(() => page.evaluate(() => window.__threadMotion.some(event => event.name === 'reserve-messenger-thread-in'))).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__threadMotion.some(event => event.direction === 'reverse'))).toBe(true);
     await expect(page.locator('.reserve-messenger')).not.toHaveClass(/is-opening-thread/);
     await page.getByRole('button', { name: '대화 목록으로 돌아가기' }).click();
     await expect(page.locator('.reserve-messenger-row')).toBeVisible();
     await expect(page.locator('.reserve-messenger')).not.toHaveClass(/is-returning-to-list/);
     const motions = await page.evaluate(() => window.__threadMotion);
     expect(motions).toEqual([
-        { name: 'reserve-messenger-thread-in', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
-        { name: 'reserve-messenger-thread-back-out', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+        { name: 'reserve-messenger-thread-back-out', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)', direction: 'reverse' },
+        { name: 'reserve-messenger-thread-back-out', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)', direction: 'normal' },
     ]);
+});
+
+test('composer uses emoji, neutral send controls, white surfaces and owner-only unlimited retraction', async ({ page }, testInfo) => {
+    await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '문의합니다' }]);
+    let retracts = 0;
+    await page.route('**/api/chat/rooms/1/messages/11/retract', route => {
+        retracts++;
+        expect(route.request().method()).toBe('POST');
+        return ok(route, { id: 11, senderRole: 'MEMBER', senderMemberId: 41, content: '전송이 취소된 메시지입니다.', retracted: true, retractionRevision: 1 });
+    });
+    if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
+    else {
+        await page.goto('/');
+        await page.getByRole('button', { name: '메시지 열기' }).click();
+    }
+    await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화', exact: true }).click();
+    await page.locator('.reserve-messenger-row').click();
+    const input = page.getByRole('textbox', { name: '메시지 입력' });
+    await expect(input).toBeVisible();
+    await expect(page.locator('.reserve-messenger-thread-body')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await page.getByRole('button', { name: '이모지 선택', exact: true }).click();
+    await page.getByRole('searchbox', { name: '이모지 검색' }).fill('coffee');
+    await page.getByRole('button', { name: '커피 ☕' }).click();
+    await expect(input).toHaveValue('☕');
+    await expect(page.getByRole('button', { name: '보내기', exact: true })).toHaveCSS('background-color', 'rgb(242, 244, 246)');
+    await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(1);
+    await page.getByRole('button', { name: '메시지 관리' }).click();
+    await page.getByRole('menuitem', { name: '전송 취소' }).click();
+    await page.getByRole('button', { name: '전송 취소', exact: true }).click();
+    await expect(page.locator('.reserve-chat-bubble-group')).toContainText(['전송이 취소된 메시지입니다.', '확인했습니다']);
+    await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(0);
+    expect(retracts).toBe(1);
+    await expect(page.getByRole('dialog', { name: '메시지 전송을 취소할까요?' })).not.toBeVisible();
+    await expect(page.locator('.reserve-messenger')).not.toContainText('문의합니다');
+    await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-composer-light.png') });
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await expect(page.locator('.reserve-messenger-thread-body')).not.toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-composer-dark.png') });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('support title stays branded before and after loading; rows show latest message', async ({ page }) => {

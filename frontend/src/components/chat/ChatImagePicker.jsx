@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { PictureOutlined, CloseOutlined } from '@ant-design/icons';
+import { PaperClipOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button } from '../common';
 import { colors, radius } from '../../styles/tokens';
 
@@ -31,8 +31,8 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled }) {
     return <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
         <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
             onChange={select} disabled={disabled} hidden aria-label="첨부할 사진 선택" />
-        <Button variant="ghost" size="sm" style={{ width: 32, height: 32, padding: 0 }} icon={<PictureOutlined />} aria-label="사진 첨부"
-            disabled={disabled} onClick={() => input.current?.click()} />
+        <button type="button" className="reserve-chat-tool" aria-label="사진 첨부"
+            disabled={disabled} onClick={() => input.current?.click()}><PaperClipOutlined /></button>
         {file && <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {preview?.file === file && <img src={preview.url} alt="전송할 사진"
                 style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: radius.md,

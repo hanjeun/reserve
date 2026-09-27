@@ -10,19 +10,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Typography, Pagination } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { SendOutlined, MessageOutlined, LoadingOutlined } from '@ant-design/icons';
+import { MessageOutlined } from '@ant-design/icons';
 import { Button, DataState, UnreadPill, RefreshButton } from '../common';
 import { Bone } from '../common/Skeletons';
 import ChatBubbleList from '../chat/ChatBubbleList';
 import useChatThread from '../../hooks/useChatThread';
 import useChatImageDraft from '../../hooks/useChatImageDraft';
-import ChatImagePicker from '../chat/ChatImagePicker';
+import ChatComposer from '../chat/ChatComposer';
 import chatService from '../../services/chatService';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { adminKeys } from '../../hooks/queryKeys';
 import { useMessage, useWindowWidth } from '../../hooks';
-import { colors, fontSize, fontWeight, radius, field } from '../../styles/tokens';
+import { colors, fontSize, fontWeight, radius } from '../../styles/tokens';
 
 const { Text } = Typography;
 
@@ -95,9 +95,9 @@ const ChatTab = () => {
         [],
     );
     const sendFn = useCallback(
-        (rid, content, clientMessageId, file) => file
-            ? chatService.sendImage(rid, file, content, clientMessageId)
-            : api.post(API_ENDPOINTS.CHAT.ADMIN_REPLY(rid), { content, clientMessageId }),
+        (rid, content, clientMessageId, file, config) => file
+            ? chatService.sendImage(rid, file, content, clientMessageId, config)
+            : api.post(API_ENDPOINTS.CHAT.ADMIN_REPLY(rid), { content, clientMessageId }, config),
         [],
     );
     /**
@@ -142,11 +142,12 @@ const ChatTab = () => {
     );
     const onError = useCallback((msg) => message.error(msg), [message]);
 
-    const { messages, loading: threadLoading, loadError, reload, sending, send } = useChatThread({
+    const { messages, loading: threadLoading, loadError, reload, sending, send, cancelSend, updateMessage } = useChatThread({
         threadKey: roomIdSel,
         myRole: 'ADMIN',
         load, poll, send: sendFn,
-        onLoaded, onSent, onError,
+        pollChanges: chatService.pollRetractions, cancellable: true,
+        onLoaded, onSent, onChanged: onSent, onError,
         pollMs: POLL_MS,
     });
 
@@ -164,7 +165,7 @@ const ChatTab = () => {
         imageDraft.clear();
         const ok = await send(text, file);
         if (ok === false && file) imageDraft.restore(file);
-        if (ok === false) setDraft(text);
+        if (ok === false) setDraft(current => current || text);
     };
 
     const conversation = (
@@ -192,7 +193,7 @@ const ChatTab = () => {
                             <DataState state="error" kind="message" subject="대화" title="대화를 불러오지 못했습니다."
                                 onRetry={reload} compact />
                         ) : (
-                            <ChatBubbleList messages={messages} mine="ADMIN" />
+                            <ChatBubbleList messages={messages} mine="ADMIN" roomId={roomIdSel} onRetracted={updateMessage} />
                         )}
                         <div ref={bottomRef} />
                     </div>
@@ -200,33 +201,9 @@ const ChatTab = () => {
                         {/* 통합 메신저와 같은 구조 — 껍데기 하나가 테두리·모서리·포커스링을
                             갖고, 전송 버튼은 그 안에 들어간다. 두 화면의 입력칸이 달라 보이면
                             "같은 기능인데 왜 다르지"가 된다. */}
-                        <div style={styles.composerShell} className="reserve-chat-composer">
-                            <ChatImagePicker file={imageDraft.file} onChange={imageDraft.choose}
-                                enabled={imageDraft.enabled} disabled={sending || threadLoading || loadError} />
-                            <textarea
-                                value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
-                                onKeyDown={(e) => {
-                                    // IME 조합 중(한글) Enter 는 확정이라 전송으로 보면 안 된다.
-                                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
-                                placeholder="답장을 입력하세요 (Enter 전송 / Shift+Enter 줄바꿈)"
-                                maxLength={2000}
-                                rows={2}
-                                style={styles.textarea}
-                            />
-                            {/* 전송 중에는 아이콘이 스피너로 바뀌고 버튼이 잠긴다.
-                                통합 메신저와 같은 규칙이다. */}
-                            <button type="button" onClick={handleSend}
-                                disabled={(!draft.trim() && !imageDraft.file) || sending || threadLoading || loadError}
-                                style={styles.sendBtn} className="reserve-chat-send"
-                                aria-label={sending ? '보내는 중' : '보내기'} aria-busy={sending}>
-                                {sending ? <LoadingOutlined /> : <SendOutlined />}
-                            </button>
-                        </div>
+                        <ChatComposer value={draft} onChange={setDraft} onSend={handleSend}
+                            file={imageDraft.file} onFileChange={imageDraft.choose} imageEnabled={imageDraft.enabled}
+                            sending={sending} disabled={threadLoading || loadError} onCancel={cancelSend} />
                     </div>
                 </>
             )}
@@ -326,15 +303,9 @@ const styles = {
     roomEmail:   { fontSize: fontSize.xs, color: colors.text.tertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     roomWhen:    { fontSize: fontSize.xs, color: colors.text.tertiary, flexShrink: 0 },
     thread:      { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: colors.background.paper, minHeight: 360 },
-    threadBody:  { flex: 1, overflowY: 'auto', padding: '18px 20px', background: colors.background.subtle },
+    threadBody:  { flex: 1, overflowY: 'auto', padding: '18px 20px', background: colors.background.paper },
     emptyDetail: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
     composer:    { padding: 12, borderTop: `1px solid ${colors.border.light}`, background: colors.background.paper },
-    // 껍데기가 곧 입력칸이다 — radius 는 field 토큰에서 온다(숫자를 두 번 적지 않는다).
-    // border(:focus-within) 와 sendBtn 의 background(:hover) 는 index.css 가 갖는다 —
-    // 인라인에 두면 인라인이 이겨서 상태 변화가 화면에 안 나타난다.
-    composerShell: { display: 'flex', alignItems: 'flex-end', gap: 6, padding: 6, borderRadius: field.radius, background: colors.background.paper },
-    textarea:    { flex: 1, minWidth: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', padding: '7px 4px 7px 8px', margin: 0, maxHeight: 120, overflowY: 'auto', fontSize: fontSize.sm, lineHeight: 1.5, fontFamily: 'inherit', color: colors.text.primary },
-    sendBtn:     { flexShrink: 0, border: 'none', cursor: 'pointer', color: '#fff', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
     paginationBar: { display: 'flex', justifyContent: 'center', padding: '10px 8px', borderTop: `1px solid ${colors.border.light}` },
 };
 

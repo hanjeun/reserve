@@ -21,7 +21,7 @@ describe('messenger interaction roles', () => {
     it('opens threads with the same smooth duration and easing as returning to the list', () => {
         const entering = declarations('.reserve-messenger.is-opening-thread > .reserve-messenger-thread').animation;
         const leaving = declarations('.reserve-messenger.is-returning-to-list > .reserve-messenger-thread').animation;
-        expect(entering).toBe(leaving.replace('reserve-messenger-thread-back-out', 'reserve-messenger-thread-in'));
+        expect(entering).toBe(leaving.replace(' both', ' reverse both'));
         expect(entering).toContain('0.26s cubic-bezier(0.4, 0, 0.2, 1)');
         expect(declarations('.reserve-messenger.is-opening-thread > .reserve-messenger-thread', '(prefers-reduced-motion: reduce)')['animation-duration'])
             .toBe('0.01ms');

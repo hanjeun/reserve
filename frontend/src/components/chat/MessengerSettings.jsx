@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { UserOutlined } from '@ant-design/icons';
 import { getMessengerImageUrl } from './messengerImages';
+import ChatPreferences from './ChatPreferences';
 
 function SettingsProfileImage({ source, initial }) {
     const [failed, setFailed] = useState(false);
@@ -38,12 +39,11 @@ export default function MessengerSettings({ user, notificationControl, headingLe
                         <Link className="reserve-messenger-settings-link" to="/my-page">내 정보 관리</Link>
                     </div>
                 </section>
-                {Boolean(notificationControl) && (
-                    <section className="reserve-messenger-settings-environment" aria-labelledby={environmentId}>
+                <section className="reserve-messenger-settings-environment" aria-labelledby={environmentId}>
                         <Subheading id={environmentId}>대화 환경</Subheading>
-                        {notificationControl}
-                    </section>
-                )}
+                        <ChatPreferences />
+                        {notificationControl || null}
+                </section>
             </div>
         </section>
     );

@@ -98,6 +98,15 @@ public class ChatRoom {
     @Column(name = "last_message_preview", length = 160)
     private String lastMessagePreview;
 
+    /** 방 잠금 안에서만 증가한다. 오래된 메시지 취소도 폴링 커서가 놓치지 않는다. */
+    @Column(name = "retraction_revision", nullable = false)
+    @Builder.Default
+    private long retractionRevision = 0;
+
+    public long nextRetractionRevision() { return ++retractionRevision; }
+
+    public void replaceLastMessagePreview(String preview) { lastMessagePreview = previewContent(preview); }
+
     /** 손님이 이 가게 대화를 차단한 시각. null이면 차단하지 않았다. */
     @Column(name = "member_blocked_at")
     private LocalDateTime memberBlockedAt;

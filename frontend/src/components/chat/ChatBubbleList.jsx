@@ -32,6 +32,8 @@ import { Typography } from 'antd';
 import { colors, fontSize, radius } from '../../styles/tokens';
 import { SupportAvatar, SupportName } from './SupportIdentity';
 import ChatImage from './ChatImage';
+import useChatPreferences from '../../hooks/useChatPreferences';
+import ChatMessageActions from './ChatMessageActions';
 
 const { Text } = Typography;
 
@@ -55,7 +57,9 @@ const inSameGroup = (a, b) => {
  * @param {Array}  messages 시간순 메시지
  * @param {string} mine     내 메시지로 볼 senderRole ('MEMBER' | 'ADMIN')
  */
-const ChatBubbleList = ({ messages, mine }) => (
+const ChatBubbleList = ({ messages, mine, roomId, onRetracted }) => {
+    const { palette } = useChatPreferences();
+    return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
         {messages.map((m, i) => {
             const isMine = m.senderRole === mine;
@@ -88,28 +92,30 @@ const ChatBubbleList = ({ messages, mine }) => (
                         {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
                         <div style={{
                             ...styles.bubble,
-                            ...(isMine ? styles.bubbleMine : styles.bubbleTheirs),
+                            ...(isMine ? { background: palette.background, color: palette.foreground } : styles.bubbleTheirs),
                             ...corner,
                             // 아직 서버가 받았는지 모르는 상태. 자리는 잡되 "확정 아님"이 보여야 한다.
                             ...(m.pending ? styles.bubblePending : null),
+                            ...(m.retracted ? { background: colors.background.subtle, color: colors.text.secondary, border: `1px solid ${colors.border.default}` } : null),
                         }}>
                             {m.imageUrl && <ChatImage url={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />}
                             {m.content && <span>{m.content}</span>}
                         </div>
                     </div>
+                    {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted} />}
                     {!isMine && last && <Text style={styles.stamp}>{formatTime(m.createdAt)}</Text>}
                 </div>
             );
         })}
     </div>
 );
+};
 
 const styles = {
     bubble: {
         padding: '9px 13px', borderRadius: radius.lg,
         fontSize: fontSize.sm, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     },
-    bubbleMine: { background: colors.primary.main, color: '#fff' },
     bubbleTheirs: {
         background: colors.background.paper, color: colors.text.primary,
         border: `1px solid ${colors.border.light}`,

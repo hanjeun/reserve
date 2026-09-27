@@ -30,6 +30,7 @@ import useExitAnimation from '../../hooks/useExitAnimation';
 import useImagePreview from '../../hooks/useImagePreview';
 import { useNavigate } from 'react-router-dom';
 import { colors, radius, shadows, fontSize, fontWeight, animation, breakpoints } from '../../styles/tokens';
+import ChatPreferences from '../../components/chat/ChatPreferences';
 import { useWindowWidth } from '../../hooks';
 
 const { Text } = Typography;
@@ -1168,6 +1169,13 @@ const MyPage = () => {
         <>
             {/* 디자인(모양·글꼴) */}
             <AppearanceSection />
+
+            <Divider />
+
+            <div style={styles.notificationSection}>
+                <Text strong style={styles.sectionTitle}>대화 환경</Text>
+                <ChatPreferences />
+            </div>
 
             <Divider />
 

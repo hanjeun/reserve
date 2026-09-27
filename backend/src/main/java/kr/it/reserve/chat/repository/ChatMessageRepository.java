@@ -11,6 +11,9 @@ import java.util.List;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
+    Slice<ChatMessage> findByRoomIdAndRetractionRevisionGreaterThanOrderByRetractionRevisionAsc(
+            Long roomId, Long revision, Pageable pageable);
+
     java.util.Optional<ChatMessage> findByIdAndRoomId(Long id, Long roomId);
 
     java.util.Optional<ChatMessage> findByRoomIdAndSenderMemberIdAndClientMessageId(

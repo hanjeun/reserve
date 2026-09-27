@@ -103,12 +103,12 @@ public class ChatModerationService {
         List<ChatMessageResponse> recent = messageRepository.findByRoomIdOrderByIdDesc(
                         roomId, PageRequest.of(0, 50))
                 .getContent().stream()
-                .map(ChatMessageResponse::from)
+                .map(ChatMessageResponse::forReport)
                 .toList()
                 .reversed();
         ChatMessageResponse reportedMessage = report.getMessageId() == null ? null
                 : messageRepository.findByIdAndRoomId(report.getMessageId(), roomId)
-                .map(ChatMessageResponse::from)
+                .map(ChatMessageResponse::forReport)
                 .orElse(null);
         return ChatReportContextResponse.builder()
                 .report(ChatReportResponse.from(report))

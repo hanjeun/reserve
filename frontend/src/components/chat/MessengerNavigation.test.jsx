@@ -89,7 +89,8 @@ describe('MessengerSettings', () => {
         expect(screen.getByText('member@example.com')).toBeInTheDocument();
         expect(container.querySelector('.reserve-messenger-settings-avatar')).toHaveTextContent('김');
         expect(screen.getByRole('link', { name: '내 정보 관리' })).toHaveAttribute('href', '/my-page');
-        expect(screen.queryByRole('region', { name: '대화 환경' })).not.toBeInTheDocument();
+        expect(screen.getByRole('region', { name: '대화 환경' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: '내 말풍선 색' })).toBeInTheDocument();
         expect(container.querySelector('.reserve-messenger-settings-note')).toBeNull();
     });
 
@@ -98,7 +99,7 @@ describe('MessengerSettings', () => {
         expect(container.querySelector('.anticon-user')).toBeInTheDocument();
         expect(container.querySelector('.reserve-messenger-settings-email')).toBeNull();
         expect(screen.queryByText('PC 세션 알림은 PC 브라우저에서 설정할 수 있어요.')).not.toBeInTheDocument();
-        expect(screen.queryByRole('region', { name: '대화 환경' })).not.toBeInTheDocument();
+        expect(screen.getByRole('region', { name: '대화 환경' })).toBeInTheDocument();
         expect(screen.queryByRole('switch')).not.toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
         expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -124,10 +125,12 @@ describe('MessengerSettings', () => {
         expect(screen.queryByText(/PC 세션 알림은 PC 브라우저/)).not.toBeInTheDocument();
     });
 
-    it.each([undefined, null, false, '', 0])('omits the environment section without an actual control: %s', notificationControl => {
-        renderSettings({ notificationControl });
-        expect(screen.queryByRole('region', { name: '대화 환경' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('heading', { name: '대화 환경' })).not.toBeInTheDocument();
+    it.each([undefined, null, false, '', 0])('keeps real color preferences without rendering an absent notification control: %s', notificationControl => {
+        const { container } = renderSettings({ notificationControl });
+        expect(screen.getByRole('region', { name: '대화 환경' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: '내 말풍선 색' })).toBeInTheDocument();
+        expect(container.querySelector('.reserve-messenger-settings-environment')).not.toHaveTextContent(/^0$/);
+        expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     });
 
     it.each(['/icons/R_logo.png', 'https://cdn.reserve.it.kr/users/1/profiles/photo.png', 'https://lh3.googleusercontent.com/design-example'])('displays the provided current-user photo at a safe address: %s', profileImage => {
@@ -143,11 +146,11 @@ describe('MessengerSettings', () => {
     });
 
     it('supports the header profile URL priority with a guarded uploaded-photo fallback', () => {
-        const user = { id: 1, name: '김회원', profileImage: '/icons/R_logo.png', profileImageUrl: 'https://example.test/social-photo.png' };
-        const { container, rerender } = renderSettings({ user });
-        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', user.profileImageUrl);
-        rerender(<MemoryRouter><MessengerSettings user={{ ...user, profileImageUrl: 'javascript:alert(1)' }} /></MemoryRouter>);
-        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', user.profileImage);
+        const account = { id: 1, name: '김회원', profileImage: '/icons/R_logo.png', profileImageUrl: 'https://example.test/social-photo.png' };
+        const { container, rerender } = renderSettings({ user: account });
+        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', account.profileImageUrl);
+        rerender(<MemoryRouter><MessengerSettings user={{ ...account, profileImageUrl: 'javascript:alert(1)' }} /></MemoryRouter>);
+        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', account.profileImage);
     });
 
     it.each(['', '  ', 'javascript:alert(1)', 'data:image/png;base64,example', 'blob:https://example.test/example', 'file:///photo.png', 'ftp://example.test/photo.png', 'https://user:password@example.test/photo.png', 'http://tracker.example/photo.png'])('uses the current initial without requesting an unsafe photo: %s', profileImage => {

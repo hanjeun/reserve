@@ -56,6 +56,22 @@ class ChatImageAccessTest {
         assertThat(images.readForReport(admin, 20L, 33L).bytes()).isEqualTo(plaintext);
     }
 
+    @Test void retractedPhotoIsUnavailableToParticipantsButRetainedForReportReview() {
+        var photo = photo();
+        photo.retract(java.time.LocalDateTime.now(), 1);
+        when(messages.findById(33L)).thenReturn(Optional.of(photo));
+        when(rooms.findById(10L)).thenReturn(Optional.of(room));
+        assertThatThrownBy(() -> images.read(customer, 33L)).isInstanceOf(ChatException.class)
+                .extracting("status").isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND);
+        verifyNoInteractions(storage);
+        when(moderation.reportContext(20L)).thenReturn(ChatReportContextResponse.builder()
+                .reportedMessage(ChatMessageResponse.forReport(photo)).recentMessages(List.of()).build());
+        byte[] plaintext = {1, 2, 3};
+        when(storage.readEncryptedChatImage(photo.getImageKey(), "users/1/chat/10"))
+                .thenReturn(cipher.encrypt(plaintext, "users/1/chat/10"));
+        assertThat(images.readForReport(admin, 20L, 33L).bytes()).isEqualTo(plaintext);
+    }
+
     @Test void blockedStoreConversationRejectsPhotoBeforeUpload() {
         when(rooms.findByIdForUpdate(10L)).thenReturn(Optional.of(room));
         when(stores.findById(5L)).thenReturn(Optional.of(Store.builder().id(5L).build()));

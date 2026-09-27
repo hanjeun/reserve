@@ -5,6 +5,60 @@ import useChatThread from '../useChatThread';
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 
 describe('chat response ownership', () => {
+    it('interrupts the pending request and keeps the same retry identity for an ambiguous delivery', async () => {
+        const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [] });
+        const poll = vi.fn().mockResolvedValue([]);
+        const onError = vi.fn();
+        const send = vi.fn().mockImplementationOnce((_room, _text, _id, _file, { signal }) =>
+            new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })))
+            .mockResolvedValueOnce({ id: 33, content: '사진', senderRole: 'MEMBER' });
+        const file = new File(['photo'], 'photo.png', { type: 'image/png' });
+        const hook = renderHook(() => useChatThread({ threadKey: 'A', myRole: 'MEMBER', load, poll, send, onError, cancellable: true }));
+        await waitFor(() => expect(hook.result.current.roomId).toBe(1));
+        let request;
+        act(() => { request = hook.result.current.send('사진', file); });
+        expect(hook.result.current.sending).toBe(true);
+        await act(async () => { hook.result.current.cancelSend(); expect(await request).toBe(false); });
+        expect(send.mock.calls[0][4].signal.aborted).toBe(true);
+        expect(hook.result.current.messages).toEqual([]);
+        expect(hook.result.current.sending).toBe(false);
+        expect(onError).toHaveBeenCalledWith(expect.stringContaining('서버에 도착했을 수'));
+        await act(async () => { expect(await hook.result.current.send('사진', file)).toBe(true); });
+        expect(send.mock.calls[1][2]).toBe(send.mock.calls[0][2]);
+    });
+
+    it('updates old message ids through a separate cursor without appending unseen history or issuing new-message notifications', async () => {
+        const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [{ id: 2, content: '원문' }, { id: 99, content: '최신' }] });
+        const poll = vi.fn().mockResolvedValue([]);
+        const pollChanges = vi.fn().mockResolvedValueOnce({ messages: [
+            { id: 1, retracted: true, content: '취소' }, { id: 2, retracted: true, content: '취소', imageUrl: null },
+        ], nextRevision: 9 }).mockResolvedValue({ messages: [], nextRevision: 9 });
+        const onPolled = vi.fn(), onChanged = vi.fn();
+        const hook = renderHook(() => useChatThread({ threadKey: 'A', myRole: 'MEMBER', load, poll, send: vi.fn(), pollChanges, onPolled, onChanged, pollMs: 60000 }));
+        await waitFor(() => expect(hook.result.current.messages[0].retracted).toBe(true));
+        expect(hook.result.current.messages.map(message => message.id)).toEqual([2, 99]);
+        await act(async () => { window.dispatchEvent(new Event('focus')); });
+        await waitFor(() => expect(pollChanges).toHaveBeenLastCalledWith(1, 9));
+        expect(poll).toHaveBeenLastCalledWith(1, 99);
+        expect(onPolled).not.toHaveBeenCalled();
+        expect(onChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not apply a stale retraction to a newly opened room', async () => {
+        const delayed = deferred();
+        const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [{ id: 2, content: '원문' }] });
+        const poll = vi.fn().mockResolvedValue([]);
+        const pollChanges = vi.fn().mockReturnValueOnce(delayed.promise).mockResolvedValue({ messages: [], nextRevision: 0 });
+        const onChanged = vi.fn();
+        const hook = renderHook(({ key }) => useChatThread({ threadKey: key, myRole: 'MEMBER', load, poll, send: vi.fn(), pollChanges, onChanged }), { initialProps: { key: 'A' } });
+        await waitFor(() => expect(pollChanges).toHaveBeenCalledTimes(1));
+        hook.rerender({ key: 'B' });
+        await waitFor(() => expect(pollChanges).toHaveBeenCalledTimes(2));
+        await act(async () => { delayed.resolve({ messages: [{ id: 2, retracted: true }], nextRevision: 1 }); });
+        expect(hook.result.current.messages).toEqual([{ id: 2, content: '원문' }]);
+        expect(onChanged).not.toHaveBeenCalled();
+    });
+
     it('sends photo-only messages and reuses their retry id without double insertion', async () => {
         const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [] });
         const poll = vi.fn().mockResolvedValue([]);

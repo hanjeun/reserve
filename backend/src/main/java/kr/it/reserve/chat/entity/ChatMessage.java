@@ -10,8 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 채팅 메시지 한 줄 (2026-08-24 신설).
  *
- * <p><b>수정·삭제가 없다.</b> 대화 기록은 "무슨 이야기가 오갔나"의 증거이고,
- * 고칠 수 있게 만드는 순간 증거가 아니게 된다. 환불 원장을 읽기 전용으로 둔 것과 같은 이유다.
+ * <p>원본은 수정·삭제하지 않는다. 전송 취소는 별도 tombstone으로 표시하며 신고 검토에만 원본을 제공한다.
  */
 @Entity
 @Table(
@@ -22,7 +21,8 @@ import java.time.LocalDateTime;
         indexes = {
                 // 방 하나의 메시지를 시간순으로 읽는다 — 사실상 유일한 조회 패턴이다.
                 @Index(name = "idx_chat_message_room", columnList = "room_id, id"),
-                @Index(name = "idx_chat_message_idempotency", columnList = "room_id, sender_member_id, client_message_id")
+                @Index(name = "idx_chat_message_idempotency", columnList = "room_id, sender_member_id, client_message_id"),
+                @Index(name = "idx_chat_message_retraction", columnList = "room_id, retraction_revision")
         }
 )
 @EntityListeners(AuditingEntityListener.class)
@@ -80,6 +80,20 @@ public class ChatMessage {
 
     @Column(name = "image_bytes")
     private Integer imageBytes;
+
+    @Column(name = "retracted_at")
+    private LocalDateTime retractedAt;
+
+    @Column(name = "retraction_revision")
+    private Long retractionRevision;
+
+    public boolean isRetracted() { return retractedAt != null; }
+
+    public void retract(LocalDateTime at, long revision) {
+        if (isRetracted()) return;
+        retractedAt = at;
+        retractionRevision = revision;
+    }
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

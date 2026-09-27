@@ -463,7 +463,7 @@ public class ChatService {
         Map<Long, String> previews = new HashMap<>();
         for (ChatMessage message : messageRepository.findLatestByRoomIds(roomIds)) {
             if (message.getRoom() != null && roomIds.contains(message.getRoom().getId())) {
-                previews.put(message.getRoom().getId(), ChatRoom.previewContent(message.getContent()));
+                previews.put(message.getRoom().getId(), ChatRoom.previewContent(ChatMessageResponse.from(message).getContent()));
             }
         }
         return previews;

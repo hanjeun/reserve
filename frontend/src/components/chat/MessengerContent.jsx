@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import PropTypes from 'prop-types';
 import {
     ArrowLeftOutlined,
-    LoadingOutlined,
     MessageOutlined,
-    SendOutlined,
 } from '@ant-design/icons';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -24,7 +22,7 @@ import { conversationTitle, SUPPORT_LABEL, SupportIdentityContext, useSupportIde
 import { SupportAvatar } from './SupportIdentity';
 import ChatNotificationControl from './ChatNotificationControl';
 import ChatBubbleList from './ChatBubbleList';
-import ChatImagePicker from './ChatImagePicker';
+import ChatComposer from './ChatComposer';
 import useChatImageDraft from '../../hooks/useChatImageDraft';
 import ChatModerationMenu from './ChatModerationMenu';
 import useChatThread from '../../hooks/useChatThread';
@@ -265,18 +263,18 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
             : chatService.pollRoom(roomId, afterId),
         [selection.kind],
     );
-    const sendFn = useCallback((_roomId, content, clientMessageId, file) => {
-        if (file) return chatService.sendImage(_roomId, file, content, clientMessageId);
+    const sendFn = useCallback((_roomId, content, clientMessageId, file, config) => {
+        if (file) return chatService.sendImage(_roomId, file, content, clientMessageId, config);
         if (selection.kind === 'admin') {
-            return chatService.sendAdminSupportRoom(selection.roomId, content, clientMessageId);
+            return chatService.sendAdminSupportRoom(selection.roomId, content, clientMessageId, config);
         }
         if (selection.kind === 'store') {
-            return chatService.sendStore(selection.storeId, content, clientMessageId);
+            return chatService.sendStore(selection.storeId, content, clientMessageId, config);
         }
         if (selection.kind === 'owner') {
-            return chatService.sendStoreInbox(selection.roomId, content, clientMessageId);
+            return chatService.sendStoreInbox(selection.roomId, content, clientMessageId, config);
         }
-        return chatService.sendSupport(content, clientMessageId);
+        return chatService.sendSupport(content, clientMessageId, config);
     }, [selection.kind, selection.roomId, selection.storeId]);
 
     const clearUnreadCaches = useCallback((readCount = 0) => {
@@ -342,15 +340,18 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     }, [clearUnreadCaches, isWide, notify, selection, threadKey]);
 
     const {
-        messages, thread, loading, loadError, sending, send, reload, prepend,
+        messages, thread, loading, loadError, sending, send, reload, prepend, cancelSend, updateMessage,
     } = useChatThread({
         threadKey,
         myRole: viewerRoleOf(selection),
         load,
         poll,
+        pollChanges: chatService.pollRetractions,
+        cancellable: true,
         send: sendFn,
         onLoaded,
         onSent,
+        onChanged: onSent,
         onPolled,
         onError,
         pollMs: POLL_THREAD_MS,
@@ -424,6 +425,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     };
 
     const choose = (next) => {
+        if (returningToList || openingThread) return;
         if (routeSelection) navigate('/messages', { replace: true });
         select(next);
         setMobileThreadOpen(true);
@@ -437,7 +439,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         setReturningToList(false);
     }, [navigate, routeSelection, showConversations]);
     const showConversationList = () => {
-        if (returningToList) return;
+        if (returningToList || openingThread) return;
         setReturningToList(true);
     };
     useEffect(() => {
@@ -544,7 +546,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
 
     return (
         <div className={`reserve-messenger reserve-messenger--${surface}${showThread ? ' has-thread' : ''}${mobileThreadVisible ? ' has-mobile-thread' : ''}${returningToList ? ' is-returning-to-list' : ''}${openingThread && !returningToList ? ' is-opening-thread' : ''}`}>
-            {(!showThread || (surface === 'page' && isWide) || returningToList) && <aside className="reserve-messenger-list" aria-label="대화 목록">
+            {(!showThread || (surface === 'page' && isWide) || returningToList || openingThread) && <aside className="reserve-messenger-list" aria-label="대화 목록"
+                inert={openingThread || returningToList ? true : undefined}>
                 <MessengerListHeading headingLevel={surface === 'page' ? 1 : 2}
                     refreshing={conversationListsFetching}
                     onRefresh={refreshConversationLists} />
@@ -735,7 +738,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                                     </Button>
                                 </div>
                             )}
-                            <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)} />
+                            <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
+                                roomId={thread?.roomId} onRetracted={updateMessage} />
                             <div ref={bottomRef} />
                         </div>
                     )}
@@ -764,35 +768,9 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                                 </div>
                             </details>
                         )}
-                        <div className="reserve-chat-composer reserve-messenger-composer">
-                            <ChatImagePicker file={imageDraft.file} onChange={imageDraft.choose}
-                                enabled={imageDraft.enabled} disabled={sending || loading || loadError} />
-                            <textarea
-                                value={draft}
-                                onChange={(event) => setDraft(selectionKey, event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                                        event.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
-                                placeholder="메시지를 입력하세요"
-                                aria-label="메시지 입력"
-                                maxLength={2000}
-                                rows={1}
-                                disabled={loading || loadError}
-                            />
-                            <button
-                                type="button"
-                                className="reserve-chat-send reserve-messenger-send"
-                                onClick={handleSend}
-                                disabled={(!draft.trim() && !imageDraft.file) || sending || loading || loadError}
-                                aria-label={sending ? '보내는 중' : '보내기'}
-                                aria-busy={sending || undefined}
-                            >
-                                {sending ? <LoadingOutlined /> : <SendOutlined />}
-                            </button>
-                        </div>
+                        <ChatComposer value={draft} onChange={value => setDraft(selectionKey, value)} onSend={handleSend}
+                            file={imageDraft.file} onFileChange={imageDraft.choose} imageEnabled={imageDraft.enabled}
+                            sending={sending} disabled={loading || loadError} onCancel={cancelSend} />
                     </div>
                 )}
             </section>}

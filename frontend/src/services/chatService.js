@@ -10,21 +10,23 @@ const chatService = {
     listStoreInbox: (page = 0) => api.get(
         API_ENDPOINTS.CHAT.STORE_INBOX, { params: { page } }).then(data => normalizeListPage(data, page)),
     getSupport: () => api.post(`${API_ENDPOINTS.CHAT.SUPPORT}/open`),
-    sendSupport: (content, clientMessageId) => api.post(
-        API_ENDPOINTS.CHAT.SUPPORT_SEND, messageBody(content, clientMessageId)),
+    sendSupport: (content, clientMessageId, config) => api.post(
+        API_ENDPOINTS.CHAT.SUPPORT_SEND, messageBody(content, clientMessageId), config),
     getStore: (storeId) => api.post(`${API_ENDPOINTS.CHAT.STORE(storeId)}/open`),
-    sendStore: (storeId, content, clientMessageId) => api.post(
-        API_ENDPOINTS.CHAT.STORE_SEND(storeId), messageBody(content, clientMessageId)),
+    sendStore: (storeId, content, clientMessageId, config) => api.post(
+        API_ENDPOINTS.CHAT.STORE_SEND(storeId), messageBody(content, clientMessageId), config),
     getStoreInboxRoom: (roomId) => api.post(`${API_ENDPOINTS.CHAT.STORE_INBOX_ROOM(roomId)}/open`),
-    sendStoreInbox: (roomId, content, clientMessageId) => api.post(
-        API_ENDPOINTS.CHAT.STORE_INBOX_SEND(roomId), messageBody(content, clientMessageId)),
+    sendStoreInbox: (roomId, content, clientMessageId, config) => api.post(
+        API_ENDPOINTS.CHAT.STORE_INBOX_SEND(roomId), messageBody(content, clientMessageId), config),
     listAdminSupportInbox: (page = 0) => api.get(
         API_ENDPOINTS.CHAT.ADMIN_ROOMS, { params: { page } }).then(data => normalizeListPage(data, page)),
     getAdminSupportRoom: (roomId) => api.post(`${API_ENDPOINTS.CHAT.ADMIN_ROOM(roomId)}/open`),
     pollAdminSupportRoom: (roomId, afterId) => api.get(
         API_ENDPOINTS.CHAT.ADMIN_POLL(roomId), { params: { afterId } }),
-    sendAdminSupportRoom: (roomId, content, clientMessageId) => api.post(
-        API_ENDPOINTS.CHAT.ADMIN_REPLY(roomId), messageBody(content, clientMessageId)),
+    sendAdminSupportRoom: (roomId, content, clientMessageId, config) => api.post(
+        API_ENDPOINTS.CHAT.ADMIN_REPLY(roomId), messageBody(content, clientMessageId), config),
+    retract: (roomId, messageId) => api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`),
+    pollRetractions: (roomId, afterRevision = 0) => api.get(`/api/chat/rooms/${roomId}/retractions`, { params: { afterRevision } }),
     markAdminSupportRead: (roomId) => api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId)),
     pollRoom: (roomId, afterId) => api.get(
         API_ENDPOINTS.CHAT.ROOM_MESSAGES(roomId), { params: { afterId } }),
@@ -43,12 +45,12 @@ const chatService = {
         API_ENDPOINTS.CHAT.ADMIN_REPORT(reportId), review),
     getUnread: () => api.get(API_ENDPOINTS.CHAT.UNREAD),
     getImageConfig: () => api.get('/api/chat/images/config'),
-    sendImage: (roomId, file, content, clientMessageId) => {
+    sendImage: (roomId, file, content, clientMessageId, config) => {
         const form = new FormData();
         form.append('image', file);
         form.append('content', content || '');
         form.append('clientMessageId', clientMessageId);
-        return api.post(`/api/chat/rooms/${roomId}/images`, form);
+        return api.post(`/api/chat/rooms/${roomId}/images`, form, config);
     },
     getImage: (url, signal) => api.get(url, { responseType: 'blob', signal }),
     getSupportIntro: () => api.get(API_ENDPOINTS.CHAT.INTRO_SUPPORT),

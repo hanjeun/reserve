@@ -214,7 +214,7 @@ describe('MessengerContent', () => {
         await user.type(screen.getByRole('textbox', { name: '메시지 입력' }), '확인했습니다');
         await user.click(screen.getByRole('button', { name: '보내기' }));
         await waitFor(() => expect(chatService.sendAdminSupportRoom).toHaveBeenCalledWith(
-            91, '확인했습니다', expect.any(String),
+            91, '확인했습니다', expect.any(String), expect.objectContaining({ signal: expect.any(AbortSignal) }),
         ));
     });
 
@@ -321,7 +321,8 @@ describe('MessengerContent', () => {
         expect(screen.queryByRole('button', { name: '고객지원에 문의' })).not.toBeInTheDocument();
         await user.click(await screen.findByRole('button', { name: /RESERVE 고객지원/ }));
         await waitFor(() => expect(chatService.getSupport).toHaveBeenCalledTimes(1));
-        expect(screen.queryByLabelText('대화 목록')).not.toBeInTheDocument();
+        fireEvent.animationEnd(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }).closest('.reserve-messenger-thread'));
+        await waitFor(() => expect(screen.queryByLabelText('대화 목록')).not.toBeInTheDocument());
         expect(screen.queryByRole('navigation', { name: '메신저 화면' })).not.toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
         const messenger = screen.getByRole('button', { name: '대화 목록으로 돌아가기' }).closest('.reserve-messenger');
@@ -345,7 +346,7 @@ describe('MessengerContent', () => {
     it('does not repeat draft and keyboard guidance below the compact input', async () => {
         const { container } = renderMessenger();
         await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled());
-        expect(screen.getByPlaceholderText('메시지를 입력하세요')).toHaveAttribute('rows', '1');
+        expect(screen.getByPlaceholderText('메시지를 입력하세요')).toHaveAttribute('rows', '2');
         expect(screen.getByRole('textbox')).toHaveAttribute('maxLength', '2000');
         expect(container.querySelector('.reserve-messenger-composer-hint')).toBeNull();
         expect(screen.queryByText(/대화별 초안은 이번 세션/)).not.toBeInTheDocument();
@@ -448,11 +449,11 @@ describe('MessengerContent', () => {
             42,
             '예약 전에 문의드려요',
             expect.any(String),
+            expect.objectContaining({ signal: expect.any(AbortSignal) }),
         ));
     });
 
     it('keeps the mobile list first, then opens and closes a conversation', async () => {
-        const user = userEvent.setup();
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
         chatService.listConversations.mockResolvedValue(page([{
             roomId: 1, type: 'SUPPORT', counterpartName: 'RESERVE 고객지원', viewerRole: 'MEMBER', unread: 0,
@@ -460,12 +461,17 @@ describe('MessengerContent', () => {
         const view = renderMessenger();
 
         expect(chatService.getSupport).not.toHaveBeenCalled();
-        await user.click(await screen.findByRole('button', { name: /RESERVE 고객지원/ }));
-        await waitFor(() => expect(chatService.getSupport).toHaveBeenCalledTimes(1));
+        fireEvent.click(await screen.findByRole('button', { name: /RESERVE 고객지원/ }));
         const messenger = view.container.querySelector('.reserve-messenger');
         expect(messenger).toHaveClass('has-mobile-thread');
 
-        await user.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
+        expect(messenger).toHaveClass('is-opening-thread');
+        fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
+        expect(messenger).not.toHaveClass('is-returning-to-list');
+        fireEvent.animationEnd(messenger.querySelector('.reserve-messenger-thread'));
+        await waitFor(() => expect(messenger).not.toHaveClass('is-opening-thread'));
+        expect(chatService.getSupport).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
         expect(messenger).toHaveClass('is-returning-to-list', 'has-mobile-thread');
         expect(messenger.querySelector('.reserve-messenger-list')).toBeInTheDocument();
         fireEvent.animationEnd(messenger.querySelector('.reserve-messenger-thread'));

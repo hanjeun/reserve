@@ -125,7 +125,7 @@ describe('first support inquiry', () => {
         expect(chatService.sendSupport).not.toHaveBeenCalled();
         await user.click(screen.getByRole('button', { name: '보내기', exact: true }));
         await waitFor(() => expect(chatService.sendSupport).toHaveBeenCalledTimes(1));
-        expect(chatService.sendSupport).toHaveBeenCalledWith('제가 쓴 내용\n예약을 확인하고 싶어요', expect.any(String));
+        expect(chatService.sendSupport).toHaveBeenCalledWith('제가 쓴 내용\n예약을 확인하고 싶어요', expect.any(String), expect.objectContaining({ signal: expect.any(AbortSignal) }));
         expect(screen.queryByLabelText('문의 시작 안내')).not.toBeInTheDocument();
     });
 

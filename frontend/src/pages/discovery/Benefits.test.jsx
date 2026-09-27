@@ -41,7 +41,7 @@ describe('public store news and benefit guidance', () => {
         benefitService.getList.mockResolvedValue({ content: [], page: { totalElements: 0 } });
         renderPage('/benefits?page=2&domain=SPORTS&sort=recent&storePage=3');
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
-        const link = screen.getByRole('link', { name: '가게 둘러보기' });
+        const link = await screen.findByRole('link', { name: '가게 둘러보기' });
         expect(link).toHaveAttribute('href', '/stores');
         expect(document.querySelector('.reserve-benefits-empty img')).toBeNull();
         fireEvent.click(link);

@@ -471,8 +471,8 @@ describe('messenger list heading', () => {
     });
 });
 
-describe('compact composer source contract', () => {
-    it('aligns a compact single row with a fixed touch target and a mobile-safe font', () => {
+describe('shared composer source contract', () => {
+    it('places tools below the input with a fixed touch target and a mobile-safe font', () => {
         const css = postcss.parse(readFileSync(resolve(cwd(), 'src/styles/global/feature-surfaces.css'), 'utf8'));
         const declarations = (selector, mobile = false) => {
             const result = {};
@@ -483,10 +483,10 @@ describe('compact composer source contract', () => {
             });
             return result;
         };
-        expect(declarations('.reserve-messenger-composer')).toMatchObject({ 'min-height': '50px', padding: '2px', 'align-items': 'center' });
-        expect(declarations('.reserve-messenger-composer textarea')).toMatchObject({ height: '40px', padding: '8px 10px', 'line-height': '24px' });
+        expect(declarations('.reserve-messenger-composer')).toMatchObject({ 'min-height': '104px', padding: '8px', 'flex-direction': 'column', 'align-items': 'stretch' });
+        expect(declarations('.reserve-messenger-composer textarea')).toMatchObject({ height: '56px', padding: '8px 10px', 'line-height': '24px' });
         expect(declarations('.reserve-chat-send')).toMatchObject({ width: '44px', height: '44px', 'border-radius': '10px' });
-        expect(declarations('.reserve-messenger-send')).toMatchObject({ flex: '0 0 44px' });
+        expect(declarations('.reserve-messenger-send')).toMatchObject({ flex: '0 0 40px', width: '40px', height: '40px' });
         expect(declarations('.reserve-messenger-composer textarea', true)['font-size']).toBe('16px');
     });
 });

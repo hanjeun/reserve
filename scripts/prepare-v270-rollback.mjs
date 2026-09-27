@@ -43,6 +43,29 @@ export function rollbackChanges() {
         text = replaceOnce(text, 'return roomRepository.findById(roomId)\n', 'return roomRepository.findById(roomId)\n                .filter(room -> room.getType() == ChatRoom.RoomType.SUPPORT)\n');
         return replaceOnce(text, 'return roomRepository.findByIdForUpdate(roomId)\n', 'return roomRepository.findByIdForUpdate(roomId)\n                .filter(room -> room.getType() == ChatRoom.RoomType.SUPPORT)\n');
     });
+    edit('backend/src/main/java/kr/it/reserve/payment/service/PaymentService.java', text => {
+        text = replaceOnce(text, '    public PaymentResponseDto refundPayment(PaymentRefundDto refundDto) {\n',
+            '    public PaymentResponseDto refundPayment(PaymentRefundDto refundDto) {\n' +
+            '        return refundPayment(refundDto, true);\n    }\n\n' +
+            '    private PaymentResponseDto refundPayment(PaymentRefundDto refundDto, boolean updateReservationDeposit) {\n');
+        text = replaceOnce(text, 'applyRefundSucceeded(payment, cancelledAmount, refundDto.getRefundReason());',
+            'applyRefundSucceeded(payment, cancelledAmount, refundDto.getRefundReason(), updateReservationDeposit);');
+        text = replaceOnce(text,
+            '    void applyRefundSucceeded(Payment payment, Integer refundAmount, String reason) {\n' +
+            '        payment.refundPayment(refundAmount, reason);\n\n' +
+            '        if (payment.getStatus() == Payment.PaymentStatus.REFUNDED) {',
+            '    void applyRefundSucceeded(Payment payment, Integer refundAmount, String reason) {\n' +
+            '        applyRefundSucceeded(payment, refundAmount, reason, true);\n    }\n\n' +
+            '    private void applyRefundSucceeded(Payment payment, Integer refundAmount, String reason,\n' +
+            '                                      boolean updateReservationDeposit) {\n' +
+            '        payment.refundPayment(refundAmount, reason);\n\n' +
+            '        // The outer reservation transaction already owns this row lock.\n' +
+            '        if (updateReservationDeposit && payment.getStatus() == Payment.PaymentStatus.REFUNDED) {');
+        text = replaceOnce(text, '\n            PaymentResponseDto response = refundPayment(refundDto);',
+            '\n            PaymentResponseDto response = refundPayment(refundDto, false);');
+        return replaceOnce(text, '\n        PaymentResponseDto response = refundPayment(refundDto);',
+            '\n        PaymentResponseDto response = refundPayment(refundDto, false);');
+    });
     edits.push({ file: 'backend/src/test/java/kr/it/reserve/chat/ChatRollbackCompatibilityTest.java', before: null,
         after: readFileSync(new URL('../docs/technical/release-fixtures/v270-rollback/ChatRollbackCompatibilityTest.java', import.meta.url), 'utf8').replace(/\r\n/g, '\n') });
     return edits;

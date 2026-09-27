@@ -36,17 +36,110 @@ permissions:
   contents: read
 
 env:
-  # appleboy의 Go SSH 클라이언트가 이 서버에서 협상하는 ECDSA 호스트 키 지문이다(시크릿 아님).
-  # 로컬 OpenSSH가 주로 표시하는 ED25519 지문으로 바꾸면 같은 서버여도 fingerprint mismatch가 난다.
+  # appleboy가 협상하는 ECDSA 호스트 키 지문이다. OpenSSH의 ED25519 지문과 구분한다.
   RESERVE_SSH_FINGERPRINT: SHA256:xUTdx0pKa31pVIYhaJyo8fEOekQbzTss15GxZbrT1Iw
 
 jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+      - name: Test backend (unit and Spring/H2 integration)
+        id: backend_tests
+        working-directory: backend
+        run: |
+          chmod +x ./gradlew
+          ./gradlew test --console=plain
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-test-report
+          path: |
+            backend/build/reports/tests/test/
+            backend/build/test-results/test/
+          retention-days: 7
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Validate Grafana dashboards
+        run: node scripts/validate-grafana-dashboards.mjs
+      - name: Validate documentation links
+        run: node scripts/check-doc-links.mjs
+      - name: Verify immutable design-system snapshot
+        shell: pwsh
+        run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
+      - name: Validate operations scripts
+        run: |
+          bash -n scripts/backup-mysql.sh
+          bash -n scripts/restore-mysql.sh
+          bash -n scripts/verify-post-deploy-readonly.sh
+          bash -n scripts/verify-mysql-row-lock.sh
+          bash -n scripts/test-frontend-release-swap.sh
+          bash -n scripts/preserve-frontend-assets.sh
+          bash -n scripts/test-frontend-assets.sh
+          bash scripts/test-frontend-assets.sh
+          bash scripts/test-frontend-release-swap.sh
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint:ci
+      - name: Test repository quality policies
+        working-directory: frontend
+        run: npm run test:policy
+      - name: Test frontend (unit and React components)
+        working-directory: frontend
+        run: npm run test:run
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test PC browser (Chromium)
+        id: browser_pc
+        working-directory: frontend
+        run: npm run test:e2e -- --project=chromium --output=test-results/pc
+      - name: Test mobile browser (Pixel 7 Chromium)
+        id: browser_mobile
+        if: "!cancelled() && (success() || (failure() && steps.browser_pc.outcome == 'failure'))"
+        working-directory: frontend
+        run: npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-browser-failures
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   # ─────────────────────────────────────────────────────────
   # 1. 백엔드 빌드 + Docker 이미지 푸시
   # ─────────────────────────────────────────────────────────
   build-backend:
+    needs: test-backend
+    # 필수 build 체크가 의존 테스트 실패를 skipped/success로 숨기지 않게 직접 실패시킨다.
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require backend test success
+        env:
+          TEST_RESULT: ${{ needs.test-backend.result }}
+        run: test "$TEST_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install JDK 21
@@ -54,20 +147,15 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-
-      # JUnit 단위·Spring/MVC·H2 통합 검사를 한 test task에서 실행한다. 실제 MySQL/PG/S3 검사는 별도다.
-      - name: Test backend (unit and Spring/H2 integration)
-        id: backend_tests
-        working-directory: backend
-        run: |
-          chmod +x ./gradlew
-          ./gradlew clean test --console=plain
+          cache: gradle
 
       # 앞 단계가 성공해야 패키징한다. test를 다시 실행하거나 -x test로 우회하지 않는다.
       - name: Package backend bootJar
         id: backend_package
         working-directory: backend
-        run: ./gradlew bootJar --console=plain
+        run: |
+          chmod +x ./gradlew
+          ./gradlew bootJar --console=plain
 
       - name: Verify rollback schema compatibility
         id: rollback_bridge
@@ -78,18 +166,6 @@ jobs:
         with:
           name: rollback-backend
           path: ${{ steps.rollback_bridge.outputs.bridge_jar }}
-          retention-days: 7
-
-      # 테스트가 깨졌을 때 Actions 로그만으로는 원인 파악이 어려워 리포트를 첨부한다.
-      # if: failure() — 실패한 경우에만 업로드해서 아티팩트 용량을 낭비하지 않는다.
-      - name: Upload test report on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: backend-test-report
-          path: |
-            backend/build/reports/tests/test/
-            backend/build/test-results/test/
           retention-days: 7
 
       # ── 여기부터는 main push에서만 실행한다 ──────────────────────────────
@@ -117,6 +193,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           docker build --platform linux/amd64 \
+            --label reserve.schema-compat=v270-refund-v1 \
             -t "$DOCKERHUB_USERNAME/reserve:latest" \
             -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
@@ -133,6 +210,7 @@ jobs:
           test -s "$BRIDGE_DIR/backend/build/libs/reserve-2.6.3.jar"
           docker build --platform linux/amd64 \
             --label reserve.rollback-base=b478ae8d732afa1e35642d790bfc39972556f885 \
+            --label reserve.schema-compat=v270-refund-v1 \
             -t "$DOCKERHUB_USERNAME/reserve:rollback-v263-v270-$COMMIT_SHA" \
             "$BRIDGE_DIR/backend"
 
@@ -158,9 +236,17 @@ jobs:
   # 새 백엔드 health 확인 뒤 deploy-backend 잡이 프론트와 upstream을 한 번에 전환한다.
   # ─────────────────────────────────────────────────────────
   build-frontend:
-    needs: build-backend
+    needs: [build-backend, test-frontend]
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require backend build and frontend test success
+        env:
+          BACKEND_RESULT: ${{ needs.build-backend.result }}
+          TEST_RESULT: ${{ needs.test-frontend.result }}
+        run: |
+          test "$BACKEND_RESULT" = success
+          test "$TEST_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js
@@ -170,71 +256,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Validate Grafana dashboards
-        run: node scripts/validate-grafana-dashboards.mjs
-
-      - name: Validate documentation links
-        run: node scripts/check-doc-links.mjs
-
-      - name: Verify immutable design-system snapshot
-        shell: pwsh
-        run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
-
-      - name: Validate operations scripts
-        run: |
-          bash -n scripts/backup-mysql.sh
-          bash -n scripts/restore-mysql.sh
-          bash -n scripts/verify-post-deploy-readonly.sh
-          bash -n scripts/verify-mysql-row-lock.sh
-          bash -n scripts/test-frontend-release-swap.sh
-          bash -n scripts/preserve-frontend-assets.sh
-          bash -n scripts/test-frontend-assets.sh
-          bash scripts/test-frontend-assets.sh
-          bash scripts/test-frontend-release-swap.sh
-
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
-
-      # npx 대신 package.json의 lint:ci 스크립트를 호출한다 — npx는 로컬에 없으면 레지스트리에서
-      # 즉석으로 받아 실행할 수 있어(그 패키지의 lifecycle 스크립트까지) 공급망 관점에서 위험하다.
-      # npm ci로 설치된 로컬 eslint만 쓰도록 고정. 실행되는 명령 자체는 이전과 동일하다.
-      - name: Run ESLint
-        working-directory: frontend
-        run: npm run lint:ci
-
-      - name: Test repository quality policies
-        working-directory: frontend
-        run: npm run test:policy
-
-      - name: Test frontend (unit and React components)
-        working-directory: frontend
-        run: npm run test:run
-
-      - name: Install Playwright Chromium
-        working-directory: frontend
-        run: npx --no-install playwright install --with-deps chromium
-
-      - name: Test PC browser (Chromium)
-        id: browser_pc
-        working-directory: frontend
-        run: npm run test:e2e -- --project=chromium --output=test-results/pc
-
-      # PC 검사만 실패한 경우에도 모바일을 확인한다. 설치/단위 검사 실패·취소는 강행하지 않는다.
-      - name: Test mobile browser (Pixel 7 Chromium)
-        id: browser_mobile
-        if: "!cancelled() && (success() || (failure() && steps.browser_pc.outcome == 'failure'))"
-        working-directory: frontend
-        run: npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile
-
-      - name: Upload browser evidence on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: frontend-browser-failures
-          path: frontend/test-results/
-          if-no-files-found: ignore
-          retention-days: 7
 
       # .env.production 파일을 GitHub Secrets로 생성
       - name: Create .env.production
@@ -355,7 +379,7 @@ jobs:
     permissions:
       contents: read
       deployments: write
-    needs: build-frontend
+    needs: [build-backend, build-frontend, test-backend, test-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: production
@@ -422,6 +446,12 @@ jobs:
             STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-time 10 http://localhost:8080/actuator/health) || STATUS_BLUE="000"
             STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-time 10 http://localhost:8081/actuator/health) || STATUS_GREEN="000"
             echo "routed=$CURRENT_UPSTREAM blue=$STATUS_BLUE green=$STATUS_GREEN"
+            ACTIVE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$CURRENT_UPSTREAM")
+            SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$ACTIVE_IMAGE")
+            if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ]; then
+              echo "Active rollback backend is not schema/refund compatible; prepare the bridge before deployment"
+              exit 1
+            fi
             if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
                || { [ "$CURRENT_UPSTREAM" = "green" ] && [ "$STATUS_GREEN" != "200" ]; }; then
               echo "Nginx points to an unhealthy upstream; refusing automatic deployment"
@@ -797,6 +827,12 @@ jobs:
             if [ "${{ env.CURRENT_UPSTREAM }}" = "none" ]; then
               echo "No previous container to stop (first deploy or both were down)"
             else
+              OLD_IMAGE=$(sudo docker inspect --format '{{.Image}}' ${{ env.CURRENT_UPSTREAM }})
+              OLD_BASE=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.rollback-base"}}' "$OLD_IMAGE")
+              if [ "$OLD_BASE" = 'b478ae8d732afa1e35642d790bfc39972556f885' ]; then
+                echo "Keeping the compatible rollback backend available"
+                exit 0
+              fi
               sudo docker stop ${{ env.CURRENT_UPSTREAM }} || true
               sudo docker rm   ${{ env.CURRENT_UPSTREAM }} || true
             fi

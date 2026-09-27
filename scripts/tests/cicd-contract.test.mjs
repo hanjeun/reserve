@@ -9,26 +9,35 @@ const workflow = require('js-yaml').load(read('.github/workflows/CICD.yml'));
 const backend = workflow.jobs['build-backend'];
 const frontend = workflow.jobs['build-frontend'];
 const deployment = workflow.jobs['deploy-backend'];
+const backendTests = workflow.jobs['test-backend'];
+const frontendTests = workflow.jobs['test-frontend'];
 const step = (job, id) => job.steps.find(entry => entry.id === id);
 
 test('required checks remain present and deployment waits for both builds', () => {
-    assert.ok(backend && frontend && deployment);
-    assert.equal(backend.if, undefined);
-    assert.equal(frontend.if, undefined);
-    assert.equal(frontend.needs, 'build-backend');
-    assert.equal(deployment.needs, 'build-frontend');
+    assert.ok(backend && frontend && deployment && backendTests && frontendTests);
+    assert.equal(backendTests.if, undefined);
+    assert.equal(frontendTests.if, undefined);
+    assert.equal(backend.needs, 'test-backend');
+    assert.deepEqual(frontend.needs, ['build-backend', 'test-frontend']);
+    assert.deepEqual(deployment.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend']);
+    for (const job of [backend, frontend]) {
+        assert.equal(job.if, '${{ always() && !cancelled() }}');
+        assert.match(job.steps[0].run, /test "\$TEST_RESULT" = success/);
+        assert.equal(job.steps[0]['continue-on-error'], undefined);
+    }
+    assert.match(frontend.steps[0].run, /test "\$BACKEND_RESULT" = success/);
     assert.match(deployment.if, /github\.ref == 'refs\/heads\/main'/);
     assert.match(deployment.if, /github\.event_name == 'push'/);
     assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 });
 
 test('backend tests are explicit, required, and run before packaging', () => {
-    const tests = step(backend, 'backend_tests');
+    const tests = step(backendTests, 'backend_tests');
     const packaging = step(backend, 'backend_package');
     assert.ok(tests && packaging);
-    assert.match(tests.run, /\.\/gradlew clean test --console=plain/);
+    assert.match(tests.run, /\.\/gradlew test --console=plain/);
     assert.match(packaging.run, /\.\/gradlew bootJar --console=plain/);
-    assert.ok(backend.steps.indexOf(tests) < backend.steps.indexOf(packaging));
+    assert.equal(step(backend, 'backend_tests'), undefined);
     assert.equal(tests['continue-on-error'], undefined);
     assert.doesNotMatch(tests.run + packaging.run, /-x\s+test|--exclude-task[=\s]+test/);
 });
@@ -53,7 +62,7 @@ test('rollback compatibility is tested and packaged before main-only image publi
 });
 
 test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
-    const snapshot = frontend.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
+    const snapshot = frontendTests.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
     assert.equal(snapshot.run, './scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard');
     assert.match(read('.gitattributes'), /^docs\/design-system\/snapshots\/\*\* -text -eol$/m);
     assert.match(read('scripts/design-system-snapshot.ps1'), /rev-parse --git-path info\/attributes/);
@@ -62,15 +71,15 @@ test('snapshot verification installs a scoped Git byte guard without changing th
 });
 
 test('PC and mobile browser checks use separate projects and failure evidence', () => {
-    const pc = step(frontend, 'browser_pc');
-    const mobile = step(frontend, 'browser_mobile');
+    const pc = step(frontendTests, 'browser_pc');
+    const mobile = step(frontendTests, 'browser_mobile');
     assert.ok(pc && mobile);
     assert.equal(pc.run, 'npm run test:e2e -- --project=chromium --output=test-results/pc');
     assert.equal(mobile.run, 'npm run test:e2e -- --project=mobile-chromium --output=test-results/mobile');
     assert.equal(mobile.if, "!cancelled() && (success() || (failure() && steps.browser_pc.outcome == 'failure'))");
-    assert.ok(frontend.steps.indexOf(pc) < frontend.steps.indexOf(mobile));
+    assert.ok(frontendTests.steps.indexOf(pc) < frontendTests.steps.indexOf(mobile));
     for (const entry of [pc, mobile]) assert.equal(entry['continue-on-error'], undefined);
-    assert.ok(frontend.steps.some(entry => entry.run === 'npm run test:run'));
+    assert.ok(frontendTests.steps.some(entry => entry.run === 'npm run test:run'));
     assert.ok(frontend.steps.some(entry => entry.run === 'npm run build'));
 });
 
@@ -85,10 +94,22 @@ test('image publication and frontend staging remain main-push-only', () => {
     }
 });
 
+test('the actual fallback backend must be schema and refund compatible', () => {
+    for (const name of ['Build Docker image', 'Build rollback compatibility image']) {
+        assert.match(backend.steps.find(entry => entry.name === name).run, /--label reserve\.schema-compat=v270-refund-v1/);
+    }
+    const detect = step(deployment, 'detect');
+    assert.match(detect.with.script, /SCHEMA_COMPAT.*reserve\.schema-compat/);
+    assert.match(detect.with.script, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
+    assert.match(deployment.steps.find(entry => entry.name === 'Stop old server (best effort)').with.script,
+        /Keeping the compatible rollback backend available/);
+    assert.match(read('scripts/prepare-v270-rollback.mjs'), /refundPayment\(refundDto, false\)/);
+});
+
 test('test failures retain reports without uploading frontend secret files', () => {
     const artifacts = job => job.steps.filter(entry => entry.uses?.startsWith('actions/upload-artifact@'));
-    const backendReport = artifacts(backend).find(entry => entry.with.name === 'backend-test-report');
-    const browserReport = artifacts(frontend).find(entry => entry.with.name === 'frontend-browser-failures');
+    const backendReport = artifacts(backendTests).find(entry => entry.with.name === 'backend-test-report');
+    const browserReport = artifacts(frontendTests).find(entry => entry.with.name === 'frontend-browser-failures');
     assert.ok(backendReport && browserReport);
     assert.equal(backendReport.if, 'failure()');
     assert.match(backendReport.with.path, /backend\/build\/test-results\/test\//);

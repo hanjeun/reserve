@@ -2,6 +2,31 @@
 
 채팅 입력·색 설정·무기한 전송 취소의 최신 구현/검증과 운영 미완료 관문은 [채팅 계약](chat-controls.md)을 따른다.
 
+## 2026-09-28 v2.7.1 운영 갱신
+
+- [PR #230](https://github.com/hanjeun/reserve/pull/230) dev 병합과
+  [릴리스 #231](https://github.com/hanjeun/reserve/pull/231) main squash·운영 배포를 완료했다.
+  현재 production SHA는 `99a7b2fc77082cdb0960d4fc0df79af6a10ab102`다.
+  [운영 CI 36344845434](https://github.com/hanjeun/reserve/actions/runs/36344845434)와
+  Deployment `6696905203`는 success다. green 이미지·nginx 루트·공개 release-id가 일치한다.
+- 운영 공개 가게 목록/health는 HTTP 200이고 브라우저에 가게 2개가 표시됐다.
+  메시지 관리의 회색 표시는 28px, 실제 클릭 영역은 44px로 확인했다.
+  기존 사용자 대화는 전송·취소·신고·삭제하지 않았다.
+- 최종 후보 CI `36343883632`에서 Vitest 104파일/904개, PC 70개(기존 3 skip),
+  모바일 73개와 두 빌드가 통과했다. 릴리스/운영의 동일 입력 테스트는 이 원본 증거를
+  재사용했다. 프론트 테스트 잡 9분 34초가 릴리스 40초·운영 45초로 줄었다.
+  빌드·호환/공개 API 준비 관문·smoke는 새로 수행했다.
+- PR #230/#231 Sonar는 새 이슈 0/Quality Gate OK다. dev 전체 분석에는 기존 npm lifecycle
+  경고 2건이 남는다. 필수 rc-tabs postinstall을 유지했고 경고를 무시하거나 보호 규칙을 우회하지 않았다.
+  불변 디자인 스냅샷의 의존성 경고 2건도 별도 미해결 상태다.
+- nginx의 비식별 지연 로그가 운영에서 출력된다. Loki 수집은 미확인이며 과거 지연의 원인은
+  아직 확정하지 않았다. 실제 Safari·새 운영 사진/PG 실기·추가 DB ALTER·파기 worker 활성화는 하지 않았다.
+  언어는 한국어만, 채팅 색 설정은 채팅에만 있다. 영구 방 나가기·메시지별 읽음 1은 미구현이다.
+  자세한 배포/재사용 증거는 [배포 운영 가이드](deployments.md)를 따른다.
+
+아래 입력·설정 및 2026-09-27 기록은 당시 관문을 보존한 이력이다.
+v2.6.3 기준선/후보 미배포 문구보다 위 최신 운영 증거가 우선한다.
+
 ## 2026-09-28 입력·설정·검증 갱신
 
 - 단순 선택용 `FormSelect`·`FilterSelect`는 읽기 전용 input에 `inputMode="none"`을 적용한다.

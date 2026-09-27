@@ -131,7 +131,8 @@ public class RefundReconciliationScheduler {
             warnIfStuck(attemptId, merchantUid, priorAttempts + 1);
             return;
         }
-        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING) {
+        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING
+                && payment.getStatus() != Payment.PaymentStatus.PAID) {
             recordIssue(view, "LOCAL_PAYMENT_STATUS_" + payment.getStatus());
             log.error("Refund ledger and local payment status disagree: paymentId={}, localStatus={}",
                     paymentId, payment.getStatus());
@@ -143,8 +144,11 @@ public class RefundReconciliationScheduler {
         String pgStatus = pgPayment.getStatus();
         switch (assessment.outcome()) {
             case SUCCEEDED -> {
-                boolean accepted = paymentService.confirmPendingRefund(
-                        paymentId, payment.refundedSoFar(), assessment.confirmedAmount(), reason);
+                boolean accepted = payment.getStatus() == Payment.PaymentStatus.PAID
+                        ? paymentService.confirmLedgerBackedRefund(
+                                view, payment.refundedSoFar(), assessment.confirmedAmount(), assessment.cancellationId())
+                        : paymentService.confirmPendingRefund(
+                                paymentId, payment.refundedSoFar(), assessment.confirmedAmount(), reason);
                 if (!accepted) {
                     recordIssue(view, "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_SUCCESS");
                     log.error("Refund success conflicts with current local state: merchantUid={}, detailCode={}",

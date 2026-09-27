@@ -584,6 +584,10 @@ public class PaymentService {
      * {@link #refundByMemberRequest(Long, String, Member)} 를 거쳐야 한다.
      */
     public PaymentResponseDto refundPayment(PaymentRefundDto refundDto) {
+        return refundPayment(refundDto, true);
+    }
+
+    private PaymentResponseDto refundPayment(PaymentRefundDto refundDto, boolean updateReservationDeposit) {
         // ★★ 행을 잠그고 읽는다 (2026-08-23) — 이중 환불 방어의 핵심.
         //   예전엔 잠금 없이 읽어서, 동시 요청 둘이 모두 PAID 를 보고 **둘 다 PG 취소를 불렀다.**
         //   왜 낙관적 락이 아닌지는 PaymentRepository#findByIdForUpdate 주석에 있다
@@ -687,7 +691,7 @@ public class PaymentService {
                 // 원장만 SUCCEEDED가 되어 재조회 대상에서 사라진다. 로컬 커밋 뒤에 닫는다.
                 refundLedgerService.pending(
                         attemptId, cancellationId, "PG cancellation succeeded; local commit pending");
-                applyRefundSucceeded(payment, cancelledAmount, refundDto.getRefundReason());
+                applyRefundSucceeded(payment, cancelledAmount, refundDto.getRefundReason(), updateReservationDeposit);
                 completeRefundLedgerAfterCommit(attemptId, cancellationId, cancelledAmount);
             }
             case REQUESTED, UNKNOWN -> {
@@ -731,9 +735,14 @@ public class PaymentService {
      * 확정 처리를 세 곳에 복붙하면 반드시 어긋난다(설계 원칙: 관문 하나).
      */
     void applyRefundSucceeded(Payment payment, Integer refundAmount, String reason) {
+        applyRefundSucceeded(payment, refundAmount, reason, true);
+    }
+
+    private void applyRefundSucceeded(
+            Payment payment, Integer refundAmount, String reason, boolean updateReservationDeposit) {
         payment.refundPayment(refundAmount, reason);
 
-        if (payment.getStatus() == Payment.PaymentStatus.REFUNDED) {
+        if (updateReservationDeposit && payment.getStatus() == Payment.PaymentStatus.REFUNDED) {
             Reservation reservation = payment.getReservation();
             reservation.setDepositPaid(false);
             reservation.setDepositAmount(0);
@@ -798,6 +807,46 @@ public class PaymentService {
                         + "expectedPrior={}, requested={}",
                 paymentId, payment.getStatus(), payment.refundedSoFar(), expectedRefundedAmount, refundAmount);
         return false;
+    }
+
+    /**
+     * PG 성공 뒤 로컬 커밋만 실패해 PAID로 남은 종료 예약을 복구한다. PG 재발신은 하지 않는다.
+     * 재조회 정책이 확인한 개별 취소 ID/금액과 유일한 내구성 원장을 잠근 결제에서 다시 대조한다.
+     * 진행 중 예약, 여러 미결 원장, 취소 ID 미확정, 변경된 금액은 자동 복구하지 않는다.
+     */
+    @Transactional
+    public boolean confirmLedgerBackedRefund(
+            UnresolvedRefundView view, int expectedRefundedAmount, int refundAmount, String cancellationId) {
+        Payment payment = paymentRepository.findByIdForUpdate(view.paymentId()).orElse(null);
+        if (payment == null || payment.getStatus() != Payment.PaymentStatus.PAID
+                || expectedRefundedAmount != 0 || payment.refundedSoFar() != 0
+                || refundAmount <= 0 || payment.getAmount() == null || refundAmount > payment.getAmount()) {
+            return false;
+        }
+        Reservation reservation = payment.getReservation();
+        if (reservation == null || !REFUND_RETRYABLE_RESERVATION_STATUSES.contains(reservation.getStatus())) {
+            return false;
+        }
+        RefundAttempt attempt = refundAttemptRepository.findById(view.attemptId()).orElse(null);
+        if (!matchesConfirmedLedger(attempt, view, payment, refundAmount, cancellationId)
+                || refundAttemptRepository.countByPaymentIdAndStatusIn(payment.getId(), RefundAttempt.UNRESOLVED) != 1) {
+            return false;
+        }
+        applyRefundSucceeded(payment, refundAmount, attempt.getReason());
+        return true;
+    }
+
+    private boolean matchesConfirmedLedger(
+            RefundAttempt attempt, UnresolvedRefundView view, Payment payment, int refundAmount, String cancellationId) {
+        return attempt != null && attempt.isUnresolved()
+                && cancellationId != null && !cancellationId.isBlank()
+                && java.util.Objects.equals(attempt.getPaymentId(), payment.getId())
+                && java.util.Objects.equals(attempt.getMerchantUid(), payment.getMerchantUid())
+                && java.util.Objects.equals(view.merchantUid(), payment.getMerchantUid())
+                && java.util.Objects.equals(attempt.getCancellationId(), cancellationId)
+                && java.util.Objects.equals(view.cancellationId(), cancellationId)
+                && java.util.Objects.equals(attempt.getRequestedAmount(), refundAmount)
+                && java.util.Objects.equals(view.requestedAmount(), refundAmount);
     }
 
     /**
@@ -986,7 +1035,9 @@ public class PaymentService {
                     .refundReason("예약 취소에 따른 자동 환불 (" + calculation.getReason() + ")")
                     .build();
 
-            PaymentResponseDto response = refundPayment(refundDto);
+            // 호출자가 예약 FOR UPDATE를 소유한다. 이 REQUIRES_NEW에서 같은 예약을 UPDATE하면
+            // 바깥 트랜잭션을 기다리며 자기 잠금에 막힌다. true 반환 뒤 호출자가 예약금을 정리한다.
+            PaymentResponseDto response = refundPayment(refundDto, false);
             return Payment.PaymentStatus.REFUNDED.name().equals(response.getStatus());
         } else {
             log.info("Refund amount is 0 by policy: reservationId={}", reservationId);
@@ -1036,7 +1087,8 @@ public class PaymentService {
                 .build();
 
         log.info("Full refund by store decision: reservationId={}, amount={}", reservationId, payment.getAmount());
-        PaymentResponseDto response = refundPayment(refundDto);
+        // 거절/취소 호출자가 잠근 예약의 수정은 호출자에게 남긴다. 독립 환불은 결제 원장만 갱신한다.
+        PaymentResponseDto response = refundPayment(refundDto, false);
         return Payment.PaymentStatus.REFUNDED.name().equals(response.getStatus());
     }
 

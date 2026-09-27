@@ -18,6 +18,25 @@ function declarations(selector, media = null) {
 }
 
 describe('messenger interaction roles', () => {
+    it('keeps unread badges red and overlays message actions without reserving an extra column', () => {
+        for (const selector of ['.reserve-messenger-unread', '.reserve-messenger-footer-badge']) {
+            expect(declarations(selector).background).toBe('var(--c-error, #f04452)');
+        }
+        expect(declarations('.reserve-chat-message-meta > .reserve-chat-message-actions').position).toBe('absolute');
+        expect(declarations('.reserve-chat-message-meta > .reserve-chat-message-time').position).toBe('absolute');
+        expect(declarations('.reserve-chat-message-row:hover .reserve-chat-message-meta > .reserve-chat-message-time',
+            '(hover: hover) and (pointer: fine)').visibility).toBe('hidden');
+    });
+    it('spans the stable footer row during both conversation transitions', () => {
+        expect(declarations('.reserve-messenger-footer')['grid-row']).toBe('2');
+        for (const selector of ['.reserve-messenger--panel > .reserve-messenger-thread',
+            '.reserve-messenger.is-opening-thread > .reserve-messenger-thread',
+            '.reserve-messenger.is-returning-to-list > .reserve-messenger-thread']) {
+            expect(declarations(selector)['grid-area']).toBe('1 / 1 / -1 / 2');
+        }
+        expect(declarations('.reserve-chat-attachment-preview:hover::after').opacity).toBe('0.2');
+        expect(declarations('.reserve-messenger-thread-heading .reserve-messenger-thread-avatar:hover::after').opacity).toBe('0.16');
+    });
     it('opens threads with the same smooth duration and easing as returning to the list', () => {
         const entering = declarations('.reserve-messenger.is-opening-thread > .reserve-messenger-thread').animation;
         const leaving = declarations('.reserve-messenger.is-returning-to-list > .reserve-messenger-thread').animation;

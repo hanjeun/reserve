@@ -8,7 +8,7 @@ const VIEWS = [
     { value: 'settings', label: '설정', icon: <SettingOutlined /> },
 ];
 
-export default function MessengerFooter({ view, onChange, unread = 0 }) {
+export default function MessengerFooter({ view, onChange, unread = 0, disabled = false }) {
     const unreadId = useId();
     const unreadCount = Number.isFinite(unread) ? Math.max(0, Math.trunc(unread)) : 0;
 
@@ -22,6 +22,7 @@ export default function MessengerFooter({ view, onChange, unread = 0 }) {
                         type="button"
                         className={`reserve-messenger-footer-tab${view === value ? ' is-active' : ''}`}
                         aria-label={label}
+                        disabled={disabled}
                         aria-current={view === value ? 'page' : undefined}
                         aria-describedby={hasUnread ? unreadId : undefined}
                         onClick={() => onChange(value)}
@@ -47,4 +48,5 @@ MessengerFooter.propTypes = {
     view: PropTypes.oneOf(['home', 'conversations', 'settings']).isRequired,
     onChange: PropTypes.func.isRequired,
     unread: PropTypes.number,
+    disabled: PropTypes.bool,
 };

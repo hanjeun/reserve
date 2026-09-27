@@ -62,4 +62,20 @@ describe('chat photo picker', () => {
         view.unmount();
         create.mockRestore(); revoke.mockRestore();
     });
+    it('keeps only an inert thumbnail for the shared exit animation and then releases it', async () => {
+        const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:exit');
+        const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+        const file = new File(['image'], 'photo.png', { type: 'image/png' });
+        const view = render(<ChatImagePicker enabled file={file} onChange={vi.fn()} />);
+        await screen.findByRole('button', { name: '첨부 사진 크게 보기' });
+        view.rerender(<ChatImagePicker enabled file={null} onChange={vi.fn()} />);
+        const exiting = view.container.querySelector('.reserve-chat-attachment');
+        expect(exiting).toHaveAttribute('inert');
+        expect(exiting.style.animation).toContain('slideUpOut');
+        expect(screen.queryByRole('button', { name: '첨부 사진 크게 보기' })).toBeNull();
+        expect(revoke).not.toHaveBeenCalled();
+        await waitFor(() => expect(view.container.querySelector('.reserve-chat-attachment')).toBeNull());
+        expect(revoke).toHaveBeenCalledWith('blob:exit');
+        create.mockRestore(); revoke.mockRestore();
+    });
 });

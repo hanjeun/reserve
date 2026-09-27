@@ -5,15 +5,48 @@ RESERVE의 릴리즈 노트 동기화, GitHub Deployments 기록, 저장소 보�
 
 ## 현재 경계
 
-- 2026-09-27 확인된 production 기준선은 **v2.6.3**(`b478ae8d…`), `origin/dev`는 `eb31d61e…`다.
-- 이 문서에 적힌 v2.6 배포 흐름은 현재 로컬 `.github/workflows/CICD.yml`의 후보 계약이다.
-  기존 인증·캐시 개선은 배포됐지만 이 혼합 프리뷰의 통합 메시지/사진 등은 아직 `dev` 병합·배포되지 않았다.
-  실제 서버에서 이번 동시 컷오버/rollback 후보를 실행한 증거도 없다.
+- 2026-09-28 확인된 production 기준선은 **v2.7.0**(`68334e5d…`)이며 `dev` 계보 복원 PR #229는 병합됐다.
+- 아래 **CI 증거 재사용·stage-release 분리·지연 로그·공개 API 준비 관문**은 후속 후보다.
+  이 후속 수정의 PR 생성은 승인됐지만 병합·운영 반영은 아직 실행하지 않았다.
 - 기능별 상태는 [현재 상태](current-status.md)를 따른다. 아래 날짜가 붙은 GitHub·서버 결과는 그
   날짜의 증거이며 현재 설정을 대신하지 않는다.
 - 배포 직전에는 실제 서버 SSH fingerprint를 신뢰 가능한 별도 경로로 다시 확인한다. 커밋, PR, merge,
   tag, 배포, GitHub 설정과 운영 쓰기는 각각 현재 대화의 별도 승인이 필요하다.
-- 태그는 있지만 GitHub Release가 없는 v2.4.0·v2.4.1 보완도 별도 승인 대상이다. 의존성 PR과 제품 통합은 분리한다.
+- v2.4.0·v2.4.1은 2026-09-28 승인 후 기존 태그와 한국어 CHANGELOG로 Release를 보완했다.
+  새 배포나 새 태그가 아니며 최신 Release는 v2.7.0으로 유지했다. 의존성 PR과 제품 통합은 분리한다.
+
+### 2026-09-28 후속 후보: 테스트 재사용과 배포 책임 분리
+
+`test-backend`/`test-frontend`와 필수 `build-backend`/`build-frontend` 이름은 유지한다.
+`scripts/ci-evidence.mjs`는 7일 이내 성공한 같은 저장소 CICD 실행의 증거만 사용한다.
+소스·테스트·잠금 파일·공유 스크립트·워크플로의 Git blob과 Node/JDK·러너 이미지·설정 리비전이
+일치해야 하며, 이전 실행의 실제 Git tree를 다시 계산하고 다운로드 ZIP의 SHA-256도 검증한다.
+fork·실패·취소·오래된 실행, API/권한/다운로드 오류는 모두 **정상 테스트 실행으로 복귀**한다.
+첫 후보처럼 워크플로가 변경되면 증거가 무효화되므로 전체 CI가 한 번 실행되는 것은 의도된 것이다.
+
+- 재사용 대상은 백엔드 unit/Spring-H2 및 프론트 unit/PC·모바일 Chromium 검사다.
+  문서·운영 스크립트·스냅샷·lint·품질 정책은 매번 짧게 확인한다.
+- build와 운영 smoke는 재사용하지 않는다. 생산 빌드는 현재 설정으로 만들며,
+  실제 Safari·TEST 결제·S3·운영 DB 확인은 이 합성 CI 증거의 대상이 아니다.
+- 수동 `workflow_dispatch` 또는 저장소 변수 `CI_FORCE_TESTS=true`는 재사용을 끈다.
+  테스트 환경 설정이 바뀌면 `CI_TEST_CONFIG_REVISION`을 올려 증거를 무효화한다.
+- CI에서만 Vitest/Playwright 워커를 2개 사용한다. 로컬은 1개다.
+  Playwright trace는 첫 재시도에만 수집하고 flaky는 성공으로 숨기지 않는다.
+
+`build-frontend`는 이 실행의 dist 아티팩트까지만 만든다. 새 `stage-release`는 이 실행 ID의
+아티팩트를 받아 서버에 전송하되 live를 바꾸지 않는다. `deploy-backend`는 전송 완료 후 새 서버 기동,
+공개 가게 목록 GET 준비 확인(2회 연속 2.5초 미만), 원자 전환, smoke, 실패 복구를 책임진다.
+`production` Environment는 이 실제 활성화 잡 하나에만 두고 수동 `createDeployment`/상태 쓰기를 제거해
+자동 기록과 이중 생성되지 않게 한다. 준비 확인 실패는 구 운영 경로를 유지한다.
+
+nginx 지연 로그는 정해진 route 종류·HTTP 상태·전체/연결/헤더/상류 응답 시간만 기록한다.
+IP·동적 ID·쿼리·쿠키·토큰·본문은 새 로그 형식에 넣지 않는다. 현재 로컬 Promtail 설정에는
+nginx 수집 job이 없으므로 Loki 수집 성공을 주장하지 않는다. 배포 후 실제 로그 경로/수집을 확인한 뒤
+`request_time`과 `upstream_*_time`으로 브라우저/CDN 대기와 앱/DB 대기를 구분한다.
+지금 빨라졌다는 관측만으로 기존 지연의 원인을 확정하지 않는다.
+
+기존 배포의 자동·수동 중복 9쌍은 SHA·15초 이내 생성·동일 결과·자동 실행 URL을 교차 확인한 뒤
+수동 복사본만 영구 삭제했다. 같은 SHA의 별도 실제 배포 시도와 자동 기록은 보존했다.
 
 ---
 

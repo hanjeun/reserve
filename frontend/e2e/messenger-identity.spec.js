@@ -78,6 +78,7 @@ test('thread entry uses the same calm easing and duration as returning to the li
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '모션 확인' }]);
     await page.addInitScript(() => {
         window.__threadMotion = [];
+        window.__threadHeights = [];
         window.__listMotion = [];
         document.addEventListener('animationstart', event => {
             const isThread = event.target.matches('.reserve-messenger-thread');
@@ -85,7 +86,15 @@ test('thread entry uses the same calm easing and duration as returning to the li
             if (!isThread && !isList) return;
             const style = getComputedStyle(event.target);
             const motion = { name: event.animationName, duration: style.animationDuration, easing: style.animationTimingFunction, direction: style.animationDirection };
-            if (isThread) window.__threadMotion.push(motion);
+            if (isThread) {
+                window.__threadMotion.push(motion);
+                const sample = () => {
+                    if (!event.target.isConnected) return;
+                    window.__threadHeights.push(event.target.clientHeight);
+                    if (event.target.getAnimations().some(animation => animation.playState === 'running')) requestAnimationFrame(sample);
+                };
+                requestAnimationFrame(sample);
+            }
             else {
                 const animation = event.target.getAnimations().find(item => item.animationName === event.animationName);
                 window.__listMotion.push({ ...motion, finalOpacity: animation?.effect.getKeyframes().at(-1).opacity });
@@ -102,9 +111,15 @@ test('thread entry uses the same calm easing and duration as returning to the li
     await expect.poll(() => page.evaluate(() => window.__threadMotion.some(event => event.name === 'reserve-messenger-thread-in'))).toBe(true);
     await expect(page.locator('.reserve-messenger')).not.toHaveClass(/is-opening-thread/);
     await expect(page.locator('.reserve-messenger-list')).toHaveCount(0);
+    const threadHeight = await page.locator('.reserve-messenger-thread').evaluate(element => element.clientHeight);
+    const enteringHeights = await page.evaluate(() => window.__threadHeights);
+    expect(enteringHeights).toEqual(enteringHeights.map(() => threadHeight));
     await page.getByRole('button', { name: '대화 목록으로 돌아가기' }).click();
     await expect(page.locator('.reserve-messenger-row')).toBeVisible();
     await expect(page.locator('.reserve-messenger')).not.toHaveClass(/is-returning-to-list/);
+    const heights = await page.evaluate(() => window.__threadHeights);
+    expect(heights.length).toBeGreaterThan(2);
+    expect(heights).toEqual(heights.map(() => threadHeight));
     const motions = await page.evaluate(() => window.__threadMotion);
     expect(motions).toEqual([
         { name: 'reserve-messenger-thread-in', duration: '0.26s', easing: 'cubic-bezier(0.4, 0, 0.2, 1)', direction: 'normal' },

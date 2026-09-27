@@ -12,7 +12,7 @@ describe('message-scoped actions', () => {
             messages={[{ id: 1, senderRole: 'MEMBER', content: '내 메시지', canRetract: true },
                 { id: 2, senderRole: 'OWNER', content: '전송이 취소된 메시지입니다.', retracted: true }]} />);
         const first = view.container.querySelector('.reserve-chat-message-row');
-        expect(first.querySelector('.reserve-chat-message-actions').nextElementSibling).toHaveClass('reserve-chat-bubble-group');
+        expect(first.querySelector('.reserve-chat-message-meta').nextElementSibling).toHaveClass('reserve-chat-bubble-group');
         fireEvent.click(screen.getAllByRole('button', { name: '메시지 관리' })[1]);
         fireEvent.click(await screen.findByText('메시지 신고'));
         fireEvent.mouseDown(await screen.findByRole('combobox'));
@@ -26,5 +26,15 @@ describe('message-scoped actions', () => {
             { id: 2, senderRole: 'OWNER', content: '만료', expired: true },
             { id: -1, senderRole: 'OWNER', content: '대기', pending: true }]} />);
         expect(screen.queryByRole('button', { name: '메시지 관리' })).toBeNull();
+    });
+    it('shares one slot between the timestamp and an accessible menu', async () => {
+        const view = render(<ChatBubbleList mine="MEMBER" roomId={7} onRetracted={vi.fn()} messages={[
+            { id: 1, senderRole: 'MEMBER', content: '내 메시지', canRetract: true, createdAt: '2026-09-28T08:22:00' }]} />);
+        const meta = view.container.querySelector('.reserve-chat-message-meta');
+        expect(meta.querySelector('.reserve-chat-message-time')).toHaveTextContent('08:22');
+        expect(meta.children).toHaveLength(2);
+        fireEvent.click(screen.getByRole('button', { name: '메시지 관리' }));
+        await waitFor(() => expect(meta).toHaveAttribute('data-menu-open', 'true'));
+        expect(screen.getByRole('button', { name: '메시지 관리' })).toHaveAttribute('aria-expanded', 'true');
     });
 });

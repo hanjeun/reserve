@@ -29,7 +29,10 @@ const StoreRegister = () => {
         handleSubmit,
         handleMainImageChange,
         handleDetailImagesChange,
-    } = useStoreForm({ mode: 'create' });
+        draftState,
+        handleValuesChange,
+        saveDraftNow,
+    } = useStoreForm({ mode: 'create', form });
 
     return (
         <>
@@ -44,6 +47,9 @@ const StoreRegister = () => {
                 onDetailImagesChange={handleDetailImagesChange}
                 onPreview={handlePreview}
                 onPreviewClickCapture={suppressLinkNavigation}
+                onValuesChange={handleValuesChange}
+                onSaveDraft={saveDraftNow}
+                draftState={draftState}
             />
             
             {/* 이미지 미리보기 모달 */}

@@ -1,23 +1,41 @@
-import React, { useEffect, useCallback, useState } from 'react';
-import { Empty } from 'antd';
+import React, { useCallback, useState } from 'react';
+import PropTypes from 'prop-types';
+import { Pagination } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { PageContainer, StoreCardSkeleton, Loading, FilterSelect } from '../../components/common';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { DataState, PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
+import StoreListRow from '../../components/store/StoreListRow';
+import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
+import StoreListingToolbar from '../../components/store/StoreListingToolbar';
+import RegionSheet from '../../components/discovery/RegionSheet';
 import AdBanner from '../../components/advertisement/AdBanner';
-import { useStoreList, useGeolocation, useMessage } from '../../hooks';
+import { useStoreList, useGeolocation, useMessage, useWindowWidth } from '../../hooks';
+import { STORE_LIST_PAGE_SIZE } from '../../hooks/useStoreList';
 import useAuthStore from '../../store/useAuthStore';
 import useLocationStore from '../../store/useLocationStore';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useReducedMotion from '../../hooks/useReducedMotion';
+import useViewModeParam from '../../hooks/useViewModeParam';
 import adService from '../../services/adService';
 import { adKeys } from '../../hooks/queryKeys';
-import { SORT_OPTIONS } from '../../constants';
-import { fontWeight, fontSize, colors } from '../../styles/tokens';
-import { Input, Typography } from 'antd';
+import { SERVICE_DOMAIN_FILTER_OPTIONS, SORT_OPTIONS } from '../../constants';
+import { formatRegionLabel } from '../../constants/regions';
+import { distanceSortParams } from '../../utils/distanceSort';
 
-const { Title, Text } = Typography;
-const { Search } = Input;
-
-const PAGE_SIZE = 12;
+// 같은 결과의 보기만 바꿔도 카드/행은 재마운트된다. 노출 집계는 안정적인 결과 관문에서 한다.
+function StoreListResult({ children, isAdvertised, adId, onImpression }) {
+    React.useEffect(() => {
+        if (isAdvertised && adId) onImpression(adId);
+    }, [isAdvertised, adId, onImpression]);
+    return <div>{children}</div>;
+}
+StoreListResult.propTypes = {
+    children: PropTypes.node.isRequired,
+    isAdvertised: PropTypes.bool,
+    adId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    onImpression: PropTypes.func.isRequired,
+};
 
 // 2026-07 추가 — MyFavorites/MyStores와 동일한 이유로 masonry(columns) 대신 고정 그리드로 전환.
 // 예전엔 columns:'4 240px'라 컨테이너 폭에 따라 3열/4열을 오갔다(최소폭 240px만 보장하는 방식이라
@@ -40,37 +58,38 @@ const PAGE_SIZE = 12;
 const StoreList = () => {
     const {
         stores, totalElements,
-        loading, refetching, fetchingNext,
-        hasNextPage, fetchNextPage,
+        loading, refetching, page, pageSize, setPage, refetch,
         searchParams, setSearchParams,
         error,
     } = useStoreList();
+    const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+    const location = useLocation();
+    const reducedMotion = useReducedMotion();
+    const [bannerEntry, setBannerEntry] = useState(() => location.state?.reserveDiscoveryEntry === 'featured-banner');
+    const [pageMotion, setPageMotion] = useState(null);
+    const [regionOpen, setRegionOpen] = useState(false);
+    const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'cards');
+    const recordedAdIdsRef = React.useRef(new Set());
+    const recordImpressionOnce = React.useCallback((adId) => {
+        if (recordedAdIdsRef.current.has(adId)) return;
+        recordedAdIdsRef.current.add(adId);
+        adService.recordImpression(adId);
+    }, []);
+    const resultClassName = view === 'list' ? 'reserve-store-list-rows' : 'rsv-store-grid';
+    const resultMotionClassName = !reducedMotion && bannerEntry
+        ? ' reserve-explore-result--banner-entry'
+        : !reducedMotion && pageMotion?.page === page
+            ? ` reserve-explore-result--page-${pageMotion.direction}`
+            : '';
+    const ResultItem = view === 'list' ? StoreListRow : StoreCard;
+    const viewportWidth = useWindowWidth();
+    const isMobile = viewportWidth < 576;
+    const domainLabel = SERVICE_DOMAIN_FILTER_OPTIONS.find(option => option.value === searchParams.domain)?.label;
+    const pageTitle = searchParams.keyword.trim() ? '검색 결과'
+        : searchParams.region ? `${formatRegionLabel(searchParams.region)} 가게`
+            : searchParams.domain && domainLabel ? domainLabel : '가게 둘러보기';
 
     useDocumentTitle('가게 목록', '원하는 조건으로 최고의 가게를 찾아보세요. RESERVE에서 다양한 업종을 간편하게 예약할 수 있습니다.');
-
-    const sentinelRef = React.useRef(null);
-    const fetchNextRef = React.useRef(fetchNextPage);
-    React.useEffect(() => { fetchNextRef.current = fetchNextPage; }, [fetchNextPage]);
-
-    // observer는 마운트 1회만 생성. 트리거 시점에 ref로 최신 함수 참조.
-    // deps에 fetchingNext/hasNextPage를 넣으면 상태 변경마다 observer가 재생성되어
-    // sentinel이 viewport 안에 있을 때 무한 루프가 발생함.
-    useEffect(() => {
-        const sentinel = sentinelRef.current;
-        if (!sentinel) return;
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting) fetchNextRef.current();
-            },
-            { rootMargin: '300px', threshold: 0 }
-        );
-        observer.observe(sentinel);
-        return () => observer.disconnect();
-    }, []);
-
-    const handleSearch = useCallback((value) => {
-        setSearchParams({ keyword: value });
-    }, [setSearchParams]);
 
     const { request: requestLocation, requesting: locating } = useGeolocation();
     const { user } = useAuthStore();
@@ -84,10 +103,6 @@ const StoreList = () => {
      *   빈 목록이 "조건에 맞는 가게가 없습니다" 로 보여서 검색 결과가 없는 것처럼 읽혔다.
      *   손님은 조건을 바꿔가며 계속 헛검색을 하게 된다. StoreDetail 과 같은 처리로 맞춘다.
      */
-    React.useEffect(() => {
-        if (error) message.error(error);
-    }, [error, message]);
-    
     // "우리동네" 배지용 위치 — 정렬 기준과 무관하게 항상 같은 우선순위로 나온다(이건 이전에는
     // searchParams.lat/lng에만 의존해서, 거리순이 아닌 다른 정렬로 바꾸면 배지가 사라지던 버그가 있었음).
     //
@@ -132,10 +147,6 @@ const StoreList = () => {
         staleTime: 1000 * 60 * 5,
     });
 
-    // 거리순 선택 시 Geolocation 먼저 요청 — 실패/거부 시 마이페이지에 등록해둔 위치가 있으면 그것으로 폴백
-    // (둘 다 없으면 useGeolocation이 이미 보여준 토스트로 이유 안내된 상태라 sort를 바꾸지 않음)
-    const roundCoord = (n) => Math.round(n * 1000) / 1000;
-
     /**
      * 선택 즉시 반영되는 "낙관적" 정렬 값 (2026-07 추가).
      *
@@ -162,13 +173,15 @@ const StoreList = () => {
         const position = await requestLocation();
         if (position) {
             setLiveLocation(position);
-            setSearchParams({ sort: 'distance', lat: roundCoord(position.latitude), lng: roundCoord(position.longitude) });
+            const distanceParams = distanceSortParams(position);
+            if (distanceParams) setSearchParams(distanceParams);
             setPendingSort(null);
             return;
         }
         if (user?.latitude != null && user?.longitude != null) {
             message.info('마이페이지에 등록된 위치 기준으로 정렬할게요.');
-            setSearchParams({ sort: 'distance', lat: roundCoord(user.latitude), lng: roundCoord(user.longitude) });
+            const distanceParams = distanceSortParams({ latitude: user.latitude, longitude: user.longitude });
+            if (distanceParams) setSearchParams(distanceParams);
             setPendingSort(null);
             return;
         }
@@ -178,105 +191,101 @@ const StoreList = () => {
     }, [setSearchParams, requestLocation, user, message, setLiveLocation]);
 
     return (
-        <PageContainer size="xl" paddingTop="40px">
-            {/* 헤더 */}
-            <div style={styles.header}>
-                <div style={styles.headerLeft}>
-                    <Title level={2} style={styles.title}>가게 둘러보기</Title>
-                    <Text type="secondary" style={{ fontSize: fontSize.lg }}>
-                        원하는 조건으로 최고의 가게를 찾아보세요
-                    </Text>
-                </div>
-                <div style={styles.searchWrap}>
-                    <Search
-                        placeholder="가게 이름 또는 카테고리"
-                        defaultValue={searchParams.keyword}
-                        key={searchParams.keyword}
-                        onSearch={handleSearch}
-                        style={{ flex: 1, minWidth: 150 }}
-                        size="large"
-                        enterButton
-                        allowClear
-                        disabled={loading}
-                    />
-                    {/* FilterSelect — 목록 위의 조작 도구라 흰 면 + 테두리.
-                        예전엔 순수 <Select>에 className을 손으로 붙여야 했고, 그걸 잊어서
-                        여기가 회색으로 떨어져 있었다. 이제 컴포넌트가 강제한다. */}
-                    <FilterSelect
-                        value={pendingSort ?? searchParams.sort}
-                        style={{ width: 120 }}
-                        onChange={handleSortChange}
-                        options={SORT_OPTIONS}
-                        disabled={loading || locating || refetching}
-                        loading={locating}
-                    />
-                </div>
-            </div>
+        <PageContainer
+            size="xl"
+            paddingTop="16px"
+            className={'reserve-explore-page' + (!reducedMotion && bannerEntry ? ' reserve-explore-page--banner-entry' : '')}
+        >
+            <h1 className="reserve-discovery-visually-hidden">{pageTitle}</h1>
 
-            {/* 스켈레톤 — 최초 로딩뿐 아니라 검색어/정렬 변경으로 인한 재조회(refetching) 때도 동일하게
-                노출(2026-07 수정). keepPreviousData 덕에 재조회 중엔 원래 직전 카드가 그대로 남아있어서
-                "조용히 있다가 휙 바뀌는" 문제가 있었는데, 처음엔 살짝 흐리게+스피너 오버레이로 시도했다가
-                "가게 리스트는 원래 스켈레톤이 컨벤션이니 그걸 그대로 재사용하는 게 낫다"는 판단으로 변경 —
-                정렬/검색 바꿀 때마다 카드가 스켈레톤으로 한 번 갈아입긴 하지만(실사용에서는 아주 짧은 순간),
-                최초 로딩과 완전히 동일한 신호를 주는 쪽이 일관적임
-                2026-07 추가: grid를 고정 4열(rsv-store-grid)로 전환 (위 GRID_STYLE 참고) —
-                masonry(columns)는 PC 폭에서도 3열로 나올 때가 있어서 항상 4열이 보장되는 그리드로 바꿈. */}
-            {(loading || refetching) ? (
+            <StoreListingToolbar
+                view={view}
+                onViewChange={setView}
+                count={!loading && !error ? totalElements : undefined}
+                region={searchParams.region}
+                regionOpen={regionOpen}
+                onRegionOpen={() => setRegionOpen(true)}
+                domain={searchParams.domain}
+                onDomainChange={domain => setSearchParams({ domain })}
+                sort={pendingSort ?? searchParams.sort}
+                onSortChange={handleSortChange}
+                sortOptions={SORT_OPTIONS}
+                disabled={loading || refetching}
+                sortDisabled={loading || locating || refetching}
+                sortLoading={locating}
+                onAnimationEnd={event => {
+                    if (event.target === event.currentTarget && !loading && !refetching && (error || stores.length === 0)) setBannerEntry(false);
+                }}
+            />
+
+            {/* 스켈레톤은 첫 조회나 쿼리 전환으로 이전 결과를 그대로 보여줄 수 없을 때만 쓴다.
+                수동 새로고침은 현재 카드와 읽던 위치를 유지하고, 툴바 버튼만 진행 상태를 표시한다.
+                grid는 고정 4열(rsv-store-grid)로 시작해 화면 폭에 따라 반응형으로 줄어든다. */}
+            {loading ? (
                 <div style={styles.skeletonWrap}>
-                    <div className="rsv-store-grid">
-                        <StoreCardSkeleton count={PAGE_SIZE} />
+                    <div className={resultClassName} role="status" aria-label="가게 목록을 불러오는 중" aria-busy="true">
+                        {view === 'list' ? <StoreListRowSkeleton count={STORE_LIST_PAGE_SIZE} /> : <StoreCardSkeleton count={STORE_LIST_PAGE_SIZE} />}
                     </div>
                     <div style={styles.fadeOut} />
                 </div>
+            ) : error ? (
+                <DataState state="error" kind="store" subject="가게 목록" error={error}
+                    onRetry={refetch} retrying={refetching} style={{ marginTop: 100 }} />
             ) : stores.length === 0 ? (
-                <Empty description={error ?? '조건에 맞는 가게가 없습니다.'} style={{ marginTop: 100 }} />
+                <DataState state="empty" kind="store"
+                    title={searchParams.region ? '이 지역에 등록된 가게가 없습니다.' : '조건에 맞는 가게가 없습니다.'}
+                    style={{ marginTop: 100 }} />
             ) : (
                 <>
-                    <div className="rsv-store-grid">
+                    <div
+                        className={resultClassName + resultMotionClassName}
+                        onAnimationEnd={event => {
+                            if (event.target !== event.currentTarget) return;
+                            setBannerEntry(false);
+                            setPageMotion(null);
+                        }}
+                    >
                         {stores.map(store => (
-                            <div key={store.id}>
-                                <StoreCard store={store} userLocation={nearbyUserLocation} isAdvertised={adStoreMap.has(store.id)} adId={adStoreMap.get(store.id)} />
-                            </div>
+                            <StoreListResult key={store.id} isAdvertised={adStoreMap.has(store.id)} adId={adStoreMap.get(store.id)}
+                                onImpression={recordImpressionOnce}>
+                                <ResultItem store={store} userLocation={nearbyUserLocation} isAdvertised={adStoreMap.has(store.id)} />
+                            </StoreListResult>
                         ))}
                     </div>
-
-                    {/* 무한스크롤 센티넬 */}
-                    {hasNextPage && <div ref={sentinelRef} style={styles.sentinel} />}
-
-                    {/* 추가 페이지 로딩 스피너 */}
-                    {fetchingNext && (
-                        <div style={styles.spinnerWrap}>
-                            <Loading minHeight="0" />
-                        </div>
-                    )}
-
-                    {/* 마지막 페이지 도달 메시지 */}
-                    {!hasNextPage && stores.length > 0 && (
-                        <div style={styles.endMessage}>
-                            <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                                총 {totalElements}개 가게를 모두 불러왔습니다
-                            </Text>
-                        </div>
-                    )}
                 </>
             )}
+            {!error && totalElements > 0 && (
+                <nav aria-label="가게 목록 페이지" style={{ marginTop: 24 }}>
+                    <Pagination
+                        current={page}
+                        pageSize={pageSize}
+                        total={totalElements}
+                        onChange={value => {
+                            if (value === page) return;
+                            setBannerEntry(false);
+                            setPageMotion({ page: value, direction: value > page ? 'next' : 'previous' });
+                            setPage(value);
+                            window.scrollTo({ top: 0, left: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
+                        }}
+                        showSizeChanger={false}
+                        showLessItems={isMobile}
+                        size={isMobile ? 'small' : 'default'}
+                        disabled={loading || refetching}
+                    />
+                </nav>
+            )}
             <AdBanner ads={bannerAds} />
+            <RegionSheet open={regionOpen} value={searchParams.region}
+                onClose={() => setRegionOpen(false)}
+                onApply={nextRegion => {
+                    setSearchParams({ region: nextRegion });
+                    setRegionOpen(false);
+                }} />
         </PageContainer>
     );
 };
 
 const styles = {
-    header: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        marginBottom: 48,
-        flexWrap: 'wrap',
-        gap: 24,
-    },
-    headerLeft:   { flex: '1 1 auto', minWidth: 250 },
-    title:        { margin: '0 0 8px', fontWeight: fontWeight.extrabold },
-    searchWrap:   { display: 'flex', gap: 8, flex: '0 1 500px', width: '100%', alignItems: 'center' },
     skeletonWrap: { position: 'relative', overflow: 'hidden' },
     fadeOut: {
         position: 'absolute',
@@ -284,14 +293,6 @@ const styles = {
         height: '55%',
         background: 'linear-gradient(to bottom, transparent 0%, var(--c-bg-default, #ffffff) 100%)',
         pointerEvents: 'none',
-    },
-    sentinel:    { marginTop: 8 },
-    spinnerWrap: { display: 'flex', justifyContent: 'center', padding: '24px 0' },
-    endMessage:  {
-        textAlign: 'center',
-        padding: '24px 0 8px',
-        borderTop: `1px solid ${colors.border.light}`,
-        marginTop: 8,
     },
 };
 

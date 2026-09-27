@@ -7,6 +7,7 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.lifecycle.dto.StoreClosureReadiness;
 import kr.it.reserve.store.dto.StoreCreateRequest;
 import kr.it.reserve.store.dto.StoreResponse;
+import kr.it.reserve.store.dto.StoreRegionGroup;
 import kr.it.reserve.store.dto.StoreStatisticsResponse;
 import kr.it.reserve.store.dto.StoreUpdateRequest;
 import kr.it.reserve.store.service.StoreService;
@@ -48,6 +49,12 @@ public class StoreApiController {
         return ApiResponse.success(stores, "내 가게 목록 조회 성공");
     }
 
+    /** 현재 공개 가게 주소의 실제 시군구·건수를 제공한다. 시도 전체 목록은 프론트가 표시한다. */
+    @GetMapping("/regions")
+    public ApiResponse<List<StoreRegionGroup>> getRegions() {
+        return ApiResponse.success(storeService.getAvailableRegions(), "가게 지역 조회 성공");
+    }
+
     // 전체 가게 조회 — 페이지네이션 지원
     // page, size 파라미터 있으면 Page 반환, 없으면 기존 List 반환 (하위 호환)
     // lat/lng: sort=distance일 때만 사용 (프론트가 Geolocation 또는 회원 등록 좌표를 전달)
@@ -58,14 +65,16 @@ public class StoreApiController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false, defaultValue = "20") int size,
             @RequestParam(required = false) Double lat,
-            @RequestParam(required = false) Double lng
+            @RequestParam(required = false) Double lng,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String region
     ) {
         if (page != null) {
-            Page<StoreResponse> storePage = storeService.searchStoresPaged(keyword, sort, page, size, lat, lng);
+            Page<StoreResponse> storePage = storeService.searchStoresPaged(keyword, sort, page, size, lat, lng, domain, region);
             return ApiResponse.success(storePage, "가게 목록 조회 성공");
         }
         // 기존 클라이언트 하위 호환
-        List<StoreResponse> stores = storeService.searchStores(keyword, sort);
+        List<StoreResponse> stores = storeService.searchStores(keyword, sort, domain, region);
         return ApiResponse.success(stores, "가게 목록 조회 성공");
     }
 

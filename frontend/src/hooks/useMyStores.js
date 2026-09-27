@@ -11,7 +11,7 @@ const useMyStores = () => {
     const { data, isLoading, error } = useQuery({
         queryKey: storeKeys.my(),
         queryFn:  () => storeService.getMyStores(),
-        select:   (d) => d || [],
+        select:   (d) => (Array.isArray(d) ? d : []),
         staleTime: 1000 * 60 * 5,
     });
 
@@ -40,7 +40,7 @@ const useMyStores = () => {
     return {
         stores:      data || [],
         loading:     isLoading,
-        error:       error?.message || null,
+        error:       error ?? null,
         deleteStore: (id) => deleteMutation.mutateAsync(id),
         refetch:     () => queryClient.invalidateQueries({ queryKey: storeKeys.my() }),
     };

@@ -1,0 +1,146 @@
+/* RESERVE 등록·수정 작업 폼의 밀도. Core 입력·다른 폼·포털 내부 달력은 변경하지 않는다. */
+@media (min-width: 768px) and (max-width: 899px) {
+    .reserve-route-skeleton--store-form { max-width: 700px; }
+}
+
+/* 좁은 PC의 주요 두 컬럼을 시간 범위 두 칸으로 다시 쪼개지 않는다. */
+@media (min-width: 900px) and (max-width: 1023px) {
+    .reserve-store-form .reserve-store-form-row--time {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 767px) {
+    .reserve-route-skeleton--store-form {
+        padding: 20px 16px 40px;
+    }
+
+    .reserve-store-form-skeleton {
+        gap: 24px;
+    }
+
+    .reserve-store-form-skeleton-field {
+        gap: 8px;
+    }
+
+    .reserve-store-form-skeleton-field:not(.reserve-store-form-skeleton-field--textarea) > .reserve-skeleton-block:last-child {
+        height: var(--reserve-store-form-control-height, 44px) !important;
+        border-radius: var(--reserve-store-form-control-radius, 10px) !important;
+    }
+
+    .reserve-store-form-skeleton-grid {
+        row-gap: 20px;
+    }
+
+    .reserve-store-form-skeleton-column,
+    .reserve-store-form-skeleton-heading,
+    .reserve-store-form-skeleton-upload-group {
+        gap: 10px;
+    }
+
+    .reserve-store-form-skeleton-uploads > .reserve-skeleton-block {
+        width: 84px !important;
+        height: 84px !important;
+    }
+
+    .reserve-store-form-page .reserve-store-form-heading .ant-typography:first-child {
+        font-size: 24px;
+        line-height: 1.35;
+    }
+
+    .reserve-store-form-page .reserve-store-form-heading .ant-typography-secondary {
+        font-size: 14px !important;
+        line-height: 1.5;
+    }
+
+    .reserve-store-form .ant-form-item {
+        margin-bottom: var(--reserve-store-form-field-gap, 12px);
+        min-width: 0;
+    }
+
+    .reserve-store-form .ant-form-item-label {
+        padding-bottom: var(--reserve-store-form-label-gap, 8px);
+    }
+
+    /* Form size=large leaves a 40px label box even in a vertical form. Do not carry it into mobile density. */
+    .reserve-store-form.ant-form .ant-form-item .ant-form-item-label > label {
+        height: auto;
+        min-height: 22px;
+        white-space: normal;
+    }
+
+    .reserve-store-form .ant-form-item-extra {
+        min-height: 0;
+        padding-top: 4px;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .reserve-store-form .ant-select.reserve-form-select {
+        --ant-select-height: var(--reserve-store-form-control-height, 44px);
+        --ant-select-border-radius: var(--reserve-store-form-control-radius, 10px);
+        /* AntD 6의 padding-block 계산도 같이 바뀐다. height만 덮지 않는다. */
+        --ant-select-font-size: 16px;
+        /* 실제 content 줄 높이(16px × 1.5)와 맞춰 padding 계산 후에도 정확히 44px가 된다. */
+        --ant-select-font-height: 24px;
+        --ant-select-border-size: 0px;
+    }
+
+    .reserve-store-form .reserve-form-field:not(textarea),
+    .reserve-store-form .ant-picker,
+    .reserve-store-form .reserve-form-date-trigger,
+    .reserve-store-form .reserve-store-form-address-box {
+        height: var(--reserve-store-form-control-height, 44px) !important;
+        min-height: var(--reserve-store-form-control-height, 44px);
+        border-radius: var(--reserve-store-form-control-radius, 10px) !important;
+    }
+
+    .reserve-store-form .ant-input-number-input {
+        height: calc(var(--reserve-store-form-control-height, 44px) - 2px);
+    }
+
+    .reserve-store-form .ant-picker input {
+        font-size: 16px;
+    }
+
+    .reserve-store-form .reserve-store-form-row--compact {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--reserve-store-form-field-gap, 12px);
+    }
+
+    .reserve-store-form .reserve-store-form-toggle {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 12px !important;
+        row-gap: 2px !important;
+    }
+
+    .reserve-store-form .reserve-store-form-toggle > .ant-typography:first-child {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .reserve-store-form .reserve-store-form-toggle > .ant-typography:nth-child(2) {
+        grid-column: 1;
+        grid-row: 2;
+        min-width: 0;
+    }
+
+    .reserve-store-form .reserve-store-form-toggle > .ant-switch {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+
+    .reserve-store-form .reserve-store-form-actions {
+        margin-top: 24px !important;
+    }
+
+    .reserve-store-form .reserve-store-form-actions .reserve-btn {
+        min-width: 0;
+        height: var(--reserve-store-form-control-height, 44px) !important;
+        border-radius: var(--reserve-store-form-control-radius, 10px) !important;
+        font-size: 14px !important;
+    }
+}

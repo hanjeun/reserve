@@ -7,7 +7,7 @@
  * 2026-07 예약 수정: URL 쿼리 ?edit={reservationId}로 진입하면 그 예약을 불러와 폼을 prefill하고,
  * 제출 시 createReservation 대신 updateReservation을 호출한다. 폼 UI(TimeSlotPicker 등)를 그대로 재사용.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -16,6 +16,7 @@ import { invalidateReservationData } from './invalidateAfterWrite';
 import adService from '../services/adService';
 import { consumeAdClickAttribution } from '../utils/adAttribution';
 import { formatDate, formatTimeForApi, formatTime } from '../utils/date';
+import { httpStatusOf } from '../utils/listErrorMessage';
 
 // 에러 메시지 추출 — Error 객체면 message, 문자열이면 그대로, 그 외엔 null.
 // 예전엔 예약 수정/생성 두 곳에 똑같은 중첩 삼항이 복붙돼 있었다
@@ -55,24 +56,62 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const reviewSectionRef  = useRef(null);
 
     const [completedReservation, setCompletedReservation] = useState(null);
+    const [reviewEligibilityError, setReviewEligibilityError] = useState(null);
+    const [reviewEligibilityLoading, setReviewEligibilityLoading] = useState(false);
+    const reviewEligibilityRequestRef = useRef(0);
 
     // ── 예약 수정(edit) 모드 ──────────────────────────────────────────────────
     const editId = searchParams.get('edit');
     const [editingReservation, setEditingReservation] = useState(null);
+    // 수정 대상 조회가 네트워크·서버 오류로 실패하면 내 예약으로 튕겨내지 않고 이 자리에서 다시 불러온다.
+    // 재시도 중 표시는 effect 가 아니라 클릭 핸들러에서 켠다(effect 본문의 동기 setState 는 lint 규칙 위반).
+    const [editLoadError, setEditLoadError] = useState(null);
+    const [editRetrying, setEditRetrying] = useState(false);
+    const [editLoadAttempt, setEditLoadAttempt] = useState(0);
+    const retryEditLoad = useCallback(() => {
+        setEditRetrying(true);
+        setEditLoadAttempt(attempt => attempt + 1);
+    }, []);
 
-    // 이 가게에서 완료된 예약이 있는지 조회 (리뷰 작성 가능 여부 판단용)
-    // 서버에서 바로 필터링된 1건만 받아옴 — 이전에는 내 전체 예약을 불러와 클라이언트에서 storeId로 필터링했음
-    useEffect(() => {
-        if (!isLoggedIn) return;
-        reservationService.getMyCompletedForStore(Number(id)).then(res => {
-            if (res) setCompletedReservation({ reservationId: res.id, reviewId: res.reviewId ?? null });
-        }).catch(() => {});
+    // 이 가게에서 완료된 예약이 있는지 조회 (리뷰 작성 가능 여부 판단용).
+    // "완료 예약 없음"과 "조회 실패"를 같은 null로 두면 작성 가능한 손님의 리뷰 폼이 조용히
+    // 사라진다. 실패는 ReviewList에서 재시도 가능한 상태로 보여 준다.
+    const loadCompletedReservation = useCallback(async () => {
+        const requestId = ++reviewEligibilityRequestRef.current;
+        if (!isLoggedIn) {
+            setCompletedReservation(null);
+            setReviewEligibilityError(null);
+            setReviewEligibilityLoading(false);
+            return;
+        }
+
+        setReviewEligibilityLoading(true);
+        setReviewEligibilityError(null);
+        try {
+            const reservation = await reservationService.getMyCompletedForStore(Number(id));
+            if (requestId !== reviewEligibilityRequestRef.current) return;
+            setCompletedReservation(reservation ? {
+                reservationId: reservation.id,
+                reviewId: reservation.reviewId ?? null,
+            } : null);
+        } catch (error) {
+            if (requestId !== reviewEligibilityRequestRef.current) return;
+            setCompletedReservation(null);
+            setReviewEligibilityError(error);
+        } finally {
+            if (requestId === reviewEligibilityRequestRef.current) setReviewEligibilityLoading(false);
+        }
     }, [id, isLoggedIn]);
+
+    useEffect(() => {
+        loadCompletedReservation();
+        return () => { reviewEligibilityRequestRef.current += 1; };
+    }, [loadCompletedReservation]);
 
     // ?edit={id}로 진입 시 그 예약을 불러와 수정 대상으로 설정.
     // 이 가게의 예약이 아니거나(방어), 결제됐거나 종료된 예약이면 수정 불가로 안내 후 내 예약으로 돌려보낸다.
     useEffect(() => {
-        if (!editId) { setEditingReservation(null); return; }
+        if (!editId) { setEditingReservation(null); setEditLoadError(null); return; }
         if (!isLoggedIn) {
             message.warning('로그인이 필요한 서비스입니다.');
             navigate('/login', { state: { from: { pathname: `/store/${id}` } } });
@@ -82,6 +121,8 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         reservationService.getReservation(Number(editId))
             .then((r) => {
                 if (cancelled) return;
+                setEditRetrying(false);
+                setEditLoadError(null);
                 if (Number(r.storeId) !== Number(id)) {
                     message.error('이 가게의 예약이 아닙니다.');
                     navigate('/my-reservations', { replace: true });
@@ -95,14 +136,22 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 }
                 setEditingReservation(r);
             })
-            .catch(() => {
+            .catch((error) => {
                 if (cancelled) return;
-                message.error('예약 정보를 불러오지 못했습니다.');
-                navigate('/my-reservations', { replace: true });
+                setEditRetrying(false);
+                // 남의 예약(403)·없는 예약(404)은 다시 불러와도 결과가 같다 — 알리고 내 예약으로 돌려보낸다.
+                const status = httpStatusOf(error);
+                if (status === 403 || status === 404) {
+                    message.error(status === 404 ? '예약을 찾을 수 없습니다.' : '변경할 수 없는 예약입니다.');
+                    navigate('/my-reservations', { replace: true });
+                    return;
+                }
+                // 네트워크·서버 오류는 다시 시도할 가치가 있다. 튕겨내면 손님이 목록에서 다시 눌러야 한다.
+                setEditLoadError(error);
             });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [editId, isLoggedIn, id]);
+    }, [editId, isLoggedIn, id, editLoadAttempt]);
 
     // 수정 대상 예약이 준비되면 폼을 기존 값으로 prefill.
     // reservationDate는 dayjs, reservationTime은 TimeSlotPicker가 쓰는 "HH:mm" 문자열로 맞춘다.
@@ -216,11 +265,12 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 reservationTime: formatTimeForApi(values.reservationTime),
                 ...(skipPayment && { skipPayment: true }),
             });
-            // 광고 전환 기록(2026-07 추가) — 이 가게에 대해 최근에 배너 광고를 클릭하고 온 이력이
-            // sessionStorage에 남아있으면(24시간 이내) 전환으로 집계한다. 예약 성공 자체를 막지 않도록
-            // 실패는 조용히 무시(adService.recordConversion 자체가 내부적으로 catch함).
+            // 최근 같은 가게 배너 클릭이 있으면 예약 ID와 함께 서버에 귀속을 요청한다.
+            // 서버가 현재 회원·가게·기간·중복을 다시 확인하고, 기록 실패는 예약 성공을 바꾸지 않는다.
             const attributedAdId = consumeAdClickAttribution(Number(id));
-            if (attributedAdId) adService.recordConversion(attributedAdId);
+            if (attributedAdId && reservation?.id) {
+                void adService.recordConversion(attributedAdId, reservation.id);
+            }
             await handleReservationResult(reservation);
         } catch (err) {
             const errMsg = toErrorMessage(err);
@@ -230,12 +280,18 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
 
     return {
         completedReservation,
+        reviewEligibilityError,
+        reviewEligibilityLoading,
+        refetchReviewEligibility: loadCompletedReservation,
         stateOpenWrite,
         stateOpenReviewId,
         reviewSectionRef,
         onFinish,
         isEditMode: !!editId,
         editingReservation,
+        editLoadError,
+        editRetrying,
+        retryEditLoad,
     };
 };
 

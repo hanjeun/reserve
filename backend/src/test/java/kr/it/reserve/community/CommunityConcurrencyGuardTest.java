@@ -38,16 +38,17 @@ class CommunityConcurrencyGuardTest {
     private CommunityService communityService;
 
     @Test
-    @DisplayName("상세 조회는 조회수를 DB 원자 쿼리로 증가시킨 뒤 새 값을 읽는다")
+    @DisplayName("조회수 쓰기는 별도 POST용 서비스만 하고 GET은 조회만 한다")
     void incrementsViewCountAtomically() {
         CommunityPost post = post(11L, 3);
         post.setViewCount(4);
-        when(postRepository.incrementViewCount(11L)).thenReturn(1);
         when(postRepository.findByIdWithAuthorAndComments(11L)).thenReturn(Optional.of(post));
 
         CommunityDto.PostResponse response = communityService.getPost(11L, null);
 
         assertThat(response.getViewCount()).isEqualTo(4);
+        verify(postRepository, never()).incrementViewCount(11L);
+        communityService.recordView(11L);
         verify(postRepository).incrementViewCount(11L);
         verify(postRepository, never()).save(post);
     }

@@ -1,0 +1,265 @@
+package kr.it.reserve.tourism.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.tourism.dto.TourismRegionPhotoResponse;
+import kr.it.reserve.tourism.entity.TourismRegionPhoto;
+import kr.it.reserve.tourism.repository.TourismRegionPhotoRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * 지역 대표 관광 사진의 권리 관문.
+ *
+ * 관광정보 API의 목록은 후보를 찾는 용도이고, 실제 등록은 detailImage2의 공공누리 제1유형을
+ * 확인한 뒤에만 한다. 외부 API와 이미지 호스트가 일시적으로 실패해도 기존 카탈로그와 핀 폴백은
+ * 그대로 남아야 하므로 이 서비스는 빈 결과로 물러난다.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class TourismRegionPhotoService {
+
+    private static final String LIST_ENDPOINT = "https://apis.data.go.kr/B551011/KorService2/areaBasedList2";
+    private static final String IMAGE_ENDPOINT = "https://apis.data.go.kr/B551011/KorService2/detailImage2";
+    private static final String SOURCE_URL = "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y";
+    private static final String PROVIDER_NAME = "한국관광공사 관광정보 서비스";
+    private static final String LICENSE_TYPE = "공공누리 제1유형";
+    private static final int CANDIDATE_LIMIT = 4;
+    private static final Duration REFRESH_AFTER = Duration.ofDays(30);
+    private static final Duration FAILURE_BACKOFF = Duration.ofHours(6);
+
+    /** Tourism API의 고정 시도 코드. 삭제 예정인 areaCode2를 호출하지 않는다. */
+    private static final Map<String, String> AREA_CODES = Map.ofEntries(
+            Map.entry("서울", "1"), Map.entry("인천", "2"), Map.entry("대전", "3"),
+            Map.entry("대구", "4"), Map.entry("광주", "5"), Map.entry("부산", "6"),
+            Map.entry("울산", "7"), Map.entry("세종", "8"), Map.entry("경기", "31"),
+            Map.entry("강원", "32"), Map.entry("충북", "33"), Map.entry("충남", "34"),
+            Map.entry("경북", "35"), Map.entry("경남", "36"), Map.entry("전북", "37"),
+            Map.entry("전남", "38"), Map.entry("제주", "39")
+    );
+    private static final Set<String> SUCCESS_CODES = Set.of("0000", "00");
+    private static final Set<String> TYPE_ONE_LICENSE_CODES = Set.of(
+            "TYPE1", "1", "제1유형", "공공누리제1유형", "KOGL1"
+    );
+
+    private final TourismRegionPhotoRepository repository;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    private final TourismImageProxyClient imageProxyClient;
+    private final Map<String, Instant> failedRefreshes = new ConcurrentHashMap<>();
+
+    @Value("${tourism.api.service-key:}")
+    private String serviceKey;
+
+    /** 최대 6개 지역을 한 화면에서 조회한다. 호출자가 임의 문자열을 주어도 고정 시도 목록 밖은 무시한다. */
+    public List<TourismRegionPhotoResponse> findRegionPhotos(Collection<String> regions) {
+        if (regions == null || regions.isEmpty()) return List.of();
+
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String region : regions) {
+            if (AREA_CODES.containsKey(region)) normalized.add(region);
+            if (normalized.size() == 6) break;
+        }
+
+        List<TourismRegionPhotoResponse> photos = new ArrayList<>();
+        for (String region : normalized) {
+            findRegionPhoto(region).ifPresent(photos::add);
+        }
+        return List.copyOf(photos);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TourismRegionPhotoResponse> catalog() {
+        return repository.findAllByOrderByRegionCodeAsc().stream()
+                .map(TourismRegionPhotoResponse::from)
+                .toList();
+    }
+
+    /**
+     * 프록시는 DB에 이미 등록된 검증 URL만 읽는다. 클라이언트가 URL을 넘길 경로는 없다.
+     * repository 읽기가 끝난 뒤 외부 HTTPS를 시작해 느린 원격 응답 동안 DB connection을 잡지 않는다.
+     */
+    public Optional<ImagePayload> loadImage(String region) {
+        if (!AREA_CODES.containsKey(region)) return Optional.empty();
+
+        Optional<TourismRegionPhoto> photo = repository.findByRegionCode(region);
+        if (photo.isEmpty() || !TourismImageProxyClient.isAllowedImageUrl(photo.get().getImageUrl())) {
+            return Optional.empty();
+        }
+
+        try {
+            return imageProxyClient.fetch(photo.get().getImageUrl())
+                    .map(image -> new ImagePayload(image.bytes(), image.contentType()));
+        } catch (Exception exception) {
+            log.warn("Tourism region image proxy failed: region={}, errorType={}", region,
+                    exception.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
+    private Optional<TourismRegionPhotoResponse> findRegionPhoto(String region) {
+        // Spring Data repository 호출은 각각 짧은 트랜잭션으로 끝낸다. 아래 Tourism API 호출을
+        // 포괄하는 서비스 트랜잭션을 두면 공개 요청이 DB connection을 수 초간 점유할 수 있다.
+        Optional<TourismRegionPhoto> existing = repository.findByRegionCode(region);
+        if (existing.filter(this::isFresh).isPresent()) {
+            return existing.map(TourismRegionPhotoResponse::from);
+        }
+        if (!StringUtils.hasText(serviceKey) || shouldBackOff(region)) {
+            return existing.map(TourismRegionPhotoResponse::from);
+        }
+
+        try {
+            Optional<Candidate> candidate = fetchCandidate(region);
+            if (candidate.isEmpty()) {
+                rememberFailure(region);
+                return existing.map(TourismRegionPhotoResponse::from);
+            }
+
+            LocalDateTime checkedAt = LocalDateTime.now();
+            TourismRegionPhoto stored = existing.orElseGet(() -> new TourismRegionPhoto());
+            Candidate accepted = candidate.get();
+            stored.refresh(region, accepted.contentId(), PROVIDER_NAME, accepted.workTitle(), accepted.imageUrl(),
+                    SOURCE_URL, LICENSE_TYPE, checkedAt);
+            repository.save(stored);
+            failedRefreshes.remove(region);
+            return Optional.of(TourismRegionPhotoResponse.from(stored));
+        } catch (Exception exception) {
+            rememberFailure(region);
+            log.warn("Tourism region photo lookup failed: region={}, errorType={}", region,
+                    exception.getClass().getSimpleName());
+            return existing.map(TourismRegionPhotoResponse::from);
+        }
+    }
+
+    private boolean isFresh(TourismRegionPhoto photo) {
+        return photo.getCheckedAt() != null
+                && photo.getCheckedAt().isAfter(LocalDateTime.now().minus(REFRESH_AFTER));
+    }
+
+    private boolean shouldBackOff(String region) {
+        Instant until = failedRefreshes.get(region);
+        return until != null && until.isAfter(Instant.now());
+    }
+
+    private void rememberFailure(String region) {
+        failedRefreshes.put(region, Instant.now().plus(FAILURE_BACKOFF));
+    }
+
+    private Optional<Candidate> fetchCandidate(String region) throws Exception {
+        List<JsonNode> listItems = requestItems(LIST_ENDPOINT, builder -> builder
+                .queryParam("areaCode", AREA_CODES.get(region))
+                .queryParam("pageNo", 1)
+                .queryParam("numOfRows", 20));
+
+        int inspected = 0;
+        for (JsonNode item : listItems) {
+            String contentId = text(item, "contentid");
+            if (!StringUtils.hasText(contentId)) continue;
+            String fallbackTitle = text(item, "title");
+            List<JsonNode> imageItems = requestItems(IMAGE_ENDPOINT, builder -> builder
+                    .queryParam("contentId", contentId));
+            inspected++;
+            for (JsonNode image : imageItems) {
+                String imageUrl = firstText(image, "originimgurl", "smallimageurl");
+                if (!isTypeOne(image) || !TourismImageProxyClient.isAllowedImageUrl(imageUrl)) continue;
+                String title = firstNonBlank(text(image, "imgname"), fallbackTitle, "대표 관광 사진");
+                return Optional.of(new Candidate(contentId, trim(title, 500), TourismImageProxyClient.toHttpsImageUrl(imageUrl)));
+            }
+            if (inspected >= CANDIDATE_LIMIT) break;
+        }
+        return Optional.empty();
+    }
+
+    private List<JsonNode> requestItems(String endpoint, java.util.function.UnaryOperator<UriComponentsBuilder> extra)
+            throws Exception {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(endpoint)
+                .queryParam("serviceKey", encodedServiceKey())
+                .queryParam("MobileOS", "ETC")
+                .queryParam("MobileApp", "RESERVE")
+                .queryParam("_type", "json");
+        URI uri = extra.apply(builder).build(true).toUri();
+        return parseItems(restTemplate.getForObject(uri, String.class));
+    }
+
+    private String encodedServiceKey() {
+        return serviceKey.contains("%")
+                ? serviceKey
+                : URLEncoder.encode(serviceKey, StandardCharsets.UTF_8);
+    }
+
+    private List<JsonNode> parseItems(String body) throws Exception {
+        if (body == null || !body.stripLeading().startsWith("{")) {
+            throw new IllegalStateException("Tourism API did not return JSON");
+        }
+        JsonNode response = objectMapper.readTree(body).path("response");
+        String resultCode = response.path("header").path("resultCode").asText();
+        if (!SUCCESS_CODES.contains(resultCode)) {
+            throw new IllegalStateException("Tourism API rejected the request");
+        }
+        JsonNode item = response.path("body").path("items").path("item");
+        if (item.isArray()) {
+            List<JsonNode> items = new ArrayList<>();
+            item.forEach(items::add);
+            return items;
+        }
+        return item.isObject() ? List.of(item) : List.of();
+    }
+
+    private boolean isTypeOne(JsonNode image) {
+        String code = text(image, "cpyrhtDivCd")
+                .replaceAll("\\s+", "")
+                .toUpperCase(Locale.ROOT);
+        return TYPE_ONE_LICENSE_CODES.contains(code);
+    }
+
+    private static String text(JsonNode node, String field) {
+        return node.path(field).asText("").trim();
+    }
+
+    private static String firstText(JsonNode node, String... fields) {
+        for (String field : fields) {
+            String value = text(node, field);
+            if (StringUtils.hasText(value)) return value;
+        }
+        return "";
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) return value.trim();
+        }
+        return "";
+    }
+
+    private static String trim(String value, int maxLength) {
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
+    }
+
+    private record Candidate(String contentId, String workTitle, String imageUrl) { }
+
+    public record ImagePayload(byte[] bytes, MediaType contentType) { }
+}

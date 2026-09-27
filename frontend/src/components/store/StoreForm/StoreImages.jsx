@@ -1,8 +1,13 @@
 import React from 'react';
 import { Form, Upload, Divider, message as antMessage } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-
-const MAX_SIZE_MB = 10;
+import {
+    IMAGE_ACCEPT,
+    MAX_IMAGE_REQUEST_BYTES,
+    MAX_IMAGE_REQUEST_MB,
+    imageFileError,
+    uploadListBytes,
+} from '../../../utils/imageUploadPolicy';
 
 /**
  * Upload 의 onChange 이벤트에서 폼 값으로 쓸 배열만 꺼낸다.
@@ -18,15 +23,9 @@ const MAX_SIZE_MB = 10;
 const normFileList = (e) => (Array.isArray(e) ? e : e?.fileList ?? []);
 
 const validateImage = (file) => {
-    if (!file.type.startsWith('image/')) {
-        antMessage.error('이미지 파일만 업로드할 수 있습니다');
-        return Upload.LIST_IGNORE;
-    }
-    const sizeMB = file.size / 1024 / 1024;
-    if (sizeMB > MAX_SIZE_MB) {
-        antMessage.error(
-            `파일 크기가 ${MAX_SIZE_MB}MB를 초과합니다 (현재 ${sizeMB.toFixed(1)}MB)`
-        );
+    const error = imageFileError(file);
+    if (error) {
+        antMessage.error(error);
         return Upload.LIST_IGNORE;
     }
     return false;
@@ -44,6 +43,22 @@ const StoreImages = ({
     onPreviewClickCapture,
     mainImageRequired = true,
 }) => {
+    const withinRequestLimit = (nextMain, nextDetails) => {
+        if (uploadListBytes([...nextMain, ...nextDetails]) <= MAX_IMAGE_REQUEST_BYTES) return true;
+        antMessage.error(`새로 올리는 이미지 전체 합계는 ${MAX_IMAGE_REQUEST_MB}MB 이하여야 합니다.`);
+        return false;
+    };
+
+    const handleMainChange = (event) => {
+        const next = event.fileList.slice(-1);
+        if (withinRequestLimit(next, detailImages)) onMainImageChange({ ...event, fileList: next });
+    };
+
+    const handleDetailsChange = (event) => {
+        const next = event.fileList.slice(0, 5);
+        if (withinRequestLimit(mainImage, next)) onDetailImagesChange({ ...event, fileList: next });
+    };
+
     return (
         <>
             <Divider>이미지 등록</Divider>
@@ -53,16 +68,17 @@ const StoreImages = ({
                 label="대표 이미지"
                 name="mainImage"
                 getValueFromEvent={normFileList}
-                extra={`JPG · PNG · WEBP 등 이미지 파일 / 최대 ${MAX_SIZE_MB}MB`}
+                extra={<span>대표 이미지는 가게 카드와 고객의 가게 문의 채팅 사진에 표시됩니다. 변경하면 채팅 사진도 함께 바뀝니다.<br />JPG · PNG · WEBP · GIF / 새 이미지 전체 합계 최대 {MAX_IMAGE_REQUEST_MB}MB</span>}
                 rules={mainImageRequired ? [{ required: true, message: '대표 이미지를 등록해주세요' }] : []}
             >
                 <Upload
                     listType="picture-card"
                     fileList={mainImage}
-                    onChange={onMainImageChange}
+                    onChange={handleMainChange}
                     onPreview={onPreview}
                     beforeUpload={validateImage}
                     maxCount={1}
+                    accept={IMAGE_ACCEPT}
                     onClickCapture={onPreviewClickCapture}
                 >
                     {mainImage.length === 0 && <UploadButton />}
@@ -74,16 +90,17 @@ const StoreImages = ({
                 label="상세 이미지 (최대 5장)"
                 name="detailImages"
                 getValueFromEvent={normFileList}
-                extra={`JPG · PNG · WEBP 등 이미지 파일 / 장당 최대 ${MAX_SIZE_MB}MB`}
+                extra={`JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 ${MAX_IMAGE_REQUEST_MB}MB`}
             >
                 <Upload
                     listType="picture-card"
                     fileList={detailImages}
-                    onChange={onDetailImagesChange}
+                    onChange={handleDetailsChange}
                     onPreview={(file) => onPreview(file, detailImages)}
                     beforeUpload={validateImage}
                     maxCount={5}
                     multiple
+                    accept={IMAGE_ACCEPT}
                     onClickCapture={onPreviewClickCapture}
                 >
                     {detailImages.length < 5 && <UploadButton />}

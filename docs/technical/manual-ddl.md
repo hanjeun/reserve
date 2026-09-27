@@ -342,6 +342,43 @@ MySQL `SHOW CREATE TABLE`로 기존 타입·기본값을 확인하고 실제 실
 `uk_chat_message_idempotency`와 기존 room index를 유지한다. 새 테이블·FULLTEXT 활성화·기존 컬럼 삭제는 이 변경에 없다.
 DB 복원만으로 사진이 복구되지 않으므로 기존 이미지 S3 객체와 보호된 암호화 키도 함께 복구 가능해야 한다.
 
+### 2026-09-27 채팅 숨김·신고 증거·90일 파기 후보 (운영 미적용)
+
+추가 DDL은 [채팅 계약](chat-controls.md)의 컬럼/테이블과 대조한다. 기존 신고는 자동 backfill하지 않는다.
+`chat_report_evidence`는 report/message별 unique, 사진 key index를 두고, 감사 원장은 report/time index를 둔다.
+두 테이블은 원장 보존을 위해 메시지 삭제 cascade를 갖지 않는다. 원문·키 값은 DDL 실행 로그에 출력하지 않는다.
+
+```sql
+ALTER TABLE chat_room ADD COLUMN member_hidden_at DATETIME(6) NULL,
+  ADD COLUMN owner_hidden_at DATETIME(6) NULL, ADD COLUMN owner_hidden_by_member_id BIGINT NULL;
+ALTER TABLE chat_message ADD COLUMN purged_at DATETIME(6) NULL,
+  ADD INDEX idx_chat_message_retention (purged_at, created_at, id);
+ALTER TABLE chat_report ADD COLUMN evidence_captured_at DATETIME(6) NULL;
+CREATE TABLE chat_report_evidence (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  report_id BIGINT NOT NULL, message_id BIGINT NOT NULL, room_id BIGINT NOT NULL,
+  sender_member_id BIGINT NULL, sender_role ENUM('ADMIN','MEMBER','OWNER') NOT NULL,
+  content TEXT NOT NULL, image_key VARCHAR(512) NULL, image_content_type VARCHAR(40) NULL,
+  image_width INT NULL, image_height INT NULL, message_created_at DATETIME(6) NULL,
+  retracted_at_capture BIT(1) NOT NULL, captured_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uk_chat_evidence_report_message (report_id,message_id),
+  KEY idx_chat_evidence_image (image_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+CREATE TABLE chat_report_access_audit (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, report_id BIGINT NOT NULL,
+  admin_member_id BIGINT NOT NULL, message_id BIGINT NULL,
+  action ENUM('CONTEXT','IMAGE') NOT NULL, purpose VARCHAR(40) NOT NULL,
+  accessed_at DATETIME(6) NOT NULL, KEY idx_chat_audit_report_time (report_id,accessed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+```
+
+운영 실행 전 `SHOW CREATE TABLE`에서 컬럼/인덱스 존재 여부를 재확인한다. 추가 테이블의 정확한 DDL은
+위에 기록하고 후보 엔티티 및 외부 기능 manifest와 대조한다. H2 성공으로 MySQL 성공을 대체하지 않는다.
+9/27 격리 MySQL 8.0.45에서는 기존 백업+DDL 33테이블·일반 파기/증거 유지/감사 INSERT가 통과했다.
+검사 DB만 제거했으며 운영 실행 증거는 아니다. 추가 DDL 해시는 외부 실행 manifest에 보존한다.
+파기 worker는 `CHAT_RETENTION_ENABLED=false`가 기본이며, 기존 신고 보류/개인정보 고지/기존 백업의
+원문 잔존/이전 화면 호환성까지 검증한 뒤 별도로 켠다. 일반 백업을 새로 설치하거나 S3/IAM을 재구성하지 않는다.
+
 ### 날짜별 이력
 
 | 날짜 | 대상 | DDL | 적용자 | 메모 |

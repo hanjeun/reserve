@@ -324,3 +324,8 @@ AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 > 운영 활성화 전에 보호된 별도 키 보관과 복구를 검증한다. 키를 덮어쓰면 기존 사진을 잃으므로 무계획 회전은 금지한다.
 > 외부 발급 키가 아니다. [PC에서 직접 생성·GitHub/IntelliJ 등록하는 절차](chat-images.md)를 따른다.
 > API·스키마·IAM 경로 목록은 [릴리스 후보 체크리스트](release-candidate-2026-09-27.md)를 따른다.
+
+> **`CHAT_RETENTION_ENABLED`** — 일반 채팅 원문/사진의 90일 파기 worker이며 기본값은 `false`다.
+> 환경변수 → `chat.retention.enabled`로 바인딩된다. 운영 compose/CI에서는 아직 켜지 않으며,
+> 추가 DDL·정책 고지·기존 신고 보류/백업/복구 검증 뒤 별도 활성화한다. 신고 증거는 자동 파기하지 않는다.
+> [채팅 계약](chat-controls.md)을 따른다. 이미 만료된 일반 원문은 이후 신고로 복구할 수 없다.

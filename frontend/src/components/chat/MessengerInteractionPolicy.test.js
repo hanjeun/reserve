@@ -21,7 +21,10 @@ describe('messenger interaction roles', () => {
     it('opens threads with the same smooth duration and easing as returning to the list', () => {
         const entering = declarations('.reserve-messenger.is-opening-thread > .reserve-messenger-thread').animation;
         const leaving = declarations('.reserve-messenger.is-returning-to-list > .reserve-messenger-thread').animation;
-        expect(entering).toBe(leaving.replace(' both', ' reverse both'));
+        expect(entering).toBe(leaving.replace('reserve-messenger-thread-back-out', 'reserve-messenger-thread-in'));
+        expect(entering).not.toContain('reverse');
+        const listOut = css.nodes.find(node => node.type === 'atrule' && node.params === 'reserve-messenger-list-out');
+        expect(listOut.nodes.find(node => node.selector === 'to').nodes.find(node => node.prop === 'opacity').value).toBe('0');
         expect(entering).toContain('0.26s cubic-bezier(0.4, 0, 0.2, 1)');
         expect(declarations('.reserve-messenger.is-opening-thread > .reserve-messenger-thread', '(prefers-reduced-motion: reduce)')['animation-duration'])
             .toBe('0.01ms');
@@ -72,8 +75,8 @@ describe('messenger interaction roles', () => {
         expect(declarations('.reserve-messenger-primary-action:active', reduced).transform).toBe('none');
         expect(declarations('.reserve-chat-send:active:not(:disabled)', reduced).transform).toBe('none');
         expect(declarations('.reserve-messenger-primary-action', reduced).transition).toBe('none');
-        expect(declarations('.reserve-messenger-list-refresh.is-refreshing .anticon').animation)
-            .toBe('reserve-messenger-refresh-rotate 0.9s linear infinite');
+        // 기본 회전은 공통 RefreshButton과 같은 Ant Design SyncOutlined spin을 사용한다.
+        expect(declarations('.reserve-messenger-list-refresh.is-refreshing .anticon')).not.toHaveProperty('animation');
         expect(declarations('.reserve-messenger-list-refresh.is-refreshing .anticon', reduced).animation)
             .toBe('none');
     });

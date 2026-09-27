@@ -39,6 +39,20 @@ describe('shared chat composer', () => {
         fireEvent.keyDown(search, { key: 'Escape' });
         expect(trigger).toHaveFocus();
     });
+    it('does not force a touch keyboard when opening or selecting an emoji', async () => {
+        const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(pointer: coarse)',
+            media: query, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+        const inputProps = props();
+        render(<ChatComposer {...inputProps} />);
+        const trigger = screen.getByRole('button', { name: '이모지 선택' });
+        fireEvent.click(trigger);
+        const search = await screen.findByRole('searchbox');
+        expect(search).not.toHaveFocus();
+        fireEvent.click(screen.getByRole('button', { name: '미소 😊' }));
+        await waitFor(() => expect(trigger).toHaveFocus());
+        expect(screen.getByRole('textbox')).not.toHaveFocus();
+        media.mockRestore();
+    });
     it('keeps the interrupt button usable during sending without allowing another send', () => {
         const inputProps = { ...props(), sending: true, onCancel: vi.fn() };
         render(<ChatComposer {...inputProps} imageEnabled />);

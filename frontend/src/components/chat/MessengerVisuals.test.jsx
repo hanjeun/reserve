@@ -420,14 +420,14 @@ describe('messenger list heading', () => {
         expect(screen.getByRole('heading', { name: '대화', level: 1 })).toBeInTheDocument();
         const refresh = screen.getByRole('button', { name: '대화 목록 새로고침' });
         expect(refresh).toHaveAttribute('type', 'button');
-        const arrow = refresh.querySelector('.anticon-reload');
+        const arrow = refresh.querySelector('.anticon-sync');
         expect(arrow).toBeInTheDocument();
         expect(onRefresh).not.toHaveBeenCalled();
         await userEvent.setup().click(refresh);
         expect(onRefresh).toHaveBeenCalledTimes(1);
         rerender(<MessengerListHeading headingLevel={1} onRefresh={onRefresh} refreshing />);
         expect(refresh).toHaveClass('is-refreshing');
-        expect(refresh.querySelector('.anticon-reload')).toBe(arrow);
+        expect(refresh.querySelector('.anticon-sync')).toBe(arrow);
         expect(refresh.querySelector('.anticon-loading')).not.toBeInTheDocument();
         expect(refresh).toHaveAttribute('aria-disabled', 'true');
         expect(refresh).not.toBeDisabled();

@@ -71,6 +71,7 @@ const FormModal = ({
     title,
     open,
     onClose,
+    afterClose,
     onCancelAction,
     onSubmit,
     submitting = false,
@@ -99,6 +100,7 @@ const FormModal = ({
             title={<Text style={{ fontSize: fontSize.base, fontWeight: 700 }}>{title}</Text>}
             open={open}
             onCancel={onClose}
+            afterClose={afterClose}
             rootClassName={rootClassName}
             /* maskClosable={false}: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
@@ -133,6 +135,8 @@ FormModal.propTypes = {
     title: PropTypes.node,
     open: PropTypes.bool,
     onClose: PropTypes.func,
+    /** 닫힘 애니메이션 뒤 조건부 부모가 폼을 제거할 때 사용한다. */
+    afterClose: PropTypes.func,
     /** 닫기 X와 별개인 footer 보조 동작. 다단계 폼의 이전 버튼 등에 사용한다. */
     onCancelAction: PropTypes.func,
     onSubmit: PropTypes.func,

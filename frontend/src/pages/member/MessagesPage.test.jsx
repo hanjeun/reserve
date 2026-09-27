@@ -9,7 +9,7 @@ const { goBack } = vi.hoisted(() => ({ goBack: vi.fn() }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/useGoBack', () => ({ default: () => goBack }));
 vi.mock('../../components/chat/MessengerContent', () => ({
-    default: () => <div>메시지 본문</div>,
+    default: ({ onClose }) => <div>메시지 본문<button onClick={onClose} aria-label="메시지 닫기" /></div>,
 }));
 
 describe('MessagesPage route motion', () => {
@@ -19,7 +19,7 @@ describe('MessagesPage route motion', () => {
         useMessengerStore.setState({ open: false, view: 'home', activeThread: false });
     });
 
-    it('does not render a second close launcher on the mobile route', () => {
+    it('closes through the content X using the existing route motion without a second launcher', async () => {
         const { container } = render(
             <MemoryRouter initialEntries={['/messages']}>
                 <MessagesPage />
@@ -27,8 +27,15 @@ describe('MessagesPage route motion', () => {
         );
         const page = container.querySelector('.reserve-messages-route');
         expect(page).toHaveClass('is-opening');
-        expect(screen.queryByRole('button', { name: '메시지 화면 닫기' })).not.toBeInTheDocument();
+        const close = screen.getByRole('button', { name: '메시지 닫기' });
         expect(container.querySelector('.reserve-messenger-launcher-wrap')).toBeNull();
+        fireEvent.click(close);
+        fireEvent.click(close);
+        expect(page).toHaveClass('is-closing');
+        expect(goBack).not.toHaveBeenCalled();
+        fireEvent.animationEnd(page);
+        fireEvent.animationEnd(page);
+        await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
     });
 
     it('uses the same close motion for the shared header back request', () => {

@@ -5,10 +5,10 @@ import { normalizeListPage } from '../utils/listResponse';
 const messageBody = (content, clientMessageId) => ({ content, clientMessageId });
 
 const chatService = {
-    listConversations: (page = 0) => api.get(
-        API_ENDPOINTS.CHAT.CONVERSATIONS, { params: { page } }).then(data => normalizeListPage(data, page)),
-    listStoreInbox: (page = 0) => api.get(
-        API_ENDPOINTS.CHAT.STORE_INBOX, { params: { page } }).then(data => normalizeListPage(data, page)),
+    listConversations: (page = 0, hidden = false) => api.get(
+        API_ENDPOINTS.CHAT.CONVERSATIONS, { params: { page, ...(hidden ? { hidden } : {}) } }).then(data => normalizeListPage(data, page)),
+    listStoreInbox: (page = 0, hidden = false) => api.get(
+        API_ENDPOINTS.CHAT.STORE_INBOX, { params: { page, ...(hidden ? { hidden } : {}) } }).then(data => normalizeListPage(data, page)),
     getSupport: () => api.post(`${API_ENDPOINTS.CHAT.SUPPORT}/open`),
     sendSupport: (content, clientMessageId, config) => api.post(
         API_ENDPOINTS.CHAT.SUPPORT_SEND, messageBody(content, clientMessageId), config),
@@ -36,6 +36,8 @@ const chatService = {
         API_ENDPOINTS.CHAT.ROOM_READ(roomId), undefined, { params: { viewerRole } }),
     setBlocked: (roomId, viewerRole, blocked) => api.put(
         API_ENDPOINTS.CHAT.ROOM_BLOCK(roomId), undefined, { params: { viewerRole, blocked } }),
+    setHidden: (roomId, viewerRole, hidden) => api.put(`/api/chat/rooms/${roomId}/visibility`, undefined,
+        { params: { viewerRole, hidden } }),
     reportConversation: (roomId, viewerRole, report) => api.post(
         API_ENDPOINTS.CHAT.ROOM_REPORTS(roomId), report, { params: { viewerRole } }),
     listReports: (page = 0, status) => api.get(

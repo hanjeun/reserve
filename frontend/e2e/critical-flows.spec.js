@@ -409,6 +409,128 @@ test('messenger: mobile route and desktop close motion follow their own shell', 
     await expect(panel).toHaveCount(0);
 });
 
+test('messenger: every internal view keeps a close X and shared refresh feedback', async ({ page, isMobile }, testInfo) => {
+    if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
+    await mockApi(page, user);
+    await page.route('**/api/chat/conversations*', route => ok(route, {
+        ...emptyPage,
+        content: [{ roomId: 7, type: 'STORE', storeId: 7, storeName: '테스트 가게',
+            counterpartName: '테스트 가게', viewerRole: 'MEMBER', unread: 0, lastMessagePreview: '안녕하세요' }],
+    }));
+    await page.route('**/api/chat/stores/7/open', route => ok(route, {
+        roomId: 7, type: 'STORE', storeId: 7, title: '테스트 가게',
+        viewerRole: 'MEMBER', canSend: true, messages: [],
+    }));
+    await page.goto('/');
+    if (isMobile) await page.getByRole('link', { name: '메시지', exact: true }).click();
+    else await page.locator('.reserve-chat-launcher').click();
+    const surface = page.locator(isMobile ? '.reserve-messages-page' : '.reserve-chat-panel');
+    const messenger = surface.locator('.reserve-messenger');
+    const close = surface.getByRole('button', { name: '메시지 닫기', exact: true });
+    const checkClose = async () => {
+        await expect(close).toHaveCount(1);
+        await expect(close).toBeVisible();
+        const box = await close.boundingBox();
+        expect(box.width).toBe(44);
+        expect(box.height).toBe(44);
+    };
+    await checkClose();
+    await surface.getByRole('button', { name: '설정', exact: true }).click();
+    await expect(surface.getByRole('heading', { name: '설정', exact: true })).toBeVisible();
+    await checkClose();
+    await surface.getByRole('button', { name: '대화', exact: true }).click();
+    await checkClose();
+    const refresh = surface.getByRole('button', { name: '대화 목록 새로고침' });
+    await expect(refresh).not.toHaveAttribute('aria-busy', 'true');
+    await expect(refresh.locator('.anticon-sync')).toHaveCount(1);
+    const refreshBox = await refresh.boundingBox();
+    expect(refreshBox.x + refreshBox.width).toBeLessThanOrEqual((await close.boundingBox()).x);
+    await refresh.click();
+    await expect(refresh).not.toHaveAttribute('aria-busy', 'true');
+    await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+    await expect(refresh.locator('.anticon-sync')).not.toHaveClass(/anticon-spin/);
+    await surface.getByRole('button', { name: /테스트 가게/ }).click();
+    await expect(messenger).toHaveClass(/has-thread/);
+    await expect(messenger).not.toHaveClass(/is-opening-thread/);
+    await checkClose();
+    const manageBox = await surface.getByRole('button', { name: '대화 관리', exact: true }).boundingBox();
+    expect(manageBox.x + manageBox.width).toBeLessThanOrEqual((await close.boundingBox()).x);
+    await page.screenshot({ path: testInfo.outputPath('messenger-close-controls.png') });
+    await surface.getByRole('button', { name: '대화 목록으로 돌아가기' }).click();
+    await expect(messenger).not.toHaveClass(/has-thread/);
+    await checkClose();
+    await close.click();
+    if (isMobile) await expect(page).toHaveURL(/\/$/);
+    else await expect(surface).toHaveCount(0);
+});
+
+test('messenger: message actions, private photo preview and motion settle without a list ghost', async ({ page, isMobile }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await mockApi(page, user);
+    await page.route('**/api/chat/conversations*', route => ok(route, { ...emptyPage, content: [{ roomId: 7,
+        type: 'STORE', storeId: 7, storeName: '합성 가게', counterpartName: '합성 가게', viewerRole: 'MEMBER', unread: 0 }] }));
+    await page.route('**/api/chat/stores/7/open', route => ok(route, { roomId: 7, type: 'STORE', storeId: 7,
+        title: '합성 가게', viewerRole: 'MEMBER', canSend: true, messages: [
+            { id: 1, senderRole: 'MEMBER', content: '합성 메시지', canRetract: true },
+            { id: 2, senderRole: 'OWNER', content: '전송이 취소된 메시지입니다.', retracted: true },
+            { id: 3, senderRole: 'OWNER', content: '', imageUrl: '/api/chat/images/3', imageWidth: 1, imageHeight: 1 },
+        ] }));
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aJ1sAAAAASUVORK5CYII=', 'base64');
+    await page.route('**/api/chat/images/config', route => ok(route, { enabled: true }));
+    await page.route('**/api/chat/images/3', route => route.fulfill({ contentType: 'image/png', body: png }));
+    await page.goto('/');
+    if (isMobile) await page.getByRole('link', { name: '메시지', exact: true }).click();
+    else await page.locator('.reserve-chat-launcher').click();
+    const surface = page.locator(isMobile ? '.reserve-messages-page' : '.reserve-chat-panel');
+    await surface.getByRole('button', { name: '대화', exact: true }).click();
+    const frames = await surface.evaluate(async element => {
+        element.querySelector('.reserve-messenger-row')?.click();
+        const samples = [];
+        const start = performance.now();
+        while (performance.now() - start < 420) {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const thread = element.querySelector('.reserve-messenger-thread');
+            const list = element.querySelector('.reserve-messenger-list');
+            if (thread) samples.push({ time: performance.now() - start, x: thread.getBoundingClientRect().x,
+                opacity: Number(getComputedStyle(thread).opacity), opening: element.querySelector('.reserve-messenger').classList.contains('is-opening-thread'),
+                listOpacity: list ? Number(getComputedStyle(list).opacity) : 0 });
+        }
+        return samples;
+    });
+    const settled = frames.filter(frame => !frame.opening);
+    expect(settled.length).toBeGreaterThan(1);
+    expect(settled.every(frame => frame.opacity === 1 && frame.listOpacity === 0)).toBe(true);
+    expect(Math.max(...settled.map(frame => frame.x)) - Math.min(...settled.map(frame => frame.x))).toBeLessThan(1);
+    const incomingTail = frames.filter(frame => frame.opening && frame.time > 220);
+    expect(incomingTail.every(frame => frame.listOpacity < 0.05)).toBe(true);
+    const own = surface.locator('.reserve-chat-message-row').first();
+    if (!isMobile) {
+        await surface.locator('.reserve-messenger-thread-heading').hover();
+        await expect(own.getByRole('button', { name: '메시지 관리' })).toHaveCSS('opacity', '0');
+        await own.hover();
+    }
+    const action = own.getByRole('button', { name: '메시지 관리' });
+    await expect(action).toHaveCSS('opacity', '1');
+    expect((await action.boundingBox()).x).toBeLessThan((await own.locator('.reserve-chat-bubble-group').boundingBox()).x);
+    await surface.getByRole('button', { name: '사진 크게 보기' }).click();
+    await expect(page.locator('.reserve-image-preview')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.reserve-image-preview')).toBeHidden();
+    await expect(surface.locator('.reserve-messenger-thread')).toBeVisible();
+    await surface.getByRole('button', { name: '이모지 선택', exact: true }).click();
+    if (isMobile) await expect(page.getByRole('searchbox', { name: '이모지 검색' })).not.toBeFocused();
+    await page.keyboard.press('Escape');
+    await surface.getByLabel('첨부할 사진 선택').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: png });
+    await surface.getByRole('button', { name: '첨부 사진 크게 보기' }).click();
+    await expect(page.locator('.reserve-image-preview')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.reserve-image-preview')).toBeHidden();
+    await expect(surface.locator('.reserve-messenger-thread')).toBeVisible();
+    await expect(surface.getByRole('textbox', { name: '메시지 입력' })).toBeVisible();
+    if (!isMobile) await expect(surface).not.toHaveClass(/is-closing/);
+    await page.screenshot({ path: testInfo.outputPath('messenger-actions-preview.png') });
+});
+
 test('messenger: a direct messages URL stays mobile-only and hands desktop back to the panel', async ({ page }, testInfo) => {
     await mockApi(page, user);
     await page.goto('/messages');

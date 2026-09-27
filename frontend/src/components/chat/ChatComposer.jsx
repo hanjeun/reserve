@@ -4,6 +4,8 @@ import { Popover } from 'antd';
 import { ArrowRightOutlined, LoadingOutlined, SmileOutlined, StopOutlined } from '@ant-design/icons';
 import ChatImagePicker from './ChatImagePicker';
 
+const usesTouchInput = () => globalThis.matchMedia?.('(pointer: coarse)').matches === true;
+
 const EMOJI = [
     ['😀', '웃음 smile happy'], ['😊', '미소 smile'], ['😂', '웃음 눈물 laugh'], ['🥰', '사랑 love'],
     ['😍', '하트 사랑 heart love'], ['😎', '멋짐 cool'], ['🤔', '생각 thinking'], ['😅', '땀 sweat'],
@@ -32,7 +34,8 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
         onChange(`${value.slice(0, start)}${emoji}${value.slice(end)}`);
         setEmojiOpen(false);
         requestAnimationFrame(() => {
-            input.current?.focus();
+            if (usesTouchInput()) trigger.current?.focus();
+            else input.current?.focus();
             input.current?.setSelectionRange(start + emoji.length, start + emoji.length);
         });
     };
@@ -60,9 +63,13 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             <div className="reserve-chat-composer-tools">
                 <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled} disabled={blocked} />
                 <Popover trigger="click" placement="topLeft" content={picker} open={emojiOpen && !blocked}
-                    onOpenChange={open => { setEmojiOpen(open); if (open) setQuery(''); }}
-                    afterOpenChange={open => { if (open) searchInput.current?.focus(); }}>
+                    onOpenChange={open => {
+                        setEmojiOpen(open);
+                        if (open) { setQuery(''); if (usesTouchInput()) input.current?.blur(); }
+                    }}
+                    afterOpenChange={open => { if (open && !usesTouchInput()) searchInput.current?.focus(); }}>
                     <button ref={trigger} type="button" className="reserve-chat-tool" aria-label="이모지 선택"
+                        onKeyDown={event => { if (event.key === 'Escape' && emojiOpen) { event.stopPropagation(); setEmojiOpen(false); } }}
                         aria-expanded={emojiOpen && !blocked} aria-controls={emojiOpen && !blocked ? id : undefined} disabled={blocked}>
                         <SmileOutlined />
                     </button>

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import PropTypes from 'prop-types';
 import {
     ArrowLeftOutlined,
+    CloseOutlined,
     MessageOutlined,
 } from '@ant-design/icons';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
@@ -114,7 +115,7 @@ const supportFallback = {
     lastMessageAt: null,
 };
 
-const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverImageSrc }) => {
+const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverImageSrc, onClose }) => {
     // 고객지원 표시 이름·사진(채팅 관리 설정) — 제목 계산보다 먼저 읽는다.
     const supportIdentity = useSupportIdentity();
     const navigate = useNavigate();
@@ -137,6 +138,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const [returningToList, setReturningToList] = useState(false);
     // 목록 → 대화 열기 애니메이션. 뒤로가기(대화가 오른쪽으로 빠짐)의 반대 방향이다.
     const [openingThread, setOpeningThread] = useState(false);
+    const [showHidden, setShowHidden] = useState(false);
     const routeStoreId = Number(initialStoreId);
     const routeSelection = useMemo(
         () => Number.isInteger(routeStoreId) && routeStoreId > 0
@@ -150,15 +152,15 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const isConversations = !isHome && !isSettings;
 
     const memberQuery = useInfiniteQuery({
-        queryKey: chatKeys.conversations(),
-        queryFn: ({ pageParam }) => chatService.listConversations(pageParam),
+        queryKey: showHidden ? [...chatKeys.conversations(), 'hidden'] : chatKeys.conversations(),
+        queryFn: ({ pageParam }) => showHidden ? chatService.listConversations(pageParam, true) : chatService.listConversations(pageParam),
         initialPageParam: 0,
         getNextPageParam: nextPage,
         ...chatListQueryPolicy,
     });
     const ownerQuery = useInfiniteQuery({
-        queryKey: chatKeys.inbox(),
-        queryFn: ({ pageParam }) => chatService.listStoreInbox(pageParam),
+        queryKey: showHidden ? [...chatKeys.inbox(), 'hidden'] : chatKeys.inbox(),
+        queryFn: ({ pageParam }) => showHidden ? chatService.listStoreInbox(pageParam, true) : chatService.listStoreInbox(pageParam),
         initialPageParam: 0,
         getNextPageParam: nextPage,
         enabled: canOwnStores,
@@ -169,7 +171,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         queryFn: ({ pageParam }) => chatService.listAdminSupportInbox(pageParam),
         initialPageParam: 0,
         getNextPageParam: nextPage,
-        enabled: canAdminSupport,
+        enabled: canAdminSupport && !showHidden,
         ...chatListQueryPolicy,
     });
 
@@ -188,7 +190,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const enabledConversationSources = [
         { enabled: true, query: memberQuery, rows: memberRows },
         { enabled: canOwnStores, query: ownerQuery, rows: ownerRows },
-        { enabled: canAdminSupport, query: adminQuery, rows: adminRows },
+        { enabled: canAdminSupport && !showHidden, query: adminQuery, rows: adminRows },
     ].filter((source) => source.enabled);
     const allConversationListsFailed = enabledConversationSources.length > 0
         && enabledConversationSources.every(({ query, rows }) => query.isError && rows.length === 0);
@@ -198,17 +200,17 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const refreshConversationLists = useCallback(() => {
         const requests = [memberQuery.refetch()];
         if (canOwnStores) requests.push(ownerQuery.refetch());
-        if (canAdminSupport) requests.push(adminQuery.refetch());
+        if (canAdminSupport && !showHidden) requests.push(adminQuery.refetch());
         return Promise.all(requests);
-    }, [adminQuery, canAdminSupport, canOwnStores, memberQuery, ownerQuery]);
+    }, [adminQuery, canAdminSupport, canOwnStores, memberQuery, ownerQuery, showHidden]);
     const supportRow = memberRows.find((row) => row.type === 'SUPPORT') ?? supportFallback;
     // 관리자 계정은 같은 지원방을 상담원 목록과 개인 회원 목록에서 모두 받을 수 있다.
     // 방 ID가 같으면 상담원 시점 한 줄만 남겨 이름·읽음 기준이 섞이지 않게 한다.
     const customerRows = useMemo(() => {
-        if (!canAdminSupport || adminRows.length === 0) return memberRows;
+        if (showHidden || !canAdminSupport || adminRows.length === 0) return memberRows;
         const administeredRoomIds = new Set(adminRows.map((row) => String(row.roomId)));
         return memberRows.filter((row) => !administeredRoomIds.has(String(row.roomId)));
-    }, [adminRows, canAdminSupport, memberRows]);
+    }, [adminRows, canAdminSupport, memberRows, showHidden]);
     const selectedRow = [...adminRows, supportRow, ...customerRows, ...ownerRows]
         .find((row) => matchesSelection(row, selection));
     const selectedUnreadRef = useRef(0);
@@ -438,6 +440,12 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         setMobileThreadOpen(false);
         setReturningToList(false);
     }, [navigate, routeSelection, showConversations]);
+    const handleVisibilityChanged = () => {
+        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+        finishConversationList();
+    };
     const showConversationList = () => {
         if (returningToList || openingThread) return;
         setReturningToList(true);
@@ -522,10 +530,18 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const notificationControl = isWide ? (
         <ChatNotificationControl state={notifications.state} onEnable={notifications.enable} onDisable={notifications.disable} />
     ) : null;
+    // PC 패널의 X는 Shell이 제공한다. 모바일 페이지는 내부 화면과 무관하게 같은 닫기 관문을 쓴다.
+    const closeAction = surface === 'page' && onClose ? (
+        <button type="button" className="reserve-chat-close reserve-messenger-shell-close"
+            onClick={onClose} aria-label="메시지 닫기">
+            <CloseOutlined />
+        </button>
+    ) : null;
 
     if (isHome || isSettings) {
         return (
             <div className={`reserve-messenger reserve-messenger--${surface} is-home`}>
+                {closeAction}
                 {isSettings ? <MessengerSettings user={user} notificationControl={notificationControl} headingLevel={surface === 'page' ? 1 : 2} /> : <MessengerHome
                     headingLevel={surface === 'page' ? 1 : 2}
                     coverImageSrc={coverImageSrc}
@@ -546,6 +562,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
 
     return (
         <div className={`reserve-messenger reserve-messenger--${surface}${showThread ? ' has-thread' : ''}${mobileThreadVisible ? ' has-mobile-thread' : ''}${returningToList ? ' is-returning-to-list' : ''}${openingThread && !returningToList ? ' is-opening-thread' : ''}`}>
+            {closeAction}
             {(!showThread || (surface === 'page' && isWide) || returningToList || openingThread) && <aside className="reserve-messenger-list" aria-label="대화 목록"
                 inert={openingThread || returningToList ? true : undefined}>
                 <MessengerListHeading headingLevel={surface === 'page' ? 1 : 2}
@@ -553,12 +570,16 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                     onRefresh={refreshConversationLists} />
 
                 <div className="reserve-messenger-list-scroll" aria-busy={enabledConversationSources.some(({ query }) => query.isLoading)}>
+                    <Button variant="ghost-sm" size="sm" aria-pressed={showHidden}
+                        onClick={() => setShowHidden(value => !value)} style={{ margin: '8px 18px' }}>
+                        {showHidden ? '일반 대화 보기' : '숨긴 대화 보기'}
+                    </Button>
                     {allConversationListsFailed ? (
                         <DataState state="error" kind="message" subject="대화 목록" error={allConversationListsError}
                             onRetry={refreshConversationLists} retrying={conversationListsFetching} />
                     ) : (
                         <>
-                    {canAdminSupport && (
+                    {canAdminSupport && !showHidden && (
                         <section aria-labelledby="reserve-admin-support-inbox">
                             <h2 id="reserve-admin-support-inbox" className="reserve-messenger-section-label">고객지원 받은 문의</h2>
                             {adminQuery.isError && adminRows.length > 0 && (
@@ -605,7 +626,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                         {memberColdError ? (
                             <DataState state="error" kind="message" subject="대화 목록" error={memberQuery.error}
                                 onRetry={memberQuery.refetch} retrying={memberQuery.isFetching} compact />
-                        ) : memberQuery.isLoading ? <ConversationListSkeleton /> : customerRows.length === 0 ? <div className="reserve-messenger-list-state">아직 시작한 대화가 없습니다.</div> : customerRows.map((row) => (
+                        ) : memberQuery.isLoading ? <ConversationListSkeleton /> : customerRows.length === 0 ? <div className="reserve-messenger-list-state">{showHidden ? '숨긴 대화가 없습니다.' : '아직 시작한 대화가 없습니다.'}</div> : customerRows.map((row) => (
                             <ConversationRow
                                 key={row.type === 'SUPPORT' ? 'support' : `store-${row.storeId}`}
                                 row={row}
@@ -701,7 +722,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                     </span>
                     <span className="reserve-messenger-thread-actions">
                         <ChatModerationMenu thread={thread} onChanged={handleModerationChanged}
-                            pending={(selection.kind === 'store' || selection.kind === 'owner') && (loading || !thread)}
+                            onHidden={handleVisibilityChanged} hidden={showHidden && Boolean(selectedRow?.roomId)}
+                            pending={selection.kind !== 'admin' && (loading || !thread)}
                             disabled={returningToList || loading} />
                     </span>
                 </header>
@@ -739,7 +761,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                                 </div>
                             )}
                             <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
-                                roomId={thread?.roomId} onRetracted={updateMessage} />
+                                roomId={thread?.roomId} onRetracted={updateMessage}
+                                reportRole={thread?.type === 'STORE' ? thread.viewerRole : undefined} />
                             <div ref={bottomRef} />
                         </div>
                     )}
@@ -789,6 +812,7 @@ MessengerContentBody.propTypes = {
     surface: PropTypes.oneOf(['page', 'panel']),
     initialStoreId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     coverImageSrc: PropTypes.string,
+    onClose: PropTypes.func,
 };
 
 /** 고객지원 표시 이름·사진(관리자 › 채팅 관리 설정)을 메신저 전체(헤더·목록·홈·답변 말풍선)에 한 번만 내려준다. */

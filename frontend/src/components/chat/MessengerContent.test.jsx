@@ -29,6 +29,7 @@ vi.mock('../../services', () => ({
         getHistory: vi.fn(),
         markRead: vi.fn(),
         setBlocked: vi.fn(),
+        setHidden: vi.fn(),
         reportConversation: vi.fn(),
     },
 }));
@@ -78,6 +79,7 @@ describe('MessengerContent', () => {
         chatService.pollRoom.mockResolvedValue([]);
         chatService.markRead.mockResolvedValue({});
         chatService.setBlocked.mockResolvedValue({ blocked: false, blockedByMe: false });
+        chatService.setHidden.mockResolvedValue(null);
         chatService.reportConversation.mockResolvedValue({ id: 5, status: 'OPEN' });
         chatService.getSupport.mockResolvedValue({
             roomId: 1,
@@ -91,6 +93,52 @@ describe('MessengerContent', () => {
     afterEach(() => {
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
+    });
+
+    it('opens the hidden list separately and keeps stable room access for reporting', async () => {
+        useMessengerStore.setState({ view: 'conversations', activeThread: false });
+        chatService.listConversations.mockImplementation((_page, hidden) => Promise.resolve(page(hidden ? [{
+            roomId: 12, type: 'STORE', storeId: 42, storeName: '숨긴 가게', counterpartName: '숨긴 가게', viewerRole: 'MEMBER',
+        }] : [])));
+        chatService.getStore.mockResolvedValue({ roomId: 12, type: 'STORE', storeId: 42, title: '숨긴 가게',
+            viewerRole: 'MEMBER', canSend: true, messages: [] });
+        renderMessenger();
+        fireEvent.click(await screen.findByRole('button', { name: '숨긴 대화 보기' }));
+        fireEvent.click(await screen.findByRole('button', { name: /숨긴 가게/ }));
+        await waitFor(() => expect(chatService.listConversations).toHaveBeenCalledWith(0, true));
+        fireEvent.click(await screen.findByRole('button', { name: '대화 관리' }));
+        expect(await screen.findByText('대화 복원')).toBeInTheDocument();
+        expect(await screen.findByText('대화 신고')).toBeInTheDocument();
+    });
+
+    it.each(['home', 'conversations', 'settings'])('keeps one X on the mobile %s page', async view => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+        useMessengerStore.setState({ view, activeThread: false });
+        const onClose = vi.fn();
+        renderMessenger({ surface: 'page', onClose });
+        const close = screen.getByRole('button', { name: '메시지 닫기' });
+        expect(screen.getAllByRole('button', { name: '메시지 닫기' })).toHaveLength(1);
+        fireEvent.click(close);
+        expect(onClose).toHaveBeenCalledOnce();
+        expect(useMessengerStore.getState().view).toBe(view);
+        await waitFor(() => expect(chatService.listConversations).toHaveBeenCalled());
+    });
+
+    it('keeps thread back separate from closing the whole mobile messenger', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+        useMessengerStore.getState().showHome();
+        const onClose = vi.fn();
+        const { container } = renderMessenger({ surface: 'page', onClose });
+        fireEvent.click(screen.getByRole('button', { name: '고객지원에 문의' }));
+        await screen.findByRole('button', { name: '대화 목록으로 돌아가기' });
+        const thread = container.querySelector('.reserve-messenger-thread');
+        fireEvent.animationEnd(thread);
+        fireEvent.click(screen.getByRole('button', { name: '대화 목록으로 돌아가기' }));
+        fireEvent.animationEnd(thread);
+        expect(onClose).not.toHaveBeenCalled();
+        expect(useMessengerStore.getState().view).toBe('conversations');
+        fireEvent.click(screen.getByRole('button', { name: '메시지 닫기' }));
+        expect(onClose).toHaveBeenCalledOnce();
     });
 
     it('opens a launcher home without creating, polling or reading a conversation', async () => {

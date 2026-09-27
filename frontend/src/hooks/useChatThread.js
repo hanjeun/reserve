@@ -31,7 +31,7 @@ const applyChanges = (previous, incoming) => {
     let changed = false;
     const next = previous.map(message => {
         const update = changes.get(message.id);
-        if (!update || (message.retracted && update.retracted)) return message;
+        if (!update || (message.retracted && update.retracted && message.expired === update.expired)) return message;
         changed = true;
         return { ...message, ...update };
     });

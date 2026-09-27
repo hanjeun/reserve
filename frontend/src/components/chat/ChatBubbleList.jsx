@@ -57,7 +57,7 @@ const inSameGroup = (a, b) => {
  * @param {Array}  messages 시간순 메시지
  * @param {string} mine     내 메시지로 볼 senderRole ('MEMBER' | 'ADMIN')
  */
-const ChatBubbleList = ({ messages, mine, roomId, onRetracted }) => {
+const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => {
     const { palette } = useChatPreferences();
     return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -71,7 +71,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted }) => {
                 : null;
 
             return (
-                <div key={m.id}
+                <div key={m.id} className="reserve-chat-message-row"
                     style={{
                         display: 'flex',
                         justifyContent: isMine ? 'flex-end' : 'flex-start',
@@ -88,6 +88,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted }) => {
                     {!isMine && m.senderRole === 'ADMIN' && <span className="reserve-chat-sender-avatar-slot">
                         {first && <SupportAvatar />}
                     </span>}
+                    {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted} />}
                     <div className="reserve-chat-bubble-group" style={{ maxWidth: m.senderRole === 'ADMIN' && !isMine ? '72%' : '78%' }}>
                         {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
                         <div style={{
@@ -96,13 +97,13 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted }) => {
                             ...corner,
                             // 아직 서버가 받았는지 모르는 상태. 자리는 잡되 "확정 아님"이 보여야 한다.
                             ...(m.pending ? styles.bubblePending : null),
-                            ...(m.retracted ? { background: colors.background.subtle, color: colors.text.secondary, border: `1px solid ${colors.border.default}` } : null),
+                            ...(m.retracted || m.expired ? { background: colors.background.subtle, color: colors.text.secondary, border: `1px solid ${colors.border.default}` } : null),
                         }}>
                             {m.imageUrl && <ChatImage url={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />}
                             {m.content && <span>{m.content}</span>}
                         </div>
                     </div>
-                    {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted} />}
+                    {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole} />}
                     {!isMine && last && <Text style={styles.stamp}>{formatTime(m.createdAt)}</Text>}
                 </div>
             );

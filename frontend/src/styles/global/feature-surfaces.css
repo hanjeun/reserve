@@ -458,6 +458,7 @@
     color: var(--c-text-primary, #191f28);
 }
 .reserve-messenger--page {
+    position: relative;
     width: min(1120px, 100%);
     height: calc(100svh - 120px);
     min-height: 560px;
@@ -584,6 +585,8 @@
 }
 .reserve-messenger--panel .reserve-messenger-list-heading { padding-right: 52px; }
 .reserve-messenger--panel .reserve-messenger-settings-heading { padding-right: 52px; }
+.reserve-messenger--page .reserve-messenger-list-heading,
+.reserve-messenger--page .reserve-messenger-settings-heading { padding-right: 52px; }
 .reserve-messenger-list-heading h1,
 .reserve-messenger-list-heading h2,
 .reserve-messenger-settings-heading h1,
@@ -617,13 +620,6 @@
 .reserve-messenger-list-refresh[aria-disabled='true'] { opacity: 0.5; cursor: default; }
 .reserve-messenger-list-refresh:focus { outline: none; }
 .reserve-messenger-list-refresh:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: -2px; }
-@keyframes reserve-messenger-refresh-rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-.reserve-messenger-list-refresh.is-refreshing .anticon {
-    animation: reserve-messenger-refresh-rotate 0.9s linear infinite;
-}
 .reserve-messenger-list-scroll {
     flex: 1;
     overflow-y: auto;
@@ -989,7 +985,8 @@
     .reserve-messenger-list-heading h1,
     .reserve-messenger-settings-heading h1 { font-size: 20px !important; }
     .reserve-messenger-row { min-height: 76px; padding-inline: 16px; }
-    .reserve-messenger-thread-heading { min-height: 64px; padding: 10px 14px; }
+    .reserve-messenger--page.has-thread { --reserve-messenger-heading-height: 64px; }
+    .reserve-messenger-thread-heading { min-height: 64px; padding: 10px 52px 10px 14px; }
     .reserve-messenger-mobile-back {
         display: inline-flex;
         align-items: center;
@@ -1004,11 +1001,19 @@
 /* 목록에서 대화를 열 때는 뒤로가기의 반대 — 대화가 오른쪽에서 들어온다(2026-09-23, 들어가기·나가기 짝). */
 .reserve-messenger.is-opening-thread > .reserve-messenger-thread {
     grid-area: 1 / 1; z-index: 2; pointer-events: none;
-    animation: reserve-messenger-thread-back-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) reverse both;
+    animation: reserve-messenger-thread-in 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 .reserve-messenger.is-opening-thread > .reserve-messenger-list {
     display: flex; grid-area: 1 / 1; z-index: 1; pointer-events: none;
-    animation: reserve-messenger-list-back-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) reverse both;
+    animation: reserve-messenger-list-out 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes reserve-messenger-thread-in {
+    from { opacity: 0; transform: translate3d(24%, 0, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes reserve-messenger-list-out {
+    from { opacity: 1; transform: translate3d(0, 0, 0); }
+    to { opacity: 0; transform: translate3d(-12%, 0, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
     .reserve-messenger.is-opening-thread > .reserve-messenger-thread,
@@ -1040,7 +1045,15 @@
 }
 .reserve-chat-message-actions {
     border: 0; background: transparent; color: var(--c-text-secondary, #4e5968); cursor: pointer;
-    border-radius: 10px; width: 36px; min-width: 36px; height: 40px; padding: 0;
+    border-radius: 10px; width: 44px; min-width: 44px; height: 44px; padding: 0;
+}
+.reserve-chat-attachment-preview { padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; display: flex; }
+.reserve-chat-attachment-preview:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-message-actions { opacity: 0; }
+    .reserve-chat-message-row:hover .reserve-chat-message-actions,
+    .reserve-chat-message-row:focus-within .reserve-chat-message-actions,
+    .reserve-chat-message-actions[aria-expanded="true"] { opacity: 1; }
 }
 .reserve-chat-message-actions:hover { background: var(--c-gray-100, #f2f4f6); }
 .reserve-chat-message-actions:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }

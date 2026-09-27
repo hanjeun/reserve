@@ -69,7 +69,7 @@ const MessagesPage = () => {
             }}
             aria-hidden={closing || undefined}
         >
-            <MessengerContent surface="page" initialStoreId={params.get('storeId')} />
+            <MessengerContent surface="page" initialStoreId={params.get('storeId')} onClose={requestClose} />
         </div>
     );
 };

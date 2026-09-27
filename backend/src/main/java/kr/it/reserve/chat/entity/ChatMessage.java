@@ -16,9 +16,13 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "chat_message",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_chat_message_idempotency",
+                columnNames = {"room_id", "sender_member_id", "client_message_id"}),
         indexes = {
                 // 방 하나의 메시지를 시간순으로 읽는다 — 사실상 유일한 조회 패턴이다.
-                @Index(name = "idx_chat_message_room", columnList = "room_id, id")
+                @Index(name = "idx_chat_message_room", columnList = "room_id, id"),
+                @Index(name = "idx_chat_message_idempotency", columnList = "room_id, sender_member_id, client_message_id")
         }
 )
 @EntityListeners(AuditingEntityListener.class)
@@ -49,11 +53,33 @@ public class ChatMessage {
     private Long senderMemberId;
 
     /**
+     * 클라이언트가 한 전송 시도에 붙인 안정 ID. 응답을 못 받아 재시도해도 방 잠금 아래
+     * 같은 ID를 먼저 찾아 한 줄만 저장한다. 구버전 요청은 null로 계속 허용한다.
+     */
+    @Column(name = "client_message_id", length = 64)
+    private String clientMessageId;
+
+    /**
      * 본문. 길이를 {@code TEXT} 로 두되 <b>입력 단계에서 2000자로 자른다</b>(DTO 검증).
      * 채팅에 장문을 붙여넣는 건 대개 실수라, 막는 편이 서로에게 낫다.
      */
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
+
+    @Column(name = "image_key", length = 512)
+    private String imageKey;
+
+    @Column(name = "image_content_type", length = 40)
+    private String imageContentType;
+
+    @Column(name = "image_width")
+    private Integer imageWidth;
+
+    @Column(name = "image_height")
+    private Integer imageHeight;
+
+    @Column(name = "image_bytes")
+    private Integer imageBytes;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

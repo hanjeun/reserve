@@ -11,5 +11,7 @@ public enum SenderRole {
     /** 방 주인(손님). */
     MEMBER,
     /** 운영자. */
-    ADMIN
+    ADMIN,
+    /** 가게 문의에서 답하는 가게 소유자. 계정 권한과 대화 안의 위치를 분리한다. */
+    OWNER
 }

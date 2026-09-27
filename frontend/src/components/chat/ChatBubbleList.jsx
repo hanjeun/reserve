@@ -1,5 +1,5 @@
 /**
- * 대화 말풍선 목록 — 손님 패널(ChatLauncher)과 관리자 탭(ChatTab)이 **같은 것을 쓴다**.
+ * 대화 말풍선 목록 — 통합 메신저(MessengerContent)와 관리자 탭(ChatTab)이 **같은 것을 쓴다**.
  *
  * 왜 컴포넌트로 뽑았나 (2026-08-24)
  * 두 화면은 같은 대화를 보여준다. 그런데 처음엔 각자 map 을 돌려 각자 그렸다 —
@@ -30,6 +30,8 @@
 import React from 'react';
 import { Typography } from 'antd';
 import { colors, fontSize, radius } from '../../styles/tokens';
+import { SupportAvatar, SupportName } from './SupportIdentity';
+import ChatImage from './ChatImage';
 
 const { Text } = Typography;
 
@@ -79,14 +81,21 @@ const ChatBubbleList = ({ messages, mine }) => (
                             {m.pending ? '보내는 중' : formatTime(m.createdAt)}
                         </Text>
                     )}
-                    <div style={{
-                        ...styles.bubble,
-                        ...(isMine ? styles.bubbleMine : styles.bubbleTheirs),
-                        ...corner,
-                        // 아직 서버가 받았는지 모르는 상태. 자리는 잡되 "확정 아님"이 보여야 한다.
-                        ...(m.pending ? styles.bubblePending : null),
-                    }}>
-                        {m.content}
+                    {!isMine && m.senderRole === 'ADMIN' && <span className="reserve-chat-sender-avatar-slot">
+                        {first && <SupportAvatar />}
+                    </span>}
+                    <div className="reserve-chat-bubble-group" style={{ maxWidth: m.senderRole === 'ADMIN' && !isMine ? '72%' : '78%' }}>
+                        {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
+                        <div style={{
+                            ...styles.bubble,
+                            ...(isMine ? styles.bubbleMine : styles.bubbleTheirs),
+                            ...corner,
+                            // 아직 서버가 받았는지 모르는 상태. 자리는 잡되 "확정 아님"이 보여야 한다.
+                            ...(m.pending ? styles.bubblePending : null),
+                        }}>
+                            {m.imageUrl && <ChatImage url={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />}
+                            {m.content && <span>{m.content}</span>}
+                        </div>
                     </div>
                     {!isMine && last && <Text style={styles.stamp}>{formatTime(m.createdAt)}</Text>}
                 </div>
@@ -97,7 +106,7 @@ const ChatBubbleList = ({ messages, mine }) => (
 
 const styles = {
     bubble: {
-        maxWidth: '78%', padding: '9px 13px', borderRadius: radius.lg,
+        padding: '9px 13px', borderRadius: radius.lg,
         fontSize: fontSize.sm, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     },
     bubbleMine: { background: colors.primary.main, color: '#fff' },

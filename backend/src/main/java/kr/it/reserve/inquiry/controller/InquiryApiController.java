@@ -1,6 +1,7 @@
 package kr.it.reserve.inquiry.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.InquiryException;
@@ -86,7 +87,7 @@ public class InquiryApiController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<InquiryDto.InquiryResponse>> createInquiry(
-            @RequestBody InquiryDto.InquiryRequest request,
+            @Valid @RequestBody InquiryDto.InquiryRequest request,
             HttpServletRequest httpRequest) {
         if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.INQUIRY_CREATE)) {
             return ResponseEntity.status(429)
@@ -109,7 +110,7 @@ public class InquiryApiController {
     @PostMapping("/{inquiryId}/answer")
     public ApiResponse<InquiryDto.InquiryResponse> answerInquiry(
             @PathVariable Long inquiryId,
-            @RequestBody InquiryDto.AnswerRequest request) {
+            @Valid @RequestBody InquiryDto.AnswerRequest request) {
         validateAdmin();
         InquiryDto.InquiryResponse response = inquiryService.answerInquiry(inquiryId, request);
         return ApiResponse.success(response, "문의 답변이 등록되었습니다.");

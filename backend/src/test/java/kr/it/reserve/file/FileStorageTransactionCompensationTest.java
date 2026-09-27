@@ -13,6 +13,10 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -68,9 +72,22 @@ class FileStorageTransactionCompensationTest {
         verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
     }
 
+    @Test
+    void encryptedPhotoAlsoGetsCompensatedWhenMessageTransactionRollsBack() {
+        fileStorageService.storeEncryptedChatImage(new byte[32], "users/1/chat/10");
+        complete(TransactionSynchronization.STATUS_ROLLED_BACK);
+        verify(s3Client).deleteObject(any(DeleteObjectRequest.class));
+    }
+
     private MockMultipartFile image() {
-        return new MockMultipartFile(
-                "image", "profile.png", "image/png", new byte[]{1, 2, 3});
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", output);
+            return new MockMultipartFile(
+                    "image", "profile.png", "image/png", output.toByteArray());
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
     }
 
     private void complete(int status) {

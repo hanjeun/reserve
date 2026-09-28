@@ -592,6 +592,7 @@ const AdManageTab = () => {
                             <FormDatePicker.RangePicker
                                 value={dateRange}
                                 onChange={(v) => { setDateRange(v); clearError('dateRange'); }}
+                                highlightHolidays
                             />
                         </FormField>
                         {adType === 'BANNER' && (

@@ -18,7 +18,7 @@ import { colors } from './colors';
  *
  *   전에는 54 와 14 가 App.jsx·Skeletons·홈 목업에 **리터럴로 흩어져 있었다.**
  *   heights.input 을 55 로 바꾸면 그 셋만 54 로 남는 상태였다 —
- *   이 프로젝트의 반복 회귀가 전부 이 형태였다(CLAUDE.md "설계 원칙" 참고).
+ *   이 프로젝트의 반복 회귀가 전부 이 형태였다(docs/technical/design-system.md 참고).
  *
  * ⚠️ 새 폼 컨트롤을 만들 때 높이·radius·아이콘 크기를 숫자로 적지 말 것. 여기서 가져온다.
  */

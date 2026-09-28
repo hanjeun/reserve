@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Button from './Button';
+import useHolidayDates from '../../hooks/useHolidayDates';
 import { animation, colors, field, fontSize, fontWeight, radius } from '../../styles/tokens';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -66,10 +67,14 @@ const FormDatePickerBase = ({
     id,
     className = '',
     allowEmpty = [false, false],
+    highlightHolidays = false,
 }) => {
     const { status } = Form.Item.useStatus();
     const [open, setOpen] = useState(false);
     const [month, setMonth] = useState(() => initialMonthFor(mode, value).startOf('month'));
+    // 공휴일(빨간날)은 서버 HolidayService 가 준다. 받기 전·실패 시에는 빈 집합이라 예전처럼 일요일만 빨갛다.
+    // 기본은 꺼 두고 호출부가 켠다 — 단위 테스트·미리보기에서 공통 입력이 네트워크를 부르지 않게.
+    const holidays = useHolidayDates(month.format('YYYY-MM'), open && highlightHolidays);
     const [draftSingle, setDraftSingle] = useState(() => validDay(value));
     const [draftMultiple, setDraftMultiple] = useState(() => (
         (Array.isArray(value) ? value : []).map(validDay).filter(Boolean)
@@ -203,12 +208,13 @@ const FormDatePickerBase = ({
         if (isSelected) classNames.push('is-selected');
         if (isInsideRange) classNames.push('is-range');
         if (isToday && !isDisabled) classNames.push('is-today');
-        if (date.day() === 0 && !isDisabled && !isSelected) classNames.push('is-holiday');
+        const isPublicHoliday = holidays.has(cell.key);
+        if ((date.day() === 0 || isPublicHoliday) && !isDisabled && !isSelected) classNames.push('is-holiday');
 
-        let stateLabel = '';
-        if (isDisabled) stateLabel = ' 선택 불가';
-        else if (isSelected) stateLabel = ' 선택됨';
-        else if (isInsideRange) stateLabel = ' 선택 범위';
+        let stateLabel = isPublicHoliday ? ' 공휴일' : '';
+        if (isDisabled) stateLabel += ' 선택 불가';
+        else if (isSelected) stateLabel += ' 선택됨';
+        else if (isInsideRange) stateLabel += ' 선택 범위';
 
         return (
             <button
@@ -378,6 +384,7 @@ const sharedPropTypes = {
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
     className: PropTypes.string,
     multiple: PropTypes.bool,
+    highlightHolidays: PropTypes.bool,
 };
 
 FormDatePicker.propTypes = sharedPropTypes;

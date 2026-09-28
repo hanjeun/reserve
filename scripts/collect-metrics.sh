@@ -3,8 +3,7 @@
 # RESERVE host/container metrics collector. Runs every minute from cron.
 #
 # Deployed to the server at ~/collect-metrics.sh -- this file is the source of
-# truth. See docs/technical/monitoring.md for why there is no Prometheus and
-# how to install it on a fresh box.
+# truth. See docs/technical/monitoring.md for how to install it on a fresh box.
 #
 # One metric per line: Loki's unwrap keeps every other parsed field as a label,
 # so packing them together would make each sample its own time series.

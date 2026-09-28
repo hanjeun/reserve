@@ -36,6 +36,11 @@ public class StoreUpdateRequest {
     private String existingMainImageUrl;
     private List<String> existingDetailImageUrls;
 
+    // 상세 이미지 최종 순서(선택, 2026-09-28 드래그 정렬). 비어 있으면 기존 이미지 → 새 이미지 순서다.
+    // 항목은 "e{i}"(existingDetailImageUrls 의 i번째) 또는 "n{j}"(detailImages 의 j번째 새 파일).
+    // 새 사진을 기존 사진 앞에 끼워 넣은 순서는 두 목록만으로 표현할 수 없어서 따로 받는다.
+    private List<String> detailImageOrder;
+
     // 영업 시간
     @DateTimeFormat(pattern = "HH:mm")
     private LocalTime openTime;

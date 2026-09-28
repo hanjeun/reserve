@@ -1,64 +1,66 @@
-# Deployments & 릴리즈 운영 가이드
+# 배포 운영
 
-RESERVE의 릴리즈 노트 동기화, GitHub Deployments 기록, 저장소 보호 설정을 한곳에 정리한 문서.
-모든 명령은 **레포 루트에서 `gh` 로그인 상태**로 실행한다. 대상 저장소는 `REPO` 환경변수로 바꿀 수 있다(기본 `hanjeun/reserve`).
+릴리즈 노트 동기화, GitHub Deployments 기록, CI 구조, 배포 후 점검과 롤백 절차예요.
 
-## 현재 경계
+모든 명령은 **레포 루트에서 `gh` 로그인 상태**로 실행해요. 대상 저장소는 `REPO` 환경변수로 바꿀 수 있어요(기본 `hanjeun/reserve`).
+버전별 변경 내용은 [업데이트 소식](../CHANGELOG.md), 기능별 상태는 [현재 상태](current-status.md)를 봐요.
 
-- 2026-09-28 확인된 production 기준선은 **v2.7.0**(`68334e5d…`)이며 `dev` 계보 복원 PR #229는 병합됐다.
-- 아래 **CI 증거 재사용·stage-release 분리·지연 로그·공개 API 준비 관문**은 후속 후보다.
-  이 후속 수정의 PR 생성은 승인됐지만 병합·운영 반영은 아직 실행하지 않았다.
-- 기능별 상태는 [현재 상태](current-status.md)를 따른다. 아래 날짜가 붙은 GitHub·서버 결과는 그
-  날짜의 증거이며 현재 설정을 대신하지 않는다.
-- 배포 직전에는 실제 서버 SSH fingerprint를 신뢰 가능한 별도 경로로 다시 확인한다. 커밋, PR, merge,
-  tag, 배포, GitHub 설정과 운영 쓰기는 각각 현재 대화의 별도 승인이 필요하다.
-- v2.4.0·v2.4.1은 2026-09-28 승인 후 기존 태그와 한국어 CHANGELOG로 Release를 보완했다.
-  새 배포나 새 태그가 아니며 최신 Release는 v2.7.0으로 유지했다. 의존성 PR과 제품 통합은 분리한다.
+## 기본 규칙
 
-### 2026-09-28 후속 후보: 테스트 재사용과 배포 책임 분리
+- 커밋, PR, merge, tag, 배포, GitHub 설정 변경, 운영 쓰기는 **각각 현재 대화에서 별도 승인**을 받아요.
+- `sync-release-notes.mjs --apply`와 `backfill-deployments.mjs --apply`는 릴리스 승인 뒤에 실행해요.
+- 배포 직전에는 서버 SSH fingerprint를 별도 경로로 확인해요.
+- 의존성 PR과 제품 통합은 분리해요.
 
-`test-backend`/`test-frontend`와 필수 `build-backend`/`build-frontend` 이름은 유지한다.
-`scripts/ci-evidence.mjs`는 7일 이내 성공한 같은 저장소 CICD 실행의 증거만 사용한다.
-소스·테스트·잠금 파일·공유 스크립트·워크플로의 Git blob과 Node/JDK·러너 이미지·설정 리비전이
-일치해야 하며, 이전 실행의 실제 Git tree를 다시 계산하고 다운로드 ZIP의 SHA-256도 검증한다.
-fork·실패·취소·오래된 실행, API/권한/다운로드 오류는 모두 **정상 테스트 실행으로 복귀**한다.
-첫 후보처럼 워크플로가 변경되면 증거가 무효화되므로 전체 CI가 한 번 실행되는 것은 의도된 것이다.
+## 릴리즈 순서
 
-CLI의 component는 `backend`·`frontend` 고정 설정만 선택하고 파일 경로로 이어 붙이지 않는다.
-Git은 절대 설치 경로, JDK는 setup-java의 절대 `JAVA_HOME`, ZIP 조회는 Ubuntu의 `/usr/bin/unzip`을
-사용한다. 잘못된 mode/component는 명령 실행·파일 생성 전에 거부한다. 헤더 간격 E2E는 진입
-애니메이션 종료 후 실제 CSS gap과 subpixel 좌표를 확인해 재시도 성공에 기대지 않는다.
+1. `dev` → `main` release PR을 **Squash and merge**로 머지해요.
+2. squash로 끊긴 계보를 `dev`에 다시 이어요.
+   ```bash
+   git merge -s ours origin/main -m "chore: record vX.Y.Z release squash into dev"
+   ```
+3. `gh release create`로 릴리즈를 먼저 만들어요. 릴리즈가 없는 버전은 동기화 스크립트가 건너뛰어요.
+4. [릴리즈 노트를 동기화](#1-릴리즈-노트-동기화-changelog--github-릴리즈)해요.
+5. `main` push로 CI/CD가 배포하면 [배포 직후 서버 작업](#4-배포-직후-서버-작업)을 진행해요.
 
-- 재사용 대상은 백엔드 unit/Spring-H2 및 프론트 unit/PC·모바일 Chromium 검사다.
-  문서·운영 스크립트·스냅샷·lint·품질 정책은 매번 짧게 확인한다.
-- build와 운영 smoke는 재사용하지 않는다. 생산 빌드는 현재 설정으로 만들며,
-  실제 Safari·TEST 결제·S3·운영 DB 확인은 이 합성 CI 증거의 대상이 아니다.
-- 수동 `workflow_dispatch` 또는 저장소 변수 `CI_FORCE_TESTS=true`는 재사용을 끈다.
-  테스트 환경 설정이 바뀌면 `CI_TEST_CONFIG_REVISION`을 올려 증거를 무효화한다.
-- CI에서만 Vitest/Playwright 워커를 2개 사용한다. 로컬은 1개다.
-  Playwright trace는 첫 재시도에만 수집하고 flaky는 성공으로 숨기지 않는다.
+브랜치별 머지 방식은 [Git 워크플로우](../rules/git-workflow.md)를 따라요.
 
-`build-frontend`는 이 실행의 dist 아티팩트까지만 만든다. 새 `stage-release`는 이 실행 ID의
-아티팩트를 받아 서버에 전송하되 live를 바꾸지 않는다. `deploy-backend`는 전송 완료 후 새 서버 기동,
-공개 가게 목록 GET 준비 확인(2회 연속 2.5초 미만), 원자 전환, smoke, 실패 복구를 책임진다.
-`production` Environment는 이 실제 활성화 잡 하나에만 두고 수동 `createDeployment`/상태 쓰기를 제거해
-자동 기록과 이중 생성되지 않게 한다. 준비 확인 실패는 구 운영 경로를 유지한다.
+## CI 잡 구조
 
-nginx 지연 로그는 정해진 route 종류·HTTP 상태·전체/연결/헤더/상류 응답 시간만 기록한다.
-IP·동적 ID·쿼리·쿠키·토큰·본문은 새 로그 형식에 넣지 않는다. 현재 로컬 Promtail 설정에는
-nginx 수집 job이 없으므로 Loki 수집 성공을 주장하지 않는다. 배포 후 실제 로그 경로/수집을 확인한 뒤
-`request_time`과 `upstream_*_time`으로 브라우저/CDN 대기와 앱/DB 대기를 구분한다.
-지금 빨라졌다는 관측만으로 기존 지연의 원인을 확정하지 않는다.
+`.github/workflows/CICD.yml`은 `main` push, `main`·`dev` 대상 PR, 수동 실행에서 돌아요. 배포 잡은 `main` push에서만 실행돼요.
 
-기존 배포의 자동·수동 중복 9쌍은 SHA·15초 이내 생성·동일 결과·자동 실행 URL을 교차 확인한 뒤
-수동 복사본만 영구 삭제했다. 같은 SHA의 별도 실제 배포 시도와 자동 기록은 보존했다.
+| 잡 | 선행 | 하는 일 |
+|---|---|---|
+| `test-backend` | — | 백엔드 unit·Spring/H2 통합 테스트 |
+| `test-frontend` | — | 문서 링크·Grafana·스냅샷·운영 스크립트 검사, ESLint, 품질 정책, Vitest, PC·모바일 Playwright |
+| `build-backend` | `test-backend` | bootJar, 롤백 스키마 호환 검사, Docker 이미지 push |
+| `build-frontend` | `build-backend`, `test-frontend` | Vite 빌드 후 이 실행의 dist 아티팩트 업로드 |
+| `stage-release` | `build-backend`, `build-frontend` | 아티팩트를 서버 `releases/<SHA>`에 staging. live는 바꾸지 않아요 |
+| `deploy-backend` | 위 전부 | 새 서버 기동, 준비 확인, 원자 전환, smoke, 실패 복구 |
 
----
+- 브랜치 보호의 필수 체크는 `build-backend`·`build-frontend`예요.
+- `production` Environment는 `deploy-backend` 하나에만 둬요.
+- `deploy-backend`는 공개 가게 목록 GET 준비 확인(2회 연속 2.5초 미만)이 실패하면 구 운영 경로를 유지해요.
+- Actions는 전체 커밋 SHA로 고정해요.
+- CI에서만 Vitest/Playwright 워커를 2개 써요(로컬은 1개). Playwright trace는 첫 재시도에만 수집해요.
+
+### 테스트 증거 재사용
+
+`scripts/ci-evidence.mjs`는 7일 이내 성공한 같은 저장소 CICD 실행의 테스트 증거를 재사용해요.
+
+- 소스·테스트·잠금 파일·공유 스크립트·워크플로의 Git blob과 Node/JDK·러너 이미지·설정 리비전이 모두 같을 때만 재사용해요.
+- 조건이 맞지 않거나 오류가 나면 정상 테스트 실행으로 돌아가요.
+- 재사용 대상은 백엔드 unit/Spring-H2와 프론트 unit/PC·모바일 Chromium 검사예요. build와 운영 smoke는 매번 실행해요.
+- 수동 `workflow_dispatch` 또는 저장소 변수 `CI_FORCE_TESTS=true`는 재사용을 꺼요. 테스트 환경 설정이 바뀌면 `CI_TEST_CONFIG_REVISION`을 올려요.
+
+### nginx 지연 로그
+
+- route 종류·HTTP 상태·전체/연결/헤더/상류 응답 시간만 기록해요. IP·동적 ID·쿼리·쿠키·토큰·본문은 넣지 않아요.
+- `request_time`과 `upstream_*_time`으로 브라우저/CDN 대기와 앱/DB 대기를 구분해요.
 
 ## 1. 릴리즈 노트 동기화 (CHANGELOG → GitHub 릴리즈)
 
-`docs/CHANGELOG.md` 의 버전별 사용자 요약을 각 GitHub 릴리즈 설명 상단에 얹는다.
-기존 자동 생성 PR 목록은 그대로 두고, 요약만 `<!-- changelog:start/end -->` 마커로 감싸 중복 없이 갱신한다.
+`docs/CHANGELOG.md`의 버전별 사용자 요약을 각 GitHub 릴리즈 설명 상단에 `<!-- changelog:start/end -->` 마커로 감싸 얹어요. 다시 돌려도 중복되지 않아요.
 
 ```bash
 # 전체 미리보기 (아무것도 바꾸지 않음)
@@ -71,25 +73,13 @@ node scripts/sync-release-notes.mjs --apply
 node scripts/sync-release-notes.mjs v1.13.0 --apply
 ```
 
-CHANGELOG를 고칠 때마다 다시 돌리면 릴리즈 설명이 최신 요약으로 교체된다(idempotent).
-
----
-
 ## 2. GitHub Deployments (배포 이력 기록)
 
-### 2026-09-06 조회 기록
-
-`.github/workflows/CICD.yml`의 `deploy-backend` 잡이 job-level `deployments: write` 권한과
-SHA로 고정한 `actions/github-script`를 사용해 **배포 시작 → 성공/실패**를 기록한다.
-2026-09-09 읽기 전용 확인에서 `deploy-backend` 잡은 `environment: production`을 사용하고,
-`production` Environment의 배포 브랜치 정책은 `main` 하나만 허용한다. `dev`와 `main`은
-`build-backend`·`build-frontend`를 strict로 요구하며 두 브랜치 모두 관리자에게도 보호 규칙을 적용한다.
-`main`은 선형 히스토리도 강제한다. 단, production Environment의 `can_admins_bypass`는 여전히 true다.
-브랜치 보호와 Environment 우회는 서로 다른 설정이므로 변경 시 각각 확인한다.
+`deploy-backend` 잡은 `environment: production`을 쓰고, GitHub가 Deployment와 상태를 자동으로 기록해요. `production`의 배포 브랜치 정책은 `main`만 허용해요.
 
 ### 2-1. 태그 백필
 
-기록이 없는 태그에만 Deployment(+success)를 만든다. **시각은 '지금'으로 찍힌다**(과거 배포 시각 아님, 일관성/기록용).
+기록이 없는 태그에만 Deployment(+success)를 만들어요. 시각은 실행 시각으로 찍혀요. 몇 번을 돌려도 빠진 것만 만들어요.
 
 ```bash
 node scripts/backfill-deployments.mjs               # 미리보기 — 무엇을 만들지
@@ -97,33 +87,18 @@ node scripts/backfill-deployments.mjs --apply       # 빠진 것만 생성
 node scripts/backfill-deployments.mjs --tag v2.2.0 --apply   # 특정 태그만
 ```
 
-**증분이라 몇 번을 돌려도 안전하다.** 태그를 커밋 SHA로 풀어서 이미 그 커밋에 배포 기록이 있으면
-건너뛴다 — 기존 기록의 ref 가 태그명이든 SHA 든 상관없다.
-
-> ⚠️ **`--reset` 은 제거됐다 (2026-08-11).** 그 플래그는 `environment=production` 인 배포를 전부 지우고
-> 다시 만들었는데, 거기에는 **CI/CD 가 배포 순간에 만든 진짜 기록(ref 가 커밋 SHA)**도 포함돼 있었다.
-> GitHub API 는 Deployment 생성 시각을 지정할 수 없어 **진짜 배포 시각은 복구되지 않는다.**
-> 2026-08-11 에 실제로 7건을 잃었다. 지금은 `--reset` 을 치면 에러와 함께 설명이 나온다.
->
-> 이 스크립트가 만든 것만 지우려면 `--prune-backfilled` 를 쓴다. `description` 의
-> `backfilled-by-script` 표식으로 대상을 고르므로 CI/CD 기록에는 손대지 않는다.
->
-> ```bash
-> node scripts/backfill-deployments.mjs --prune-backfilled           # 미리보기
-> node scripts/backfill-deployments.mjs --prune-backfilled --apply
-> ```
-
-> `production` environment는 2026-09-03 조회에서 존재했지만 보호 규칙과 배포 브랜치 제한은
-> 비어 있었다. 2026-09-06 기록과도 시점 차이가 있으므로 실제 배포 전 현재 값을 다시 조회한다.
-
-### 2-2. 현재 CICD 기록 검증
-
-코드와 GitHub 원격 상태를 둘 다 확인해야 한다. 워크플로에 스텝이 있다는 사실만으로 실제 기록 성공을
-증명할 수 없고, Deployment 객체만으로 서버 health check 성공을 증명할 수도 없다.
+스크립트가 만든 기록만 지울 때는 `--prune-backfilled`를 써요(`description`의 `backfilled-by-script` 표식으로 골라요).
 
 ```bash
-# 코드: job-level 최소 권한과 create/status 스텝
-rg -n "deployments: write|Create GitHub deployment|Mark deployment" .github/workflows/CICD.yml
+node scripts/backfill-deployments.mjs --prune-backfilled           # 미리보기
+node scripts/backfill-deployments.mjs --prune-backfilled --apply
+```
+
+### 2-2. 기록 확인
+
+```bash
+# 코드: main 전용 stage/활성화와 자동 Environment 기록
+rg -n "stage-release:|deploy-backend:|environment:|production|deployments:" .github/workflows/CICD.yml
 
 # 원격: 최신 production 배포와 상태
 gh api --method GET repos/hanjeun/reserve/deployments -f environment=production \
@@ -132,16 +107,20 @@ gh api repos/hanjeun/reserve/deployments/<id>/statuses \
   --jq '.[0] | {state,created_at,environment_url}'
 ```
 
-`actions/github-script`와 다른 Actions는 태그가 아니라 전체 커밋 SHA로 고정한다. 배포 기록 생성 실패는
-실제 배포를 막지 않도록 `continue-on-error`이고, id가 있을 때만 성공·실패 상태를 기록한다.
-
----
-
 ## 3. 저장소 보호 & PR/브랜치 정리
 
 ### 3-1. 브랜치 보호 (main / dev)
 
-UI: Settings → Branches → Add rule. gh CLI (PowerShell here-string):
+- `main`·`dev` 모두 `build-backend`·`build-frontend`를 필수 체크(strict)로 요구하고, 관리자에게도 적용해요.
+- `main`은 PR 필수, 선형 히스토리 강제, 강제 push·삭제 차단이에요.
+- `contexts`에는 PR에서 실제로 도는 잡만 넣어요.
+
+```bash
+gh api repos/hanjeun/reserve/branches/main/protection
+gh api repos/hanjeun/reserve/branches/dev/protection
+```
+
+설정 예시(gh CLI, PowerShell here-string):
 
 ```powershell
 @'
@@ -157,32 +136,13 @@ UI: Settings → Branches → Add rule. gh CLI (PowerShell here-string):
 '@ | gh api --method PUT repos/hanjeun/reserve/branches/main/protection --input -
 ```
 
-> 2026-09-03 읽기 전용 확인: `main`에는 위 두 체크, PR 필수, 선형 히스토리, 강제 push·삭제
-> 차단이 적용돼 있다. `strict=false`, 승인 리뷰 수 0이다. `dev`는 현재 보호되지 않았다.
-> 아래처럼 실제 값을 다시 읽고, `dev` 보호 추가는 별도 승인 뒤 진행한다.
-
-```bash
-gh api repos/hanjeun/reserve/branches/main/protection
-gh api repos/hanjeun/reserve/branches/dev/protection
-```
-
-> ⚠️ `contexts` 는 **PR에서 실제로 실행되는 잡**만 넣어야 한다. CICD.yml에서 `deploy-backend`는
-> `if: github.ref == 'refs/heads/main' && github.event_name == 'push'` 이라 **PR에선 안 돈다** →
-> 필수 체크로 걸면 모든 PR이 영영 막힌다. 그래서 PR에서 도는 `build-backend`·`build-frontend`만 필수로 둔다.
->
-> ⚠️ 1인 프로젝트에서 `main`에 직접 push 해왔다면, 위 규칙(required_pull_request_reviews) 적용 후엔
-> **main 직접 push가 막히고 PR을 거쳐야 한다**. 이게 정석이지만 워크플로가 바뀌니 인지하고 켤 것.
-> 지금처럼 직접 push를 유지하려면 `required_pull_request_reviews` 를 빼고 status check·선형 히스토리만 강제해도 된다.
-
 ### 3-2. 머지된 head 브랜치 자동 삭제
-
-UI: Settings → General → "Automatically delete head branches" 체크. gh CLI:
 
 ```bash
 gh api --method PATCH repos/$REPO -f delete_branch_on_merge=true
 ```
 
-이미 머지됐지만 남아있는 브랜치 정리:
+이미 머지됐지만 남아 있는 브랜치 정리:
 
 ```bash
 git fetch --prune
@@ -190,45 +150,27 @@ git branch --merged main | grep -vE '^\*|main|dev|local-preview-all-changes' | x
 git push origin --delete <branch>   # 원격 브랜치 삭제(필요한 것만)
 ```
 
-### 3-3. Dependabot 메이저 무시 (과거 예시)
+### 3-3. Dependabot
 
-메이저 업그레이드 PR은 닫지 말고 코멘트로 "이 메이저는 무시" 지시(향후 메이저 PR 재생성 방지):
+메이저 업그레이드 PR은 닫지 않고 코멘트로 무시를 지시해요.
 
 ```bash
 gh pr comment 79 -R $REPO --body "@dependabot ignore this major version"
 gh pr comment 76 -R $REPO --body "@dependabot ignore this major version"
 ```
 
-안전한 마이너/패치 PR 머지 후 위 3-2로 브랜치 정리:
+마이너/패치 PR은 직접 머지해요.
 
 ```bash
 gh pr list -R $REPO --label dependencies       # 목록 확인
 gh pr merge <번호> -R $REPO --squash --delete-branch
 ```
 
----
-
-## 2026-09-03 GitHub 설정 제안(과거 기록, 실행 전 재조회)
-
-1. `dev`에 PR·`build-backend`·`build-frontend`·강제 push/삭제 차단을 적용한다.
-2. 이미 존재하는 `production` environment를 `main` 배포만 허용하도록 제한하고 필요하면 수동 승인자를 둔다.
-3. `sync-release-notes.mjs --apply`와 `backfill-deployments.mjs --apply`는 외부 GitHub 기록을 바꾸므로
-   릴리스 작업 승인을 받은 뒤에만 실행한다.
-
-2026-09-03 당시 머지 후 head 브랜치 자동 삭제와 `protect-release-tags` ruleset은 적용돼 있었다.
-`production` environment는 존재하지만 protection rule과 deployment branch policy가 없다.
-
----
-
-## 4. 배포 직후 서버 작업 체크리스트
-
-레포에는 들어가 있지만 **서버에서 손을 대야 비로소 동작하는 것들**이다.
-순서가 중요한 것만 모았고, 각 항목의 상세는 링크된 문서에 있다.
+## 4. 배포 직후 서버 작업
 
 ### 4-0. DB 구조와 운영 큐 읽기 전용 점검
 
-앱이 새 버전으로 정상 기동한 뒤 `verify-post-deploy-readonly.sh`를 서버에 복사해 실행한다.
-백업 설정을 아직 만들지 않았다면 별도 root 전용 환경 파일에 `DB_PASSWORD`만 넣어도 된다.
+앱이 새 버전으로 기동한 뒤 `verify-post-deploy-readonly.sh`를 서버에서 실행해요. 환경 파일에는 `DB_PASSWORD`가 있어야 해요.
 
 ```bash
 scp scripts/verify-post-deploy-readonly.sh scripts/verify-mysql-row-lock.sh ubuntu@<server>:/tmp/
@@ -238,194 +180,49 @@ sudo install -m 0755 /tmp/verify-mysql-row-lock.sh /usr/local/bin/reserve-mysql-
 sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env /usr/local/bin/reserve-post-deploy-verify
 ```
 
-이 점검은 다음만 읽는다.
+읽는 항목:
 
 - `payment_webhook_inbox`, `payment_reconciliation_issue`, `file_deletion_task`,
   `oauth_unlink_task`, `marketing_consent_history` 테이블과 필수 인덱스
 - `reservation.checked_in_at`, `member.auth_version` 컬럼
 - 관련 테이블의 InnoDB 엔진 여부
-- 7일 넘은 `READY`, 열린 대사 건, 미완료 웹훅, 실패한 S3/OAuth outbox,
-  결제 장부·예약금 플래그 불변식 위반 건수
+- 7일 넘은 `READY`, 열린 대사 건, 미완료 웹훅, 실패한 S3/OAuth outbox, 결제 장부·예약금 플래그 불변식 위반 건수
 
-종료 코드는 `0=구조와 큐 정상`, `1=구조 오류`, `2=구조는 정상이지만 수동 확인할 큐 존재`다.
-`2`가 나와도 스크립트는 아무 상태도 바꾸지 않는다. 특히 오래된 `READY`는 먼저 PortOne 콘솔과
-대조하고, 관리자 패널의 개별 **재확인** 동작은 별도 승인 뒤 실행한다.
+| 종료 코드 | 뜻 |
+|---|---|
+| `0` | 구조와 큐 정상 |
+| `1` | 구조 오류 |
+| `2` | 구조는 정상이지만 수동 확인할 큐 존재 |
 
-MySQL 잠금 실기는 일반 점검과 분리한다. `verify-mysql-row-lock.sh`는 선택한 결제 행을 약 5초간
-`FOR UPDATE`로 잠그므로, 트래픽이 없는 TEST 결제 ID와 승인된 점검 창에서만 실행한다. 두 세션은
-모두 `ROLLBACK`하며 두 번째 세션이 lock wait timeout으로 막혀야 통과한다.
+`2`가 나오면 오래된 `READY`를 PortOne 콘솔과 대조하고, 관리자 패널의 **재확인**은 별도 승인 뒤 실행해요.
+
+MySQL 행 잠금 점검은 선택한 결제 행을 약 5초간 `FOR UPDATE`로 잠가요. 트래픽이 없는 TEST 결제 ID로 승인된 점검 창에서 실행하고, 두 번째 세션이 lock wait timeout으로 막히면 통과예요.
 
 ```bash
 sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env \
   /usr/local/bin/reserve-mysql-row-lock <idle-test-payment-id>
 ```
 
-이 스크립트 결과는 실제 InnoDB 행 잠금의 증거지만, 동시에 들어온 두 환불 중 PG 호출이 한 번만
-나가는지까지 증명하지는 않는다. 그 마지막 검증은 PortOne TEST 결제 두 요청 시나리오로 별도 수행한다.
+### 4-1. CSP 위반 관측
 
-### 2026-09-05 — v2.5.0 운영 검증 기록
+`nginx/default.conf`의 CSP는 **Report-Only**로 나가요. 위반 보고는 `POST /api/csp-reports`로 들어오고, 서버는 지시문 종류와 차단된 URI의 scheme만 `CSP violation observed` 로그로 남겨요.
 
-검증 기준 커밋은 `6e9dfdc69770d0f6af339cdb9e6d3d38ffa6698e`이며 `main`과 `v2.5.0` 태그가
-같은 커밋을 가리킨다. GitHub Actions run `33958795226`의 재실행 attempt 2에서 백엔드 배포와
-의존 build job이 모두 성공했고, Production deployment는 `2026-09-05T10:18:50Z`에 성공으로 끝났다.
-
-| 항목 | 실제 확인 결과 |
-|---|---|
-| 애플리케이션 | blue 컨테이너가 8080에서 활성, green/8081 비활성, nginx upstream은 blue |
-| 외부 상태 | `/`와 `/actuator/health` 모두 HTTP 200, HSTS·nosniff·CSP Report-Only 헤더 확인 |
-| DB 구조 | 세 운영 테이블, `reservation.checked_in_at`, 필수 인덱스, InnoDB 엔진 확인 |
-| 운영 큐 | 열린 대사 0, 미완료 웹훅 0, S3 삭제 pending/failed 0, 7일 넘은 `READY` 2건 |
-| MySQL 잠금 | 승인한 비활성 TEST 결제 행에서 두 번째 트랜잭션 timeout 및 양쪽 rollback 확인 |
-| 프론트 배포 | `current`가 위 커밋 SHA 디렉터리를 가리키는 원자 전환 확인 |
-| 미완료 | PortOne 콘솔 호출 테스트, 오래된 `READY` 2건의 관리자 재확인, CSP 7일 관측 |
-
-Sentry DSN은 실행 중이던 컨테이너의 유효 값을 화면·파일·명령 인자에 노출하지 않고 GitHub
-repository secret으로 갱신한 뒤 재배포했다. GitHub는 secret 값을 다시 보여주지 않으므로 갱신 시각과
-새 컨테이너의 정상 기동만 확인했고, 문서나 로그에는 값을 기록하지 않는다.
-
-### 2026-09-06 — 배포 후 운영 후속 확인
-
-- 새 Grafana 로그·서버 자원 JSON을 운영에 overwrite import하고 실제 패널을 확인했다.
-- PortOne TEST 웹훅 URL·시크릿이 설정되어 있고, 콘솔 `호출 테스트`가 endpoint의 서명 검증과 inbox
-  등록까지 도달함을 확인했다. 호출 테스트용 가짜 결제 ID가 404·`FAILED`로 남지 않게 하는 수정은
-  PR #186을 거쳐 v2.5.1에 배포됐다. 배포 전에 생성된 가짜 `FAILED` 행은 자동 재처리하지 않았다.
-- 7일 넘은 `READY` 결제 2건은 관리자 재확인으로 모두 `미결제로 종료`했다. 오래된 `READY`와 열린
-  대사 큐는 각각 0건이며 결제·환불 호출은 없었다.
-- CSP Report-Only의 최소 7일 관측과 실제 TEST 결제 웹훅 복구, 두 동시 환불의 단일 PG 호출,
-  이전 프론트 릴리스로의 운영 롤백 훈련은 계속 미완료다.
-
-### 2026-09-09 — v2.5.1과 SSH 지문 복구
-
-- PR #186의 미등록 결제 웹훅 처리와 환불 안전성 변경을 포함한 v2.5.1을 main에 squash merge하고
-  태그·GitHub Release를 생성했다. 릴리스 대상 커밋은 `253ac73`이다.
-- 최초 Actions 실행 `34319244608`은 서버 변경 전에 SSH 호스트 지문 검증에서 실패했다.
-  실패 실행은 원인·영향 범위·복구 연결을 보여주는 감사 증거이므로 삭제하지 않는다.
-- PR #190으로 RSA SHA256 지문을 복구한 뒤 실행 `34336480904`가 성공했고 공개 헬스체크를 확인했다.
-  동일 변경은 PR #191로 dev에 반영했고, PR #192로 v2.5.1 squash 계보를 dev에 연결했다.
-- 운영 DB 확인은 읽기 전용으로 수행했다. 기존 호출 테스트용 `FAILED` inbox 행의 재처리와
-  운영 DB·PortOne·S3 쓰기, TEST 결제, 운영 롤백은 이 작업 범위에 포함하지 않았다.
-
-### 2026-09-25 — v2.6.0 운영 배포 기록
-
-`dev → main` squash 커밋은 `3abc26d2d1d211c69e9ce4a5b248519786a22583`(PR #203)이고, `main`과 `v2.6.0` 태그가
-같은 커밋을 가리킨다. GitHub Actions run `36096322397`에서 build-backend·build-frontend·deploy-backend가 모두
-성공했고, Production deployment `6654056579`는 `2026-09-25T05:01:27Z`에 성공으로 끝났다. 새 서버 상태 확인을
-통과해 자동 되돌리기는 실행되지 않았고, nginx upstream 전환과 이전 서버 정지까지 마쳤다.
-
-| 항목 | 운영 확인 결과 |
-|---|---|
-| 외부 접속 | `/`·`/stores`·`/store/1`·`/login`·`/my-page` 모두 HTTP 200. HSTS·`X-Frame-Options: DENY`·nosniff·CSP Report-Only 헤더 유지 |
-| 검색 노출 헤더 | `/`·`/stores`·`/store/1`에는 `X-Robots-Tag` 없음, `/login`·`/my-page`에는 `noindex, nofollow` — PR #196 정책대로 동작 |
-| 프론트 교체 | index 스크립트가 `index-CpbA8aJA.js`에서 `index-B6hHEiaX.js`로 바뀜 |
-| 백엔드 | 공개 가게 목록 API(`/api/stores?page=0&size=1`) HTTP 200, `success=true` |
-| 배포 전 점검 | 새 환경 변수·비밀값 없음. 새 테이블 `ad_payment_attempt`는 `ddl-auto: update`로 생성. FULLTEXT 설정은 계속 꺼짐 |
-| 서버 DB 확인 | `reserve-post-deploy-verify` PASS. 필수 테이블 3개(`payment_webhook_inbox`·`payment_reconciliation_issue`·`file_deletion_task`), `reservation.checked_in_at`, 인덱스 7개 존재. 결제·생명주기 테이블 InnoDB |
-| 새 테이블 | `ad_payment_attempt` InnoDB, 0행. 인덱스 `PRIMARY`·`idx_ad_payment_due`·`idx_ad_payment_store`·`idx_ad_payment_owner`·`idx_ad_payment_ad`·주문번호 유일 인덱스 존재. 검증 스크립트가 이 테이블을 모르므로 `information_schema`로 따로 확인 |
-| 운영 큐 | 7일 넘은 `READY` 0, 열린 결제 대사 이슈 0, 처리 안 된 PortOne 웹훅 0, 파일 삭제 outbox pending 0·failed 0 |
-| 남은 일 | 검증 스크립트에 `ad_payment_attempt` 확인 추가 필요. 운영 DB 자동 백업은 같은 날 설정·복원 훈련까지 마쳤다(`backup.md`) |
-
-배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`edaede8ec9`)을 확인하고, PR #204로 v2.6.0 squash 계보를
-`dev`에 연결했다.
-
-서버에는 검증 스크립트가 설치돼 있지 않아, `v2.6.0` 태그의 `scripts/verify-post-deploy-readonly.sh`를 받아 SHA-256
-(`c7596d83…d704`)을 확인한 뒤 `/usr/local/bin/reserve-post-deploy-verify`로 설치했다. 백업 설정 파일이 없어
-DB 비밀번호는 MySQL 컨테이너의 환경 변수에서 그 자리에서 읽어 넘겼다(화면·명령 기록에 남기지 않음).
-
-### 2026-09-26 — v2.6.1 운영 배포 기록
-
-`dev → main` squash 커밋은 `888f06ac3b61b7f3bf802c437ebde7066f2e2334`(PR #212)이고, `main`과 `v2.6.1` 태그가
-같은 커밋을 가리킨다. GitHub Actions run `36163869763`에서 build-backend·build-frontend·deploy-backend가 모두
-성공했고, Production deployment `6665945055`는 `2026-09-25T17:03:00Z`에 성공으로 끝났다(KST 9월 26일 새벽).
-GitHub 릴리즈 v2.6.1을 만들고 CHANGELOG 요약을 얹었다.
-
-| 항목 | 운영 확인 결과 |
-|---|---|
-| 외부 접속 | `/`·`/login` HTTP 200. `/login`에 `noindex, nofollow`·HSTS·CSP Report-Only 헤더 유지 |
-| 프론트 교체 | index 스크립트가 `index-B6hHEiaX.js`에서 `index-C3SyTwa3.js`로 바뀜 |
-| 백엔드 | 공개 가게 목록 API HTTP 200, `success=true` |
-| 새 코드 동작 | 쿠키 없는 `POST /api/auth/refresh`가 새 문구로 401. 비로그인 `GET /api/email/check-verified`(삭제)·`POST /api/auth/agree-terms`·`PUT /api/member/password` 모두 401 |
-| 거절 사유 로그 | 위 확인 요청이 `Refresh rejected: reason=MISSING_COOKIE, memberId=null`(INFO)로 남음. 토큰은 로그에 없음 |
-| 서버 DB 확인 | v2.6.1 태그의 검증 스크립트(SHA-256 `2014fc15…cfe4`)로 교체 후 PASS(exit 0). 테이블 5개, 컬럼 5개(`member.auth_version`, `refresh_token.previous_token_hash`·`rotated_at`, `oauth_unlink_task.lease_id`, `reservation.checked_in_at`), 인덱스 11개, InnoDB 확인 |
-| 새 스키마 | `ddl-auto: update`가 컬럼 3개·테이블 2개·`idx_refresh_token_previous_hash`를 모두 만들어 수동 DDL은 필요 없었다 |
-| 운영 큐 | 7일 넘은 `READY` 0, 열린 대사 0, 미완료 웹훅 0, 파일 삭제 outbox pending 0·failed 0, OAuth 연동 해제 미결 0 |
-| 백업 | `reserve-backup`을 v2.6.1 버전(SHA-256 `f2434537…8845`)으로 교체하고 수동 실행 — 28 tables, 11 KiB, S3 업로드 성공 |
-| 남은 일 | 로그인한 기기에서 30분 뒤 `Refresh rotated` 로그 확인, Grafana 알림 8번 쿼리를 `OAuth unlink queue requires attention`으로 교체, 서버 OS 업데이트(46건)·재부팅 필요 표시 처리 |
-
-배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`41f8b85915`)을 확인하고, PR #213으로 v2.6.1 squash 계보를
-`dev`에 연결했다. DB 비밀번호는 `/etc/reserve-backup.env`에서 스크립트가 직접 읽었다(화면·명령 기록에 남기지 않음).
-
-### 2026-09-26 — v2.6.2 운영 배포 기록
-
-`dev → main` squash 커밋은 `481e9b6907f0d5c55f424115e245e739cca92a20`(PR #217)이고, `main`과 `v2.6.2` 태그가
-같은 커밋을 가리킨다. GitHub Actions run `36216975292`에서 build-backend·build-frontend(프론트·nginx 설정 배포 포함)·
-deploy-backend가 모두 성공했고, Production deployment `6674525049`는 `2026-09-26T04:16:36Z`에 성공으로 끝났다(KST 13시 16분).
-GitHub 릴리즈 v2.6.2를 만들고 CHANGELOG 요약을 얹었다.
-
-| 항목 | 운영 확인 결과 |
-|---|---|
-| 외부 접속 | `/`·`/favorites` HTTP 200, 공개 가게 목록 API HTTP 200 |
-| 프론트 교체 | index 스크립트가 `index-C3SyTwa3.js`에서 `index-Cg3Y5ovN.js`로 바뀜 |
-| gzip — 메인 JS | `Accept-Encoding: gzip` 요청에 `Content-Encoding: gzip`·`Vary: Accept-Encoding`. 전송량 571,142 → 189,537 bytes. `Cache-Control: public, max-age=31536000, immutable` 유지 |
-| gzip — HTML | `/login`에 gzip 적용, `no-cache`·HSTS·`X-Robots-Tag: noindex, nofollow`·CSP Report-Only 유지 |
-| gzip — API JSON | 공개 가게 목록 응답 2,792 → 1,136 bytes, API의 `no-store` 유지 |
-| 미지원 클라이언트 | `Accept-Encoding` 없는 요청은 압축 없이 `Content-Length: 571142` |
-| 스키마·비밀값 | 변경 없음. 서버 DB 검증 스크립트는 돌리지 않았다(백엔드는 버전 숫자만 바뀜) |
-| 남은 일 | 즐겨찾기 페이지에서 하트를 끄면 새로고침 버튼 회전·스켈레톤 뒤 카드가 빠지는지 PC·모바일에서 확인 |
-
-배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`43e37dda9c`)을 확인하고, PR #218로 v2.6.2 squash 계보를
-`dev`에 연결했다.
-
-### 2026-09-26 — v2.6.3 운영 배포 기록
-
-`dev → main` squash 커밋은 `b478ae8d732afa1e35642d790bfc39972556f885`(PR #222)이고, `main`과 `v2.6.3` 태그가
-같은 커밋을 가리킨다. GitHub Actions run `36238175151`에서 build-backend·build-frontend·deploy-backend가 모두
-성공했고, Production deployment `6678168550`는 `2026-09-26T11:20:05Z`에 성공으로 끝났다(KST 20시 20분).
-GitHub 릴리즈 v2.6.3을 만들고 CHANGELOG 요약을 얹었다.
-
-| 항목 | 운영 확인 결과 |
-|---|---|
-| 변경 범위 | 관리자 결제 운영 탭 두 곳의 캐시 무효화(PR #220)와 버전 숫자만. 스키마·비밀값·nginx 변경 없음 |
-| 외부 접속 | `/` HTTP 200, 공개 가게 목록 API HTTP 200, 비로그인 `GET /api/admin/ad-payments` HTTP 401 |
-| 프론트 교체 | index 스크립트가 `index-Cg3Y5ovN.js`에서 `index-USDcEPVp.js`로 바뀜 |
-| v2.6.2 유지 | 메인 JS·`/login` gzip, `immutable`·`no-cache`·HSTS·`X-Robots-Tag` 그대로 |
-| 실제 동작 | 운영 PG 대사·환불은 실제 돈이 오가는 작업이라 돌리지 않았다. 다음에 처리할 일이 생기면 광고·전체 예약 탭이 바로 바뀌는지 확인 |
-
-배포 뒤 `origin/main`과 `origin/dev`의 트리가 같음(`e886df73bf`)을 확인하고, PR #223으로 v2.6.3 squash 계보를
-`dev`에 연결했다.
-
-### 4-1. CSP 위반 관측 (배포 즉시)
-
-`nginx/default.conf` 의 CSP 는 **Report-Only** 로 나간다 — 지금은 아무것도 차단하지 않는다.
-브라우저 위반 보고는 `POST /api/csp-reports`로 들어오며, 서버는 URL·쿼리·문서 주소를 버리고
-지시문 종류와 차단된 URI의 scheme만 `CSP violation observed` 로그로 남긴다.
-
-1. 배포 후 https://reserve.it.kr 에서 개발자도구 콘솔을 열고 **PC와 실제 모바일에서 주요 화면을 한 바퀴 돌면서**
-   `[Report Only]` 경고를 모은다.
+1. 배포 후 https://reserve.it.kr 에서 개발자도구 콘솔을 열고 **PC와 실제 모바일에서 주요 화면을 한 바퀴 돌며**
+   `[Report Only]` 경고를 모아요.
    → 홈 / 가게 목록 · 검색 / 가게 상세(**카카오맵이 뜨는 화면**) / 예약 · **결제** / 로그인(소셜 3사) /
      마이페이지 이미지 업로드 · 미리보기 / 관리자 패널
-2. 먼저 nginx → `app.log` → Promtail positions/labels → Loki에 `reserve` 애플리케이션 스트림이
-   실제로 들어오는지 확인한다. 스트림이 없거나 다른 로그와 결과가 불일치하면 0건은 위반 없음의
-   증거가 아니라 관측 실패다. 수집 경로를 복구한 뒤 아래 쿼리로 배포 뒤 위반을 확인한다.
+2. Loki에 `reserve` 스트림이 들어오는지 확인한 뒤 아래 쿼리로 위반을 봐요.
 
    ```logql
    {job="reserve"} |= `CSP violation observed`
    ```
 
-3. 결제·지도·Sentry를 포함한 수동 시나리오를 모두 통과하고 **최소 7일** 동안 실제 트래픽에서도
-   설명되지 않는 위반이 없을 때만
-   헤더명에서 `-Report-Only`를 지우는 별도 PR을 만든다. 한 번의 콘솔 0건만으로 강제 전환하지 않는다.
-4. 경고가 있으면 필요한 출처만 해당 지시문에 추가한다. **절대 `unsafe-inline` 을 script-src 에 넣지 말 것**
-   — 그순간 CSP 가 막아야 할 XSS 를 전부 통과시킨다(style-src 는 antd 때문에 어쩔 수 없다).
+3. 수동 시나리오를 모두 통과하고 **최소 7일** 동안 설명되지 않는 위반이 없으면 헤더명에서 `-Report-Only`를 지우는 별도 PR을 만들어요.
+4. 경고가 있으면 필요한 출처만 해당 지시문에 추가해요. script-src에는 `unsafe-inline`을 넣지 않아요.
 
-> 결제는 PC 에서 popup(`window.open`)이라 CSP 대상이 아니지만 **모바일은 리다이렉트/iframe**
-> 경로라 다르게 동작한다. 모바일에서도 한 번 결제해볼 것.
->
-> 현재 자산 현지화가 끝나지 않아 쓰는 Unsplash 허용 출처는 실제 참조를 제거하고 다시 관측하기 전까지
-> 먼저 삭제하지 않는다.
+### 4-2. 가게 검색 FULLTEXT
 
-### 4-2. 가게 검색 FULLTEXT (순서 고정 — 뒤집으면 검색이 전부 500)
-
-상세: [`manual-ddl.md`](manual-ddl.md)
+DDL을 먼저 적용하고, 그다음 별도 배포로 플래그를 켜요. 상세: [`manual-ddl.md`](manual-ddl.md)
 
 ```bash
 # ① (권장) 먼저 백업
@@ -439,18 +236,13 @@ ALTER TABLE store ADD FULLTEXT INDEX ft_store_search
 SHOW INDEX FROM store WHERE Index_type = 'FULLTEXT';"
 ```
 
-③ `manual-ddl.md` 이력 표에 한 줄 기록(현재 `_(미적용)_`)
-④ 그 다음 **별도 배포로** `application-prod.yml` 의 `fulltext-enabled` 주석을 해제
+③ 별도 배포로 `application-prod.yml`의 `fulltext-enabled` 주석을 해제해요.
 
-> 현재 플래그는 안전하게 **주석 처리된 상태**다. 인덱스 없이 켜면
-> `Can't find FULLTEXT index matching the column list` 로 키워드 검색이 전부 500 이 된다.
-
-### 4-3. nginx 로그를 실제 파일로 (그냥 두면 Loki 에 0건)
+### 4-3. nginx 로그를 실제 파일로
 
 상세: [`monitoring.md`](monitoring.md) — "nginx 로그 수집"
 
-공식 nginx 이미지는 `access.log` 를 `/dev/stdout` 으로 심볼릭 링크해둔다 — **파일이 없다.**
-그래서 promtail 이 읽을 게 없다. 호스트 디렉토리를 마운트해야 실제 파일이 생긴다.
+호스트 디렉터리를 마운트해 nginx access 로그를 파일로 남기고 promtail 설정을 반영해요.
 
 ```bash
 sudo mkdir -p /var/log/nginx
@@ -458,64 +250,36 @@ sudo mkdir -p /var/log/nginx
 scp promtail-config.yml ubuntu@<서버>:~/ && ssh ubuntu@<서버> 'docker restart promtail'
 ```
 
-확인: Grafana 에서 `{job="nginx"}` 가 0건이면 마운트가 안 된 것이다.
+확인: Grafana에서 `{job="nginx"}`를 조회해요.
 
 ### 4-4. 알림 규칙
 
-상세: [`monitoring.md`](monitoring.md) — "알림 규칙(Grafana Alerting)"
-
-Contact point 의 **Test 버튼으로 수신까지** 확인한 뒤 규칙을 만든다.
-SMTP 가 안 묶여 있으면 알림은 **조용히 안 온다**.
-
-> 429 알림은 4-3 이, 백업 알림은 백업 cron 등록이 선행돼야 한다.
-> 선행 작업 없이 먼저 켜두면 부질없이 계속 울린다.
-
----
+Contact point의 **Test**로 수신을 확인한 뒤 [모니터링](monitoring.md)의 "알림 규칙"대로 규칙을 만들어요.
 
 ## 5. 프론트엔드 원자적 배포와 롤백
 
-v2.6 후보 워크플로는 프론트를 먼저 live로 바꾸지 않는다.
+프론트는 새 백엔드가 준비된 뒤에 live로 바뀌어요.
 
-1. `build-frontend`는 검사를 통과한 산출물을
-   `/usr/share/nginx/html/releases/<commit-sha>`에 staging하고 SHA별 nginx 템플릿을 보관한다.
-   이 잡은 `current` symlink, nginx 설정, backend upstream을 바꾸지 않는다.
-   `scripts/preserve-frontend-assets.sh`는 live와 보존된 릴리스 하나의 원래 해시 자산을 새 staging에 복사한다.
-   `reserve-assets.sha256`은 각 릴리스의 원래 파일만 기록해 이전에 상속받은 자산의 무한 누적을 막는다.
-   동일 파일명/다른 SHA-256은 덮어쓰지 않고 배포를 중단한다. 기존 `/assets/` URL·immutable 캐시 계약은 유지한다.
-2. `deploy-backend`는 nginx 컨테이너의 `service-env.inc`를 live upstream 정본으로 읽고, 그 대상의
-   loopback health가 200인지 교차 확인한 뒤 반대편 Blue/Green 컨테이너를 SHA 이미지로 기동한다.
-   구 컨테이너 정리가 실패해 둘 다 200이어도 health 순서로 live를 추측하지 않는다. 새 컨테이너의
-   loopback health가 통과하기 전에는 live 경로를 건드리지 않는다.
-3. 전환 직전 현재 `default.conf`, `service-env.inc`, `current` 포인터를
-   `/home/ubuntu/release-rollback-<새 commit-sha>-<run-id>-<run-attempt>/`에 묶어 저장한다.
-   commit SHA만으로 재사용하지 않아 같은 SHA 재실행이 이전 실행의 rollback marker를 소비하지 않는다.
-4. nginx 후보에는 새 프론트의 **SHA 절대 경로**와 새 backend upstream을 함께 넣는다. `nginx -t`가
-   통과한 뒤 `current` 포인터를 bookkeeping용으로 갱신하고 nginx를 **한 번만 reload**한다.
-5. nginx를 통과하는 HTML·정적 asset·공개 API smoke가 성공한 뒤에만 구 backend를 정지하고 오래된
-   릴리스를 정리한다. 그 전에는 구 프론트와 구 backend를 유지한다.
-6. health, candidate 검사, reload, smoke 중 하나라도 실패하거나 실행이 취소·종료 신호를 받으면
-   `set -Eeuo pipefail`과 실행 시도별 rollback 경로가 저장한 두 nginx 파일과 프론트 포인터를 함께
-   복원하고 새 backend를 제거한다.
+1. `stage-release`가 dist 아티팩트를 `/usr/share/nginx/html/releases/<commit-sha>`에 staging하고 SHA별 nginx 템플릿을 보관해요. `current` symlink, nginx 설정, backend upstream은 바꾸지 않아요.
+   - `scripts/preserve-frontend-assets.sh`가 live와 보존된 릴리스 하나의 해시 자산을 새 staging에 복사해요.
+   - `reserve-assets.sha256`은 각 릴리스의 원래 파일만 기록해요.
+   - 파일명이 같은데 SHA-256이 다르면 배포를 중단해요.
+2. `deploy-backend`가 nginx의 `service-env.inc`로 live upstream을 읽고 health를 확인한 뒤, 반대편 Blue/Green 컨테이너를 SHA 이미지로 기동해요. 새 컨테이너의 loopback health가 통과해야 다음 단계로 가요.
+3. 전환 직전 `default.conf`, `service-env.inc`, `current` 포인터를
+   `/home/ubuntu/release-rollback-<새 commit-sha>-<run-id>-<run-attempt>/`에 저장해요.
+4. nginx 후보에 새 프론트의 **SHA 절대 경로**와 새 backend upstream을 함께 넣고, `nginx -t`가 통과하면 `current` 포인터를 갱신한 뒤 nginx를 **한 번만 reload**해요.
+5. nginx를 거치는 HTML·정적 asset·공개 API smoke가 성공하면 구 backend를 정지하고 오래된 릴리스를 정리해요.
+6. health, 후보 검사, reload, smoke 중 하나라도 실패하거나 실행이 취소되면 저장한 두 nginx 파일과 프론트 포인터를 복원하고 새 backend를 제거해요.
 
-자동 정리는 현재 프론트와 최신 두 릴리스 디렉터리만 보존 대상으로 다룬다. 호스트 전체의
-`docker image/system prune`은 다른 서비스와 backend rollback 이미지를 지울 수 있어 배포 워크플로에서
-실행하지 않는다. 용량 정리는 대상 이미지·Compose project를 읽기 전용으로 확인한 별도 운영 절차다.
+- 자동 정리는 현재 프론트와 최신 두 릴리스 디렉터리만 보존해요.
+- 배포 워크플로는 호스트 전체 `docker image/system prune`을 실행하지 않아요.
 
-새 nginx 설정은 실제 root를 SHA 절대 경로에 고정하므로 **symlink만 되돌리는 수동 조치는 완전한
-rollback이 아니다.** 긴급 복구도 해당 실행의 rollback 디렉터리에서 `default.conf`와
-`service-env.inc`를 함께 복구하고 `nginx -t` 뒤 한 번 reload해야 한다. 이 운영 쓰기는 대상 SHA와
-현재 upstream을 읽기 전용으로 확인한 뒤 별도 승인을 받아 실행한다.
+### 수동 롤백
 
-2026-09-05 v2.5.0 배포에서 운영 `current`가 새 SHA 디렉터리를 가리키는 최초 원자 전환은 확인했다.
-다만 서버의 `releases` 아래 보존된 디렉터리가 현재 SHA 하나뿐이어서 **과거 버전으로 되돌리는 운영
-롤백 훈련은 실행할 대상이 없었다.** 다음 서로 다른 프론트 릴리스가 한 번 더 쌓인 뒤 수행한다.
+nginx `root`가 SHA 절대 경로에 고정되므로 두 nginx 파일을 함께 복구해요.
 
-`bash scripts/test-frontend-release-swap.sh`의 통과는 Linux 파일시스템 명령의 로컬 회귀 증거일 뿐,
-GitHub Actions 표현식, SSH 환경, 운영 nginx 권한·마운트·설정 복구를 증명하지 않는다. 첫 정식 배포
-뒤에는 실제 서버에서 새 SHA 절대 root와 upstream이 함께 적용됐는지 확인하고, 보존된 직전 조합으로
-되돌렸다가 다시 현재 조합으로 복귀하는 훈련을 별도 승인 창에서 실행한다.
+1. 대상 SHA와 현재 upstream을 읽기 전용으로 확인하고 별도 승인을 받아요.
+2. 해당 실행의 rollback 디렉터리에서 `default.conf`와 `service-env.inc`를 함께 복구해요.
+3. `nginx -t` 뒤 한 번 reload해요.
 
-9/27 격리 통합에서 `bash scripts/test-frontend-assets.sh`의 legacy 이식/소유 manifest/충돌/경로 거부 검사는 통과했다.
-이는 전체 Linux cutover 훈련이나 운영 URL 가용성 증거가 아니다. 배포 전 옛 문서를 열어둔 상태에서
-전환하고, 아직 로드하지 않은 화면의 JS/CSS/font 요청이 HTML fallback 없이 성공하는지 확인한다.
-보존 범위를 벗어난 오래된 문서의 무기한 가용성은 보장하지 않는다.
+로컬 회귀 검사는 `bash scripts/test-frontend-release-swap.sh`와 `bash scripts/test-frontend-assets.sh`예요.

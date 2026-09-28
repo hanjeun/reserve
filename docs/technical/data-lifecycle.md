@@ -1,27 +1,18 @@
 # 데이터 생명주기
 
-> 광고 원장·잠금 경계 갱신: 2026-09-07, `local-preview-all-changes` 로컬 프리뷰 브랜치.
-> 이 문서는 **아직 배포되지 않은 코드의 계약**이다. 운영 MySQL·S3·OAuth 제공자에서의 실기 검증은 아래 체크리스트가 남아 있다.
-
----
+회원 탈퇴와 가게 영업 종료 때 무엇을 막고, 지우고, 남기는지 정리해요.
 
 ## 원칙
 
-회원 탈퇴와 가게 영업 종료는 행을 연쇄 삭제하는 기능이 아니다.
-
-1. 예약·결제·환불·리뷰·광고처럼 거래나 분쟁에 연결된 행은 FK와 상태를 보존한다.
-2. 탈퇴·폐업 전에 해결해야 할 의무는 `DataLifecycleGuard` 한 곳에서 검사한다.
-3. 보존하는 행에서도 로그인·연락·위치 같은 직접 식별자는 제거한다.
-4. DB 트랜잭션과 원자적으로 묶을 수 없는 S3 삭제는 durable outbox로 넘긴다.
-5. OAuth 연동 해제는 DB 탈퇴 커밋 뒤에만 시도한다.
-
----
+1. 예약·결제·환불·리뷰·광고처럼 거래나 분쟁에 연결된 행은 FK와 상태를 보존해요.
+2. 탈퇴·폐업 전에 해결할 의무는 `DataLifecycleGuard` 한 곳에서 검사해요.
+3. 보존하는 행에서도 로그인·연락·위치 같은 직접 식별자는 지워요.
+4. S3 삭제는 durable outbox로 넘겨요.
+5. OAuth 연동 해제는 DB 탈퇴 커밋 뒤에만 시도해요.
 
 ## 가게 영업 종료
 
-### 관문
-
-다음 값이 모두 0이어야 한다. 하나라도 남으면 `409 Conflict`로 중단한다.
+아래 값이 모두 0이어야 해요. 하나라도 남으면 `409 Conflict`예요.
 
 | 항목 | 차단 상태 |
 |---|---|
@@ -32,32 +23,24 @@
 | 결제 대사 | 예약 `OPEN` 이슈 + 광고 미결/미이관 건수 |
 | 웹훅 | 미완료 inbox |
 
-가게 행은 예약 생성·수정과 같은 비관적 잠금으로 읽는다. 준비 상태를 확인한 직후 새 예약이 끼어드는
-check-then-close 경합을 줄이기 위한 경계다. 광고 생성·금융 전이·가게 수정·제재도 같은 가게 잠금을 지난다.
-광고 원장은 숨김 상태와 관계없이 검사한다. 로컬 `PAYMENT_FAILED`나 `CANCELLED`만으로 종결을 인정하지 않는다.
-PG 증거와 이관/수동 복구 절차는 [광고 결제 런북](ad-payments.md)을 따른다.
+- 가게 행은 예약 생성·수정과 같은 비관적 잠금으로 읽어요. 광고 생성·금융 전이·가게 수정·제재도 같은 잠금을 지나요.
+- 광고 원장은 숨김 상태와 관계없이 검사하고, 로컬 `PAYMENT_FAILED`나 `CANCELLED`만으로 종결을 인정하지 않아요. 절차는 [광고 결제 런북](ad-payments.md)을 따라요.
 
-### 종료 시 처리
+종료 시 처리:
 
-- 가게와 광고의 이미지 경로를 `file_deletion_task`에 넣고 DB의 이미지 필드를 비운다.
-- 즐겨찾기와 홍보 연결을 제거한다.
-- 가게에 `deletedAt`을 기록해 공개 목록과 신규 예약에서 제외한다.
-- 가게·예약·결제·환불·리뷰·광고 원장은 물리 삭제하지 않는다.
-- 결제·예약·리뷰 repository의 가게/회원 일괄 삭제 메서드와 범용 기간 일괄 삭제 메서드는 제거해
-  다른 호출부가 생명주기 관문을 우회하지 못하게 한다.
+- 가게와 광고의 이미지 경로를 `file_deletion_task`에 넣고 이미지 필드를 비워요.
+- 즐겨찾기와 홍보 연결을 지워요.
+- 가게에 `deletedAt`을 기록해 공개 목록과 신규 예약에서 빼요.
+- 가게·예약·결제·환불·리뷰·광고 원장은 물리 삭제하지 않아요. 결제·예약·리뷰 repository에는 가게/회원 일괄 삭제와 기간 일괄 삭제 메서드를 두지 않아요.
 
-API:
-
-- `GET /api/stores/{id}/closure-readiness`
-- `DELETE /api/stores/{id}`
-
----
+| API | 용도 |
+|---|---|
+| `GET /api/stores/{id}/closure-readiness` | 차단 건수 조회 |
+| `DELETE /api/stores/{id}` | 영업 종료 |
 
 ## 회원 탈퇴
 
-### 관문
-
-다음 값이 모두 0이어야 한다. 하나라도 남으면 `409 Conflict`로 중단한다.
+아래 값이 모두 0이어야 해요. 하나라도 남으면 `409 Conflict`예요.
 
 | 항목 | 차단 상태 |
 |---|---|
@@ -67,44 +50,38 @@ API:
 | 결제 대사 | 예약 `OPEN` 이슈 + 광고 미결/미이관 건수 |
 | 웹훅 | 미완료 inbox |
 
-### 탈퇴 시 처리
+탈퇴 시 처리:
 
-- 회원 정보 수정·프로필/동의/위치 변경·비밀번호 재설정·예약 생성과 탈퇴는 같은 회원 행의
-  비관적 잠금 관문을 사용한다. 탈퇴 직전에 시작된 요청이 비식별 상태를 덮어쓰거나 새 예약을 만드는 것을 막는다.
-- 회원 행을 삭제하지 않고 `withdrawn-{memberId}@reserve.invalid`로 이메일을 치환한다.
-- 이름은 `탈퇴한 회원`, 역할은 `USER`, 상태는 `ACTIVE`로 정규화하고 `deletedAt`을 기록한다.
-- 비밀번호·OAuth 식별자/토큰·프로필·알림/동의·위치·제재 정보를 비운다.
-- 결제의 중복 구매자 이름/이메일/전화번호와 예약의 자유 입력 요청사항을 비운다.
-- refresh/password-reset/email-verification 토큰을 제거한다.
-- 즐겨찾기·홍보·커뮤니티 작성물/반응·사업자 인증을 제거한다.
-- 프로필과 사업자등록증 이미지는 파일 삭제 outbox에 넣는다.
-- 예약·결제·환불·리뷰·문의·채팅·채팅 신고와 회원 FK는 보존한다. 공개 리뷰 DTO는 회원 식별자를 내보내지 않는다.
-- 응답이 성공하면 access/refresh 쿠키를 삭제한다. 이후 JWT 인증도 매 요청 회원의 삭제·정지·영구정지
-  상태와 현재 역할을 DB에서 확인하므로 탈퇴하거나 제재된 회원의 기존 access token은 인증에 사용할 수 없다.
+- 회원 정보 수정·프로필/동의/위치 변경·비밀번호 재설정·예약 생성과 탈퇴는 같은 회원 행 비관적 잠금을 써요.
+- 회원 행은 지우지 않고 이메일을 `withdrawn-{memberId}@reserve.invalid`로 바꿔요.
+- 이름은 `탈퇴한 회원`, 역할은 `USER`, 상태는 `ACTIVE`로 정규화하고 `deletedAt`을 기록해요.
+- 비밀번호·OAuth 식별자/토큰·프로필·알림/동의·위치·제재 정보를 비워요.
+- 결제의 구매자 이름/이메일/전화번호와 예약의 자유 입력 요청사항을 비워요.
+- refresh/password-reset/email-verification 토큰을 지워요.
+- 즐겨찾기·홍보·커뮤니티 작성물/반응·사업자 인증을 지워요.
+- 프로필과 사업자등록증 이미지는 파일 삭제 outbox에 넣어요.
+- 예약·결제·환불·리뷰·문의·채팅·채팅 신고와 회원 FK는 보존해요. 공개 리뷰 DTO는 회원 식별자를 내보내지 않아요.
+- 성공하면 access/refresh 쿠키를 지워요. JWT 인증은 매 요청 회원 상태와 역할을 DB에서 확인해요.
 
-API:
-
-- `GET /api/member/withdrawal-readiness`
-- `DELETE /api/member/delete`
-
----
+| API | 용도 |
+|---|---|
+| `GET /api/member/withdrawal-readiness` | 차단 건수 조회 |
+| `DELETE /api/member/delete` | 탈퇴 |
 
 ## S3 파일 삭제 outbox
 
-`file_deletion_task`는 비즈니스 변경과 같은 DB 트랜잭션에 삭제 의도를 기록한다. 실제 S3 호출은
-`FileDeletionScheduler`가 기본 60초 간격, 한 번에 최대 50건씩 처리한다.
+`file_deletion_task`는 비즈니스 변경과 같은 트랜잭션에 삭제 의도를 기록해요. `FileDeletionScheduler`가 기본 60초 간격, 한 번에 최대 50건씩 S3에서 지워요.
 
 | 필드/상태 | 의미 |
 |---|---|
-| `target_hash` | 경로 SHA-256. unique 제약으로 같은 대상의 중복 작업을 막는다. |
+| `target_hash` | 경로 SHA-256. unique 제약으로 중복 작업을 막아요 |
 | `PENDING` | 아직 시도하지 않음 |
 | `FAILED` | 지수 backoff 뒤 재시도 |
-| `COMPLETED` | 삭제 성공. 원본 `target` 경로도 즉시 `NULL`로 제거 |
+| `COMPLETED` | 삭제 성공. `target` 경로도 `NULL`로 지움 |
 
-항목 하나마다 `REQUIRES_NEW` 트랜잭션과 행 잠금을 사용하므로 한 대상의 실패가 다음 대상을 막지 않는다.
-로그에는 파일 경로를 남기지 않고 task ID와 예외 종류만 남긴다.
+항목마다 `REQUIRES_NEW` 트랜잭션과 행 잠금을 써요. 로그에는 task ID와 예외 종류만 남겨요.
 
-운영 확인 쿼리:
+확인 쿼리:
 
 ```sql
 SELECT status, COUNT(*)
@@ -118,69 +95,25 @@ WHERE status = 'FAILED'
 ORDER BY next_attempt_at ASC;
 ```
 
----
-
 ## OAuth 연동 해제
 
-외부 OAuth 해제는 DB 트랜잭션보다 먼저 실행하지 않는다. 회원 비식별화와 같은 트랜잭션에서
-`oauth_unlink_task`에 제공자·회원·암호화 토큰을 저장하고, 커밋 뒤 스케줄러가 제공자를 호출한다.
-앱이 DB 커밋 직후 종료되거나 제공자 호출이 실패해도 작업은 남아 지수 backoff로 재시도한다.
-(v2.6.1에서 예전 `AFTER_COMMIT` 이벤트 리스너를 이 outbox로 바꿨다.)
+회원 비식별화와 같은 트랜잭션에서 `oauth_unlink_task`에 제공자·회원·암호화 토큰을 저장하고, 커밋 뒤 스케줄러가 제공자를 호출해요. 실패하면 지수 backoff로 재시도해요.
 
-- `task_key` unique로 회원·provider별 중복 enqueue를 막는다.
-- access token은 목적 분리 AES-GCM 암호문만 저장하고 완료 즉시 NULL로 지운다.
-- 짧은 `PROCESSING` lease 앞뒤에서만 DB 행을 잠그고, 제공자 HTTP 호출 중에는 트랜잭션을 열어두지 않는다.
-- 토큰이 없던 탈퇴는 `BLOCKED`, 제공자 실패는 `FAILED`, 성공은 `COMPLETED`다.
-- 로그에 토큰·제공자 응답 본문을 남기지 않는다.
-- `FAILED/BLOCKED`가 하나라도 있으면 15분마다 `OAuth unlink queue requires attention` 집계 로그가 난다
-  (Grafana 알림 8번, `docs/technical/monitoring.md`).
+- `task_key` unique로 회원·provider별 중복 등록을 막아요.
+- access token은 AES-GCM 암호문만 저장하고 완료 즉시 NULL로 지워요.
+- 토큰이 없던 탈퇴는 `BLOCKED`, 제공자 실패는 `FAILED`, 성공은 `COMPLETED`예요.
+- 로그에 토큰·제공자 응답 본문을 남기지 않아요.
+- `FAILED/BLOCKED`가 있으면 15분마다 `OAuth unlink queue requires attention` 로그가 나요([모니터링](monitoring.md) Grafana 알림 8번).
 
-키·상태·운영 절차는 [계정 보안 계약](account-security.md)을 따른다. 이 구조는 로컬/H2 테스트 증거이며,
-각 제공자 콘솔에서 실제 연동 해제됐다는 운영 증거는 아직 별도 확인이 필요하다.
-
----
+상태와 키 설정은 [계정 보안 계약](account-security.md)에 있어요.
 
 ## 휴지통과 감사로그
 
-- `SOFT_DELETE` 휴지통 보존 기간: 30일
-- 복구/영구삭제/제재 등 일반 감사로그 보존 기간: 90일
-- 만료 항목은 별도 `AuditCleanupWorker`가 항목별 `REQUIRES_NEW` 트랜잭션으로 처리한다.
-- 결제가 있거나 리뷰가 연결된 예약 및 모든 광고는 자동 영구삭제하지 않고 `RETENTION_HOLD`를 남긴다.
-  과거 광고 표시 상태만으로 이전 UID의 결제를 배제할 수 없기 때문이다. 광고 원장도 자동 파기하지 않는다.
-- 실패한 `SOFT_DELETE` 로그는 일괄 로그 정리에서 제외해 다음 실행에서 다시 시도한다.
+| 대상 | 보존 기간 |
+|---|---|
+| `SOFT_DELETE` 휴지통 | 30일 |
+| 복구/영구삭제/제재 등 일반 감사로그 | 90일 |
 
-30일/90일은 현재 애플리케이션 동작의 정본이다. 거래·분쟁 행의 최종 보존 기간과 자동 파기 기준은
-법적·운영 승인을 거친 정책이 아직 없으므로 코드가 임의로 영구삭제하지 않는다.
-
----
-
-## 배포 전 운영 검증
-
-- [ ] 운영 백업이 존재하고 별도 빈 DB로 복원 가능한지 먼저 확인
-- [ ] 재시작 후 운영 MySQL에 `file_deletion_task`, OAuth unlink·마케팅 동의 이력, 결제 inbox/대사 테이블이 생성됐는지 확인
-- [ ] `SHOW CREATE TABLE file_deletion_task`와 `SHOW INDEX`로 unique/index 확인
-- [ ] S3 IAM이 대상 객체 삭제만 허용하는지 확인
-- [ ] S3 삭제 실패를 한 번 만들고 `FAILED → COMPLETED` 재시도를 실기 확인
-- [ ] 각 OAuth 제공자에서 탈퇴 후 연동이 실제 해제되는지 확인
-- [ ] OAuth unlink의 `FAILED → COMPLETED`와 `BLOCKED` 운영 알림 확인
-- [ ] 예약 생성과 가게 종료 동시 요청, 광고 생성과 가게 종료 동시 요청을 MySQL에서 실기 확인
-- [ ] 예약 생성·회원정보 수정·비밀번호 재설정과 회원 탈퇴 동시 요청을 MySQL에서 실기 확인
-- [ ] 회원/가게 준비 상태 API의 차단 건수와 운영 DB 원장을 표본 대조
-- [ ] 보존 중인 리뷰·문의·채팅 본문과 신고 hold에 대한 최종 개인정보 보존/파기 정책 승인
-- [ ] 거래·분쟁 원장의 최종 파기 기간과 실행 주체 결정
-
----
-
-## 로컬 검증 증거
-
-아래는 **2026-09-03 당시 기록**이다. 2026-09-07 실행 수치는 [품질 로드맵](quality-roadmap.md)에 둔다:
-
-- `backend/gradlew.bat test`: 166 tests, failures 0, errors 0, skipped 0
-- `frontend/npm.cmd run lint:ci`: 성공
-- `frontend/npm.cmd run test:run`: 4 files, 10 tests 성공
-- `frontend/npm.cmd run test:e2e`: PC·Pixel 7 핵심 흐름 12 tests 성공
-- `frontend/npm.cmd run build`: 성공, 초기 JS 318.1 KiB gzip·최대 청크 555.1 KiB 예산 통과
-- `node scripts/validate-grafana-dashboards.mjs`: 성공
-
-이 결과는 컴파일·단위/통합 테스트, 모의 API 브라우저 흐름과 H2 쿼리 실행 증거다. 운영 MySQL의
-잠금 동작, 실제 PortOne 웹훅·S3 삭제, OAuth 제공자 응답, 배포 설정을 증명하지는 않는다.
+- 만료 항목은 `AuditCleanupWorker`가 항목별 `REQUIRES_NEW` 트랜잭션으로 처리해요.
+- 결제가 있거나 리뷰가 연결된 예약과 모든 광고는 자동 영구삭제하지 않고 `RETENTION_HOLD`를 남겨요. 광고 원장도 자동 파기하지 않아요.
+- 실패한 `SOFT_DELETE` 로그는 일괄 정리에서 빼고 다음 실행에서 다시 시도해요.

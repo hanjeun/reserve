@@ -143,6 +143,19 @@ test('latency logs contain coarse routes and durations, never request identifier
     assert.doesNotMatch(format, /\$request_uri|\$args|\$remote_addr|\$http_|\$request_body|\$uri\b|\$request\b/);
 });
 
+test('public pages ship an indexable robots meta in the raw HTML', () => {
+    // nginx map 은 빈 값에 정규식을 평가하지 않는다. "~^$" 로 색인 대상(빈 X-Robots-Tag)을 잡으면
+    // 항상 default(noindex)로 떨어져 공개 페이지 원본 HTML 전체가 noindex 가 된다(2026-09-28 운영 사고).
+    const config = read('nginx/default.conf');
+    const robotsMeta = config.match(/map \$reserve_robots_tag \$reserve_robots_meta \{[\s\S]*?\}/)?.[0];
+    assert.ok(robotsMeta);
+    assert.match(robotsMeta, /default\s+"index, follow";/);
+    assert.match(robotsMeta, /"noindex, nofollow"\s+"noindex, nofollow";/);
+    for (const block of config.match(/^map [\s\S]*?^\}/gm) ?? []) {
+        assert.doesNotMatch(block, /^\s*"~\^\$"/m, 'map 에서 빈 값을 정규식 "~^$" 로 비교하지 않는다');
+    }
+});
+
 test('the actual fallback backend must be schema and refund compatible', () => {
     for (const name of ['Build Docker image', 'Build rollback compatibility image']) {
         assert.match(backend.steps.find(entry => entry.name === name).run, /--label reserve\.schema-compat=v270-refund-v1/);

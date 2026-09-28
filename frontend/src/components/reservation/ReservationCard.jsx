@@ -150,7 +150,7 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
             />
 
             {/* ⚠️ open={reasonModal != null} 로 두고 문구만 갈아끼운다. Modal에 key를 주면 닫을 때
-                언마운트돼 닫힘 애니메이션이 죽는다(antd 6 함정, CLAUDE.md 참고). reasonModal이
+                언마운트돼 닫힘 애니메이션이 죽는다(antd 6). reasonModal이
                 null이 되는 순간 REASON_MODALS 조회도 없어지므로 문구는 fallback으로 방어한다. */}
             <Modal
                 title={

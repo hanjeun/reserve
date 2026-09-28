@@ -63,7 +63,7 @@ const toggleStyles = {
  * compact로 표시하며 모바일 밀도는 작업 폼 전용 CSS 관문에서 정한다.
  *
  * 폭 판정을 호출부에서 prop 으로 받지 않고 여기서 하는 이유: 이 파일의 SettingsSection 은
- * isMobile 을 안 받는다. 관문 한 곳에서 정해야 7곳이 어긋나지 않는다(CLAUDE.md 설계 원칙).
+ * isMobile 을 안 받는다. 관문 한 곳에서 정해야 7곳이 어긋나지 않는다(docs/technical/design-system.md).
  */
 const FieldRow = ({ children, style, compact = false, className = '' }) => {
     const isMobile = useWindowWidth() < 768;
@@ -89,6 +89,7 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
     // 예약 방식에 따라 아래 칸들의 의미가 바뀐다 — 안내 문구와 회차 칸 노출을 여기서 갈라준다.
     // useWatch 를 쓰는 이유: 값이 바뀌는 즉시 다시 그려야 하는데, form.getFieldValue 는 리렌더를 안 일으킨다.
     const bookingType = Form.useWatch('bookingType', form) ?? 'SLOT';
+    const isSlot = bookingType === 'SLOT';
     return (
         <>
             <Form.Item label="가게 이름" name="name" rules={VALIDATION_RULES.storeName} style={mb}>
@@ -139,15 +140,16 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                 <FormInput placeholder="예: 필라테스, 네일샵, 한식 등" maxLength={30} />
             </Form.Item>
 
-            <FieldRow compact style={isMobile ? {} : { marginBottom: 12 }}>
+            {/* 예약 단위·브레이크 타임은 시간대(SLOT) 방식에서만 예약을 바꾼다(ReservationService.bookableSlotTimes).
+                회차·날짜 방식에서는 칸을 숨기되 hidden 으로 등록은 유지해 값을 그대로 저장한다 —
+                SLOT 으로 되돌렸을 때 예전 설정이 살아 있어야 하고, 숨긴 칸의 required 가 제출을 막지 않게 규칙도 끈다. */}
+            <FieldRow compact={isSlot} style={isMobile ? {} : { marginBottom: 12 }}>
                 <Form.Item
                     label="예약 단위" name="reservationSlotMinutes"
-                    rules={[{ required: true, message: '예약 단위를 선택해주세요.' }]}
-                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                        {bookingType === 'SLOT' ? '시간 선택 간격' : '시간대 방식에서 사용'}
-                    </Text>}
+                    hidden={!isSlot}
+                    rules={isSlot ? [{ required: true, message: '예약 단위를 선택해주세요.' }] : []}
+                    extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>시간 선택 간격</Text>}
                 >
-                    {/* 값은 그대로 저장한다 — SLOT 으로 되돌렸을 때 예전 설정이 살아 있어야 한다. */}
                     <FormSelect options={RESERVATION_SLOT_OPTIONS} placeholder="선택" />
                 </Form.Item>
 
@@ -158,7 +160,12 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
             </FieldRow>
 
             <FieldRow className="reserve-store-form-row--time" style={isMobile ? {} : { marginBottom: 12 }}>
-                <Form.Item label="영업 시간" name="times" rules={VALIDATION_RULES.businessHours}>
+                <Form.Item
+                    label="영업 시간" name="times" rules={VALIDATION_RULES.businessHours}
+                    extra={BUSINESS_HOURS_HINTS[bookingType]
+                        ? <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>{BUSINESS_HOURS_HINTS[bookingType]}</Text>
+                        : undefined}
+                >
                     <FormTimePicker.RangePicker
                         placeholder={['시작 시간', '종료 시간']}
                     />
@@ -166,7 +173,8 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
                 <Form.Item
                     label="브레이크 타임"
                     name="breakTimes"
-                    rules={VALIDATION_RULES.breakTimes}
+                    hidden={!isSlot}
+                    rules={isSlot ? VALIDATION_RULES.breakTimes : []}
                     // 영업시간이 바뀌면 브레이크 검증도 다시 돌아야 한다 — 안 그러면
                     // 영업시간을 줄였을 때 범위 밖이 된 브레이크가 그대로 통과한다.
                     dependencies={['times']}
@@ -199,14 +207,30 @@ const BasicSection = ({ isMobile = true, form, zipCode = '', addressDetail = '' 
     );
 };
 
+// 예약 방식별로 영업시간이 하는 일이 다르다 — SLOT 은 예약 칸을 만들고, 나머지는 안내용이다.
+const BUSINESS_HOURS_HINTS = {
+    SESSION: '가게 정보에 보여주는 시간이에요. 예약은 회차 시각으로만 받아요',
+    DAY: '가게 정보에 보여주는 시간이에요. 날짜 예약은 여는 시각으로 기록돼요',
+};
+
+// 정원은 예약 건수가 아니라 **인원 합계**다(ReservationRepository.sumActiveGuestsBySlot, PENDING·CONFIRMED 만).
+// 취소·거절된 예약은 합계에서 빠지므로 자리가 바로 다시 열린다.
+const CAPACITY_HINTS = {
+    SLOT: '한 시간대 인원 합계, 비워두면 무제한',
+    SESSION: '한 회차 인원 합계, 비워두면 무제한',
+    DAY: '하루 인원 합계, 비워두면 무제한',
+};
+
 // 운영 설정 (오른쪽 컬럼)
-const SettingsSection = () => (
+const SettingsSection = ({ bookingType = 'SLOT' }) => (
     <>
         <FieldRow compact>
             <Form.Item
                 label="최대 예약 인원" name="maxCapacityPerSlot"
                 rules={VALIDATION_RULES.maxCapacityPerSlot}
-                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>동시간대 기준, 비워두면 무제한</Text>}
+                extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                    {CAPACITY_HINTS[bookingType] ?? CAPACITY_HINTS.SLOT}
+                </Text>}
             >
                 <FormInput type="number" placeholder="예) 4" suffix="명" min={1} max={999} precision={0} />
             </Form.Item>
@@ -242,7 +266,7 @@ const SettingsSection = () => (
         <Flex vertical gap={0} style={{ marginBottom: 16 }}>
             <ToggleItem name="autoApprovalEnabled"       label="예약 자동 승인" desc="ON 시 예약 요청이 즉시 확정됩니다" />
             <ToggleItem name="allowLatePayment"          label="나중 결제 허용"  desc="예약금이 있어도 나중에 결제 가능" />
-            <ToggleItem name="allowDuplicateReservation" label="중복 예약 허용"  desc="OFF 시 같은 날짜에 1인 1예약만 가능" />
+            <ToggleItem name="allowDuplicateReservation" label="중복 예약 허용"  desc="OFF 시 한 손님은 같은 날 1건만 (한 건에 여러 명은 가능)" />
             <ToggleItem name="emailNotificationEnabled"  label="예약 알림 메일"  desc="새 예약 접수 시 이메일로 알림 받기" />
         </Flex>
 
@@ -281,6 +305,7 @@ const SettingsSection = () => (
             <FormDatePicker.RangePicker
                 placeholder={['시작일', '종료일']}
                 allowEmpty={[true, true]}
+                highlightHolidays
             />
         </Form.Item>
 
@@ -295,6 +320,7 @@ const SettingsSection = () => (
                     multiple
                     placeholder="날짜 선택"
                     disabledDate={(d) => d && d.isBefore(dayjs().startOf('day'))}
+                    highlightHolidays
                 />
             </Form.Item>
             <Form.Item
@@ -344,13 +370,14 @@ const StoreBasicInfo = ({ isMobile = true, form, zipCode = '', addressDetail = '
     const watchedAddressDetail = Form.useWatch('addressDetail', form);
     const currentZipCode = watchedZipCode === undefined ? zipCode : watchedZipCode;
     const currentAddressDetail = watchedAddressDetail === undefined ? addressDetail : watchedAddressDetail;
+    const bookingType = Form.useWatch('bookingType', form) ?? 'SLOT';
 
     if (!isMobile) {
         return (
             <div style={pcStyles.grid}>
                 <div style={pcStyles.col}><BasicSection isMobile={false} form={form} zipCode={currentZipCode} addressDetail={currentAddressDetail} /></div>
                 <div style={pcStyles.dividerVertical} />
-                <div style={pcStyles.col}><SettingsSection /></div>
+                <div style={pcStyles.col}><SettingsSection bookingType={bookingType} /></div>
             </div>
         );
     }
@@ -358,7 +385,7 @@ const StoreBasicInfo = ({ isMobile = true, form, zipCode = '', addressDetail = '
         <>
             <BasicSection form={form} zipCode={currentZipCode} addressDetail={currentAddressDetail} />
             <Divider top={8} bottom={16} />
-            <SettingsSection />
+            <SettingsSection bookingType={bookingType} />
         </>
     );
 };

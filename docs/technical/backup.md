@@ -1,7 +1,6 @@
 # 백업 · 복구 런북
 
-RESERVE의 MySQL 백업 구성과 복원 절차. **결제·예약 데이터가 있는 서비스라 이 문서가 보안 문서보다 우선순위가 높다** —
-공격자가 없어도 디스크 장애·조작 실수만으로 터지는 영역이기 때문이다.
+RESERVE MySQL의 백업 구성과 복원 절차예요.
 
 | 항목 | 값 |
 |---|---|
@@ -10,43 +9,10 @@ RESERVE의 MySQL 백업 구성과 복원 절차. **결제·예약 데이터가 �
 | 주기 | 매일 03:10 KST (root cron, 18:10 UTC) |
 | 보관 | 로컬 7일 + S3 `reserve-it-kr-backup/mysql/` 90일(Standard, 옛 버전은 7일 뒤 삭제) |
 | 스크립트 | `scripts/backup-mysql.sh`, `scripts/restore-mysql.sh` |
-| 목표 로그 | `/var/log/reserve/backup.log` → Promtail → Loki → Grafana |
+| 설치 위치 | `/usr/local/bin/reserve-backup`·`reserve-restore`, 설정 `/etc/reserve-backup.env`(600 root), 덤프 `/var/backups/reserve` |
+| 로그 | `/var/log/reserve/backup.log` → Promtail → Loki → Grafana |
 
-> **운영 상태 — 2026-09-25 적용 완료:** 서버에 `/usr/local/bin/reserve-backup`·`reserve-restore`(v2.6.0 태그 버전,
-> SHA-256 대조), `/etc/reserve-backup.env`(600 root), root cron, `/var/backups/reserve`를 설치했다.
-> 첫 백업 `reserve-20260925-095532.sql.gz`(26 tables, 9.8 KiB)가 S3에 올라갔고, 별도 DB 복원 훈련을 통과했다(맨 아래 이력).
-> 2026-09-26 v2.6.1 배포 뒤 `reserve-backup`만 v2.6.1 태그 버전(SHA-256 `f2434537…8845`, AWS 값 export 수정 포함)으로
-> 교체하고 수동 실행으로 업로드를 확인했다(28 tables, 11 KiB). `reserve-restore`는 바뀐 게 없어 v2.6.0 버전 그대로다.
-> 로그 → Grafana 연결과 실패 알림은 아직 목표 상태다(5장).
-
-> **2026-09-27 정정:** 9/25 Claude 공개 세션과 현재 `origin/dev` 런북에는 서버 설치·cron·S3 업로드와
-> 격리 DB 복원 26/26 테이블 및 전 테이블 행 수 일치 증거가 있다. 9/26에는 28테이블·약 11KiB 수동 백업 업로드를 확인했다.
-> 이번 대화에서 운영 DB/S3를 다시 쓰거나 복원한 것은 아니다. 첫 복원과 이후 백업 성공을 서로 구분한다.
-
-> 자동 Lightsail 스냅샷은 사용자의 9/25 결정으로 끈 상태를 유지한다. 기존 백업 S3/IAM/cron을 새로 만들지 않는다.
-> root DB 비밀번호는 회전됐다. 복원 시 오래된 컨테이너 `MYSQL_ROOT_PASSWORD` 값을 믿지 말고
-> `/etc/reserve-backup.env`의 보호된 `DB_PASSWORD`를 정본으로 사용한다(값을 출력하지 않는다).
-> 아래 설치 명령은 재설치 참고 자료이며 실행 지시가 아니다. 로컬 강화 스크립트는 운영 설치본과 별개다.
-
----
-
-## 0. 먼저 확인할 것 — Lightsail 자동 스냅샷
-
-애플리케이션 레벨 백업(mysqldump)과 인스턴스 스냅샷은 **서로 대체재가 아니다.**
-
-| | 스냅샷 | mysqldump |
-|---|---|---|
-| 복구 단위 | 인스턴스 통째 | DB·테이블 단위 |
-| "어제 지운 예약 하나만 살리기" | ❌ | ✅ |
-| 서버 자체가 날아갔을 때 | ✅ | 별도 보관 위치 필요(S3) |
-| 비용 | 디스크 크기 비례 | 덤프 크기(수십 MB) |
-
-**2026-09-25 결정: 자동 스냅샷은 켜지 않는다.** 확인 당시 `reserve-server`(`small_3_0`)의 AutoSnapshot은 꺼져 있었다.
-코드·설정은 GitHub과 개발 PC에, 비밀값은 GitHub Secrets에 있어 서버 자체는 다시 만들 수 있고,
-**다시 만들 수 없는 건 DB뿐**이라 mysqldump + S3로 충분하다고 판단했다(스냅샷 비용을 쓰지 않는다).
-서버를 새로 만드는 절차는 4장이다.
-
----
+DB 비밀번호는 `/etc/reserve-backup.env`의 `DB_PASSWORD`를 기준으로 써요.
 
 ## 1. 설치 (서버에서 1회)
 
@@ -61,7 +27,7 @@ sudo chmod +x /usr/local/bin/reserve-backup /usr/local/bin/reserve-restore
 sudo install -d -m 700 -o root -g root /var/backups/reserve
 ```
 
-서버에 레포가 없으면 **배포된 태그 버전**을 받아, 같은 태그의 파일 해시와 대조한 뒤 설치한다.
+서버에 레포가 없으면 배포된 태그의 파일을 받아 해시를 대조한 뒤 설치해요. `TAG`는 운영에 배포된 태그로 바꿔요.
 
 ```bash
 TAG=v2.6.0
@@ -73,10 +39,7 @@ sudo install -m 0755 /tmp/reserve-backup /tmp/reserve-restore /usr/local/bin/
 
 ### 1-2. 설정 파일
 
-키는 **화면·명령 기록에 남지 않게** 입력받는다. DB 비밀번호는 **실행 중인 앱 컨테이너**(blue/green)에서 읽는다 —
-앱은 배포 때 GitHub Secret `DB_PASSWORD`를 받으므로 그게 현재 값이다. MySQL 컨테이너의 `MYSQL_ROOT_PASSWORD`는
-컨테이너를 처음 만들 때의 값이라, 비밀번호를 한 번이라도 바꾼 뒤에는 틀린 값이다(7장).
-서버에는 aws CLI가 없어 업로드는 스크립트의 docker 폴백(`amazon/aws-cli`)이 한다.
+키는 화면에 보이지 않게 입력받고, DB 비밀번호는 실행 중인 앱 컨테이너(blue/green)에서 읽어요. 업로드는 스크립트의 docker 폴백(`amazon/aws-cli`)이 해요.
 
 ```bash
 read -rp 'AWS_ACCESS_KEY_ID: ' AK; read -rsp 'AWS_SECRET_ACCESS_KEY: ' SK; echo
@@ -88,51 +51,28 @@ unset AK SK DBPW
 sudo stat -c '%a %U %n' /etc/reserve-backup.env   # 600 root
 ```
 
-> 2026-09-25 설치 때는 스크립트가 AWS 값을 내보내지 않아 설정 파일의 AWS 줄 앞에 `export`를 붙여 우회했다.
-> 지금 스크립트는 스스로 내보내므로 `export`는 없어도 되고, 있어도 동작한다(운영 파일은 그대로 둔다).
+AWS 키는 백업 전용 사용자 `reserve-backup-uploader`의 키를 써요.
 
-> ⚠️ **이미지용 `reserve-s3-user` 키를 백업에 쓰지 말 것.** 백업 버킷은 별도 사용자(`reserve-backup-uploader`)만 쓴다.
+### 1-3. 백업 전용 S3·IAM
 
-### 1-3. 백업 전용 S3·IAM 설계
+버킷은 이미지 버킷과 분리한 `reserve-it-kr-backup`(서울 리전)이에요.
 
-버킷은 이미지 버킷과 분리한 `reserve-it-kr-backup`(서울 리전)을 사용한다. 실제 생성·정책 변경은
-운영 변경 승인 뒤에만 한다.
+| 설정 | 값 |
+|---|---|
+| Object Ownership | **Bucket owner enforced** (ACL 사용 안 함) |
+| Block Public Access | 네 항목 전부 활성화 |
+| Versioning | 활성화 |
+| 기본 암호화 | SSE-S3(AES256). 스크립트도 업로드 때 `--sse AES256`을 붙여요 |
+| 버킷 정책 | `aws:SecureTransport=false` 요청 거부(TLS 강제), 공개 Allow 없음 |
+| 객체명 | `mysql/reserve-YYYYMMDD-HHMMSS.sql.gz` — `If-None-Match: *`로 덮어쓰기 거부 |
 
-- Object Ownership: **Bucket owner enforced**(ACL 사용 안 함)
-- Block Public Access: 네 항목 전부 활성화
-- Versioning: 활성화
-- 기본 암호화: SSE-S3. 스크립트도 `AES256`을 명시
-- 버킷 정책: `aws:SecureTransport=false` 요청 거부(TLS 강제), 공개 Allow 없음
-- 객체명: `mysql/reserve-YYYYMMDD-HHMMSS.sql.gz` — append-only 이름이며 `If-None-Match: *`로 충돌 덮어쓰기 거부
-- Lifecycle: 현재 버전은 Standard에 유지하고 **90일 뒤 만료 표시**
-- Versioning 복구 여유: 비현재 버전은 비현재가 된 뒤 7일 보존 후 삭제
-- 미완료 multipart upload: 7일 뒤 중단(다른 도구가 만든 고아 part 비용 방어)
+라이프사이클은 Standard 90일 보관 후 만료, 옛 버전 7일 뒤 삭제, 끊긴 멀티파트 업로드 1일 뒤 정리예요.
 
-작은 현재 덤프에는 Glacier 전환을 추가하지 않는다. 이전 30일 전환·120일 만료 설계는 운영 정책이 아니다.
-S3 저장·요청에는 기존 소액 사용량 요금이 있을 수 있다. 새 자원·권한·lifecycle 변경은 별도 승인 대상이다.
-
-```json
-{
-  "Rules": [
-    {
-      "ID": "archive-reserve-mysql-backups",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "mysql/" },
-      "Expiration": { "Days": 90 },
-      "NoncurrentVersionExpiration": { "NoncurrentDays": 7 },
-      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
-    },
-    {
-      "ID": "cleanup-expired-delete-markers",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "mysql/" },
-      "Expiration": { "ExpiredObjectDeleteMarker": true }
-    }
-  ]
-}
+```bash
+aws s3api put-bucket-lifecycle-configuration --bucket reserve-it-kr-backup --lifecycle-configuration '{"Rules":[{"ID":"mysql-90d","Filter":{"Prefix":"mysql/"},"Status":"Enabled","Expiration":{"Days":90},"NoncurrentVersionExpiration":{"NoncurrentDays":7},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":1}}]}'
 ```
 
-버킷 정책은 전송 중 TLS만 강제한다. writer 권한은 아래 IAM 정책에서 별도로 제한한다.
+버킷 정책:
 
 ```json
 {
@@ -151,10 +91,7 @@ S3 저장·요청에는 기존 소액 사용량 요금이 있을 수 있다. 새
 }
 ```
 
-사용자 `reserve-backup-uploader`, 인라인 정책 `reserve-backup-put-only`(2026-09-25 생성).
-액세스 키에는 설명 태그로 "어디에 넣었나 · 용도"를 남긴다(`lightsail mysql backup upload only - /etc/reserve-backup.env`).
-백업 사용자에게는 **쓰기만** 준다. 읽기·삭제를 주지 않으면, 그 키가 유출돼도 공격자가
-백업을 지우거나 내려받을 수 없다(랜섬웨어가 백업부터 지우는 걸 막는 게 핵심이다).
+`reserve-backup-uploader`에는 인라인 정책 `reserve-backup-put-only`로 쓰기만 줘요.
 
 ```json
 {
@@ -170,40 +107,18 @@ S3 저장·요청에는 기존 소액 사용량 요금이 있을 수 있다. 새
 }
 ```
 
-스크립트는 5GB 이하 파일을 `s3api put-object` 한 번으로 올리므로 writer에 multipart·목록·읽기·삭제 권한이
-필요 없다. 5GB를 넘으면 스크립트가 실패하고, 그때 별도 multipart 설계와 `AbortMultipartUpload` 권한을
-검토한다. 복원에 필요한 `s3:GetObject`/`ListBucket`은 **그때 관리자 또는 단기 복원 자격증명으로** 쓰고
-서버에 상시로 두지 않는다.
-
-버킷 설정(`reserve-it-kr-backup`, 서울, 2026-09-25 CloudShell로 생성):
-- **퍼블릭 액세스 차단** 전부 켜기
-- **기본 암호화** SSE-S3(AES256) — 스크립트도 업로드 때 `--sse AES256`을 붙인다
-- **버전 관리(Versioning) 켜기** — 실수로 덮어써도 이전 객체가 남는다
-- 라이프사이클: **Standard로 90일 보관 후 만료**, 버전 관리로 남는 옛 버전은 7일 뒤 삭제, 끊긴 멀티파트 업로드는 1일 뒤 정리.
-  Glacier 계열은 쓰지 않는다 — 최소 보관 기간(90일) 요금이 붙고, 덤프가 작아 절약액이 한 달 몇십 원 수준인데 복원만 느려진다.
-  같은 접두(`mysql/`)에 만료 규칙을 두 개 두면 겹친다며 거부될 수 있어 하나로 합쳤다.
-
-```bash
-aws s3api put-bucket-lifecycle-configuration --bucket reserve-it-kr-backup --lifecycle-configuration '{"Rules":[{"ID":"mysql-90d","Filter":{"Prefix":"mysql/"},"Status":"Enabled","Expiration":{"Days":90},"NoncurrentVersionExpiration":{"NoncurrentDays":7},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":1}}]}'
-```
-
-**앱 사용자 권한도 좁혔다(2026-09-25).** 이미지용 `reserve-s3-user`는 `AmazonS3FullAccess`라 백업 버킷까지 읽고 지울 수 있었다.
-앱 코드(`FileStorageService`)가 S3에 하는 일은 올리기(PutObject)·서명 URL 보기(GetObject)·지우기(DeleteObject)뿐이라,
-인라인 정책 `reserve-app-images-rw`로 `reserve-it-kr-bucket/*`의 이 세 동작만 허용하고 `AmazonS3FullAccess`를 뗐다.
-IAM 시뮬레이터에서 이미지 버킷은 `allowed`, 백업 버킷은 `implicitDeny`였고, 운영에서 프로필 사진 업로드도 정상이었다.
-(시뮬레이터는 자원을 하나씩 넣어야 한다 — 여러 개를 한 번에 넣으면 맨 위에 일반 경우의 요약만 나와 거부처럼 보인다.)
+- 스크립트는 5GB 이하 파일을 `s3api put-object` 한 번으로 올려요
+- 복원에 필요한 `s3:GetObject`/`ListBucket`은 관리자 또는 단기 복원 자격증명으로 써요
+- 이미지용 `reserve-s3-user`는 인라인 정책 `reserve-app-images-rw`로 `reserve-it-kr-bucket/*`의 PutObject·GetObject·DeleteObject만 가져요
 
 ### 1-4. cron 등록
 
-편집기 대신 아래 한 줄로 등록한다. 여러 번 실행해도 줄이 중복되지 않는다.
+여러 번 실행해도 줄이 중복되지 않아요.
 
 ```bash
 ( sudo crontab -l 2>/dev/null | grep -v '/usr/local/bin/reserve-backup'; echo '10 18 * * * /usr/local/bin/reserve-backup >/dev/null 2>&1' ) | sudo crontab -
 sudo crontab -l | grep reserve-backup; date   # 서버는 UTC — 18:10 UTC = 03:10 KST
 ```
-
-> 2026-09-02 확인 당시 서버와 JVM은 UTC였다. `TrashCleanupScheduler`의 `03:00`도 JVM 기준
-> 03:00 UTC(12:00 KST)이므로 백업과 겹치지 않는다. 타임존 정책을 바꾸면 cron도 함께 재검토한다.
 
 ### 1-5. 첫 실행 확인
 
@@ -213,10 +128,7 @@ tail -20 /var/log/reserve/backup.log
 ls -lh /var/backups/reserve/
 ```
 
-로그에 `verified: ... , NN tables` 와 `upload ok` 가 찍혀야 정상이다. 처음 한 번은 `amazon/aws-cli` 이미지를 받느라 10~20초 더 걸린다.
-S3 쪽은 CloudShell에서 `aws s3 ls s3://reserve-it-kr-backup/mysql/ --human-readable`로 확인한다(서버 키는 목록 권한이 없다).
-
----
+로그에 `verified: ... , NN tables`와 `upload ok`가 찍히면 정상이에요. S3 쪽은 CloudShell에서 `aws s3 ls s3://reserve-it-kr-backup/mysql/ --human-readable`로 확인해요.
 
 ## 2. 복원
 
@@ -254,8 +166,7 @@ curl -s localhost:8080/actuator/health
 
 ### 2-4. S3에서 복원
 
-서버에는 aws CLI도 읽기 권한도 없다(백업 키는 올리기 전용). **CloudShell(관리자 권한)에서 10분짜리 임시 다운로드 주소를 만들고**,
-서버는 그 주소로 파일만 받는다. 서버에 관리자 키를 두지 않기 위해서다.
+CloudShell(관리자 권한)에서 10분짜리 임시 다운로드 주소를 만들고, 서버는 그 주소로 파일을 받아요.
 
 ```bash
 # CloudShell
@@ -267,14 +178,9 @@ curl -fsSL -o /var/backups/reserve/reserve-20260731-031000.sql.gz '<presigned UR
 sudo reserve-restore --dry-run /var/backups/reserve/reserve-20260731-031000.sql.gz
 ```
 
----
-
 ## 3. 복원 훈련 (분기 1회)
 
-**한 번도 복원해보지 않은 백업은 대개 필요할 때 안 된다.** 운영 DB를 건드리지 않고 확인한다.
-
-DB 비밀번호의 기준은 root 전용 설정 파일 `/etc/reserve-backup.env`다. 운영자 셸로 한 번 읽어 와서 쓰고, 끝나면 지운다.
-MySQL 컨테이너의 `MYSQL_ROOT_PASSWORD`는 2026-09-25 교체 전의 옛 값이라 쓰면 안 된다(7장).
+운영 DB를 건드리지 않고 별도 DB로 복원해 확인해요.
 
 ```bash
 # DB 접속 준비 — 비밀번호의 기준은 /etc/reserve-backup.env (7장)
@@ -293,23 +199,9 @@ sudo docker exec -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -uroot -e "DROP DATABAS
 unset DB_PASSWORD
 ```
 
-훈련 결과는 이 문서 맨 아래 이력에 한 줄 남긴다.
-
----
-
 ## 4. 서버 재구축 시 MySQL 되살리기
 
-레포의 `docker-compose-mysql.yml`이 그 수단이다.
-
-> ⚠️ **기존 서버에 그대로 `up -d` 하지 말 것.** 볼륨 이름이 실제와 다르면
-> 데이터가 없는 새 볼륨으로 떠서 "DB가 텅 빈" 상태가 된다.
-> 파일 상단 주석의 `docker inspect` 대조 절차를 먼저 수행한다.
-
-> **지금 운영 MySQL 컨테이너(2026-09-25 확인)** 는 compose가 아니라 `docker run`으로 만든 것이다.
-> 상태 검사(healthcheck)가 없고, 데이터는 볼륨 `mysql-data`(`/var/lib/mysql`)에 있다.
-> 컨테이너 설정의 `MYSQL_ROOT_PASSWORD`는 처음 만들 때 값이라 지금 비밀번호와 다르다 — 비밀번호를 읽는 데 쓰지 말 것.
-> 컨테이너를 다시 만들 일이 생기면 그때 현재 비밀번호를 `DB_PASSWORD`로 넘긴다
-> (데이터가 이미 있으면 MySQL은 `MYSQL_ROOT_PASSWORD`를 무시하므로 설정 값만 맞춰진다).
+레포의 `docker-compose-mysql.yml`을 써요. 기존 서버라면 파일 상단 주석의 `docker inspect` 대조 절차를 먼저 해요. 데이터는 볼륨 `mysql-data`(`/var/lib/mysql`)에 있어요.
 
 신규 서버라면:
 
@@ -322,61 +214,35 @@ sudo -E docker compose -f docker-compose-mysql.yml up -d
 sudo reserve-restore /var/backups/reserve/<최신파일>
 ```
 
----
-
 ## 5. 모니터링
 
-백업 로그가 `/var/log/reserve/backup.log`에 쌓이고 Promtail이 그 디렉토리를 수집하므로
-9/25 Claude 세션에서 Loki `{job="reserve"}`의 백업 성공 로그 1건을 확인했다. 이번에 서버 수집을 재검증한 것은 아니다.
+백업 로그는 Loki `{job="reserve"}`에서 봐요.
 
 ```logql
 {job="reserve"} |= "[backup]"
 {job="reserve"} |= "ERROR [backup]"
 ```
 
-알림 규칙(아직 운영 적용 증거 없음): **"최근 26시간 동안 백업 완료가 0건"** 이면 알림.
-기존 설치본과 로컬 강화본의 로그 구분자는 다르므로 `[backup]`과 `=== backup done`을 따로 필터한다.
-Grafana 규칙은 [모니터링](monitoring.md)의 7번과 함께 승인 후 적용·실제 수신을 확인한다.
-실패 알림보다 이쪽이 낫다 — 스크립트가 아예 실행되지 않은 경우(cron 죽음, 디스크 풀)까지 잡히기 때문이다.
+알림은 최근 26시간 동안 백업 완료가 0건이면 울려요. 규칙은 [모니터링](monitoring.md)의 알림 규칙 7번이에요.
 
----
+## 6. 복구 범위
 
-## 6. 알려진 한계
-
-- **RPO 24시간.** 마지막 백업 이후의 데이터는 복구되지 않는다. 결제 건이 걸리면
-  PortOne 관리자 콘솔의 거래 내역이 사실상의 2차 원장이 되므로 대조에 쓸 수 있다.
-- **바이너리 로그 기반 시점 복구(PITR)는 구성돼 있지 않다.** 서버 1대·1인 운영 규모에서
-  binlog 관리 비용이 이득보다 크다고 판단했다. 필요해지면 `--log-bin` + binlog S3 동기화로 확장한다.
-- `--single-transaction`은 **InnoDB 전제**다. MyISAM 테이블이 섞이면 그 테이블은 일관성이 보장되지 않는다.
-  확인: `SELECT table_name, engine FROM information_schema.tables WHERE table_schema='reserve' AND engine <> 'InnoDB';`
-
----
+- RPO는 24시간이에요. 마지막 백업 이후 데이터는 복구되지 않아요
+- `--single-transaction`은 InnoDB 테이블을 전제로 해요. 확인: `SELECT table_name, engine FROM information_schema.tables WHERE table_schema='reserve' AND engine <> 'InnoDB';`
 
 ## 7. DB root 비밀번호 무중단 교체
 
-2026-09-25에 4자리였던 root 비밀번호를 32자(영문·숫자)로 바꾸며 쓴 절차다. **서비스는 한순간도 멈추지 않았다.**
-MySQL 8의 이중 비밀번호(`RETAIN CURRENT PASSWORD`)로 옛 값과 새 값이 잠시 둘 다 통하게 해 두고,
-쓰는 곳을 하나씩 옮긴 뒤 옛 값을 폐기한다.
-
-### 비밀번호를 쓰는 곳
+MySQL 8의 이중 비밀번호(`RETAIN CURRENT PASSWORD`)로 옛 값과 새 값을 잠시 함께 허용하고, 쓰는 곳을 하나씩 옮긴 뒤 옛 값을 폐기해요.
 
 | 쓰는 곳 | 계정 | 값이 들어가는 경로 |
 |---|---|---|
 | 앱(blue/green) | root (`DB_USERNAME` 미설정 → 기본값 root) | GitHub Secret `DB_PASSWORD` → 배포 때 컨테이너 환경 변수 |
 | 백업·복원 스크립트 | root | `/etc/reserve-backup.env` |
 | 개발 PC IntelliJ `reserve-prod` 데이터 소스 | root | IntelliJ 저장값(SSH 터널) |
-| MySQL 컨테이너 설정 `MYSQL_ROOT_PASSWORD` | — | 처음 만들 때 값. 교체 뒤에는 틀린 값이라 쓰지 않는다 |
 
-### 원칙
-
-- 새 비밀번호는 **영문·숫자만** 쓴다. `$`·`!`·따옴표는 compose·YAML·셸에서 다르게 해석된다(`docs/rules/git-workflow.md`).
-- 값은 채팅·로그·명령 인자·문서에 남기지 않는다. 서버에서는 `read -rsp`로 받고, `docker exec`에는 환경 변수 **이름만** 넘긴다.
-- GitHub Secret은 다시 읽을 수 없으므로, 넣기 전에 **SHA-256 지문(앞 12자)** 으로 서버 값과 같은지 대조한다.
-  지문은 공유해도 비밀번호를 알아낼 수 없다.
-- 터미널에서 비밀번호를 복사할 때는 **더블클릭**으로 선택한다(영문·숫자 한 단어라 정확히 잡힌다).
-  복사한 뒤 지문 대조가 끝날 때까지 다른 것을 복사하지 않는다 — 2026-09-25에도 그 사이 클립보드가 바뀌어 한 번 멈췄다.
-
-### 순서
+- 새 비밀번호는 영문·숫자만 써요([Git 워크플로우](../rules/git-workflow.md))
+- 서버에서는 `read -rsp`로 받고, `docker exec`에는 환경 변수 이름만 넘겨요
+- GitHub Secret에 넣기 전에 SHA-256 지문(앞 12자)으로 서버 값과 대조해요
 
 ```bash
 # 1. 서버 — 새 비밀번호를 두 root 계정에 추가한다(옛 비밀번호는 유지). 이 SSH 창은 끝날 때까지 닫지 않는다.
@@ -418,26 +284,3 @@ sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -
 curl -s -o /dev/null -w '%{http_code}\n' 'https://reserve.it.kr/api/stores?size=1'
 unset NEWPW MYSQL_PWD
 ```
-
-### 주의
-
-- **1단계 뒤에 `RETAIN CURRENT PASSWORD`를 다시 쓰지 말 것.** 그러면 새 값이 보조로 밀리고 옛 값(앱이 쓰는 값)이 사라져
-  앱이 끊긴다. 새 값을 잃어버렸다면 `RETAIN` 없이 `IDENTIFIED BY`만 다시 실행한다 — 보조(옛) 비밀번호는 그대로 남는다.
-- 폐기(6단계)는 2~5단계를 모두 확인한 뒤에만 한다. 그 전까지는 무엇이 잘못돼도 옛 값으로 계속 돈다.
-- 앱 전용 DB 계정(`reserve.*` 권한만)을 따로 두면 root 비밀번호를 앱과 분리할 수 있다. `application-prod.yml`이
-  `DB_USERNAME`을 이미 받으므로 compose·CICD에 값만 추가하면 된다(미적용).
-
-### 교체 이력
-
-| 날짜 | 내용 | 메모 |
-|---|---|---|
-| 2026-09-25 | 4자리 → 32자 영문·숫자 | GitHub Secret 교체 후 CICD `36096322397` 재실행(green), 백업 설정·IntelliJ 교체, 옛 값 폐기. 무중단 |
-
----
-
-## 복원 훈련 이력
-
-| 날짜 | 대상 백업 | 결과 | 메모 |
-|---|---|---|---|
-| 2026-09-25 | `reserve-20260925-095532.sql.gz` (9.8 KiB) | 통과 — 26/26 테이블 복원, 26개 테이블 행 수 운영과 일치 | 별도 DB `reserve_restore_test`로 복원 후 삭제. 다음 훈련 2026-12 |
-| 2026-09-26 | v2.6.1 이후 28 tables·약 11KiB | S3 업로드 성공 | 이후 백업 증거이며 새 복원 훈련 증거가 아님 |

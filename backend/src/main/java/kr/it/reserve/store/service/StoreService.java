@@ -591,6 +591,8 @@ public class StoreService {
         // 새 파일을 S3에 올리기 전에 기존 URL 참조를 전부 검증한다. 검증을 뒤로 미루면
         // 잘못된 요청을 409로 거절하면서도 S3에는 새 객체가 남는 부분 성공이 생긴다.
         validateExistingStoreImageReferences(store, request);
+        // 순서 정보도 업로드 전에 푼다 — 잘못된 순서를 거절하면서 새 파일만 S3 에 남기지 않게.
+        List<DetailImageSlot> detailOrder = resolveDetailImageOrder(request);
 
         if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
             String oldMainImage = store.getMainImageUrl();
@@ -615,19 +617,34 @@ public class StoreService {
             urlToDim.put(oldUrls.get(i), oldDims.get(i));
         }
 
+        List<String> keptUrls = request.getExistingDetailImageUrls() != null
+                ? request.getExistingDetailImageUrls() : List.of();
+        List<UploadedDetailImage> uploaded = request.getDetailImages() != null
+                ? uploadDetailImagesParallel(request.getDetailImages(), memberId, storeId) : List.of();
+
         List<String> finalDetailImages = new ArrayList<>();
         List<ImageDimension> finalDetailDims = new ArrayList<>();
-        if (request.getExistingDetailImageUrls() != null) {
-            for (String url : request.getExistingDetailImageUrls()) {
+        if (detailOrder == null) {
+            // 순서 정보가 없는 예전 클라이언트: 기존 이미지 → 새 이미지
+            for (String url : keptUrls) {
                 finalDetailImages.add(url);
                 finalDetailDims.add(urlToDim.getOrDefault(url, new ImageDimension(null, null)));
             }
-        }
-
-        if (request.getDetailImages() != null) {
-            for (UploadedDetailImage r : uploadDetailImagesParallel(request.getDetailImages(), memberId, storeId)) {
+            for (UploadedDetailImage r : uploaded) {
                 finalDetailImages.add(r.url());
                 finalDetailDims.add(r.dim());
+            }
+        } else {
+            for (DetailImageSlot slot : detailOrder) {
+                if (slot.existing()) {
+                    String url = keptUrls.get(slot.index());
+                    finalDetailImages.add(url);
+                    finalDetailDims.add(urlToDim.getOrDefault(url, new ImageDimension(null, null)));
+                } else {
+                    UploadedDetailImage r = uploaded.get(slot.index());
+                    finalDetailImages.add(r.url());
+                    finalDetailDims.add(r.dim());
+                }
             }
         }
 
@@ -673,6 +690,42 @@ public class StoreService {
                 throw staleStoreImageReference();
             }
         }
+    }
+
+    /** 상세 이미지 한 칸 — 기존 이미지(existingDetailImageUrls)의 i번째인지, 새 파일(detailImages)의 j번째인지. */
+    private record DetailImageSlot(boolean existing, int index) {}
+
+    /**
+     * {@code detailImageOrder} 를 칸 목록으로 푼다. 비어 있으면 {@code null} — 기존 → 새 순서를 그대로 쓴다.
+     *
+     * <p>기존 개수 + 새 개수와 길이가 같고, 모든 항목이 범위 안이며 중복이 없어야 한다 = 정확히 한 번씩 쓰는 순열.
+     * 하나라도 어긋나면 사진이 빠지거나 두 번 들어가므로 저장하지 않고 거절한다.
+     */
+    private List<DetailImageSlot> resolveDetailImageOrder(StoreUpdateRequest request) {
+        List<String> order = request.getDetailImageOrder();
+        if (order == null || order.isEmpty()) return null;
+
+        int existingCount = request.getExistingDetailImageUrls() != null ? request.getExistingDetailImageUrls().size() : 0;
+        int newCount = request.getDetailImages() == null ? 0
+                : (int) request.getDetailImages().stream().filter(f -> f != null && !f.isEmpty()).count();
+        if (order.size() != existingCount + newCount) throw invalidDetailImageOrder();
+
+        Set<String> seen = new HashSet<>();
+        List<DetailImageSlot> slots = new ArrayList<>();
+        for (String token : order) {
+            if (token == null || !token.matches("[en]\\d{1,2}") || !seen.add(token)) throw invalidDetailImageOrder();
+            boolean existing = token.charAt(0) == 'e';
+            int index = Integer.parseInt(token.substring(1));
+            if (index >= (existing ? existingCount : newCount)) throw invalidDetailImageOrder();
+            slots.add(new DetailImageSlot(existing, index));
+        }
+        return slots;
+    }
+
+    private StoreException invalidDetailImageOrder() {
+        return new StoreException(
+                "상세 이미지 순서 정보가 올바르지 않습니다. 새로고침한 뒤 다시 시도해주세요.",
+                HttpStatus.BAD_REQUEST);
     }
 
     private StoreException staleStoreImageReference() {

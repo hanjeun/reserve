@@ -98,7 +98,14 @@ cookies.txt
 # ========================
 # 에이전트 로컬 지침
 # ========================
-# AGENTS.md 는 CLAUDE.md 전체 + Cowork 프로젝트 지침을 합친 **로컬 전용** 파일이다.
-# 레포에 올리면 같은 규칙이 두 파일에 중복돼 한쪽만 고쳐지므로 추적하지 않는다.
-# 레포의 정본은 CLAUDE.md 다. (2026-09-01 결정)
+# AI 에이전트용 로컬 지침은 저장소에 올리지 않는다.
 AGENTS.md
+CLAUDE.md
+
+# ========================
+# README 실화면 캡처용 임시 로그인 상태 (capture-readme-live.mjs --login)
+# ========================
+# 세션 쿠키(리프레시 토큰 포함)가 들어 있다. npm run capture:readme:clean 전까지 남아 있으니 절대 올라가지 않게 막는다.
+frontend/.readme-capture/
+docs/images/readme-v2.6/.*.tmp
+docs/images/readme-v2.6/*.new.png

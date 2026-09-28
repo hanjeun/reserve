@@ -4,6 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import FormDatePicker from '../FormDatePicker';
+import holidayService from '../../../services/holidayService';
+
+vi.mock('../../../services/holidayService', () => ({
+    default: { getMonth: vi.fn(() => Promise.resolve(['2026-12-25'])) },
+}));
 
 vi.mock('antd', async () => {
     const ReactModule = await import('react');
@@ -20,6 +25,21 @@ vi.mock('antd', async () => {
 });
 
 describe('FormDatePicker', () => {
+    it('paints public holidays red only when the caller opts in', async () => {
+        const user = userEvent.setup();
+        const { unmount } = render(<FormDatePicker value={dayjs('2026-12-01')} />);
+        await user.click(screen.getByRole('button', { name: '2026-12-01' }));
+        expect(screen.getByRole('button', { name: '12월 25일' })).not.toHaveClass('is-holiday');
+        expect(holidayService.getMonth).not.toHaveBeenCalled();
+        unmount();
+
+        render(<FormDatePicker value={dayjs('2026-12-01')} highlightHolidays />);
+        await user.click(screen.getByRole('button', { name: '2026-12-01' }));
+        expect(await screen.findByRole('button', { name: '12월 25일 공휴일' })).toHaveClass('is-holiday');
+        expect(holidayService.getMonth).toHaveBeenCalledWith('2026-12');
+        expect(screen.getByRole('button', { name: '12월 24일' })).not.toHaveClass('is-holiday');
+    });
+
     it('selects a date range in the shared one-month calendar', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();

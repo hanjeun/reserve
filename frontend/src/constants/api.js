@@ -34,6 +34,9 @@ export const API_ENDPOINTS = {
     ADDRESS: {
         SEARCH: '/api/address/search',
     },
+    HOLIDAY: {
+        MONTH: '/api/holidays',
+    },
     TOURISM: {
         REGION_PHOTOS: '/api/tourism/region-photos',
         REGION_PHOTO_CATALOG: '/api/tourism/region-photos/catalog',

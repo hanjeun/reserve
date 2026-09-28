@@ -28,9 +28,6 @@ import org.springframework.web.util.HtmlUtils;
  *       기준 문구 뒤에는 수신자·제목·예외 메시지 대신 오류 타입처럼 개인정보가 아닌 진단값만 남긴다.
  *       기준 문구를 바꿔야 한다면 {@code docs/technical/monitoring.md} 의 알림 규칙을 같이 고칠 것.</li>
  * </ol>
- *
- * <p>이 계약이 왜 생겼는지(2026-07-29 메일 3주 무단 중단)와 방어 3겹의 전체 그림은
- * {@code docs/technical/monitoring.md} 에 있다.
  */
 @Slf4j
 @Service

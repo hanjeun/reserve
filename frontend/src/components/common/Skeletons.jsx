@@ -39,7 +39,7 @@ import StoreCardSkeleton from './StoreCardSkeleton';
    ★ 2026-08-04 — shimmer CSS 는 이 파일에 없다. `index.css` 의 "스켈레톤 shimmer" 블록에 있다.
      예전에는 이 파일이 런타임에 <style> 을 document.head 에 주입했다. 그 방식의 문제:
        1) 전역 규칙이 컴포넌트 파일에 숨어 있어, 이 파일을 import 하지 않는 화면에는 규칙이 없다
-          (이 프로젝트가 같은 함정에 두 번 빠졌다 — CLAUDE.md "설계 원칙" 참고)
+          (이 프로젝트가 같은 함정에 두 번 빠졌다 — docs/technical/design-system.md 참고)
        2) head 맨 뒤에 붙어서 index.css 규칙을 덮어버린다 — 두 곳에 두면 반드시 충돌한다
      → 규칙은 index.css 한 곳에만 둔다. 여기서는 클래스명만 붙인다.
 ───────────────────────────────────────────── */

@@ -7,7 +7,7 @@
    7칸 그리드로 고정한다 — 폭이 좁아지면 칸이 같이 좁아질 뿐 줄이 나뉘지 않는다.
 
    ★ 클래스는 StoreBasicInfo.jsx 의 Checkbox.Group 에 붙어 있다.
-     전역 CSS 를 여기 두는 이유는 CLAUDE.md "설계 원칙" 2번 참고 —
+     전역 CSS 를 여기 두는 이유는 docs/technical/design-system.md 참고 —
      컴포넌트 안 <style> 에 두면 그 컴포넌트를 안 쓰는 화면에는 규칙이 존재하지 않는다. */
 .reserve-weekday-group.ant-checkbox-group {
     display: grid;
@@ -78,7 +78,7 @@
    짝이 되는 규칙은 StoreDetail 의 .rsv-time-pill 이다 - 한쪽만 고치지 말 것.
 
    왜 index.css 인가 - hover 는 인라인 스타일로 표현할 수 없고,
-   전역 CSS 는 index.css 에 둔다는 규칙이 있다(CLAUDE.md). StoreDetail 의 style 블록은
+   전역 CSS 는 index.css 에 둔다는 규칙이 있다(docs/technical/design-system.md). StoreDetail 의 style 블록은
    head 맨 뒤에 붙어 index.css 를 덮으므로, 거기 넣으면 나중에 찾기 어려운 함정이 된다.
 
    ⚠️ 선택 상태에 transform 을 쓰지 않는다. 칸에는 scaleSpringIn 이 both 로 걸려 있어서

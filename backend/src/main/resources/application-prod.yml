@@ -51,7 +51,7 @@ cors:
 # test(H2)·local 은 MATCH...AGAINST 문법이 없거나 인덱스가 없으므로 기본값 false를 유지한다.
 #
 # ★★ 2026-08-05 — 일부러 켜지 않은 상태로 둔다(주석).
-#   `docs/technical/manual-ddl.md` 의 적용 이력이 아직 "(미적용)" 이다.
+#   운영에 FULLTEXT 인덱스를 적용하기 전까지 켜지 않는다(docs/technical/manual-ddl.md).
 #   인덱스 없이 이 값을 true 로 두면 가게 검색이 매번
 #   "Can't find FULLTEXT index matching the column list" 로 실패한다 = 검색 전면 500.
 #   기본값(false)이면 기존 LIKE 경로로 폴백하므로 느릴 뿐 동작은 한다.

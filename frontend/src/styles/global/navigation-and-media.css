@@ -298,7 +298,7 @@
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) !important;
 }
 /* 닫힘 상태에도 각도를 명시한다 — `transform: none` 은 행렬 보간이라 방향이 뒤집힌다
-   (CLAUDE.md "아이콘 회전" 함정). */
+   (docs/technical/design-system.md 회전 규칙). */
 .reserve-carousel .slick-prev::before { transform: rotate(-135deg) !important; margin-left: 6px !important; }
 .reserve-carousel .slick-next::before { transform: rotate(45deg) !important; margin-right: 6px !important; }
 .reserve-carousel .slick-prev { left: 10px !important; }

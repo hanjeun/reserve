@@ -16,7 +16,7 @@
  *   덤으로 "혼자 남은 마지막 버튼이 줄 전체를 차지하는" flex-grow 버그도 구조적으로 사라진다.
  *
  * ★ 2026-08-06 신설 — SegmentedControl 에서 갈라냈다(prop 3분기 → 형제 컴포넌트).
- *   근거는 SegmentedControl.jsx 상단 주석과 CLAUDE.md "설계 원칙" 3번 참고.
+ *   근거는 SegmentedControl.jsx 상단 주석과 docs/technical/design-system.md 참고.
  */
 import React from 'react';
 import PropTypes from 'prop-types';

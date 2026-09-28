@@ -17,7 +17,7 @@ const { Title, Text } = Typography;
 // 2026-07-30 — 3열 단계 추가(경계 근거는 StoreList.jsx의 GRID_STYLE 주석 참고).
 // CSS 는 index.css 로 이관했다(2026-08-05). JSX 안 <style> 은 인스턴스마다 렌더되고,
 // 전역 규칙이 컴포넌트에 숨으면 그 컴포넌트를 안 쓰는 화면에는 규칙이 없다.
-// 전역 정책은 index.css — CLAUDE.md "설계 원칙" 참고.
+// 전역 정책은 index.css — docs/technical/design-system.md 참고.
 
 const MyFavorites = () => {
     useDocumentTitle('즐겨찾기');

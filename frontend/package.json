@@ -18,6 +18,9 @@
     "test:policy": "node --test scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs ../scripts/tests/cicd-contract.test.mjs ../scripts/tests/ci-evidence.test.mjs ../scripts/tests/audit-preview-release.test.mjs",
     "test:e2e": "playwright test",
     "generate:readme-assets": "node scripts/generate-readme-assets.mjs",
+    "capture:readme": "node scripts/capture-readme-live.mjs",
+    "capture:readme:auth": "node scripts/capture-readme-live.mjs --auth",
+    "capture:readme:clean": "node scripts/capture-readme-live.mjs --clean",
     "preview": "vite preview",
     "postinstall": "patch-package"
   },

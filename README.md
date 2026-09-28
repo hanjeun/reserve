@@ -2,9 +2,10 @@
 
 <a href="https://reserve.it.kr"><img src="frontend/public/og-image.png" alt="RESERVE — 예약이 필요한 순간" width="760" /></a>
 
-### 예약이 필요한 순간, RESERVE
-
-업종을 가리지 않고 **찾고 · 예약하고 · 결제까지** 한 번에 끝내는 범용 예약 플랫폼
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/readme-title-dark.svg" />
+  <img src="docs/images/readme/readme-title-light.svg" alt="예약이 필요한 순간, RESERVE — 업종을 가리지 않고 찾고 · 예약하고 · 결제까지 한 번에" width="640" />
+</picture>
 
 [**서비스 바로가기**](https://reserve.it.kr) &nbsp;·&nbsp;
 [손님 가이드](docs/guide/user-guide.md) &nbsp;·&nbsp;
@@ -26,43 +27,26 @@
 
 <br />
 
-## 한눈에 보기
+## 소개
 
-<table>
-  <tr>
-    <td width="33%" valign="top">
-      <h4>🙋 손님</h4>
-      가게를 찾고, 빈자리를 달력에서 바로 확인해 예약하고, 노쇼 예약금까지 카카오페이로 결제해요.
-    </td>
-    <td width="33%" valign="top">
-      <h4>🏪 사장님</h4>
-      예약 승인·거절, QR 출석 기록, 예약금·환불 정책, 광고와 통계를 한 화면에서 관리해요.
-    </td>
-    <td width="33%" valign="top">
-      <h4>🛡️ 관리자</h4>
-      사업자 심사, 회원·예약·광고 조회, 휴지통 복구와 감사 로그로 서비스를 운영해요.
-    </td>
-  </tr>
-</table>
+RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가리지 않고 쓰는 예약 플랫폼이에요.
+시간대 · 회차 · 날짜 단위 세 가지 예약 방식을 지원하고, 빈자리 확인부터 노쇼 예약금 결제, QR 방문 확인, 가게 문의 채팅까지 예약에 필요한 흐름을 한곳에서 처리해요.
 
 ## 화면
 
 아래 화면은 운영 사이트([reserve.it.kr](https://reserve.it.kr))를 그대로 찍은 것이에요.
 
-<p align="center">
-  <img src="docs/images/readme-v2.6/home.png" alt="홈" width="100%" />
-</p>
-<p align="center">
-  <img src="docs/images/readme-v2.6/stores.png" alt="가게 목록" width="49%" />
-  <img src="docs/images/readme-v2.6/store-detail.png" alt="가게 상세" width="49%" />
-</p>
-<p align="center">
-  <img src="docs/images/readme-v2.6/business.png" alt="사업자 패널" width="49%" />
-  <img src="docs/images/readme-v2.6/admin.png" alt="관리자 패널" width="49%" />
-</p>
-<p align="center">
-  <img src="docs/images/readme-v2.6/monitoring.png" alt="Grafana 모니터링" width="100%" />
-</p>
+| 홈 | 가게 목록 |
+|---|---|
+| ![홈](docs/images/readme-v2.6/home.png) | ![가게 목록](docs/images/readme-v2.6/stores.png) |
+
+| 가게 상세 | 사업자 패널 |
+|---|---|
+| ![가게 상세](docs/images/readme-v2.6/store-detail.png) | ![사업자 패널](docs/images/readme-v2.6/business.png) |
+
+| 관리자 패널 | 모니터링 |
+|---|---|
+| ![관리자 패널](docs/images/readme-v2.6/admin.png) | ![Grafana 모니터링](docs/images/readme-v2.6/monitoring.png) |
 
 ## 주요 기능
 

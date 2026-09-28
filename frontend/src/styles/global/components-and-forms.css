@@ -998,10 +998,29 @@ input:disabled {
 .reserve-form-date-trigger:focus-visible {
     box-shadow: inset 0 0 0 1px var(--c-gray-500, #8b95a1);
 }
-/* 날짜 선택은 입력칸처럼 보이는 버튼이다. 버튼 공통의 굵은 외곽선 대신 입력칸과 같은 표시만 쓴다.
-   오류 상태의 빨간 링은 인라인 스타일이라 위 규칙보다 우선해 그대로 남는다. */
-.reserve-form-date-trigger:focus-visible { outline: none; }
 
-/* 표의 코드 칸(주문번호처럼 글자 + 복사 아이콘): 아이콘이 다음 줄로 꺾이지 않게 한 줄로 둔다.
-   칸 폭은 호출부가 실측값으로 준다. 표는 모바일에서 가로로 스크롤한다(2026-09-21). */
-.ant-table .reserve-table-code { white-space: nowrap; }
+/* 사진 순서 바꾸기 (2026-09-28, SortableImageUpload) — 집은 칸은 떠오르고 나머지는 자리로 미끄러진다.
+   이동(translate)은 dnd-kit 이 바깥 칸에 주므로, 떠오르는 확대·그림자는 안쪽 AntD 칸에만 걸어 서로 덮지 않게 한다. */
+.reserve-sortable-upload-item {
+    height: 100%;
+    cursor: grab;
+    border-radius: 8px;
+}
+.reserve-sortable-upload-item:focus-visible {
+    outline: 2px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+}
+.reserve-sortable-upload-item.is-dragging {
+    position: relative;
+    z-index: 2;
+    cursor: grabbing;
+}
+.reserve-sortable-upload-item.is-dragging .ant-upload-list-item {
+    transform: scale(1.06);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .reserve-sortable-upload-item .ant-upload-list-item {
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+}

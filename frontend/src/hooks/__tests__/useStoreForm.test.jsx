@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStoreForm } from '../useStoreForm';
 import useAuthStore from '../../store/useAuthStore';
 import { saveStoreDraft } from '../../utils/storeDraftStorage';
+import { storeService } from '../../services';
 
 vi.mock('../../utils/storeDraftStorage', () => ({
     deleteStoreDraft: vi.fn().mockResolvedValue(undefined),
@@ -19,6 +20,13 @@ vi.mock('../../utils/storeDraftStorage', () => ({
     purgeExpiredStoreDrafts: vi.fn().mockResolvedValue(0),
     readStoreDraft: vi.fn().mockResolvedValue(null),
     saveStoreDraft: vi.fn().mockResolvedValue({ savedAt: 1 }),
+}));
+
+vi.mock('../../utils/form', () => ({ buildStoreFormData: vi.fn(() => new FormData()) }));
+
+vi.mock('../../services', async (importOriginal) => ({
+    ...(await importOriginal()),
+    storeService: { createStore: vi.fn().mockResolvedValue({}), updateStore: vi.fn().mockResolvedValue({}) },
 }));
 
 const form = {
@@ -80,5 +88,29 @@ describe('useStoreForm draft scheduling', () => {
             await Promise.resolve();
         });
         expect(saveStoreDraft).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('useStoreForm detail image order', () => {
+    beforeEach(() => {
+        useAuthStore.setState({ user: { id: 7, role: 'BUSINESS' }, isLoggedIn: true });
+    });
+
+    it('sends the on-screen order even when a new photo is dragged before existing ones', async () => {
+        const initialData = { id: 3, name: '가게', detailImageUrls: ['https://cdn.example.test/a.png', 'https://cdn.example.test/b.png'] };
+        const { result } = renderHook(
+            () => useStoreForm({ mode: 'edit', initialData, storeId: 3, form }),
+            { wrapper },
+        );
+        const [existingA, existingB] = result.current.detailImages;
+        const newPhoto = { uid: 'new-1', name: 'new.png', originFileObj: new File(['x'], 'new.png', { type: 'image/png' }) };
+
+        act(() => result.current.handleDetailImagesChange({ fileList: [newPhoto, existingB, existingA] }));
+        await act(async () => { await result.current.handleSubmit({ name: '가게' }); });
+
+        const sent = storeService.updateStore.mock.calls.at(-1)[1];
+        expect(sent.getAll('existingDetailImageUrls')).toEqual(['https://cdn.example.test/b.png', 'https://cdn.example.test/a.png']);
+        expect(sent.getAll('detailImages')).toHaveLength(1);
+        expect(sent.getAll('detailImageOrder')).toEqual(['n0', 'e0', 'e1']);
     });
 });

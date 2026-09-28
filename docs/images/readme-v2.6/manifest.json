@@ -47,8 +47,10 @@
     },
     {
       "path": "monitoring.png",
-      "bytes": 102599,
-      "sha256": "afccfdd96de1c45554b7001038592ac26d72d7aae30fe4d601cef21ea6797363"
+      "bytes": 52020,
+      "sha256": "27702cc581d850c4c1f0ac2c88c866c0a70d0657b1e1905d02ea7981a3e8193e",
+      "source": "https://grafana.reserve.it.kr",
+      "capturedAt": "2026-09-28T11:11:46.661Z"
     }
   ]
 }

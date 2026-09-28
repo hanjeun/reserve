@@ -1,6 +1,6 @@
 # 코드 구조
 
----
+모노레포 폴더 구조, 라우트, 환경변수를 한곳에 정리했어요.
 
 ## 모노레포 루트
 
@@ -49,11 +49,11 @@ RESERVE/
 └── README.md
 ```
 
----
+`docs/technical/`의 전체 문서 목록은 [기술 문서 안내](README.md)에 있어요.
 
 ## 백엔드 (`backend/src/main/java/kr/it/reserve/`) — 20개 패키지
 
-진입점은 `kr/it/reserve/ReserveApplication.java`.
+진입점은 `kr/it/reserve/ReserveApplication.java`예요.
 
 ```
 kr.it.reserve/
@@ -86,7 +86,7 @@ kr.it.reserve/
 ├── business/                      ← 사업자 인증 신청/심사
 ├── inquiry/                       ← 1:1 문의 (회원/비회원 게스트, category enum, 관리자 답변)
 ├── mailbox/                       ← 관리자 메일 발송(Resend) — 보낸 메일함 (인바운드 없음)
-├── notice/                        ← 공지사항 등록/조회                                   ★신규
+├── notice/                        ← 공지사항 등록/조회
 ├── audit/                         ← 감사 로그 + 휴지통(소프트 삭제·복구),
 │                                     AdminManagementController(회원/가게 정지·차단),
 │                                     TrashCleanupScheduler
@@ -117,12 +117,7 @@ application-green.yml    ← Green 컨테이너 포트 (8081)
 application-secret.yml   ← 민감 정보의 ${ENV_VAR} 플레이스홀더. 레포에 추적되는 게 정상
 ```
 
-> `application-secret.yml`은 **gitignore 대상이 아니다.** `application.yml`이 secret 프로파일을
-> include하므로 이 파일이 없으면 앱이 뜨지 않는다. 내용은 전부 `${ENV_VAR}` 플레이스홀더이고
-> 실제 값은 배포 환경변수로 주입된다 — **이 파일에 실제 값을 적으면 안 된다.**
-> (예전 `.gitignore`에 이 파일이 있었지만 이미 추적 중이라 효력이 없었다. 거짓 안심이라 2026-07-26에 제거했다.)
-
----
+> 주의: `application-secret.yml`은 gitignore 대상이 아니에요. `application.yml`이 secret 프로파일을 include해서 이 파일이 없으면 앱이 뜨지 않아요. 내용은 전부 `${ENV_VAR}` 플레이스홀더이고 실제 값은 배포 환경변수로 주입돼요. **이 파일에 실제 값을 적으면 안 돼요.**
 
 ## 프론트엔드 (`frontend/src/`)
 
@@ -136,8 +131,8 @@ src/
 │   │                            AuditLogTab, TrashTab, MailboxTab, AdminAdsTab,
 │   │                            BusinessVerificationTab, PaymentOperationsTab, SanctionModal
 │   │                            (AdminPanel이 탭 위임)
-│   ├── business/             ← 사장님 패널 탭 (예약 관리, 통계)                     ★신규
-│   ├── advertisement/        ← AdBanner(배너 노출), AdManageTab(광고 등록/결제)      ★신규
+│   ├── business/             ← 사장님 패널 탭 (예약 관리, 통계)
+│   ├── advertisement/        ← AdBanner(배너 노출), AdManageTab(광고 등록/결제)
 │   ├── reservation/          ← ReservationStatusBadge, ReservationCard, ReservationRow,
 │   │                            ReservationMeta, ReservationDetailModal,
 │   │                            QrCodeModal(손님 QR), QrScannerTab(사장님 스캔)
@@ -152,13 +147,13 @@ src/
 │   ├── queryKeys.js          ← TanStack Query 키 팩토리 (신규 쿼리는 여기부터)
 │   ├── invalidateAfterWrite.js ← 쓰기 후 캐시 무효화 규칙 (신규 mutation은 여기서 고름)
 │   ├── useImagePreview.jsx   ← Image.PreviewGroup 기반 미리보기 (닫힘 애니·멀티)
-│   ├── useExitAnimation.js   ← 닫힘 트랜지션 공통 훅                                ★신규
-│   ├── useQueryParamState.js ← 관리자 탭 URL 쿼리스트링 동기화                       ★신규
+│   ├── useExitAnimation.js   ← 닫힘 트랜지션 공통 훅
+│   ├── useQueryParamState.js ← 관리자 탭 URL 쿼리스트링 동기화
 │   ├── useRouteSeo.js        ← 공개 경로 allowlist·robots·query 없는 canonical/OG URL
-│   ├── useStoreImageHint.js  ← 상세 스켈레톤용 이미지 비율 힌트                       ★신규
+│   ├── useStoreImageHint.js  ← 상세 스켈레톤용 이미지 비율 힌트
 │   ├── useStoreForm.js       ← 등록·수정 공통 폼 + IndexedDB 자동/수동 임시저장
-│   ├── useOnlineStatus.js    ← 온라인/오프라인 감지 (useSyncExternalStore)           ★신규
-│   ├── useAdPayment.js       ← 광고 결제 플로우                                       ★신규
+│   ├── useOnlineStatus.js    ← 온라인/오프라인 감지 (useSyncExternalStore)
+│   ├── useAdPayment.js       ← 광고 결제 플로우
 │   ├── usePayment.js         ← 예약 결제 플로우 (포트원)
 │   ├── useManageReservations.js / useReservations.js / useStoreData.js /
 │   │   useStoreDetailActions.js / useStoreForm.js / useStoreList.js / useMyStores.js
@@ -179,18 +174,18 @@ src/
 │
 ├── services/                ← 도메인별 API 레이어: adService, businessService, favoriteService,
 │                               memberService, paymentService, reservationService,
-│                               reviewService, storeService                          (adService ★신규)
+│                               reviewService, storeService
 ├── store/
 │   ├── useAuthStore.js       ← Zustand (로그인 상태) — 401/403/세션만료 때만 로그아웃
-│   └── useLocationStore.js   ← 세션 한정 라이브 위치 (우리동네 배지용)                 ★신규
+│   └── useLocationStore.js   ← 세션 한정 라이브 위치 (우리동네 배지용)
 ├── styles/
 │   ├── global/               ← foundation, forms, navigation, interactions, feature surfaces
 │   ├── theme.css             ← 라이트/다크 CSS 변수
 │   └── tokens/               ← colors, typography, spacing, field, animations, chart
 ├── utils/                   ← image, form, errorHandler, validation, storeDraftStorage,
-│                               imageUploadPolicy, distance(★),
-│                               adAttribution(★), imageHintCache(★), paymentWindowGuard(★),
-│                               redirect(★), index
+│                               imageUploadPolicy, distance,
+│                               adAttribution, imageHintCache, paymentWindowGuard,
+│                               redirect, index
 ├── App.jsx                  ← 라우터(라우트 lazy 코드분할) + ConfigProvider + AntApp
 ├── index.css                ← 전역 CSS 진입점(styles/global/*.css import)
 └── main.jsx
@@ -204,22 +199,20 @@ ImagePreviewPortal, InquiryModal, KakaoMap, Loading(+ArcSpinner/SpinIndicator), 
 PageContainer, PieLegend, RefreshButton, SegmentedControl, SegmentedGrid, Skeletons(Bone 외),
 StatCard, UnreadPill, pickerSuffix, index.js`
 
-공유 컴포넌트는 `docs/rules/code-conventions.md` 기준 **PropTypes 필수** 대상. 사용법은 `design-system.md` 참고.
+공유 컴포넌트는 [코드 컨벤션](../rules/code-conventions.md) 기준 **PropTypes 필수** 대상이에요. 사용법은 [디자인 시스템](design-system.md)에 있어요.
 
 ### 초기 번들 경계
 
-라우트는 `App.jsx`에서 lazy 로드하고, 비회원도 항상 보는 Header/Footer는 인증 계정 메뉴와
-`InquiryModal`을 필요할 때만 가져온다. 공통 `hooks/index.js`·`components/common/index.js` barrel을
-앱 셸에서 import하면 관리자·결제·AntD 코드가 초기 청크로 다시 합쳐질 수 있으므로 직접 import한다.
+- 라우트는 `App.jsx`에서 lazy 로드해요. 비회원도 항상 보는 Header/Footer는 인증 계정 메뉴와 `InquiryModal`을 필요할 때만 가져와요.
+- 앱 셸에서는 `hooks/index.js`·`components/common/index.js` barrel 대신 직접 import해요. barrel을 쓰면 관리자·결제·AntD 코드가 초기 청크로 다시 합쳐질 수 있어요.
+- `npm run build`의 postbuild가 `scripts/check-bundle-budget.mjs`를 실행해요.
 
-`npm run build`의 postbuild가 `scripts/check-bundle-budget.mjs`를 실행한다. 예산은 단일 JS 600 KiB,
-HTML이 직접 preload하는 초기 JS 합계 350 KiB gzip이다. 2026-09-03 실측은 각각 최대 555.1 KiB,
-초기 318.1 KiB gzip이다.
+| 예산 (gzip 기준) | 한도 |
+|---|---|
+| 단일 JS | 600 KiB |
+| HTML이 직접 preload하는 초기 JS 합계 | 350 KiB |
 
-예산은 gzip 기준이다. 2026-09 전까지 nginx 는 gzip 이 꺼져 있어 실제 전송은 원본 크기였다.
-지금은 `nginx/default.conf` 의 "전송 압축" 절에서 JS·CSS·HTML·JSON 을 압축해 보낸다.
-
----
+실제 전송은 `nginx/default.conf`의 "전송 압축" 절에서 JS·CSS·HTML·JSON을 gzip으로 압축해 보내요.
 
 ## 라우트
 
@@ -249,13 +242,11 @@ HTML이 직접 preload하는 초기 JS 합계 350 KiB gzip이다. 2026-09-03 실
 | `/admin` | 관리자 패널 | ADMIN |
 | `/payment/result` | 결제 결과 (예약/광고) | 로그인 |
 
-`/sitemap.xml`은 SPA 라우트가 아니라 Nginx가 백엔드 `SitemapController`로 전달하는 공개 시스템
-엔드포인트다. 정적 URL과 활성·미삭제 가게 상세만 포함하며 최대 50,000 URL로 제한한다.
-프론트의 `useRouteSeo`도 같은 공개 집합(`/`, `/stores`, 숫자형 `/store/:id`, `/terms`, `/privacy`,
-`/content-sources`, `/operation-guide`)만
-`index, follow`로 두고 나머지는 `noindex, nofollow`로 만든다. canonical과 `og:url`에는 쿼리·해시를 넣지 않는다.
+### sitemap과 색인
 
----
+- `/sitemap.xml`은 SPA 라우트가 아니라 Nginx가 백엔드 `SitemapController`로 넘기는 공개 시스템 엔드포인트예요. 정적 URL과 활성·미삭제 가게 상세만 넣고 최대 50,000 URL로 제한해요.
+- 프론트 `useRouteSeo`도 같은 공개 집합(`/`, `/stores`, 숫자형 `/store/:id`, `/terms`, `/privacy`, `/content-sources`, `/operation-guide`)만 `index, follow`로 두고 나머지는 `noindex, nofollow`예요.
+- canonical과 `og:url`에는 쿼리·해시를 넣지 않아요.
 
 ## 환경변수
 
@@ -269,7 +260,7 @@ VITE_SKELETON_DELAY=0
 
 ### 백엔드 (`backend/src/main/resources/application-secret.yml`)
 
-로컬에서 직접 생성. 운영 환경에서는 GitHub Secrets → Docker Compose 환경변수로 자동 주입.
+로컬에서는 직접 만들고, 운영에서는 GitHub Secrets → Docker Compose 환경변수로 자동 주입돼요.
 
 ```yaml
 spring:
@@ -307,25 +298,27 @@ AWS_ACCESS_KEY_ID: YOUR_ACCESS_KEY
 AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 ```
 
-> **`imp-key`·`imp-secret`·`imp-code` 는 없앴다** — PortOne V1(구 아임포트) 시절 값이다.
-> V2 는 토큰 교환 없이 `v2-secret` 하나로 호출하고, `imp-code` 자리는 `store-id` 가 대체한다.
+### 값별 주의점
 
-> **`PORTONE_WEBHOOK_SECRET` 은 비워도 앱이 뜬다.** 대신 웹훅이 **전부 거부**된다(fail-closed).
-> 이 값이 없으면 "결제는 됐는데 브라우저가 안 돌아온" 건을 PG 가 알려줄 수 없다 —
-> 설정 절차는 `docs/technical/payments.md` 참고.
+| 변수 | 비었을 때 / 주의 |
+|---|---|
+| `imp-key`·`imp-secret`·`imp-code` | 없앴어요. PortOne V1 시절 값이에요. V2는 토큰 교환 없이 `v2-secret` 하나로 호출하고, `imp-code` 자리는 `store-id`가 대체해요 |
+| `PORTONE_WEBHOOK_SECRET` | 비워도 앱은 뜨지만 웹훅이 **전부 거부**돼요(fail-closed). "결제는 됐는데 브라우저가 안 돌아온" 건을 PG가 알려줄 수 없어요. 설정 절차는 [결제 문서](payments.md) |
+| `TOURISM_API_SERVICE_KEY` | 비워도 앱은 떠요. 외부 호출을 생략하고, 이전에 확인한 카탈로그가 있으면 유지하고 없으면 핀 아이콘을 보여요. 실제 키는 서버 환경변수와 GitHub Secret에만 둬요. 상세는 [지역 사진 자산](region-photo-assets.md) |
+| `CHAT_IMAGE_ENCRYPTION_KEY` | 표준 Base64로 인코딩한 32바이트 AES 키예요. 비어 있으면 텍스트 채팅은 유지하고 대화 사진만 꺼져요. 잘못된 키는 기동을 실패시켜요 |
+| `CHAT_RETENTION_ENABLED` | 일반 채팅 원문/사진의 90일 파기 worker이고 기본값은 `false`예요. `chat.retention.enabled`로 바인딩돼요 |
 
-> **`TOURISM_API_SERVICE_KEY` 가 비어도 앱은 기동한다.** 지역 사진 API는 외부 호출을 생략하고,
-> 이전에 확인한 카탈로그가 있으면 그 항목을 유지하며 없으면 핀 아이콘을 표시한다. 실제 키는 서버 프로세스 환경변수와 GitHub Secret에만 둔다.
-> 상세 경계와 공개 카탈로그는 [지역 사진 자산](region-photo-assets.md)을 참고한다.
+**`CHAT_IMAGE_ENCRYPTION_KEY`**
 
-> **`CHAT_IMAGE_ENCRYPTION_KEY`** — 표준 Base64로 인코딩한 32바이트 AES 키. 비어 있으면 텍스트 채팅은
-> 유지하고 대화 사진만 비활성이다. 잘못된 키는 기동을 실패시킨다. GitHub Secret → SSH 환경 → blue/green
-> compose → `chat.images.encryption-key`로 전달하며 저장소/CLI 인자/로그에 키를 넣지 않는다.
-> 운영 활성화 전에 보호된 별도 키 보관과 복구를 검증한다. 키를 덮어쓰면 기존 사진을 잃으므로 무계획 회전은 금지한다.
-> 외부 발급 키가 아니다. [PC에서 직접 생성·GitHub/IntelliJ 등록하는 절차](chat-images.md)를 따른다.
-> API·스키마·IAM 경로 목록은 [릴리스 후보 체크리스트](release-candidate-2026-09-27.md)를 따른다.
+- GitHub Secret → SSH 환경 → blue/green compose → `chat.images.encryption-key`로 전달해요. 저장소·CLI 인자·로그에 키를 넣지 않아요.
+- 외부 발급 키가 아니에요. [PC에서 직접 생성·GitHub/IntelliJ에 등록하는 절차](chat-images.md)를 따라요.
+- 운영 활성화 전에 별도 키 보관과 복구를 검증해요. API·스키마·IAM 경로 목록은 [릴리스 체크리스트](release-candidate-2026-09-27.md)에 있어요.
 
-> **`CHAT_RETENTION_ENABLED`** — 일반 채팅 원문/사진의 90일 파기 worker이며 기본값은 `false`다.
-> 환경변수 → `chat.retention.enabled`로 바인딩된다. 운영 compose/CI에서는 아직 켜지 않으며,
-> 추가 DDL·정책 고지·기존 신고 보류/백업/복구 검증 뒤 별도 활성화한다. 신고 증거는 자동 파기하지 않는다.
-> [채팅 계약](chat-controls.md)을 따른다. 이미 만료된 일반 원문은 이후 신고로 복구할 수 없다.
+> 주의: 키를 덮어쓰면 기존 사진을 잃어요. 계획 없는 키 회전은 금지예요.
+
+**`CHAT_RETENTION_ENABLED`**
+
+- 운영 compose/CI에서는 아직 켜지 않아요. 추가 DDL·정책 고지·기존 신고 보류/백업/복구 검증 뒤 따로 활성화해요.
+- 신고 증거는 자동 파기하지 않아요. 계약은 [채팅 계약](chat-controls.md)을 따라요.
+
+> 주의: 이미 만료된 일반 원문은 이후 신고로 복구할 수 없어요.

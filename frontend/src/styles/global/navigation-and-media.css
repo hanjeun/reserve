@@ -261,7 +261,8 @@
     -webkit-user-select: none;
 }
 .reserve-carousel .slick-slide > div { line-height: 0 !important; font-size: 0 !important; }
-.reserve-carousel .slick-slide[aria-hidden='true'] { visibility: hidden; }
+/* 화면 밖 슬라이드를 visibility 로 숨기지 않는다 — 넘어가는 동안 옆 슬라이드와 무한 루프용 복제 슬라이드가
+   함께 보여야 한다. 숨기면 마지막 → 처음으로 넘어갈 때 빈 칸이 지나가며 하얗게 깜빡인다. */
 .reserve-carousel .slick-slide[aria-hidden='true'] * { pointer-events: none; }
 
 /* 좌·우 화살표 — AntD 기본 화살표(::after 삼각형)를 지우고 얇은 꺾쇠를 직접 그린다.

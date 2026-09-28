@@ -15,11 +15,11 @@ RESERVE(https://reserve.it.kr)의 보안 취약점 제보 방법을 안내해요
 
 **공개 이슈로 올리지 말아 주세요.** 아직 고쳐지지 않은 취약점이 공개되면 이용자가 위험해져요.
 
-현재 수신이 확인된 비공개 채널은 **GitHub Private Vulnerability Reporting**뿐이에요.
+비공개 제보 채널은 **GitHub Private Vulnerability Reporting**이에요.
 
 [Security → Report a vulnerability](https://github.com/hanjeun/reserve/security/advisories/new)
 
-이메일 주소는 실제 수신·회신 경로가 검증되기 전까지 보안 제보 채널로 안내하지 않아요. 공개 Issue, Discussion, PR 댓글에는 취약점 상세나 개인정보를 적지 말아 주세요.
+공개 Issue, Discussion, PR 댓글에는 취약점 상세나 개인정보를 적지 말아 주세요.
 
 ### 함께 보내 주시면 좋은 것
 
@@ -34,8 +34,6 @@ RESERVE(https://reserve.it.kr)의 보안 취약점 제보 방법을 안내해요
 | 접수 확인 회신 | 3일 이내 |
 | 영향도 평가 및 대응 방향 공유 | 7일 이내 |
 | 수정 배포 | 심각도에 따라 협의 |
-
-1인 개발 프로젝트라 바로 대응하기 어려울 수 있어요. 회신이 늦어지더라도 반드시 확인해요.
 
 ## 제보할 때 지켜 주세요
 

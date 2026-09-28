@@ -24,7 +24,7 @@ import java.util.List;
  * 잘못 적힌 건은 PortOne 콘솔에서 확인하고 결제 상태를 바로잡는 경로로 처리한다.
  *
  * <p>페이지 파라미터를 반드시 서버로 넘긴다 — 관리자 탭 세 곳이 전부 "프론트에서 전량 받아
- * 필터링"으로 시작했다가 같은 문제를 겪었다(CLAUDE.md 함정 참고).
+ * 필터링"으로 시작했다가 같은 문제를 겪었다.
  */
 @RestController
 @RequiredArgsConstructor

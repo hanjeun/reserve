@@ -80,7 +80,7 @@ const Card = ({
             </AntCard>
             {/* 그림자·hover·actions 줄 CSS 는 index.css 의 "Card 그림자·hover" 블록으로 옮겼다.
                 JSX 안 <style> 은 인스턴스마다 렌더돼서, 카드가 수십 개인 목록 화면에서
-                동일한 태그가 그만큼 쌓였다. 전역 정책은 index.css — CLAUDE.md 설계 원칙 참고.
+                동일한 태그가 그만큼 쌓였다. 전역 정책은 index.css — docs/technical/design-system.md 참고.
                 ★ 이 컴포넌트를 쓰는 쪽에서 인라인 boxShadow 를 주면 hover 그림자가 죽는다. */}
         </>
     );

@@ -96,7 +96,7 @@
      React 19 는 precedence prop 이 없으면 style 태그를 호이스팅·중복 제거하지 않는다.
      브라우저 실측: 마이페이지 한 화면에 Button 의 동일한 style 태그가 3개 있었다.
      버튼이 많은 화면(가게 목록·관리자 테이블)에서는 수십 개가 된다.
-   전역 정책은 이 파일에, 컴포넌트에는 인스턴스 전용 인라인 style 만 — CLAUDE.md 설계 원칙.
+   전역 정책은 이 파일에, 컴포넌트에는 인스턴스 전용 인라인 style 만 — docs/technical/design-system.md.
 
    변수 보간이 전혀 없는 정적 CSS 였으므로 내용은 그대로 옮겼다. */
 .reserve-btn {

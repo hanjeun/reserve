@@ -180,9 +180,8 @@ async function capture(context, { name, pathname, url, auth, grafana }) {
         }
         await maskPersonalText(page);
         await page.evaluate(() => window.scrollTo(0, 0));
-        // Grafana 는 접힌 행 아래가 빈 배경이라, 대시보드가 끝나는 곳까지만 자른다.
-        const clip = grafana ? await contentClip(page, '.react-grid-layout') : undefined;
-        const image = await page.screenshot({ fullPage: false, ...(clip ? { clip } : {}) });
+        // README 는 여섯 화면을 같은 크기 격자로 보여 준다 — Grafana 도 자르지 않고 같은 1600×900 으로 찍는다.
+        const image = await page.screenshot({ fullPage: false });
         return (await saveImage(name, image)) ? name : null;
     } catch (error) {
         // 한 화면이 실패해도 나머지는 계속 찍는다(특히 로그인 화면의 회전된 토큰 저장까지 가야 한다).
@@ -191,12 +190,6 @@ async function capture(context, { name, pathname, url, auth, grafana }) {
     } finally {
         await page.close();
     }
-}
-
-async function contentClip(page, selector) {
-    const box = await page.locator(selector).first().boundingBox().catch(() => null);
-    if (!box) return undefined;
-    return { x: 0, y: 0, width: VIEWPORT.width, height: Math.min(VIEWPORT.height, Math.ceil(box.y + box.height + 16)) };
 }
 
 // 리다이렉트가 waitReady 이후에 끝나는 경우도 있어 주소와 로그인 폼을 둘 다 본다.

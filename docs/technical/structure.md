@@ -1,6 +1,6 @@
 # 코드 구조
 
-모노레포 폴더 구조, 라우트, 환경변수를 한곳에 정리했어요.
+모노레포 폴더 구조, 라우트, 환경변수를 정리했어요.
 
 ## 모노레포 루트
 
@@ -31,11 +31,9 @@ RESERVE/
 │       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
 │       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
 │       ├── current-status.md      ← 코드·로컬·dev·production·외부 실증 상태 정본
-│       ├── preview-release-plan.md ← 과거 계획의 보관 위치 안내
 │       ├── quality-roadmap.md     ← 프리뷰 검증 · 미해결 위험 · PR 정리 순서
-│       ├── ui-decisions.md        ← 공통 UI의 선택 이유 · 회귀 경계
-│       ├── README.md              ← 현재 문서와 과거 작업 기록의 구분
-│       ├── history/2026-09-preview/ ← 날짜별 프리뷰 계획 · 구현 · 실측 · 인수인계 이력
+│       ├── ui-decisions.md        ← 공통 UI 구현 결정
+│       ├── README.md              ← 기술 문서 안내
 │       ├── structure.md          ← 코드 구조 (이 문서)
 │       └── design-system.md      ← 디자인 토큰 · 공통 컴포넌트
 ├── .github/
@@ -94,8 +92,7 @@ kr.it.reserve/
 ├── seo/                           ← 공개 정적 URL + 활성 가게 상세 동적 sitemap
 ├── email/                         ← 이메일 인증 코드 발송/검증
 ├── community/                     ← 게시판 — 프론트 미노출. Member/Store cascade 삭제가 참조해 존치
-├── promotion/                     ← 가게 홍보 게시글 — 식당 시절 유물, 미노출.
-│                                     **광고(advertisement, 유료 노출)와는 다른 개념이니 혼동 주의**
+├── promotion/                     ← 가게 홍보 게시글 (광고 advertisement와 별개)
 ├── common/                        ← HealthCheckController
 ├── main/                          ← (빈 패키지 — 잔재)
 └── global/
@@ -117,7 +114,7 @@ application-green.yml    ← Green 컨테이너 포트 (8081)
 application-secret.yml   ← 민감 정보의 ${ENV_VAR} 플레이스홀더. 레포에 추적되는 게 정상
 ```
 
-> 주의: `application-secret.yml`은 gitignore 대상이 아니에요. `application.yml`이 secret 프로파일을 include해서 이 파일이 없으면 앱이 뜨지 않아요. 내용은 전부 `${ENV_VAR}` 플레이스홀더이고 실제 값은 배포 환경변수로 주입돼요. **이 파일에 실제 값을 적으면 안 돼요.**
+`application.yml`이 secret 프로파일을 include해요. `application-secret.yml`에는 `${ENV_VAR}` 플레이스홀더만 두고, 실제 값은 배포 환경변수로 주입돼요.
 
 ## 프론트엔드 (`frontend/src/`)
 
@@ -204,7 +201,7 @@ StatCard, UnreadPill, pickerSuffix, index.js`
 ### 초기 번들 경계
 
 - 라우트는 `App.jsx`에서 lazy 로드해요. 비회원도 항상 보는 Header/Footer는 인증 계정 메뉴와 `InquiryModal`을 필요할 때만 가져와요.
-- 앱 셸에서는 `hooks/index.js`·`components/common/index.js` barrel 대신 직접 import해요. barrel을 쓰면 관리자·결제·AntD 코드가 초기 청크로 다시 합쳐질 수 있어요.
+- 앱 셸에서는 `hooks/index.js`·`components/common/index.js` barrel 대신 직접 import해요.
 - `npm run build`의 postbuild가 `scripts/check-bundle-budget.mjs`를 실행해요.
 
 | 예산 (gzip 기준) | 한도 |
@@ -212,7 +209,7 @@ StatCard, UnreadPill, pickerSuffix, index.js`
 | 단일 JS | 600 KiB |
 | HTML이 직접 preload하는 초기 JS 합계 | 350 KiB |
 
-실제 전송은 `nginx/default.conf`의 "전송 압축" 절에서 JS·CSS·HTML·JSON을 gzip으로 압축해 보내요.
+전송 압축은 `nginx/default.conf`에서 JS·CSS·HTML·JSON을 gzip으로 보내요.
 
 ## 라우트
 
@@ -298,27 +295,11 @@ AWS_ACCESS_KEY_ID: YOUR_ACCESS_KEY
 AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 ```
 
-### 값별 주의점
+### 추가 환경변수
 
-| 변수 | 비었을 때 / 주의 |
+| 이름 | 용도 |
 |---|---|
-| `imp-key`·`imp-secret`·`imp-code` | 없앴어요. PortOne V1 시절 값이에요. V2는 토큰 교환 없이 `v2-secret` 하나로 호출하고, `imp-code` 자리는 `store-id`가 대체해요 |
-| `PORTONE_WEBHOOK_SECRET` | 비워도 앱은 뜨지만 웹훅이 **전부 거부**돼요(fail-closed). "결제는 됐는데 브라우저가 안 돌아온" 건을 PG가 알려줄 수 없어요. 설정 절차는 [결제 문서](payments.md) |
-| `TOURISM_API_SERVICE_KEY` | 비워도 앱은 떠요. 외부 호출을 생략하고, 이전에 확인한 카탈로그가 있으면 유지하고 없으면 핀 아이콘을 보여요. 실제 키는 서버 환경변수와 GitHub Secret에만 둬요. 상세는 [지역 사진 자산](region-photo-assets.md) |
-| `CHAT_IMAGE_ENCRYPTION_KEY` | 표준 Base64로 인코딩한 32바이트 AES 키예요. 비어 있으면 텍스트 채팅은 유지하고 대화 사진만 꺼져요. 잘못된 키는 기동을 실패시켜요 |
-| `CHAT_RETENTION_ENABLED` | 일반 채팅 원문/사진의 90일 파기 worker이고 기본값은 `false`예요. `chat.retention.enabled`로 바인딩돼요 |
-
-**`CHAT_IMAGE_ENCRYPTION_KEY`**
-
-- GitHub Secret → SSH 환경 → blue/green compose → `chat.images.encryption-key`로 전달해요. 저장소·CLI 인자·로그에 키를 넣지 않아요.
-- 외부 발급 키가 아니에요. [PC에서 직접 생성·GitHub/IntelliJ에 등록하는 절차](chat-images.md)를 따라요.
-- 운영 활성화 전에 별도 키 보관과 복구를 검증해요. API·스키마·IAM 경로 목록은 [릴리스 체크리스트](release-candidate-2026-09-27.md)에 있어요.
-
-> 주의: 키를 덮어쓰면 기존 사진을 잃어요. 계획 없는 키 회전은 금지예요.
-
-**`CHAT_RETENTION_ENABLED`**
-
-- 운영 compose/CI에서는 아직 켜지 않아요. 추가 DDL·정책 고지·기존 신고 보류/백업/복구 검증 뒤 따로 활성화해요.
-- 신고 증거는 자동 파기하지 않아요. 계약은 [채팅 계약](chat-controls.md)을 따라요.
-
-> 주의: 이미 만료된 일반 원문은 이후 신고로 복구할 수 없어요.
+| `PORTONE_WEBHOOK_SECRET` | 포트원 웹훅 서명 검증 키. 설정 절차는 [결제 문서](payments.md) |
+| `TOURISM_API_SERVICE_KEY` | 지역 대표 관광 사진 서버 조회 키. [지역 사진 자산](region-photo-assets.md) |
+| `CHAT_IMAGE_ENCRYPTION_KEY` | 대화 사진 암호화용 32바이트 AES 키(표준 Base64). 생성·등록은 [채팅 사진](chat-images.md) |
+| `CHAT_RETENTION_ENABLED` | 일반 채팅 원문·사진 90일 파기 worker 스위치(`chat.retention.enabled`, 기본 `false`). [채팅 계약](chat-controls.md) |

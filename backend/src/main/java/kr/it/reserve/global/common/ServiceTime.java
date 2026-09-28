@@ -42,7 +42,7 @@ import java.time.ZoneOffset;
  *
  * <p>예전엔 이 상수가 {@code ReservationElapsedScheduler} 와 {@code QrCheckinTokenProvider} 에
  * 각각 복사돼 있었고, 규칙은 그 두 파일의 주석에만 있었다. 주석은 강제력이 0이라 나머지 열 몇 곳이
- * 조용히 어긋나 있었다. 관문을 하나로 모은다(CLAUDE.md "설계 원칙").
+ * 조용히 어긋나 있었다. 관문을 하나로 모은다(docs/technical/design-system.md).
  */
 public final class ServiceTime {
 

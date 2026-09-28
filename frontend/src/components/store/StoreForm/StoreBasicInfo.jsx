@@ -63,7 +63,7 @@ const toggleStyles = {
  * compact로 표시하며 모바일 밀도는 작업 폼 전용 CSS 관문에서 정한다.
  *
  * 폭 판정을 호출부에서 prop 으로 받지 않고 여기서 하는 이유: 이 파일의 SettingsSection 은
- * isMobile 을 안 받는다. 관문 한 곳에서 정해야 7곳이 어긋나지 않는다(CLAUDE.md 설계 원칙).
+ * isMobile 을 안 받는다. 관문 한 곳에서 정해야 7곳이 어긋나지 않는다(docs/technical/design-system.md).
  */
 const FieldRow = ({ children, style, compact = false, className = '' }) => {
     const isMobile = useWindowWidth() < 768;

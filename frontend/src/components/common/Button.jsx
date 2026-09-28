@@ -211,7 +211,7 @@ const Button = ({
 /* hover·active 등 상호작용 CSS 는 index.css 의 "Button 상호작용 상태" 블록에 있다.
    예전에는 이 파일 안의 <style> 태그였는데, JSX 안의 style 은 **인스턴스마다 렌더**되어
    버튼이 많은 화면에서 동일한 태그가 수십 개 쌓였다(실측: 마이페이지에서 3개).
-   전역 정책은 index.css 로 — CLAUDE.md "설계 원칙" 참고. */
+   전역 정책은 index.css 로 — docs/technical/design-system.md 참고. */
 
 const spinStyle = {};
 

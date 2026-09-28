@@ -9,3 +9,4 @@ export { default as favoriteService } from './favoriteService';
 export { default as adService } from './adService';
 export { default as chatService } from './chatService';
 export { default as tourismService } from './tourismService';
+export { default as holidayService } from './holidayService';

@@ -4,11 +4,7 @@
 
 ## 인프라 구성
 
-![RESERVE v2.6 통합 후보 아키텍처](../images/readme-v2.6/architecture.png)
-
-> 이 이미지는 현재 로컬 코드 경계를 합성한 다이어그램이며 production 배포 증거가 아니다.
-> 생성기와 SHA-256 기록은 `frontend/scripts/generate-readme-assets.mjs`와
-> `docs/images/readme-v2.6/manifest.json`을 기준으로 한다.
+![RESERVE 아키텍처](../images/RESERVE_Architecture.png)
 
 ---
 

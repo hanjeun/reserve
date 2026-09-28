@@ -998,6 +998,43 @@ input:disabled {
 .reserve-form-date-trigger:focus-visible {
     box-shadow: inset 0 0 0 1px var(--c-gray-500, #8b95a1);
 }
+
+/* 사진 순서 바꾸기 (2026-09-28, SortableImageUpload) — 집은 칸은 떠오르고 나머지는 자리로 미끄러진다.
+   이동(translate)은 dnd-kit 이 바깥 칸에 주므로, 떠오르는 확대·그림자는 안쪽 AntD 칸에만 걸어 서로 덮지 않게 한다. */
+.reserve-sortable-upload-item {
+    height: 100%;
+    cursor: grab;
+    border-radius: 8px;
+}
+.reserve-sortable-upload-item:focus-visible {
+    outline: 2px solid var(--c-primary, #3182f6);
+    outline-offset: 2px;
+}
+.reserve-sortable-upload-item.is-dragging {
+    position: relative;
+    z-index: 2;
+    cursor: grabbing;
+}
+.reserve-sortable-upload-item.is-dragging .ant-upload-list-item {
+    transform: scale(1.06);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .reserve-sortable-upload-item .ant-upload-list-item {
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+}
+
+/* 여러 개를 고르는 칸의 선택 칩 (2026-09-28) — 회차 시각처럼 값이 칩으로 쌓이는 칸.
+   AntD filled 변형은 칩을 흰 면 + 옅은 테두리로 그린다(date-picker/style/variants.js 의 &-filled).
+   포커스 때 칸이 흰색이 되면 흰 칩이 테두리로만 구분돼, 회색 면으로 구분하는 채움형 규칙과 결이 달랐다.
+   칩은 보조 버튼과 같은 회색 면(gray-100)·테두리 없음 한 가지로 통일한다.
+   AntD 선택자와 명시도가 같으면 런타임 주입 순서에 따라 지므로 .ant-picker/.ant-select 를 한 번 더 붙인다. */
+.ant-picker.ant-picker-filled.ant-picker-multiple .ant-picker-selection-item,
+.ant-select.ant-select-filled.ant-select-multiple .ant-select-selection-item {
+    background: var(--c-gray-100, #f2f4f6);
+    border-color: transparent;
+}
 /* 날짜 선택은 입력칸처럼 보이는 버튼이다. 버튼 공통의 굵은 외곽선 대신 입력칸과 같은 표시만 쓴다.
    오류 상태의 빨간 링은 인라인 스타일이라 위 규칙보다 우선해 그대로 남는다. */
 .reserve-form-date-trigger:focus-visible { outline: none; }

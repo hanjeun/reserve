@@ -466,74 +466,6 @@ function monitoringHtml() {
     </main></body></html>`;
 }
 
-function architectureHtml() {
-    return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
-      ${sharedStaticStyles}
-      .header { display: flex; justify-content: space-between; align-items: flex-start; }
-      .legend { display: flex; gap: 12px; color: #667289; font-size: 12px; }
-      .legend span { display: flex; align-items: center; gap: 6px; }
-      .swatch { width: 12px; height: 12px; border-radius: 4px; }
-      .diagram { margin-top: 24px; }
-      .lane { border: 1px solid #dbe2ee; border-radius: 24px; background: rgba(255,255,255,.76); padding: 42px 20px 18px; position: relative; }
-      .lane-title { position: absolute; top: 15px; left: 20px; color: #7a8699; font-size: 12px; font-weight: 850; letter-spacing: .08em; }
-      .runtime-map { position: relative; height: 330px; }
-      .node { display: flex; flex-direction: column; justify-content: center; min-height: 82px; border-radius: 17px; padding: 14px 16px; background: #fff; border: 1px solid #dbe2ee; box-shadow: 0 10px 24px rgba(34,55,91,.07); }
-      .node b { font-size: 15px; }
-      .node small { margin-top: 5px; color: #738096; line-height: 1.35; }
-      .blue { border-color: #a9c7ff; background: #f3f7ff; }
-      .green { border-color: #a9dfca; background: #f1fbf7; }
-      .orange { border-color: #f1cca3; background: #fff8ee; }
-      .purple { border-color: #c9b7ef; background: #f8f4ff; }
-      .stack { display: grid; gap: 10px; }
-      .map-group, .map-node { position: absolute; z-index: 2; }
-      .actors { left: 8px; top: 28px; width: 205px; }
-      .actors .node { min-height: 78px; text-align: center; }
-      .route53 { left: 272px; top: 123px; width: 170px; min-height: 86px; }
-      .nginx { left: 500px; top: 112px; width: 190px; min-height: 108px; }
-      .frontend { left: 762px; top: 34px; width: 215px; min-height: 105px; }
-      .backend { left: 762px; top: 204px; width: 215px; min-height: 105px; }
-      .s3 { left: 1080px; top: 18px; width: 200px; min-height: 92px; }
-      .mysql { left: 1080px; top: 119px; width: 200px; min-height: 92px; }
-      .logs { left: 1080px; top: 220px; width: 200px; min-height: 92px; }
-      .connections { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: visible; }
-      .connections > path { fill: none; stroke: #8291a7; stroke-width: 2.2; }
-      .connections text { fill: #65748a; font: 700 11px Pretendard, "Segoe UI", sans-serif; paint-order: stroke; stroke: #fff; stroke-width: 5px; stroke-linejoin: round; }
-      .arrow { color: #7d8ca3; font-size: 31px; font-weight: 500; text-align: center; }
-      .atomic { color: #2568d9; font-size: 12px; font-weight: 800; line-height: 1.45; }
-      .bottom-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 18px; margin-top: 18px; }
-      .external-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-      .external-grid .node { text-align: center; min-height: 92px; padding-inline: 10px; }
-      .delivery-grid { display: grid; grid-template-columns: 1fr 22px 1fr 22px 1.2fr 22px 1fr; align-items: center; gap: 4px; }
-      .delivery-grid .node { min-height: 92px; padding-inline: 10px; }
-      .delivery-grid .arrow { font-size: 23px; }
-      .boundary-note { margin-top: 11px; color: #738096; font-size: 12px; font-weight: 650; }
-    </style></head><body><main class="canvas">
-      <div class="header"><div><div class="eyebrow">RESERVE SYSTEM MAP</div><h1>v2.6 통합 후보 아키텍처</h1><div class="notice">● 코드 기준 합성 다이어그램 · production 배포 증거 아님</div></div><div class="legend"><span><i class="swatch" style="background:#f3f7ff"></i>엣지·프론트</span><span><i class="swatch" style="background:#f1fbf7"></i>애플리케이션·데이터</span><span><i class="swatch" style="background:#fff8ee"></i>외부 서비스</span><span><i class="swatch" style="background:#f8f4ff"></i>배포</span></div></div>
-      <section class="diagram">
-        <div class="lane"><span class="lane-title">EXPLICIT REQUEST · DATA · LOG PATHS</span><div class="runtime-map">
-          <svg class="connections" viewBox="0 0 1464 330" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8291a7" stroke="none"/></marker></defs>
-            <path d="M213 165 H272" marker-end="url(#arrowhead)"/><path d="M442 165 H500" marker-end="url(#arrowhead)"/>
-            <path d="M690 165 H724 V86 H762" marker-end="url(#arrowhead)"/><path d="M690 165 H724 V256 H762" marker-end="url(#arrowhead)"/>
-            <path d="M977 86 H1030 V64 H1080" marker-end="url(#arrowhead)"/><path d="M977 256 H1030 V165 H1080" marker-end="url(#arrowhead)"/><path d="M977 256 H1030 V266 H1080" marker-end="url(#arrowhead)"/>
-            <text x="700" y="79">static</text><text x="697" y="244">API upstream</text><text x="1000" y="55">image CDN</text><text x="1000" y="156">JDBC</text><text x="984" y="285">app.log → Promtail</text>
-          </svg>
-          <div class="stack map-group actors"><div class="node"><b>손님</b><small>검색 · 예약 · 결제 · 메시지</small></div><div class="node"><b>사업자</b><small>가게 · 예약 · 광고 관리</small></div><div class="node"><b>관리자</b><small>심사 · 운영 · 감사</small></div></div>
-          <div class="node blue map-node route53"><b>Route 53 · TLS</b><small>reserve.it.kr</small></div>
-          <div class="node blue map-node nginx"><b>Nginx</b><small>정적 파일 · API 라우팅</small><span class="atomic">프론트 경로 + upstream<br>1회 reload</span></div>
-          <div class="node blue map-node frontend"><b>React 19 · Vite</b><small>SHA release · live symlink</small></div>
-          <div class="node green map-node backend"><b>Spring Boot 3.5</b><small>Blue / Green · Java 21</small></div>
-          <div class="node green map-node s3"><b>S3 + CloudFront</b><small>사용자 이미지 CDN</small></div>
-          <div class="node green map-node mysql"><b>MySQL 8</b><small>예약·결제 원장</small></div>
-          <div class="node green map-node logs"><b>Loki · Grafana</b><small>애플리케이션 로그 관측</small></div>
-        </div></div>
-        <div class="bottom-grid">
-          <div class="lane"><span class="lane-title">SERVER-MEDIATED EXTERNAL BOUNDARIES</span><div class="external-grid"><div class="node orange"><b>PortOne TEST</b><small>카카오페이 · 웹훅</small></div><div class="node orange"><b>OAuth</b><small>Google · Naver · Kakao</small></div><div class="node orange"><b>Kakao Map</b><small>주소 · 지도</small></div><div class="node orange"><b>Resend</b><small>트랜잭션 메일</small></div><div class="node orange"><b>Tourism API</b><small>HTTPS 이미지 프록시</small></div></div><div class="boundary-note">서버가 자격 증명과 권한 경계를 유지하며, LIVE 쓰기는 별도 승인 대상입니다.</div></div>
-          <div class="lane"><span class="lane-title">DELIVERY PIPELINE · RUNTIME CUTOVER</span><div class="delivery-grid"><div class="node purple"><b>GitHub Actions</b><small>test · build</small></div><div class="arrow">→</div><div class="node purple"><b>Docker Hub</b><small>sha image</small></div><div class="arrow">→</div><div class="node purple"><b>Staged deploy</b><small>health · nginx -t · rollback trap</small></div><div class="arrow">→</div><div class="node purple"><b>Smoke</b><small>marker · API</small></div></div><div class="boundary-note">production 적용 여부는 배포 문서의 별도 증거로 판단합니다.</div></div>
-        </div>
-      </section>
-    </main></body></html>`;
-}
-
 async function captureStaticScene(browser, name, html) {
     const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
     const page = await context.newPage();
@@ -599,9 +531,10 @@ async function main() {
             ready: page => page.getByText('128', { exact: true }).waitFor(),
         });
         await captureStaticScene(browser, 'monitoring', monitoringHtml());
-        await captureStaticScene(browser, 'architecture', architectureHtml());
-        await writeManifest(['home', 'stores', 'store-detail', 'business', 'admin', 'monitoring', 'architecture']);
-        console.log(`Generated 7 synthetic README images in ${OUTPUT_DIR}`);
+        // 아키텍처 그림은 생성하지 않는다 — README·architecture.md 는 사람이 피그마로 그린
+        // docs/images/RESERVE_Architecture.png 를 쓴다(2026-09-28 사용자 결정).
+        await writeManifest(['home', 'stores', 'store-detail', 'business', 'admin', 'monitoring']);
+        console.log(`Generated 6 synthetic README images in ${OUTPUT_DIR}`);
     } catch (error) {
         const diagnostics = server.diagnostics?.join('\n');
         if (diagnostics) console.error(diagnostics);

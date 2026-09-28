@@ -87,7 +87,9 @@ describe('MessengerSettings', () => {
         expect(screen.getByRole('heading', { name: '설정', level: 2 })).toBeInTheDocument();
         expect(screen.getByText('김회원')).toBeInTheDocument();
         expect(screen.getByText('member@example.com')).toBeInTheDocument();
-        expect(container.querySelector('.reserve-messenger-settings-avatar')).toHaveTextContent('김');
+        const avatar = container.querySelector('.reserve-messenger-settings-avatar');
+        expect(avatar.querySelector('.anticon-user')).not.toBeNull();
+        expect(avatar).not.toHaveTextContent('김');
         expect(screen.getByRole('link', { name: '내 정보 관리' })).toHaveAttribute('href', '/my-page');
         expect(screen.getByRole('region', { name: '대화 환경' })).toBeInTheDocument();
         expect(screen.getByRole('combobox', { name: '내 말풍선 색' })).toBeInTheDocument();
@@ -153,20 +155,22 @@ describe('MessengerSettings', () => {
         expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', account.profileImage);
     });
 
-    it.each(['', '  ', 'javascript:alert(1)', 'data:image/png;base64,example', 'blob:https://example.test/example', 'file:///photo.png', 'ftp://example.test/photo.png', 'https://user:password@example.test/photo.png', 'http://tracker.example/photo.png'])('uses the current initial without requesting an unsafe photo: %s', profileImage => {
+    it.each(['', '  ', 'javascript:alert(1)', 'data:image/png;base64,example', 'blob:https://example.test/example', 'file:///photo.png', 'ftp://example.test/photo.png', 'https://user:password@example.test/photo.png', 'http://tracker.example/photo.png'])('uses the default profile icon without requesting an unsafe photo: %s', profileImage => {
         const { container } = renderSettings({ user: { name: '김회원', profileImage } });
         const avatar = container.querySelector('.reserve-messenger-settings-avatar');
         expect(avatar.querySelector('img')).toBeNull();
-        expect(avatar).toHaveTextContent('김');
+        expect(avatar.querySelector('.anticon-user')).not.toBeNull();
+        expect(avatar).not.toHaveTextContent('김');
         expect(container.querySelector('.reserve-messenger-avatar')).toBeNull();
     });
 
-    it('falls back to the current-user initial rather than the operator brand after an image error', () => {
+    it('falls back to the default profile icon rather than the operator brand after an image error', () => {
         const { container } = renderSettings({ user: { id: 1, name: '김회원', profileImage: '/icons/R_logo.png' } });
         const avatar = container.querySelector('.reserve-messenger-settings-avatar');
         fireEvent.error(avatar.querySelector('img'));
         expect(avatar.querySelector('img')).toBeNull();
-        expect(avatar).toHaveTextContent('김');
+        expect(avatar.querySelector('.anticon-user')).not.toBeNull();
+        expect(avatar).not.toHaveTextContent('김');
     });
 
     it('falls back to the neutral user icon after an image error when no name is supplied', () => {
@@ -195,7 +199,8 @@ describe('MessengerSettings', () => {
         rerender(<MemoryRouter><MessengerSettings user={{ id: 2, name: '이회원', email: 'second@example.test' }} /></MemoryRouter>);
         const avatar = container.querySelector('.reserve-messenger-settings-avatar');
         expect(avatar.querySelector('img')).toBeNull();
-        expect(avatar).toHaveTextContent('이');
+        expect(avatar.querySelector('.anticon-user')).not.toBeNull();
+        expect(avatar).not.toHaveTextContent('이');
         expect(screen.queryByText('first@example.test')).not.toBeInTheDocument();
         rerender(<MemoryRouter><MessengerSettings user={null} /></MemoryRouter>);
         expect(avatar.querySelector('img')).toBeNull();

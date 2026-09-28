@@ -625,9 +625,9 @@ const BusinessTab = ({ user }) => {
                     beforeUpload={beforeUploadLicense}
                     onSubmit={handleUpdate} loading={updateLoading}
                     submitLabel="수정 저장"
+                    onCancel={() => setIsEditing(false)}
                 />
                 {previewNode}
-                <Button variant="secondary" onClick={() => setIsEditing(false)} block>취소</Button>
             </div>
         );
 
@@ -719,7 +719,7 @@ const BusinessTab = ({ user }) => {
  *   handleStartEdit 가 setForm → setIsEditing 순서로 호출해 **폼이 새 값으로 마운트**되므로
  *   초기값만으로 충분하고, 이펙트를 두면 타이핑 중 값을 되돌릴 위험만 생긴다.
  */
-const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청', licenseRequired = false }) => {
+const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청', licenseRequired = false, onCancel }) => {
     const [antdForm] = Form.useForm();
 
     return (
@@ -794,7 +794,16 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
             </Form.Item>
 
             {/* Button 은 우리 공용 컴포넌트라 htmlType 을 전달하지 않는다 → submit() 을 직접 호출한다. */}
-            <Button variant="primary" loading={loading} onClick={() => antdForm.submit()} block>{submitLabel}</Button>
+            {/* 취소가 있는 수정 모드는 [취소 | 저장] 한 줄 — 이 파일의 사진 변경·심사 중 버튼과 같은 배치다.
+                세로로 쌓으면 두 버튼이 같은 무게로 보이고 저장 버튼이 폼 안, 취소가 폼 밖으로 갈라진다. */}
+            {onCancel ? (
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <Button variant="secondary" onClick={onCancel} disabled={loading} style={{ flex: 1 }}>취소</Button>
+                    <Button variant="primary" loading={loading} onClick={() => antdForm.submit()} style={{ flex: 1 }}>{submitLabel}</Button>
+                </div>
+            ) : (
+                <Button variant="primary" loading={loading} onClick={() => antdForm.submit()} block>{submitLabel}</Button>
+            )}
         </Form>
     );
 };

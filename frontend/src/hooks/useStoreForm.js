@@ -388,12 +388,23 @@ export const useStoreForm = ({
             formData.append('mainImage', mainImageRef.current[0].originFileObj);
         }
 
+        // 화면 순서를 그대로 저장하려고 칸마다 "e{i}"(기존 i번째) / "n{j}"(새 파일 j번째)를 함께 보낸다.
+        // 기존·새 목록만 보내면 서버는 기존 → 새 순서로 붙여서, 새 사진을 앞으로 끌어온 정렬이 사라진다.
         const existingUrls = [];
+        const order = [];
+        let newCount = 0;
         detailImagesRef.current.forEach(file => {
-            if (file.existingUrl) existingUrls.push(file.existingUrl);
-            else if (file.originFileObj) formData.append('detailImages', file.originFileObj);
+            if (file.existingUrl) {
+                order.push(`e${existingUrls.length}`);
+                existingUrls.push(file.existingUrl);
+            } else if (file.originFileObj) {
+                order.push(`n${newCount}`);
+                newCount += 1;
+                formData.append('detailImages', file.originFileObj);
+            }
         });
         existingUrls.forEach(url => formData.append('existingDetailImageUrls', url));
+        order.forEach(token => formData.append('detailImageOrder', token));
     };
 
     const handleSubmit = async values => {

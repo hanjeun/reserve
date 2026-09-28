@@ -40,3 +40,4 @@ export { default as PieLegend } from './PieLegend';
 export { default as UnreadPill } from './UnreadPill';
 export { default as RefreshButton } from './RefreshButton';
 export { default as DataState } from './DataState';
+// SortableImageUpload 은 일부러 여기서 내보내지 않는다 — 파일 경로로 직접 import 한다(그 파일 주석 참고).

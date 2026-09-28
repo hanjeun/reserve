@@ -8,6 +8,7 @@ import {
     imageFileError,
     uploadListBytes,
 } from '../../../utils/imageUploadPolicy';
+import SortableImageUpload from '../../common/SortableImageUpload';
 
 /**
  * Upload 의 onChange 이벤트에서 폼 값으로 쓸 배열만 꺼낸다.
@@ -90,11 +91,13 @@ const StoreImages = ({
                 label="상세 이미지 (최대 5장)"
                 name="detailImages"
                 getValueFromEvent={normFileList}
-                extra={`JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 ${MAX_IMAGE_REQUEST_MB}MB`}
+                extra={`사진을 끌어서 순서를 바꿀 수 있어요 · JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 ${MAX_IMAGE_REQUEST_MB}MB`}
             >
-                <Upload
+                {/* 순서가 곧 가게 상세의 사진 순서다. 기존·새 사진이 섞여도 서버가 이 순서로 저장한다(useStoreForm detailImageOrder). */}
+                <SortableImageUpload
                     listType="picture-card"
                     fileList={detailImages}
+                    onReorder={(next) => onDetailImagesChange({ fileList: next })}
                     onChange={handleDetailsChange}
                     onPreview={(file) => onPreview(file, detailImages)}
                     beforeUpload={validateImage}
@@ -104,7 +107,7 @@ const StoreImages = ({
                     onClickCapture={onPreviewClickCapture}
                 >
                     {detailImages.length < 5 && <UploadButton />}
-                </Upload>
+                </SortableImageUpload>
             </Form.Item>
         </>
     );

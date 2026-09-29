@@ -170,11 +170,18 @@ export const hydrateDraftImages = (records = []) => {
     return { files, objectUrls };
 };
 
+// UTF-16 코드 단위 기준 비교 — 기본 sort()와 같은 순서.
+const compareCodeUnits = (a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+};
+
 const stableValue = value => {
     if (Array.isArray(value)) return value.map(stableValue);
     if (value && typeof value === 'object') {
         // 기존 UTF-16 정렬을 유지해야 저장된 초안의 fingerprint가 달라지지 않는다.
-        return Object.keys(value).sort((a, b) => a < b ? -1 : a > b ? 1 : 0).reduce((result, key) => {
+        return Object.keys(value).sort(compareCodeUnits).reduce((result, key) => {
             result[key] = stableValue(value[key]);
             return result;
         }, {});

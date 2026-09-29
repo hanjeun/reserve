@@ -204,6 +204,29 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
         );
     };
 
+    // 날짜 그리드 본문 — 오류 → 로딩(스켈레톤) → 날짜 칸 순으로 판정한다.
+    const renderDayGrid = () => {
+        if (error) {
+            return <DataState state="error" title={error} onRetry={refetch} compact />;
+        }
+        if (loading || fetching) {
+            return (
+                <div role="status" aria-label="예약 가능한 날짜를 불러오는 중" aria-busy="true">
+                    <div style={styles.grid} aria-hidden="true">
+                        {cells.map(cell => cell.blank ? <span key={cell.key} /> : <Bone key={cell.date.format('YYYY-MM-DD')} height={40} borderRadius={radius.md} />)}
+                    </div>
+                </div>
+            );
+        }
+        return (
+            <div style={styles.grid}>
+                {cells.map((cell, i) => (cell.blank
+                    ? <span key={cell.key} />
+                    : renderDay(cell.date, i)))}
+            </div>
+        );
+    };
+
     return (
         <>
             {/* 필드는 항상 자리를 지킨다 — 다른 입력칸과 같은 높이·같은 채움색. */}
@@ -278,21 +301,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                 </div>
 
                 <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-                {error ? (
-                    <DataState state="error" title={error} onRetry={refetch} compact />
-                ) : loading || fetching ? (
-                    <div role="status" aria-label="예약 가능한 날짜를 불러오는 중" aria-busy="true">
-                        <div style={styles.grid} aria-hidden="true">
-                            {cells.map(cell => cell.blank ? <span key={cell.key} /> : <Bone key={cell.date.format('YYYY-MM-DD')} height={40} borderRadius={radius.md} />)}
-                        </div>
-                    </div>
-                ) : (
-                    <div style={styles.grid}>
-                        {cells.map((cell, i) => (cell.blank
-                            ? <span key={cell.key} />
-                            : renderDay(cell.date, i)))}
-                    </div>
-                )}
+                {renderDayGrid()}
                 </div>
             </Modal>
         </>

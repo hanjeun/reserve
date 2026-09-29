@@ -27,24 +27,31 @@ export default function SupportIntroTab() {
             ? error.message : '채팅 설정을 저장하지 못했어요. 잠시 후 다시 시도해주세요.'),
     });
 
+    // 설정 본문 — 로딩 → 오류 → 편집기 순으로 판정한다.
+    const renderEditor = () => {
+        if (isLoading) {
+            return <ChatIntroEditorSkeleton />;
+        }
+        if (isError) {
+            return <DataState state="error" kind="message" subject="채팅 설정" onRetry={refetch} retrying={isFetching} compact />;
+        }
+        return (
+            <ChatIntroEditor
+                kind="support"
+                intro={intro}
+                identity={{ previewUserName: '회원' }}
+                saving={saveMutation.isPending}
+                onSave={body => saveMutation.mutateAsync(body)}
+                onUploadAvatar={file => chatService.uploadSupportAvatar(file).then(result => result.url)}
+                noticeHelp="대화창 맨 위 확성기 줄에 보여요. 점검·운영시간처럼 먼저 알려야 할 내용을 적어 주세요. 비워 두면 '안녕하세요. 표시 이름입니다.'가 보여요."
+            />
+        );
+    };
+
     return (
         <div className="reserve-chat-intro-tab">
             <FilterToolbar onReload={refetch} loading={isFetching} />
-            {isLoading ? (
-                <ChatIntroEditorSkeleton />
-            ) : isError ? (
-                <DataState state="error" kind="message" subject="채팅 설정" onRetry={refetch} retrying={isFetching} compact />
-            ) : (
-                <ChatIntroEditor
-                    kind="support"
-                    intro={intro}
-                    identity={{ previewUserName: '회원' }}
-                    saving={saveMutation.isPending}
-                    onSave={body => saveMutation.mutateAsync(body)}
-                    onUploadAvatar={file => chatService.uploadSupportAvatar(file).then(result => result.url)}
-                    noticeHelp="대화창 맨 위 확성기 줄에 보여요. 점검·운영시간처럼 먼저 알려야 할 내용을 적어 주세요. 비워 두면 '안녕하세요. 표시 이름입니다.'가 보여요."
-                />
-            )}
+            {renderEditor()}
         </div>
     );
 }

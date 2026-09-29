@@ -38,10 +38,9 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
     // 거절과 취소는 서로 다른 필드를 다른 라벨로 보여준다 (2026-08-11).
     // 하나로 합치면 취소된 예약에 "거절 사유"가 찍혀 이용자가 오해한다.
     // cancelReason 은 가게가 취소했을 때만 채워지므로, 본인 취소 건에는 이 블록이 안 나온다.
-    const reasonBlock =
-        (status === 'REJECTED' && rejectionReason) ? { label: '거절 사유', value: rejectionReason }
-      : (status === 'CANCELLED' && cancelReason)   ? { label: '취소 사유', value: cancelReason }
-      : null;
+    let reasonBlock = null;
+    if (status === 'REJECTED' && rejectionReason) reasonBlock = { label: '거절 사유', value: rejectionReason };
+    else if (status === 'CANCELLED' && cancelReason) reasonBlock = { label: '취소 사유', value: cancelReason };
 
     return (
         <Modal title="예약 상세" open={open} onCancel={onClose} footer={null} centered>

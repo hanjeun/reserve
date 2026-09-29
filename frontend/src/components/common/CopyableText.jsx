@@ -47,7 +47,7 @@ const CopyableText = ({ value, label = '내용', fallback = '-', className = '',
     };
 
     return (
-        <span {...spanProps} className={`reserve-copyable-text${className ? ` ${className}` : ''}`} style={style}>
+        <span {...spanProps} className={className ? `reserve-copyable-text ${className}` : 'reserve-copyable-text'} style={style}>
             <span className="reserve-copyable-text__value">{hasText ? text : fallback}</span>
             {hasText && (
                 <button

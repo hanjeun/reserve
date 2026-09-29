@@ -21,7 +21,7 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', appearance = 'ove
     const queryClient = useQueryClient();
 
     const iconSize = size === 'sm' ? 18 : 22;
-    const btnSize  = appearance === 'plain' ? 44 : (size === 'sm' ? 36 : 44);
+    const btnSize  = appearance !== 'plain' && size === 'sm' ? 36 : 44;
 
     // initialStatus가 주어지면 그 값으로 캐시를 미리 채워두고(자체 조회 스킵), 없으면 직접 조회
     const { data: favoriteData, isError: statusFailed, isFetching: statusFetching, refetch: refetchStatus } = useQuery({
@@ -100,9 +100,14 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', appearance = 'ove
     // 로그인하지 않은 사용자에게는 버튼 미표시
     if (!isLoggedIn) return null;
 
-    const accessibleLabel = statusUnknown
-        ? (statusFailed ? '즐겨찾기 상태를 확인하지 못했어요. 눌러서 다시 확인' : '즐겨찾기 상태 확인 중')
-        : (isFavorite ? '즐겨찾기 삭제' : '즐겨찾기 추가');
+    let accessibleLabel;
+    if (!statusUnknown) {
+        accessibleLabel = isFavorite ? '즐겨찾기 삭제' : '즐겨찾기 추가';
+    } else if (statusFailed) {
+        accessibleLabel = '즐겨찾기 상태를 확인하지 못했어요. 눌러서 다시 확인';
+    } else {
+        accessibleLabel = '즐겨찾기 상태 확인 중';
+    }
     const blocked = toggleMutation.isPending || (statusUnknown && (!statusFailed || statusFetching));
 
     return (

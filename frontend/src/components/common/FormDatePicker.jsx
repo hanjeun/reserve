@@ -132,15 +132,13 @@ const FormDatePickerBase = ({
                 next[0] = date;
                 if (next[1]?.isBefore(date, 'day')) next[1] = null;
                 setRangePart(1);
-            } else {
+            } else if (next[0]?.isAfter(date, 'day')) {
                 // 끝 날짜를 시작 날짜보다 먼저 고르면 선택을 무효화하지 않고 날짜순으로
                 // 정렬한다. 사용자가 시작/종료 탭을 다시 찾아 누르게 만드는 상태를 피한다.
-                if (next[0]?.isAfter(date, 'day')) {
-                    next[1] = next[0];
-                    next[0] = date;
-                } else {
-                    next[1] = date;
-                }
+                next[1] = next[0];
+                next[0] = date;
+            } else {
+                next[1] = date;
             }
             return next;
         });
@@ -244,11 +242,11 @@ const FormDatePickerBase = ({
     const label = triggerLabel(mode, value, placeholder, format);
     const dialogLabel = mode === 'range' ? '날짜 범위 선택' : '날짜 선택';
     const isError = status === 'error';
-    const iconColor = disabled
-        ? colors.gray[400]
-        : isError && !hasValue
-            ? colors.error.main
-            : hasValue ? colors.primary.main : field.placeholderColor;
+    let iconColor;
+    if (disabled) iconColor = colors.gray[400];
+    else if (isError && !hasValue) iconColor = colors.error.main;
+    else if (hasValue) iconColor = colors.primary.main;
+    else iconColor = field.placeholderColor;
 
     return (
         <>

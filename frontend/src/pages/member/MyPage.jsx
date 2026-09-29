@@ -16,7 +16,7 @@ import {
 import { PageContainer, Button, DataState, FormInput, Avatar, Bone, SegmentedControl, FormSelect } from '../../components/common';
 import useTheme, { FONT_OPTIONS, ACCENT_OPTIONS } from '../../hooks/useTheme';
 import AddressSearch from '../../components/store/StoreForm/AddressSearch';
-import { useMessage } from '../../hooks';
+import { useMessage, useWindowWidth } from '../../hooks';
 import { memberService, businessService } from '../../services';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { hasAdminAccess } from '../../constants/roles';
@@ -30,7 +30,6 @@ import useExitAnimation from '../../hooks/useExitAnimation';
 import useImagePreview from '../../hooks/useImagePreview';
 import { useNavigate } from 'react-router-dom';
 import { colors, radius, shadows, fontSize, fontWeight, animation, breakpoints } from '../../styles/tokens';
-import { useWindowWidth } from '../../hooks';
 
 const { Text } = Typography;
 const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
@@ -808,13 +807,18 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
     );
 };
 
+// 상태 카드 배경색: success·warning 외에는 error 톤.
+const statusCardBackground = (type) => {
+    if (type === 'success') return colors.success.light;
+    if (type === 'warning') return colors.warning.light;
+    return colors.error.light;
+};
+
 const bizStyles = {
     statusCard: (type) => ({
         display: 'flex', alignItems: 'flex-start', gap: 12,
         padding: '16px',
-        backgroundColor: type === 'success' ? colors.success.light
-            : type === 'warning' ? colors.warning.light
-            : colors.error.light,
+        backgroundColor: statusCardBackground(type),
         borderRadius: radius.xl,
     }),
     infoNotice: {

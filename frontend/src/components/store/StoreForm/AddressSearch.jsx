@@ -246,7 +246,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         if (!state.open) return;
         if (e.key === 'ArrowDown')                     { e.preventDefault(); dispatch({ type: 'ARROW_DOWN' }); }
         else if (e.key === 'ArrowUp')                  { e.preventDefault(); dispatch({ type: 'ARROW_UP' }); }
-        else if (e.key === 'Enter' && state.results.length > 0) { handleSelect(state.results[state.activeIdx >= 0 ? state.activeIdx : 0]); }
+        else if (e.key === 'Enter' && state.results.length > 0) { handleSelect(state.results[Math.max(state.activeIdx, 0)]); }
         else if (e.key === 'Escape')                  { dispatch({ type: 'CLOSE_DROPDOWN' }); }
     };
 
@@ -262,6 +262,11 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         padding: '0 12px', height: heights.input,
         transition: 'border-color 0.2s',
     });
+
+    // 우편번호·상세주소 섹션 애니메이션 — 닫히는 중 / 직접 선택해 열림 / 프리필(애니메이션 없음)
+    let sectionAnimation = 'none';
+    if (sectionClosing) sectionAnimation = animation.slideUpOut;
+    else if (state.animateSection) sectionAnimation = animation.slideUpIn;
 
     return (
         <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
@@ -389,9 +394,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
             {sectionShouldRender && (
                 <div style={{
                     display: 'flex', gap: 8, minWidth: 0, width: '100%',
-                    animation: sectionClosing
-                        ? animation.slideUpOut
-                        : (state.animateSection ? animation.slideUpIn : 'none'),
+                    animation: sectionAnimation,
                 }}>
                     {section.zipCode && (
                         // 우편번호: readOnly → div 기반 터치 스크롤 컨테이너

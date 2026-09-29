@@ -66,7 +66,7 @@ function FormSkeleton() {
 
 // 페이지가 데이터 로딩 때 그리는 것과 같은 컴포넌트·개수·보기 방식 — 코드 로딩 → 데이터 로딩으로 넘어갈 때 모양이 안 바뀐다(2026-09-24).
 function CardsSkeleton({ pathname = '', search = '' }) {
-    if (/^\/my-favorites/.test(pathname)) {
+    if (pathname.startsWith('/my-favorites')) {
         return <PageContainer size="xl" paddingTop="40px">
             <ListingHeader title="즐겨찾기" description="즐겨찾기를 불러오는 중입니다." />
             <RefreshToolbarSkeleton />

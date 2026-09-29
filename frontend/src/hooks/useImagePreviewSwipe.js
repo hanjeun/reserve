@@ -63,7 +63,7 @@ const useImagePreviewSwipe = () => {
             // 마우스는 제외 — 데스크톱에는 좌우 버튼이 있고, 드래그는 팬에 쓰인다.
             if (e.pointerType === 'mouse' || !e.isPrimary) return;
             const el = openPreview();
-            if (!el || !el.contains(e.target)) return;
+            if (!el?.contains(e.target)) return;
             if (isZoomed(el)) return;
             root = el;
             startX = e.clientX;

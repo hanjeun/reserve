@@ -266,9 +266,16 @@ function AppRoutes() {
         previousHistoryIndexRef.current = historyIndex;
     }, [pathname, search, locationState, navigationType, isSearchPage]);
 
+    let layoutClassName = 'reserve-app-layout';
+    if (pathname === '/') {
+        layoutClassName = 'reserve-app-layout reserve-app-layout--home';
+    } else if (isSearchPage) {
+        layoutClassName = 'reserve-app-layout reserve-app-layout--search';
+    }
+
     return (
         <Layout
-            className={pathname === '/' ? 'reserve-app-layout reserve-app-layout--home' : isSearchPage ? 'reserve-app-layout reserve-app-layout--search' : 'reserve-app-layout'}
+            className={layoutClassName}
             style={{ minHeight: '100vh', backgroundColor: colors.background.default }}
         >
             <ScrollToTop />

@@ -139,6 +139,42 @@ const AdminAdsTab = () => {
         },
     ];
 
+    // 광고 목록 본문 — 오류 → 로딩(스켈레톤) → 표 순으로 판정한다.
+    const renderAdList = () => {
+        if (adsError) {
+            return (
+                <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
+                    onRetry={refetch} retrying={isFetching} compact />
+            );
+        }
+        if (loading || isPlaceholderData) {
+            return (
+                <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS}
+                    headers={SKELETON_HEADERS}
+                    actionBtns={1}
+                    pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
+                />
+            );
+        }
+        return (
+            <DataTable
+                rowKey="id"
+                columns={columns}
+                dataSource={ads}
+                pagination={{
+                    current: page + 1,
+                    pageSize: PAGE_SIZE,
+                    total: totalElements,
+                    showSizeChanger: false,
+                    onChange: (p) => setPage(p - 1),
+                }}
+                locale={{ emptyText: '등록된 광고가 없습니다.' }}
+            />
+        );
+    };
+
     return (
         <div>
             <FilterToolbar
@@ -147,32 +183,7 @@ const AdminAdsTab = () => {
                 onReload={refetch}
                 loading={loading || isFetching}
             />
-            {adsError ? (
-                <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
-                    onRetry={refetch} retrying={isFetching} compact />
-            ) : (loading || isPlaceholderData) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={1}
-                    pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            ) : (
-                <DataTable
-                    rowKey="id"
-                    columns={columns}
-                    dataSource={ads}
-                    pagination={{
-                        current: page + 1,
-                        pageSize: PAGE_SIZE,
-                        total: totalElements,
-                        showSizeChanger: false,
-                        onChange: (p) => setPage(p - 1),
-                    }}
-                    locale={{ emptyText: '등록된 광고가 없습니다.' }}
-                />
-            )}
+            {renderAdList()}
 
             <SanctionModal
                 open={!!suspendTarget}

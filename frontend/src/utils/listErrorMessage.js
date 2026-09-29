@@ -14,7 +14,7 @@ export const listRequestErrorKind = error => {
 
 const withObjectParticle = subject => {
     const last = subject.at(-1);
-    const code = last?.charCodeAt(0);
+    const code = last?.codePointAt(0);
     const hasFinalConsonant = code >= 0xac00 && code <= 0xd7a3
         ? (code - 0xac00) % 28 !== 0
         : false;

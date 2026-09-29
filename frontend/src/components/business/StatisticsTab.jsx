@@ -71,7 +71,8 @@ AdStatItem.propTypes = {
 // 줄어드는지를 한눈에 보여주는 가로 막대 퍼널. 노출을 100%로 놓고 클릭/전환을 그 대비 비율로 그린다
 // (값이 0보다 크면 눈에 안 보일 수 있는 아주 작은 폭도 최소 2%로 보장).
 const AdFunnelBar = ({ label, value, maxValue, color }) => {
-    const pct = maxValue > 0 ? Math.max((value / maxValue) * 100, value > 0 ? 2 : 0) : 0;
+    const minPct = value > 0 ? 2 : 0;
+    const pct = maxValue > 0 ? Math.max((value / maxValue) * 100, minPct) : 0;
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -90,6 +91,13 @@ AdFunnelBar.propTypes = {
     value: PropTypes.number.isRequired,
     maxValue: PropTypes.number.isRequired,
     color: PropTypes.string.isRequired,
+};
+
+// 기간 값 → 요약 카드 문구용 일수. 7d/90d 외에는 기본값 30일로 표시한다.
+const rangeDays = (range) => {
+    if (range === '7d') return '7';
+    if (range === '90d') return '90';
+    return '30';
 };
 
 // 날짜 라벨 축약 — YYYY-MM-DD → M/D (차트 X축용)
@@ -189,6 +197,129 @@ const StatisticsTab = () => {
             .filter((d) => d.value > 0)
         : [];
 
+    // 차트 본문 — 카드 껍데기는 항상 그리고, 본문만 로딩/데이터있음/데이터없음 3단으로 분기한다.
+    const renderReservationTrend = () => {
+        if (loading) {
+            return (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
+                    {[60, 100, 75, 130, 95, 150].map((h, i) => (
+                        <Bone key={i} width={28} height={h} borderRadius={6} />
+                    ))}
+                </div>
+            );
+        }
+        if (stats?.reservationTrend?.some((d) => d.value > 0)) {
+            return (
+                <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={stats.reservationTrend} margin={chartMargin}>
+                        <defs>
+                            <linearGradient id={reservationGradient.id} x1="0" y1="0" x2="0" y2="1">
+                                {reservationGradient.stops.map((s) => (
+                                    <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
+                                ))}
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid {...chartGridProps} />
+                        <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
+                        <YAxis width={chartYAxisWidth.count} tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
+                        <Tooltip labelFormatter={shortDate} formatter={(v) => [`${v}건`, '예약']} {...chartTooltipStyle} />
+                        <Area type="monotone" dataKey="value" stroke={colors.primary.main} strokeWidth={2} fill={`url(#${reservationGradient.id})`} />
+                    </AreaChart>
+                </ResponsiveContainer>
+            );
+        }
+        return (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Text type="secondary">해당 기간 예약이 없습니다.</Text>
+            </div>
+        );
+    };
+
+    const renderStatusPie = () => {
+        if (loading) {
+            return (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ position: 'relative', width: 180, height: 180 }}>
+                        <Bone width={180} height={180} borderRadius="50%" />
+                        <div style={{
+                            position: 'absolute', top: '50%', left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: 110, height: 110, borderRadius: '50%',
+                            background: colors.background.paper,
+                        }} />
+                    </div>
+                </div>
+            );
+        }
+        if (statusPieData.length > 0) {
+            return (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ width: 130, height: 130, flexShrink: 0 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={statusPieData}
+                                    cx="50%" cy="50%"
+                                    innerRadius={40} outerRadius={65}
+                                    paddingAngle={3} dataKey="value"
+                                    cornerRadius={chartPieCornerRadius}
+                                >
+                                    {statusPieData.map((entry, i) => (
+                                        <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
+                                    ))}
+                                </Pie>
+                                <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <PieLegend data={statusPieData} palette={chartPalette} />
+                </div>
+            );
+        }
+        return (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Text type="secondary">해당 기간 예약이 없습니다.</Text>
+            </div>
+        );
+    };
+
+    const renderRevenueTrend = () => {
+        if (loading) {
+            return (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
+                    {[90, 60, 120, 80, 140, 100].map((h, i) => (
+                        <Bone key={i} width={28} height={h} borderRadius={6} />
+                    ))}
+                </div>
+            );
+        }
+        if (stats?.revenueTrend?.some((d) => d.value > 0)) {
+            return (
+                <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={stats.revenueTrend} margin={chartMargin}>
+                        <defs>
+                            <linearGradient id={revenueGradient.id} x1="0" y1="0" x2="0" y2="1">
+                                {revenueGradient.stops.map((s) => (
+                                    <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
+                                ))}
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid {...chartGridProps} />
+                        <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
+                        <YAxis width={chartYAxisWidth.currency} tick={chartAxisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip labelFormatter={shortDate} formatter={(v) => [`${Number(v).toLocaleString()}원`, '순결제액']} {...chartTooltipStyle} />
+                        <Area type="monotone" dataKey="value" stroke={colors.success.main} strokeWidth={2} fill={`url(#${revenueGradient.id})`} />
+                    </AreaChart>
+                </ResponsiveContainer>
+            );
+        }
+        return (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Text type="secondary">해당 기간 순결제액이 없습니다.</Text>
+            </div>
+        );
+    };
+
     return (
         <div className="reserve-statistics-tab" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {toolbar}
@@ -220,7 +351,7 @@ const StatisticsTab = () => {
                     icon={<WalletOutlined />}
                     label="예약금 순결제액"
                     value={(stats?.totalDepositRevenue ?? 0).toLocaleString()}
-                    suffix={`원 · 최근 ${range === '7d' ? '7' : range === '90d' ? '90' : '30'}일`}
+                    suffix={`원 · 최근 ${rangeDays(range)}일`}
                     loading={loading}
                 />
                 <StatCard
@@ -246,34 +377,7 @@ const StatisticsTab = () => {
                     tableColumns={DATE_COUNT_COLUMNS}
                     tableRows={!loading ? (stats?.reservationTrend ?? []) : []}
                 >
-                    {loading ? (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
-                            {[60, 100, 75, 130, 95, 150].map((h, i) => (
-                                <Bone key={i} width={28} height={h} borderRadius={6} />
-                            ))}
-                        </div>
-                    ) : stats?.reservationTrend?.some((d) => d.value > 0) ? (
-                        <ResponsiveContainer width="100%" height={260}>
-                            <AreaChart data={stats.reservationTrend} margin={chartMargin}>
-                                <defs>
-                                    <linearGradient id={reservationGradient.id} x1="0" y1="0" x2="0" y2="1">
-                                        {reservationGradient.stops.map((s) => (
-                                            <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
-                                        ))}
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid {...chartGridProps} />
-                                <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
-                                <YAxis width={chartYAxisWidth.count} tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
-                                <Tooltip labelFormatter={shortDate} formatter={(v) => [`${v}건`, '예약']} {...chartTooltipStyle} />
-                                <Area type="monotone" dataKey="value" stroke={colors.primary.main} strokeWidth={2} fill={`url(#${reservationGradient.id})`} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text type="secondary">해당 기간 예약이 없습니다.</Text>
-                        </div>
-                    )}
+                    {renderReservationTrend()}
                 </ChartCard>
 
                 <ChartCard
@@ -286,45 +390,7 @@ const StatisticsTab = () => {
                     tableColumns={STATUS_COUNT_COLUMNS}
                     tableRows={!loading ? statusPieData : []}
                 >
-                    {loading ? (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div style={{ position: 'relative', width: 180, height: 180 }}>
-                                <Bone width={180} height={180} borderRadius="50%" />
-                                <div style={{
-                                    position: 'absolute', top: '50%', left: '50%',
-                                    transform: 'translate(-50%, -50%)',
-                                    width: 110, height: 110, borderRadius: '50%',
-                                    background: colors.background.paper,
-                                }} />
-                            </div>
-                        </div>
-                    ) : statusPieData.length > 0 ? (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 16 }}>
-                            <div style={{ width: 130, height: 130, flexShrink: 0 }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={statusPieData}
-                                            cx="50%" cy="50%"
-                                            innerRadius={40} outerRadius={65}
-                                            paddingAngle={3} dataKey="value"
-                                            cornerRadius={chartPieCornerRadius}
-                                        >
-                                            {statusPieData.map((entry, i) => (
-                                                <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <PieLegend data={statusPieData} palette={chartPalette} />
-                        </div>
-                    ) : (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text type="secondary">해당 기간 예약이 없습니다.</Text>
-                        </div>
-                    )}
+                    {renderStatusPie()}
                 </ChartCard>
 
                 <ChartCard
@@ -337,34 +403,7 @@ const StatisticsTab = () => {
                     tableColumns={DATE_REVENUE_COLUMNS}
                     tableRows={!loading ? (stats?.revenueTrend ?? []) : []}
                 >
-                    {loading ? (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
-                            {[90, 60, 120, 80, 140, 100].map((h, i) => (
-                                <Bone key={i} width={28} height={h} borderRadius={6} />
-                            ))}
-                        </div>
-                    ) : stats?.revenueTrend?.some((d) => d.value > 0) ? (
-                        <ResponsiveContainer width="100%" height={260}>
-                            <AreaChart data={stats.revenueTrend} margin={chartMargin}>
-                                <defs>
-                                    <linearGradient id={revenueGradient.id} x1="0" y1="0" x2="0" y2="1">
-                                        {revenueGradient.stops.map((s) => (
-                                            <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
-                                        ))}
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid {...chartGridProps} />
-                                <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
-                                <YAxis width={chartYAxisWidth.currency} tick={chartAxisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                                <Tooltip labelFormatter={shortDate} formatter={(v) => [`${Number(v).toLocaleString()}원`, '순결제액']} {...chartTooltipStyle} />
-                                <Area type="monotone" dataKey="value" stroke={colors.success.main} strokeWidth={2} fill={`url(#${revenueGradient.id})`} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text type="secondary">해당 기간 순결제액이 없습니다.</Text>
-                        </div>
-                    )}
+                    {renderRevenueTrend()}
                 </ChartCard>
             </div>
 

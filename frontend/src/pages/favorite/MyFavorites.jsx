@@ -45,56 +45,77 @@ const MyFavorites = () => {
         reviewCount: fav.storeReviewCount ?? 0,
     });
 
+    // 헤더 안내 문구 — 로딩 → 실패(빈 목록) → 목록 있음 → 빈 목록 순으로 판정한다.
+    const headerMessage = () => {
+        if (loading) return '즐겨찾기를 불러오는 중입니다.';
+        if (error && favorites.length === 0) return '즐겨찾기 목록을 확인하지 못했습니다.';
+        if (favorites.length > 0) return `총 ${favorites.length}개의 가게를 즐겨찾기했습니다.`;
+        return '마음에 드는 가게를 즐겨찾기에 추가해보세요.';
+    };
+
+    // 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다.
+    // 재조회 스켈레톤은 지금 보이던 카드 수만큼(최소 1개) 그린다 — 개수가 튀면 레이아웃이 출렁인다.
+    // 개수를 모르는 첫 로딩만 8개다. 목록이 비었는데 조회가 실패한 상태의 다시 시도는
+    // DataState 가 자체 진행 표시(retrying)를 갖는다.
+    // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .rsv-fav-grid 가 grid 로 정한다.
+    const renderContent = () => {
+        if (loading) {
+            return (
+                <output className="rsv-fav-grid" aria-label="즐겨찾기를 불러오는 중">
+                    <div style={{ display: 'contents' }} aria-hidden="true"><StoreCardSkeleton count={8} /></div>
+                </output>
+            );
+        }
+        if (error && favorites.length === 0) {
+            return (
+                <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
+                    onRetry={refetch} retrying={isFetching} style={{ marginTop: 100 }} />
+            );
+        }
+        if (refetching) {
+            return (
+                <output className="rsv-fav-grid" aria-label="즐겨찾기를 새로 불러오는 중">
+                    <div style={{ display: 'contents' }} aria-hidden="true">
+                        <StoreCardSkeleton count={Math.max(favorites.length, 1)} />
+                    </div>
+                </output>
+            );
+        }
+        if (favorites.length === 0) {
+            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없습니다." style={{ marginTop: 100 }} />;
+        }
+        return (
+            <>
+                {error && (
+                    <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
+                        title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                        onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />
+                )}
+                <div className="rsv-fav-grid">
+                    {favorites.map(fav => (
+                        <div key={fav.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
+                            <StoreCard store={toStoreShape(fav)} />
+                        </div>
+                    ))}
+                </div>
+            </>
+        );
+    };
+
     return (
         <PageContainer size="xl" paddingTop="40px" aria-busy={isFetching}>
             {/* 헤더 */}
             <div style={styles.header}>
                 <Title level={2} style={styles.title}>즐겨찾기</Title>
                 <Text type="secondary" style={{ fontSize: fontSize.lg }}>
-                    {loading ? '즐겨찾기를 불러오는 중입니다.' : error && favorites.length === 0
-                        ? '즐겨찾기 목록을 확인하지 못했습니다.' : favorites.length > 0
-                        ? `총 ${favorites.length}개의 가게를 즐겨찾기했습니다.`
-                        : '마음에 드는 가게를 즐겨찾기에 추가해보세요.'}
+                    {headerMessage()}
                 </Text>
             </div>
 
             <FilterToolbar onReload={refetch} loading={loading || refetching} />
 
-            {/* 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다.
-                재조회 스켈레톤은 지금 보이던 카드 수만큼(최소 1개) 그린다 — 개수가 튀면 레이아웃이 출렁인다.
-                개수를 모르는 첫 로딩만 8개다. 목록이 비었는데 조회가 실패한 상태의 다시 시도는
-                DataState 가 자체 진행 표시(retrying)를 갖는다. */}
-            {loading ? (
-                <div className="rsv-fav-grid" role="status" aria-label="즐겨찾기를 불러오는 중">
-                    <div style={{ display: 'contents' }} aria-hidden="true"><StoreCardSkeleton count={8} /></div>
-                </div>
-            ) : error && favorites.length === 0 ? (
-                <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
-                    onRetry={refetch} retrying={isFetching} style={{ marginTop: 100 }} />
-            ) : refetching ? (
-                <div className="rsv-fav-grid" role="status" aria-label="즐겨찾기를 새로 불러오는 중">
-                    <div style={{ display: 'contents' }} aria-hidden="true">
-                        <StoreCardSkeleton count={Math.max(favorites.length, 1)} />
-                    </div>
-                </div>
-            ) : favorites.length === 0 ? (
-                <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없습니다." style={{ marginTop: 100 }} />
-            ) : (
-                <>
-                    {error && (
-                        <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
-                            title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있습니다."
-                            onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />
-                    )}
-                    <div className="rsv-fav-grid">
-                        {favorites.map(fav => (
-                            <div key={fav.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
-                                <StoreCard store={toStoreShape(fav)} />
-                            </div>
-                        ))}
-                    </div>
-                </>
-            )}
+            {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
+            {renderContent()}
         </PageContainer>
     );
 };

@@ -253,6 +253,20 @@ const isExistingReservationSlot = (slot, storeId, dateKey, editingReservation) =
 const isSelectableSlot = (slot, storeId, dateKey, editingReservation) =>
     slot.available === true || isExistingReservationSlot(slot, storeId, dateKey, editingReservation);
 
+// DAY 예약 안내 문구 — 기존 예약 날짜 > 마감 > 기본 안내 순서로 고른다.
+const dayBookingNotice = (existingSelection, onlySlot) => {
+    if (existingSelection) return '기존 예약 날짜를 선택했어요';
+    if (onlySlot?.available === false) return '이 날은 예약이 마감됐어요';
+    return '이 가게는 날짜만 선택하면 돼요';
+};
+
+// 예약 시간 칸 라벨 — 예약 방식(DAY/SESSION/그 외)을 따라간다.
+const reservationTimeLabel = (bookingType) => {
+    if (bookingType === 'DAY') return '예약 확인';
+    if (bookingType === 'SESSION') return '회차 선택';
+    return '예약 시간';
+};
+
 const ExistingTimeNotice = () => (
     <p style={{ margin: '0 0 8px', fontSize: fontSize.sm, color: colors.text.tertiary }}>
         기존 예약 시간이에요. 저장할 때 예약 가능 여부를 다시 확인해요.
@@ -369,11 +383,7 @@ export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvai
         return (
             <div>
                 {existingSelection && <ExistingTimeNotice />}
-                <TimePlaceholder text={existingSelection
-                    ? '기존 예약 날짜를 선택했어요'
-                    : onlySlot?.available === false
-                    ? '이 날은 예약이 마감됐어요'
-                    : '이 가게는 날짜만 선택하면 돼요'} />
+                <TimePlaceholder text={dayBookingNotice(existingSelection, onlySlot)} />
             </div>
         );
     }
@@ -510,6 +520,8 @@ export const ReservationPanel = ({
     // DAY auto-fill runs in the same effect batch as lookup completion. Validation must see that
     // completion immediately, rather than the previous render's pending state.
     const handleAvailabilityChange = React.useCallback(next => { timeAvailabilityRef.current = next; }, []);
+    let submitLabel = isEditMode ? '예약 변경하기' : '예약 신청하기';
+    if (paying) submitLabel = '처리 중...';
     return (
     <div style={isPC ? pcFormStyles.panel : {}}>
         <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
@@ -539,7 +551,7 @@ export const ReservationPanel = ({
                     {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
                         "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
                     <Form.Item
-                        label={store?.bookingType === 'DAY' ? '예약 확인' : (store?.bookingType === 'SESSION' ? '회차 선택' : '예약 시간')}
+                        label={reservationTimeLabel(store?.bookingType)}
                         name="reservationTime"
                         // 날짜를 고르기 전에는 이 칸에 넣을 값 자체가 없다(슬롯을 날짜로 조회한다).
                         // 그런데도 required 를 걸어두면 아무것도 안 채우고 제출했을 때 날짜와 시간이
@@ -583,7 +595,7 @@ export const ReservationPanel = ({
                     </Form.Item>
                     <div style={{ marginTop: 24 }}>
                         <Button variant="primary" htmlType="submit" block loading={paying}>
-                            {paying ? '처리 중...' : (isEditMode ? '예약 변경하기' : '예약 신청하기')}
+                            {submitLabel}
                         </Button>
                     </div>
                 </>
@@ -658,10 +670,12 @@ const StoreDetail = () => {
         retryEditLoad,
     } = useStoreDetailActions({ id, store, isLoggedIn, user, form, pay, message });
 
+    const categoryPart = store?.category ? store.category + ' ' : '';
+    const addressPart = store?.address ? store.address + '. ' : '';
     useDocumentTitle(
         store?.name ?? null,
         store
-            ? `${store.name} 예약 | ${store.category ? store.category + ' ' : ''}${store.address ? store.address + '. ' : ''}RESERVE에서 간편하게 예약하세요.`
+            ? `${store.name} 예약 | ${categoryPart}${addressPart}RESERVE에서 간편하게 예약하세요.`
             : undefined
     );
 

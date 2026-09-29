@@ -195,6 +195,41 @@ const PaymentOperationsTab = () => {
         webhooks: '처리가 끝나지 않은 PortOne 웹훅입니다. 재처리는 같은 멱등 관문을 통과합니다.',
     };
 
+    // 목록 영역 — 오류 / 스켈레톤 / 표. 광고 큐에서는 activeQuery·columns 가 없으므로
+    // 미리 계산하지 않고 렌더 시점(광고 외 큐)에만 호출한다.
+    const renderTableBody = () => {
+        if (activeQuery.isError) {
+            return (
+                <DataState state="error" kind="payment" subject="결제 운영 목록" error={activeQuery.error}
+                    onRetry={activeQuery.refetch} retrying={activeQuery.isFetching} compact />
+            );
+        }
+        if (loading) {
+            return (
+                <AdminTableSkeleton
+                    rows={6}
+                    cols={columns.map((column) => column.width ?? null)}
+                    headers={columns.map((column) => column.title)}
+                    actionBtns={queue === 'issues' ? 0 : 1}
+                />
+            );
+        }
+        return (
+            <DataTable
+                columns={columns}
+                dataSource={data}
+                rowKey={queue === 'ready' ? 'paymentId' : 'id'}
+                locale={{ emptyText: '처리할 항목이 없습니다.' }}
+                pagination={{
+                    current: page,
+                    pageSize: PAGE_SIZE,
+                    total,
+                    onChange: setPage,
+                }}
+            />
+        );
+    };
+
     return (
         <div>
             <div style={{ maxWidth: 560, marginBottom: 16 }}>
@@ -218,30 +253,7 @@ const PaymentOperationsTab = () => {
                 loading={activeQuery?.isFetching}
             />
 
-            {activeQuery.isError ? (
-                <DataState state="error" kind="payment" subject="결제 운영 목록" error={activeQuery.error}
-                    onRetry={activeQuery.refetch} retrying={activeQuery.isFetching} compact />
-            ) : loading ? (
-                <AdminTableSkeleton
-                    rows={6}
-                    cols={columns.map((column) => column.width ?? null)}
-                    headers={columns.map((column) => column.title)}
-                    actionBtns={queue === 'issues' ? 0 : 1}
-                />
-            ) : (
-                <DataTable
-                    columns={columns}
-                    dataSource={data}
-                    rowKey={queue === 'ready' ? 'paymentId' : 'id'}
-                    locale={{ emptyText: '처리할 항목이 없습니다.' }}
-                    pagination={{
-                        current: page,
-                        pageSize: PAGE_SIZE,
-                        total,
-                        onChange: setPage,
-                    }}
-                />
-            )}
+            {renderTableBody()}
             </>}
         </div>
     );

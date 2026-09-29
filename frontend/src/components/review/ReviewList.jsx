@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Rate, Typography } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, DataState, ReviewCardSkeleton } from '../common';
+import {
+    DataState, ReviewCardSkeleton, FormInput, FormTextArea, FormField,
+} from '../common';
 import {
     UserOutlined, EditOutlined, DeleteOutlined,
     CheckOutlined, CloseOutlined,
@@ -13,7 +15,6 @@ import { reviewKeys } from '../../hooks/queryKeys';
 import { invalidateReviewData } from '../../hooks/invalidateAfterWrite';
 import useAuthStore from '../../store/useAuthStore';
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
-import { FormInput, FormTextArea, FormField } from '../common';
 
 const { Text } = Typography;
 
@@ -24,6 +25,13 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                      errors = {}, clearError = () => {} }) => {
     const [hover, setHover] = useState(0);
     const displayRating = hover || form.rating;
+    // 제출 버튼 문구 — 수정/작성 여부와 진행 중 여부 조합
+    let submitLabel;
+    if (formLoading) {
+        submitLabel = isEdit ? '저장 중...' : '등록 중...';
+    } else {
+        submitLabel = isEdit ? '저장' : '리뷰 등록';
+    }
 
     return (
         <div style={styles.card}>
@@ -93,7 +101,7 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                     disabled={formLoading}
                 >
                     <CheckOutlined style={{ marginRight: 4 }} />
-                    {formLoading ? (isEdit ? '저장 중...' : '등록 중...') : (isEdit ? '저장' : '리뷰 등록')}
+                    {submitLabel}
                 </button>
             </div>
         </div>

@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, DataState } from '../../components/common';
+import { DataState } from '../../components/common';
 import RegionSheet from '../../components/discovery/RegionSheet';
 import StoreListRow from '../../components/store/StoreListRow';
 import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
@@ -323,30 +323,45 @@ function RecommendedStores({ region = '' }) {
     });
     const stores = storeContent(data);
 
+    // 로딩 → 실패 → 빈 목록 → 목록 순으로 판정한다.
+    // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .reserve-discovery-store-list 가 grid 로 정한다.
+    const renderStores = () => {
+        if (isLoading) {
+            return (
+                <output className="reserve-discovery-store-list reserve-store-list-rows" aria-label="추천 가게를 불러오는 중" aria-busy="true">
+                    <StoreListRowSkeleton count={4} />
+                </output>
+            );
+        }
+        if (isError) {
+            return (
+                <DataState state="error" kind="store" subject="추천 가게" error={error}
+                    title="추천 가게를 불러오지 못했어요." onRetry={refetch} retrying={isFetching} compact />
+            );
+        }
+        if (stores.length === 0) {
+            return (
+                <div className="reserve-discovery-empty">
+                    <DataState state="empty" kind="store" title={region ? '이 지역에 등록된 가게가 없습니다.' : '아직 추천할 가게가 없습니다.'} />
+                </div>
+            );
+        }
+        return (
+            <ul className="reserve-discovery-store-list reserve-store-list-rows">
+                {stores.map(store => (
+                    <li key={store.id}><StoreListRow store={store} /></li>
+                ))}
+            </ul>
+        );
+    };
+
     return (
         <section className="reserve-discovery-recommended" aria-labelledby="home-recommended-title">
             <SectionHeading
                 title={<span id="home-recommended-title">이런 곳은 어때요?</span>}
                 action={<Link to={withRegion('/stores?sort=rating', region)} className="reserve-discovery-more">전체 보기 <ArrowRightOutlined aria-hidden="true" /></Link>}
             />
-            {isLoading ? (
-                <div className="reserve-discovery-store-list reserve-store-list-rows" role="status" aria-label="추천 가게를 불러오는 중" aria-busy="true">
-                    <StoreListRowSkeleton count={4} />
-                </div>
-            ) : isError ? (
-                <DataState state="error" kind="store" subject="추천 가게" error={error}
-                    title="추천 가게를 불러오지 못했어요." onRetry={refetch} retrying={isFetching} compact />
-            ) : stores.length === 0 ? (
-                <div className="reserve-discovery-empty">
-                    <DataState state="empty" kind="store" title={region ? '이 지역에 등록된 가게가 없습니다.' : '아직 추천할 가게가 없습니다.'} />
-                </div>
-            ) : (
-                <ul className="reserve-discovery-store-list reserve-store-list-rows">
-                    {stores.map(store => (
-                        <li key={store.id}><StoreListRow store={store} /></li>
-                    ))}
-                </ul>
-            )}
+            {renderStores()}
         </section>
     );
 }

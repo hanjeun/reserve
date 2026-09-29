@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
-import { CloseOutlined, MoreOutlined, SendOutlined } from '@ant-design/icons';
+import { CloseOutlined, MoreOutlined } from '@ant-design/icons';
+import ChatComposer from './ChatComposer';
 import ChatIntro from './ChatIntro';
 import MessengerAvatar from './MessengerAvatar';
 import { SUPPORT_DISPLAY_NAME } from '../../constants/chatIntro';
@@ -7,8 +8,10 @@ import { SUPPORT_DISPLAY_NAME } from '../../constants/chatIntro';
 /**
  * 채팅 관리 화면의 미리보기 — 손님이 보는 메신저 대화창 모양 그대로 그린다 (2026-09-23).
  * 헤더·본문·입력창은 메신저의 실제 클래스를 재사용한다. 가게·고객지원 모두 첫 대화에는 항상 안내가 보인다(09-24 통일).
- * 질문 버튼은 실제처럼 눌러 볼 수 있고, 입력창·전송·메뉴는 모양만 있다.
+ * 질문 버튼은 실제처럼 눌러 볼 수 있다. 입력창은 실제 입력 관문(ChatComposer)을 그대로 그리되 inert 로 막아 모양만 보인다.
  */
+const noop = () => {};
+
 export default function ChatIntroPreview({ kind = 'store', name, imageSrc, userName, notice, greeting, items = [] }) {
     const isStore = kind === 'store';
     const displayName = name || (isStore ? '가게' : SUPPORT_DISPLAY_NAME);
@@ -40,11 +43,8 @@ export default function ChatIntroPreview({ kind = 'store', name, imageSrc, userN
                         items={items}
                     />
                 </div>
-                <div className="reserve-messenger-composer-wrap" aria-hidden="true">
-                    <div className="reserve-chat-composer reserve-chat-intro-device-composer">
-                        <span>메시지를 입력하세요</span>
-                        <span className="reserve-chat-send reserve-chat-intro-device-send"><SendOutlined /></span>
-                    </div>
+                <div className="reserve-messenger-composer-wrap" aria-hidden="true" inert>
+                    <ChatComposer value="" onChange={noop} onSend={noop} onFileChange={noop} imageEnabled />
                 </div>
             </div>
         </div>

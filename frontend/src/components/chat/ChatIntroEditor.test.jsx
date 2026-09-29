@@ -26,7 +26,7 @@ describe('chat intro editor', () => {
         fireEvent.click(within(preview()).getByRole('button', { name: '주차' }));
         expect(within(preview()).getByText('2대 가능')).toBeInTheDocument();
         expect(within(preview()).getByText('가게 문의')).toBeInTheDocument();
-        expect(within(preview()).getByText('메시지를 입력하세요')).toBeInTheDocument();
+        expect(within(preview()).getByPlaceholderText('메시지를 입력하세요')).toBeInTheDocument();
         fireEvent.click(within(preview()).getByRole('button', { name: '처음부터' }));
         expect(within(preview()).getByRole('button', { name: '주차' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '저장하기' })).toBeDisabled();

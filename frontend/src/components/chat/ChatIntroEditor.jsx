@@ -168,25 +168,25 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
                 </section>
 
                 <section className="reserve-chat-intro-card">
-                    <div className="reserve-chat-intro-card-head reserve-chat-intro-card-head--action">
-                        <div>
+                    <div className="reserve-chat-intro-card-head">
+                        <div className="reserve-chat-intro-title-row">
                             <h3>인사말</h3>
-                            <p>공지사항 아래에 보이는 인사예요. {'{이름}'}은 손님 이름으로 바뀌고(모르면 &apos;회원&apos;), 빈 줄로 문단을 나눠요. 비우면 기본 문구가 보여요.</p>
+                            <Button variant="ghost-sm" size="sm" onClick={() => setField('greeting', defaultGreeting)}
+                                disabled={draft.greeting === defaultGreeting}>기본 문구로</Button>
                         </div>
-                        <Button variant="ghost-sm" size="sm" onClick={() => setField('greeting', defaultGreeting)}
-                            disabled={draft.greeting === defaultGreeting}>기본 문구로</Button>
+                        <p>공지사항 아래에 보이는 인사예요. {'{이름}'}은 손님 이름으로 바뀌고(모르면 &apos;회원&apos;), 빈 줄로 문단을 나눠요. 비우면 기본 문구가 보여요.</p>
                     </div>
                     <FormTextArea value={draft.greeting} onChange={event => setField('greeting', event.target.value)}
                         maxLength={LIMITS.greeting} showCount rows={5} aria-label="인사말" />
                 </section>
 
                 <section className="reserve-chat-intro-card">
-                    <div className="reserve-chat-intro-card-head reserve-chat-intro-card-head--action">
-                        <div>
+                    <div className="reserve-chat-intro-card-head">
+                        <div className="reserve-chat-intro-title-row">
                             <h3>자주 묻는 질문 <span className="reserve-chat-intro-count">{items.length} / {LIMITS.items}</span></h3>
-                            <p>손님이 질문을 누르면 답변이 바로 보여요. 손님 화면에만 보이는 안내라 문의함에는 쌓이지 않아요.</p>
+                            <Button variant="ghost-sm-primary" size="sm" icon={<PlusOutlined />} onClick={addItem} disabled={full}>질문 추가</Button>
                         </div>
-                        <Button variant="ghost-sm-primary" size="sm" icon={<PlusOutlined />} onClick={addItem} disabled={full}>질문 추가</Button>
+                        <p>손님이 질문을 누르면 답변이 바로 보여요. 손님 화면에만 보이는 안내라 문의함에는 쌓이지 않아요.</p>
                     </div>
                     {items.length === 0 ? (
                         <div className="reserve-chat-intro-empty">
@@ -230,11 +230,11 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
 
             <section className="reserve-chat-intro-preview" aria-label="미리보기">
                 <div className="reserve-chat-intro-preview-head">
-                    <div>
+                    <div className="reserve-chat-intro-title-row">
                         <strong>미리보기</strong>
-                        <span>손님이 처음 문의할 때 보이는 화면이에요. 질문을 눌러 보세요.</span>
+                        <Button variant="ghost-sm" size="sm" icon={<ReloadOutlined />} onClick={() => setPreviewRound(round => round + 1)}>처음부터</Button>
                     </div>
-                    <Button variant="ghost-sm" size="sm" icon={<ReloadOutlined />} onClick={() => setPreviewRound(round => round + 1)}>처음부터</Button>
+                    <p>손님이 처음 문의할 때 보이는 화면이에요. 질문을 눌러 보세요.</p>
                 </div>
                 <ChatIntroPreview
                     key={previewRound + ':' + JSON.stringify(previewItems)}

@@ -125,7 +125,7 @@ for (const policy of dashboardPolicies) {
 
   for (const rowId of policy.collapsedRowIds) {
     const row = (dashboard.panels ?? []).find((panel) => panel.id === rowId);
-    if (!row || row.type !== 'row' || row.collapsed !== true || !row.panels?.length) {
+    if (row?.type !== 'row' || row.collapsed !== true || !row.panels?.length) {
       fail(policy.file, `row ${rowId} must remain collapsed and own its detail panels`);
     }
   }
@@ -138,7 +138,7 @@ for (const policy of dashboardPolicies) {
 
   if (policy.uid === 'reserve-logs') {
     const search = dashboard.templating?.list?.find((variable) => variable.name === 'search');
-    if (!search || search.query !== '' || search.current?.value !== '') {
+    if (search?.query !== '' || search.current?.value !== '') {
       fail(policy.file, 'log search must start blank instead of exposing the .* regular expression');
     }
   }

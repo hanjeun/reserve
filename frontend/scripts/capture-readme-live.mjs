@@ -50,7 +50,7 @@ const REPOSITORY_DIR = path.resolve(FRONTEND_DIR, '..');
 const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images');
 const AUTH_DIR = path.join(FRONTEND_DIR, '.readme-capture');
 const AUTH_FILE = path.join(AUTH_DIR, 'auth.json');
-const BASE_URL = (process.env.README_BASE_URL || 'https://reserve.it.kr').replace(/\/+$/, '');
+const BASE_URL = (process.env.README_BASE_URL || 'https://reserve.it.kr').replace(/(?<!\/)\/+$/, '');
 const VIEWPORT = { width: 1600, height: 900 };
 const CDP_URL = `http://127.0.0.1:${process.env.README_CDP_PORT || 9222}`;
 const GRAFANA_URL = process.env.README_GRAFANA_URL || 'https://grafana.reserve.it.kr/d/reserve-logs';
@@ -85,7 +85,7 @@ async function importAuthFromChrome() {
     try {
         const context = browser.contexts()[0];
         const state = context ? await context.storageState() : { cookies: [], origins: [] };
-        const belongs = host => AUTH_DOMAINS.some(domain => host.replace(/^\./, '') === domain);
+        const belongs = host => AUTH_DOMAINS.includes(host.replace(/^\./, ''));
         const cookies = state.cookies.filter(cookie => belongs(cookie.domain));
         const origins = state.origins.filter(origin => belongs(new URL(origin.origin).hostname));
         if (cookies.length === 0) {

@@ -162,6 +162,7 @@ test('list region hover surface stays smaller than its touch target and reduced 
 });
 
 test('mobile region sheet entrance follows one upward path without a snap back', async ({ page, isMobile }) => {
+    // 바텀시트 등장 모션은 모바일에서만 쓰이므로 데스크톱 프로젝트에서는 건너뛴다.
     test.skip(!isMobile, 'Mobile bottom sheet only');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.route('**/api/stores/regions', async route => {

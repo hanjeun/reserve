@@ -144,6 +144,7 @@ test('store registration uses the shared calendar and restores a browser-local d
 });
 
 test('mobile registration and editing keep short structured fields in compact rows', async ({ page }, testInfo) => {
+    // 짧은 필드를 한 줄에 묶는 compact 행은 모바일 레이아웃 전용이라 다른 프로젝트에서는 건너뛴다.
     test.skip(!testInfo.project.name.includes('mobile'), '모바일 레이아웃 전용 검증');
 
     const verifyCompactRows = async () => {

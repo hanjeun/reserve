@@ -17,8 +17,8 @@ node "$ROOT/scripts/prepare-v270-rollback.mjs" "$BRIDGE_DIR" --git-patch | git -
     --tests kr.it.reserve.chat.ChatConcurrencyGuardTest bootJar --console=plain
 )
 BRIDGE_JAR="$BRIDGE_DIR/backend/build/libs/reserve-2.6.3.jar"
-test -s "$BRIDGE_JAR"
-if [ -n "${GITHUB_OUTPUT:-}" ]; then
+[[ -s "$BRIDGE_JAR" ]]
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   printf 'bridge_dir=%s\nbridge_jar=%s\n' "$BRIDGE_DIR" "$BRIDGE_JAR" >> "$GITHUB_OUTPUT"
 fi
 printf 'Rollback compatibility bridge verified: base=%s\n' "$BASE"

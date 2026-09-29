@@ -125,7 +125,8 @@ docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 || die "container '$MYSQL_CONT
 [[ -n "${DB_PASSWORD:-}" ]] || die "DB_PASSWORD is not set (check $CONFIG_FILE)"
 
 container_running() {
-    [[ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]]
+    local container=$1
+    [[ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || true)" = "true" ]]
 }
 
 if [[ "$TARGET_DB" = "$DB_NAME" ]] && (container_running blue || container_running green); then

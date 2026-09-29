@@ -549,6 +549,7 @@ test('messenger: a direct messages URL stays mobile-only and hands desktop back 
 });
 
 test('messenger: mobile thread back keeps the return animation before restoring the list', async ({ page }, testInfo) => {
+    // 스레드 뒤로가기 전환은 모바일 레이아웃에만 있으므로 다른 프로젝트에서는 건너뛴다.
     test.skip(testInfo.project.name !== 'mobile-chromium', '모바일 전용 전환입니다.');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await mockApi(page, user);

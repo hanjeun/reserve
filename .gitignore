@@ -107,5 +107,5 @@ CLAUDE.md
 # ========================
 # 세션 쿠키(리프레시 토큰 포함)가 들어 있다. npm run capture:readme:clean 전까지 남아 있으니 절대 올라가지 않게 막는다.
 frontend/.readme-capture/
-docs/images/readme-v2.6/.*.tmp
-docs/images/readme-v2.6/*.new.png
+docs/images/.*.tmp
+docs/images/*.new.png

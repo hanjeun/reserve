@@ -256,7 +256,7 @@ test('photo captions stay below the image in narrow chat bubbles', async ({ page
 
 test('photo-only messages use multipart upload and an authenticated preview', async ({ page }, testInfo) => {
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '사진 문의' }]);
-    const png = readFileSync(new URL('../../docs/images/readme-v2.6/store-detail.png', import.meta.url));
+    const png = readFileSync(new URL('../../docs/images/store-detail.png', import.meta.url));
     let upload;
     await page.route('**/api/chat/images/config', route => ok(route, { enabled: true, maxBytes: 8388608 }));
     await page.route('**/api/chat/rooms/1/images', route => {

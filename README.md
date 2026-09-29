@@ -3,8 +3,8 @@
 <a href="https://reserve.it.kr"><img src="frontend/public/og-image.png" alt="RESERVE — 예약이 필요한 순간" width="760" /></a>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/readme-title-dark.svg" />
-  <img src="docs/images/readme/readme-title-light.svg" alt="예약이 필요한 순간, RESERVE — 업종을 가리지 않고 찾고 · 예약하고 · 결제까지 한 번에" width="640" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/title-dark.svg" />
+  <img src="docs/images/title-light.svg" alt="예약이 필요한 순간, RESERVE — 업종을 가리지 않고 찾고 · 예약하고 · 결제까지 한 번에" width="640" />
 </picture>
 
 [**서비스 바로가기**](https://reserve.it.kr) &nbsp;·&nbsp;
@@ -38,15 +38,15 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 
 | 홈 | 가게 목록 |
 |---|---|
-| ![홈](docs/images/readme-v2.6/home.png) | ![가게 목록](docs/images/readme-v2.6/stores.png) |
+| ![홈](docs/images/home.png) | ![가게 목록](docs/images/stores.png) |
 
 | 가게 상세 | 사업자 패널 |
 |---|---|
-| ![가게 상세](docs/images/readme-v2.6/store-detail.png) | ![사업자 패널](docs/images/readme-v2.6/business.png) |
+| ![가게 상세](docs/images/store-detail.png) | ![사업자 패널](docs/images/business.png) |
 
 | 관리자 패널 | 모니터링 |
 |---|---|
-| ![관리자 패널](docs/images/readme-v2.6/admin.png) | ![Grafana 모니터링](docs/images/readme-v2.6/monitoring.png) |
+| ![관리자 패널](docs/images/admin.png) | ![Grafana 모니터링](docs/images/monitoring.png) |
 
 ## 주요 기능
 

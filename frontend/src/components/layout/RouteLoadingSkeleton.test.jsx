@@ -57,10 +57,26 @@ describe('route chunk loading patterns', () => {
 
     it('mirrors the full home structure while its route chunk loads', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/" />);
-        expect(container.querySelector('.reserve-route-discovery-location')).toBeInTheDocument();
-        expect(container.querySelectorAll('.reserve-route-discovery-shortcut')).toHaveLength(10);
-        expect(container.querySelector('.reserve-route-discovery-notice')).toBeInTheDocument();
-        expect(container.querySelectorAll('.reserve-route-discovery-stores .reserve-store-list-row-skeleton')).toHaveLength(4);
+        const home = container.querySelector('.reserve-discovery-home');
+        // 실제 홈과 같은 순서: 지역 줄 → 배너 → 바로가기(서비스 6 + 빠른 메뉴 4) → 추천. 홈에 없는 공지 줄은 없다.
+        expect(Array.from(home.children, child => child.className)).toEqual([
+            'reserve-discovery-location',
+            'reserve-discovery-featured',
+            'reserve-discovery-shortcuts',
+            'reserve-discovery-recommended',
+        ]);
+        expect(container.querySelectorAll('.reserve-discovery-shortcut-group--services .reserve-discovery-shortcut')).toHaveLength(6);
+        expect(container.querySelectorAll('.reserve-discovery-shortcut-group--quick .reserve-discovery-shortcut')).toHaveLength(4);
+        expect(container.querySelectorAll('.reserve-discovery-shortcut-group-title')).toHaveLength(2);
+        expect(container.querySelectorAll('.reserve-discovery-store-list .reserve-store-list-row-skeleton')).toHaveLength(4);
+    });
+
+    it('lets the reservation search bone shrink and keeps the refresh in the real refresh slot', () => {
+        const { container } = render(<RouteSkeletonPreview pathname="/my-reservations" />);
+        const row = container.querySelector('.reserve-filter-toolbar-secondary');
+        expect(row.firstElementChild).toHaveStyle({ flexShrink: '1', minWidth: '0px', maxWidth: '480px' });
+        expect(row.querySelector('.reserve-filter-toolbar-refresh > .reserve-skeleton-block')).toHaveStyle({ width: '70px', height: '16px' });
+        expect(container.querySelector('.reserve-explore-filters')).toHaveStyle({ minHeight: '44px' });
     });
 
     it('keeps reservations at the real page width, heading and selected card layout', () => {

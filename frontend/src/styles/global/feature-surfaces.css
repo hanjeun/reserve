@@ -1622,14 +1622,18 @@
 }
 .reserve-route-store-toolbar-spacer { flex: 1; min-width: 0; }
 .reserve-route-skeleton--document { max-width: 700px; }
-.reserve-route-skeleton--reservations,
-.reserve-route-skeleton--cards,
-.reserve-route-skeleton--benefits { padding: 0; }
+/* 안쪽 PageContainer·혜택 틀이 폭과 여백을 직접 정한다. 바깥 틀이 여백·최대 폭을 또 주면 안 된다.
+   클래스 두 개로 적는 이유: 아래 모바일 규칙(.reserve-route-skeleton { padding-inline: 20px })과 명시도가 같으면
+   뒤에 선언된 그쪽이 이겨 여백이 두 번 들어가고, 1200px 제한이 혜택(1248px) 틀을 좁혀 로딩 뒤 넓어졌다(2026-09-29 실측). */
+.reserve-route-skeleton.reserve-route-skeleton--reservations,
+.reserve-route-skeleton.reserve-route-skeleton--cards,
+.reserve-route-skeleton.reserve-route-skeleton--benefits { max-width: none; padding: 0; }
 .reserve-route-skeleton.reserve-route-skeleton--search { max-width: none; padding: 0; }
 .reserve-route-skeleton.reserve-route-skeleton--my-page { padding: 0; }
 .reserve-route-skeleton--form { max-width: 420px; }
 .reserve-route-skeleton--store-form { max-width: 1000px; }
-.reserve-route-skeleton--discovery { max-width: 1248px; --reserve-route-banner-ratio: 3 / 2; padding-top: 12px; }
+/* 홈 뼈대는 실제 홈 틀(.reserve-discovery-home)이 폭·여백을 정한다 — 바깥 틀은 여백 없이 감싸기만 한다. */
+.reserve-route-skeleton.reserve-route-skeleton--discovery { max-width: none; padding: 0; }
 .reserve-route-skeleton-copy,
 .reserve-route-skeleton-form { display: flex; flex-direction: column; gap: 24px; }
 .reserve-store-form-skeleton { display: flex; flex-direction: column; gap: 32px; }
@@ -1661,20 +1665,10 @@
 .reserve-route-skeleton-reservation { display: flex; gap: 16px; padding-block: 18px; border-bottom: 1px solid var(--c-border-light, #f2f4f6); }
 .reserve-route-skeleton-reservation .reserve-route-skeleton-copy { flex: 1; min-width: 0; gap: 5px; }
 .reserve-route-skeleton-detail { display: grid; gap: 28px; }
-.reserve-route-discovery-body { display: flex; flex-direction: column; }
-.reserve-route-discovery-location { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.reserve-route-skeleton-shortcuts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 22px; margin-block: 28px 24px; }
-.reserve-route-discovery-shortcut { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.reserve-route-discovery-notice { display: flex; min-height: 62px; align-items: center; gap: 18px; border-block: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-route-discovery-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-block: 28px 18px; }
-.reserve-route-discovery-heading > div:first-child { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
-/* 홈 추천과 같은 배치: 900px 미만 1열, 이상 2열 (.reserve-discovery-store-list 와 같다) */
-.reserve-route-discovery-stores { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px 20px; }
-@media (min-width: 900px) { .reserve-route-discovery-stores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 바로가기 이름 자리 — 실제 글자 줄 높이(글자 크기 × 1.5)와 같게 둔다. */
+.reserve-route-discovery-shortcut-label { height: 1.5em; display: flex; align-items: center; }
 @media (min-width: 576px) { .reserve-route-skeleton--reservations { --reserve-route-row-image: 72px; } }
 @media (min-width: 900px) {
-    .reserve-route-skeleton--discovery { --reserve-route-banner-ratio: 5 / 2; }
-    .reserve-route-skeleton-shortcuts { grid-template-columns: repeat(10, minmax(0, 1fr)); }
     .reserve-route-skeleton--store-form { padding-top: 48px; }
     .reserve-route-skeleton-detail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .reserve-route-skeleton-detail > :first-child { grid-row: span 2; }

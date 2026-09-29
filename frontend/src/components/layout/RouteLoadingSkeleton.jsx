@@ -17,7 +17,11 @@ import MyPageSkeleton from './MyPageSkeleton';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 
 const ROWS = ['one', 'two', 'three', 'four'];
-const HOME_SHORTCUTS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+// 홈 바로가기 두 묶음 — 서비스 분야별(분야 수만큼) + 빠른 메뉴 4칸(평점순·관심 가게·내 예약·메시지). pages/Home 의 SHORTCUT_GROUPS 와 같은 개수.
+const HOME_SHORTCUT_GROUPS = [
+    { key: 'services', count: SERVICE_DOMAIN_OPTIONS.length },
+    { key: 'quick', count: 4 },
+];
 
 function ListingHeader({ title, description, marginBottom = 32 }) {
     return <div style={{ marginBottom }}>
@@ -28,7 +32,9 @@ function ListingHeader({ title, description, marginBottom = 32 }) {
 ListingHeader.propTypes = { title: PropTypes.string.isRequired, description: PropTypes.string.isRequired, marginBottom: PropTypes.number };
 
 function ListingToolbarSkeleton() {
-    return <div className="reserve-explore-filters" aria-hidden="true">
+    // 실제 줄은 보기 전환·필터 버튼이 44px 터치 영역이라 44 + 아래 8 + 구분선 1 = 53px 이다.
+    // 뼈대만 두면 36px 로 줄어 로딩이 끝날 때 아래 내용이 8px 밀렸다(2026-09-29 실측).
+    return <div className="reserve-explore-filters" aria-hidden="true" style={{ minHeight: 44, boxSizing: 'content-box' }}>
         <Bone width={72} height={36} />
         <span style={{ flex: 1 }} />
         <div className="reserve-explore-filter-controls"><Bone width={82} height={36} /><Bone width={90} height={36} /></div>
@@ -36,11 +42,13 @@ function ListingToolbarSkeleton() {
 }
 
 function RefreshToolbarSkeleton({ search = false }) {
+    // 실제 FilterToolbar 와 같은 배치: 검색칸은 남는 폭을 채우되 줄어들 수 있고(최대 480px),
+    // 새로고침은 같은 .reserve-filter-toolbar-refresh 자리에 글자 버튼 크기(약 70x18)로 둔다.
+    // Bone 은 기본이 flexShrink 0 이라 100% 폭 검색 뼈대가 줄지 않아 새로고침이 화면 밖(390 폭에서 x=406)으로 밀렸다.
     return <div className="reserve-filter-toolbar" aria-hidden="true">
         <div className={`reserve-filter-toolbar-secondary${search ? '' : ' reserve-filter-toolbar-secondary--refresh-only'}`}>
-            {search && <Bone width="100%" height={40} style={{ maxWidth: 480 }} />}
-            <span style={{ flex: 1 }} />
-            <Bone width={36} height={36} />
+            {search && <Bone height={40} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, maxWidth: 480 }} />}
+            <div className="reserve-filter-toolbar-refresh"><Bone width={70} height={16} /></div>
         </div>
     </div>;
 }
@@ -122,33 +130,49 @@ function BenefitsRouteSkeleton() {
 }
 
 
+// 실제 홈(pages/Home)의 틀 클래스를 그대로 써서 위치·여백·반응형 경계를 홈 CSS 한 곳에서 따라가게 한다(2026-09-29).
+// 예전엔 전용 클래스로 따로 그려 홈에 없는 공지 줄, 한 줄 10칸 바로가기, 89px 제목 줄이 있어 로딩 뒤 모양이 바뀌었다.
 function DiscoverySkeleton() {
     return (
-        <div className="reserve-route-discovery-body">
-            <div className="reserve-route-discovery-location">
+        <div className="reserve-discovery-home">
+            <div className="reserve-discovery-location">
                 <Bone width={112} height={20} />
                 <Bone width={72} height={20} />
             </div>
-            <Bone height="auto" borderRadius={16} style={{ aspectRatio: 'var(--reserve-route-banner-ratio, 3 / 2)' }} />
-            <div className="reserve-route-skeleton-shortcuts">
-                {HOME_SHORTCUTS.map(key => (
-                    <div className="reserve-route-discovery-shortcut" key={key}>
-                        <Bone width={48} height={48} borderRadius="50%" />
-                        <Bone width={42} height={12} />
-                    </div>
-                ))}
+            <div className="reserve-discovery-featured">
+                <div className="reserve-discovery-banner-track">
+                    <Bone height="auto" borderRadius="var(--reserve-home-banner-radius)" style={{ aspectRatio: 'var(--reserve-home-banner-ratio)' }} />
+                </div>
             </div>
-            <div className="reserve-route-discovery-notice">
-                <Bone width={78} height={18} />
-                <Bone width="55%" height={14} />
+            <div className="reserve-discovery-shortcuts">
+                <div className="reserve-discovery-shortcut-grid">
+                    {HOME_SHORTCUT_GROUPS.map(group => (
+                        <div key={group.key} className={'reserve-discovery-shortcut-group reserve-discovery-shortcut-group--' + group.key}>
+                            {/* 그룹 제목은 PC 에서만 보인다(모바일은 홈 CSS 가 숨긴다). 20px 줄 높이에 맞춘다 —
+                                뼈대의 margin 은 부모 밖으로 겹쳐 사라지므로 부모의 padding 으로 높이를 채운다. */}
+                            <div className="reserve-discovery-shortcut-group-title" style={{ paddingBlock: 3 }}><Bone width={96} height={14} /></div>
+                            <div className="reserve-discovery-shortcut-items">
+                                {Array.from({ length: group.count }, (_, index) => (
+                                    <div className="reserve-discovery-shortcut" key={`${group.key}-${index}`}>
+                                        <span className="reserve-discovery-shortcut-media"><Bone width={48} height={48} borderRadius="50%" /></span>
+                                        <span className="reserve-route-discovery-shortcut-label"><Bone width={42} height={12} /></span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
-            <div className="reserve-route-discovery-heading">
-                <div><Bone width={150} height={22} /><Bone width={210} height={13} /></div>
-                <Bone width={58} height={16} />
-            </div>
-            {/* 홈 추천은 가게 목록 행(StoreListRow)을 재사용하므로 스켈레톤도 같은 목록 행 스켈레톤이다. */}
-            <div className="reserve-route-discovery-stores reserve-store-list-rows">
-                <StoreListRowSkeleton count={4} />
+            <div className="reserve-discovery-recommended">
+                <div className="reserve-discovery-section-heading">
+                    <div className="reserve-discovery-section-copy"><Bone width={150} height={22} style={{ marginBlock: 3 }} /></div>
+                    {/* '전체 보기' 링크의 44px 터치 높이 */}
+                    <div style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}><Bone width={58} height={16} /></div>
+                </div>
+                {/* 홈 추천은 가게 목록 행(StoreListRow)을 재사용하므로 스켈레톤도 같은 목록 행 스켈레톤이다. */}
+                <div className="reserve-discovery-store-list reserve-store-list-rows">
+                    <StoreListRowSkeleton count={4} />
+                </div>
             </div>
         </div>
     );

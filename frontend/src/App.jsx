@@ -42,7 +42,7 @@ const MessagesPage = lazy(() => import('./pages/member/MessagesPage'));
 // 로그인한 사용자만 쓰는 통합 메신저는 익명 랜딩의 초기 번들에서 제외한다.
 const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
 
-import Header from './components/layout/Header';
+import Header, { HeaderPlaceholder } from './components/layout/Header';
 import DiscoveryNav from './components/layout/DiscoveryNav';
 import RouteLoadingSkeleton from './components/layout/RouteLoadingSkeleton';
 import { getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
@@ -168,8 +168,19 @@ const buildThemeConfig = (isDark, accent) => ({
  */
 const spinConfig = { indicator: <SpinIndicator /> };
 
+const isSearchPath = pathname => /^\/search\/?$/.test(pathname);
+const appLayoutStyle = { minHeight: '100vh', backgroundColor: colors.background.default };
+
+// 부트 셸과 AppRoutes 가 같은 레이아웃 클래스를 쓴다 — 홈·검색은 폭·좌우 여백 변수를 이 클래스에서 받는다.
+// 부트 셸에만 없으면 로그인 확인 중 검색 화면의 좌우 여백이 0 이 됐다(2026-09-29 실측).
+function appLayoutClassName(pathname) {
+    if (pathname === '/') return 'reserve-app-layout reserve-app-layout--home';
+    if (isSearchPath(pathname)) return 'reserve-app-layout reserve-app-layout--search';
+    return 'reserve-app-layout';
+}
+
 function AppContent() {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const { initializeAuth, sessionRevision } = useAuthStore();
     const [loading, setLoading] = useState(true);
 
@@ -186,12 +197,18 @@ function AppContent() {
 
     // 로그인 확인 중에도 빈 화면 + 스피너 대신 헤더 자리와 그 페이지 모양의 스켈레톤을 바로 그린다(2026-09-24).
     // 진짜 헤더·메신저는 확인이 끝난 뒤 그린다 — 확인 전에 그들이 API 를 부르면 토큰 재발급이 겹칠 수 있다.
+    // 2026-09-29: 레이아웃 틀·로고·탐색 탭(DiscoveryNav — API·로그인 상태를 쓰지 않는다)은 AppRoutes 와 똑같이 그린다.
+    // 예전엔 빈 64px 띠뿐이라 확인이 끝나는 순간 탭 44px 만큼 내용이 밀려 내려갔다.
     if (loading) {
+        const discoveryRoot = isDiscoveryRootPath(pathname, search);
         return (
-            <div className="reserve-boot-shell">
-                {!/^\/search\/?$/.test(pathname) && <div className="reserve-boot-shell-header" aria-hidden="true" />}
-                <RouteLoadingSkeleton />
-            </div>
+            <Layout className={appLayoutClassName(pathname) + ' reserve-boot-shell'} style={appLayoutStyle}>
+                {!isSearchPath(pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} />}
+                {discoveryRoot && <DiscoveryNav />}
+                <Content>
+                    <RouteLoadingSkeleton />
+                </Content>
+            </Layout>
         );
     }
 
@@ -208,7 +225,7 @@ function AppRoutes() {
     const isLoggedIn = useAuthStore((state) => !!state.user);
     const { pathname, search, state: locationState } = useLocation();
     const navigationType = useNavigationType();
-    const isSearchPage = /^\/search\/?$/.test(pathname);
+    const isSearchPage = isSearchPath(pathname);
     const routeContentRef = useRef(null);
     const previousPathnameRef = useRef(null);
     const previousDiscoveryTabRef = useRef(null);
@@ -252,10 +269,7 @@ function AppRoutes() {
     }, [pathname, search, locationState, navigationType, isSearchPage]);
 
     return (
-        <Layout
-            className={pathname === '/' ? 'reserve-app-layout reserve-app-layout--home' : isSearchPage ? 'reserve-app-layout reserve-app-layout--search' : 'reserve-app-layout'}
-            style={{ minHeight: '100vh', backgroundColor: colors.background.default }}
-        >
+        <Layout className={appLayoutClassName(pathname)} style={appLayoutStyle}>
             <ScrollToTop />
             <OfflineBanner />
             {!isSearchPage && <Header />}

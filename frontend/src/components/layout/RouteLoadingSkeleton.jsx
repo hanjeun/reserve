@@ -1,76 +1,41 @@
 import PropTypes from 'prop-types';
-import { Typography } from 'antd';
 import { useLocation } from 'react-router-dom';
 import Bone from '../common/Bone';
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import { StoreDetailSkeleton, MyReservationCardSkeleton, ReservationSummaryCardSkeleton } from '../common/Skeletons';
 import PageContainer from '../common/PageContainer';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
-import StoreFormSkeleton from '../store/StoreFormSkeleton';
+import BenefitDetailSkeleton from '../common/BenefitDetailSkeleton';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
 import { STORE_LIST_PAGE_SIZE } from '../../constants/storeListPageSize';
-import { field } from '../../styles/tokens/field';
-import { fontWeight, fontSize } from '../../styles/tokens';
 import { getRouteSkeletonKind } from './routeSkeletonKind';
 import { resolveViewMode } from '../../utils/viewMode';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
 import MyPageSkeleton from './MyPageSkeleton';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
+import { ListingHeader, ListingToolbarSkeleton, RefreshToolbarSkeleton } from './routeSkeletonParts';
+import { usePageSkeletonModule } from './routeSkeletonLoader';
 
-const ROWS = ['one', 'two', 'three', 'four'];
+const PageSkeletonPending = () => <div style={{ minHeight: 'calc(100svh - 64px)' }} />;
+
+// 별도 청크의 뼈대를 그 이름으로 꺼내 그린다.
+const fromPageSkeletons = name => {
+    function PageSkeleton(props) {
+        const module = usePageSkeletonModule();
+        const Skeleton = module?.[name];
+        return Skeleton ? <Skeleton {...props} /> : <PageSkeletonPending />;
+    }
+    PageSkeleton.displayName = name;
+    return PageSkeleton;
+};
+
+// StoreDetail.jsx 의 BREAKPOINT 와 같은 값 — PC 두 칸 배치가 시작되는 폭.
+const STORE_DETAIL_BREAKPOINT = 900;
 // 홈 바로가기 두 묶음 — 서비스 분야별(분야 수만큼) + 빠른 메뉴 4칸(평점순·관심 가게·내 예약·메시지). pages/Home 의 SHORTCUT_GROUPS 와 같은 개수.
 const HOME_SHORTCUT_GROUPS = [
     { key: 'services', count: SERVICE_DOMAIN_OPTIONS.length },
     { key: 'quick', count: 4 },
 ];
-
-function ListingHeader({ title, description, marginBottom = 32 }) {
-    return <div style={{ marginBottom }}>
-        <Typography.Title level={2} style={{ margin: '0 0 8px', fontWeight: fontWeight.extrabold }}>{title}</Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: fontSize.lg }}>{description}</Typography.Text>
-    </div>;
-}
-ListingHeader.propTypes = { title: PropTypes.string.isRequired, description: PropTypes.string.isRequired, marginBottom: PropTypes.number };
-
-function ListingToolbarSkeleton() {
-    // 실제 줄은 보기 전환·필터 버튼이 44px 터치 영역이라 44 + 아래 8 + 구분선 1 = 53px 이다.
-    // 뼈대만 두면 36px 로 줄어 로딩이 끝날 때 아래 내용이 8px 밀렸다(2026-09-29 실측).
-    return <div className="reserve-explore-filters" aria-hidden="true" style={{ minHeight: 44, boxSizing: 'content-box' }}>
-        <Bone width={72} height={36} />
-        <span style={{ flex: 1 }} />
-        <div className="reserve-explore-filter-controls"><Bone width={82} height={36} /><Bone width={90} height={36} /></div>
-    </div>;
-}
-
-function RefreshToolbarSkeleton({ search = false }) {
-    // 실제 FilterToolbar 와 같은 배치: 검색칸은 남는 폭을 채우되 줄어들 수 있고(최대 480px),
-    // 새로고침은 같은 .reserve-filter-toolbar-refresh 자리에 글자 버튼 크기(약 70x18)로 둔다.
-    // Bone 은 기본이 flexShrink 0 이라 100% 폭 검색 뼈대가 줄지 않아 새로고침이 화면 밖(390 폭에서 x=406)으로 밀렸다.
-    return <div className="reserve-filter-toolbar" aria-hidden="true">
-        <div className={`reserve-filter-toolbar-secondary${search ? '' : ' reserve-filter-toolbar-secondary--refresh-only'}`}>
-            {search && <Bone height={40} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, maxWidth: 480 }} />}
-            <div className="reserve-filter-toolbar-refresh"><Bone width={70} height={16} /></div>
-        </div>
-    </div>;
-}
-RefreshToolbarSkeleton.propTypes = { search: PropTypes.bool };
-
-function DocumentSkeleton() {
-    return (
-        <div className="reserve-route-skeleton-copy">
-            <Bone width="48%" height={24} />
-            {ROWS.map(key => <Bone key={key} width="90%" height={14} />)}
-        </div>
-    );
-}
-
-function FormSkeleton() {
-    return (
-        <div className="reserve-route-skeleton-form">
-            <Bone width="55%" height={24} />
-            {ROWS.map(key => <Bone key={key} height={field.height} borderRadius={field.radius} />)}
-        </div>
-    );
-}
 
 // 페이지가 데이터 로딩 때 그리는 것과 같은 컴포넌트·개수·보기 방식 — 코드 로딩 → 데이터 로딩으로 넘어갈 때 모양이 안 바뀐다(2026-09-24).
 function CardsSkeleton({ pathname = '', search = '' }) {
@@ -129,6 +94,18 @@ function BenefitsRouteSkeleton() {
     </section></section>;
 }
 
+// 가게 소식 상세 — 페이지가 데이터 로딩 때 그리는 뼈대를 그대로 쓴다.
+const BenefitDetailRouteSkeleton = () => <BenefitDetailSkeleton />;
+
+// 가게 상세 — 페이지의 데이터 로딩과 같은 틀(PC xl·32 / 900px 미만 md 700·20)과 같은 뼈대.
+// 예전엔 라우트 틀(최대 1200·여백 32/20)에 넣어 태블릿(768~899)에서 폭·여백이 실제와 달랐다(2026-09-29).
+function DetailRouteSkeleton() {
+    const isPC = useWindowWidth() >= STORE_DETAIL_BREAKPOINT;
+    return <PageContainer size={isPC ? 'xl' : 'md'} paddingTop={isPC ? '32px' : '20px'}>
+        <StoreDetailSkeleton isPC={isPC} />
+    </PageContainer>;
+}
+
 
 // 실제 홈(pages/Home)의 틀 클래스를 그대로 써서 위치·여백·반응형 경계를 홈 CSS 한 곳에서 따라가게 한다(2026-09-29).
 // 예전엔 전용 클래스로 따로 그려 홈에 없는 공지 줄, 한 줄 10칸 바로가기, 89px 제목 줄이 있어 로딩 뒤 모양이 바뀌었다.
@@ -178,16 +155,6 @@ function DiscoverySkeleton() {
     );
 }
 
-function WorkspaceSkeleton() {
-    return (
-        <div className="reserve-route-skeleton-copy">
-            <Bone width="32%" height={24} />
-            <Bone height={44} borderRadius={16} />
-            {ROWS.map(key => <Bone key={key} height={44} />)}
-        </div>
-    );
-}
-
 function SearchSkeleton() {
     return <div className="reserve-search-page">
         <div className="reserve-search-header">
@@ -212,20 +179,35 @@ function SearchSkeleton() {
     </div>;
 }
 
+const ComingSoonRouteSkeletonLazy = fromPageSkeletons('ComingSoonRouteSkeleton');
+const AuthRouteSkeletonLazy = fromPageSkeletons('AuthRouteSkeleton');
+const LegalRouteSkeletonLazy = fromPageSkeletons('LegalRouteSkeleton');
+const PaymentResultRouteSkeletonLazy = fromPageSkeletons('PaymentResultRouteSkeleton');
+const AdminRouteSkeletonLazy = fromPageSkeletons('AdminRouteSkeleton');
+const BusinessRouteSkeletonLazy = fromPageSkeletons('BusinessRouteSkeleton');
+const MessagesRouteSkeletonLazy = fromPageSkeletons('MessagesRouteSkeleton');
+
 const KINDS = {
     search: SearchSkeleton,
     'my-page': MyPageSkeleton,
     discovery: DiscoverySkeleton,
-    'store-form': StoreFormSkeleton,
-    // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 스켈레톤
-    detail: StoreDetailSkeleton,
+    'store-form': fromPageSkeletons('StoreFormRouteSkeleton'),
+    // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 틀·스켈레톤
+    detail: DetailRouteSkeleton,
     cards: CardsSkeleton,
     'store-list': StoreListRouteSkeleton,
     reservations: ReservationsSkeleton,
     benefits: BenefitsRouteSkeleton,
-    form: FormSkeleton,
-    workspace: WorkspaceSkeleton,
-    document: DocumentSkeleton,
+    'benefit-detail': BenefitDetailRouteSkeleton,
+    'coming-soon': ComingSoonRouteSkeletonLazy,
+    auth: AuthRouteSkeletonLazy,
+    legal: LegalRouteSkeletonLazy,
+    'payment-result': PaymentResultRouteSkeletonLazy,
+    admin: AdminRouteSkeletonLazy,
+    business: BusinessRouteSkeletonLazy,
+    messages: MessagesRouteSkeletonLazy,
+    // 그 밖의 경로(소셜 로그인 콜백·없는 주소) — 문서형 틀
+    document: LegalRouteSkeletonLazy,
 };
 
 export function RouteSkeletonPreview({ pathname, search = '' }) {

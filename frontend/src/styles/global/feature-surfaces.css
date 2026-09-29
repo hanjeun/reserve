@@ -1621,70 +1621,60 @@
     border-bottom: 1px solid var(--c-border-light, #f2f4f6);
 }
 .reserve-route-store-toolbar-spacer { flex: 1; min-width: 0; }
-.reserve-route-skeleton--document { max-width: 700px; }
-/* 안쪽 PageContainer·혜택 틀이 폭과 여백을 직접 정한다. 바깥 틀이 여백·최대 폭을 또 주면 안 된다.
+/* 안쪽 PageContainer·실제 페이지 틀이 폭과 여백을 직접 정한다. 바깥 틀이 여백·최대 폭을 또 주면 안 된다.
    클래스 두 개로 적는 이유: 아래 모바일 규칙(.reserve-route-skeleton { padding-inline: 20px })과 명시도가 같으면
-   뒤에 선언된 그쪽이 이겨 여백이 두 번 들어가고, 1200px 제한이 혜택(1248px) 틀을 좁혀 로딩 뒤 넓어졌다(2026-09-29 실측). */
+   뒤에 선언된 그쪽이 이겨 여백이 두 번 들어가고, 1200px 제한이 혜택(1248px) 틀을 좁혀 로딩 뒤 넓어졌다(2026-09-29 실측).
+   2026-09-29: 로그인·약관·결제 결과·관리자·파트너·메시지·가게 상세·준비 중 화면도 실제 틀을 그대로 그리게 바꿔 전부 여기로 모았다. */
 .reserve-route-skeleton.reserve-route-skeleton--reservations,
 .reserve-route-skeleton.reserve-route-skeleton--cards,
-.reserve-route-skeleton.reserve-route-skeleton--benefits { max-width: none; padding: 0; }
-.reserve-route-skeleton.reserve-route-skeleton--search { max-width: none; padding: 0; }
+.reserve-route-skeleton.reserve-route-skeleton--benefits,
+.reserve-route-skeleton.reserve-route-skeleton--benefit-detail,
+.reserve-route-skeleton.reserve-route-skeleton--search,
+.reserve-route-skeleton.reserve-route-skeleton--discovery,
+.reserve-route-skeleton.reserve-route-skeleton--coming-soon,
+.reserve-route-skeleton.reserve-route-skeleton--auth,
+.reserve-route-skeleton.reserve-route-skeleton--legal,
+.reserve-route-skeleton.reserve-route-skeleton--document,
+.reserve-route-skeleton.reserve-route-skeleton--payment-result,
+.reserve-route-skeleton.reserve-route-skeleton--admin,
+.reserve-route-skeleton.reserve-route-skeleton--business,
+.reserve-route-skeleton.reserve-route-skeleton--messages,
+.reserve-route-skeleton.reserve-route-skeleton--detail { max-width: none; padding: 0; }
 .reserve-route-skeleton.reserve-route-skeleton--my-page { padding: 0; }
-.reserve-route-skeleton--form { max-width: 420px; }
-.reserve-route-skeleton--store-form { max-width: 1000px; }
-/* 홈 뼈대는 실제 홈 틀(.reserve-discovery-home)이 폭·여백을 정한다 — 바깥 틀은 여백 없이 감싸기만 한다. */
-.reserve-route-skeleton.reserve-route-skeleton--discovery { max-width: none; padding: 0; }
-.reserve-route-skeleton-copy,
-.reserve-route-skeleton-form { display: flex; flex-direction: column; gap: 24px; }
-.reserve-store-form-skeleton { display: flex; flex-direction: column; gap: 32px; }
-.reserve-store-form-skeleton-heading,
-.reserve-store-form-skeleton-column,
-.reserve-store-form-skeleton-upload-group { display: flex; flex-direction: column; gap: 12px; }
-.reserve-store-form-skeleton-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
-    column-gap: 32px;
-    align-items: start;
-}
-.reserve-store-form-skeleton-divider { align-self: stretch; background: var(--c-border-light, #f2f4f6); }
-.reserve-store-form-skeleton-field { display: flex; flex-direction: column; gap: 10px; }
-.reserve-store-form-skeleton-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.reserve-store-form-skeleton-toggles { display: flex; flex-direction: column; gap: 4px; }
-.reserve-store-form-skeleton-toggle { min-height: 38px; display: flex; align-items: center; gap: 12px; }
-.reserve-store-form-skeleton-toggle > div:first-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.reserve-store-form-skeleton-images { display: flex; flex-direction: column; gap: 16px; }
-.reserve-store-form-skeleton-uploads { display: flex; flex-wrap: wrap; gap: 8px; }
-.reserve-store-form-skeleton-actions { display: flex; flex-direction: column; gap: 10px; }
-.reserve-store-form-skeleton-actions > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.reserve-route-skeleton-copy { display: flex; flex-direction: column; gap: 24px; }
 .reserve-messenger-skeleton-row { display: flex; align-items: center; gap: 12px; padding: 18px; }
 .reserve-messenger-skeleton-row > div:last-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .reserve-messenger-thread-skeleton > div { display: flex; flex-direction: column; gap: 16px; }
-.reserve-route-skeleton-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
-.reserve-route-skeleton-card { overflow: hidden; border: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-route-skeleton-card-copy { display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 20px; }
-.reserve-route-skeleton-reservation { display: flex; gap: 16px; padding-block: 18px; border-bottom: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-route-skeleton-reservation .reserve-route-skeleton-copy { flex: 1; min-width: 0; gap: 5px; }
-.reserve-route-skeleton-detail { display: grid; gap: 28px; }
+/* 관리자·파트너 패널의 알약 탭(.reserve-pill-tabs) 자리 — 탭 한 칸 40px(≤768px 38px), 탭 사이 4, 아래 16. */
+.reserve-route-panel-tabs { display: flex; align-items: center; margin-bottom: 16px; }
+.reserve-route-panel-tabs-list { display: flex; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
+.reserve-route-panel-tab {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 10px;
+}
+.reserve-route-panel-tab.is-active { background: var(--c-gray-200, #e5e8eb); }
+.reserve-route-panel-tabs-more { flex-shrink: 0; width: 45px; height: 40px; display: flex; align-items: center; justify-content: center; }
+@media (max-width: 768px) {
+    .reserve-route-panel-tab { height: 38px; padding: 0 10px; }
+    .reserve-route-panel-tabs-more { height: 38px; }
+}
 /* 바로가기 이름 자리 — 실제 글자 줄 높이(글자 크기 × 1.5)와 같게 둔다. */
 .reserve-route-discovery-shortcut-label { height: 1.5em; display: flex; align-items: center; }
-@media (min-width: 576px) { .reserve-route-skeleton--reservations { --reserve-route-row-image: 72px; } }
-@media (min-width: 900px) {
-    .reserve-route-skeleton--store-form { padding-top: 48px; }
-    .reserve-route-skeleton-detail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .reserve-route-skeleton-detail > :first-child { grid-row: span 2; }
-}
-@media (max-width: 899px) {
-    .reserve-store-form-skeleton-grid { grid-template-columns: minmax(0, 1fr); row-gap: 24px; }
-    .reserve-store-form-skeleton-divider { height: 1px; }
-}
-@media (max-width: 1079px) { .reserve-route-skeleton-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 815px) { .reserve-route-skeleton-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 767px) {
-    .reserve-route-skeleton--store-form { max-width: 420px; }
+/* 글자 모양 뼈대 — 고정 문구를 투명 글자로 두고 줄마다 회색 막대를 그린다. 폭에 따른 줄바꿈이 실제 문구와 같아 높이가 어긋나지 않는다. */
+.reserve-route-skeleton-text {
+    color: transparent;
+    border-radius: 6px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    user-select: none;
 }
 @media (max-width: 551px) {
     .reserve-route-skeleton { padding-inline: 20px; }
-    .reserve-route-skeleton-cards { grid-template-columns: minmax(0, 1fr); }
 }
 .reserve-discovery-coming-soon {
     box-sizing: border-box;

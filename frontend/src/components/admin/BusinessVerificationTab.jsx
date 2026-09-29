@@ -42,6 +42,11 @@ import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { colors, fontSize, radius } from '../../styles/tokens';
 import { getDetailImageUrl } from '../../utils';
+import {
+    BUSINESS_VERIFICATION_SKELETON_COLS,
+    BUSINESS_VERIFICATION_SKELETON_HEADERS,
+    BUSINESS_VERIFICATION_SKELETON_ROWS,
+} from './businessVerificationSkeleton';
 
 const { Text, Paragraph } = Typography;
 
@@ -53,9 +58,9 @@ const BIZ_STATUS_CONFIG = {
     REJECTED: { color: 'red',    label: '거절됨' },
 };
 
-// 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지
-const SKELETON_HEADERS = ['신청자', '상호명', '사업자번호', '신청일', '상태', '처리'];
-const SKELETON_COLS    = [200, 130, 110, 100, 90, 260];
+// 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지(관리자 패널 청크 로딩 뼈대와 공유)
+const SKELETON_HEADERS = [...BUSINESS_VERIFICATION_SKELETON_HEADERS];
+const SKELETON_COLS    = [...BUSINESS_VERIFICATION_SKELETON_COLS];
 const PAGE_SIZE = 15;
 const QUERY_DEFAULTS = { search: '', page: '1' };
 
@@ -63,7 +68,7 @@ const QUERY_DEFAULTS = { search: '', page: '1' };
 // 자격취소 뮤테이션 후 페이지 리셋 버그와, 스켈레톤 로딩 중 페이지 버튼 소멸 문제를 동시에 해결
 // (mode='pending'/'all' 각각 독립적인 컴포넌트 인스턴스라 page state도 서로 영향을 주지 않는다).
 const skeletonRowCount = (total, pageIdx1, pageSize) => {
-    if (!total) return Math.min(8, pageSize);
+    if (!total) return Math.min(BUSINESS_VERIFICATION_SKELETON_ROWS, pageSize);
     const remaining = total - (pageIdx1 - 1) * pageSize;
     return Math.max(1, Math.min(pageSize, remaining));
 };

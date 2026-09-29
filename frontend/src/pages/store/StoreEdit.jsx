@@ -70,7 +70,7 @@ const StoreEdit = () => {
     // 가게 데이터 로딩 중에는 폼의 골격을 유지한다.
     // (initialValues는 Form 최초 마운트 시 1회만 읽히므로 store가 준비된 후 렌더해야 함)
     if (loading) {
-        return <section className="reserve-route-skeleton reserve-route-skeleton--store-form" role="status" aria-label="가게 정보를 불러오는 중" aria-busy="true"><div aria-hidden="true"><StoreFormSkeleton /></div></section>;
+        return <section className="reserve-route-skeleton reserve-route-skeleton--store-form" role="status" aria-label="가게 정보를 불러오는 중" aria-busy="true"><div aria-hidden="true"><StoreFormSkeleton mode="edit" /></div></section>;
     }
 
     if (!store) {

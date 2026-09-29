@@ -184,13 +184,10 @@ export function ConversationListPanel({
             inert={inert ? true : undefined}>
             <MessengerListHeading headingLevel={headingLevel}
                 refreshing={lists.conversationListsFetching}
-                onRefresh={lists.refreshConversationLists} />
+                onRefresh={lists.refreshConversationLists}
+                showHidden={showHidden} onToggleHidden={onToggleHidden} />
 
             <div className="reserve-messenger-list-scroll" aria-busy={lists.conversationListsLoading}>
-                <Button variant="ghost-sm" size="sm" aria-pressed={showHidden}
-                    onClick={onToggleHidden} style={{ margin: '8px 18px' }}>
-                    {showHidden ? '일반 대화 보기' : '숨긴 대화 보기'}
-                </Button>
                 {lists.allConversationListsFailed ? (
                     <DataState state="error" kind="message" subject="대화 목록" error={lists.allConversationListsError}
                         onRetry={lists.refreshConversationLists} retrying={lists.conversationListsFetching} />

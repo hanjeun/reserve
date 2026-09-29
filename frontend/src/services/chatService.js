@@ -40,7 +40,7 @@ const chatService = {
         { params: { viewerRole, hidden } }),
     reportConversation: (roomId, viewerRole, report) => api.post(
         API_ENDPOINTS.CHAT.ROOM_REPORTS(roomId), report, { params: { viewerRole } }),
-    listReports: (page = 0, status) => api.get(
+    listReports: (page, status) => api.get(
         API_ENDPOINTS.CHAT.ADMIN_REPORTS, { params: { page, status } }).then(data => normalizeListPage(data, page)),
     getReportContext: (reportId) => api.get(API_ENDPOINTS.CHAT.ADMIN_REPORT_CONTEXT(reportId)),
     reviewReport: (reportId, review) => api.patch(

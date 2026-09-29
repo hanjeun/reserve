@@ -168,6 +168,27 @@ const ChatTab = () => {
         if (ok === false) setDraft(current => current || text);
     };
 
+    // 대화 본문: 로딩 → 실패 → 말풍선 순으로 판정한다.
+    // 로딩 영역은 <output>(암묵 role=status)이다. display 는 인라인 style 이 flex 로 정한다.
+    const renderThreadBody = () => {
+        if (threadLoading) {
+            return (
+                <output aria-label="대화를 불러오는 중" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    <Bone width="70%" height={48} borderRadius={radius.lg} />
+                    <Bone width="60%" height={48} borderRadius={radius.lg} style={{ alignSelf: 'flex-end' }} />
+                    <Bone width="50%" height={48} borderRadius={radius.lg} />
+                </output>
+            );
+        }
+        if (loadError) {
+            return (
+                <DataState state="error" kind="message" subject="대화" title="대화를 불러오지 못했습니다."
+                    onRetry={reload} compact />
+            );
+        }
+        return <ChatBubbleList messages={messages} mine="ADMIN" roomId={roomIdSel} onRetracted={updateMessage} />;
+    };
+
     const conversation = (
         <div style={styles.thread}>
             {!selected ? (
@@ -183,18 +204,7 @@ const ChatTab = () => {
                         {/* 손님 패널과 **같은 컴포넌트**다 — 두 화면이 같은 대화를 그리는데
                             각자 map 을 돌리면 한쪽만 고쳐지고 다른 쪽이 남는다.
                             다른 건 "내 말풍선이 어느 쪽인가" 하나뿐이라 그것만 넘긴다. */}
-                        {threadLoading ? (
-                            <div role="status" aria-label="대화를 불러오는 중" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                                <Bone width="70%" height={48} borderRadius={radius.lg} />
-                                <Bone width="60%" height={48} borderRadius={radius.lg} style={{ alignSelf: 'flex-end' }} />
-                                <Bone width="50%" height={48} borderRadius={radius.lg} />
-                            </div>
-                        ) : loadError ? (
-                            <DataState state="error" kind="message" subject="대화" title="대화를 불러오지 못했습니다."
-                                onRetry={reload} compact />
-                        ) : (
-                            <ChatBubbleList messages={messages} mine="ADMIN" roomId={roomIdSel} onRetracted={updateMessage} />
-                        )}
+                        {renderThreadBody()}
                         <div ref={bottomRef} />
                     </div>
                     <div style={styles.composer}>
@@ -210,16 +220,16 @@ const ChatTab = () => {
         </div>
     );
 
-    return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                <RefreshButton onReload={refetch} loading={isFetching} />
-            </div>
-
-            {roomsError ? (
+    // 방 목록: 실패 → 로딩 → 빈 목록 → (모바일) 목록/대화 전환 · (PC) 좌우 분할 순으로 판정한다.
+    const renderRooms = () => {
+        if (roomsError) {
+            return (
                 <DataState state="error" kind="message" subject="문의 목록" error={roomsError}
                     onRetry={refetch} retrying={isFetching} compact />
-            ) : isLoading ? (
+            );
+        }
+        if (isLoading) {
+            return (
                 <div style={styles.listPanel}>
                     {['s0', 's1', 's2'].map((k) => (
                         <div key={k} style={{ padding: '14px 16px', borderBottom: `1px solid ${colors.border.light}` }}>
@@ -228,55 +238,73 @@ const ChatTab = () => {
                         </div>
                     ))}
                 </div>
-            ) : rooms.length === 0 ? (
+            );
+        }
+        if (rooms.length === 0) {
+            return (
                 <div style={styles.emptyPanel}>
                     <MessageOutlined style={{ fontSize: 52, color: colors.border.default, marginBottom: 14 }} />
                     <Text style={{ fontSize: fontSize.base, color: colors.text.secondary, display: 'block' }}>
                         아직 문의가 없습니다
                     </Text>
                 </div>
-            ) : isMobile ? (
-                // 모바일은 한 화면에 둘을 못 넣는다 — 목록과 대화를 오간다.
-                selected ? (
-                    <>
-                        <Button variant="ghost-sm" size="md" onClick={() => selectRoom(null)} style={{ marginBottom: 10 }}>
-                            ← 목록으로
-                        </Button>
-                        {conversation}
-                    </>
-                ) : (
-                    <>
-                        <div style={styles.listPanel}>
-                            {rooms.map((r) => (
-                                <RoomRow key={r.id} room={r} selected={false} onClick={selectRoom} />
-                            ))}
-                        </div>
-                        {total > PAGE_SIZE && (
-                            <div style={styles.paginationBar}>
-                                <Pagination current={page} pageSize={PAGE_SIZE} total={total}
-                                    onChange={setPage} simple size="small" showSizeChanger={false} />
-                            </div>
-                        )}
-                    </>
-                )
-            ) : (
-                <div style={styles.splitPane}>
-                    <div style={styles.listColumn}>
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            {rooms.map((r) => (
-                                <RoomRow key={r.id} room={r} selected={r.id === selected?.id} onClick={selectRoom} />
-                            ))}
-                        </div>
-                        {total > PAGE_SIZE && (
-                            <div style={styles.paginationBar}>
-                                <Pagination current={page} pageSize={PAGE_SIZE} total={total}
-                                    onChange={setPage} size="small" showSizeChanger={false} showQuickJumper={false} />
-                            </div>
-                        )}
-                    </div>
+            );
+        }
+        // 모바일은 한 화면에 둘을 못 넣는다 — 목록과 대화를 오간다.
+        if (isMobile && selected) {
+            return (
+                <>
+                    <Button variant="ghost-sm" size="md" onClick={() => selectRoom(null)} style={{ marginBottom: 10 }}>
+                        ← 목록으로
+                    </Button>
                     {conversation}
+                </>
+            );
+        }
+        if (isMobile) {
+            return (
+                <>
+                    <div style={styles.listPanel}>
+                        {rooms.map((r) => (
+                            <RoomRow key={r.id} room={r} selected={false} onClick={selectRoom} />
+                        ))}
+                    </div>
+                    {total > PAGE_SIZE && (
+                        <div style={styles.paginationBar}>
+                            <Pagination current={page} pageSize={PAGE_SIZE} total={total}
+                                onChange={setPage} simple size="small" showSizeChanger={false} />
+                        </div>
+                    )}
+                </>
+            );
+        }
+        return (
+            <div style={styles.splitPane}>
+                <div style={styles.listColumn}>
+                    <div style={{ flex: 1, overflowY: 'auto' }}>
+                        {rooms.map((r) => (
+                            <RoomRow key={r.id} room={r} selected={r.id === selected?.id} onClick={selectRoom} />
+                        ))}
+                    </div>
+                    {total > PAGE_SIZE && (
+                        <div style={styles.paginationBar}>
+                            <Pagination current={page} pageSize={PAGE_SIZE} total={total}
+                                onChange={setPage} size="small" showSizeChanger={false} showQuickJumper={false} />
+                        </div>
+                    )}
                 </div>
-            )}
+                {conversation}
+            </div>
+        );
+    };
+
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                <RefreshButton onReload={refetch} loading={isFetching} />
+            </div>
+
+            {renderRooms()}
         </div>
     );
 };

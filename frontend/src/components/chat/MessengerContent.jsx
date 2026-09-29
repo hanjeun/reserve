@@ -320,7 +320,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const onError = useCallback((text) => message.error(text), [message]);
     const onPolled = useCallback((roomId, fresh) => {
         const readScope = readScopeRef.current;
-        if (!readScope || readScope.threadKey !== threadKey || readScope.loading || readScope.roomId !== roomId
+        if (readScope?.threadKey !== threadKey || readScope.loading || readScope.roomId !== roomId
             || readScope.identity !== messengerIdentityOf(useAuthStore.getState())) return;
         const viewerRole = viewerRoleOf(selection);
         if (isWide && notify({ roomId, messages: fresh, viewerRole })) {
@@ -400,7 +400,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const loadOlderMessages = async () => {
         if (!thread?.roomId || !currentHistory.nextBeforeId || currentHistory.loading) return;
         const scope = historyScopeRef.current;
-        if (!scope || scope.threadKey !== threadKey || scope.roomId !== thread.roomId) return;
+        if (scope?.threadKey !== threadKey || scope.roomId !== thread.roomId) return;
         const body = threadBodyRef.current;
         if (body) historyScrollRef.current = { height: body.scrollHeight, top: body.scrollTop };
         setHistory((state) => ({ ...state, loading: true }));
@@ -476,23 +476,25 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         }
     };
 
-    const title = selection.kind === 'admin'
-        ? thread?.title || selectedRow?.counterpartName || '회원 문의'
-        : selection.kind === 'support'
-        ? supportIdentity.name
-        : selection.kind === 'owner'
-            ? thread?.title || conversationTitle(selectedRow)
-            : selectedRow?.storeName || thread?.title || conversationTitle(selectedRow);
-    const threadKind = selection.kind === 'admin'
-        ? 'RESERVE 고객지원 · 관리자'
-        : selection.kind === 'owner'
-        ? `${selectedRow?.storeName || '가게'} · 받은 문의`
-        : (selection.kind === 'support' ? 'RESERVE 고객지원' : '가게 문의');
-    const emptyText = selection.kind === 'admin'
-        ? '회원의 문의에 답변할 수 있습니다.'
-        : selection.kind === 'support'
-        ? '서비스 이용에 관해 궁금한 점을 남겨주세요.'
-        : STORE_EMPTY_TEXT;
+    // 대화 종류(관리자 · 고객지원 · 사업자 · 가게 문의)별 제목/부제/빈 대화 문구.
+    let title;
+    let threadKind;
+    let emptyText = STORE_EMPTY_TEXT;
+    if (selection.kind === 'admin') {
+        title = thread?.title || selectedRow?.counterpartName || '회원 문의';
+        threadKind = 'RESERVE 고객지원 · 관리자';
+        emptyText = '회원의 문의에 답변할 수 있습니다.';
+    } else if (selection.kind === 'support') {
+        title = supportIdentity.name;
+        threadKind = 'RESERVE 고객지원';
+        emptyText = '서비스 이용에 관해 궁금한 점을 남겨주세요.';
+    } else if (selection.kind === 'owner') {
+        title = thread?.title || conversationTitle(selectedRow);
+        threadKind = `${selectedRow?.storeName || '가게'} · 받은 문의`;
+    } else {
+        title = selectedRow?.storeName || thread?.title || conversationTitle(selectedRow);
+        threadKind = '가게 문의';
+    }
     // 첫 안내(인사말 + 자동 문답) — 고객지원은 관리자가, 가게 문의는 사장님이 설정한다(2026-09-23).
     const introScope = chatIntroScope(selection);
     const { intro } = useChatIntro(introScope, { enabled: Boolean(introScope) });
@@ -511,14 +513,18 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         if (!showIntro || sending || next.length > 2000) return;
         setDraft(selectionKey, next, state.sessionIdentity);
     };
-    const disabledMessage = thread?.sendDisabledReason === 'BLOCKED_BY_ME'
-        ? '내가 차단한 대화입니다. 대화 관리에서 차단을 해제할 수 있습니다.'
-        : thread?.sendDisabledReason === 'BLOCKED_BY_OTHER'
-            ? '상대방이 차단해 새 메시지를 보낼 수 없습니다. 이전 대화는 계속 볼 수 있습니다.'
-            : '현재 운영 상태에서는 새 메시지를 보낼 수 없지만 이전 대화는 계속 볼 수 있습니다.';
+    let disabledMessage = '현재 운영 상태에서는 새 메시지를 보낼 수 없지만 이전 대화는 계속 볼 수 있습니다.';
+    if (thread?.sendDisabledReason === 'BLOCKED_BY_ME') {
+        disabledMessage = '내가 차단한 대화입니다. 대화 관리에서 차단을 해제할 수 있습니다.';
+    } else if (thread?.sendDisabledReason === 'BLOCKED_BY_OTHER') {
+        disabledMessage = '상대방이 차단해 새 메시지를 보낼 수 없습니다. 이전 대화는 계속 볼 수 있습니다.';
+    }
 
+    let footerView = 'conversations';
+    if (isHome) footerView = 'home';
+    else if (isSettings) footerView = 'settings';
     const navigation = (
-        <MessengerFooter view={isHome ? 'home' : isSettings ? 'settings' : 'conversations'} disabled={openingThread || returningToList}
+        <MessengerFooter view={footerView} disabled={openingThread || returningToList}
             onChange={value => {
                 if (routeSelection) navigate('/messages', { replace: true });
                 setMobileThreadOpen(false);
@@ -537,6 +543,137 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
             <CloseOutlined />
         </button>
     ) : null;
+
+    // 목록 섹션 본문: 실패 → 로딩 → 빈 목록 → 목록 순으로 판정한다.
+    const renderAdminRows = () => {
+        if (adminColdError) {
+            return (
+                <DataState state="error" kind="message" subject="고객 문의" error={adminQuery.error}
+                    onRetry={adminQuery.refetch} retrying={adminQuery.isFetching} compact />
+            );
+        }
+        if (adminQuery.isLoading) return <ConversationListSkeleton />;
+        if (adminRows.length === 0) {
+            return <div className="reserve-messenger-list-state">아직 접수된 고객 문의가 없습니다.</div>;
+        }
+        return adminRows.map((row) => (
+            <ConversationRow
+                key={`admin-${row.roomId}`}
+                row={row}
+                selected={showThread && matchesSelection(row, selection)}
+                onSelect={() => choose({ kind: 'admin', roomId: row.roomId })}
+            />
+        ));
+    };
+    const renderCustomerRows = () => {
+        if (memberColdError) {
+            return (
+                <DataState state="error" kind="message" subject="대화 목록" error={memberQuery.error}
+                    onRetry={memberQuery.refetch} retrying={memberQuery.isFetching} compact />
+            );
+        }
+        if (memberQuery.isLoading) return <ConversationListSkeleton />;
+        if (customerRows.length === 0) {
+            return <div className="reserve-messenger-list-state">{showHidden ? '숨긴 대화가 없습니다.' : '아직 시작한 대화가 없습니다.'}</div>;
+        }
+        return customerRows.map((row) => (
+            <ConversationRow
+                key={row.type === 'SUPPORT' ? 'support' : `store-${row.storeId}`}
+                row={row}
+                owner={false}
+                selected={showThread && matchesSelection(row, selection)}
+                onSelect={() => choose(row.type === 'SUPPORT'
+                    ? { kind: 'support' }
+                    : { kind: 'store', storeId: row.storeId })}
+            />
+        ));
+    };
+    const renderOwnerRows = () => {
+        if (ownerColdError) {
+            return (
+                <DataState state="error" kind="message" subject="받은 문의" error={ownerQuery.error}
+                    onRetry={ownerQuery.refetch} retrying={ownerQuery.isFetching} compact />
+            );
+        }
+        if (ownerQuery.isLoading) return <ConversationListSkeleton />;
+        if (ownerRows.length === 0) {
+            return <div className="reserve-messenger-list-state">아직 받은 가게 문의가 없습니다.</div>;
+        }
+        return ownerRows.map((row) => (
+            <ConversationRow
+                key={`owner-${row.roomId}`}
+                row={row}
+                owner
+                selected={showThread && matchesSelection(row, selection)}
+                onSelect={() => choose({ kind: 'owner', roomId: row.roomId })}
+            />
+        ));
+    };
+    // 대화창 헤더 아바타: 고객지원 → 상대 사람(관리자·사업자 시점) → 가게 사진 → 기본 아이콘.
+    const renderThreadAvatar = () => {
+        if (selection.kind === 'support') return <SupportAvatar className="reserve-messenger-thread-avatar" />;
+        if (selection.kind === 'admin' || selection.kind === 'owner') {
+            return (
+                <MessengerAvatar imageSrc={thread?.counterpartProfileImage ?? selectedRow?.counterpartProfileImage}
+                    variant="person" className="reserve-messenger-thread-avatar" />
+            );
+        }
+        if (selection.kind === 'store' && (thread?.storeImageUrl || selectedRow?.storeImageUrl)) {
+            return <MessengerAvatar imageSrc={thread?.storeImageUrl || selectedRow?.storeImageUrl} variant="store" className="reserve-messenger-thread-avatar" />;
+        }
+        return <span className="reserve-messenger-thread-avatar" aria-hidden="true"><MessageOutlined /></span>;
+    };
+    // 대화 본문: 로딩 → 실패 → 첫 안내 → 빈 대화 → 메시지 순으로 판정한다.
+    const renderThreadBody = () => {
+        if (loading) {
+            return (
+                <div className="reserve-messenger-thread-skeleton" role="status" aria-label="대화를 불러오는 중" aria-busy="true">
+                    <div aria-hidden="true"><Bone width="65%" height={44} borderRadius={14} /><Bone width="50%" height={44} borderRadius={14} style={{ marginLeft: 'auto' }} /><Bone width="75%" height={44} borderRadius={14} /></div>
+                </div>
+            );
+        }
+        if (loadError) {
+            return (
+                <DataState state="error" kind="message" title="대화를 불러오지 못했습니다."
+                    onRetry={reload} compact />
+            );
+        }
+        if (showIntro) {
+            return (
+                <ChatIntro variant={showStoreIntro ? 'store' : 'support'} userName={user?.name}
+                    displayName={showStoreIntro ? title : supportIdentity.name}
+                    notice={intro.notice ?? undefined} greeting={intro.greeting ?? undefined} items={intro.items}
+                    onAsk={chooseIntroQuestion} disabled={sending} draftLength={draft.length} />
+            );
+        }
+        if (messages.length === 0) {
+            return (
+                <div className="reserve-messenger-thread-state">
+                    <MessageOutlined aria-hidden="true" />
+                    <span>{emptyText}</span>
+                </div>
+            );
+        }
+        return (
+            <div>
+                {currentHistory.hasMore && (
+                    <div className="reserve-messenger-history-action">
+                        <Button
+                            variant="ghost-sm-primary"
+                            size="sm"
+                            loading={currentHistory.loading}
+                            onClick={loadOlderMessages}
+                        >
+                            이전 메시지 보기
+                        </Button>
+                    </div>
+                )}
+                <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
+                    roomId={thread?.roomId} onRetracted={updateMessage}
+                    reportRole={thread?.type === 'STORE' ? thread.viewerRole : undefined} />
+            </div>
+        );
+    };
 
     if (isHome || isSettings) {
         return (
@@ -587,21 +724,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                                     title="최신 고객 문의를 확인하지 못해 이전 목록을 보여드리고 있습니다."
                                     onRetry={adminQuery.refetch} retrying={adminQuery.isFetching} compact />
                             )}
-                            {adminColdError ? (
-                                <DataState state="error" kind="message" subject="고객 문의" error={adminQuery.error}
-                                    onRetry={adminQuery.refetch} retrying={adminQuery.isFetching} compact />
-                            ) : adminQuery.isLoading ? (
-                                <ConversationListSkeleton />
-                            ) : adminRows.length === 0 ? (
-                                <div className="reserve-messenger-list-state">아직 접수된 고객 문의가 없습니다.</div>
-                            ) : adminRows.map((row) => (
-                                <ConversationRow
-                                    key={`admin-${row.roomId}`}
-                                    row={row}
-                                    selected={showThread && matchesSelection(row, selection)}
-                                    onSelect={() => choose({ kind: 'admin', roomId: row.roomId })}
-                                />
-                            ))}
+                            {renderAdminRows()}
                             {adminQuery.hasNextPage && (
                                 <Button
                                     variant="ghost-sm-primary"
@@ -623,20 +746,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                                 title="최신 대화를 확인하지 못해 이전 목록을 보여드리고 있습니다."
                                 onRetry={memberQuery.refetch} retrying={memberQuery.isFetching} compact />
                         )}
-                        {memberColdError ? (
-                            <DataState state="error" kind="message" subject="대화 목록" error={memberQuery.error}
-                                onRetry={memberQuery.refetch} retrying={memberQuery.isFetching} compact />
-                        ) : memberQuery.isLoading ? <ConversationListSkeleton /> : customerRows.length === 0 ? <div className="reserve-messenger-list-state">{showHidden ? '숨긴 대화가 없습니다.' : '아직 시작한 대화가 없습니다.'}</div> : customerRows.map((row) => (
-                            <ConversationRow
-                                key={row.type === 'SUPPORT' ? 'support' : `store-${row.storeId}`}
-                                row={row}
-                                owner={false}
-                                selected={showThread && matchesSelection(row, selection)}
-                                onSelect={() => choose(row.type === 'SUPPORT'
-                                    ? { kind: 'support' }
-                                    : { kind: 'store', storeId: row.storeId })}
-                            />
-                        ))}
+                        {renderCustomerRows()}
                         {memberQuery.hasNextPage && (
                             <Button
                                 variant="ghost-sm-primary"
@@ -658,22 +768,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                                     title="최신 받은 문의를 확인하지 못해 이전 목록을 보여드리고 있습니다."
                                     onRetry={ownerQuery.refetch} retrying={ownerQuery.isFetching} compact />
                             )}
-                            {ownerColdError ? (
-                                <DataState state="error" kind="message" subject="받은 문의" error={ownerQuery.error}
-                                    onRetry={ownerQuery.refetch} retrying={ownerQuery.isFetching} compact />
-                            ) : ownerQuery.isLoading ? (
-                                <ConversationListSkeleton />
-                            ) : ownerRows.length === 0 ? (
-                                <div className="reserve-messenger-list-state">아직 받은 가게 문의가 없습니다.</div>
-                            ) : ownerRows.map((row) => (
-                                <ConversationRow
-                                    key={`owner-${row.roomId}`}
-                                    row={row}
-                                    owner
-                                    selected={showThread && matchesSelection(row, selection)}
-                                    onSelect={() => choose({ kind: 'owner', roomId: row.roomId })}
-                                />
-                            ))}
+                            {renderOwnerRows()}
                             {ownerQuery.hasNextPage && (
                                 <Button
                                     variant="ghost-sm-primary"
@@ -709,13 +804,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                     >
                         <ArrowLeftOutlined />
                     </button>
-                    {selection.kind === 'support' ? <SupportAvatar className="reserve-messenger-thread-avatar" />
-                        : selection.kind === 'admin' || selection.kind === 'owner'
-                            ? <MessengerAvatar imageSrc={thread?.counterpartProfileImage ?? selectedRow?.counterpartProfileImage}
-                                variant="person" className="reserve-messenger-thread-avatar" />
-                        : selection.kind === 'store' && (thread?.storeImageUrl || selectedRow?.storeImageUrl)
-                            ? <MessengerAvatar imageSrc={thread?.storeImageUrl || selectedRow?.storeImageUrl} variant="store" className="reserve-messenger-thread-avatar" />
-                            : <span className="reserve-messenger-thread-avatar" aria-hidden="true"><MessageOutlined /></span>}
+                    {renderThreadAvatar()}
                     <span className="reserve-messenger-thread-copy">
                         <strong id="reserve-messenger-thread-title">{title}</strong>
                         {selection.kind !== 'support' && <span>{threadKind}</span>}
@@ -729,42 +818,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                 </header>
 
                 <div ref={threadBodyRef} className={`reserve-messenger-thread-body${selection.kind === 'support' ? ' reserve-messenger-thread-body--support' : ''}`}>
-                    {loading ? (
-                        <div className="reserve-messenger-thread-skeleton" role="status" aria-label="대화를 불러오는 중" aria-busy="true">
-                            <div aria-hidden="true"><Bone width="65%" height={44} borderRadius={14} /><Bone width="50%" height={44} borderRadius={14} style={{ marginLeft: 'auto' }} /><Bone width="75%" height={44} borderRadius={14} /></div>
-                        </div>
-                    ) : loadError ? (
-                        <DataState state="error" kind="message" title="대화를 불러오지 못했습니다."
-                            onRetry={reload} compact />
-                    ) : showIntro ? (
-                        <ChatIntro variant={showStoreIntro ? 'store' : 'support'} userName={user?.name}
-                            displayName={showStoreIntro ? title : supportIdentity.name}
-                            notice={intro.notice ?? undefined} greeting={intro.greeting ?? undefined} items={intro.items}
-                            onAsk={chooseIntroQuestion} disabled={sending} draftLength={draft.length} />
-                    ) : messages.length === 0 ? (
-                        <div className="reserve-messenger-thread-state">
-                            <MessageOutlined aria-hidden="true" />
-                            <span>{emptyText}</span>
-                        </div>
-                    ) : (
-                        <div>
-                            {currentHistory.hasMore && (
-                                <div className="reserve-messenger-history-action">
-                                    <Button
-                                        variant="ghost-sm-primary"
-                                        size="sm"
-                                        loading={currentHistory.loading}
-                                        onClick={loadOlderMessages}
-                                    >
-                                        이전 메시지 보기
-                                    </Button>
-                                </div>
-                            )}
-                            <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
-                                roomId={thread?.roomId} onRetracted={updateMessage}
-                                reportRole={thread?.type === 'STORE' ? thread.viewerRole : undefined} />
-                        </div>
-                    )}
+                    {renderThreadBody()}
                 </div>
 
                 {!loading && !loadError && thread?.canSend === false ? (

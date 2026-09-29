@@ -39,7 +39,8 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             input.current?.setSelectionRange(start + emoji.length, start + emoji.length);
         });
     };
-    const picker = <div className="reserve-chat-emoji-picker" id={id} role="region" aria-label="이모지 선택"
+    // aria-label 이 있는 <section> 은 암묵 role=region 이다(기본 display 는 div 와 같은 block).
+    const picker = <section className="reserve-chat-emoji-picker" id={id} aria-label="이모지 선택"
         onKeyDown={event => {
             if (event.key === 'Escape') { setEmojiOpen(false); trigger.current?.focus(); }
         }}>
@@ -50,7 +51,18 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                 aria-label={`${keywords.split(' ')[0]} ${emoji}`} onClick={() => selectEmoji(emoji)}>{emoji}</button>)}
         </div>
         {emojis.length === 0 && <p role="status">검색 결과가 없습니다.</p>}
-    </div>;
+    </section>;
+    // 전송 버튼: 보내는 중이면 (중단 가능 시) 중단 · 아니면 로딩, 평소에는 보내기.
+    const canCancel = sending && Boolean(onCancel);
+    let sendLabel = '보내기';
+    let sendIcon = <ArrowRightOutlined />;
+    if (canCancel) {
+        sendLabel = '전송 요청 중단';
+        sendIcon = <StopOutlined />;
+    } else if (sending) {
+        sendLabel = '보내는 중';
+        sendIcon = <LoadingOutlined />;
+    }
     return <div className="reserve-chat-composer reserve-messenger-composer">
         <textarea ref={input} value={value} onChange={event => onChange(event.target.value)}
             onKeyDown={event => {
@@ -76,9 +88,9 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                 </Popover>
             </div>
             <button type="button" className="reserve-chat-send reserve-messenger-send" onClick={sending && onCancel ? onCancel : onSend}
-                disabled={disabled || (sending ? !onCancel : (!value.trim() && !file))} aria-label={sending && onCancel ? '전송 요청 중단' : sending ? '보내는 중' : '보내기'}
+                disabled={disabled || (sending ? !onCancel : (!value.trim() && !file))} aria-label={sendLabel}
                 aria-busy={sending || undefined}>
-                {sending ? onCancel ? <StopOutlined /> : <LoadingOutlined /> : <ArrowRightOutlined />}
+                {sendIcon}
             </button>
         </div>
     </div>;

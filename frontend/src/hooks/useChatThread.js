@@ -224,9 +224,11 @@ export default function useChatThread({
         }]);
 
         try {
-            const sent = controller ? await send(roomId, text, clientMessageId, attachment, { signal: controller.signal }) : attachment
-                ? await send(roomId, text, clientMessageId, attachment)
-                : await send(roomId, text, clientMessageId);
+            // 중단 가능하면 signal 을, 사진이 있으면 첨부까지 넘긴다(없는 인자는 넘기지 않는다).
+            let sent;
+            if (controller) sent = await send(roomId, text, clientMessageId, attachment, { signal: controller.signal });
+            else if (attachment) sent = await send(roomId, text, clientMessageId, attachment);
+            else sent = await send(roomId, text, clientMessageId);
             if (activeRef.current !== active || active.invalidated) return null;
             setMessages((prev) => mergeById(
                 prev.filter((m) => m.id !== tempId),
@@ -241,11 +243,10 @@ export default function useChatThread({
             // 429 는 레이트리밋이다. "실패했다"가 아니라 "너무 빠르다"라고 말해야
             // 사용자가 같은 동작을 계속 반복하지 않는다.
             const tooFast = (e?.status ?? e?.response?.status) === 429;
-            onError?.(controller?.signal.aborted
-                ? '전송 요청을 중단했습니다. 서버에 도착했을 수 있으니 대화를 확인해주세요.'
-                : tooFast
-                ? '조금 천천히 보내주세요.'
-                : '전송하지 못했습니다. 잠시 후 다시 시도해주세요.');
+            let failure = '전송하지 못했습니다. 잠시 후 다시 시도해주세요.';
+            if (controller?.signal.aborted) failure = '전송 요청을 중단했습니다. 서버에 도착했을 수 있으니 대화를 확인해주세요.';
+            else if (tooFast) failure = '조금 천천히 보내주세요.';
+            onError?.(failure);
             return false;
         } finally {
             if (activeRef.current === active && !active.invalidated) {

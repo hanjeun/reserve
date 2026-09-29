@@ -38,6 +38,8 @@ RESERVE/
 │       └── design-system.md      ← 디자인 토큰 · 공통 컴포넌트
 ├── .github/
 │   ├── workflows/CICD.yml        ← dev/main PR 검사 · main push Blue/Green 배포
+│   ├── workflows/pr-labels.yml   ← PR 제목·경로로 라벨 자동 부착
+│   ├── workflows/cache-cleanup.yml ← 닫힌 PR 의 Actions 캐시 삭제
 │   ├── ISSUE_TEMPLATE/           ← 버그/기능 이슈 폼
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── dependabot.yml            ← 의존성 자동 업데이트 (npm · gradle · actions)

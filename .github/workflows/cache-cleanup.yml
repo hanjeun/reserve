@@ -1,0 +1,26 @@
+name: Cache Cleanup
+
+# PR 에서 만든 캐시는 그 PR(refs/pull/N/merge)만 다시 쓸 수 있다.
+# PR 이 닫히면 쓸 곳이 없으므로 지워서, dev·main 캐시가 10GB 한도에 밀려나지 않게 한다.
+# Dependabot PR 은 pull_request 이벤트에서 읽기 권한만 받아서 pull_request_target 을 쓴다.
+# PR 코드를 체크아웃하지 않으므로 안전하다.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete caches of the closed PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          gh cache list --ref "$REF" --limit 100 --json id --jq '.[].id' | while read -r id; do
+            gh cache delete "$id"
+          done

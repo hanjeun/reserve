@@ -60,9 +60,8 @@ feature/기능명  ← 기능별 작업 브랜치
 
 ### 라벨
 
-- 일반 PR에는 저장소에 있는 `bug`, `enhancement`, `documentation` 등 의미에 맞는 라벨을 달아요.
-- Dependabot 설정의 `chore`, `dependencies` 라벨이 저장소에 없으면 별도 승인 후 만들어요.
-- 새 분류 체계는 합의 없이 만들지 않아요.
+- PR 라벨은 자동으로 붙어요(`pr-labels.yml`). 제목의 type으로 `feat`·`fix`·`refactor`·`documentation`·`chore`·`release` 등이, 바뀐 경로로 `frontend`·`backend`·`infra`·`documentation`이 붙어요.
+- Dependabot PR은 `dependabot.yml`의 `chore`, `dependencies` 라벨을 그대로 써요.
 
 ## feature → dev
 
@@ -169,19 +168,19 @@ release: home page mobile/PC layout improvements
 | `feature/*`·`fix/*`·`chore/*` → `dev` | **Create a merge commit** | 브랜치 커밋 그대로 + 머지 커밋 추가 |
 | `dev` → `main` (release) | **Squash and merge** | main은 `Require linear history`라 이 옵션만 써요 |
 
-### 릴리즈 후 dev에 계보 잇기
+### 릴리즈 후 dev 맞추기
 
-`dev` → `main`을 Squash한 뒤에는 배포 코드가 같은지 확인하고 dev에 계보를 이어요. dev도 보호돼 있으니 별도 PR로 반영해요.
+`main`은 squash만 받아서, 릴리즈 뒤에는 main의 squash 커밋이 dev 이력에 없어요. 그대로 두면 다음 릴리즈 PR이 이미 나간 변경까지 다시 비교해요. 그래서 코드가 같은지 확인한 뒤 그 커밋을 dev 이력에 기록하는 PR을 따로 올려요(git-flow의 back-merge와 같은 단계예요).
 
 ```bash
 git fetch origin
 git diff --exit-code origin/main origin/dev
 # 차이가 있으면 중단. main의 미반영 hotfix 등을 실제로 먼저 병합한다.
-git checkout -b chore/record-vX.Y.Z-release origin/dev
-git merge -s ours origin/main -m "chore: record vX.Y.Z release squash into dev"
+git checkout -b chore/sync-dev-vX.Y.Z origin/dev
+git merge -s ours origin/main -m "chore: sync dev with vX.Y.Z release"
 git diff --exit-code origin/dev HEAD
-git push -u origin chore/record-vX.Y.Z-release
-# base=dev PR → CI → Create a merge commit
+git push -u origin chore/sync-dev-vX.Y.Z
+# base=dev PR(본문은 PR 템플릿 형식) → CI → Create a merge commit
 ```
 
 main과 dev의 코드 차이를 설명할 수 없으면 `-s ours`를 쓰지 않아요.

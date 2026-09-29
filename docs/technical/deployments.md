@@ -15,9 +15,9 @@
 ## 릴리즈 순서
 
 1. `dev` → `main` release PR을 **Squash and merge**로 머지해요.
-2. squash로 끊긴 계보를 `dev`에 다시 이어요.
+2. [dev를 main에 맞추는 PR](../rules/git-workflow.md#릴리즈-후-dev-맞추기)을 올려요.
    ```bash
-   git merge -s ours origin/main -m "chore: record vX.Y.Z release squash into dev"
+   git merge -s ours origin/main -m "chore: sync dev with vX.Y.Z release"
    ```
 3. `gh release create`로 릴리즈를 먼저 만들어요. 릴리즈가 없는 버전은 동기화 스크립트가 건너뛰어요.
 4. [릴리즈 노트를 동기화](#1-릴리즈-노트-동기화-changelog--github-릴리즈)해요.

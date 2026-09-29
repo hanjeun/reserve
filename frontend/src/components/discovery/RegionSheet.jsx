@@ -18,6 +18,112 @@ const emptyAreaMessage = (groupCount, ownerRegions) => {
     return '현재 등록된 가게가 없습니다. 이 지역으로 검색하면 빈 결과가 표시됩니다.';
 };
 
+const buildRegionGroups = actualGroups => REGION_OPTIONS.map(option => {
+    const actual = actualGroups.find(group => group.name === option.value);
+    return { name: option.value, label: option.label, count: actual?.count || 0, areas: actual?.areas || [] };
+});
+
+const buildPopularAreas = actualGroups => actualGroups
+    .filter(group => REGION_OPTIONS.some(option => option.value === group.name))
+    .flatMap(group => (group.areas || []).map(area => ({
+        label: `${group.name} ${area.name}`,
+        displayLabel: formatRegionLabel(`${group.name} ${area.name}`),
+        count: area.count,
+        group: group.name,
+    })))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'ko-KR'))
+    .slice(0, 6);
+
+const PopularAreaButton = ({ area, draft, onPick }) => {
+    const photoSrc = area.photo?.src ?? area.photo?.imageUrl;
+    return (
+        <button
+            type="button"
+            className={'reserve-region-sheet-popular-item' + (draft === area.label ? ' is-selected' : '')}
+            aria-pressed={draft === area.label}
+            onClick={() => onPick(area)}
+        >
+            <span className="reserve-region-sheet-popular-icon" aria-hidden="true">
+                <EnvironmentOutlined />
+                {photoSrc && (
+                    <img
+                        src={photoSrc}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        onError={(event) => { event.currentTarget.hidden = true; }}
+                    />
+                )}
+            </span>
+            <span>{area.displayLabel}</span>
+        </button>
+    );
+};
+
+// 인기 지역 영역 — 로딩 스켈레톤 / 목록 / 빈 안내 중 하나.
+const PopularAreaList = ({ isLoading, hasAreas, areas, draft, ownerRegions, onPick }) => {
+    if (isLoading) {
+        return (
+            <div className="reserve-region-sheet-popular-list" role="status" aria-label="인기 지역을 불러오는 중" aria-busy="true">
+                {[0, 1, 2, 3, 4, 5].map(index => (
+                    <div key={index} className="reserve-region-sheet-popular-placeholder" aria-hidden="true">
+                        <Skeleton.Avatar active shape="circle" size={52} />
+                        <Skeleton.Input active size="small" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    if (hasAreas) {
+        return (
+            <div className="reserve-region-sheet-popular-list">
+                {areas.map(area => (
+                    <PopularAreaButton key={area.label} area={area} draft={draft} onPick={onPick} />
+                ))}
+            </div>
+        );
+    }
+    return <p className="reserve-region-sheet-popular-empty">{ownerRegions ? '아직 등록한 가게가 없습니다.' : '아직 많이 찾는 지역이 없습니다.'}</p>;
+};
+
+// 선택한 시도의 "전체" + 시군구 목록.
+const GroupAreaList = ({ group, isLoading, draft, ownerRegions, onSelect }) => (
+    <>
+        <button type="button" className={draft === group.name ? 'is-selected' : ''}
+            aria-pressed={draft === group.name}
+            onClick={() => onSelect(group.name)}>
+            <span>{group.label} 전체</span>
+            {!isLoading && <span className="reserve-region-sheet-count">{group.count}</span>}
+        </button>
+        {isLoading ? <div className="reserve-region-sheet-loading" role="status" aria-label="세부 지역을 불러오는 중" aria-busy="true"><Skeleton active title={false} paragraph={{ rows: 4 }} /></div>
+            : group.areas.map(area => {
+            const areaValue = `${group.name} ${area.name}`;
+            return <button key={area.name} type="button" className={draft === areaValue ? 'is-selected' : ''}
+                aria-pressed={draft === areaValue}
+                onClick={() => onSelect(areaValue)}>
+                <span>{area.name}</span>
+                <span className="reserve-region-sheet-count">{area.count}</span>
+            </button>;
+        })}
+        {!isLoading && group.areas.length === 0 &&
+            <p>{emptyAreaMessage(group.count, ownerRegions)}</p>}
+    </>
+);
+
+// 시도를 고르기 전(전국) 안내 + 인기 지역 바로가기.
+const CountryOverview = ({ isLoading, areas, onPick }) => (
+    <div className="reserve-region-sheet-country">
+        <strong>전국에서 찾아보기</strong>
+        <p>시도를 선택하면 세부 지역을 볼 수 있어요.</p>
+        {!isLoading && areas.slice(0, 4).map(area => (
+            <button key={area.label} type="button" onClick={() => onPick(area)}>
+                <span>{area.displayLabel}</span>
+                <span className="reserve-region-sheet-count">{area.count}</span>
+            </button>
+        ))}
+    </div>
+);
+
 /** 홈과 목록이 같은 선택 데이터·적용 행동을 쓰는 지역 시트. */
 export default function RegionSheet({ open, value = '', onClose, onApply, availableGroups }) {
     const [selection, setSelection] = useState(() => selectionFor(value));
@@ -44,22 +150,10 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
     // 사장님 화면이 넘겨준 지역이 있으면 그것을, 없으면 조회 결과를 쓴다.
     const fetchedGroups = Array.isArray(data) ? data : EMPTY_GROUPS;
     const actualGroups = Array.isArray(availableGroups) ? availableGroups : fetchedGroups;
-    const groups = REGION_OPTIONS.map(option => {
-        const actual = actualGroups.find(group => group.name === option.value);
-        return { name: option.value, label: option.label, count: actual?.count || 0, areas: actual?.areas || [] };
-    });
+    const groups = buildRegionGroups(actualGroups);
     const shownGroup = activeGroup || draft.split(' ')[0];
     const selectedGroup = groups.find(group => group.name === shownGroup);
-    const popularAreas = useMemo(() => actualGroups
-        .filter(group => REGION_OPTIONS.some(option => option.value === group.name))
-        .flatMap(group => (group.areas || []).map(area => ({
-            label: `${group.name} ${area.name}`,
-            displayLabel: formatRegionLabel(`${group.name} ${area.name}`),
-            count: area.count,
-            group: group.name,
-        })))
-        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'ko-KR'))
-        .slice(0, 6), [actualGroups]);
+    const popularAreas = useMemo(() => buildPopularAreas(actualGroups), [actualGroups]);
     const photoRegions = useMemo(
         // 17개 시도 코드를 일괄 등록하지 않는다. 현재 보이는 인기 지역만 조회하고, 새 지역이
         // 목록에 나타나면 서버가 같은 방식으로 후보를 검증·캐시한다.
@@ -91,53 +185,10 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
         setDraft(name);
     };
 
-    // 인기 지역 영역 — 로딩 스켈레톤 / 목록 / 빈 안내 중 하나.
-    let popularContent;
-    if (isLoading) {
-        popularContent = (
-            <div className="reserve-region-sheet-popular-list" role="status" aria-label="인기 지역을 불러오는 중" aria-busy="true">
-                {[0, 1, 2, 3, 4, 5].map(index => (
-                    <div key={index} className="reserve-region-sheet-popular-placeholder" aria-hidden="true">
-                        <Skeleton.Avatar active shape="circle" size={52} />
-                        <Skeleton.Input active size="small" />
-                    </div>
-                ))}
-            </div>
-        );
-    } else if (popularAreas.length > 0) {
-        popularContent = (
-            <div className="reserve-region-sheet-popular-list">
-                {popularAreasWithPhoto.map(area => {
-                    const photoSrc = area.photo?.src ?? area.photo?.imageUrl;
-                    return (
-                    <button
-                        key={area.label}
-                        type="button"
-                        className={'reserve-region-sheet-popular-item' + (draft === area.label ? ' is-selected' : '')}
-                        aria-pressed={draft === area.label}
-                        onClick={() => { setActiveGroup(area.group); setDraft(area.label); }}
-                    >
-                        <span className="reserve-region-sheet-popular-icon" aria-hidden="true">
-                            <EnvironmentOutlined />
-                            {photoSrc && (
-                                <img
-                                    src={photoSrc}
-                                    alt=""
-                                    loading="lazy"
-                                    decoding="async"
-                                    onError={(event) => { event.currentTarget.hidden = true; }}
-                                />
-                            )}
-                        </span>
-                        <span>{area.displayLabel}</span>
-                    </button>
-                    );
-                })}
-            </div>
-        );
-    } else {
-        popularContent = <p className="reserve-region-sheet-popular-empty">{ownerRegions ? '아직 등록한 가게가 없습니다.' : '아직 많이 찾는 지역이 없습니다.'}</p>;
-    }
+    const pickArea = area => {
+        setActiveGroup(area.group);
+        setDraft(area.label);
+    };
 
     return (
         <Modal
@@ -162,7 +213,8 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
             <>
                     <section className="reserve-region-sheet-popular" aria-label={ownerRegions ? '내 가게가 있는 지역' : '가게가 많은 지역'}>
                         <h3>{ownerRegions ? '내 가게가 있는 지역' : '가게가 많은 지역'}</h3>
-                        {popularContent}
+                        <PopularAreaList isLoading={isLoading} hasAreas={popularAreas.length > 0}
+                            areas={popularAreasWithPhoto} draft={draft} ownerRegions={ownerRegions} onPick={pickArea} />
                         {hasPhotoAttribution && (
                             <Link className="reserve-region-sheet-attribution-link" to="/content-sources#region-photos">
                                 사진·콘텐츠 출처 및 이용조건
@@ -185,40 +237,10 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
                         </div>
                         <div className="reserve-region-sheet-areas" aria-label="시군구">
                             {selectedGroup ? (
-                                <>
-                                    <button type="button" className={draft === selectedGroup.name ? 'is-selected' : ''}
-                                        aria-pressed={draft === selectedGroup.name}
-                                        onClick={() => setDraft(selectedGroup.name)}>
-                                        <span>{selectedGroup.label} 전체</span>
-                                        {!isLoading && <span className="reserve-region-sheet-count">{selectedGroup.count}</span>}
-                                    </button>
-                                    {isLoading ? <div className="reserve-region-sheet-loading" role="status" aria-label="세부 지역을 불러오는 중" aria-busy="true"><Skeleton active title={false} paragraph={{ rows: 4 }} /></div>
-                                        : selectedGroup.areas.map(area => {
-                                        const areaValue = `${selectedGroup.name} ${area.name}`;
-                                        return <button key={area.name} type="button" className={draft === areaValue ? 'is-selected' : ''}
-                                            aria-pressed={draft === areaValue}
-                                            onClick={() => setDraft(areaValue)}>
-                                            <span>{area.name}</span>
-                                            <span className="reserve-region-sheet-count">{area.count}</span>
-                                        </button>;
-                                    })}
-                                    {!isLoading && selectedGroup.areas.length === 0 &&
-                                        <p>{emptyAreaMessage(selectedGroup.count, ownerRegions)}</p>}
-                                </>
+                                <GroupAreaList group={selectedGroup} isLoading={isLoading} draft={draft}
+                                    ownerRegions={ownerRegions} onSelect={setDraft} />
                             ) : (
-                                <div className="reserve-region-sheet-country">
-                                    <strong>전국에서 찾아보기</strong>
-                                    <p>시도를 선택하면 세부 지역을 볼 수 있어요.</p>
-                                    {!isLoading && popularAreasWithPhoto.slice(0, 4).map(area => (
-                                        <button key={area.label} type="button" onClick={() => {
-                                            setActiveGroup(area.group);
-                                            setDraft(area.label);
-                                        }}>
-                                            <span>{area.displayLabel}</span>
-                                            <span className="reserve-region-sheet-count">{area.count}</span>
-                                        </button>
-                                    ))}
-                                </div>
+                                <CountryOverview isLoading={isLoading} areas={popularAreasWithPhoto} onPick={pickArea} />
                             )}
                         </div>
                     </div>

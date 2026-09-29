@@ -124,6 +124,37 @@ const SIZE_FONT = {
     hero: '19px',
 };
 
+// 중첩 삼항 대신 if/else로 추출 (SonarCloud: no nested ternary)
+function resolveHeight(variant, size) {
+    if (variant.startsWith('ghost-sm') || variant === 'link') return 'auto';
+    if (variant === 'hero') return heights.buttonHero;
+    return SIZE_HEIGHT[size];
+}
+
+function resolveFontSize(variant, size) {
+    if (variant.startsWith('ghost-sm')) return fontSize.sm;
+    if (variant === 'hero') return '19px';
+    return SIZE_FONT[size];
+}
+
+function resolvePadding(variant, size) {
+    if (variant.startsWith('ghost-sm')) return '2px 0';
+    if (size === 'sm' && SM_PADDING_X[variant]) return `0 ${SM_PADDING_X[variant]}px`;
+    return undefined;
+}
+
+// 아이콘 자리 — 로딩 중이면 로딩 아이콘(없으면 스피너), 아니면 넘겨받은 아이콘.
+function renderLeadingIcon({ loading, loadingIcon, icon, children }) {
+    if (loading) {
+        return loadingIcon
+            ? <span className="reserve-btn-loading-icon" aria-hidden="true">{loadingIcon}</span>
+            : <span style={spinStyle} className="reserve-btn-spin" />;
+    }
+    return icon && (
+        <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }} aria-hidden={children ? 'true' : undefined}>{icon}</span>
+    );
+}
+
 const Button = ({
     variant = 'primary',
     size = 'lg',
@@ -140,25 +171,12 @@ const Button = ({
     ...rest
 }) => {
     const isGhostSm = variant.startsWith('ghost-sm');
-    const isHero    = variant === 'hero';
-    const isLink    = variant === 'link';
 
     const v = VARIANTS[variant] || VARIANTS.primary;
 
-    // 중첩 삼항 대신 if/else로 추출 (SonarCloud: no nested ternary)
-    let buttonHeight;
-    if (isGhostSm || isLink) buttonHeight = 'auto';
-    else if (isHero)          buttonHeight = heights.buttonHero;
-    else                      buttonHeight = SIZE_HEIGHT[size];
-
-    let buttonFontSize;
-    if (isGhostSm)   buttonFontSize = fontSize.sm;
-    else if (isHero) buttonFontSize = '19px';
-    else             buttonFontSize = SIZE_FONT[size];
-
-    let buttonPadding;
-    if (isGhostSm)                                   buttonPadding = '2px 0';
-    else if (size === 'sm' && SM_PADDING_X[variant]) buttonPadding = `0 ${SM_PADDING_X[variant]}px`;
+    const buttonHeight   = resolveHeight(variant, size);
+    const buttonFontSize = resolveFontSize(variant, size);
+    const buttonPadding  = resolvePadding(variant, size);
 
     const baseStyle = {
         display: 'inline-flex',
@@ -184,17 +202,7 @@ const Button = ({
         onClick?.(e);
     };
 
-    // 아이콘 자리 — 로딩 중이면 로딩 아이콘(없으면 스피너), 아니면 넘겨받은 아이콘.
-    let leadingIcon;
-    if (loading) {
-        leadingIcon = loadingIcon
-            ? <span className="reserve-btn-loading-icon" aria-hidden="true">{loadingIcon}</span>
-            : <span style={spinStyle} className="reserve-btn-spin" />;
-    } else {
-        leadingIcon = icon && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }} aria-hidden={children ? 'true' : undefined}>{icon}</span>
-        );
-    }
+    const leadingIcon = renderLeadingIcon({ loading, loadingIcon, icon, children });
 
     return (
         <button

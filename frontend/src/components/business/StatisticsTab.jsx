@@ -114,6 +114,266 @@ const useStoreStatistics = (storeId, range) => {
     });
 };
 
+const resolveStoreId = (myStores, statisticsStore) => {
+    const requestedStoreId = Number(statisticsStore);
+    return myStores.some(store => store.id === requestedStoreId)
+        ? requestedStoreId
+        : myStores[0]?.id;
+};
+
+const resolveRange = (statisticsRange) => (
+    RANGE_OPTIONS.some(option => option.value === statisticsRange) ? statisticsRange : '30d'
+);
+
+const buildStatusPieData = (statusBreakdown) => (
+    statusBreakdown
+        ? Object.entries(statusBreakdown)
+            // 라벨은 constants/status.js 한 곳에서만 온다. 여기서 사본을 두면
+            // UNCONFIRMED 처럼 나중에 늘어난 상태가 빠져 사용자에게 영어 enum 이 그대로 보인다.
+            // 모르는 상태가 둘 이상이면 이름이 '기타'로 겹치므로, 조각/범례의 React key 는
+            // 이름이 아니라 원래 enum(k)으로 만든다.
+            .map(([k, v]) => ({ key: k, name: RESERVATION_STATUS_LABELS[k] ?? '기타', value: v }))
+            .filter((d) => d.value > 0)
+        : []
+);
+
+const statusPieSummary = (loading, stats, statusPieData) => (
+    !loading && stats
+        ? `선택한 기간의 예약 ${statusPieData.reduce((sum, row) => sum + row.value, 0)}건을 상태별로 나눴습니다.`
+        : undefined
+);
+
+const revenueSummary = (loading, stats) => (
+    !loading && stats?.revenueTrend?.length
+        ? `확정 환불을 차감한 결제 완료일 기준입니다. ${summarizeDaily(stats.revenueTrend, '원')}`
+        : undefined
+);
+
+// 차트 본문 — 카드 껍데기는 항상 그리고, 본문만 로딩/데이터있음/데이터없음 3단으로 분기한다.
+const renderReservationTrend = (loading, stats, reservationGradient) => {
+    if (loading) {
+        return (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
+                {[60, 100, 75, 130, 95, 150].map((h, i) => (
+                    <Bone key={i} width={28} height={h} borderRadius={6} />
+                ))}
+            </div>
+        );
+    }
+    if (stats?.reservationTrend?.some((d) => d.value > 0)) {
+        return (
+            <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={stats.reservationTrend} margin={chartMargin}>
+                    <defs>
+                        <linearGradient id={reservationGradient.id} x1="0" y1="0" x2="0" y2="1">
+                            {reservationGradient.stops.map((s) => (
+                                <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
+                            ))}
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
+                    <YAxis width={chartYAxisWidth.count} tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
+                    <Tooltip labelFormatter={shortDate} formatter={(v) => [`${v}건`, '예약']} {...chartTooltipStyle} />
+                    <Area type="monotone" dataKey="value" stroke={colors.primary.main} strokeWidth={2} fill={`url(#${reservationGradient.id})`} />
+                </AreaChart>
+            </ResponsiveContainer>
+        );
+    }
+    return (
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Text type="secondary">해당 기간 예약이 없습니다.</Text>
+        </div>
+    );
+};
+
+const renderStatusPie = (loading, statusPieData) => {
+    if (loading) {
+        return (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'relative', width: 180, height: 180 }}>
+                    <Bone width={180} height={180} borderRadius="50%" />
+                    <div style={{
+                        position: 'absolute', top: '50%', left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: 110, height: 110, borderRadius: '50%',
+                        background: colors.background.paper,
+                    }} />
+                </div>
+            </div>
+        );
+    }
+    if (statusPieData.length > 0) {
+        return (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ width: 130, height: 130, flexShrink: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={statusPieData}
+                                cx="50%" cy="50%"
+                                innerRadius={40} outerRadius={65}
+                                paddingAngle={3} dataKey="value"
+                                cornerRadius={chartPieCornerRadius}
+                            >
+                                {statusPieData.map((entry, i) => (
+                                    <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
+                                ))}
+                            </Pie>
+                            <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+                <PieLegend data={statusPieData} palette={chartPalette} />
+            </div>
+        );
+    }
+    return (
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Text type="secondary">해당 기간 예약이 없습니다.</Text>
+        </div>
+    );
+};
+
+const renderRevenueTrend = (loading, stats, revenueGradient) => {
+    if (loading) {
+        return (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
+                {[90, 60, 120, 80, 140, 100].map((h, i) => (
+                    <Bone key={i} width={28} height={h} borderRadius={6} />
+                ))}
+            </div>
+        );
+    }
+    if (stats?.revenueTrend?.some((d) => d.value > 0)) {
+        return (
+            <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={stats.revenueTrend} margin={chartMargin}>
+                    <defs>
+                        <linearGradient id={revenueGradient.id} x1="0" y1="0" x2="0" y2="1">
+                            {revenueGradient.stops.map((s) => (
+                                <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
+                            ))}
+                        </linearGradient>
+                    </defs>
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
+                    <YAxis width={chartYAxisWidth.currency} tick={chartAxisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip labelFormatter={shortDate} formatter={(v) => [`${Number(v).toLocaleString()}원`, '순결제액']} {...chartTooltipStyle} />
+                    <Area type="monotone" dataKey="value" stroke={colors.success.main} strokeWidth={2} fill={`url(#${revenueGradient.id})`} />
+                </AreaChart>
+            </ResponsiveContainer>
+        );
+    }
+    return (
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Text type="secondary">해당 기간 순결제액이 없습니다.</Text>
+        </div>
+    );
+};
+
+// 요약 카드 4장
+const renderSummaryCards = (stats, loading, range) => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+        <StatCard
+            icon={<StarFilled />}
+            label="평균 별점"
+            value={stats?.averageRating != null ? stats.averageRating.toFixed(1) : '0.0'}
+            loading={loading}
+        />
+        <StatCard
+            icon={<CommentOutlined />}
+            label="리뷰 수"
+            value={stats?.reviewCount ?? 0}
+            suffix="전체 누적"
+            loading={loading}
+        />
+        <StatCard
+            icon={<WalletOutlined />}
+            label="예약금 순결제액"
+            value={(stats?.totalDepositRevenue ?? 0).toLocaleString()}
+            suffix={`원 · 최근 ${rangeDays(range)}일`}
+            loading={loading}
+        />
+        <StatCard
+            icon={<NotificationOutlined />}
+            label="광고 노출"
+            value={stats?.adSummary ? `${AD_TYPE_LABELS[stats.adSummary.adType] || stats.adSummary.adType}` : '없음'}
+            suffix={stats?.adSummary ? `${stats.adSummary.daysRemaining}일 남음` : '진행 중인 광고 없음'}
+            loading={loading}
+        />
+    </div>
+);
+
+// 광고 성과 카드 본문 — 로딩 중엔 지표 자리 스켈레톤
+const renderAdPerformance = (loading, adSummary) => {
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                {[1, 2, 3].map((i) => (
+                    <div key={i} style={{ flex: '1 1 120px' }}>
+                        <Bone width={64} height={13} style={{ marginBottom: 8 }} />
+                        <Bone width={40} height={26} />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <AdStatItem
+                    label={`${AD_TYPE_LABELS[adSummary.adType] || adSummary.adType} 노출수`}
+                    value={adSummary.impressionCount ?? 0}
+                    suffix="회"
+                    color={colors.primary.main}
+                />
+                {/* 노출형은 클릭 개념이 애매해서(카드 자체 클릭과 구별 불가) 클릭/전환 지표는 배너형만 표시 */}
+                {adSummary.adType === 'BANNER' && (
+                    <>
+                        <AdStatItem label="클릭수" value={adSummary.clickCount ?? 0} suffix="회" color={colors.success.main} />
+                        <AdStatItem
+                            label="클릭율(CTR)"
+                            value={adSummary.clickThroughRate != null ? `${adSummary.clickThroughRate}%` : '-'}
+                            color="#8b5cf6"
+                        />
+                        <AdStatItem label="전환수" value={adSummary.conversionCount ?? 0} suffix="건" color={colors.warning.main} />
+                        <AdStatItem
+                            label="전환율"
+                            value={adSummary.conversionRate != null ? `${adSummary.conversionRate}%` : '-'}
+                            color={colors.error.main}
+                        />
+                    </>
+                )}
+            </div>
+
+            {/* 노출 → 클릭 → 전환 퍼널 — 배너형만(노출형은 클릭/전환 개념 자체가 없으므로 생략) */}
+            {adSummary.adType === 'BANNER' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 420 }}>
+                    <AdFunnelBar
+                        label="노출"
+                        value={adSummary.impressionCount ?? 0}
+                        maxValue={adSummary.impressionCount ?? 0}
+                        color={colors.primary.main}
+                    />
+                    <AdFunnelBar
+                        label="클릭"
+                        value={adSummary.clickCount ?? 0}
+                        maxValue={adSummary.impressionCount ?? 0}
+                        color={colors.success.main}
+                    />
+                    <AdFunnelBar
+                        label="전환"
+                        value={adSummary.conversionCount ?? 0}
+                        maxValue={adSummary.impressionCount ?? 0}
+                        color={colors.warning.main}
+                    />
+                </div>
+            )}
+        </div>
+    );
+};
+
 /**
  * 사업자 "통계 · 분석" 탭.
  * 관리자 DashboardTab과 동일한 StatCard/ChartCard + chart 토큰을 재사용 — 처음부터 새로 만든 화면.
@@ -123,13 +383,8 @@ const useStoreStatistics = (storeId, range) => {
 const StatisticsTab = () => {
     const { stores: myStores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();
     const [{ statisticsStore, statisticsRange }, setStatisticsParams] = useQueryParamsState(STATISTICS_QUERY_DEFAULTS);
-    const requestedStoreId = Number(statisticsStore);
-    const storeId = myStores.some(store => store.id === requestedStoreId)
-        ? requestedStoreId
-        : myStores[0]?.id;
-    const range = RANGE_OPTIONS.some(option => option.value === statisticsRange)
-        ? statisticsRange
-        : '30d';
+    const storeId = resolveStoreId(myStores, statisticsStore);
+    const range = resolveRange(statisticsRange);
 
     const { data: stats, isLoading: statsLoading, isFetching, error: statsError, refetch } = useStoreStatistics(storeId, range);
     const loading = storesLoading || statsLoading;
@@ -187,138 +442,7 @@ const StatisticsTab = () => {
     const reservationGradient = chartAreaGradient(areaGradientId, colors.primary.main);
     const revenueGradient = chartAreaGradient(revenueGradientId, colors.success.main);
 
-    const statusPieData = stats?.statusBreakdown
-        ? Object.entries(stats.statusBreakdown)
-            // 라벨은 constants/status.js 한 곳에서만 온다. 여기서 사본을 두면
-            // UNCONFIRMED 처럼 나중에 늘어난 상태가 빠져 사용자에게 영어 enum 이 그대로 보인다.
-            // 모르는 상태가 둘 이상이면 이름이 '기타'로 겹치므로, 조각/범례의 React key 는
-            // 이름이 아니라 원래 enum(k)으로 만든다.
-            .map(([k, v]) => ({ key: k, name: RESERVATION_STATUS_LABELS[k] ?? '기타', value: v }))
-            .filter((d) => d.value > 0)
-        : [];
-
-    // 차트 본문 — 카드 껍데기는 항상 그리고, 본문만 로딩/데이터있음/데이터없음 3단으로 분기한다.
-    const renderReservationTrend = () => {
-        if (loading) {
-            return (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
-                    {[60, 100, 75, 130, 95, 150].map((h, i) => (
-                        <Bone key={i} width={28} height={h} borderRadius={6} />
-                    ))}
-                </div>
-            );
-        }
-        if (stats?.reservationTrend?.some((d) => d.value > 0)) {
-            return (
-                <ResponsiveContainer width="100%" height={260}>
-                    <AreaChart data={stats.reservationTrend} margin={chartMargin}>
-                        <defs>
-                            <linearGradient id={reservationGradient.id} x1="0" y1="0" x2="0" y2="1">
-                                {reservationGradient.stops.map((s) => (
-                                    <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
-                                ))}
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid {...chartGridProps} />
-                        <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
-                        <YAxis width={chartYAxisWidth.count} tick={chartAxisTick} allowDecimals={false} axisLine={false} tickLine={false} />
-                        <Tooltip labelFormatter={shortDate} formatter={(v) => [`${v}건`, '예약']} {...chartTooltipStyle} />
-                        <Area type="monotone" dataKey="value" stroke={colors.primary.main} strokeWidth={2} fill={`url(#${reservationGradient.id})`} />
-                    </AreaChart>
-                </ResponsiveContainer>
-            );
-        }
-        return (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Text type="secondary">해당 기간 예약이 없습니다.</Text>
-            </div>
-        );
-    };
-
-    const renderStatusPie = () => {
-        if (loading) {
-            return (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ position: 'relative', width: 180, height: 180 }}>
-                        <Bone width={180} height={180} borderRadius="50%" />
-                        <div style={{
-                            position: 'absolute', top: '50%', left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: 110, height: 110, borderRadius: '50%',
-                            background: colors.background.paper,
-                        }} />
-                    </div>
-                </div>
-            );
-        }
-        if (statusPieData.length > 0) {
-            return (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ width: 130, height: 130, flexShrink: 0 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={statusPieData}
-                                    cx="50%" cy="50%"
-                                    innerRadius={40} outerRadius={65}
-                                    paddingAngle={3} dataKey="value"
-                                    cornerRadius={chartPieCornerRadius}
-                                >
-                                    {statusPieData.map((entry, i) => (
-                                        <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <PieLegend data={statusPieData} palette={chartPalette} />
-                </div>
-            );
-        }
-        return (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Text type="secondary">해당 기간 예약이 없습니다.</Text>
-            </div>
-        );
-    };
-
-    const renderRevenueTrend = () => {
-        if (loading) {
-            return (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 16, paddingBottom: 20 }}>
-                    {[90, 60, 120, 80, 140, 100].map((h, i) => (
-                        <Bone key={i} width={28} height={h} borderRadius={6} />
-                    ))}
-                </div>
-            );
-        }
-        if (stats?.revenueTrend?.some((d) => d.value > 0)) {
-            return (
-                <ResponsiveContainer width="100%" height={260}>
-                    <AreaChart data={stats.revenueTrend} margin={chartMargin}>
-                        <defs>
-                            <linearGradient id={revenueGradient.id} x1="0" y1="0" x2="0" y2="1">
-                                {revenueGradient.stops.map((s) => (
-                                    <stop key={s.offset} offset={s.offset} stopColor={s.stopColor} stopOpacity={s.stopOpacity} />
-                                ))}
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid {...chartGridProps} />
-                        <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={{ stroke: colors.gray[100] }} tickLine={false} minTickGap={20} />
-                        <YAxis width={chartYAxisWidth.currency} tick={chartAxisTick} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                        <Tooltip labelFormatter={shortDate} formatter={(v) => [`${Number(v).toLocaleString()}원`, '순결제액']} {...chartTooltipStyle} />
-                        <Area type="monotone" dataKey="value" stroke={colors.success.main} strokeWidth={2} fill={`url(#${revenueGradient.id})`} />
-                    </AreaChart>
-                </ResponsiveContainer>
-            );
-        }
-        return (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Text type="secondary">해당 기간 순결제액이 없습니다.</Text>
-            </div>
-        );
-    };
+    const statusPieData = buildStatusPieData(stats?.statusBreakdown);
 
     return (
         <div className="reserve-statistics-tab" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -333,35 +457,7 @@ const StatisticsTab = () => {
             {(!statsError || stats) && <>
             {/* 요약 카드 - 최소폭을 200에서 150으로 줄여 좁은 모바일 화면에서도 2열이 유지되게 함
                 (DashboardTab과 동일한 이유로 통일했다. 예전 최소폭이 넓어 모바일에서 카드들이 세로로 쌓였다) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
-                <StatCard
-                    icon={<StarFilled />}
-                    label="평균 별점"
-                    value={stats?.averageRating != null ? stats.averageRating.toFixed(1) : '0.0'}
-                    loading={loading}
-                />
-                <StatCard
-                    icon={<CommentOutlined />}
-                    label="리뷰 수"
-                    value={stats?.reviewCount ?? 0}
-                    suffix="전체 누적"
-                    loading={loading}
-                />
-                <StatCard
-                    icon={<WalletOutlined />}
-                    label="예약금 순결제액"
-                    value={(stats?.totalDepositRevenue ?? 0).toLocaleString()}
-                    suffix={`원 · 최근 ${rangeDays(range)}일`}
-                    loading={loading}
-                />
-                <StatCard
-                    icon={<NotificationOutlined />}
-                    label="광고 노출"
-                    value={stats?.adSummary ? `${AD_TYPE_LABELS[stats.adSummary.adType] || stats.adSummary.adType}` : '없음'}
-                    suffix={stats?.adSummary ? `${stats.adSummary.daysRemaining}일 남음` : '진행 중인 광고 없음'}
-                    loading={loading}
-                />
-            </div>
+            {renderSummaryCards(stats, loading, range)}
 
             {/* 차트 — DashboardTab과 동일한 패턴(2026-07 추가): 카드 껍데기(제목 포함)는 항상 그리고,
                 본문만 loading/데이터있음/데이터없음 3단으로 분기해서 실제 차트 모양에 가까운 스켈레톤을 넣는다.
@@ -377,33 +473,29 @@ const StatisticsTab = () => {
                     tableColumns={DATE_COUNT_COLUMNS}
                     tableRows={!loading ? (stats?.reservationTrend ?? []) : []}
                 >
-                    {renderReservationTrend()}
+                    {renderReservationTrend(loading, stats, reservationGradient)}
                 </ChartCard>
 
                 <ChartCard
                     title="상태별 분포"
                     height={260}
                     minWidth={280}
-                    summary={!loading && stats
-                        ? `선택한 기간의 예약 ${statusPieData.reduce((sum, row) => sum + row.value, 0)}건을 상태별로 나눴습니다.`
-                        : undefined}
+                    summary={statusPieSummary(loading, stats, statusPieData)}
                     tableColumns={STATUS_COUNT_COLUMNS}
                     tableRows={!loading ? statusPieData : []}
                 >
-                    {renderStatusPie()}
+                    {renderStatusPie(loading, statusPieData)}
                 </ChartCard>
 
                 <ChartCard
                     title="예약금 순결제액 추이"
                     height={260}
                     minWidth={340}
-                    summary={!loading && stats?.revenueTrend?.length
-                        ? `확정 환불을 차감한 결제 완료일 기준입니다. ${summarizeDaily(stats.revenueTrend, '원')}`
-                        : undefined}
+                    summary={revenueSummary(loading, stats)}
                     tableColumns={DATE_REVENUE_COLUMNS}
                     tableRows={!loading ? (stats?.revenueTrend ?? []) : []}
                 >
-                    {renderRevenueTrend()}
+                    {renderRevenueTrend(loading, stats, revenueGradient)}
                 </ChartCard>
             </div>
 
@@ -413,68 +505,7 @@ const StatisticsTab = () => {
                 노출형은 클릭 개념이 없어서 노출수만, 배너형은 클릭/전환까지 함께 보여준다. */}
             {(loading || stats?.adSummary) && (
                 <ChartCard title="광고 성과" height="auto">
-                    {loading ? (
-                        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} style={{ flex: '1 1 120px' }}>
-                                    <Bone width={64} height={13} style={{ marginBottom: 8 }} />
-                                    <Bone width={40} height={26} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                                <AdStatItem
-                                    label={`${AD_TYPE_LABELS[stats.adSummary.adType] || stats.adSummary.adType} 노출수`}
-                                    value={stats.adSummary.impressionCount ?? 0}
-                                    suffix="회"
-                                    color={colors.primary.main}
-                                />
-                                {/* 노출형은 클릭 개념이 애매해서(카드 자체 클릭과 구별 불가) 클릭/전환 지표는 배너형만 표시 */}
-                                {stats.adSummary.adType === 'BANNER' && (
-                                    <>
-                                        <AdStatItem label="클릭수" value={stats.adSummary.clickCount ?? 0} suffix="회" color={colors.success.main} />
-                                        <AdStatItem
-                                            label="클릭율(CTR)"
-                                            value={stats.adSummary.clickThroughRate != null ? `${stats.adSummary.clickThroughRate}%` : '-'}
-                                            color="#8b5cf6"
-                                        />
-                                        <AdStatItem label="전환수" value={stats.adSummary.conversionCount ?? 0} suffix="건" color={colors.warning.main} />
-                                        <AdStatItem
-                                            label="전환율"
-                                            value={stats.adSummary.conversionRate != null ? `${stats.adSummary.conversionRate}%` : '-'}
-                                            color={colors.error.main}
-                                        />
-                                    </>
-                                )}
-                            </div>
-
-                            {/* 노출 → 클릭 → 전환 퍼널 — 배너형만(노출형은 클릭/전환 개념 자체가 없으므로 생략) */}
-                            {stats.adSummary.adType === 'BANNER' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 420 }}>
-                                    <AdFunnelBar
-                                        label="노출"
-                                        value={stats.adSummary.impressionCount ?? 0}
-                                        maxValue={stats.adSummary.impressionCount ?? 0}
-                                        color={colors.primary.main}
-                                    />
-                                    <AdFunnelBar
-                                        label="클릭"
-                                        value={stats.adSummary.clickCount ?? 0}
-                                        maxValue={stats.adSummary.impressionCount ?? 0}
-                                        color={colors.success.main}
-                                    />
-                                    <AdFunnelBar
-                                        label="전환"
-                                        value={stats.adSummary.conversionCount ?? 0}
-                                        maxValue={stats.adSummary.impressionCount ?? 0}
-                                        color={colors.warning.main}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {renderAdPerformance(loading, stats?.adSummary)}
                 </ChartCard>
             )}
             </>}

@@ -44,6 +44,28 @@ const newClientMessageId = () => {
     return Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
+// 같은 본문·첨부를 다시 보내면 직전 식별자를 재사용한다.
+const reuseOrNewClientMessageId = (retry, text, attachment) => (
+    retry?.content === text && retry?.attachment === attachment
+        ? retry.clientMessageId
+        : newClientMessageId()
+);
+
+// 중단 가능하면 signal 을, 사진이 있으면 첨부까지 넘긴다(없는 인자는 넘기지 않는다).
+const callSend = (send, controller, roomId, text, clientMessageId, attachment) => {
+    if (controller) return send(roomId, text, clientMessageId, attachment, { signal: controller.signal });
+    if (attachment) return send(roomId, text, clientMessageId, attachment);
+    return send(roomId, text, clientMessageId);
+};
+
+// 429 는 레이트리밋이다. "실패했다"가 아니라 "너무 빠르다"라고 말해야
+// 사용자가 같은 동작을 계속 반복하지 않는다.
+const sendFailureText = (error, controller) => {
+    if (controller?.signal.aborted) return '전송 요청을 중단했습니다. 서버에 도착했을 수 있으니 대화를 확인해주세요.';
+    if ((error?.status ?? error?.response?.status) === 429) return '조금 천천히 보내주세요.';
+    return '전송하지 못했습니다. 잠시 후 다시 시도해주세요.';
+};
+
 /**
  * @param {object}   o
  * @param {*}        o.threadKey 어느 대화인가. 이 값이 바뀌면 목록을 즉시 비우고 다시 불러온다.
@@ -202,10 +224,7 @@ export default function useChatThread({
         const active = activeRef.current;
         if (!active || active.scope !== scope) return null;
         if ((!text && !attachment) || active.sending || roomId == null || !active.ready || active.invalidated) return false;
-        const retry = retryRef.current;
-        const clientMessageId = retry?.content === text && retry?.attachment === attachment
-            ? retry.clientMessageId
-            : newClientMessageId();
+        const clientMessageId = reuseOrNewClientMessageId(retryRef.current, text, attachment);
         if (!clientMessageId) { onError?.('안전한 연결에서 다시 시도해주세요.'); return false; }
         active.sending = true;
         const controller = cancellable ? new AbortController() : null;
@@ -224,11 +243,7 @@ export default function useChatThread({
         }]);
 
         try {
-            // 중단 가능하면 signal 을, 사진이 있으면 첨부까지 넘긴다(없는 인자는 넘기지 않는다).
-            let sent;
-            if (controller) sent = await send(roomId, text, clientMessageId, attachment, { signal: controller.signal });
-            else if (attachment) sent = await send(roomId, text, clientMessageId, attachment);
-            else sent = await send(roomId, text, clientMessageId);
+            const sent = await callSend(send, controller, roomId, text, clientMessageId, attachment);
             if (activeRef.current !== active || active.invalidated) return null;
             setMessages((prev) => mergeById(
                 prev.filter((m) => m.id !== tempId),
@@ -240,13 +255,7 @@ export default function useChatThread({
         } catch (e) {
             if (activeRef.current !== active || active.invalidated) return null;
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
-            // 429 는 레이트리밋이다. "실패했다"가 아니라 "너무 빠르다"라고 말해야
-            // 사용자가 같은 동작을 계속 반복하지 않는다.
-            const tooFast = (e?.status ?? e?.response?.status) === 429;
-            let failure = '전송하지 못했습니다. 잠시 후 다시 시도해주세요.';
-            if (controller?.signal.aborted) failure = '전송 요청을 중단했습니다. 서버에 도착했을 수 있으니 대화를 확인해주세요.';
-            else if (tooFast) failure = '조금 천천히 보내주세요.';
-            onError?.(failure);
+            onError?.(sendFailureText(e, controller));
             return false;
         } finally {
             if (activeRef.current === active && !active.invalidated) {

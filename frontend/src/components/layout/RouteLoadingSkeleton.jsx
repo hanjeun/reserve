@@ -4,6 +4,7 @@ import Bone from '../common/Bone';
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import { StoreDetailSkeleton, MyReservationCardSkeleton, ReservationSummaryCardSkeleton } from '../common/Skeletons';
 import PageContainer from '../common/PageContainer';
+import { PageStatusSkeleton } from '../common/PageStatus';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
 import BenefitDetailSkeleton from '../common/BenefitDetailSkeleton';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
@@ -206,8 +207,10 @@ const KINDS = {
     admin: AdminRouteSkeletonLazy,
     business: BusinessRouteSkeletonLazy,
     messages: MessagesRouteSkeletonLazy,
-    // 그 밖의 경로(소셜 로그인 콜백·없는 주소) — 문서형 틀
+    // 소셜 로그인 콜백 — 문서형 틀
     document: LegalRouteSkeletonLazy,
+    // 알 수 없는 주소 — NotFound 와 같은 틀(PageStatus). 작고 오류 폴백과 공유하므로 첫 번들에 둔다.
+    'not-found': PageStatusSkeleton,
 };
 
 export function RouteSkeletonPreview({ pathname, search = '' }) {

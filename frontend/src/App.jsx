@@ -39,6 +39,8 @@ const Privacy = lazy(() => import('./pages/legal/Privacy'));
 const ContentSources = lazy(() => import('./pages/legal/ContentSources'));
 const OperationGuide = lazy(() => import('./pages/legal/OperationGuide'));
 const MessagesPage = lazy(() => import('./pages/member/MessagesPage'));
+// 어떤 라우트에도 맞지 않는 주소(path="*"). 예전엔 이 라우트가 없어 헤더·푸터 사이가 비어 보였다.
+const NotFound = lazy(() => import('./pages/NotFound'));
 // 로그인한 사용자만 쓰는 통합 메신저는 익명 랜딩의 초기 번들에서 제외한다.
 const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
 
@@ -52,6 +54,7 @@ import OfflineBanner from './components/layout/OfflineBanner';
 import { SpinIndicator } from './components/common/Loading';
 import PrivateRoute from './components/PrivateRoute';
 import ScrollToTop from './components/ScrollToTop';
+import { AppErrorBoundary, RouteErrorBoundary } from './components/layout/AppErrorBoundary';
 
 const { Content } = Layout;
 
@@ -275,6 +278,8 @@ function AppRoutes() {
             {!isSearchPage && <Header />}
             {isDiscoveryRootPath(pathname, search) && <DiscoveryNav />}
             <Content ref={routeContentRef}>
+                {/* 라우트 콘텐츠의 렌더 오류는 여기서 멈춘다 — 헤더·푸터는 남아 다른 화면으로 갈 수 있다. */}
+                <RouteErrorBoundary>
                 <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
                     {/* 공용 페이지 */}
@@ -317,8 +322,12 @@ function AppRoutes() {
                         <Route path="/my-page" element={<MyPage />} />
                         <Route path="/messages" element={<MessagesPage />} />
                     </Route>
+
+                    {/* 위 어디에도 맞지 않는 주소. robots noindex 는 useRouteSeo 가 경로 기준으로 붙인다. */}
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>
+                </RouteErrorBoundary>
             </Content>
 
             {pathname !== '/messages' && !isSearchPage && <AppFooter />}
@@ -363,7 +372,10 @@ function App() {
                     spin={spinConfig}
                     form={{ validateMessages }}
                 >
-                    <AppContent />
+                    {/* AntApp 바깥의 마지막 그물 — 헤더·메신저 등 앱 셸 자체의 렌더 오류가 흰 화면이 되지 않게 한다. */}
+                    <AppErrorBoundary>
+                        <AppContent />
+                    </AppErrorBoundary>
                 </ConfigProvider>
             </BrowserRouter>
     );

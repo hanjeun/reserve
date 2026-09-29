@@ -12,6 +12,9 @@ const routes = {
     '/stores': 'store-list', '/store/12': 'detail', '/terms': 'legal', '/privacy': 'legal', '/operation-guide': 'legal', '/content-sources': 'legal',
     '/my-stores': 'cards', '/store/register': 'store-form', '/store/12/edit': 'store-form', '/business': 'business', '/admin': 'admin',
     '/my-reservations': 'reservations', '/my-favorites': 'cards', '/payment/result': 'payment-result', '/my-page': 'my-page', '/messages': 'messages',
+    '/benefits/abc': 'benefit-detail',
+    // App.jsx 의 path="*" — 어떤 라우트에도 맞지 않는 주소
+    '/this-does-not-exist': 'not-found', '/,%20https:/reserve.it.kr/login': 'not-found', '/store/12/unknown': 'not-found', '/benefits/1/extra': 'not-found',
 };
 
 const originalWidth = window.innerWidth;
@@ -203,6 +206,16 @@ describe('route chunk loading patterns', () => {
         await act(async () => release({ AuthRouteSkeleton: () => <h2>로그인</h2> }));
         expect(container.querySelector('h2')).toHaveTextContent('로그인');
         vi.doUnmock('./RouteSkeletonPages');
+    });
+
+    it('draws the unknown-address skeleton in the same small centered frame as NotFound', () => {
+        const { container } = render(<RouteSkeletonPreview pathname="/this-does-not-exist" />);
+        const frame = container.querySelector('.reserve-page-container.reserve-page-status-page');
+        expect(frame).toHaveStyle({ maxWidth: '420px', textAlign: 'center' });
+        // PageContainer 의 최소 높이를 그대로 써서 청크가 도착해도 푸터가 튀지 않는다.
+        expect(frame.style.minHeight).toContain('100svh');
+        expect(container.querySelector('.reserve-page-status__actions')).toBeInTheDocument();
+        expect(container.querySelector('.reserve-route-skeleton-copy')).toBeNull();
     });
 
     it('resolves and removes the page skeleton when the chunk is ready', async () => {

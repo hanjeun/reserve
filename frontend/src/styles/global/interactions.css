@@ -363,7 +363,7 @@
 .reserve-filter-menu:focus { outline: none; }
 .reserve-filter-menu:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
 .reserve-filter-menu:disabled { color: var(--c-text-tertiary, #8b95a1); cursor: not-allowed; opacity: 0.65; }
-.reserve-filter-menu-options.ant-dropdown-menu { box-sizing: border-box; min-width: 128px; max-width: calc(100vw - 32px); max-height: min(320px, calc(50svh - 24px)); overflow-y: auto; overscroll-behavior: contain; padding: 4px; border-radius: 10px; }
+.reserve-filter-menu-options.ant-dropdown-menu { box-sizing: border-box; min-width: 128px; max-width: calc(100vw - 32px); max-height: min(376px, calc(60svh - 24px)); overflow-y: auto; overscroll-behavior: contain; padding: 4px; border-radius: 10px; }
 .reserve-filter-menu-options.ant-dropdown-menu .ant-dropdown-menu-item { box-sizing: border-box; min-height: 40px; padding: 6px 8px; border-radius: 6px; color: var(--c-text-primary, #191f28); font-size: 13px; line-height: 20px; }
 @media (min-width: 900px) {
     .reserve-filter-menu-options.ant-dropdown-menu .ant-dropdown-menu-item { min-height: 36px; }

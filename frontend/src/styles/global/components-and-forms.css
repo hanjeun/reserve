@@ -1007,7 +1007,7 @@ input:disabled {
     border-radius: 8px;
 }
 .reserve-sortable-upload-item:focus-visible {
-    outline: 2px solid var(--c-primary, #3182f6);
+    outline: 2px solid var(--c-text-secondary, #4e5968);
     outline-offset: 2px;
 }
 .reserve-sortable-upload-item.is-dragging {

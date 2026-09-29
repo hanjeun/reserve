@@ -212,18 +212,6 @@ jobs:
           chmod +x ./gradlew
           ./gradlew bootJar --console=plain
 
-      - name: Verify rollback schema compatibility
-        id: rollback_bridge
-        run: bash scripts/test-v270-rollback.sh
-
-      - name: Upload verified rollback backend
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: rollback-backend
-          overwrite: true
-          path: ${{ steps.rollback_bridge.outputs.bridge_jar }}
-          retention-days: 7
-
       # ── 여기부터는 main push에서만 실행한다 ──────────────────────────────
       # 예전엔 조건이 없어서 main으로 PR을 여는 것만으로 이미지가 빌드·푸시됐다.
       # deploy-backend가 :latest를 pull하므로, PR을 열어둔 상태에서 배포가 돌면
@@ -253,29 +241,6 @@ jobs:
             -t "$DOCKERHUB_USERNAME/reserve:latest" \
             -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
-
-      # 원본 v2.6.3 이미지는 OWNER/취소/사진 데이터를 안전하게 읽지 못한다.
-      # 위 격리 검사에서 만든 호환 서버만 별도 불변 태그로 보관한다. latest는 건드리지 않는다.
-      - name: Build rollback compatibility image
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          COMMIT_SHA: ${{ github.sha }}
-          BRIDGE_DIR: ${{ steps.rollback_bridge.outputs.bridge_dir }}
-        run: |
-          test -s "$BRIDGE_DIR/backend/build/libs/reserve-2.6.3.jar"
-          docker build --platform linux/amd64 \
-            --label reserve.rollback-base=b478ae8d732afa1e35642d790bfc39972556f885 \
-            --label reserve.schema-compat=v270-refund-v1 \
-            -t "$DOCKERHUB_USERNAME/reserve:rollback-v263-v270-$COMMIT_SHA" \
-            "$BRIDGE_DIR/backend"
-
-      - name: Push rollback compatibility image
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          COMMIT_SHA: ${{ github.sha }}
-        run: docker push "$DOCKERHUB_USERNAME/reserve:rollback-v263-v270-$COMMIT_SHA"
 
       - name: Push Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -505,7 +470,7 @@ jobs:
             ACTIVE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$CURRENT_UPSTREAM")
             SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$ACTIVE_IMAGE")
             if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ]; then
-              echo "Active rollback backend is not schema/refund compatible; prepare the bridge before deployment"
+              echo "Active backend image is not schema/refund compatible; refusing automatic deployment"
               exit 1
             fi
             if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
@@ -914,12 +879,6 @@ jobs:
             if [ "${{ env.CURRENT_UPSTREAM }}" = "none" ]; then
               echo "No previous container to stop (first deploy or both were down)"
             else
-              OLD_IMAGE=$(sudo docker inspect --format '{{.Image}}' ${{ env.CURRENT_UPSTREAM }})
-              OLD_BASE=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.rollback-base"}}' "$OLD_IMAGE")
-              if [ "$OLD_BASE" = 'b478ae8d732afa1e35642d790bfc39972556f885' ]; then
-                echo "Keeping the compatible rollback backend available"
-                exit 0
-              fi
               sudo docker stop ${{ env.CURRENT_UPSTREAM }} || true
               sudo docker rm   ${{ env.CURRENT_UPSTREAM }} || true
             fi

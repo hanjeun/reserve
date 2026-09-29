@@ -8,7 +8,6 @@ import benefitService from '../../services/benefitService';
 import { BENEFIT_IMAGE_FALLBACK, getBenefitImageUrl } from './benefitPresentation';
 
 vi.mock('../../services/benefitService', () => ({ default: { getList: vi.fn(), getDetail: vi.fn() } }));
-vi.mock('./BenefitStoreDiscovery', () => ({ default: () => <section id="benefit-stores" aria-label="일반 가게 탐색" /> }));
 const item = { id: 1, storeId: 12, storeName: '가게 이름', title: '신메뉴 안내', excerpt: '가게의 새 소식', content: '<img src=x onerror="window.hacked=true">\n<script>alert(1)</script>', mainImageUrl: 'https://tracker.example/photo.png', createdAt: '2026-09-13T10:00:00' };
 const StoreRouteProbe = () => {
     const location = useLocation();

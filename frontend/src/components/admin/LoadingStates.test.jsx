@@ -11,7 +11,6 @@ import ReservationsAllTab from './ReservationsAllTab';
 import TrashTab from './TrashTab';
 import PaymentOperationsTab from './PaymentOperationsTab';
 import MailboxTab from './MailboxTab';
-import ChatTab from './ChatTab';
 import AdManageTab from '../advertisement/AdManageTab';
 import StatisticsTab from '../business/StatisticsTab';
 import BusinessPanel from '../../pages/business/BusinessPanel';
@@ -276,25 +275,6 @@ it('labels retained statistics when a refresh fails', () => {
     render(<StatisticsTab />);
     expect(screen.getByRole('alert')).toHaveTextContent('이전 조회 결과');
     expect(screen.getByText('예약금 순결제액: 2,000')).toBeInTheDocument();
-});
-
-it('shows conversation bones before the first admin thread response', () => {
-    state.query.data = { content: [{ id: 21, memberName: '손님', adminUnread: 0 }] };
-    state.thread.loading = true;
-    render(<ChatTab />);
-    fireEvent.click(screen.getByRole('button', { name: '손님' }));
-    expect(screen.getByRole('status', { name: '대화를 불러오는 중' })).toBeInTheDocument();
-    expect(screen.queryByTestId('chat-bubbles')).not.toBeInTheDocument();
-});
-
-it('offers the existing thread reload on admin conversation failure', () => {
-    state.query.data = { content: [{ id: 21, memberName: '손님', adminUnread: 0 }] };
-    state.thread.loadError = true;
-    render(<ChatTab />);
-    fireEvent.click(screen.getByRole('button', { name: '손님' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('대화를 불러오지 못했습니다');
-    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
-    expect(state.reload).toHaveBeenCalledOnce();
 });
 
 it('disables the partner store filter until its shared lookup is ready', () => {

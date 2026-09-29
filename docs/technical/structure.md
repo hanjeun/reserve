@@ -30,7 +30,6 @@ RESERVE/
 │       ├── backup.md             ← MySQL 백업 · 복원 훈련
 │       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
 │       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
-│       ├── current-status.md      ← 코드·로컬·dev·production·외부 실증 상태 정본
 │       ├── quality-roadmap.md     ← 프리뷰 검증 · 미해결 위험 · PR 정리 순서
 │       ├── ui-decisions.md        ← 공통 UI 구현 결정
 │       ├── README.md              ← 기술 문서 안내

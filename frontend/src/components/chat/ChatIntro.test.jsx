@@ -43,7 +43,7 @@ beforeEach(() => {
     chatService.pollRoom.mockResolvedValue([]);
     chatService.markRead.mockResolvedValue({});
     // 설정 조회가 아무것도 돌려주지 않으면 기본 안내(기존 질문 4개, 답변 없음)로 떨어진다.
-    chatService.getSupportIntro.mockResolvedValue(undefined);
+    chatService.getSupportIntro.mockResolvedValue(null);
     chatService.getStoreIntro.mockResolvedValue({ configured: false, notice: null, items: [] });
 });
 afterEach(() => vi.restoreAllMocks());
@@ -166,10 +166,11 @@ describe('first support inquiry', () => {
         expect(screen.getByRole('status', { name: '대화를 불러오는 중' })).toBeInTheDocument();
         expect(screen.queryByLabelText('문의 시작 안내')).not.toBeInTheDocument();
         await act(async () => reject(new Error('offline')));
-        expect(screen.getByRole('alert')).toHaveTextContent('대화를 불러오지 못했습니다.');
+        const thread = within(screen.getByRole('region', { name: 'RESERVE 고객지원' }));
+        expect(thread.getByRole('alert')).toHaveTextContent('대화를 불러오지 못했습니다.');
         expect(screen.getByRole('textbox')).toBeDisabled();
         expect(screen.queryByLabelText('문의 시작 안내')).not.toBeInTheDocument();
-        await userEvent.setup().click(screen.getByRole('button', { name: '다시 불러오기' }));
+        await userEvent.setup().click(thread.getByRole('button', { name: '다시 불러오기' }));
         expect(await screen.findByLabelText('문의 시작 안내')).toBeInTheDocument();
         expect(screen.getByRole('textbox')).toBeEnabled();
     });

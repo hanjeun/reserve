@@ -33,19 +33,23 @@ const managedActions = (store, onEdit, onDelete, inRow = false) => [
 ];
 
 // ─── 영업 종료 확인 모달 ──────────────────────────────────────────────────────
-const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => {
-    const [loadingReadiness, setLoadingReadiness] = useState(false);
+export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => {
+    const [loadingReadiness, setLoadingReadiness] = useState(Boolean(open && storeId));
     const [readiness, setReadiness] = useState(null);
     const [readinessError, setReadinessError] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [observedTarget, setObservedTarget] = useState({ open, storeId });
+    if (observedTarget.open !== open || observedTarget.storeId !== storeId) {
+        setObservedTarget({ open, storeId });
+        setLoadingReadiness(Boolean(open && storeId));
+        setReadiness(null);
+        setReadinessError(false);
+    }
 
     // 모달 열릴 때마다 예약·광고·환불·대사·웹훅을 한 번에 확인
     React.useEffect(() => {
         if (!open || !storeId) return;
         let active = true;
-        setLoadingReadiness(true);
-        setReadiness(null);
-        setReadinessError(false);
         storeService.getClosureReadiness(storeId)
             .then(value => {
                 if (!active) return;

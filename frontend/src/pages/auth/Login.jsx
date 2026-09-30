@@ -35,6 +35,11 @@ const KakaoIcon = () => (
     </svg>
 );
 
+const suspensionInfo = (status, until, reason) => ({
+    title: status === 'BANNED' ? '영구 정지된 계정입니다' : '이용이 제한된 계정입니다',
+    isBanned: status === 'BANNED', until, reason,
+});
+
 const Login = () => {
     const { login, isLoggedIn } = useAuthStore();
     useDocumentTitle('로그인');
@@ -56,15 +61,16 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     // 정지/영구정지 안내 모달 상태 — 앱 전반 모달 스타일(큰색 제목 + 텍스트 본문 + 단일 버튼)과 통일하기 위해
     // antd 기본 modal.error() 대신 직접 제어하는 Modal 사용 (빨간 X 아이콘 없이 다른 안내 모달과 동일한 톤)
-    const [suspendInfo, setSuspendInfo] = useState(null); // { title, until, reason }
+    const [suspendInfo, setSuspendInfo] = useState(() => {
+        if (isLoggedIn || location.state?.signupSuccess || location.state?.prevented) return null;
+        const params = new URLSearchParams(window.location.search);
+        return params.get('suspended') === 'true' && params.get('status')
+            ? suspensionInfo(params.get('status'), params.get('until'), null) : null;
+    });
 
     // 정지/영구정지 안내 모달 — 소셜·이메일 로그인 공통 포맷 (배너 차별 없이 동일한 UX)
     const showSuspendModal = (status, until, reason) => {
-        const isBanned = status === 'BANNED';
-        setSuspendInfo({
-            title: isBanned ? '영구 정지된 계정입니다' : '이용이 제한된 계정입니다',
-            isBanned, until, reason,
-        });
+        setSuspendInfo(suspensionInfo(status, until, reason));
     };
 
     useEffect(() => {
@@ -97,11 +103,9 @@ const Login = () => {
         const params = new URLSearchParams(window.location.search);
         const isSuspended = params.get('suspended') === 'true';
         const suspendStatus = params.get('status');    // 'SUSPENDED' | 'BANNED'
-        const suspendUntil  = params.get('until');      // '2026-08-15' | null
 
         if (isSuspended && suspendStatus) {
             hasHandledRef.current = true;
-            showSuspendModal(suspendStatus, suspendUntil, null);
             window.history.replaceState({}, '', '/login');
         }
 

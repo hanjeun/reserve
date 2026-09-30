@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Form } from 'antd';
 import dayjs from 'dayjs';
 import BookingCalendar from './BookingCalendar';
@@ -9,7 +9,19 @@ vi.mock('../../hooks', () => ({ useBookingCalendar: () => state }));
 
 describe('booking calendar loading boundary', () => {
     beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         Object.assign(state, { byDate: {}, loading: true, fetching: false, error: null });
+    });
+    afterEach(async () => {
+        // Form.Item debounces errors/warnings for 10 ms even after this fixture unmounts.
+        // Run those callbacks while jsdom still exists instead of leaking them into teardown.
+        cleanup();
+        try {
+            await act(async () => { await vi.runOnlyPendingTimersAsync(); });
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
     it('keeps the trigger but never offers selectable dates while data is pending', () => {
         render(<Form><Form.Item name="date"><BookingCalendar storeId={12} /></Form.Item></Form>);

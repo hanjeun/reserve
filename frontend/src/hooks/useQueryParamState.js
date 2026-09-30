@@ -32,6 +32,7 @@ import { useSearchParams } from 'react-router-dom';
  */
 export const useQueryParamsState = (defaults) => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const defaultsKey = JSON.stringify(defaults);
 
     const values = {};
     Object.keys(defaults).forEach((key) => {
@@ -39,10 +40,11 @@ export const useQueryParamsState = (defaults) => {
     });
 
     const setValues = useCallback((patch) => {
+        const stableDefaults = JSON.parse(defaultsKey);
         setSearchParams((prev) => {
             const params = new URLSearchParams(prev);
             Object.entries(patch).forEach(([key, val]) => {
-                const def = defaults[key];
+                const def = stableDefaults[key];
                 if (val == null || val === '' || val === def) {
                     params.delete(key);
                 } else {
@@ -53,8 +55,7 @@ export const useQueryParamsState = (defaults) => {
         }, { replace: true });
         // defaults는 각 탭에서 렌더마다 새 객체 리터럴로 넘어오지만 그 내용(키/기본값)은 사실상
         // 고정이라 JSON.stringify로 값 비교해서 불필요한 재생성을 막는다.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [JSON.stringify(defaults)]);
+    }, [defaultsKey, setSearchParams]);
 
     return [values, setValues];
 };

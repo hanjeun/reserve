@@ -4,14 +4,14 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import MyPage from './MyPage';
 import useAuthStore from '../../store/useAuthStore';
-import { businessService } from '../../services';
+import { businessService, memberService } from '../../services';
 
 const feedback = vi.hoisted(() => ({
     message: { error: vi.fn(), warning: vi.fn(), success: vi.fn() },
     confirm: vi.fn(),
 }));
 vi.mock('../../services', () => ({
-    memberService: {},
+    memberService: { updateMember: vi.fn(), updateMarketingConsent: vi.fn() },
     businessService: {
         getMyStatus: vi.fn(), update: vi.fn(), submit: vi.fn(), cancel: vi.fn(), resign: vi.fn(),
     },
@@ -79,6 +79,8 @@ describe('MyPage business edit prefill', () => {
         businessService.getMyStatus.mockResolvedValue(pending());
         businessService.update.mockResolvedValue({});
         businessService.cancel.mockResolvedValue({});
+        memberService.updateMember.mockResolvedValue({});
+        memberService.updateMarketingConsent.mockResolvedValue({});
         Element.prototype.scrollIntoView = vi.fn();
     });
 
@@ -116,6 +118,61 @@ describe('MyPage business edit prefill', () => {
         await settle(request, pending());
         expect(await screen.findByPlaceholderText('상호명 *')).toHaveValue('기존 상호');
         expect(screen.queryByRole('status', { name: '사업자 신청 내용을 불러오는 중' })).toBeNull();
+    });
+
+    it('shows approved business status without a redundant lookup or loading render', () => {
+        useAuthStore.setState({ user: { id: 7, role: 'BUSINESS', name: '사장님' } });
+        show();
+        fireEvent.click(screen.getByRole('tab', { name: /사업자/ }));
+        expect(screen.getByText('파트너 사장님으로 활동 중이에요')).toBeInTheDocument();
+        expect(screen.queryByRole('status', { name: '사업자 인증 상태를 불러오는 중' })).toBeNull();
+        expect(businessService.getMyStatus).not.toHaveBeenCalled();
+    });
+
+    it('keeps notification settings synchronized and preserves concurrent successful updates', async () => {
+        useAuthStore.getState().login({ id: 7, role: 'USER', emailNotificationEnabled: true, marketingAgreed: false });
+        show();
+        const mail = deferred();
+        const marketing = deferred();
+        memberService.updateMember.mockReturnValueOnce(mail.promise);
+        memberService.updateMarketingConsent.mockReturnValueOnce(marketing.promise);
+        const switches = screen.getAllByRole('switch');
+        fireEvent.click(switches[0]);
+        fireEvent.click(switches[1]);
+        await settle(marketing, {});
+        await settle(mail, {});
+        expect(useAuthStore.getState().user).toMatchObject({ emailNotificationEnabled: false, marketingAgreed: true });
+        expect(switches[0]).not.toBeChecked();
+        expect(switches[1]).toBeChecked();
+        act(() => useAuthStore.getState().updateUser({ ...useAuthStore.getState().user, emailNotificationEnabled: true, marketingAgreed: false }));
+        expect(switches[0]).toBeChecked();
+        expect(switches[1]).not.toBeChecked();
+    });
+
+    it('does not apply an old consent response after a new session for the same account', async () => {
+        useAuthStore.setState({ user: { id: 7, role: 'USER', emailNotificationEnabled: true, marketingAgreed: false } });
+        show();
+        const request = deferred();
+        memberService.updateMember.mockReturnValueOnce(request.promise);
+        fireEvent.click(screen.getAllByRole('switch')[0]);
+        act(() => useAuthStore.setState({ sessionRevision: 71 }));
+        await settle(request, {});
+        expect(useAuthStore.getState().user.emailNotificationEnabled).toBe(true);
+        expect(screen.getAllByRole('switch')[0]).toBeChecked();
+    });
+
+    it('retries an initial status failure with a loading boundary before exposing any application form', async () => {
+        businessService.getMyStatus.mockRejectedValueOnce(new Error('offline'));
+        show();
+        fireEvent.click(screen.getByRole('tab', { name: /사업자/ }));
+        await screen.findByText('사업자 인증 상태를 불러오지 못했습니다.');
+        const request = deferred();
+        businessService.getMyStatus.mockReturnValueOnce(request.promise);
+        fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+        expect(screen.getByRole('status', { name: '사업자 인증 상태를 불러오는 중' })).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('상호명 *')).toBeNull();
+        await settle(request, pending());
+        expect(screen.getByText('심사 중이에요')).toBeInTheDocument();
     });
 
     it.each([null, { status: 'APPROVED', businessName: '승인된 상호' }, pending('  ')])(
@@ -177,7 +234,7 @@ describe('MyPage business edit prefill', () => {
         act(() => { useAuthStore.setState(auth); });
         expect(screen.queryByPlaceholderText('상호명 *')).toBeNull();
         expect(screen.queryByText('신청 내용 수정')).toBeNull();
-        expect(screen.getByText('심사 중이에요')).toBeInTheDocument();
+        await screen.findByText('심사 중이에요');
         expect(businessService.update).not.toHaveBeenCalled();
         businessService.getMyStatus.mockResolvedValueOnce(pending('현재 회원의 상호'));
         startEdit();
@@ -191,9 +248,11 @@ describe('MyPage business edit prefill', () => {
         await openBusiness();
         const oldRequest = deferred();
         const newRequest = deferred();
-        businessService.getMyStatus.mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(newRequest.promise);
+        businessService.getMyStatus.mockReturnValueOnce(oldRequest.promise)
+            .mockResolvedValueOnce(pending()).mockReturnValueOnce(newRequest.promise);
         startEdit();
         act(() => { useAuthStore.setState(auth); });
+        await screen.findByText('심사 중이에요');
         expect(screen.getByRole('button', { name: '수정하기' })).toBeEnabled();
         startEdit();
         await settle(oldRequest, fails ? new Error('old session failure') : pending('이전 회원 상호'), fails);

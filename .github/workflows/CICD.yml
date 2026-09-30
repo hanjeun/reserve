@@ -123,6 +123,7 @@ jobs:
         run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
       - name: Validate operations scripts
         run: |
+          node --test scripts/tests/observability-config.test.mjs
           bash -n scripts/backup-mysql.sh
           bash -n scripts/restore-mysql.sh
           bash -n scripts/verify-post-deploy-readonly.sh

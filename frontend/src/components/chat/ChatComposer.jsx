@@ -18,7 +18,7 @@ const EMOJI = [
 
 /** 고객·사업자·관리자 입력의 IME/길이/도구/전송 규칙을 한 관문에 둔다. */
 export default function ChatComposer({ value, onChange, onSend, sending = false, disabled = false,
-    file, onFileChange, imageEnabled = false, onCancel }) {
+    file, onFileChange, imageEnabled = false, imageLoading = false, onCancel }) {
     const input = useRef(null);
     const trigger = useRef(null);
     const searchInput = useRef(null);
@@ -73,7 +73,8 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             }} placeholder="메시지를 입력하세요" aria-label="메시지 입력" maxLength={2000} rows={2} disabled={disabled} />
         <div className="reserve-chat-composer-toolbar">
             <div className="reserve-chat-composer-tools">
-                <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled} disabled={blocked} />
+                <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled || imageLoading}
+                    disabled={blocked || imageLoading} />
                 <Popover trigger="click" placement="topLeft" content={picker} open={emojiOpen && !blocked}
                     onOpenChange={open => {
                         setEmojiOpen(open);
@@ -99,6 +100,6 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
 ChatComposer.propTypes = {
     value: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired, onSend: PropTypes.func.isRequired,
     sending: PropTypes.bool, disabled: PropTypes.bool, file: PropTypes.object,
-    onFileChange: PropTypes.func.isRequired, imageEnabled: PropTypes.bool,
+    onFileChange: PropTypes.func.isRequired, imageEnabled: PropTypes.bool, imageLoading: PropTypes.bool,
     onCancel: PropTypes.func,
 };

@@ -116,9 +116,10 @@ const ReservationRowSkeletonItem = ({ isWide, actionCount = 2 }) => {
             </div>
           </div>
 
-          {/* 줄3 — 날짜·시간 | 액션 버튼. 실제 카드에서 폭이 모자라면 줄어드는 건 이 줄의 왼쪽뿐이다. */}
+          {/* 줄3 — 날짜·시간 | 액션 버튼. 실제 카드에서 폭이 모자라면 줄어드는 건 이 줄의 왼쪽뿐이다.
+              왼쪽 뼈대는 크기가 고정(flexShrink 0)이라 묶음이 줄어도 넘쳐 버튼 뼈대와 겹쳤다(390 폭 실측) — 넘치는 부분은 잘라낸다. */}
           <div style={line3}>
-            <div style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+            <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 0, overflow: 'hidden' }}>
               <Bone width={72} height={12} />
               <Bone width={48} height={12} />
             </div>

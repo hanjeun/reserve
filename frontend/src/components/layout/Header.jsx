@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import PropTypes from 'prop-types';
 import { ArrowLeftOutlined, SearchOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useReducedMotion from '../../hooks/useReducedMotion';
@@ -132,6 +133,27 @@ const Header = () => {
         </header>
     );
 };
+
+/**
+ * 앱 첫 로딩(로그인 확인) 동안 App 부트 셸이 그리는 정적 헤더(2026-09-29).
+ * 진짜 헤더와 같은 틀·같은 RESERVE 로고 자리만 두고, 계정 메뉴·검색처럼 API 나 로그인 상태가 필요한 것은 그리지 않는다.
+ * 예전엔 빈 64px 띠만 있어 헤더가 비어 보였다. 뒤로가기 버튼은 두지 않는다 — 진짜 헤더가 붙을 때 그 버튼은
+ * 펼침 모션으로 들어오므로 로고가 옆으로 미끄러질 뿐 튀지 않는다.
+ */
+export function HeaderPlaceholder({ discoveryRoot = false }) {
+    return (
+        <div className="reserve-boot-shell-header" aria-hidden="true" style={discoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header}>
+            <div className="reserve-header-inner" style={styles.inner}>
+                <div className="reserve-header-brand">
+                    <span className="reserve-header-logo" style={{ color: styles.logo.color }}>
+                        <span className="reserve-header-logo-wordmark">RESERVE</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+}
+HeaderPlaceholder.propTypes = { discoveryRoot: PropTypes.bool };
 
 const styles = {
     header: {

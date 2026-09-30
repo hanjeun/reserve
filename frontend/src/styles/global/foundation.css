@@ -40,8 +40,9 @@ html {
    자리를 늘 확보하면 잠가도 폭이 그대로라 보정이 필요 없어져 끈다(겹쳐 보정하면 본문이 15px 줄어든다).
    덤으로 스크롤이 있는 페이지와 없는 페이지를 오갈 때 화면이 좌우로 튀던 것도 사라진다.
    이 속성을 모르는 브라우저는 AntD 의 기존 보정을 그대로 쓴다. */
-/* 앱 첫 로딩(로그인 확인) 동안의 틀 — 헤더와 같은 64px 자리와 아래 구분선만 둔다. */
-.reserve-boot-shell-header { height: 64px; box-shadow: inset 0 -1px 0 var(--c-border-light, #f2f4f6); }
+/* 앱 첫 로딩(로그인 확인) 동안의 정적 헤더(Header.jsx 의 HeaderPlaceholder) — 크기·구분선은 진짜 헤더와 같은 인라인 스타일을 쓴다.
+   누를 수 있는 것이 없으므로 로고의 hover·눌림 효과가 걸리지 않게 포인터를 받지 않는다. */
+.reserve-boot-shell-header { pointer-events: none; }
 
 @supports (scrollbar-gutter: stable) {
   html { scrollbar-gutter: stable; }

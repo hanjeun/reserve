@@ -19,6 +19,7 @@ import { getDetailImageUrl } from '../../utils';
 import { formatTime } from '../../utils/date';
 import { isNearby } from '../../utils/distance';
 import { normalizeStoreRating } from '../../utils/storeRating';
+import { httpStatusOf } from '../../utils/listErrorMessage';
 import useLocationStore from '../../store/useLocationStore';
 import useMessengerStore from '../../store/useMessengerStore';
 import { breakpoints, colors, radius, fontWeight, fontSize, heights, animation, field } from '../../styles/tokens';
@@ -747,11 +748,16 @@ const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProps, revi
 
 const StoreDetail = () => {
     const { id } = useParams();
+    // /store/abc 처럼 숫자가 아닌 id 는 API 에 보내지 않는다 — 보내면 400 이 와서
+    // "요청을 처리할 수 없습니다 · 다시 불러오기" 라는, 다시 눌러도 낫지 않는 오류로 보였다.
+    const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
     const navigate = useNavigate();
     const { message } = useMessage();
     const { isLoggedIn, user } = useAuthStore();
     const { pay, paying } = usePayment();
-    const { store, loading, error, refetch } = useStoreData(id);
+    const { store, loading, error, refetch } = useStoreData(validId ? id : null);
+    // 삭제·제재된 가게(404)도 "없는 가게"다. 일시 장애처럼 재시도를 권하지 않는다.
+    const notFound = !validId || httpStatusOf(error) === 404;
     const imageHint = useStoreImageHint(id);
 
     // 상세 데이터가 도착하면 이 가게의 커버 이미지 비율도 적어둔다 (2026-07 추가).
@@ -812,7 +818,7 @@ const StoreDetail = () => {
     );
     if (!store) return (
         <PageContainer size={containerSize} paddingTop={paddingTop}>
-            <StoreNotFound error={error} onRetry={refetch} />
+            <StoreNotFound error={notFound ? undefined : error} onRetry={refetch} />
         </PageContainer>
     );
 

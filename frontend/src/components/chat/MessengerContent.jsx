@@ -474,6 +474,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                             file: imageDraft.file,
                             onFileChange: imageDraft.choose,
                             imageEnabled: imageDraft.enabled,
+                            imageLoading: imageDraft.loading,
                             disabled: loading || loadError,
                             onCancel: cancelSend,
                         },

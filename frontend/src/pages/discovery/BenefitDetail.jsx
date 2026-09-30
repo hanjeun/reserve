@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { Bone, DataState } from '../../components/common';
+import { DataState } from '../../components/common';
+import BenefitDetailSkeleton from '../../components/common/BenefitDetailSkeleton';
 import { benefitKeys } from '../../hooks/queryKeys';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import benefitService from '../../services/benefitService';
@@ -19,7 +20,7 @@ export default function BenefitDetail() {
     useDocumentTitle(item?.title ? `${item.title} · 가게 소식` : '가게 소식');
     if (!validId || error?.status === 404) return <section className="reserve-benefits-page"><DataState state="empty" kind="news" title="현재 공개된 가게 소식이 아니에요."
         action={<Link className="reserve-benefits-text-link" to="/benefits">소식 목록으로</Link>} /></section>;
-    if (isPending) return <section className="reserve-benefits-page reserve-benefit-detail" role="status" aria-label="가게 소식을 불러오는 중" aria-busy="true"><div className="reserve-route-skeleton-copy" aria-hidden="true"><Bone width="30%" height={14} /><Bone width="80%" height={28} /><Bone height={180} borderRadius={12} /><Bone width="90%" height={14} /><Bone width="80%" height={14} /></div></section>;
+    if (isPending) return <BenefitDetailSkeleton role="status" aria-label="가게 소식을 불러오는 중" aria-busy="true" />;
     if (isError) return <section className="reserve-benefits-page"><DataState state="error" kind="news" subject="가게 소식" error={error}
         title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} /></section>;
     return (

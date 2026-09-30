@@ -203,19 +203,29 @@ test('store editing reserves the full form skeleton while the initial data is de
         });
     });
 
-    const navigation = page.goto('/store/99/edit');
+    // Measure the held data request, not the first load of the form/authentication chunks.
+    await page.goto('/store/register');
+    await expect(page.getByRole('heading', { name: '가게 등록' })).toBeVisible();
     const skeleton = page.getByRole('status', { name: '가게 정보를 불러오는 중' });
-    await expect(skeleton).toBeVisible();
-    await expect(skeleton).toHaveAttribute('aria-busy', 'true');
-    for (const section of ['basic', 'settings', 'images', 'actions']) {
-        await expect(skeleton.locator(`[data-skeleton-section="${section}"]`)).toBeVisible();
+    try {
+        await page.goto('/store/99/edit', { waitUntil: 'domcontentloaded' });
+        await expect(skeleton).toBeVisible();
+        await expect(skeleton).toHaveAttribute('aria-busy', 'true');
+        for (const section of ['basic', 'settings', 'images', 'actions']) {
+            await expect(skeleton.locator(`[data-skeleton-section="${section}"]`)).toBeVisible();
+        }
+        await expect(skeleton.locator('.reserve-store-form-skeleton-toggle')).toHaveCount(4);
+        await expect(skeleton.locator('.reserve-store-form-skeleton-control--upload')).toHaveCount(2);
+        for (const label of ['대표 이미지', '상세 이미지 (최대 5장)']) {
+            const upload = skeleton.locator(`[data-label="${label}"] .reserve-store-form-skeleton-control--upload > .reserve-skeleton-block`);
+            await expect(upload).toHaveCount(1);
+            await expect(upload).toHaveCSS('width', '102px');
+            await expect(upload).toHaveCSS('height', '102px');
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    } finally {
+        releaseEditRequest();
     }
-    await expect(skeleton.locator('.reserve-store-form-skeleton-toggle')).toHaveCount(4);
-    await expect(skeleton.locator('.reserve-store-form-skeleton-uploads > .reserve-skeleton-block')).toHaveCount(3);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-
-    releaseEditRequest();
-    await navigation;
     await expect(page.getByRole('heading', { name: '가게 정보 수정' })).toBeVisible();
     await expect(skeleton).toBeHidden();
 });

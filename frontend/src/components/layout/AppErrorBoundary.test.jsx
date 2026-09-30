@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { AppErrorBoundary, RouteErrorBoundary } from './AppErrorBoundary';
 
@@ -51,21 +51,21 @@ describe('render error boundaries', () => {
         expect(screen.getByText('정상 화면')).toBeInTheDocument();
     });
 
-    it('resets itself when the address changes without remounting on every navigation', async () => {
+    it('resets itself when the address changes without remounting on every navigation', () => {
         renderRoute();
         expect(screen.getByRole('heading', { name: '문제가 생겼어요' })).toBeInTheDocument();
 
         state.throws = false;
-        await act(async () => { fireEvent.click(screen.getByRole('button', { name: '다른 화면' })); });
+        fireEvent.click(screen.getByRole('button', { name: '다른 화면' }));
 
         expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/elsewhere');
         expect(screen.getByText('정상 화면')).toBeInTheDocument();
     });
 
-    it('sends 홈으로 to the root and clears the error', async () => {
+    it('sends 홈으로 to the root and clears the error', () => {
         renderRoute();
         state.throws = false;
-        await act(async () => { fireEvent.click(screen.getByRole('button', { name: '홈으로' })); });
+        fireEvent.click(screen.getByRole('button', { name: '홈으로' }));
 
         expect(screen.getByLabelText('현재 경로')).toHaveTextContent(/^\/$/);
         expect(screen.getByText('정상 화면')).toBeInTheDocument();

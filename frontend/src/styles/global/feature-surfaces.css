@@ -1059,12 +1059,16 @@
 .reserve-chat-message-actions {
     border: 0; background: transparent; color: var(--c-text-secondary, #4e5968); cursor: pointer;
     border-radius: 10px; width: 44px; min-width: 44px; height: 44px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
 }
 .reserve-chat-message-actions::before {
     content: ''; position: absolute; inset: 8px; border-radius: 8px; pointer-events: none;
 }
 .reserve-chat-message-actions > .anticon { position: relative; }
 .reserve-chat-message-meta { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
+.reserve-chat-message-row:has(> .reserve-chat-message-meta) > .reserve-chat-bubble-group {
+    min-height: 44px; align-content: center;
+}
 .reserve-chat-message-time { font-size: 10px; color: var(--c-text-tertiary, #8b95a1); white-space: nowrap; flex-shrink: 0; }
 .reserve-chat-message-meta > .reserve-chat-message-time { position: absolute; bottom: 2px; inset-inline: 0; text-align: center; pointer-events: none; }
 .reserve-chat-message-meta > .reserve-chat-message-actions { position: absolute; inset: 0; height: 44px; }

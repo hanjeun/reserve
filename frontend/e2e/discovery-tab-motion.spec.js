@@ -20,6 +20,10 @@ test('top tabs move only their content in the selected direction, including brow
     const tabs = page.locator('.reserve-discovery-top-nav');
     const waitingTab = page.getByRole('link', { name: '웨이팅', exact: true });
     const feedTab = page.getByRole('link', { name: '피드', exact: true });
+    await expect(page.locator('.reserve-boot-shell')).toHaveCount(0);
+    await expect(page.locator('.ant-layout-content > .reserve-discovery-home')).toBeVisible();
+    await expect(header).toBeVisible();
+    await expect(tabs).toBeVisible();
     const initialHeader = await header.boundingBox();
     const initialTabs = await tabs.boundingBox();
     for (const line of await page.locator('.reserve-discovery-banner--current .reserve-discovery-banner-copy > *').all()) {
@@ -30,7 +34,7 @@ test('top tabs move only their content in the selected direction, including brow
     await expect(waitingTab).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('heading', { name: '웨이팅은 아직 준비 중이에요' })).toBeVisible();
     await expect(content).toHaveClass(/reserve-route-entry--from-right/);
-    const destination = page.locator('.reserve-discovery-coming-soon');
+    const destination = page.locator('.ant-layout-content > .reserve-discovery-coming-soon');
     await expect(content).toHaveCSS('animation-name', 'none');
     await expect(destination).toHaveCSS('animation-name', 'reserve-discovery-page-from-right');
     await expect(header).toHaveCSS('animation-name', 'none');
@@ -138,9 +142,10 @@ test('a slow lazy tab shows a still loading skeleton and animates only the resol
         await route.continue();
     });
     await page.goto('/');
-    const home = page.locator('.reserve-discovery-home');
+    const home = page.locator('.ant-layout-content > .reserve-discovery-home');
     const waitingTab = page.getByRole('link', { name: '웨이팅', exact: true });
     const skeleton = page.locator('.reserve-route-skeleton');
+    await expect(page.locator('.reserve-boot-shell')).toHaveCount(0);
     await expect(home).toBeVisible();
 
     try {
@@ -158,5 +163,5 @@ test('a slow lazy tab shows a still loading skeleton and animates only the resol
     }
 
     await expect(page.getByRole('heading', { name: '웨이팅은 아직 준비 중이에요' })).toBeVisible();
-    await expect(page.locator('.reserve-discovery-coming-soon')).toHaveCSS('animation-name', 'reserve-discovery-page-from-right');
+    await expect(page.locator('.ant-layout-content > .reserve-discovery-coming-soon')).toHaveCSS('animation-name', 'reserve-discovery-page-from-right');
 });

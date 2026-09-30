@@ -203,6 +203,7 @@ const ChatTab = () => {
                             "같은 기능인데 왜 다르지"가 된다. */}
                         <ChatComposer value={draft} onChange={setDraft} onSend={handleSend}
                             file={imageDraft.file} onFileChange={imageDraft.choose} imageEnabled={imageDraft.enabled}
+                            imageLoading={imageDraft.loading}
                             sending={sending} disabled={threadLoading || loadError} onCancel={cancelSend} />
                     </div>
                 </>

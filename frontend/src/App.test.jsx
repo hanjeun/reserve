@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Link } from 'react-router-dom';
 import App from './App';
 
@@ -26,12 +26,14 @@ vi.mock('./pages/legal/Terms', () => ({
     },
 }));
 
-const renderAt = async (path) => {
+const renderAt = (path) => {
     window.history.replaceState(null, '', path);
-    await act(async () => { render(<App />); });
+    render(<App />);
 };
 
 describe('app route table fallbacks', () => {
+    // Test the route table with the real page, not the first Vite transform of its lazy module.
+    beforeAll(() => import('./pages/NotFound'));
     beforeEach(() => {
         document.head.innerHTML = `
             <title>RESERVE | 예약이 필요한 순간</title>
@@ -49,7 +51,7 @@ describe('app route table fallbacks', () => {
         '/,%20https://reserve.it.kr/login',
         '/store/12/unknown',
     ])('renders the not-found page with noindex for %s instead of an empty body', async (path) => {
-        await renderAt(path);
+        renderAt(path);
 
         expect(await screen.findByRole('heading', { level: 1, name: '페이지를 찾을 수 없어요' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '홈으로' })).toBeInTheDocument();
@@ -62,14 +64,14 @@ describe('app route table fallbacks', () => {
     it('keeps the header when a routed page throws, then recovers on the next address', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         pageState.termsThrows = true;
-        await renderAt('/terms');
+        renderAt('/terms');
 
         expect(await screen.findByRole('heading', { name: '문제가 생겼어요' })).toBeInTheDocument();
         expect(screen.getByRole('alert')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: '다른 곳으로' })).toBeInTheDocument();
         expect(screen.getByText('푸터')).toBeInTheDocument();
 
-        await act(async () => { fireEvent.click(screen.getByRole('link', { name: '다른 곳으로' })); });
+        fireEvent.click(screen.getByRole('link', { name: '다른 곳으로' }));
 
         expect(await screen.findByRole('heading', { name: '페이지를 찾을 수 없어요' })).toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: '문제가 생겼어요' })).toBeNull();
@@ -78,11 +80,11 @@ describe('app route table fallbacks', () => {
     it('retries the same route after the render error is fixed', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         pageState.termsThrows = true;
-        await renderAt('/terms');
+        renderAt('/terms');
         expect(await screen.findByRole('heading', { name: '문제가 생겼어요' })).toBeInTheDocument();
 
         pageState.termsThrows = false;
-        await act(async () => { fireEvent.click(screen.getByRole('button', { name: '다시 시도' })); });
+        fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
 
         expect(await screen.findByRole('heading', { name: '서비스 이용약관' })).toBeInTheDocument();
     });

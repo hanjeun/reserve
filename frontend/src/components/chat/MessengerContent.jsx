@@ -792,6 +792,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                         )}
                         <ChatComposer value={draft} onChange={value => setDraft(selectionKey, value)} onSend={handleSend}
                             file={imageDraft.file} onFileChange={imageDraft.choose} imageEnabled={imageDraft.enabled}
+                            imageLoading={imageDraft.loading}
                             sending={sending} disabled={loading || loadError} onCancel={cancelSend} />
                     </div>
                 )}

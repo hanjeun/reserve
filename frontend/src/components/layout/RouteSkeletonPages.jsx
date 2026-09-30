@@ -6,6 +6,7 @@ import AdminTableSkeletonTable from '../common/AdminTableSkeletonTable';
 import { ReservationCardSkeleton, ReservationSummaryCardSkeleton } from '../common/Skeletons';
 import StoreFormSkeleton from '../store/StoreFormSkeleton';
 import { ListingHeader, ListingToolbarSkeleton, RefreshToolbarSkeleton } from './routeSkeletonParts';
+import { normalizeRouteSkeletonPath } from './routeSkeletonKind';
 import {
     BUSINESS_VERIFICATION_SKELETON_COLS,
     BUSINESS_VERIFICATION_SKELETON_HEADERS,
@@ -140,7 +141,7 @@ const AUTH_SKELETONS = {
     '/signup/social': SocialAgreementSkeleton,
 };
 export function AuthRouteSkeleton({ pathname = '/login' }) {
-    const Skeleton = AUTH_SKELETONS[pathname.replace(/\/+$/, '')] ?? LoginSkeleton;
+    const Skeleton = AUTH_SKELETONS[normalizeRouteSkeletonPath(pathname)] ?? LoginSkeleton;
     return <Skeleton />;
 }
 AuthRouteSkeleton.propTypes = { pathname: PropTypes.string };
@@ -156,7 +157,7 @@ const LEGAL_TITLES = {
 // 문단 줄(15px × 1.8 = 27px) — 실제 Section: 제목(h4 28 + 아래 12) → 본문, 섹션 아래 32.
 const LEGAL_SECTIONS = [['a', [100, 92, 64]], ['b', [96, 88, 90, 52]], ['c', [98, 70]]];
 export function LegalRouteSkeleton({ pathname = '' }) {
-    const title = LEGAL_TITLES[pathname.replace(/\/+$/, '')];
+    const title = LEGAL_TITLES[normalizeRouteSkeletonPath(pathname)];
     return <PageContainer size="md" paddingTop="60px">
         <div style={{ marginBottom: 40 }}>
             {title
@@ -322,6 +323,6 @@ MessagesRouteSkeleton.propTypes = { search: PropTypes.string };
 
 /* ── 가게 등록·수정 — 뼈대가 실제 폼과 같은 PageContainer 를 직접 그린다(StoreFormSkeleton). ── */
 export function StoreFormRouteSkeleton({ pathname = '' }) {
-    return <StoreFormSkeleton mode={pathname.replace(/\/+$/, '').endsWith('/edit') ? 'edit' : 'create'} />;
+    return <StoreFormSkeleton mode={normalizeRouteSkeletonPath(pathname).endsWith('/edit') ? 'edit' : 'create'} />;
 }
 StoreFormRouteSkeleton.propTypes = { pathname: PropTypes.string };

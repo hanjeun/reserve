@@ -40,6 +40,7 @@ const StoreEdit = () => {
     const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
     const { store, loading, error, refetch } = useStoreData(validId ? id : null, { forEdit: true });
     const notFound = !validId || httpStatusOf(error) === 404;
+    const loadFailed = Boolean(error && !notFound);
 
     // 소유자 검증 — store 로딩 후 본인 가게가 아니면 리다이렉트
     useEffect(() => {
@@ -75,19 +76,19 @@ const StoreEdit = () => {
     // 가게 데이터 로딩 중에는 폼의 골격을 유지한다.
     // (initialValues는 Form 최초 마운트 시 1회만 읽히므로 store가 준비된 후 렌더해야 함)
     if (loading) {
-        return <section className="reserve-route-skeleton reserve-route-skeleton--store-form" role="status" aria-label="가게 정보를 불러오는 중" aria-busy="true"><div aria-hidden="true"><StoreFormSkeleton mode="edit" /></div></section>;
+        return <output className="reserve-route-skeleton reserve-route-skeleton--store-form" aria-label="가게 정보를 불러오는 중" aria-busy="true" style={{ display: 'block' }}><div aria-hidden="true"><StoreFormSkeleton mode="edit" /></div></output>;
     }
 
     if (!store) {
         return (
             <PageContainer size="lg" paddingTop="32px">
                 <DataState
-                    state={error && !notFound ? 'error' : 'empty'}
+                    state={loadFailed ? 'error' : 'empty'}
                     kind="store"
                     subject="내 가게 정보"
                     error={notFound ? undefined : error}
-                    title={error && !notFound ? undefined : '수정할 가게를 찾을 수 없습니다.'}
-                    onRetry={error && !notFound ? refetch : undefined}
+                    title={loadFailed ? undefined : '수정할 가게를 찾을 수 없습니다.'}
+                    onRetry={loadFailed ? refetch : undefined}
                     style={{ marginTop: 100 }}
                 />
             </PageContainer>
@@ -111,7 +112,7 @@ const StoreEdit = () => {
                 onValuesChange={handleValuesChange}
                 onSaveDraft={saveDraftNow}
                 draftState={draftState}
-                initialValues={store ? getInitialValues() : undefined}
+                initialValues={getInitialValues()}
             />
             
             {/* 이미지 미리보기 모달 */}

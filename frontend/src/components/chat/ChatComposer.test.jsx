@@ -4,6 +4,26 @@ import ChatComposer from './ChatComposer';
 
 const props = () => ({ value: '안녕하세요', onChange: vi.fn(), onSend: vi.fn(), onFileChange: vi.fn() });
 describe('shared chat composer', () => {
+    it('reserves a disabled attachment control while the image setting is loading', () => {
+        const inputProps = props();
+        const view = render(<ChatComposer {...inputProps} imageLoading disabled />);
+        expect(screen.getByRole('button', { name: '사진 첨부' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: '이모지 선택' })).toBeDisabled();
+        view.rerender(<ChatComposer {...inputProps} imageLoading />);
+        expect(screen.getByRole('button', { name: '사진 첨부' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: '이모지 선택' })).toBeEnabled();
+        expect(screen.getByRole('textbox', { name: '메시지 입력' })).toBeEnabled();
+        view.rerender(<ChatComposer {...inputProps} imageEnabled />);
+        expect(screen.getByRole('button', { name: '사진 첨부' })).toBeEnabled();
+    });
+    it('hides attachments when the feature setting resolves to disabled', () => {
+        const inputProps = props();
+        const view = render(<ChatComposer {...inputProps} imageLoading />);
+        expect(screen.getByRole('button', { name: '사진 첨부' })).toBeDisabled();
+        view.rerender(<ChatComposer {...inputProps} />);
+        expect(screen.queryByRole('button', { name: '사진 첨부' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '이모지 선택' })).toBeEnabled();
+    });
     it('sends with Enter but not during IME composition or Shift+Enter', () => {
         const inputProps = props();
         render(<ChatComposer {...inputProps} />);

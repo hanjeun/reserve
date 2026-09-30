@@ -16,7 +16,8 @@ export function usePageSkeletonModule() {
     useEffect(() => {
         if (module) return undefined;
         let alive = true;
-        pageSkeletonRequest.then(loaded => { if (alive && loaded) setModule(loaded); });
+        // Import failure is already normalized to null; this subscription does not outlive the effect.
+        void pageSkeletonRequest.then(loaded => { if (alive && loaded) setModule(loaded); });
         return () => { alive = false; };
     }, [module]);
     return module;

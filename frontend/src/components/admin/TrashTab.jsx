@@ -100,7 +100,7 @@ const TrashTab = () => {
 
     const restoreMutation = useMutation({
         mutationFn: (record) => api.post(API_ENDPOINTS.TRASH.RESTORE(record.entityType, record.entityId)),
-        onSuccess: () => { message.success('복구되었습니다.'); invalidateTrash(); },
+        onSuccess: () => { message.success('복구되었습니다.'); void invalidateTrash(); },
         onError: () => message.error('복구에 실패했습니다.'),
     });
 

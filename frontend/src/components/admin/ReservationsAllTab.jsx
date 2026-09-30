@@ -87,8 +87,8 @@ const ReservationsAllTab = () => {
         onSuccess: () => {
             message.success('휴지통으로 이동되었습니다.');
             // 휴지통 탭·대시보드·감사 로그와 예약 달력까지 함께 바뀐다.
-            invalidateAdminData(queryClient);
-            invalidateReservationData(queryClient);
+            void invalidateAdminData(queryClient);
+            void invalidateReservationData(queryClient);
         },
         onError: () => message.error('삭제에 실패했습니다.'),
     });

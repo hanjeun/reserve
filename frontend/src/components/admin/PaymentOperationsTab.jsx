@@ -89,7 +89,7 @@ const PaymentOperationsTab = () => {
         onSuccess: (result) => {
             const label = OUTCOME_LABELS[result?.outcome] ?? result?.outcome ?? '처리 완료';
             message.success(`PG 재확인 결과: ${label}`);
-            invalidatePaymentOutcome();
+            void invalidatePaymentOutcome();
         },
         onError: () => message.error('PG 재확인에 실패했습니다.'),
     });
@@ -100,7 +100,7 @@ const PaymentOperationsTab = () => {
         ),
         onSuccess: () => {
             message.success('웹훅 재처리를 요청했습니다.');
-            invalidatePaymentOutcome();
+            void invalidatePaymentOutcome();
         },
         onError: () => message.error('웹훅 재처리 요청에 실패했습니다.'),
     });

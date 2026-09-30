@@ -598,6 +598,15 @@
     font-size: 22px !important;
     line-height: 1.3 !important;
 }
+.reserve-messenger-list-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+.reserve-messenger-list-refresh[aria-pressed='true'] {
+    color: var(--c-primary, #3182f6);
+}
 .reserve-messenger-list-refresh {
     flex: 0 0 44px;
     width: 44px;

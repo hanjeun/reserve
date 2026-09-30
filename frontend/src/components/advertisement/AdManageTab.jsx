@@ -390,7 +390,7 @@ const AdManageTab = () => {
         mutationFn: (adId) => adService.removeAd(adId),
         onSuccess: () => {
             message.success('목록에서 삭제되었습니다.');
-            queryClient.invalidateQueries({ queryKey: adKeys.my() });
+            void queryClient.invalidateQueries({ queryKey: adKeys.my() });
         },
         onError: (err) => message.error(errorMessageOr(err, '삭제에 실패했습니다.')),
     });
@@ -402,7 +402,7 @@ const AdManageTab = () => {
         onSuccess: () => {
             message.success('광고가 수정되었습니다.');
             // 배너 문구·이미지는 공개 목록의 배너에도 보인다.
-            invalidateAdData(queryClient);
+            void invalidateAdData(queryClient);
             setEditTarget(null);
             resetEditErrors();
         },

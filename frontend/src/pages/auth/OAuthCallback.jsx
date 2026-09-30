@@ -60,7 +60,7 @@ const OAuthCallback = () => {
                 navigate('/login', { replace: true });
             }
         };
-        finalizeLogin();
+        void finalizeLogin();
     }, [checkAuth, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return <Loading fullPage />;

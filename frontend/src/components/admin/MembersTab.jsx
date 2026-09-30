@@ -141,7 +141,7 @@ const MembersTab = () => {
         onSuccess: (_, { days }) => {
             message.success(`${days}일간 정지 처리되었습니다.`);
             setSuspendOpen(false);
-            invalidateMembers();
+            void invalidateMembers();
         },
         onError: () => message.error('정지 처리에 실패했습니다.'),
     });
@@ -151,7 +151,7 @@ const MembersTab = () => {
         onSuccess: () => {
             message.success('영구 정지 처리되었습니다.');
             setBanOpen(false);
-            invalidateMembers();
+            void invalidateMembers();
         },
         onError: () => message.error('영구 정지에 실패했습니다.'),
     });
@@ -160,7 +160,7 @@ const MembersTab = () => {
         mutationFn: (id) => api.post(API_ENDPOINTS.ADMIN_MANAGE.MEMBER_UNBAN(id)),
         onSuccess: () => {
             message.success('정지가 해제되었습니다.');
-            invalidateMembers();
+            void invalidateMembers();
         },
         onError: () => message.error('해제에 실패했습니다.'),
     });

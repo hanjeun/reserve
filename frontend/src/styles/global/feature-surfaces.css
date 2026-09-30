@@ -292,10 +292,12 @@
     border-radius: 8px;
     transition: background 0.15s ease, color 0.15s ease;
 }
-.reserve-chat-close:hover,
-.reserve-chat-icon-button:hover {
-    background: var(--c-gray-100, #f2f4f6);
-    color: var(--c-text-secondary, #4e5968);
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-close:hover,
+    .reserve-chat-icon-button:hover {
+        background: var(--c-gray-100, #f2f4f6);
+        color: var(--c-text-secondary, #4e5968);
+    }
 }
 .reserve-chat-close:focus,
 .reserve-chat-icon-button:focus { outline: none; box-shadow: none; }
@@ -604,9 +606,6 @@
     gap: 2px;
     flex-shrink: 0;
 }
-.reserve-messenger-list-refresh[aria-pressed='true'] {
-    color: var(--c-primary, #3182f6);
-}
 .reserve-messenger-list-refresh {
     flex: 0 0 44px;
     width: 44px;
@@ -621,10 +620,14 @@
     color: var(--c-text-secondary, #4e5968);
     font-size: 18px;
     cursor: pointer;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
 }
-.reserve-messenger-list-refresh:hover:not([aria-disabled='true']) {
-    color: var(--c-text-primary, #191f28);
-    background: var(--c-gray-50, #f9fafb);
+@media (hover: hover) and (pointer: fine) {
+    .reserve-messenger-list-refresh:hover:not([aria-disabled='true']) {
+        color: var(--c-text-primary, #191f28);
+        background: var(--c-gray-50, #f9fafb);
+    }
 }
 .reserve-messenger-list-refresh:active:not([aria-disabled='true']) { opacity: 0.7; }
 .reserve-messenger-list-refresh[aria-disabled='true'] { opacity: 0.5; cursor: default; }

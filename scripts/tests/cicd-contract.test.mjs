@@ -14,6 +14,22 @@ const frontendTests = workflow.jobs['test-frontend'];
 const staging = workflow.jobs['stage-release'];
 const step = (job, id) => job.steps.find(entry => entry.id === id);
 
+test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled security scans', () => {
+    const scan = require('js-yaml').load(read('.github/workflows/codeql.yml'));
+    assert.deepEqual(scan.on.push.branches, ['main']);
+    assert.deepEqual(scan.on.pull_request.branches, ['main', 'dev']);
+    assert.ok(scan.on.schedule.length > 0);
+    assert.deepEqual(scan.jobs.analyze.strategy.matrix.include.map(entry => entry.language), ['java-kotlin', 'javascript-typescript']);
+    assert.equal(scan.jobs.analyze['continue-on-error'], undefined);
+});
+
+test('PR body edits do not allocate a labeling runner', () => {
+    const labels = require('js-yaml').load(read('.github/workflows/pr-labels.yml'));
+    assert.equal(labels.jobs.label.if, "github.actor != 'dependabot[bot]' && (github.event.action != 'edited' || github.event.changes.title != null)");
+    assert.ok(labels.on.pull_request.types.includes('synchronize'));
+    assert.ok(labels.on.pull_request.types.includes('edited'));
+});
+
 test('required checks remain present and deployment waits for both builds', () => {
     assert.ok(backend && frontend && deployment && backendTests && frontendTests);
     assert.equal(backendTests.if, undefined);

@@ -23,14 +23,12 @@ RESERVE/
 │       ├── payments.md           ← 결제 · 환불 · 웹훅 inbox · 대사 큐
 │       ├── data-lifecycle.md      ← 탈퇴 · 폐업 · 파일 삭제 outbox · 보존 정책
 │       ├── account-security.md    ← 비밀번호 · 세션 세대 · 로그인 유지(refresh 회전) · 동의 이력 · OAuth unlink outbox
-│       ├── api-versioning.md      ← v1 전환 기준 · 호환성 · 단계적 폐기
 │       ├── store-drafts.md        ← 가게 등록·수정 IndexedDB 임시저장
 │       ├── messaging.md          ← 고객지원·가게 문의 권한 · 전송 안정성 · 확장 관문
 │       ├── region-photo-assets.md ← 지역 대표 사진 · 공공누리 출처 · 가공 기준
 │       ├── backup.md             ← MySQL 백업 · 복원 훈련
 │       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
 │       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
-│       ├── quality-roadmap.md     ← 프리뷰 검증 · 미해결 위험 · PR 정리 순서
 │       ├── ui-decisions.md        ← 공통 UI 구현 결정
 │       ├── README.md              ← 기술 문서 안내
 │       ├── structure.md          ← 코드 구조 (이 문서)

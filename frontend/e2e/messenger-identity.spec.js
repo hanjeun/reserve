@@ -94,6 +94,40 @@ test.beforeEach(async ({ page, context }) => {
     });
 });
 
+test('neutral hidden-conversation controls keep touch clear and keyboard focus visible', async ({ page }, testInfo) => {
+    await mockApi(page, account, []);
+    await page.goto('/');
+    await page.getByRole('button', { name: '메시지 열기' }).click();
+    await expect(page.locator('.reserve-messenger-brand-cover img')).toHaveAttribute('src', /\/og-image\.png\?v=[a-f0-9]{12}$/);
+    await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화' }).click();
+    const toggle = page.locator('.reserve-messenger-list-actions button[aria-pressed]');
+    await expect(toggle).toHaveAccessibleName('숨긴 대화 보기');
+    const refresh = page.getByRole('button', { name: '대화 목록 새로고침' });
+    const neutralColor = await refresh.evaluate(el => getComputedStyle(el).color);
+    if (testInfo.project.name === 'mobile-chromium') await toggle.tap();
+    else {
+        await toggle.hover();
+        await expect(toggle).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await toggle.click();
+        await page.mouse.move(0, 0);
+    }
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveAccessibleName('일반 대화 보기');
+    await expect(toggle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(toggle).toHaveCSS('color', neutralColor);
+    if (testInfo.project.name === 'mobile-chromium') {
+        await expect(toggle).toHaveCSS('outline-style', 'none');
+        await refresh.tap();
+        await expect(refresh).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    } else {
+        await page.keyboard.press('Tab');
+        await toggle.focus();
+        await expect(toggle).toHaveCSS('outline-style', 'solid');
+        await page.keyboard.press('Enter');
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    }
+});
+
 test('launcher unread badge moves with the logo on hover and press', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await mockApi(page, account, []);

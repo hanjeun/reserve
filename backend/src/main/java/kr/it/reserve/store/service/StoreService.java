@@ -200,6 +200,7 @@ public class StoreService {
                 .allowLatePayment(request.getAllowLatePayment() != null ? request.getAllowLatePayment() : false)
                 .allowDuplicateReservation(request.getAllowDuplicateReservation() != null ? request.getAllowDuplicateReservation() : false)
                 .emailNotificationEnabled(request.getEmailNotificationEnabled() != null ? request.getEmailNotificationEnabled() : true)
+                .imageAutoplayEnabled(!Boolean.FALSE.equals(request.getImageAutoplayEnabled()))
                 .maxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()))
                 .build();
 
@@ -360,6 +361,7 @@ public class StoreService {
             store.setAllowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()));
             // emailNotificationEnabled: null이면 변경 안 함
             if (request.getEmailNotificationEnabled() != null) store.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
+            if (request.getImageAutoplayEnabled() != null) store.setImageAutoplayEnabled(request.getImageAutoplayEnabled());
             // 휴무는 "항상 덮어쓴다" — 요일·날짜를 **빼는** 것도 정상적인 수정이라
             // null 가드를 두면 마지막 휴무를 지울 방법이 없어진다.
             store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));

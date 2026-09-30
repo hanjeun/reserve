@@ -10,7 +10,8 @@ import { resolveBin } from './resolve-bin.mjs';
 const VERSION = 1;
 const MAX_AGE_MS = 7 * 86_400_000;
 const scopes = {
-    backend: ['backend', 'scripts', '.github', '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml'],
+    backend: ['backend', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs',
+        '.github/workflows/CICD.yml', '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml'],
     frontend: ['frontend', 'backend/src/main', 'scripts', '.github', '.gitattributes', 'nginx', 'monitoring', 'docs/design-system/snapshots'],
 };
 function componentConfig(requested) {
@@ -26,6 +27,10 @@ const git = args => {
     if (!isAbsolute(executable)) throw new Error('GIT_BIN must be an absolute installation path');
     return execFileSync(executable, args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
 };
+export function evidenceInputPaths(component) {
+    componentConfig(component);
+    return [...scopes[component]];
+}
 export function evidenceKey(component, entries, runtime) {
     componentConfig(component);
     // Markdown is checked afresh by the documentation step; executable/lock/test blobs remain inputs.
@@ -61,7 +66,7 @@ function runtimeIdentity(component) {
         ...(java ? { java } : {}) };
 }
 function keyAt(component, ref, runtime) {
-    return evidenceKey(component, git(['ls-tree', '-r', '-z', ref, '--', ...scopes[component]]), runtime);
+    return evidenceKey(component, git(['ls-tree', '-r', '-z', ref, '--', ...evidenceInputPaths(component)]), runtime);
 }
 const output = values => {
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT,

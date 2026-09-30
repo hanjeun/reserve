@@ -91,6 +91,7 @@ public class StoreResponse {
     private Boolean allowLatePayment;
     private Boolean allowDuplicateReservation;
     private Boolean emailNotificationEnabled;
+    private Boolean imageAutoplayEnabled;
 
     // 휴무·예약범위 (2026-08-11). 달력이 어떤 날짜를 막을지 결정하는 데 쓰인다 —
     // 서버 검증(Store.isClosedOn)과 같은 값을 내려야 화면과 실제 동작이 어긋나지 않는다.
@@ -183,6 +184,7 @@ public class StoreResponse {
                 .allowLatePayment(store.getAllowLatePayment())
                 .allowDuplicateReservation(store.getAllowDuplicateReservation())
                 .emailNotificationEnabled(store.getEmailNotificationEnabled())
+                .imageAutoplayEnabled(!Boolean.FALSE.equals(store.getImageAutoplayEnabled()))
                 .bookingType(store.resolveBookingType().name())
                 .sessionTimes(store.getSessionTimeList().stream()
                         .map(t -> t.toString().substring(0, 5)).toList())

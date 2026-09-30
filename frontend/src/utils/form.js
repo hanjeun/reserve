@@ -86,6 +86,9 @@ export const buildStoreFormData = (values) => {
     fd.append('allowLatePayment',          boolString(values.allowLatePayment));
     fd.append('allowDuplicateReservation', boolString(values.allowDuplicateReservation));
     fd.append('emailNotificationEnabled',  boolString(values.emailNotificationEnabled));
+    if (values.imageAutoplayEnabled != null) {
+        fd.append('imageAutoplayEnabled', boolString(values.imageAutoplayEnabled));
+    }
 
     // 예약 마감 시간 (없으면 미전송 → 백엔드 null = 제한 없음)
     appendOptional(fd, 'bookingDeadlineHours', values.bookingDeadlineHours);

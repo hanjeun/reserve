@@ -1,11 +1,11 @@
 name: CodeQL
 
 # GitHub 무료 코드 스캐닝(public 레포 한정). CICD.yml과 분리한 이유:
-#  - CICD.yml은 main 전용 트리거인데 CodeQL은 dev에서도 돌아야 한다(Dependabot PR이 dev로 온다)
+#  - dev/main PR과 main push를 검사한다. dev push의 동일 변경 중복 스캔은 생략한다.
 #  - 배포 파이프라인이 스캔 때문에 느려지거나 실패하면 안 된다
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main" ]
     paths-ignore:
       - '**.md'
       - 'docs/**'

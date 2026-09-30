@@ -273,6 +273,10 @@ public class Store {
     @Builder.Default
     private Boolean emailNotificationEnabled = true;
 
+    @Column(name = "image_autoplay_enabled", nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private Boolean imageAutoplayEnabled = true;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

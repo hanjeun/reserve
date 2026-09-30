@@ -82,7 +82,7 @@ function normalizeTarget(rawTarget) {
   const titleMatch = target.match(/^(\S+?)(?:\s+["'(].*)$/);
   if (titleMatch) target = titleMatch[1];
 
-  return target.replaceAll('\\ ', ' ');
+  return target.replaceAll(String.raw`\ `, ' ');
 }
 
 function shouldIgnore(target) {

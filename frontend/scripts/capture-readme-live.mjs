@@ -47,7 +47,7 @@ import { chromium } from 'playwright';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(SCRIPT_DIR, '..');
 const REPOSITORY_DIR = path.resolve(FRONTEND_DIR, '..');
-const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images', 'readme-v2.6');
+const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images');
 const AUTH_DIR = path.join(FRONTEND_DIR, '.readme-capture');
 const AUTH_FILE = path.join(AUTH_DIR, 'auth.json');
 const BASE_URL = (process.env.README_BASE_URL || 'https://reserve.it.kr').replace(/\/+$/, '');
@@ -224,7 +224,7 @@ async function saveImage(name, image) {
 }
 
 async function writeManifest(captured) {
-    const manifestPath = path.join(OUTPUT_DIR, 'manifest.json');
+    const manifestPath = path.join(OUTPUT_DIR, 'screenshots.json');
     const previous = existsSync(manifestPath) ? JSON.parse(await readFile(manifestPath, 'utf8')) : { files: [] };
     const files = new Map((previous.files ?? []).map(file => [file.path, file]));
     for (const name of captured) {

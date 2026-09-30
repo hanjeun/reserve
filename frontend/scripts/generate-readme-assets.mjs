@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(SCRIPT_DIR, '..');
 const REPOSITORY_DIR = path.resolve(FRONTEND_DIR, '..');
-const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images', 'readme-v2.6');
+const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images');
 const HOST = '127.0.0.1';
 const PORT = 4273;
 const BASE_URL = `http://${HOST}:${PORT}`;
@@ -500,7 +500,7 @@ async function writeManifest(names) {
         generator: 'frontend/scripts/generate-readme-assets.mjs',
         files,
     };
-    await writeFile(path.join(OUTPUT_DIR, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    await writeFile(path.join(OUTPUT_DIR, 'screenshots.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 }
 
 async function main() {

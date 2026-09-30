@@ -94,8 +94,10 @@
     line-height: 24px;
 }
 .reserve-chat-intro-card-head p { margin: 4px 0 0; color: var(--c-text-secondary, #4e5968); font-size: 13px; line-height: 20px; }
-.reserve-chat-intro-card-head--action { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.reserve-chat-intro-card-head--action > .reserve-btn { flex: 0 0 auto; margin-top: -4px; }
+/* 제목 줄 오른쪽 동작 버튼(기본 문구로·질문 추가·처음부터) — 제목과 같은 줄 가운데에 두고,
+   글자형 버튼이라 오른쪽 끝이 카드 안쪽 여백(입력칸 오른쪽 끝)과 맞는다. 안내 문구는 그 아래 전체 폭으로. */
+.reserve-chat-intro-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 24px; }
+.reserve-chat-intro-title-row > .reserve-btn { flex: 0 0 auto; }
 .reserve-chat-intro-count { color: var(--c-text-tertiary, #8b95a1); font-size: 13px; font-weight: 500; }
 
 .reserve-chat-intro-empty {
@@ -126,12 +128,8 @@
 
 /* 미리보기: 손님이 보는 대화창과 같은 크기·모양 */
 .reserve-chat-intro-preview { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
-.reserve-chat-intro-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-/* 제목·안내 문구에만 적용한다(> div >). 예전엔 span 전체를 잡아서 옆 '처음부터' 버튼의 아이콘 span 까지
-   display:block·위 여백 2px 이 걸려 아이콘이 글자보다 1px 아래로 내려갔다(2026-09-24 실측). */
-.reserve-chat-intro-preview-head > div > strong { display: block; color: var(--c-text-primary, #191f28); font-size: 16px; font-weight: 700; line-height: 24px; }
-.reserve-chat-intro-preview-head > div > span { display: block; margin-top: 2px; color: var(--c-text-secondary, #4e5968); font-size: 13px; line-height: 20px; }
-.reserve-chat-intro-preview-head > .reserve-btn { flex: 0 0 auto; }
+.reserve-chat-intro-preview-head strong { color: var(--c-text-primary, #191f28); font-size: 16px; font-weight: 700; line-height: 24px; }
+.reserve-chat-intro-preview-head p { margin: 4px 0 0; color: var(--c-text-secondary, #4e5968); font-size: 13px; line-height: 20px; }
 
 .reserve-chat-intro-device {
     width: 100%;
@@ -149,20 +147,6 @@
 .reserve-chat-intro-device-heading { padding-right: 16px; }
 .reserve-chat-intro-device-icons { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 20px; margin-left: auto; color: var(--c-text-tertiary, #8b95a1); font-size: 18px; }
 .reserve-chat-intro-device-body { flex: 1; min-height: 0; overflow-y: auto; }
-.reserve-chat-intro-device-composer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 56px;
-    box-sizing: border-box;
-    padding: 5px 5px 5px 14px;
-    border-radius: 16px;
-    color: var(--c-text-tertiary, #8b95a1);
-    font-size: 14px;
-}
-.reserve-chat-intro-device-composer > span:first-child { flex: 1; min-width: 0; }
-/* 실제 전송 버튼의 빈 입력 상태(:disabled 투명도 0.3)와 같다. */
-.reserve-chat-intro-device-send { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; color: #fff; opacity: 0.3; }
 
 /* PC: 왼쪽 설정 · 오른쪽 미리보기(따라 내려옴). 모바일: 위쪽 설정|미리보기 전환 */
 .reserve-chat-intro-switch { display: none; }

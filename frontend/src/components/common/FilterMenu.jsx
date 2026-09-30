@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Dropdown } from 'antd';
 import { CheckOutlined, DownOutlined, LoadingOutlined } from '@ant-design/icons';
@@ -7,7 +7,22 @@ import { CheckOutlined, DownOutlined, LoadingOutlined } from '@ant-design/icons'
 export default function FilterMenu({ value, options, onChange, appearance = 'chip', icon, disabled = false, loading = false, className, ...rest }) {
     const [open, setOpen] = useState(false);
     const triggerRef = useRef(null);
+    const popupRef = useRef(null);
     const selected = options.find(option => option.value === value);
+
+    // 열 때 목록을 선택한 항목 기준으로 맞춘다. 첫 항목이 선택돼 있으면 맨 위에서 시작한다 —
+    // 항목이 목록 높이를 조금 넘으면 브라우저가 스크롤을 남겨 첫 항목 윗부분이 잘려 보였다(2026-09-29).
+    useEffect(() => {
+        if (!open) return undefined;
+        const frame = requestAnimationFrame(() => {
+            const list = popupRef.current?.querySelector('.reserve-filter-menu-options');
+            if (!list) return;
+            const active = list.querySelector('.ant-dropdown-menu-item-selected');
+            const overflow = active ? active.offsetTop + active.offsetHeight - list.clientHeight : 0;
+            list.scrollTop = overflow > 0 ? overflow + 4 : 0;
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [open]);
 
     const closeWithFocus = () => {
         setOpen(false);
@@ -22,6 +37,7 @@ export default function FilterMenu({ value, options, onChange, appearance = 'chi
             open={open && !disabled}
             disabled={disabled}
             onOpenChange={nextOpen => setOpen(nextOpen)}
+            popupRender={menu => <div ref={popupRef}>{menu}</div>}
             menu={{
                 className: 'reserve-filter-menu-options',
                 selectable: true,

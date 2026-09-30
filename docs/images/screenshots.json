@@ -1,13 +1,12 @@
 {
   "schemaVersion": 2,
-  "purpose": "README screenshots. Files with \"source\" were captured from a real site; others come from the synthetic generator.",
+  "purpose": "README screenshots captured from a real site.",
   "viewport": {
     "width": 1600,
     "height": 900
   },
   "generators": [
-    "frontend/scripts/capture-readme-live.mjs",
-    "frontend/scripts/generate-readme-assets.mjs"
+    "frontend/scripts/capture-readme-live.mjs"
   ],
   "files": [
     {

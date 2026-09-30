@@ -3,12 +3,12 @@
 릴리즈 노트 동기화, GitHub Deployments 기록, CI 구조, 배포 후 점검과 롤백 절차예요.
 
 모든 명령은 **레포 루트에서 `gh` 로그인 상태**로 실행해요. 대상 저장소는 `REPO` 환경변수로 바꿀 수 있어요(기본 `hanjeun/reserve`).
-버전별 변경 내용은 [업데이트 소식](../CHANGELOG.md), 기능별 상태는 [현재 상태](current-status.md)를 봐요.
+버전별 변경 내용은 [업데이트 소식](../CHANGELOG.md)을 봐요.
 
 ## 기본 규칙
 
 - 커밋, PR, merge, tag, 배포, GitHub 설정 변경, 운영 쓰기는 **각각 현재 대화에서 별도 승인**을 받아요.
-- `sync-release-notes.mjs --apply`와 `backfill-deployments.mjs --apply`는 릴리스 승인 뒤에 실행해요.
+- `sync-release-notes.mjs --apply`는 릴리스 승인 뒤에 실행해요.
 - 배포 직전에는 서버 SSH fingerprint를 별도 경로로 확인해요.
 - 의존성 PR과 제품 통합은 분리해요.
 
@@ -33,7 +33,7 @@
 |---|---|---|
 | `test-backend` | — | 백엔드 unit·Spring/H2 통합 테스트 |
 | `test-frontend` | — | 문서 링크·Grafana·스냅샷·운영 스크립트 검사, ESLint, 품질 정책, Vitest, PC·모바일 Playwright |
-| `build-backend` | `test-backend` | bootJar, 롤백 스키마 호환 검사, Docker 이미지 push |
+| `build-backend` | `test-backend` | bootJar, Docker 이미지 push |
 | `build-frontend` | `build-backend`, `test-frontend` | Vite 빌드 후 이 실행의 dist 아티팩트 업로드 |
 | `stage-release` | `build-backend`, `build-frontend` | 아티팩트를 서버 `releases/<SHA>`에 staging. live는 바꾸지 않아요 |
 | `deploy-backend` | 위 전부 | 새 서버 기동, 준비 확인, 원자 전환, smoke, 실패 복구 |
@@ -77,24 +77,7 @@ node scripts/sync-release-notes.mjs v1.13.0 --apply
 
 `deploy-backend` 잡은 `environment: production`을 쓰고, GitHub가 Deployment와 상태를 자동으로 기록해요. `production`의 배포 브랜치 정책은 `main`만 허용해요.
 
-### 2-1. 태그 백필
-
-기록이 없는 태그에만 Deployment(+success)를 만들어요. 시각은 실행 시각으로 찍혀요. 몇 번을 돌려도 빠진 것만 만들어요.
-
-```bash
-node scripts/backfill-deployments.mjs               # 미리보기 — 무엇을 만들지
-node scripts/backfill-deployments.mjs --apply       # 빠진 것만 생성
-node scripts/backfill-deployments.mjs --tag v2.2.0 --apply   # 특정 태그만
-```
-
-스크립트가 만든 기록만 지울 때는 `--prune-backfilled`를 써요(`description`의 `backfilled-by-script` 표식으로 골라요).
-
-```bash
-node scripts/backfill-deployments.mjs --prune-backfilled           # 미리보기
-node scripts/backfill-deployments.mjs --prune-backfilled --apply
-```
-
-### 2-2. 기록 확인
+### 2-1. 기록 확인
 
 ```bash
 # 코드: main 전용 stage/활성화와 자동 Environment 기록

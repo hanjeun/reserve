@@ -1,8 +1,7 @@
 /**
  * README 스크린샷을 **실제 서비스 화면·실제 가게 데이터**로 찍는다.
  *
- * generate-readme-assets.mjs 는 API 를 가짜 데이터로 막아 찍는 "합성" 생성기다(샘플 커피 스튜디오 등).
- * 이 스크립트는 반대로 API 를 막지 않고, 지정한 사이트(기본: 운영)에 실제로 접속해 찍는다.
+ * API 를 막지 않고, 지정한 사이트(기본: 운영)에 실제로 접속해 찍는다.
  * 아키텍처 그림은 찍지 않는다 — README 는 피그마 원본(docs/images/RESERVE_Architecture.png)을 쓴다.
  * 모니터링(monitoring.png)은 운영 Grafana(grafana.reserve.it.kr)의 "RESERVE 로그" 대시보드 요약 카드를 찍는다.
  * 로그 원문 패널은 접힌 상태 그대로 둔다 — 요청 경로·IP 같은 원문이 이미지에 들어가지 않게.
@@ -240,9 +239,9 @@ async function writeManifest(captured) {
     }
     const manifest = {
         schemaVersion: 2,
-        purpose: 'README screenshots. Files with "source" were captured from a real site; others come from the synthetic generator.',
+        purpose: 'README screenshots captured from a real site.',
         viewport: VIEWPORT,
-        generators: ['frontend/scripts/capture-readme-live.mjs', 'frontend/scripts/generate-readme-assets.mjs'],
+        generators: ['frontend/scripts/capture-readme-live.mjs'],
         files: [...files.values()],
     };
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');

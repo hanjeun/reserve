@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import process from 'node:process';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
+const messengerCoverRevision = createHash('sha256')
+    .update(readFileSync(new URL('./public/og-image.png', import.meta.url)))
+    .digest('hex').slice(0, 12);
 
 export default defineConfig({
+    define: {
+        'import.meta.env.VITE_MESSENGER_COVER_REVISION': JSON.stringify(messengerCoverRevision),
+    },
     plugins: [
         react(),
     ],

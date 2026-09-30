@@ -12,12 +12,16 @@ import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.dto.StoreUpdateRequest;
+import kr.it.reserve.store.dto.StoreCreateRequest;
+import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -95,6 +99,55 @@ class StoreDetailImageOrderTest {
 
     private static MultipartFile newImage() {
         return new MockMultipartFile("detailImages", "new.png", "image/png", new byte[] {1, 2, 3});
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("사진 자동 넘김 설정을 수정하고 응답에 반영한다")
+    void updatesImageAutoplay(boolean enabled) {
+        StoreUpdateRequest request = new StoreUpdateRequest();
+        request.setImageAutoplayEnabled(enabled);
+
+        StoreResponse response = storeService.updateStore(STORE_ID, request, owner);
+
+        assertThat(store.getImageAutoplayEnabled()).isEqualTo(enabled);
+        assertThat(response.getImageAutoplayEnabled()).isEqualTo(enabled);
+    }
+
+    @Test
+    @DisplayName("예전 수정 요청이 사진 자동 넘김을 보내지 않으면 기존 설정을 보존한다")
+    void preservesImageAutoplayWhenOmitted() {
+        store.setImageAutoplayEnabled(false);
+
+        StoreResponse response = storeService.updateStore(STORE_ID, new StoreUpdateRequest(), owner);
+
+        assertThat(store.getImageAutoplayEnabled()).isFalse();
+        assertThat(response.getImageAutoplayEnabled()).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("등록한 사진 자동 넘김 설정을 저장한다")
+    void createsImageAutoplay(boolean enabled) {
+        when(storeRepository.save(any(Store.class))).thenAnswer(invocation -> {
+            Store saved = invocation.getArgument(0);
+            saved.setId(STORE_ID);
+            return saved;
+        });
+        StoreCreateRequest request = new StoreCreateRequest();
+        request.setName("store");
+        request.setImageAutoplayEnabled(enabled);
+
+        assertThat(storeService.createStore(request, owner).getImageAutoplayEnabled()).isEqualTo(enabled);
+    }
+
+    @Test
+    @DisplayName("기존 가게와 예전 등록 요청은 자동 넘김 기본값을 유지한다")
+    void defaultsImageAutoplayToEnabled() {
+        assertThat(new StoreCreateRequest().getImageAutoplayEnabled()).isTrue();
+        assertThat(store.getImageAutoplayEnabled()).isTrue();
+        store.setImageAutoplayEnabled(null);
+        assertThat(StoreResponse.fromEntity(store).getImageAutoplayEnabled()).isTrue();
     }
 
     @Test

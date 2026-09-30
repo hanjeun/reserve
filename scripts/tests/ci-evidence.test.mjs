@@ -1,13 +1,21 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolve } from 'node:path';
-import { eligibleRun, evidenceKey, freshProof, main } from '../ci-evidence.mjs';
+import { eligibleRun, evidenceKey, evidenceInputPaths, freshProof, main } from '../ci-evidence.mjs';
 
 const entries = '100644 blob aaaa\tfrontend/src/App.jsx\0' +
     '100644 blob bbbb\tfrontend/package-lock.json\0' +
     '100644 blob cccc\tfrontend/src/App.test.jsx\0' +
     '100644 blob dddd\t.github/workflows/CICD.yml\0';
 const runtime = { node: 'v22.21.0', image: 'ubuntu24', imageVersion: '1', configRevision: '1' };
+test('backend evidence covers its code and test executor, not unrelated frontend tooling or PR labels', () => {
+    assert.deepEqual(evidenceInputPaths('backend'), [
+        'backend', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', '.github/workflows/CICD.yml',
+        '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml',
+    ]);
+    assert.ok(evidenceInputPaths('frontend').includes('backend/src/main'));
+    assert.throws(() => evidenceInputPaths('../outside'), /Unknown test component/);
+});
 test('CLI rejects unsupported modes and path-like components before executing tools or writing files', async () => {
     await assert.rejects(main('unsupported', 'frontend'), /Expected restore or record/);
     for (const component of ['../outside', resolve('outside'), String.raw`C:\outside`, 'frontend/../outside', '__proto__', 'constructor', '', undefined]) {

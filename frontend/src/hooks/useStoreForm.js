@@ -43,6 +43,7 @@ const initialValuesFromStore = initialData => {
         allowLatePayment: initialData.allowLatePayment ?? false,
         allowDuplicateReservation: initialData.allowDuplicateReservation ?? false,
         emailNotificationEnabled: initialData.emailNotificationEnabled ?? true,
+        imageAutoplayEnabled: initialData.imageAutoplayEnabled ?? true,
         fullRefundDays: initialData.fullRefundDays ?? 3,
         partialRefundDays: initialData.partialRefundDays ?? 1,
         partialRefundRate: initialData.partialRefundRate ?? 50,

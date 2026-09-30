@@ -6,13 +6,14 @@ import { describe, expect, it, vi } from 'vitest';
 import MessengerFooter from './MessengerFooter';
 import MessengerSettings from './MessengerSettings';
 import MessengerHome from './MessengerHome';
+import { MESSENGER_COVER_IMAGE } from './messengerImages';
 import Avatar from '../common/Avatar';
 
 describe('MessengerHome headings', () => {
     it.each([1, 2])('keeps one accessible heading at level %s without a visible cover wordmark', headingLevel => {
         const onChoose = vi.fn();
         const { container } = render(<MessengerHome onChoose={onChoose} headingLevel={headingLevel} />);
-        expect(container.querySelector('.reserve-messenger-cover-image')).toHaveAttribute('src', '/og-image.png');
+        expect(container.querySelector('.reserve-messenger-cover-image')).toHaveAttribute('src', MESSENGER_COVER_IMAGE);
         expect(screen.getByRole('heading', { name: '메시지', level: headingLevel })).toHaveClass('reserve-messenger-sr-only');
         expect(screen.queryByRole('heading', { name: 'RESERVE' })).not.toBeInTheDocument();
         expect(screen.getAllByRole('heading')).toHaveLength(1);

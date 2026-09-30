@@ -29,9 +29,10 @@ describe('StoreFormSkeleton', () => {
         expect(labels).toEqual([
             '가게 이름', '예약 방식', '서비스 분야', '카테고리', '예약 단위', '연락처', '영업 시간', '브레이크 타임', '주소', '가게 소개',
             '최대 예약 인원', '노쇼 예약금', '우리동네 배지 기준', '정기 휴무', '운영 기간', '임시 휴무일', '예약 가능 기간',
-            '전액 환불', '부분 환불', '부분 환불율', '예약 마감', '결제 마감', '대표 이미지', '상세 이미지 (최대 5장)',
+            '전액 환불', '부분 환불', '부분 환불율', '예약 마감', '결제 마감', '대표 이미지', '상세 이미지 (최대 5장)', '사진 자동 넘김',
         ]);
         expect(container.querySelector('input,button,select,textarea,a')).toBeNull();
+        expect(container.querySelector('[data-skeleton-section="images"] .reserve-store-form-skeleton-control--switch')).not.toBeNull();
     });
 
     it('uses the real form frame: two columns from 900px, one column and small inputs below', () => {

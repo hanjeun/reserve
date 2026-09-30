@@ -74,8 +74,11 @@ describe('chat photo picker', () => {
         expect(exiting.style.animation).toContain('slideUpOut');
         expect(screen.queryByRole('button', { name: '첨부 사진 크게 보기' })).toBeNull();
         expect(revoke).not.toHaveBeenCalled();
-        await waitFor(() => expect(view.container.querySelector('.reserve-chat-attachment')).toBeNull());
-        expect(revoke).toHaveBeenCalledWith('blob:exit');
+        // DOM removal can precede the passive effect that releases its object URL.
+        await waitFor(() => {
+            expect(view.container.querySelector('.reserve-chat-attachment')).toBeNull();
+            expect(revoke).toHaveBeenCalledWith('blob:exit');
+        });
         create.mockRestore(); revoke.mockRestore();
     });
 });

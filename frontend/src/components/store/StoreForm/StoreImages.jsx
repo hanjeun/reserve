@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Upload, Divider, message as antMessage } from 'antd';
+import { Form, Upload, Divider, Switch, message as antMessage } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import {
     IMAGE_ACCEPT,
@@ -91,7 +91,7 @@ const StoreImages = ({
                 label="상세 이미지 (최대 5장)"
                 name="detailImages"
                 getValueFromEvent={normFileList}
-                extra={`사진을 끌어서 순서를 바꿀 수 있어요 · JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 ${MAX_IMAGE_REQUEST_MB}MB`}
+                extra={<span>사진을 끌어 옆 사진과 순서를 바꿀 수 있어요. 휴대폰에서는 사진을 길게 누른 뒤 끌어주세요.<br />JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 {MAX_IMAGE_REQUEST_MB}MB</span>}
             >
                 {/* 순서가 곧 가게 상세의 사진 순서다. 기존·새 사진이 섞여도 서버가 이 순서로 저장한다(useStoreForm detailImageOrder). */}
                 <SortableImageUpload
@@ -108,6 +108,15 @@ const StoreImages = ({
                 >
                     {detailImages.length < 5 && <UploadButton />}
                 </SortableImageUpload>
+            </Form.Item>
+            <Form.Item
+                className="reserve-store-photo-autoplay"
+                label="사진 자동 넘김"
+                name="imageAutoplayEnabled"
+                valuePropName="checked"
+                extra="가게 상세의 사진을 자동으로 넘깁니다. 끄면 직접 넘길 수 있어요."
+            >
+                <Switch />
             </Form.Item>
         </>
     );

@@ -37,6 +37,8 @@
 .reserve-store-form-skeleton-control--select { height: 53px; }
 .reserve-store-form-skeleton-control--textarea { height: 121px; }
 .reserve-store-form-skeleton-control--upload { height: 102px; }
+.reserve-store-form-skeleton-control--switch { width: 44px; height: 22px; --reserve-store-form-skeleton-radius: 999px; }
+.reserve-store-form .reserve-store-photo-autoplay .ant-form-item-control-input { min-height: 22px; }
 .reserve-store-form-skeleton-control--check {
     height: 40px;
     display: grid;
@@ -111,6 +113,7 @@
     .reserve-store-form-skeleton-control--textarea { height: 121px; }
     .reserve-store-form-skeleton-control--upload { height: 102px; }
     .reserve-store-form-skeleton-control--check { height: 40px; }
+    .reserve-store-form-skeleton-control--switch { height: 22px; }
 
     .reserve-store-form-skeleton-help {
         min-height: 0;

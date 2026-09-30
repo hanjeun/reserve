@@ -110,6 +110,7 @@ const StoreImages = ({
                 </SortableImageUpload>
             </Form.Item>
             <Form.Item
+                className="reserve-store-photo-autoplay"
                 label="사진 자동 넘김"
                 name="imageAutoplayEnabled"
                 valuePropName="checked"

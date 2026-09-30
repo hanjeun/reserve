@@ -806,7 +806,9 @@
     background: transparent;
     color: var(--c-text-primary, #191f28);
 }
-.reserve-messenger-mobile-back:hover { background: var(--c-gray-50, #f9fafb); }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-messenger-mobile-back:hover { background: var(--c-gray-50, #f9fafb); }
+}
 .reserve-messenger-mobile-back:active { opacity: 0.7; }
 .reserve-messenger-mobile-back:focus { outline: none; }
 .reserve-messenger-mobile-back:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: -2px; }

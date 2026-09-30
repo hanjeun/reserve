@@ -50,11 +50,15 @@ describe('messenger interaction roles', () => {
     });
 
     it('uses neutral hover and press feedback without shrinking navigation controls', () => {
-        expect(declarations('.reserve-chat-close:hover')).toMatchObject({
+        const hoverMedia = '(hover: hover) and (pointer: fine)';
+        expect(declarations('.reserve-chat-close:hover')).toEqual({});
+        expect(declarations('.reserve-chat-close:hover', hoverMedia)).toMatchObject({
             background: 'var(--c-gray-100, #f2f4f6)', color: 'var(--c-text-secondary, #4e5968)',
         });
-        expect(declarations('.reserve-messenger-mobile-back:hover').background).toBe('var(--c-gray-50, #f9fafb)');
-        expect(declarations(".reserve-messenger-list-refresh:hover:not([aria-disabled='true'])").background)
+        expect(declarations('.reserve-messenger-mobile-back:hover')).toEqual({});
+        expect(declarations('.reserve-messenger-mobile-back:hover', hoverMedia).background).toBe('var(--c-gray-50, #f9fafb)');
+        expect(declarations(".reserve-messenger-list-refresh:hover:not([aria-disabled='true'])")).toEqual({});
+        expect(declarations(".reserve-messenger-list-refresh:hover:not([aria-disabled='true'])", hoverMedia).background)
             .toBe('var(--c-gray-50, #f9fafb)');
         expect(declarations('.reserve-messenger-footer-tab:hover').background).toBe('transparent');
         expect(declarations('.reserve-messenger-support-question:hover:not(:disabled)')).toMatchObject({

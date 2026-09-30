@@ -286,10 +286,10 @@ sudo mkdir -p /var/log/reserve && sudo chown -R 1000:1000 /var/log/reserve
 기존 설정과 positions를 보존하고 새 config의 2.9.0 syntax·합성 파이프라인 검사를 통과한 뒤, 적용은 **Promtail만** 해요. Grafana·Loki·앱·DB는 재생성하지 않아요.
 
 ```bash
-NGINX_LOG_PATH=$(docker inspect --format '{{.LogPath}}' nginxserver)
+NGINX_LOG_PATH=$(sudo docker inspect --format '{{.LogPath}}' nginxserver)
 NGINX_LOG_DIR=${NGINX_LOG_PATH%/*}
 [[ "$NGINX_LOG_DIR" =~ ^/var/lib/docker/containers/[0-9a-f]{64}$ ]] || exit 1
-test -f "$NGINX_LOG_PATH" || exit 1
+sudo test -f "$NGINX_LOG_PATH" || exit 1
 sudo env RESERVE_NGINX_LOG_DIR="$NGINX_LOG_DIR" docker compose \
   -f /home/ubuntu/docker-compose-monitoring.yml \
   -f /home/ubuntu/docker-compose-observability.yml \

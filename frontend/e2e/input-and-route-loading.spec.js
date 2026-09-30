@@ -29,7 +29,7 @@ test('choice-only chat and profile settings retain focus without editable keyboa
     await color.press('ArrowDown');
     await color.press('ArrowDown');
     await color.press('Enter');
-    await expect(page.locator('.reserve-chat-preferences .ant-select-content-value')).toHaveText('로즈');
+    await expect(page.locator('.reserve-chat-preferences .reserve-chat-color-option')).toHaveText('로즈');
     await expect(color).toBeFocused();
     await expect(page.locator('.reserve-chat-preferences')).toContainText('앱의 포인트 색은 바뀌지 않습니다');
     await color.click();

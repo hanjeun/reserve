@@ -282,7 +282,7 @@ test(`QR sheet content stays unboxed and mock scanning stops and closes with ${m
     await expect(sheet.locator('.reserve-qr-scanning-dot')).toHaveCSS('background-color', 'rgb(50, 211, 101)');
     await sheet.getByRole('button', { name: '스캔 중지', exact: true }).click();
     await expect(start).toBeEnabled();
-    await sheet.getByRole('button', { name: '닫기', exact: true }).click();
+    await sheet.getByRole('button', { name: '닫기', exact: true }).filter({ hasText: /^닫기$/ }).click();
     await expect(sheet).toBeHidden();
     expect(await page.evaluate(() => window.__cameraRequests)).toBe(0);
     expect(requests.writes).toBe(0);

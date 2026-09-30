@@ -25,16 +25,17 @@ export function ListingToolbarSkeleton() {
     </div>;
 }
 
-export function RefreshToolbarSkeleton({ search = false }) {
+export function RefreshToolbarSkeleton({ search = false, viewControl = false }) {
     // 실제 FilterToolbar 와 같은 배치: 검색칸은 남는 폭을 채우되 줄어들 수 있고(최대 480px),
     // 새로고침은 같은 .reserve-filter-toolbar-refresh 자리에 글자 버튼 크기(약 70x18)로 둔다.
     // Bone 은 기본이 flexShrink 0 이라 100% 폭 검색 뼈대가 줄지 않아 새로고침이 화면 밖(390 폭에서 x=406)으로 밀렸다.
     return <div className="reserve-filter-toolbar" aria-hidden="true">
+        {viewControl && <div className="reserve-filter-toolbar-primary"><Bone width={44} height={44} borderRadius={10} /></div>}
         <div className={`reserve-filter-toolbar-secondary${search ? '' : ' reserve-filter-toolbar-secondary--refresh-only'}`}>
             {search && <Bone height={40} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, maxWidth: 480 }} />}
             <div className="reserve-filter-toolbar-refresh"><Bone width={70} height={16} /></div>
         </div>
     </div>;
 }
-RefreshToolbarSkeleton.propTypes = { search: PropTypes.bool };
+RefreshToolbarSkeleton.propTypes = { search: PropTypes.bool, viewControl: PropTypes.bool };
 

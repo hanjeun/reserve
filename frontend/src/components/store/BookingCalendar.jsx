@@ -56,7 +56,7 @@ const SWIPE_MIN_PX = 45;
 
 
 /**
- * 막힌 이유. 여기 없는 상태는 라벨 없이 흐리게만 둔다(PAST·TOO_FAR — 손님이 할 수 있는 게 없다).
+ * 휴무·마감만 표시한다. 기간 밖·과거·예약 범위 초과는 라벨 없이 흐리게 둔다.
  *
  * ★ 예전엔 여기에 "남은 시간 N개"도 같이 찍었는데 뺐다. 30분 단위 가게는 하루 22~24개라
  *   **달력이 같은 숫자로 도배**됐다. 매 칸에 있는 숫자는 정보가 아니라 배경이다.
@@ -64,7 +64,6 @@ const SWIPE_MIN_PX = 45;
 const BLOCKED_LABEL = {
     CLOSED: '휴무',
     FULL: '마감',
-    OUT_OF_PERIOD: '기간 밖',
 };
 
 const BookingCalendar = ({ storeId, value, onChange, style }) => {
@@ -111,7 +110,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
      *
      * ★ 초안 + [취소][확인] 안도 만들어봤는데 되돌렸다(2026-08-25).
      *   버튼 두 개가 달력 아래 붙으면 옛날 폼처럼 보이고, 무엇보다 **고민은 누르기 전에
-     *   격자를 보면서 하는 것**이다 — 휴무·마감·기간 밖이 이미 칸에 다 적혀 있다.
+     *   격자를 보면서 하는 것**이다 — 휴무·마감과 선택 불가 상태를 칸에서 볼 수 있다.
      *   누르는 건 이미 결정한 것이므로, 거기서 한 번 더 확인을 받는 건 일을 늘리기만 한다.
      *   마음이 바뀌면 다시 여는 게 탭 한 번이고, 그동안 필드엔 직전 선택이 그대로 남아 있다.
      */
@@ -166,8 +165,8 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
         // 키가 없거나 공공데이터포털이 죽으면 holiday 가 전부 false 로 와서 일요일만 남는다.
         const isRedDay = date.day() === 0 || info?.holiday === true;
 
-        // 한 번만 찾아 쓴다 — 아래에서 aria-label·라벨 렌더에 같이 들어간다.
         const blockedLabel = BLOCKED_LABEL[dayStatus];
+        const blockedReason = blockedLabel ?? (dayStatus === 'OUT_OF_PERIOD' ? '예약 가능한 기간이 아닙니다' : null);
         const dayLabel = date.format('M월 D일');
         const cls = ['rsv-tap-btn', 'reserve-cal-cell'];
 
@@ -184,7 +183,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                 disabled={!isOpenDay}
                 onClick={() => pick(date)}
                 aria-pressed={isSelected}
-                aria-label={blockedLabel ? `${dayLabel} ${blockedLabel}` : dayLabel}
+                aria-label={blockedReason ? `${dayLabel} ${blockedReason}` : dayLabel}
                 style={{
                     ...styles.cell,
                     ...(isToday && !isSelected ? styles.cellToday : null),

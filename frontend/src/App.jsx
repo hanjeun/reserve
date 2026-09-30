@@ -187,13 +187,15 @@ const buildThemeConfig = (isDark, accent) => {
 const spinConfig = { indicator: <SpinIndicator /> };
 
 const isSearchPath = pathname => /^\/search\/?$/.test(pathname);
-const appLayoutStyle = { minHeight: '100vh', backgroundColor: colors.background.default };
+const isMessagesPath = pathname => /^\/messages\/?$/.test(pathname);
+const appLayoutStyle = { backgroundColor: colors.background.default };
 
 // 부트 셸과 AppRoutes 가 같은 레이아웃 클래스를 쓴다 — 홈·검색은 폭·좌우 여백 변수를 이 클래스에서 받는다.
 // 부트 셸에만 없으면 로그인 확인 중 검색 화면의 좌우 여백이 0 이 됐다(2026-09-29 실측).
 function appLayoutClassName(pathname) {
     if (pathname === '/') return 'reserve-app-layout reserve-app-layout--home';
     if (isSearchPath(pathname)) return 'reserve-app-layout reserve-app-layout--search';
+    if (isMessagesPath(pathname)) return 'reserve-app-layout reserve-app-layout--messages';
     return 'reserve-app-layout';
 }
 
@@ -346,7 +348,7 @@ function AppRoutes() {
                 </RouteErrorBoundary>
             </Content>
 
-            {pathname !== '/messages' && !isSearchPage && <AppFooter />}
+            {!isMessagesPath(pathname) && !isSearchPage && <AppFooter />}
             {/* 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다. 익명 사용자는 청크도 받지 않는다. */}
             {isLoggedIn && (
                 <Suspense fallback={null}>

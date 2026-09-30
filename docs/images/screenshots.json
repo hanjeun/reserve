@@ -45,11 +45,11 @@
       "capturedAt": "2026-09-28T10:58:28.050Z"
     },
     {
-      "path": "monitoring.png",
-      "bytes": 54637,
-      "sha256": "2f986b7a13a7b63f85120e6c8eef4d9eeb37d3d87abbad5f4a0262447bf167d6",
+      "path": "grafana.png",
+      "bytes": 60407,
+      "sha256": "c42511262eb30656e3a9ff198fb873a2fae1e535975e7a71c177c9d126c9095f",
       "source": "https://grafana.reserve.it.kr",
-      "capturedAt": "2026-09-28T11:11:46.661Z"
+      "provenanceNote": "Existing local screenshot verified on 2026-09-30. Its original capture time is unverified."
     }
   ]
 }

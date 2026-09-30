@@ -421,6 +421,7 @@
     pointer-events: none;
 }
 
+.reserve-app-layout { min-height: 100vh; }
 .reserve-messages-page {
     width: 100%;
     padding: 28px 24px;
@@ -526,8 +527,7 @@
 .reserve-messenger-settings { display: flex; flex-direction: column; min-height: 0; }
 .reserve-messenger-settings-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
 .reserve-messenger-settings-profile { display: flex; flex-direction: column; align-items: center; padding: 16px 0 28px; gap: 12px; text-align: center; }
-.reserve-messenger-settings-avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--c-primary-light, #edf6ff); color: var(--c-primary, #3182f6); font-size: 24px; }
-.reserve-messenger-settings-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.reserve-messenger-settings-avatar { flex-shrink: 0; line-height: 0; }
 .reserve-messenger-settings-name { display: block; font-size: 16px; }
 .reserve-messenger-settings-email { display: block; margin-top: 4px; color: var(--c-text-tertiary, #8b95a1); font-size: 12px; overflow-wrap: anywhere; }
 .reserve-messenger-settings-link { min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 10px; background: var(--c-gray-50, #f9fafb); color: var(--c-text-secondary, #4e5968); font-size: 12px; }
@@ -975,14 +975,17 @@
     line-height: 1.5;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
     .reserve-messenger-launcher-wrap { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
     .reserve-messenger-launcher { width: 48px; height: 48px; border-radius: 14px; font-size: 20px; }
-    .reserve-messages-page { padding: 0; }
+    /* Safari 주소창 크기가 바뀌어도 /messages만 현재 보이는 높이를 채운다. 홈의 svh는 유지한다. */
+    .reserve-app-layout--messages { height: 100svh; height: 100dvh; min-height: 0; }
+    .reserve-app-layout--messages > .ant-layout-content { flex: 1; min-height: 0; overflow: hidden; }
+    .reserve-messages-page { padding: 0; height: 100%; }
     .reserve-messenger--page {
         width: 100%;
-        height: calc(100svh - 64px);
-        min-height: 420px;
+        height: 100%;
+        min-height: 0;
         margin: 0;
         border: 0;
         border-radius: 0;
@@ -1016,7 +1019,7 @@
 
 /* 목록에서 대화를 열 때는 뒤로가기의 반대 — 대화가 오른쪽에서 들어온다(2026-09-23, 들어가기·나가기 짝). */
 .reserve-messenger--panel > .reserve-messenger-thread { grid-area: 1 / 1 / -1 / 2; }
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
     .reserve-messenger--page > .reserve-messenger-thread { grid-area: 1 / 1 / -1 / 2; }
 }
 .reserve-messenger.is-opening-thread > .reserve-messenger-footer,
@@ -2499,6 +2502,14 @@
     height: auto !important;
     display: block !important;
 }
+/* 각 슬라이드도 자른다 — 이동 중 드러나는 사진 경계까지 둥글게. 원본 미리보기에는 적용하지 않는다. */
+.reserve-store-gallery .ant-image {
+    border-radius: 16px;
+    overflow: hidden;
+    /* hover cover는 사진 위에 그려진다. 이동 중에도 둘을 같은 윤곽으로 자른다. */
+    clip-path: inset(0 round 16px);
+}
+.reserve-store-gallery .ant-image-img { border-radius: inherit; }
 .reserve-store-detail .slick-slide[aria-hidden='true'] * { pointer-events: none; }
 .rsv-tap-btn {
     -webkit-tap-highlight-color: transparent;

@@ -11,7 +11,7 @@ import { UserOutlined } from '@ant-design/icons';
 import { getImageUrl } from '../../utils/image';
 import { colors } from '../../styles/tokens';
 
-const Avatar = ({ src, size = 36, style }) => {
+const Avatar = ({ src, size = 36, style, draggable, referrerPolicy }) => {
     const [imgError, setImgError] = useState(false);
 
     // src 변경 시 에러 상태 초기화
@@ -49,6 +49,8 @@ const Avatar = ({ src, size = 36, style }) => {
                 <img
                     src={imgUrl}
                     alt="프로필"
+                    draggable={draggable}
+                    referrerPolicy={referrerPolicy}
                     onError={() => setImgError(true)}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }}
                 />
@@ -61,6 +63,8 @@ Avatar.propTypes = {
     src: PropTypes.string,
     size: PropTypes.number,
     style: PropTypes.object,
+    draggable: PropTypes.bool,
+    referrerPolicy: PropTypes.string,
 };
 
 export default Avatar;

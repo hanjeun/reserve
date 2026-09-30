@@ -16,7 +16,7 @@ export default defineConfig({
                 // 첫 HTML의 modulepreload 대상이 된다. Rollup이 라우트 그래프에 맞춰 나누게 두면
                 // 관리자·결제·스캐너 코드는 해당 화면에 들어갈 때만 내려받는다.
                 manualChunks: {
-                    'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+                    'vendor-react': ['react', 'react-dom', 'react-dom/client', 'react-router-dom'],
                     'vendor-sentry': ['@sentry/react'],
                     'vendor-state': ['axios', '@tanstack/react-query', 'zustand'],
                 },

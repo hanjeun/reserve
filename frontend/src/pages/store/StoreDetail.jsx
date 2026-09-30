@@ -95,6 +95,26 @@ const buildDepositRow = (store) => {
     return { Icon: CreditCardOutlined, label: '노쇼 예약금', value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}원 (예약 후 결제)`, highlight: true };
 };
 
+const buildOperatingPeriodRow = (store) => {
+    if (!store.openDate && !store.closeDate) return null;
+    let value;
+    if (store.openDate && store.closeDate) value = `${store.openDate} ~ ${store.closeDate}`;
+    else if (store.openDate) value = `${store.openDate}부터 운영`;
+    else value = `${store.closeDate}까지 운영`;
+    return { Icon: FieldTimeOutlined, label: '운영 기간', value };
+};
+
+const buildClosedDaysRow = (store) => {
+    if (!store.closedDays?.length) return null;
+    const labels = ['', '월', '화', '수', '목', '금', '토', '일'];
+    return { Icon: ClockCircleOutlined, label: '정기 휴무', value: `매주 ${store.closedDays.map(day => labels[day]).join('·')} 휴무` };
+};
+
+const buildAdvanceBookingRow = (store) => {
+    if (!(store.maxAdvanceBookingDays > 0)) return null;
+    return { Icon: FieldTimeOutlined, label: '예약 범위', value: `${store.maxAdvanceBookingDays}일 이내만 예약 가능` };
+};
+
 const buildRefundRow = (store) => {
     const hasRefund = store.fullRefundDays > 0 || store.partialRefundDays > 0;
     if (store.noShowDeposit <= 0 || !hasRefund) return null;
@@ -147,10 +167,13 @@ const RowValue = ({ row }) => {
 };
 
 // 가게 상세 정보 섹션 — Cognitive Complexity: 30 → ~5
-const StoreInfoSection = ({ store }) => {
+export const StoreInfoSection = ({ store }) => {
     const rows = [
         buildAddressRow(store),
         buildHoursRow(store),
+        buildOperatingPeriodRow(store),
+        buildClosedDaysRow(store),
+        buildAdvanceBookingRow(store),
         buildDepositRow(store),
         buildRefundRow(store),
         buildDeadlineRow(store),
@@ -508,25 +531,6 @@ const timeSlotStyles = {
     },
 };
 
-/** 달력에서 회색으로 막힌 이유를 미리 알려준다 — 막아만 두면 "왜 안 눌리지"가 된다. */
-const bookingRangeHint = (store) => {
-    const days = (store?.closedDays ?? []);
-    const labels = ['', '월', '화', '수', '목', '금', '토', '일'];
-    const parts = [];
-    if (days.length > 0) parts.push(`매주 ${days.map(d => labels[d]).join('·')} 휴무`);
-    // 운영 기간은 제일 앞에 세운다 — 기간 자체가 끝났으면 나머지 안내가 의미가 없다.
-    if (store?.openDate && store?.closeDate) parts.unshift(`${store.openDate} ~ ${store.closeDate} 운영`);
-    else if (store?.closeDate) parts.unshift(`${store.closeDate}까지 운영`);
-    else if (store?.openDate) parts.unshift(`${store.openDate}부터 운영`);
-    if (store?.maxAdvanceBookingDays > 0) parts.push(`${store.maxAdvanceBookingDays}일 이내만 예약 가능`);
-    if (parts.length === 0) return null;
-    return (
-        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-            {parts.join(' · ')}
-        </Text>
-    );
-};
-
 export const ReservationPanel = ({
     store, form, onFinish, paying, isPC, isEditMode, editingReservation,
     editLoadError = null, editRetrying = false, onRetryEditLoad,
@@ -554,8 +558,7 @@ export const ReservationPanel = ({
             ) : (
                 <>
                     <Form.Item label="예약 날짜" name="reservationDate"
-                        rules={[{ required: true, message: '날짜를 선택해주세요.' }]}
-                        extra={bookingRangeHint(store)}>
+                        rules={[{ required: true, message: '날짜를 선택해주세요.' }]}>
                         {/* ★ 2026-08-25 — AntD DatePicker 팝업에서 인라인 BookingCalendar 로 교체.
                             예전에는 disabledDate 로 막았는데 그건 **회색밖에 못 칠한다** — 정기휴무,
                             임시휴무, 운영기간 밖, 예약범위 초과, 정원 마감이 전부 같은 회색이라
@@ -658,7 +661,7 @@ const StoreNotFound = ({ error, onRetry }) => (
 // 상세 이미지 캐러셀 — PC·모바일이 래퍼/이미지 스타일만 다르고 구조는 같다.
 const StoreImageCarousel = ({ storeName, sliderImages, wrapperStyle, imageStyle }) => (
     <div style={{ position: 'relative' }}>
-        <div style={wrapperStyle} onClickCapture={rememberStorePreviewOrigin}>
+        <div className="reserve-store-gallery" style={wrapperStyle} onClickCapture={rememberStorePreviewOrigin}>
             <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={storePreviewClassNames}><Carousel className="reserve-carousel" infinite
                 /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
                    swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
@@ -812,7 +815,7 @@ const StoreDetail = () => {
     const paddingTop = isPC ? '32px' : '20px';
 
     if (loading) return (
-        <PageContainer size={containerSize} paddingTop={paddingTop}>
+        <PageContainer size={containerSize} paddingTop={paddingTop} className="reserve-data-skeleton" aria-busy="true">
             <StoreDetailSkeleton imageHint={imageHint} isPC={isPC} />
         </PageContainer>
     );

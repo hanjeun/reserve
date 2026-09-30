@@ -218,6 +218,23 @@ describe('route chunk loading patterns', () => {
         expect(container.querySelector('.reserve-route-skeleton-copy')).toBeNull();
     });
 
+    it('matches favorites URL and saved list views without rendering interactive loading controls', () => {
+        const { container, rerender } = render(<RouteSkeletonPreview pathname="/my-favorites" search="?view=list" />);
+        expect(container.querySelectorAll('.reserve-store-list-row-skeleton')).toHaveLength(8);
+        expect(container.querySelector('.rsv-fav-grid')).toBeNull();
+        expect(container.querySelector('button, a, img')).toBeNull();
+        sessionStorage.setItem('reserve:view-mode:/my-favorites', 'list');
+        try {
+            rerender(<RouteSkeletonPreview pathname="/my-favorites" />);
+            expect(container.querySelectorAll('.reserve-store-list-row-skeleton')).toHaveLength(8);
+            rerender(<RouteSkeletonPreview pathname="/my-favorites" search="?view=cards" />);
+            expect(container.querySelector('.rsv-fav-grid').children).toHaveLength(8);
+            expect(container.querySelector('.reserve-store-list-row-skeleton')).toBeNull();
+        } finally {
+            sessionStorage.removeItem('reserve:view-mode:/my-favorites');
+        }
+    });
+
     it('resolves and removes the page skeleton when the chunk is ready', async () => {
         let resolve;
         const Page = lazy(() => new Promise(yes => { resolve = yes; }));

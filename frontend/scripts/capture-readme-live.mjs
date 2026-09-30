@@ -3,7 +3,7 @@
  *
  * API 를 막지 않고, 지정한 사이트(기본: 운영)에 실제로 접속해 찍는다.
  * 아키텍처 그림은 찍지 않는다 — README 는 피그마 원본(docs/images/RESERVE_Architecture.png)을 쓴다.
- * 모니터링(monitoring.png)은 운영 Grafana(grafana.reserve.it.kr)의 "RESERVE 로그" 대시보드 요약 카드를 찍는다.
+ * 모니터링(grafana.png)은 운영 Grafana(grafana.reserve.it.kr)의 "RESERVE 로그" 대시보드 요약 카드를 찍는다.
  * 로그 원문 패널은 접힌 상태 그대로 둔다 — 요청 경로·IP 같은 원문이 이미지에 들어가지 않게.
  *
  * 사용법 (frontend 폴더에서, PowerShell):
@@ -42,6 +42,7 @@ import process from 'node:process';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { README_IMAGE_FILENAMES } from './readme-image-paths.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(SCRIPT_DIR, '..');
@@ -201,8 +202,9 @@ async function landedOnLogin(page) {
 // EBUSY/EPERM/UNKNOWN(-4094)으로 실패한다. 임시 파일에 쓴 뒤 바꿔치기하고, 잠겨 있으면 잠깐씩 다시 시도한다.
 // 끝내 안 되면 <이름>.new.png 로 남겨 찍은 결과를 잃지 않는다.
 async function saveImage(name, image) {
-    const target = path.join(OUTPUT_DIR, `${name}.png`);
-    const temp = path.join(OUTPUT_DIR, `.${name}.png.tmp`);
+    const filename = README_IMAGE_FILENAMES[name];
+    const target = path.join(OUTPUT_DIR, filename);
+    const temp = path.join(OUTPUT_DIR, `.${filename}.tmp`);
     await writeFile(temp, image);
     for (let attempt = 1; attempt <= 6; attempt += 1) {
         try {
@@ -210,7 +212,7 @@ async function saveImage(name, image) {
             return true;
         } catch (error) {
             if (attempt === 6) {
-                const fallback = path.join(OUTPUT_DIR, `${name}.new.png`);
+                const fallback = path.join(OUTPUT_DIR, filename.replace(/\.png$/, '.new.png'));
                 await rename(temp, fallback).catch(() => {});
                 console.warn(`  ! ${name}.png 를 덮어쓰지 못했습니다(${error.code}) — 다른 프로그램이 파일을 열고 있는지 확인하세요.`);
                 console.warn(`    찍은 결과는 ${path.basename(fallback)} 로 저장했습니다. 그 프로그램을 닫고 이름을 바꾸거나 다시 실행하세요.`);
@@ -227,7 +229,7 @@ async function writeManifest(captured) {
     const previous = existsSync(manifestPath) ? JSON.parse(await readFile(manifestPath, 'utf8')) : { files: [] };
     const files = new Map((previous.files ?? []).map(file => [file.path, file]));
     for (const name of captured) {
-        const filename = `${name}.png`;
+        const filename = README_IMAGE_FILENAMES[name];
         const contents = await readFile(path.join(OUTPUT_DIR, filename));
         files.set(filename, {
             path: filename,

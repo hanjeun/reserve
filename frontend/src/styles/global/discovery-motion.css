@@ -1,9 +1,11 @@
-/* 헤더와 탐색 탭은 정지하고, 도착한 화면만 짧게 들어온다. */
+/* 헤더와 탐색 탭은 정지하고, 도착한 화면만 짧게 들어온다.
+   코드 청크뿐 아니라 데이터 스켈레톤을 포함한 부모도 정지한다.
+   화면마다 제외 클래스를 기억해서 붙이지 않아도 같은 관문에서 로딩 이동을 막는다. */
 @media (prefers-reduced-motion: no-preference) {
-    .reserve-route-entry--from-right > :not(.reserve-route-skeleton) {
+    .reserve-route-entry--from-right > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block)) {
         animation: reserve-discovery-page-from-right 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }
-    .reserve-route-entry--from-left > :not(.reserve-route-skeleton) {
+    .reserve-route-entry--from-left > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block)) {
         animation: reserve-discovery-page-from-left 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     }
 
@@ -35,8 +37,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .reserve-route-entry--from-right > :not(.reserve-route-skeleton),
-    .reserve-route-entry--from-left > :not(.reserve-route-skeleton),
+    .reserve-route-entry--from-right > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block)),
+    .reserve-route-entry--from-left > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block)),
     .reserve-explore-page--banner-entry .reserve-explore-filters,
     .reserve-explore-result--banner-entry,
     .reserve-explore-result--page-next,

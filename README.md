@@ -46,7 +46,7 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 
 | 관리자 패널 | 모니터링 |
 |---|---|
-| ![관리자 패널](docs/images/admin.png) | ![Grafana 모니터링](docs/images/monitoring.png) |
+| ![관리자 패널](docs/images/admin.png) | ![Grafana 모니터링](docs/images/grafana.png) |
 
 ## 주요 기능
 

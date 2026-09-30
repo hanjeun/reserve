@@ -8,6 +8,7 @@ import { Button, DataState } from '../common';
 import { storeService, tourismService } from '../../services';
 import { REGION_OPTIONS, formatRegionLabel } from '../../constants/regions';
 import { storeKeys, tourismKeys } from '../../hooks/queryKeys';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 const EMPTY_GROUPS = [];
 const selectionFor = value => ({ base: value, draft: value, activeGroup: value.split(' ')[0] });
@@ -126,6 +127,7 @@ const CountryOverview = ({ isLoading, areas, onPick }) => (
 
 /** 홈과 목록이 같은 선택 데이터·적용 행동을 쓰는 지역 시트. */
 export default function RegionSheet({ open, value = '', onClose, onApply, availableGroups }) {
+    const reducedMotion = useReducedMotion();
     const [selection, setSelection] = useState(() => selectionFor(value));
     const currentSelection = selection.base === value ? selection : selectionFor(value);
     const { draft, activeGroup } = currentSelection;
@@ -197,7 +199,8 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
             footer={null}
             width={600}
             zIndex={1100}
-            transitionName="reserve-region-sheet-motion"
+            transitionName={reducedMotion ? '' : 'reserve-region-sheet-motion'}
+            maskTransitionName={reducedMotion ? '' : undefined}
             destroyOnHidden
             rootClassName="reserve-region-sheet-root"
             className="reserve-region-sheet"

@@ -1,8 +1,13 @@
 import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
+import StoreListViewToggle from '../../components/store/StoreListViewToggle';
+import StoreListRow from '../../components/store/StoreListRow';
+import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useViewModeParam from '../../hooks/useViewModeParam';
 import { favoriteKeys } from '../../hooks/queryKeys';
 import favoriteService from '../../services/favoriteService';
 import { fontWeight, fontSize } from '../../styles/tokens';
@@ -21,6 +26,10 @@ const { Title, Text } = Typography;
 
 const MyFavorites = () => {
     useDocumentTitle('즐겨찾기');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [view, setView] = useViewModeParam(searchParams, setSearchParams, 'cards');
+    const resultClassName = view === 'list' ? 'reserve-store-list-rows' : 'rsv-fav-grid';
+    const ResultSkeleton = view === 'list' ? StoreListRowSkeleton : StoreCardSkeleton;
 
     const { data: favorites = [], isLoading: loading, isFetching, error, refetch } = useQuery({
         queryKey: favoriteKeys.my(),
@@ -61,8 +70,8 @@ const MyFavorites = () => {
     const renderContent = () => {
         if (loading) {
             return (
-                <output className="rsv-fav-grid" aria-label="즐겨찾기를 불러오는 중">
-                    <div style={{ display: 'contents' }} aria-hidden="true"><StoreCardSkeleton count={8} /></div>
+                <output className={resultClassName} aria-label="즐겨찾기를 불러오는 중">
+                    <div style={{ display: 'contents' }} aria-hidden="true"><ResultSkeleton count={8} /></div>
                 </output>
             );
         }
@@ -74,9 +83,9 @@ const MyFavorites = () => {
         }
         if (refetching) {
             return (
-                <output className="rsv-fav-grid" aria-label="즐겨찾기를 새로 불러오는 중">
+                <output className={resultClassName} aria-label="즐겨찾기를 새로 불러오는 중">
                     <div style={{ display: 'contents' }} aria-hidden="true">
-                        <StoreCardSkeleton count={Math.max(favorites.length, 1)} />
+                        <ResultSkeleton count={Math.max(favorites.length, 1)} />
                     </div>
                 </output>
             );
@@ -91,8 +100,10 @@ const MyFavorites = () => {
                         title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있습니다."
                         onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />
                 )}
-                <div className="rsv-fav-grid">
-                    {favorites.map(fav => (
+                <div className={resultClassName}>
+                    {favorites.map(fav => view === 'list' ? (
+                        <StoreListRow key={fav.id} store={toStoreShape(fav)} />
+                    ) : (
                         <div key={fav.id} style={{ breakInside: 'avoid', marginBottom: 24 }}>
                             <StoreCard store={toStoreShape(fav)} />
                         </div>
@@ -112,7 +123,8 @@ const MyFavorites = () => {
                 </Text>
             </div>
 
-            <FilterToolbar onReload={refetch} loading={loading || refetching} />
+            <FilterToolbar onReload={refetch} loading={loading || refetching}
+                extra={<StoreListViewToggle view={view} onChange={setView} disabled={loading || refetching} />} />
 
             {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
             {renderContent()}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { StoreIdentity } from './StoreDetail';
+import { StoreIdentity, StoreInfoSection } from './StoreDetail';
 
 vi.mock('../../api/axios', () => ({ default: {} }));
 vi.mock('../../components/common', () => ({
@@ -57,5 +57,32 @@ describe('store detail identity rating', () => {
         expect(summary.querySelector('[aria-hidden="true"] svg')).toBeTruthy();
         expect(summary).not.toHaveTextContent('NaN');
         expect(screen.queryByText('아직 리뷰가 없어요')).toBeNull();
+    });
+});
+
+describe('store operating schedule information', () => {
+    it.each(['SLOT', 'SESSION', 'DAY'])('shows schedule rows in the shared PC/mobile information section for %s', bookingType => {
+        render(<StoreInfoSection store={{ bookingType, openTime: '09:00', closeTime: '18:00', openDate: '2026-09-01', closeDate: '2026-12-31', closedDays: [6, 7], maxAdvanceBookingDays: 30 }} />);
+        expect(screen.getByText('영업 시간')).toBeInTheDocument();
+        expect(screen.getByText('운영 기간')).toBeInTheDocument();
+        expect(screen.getByText('2026-09-01 ~ 2026-12-31')).toBeInTheDocument();
+        expect(screen.getByText('정기 휴무')).toBeInTheDocument();
+        expect(screen.getByText('매주 토·일 휴무')).toBeInTheDocument();
+        expect(screen.getByText('30일 이내만 예약 가능')).toBeInTheDocument();
+    });
+
+    it.each([
+        [{ openDate: '2026-10-01' }, '2026-10-01부터 운영'],
+        [{ closeDate: '2026-12-31' }, '2026-12-31까지 운영'],
+    ])('keeps one-sided operating periods visible: %j', (store, value) => {
+        render(<StoreInfoSection store={store} />);
+        expect(screen.getByText(value)).toBeInTheDocument();
+    });
+
+    it('omits unspecified schedule rows', () => {
+        render(<StoreInfoSection store={{ description: '기존 소개', closedDays: [], maxAdvanceBookingDays: 0 }} />);
+        expect(screen.queryByText('운영 기간')).toBeNull();
+        expect(screen.queryByText('정기 휴무')).toBeNull();
+        expect(screen.queryByText('예약 범위')).toBeNull();
     });
 });

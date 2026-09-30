@@ -542,7 +542,6 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                             size="md"
                             onClick={status === 'scanning' ? stopScanning : startScanning}
                             loading={status === 'starting'}
-                            loadingIcon={<ReloadOutlined spin aria-hidden="true" />}
                             icon={status === 'error' ? <ReloadOutlined aria-hidden="true" /> : undefined}
                         >
                             {status === 'scanning' && '스캔 중지'}
@@ -565,7 +564,7 @@ const styles = {
         boxShadow: shadows.card,
         padding: 20,
     },
-    sheetCard: { border: 'none', boxShadow: 'none', padding: 0 },
+    sheetCard: { background: 'transparent', border: 'none', borderRadius: 0, boxShadow: 'none', padding: 0 },
     cardTitle: { display: 'block', fontSize: fontSize.base, color: colors.text.primary, marginBottom: 4 },
     hint:     { display: 'block', marginBottom: 16, fontSize: fontSize.sm, lineHeight: 1.5 },
     // aspectRatio 는 렌더에서 카메라 실측값으로 덮는다 — 여기 고정값을 두지 않는다.
@@ -632,9 +631,7 @@ const styles = {
         alignItems: 'center',
         gap: 10,
         marginTop: 12,
-        padding: '10px 14px',
-        borderRadius: radius.lg,
-        backgroundColor: colors.gray[50],
+        padding: '10px 0',
     },
     scanningDot: {
         display: 'block', width: 8, height: 8, borderRadius: '50%',

@@ -155,14 +155,17 @@ test('list region hover surface stays smaller than its touch target and reduced 
     await recordRegionMotion(page);
     await trigger.click();
     await expect(page.locator('.reserve-region-sheet-root .ant-modal')).toBeVisible();
-    const durations = await page.evaluate(() => window.__regionMotion
-        .filter(entry => entry.className.includes('reserve-region-sheet-motion-'))
-        .flatMap(entry => [entry.duration, entry.containerDuration]));
-    expect(durations).toContain('0s');
+    const sheet = page.locator('.reserve-region-sheet-root .ant-modal');
+    await expect(sheet).toHaveCSS('animation-name', 'none');
+    await sheet.locator('.ant-modal-close').click();
+    await expect(sheet).toBeHidden();
+    await trigger.click();
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
 });
 
 test('mobile region sheet entrance follows one upward path without a snap back', async ({ page, isMobile }) => {
-    // 바텀시트 등장 모션은 모바일에서만 쓰이므로 데스크톱 프로젝트에서는 건너뛴다.
     test.skip(!isMobile, 'Mobile bottom sheet only');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.route('**/api/stores/regions', async route => {

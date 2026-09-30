@@ -41,8 +41,10 @@
 .reserve-card.ant-card-hoverable:hover {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);     /* = shadows.cardHover */
 }
-.reserve-card.ant-card-hoverable:hover .reserve-card-image {
-    transform: scale(1.05);
+@media (hover: hover) and (pointer: fine) {
+    .reserve-card.ant-card-hoverable:hover .reserve-card-image {
+        transform: scale(1.05);
+    }
 }
 /* "모션 줄이기"를 켠 사용자에게는 확대·그림자 전환을 끈다.
    확대·이동 모션은 전정기관 장애가 있는 사용자에게 실제로 불편을 유발한다.

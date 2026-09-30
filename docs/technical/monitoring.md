@@ -282,6 +282,7 @@ sudo mkdir -p /var/log/reserve && sudo chown -R 1000:1000 /var/log/reserve
 - `docker-compose-observability.yml`을 기존 monitoring compose에 더해 nginx 컨테이너의 **검증된 로그 디렉터리 하나만** read-only 마운트해요. Docker socket이나 전체 containers 경로는 마운트하지 않아요.
 - Docker 시각을 보존하고 stdout의 완전한 allowlist 스키마만 전송해요. stderr·다른 형식·추가 식별 필드·1시간보다 오래된 nginx 항목은 버려요. 기존 app/backup positions는 그대로예요.
 - nginx 컨테이너가 나중에 재생성되면 LogPath도 달라지므로 새 경로를 다시 확인하고 Promtail 마운트만 갱신해요. 수집 부재는 지연/오류 0건이 아니에요.
+- 기존 compose의 `~/promtail-config.yml`은 sudo 실행 시 `/root`로 풀릴 수 있어요. overlay는 현재 설치된 `/home/ubuntu/promtail-config.yml`을 명시적으로 read-only 마운트해요. 다른 서버에서는 실제 설치 경로를 먼저 확인해요.
 
 기존 설정과 positions를 보존하고 새 config의 2.9.0 syntax·합성 파이프라인 검사를 통과한 뒤, 적용은 **Promtail만** 해요. Grafana·Loki·앱·DB는 재생성하지 않아요.
 

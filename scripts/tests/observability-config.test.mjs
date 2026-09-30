@@ -69,6 +69,8 @@ test('collector separates user/system/iowait/steal while keeping the legacy aggr
 test('compose overlay mounts only the selected directory read-only without creating it', () => {
   const overlay = read('docker-compose-observability.yml');
   assert.ok(overlay.includes('RESERVE_NGINX_LOG_DIR:?'));
+  assert.ok(overlay.includes('source: /home/ubuntu/promtail-config.yml'));
+  assert.ok(overlay.includes('target: /etc/promtail/config.yml'));
   assert.ok(overlay.includes('target: /var/log/reserve-nginx'));
   assert.ok(overlay.includes('read_only: true'));
   assert.ok(overlay.includes('create_host_path: false'));

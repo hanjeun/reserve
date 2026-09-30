@@ -104,7 +104,7 @@ const StoresAdminTab = () => {
         onSuccess: (_, { days }) => {
             message.success(`${days}일간 영업정지 처리되었습니다.`);
             setStoreSuspendOpen(false);
-            invalidateStores();
+            void invalidateStores();
         },
         onError: () => message.error('영업정지 처리에 실패했습니다.'),
     });
@@ -114,7 +114,7 @@ const StoresAdminTab = () => {
         onSuccess: () => {
             message.success('영구 폐업 처리되었습니다.');
             setStoreBanOpen(false);
-            invalidateStores();
+            void invalidateStores();
         },
         onError: () => message.error('영구 폐업 처리에 실패했습니다.'),
     });
@@ -123,7 +123,7 @@ const StoresAdminTab = () => {
         mutationFn: (id) => api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_UNBAN(id)),
         onSuccess: () => {
             message.success('영업정지가 해제되었습니다.');
-            invalidateStores();
+            void invalidateStores();
         },
         onError: () => message.error('해제에 실패했습니다.'),
     });

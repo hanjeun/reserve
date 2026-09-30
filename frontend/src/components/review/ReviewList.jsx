@@ -173,7 +173,7 @@ const ReviewList = ({
         onSuccess: (created) => {
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => [created, ...old]);
             // 목록은 위에서 직접 고쳤지만, 가게 별점·리뷰 수와 '내 예약'의 리뷰 버튼은 다른 쿼리다.
-            invalidateReviewData(queryClient);
+            void invalidateReviewData(queryClient);
             message.success('리뷰가 등록되었습니다');
             setWriteForm({ rating: 0, title: '', content: '' });
             setWritten(true);
@@ -208,7 +208,7 @@ const ReviewList = ({
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) =>
                 old.map(r => (r.id === reviewId ? { ...r, ...payload } : r))
             );
-            invalidateReviewData(queryClient);
+            void invalidateReviewData(queryClient);
             message.success('리뷰가 수정되었습니다');
             cancelEdit();
         },
@@ -231,7 +231,7 @@ const ReviewList = ({
         mutationFn: (reviewId) => reviewService.deleteReview(reviewId),
         onSuccess: (_, reviewId) => {
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => old.filter(r => r.id !== reviewId));
-            invalidateReviewData(queryClient);
+            void invalidateReviewData(queryClient);
             message.success('리뷰가 삭제되었습니다');
         },
         onError: () => message.error('리뷰 삭제에 실패했습니다'),

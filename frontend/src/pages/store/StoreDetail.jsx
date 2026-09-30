@@ -668,7 +668,7 @@ const StoreNotFound = ({ error, onRetry }) => (
 );
 
 // 상세 이미지 캐러셀 — PC·모바일이 래퍼/이미지 스타일만 다르고 구조는 같다.
-const StoreImageCarousel = ({ storeName, sliderImages, wrapperStyle, imageStyle }) => (
+const StoreImageCarousel = ({ storeName, sliderImages, autoplay, wrapperStyle, imageStyle }) => (
     <div style={{ position: 'relative' }}>
         <div className="reserve-store-gallery" style={wrapperStyle} onClickCapture={rememberStorePreviewOrigin}>
             <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={storePreviewClassNames}><Carousel className="reserve-carousel" infinite
@@ -677,7 +677,7 @@ const StoreImageCarousel = ({ storeName, sliderImages, wrapperStyle, imageStyle 
                    짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.
                    touchThreshold 를 낮춰 감도도 올린다(기본 5는 둔하다). */
                 draggable swipe touchMove swipeToSlide touchThreshold={12}
-                dotPlacement="bottom" autoplay>
+                dotPlacement="bottom" autoplay={autoplay}>
                 {sliderImages.map((img, sliderIdx) => (
                     <div key={img}>
                         {/* draggable={false} — PC 마우스 드래그 스와이프용.
@@ -707,6 +707,7 @@ const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, reviewPr
             <div style={styles.pcGrid}>
                 <div style={styles.pcLeft}>
                     <StoreImageCarousel storeName={store.name} sliderImages={sliderImages}
+                        autoplay={store.imageAutoplayEnabled !== false}
                         wrapperStyle={styles.pcImageWrapper} imageStyle={styles.pcMainImg} />
                     <StoreIdentity {...identityProps} />
                     <StoreInfoSection store={store} />
@@ -736,6 +737,7 @@ const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProps, revi
         <>
             <section style={{ padding: 0 }}>
                 <StoreImageCarousel storeName={store.name} sliderImages={sliderImages}
+                    autoplay={store.imageAutoplayEnabled !== false}
                     wrapperStyle={styles.mobileImageWrapper} imageStyle={styles.mainImg} />
                 <div>
                     <StoreIdentity {...identityProps} />

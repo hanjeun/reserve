@@ -109,3 +109,13 @@ CLAUDE.md
 frontend/.readme-capture/
 docs/images/.*.tmp
 docs/images/*.new.png
+
+# 내부 계획·작업 기록은 PC에 보관하고 공개 저장소에는 포함하지 않는다.
+/docs/private/
+/docs/technical/quality-roadmap.md
+/docs/technical/current-status.md
+/docs/technical/preview-release-plan.md
+/docs/technical/api-versioning.md
+/docs/technical/modularization-plan.md
+/docs/technical/history/
+/Claude outputs/

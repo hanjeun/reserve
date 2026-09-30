@@ -94,6 +94,40 @@ test.beforeEach(async ({ page, context }) => {
     });
 });
 
+test('neutral hidden-conversation controls keep touch clear and keyboard focus visible', async ({ page }, testInfo) => {
+    await mockApi(page, account, []);
+    await page.goto('/');
+    await page.getByRole('button', { name: '메시지 열기' }).click();
+    await expect(page.locator('.reserve-messenger-brand-cover img')).toHaveAttribute('src', /\/og-image\.png\?v=[a-f0-9]{12}$/);
+    await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화' }).click();
+    const toggle = page.locator('.reserve-messenger-list-actions button[aria-pressed]');
+    await expect(toggle).toHaveAccessibleName('숨긴 대화 보기');
+    const refresh = page.getByRole('button', { name: '대화 목록 새로고침' });
+    const neutralColor = await refresh.evaluate(el => getComputedStyle(el).color);
+    if (testInfo.project.name === 'mobile-chromium') await toggle.tap();
+    else {
+        await toggle.hover();
+        await expect(toggle).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await toggle.click();
+        await page.mouse.move(0, 0);
+    }
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveAccessibleName('일반 대화 보기');
+    await expect(toggle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(toggle).toHaveCSS('color', neutralColor);
+    if (testInfo.project.name === 'mobile-chromium') {
+        await expect(toggle).toHaveCSS('outline-style', 'none');
+        await refresh.tap();
+        await expect(refresh).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    } else {
+        await page.keyboard.press('Tab');
+        await toggle.focus();
+        await expect(toggle).toHaveCSS('outline-style', 'solid');
+        await page.keyboard.press('Enter');
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    }
+});
+
 test('launcher unread badge moves with the logo on hover and press', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await mockApi(page, account, []);
@@ -226,8 +260,18 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     }
     await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-actions-aligned.png') });
     await messageMenu.click();
-    await page.getByRole('menuitem', { name: '전송 취소' }).click();
-    await page.getByRole('button', { name: '전송 취소', exact: true }).click();
+    const retractMenuItem = page.getByRole('menuitem', { name: '전송 취소' });
+    await expect(retractMenuItem).toBeVisible();
+    // AntD animates the popup ancestor, not the menu item Playwright checks for stability.
+    await expect.poll(() => retractMenuItem.evaluate(element => {
+        const popup = element.closest('.ant-dropdown');
+        return popup && getComputedStyle(popup).opacity === '1'
+            && popup.getAnimations({ subtree: true }).every(animation => ['finished', 'idle'].includes(animation.playState));
+    })).toBe(true);
+    await retractMenuItem.click();
+    const retractDialog = page.getByRole('dialog', { name: '메시지 전송을 취소할까요?' });
+    await expect(retractDialog).toBeVisible();
+    await retractDialog.getByRole('button', { name: '전송 취소', exact: true }).click();
     await expect(page.locator('.reserve-chat-bubble-group')).toContainText(['전송이 취소된 메시지입니다.', '확인했습니다']);
     await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(0);
     expect(retracts).toBe(1);

@@ -62,6 +62,7 @@ const StoreForm = ({
                     allowLatePayment: false,
                     allowDuplicateReservation: false,
                     emailNotificationEnabled: true,
+                    imageAutoplayEnabled: true,
                     noShowDeposit: 0,
                 } : (externalInitialValues ?? {})}
             >

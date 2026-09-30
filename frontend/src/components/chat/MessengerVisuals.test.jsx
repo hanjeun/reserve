@@ -1,4 +1,5 @@
 import React from 'react';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cwd } from 'node:process';
@@ -94,6 +95,13 @@ describe('messenger image display boundary', () => {
 
     it.each([null, undefined, '', '   ', 42, {}])('uses the explicit fallback for absent or non-string input %s', source => {
         expect(getMessengerImageUrl(source, MESSENGER_COVER_IMAGE)).toBe(MESSENGER_COVER_IMAGE);
+    });
+
+    it('versions the messenger cover by its actual contents', () => {
+        const revision = createHash('sha256').update(readFileSync(resolve(cwd(), 'public/og-image.png')))
+            .digest('hex').slice(0, 12);
+        expect(MESSENGER_COVER_IMAGE).toBe(`/og-image.png?v=${revision}`);
+        expect(getMessengerImageUrl(MESSENGER_COVER_IMAGE)).toBe(MESSENGER_COVER_IMAGE);
     });
 
     it('keeps local brand assets, HTTPS profiles and same-origin development photos displayable', () => {
@@ -459,9 +467,15 @@ describe('messenger list heading', () => {
         });
         expect(rulesFor('.reserve-messenger-list-scroll').padding).toBe('0 0 16px');
         expect(rulesFor('.reserve-messenger-list-refresh')).toMatchObject({ width: '44px', height: '44px', padding: '0' });
-        expect(rulesFor(".reserve-messenger-list-refresh:hover:not([aria-disabled='true'])")).toMatchObject({
-            color: 'var(--c-text-primary, #191f28)', background: 'var(--c-gray-50, #f9fafb)',
+        const hoverSelector = ".reserve-messenger-list-refresh:hover:not([aria-disabled='true'])";
+        expect(rulesFor(hoverSelector)).toEqual({});
+        css.walkRules(rule => {
+            if (rule.selectors.includes(hoverSelector)) {
+                expect(rule.parent.params).toBe('(hover: hover) and (pointer: fine)');
+            }
         });
+        expect(rulesFor('.reserve-messenger-list-refresh:focus-visible').outline).toBe('2px solid var(--c-text-secondary, #4e5968)');
+        expect(rulesFor(".reserve-messenger-list-refresh[aria-pressed='true']")).toEqual({});
         expect(rulesFor('.reserve-messenger-shell-close')).toMatchObject({
             top: 'calc((var(--reserve-messenger-heading-height, 72px) - 44px) / 2)', width: '44px', height: '44px',
             'font-size': '18px',

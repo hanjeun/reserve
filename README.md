@@ -94,26 +94,10 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
   <img src="docs/images/RESERVE_Architecture.png" alt="RESERVE 아키텍처" width="100%" />
 </p>
 
-```mermaid
-flowchart LR
-    PR["release PR → main"] --> BE["build-backend<br/>Gradle · Docker 이미지"]
-    PR --> FE["build-frontend<br/>테스트 · Vite 빌드"]
-    BE --> DEPLOY["deploy-backend<br/>비활성 Blue/Green 기동 · health 확인"]
-    FE --> DEPLOY
-    DEPLOY --> SWITCH["Nginx reload 한 번으로<br/>새 프론트 + 새 upstream 전환"]
-    SWITCH --> SMOKE{"Nginx 경유 smoke"}
-    SMOKE -- 통과 --> DONE["구 컨테이너 종료"]
-    SMOKE -- 실패 --> ROLLBACK["프론트 경로 · Nginx 설정 ·<br/>upstream 함께 롤백"]
-```
-
 ## 문서
 
 | 분류 | 문서 |
 |---|---|
 | **사용 안내** | [손님 가이드](docs/guide/user-guide.md) · [사장님 가이드](docs/guide/owner-guide.md) · [업데이트 소식](docs/CHANGELOG.md) |
-| **구조** | [아키텍처](docs/technical/architecture.md) · [코드 구조](docs/technical/structure.md) · [디자인 시스템](docs/technical/design-system.md) · [UI 구현 결정](docs/technical/ui-decisions.md) |
-| **운영** | [배포 운영](docs/technical/deployments.md) · [모니터링](docs/technical/monitoring.md) · [백업 · 복구](docs/technical/backup.md) |
-| **도메인** | [결제 · 환불](docs/technical/payments.md) · [통합 메시지](docs/technical/messaging.md) · [가게 임시저장](docs/technical/store-drafts.md) · [데이터 생명주기](docs/technical/data-lifecycle.md) |
-| **보안 · API** | [계정 보안](docs/technical/account-security.md) · [API 버전 관리](docs/technical/api-versioning.md) · [보안 정책](SECURITY.md) |
-| **자산 · 규칙** | [지역 사진 자산](docs/technical/region-photo-assets.md) · [서드파티 고지](THIRD_PARTY_NOTICES.md) · [코드 컨벤션](docs/rules/code-conventions.md) · [Git 워크플로우](docs/rules/git-workflow.md) |
-| **전체 색인** | [기술 문서 안내](docs/technical/README.md) · [품질 로드맵](docs/technical/quality-roadmap.md) |
+| **기술 · 운영** | [기술 문서 안내](docs/technical/README.md) |
+| **정책** | [보안 정책](SECURITY.md) · [서드파티 고지](THIRD_PARTY_NOTICES.md) |

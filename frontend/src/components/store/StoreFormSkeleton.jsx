@@ -38,7 +38,7 @@ Field.propTypes = {
     label: PropTypes.string.isRequired,
     hint: PropTypes.node,
     plainHint: PropTypes.node,
-    control: PropTypes.oneOf(['input', 'select', 'textarea', 'check', 'upload']),
+    control: PropTypes.oneOf(['input', 'select', 'textarea', 'check', 'upload', 'switch']),
     gap: PropTypes.oneOf(['default', 'tight', 'none']),
     style: PropTypes.object,
 };
@@ -162,7 +162,8 @@ export default function StoreFormSkeleton({ mode = 'create' }) {
                 <Field label="대표 이미지" control="upload"
                     plainHint={<>{STORE_FORM_SKELETON_HINTS.mainImage}<br />JPG · PNG · WEBP · GIF / 새 이미지 전체 합계 최대 {MAX_IMAGE_REQUEST_MB}MB</>} />
                 <Field label="상세 이미지 (최대 5장)" control="upload"
-                    plainHint={`${STORE_FORM_SKELETON_HINTS.detailImages}${MAX_IMAGE_REQUEST_MB}MB`} />
+                    plainHint={<>{STORE_FORM_SKELETON_HINTS.detailImages}<br />{STORE_FORM_SKELETON_HINTS.detailImageLimits}{MAX_IMAGE_REQUEST_MB}MB</>} />
+                <Field label="사진 자동 넘김" control="switch" plainHint={STORE_FORM_SKELETON_HINTS.imageAutoplay} />
             </div>
 
             <div className="reserve-store-form-skeleton-actions" data-skeleton-section="actions">

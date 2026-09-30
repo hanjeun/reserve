@@ -73,6 +73,18 @@ test.beforeEach(async ({ context, page }) => {
     });
 });
 
+test('store photo autoplay has a compact control matching its loading placeholder', async ({ page }) => {
+    await page.goto('/store/register');
+    await expect(page.getByRole('heading', { name: '가게 등록' })).toBeVisible();
+    const control = page.getByRole('switch', { name: '사진 자동 넘김' });
+    await expect(control).toBeChecked();
+    await expect(page.locator('.reserve-store-photo-autoplay .ant-form-item-control-input')).toHaveCSS('min-height', '22px');
+    expect(await control.evaluate(el => el.getBoundingClientRect().height)).toBe(22);
+    await control.click();
+    await expect(control).not.toBeChecked();
+    await expect(page.getByText('휴대폰에서는 사진을 길게 누른 뒤 끌어주세요.', { exact: false })).toBeVisible();
+});
+
 test('store editing keeps a local draft and warns when the server base changed', async ({ page }) => {
     await page.goto('/store/99/edit');
 

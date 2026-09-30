@@ -24,6 +24,23 @@ async function mockStorePreview(page, { authenticated = false, storeOverrides = 
     });
 }
 
+test('disabled detail photo autoplay stays still while manual navigation remains available', async ({ page }) => {
+    await page.clock.install();
+    await mockStorePreview(page, { storeOverrides: {
+        imageAutoplayEnabled: false,
+        detailImageUrls: ['https://reserve-image.test/photo.svg', 'https://reserve-image.test/photo.svg#second'],
+    } });
+    await page.goto('/store/81');
+    const activePhoto = page.locator('.reserve-carousel .slick-active img').first();
+    await expect(activePhoto).toBeVisible();
+    await expect(activePhoto).toHaveAttribute('alt', `${store.name}-0`);
+    await page.clock.fastForward(10_000);
+    await expect(activePhoto).toHaveAttribute('alt', `${store.name}-0`);
+    await page.clock.resume();
+    await page.locator('.reserve-carousel .slick-dots li').nth(1).getByRole('button').click();
+    await expect(activePhoto).toHaveAttribute('alt', `${store.name}-1`);
+});
+
 test('first store-detail photo preview animates its entrance after a fresh navigation', async ({ page }) => {
     page.on('pageerror', error => console.error(`[preview page error] ${error.message}`));
     await page.emulateMedia({ reducedMotion: 'no-preference' });

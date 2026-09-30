@@ -2,19 +2,12 @@
 
 RESERVE의 설계·운영·도메인 문서를 한곳에 모았어요. 문서와 코드가 다르면 코드가 정답이에요.
 
-## 현황
-
-| 문서 | 내용 |
-|---|---|
-| [품질 로드맵](quality-roadmap.md) | 남은 작업과 우선순위 |
-
 ## 구조
 
 | 문서 | 내용 |
 |---|---|
 | [아키텍처](architecture.md) | 인프라·배포·S3 경로 |
 | [코드 구조](structure.md) | 폴더 구조·라우트·환경 변수 |
-| [모듈러 모놀리스 전환 계획](modularization-plan.md) | 도메인 경계 강제 단계와 규칙 |
 | [디자인 시스템](design-system.md) | 디자인 토큰·공통 컴포넌트 |
 | [UI 구현 결정](ui-decisions.md) | 공통 UI 구현 규칙 |
 
@@ -42,9 +35,3 @@ RESERVE의 설계·운영·도메인 문서를 한곳에 모았어요. 문서와
 | [검색 화면](search-ui.md) | 검색 전용 화면과 헤더 |
 | [홈 이미지 자산](home-visual-assets.md) | 홈 이미지와 사진 중심 탐색 |
 | [지역 사진 자산](region-photo-assets.md) | 지역 대표 사진 API와 자산 출처 |
-
-## 계획
-
-| 문서 | 내용 |
-|---|---|
-| [API 버전 관리](api-versioning.md) | API v1 도입 기준 |

@@ -1,11 +1,17 @@
 import React, { useEffect } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Form } from 'antd';
 import dayjs from 'dayjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReservationPanel, TimeSlotPicker } from './StoreDetail';
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
+afterEach(async () => {
+    cleanup();
+    // Form.Item delays error/warning updates by 10 ms, including after unmount.
+    // Let those callbacks finish while jsdom still exists; keep real async lookup tests.
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+});
 vi.mock('../../api/axios', () => ({ default: api }));
 vi.mock('@ant-design/icons', () => ({
     PlusOutlined: () => null, MinusOutlined: () => null, ClockCircleOutlined: () => null,

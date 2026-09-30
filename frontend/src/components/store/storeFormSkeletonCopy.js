@@ -16,7 +16,9 @@ export const STORE_FORM_SKELETON_HINTS = Object.freeze({
     closedDates: '명절·개인 사정 등 특정 날짜만 쉴 때. 지난 날짜는 저장 시 자동으로 정리돼요',
     advance: '오늘부터 며칠 뒤까지 받을지. 비워두면 제한 없음 (최대 365일)',
     mainImage: '대표 이미지는 가게 카드와 고객의 가게 문의 채팅 사진에 표시됩니다. 변경하면 채팅 사진도 함께 바뀝니다.',
-    detailImages: '사진을 끌어서 순서를 바꿀 수 있어요 · JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 ',
+    detailImages: '사진을 끌어 옆 사진과 순서를 바꿀 수 있어요. 휴대폰에서는 사진을 길게 누른 뒤 끌어주세요.',
+    detailImageLimits: 'JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 ',
+    imageAutoplay: '가게 상세의 사진을 자동으로 넘깁니다. 끄면 직접 넘길 수 있어요.',
     draft: '입력 내용과 새 이미지는 이 브라우저에만 자동 저장돼요.',
 });
 export const STORE_FORM_SKELETON_TOGGLES = Object.freeze([

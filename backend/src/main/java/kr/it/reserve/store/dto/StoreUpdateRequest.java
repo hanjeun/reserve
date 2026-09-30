@@ -94,6 +94,8 @@ public class StoreUpdateRequest {
     // 이메일 알림 수신 여부
     private Boolean emailNotificationEnabled;
 
+    private Boolean imageAutoplayEnabled;
+
     /**
      * 정기 휴무 요일 — ISO 요일 번호 목록 (월=1 … 일=7). 빈 목록·null = 연중무휴.
      * 폼이 multipart 라 문자열 CSV 로도 올 수 있어 서비스에서 정규화한다.

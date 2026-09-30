@@ -96,6 +96,13 @@ describe('useStoreForm detail image order', () => {
         useAuthStore.setState({ user: { id: 7, role: 'BUSINESS' }, isLoggedIn: true });
     });
 
+    it('hydrates an explicitly disabled photo autoplay setting without replacing it with the default', () => {
+        renderHook(() => useStoreForm({
+            mode: 'edit', initialData: { id: 3, name: '가게', imageAutoplayEnabled: false }, storeId: 3, form,
+        }), { wrapper });
+        expect(form.setFieldsValue).toHaveBeenCalledWith(expect.objectContaining({ imageAutoplayEnabled: false }));
+    });
+
     it('sends the on-screen order even when a new photo is dragged before existing ones', async () => {
         const initialData = { id: 3, name: '가게', detailImageUrls: ['https://cdn.example.test/a.png', 'https://cdn.example.test/b.png'] };
         const { result } = renderHook(

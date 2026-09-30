@@ -219,6 +219,18 @@ git push origin --delete feature/기능명  # 원격 브랜치 삭제
 
 ## PR·CI 점검
 
+반복 수정 중에는 바꾼 파일·동작에 직접 해당하는 검사만 실행해요. 의존성이 바뀌지 않았다면
+이미 설치한 환경에서 매번 `npm ci`를 반복하지 않아요. 관련 변경을 로컬에서 모아 확인한 뒤
+한 번 push하고, 커밋·릴리스 후보의 전체 검사는 CI에서 확인해요.
+결제·계정·데이터 무결성·공통 경로 변경은 영향에 맞게 넓혀 검사해요.
+
+CodeQL은 dev/main PR·main push·주간 스캔을 유지하고 dev push 중복은 생략해요.
+PR 본문만 편집할 때는 라벨 러너를 시작하지 않아요. 테스트 증거 재사용은 입력 해시·실행 환경·
+유효 기간·성공 기록이 일치할 때만 가능하며, 빌드·배포 readiness·smoke는 다시 실행해요.
+
+공개 문서는 사용자 안내·현재 제품 계약·운영 런북을 남겨요. 내부 계획·작업 기록은
+`docs/private/` 등 ignore 대상에 보관해요. 추적 제외는 로컬 파일을 삭제하거나 과거 Git 이력을 지우지 않아요.
+
 ```bash
 node scripts/pr-review-audit.mjs
 node scripts/pr-review-audit.mjs --json

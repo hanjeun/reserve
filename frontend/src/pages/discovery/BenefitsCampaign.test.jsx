@@ -10,9 +10,6 @@ import { BENEFIT_IMAGE_FALLBACK } from './benefitPresentation';
 
 vi.mock('../../api/axios', () => ({ default: { get: vi.fn() } }));
 vi.mock('../../services/benefitService', () => ({ default: { getList: vi.fn(), getDetail: vi.fn() } }));
-vi.mock('./BenefitStoreDiscovery', () => ({
-    default: () => <section id="benefit-stores" aria-label="일반 가게 탐색" />,
-}));
 
 const BENEFITS_TITLE = '혜택';
 const item = {

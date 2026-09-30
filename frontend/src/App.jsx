@@ -39,10 +39,12 @@ const Privacy = lazy(() => import('./pages/legal/Privacy'));
 const ContentSources = lazy(() => import('./pages/legal/ContentSources'));
 const OperationGuide = lazy(() => import('./pages/legal/OperationGuide'));
 const MessagesPage = lazy(() => import('./pages/member/MessagesPage'));
+// 어떤 라우트에도 맞지 않는 주소(path="*"). 예전엔 이 라우트가 없어 헤더·푸터 사이가 비어 보였다.
+const NotFound = lazy(() => import('./pages/NotFound'));
 // 로그인한 사용자만 쓰는 통합 메신저는 익명 랜딩의 초기 번들에서 제외한다.
 const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
 
-import Header from './components/layout/Header';
+import Header, { HeaderPlaceholder } from './components/layout/Header';
 import DiscoveryNav from './components/layout/DiscoveryNav';
 import RouteLoadingSkeleton from './components/layout/RouteLoadingSkeleton';
 import { getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
@@ -52,6 +54,7 @@ import OfflineBanner from './components/layout/OfflineBanner';
 import { SpinIndicator } from './components/common/Loading';
 import PrivateRoute from './components/PrivateRoute';
 import ScrollToTop from './components/ScrollToTop';
+import { AppErrorBoundary, RouteErrorBoundary } from './components/layout/AppErrorBoundary';
 
 const { Content } = Layout;
 
@@ -66,6 +69,12 @@ const validateMessages = {
         max: '최대 ${max}자까지 입력 가능합니다.',
     },
 };
+
+const buildNeutralFocus = isDark => ({
+    activeBorderColor: isDark ? '#8b939e' : rawColors.gray[500],
+    hoverBorderColor: isDark ? '#5c636d' : rawColors.gray[400],
+    activeShadow: 'none',
+});
 
 /**
  * AntD 테마 설정.
@@ -88,73 +97,84 @@ const validateMessages = {
  *                 그래서 CSS 쪽(--c-primary)과 여기(colorPrimary)를 각각 넣어야 하고,
  *                 둘 다 같은 출처(ACCENT_OPTIONS)에서 나오므로 어긋나지 않는다.
  */
-const buildThemeConfig = (isDark, accent) => ({
-    algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-    token: {
-        colorPrimary: accent.main,
-        colorBgContainer: isDark ? '#1e2126' : '#ffffff',
-        colorBorder: isDark ? '#2d3138' : rawColors.gray[100],
-        borderRadius: fieldPx(field.radius),
-        // 앱 고정 UI(헤더 1000, 메신저 1001)보다 모달이 위에 있어야 결제·폼 동작을 가리지 않는다.
-        // spacing.js의 레이어 정본을 AntD popup 관문에 연결한다.
-        zIndexPopupBase: zIndex.modal,
-        // 2026-08-04 — AntD 기본 에러색(#ff4d4f)과 이 프로젝트 색(#f04452)이 달라서
-        // "AntD Form.Item 이 그린 빨강"과 "FormField 가 그린 빨강"이 미묘하게 다른 색이었다.
-        // 여기서 한 번 맞추면 Form 검증 메시지·에러 상태 테두리·경고 아이콘까지 전부 따라온다.
-        // rawColors 를 쓰는 이유: ConfigProvider 토큰은 AntD 가 JS 로 파생색(hover/알파)을 계산하므로
-        // var(--c-error) 같은 CSS 값을 넣으면 계산에 실패한다(리터럴이어야 한다).
-        // 값의 출처는 styles/theme.css 의 --c-error / --c-warning (라이트 :root, 다크 [data-theme=dark]).
-        // 그 파일을 고치면 여기도 함께 고쳐야 한다 — CSS 변수를 못 쓰는 자리라 중복이 불가피하다.
-        colorError:   isDark ? '#ff6b76' : '#f04452',
-        colorWarning: isDark ? '#ffc633' : '#ffb800',
-        // 다크에서 placeholder·비활성 글자를 AntD 기본값보다 밝게 올린다.
-        // 기본값은 라이트/다크 모두 25% 알파인데, 흰 배경 위의 25% 검정은 잘 보이는 반면
-        // 어두운 배경(#1a1d21) 위의 25% 흰색은 사실상 어두운 회색으로 보인다 —
-        // "날짜 선택", "날짜를 먼저 선택해주세요"가 검게 보인다는 증상의 실제 원인이었다.
-        // 라이트는 기존 AntD 기본값을 그대로 명시해 변화가 없도록 한다.
-        colorTextPlaceholder: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.25)',
-        colorTextDisabled:    isDark ? 'rgba(255, 255, 255, 0.38)' : 'rgba(0, 0, 0, 0.25)',
-        // 'inherit' — 글꼴 옵션이 동작하려면 여기서 특정 폰트를 박으면 안 된다.
-        // 예전엔 Pretendard를 하드코딩해서 AntD가 모든 .ant-* 요소에 그 font-family를 주입했고,
-        // 그래서 마이페이지에서 '명조'를 골라도 AntD 컴포넌트는 그대로 프리텐다드였다.
-        // inherit면 body의 var(--app-font)를 그대로 물려받는다.
-        fontFamily: 'inherit',
-    },
-    components: {
-        Button: {
-            primaryColor: '#fff',
+const buildThemeConfig = (isDark, accent) => {
+    const neutralFocus = buildNeutralFocus(isDark);
+    return {
+        algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+        token: {
             colorPrimary: accent.main,
+            colorBgContainer: isDark ? '#1e2126' : '#ffffff',
+            colorBorder: isDark ? '#2d3138' : rawColors.gray[100],
+            borderRadius: fieldPx(field.radius),
+            // 앱 고정 UI(헤더 1000, 메신저 1001)보다 모달이 위에 있어야 결제·폼 동작을 가리지 않는다.
+            // spacing.js의 레이어 정본을 AntD popup 관문에 연결한다.
+            zIndexPopupBase: zIndex.modal,
+            // 2026-08-04 — AntD 기본 에러색(#ff4d4f)과 이 프로젝트 색(#f04452)이 달라서
+            // "AntD Form.Item 이 그린 빨강"과 "FormField 가 그린 빨강"이 미묘하게 다른 색이었다.
+            // 여기서 한 번 맞추면 Form 검증 메시지·에러 상태 테두리·경고 아이콘까지 전부 따라온다.
+            // rawColors 를 쓰는 이유: ConfigProvider 토큰은 AntD 가 JS 로 파생색(hover/알파)을 계산하므로
+            // var(--c-error) 같은 CSS 값을 넣으면 계산에 실패한다(리터럴이어야 한다).
+            // 값의 출처는 styles/theme.css 의 --c-error / --c-warning (라이트 :root, 다크 [data-theme=dark]).
+            // 그 파일을 고치면 여기도 함께 고쳐야 한다 — CSS 변수를 못 쓰는 자리라 중복이 불가피하다.
+            colorError:   isDark ? '#ff6b76' : '#f04452',
+            colorWarning: isDark ? '#ffc633' : '#ffb800',
+            // 다크에서 placeholder·비활성 글자를 AntD 기본값보다 밝게 올린다.
+            // 기본값은 라이트/다크 모두 25% 알파인데, 흰 배경 위의 25% 검정은 잘 보이는 반면
+            // 어두운 배경(#1a1d21) 위의 25% 흰색은 사실상 어두운 회색으로 보인다 —
+            // "날짜 선택", "날짜를 먼저 선택해주세요"가 검게 보인다는 증상의 실제 원인이었다.
+            // 라이트는 기존 AntD 기본값을 그대로 명시해 변화가 없도록 한다.
+            colorTextPlaceholder: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.25)',
+            colorTextDisabled:    isDark ? 'rgba(255, 255, 255, 0.38)' : 'rgba(0, 0, 0, 0.25)',
+            // 'inherit' — 글꼴 옵션이 동작하려면 여기서 특정 폰트를 박으면 안 된다.
+            // 예전엔 Pretendard를 하드코딩해서 AntD가 모든 .ant-* 요소에 그 font-family를 주입했고,
+            // 그래서 마이페이지에서 '명조'를 골라도 AntD 컴포넌트는 그대로 프리텐다드였다.
+            // inherit면 body의 var(--app-font)를 그대로 물려받는다.
+            fontFamily: 'inherit',
         },
-        Input: {
-            colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
+        components: {
+            Button: {
+                primaryColor: '#fff',
+                colorPrimary: accent.main,
+            },
+            // 테두리형 입력(검색창 등)의 포커스도 채움형 입력과 같은 중립 회색 1px 이다 — 브랜드 파랑은 실행 버튼에만.
+            // AntD 기본값은 파란 테두리 + 파란 halo 라, 목록 검색창만 파랗게 튀었다(2026-09-29).
+            Input: {
+                colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
+                ...neutralFocus,
+            },
+            InputNumber: { ...neutralFocus },
+            DatePicker: { ...neutralFocus },
+            // Select는 다른 폼 컨트롤과 **같은 gray[50]**이어야 한다.
+            // FormInput·FormTextArea·FormDatePicker·FormTimePicker가 전부
+            // `disabled ? gray[100] : gray[50]`을 쓴다 — 이게 이 프로젝트의 채움형(filled) 입력 규칙이다.
+            // 한때 "흰 배경에서 롤러가 안 보인다"고 gray[100]으로 올렸는데, 그러면 Select만 다른 톤이 되어
+            // 같은 폼 안에서 입력칸끼리 색이 어긋난다. 옅게 보이는 건 채움형 입력의 의도된 특성이다
+            // (토스 계열 UI의 관례 — 테두리 대신 아주 옅은 면으로 입력 영역을 암시).
+            // 더 진하게 갈 거면 Select만이 아니라 5개 전부를 함께 바꾸는 디자인 시스템 결정이어야 한다.
+            Select: {
+                colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
+                colorBgElevated: isDark ? '#1e2126' : '#ffffff',   // 드롭다운 패널
+                optionSelectedBg: isDark ? '#2d3138' : rawColors.gray[200],
+                activeBorderColor: neutralFocus.activeBorderColor,
+                hoverBorderColor: neutralFocus.hoverBorderColor,
+                activeOutlineColor: 'transparent',
+            },
+            // Card의 actions(가게 카드 하단 수정/삭제 줄)는 전용 토큰(actionsBg)을 쓴다.
+            // 전역 colorBgContainer를 따라가지 않아서, 다크에서 이 줄만 흰 띠로 남아 있었다.
+            Card: {
+                actionsBg: isDark ? '#1e2126' : '#ffffff',
+            },
+            Tabs: {
+                inkBarColor: accent.main,
+                horizontalItemGutter: 24,
+                itemColor: isDark ? '#8b939e' : rawColors.gray[500],
+                itemHoverColor: isDark ? '#e8eaed' : rawColors.gray[900],
+                itemSelectedColor: accent.main,
+                colorBorderSecondary: isDark ? '#23262b' : rawColors.gray[100],
+            },
         },
-        // Select는 다른 폼 컨트롤과 **같은 gray[50]**이어야 한다.
-        // FormInput·FormTextArea·FormDatePicker·FormTimePicker가 전부
-        // `disabled ? gray[100] : gray[50]`을 쓴다 — 이게 이 프로젝트의 채움형(filled) 입력 규칙이다.
-        // 한때 "흰 배경에서 롤러가 안 보인다"고 gray[100]으로 올렸는데, 그러면 Select만 다른 톤이 되어
-        // 같은 폼 안에서 입력칸끼리 색이 어긋난다. 옅게 보이는 건 채움형 입력의 의도된 특성이다
-        // (토스 계열 UI의 관례 — 테두리 대신 아주 옅은 면으로 입력 영역을 암시).
-        // 더 진하게 갈 거면 Select만이 아니라 5개 전부를 함께 바꾸는 디자인 시스템 결정이어야 한다.
-        Select: {
-            colorBgContainer: isDark ? '#23262b' : rawColors.gray[50],
-            colorBgElevated: isDark ? '#1e2126' : '#ffffff',   // 드롭다운 패널
-            optionSelectedBg: isDark ? '#2d3138' : rawColors.gray[200],
-        },
-        // Card의 actions(가게 카드 하단 수정/삭제 줄)는 전용 토큰(actionsBg)을 쓴다.
-        // 전역 colorBgContainer를 따라가지 않아서, 다크에서 이 줄만 흰 띠로 남아 있었다.
-        Card: {
-            actionsBg: isDark ? '#1e2126' : '#ffffff',
-        },
-        Tabs: {
-            inkBarColor: accent.main,
-            horizontalItemGutter: 24,
-            itemColor: isDark ? '#8b939e' : rawColors.gray[500],
-            itemHoverColor: isDark ? '#e8eaed' : rawColors.gray[900],
-            itemSelectedColor: accent.main,
-            colorBorderSecondary: isDark ? '#23262b' : rawColors.gray[100],
-        },
-    },
-});
+    };
+};
 
 /**
  * AntD <Spin>(및 Table의 loading prop)의 기본 인디케이터를 우리 링 스피너로 교체.
@@ -168,8 +188,21 @@ const buildThemeConfig = (isDark, accent) => ({
  */
 const spinConfig = { indicator: <SpinIndicator /> };
 
+const isSearchPath = pathname => /^\/search\/?$/.test(pathname);
+const isMessagesPath = pathname => /^\/messages\/?$/.test(pathname);
+const appLayoutStyle = { backgroundColor: colors.background.default };
+
+// 부트 셸과 AppRoutes 가 같은 레이아웃 클래스를 쓴다 — 홈·검색은 폭·좌우 여백 변수를 이 클래스에서 받는다.
+// 부트 셸에만 없으면 로그인 확인 중 검색 화면의 좌우 여백이 0 이 됐다(2026-09-29 실측).
+function appLayoutClassName(pathname) {
+    if (pathname === '/') return 'reserve-app-layout reserve-app-layout--home';
+    if (isSearchPath(pathname)) return 'reserve-app-layout reserve-app-layout--search';
+    if (isMessagesPath(pathname)) return 'reserve-app-layout reserve-app-layout--messages';
+    return 'reserve-app-layout';
+}
+
 function AppContent() {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const { initializeAuth, sessionRevision } = useAuthStore();
     const [loading, setLoading] = useState(true);
 
@@ -181,17 +214,24 @@ function AppContent() {
                 setLoading(false);
             }
         };
-        initAuth();
+        // initializeAuth resolves to null after handled authentication/network failures.
+        void initAuth();
     }, [initializeAuth]);
 
     // 로그인 확인 중에도 빈 화면 + 스피너 대신 헤더 자리와 그 페이지 모양의 스켈레톤을 바로 그린다(2026-09-24).
     // 진짜 헤더·메신저는 확인이 끝난 뒤 그린다 — 확인 전에 그들이 API 를 부르면 토큰 재발급이 겹칠 수 있다.
+    // 2026-09-29: 레이아웃 틀·로고·탐색 탭(DiscoveryNav — API·로그인 상태를 쓰지 않는다)은 AppRoutes 와 똑같이 그린다.
+    // 예전엔 빈 64px 띠뿐이라 확인이 끝나는 순간 탭 44px 만큼 내용이 밀려 내려갔다.
     if (loading) {
+        const discoveryRoot = isDiscoveryRootPath(pathname, search);
         return (
-            <div className="reserve-boot-shell">
-                {!/^\/search\/?$/.test(pathname) && <div className="reserve-boot-shell-header" aria-hidden="true" />}
-                <RouteLoadingSkeleton />
-            </div>
+            <Layout className={appLayoutClassName(pathname) + ' reserve-boot-shell'} style={appLayoutStyle}>
+                {!isSearchPath(pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} />}
+                {discoveryRoot && <DiscoveryNav />}
+                <Content>
+                    <RouteLoadingSkeleton />
+                </Content>
+            </Layout>
         );
     }
 
@@ -208,7 +248,7 @@ function AppRoutes() {
     const isLoggedIn = useAuthStore((state) => !!state.user);
     const { pathname, search, state: locationState } = useLocation();
     const navigationType = useNavigationType();
-    const isSearchPage = /^\/search\/?$/.test(pathname);
+    const isSearchPage = isSearchPath(pathname);
     const routeContentRef = useRef(null);
     const previousPathnameRef = useRef(null);
     const previousDiscoveryTabRef = useRef(null);
@@ -252,15 +292,14 @@ function AppRoutes() {
     }, [pathname, search, locationState, navigationType, isSearchPage]);
 
     return (
-        <Layout
-            className={pathname === '/' ? 'reserve-app-layout reserve-app-layout--home' : isSearchPage ? 'reserve-app-layout reserve-app-layout--search' : 'reserve-app-layout'}
-            style={{ minHeight: '100vh', backgroundColor: colors.background.default }}
-        >
+        <Layout className={appLayoutClassName(pathname)} style={appLayoutStyle}>
             <ScrollToTop />
             <OfflineBanner />
             {!isSearchPage && <Header />}
             {isDiscoveryRootPath(pathname, search) && <DiscoveryNav />}
             <Content ref={routeContentRef}>
+                {/* 라우트 콘텐츠의 렌더 오류는 여기서 멈춘다 — 헤더·푸터는 남아 다른 화면으로 갈 수 있다. */}
+                <RouteErrorBoundary>
                 <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
                     {/* 공용 페이지 */}
@@ -303,11 +342,15 @@ function AppRoutes() {
                         <Route path="/my-page" element={<MyPage />} />
                         <Route path="/messages" element={<MessagesPage />} />
                     </Route>
+
+                    {/* 위 어디에도 맞지 않는 주소. robots noindex 는 useRouteSeo 가 경로 기준으로 붙인다. */}
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>
+                </RouteErrorBoundary>
             </Content>
 
-            {pathname !== '/messages' && !isSearchPage && <AppFooter />}
+            {!isMessagesPath(pathname) && !isSearchPage && <AppFooter />}
             {/* 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다. 익명 사용자는 청크도 받지 않는다. */}
             {isLoggedIn && (
                 <Suspense fallback={null}>
@@ -349,7 +392,10 @@ function App() {
                     spin={spinConfig}
                     form={{ validateMessages }}
                 >
-                    <AppContent />
+                    {/* AntApp 바깥의 마지막 그물 — 헤더·메신저 등 앱 셸 자체의 렌더 오류가 흰 화면이 되지 않게 한다. */}
+                    <AppErrorBoundary>
+                        <AppContent />
+                    </AppErrorBoundary>
                 </ConfigProvider>
             </BrowserRouter>
     );

@@ -87,8 +87,8 @@ const ReservationsAllTab = () => {
         onSuccess: () => {
             message.success('휴지통으로 이동되었습니다.');
             // 휴지통 탭·대시보드·감사 로그와 예약 달력까지 함께 바뀐다.
-            invalidateAdminData(queryClient);
-            invalidateReservationData(queryClient);
+            void invalidateAdminData(queryClient);
+            void invalidateReservationData(queryClient);
         },
         onError: () => message.error('삭제에 실패했습니다.'),
     });
@@ -119,6 +119,78 @@ const ReservationsAllTab = () => {
         { title: '처리', key: 'actions', width: 80, render: (_, r) => <Button variant="ghost-sm-danger" loading={deleteMutation.isPending && deleteMutation.variables === r.id} onClick={() => handleSoftDeleteReservation(r)}><DeleteOutlined /> 삭제</Button> },
     ];
 
+    // 본문 — 오류 / 스켈레톤 / 카드 / 표 중 하나를 고른다.
+    let listContent;
+    if (resError) {
+        listContent = (
+            <DataState state="error" kind="reservation" subject="예약 목록" error={resError}
+                onRetry={loadReservations} retrying={isFetching} compact />
+        );
+    } else if (resLoading || isPlaceholderData) {
+        if (viewMode === 'cards') {
+            listContent = (
+                <ReservationSummaryCardSkeleton count={Math.min(PAGE_SIZE, Math.max(totalElements, 4))} />
+            );
+        } else {
+            listContent = (
+                <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS}
+                    headers={SKELETON_HEADERS}
+                    actionBtns={1}
+                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
+                />
+            );
+        }
+    } else if (viewMode === 'cards') {
+        if (reservations.length === 0) {
+            listContent = (
+                <DataState state="empty" kind="reservation" title="예약 내역이 없습니다." style={{ marginTop: 80 }} />
+            );
+        } else {
+            listContent = (
+                <>
+                    <div className="reserve-reservation-card-grid">
+                        {reservations.map(reservation => (
+                            <ReservationSummaryCard
+                                key={reservation.id}
+                                reservation={reservation}
+                                showMemberInfo
+                                onOpenDetail={() => setDetailReservation(reservation)}
+                                actions={[
+                                    <Button key="delete" variant="ghost-sm-danger"
+                                        loading={deleteMutation.isPending && deleteMutation.variables === reservation.id}
+                                        onClick={() => handleSoftDeleteReservation(reservation)}>
+                                        <DeleteOutlined /> 삭제
+                                    </Button>,
+                                ]}
+                            />
+                        ))}
+                    </div>
+                    <Pagination
+                        current={page}
+                        pageSize={PAGE_SIZE}
+                        total={totalElements}
+                        onChange={setPage}
+                        showSizeChanger={false}
+                        align="end"
+                        style={{ marginTop: 16 }}
+                    />
+                </>
+            );
+        }
+    } else {
+        listContent = (
+            <DataTable
+                columns={reservationColumns}
+                dataSource={reservations}
+                rowKey="id"
+                pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
+                locale={{ emptyText: '예약 내역이 없습니다.' }}
+            />
+        );
+    }
+
     return (
         <>
             <ReservationListingToolbar
@@ -141,63 +213,7 @@ const ReservationsAllTab = () => {
             />
             {/* 본문 스켈레톤은 첫 조회·쿼리 전환에만 표시한다. 수동 새로고침은 기존 행을 유지하고
                 툴바의 진행 상태만 바뀌므로, 읽던 목록과 페이지 위치가 사라지지 않는다. */}
-            {resError ? (
-                <DataState state="error" kind="reservation" subject="예약 목록" error={resError}
-                    onRetry={loadReservations} retrying={isFetching} compact />
-            ) : (resLoading || isPlaceholderData) ? (
-                viewMode === 'cards' ? (
-                    <ReservationSummaryCardSkeleton count={Math.min(PAGE_SIZE, Math.max(totalElements, 4))} />
-                ) : (
-                    <AdminTableSkeleton
-                        rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                        cols={SKELETON_COLS}
-                        headers={SKELETON_HEADERS}
-                        actionBtns={1}
-                        pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-                    />
-                )
-            ) : viewMode === 'cards' ? (
-                reservations.length === 0 ? (
-                    <DataState state="empty" kind="reservation" title="예약 내역이 없습니다." style={{ marginTop: 80 }} />
-                ) : (
-                    <>
-                        <div className="reserve-reservation-card-grid">
-                            {reservations.map(reservation => (
-                                <ReservationSummaryCard
-                                    key={reservation.id}
-                                    reservation={reservation}
-                                    showMemberInfo
-                                    onOpenDetail={() => setDetailReservation(reservation)}
-                                    actions={[
-                                        <Button key="delete" variant="ghost-sm-danger"
-                                            loading={deleteMutation.isPending && deleteMutation.variables === reservation.id}
-                                            onClick={() => handleSoftDeleteReservation(reservation)}>
-                                            <DeleteOutlined /> 삭제
-                                        </Button>,
-                                    ]}
-                                />
-                            ))}
-                        </div>
-                        <Pagination
-                            current={page}
-                            pageSize={PAGE_SIZE}
-                            total={totalElements}
-                            onChange={setPage}
-                            showSizeChanger={false}
-                            align="end"
-                            style={{ marginTop: 16 }}
-                        />
-                    </>
-                )
-            ) : (
-                <DataTable
-                    columns={reservationColumns}
-                    dataSource={reservations}
-                    rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                    locale={{ emptyText: '예약 내역이 없습니다.' }}
-                />
-            )}
+            {listContent}
             <ReservationDetailModal
                 reservation={detailReservation}
                 open={detailReservation != null}

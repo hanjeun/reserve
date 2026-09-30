@@ -19,11 +19,13 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -51,6 +53,9 @@ public class TourismRegionPhotoService {
     private static final int CANDIDATE_LIMIT = 4;
     private static final Duration REFRESH_AFTER = Duration.ofDays(30);
     private static final Duration FAILURE_BACKOFF = Duration.ofHours(6);
+    private static final Duration IMAGE_CACHE_TTL = Duration.ofDays(1);
+    private static final Duration IMAGE_FAILURE_BACKOFF = Duration.ofMinutes(1);
+    private static final int IMAGE_CACHE_MAX_BYTES = 16 * 1024 * 1024;
 
     /** Tourism API의 고정 시도 코드. 삭제 예정인 areaCode2를 호출하지 않는다. */
     private static final Map<String, String> AREA_CODES = Map.ofEntries(
@@ -71,6 +76,12 @@ public class TourismRegionPhotoService {
     private final ObjectMapper objectMapper;
     private final TourismImageProxyClient imageProxyClient;
     private final Map<String, Instant> failedRefreshes = new ConcurrentHashMap<>();
+    // 고정된 17개 시도만 관문을 통과하므로 잠금·실패 기록도 사용자 입력에 따라 늘어나지 않는다.
+    private final Map<String, Object> regionLocks = new ConcurrentHashMap<>();
+    private final Map<String, CachedImage> imageCache = new LinkedHashMap<>(17, 0.75f, true);
+    private final Map<String, ImageFailure> failedImageLoads = new ConcurrentHashMap<>();
+    private int cachedImageBytes;
+    private final Clock imageCacheClock = Clock.systemUTC();
 
     @Value("${tourism.api.service-key:}")
     private String serviceKey;
@@ -105,23 +116,82 @@ public class TourismRegionPhotoService {
      */
     public Optional<ImagePayload> loadImage(String region) {
         if (!AREA_CODES.containsKey(region)) return Optional.empty();
+        synchronized (regionLock(region)) {
+            return loadCachedImage(region);
+        }
+    }
 
+    private Optional<ImagePayload> loadCachedImage(String region) {
         Optional<TourismRegionPhoto> photo = repository.findByRegionCode(region);
         if (photo.isEmpty() || !TourismImageProxyClient.isAllowedImageUrl(photo.get().getImageUrl())) {
             return Optional.empty();
         }
 
+        String imageUrl = TourismImageProxyClient.toHttpsImageUrl(photo.get().getImageUrl());
+        Optional<ImagePayload> cached = cachedImage(region, imageUrl);
+        if (cached.isPresent()) return cached;
+        ImageFailure failure = failedImageLoads.get(region);
+        if (failure != null && failure.imageUrl().equals(imageUrl) && failure.retryAt().isAfter(imageCacheClock.instant())) {
+            return Optional.empty();
+        }
+
         try {
-            return imageProxyClient.fetch(photo.get().getImageUrl())
-                    .map(image -> new ImagePayload(image.bytes(), image.contentType()));
+            Optional<TourismImageProxyClient.FetchedImage> fetched = imageProxyClient.fetch(imageUrl);
+            if (fetched.isPresent()) {
+                var image = fetched.get();
+                ImagePayload payload = new ImagePayload(image.bytes(), image.contentType());
+                cacheImage(region, imageUrl, payload);
+                failedImageLoads.remove(region);
+                return Optional.of(payload);
+            }
         } catch (Exception exception) {
             log.warn("Tourism region image proxy failed: region={}, errorType={}", region,
                     exception.getClass().getSimpleName());
-            return Optional.empty();
         }
+        failedImageLoads.put(region, new ImageFailure(imageUrl, imageCacheClock.instant().plus(IMAGE_FAILURE_BACKOFF)));
+        return Optional.empty();
     }
 
     private Optional<TourismRegionPhotoResponse> findRegionPhoto(String region) {
+        // 최초 등록·30일 만료 시 같은 시도의 동시 조회를 합친다. 다른 시도는 서로 막지 않는다.
+        synchronized (regionLock(region)) {
+            return refreshRegionPhoto(region);
+        }
+    }
+
+    private Object regionLock(String region) {
+        return regionLocks.computeIfAbsent(region, ignored -> new Object());
+    }
+
+    private Optional<ImagePayload> cachedImage(String region, String imageUrl) {
+        synchronized (imageCache) {
+            CachedImage cached = imageCache.get(region);
+            if (cached == null) return Optional.empty();
+            if (!cached.imageUrl().equals(imageUrl) || !cached.expiresAt().isAfter(imageCacheClock.instant())) {
+                cachedImageBytes -= cached.payload().bytes().length;
+                imageCache.remove(region);
+                return Optional.empty();
+            }
+            return Optional.of(new ImagePayload(cached.payload().bytes().clone(), cached.payload().contentType()));
+        }
+    }
+
+    private void cacheImage(String region, String imageUrl, ImagePayload payload) {
+        synchronized (imageCache) {
+            CachedImage previous = imageCache.remove(region);
+            if (previous != null) cachedImageBytes -= previous.payload().bytes().length;
+            while (!imageCache.isEmpty() && cachedImageBytes + payload.bytes().length > IMAGE_CACHE_MAX_BYTES) {
+                String oldestRegion = imageCache.keySet().iterator().next();
+                cachedImageBytes -= imageCache.remove(oldestRegion).payload().bytes().length;
+            }
+            if (payload.bytes().length > IMAGE_CACHE_MAX_BYTES) return;
+            ImagePayload stored = new ImagePayload(payload.bytes().clone(), payload.contentType());
+            imageCache.put(region, new CachedImage(imageUrl, stored, imageCacheClock.instant().plus(IMAGE_CACHE_TTL)));
+            cachedImageBytes += stored.bytes().length;
+        }
+    }
+
+    private Optional<TourismRegionPhotoResponse> refreshRegionPhoto(String region) {
         // Spring Data repository 호출은 각각 짧은 트랜잭션으로 끝낸다. 아래 Tourism API 호출을
         // 포괄하는 서비스 트랜잭션을 두면 공개 요청이 DB connection을 수 초간 점유할 수 있다.
         Optional<TourismRegionPhoto> existing = repository.findByRegionCode(region);
@@ -260,6 +330,8 @@ public class TourismRegionPhotoService {
     }
 
     private record Candidate(String contentId, String workTitle, String imageUrl) { }
+    private record CachedImage(String imageUrl, ImagePayload payload, Instant expiresAt) { }
+    private record ImageFailure(String imageUrl, Instant retryAt) { }
 
     public record ImagePayload(byte[] bytes, MediaType contentType) { }
 }

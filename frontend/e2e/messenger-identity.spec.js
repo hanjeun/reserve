@@ -1,6 +1,60 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
+
+test('message actions center grouped short bubbles and keep tall bubbles bottom aligned', async ({ page }, testInfo) => {
+    await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '감사합니다' }]);
+    await page.route('**/api/chat/support/open', route => ok(route, {
+        roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', canSend: true, messages: [
+            { id: 11, senderRole: 'MEMBER', canRetract: true, content: '확인했습니다', createdAt: '2026-09-15T10:00:00' },
+            { id: 12, senderRole: 'MEMBER', canRetract: true, content: '감사합니다', createdAt: '2026-09-15T10:01:00' },
+            { id: 13, senderRole: 'ADMIN', content: '상대방 안내입니다.', createdAt: '2026-09-15T10:02:00' },
+            { id: 14, senderRole: 'MEMBER', canRetract: true, content: '여러 줄 안내입니다.\n두 번째 줄입니다.\n마지막 줄입니다.', createdAt: '2026-09-15T10:03:00' },
+        ],
+    }));
+    if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
+    else {
+        await page.goto('/');
+        await page.getByRole('button', { name: '메시지 열기' }).click();
+    }
+    await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화', exact: true }).click();
+    await page.locator('.reserve-messenger-row').click();
+    for (const content of ['확인했습니다', '감사합니다']) {
+        const row = page.locator('.reserve-chat-message-row').filter({ has: page.getByText(content, { exact: true }) });
+        const button = row.getByRole('button', { name: '메시지 관리' });
+        await expect(button).toBeVisible();
+        if (testInfo.project.name === 'chromium') await button.hover();
+        const buttonBox = await button.boundingBox();
+        const bubbleBox = await row.locator('.reserve-chat-bubble-group > div').boundingBox();
+        expect(buttonBox.height).toBe(44);
+        expect(Math.abs(buttonBox.y + buttonBox.height / 2 - bubbleBox.y - bubbleBox.height / 2)).toBeLessThan(1);
+        const iconBox = await button.locator('svg').boundingBox();
+        expect(Math.abs(iconBox.y + iconBox.height / 2 - bubbleBox.y - bubbleBox.height / 2)).toBeLessThan(1);
+        expect(await button.evaluate(el => {
+            const visual = getComputedStyle(el, '::before');
+            return { width: visual.width, height: visual.height };
+        })).toEqual({ width: '28px', height: '28px' });
+    }
+    const tallRow = page.locator('.reserve-chat-message-row').filter({ has: page.getByText('여러 줄 안내입니다.', { exact: false }) });
+    const tallButton = tallRow.getByRole('button', { name: '메시지 관리' });
+    const tallButtonBox = await tallButton.boundingBox();
+    const tallBubbleBox = await tallRow.locator('.reserve-chat-bubble-group > div').boundingBox();
+    expect(tallBubbleBox.height).toBeGreaterThan(44);
+    expect(Math.abs(tallButtonBox.y + tallButtonBox.height - tallBubbleBox.y - tallBubbleBox.height)).toBeLessThan(1);
+    const finalOwnRow = page.locator('.reserve-chat-message-row').filter({ has: page.getByText('감사합니다', { exact: true }) });
+    const finalButton = finalOwnRow.getByRole('button', { name: '메시지 관리' });
+    await expect(finalOwnRow.locator('.reserve-chat-message-time')).toHaveText('10:01');
+    if (testInfo.project.name === 'chromium') await finalButton.hover();
+    else await finalButton.focus();
+    await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-grouped-actions-aligned.png') });
+    await finalButton.click();
+    await expect(finalButton).toHaveAttribute('aria-expanded', 'true');
+    await expect(finalOwnRow.locator('.reserve-chat-message-time')).toHaveCSS('visibility',
+        testInfo.project.name === 'chromium' ? 'hidden' : 'visible');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+
 const account = { id: 41, name: '테스트 고객', email: 'identity@example.test', role: 'USER', termsAgreed: true };
 const pageOf = (rows) => ({ content: rows, page: { number: 0, totalElements: rows.length, totalPages: 1 } });
 const ok = (route, data) => route.fulfill({ json: { success: true, data } });
@@ -157,6 +211,11 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     const messageMenu = page.getByRole('button', { name: '메시지 관리' });
     await expect(messageMenu).toHaveCSS('width', '44px');
     await expect(messageMenu).toHaveCSS('height', '44px');
+    const row = messageMenu.locator('xpath=ancestor::*[contains(@class,"reserve-chat-message-row")]');
+    const shortBubble = row.getByText('문의합니다', { exact: true });
+    const menuBox = await messageMenu.boundingBox();
+    const bubbleBox = await shortBubble.boundingBox();
+    expect(Math.abs(menuBox.y + menuBox.height / 2 - bubbleBox.y - bubbleBox.height / 2)).toBeLessThan(1);
     if (testInfo.project.name === 'chromium') {
         await messageMenu.hover();
         expect(await messageMenu.evaluate(element => {
@@ -165,6 +224,7 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
         })).toEqual({ width: '28px', height: '28px', background: 'rgb(242, 244, 246)' });
         await expect(messageMenu).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     }
+    await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-actions-aligned.png') });
     await messageMenu.click();
     await page.getByRole('menuitem', { name: '전송 취소' }).click();
     await page.getByRole('button', { name: '전송 취소', exact: true }).click();
@@ -178,6 +238,52 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     await expect(page.locator('.reserve-messenger-thread-body')).not.toHaveCSS('background-color', 'rgb(255, 255, 255)');
     await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-composer-dark.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('composer reserves both disabled tools while thread and image settings load', async ({ page }, testInfo) => {
+    await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '문의합니다' }]);
+    let releaseThread;
+    let releaseImage;
+    const threadHeld = new Promise(resolve => { releaseThread = resolve; });
+    const imageHeld = new Promise(resolve => { releaseImage = resolve; });
+    await page.route('**/api/chat/support/open', async route => {
+        await threadHeld;
+        return ok(route, { roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', canSend: true, messages: [] });
+    });
+    await page.route('**/api/chat/images/config', async route => {
+        await imageHeld;
+        return ok(route, { enabled: true });
+    });
+    try {
+        if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
+        else {
+            await page.goto('/');
+            await page.getByRole('button', { name: '메시지 열기' }).click();
+        }
+        await page.getByRole('navigation', { name: '메신저 화면' }).getByRole('button', { name: '대화', exact: true }).click();
+        await page.locator('.reserve-messenger-row').click();
+        const photo = page.getByRole('button', { name: '사진 첨부' });
+        const emoji = page.getByRole('button', { name: '이모지 선택', exact: true });
+        const input = page.getByRole('textbox', { name: '메시지 입력' });
+        await expect(page.getByRole('status', { name: '대화를 불러오는 중' })).toBeVisible();
+        await expect(photo).toBeVisible();
+        await expect(photo).toBeDisabled();
+        await expect(emoji).toBeDisabled();
+        await expect(input).toBeDisabled();
+        const emojiX = (await emoji.boundingBox()).x;
+        await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-composer-loading.png') });
+        releaseThread();
+        await expect(input).toBeEnabled();
+        await expect(emoji).toBeEnabled();
+        await expect(photo).toBeDisabled();
+        releaseImage();
+        await expect(photo).toBeEnabled();
+        expect((await emoji.boundingBox()).x).toBeCloseTo(emojiX, 1);
+        await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-composer-ready.png') });
+    } finally {
+        releaseThread();
+        releaseImage();
+    }
 });
 
 test('support title stays branded before and after loading; rows show latest message', async ({ page }) => {
@@ -256,7 +362,7 @@ test('photo captions stay below the image in narrow chat bubbles', async ({ page
 
 test('photo-only messages use multipart upload and an authenticated preview', async ({ page }, testInfo) => {
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '사진 문의' }]);
-    const png = readFileSync(new URL('../../docs/images/readme-v2.6/store-detail.png', import.meta.url));
+    const png = readFileSync(new URL('../../docs/images/store-detail.png', import.meta.url));
     let upload;
     await page.route('**/api/chat/images/config', route => ok(route, { enabled: true, maxBytes: 8388608 }));
     await page.route('**/api/chat/rooms/1/images', route => {

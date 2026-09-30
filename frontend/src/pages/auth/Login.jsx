@@ -206,8 +206,7 @@ const Login = () => {
                         로그인 시{' '}
                         <button type="button" style={styles.linkBtn} onClick={() => navigate('/terms')}>이용약관</button>
                         {' · '}
-                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>
-                        에 동의합니다.
+                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>에 동의합니다.
                     </Text>
                 </Flex>
             </div>

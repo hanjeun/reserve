@@ -40,4 +40,6 @@ export { default as PieLegend } from './PieLegend';
 export { default as UnreadPill } from './UnreadPill';
 export { default as RefreshButton } from './RefreshButton';
 export { default as DataState } from './DataState';
+// 페이지 자체가 없거나(404) 그리다 실패한(오류 경계) 화면의 공통 틀. 조회 결과 상태는 DataState.
+export { default as PageStatus, PageStatusSkeleton } from './PageStatus';
 // SortableImageUpload 은 일부러 여기서 내보내지 않는다 — 파일 경로로 직접 import 한다(그 파일 주석 참고).

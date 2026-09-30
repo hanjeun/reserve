@@ -12,8 +12,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Input, InputNumber } from 'antd';
-import { colors, radius, heights } from '../../styles/tokens';
-import { fontSize } from '../../styles/tokens';
+import { colors, radius, heights, fontSize } from '../../styles/tokens';
 
 const FormInput = ({ 
     type = 'text',
@@ -129,13 +128,17 @@ FormInput.WithButton = ({
         ...style,
     };
 
+    let buttonBackground = colors.primary.main;
+    if (verified) buttonBackground = colors.success.main;
+    else if (buttonDisabled) buttonBackground = colors.gray[200];
+
     const btnStyle = {
         borderRadius: `0 ${radius.lg} ${radius.lg} 0`,
         height: heights.input,
         fontWeight: 700,
         padding: '0 20px',
         border: 'none',
-        backgroundColor: verified ? colors.success.main : (buttonDisabled ? colors.gray[200] : colors.primary.main),
+        backgroundColor: buttonBackground,
         color: '#fff',
         fontSize: '14px',
         ...buttonStyle,

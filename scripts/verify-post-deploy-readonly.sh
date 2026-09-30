@@ -36,8 +36,9 @@ docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
     || die "container '$MYSQL_CONTAINER' is not running"
 
 mysql_query() {
+    local query=$1
     docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
-        mysql --user="$DB_USER" --batch --skip-column-names "$DB_NAME" -e "$1"
+        mysql --user="$DB_USER" --batch --skip-column-names "$DB_NAME" -e "$query"
 }
 
 require_table() {

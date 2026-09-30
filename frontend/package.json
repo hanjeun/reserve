@@ -1,14 +1,13 @@
 {
   "name": "reserve",
   "private": true,
-  "version": "2.8.0",
+  "version": "2.8.1",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "vite build",
     "postbuild": "node scripts/check-bundle-budget.mjs",
     "lint": "eslint .",
@@ -17,7 +16,6 @@
     "test:run": "vitest run",
     "test:policy": "node --test scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs ../scripts/tests/cicd-contract.test.mjs ../scripts/tests/ci-evidence.test.mjs ../scripts/tests/audit-preview-release.test.mjs",
     "test:e2e": "playwright test",
-    "generate:readme-assets": "node scripts/generate-readme-assets.mjs",
     "capture:readme": "node scripts/capture-readme-live.mjs",
     "capture:readme:auth": "node scripts/capture-readme-live.mjs --auth",
     "capture:readme:clean": "node scripts/capture-readme-live.mjs --clean",
@@ -34,7 +32,6 @@
     "@tanstack/react-query": "^5.101.4",
     "antd": "^6.2.0",
     "axios": "^1.19.0",
-    "framer-motion": "^12.43.0",
     "hangul-js": "^0.2.6",
     "html5-qrcode": "^2.3.8",
     "pretendard": "^1.3.9",

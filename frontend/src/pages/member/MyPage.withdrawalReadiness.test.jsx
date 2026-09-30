@@ -44,9 +44,16 @@ const show = () => render(<MemoryRouter><MyPage /></MemoryRouter>);
 const startWithdrawal = () => fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }));
 const latestConfirm = () => feedback.confirm.mock.calls.at(-1)[0];
 const openConfirm = async () => {
+    const count = feedback.confirm.mock.calls.length;
     startWithdrawal();
-    await waitFor(() => expect(feedback.confirm).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(feedback.confirm).toHaveBeenCalledTimes(count + 1));
     return latestConfirm();
+};
+const beginReadiness = () => {
+    startWithdrawal();
+    let result;
+    act(() => { result = latestConfirm().onOk(); });
+    return result;
 };
 const settle = (request, value, fails = false) => act(async () => {
     if (fails) request.reject(value); else request.resolve(value);
@@ -77,16 +84,30 @@ describe('MyPage withdrawal session readiness gate', () => {
         Element.prototype.scrollIntoView = vi.fn();
     });
 
-    it('keeps the server blocked decision and reports its unresolved counters without confirmation or deletion', async () => {
+    it('opens confirmation before any preparation or deletion and cancels without either request', async () => {
+        show();
+        const options = await openConfirm();
+        expect(options).toMatchObject({ title: '회원 탈퇴', okText: '탈퇴하기', cancelText: '취소', centered: true, okButtonProps: { danger: true } });
+        expect(options.content).toContain('거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다.');
+        expect(memberService.getWithdrawalReadiness).not.toHaveBeenCalled();
+        expect(memberService.deleteMember).not.toHaveBeenCalled();
+        act(() => { options.onCancel(); });
+        await act(async () => { await options.onOk(); });
+        expect(memberService.getWithdrawalReadiness).not.toHaveBeenCalled();
+        expect(memberService.deleteMember).not.toHaveBeenCalled();
+        expectNoCompletion();
+    });
+
+    it('keeps the server blocked decision after confirmation and reports its unresolved counters without deletion', async () => {
         show();
         memberService.getWithdrawalReadiness.mockResolvedValueOnce({
             canWithdraw: false, openStores: 1, unresolvedReservations: 2, unresolvedRefunds: 3, openPaymentIssues: 4, unfinishedWebhooks: 5,
         });
-        startWithdrawal();
+        await act(async () => { await beginReadiness(); });
         await waitFor(() => expect(feedback.message.warning).toHaveBeenCalledWith(
             '먼저 처리할 항목이 있습니다. 운영 중 가게 1곳, 예약 2건, 환불 3건, 결제 확인 4건, 웹훅 5건',
         ));
-        expect(feedback.confirm).not.toHaveBeenCalled();
+        expect(feedback.confirm).toHaveBeenCalledTimes(1);
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeEnabled();
         expectNoCompletion();
@@ -95,25 +116,26 @@ describe('MyPage withdrawal session readiness gate', () => {
     it.each([null, {}, { canWithdraw: 'true' }, { canWithdraw: 1 }])('fails closed for an incomplete readiness response %#', async response => {
         show();
         memberService.getWithdrawalReadiness.mockResolvedValueOnce(response);
-        startWithdrawal();
+        await act(async () => { await beginReadiness(); });
         await waitFor(() => expect(feedback.message.error).toHaveBeenCalledWith(
             '탈퇴 준비 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.',
         ));
-        expect(feedback.confirm).not.toHaveBeenCalled();
+        expect(feedback.confirm).toHaveBeenCalledTimes(1);
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expectNoCompletion();
     });
 
-    it('reports a current preparation failure, unlocks retry and never deletes without confirmation', async () => {
+    it('reports a confirmed preparation failure, unlocks retry and requires a fresh confirmation', async () => {
         show();
         memberService.getWithdrawalReadiness.mockRejectedValueOnce(new Error('readiness offline'));
-        startWithdrawal();
+        await act(async () => { await beginReadiness(); });
         await waitFor(() => expect(feedback.message.error).toHaveBeenCalledWith('readiness offline'));
         expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeEnabled();
-        expect(feedback.confirm).not.toHaveBeenCalled();
+        expect(feedback.confirm).toHaveBeenCalledTimes(1);
         const options = await openConfirm();
         expect(options).toMatchObject({ title: '회원 탈퇴', okText: '탈퇴하기', cancelText: '취소', centered: true, okButtonProps: { danger: true } });
         expect(options.content).toContain('거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다.');
+        expect(memberService.getWithdrawalReadiness).toHaveBeenCalledTimes(1);
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expectNoCompletion();
     });
@@ -124,16 +146,21 @@ describe('MyPage withdrawal session readiness gate', () => {
         memberService.getWithdrawalReadiness.mockReturnValueOnce(request.promise);
         startWithdrawal();
         startWithdrawal();
-        expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
-        expect(memberService.getWithdrawalReadiness).toHaveBeenCalledTimes(1);
-        await settle(request, ready);
         const oldOptions = latestConfirm();
+        expect(memberService.getWithdrawalReadiness).not.toHaveBeenCalled();
+        expect(feedback.confirm).toHaveBeenCalledTimes(1);
+        let preparation;
+        act(() => { preparation = oldOptions.onOk(); });
+        await act(async () => { await oldOptions.onOk(); });
         startWithdrawal();
+        expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
         expect(memberService.getWithdrawalReadiness).toHaveBeenCalledTimes(1);
         expect(feedback.confirm).toHaveBeenCalledTimes(1);
         act(() => { oldOptions.onCancel(); });
         startWithdrawal();
         await waitFor(() => expect(feedback.confirm).toHaveBeenCalledTimes(2));
+        await settle(request, ready);
+        await act(async () => { await preparation; });
         await act(async () => { await oldOptions.onOk(); });
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expectNoCompletion();
@@ -143,10 +170,11 @@ describe('MyPage withdrawal session readiness gate', () => {
         show();
         const request = deferred();
         memberService.getWithdrawalReadiness.mockReturnValueOnce(request.promise);
-        startWithdrawal();
+        const preparation = beginReadiness();
         act(() => { useAuthStore.setState(change); });
         await settle(request, ready);
-        expect(feedback.confirm).not.toHaveBeenCalled();
+        await act(async () => { await preparation; });
+        expect(feedback.confirm).toHaveBeenCalledTimes(1);
         expect(feedback.message.error).not.toHaveBeenCalled();
         expect(feedback.message.warning).not.toHaveBeenCalled();
         expect(memberService.deleteMember).not.toHaveBeenCalled();
@@ -159,15 +187,19 @@ describe('MyPage withdrawal session readiness gate', () => {
         const oldRequest = deferred();
         const newRequest = deferred();
         memberService.getWithdrawalReadiness.mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(newRequest.promise);
-        startWithdrawal();
+        const oldPreparation = beginReadiness();
         act(() => { useAuthStore.setState({ sessionRevision: 71 }); });
-        startWithdrawal();
+        const newOptions = await openConfirm();
+        let newPreparation;
+        act(() => { newPreparation = newOptions.onOk(); });
         await settle(oldRequest, new Error('old readiness offline'), true);
+        await act(async () => { await oldPreparation; });
         expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
         expect(feedback.message.error).not.toHaveBeenCalled();
-        expect(feedback.confirm).not.toHaveBeenCalled();
-        await settle(newRequest, ready);
-        expect(feedback.confirm).toHaveBeenCalledTimes(1);
+        expect(feedback.confirm).toHaveBeenCalledTimes(2);
+        await settle(newRequest, { ...ready, canWithdraw: false });
+        await act(async () => { await newPreparation; });
+        expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeEnabled();
         expect(memberService.deleteMember).not.toHaveBeenCalled();
     });
 
@@ -175,10 +207,11 @@ describe('MyPage withdrawal session readiness gate', () => {
         const page = show();
         const request = deferred();
         memberService.getWithdrawalReadiness.mockReturnValueOnce(request.promise);
-        startWithdrawal();
+        const preparation = beginReadiness();
         page.unmount();
         await settle(request, fails ? new Error('unmounted readiness') : ready, fails);
-        expect(feedback.confirm).not.toHaveBeenCalled();
+        await act(async () => { await preparation; });
+        expect(feedback.confirm).toHaveBeenCalledTimes(1);
         expect(feedback.message.error).not.toHaveBeenCalled();
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expectNoCompletion();
@@ -189,6 +222,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         const options = await openConfirm();
         act(() => { useAuthStore.setState(change); });
         await act(async () => { await options.onOk(); });
+        expect(memberService.getWithdrawalReadiness).not.toHaveBeenCalled();
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expect(feedback.message.error).not.toHaveBeenCalled();
         expectNoCompletion();
@@ -199,6 +233,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         const options = await openConfirm();
         page.unmount();
         await act(async () => { await options.onOk(); });
+        expect(memberService.getWithdrawalReadiness).not.toHaveBeenCalled();
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expectNoCompletion();
     });
@@ -215,7 +250,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         memberService.deleteMember.mockReturnValueOnce(deletion.promise);
         let result;
         act(() => { result = options.onOk(); });
-        expect(memberService.deleteMember).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(memberService.deleteMember).toHaveBeenCalledTimes(1));
         act(() => { useAuthStore.setState(change); });
         await settle(deletion, fails ? new Error('old deletion failure') : {}, fails);
         await act(async () => { await result; });
@@ -230,6 +265,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         memberService.deleteMember.mockReturnValueOnce(deletion.promise);
         let result;
         act(() => { result = options.onOk(); });
+        await waitFor(() => expect(memberService.deleteMember).toHaveBeenCalledTimes(1));
         page.unmount();
         await settle(deletion, fails ? new Error('unmounted deletion') : {}, fails);
         await act(async () => { await result; });
@@ -267,6 +303,8 @@ describe('MyPage withdrawal session readiness gate', () => {
         expectNoCompletion();
         startWithdrawal();
         await waitFor(() => expect(feedback.confirm).toHaveBeenCalledTimes(2));
+        expect(memberService.getWithdrawalReadiness).toHaveBeenCalledTimes(1);
+        await act(async () => { await latestConfirm().onOk(); });
         expect(memberService.getWithdrawalReadiness).toHaveBeenCalledTimes(2);
     });
 });

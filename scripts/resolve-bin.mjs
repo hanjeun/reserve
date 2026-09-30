@@ -19,12 +19,12 @@ import { existsSync } from 'node:fs';
 const CANDIDATES = {
     win32: {
         gh: [
-            'C:\\Program Files\\GitHub CLI\\gh.exe',
-            'C:\\Program Files (x86)\\GitHub CLI\\gh.exe',
+            String.raw`C:\Program Files\GitHub CLI\gh.exe`,
+            String.raw`C:\Program Files (x86)\GitHub CLI\gh.exe`,
         ],
         git: [
-            'C:\\Program Files\\Git\\cmd\\git.exe',
-            'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+            String.raw`C:\Program Files\Git\cmd\git.exe`,
+            String.raw`C:\Program Files (x86)\Git\cmd\git.exe`,
         ],
     },
     other: {

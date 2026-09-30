@@ -65,13 +65,16 @@ const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pendi
         });
     };
 
+    let blockLabel = '대화 차단';
+    if (thread.blockedByMe) blockLabel = '내 차단 해제';
+    else if (blockedByOther) blockLabel = '상대방이 차단한 대화';
     const items = [
         { key: 'visibility', icon: hidden ? <EyeOutlined /> : <EyeInvisibleOutlined />, label: hidden ? '대화 복원' : '내 목록에서 숨기기' },
         ...(thread.type === 'STORE' ? [
         {
             key: 'block',
             icon: thread.blockedByMe ? <UnlockOutlined /> : <StopOutlined />,
-            label: thread.blockedByMe ? '내 차단 해제' : (blockedByOther ? '상대방이 차단한 대화' : '대화 차단'),
+            label: blockLabel,
             disabled: blockedByOther,
         },
         { key: 'report', icon: <FlagOutlined />, label: '대화 신고' },

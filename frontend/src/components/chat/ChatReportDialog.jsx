@@ -37,9 +37,9 @@ export default function ChatReportDialog({ roomId, viewerRole, messageId, onClos
             if (openedRevision !== useAuthStore.getState().sessionRevision) return;
             setVisible(false);
             message.success('신고를 접수했습니다. 관리자가 확인할게요.');
-        } catch (failure) {
+        } catch (error_) {
             if (openedRevision === useAuthStore.getState().sessionRevision) message.error(
-                (failure?.status ?? failure?.response?.status) === 429
+                (error_?.status ?? error_?.response?.status) === 429
                     ? '신고 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' : '신고를 접수하지 못했습니다.');
         } finally { active.current = false; setSubmitting(false); }
     };

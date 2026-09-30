@@ -17,6 +17,19 @@ const readFlag = (flag, fallback = false) => {
     }
 };
 
+// 방별 커서(previous) 기준으로 가장 큰 서버 id와 상대가 보낸 새 메시지 여부를 계산한다.
+const scanMessages = (messages, previous, viewerRole) => {
+    let highest = previous;
+    let hasIncoming = false;
+    for (const message of messages) {
+        const id = positiveId(message?.id);
+        if (id === null || !ROLES.has(message.senderRole)) continue;
+        highest = Math.max(highest, id);
+        if (id > previous && message.senderRole !== viewerRole) hasIncoming = true;
+    }
+    return { highest, hasIncoming };
+};
+
 /**
  * PC 브라우저 세션용 알림. enable은 반드시 사용자 클릭 핸들러에서 호출한다.
  * 초깃값은 OFF이며 서버·저장장치·Service Worker와 연결하지 않는다.
@@ -147,15 +160,7 @@ export function createChatNotifier({
     const notify = ({ roomId, messages, viewerRole } = {}) => {
         if (disposed || positiveId(roomId) === null
             || !ROLES.has(viewerRole) || !Array.isArray(messages)) return false;
-        const previous = seen.get(roomId) ?? 0;
-        let highest = previous;
-        let hasIncoming = false;
-        for (const message of messages) {
-            const id = positiveId(message?.id);
-            if (id === null || !ROLES.has(message.senderRole)) continue;
-            highest = Math.max(highest, id);
-            if (id > previous && message.senderRole !== viewerRole) hasIncoming = true;
-        }
+        const { highest, hasIncoming } = scanMessages(messages, seen.get(roomId) ?? 0, viewerRole);
         if (highest > 0) {
             seen.delete(roomId);
             seen.set(roomId, highest);

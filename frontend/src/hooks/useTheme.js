@@ -157,12 +157,12 @@ const applyAccent = (value, resolvedTheme) => {
 const applyTheme = (pref, { animate = true } = {}) => {
     const root = document.documentElement;
     if (animate) {
-        root.setAttribute('data-theme-changing', '');
+        root.dataset.themeChanging = '';
         // 계속 걸어두면 모든 요소에 transition이 남아 스켈레톤·hover와 섞인다 → 끝나면 뗀다.
-        window.setTimeout(() => root.removeAttribute('data-theme-changing'), 220);
+        window.setTimeout(() => { delete root.dataset.themeChanging; }, 220);
     }
     const resolved = resolveTheme(pref);
-    root.setAttribute('data-theme', resolved);
+    root.dataset.theme = resolved;
     // ★ 테마가 바뀌면 강조색도 다시 적용해야 한다 — 라이트/다크에서 쓰는 hex 가 다르다.
     //   이걸 빼면 다크로 갔을 때 포인트 색이 라이트용 값에 머물러 채도가 죽어 보인다.
     applyAccent(state.accent, resolved);
@@ -214,7 +214,7 @@ export default function useTheme() {
 
     // StrictMode 이중 마운트나 HMR로 DOM 속성이 어긋나는 경우를 대비한 보정.
     useEffect(() => {
-        if (document.documentElement.getAttribute('data-theme') !== resolveTheme(snap.theme)) {
+        if (document.documentElement.dataset.theme !== resolveTheme(snap.theme)) {
             applyTheme(snap.theme, { animate: false });
         }
     }, [snap.theme]);

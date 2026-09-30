@@ -46,6 +46,41 @@ function activeQueryCount(dashboard) {
   return panelQueries + annotationQueries;
 }
 
+function checkPanelTargets(policy, panel) {
+  const refIds = new Set();
+  for (const target of panel.targets ?? []) {
+    if (refIds.has(target.refId)) {
+      fail(policy.file, `panel ${panel.id} has duplicate refId ${target.refId}`);
+    }
+    refIds.add(target.refId);
+
+    if (target.datasource?.type === 'loki' && target.datasource.uid !== '${DS_LOKI}') {
+      fail(policy.file, `panel ${panel.id} must use the import-time Loki placeholder`);
+    }
+
+    const isRangeAggregation = target.queryType === 'range'
+      && /(?:count|avg|sum|min|max|last)_over_time\(/.test(target.expr ?? '');
+    if (isRangeAggregation && !target.expr.includes('$__auto')) {
+      fail(policy.file, `panel ${panel.id} range aggregation must use $__auto`);
+    }
+  }
+}
+
+function checkStatPanel(policy, panel) {
+  if ((panel.targets?.length ?? 0) !== 1 || panel.targets?.[0]?.queryType !== 'instant') {
+    fail(policy.file, `stat panel ${panel.id} must use exactly one instant query`);
+  }
+  if (panel.options?.graphMode !== 'none' || panel.options?.textMode !== 'value') {
+    fail(policy.file, `stat panel ${panel.id} must hide query labels and sparklines`);
+  }
+  if (panel.fieldConfig?.defaults?.noValue === '0') {
+    fail(policy.file, `stat panel ${panel.id} must not present missing data as zero`);
+  }
+  if (policy.zeroFallbackForStats && !panel.targets?.[0]?.expr?.includes('or vector(0)')) {
+    fail(policy.file, `stat panel ${panel.id} needs an explicit zero fallback`);
+  }
+}
+
 for (const policy of dashboardPolicies) {
   const absolutePath = path.join(repositoryRoot, policy.file);
   let dashboard;
@@ -85,37 +120,9 @@ for (const policy of dashboardPolicies) {
     }
     panelIds.add(panel.id);
 
-    const refIds = new Set();
-    for (const target of panel.targets ?? []) {
-      if (refIds.has(target.refId)) {
-        fail(policy.file, `panel ${panel.id} has duplicate refId ${target.refId}`);
-      }
-      refIds.add(target.refId);
-
-      if (target.datasource?.type === 'loki' && target.datasource.uid !== '${DS_LOKI}') {
-        fail(policy.file, `panel ${panel.id} must use the import-time Loki placeholder`);
-      }
-
-      const isRangeAggregation = target.queryType === 'range'
-        && /(?:count|avg|sum|min|max|last)_over_time\(/.test(target.expr ?? '');
-      if (isRangeAggregation && !target.expr.includes('$__auto')) {
-        fail(policy.file, `panel ${panel.id} range aggregation must use $__auto`);
-      }
-    }
-
+    checkPanelTargets(policy, panel);
     if (panel.type === 'stat') {
-      if ((panel.targets?.length ?? 0) !== 1 || panel.targets?.[0]?.queryType !== 'instant') {
-        fail(policy.file, `stat panel ${panel.id} must use exactly one instant query`);
-      }
-      if (panel.options?.graphMode !== 'none' || panel.options?.textMode !== 'value') {
-        fail(policy.file, `stat panel ${panel.id} must hide query labels and sparklines`);
-      }
-      if (panel.fieldConfig?.defaults?.noValue === '0') {
-        fail(policy.file, `stat panel ${panel.id} must not present missing data as zero`);
-      }
-      if (policy.zeroFallbackForStats && !panel.targets?.[0]?.expr?.includes('or vector(0)')) {
-        fail(policy.file, `stat panel ${panel.id} needs an explicit zero fallback`);
-      }
+      checkStatPanel(policy, panel);
     }
 
     if (parents.some((parent) => parent.type === 'row' && parent.collapsed !== true)) {
@@ -125,7 +132,7 @@ for (const policy of dashboardPolicies) {
 
   for (const rowId of policy.collapsedRowIds) {
     const row = (dashboard.panels ?? []).find((panel) => panel.id === rowId);
-    if (!row || row.type !== 'row' || row.collapsed !== true || !row.panels?.length) {
+    if (row?.type !== 'row' || row.collapsed !== true || !row.panels?.length) {
       fail(policy.file, `row ${rowId} must remain collapsed and own its detail panels`);
     }
   }
@@ -138,7 +145,7 @@ for (const policy of dashboardPolicies) {
 
   if (policy.uid === 'reserve-logs') {
     const search = dashboard.templating?.list?.find((variable) => variable.name === 'search');
-    if (!search || search.query !== '' || search.current?.value !== '') {
+    if (search?.query !== '' || search.current?.value !== '') {
       fail(policy.file, 'log search must start blank instead of exposing the .* regular expression');
     }
   }

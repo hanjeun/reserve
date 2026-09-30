@@ -38,15 +38,38 @@ function collectMarkdownFiles(directory, result = []) {
   return result;
 }
 
+// 여는 펜스 길이부터 3까지 한 글자씩 줄여 가며, bodyStart 이후 가장 가까운 닫는 펜스 줄의 끝을 찾는다.
+// 이전 정규식 /^(?: {0,3})(`{3,}|~{3,})[^\n]*\n[\s\S]*?^(?: {0,3})\1[ \t]*$/gm 의 백트래킹 순서를 그대로 따른다.
+function findFencedBlockEnd(markdown, fenceRun, bodyStart) {
+  for (let length = fenceRun.length; length >= 3; length -= 1) {
+    const closingFence = new RegExp(String.raw`^ {0,3}${fenceRun.slice(0, length)}[ \t]*$`, 'gm');
+    closingFence.lastIndex = bodyStart;
+    const closing = closingFence.exec(markdown);
+    if (closing) return closing.index + closing[0].length;
+  }
+  return -1;
+}
+
 function removeFencedCode(markdown) {
-  return markdown.replace(/^(?: {0,3})(`{3,}|~{3,})[^\n]*\n[\s\S]*?^(?: {0,3})\1[ \t]*$/gm, (block) =>
-    block.replace(/[^\n]/g, ' '),
-  );
+  const openingFence = /^ {0,3}(?:`{3,}|~{3,})/gm;
+  let result = '';
+  let copiedUntil = 0;
+  for (let opening = openingFence.exec(markdown); opening; opening = openingFence.exec(markdown)) {
+    const lineEnd = markdown.indexOf('\n', openingFence.lastIndex);
+    if (lineEnd === -1) break;
+    const blockEnd = findFencedBlockEnd(markdown, opening[0].trimStart(), lineEnd + 1);
+    if (blockEnd === -1) continue;
+    result += markdown.slice(copiedUntil, opening.index);
+    result += markdown.slice(opening.index, blockEnd).replaceAll(/[^\n]/g, ' ');
+    copiedUntil = blockEnd;
+    openingFence.lastIndex = blockEnd;
+  }
+  return result + markdown.slice(copiedUntil);
 }
 function lineNumberAt(text, offset) {
   let line = 1;
   for (let index = 0; index < offset; index += 1) {
-    if (text.charCodeAt(index) === 10) line += 1;
+    if (text.codePointAt(index) === 10) line += 1;
   }
   return line;
 }
@@ -59,7 +82,7 @@ function normalizeTarget(rawTarget) {
   const titleMatch = target.match(/^(\S+?)(?:\s+["'(].*)$/);
   if (titleMatch) target = titleMatch[1];
 
-  return target.replace(/\\ /g, ' ');
+  return target.replaceAll(String.raw`\ `, ' ');
 }
 
 function shouldIgnore(target) {
@@ -97,7 +120,7 @@ function extractTargets(markdown) {
   const patterns = [
     // Inline links and images. The destination intentionally stops at whitespace
     // or the first closing parenthesis; repository paths do not use parentheses.
-    /!?\[[^\]\n]*\]\((<[^>\n]+>|[^\s)\n]+)(?:\s+["'(][^\n]*)?\)/g,
+    /!?\[[^[\]\n]*\]\((<[^>\n]+>|[^\s)]+)(?:\s+["'(][^\n]*)?\)/g,
     // Reference definitions: [name]: path "optional title"
     /^ {0,3}\[[^\]\n]+\]:\s*(<[^>\n]+>|\S+)/gm,
     // Simple HTML links and images used in README files.

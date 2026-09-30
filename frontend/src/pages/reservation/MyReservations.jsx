@@ -94,8 +94,7 @@ const createReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, 
             : <Button key="review" variant="ghost-sm-primary"
                 onClick={(e) => { e.stopPropagation(); onReview(res, false); }}>
                 <StarOutlined /> 리뷰 쓰기
-              </Button>);
-        actions.push(
+              </Button>,
             <Button key="remove" variant="ghost-sm" size="sm"
                 onClick={(e) => { e.stopPropagation(); onRemove(res); }}
                 style={{ color: colors.text.tertiary }}>
@@ -115,6 +114,61 @@ const createReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, 
     return actions;
 };
 
+const resolveOptionParam = (params, key, options, fallback) => (options.some(option => option.value === params.get(key))
+    ? params.get(key) : fallback);
+
+// 툴바 값 하나를 URL 에 반영한다 — 빈 값과 기본값(정렬 recent, 상태 ALL)은 URL 에서 뺀다.
+const withToolbarParam = (current, key, value) => {
+    const next = new URLSearchParams(current);
+    if (value && !(key === 'sort' && value === 'recent') && !(key === 'status' && value === 'ALL')) next.set(key, value);
+    else next.delete(key);
+    return next;
+};
+
+const matchesReservationKeyword = (r, kw) =>
+    r.storeName?.toLowerCase().includes(kw) ||
+    r.specialRequest?.toLowerCase().includes(kw) ||
+    r.reservationCode?.toLowerCase().includes(kw);
+
+const visitSortKey = (r) => (r.reservationDate ? `${r.reservationDate}T${r.reservationTime || ''}` : '9999');
+
+const filterAndSortReservations = (reservations, { statusFilter, keyword, sort }) => {
+    let list = statusFilter !== 'ALL'
+        ? reservations.filter(r => r.status === statusFilter)
+        : reservations;
+    if (keyword.trim()) {
+        const kw = keyword.toLowerCase();
+        list = list.filter(r => matchesReservationKeyword(r, kw));
+    }
+    // 서버 응답은 생성 최신순이며 응답 DTO에는 생성 시각이 없다. 이 순서만 뒤집고,
+    // 방문일은 응답의 예약 날짜·시간 필드를 사용한다.
+    if (sort === 'oldest') return [...list].reverse();
+    if (sort === 'visit') return [...list].sort((a, b) => visitSortKey(a).localeCompare(visitSortKey(b)));
+    return list;
+};
+
+// 목록 결과 — 빈 안내 또는 카드/목록형 항목들.
+const ReservationResults = ({ filtered, view, filtersActive, renderItem }) => {
+    if (filtered.length === 0) {
+        return (
+            <DataState state="empty" kind="reservation" style={{ marginTop: 100 }}
+                title={filtersActive
+                    ? '조건에 맞는 예약이 없습니다.'
+                    : '예약 내역이 없습니다.'} />
+        );
+    }
+    return (
+        <div className={view === 'cards' ? 'reserve-reservation-card-grid' : 'reserve-myreservation-rows'}>
+            {filtered.map((res, i) => (
+                <div key={res.id} className={view === 'cards' ? 'reserve-myreservation-card-item' : 'reserve-myreservation-row'}>
+                    {renderItem(res)}
+                    {view === 'list' && i < filtered.length - 1 && <div style={styles.divider} />}
+                </div>
+            ))}
+        </div>
+    );
+};
+
 const MyReservations = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -125,17 +179,10 @@ const MyReservations = () => {
     const { pay, paying } = usePayment();
     useDocumentTitle('내 예약');
 
-    const statusFilter = STATUS_OPTIONS.some(option => option.value === urlSearchParams.get('status'))
-        ? urlSearchParams.get('status') : 'ALL';
-    const sort = SORT_OPTIONS.some(option => option.value === urlSearchParams.get('sort'))
-        ? urlSearchParams.get('sort') : 'recent';
+    const statusFilter = resolveOptionParam(urlSearchParams, 'status', STATUS_OPTIONS, 'ALL');
+    const sort = resolveOptionParam(urlSearchParams, 'sort', SORT_OPTIONS, 'recent');
     const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'list');
-    const setToolbarParam = (key, value) => setUrlSearchParams(current => {
-        const next = new URLSearchParams(current);
-        if (value && !(key === 'sort' && value === 'recent') && !(key === 'status' && value === 'ALL')) next.set(key, value);
-        else next.delete(key);
-        return next;
-    });
+    const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const [keyword, setKeyword] = useState('');
     const debouncedKeyword = useDebounce(keyword, 300);
     const [qrReservationId, setQrReservationId] = useState(null);
@@ -155,28 +202,10 @@ const MyReservations = () => {
         if (location.state) navigate(location.pathname, { replace: true, state: {} });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const filtered = useMemo(() => {
-        let list = statusFilter !== 'ALL'
-            ? reservations.filter(r => r.status === statusFilter)
-            : reservations;
-        if (debouncedKeyword.trim()) {
-            const kw = debouncedKeyword.toLowerCase();
-            list = list.filter(r =>
-                r.storeName?.toLowerCase().includes(kw) ||
-                r.specialRequest?.toLowerCase().includes(kw) ||
-                r.reservationCode?.toLowerCase().includes(kw)
-            );
-        }
-        // 서버 응답은 생성 최신순이며 응답 DTO에는 생성 시각이 없다. 이 순서만 뒤집고,
-        // 방문일은 응답의 예약 날짜·시간 필드를 사용한다.
-        if (sort === 'oldest') return [...list].reverse();
-        if (sort === 'visit') return [...list].sort((a, b) => {
-            const aDate = a.reservationDate ? `${a.reservationDate}T${a.reservationTime || ''}` : '9999';
-            const bDate = b.reservationDate ? `${b.reservationDate}T${b.reservationTime || ''}` : '9999';
-            return aDate.localeCompare(bDate);
-        });
-        return list;
-    }, [reservations, statusFilter, debouncedKeyword, sort]);
+    const filtered = useMemo(
+        () => filterAndSortReservations(reservations, { statusFilter, keyword: debouncedKeyword, sort }),
+        [reservations, statusFilter, debouncedKeyword, sort],
+    );
 
     const handlePay = async (res) => {
         await pay(
@@ -287,6 +316,38 @@ const MyReservations = () => {
         return <ReservationRow {...itemProps} renderActions={() => actions} />;
     };
 
+    // 목록 영역 — 첫 조회 스켈레톤 / 처음부터 실패 / 목록(재조회 실패 띠 포함)
+    let listBody;
+    if (loading) {
+        listBody = (
+            <div role="status" aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
+                {view === 'cards'
+                    ? <ReservationSummaryCardSkeleton count={4} />
+                    : <MyReservationCardSkeleton count={4} />}
+            </div></div>
+        );
+    } else if (error && reservations.length === 0) {
+        listBody = (
+            // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
+            <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                onRetry={refetch} retrying={loading || refetching} style={{ marginTop: 100 }} />
+        );
+    } else {
+        listBody = (
+            <>
+                {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
+                {error && (
+                    <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                        title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                        onRetry={refetch} retrying={loading || refetching} compact style={{ marginBottom: 16 }} />
+                )}
+                <ReservationResults filtered={filtered} view={view}
+                    filtersActive={statusFilter !== 'ALL' || Boolean(debouncedKeyword.trim())}
+                    renderItem={renderReservationItem} />
+            </>
+        );
+    }
+
     return (
         <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page" aria-busy={loading || refetching}>
             <div style={{ marginBottom: 32 }}>
@@ -310,41 +371,7 @@ const MyReservations = () => {
 
             {/* 첫 조회에만 스켈레톤을 표시한다. 폴링·창 포커스·수동 새로고침은 현재 예약과
                 읽던 위치를 유지하고 툴바에서만 진행 상태를 알린다. */}
-            {loading ? (
-                <div role="status" aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
-                    {view === 'cards'
-                        ? <ReservationSummaryCardSkeleton count={4} />
-                        : <MyReservationCardSkeleton count={4} />}
-                </div></div>
-            ) : error && reservations.length === 0 ? (
-                // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
-                <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                    onRetry={refetch} retrying={loading || refetching} style={{ marginTop: 100 }} />
-            ) : (
-                <>
-                    {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
-                    {error && (
-                        <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                            title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있습니다."
-                            onRetry={refetch} retrying={loading || refetching} compact style={{ marginBottom: 16 }} />
-                    )}
-                    {filtered.length === 0 ? (
-                        <DataState state="empty" kind="reservation" style={{ marginTop: 100 }}
-                            title={statusFilter === 'ALL' && !debouncedKeyword.trim()
-                                ? '예약 내역이 없습니다.'
-                                : '조건에 맞는 예약이 없습니다.'} />
-                    ) : (
-                        <div className={view === 'cards' ? 'reserve-reservation-card-grid' : 'reserve-myreservation-rows'}>
-                            {filtered.map((res, i) => (
-                                <div key={res.id} className={view === 'cards' ? 'reserve-myreservation-card-item' : 'reserve-myreservation-row'}>
-                                    {renderReservationItem(res)}
-                                    {view === 'list' && i < filtered.length - 1 && <div style={styles.divider} />}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </>
-            )}
+            {listBody}
             <QrCodeModal
                 reservationId={qrReservationId}
                 open={qrReservationId != null}

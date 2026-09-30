@@ -1,10 +1,9 @@
 /**
  * README 스크린샷을 **실제 서비스 화면·실제 가게 데이터**로 찍는다.
  *
- * generate-readme-assets.mjs 는 API 를 가짜 데이터로 막아 찍는 "합성" 생성기다(샘플 커피 스튜디오 등).
- * 이 스크립트는 반대로 API 를 막지 않고, 지정한 사이트(기본: 운영)에 실제로 접속해 찍는다.
+ * API 를 막지 않고, 지정한 사이트(기본: 운영)에 실제로 접속해 찍는다.
  * 아키텍처 그림은 찍지 않는다 — README 는 피그마 원본(docs/images/RESERVE_Architecture.png)을 쓴다.
- * 모니터링(monitoring.png)은 운영 Grafana(grafana.reserve.it.kr)의 "RESERVE 로그" 대시보드 요약 카드를 찍는다.
+ * 모니터링(grafana.png)은 운영 Grafana(grafana.reserve.it.kr)의 "RESERVE 로그" 대시보드 요약 카드를 찍는다.
  * 로그 원문 패널은 접힌 상태 그대로 둔다 — 요청 경로·IP 같은 원문이 이미지에 들어가지 않게.
  *
  * 사용법 (frontend 폴더에서, PowerShell):
@@ -43,14 +42,15 @@ import process from 'node:process';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { README_IMAGE_FILENAMES } from './readme-image-paths.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(SCRIPT_DIR, '..');
 const REPOSITORY_DIR = path.resolve(FRONTEND_DIR, '..');
-const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images', 'readme-v2.6');
+const OUTPUT_DIR = path.join(REPOSITORY_DIR, 'docs', 'images');
 const AUTH_DIR = path.join(FRONTEND_DIR, '.readme-capture');
 const AUTH_FILE = path.join(AUTH_DIR, 'auth.json');
-const BASE_URL = (process.env.README_BASE_URL || 'https://reserve.it.kr').replace(/\/+$/, '');
+const BASE_URL = (process.env.README_BASE_URL || 'https://reserve.it.kr').replace(/(?<!\/)\/+$/, '');
 const VIEWPORT = { width: 1600, height: 900 };
 const CDP_URL = `http://127.0.0.1:${process.env.README_CDP_PORT || 9222}`;
 const GRAFANA_URL = process.env.README_GRAFANA_URL || 'https://grafana.reserve.it.kr/d/reserve-logs';
@@ -85,7 +85,7 @@ async function importAuthFromChrome() {
     try {
         const context = browser.contexts()[0];
         const state = context ? await context.storageState() : { cookies: [], origins: [] };
-        const belongs = host => AUTH_DOMAINS.some(domain => host.replace(/^\./, '') === domain);
+        const belongs = host => AUTH_DOMAINS.includes(host.replace(/^\./, ''));
         const cookies = state.cookies.filter(cookie => belongs(cookie.domain));
         const origins = state.origins.filter(origin => belongs(new URL(origin.origin).hostname));
         if (cookies.length === 0) {
@@ -202,8 +202,9 @@ async function landedOnLogin(page) {
 // EBUSY/EPERM/UNKNOWN(-4094)으로 실패한다. 임시 파일에 쓴 뒤 바꿔치기하고, 잠겨 있으면 잠깐씩 다시 시도한다.
 // 끝내 안 되면 <이름>.new.png 로 남겨 찍은 결과를 잃지 않는다.
 async function saveImage(name, image) {
-    const target = path.join(OUTPUT_DIR, `${name}.png`);
-    const temp = path.join(OUTPUT_DIR, `.${name}.png.tmp`);
+    const filename = README_IMAGE_FILENAMES[name];
+    const target = path.join(OUTPUT_DIR, filename);
+    const temp = path.join(OUTPUT_DIR, `.${filename}.tmp`);
     await writeFile(temp, image);
     for (let attempt = 1; attempt <= 6; attempt += 1) {
         try {
@@ -211,7 +212,7 @@ async function saveImage(name, image) {
             return true;
         } catch (error) {
             if (attempt === 6) {
-                const fallback = path.join(OUTPUT_DIR, `${name}.new.png`);
+                const fallback = path.join(OUTPUT_DIR, filename.replace(/\.png$/, '.new.png'));
                 await rename(temp, fallback).catch(() => {});
                 console.warn(`  ! ${name}.png 를 덮어쓰지 못했습니다(${error.code}) — 다른 프로그램이 파일을 열고 있는지 확인하세요.`);
                 console.warn(`    찍은 결과는 ${path.basename(fallback)} 로 저장했습니다. 그 프로그램을 닫고 이름을 바꾸거나 다시 실행하세요.`);
@@ -224,11 +225,11 @@ async function saveImage(name, image) {
 }
 
 async function writeManifest(captured) {
-    const manifestPath = path.join(OUTPUT_DIR, 'manifest.json');
+    const manifestPath = path.join(OUTPUT_DIR, 'screenshots.json');
     const previous = existsSync(manifestPath) ? JSON.parse(await readFile(manifestPath, 'utf8')) : { files: [] };
     const files = new Map((previous.files ?? []).map(file => [file.path, file]));
     for (const name of captured) {
-        const filename = `${name}.png`;
+        const filename = README_IMAGE_FILENAMES[name];
         const contents = await readFile(path.join(OUTPUT_DIR, filename));
         files.set(filename, {
             path: filename,
@@ -240,27 +241,55 @@ async function writeManifest(captured) {
     }
     const manifest = {
         schemaVersion: 2,
-        purpose: 'README screenshots. Files with "source" were captured from a real site; others come from the synthetic generator.',
+        purpose: 'README screenshots captured from a real site.',
         viewport: VIEWPORT,
-        generators: ['frontend/scripts/capture-readme-live.mjs', 'frontend/scripts/generate-readme-assets.mjs'],
+        generators: ['frontend/scripts/capture-readme-live.mjs'],
         files: [...files.values()],
     };
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 }
 
-async function main() {
+// 로그인 상태만 다루는 보조 명령(--login / --auth / --clean). 실행했으면 true.
+async function runAuthCommand() {
     if (process.argv.includes('--login')) {
         await login();
-        return;
+        return true;
     }
     if (process.argv.includes('--auth')) {
         await importAuthFromChrome();
-        return;
+        return true;
     }
     if (process.argv.includes('--clean')) {
         await cleanAuth();
-        return;
+        return true;
     }
+    return false;
+}
+
+async function captureScenes(browser, publicScenes, authScenes, hasAuth) {
+    const captured = [];
+    if (publicScenes.length) {
+        const publicContext = await newCaptureContext(browser, false);
+        for (const scene of publicScenes) captured.push(await capture(publicContext, scene));
+        await publicContext.close();
+    }
+
+    if (hasAuth && authScenes.length) {
+        // 로그인 화면들은 컨텍스트 하나를 같이 쓴다 — 따로 열면 앞 화면이 회전시킨 리프레시 토큰을
+        // 뒤 화면이 옛 값으로 다시 써서 서버가 재사용(탈취)으로 판단하고 세션을 끊는다.
+        const authContext = await newCaptureContext(browser, true);
+        try {
+            for (const scene of authScenes) captured.push(await capture(authContext, scene));
+        } finally {
+            await authContext.storageState({ path: AUTH_FILE });
+            await authContext.close();
+        }
+    }
+    return captured;
+}
+
+async function main() {
+    if (await runAuthCommand()) return;
     await mkdir(OUTPUT_DIR, { recursive: true });
     const hasAuth = existsSync(AUTH_FILE);
     const wanted = scene => ONLY.length === 0 || ONLY.includes(scene.name);
@@ -282,25 +311,9 @@ async function main() {
     if (!hasAuth && authScenes.length) console.log('저장된 로그인 상태가 없어 사업자·관리자·모니터링 화면은 건너뜁니다(스크립트 맨 위 주석 참고).');
 
     const browser = await chromium.launch({ headless: true });
-    const captured = [];
+    let captured;
     try {
-        if (publicScenes.length) {
-            const publicContext = await newCaptureContext(browser, false);
-            for (const scene of publicScenes) captured.push(await capture(publicContext, scene));
-            await publicContext.close();
-        }
-
-        if (hasAuth && authScenes.length) {
-            // 로그인 화면들은 컨텍스트 하나를 같이 쓴다 — 따로 열면 앞 화면이 회전시킨 리프레시 토큰을
-            // 뒤 화면이 옛 값으로 다시 써서 서버가 재사용(탈취)으로 판단하고 세션을 끊는다.
-            const authContext = await newCaptureContext(browser, true);
-            try {
-                for (const scene of authScenes) captured.push(await capture(authContext, scene));
-            } finally {
-                await authContext.storageState({ path: AUTH_FILE });
-                await authContext.close();
-            }
-        }
+        captured = await captureScenes(browser, publicScenes, authScenes, hasAuth);
     } finally {
         await browser.close();
     }

@@ -100,7 +100,7 @@ const TrashTab = () => {
 
     const restoreMutation = useMutation({
         mutationFn: (record) => api.post(API_ENDPOINTS.TRASH.RESTORE(record.entityType, record.entityId)),
-        onSuccess: () => { message.success('복구되었습니다.'); invalidateTrash(); },
+        onSuccess: () => { message.success('복구되었습니다.'); void invalidateTrash(); },
         onError: () => message.error('복구에 실패했습니다.'),
     });
 
@@ -149,6 +149,35 @@ const TrashTab = () => {
         },
     ];
 
+    // 휴지통 목록 영역 — 오류 / 스켈레톤 / 표 중 하나.
+    let trashContent;
+    if (itemsError) {
+        trashContent = (
+            <DataState state="error" subject="휴지통 목록" error={itemsError}
+                onRetry={refetch} retrying={isFetching} compact />
+        );
+    } else if (loading || isPlaceholderData) {
+        trashContent = (
+            <AdminTableSkeleton
+                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                cols={SKELETON_COLS}
+                headers={SKELETON_HEADERS}
+                actionBtns={1}
+                pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
+            />
+        );
+    } else {
+        trashContent = (
+            <DataTable
+                columns={columns}
+                dataSource={items}
+                rowKey="id"
+                pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
+                locale={{ emptyText: '휴지통에 항목이 없습니다.' }}
+            />
+        );
+    }
+
     return (
         <div>
             {/* 다른 관리자 탭과 동일한 FilterToolbar 패턴: 3초 쿨다운(rate limit) 내장 */}
@@ -176,26 +205,7 @@ const TrashTab = () => {
                 소프트 삭제된 항목은 30일 후 자동으로 영구 삭제됩니다. 복구가 필요한 항목은 기간 내에 복구하세요.
             </div>
 
-            {itemsError ? (
-                <DataState state="error" subject="휴지통 목록" error={itemsError}
-                    onRetry={refetch} retrying={isFetching} compact />
-            ) : (loading || isPlaceholderData) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={1}
-                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            ) : (
-                <DataTable
-                    columns={columns}
-                    dataSource={items}
-                    rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                    locale={{ emptyText: '휴지통에 항목이 없습니다.' }}
-                />
-            )}
+            {trashContent}
         </div>
     );
 };

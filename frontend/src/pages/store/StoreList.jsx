@@ -76,18 +76,24 @@ const StoreList = () => {
         adService.recordImpression(adId);
     }, []);
     const resultClassName = view === 'list' ? 'reserve-store-list-rows' : 'rsv-store-grid';
-    const resultMotionClassName = !reducedMotion && bannerEntry
-        ? ' reserve-explore-result--banner-entry'
-        : !reducedMotion && pageMotion?.page === page
-            ? ` reserve-explore-result--page-${pageMotion.direction}`
-            : '';
+    let resultMotionClassName = '';
+    if (!reducedMotion && bannerEntry) {
+        resultMotionClassName = ' reserve-explore-result--banner-entry';
+    } else if (!reducedMotion && pageMotion?.page === page) {
+        resultMotionClassName = ` reserve-explore-result--page-${pageMotion.direction}`;
+    }
     const ResultItem = view === 'list' ? StoreListRow : StoreCard;
     const viewportWidth = useWindowWidth();
     const isMobile = viewportWidth < 576;
     const domainLabel = SERVICE_DOMAIN_FILTER_OPTIONS.find(option => option.value === searchParams.domain)?.label;
-    const pageTitle = searchParams.keyword.trim() ? '검색 결과'
-        : searchParams.region ? `${formatRegionLabel(searchParams.region)} 가게`
-            : searchParams.domain && domainLabel ? domainLabel : '가게 둘러보기';
+    let pageTitle = '가게 둘러보기';
+    if (searchParams.keyword.trim()) {
+        pageTitle = '검색 결과';
+    } else if (searchParams.region) {
+        pageTitle = `${formatRegionLabel(searchParams.region)} 가게`;
+    } else if (searchParams.domain && domainLabel) {
+        pageTitle = domainLabel;
+    }
 
     useDocumentTitle('가게 목록', '원하는 조건으로 최고의 가게를 찾아보세요. RESERVE에서 다양한 업종을 간편하게 예약할 수 있습니다.');
 
@@ -190,6 +196,50 @@ const StoreList = () => {
         setPendingSort(null);
     }, [setSearchParams, requestLocation, user, message, setLiveLocation]);
 
+    // 결과 영역: 로딩 → 오류 → 빈 목록 → 목록 순으로 하나만 그린다.
+    const renderResult = () => {
+        if (loading) {
+            return (
+                <div style={styles.skeletonWrap}>
+                    <div className={resultClassName} role="status" aria-label="가게 목록을 불러오는 중" aria-busy="true">
+                        {view === 'list' ? <StoreListRowSkeleton count={STORE_LIST_PAGE_SIZE} /> : <StoreCardSkeleton count={STORE_LIST_PAGE_SIZE} />}
+                    </div>
+                    <div style={styles.fadeOut} />
+                </div>
+            );
+        }
+        if (error) {
+            return (
+                <DataState state="error" kind="store" subject="가게 목록" error={error}
+                    onRetry={refetch} retrying={refetching} style={{ marginTop: 100 }} />
+            );
+        }
+        if (stores.length === 0) {
+            return (
+                <DataState state="empty" kind="store"
+                    title={searchParams.region ? '이 지역에 등록된 가게가 없습니다.' : '조건에 맞는 가게가 없습니다.'}
+                    style={{ marginTop: 100 }} />
+            );
+        }
+        return (
+            <div
+                className={resultClassName + resultMotionClassName}
+                onAnimationEnd={event => {
+                    if (event.target !== event.currentTarget) return;
+                    setBannerEntry(false);
+                    setPageMotion(null);
+                }}
+            >
+                {stores.map(store => (
+                    <StoreListResult key={store.id} isAdvertised={adStoreMap.has(store.id)} adId={adStoreMap.get(store.id)}
+                        onImpression={recordImpressionOnce}>
+                        <ResultItem store={store} userLocation={nearbyUserLocation} isAdvertised={adStoreMap.has(store.id)} />
+                    </StoreListResult>
+                ))}
+            </div>
+        );
+    };
+
     return (
         <PageContainer
             size="xl"
@@ -221,39 +271,7 @@ const StoreList = () => {
             {/* 스켈레톤은 첫 조회나 쿼리 전환으로 이전 결과를 그대로 보여줄 수 없을 때만 쓴다.
                 수동 새로고침은 현재 카드와 읽던 위치를 유지하고, 툴바 버튼만 진행 상태를 표시한다.
                 grid는 고정 4열(rsv-store-grid)로 시작해 화면 폭에 따라 반응형으로 줄어든다. */}
-            {loading ? (
-                <div style={styles.skeletonWrap}>
-                    <div className={resultClassName} role="status" aria-label="가게 목록을 불러오는 중" aria-busy="true">
-                        {view === 'list' ? <StoreListRowSkeleton count={STORE_LIST_PAGE_SIZE} /> : <StoreCardSkeleton count={STORE_LIST_PAGE_SIZE} />}
-                    </div>
-                    <div style={styles.fadeOut} />
-                </div>
-            ) : error ? (
-                <DataState state="error" kind="store" subject="가게 목록" error={error}
-                    onRetry={refetch} retrying={refetching} style={{ marginTop: 100 }} />
-            ) : stores.length === 0 ? (
-                <DataState state="empty" kind="store"
-                    title={searchParams.region ? '이 지역에 등록된 가게가 없습니다.' : '조건에 맞는 가게가 없습니다.'}
-                    style={{ marginTop: 100 }} />
-            ) : (
-                <>
-                    <div
-                        className={resultClassName + resultMotionClassName}
-                        onAnimationEnd={event => {
-                            if (event.target !== event.currentTarget) return;
-                            setBannerEntry(false);
-                            setPageMotion(null);
-                        }}
-                    >
-                        {stores.map(store => (
-                            <StoreListResult key={store.id} isAdvertised={adStoreMap.has(store.id)} adId={adStoreMap.get(store.id)}
-                                onImpression={recordImpressionOnce}>
-                                <ResultItem store={store} userLocation={nearbyUserLocation} isAdvertised={adStoreMap.has(store.id)} />
-                            </StoreListResult>
-                        ))}
-                    </div>
-                </>
-            )}
+            {renderResult()}
             {!error && totalElements > 0 && (
                 <nav aria-label="가게 목록 페이지" style={{ marginTop: 24 }}>
                     <Pagination

@@ -12,7 +12,7 @@ import { hasDistanceCoordinates } from '../utils/distanceSort';
 import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 
 export { STORE_LIST_PAGE_SIZE };
-const FILTER_KEYS = ['keyword', 'domain', 'region', 'sort', 'lat', 'lng'];
+const FILTER_KEYS = new Set(['keyword', 'domain', 'region', 'sort', 'lat', 'lng']);
 
 const readPage = (value) => {
     if (!/^[1-9]\d*$/.test(value ?? '')) return 1;
@@ -95,7 +95,7 @@ const useStoreList = () => {
             Object.entries(newParams).forEach(([key, value]) => {
                 if (value === '' || value == null) next.delete(key);
                 else next.set(key, String(value));
-                if (FILTER_KEYS.includes(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
+                if (FILTER_KEYS.has(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
             });
             if (filtersChanged || readPage(next.get('page')) === 1) next.delete('page');
             return next;

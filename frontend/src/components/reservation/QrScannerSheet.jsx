@@ -1,9 +1,11 @@
 import PropTypes from 'prop-types';
 import { Modal } from 'antd';
 import QrScannerTab from './QrScannerTab';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 /** RegionSheet와 같은 데스크톱 다이얼로그/모바일 바텀시트 표면을 쓰는 QR 체크인. */
 export default function QrScannerSheet({ open, onClose }) {
+    const reducedMotion = useReducedMotion();
     return (
         <Modal
             open={open}
@@ -11,7 +13,8 @@ export default function QrScannerSheet({ open, onClose }) {
             footer={null}
             width={520}
             zIndex={1100}
-            transitionName="reserve-region-sheet-motion"
+            transitionName={reducedMotion ? '' : 'reserve-region-sheet-motion'}
+            maskTransitionName={reducedMotion ? '' : undefined}
             destroyOnHidden
             rootClassName="reserve-region-sheet-root reserve-qr-sheet-root"
             className="reserve-region-sheet reserve-qr-sheet"

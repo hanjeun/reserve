@@ -104,6 +104,8 @@ describe('MessengerContent', () => {
             viewerRole: 'MEMBER', canSend: true, messages: [] });
         renderMessenger();
         fireEvent.click(await screen.findByRole('button', { name: '숨긴 대화 보기' }));
+        expect(await screen.findByRole('button', { name: '일반 대화 보기' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('heading', { name: '숨긴 대화' })).toBeInTheDocument();
         fireEvent.click(await screen.findByRole('button', { name: /숨긴 가게/ }));
         await waitFor(() => expect(chatService.listConversations).toHaveBeenCalledWith(0, true));
         fireEvent.click(await screen.findByRole('button', { name: '대화 관리' }));

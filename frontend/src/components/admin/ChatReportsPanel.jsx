@@ -38,6 +38,8 @@ const RESOLUTION_OPTIONS = [
     { value: 'DISMISSED', label: '신고 기각' },
 ];
 
+const STATUS_TAG_COLORS = { OPEN: 'error', REVIEWING: 'processing' };
+
 const formatDateTime = (value) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -112,7 +114,7 @@ const ChatReportsPanel = () => {
             render: (value) => value ? `메시지 #${value}` : '대화 전체' },
         { title: '설명', dataIndex: 'details', width: 260, render: (value) => value || '-' },
         { title: '상태', dataIndex: 'status', width: 100,
-            render: (value) => <Tag color={value === 'OPEN' ? 'error' : value === 'REVIEWING' ? 'processing' : 'default'}>
+            render: (value) => <Tag color={STATUS_TAG_COLORS[value] ?? 'default'}>
                 {STATUS_LABELS[value] ?? value}
             </Tag> },
         { title: '접수 시각', dataIndex: 'createdAt', width: 180, render: formatDateTime },
@@ -135,6 +137,71 @@ const ChatReportsPanel = () => {
 
     const rows = listRows(query.data);
     const total = query.data?.page?.totalElements ?? query.data?.totalElements ?? rows.length;
+    // 목록: 실패 → 로딩 → 표 순으로 판정한다.
+    const renderReports = () => {
+        if (query.isError) {
+            return (
+                <DataState state="error" kind="message" subject="채팅 신고" error={query.error}
+                    onRetry={query.refetch} retrying={query.isFetching} compact />
+            );
+        }
+        if (query.isPending) {
+            return (
+                <AdminTableSkeleton rows={4} headers={columns.map((column) => column.title)}
+                    cols={columns.map((column) => column.width)} actionBtns={3} />
+            );
+        }
+        return (
+            <DataTable
+                columns={columns}
+                dataSource={rows}
+                rowKey="id"
+                locale={{ emptyText: '해당 상태의 채팅 신고가 없습니다.' }}
+                pagination={{ current: page, pageSize: PAGE_SIZE, total, onChange: setPage }}
+                scroll={{ x: 1360 }}
+            />
+        );
+    };
+    // 신고 대화 내용: 로딩 → 실패 → 본문 순으로 판정한다.
+    const renderContext = () => {
+        if (contextQuery.isPending) {
+            return <ModalLoading text="대화 내용을 불러오는 중입니다." minHeight="160px" />;
+        }
+        if (contextQuery.isError) {
+            return (
+                <DataState state="error" kind="message" subject="신고된 대화 내용" error={contextQuery.error}
+                    onRetry={contextQuery.refetch} retrying={contextQuery.isFetching} compact />
+            );
+        }
+        return (
+            <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+                {contextQuery.data?.reportedMessage && (
+                    <div style={{ padding: 12, marginBottom: 12, borderRadius: 10, background: 'var(--c-red-50, #fff1f0)' }}>
+                        <strong>신고된 메시지</strong>
+                        {contextQuery.data.reportedMessage.imageUrl && <ChatImage
+                            url={`/api/admin/chat/reports/${contextReportId}/images/${contextQuery.data.reportedMessage.id}`}
+                            width={contextQuery.data.reportedMessage.imageWidth} height={contextQuery.data.reportedMessage.imageHeight} />}
+                        <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                            {contextQuery.data.reportedMessage.content}
+                        </div>
+                    </div>
+                )}
+                {(contextQuery.data?.recentMessages ?? []).length === 0 ? (
+                    <Text type="secondary">저장된 메시지가 없습니다.</Text>
+                ) : (contextQuery.data?.recentMessages ?? []).map((item) => (
+                    <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--c-border-light, #f2f4f6)' }}>
+                        <strong>{item.senderRole === 'OWNER' ? '사장님' : '회원'}</strong>
+                        {item.imageUrl && <ChatImage url={`/api/admin/chat/reports/${contextReportId}/images/${item.id}`}
+                            width={item.imageWidth} height={item.imageHeight} />}
+                        <div style={{ marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                            {item.content}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     return (
         <section aria-label="신고">
             <FilterToolbar
@@ -151,22 +218,7 @@ const ChatReportsPanel = () => {
                 onReload={query.refetch}
                 loading={query.isFetching}
             />
-            {query.isError ? (
-                <DataState state="error" kind="message" subject="채팅 신고" error={query.error}
-                    onRetry={query.refetch} retrying={query.isFetching} compact />
-            ) : query.isPending ? (
-                <AdminTableSkeleton rows={4} headers={columns.map((column) => column.title)}
-                    cols={columns.map((column) => column.width)} actionBtns={3} />
-            ) : (
-                <DataTable
-                    columns={columns}
-                    dataSource={rows}
-                    rowKey="id"
-                    locale={{ emptyText: '해당 상태의 채팅 신고가 없습니다.' }}
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total, onChange: setPage }}
-                    scroll={{ x: 1360 }}
-                />
-            )}
+            {renderReports()}
 
             <FormModal
                 title={`신고 #${selected?.id ?? ''} 처리`}
@@ -195,38 +247,7 @@ const ChatReportsPanel = () => {
                 footer={null}
                 width={640}
             >
-                {contextQuery.isPending ? (
-                    <ModalLoading text="대화 내용을 불러오는 중입니다." minHeight="160px" />
-                ) : contextQuery.isError ? (
-                    <DataState state="error" kind="message" subject="신고된 대화 내용" error={contextQuery.error}
-                        onRetry={contextQuery.refetch} retrying={contextQuery.isFetching} compact />
-                ) : (
-                    <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
-                        {contextQuery.data?.reportedMessage && (
-                            <div style={{ padding: 12, marginBottom: 12, borderRadius: 10, background: 'var(--c-red-50, #fff1f0)' }}>
-                                <strong>신고된 메시지</strong>
-                                {contextQuery.data.reportedMessage.imageUrl && <ChatImage
-                                    url={`/api/admin/chat/reports/${contextReportId}/images/${contextQuery.data.reportedMessage.id}`}
-                                    width={contextQuery.data.reportedMessage.imageWidth} height={contextQuery.data.reportedMessage.imageHeight} />}
-                                <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                    {contextQuery.data.reportedMessage.content}
-                                </div>
-                            </div>
-                        )}
-                        {(contextQuery.data?.recentMessages ?? []).length === 0 ? (
-                            <Text type="secondary">저장된 메시지가 없습니다.</Text>
-                        ) : (contextQuery.data?.recentMessages ?? []).map((item) => (
-                            <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--c-border-light, #f2f4f6)' }}>
-                                <strong>{item.senderRole === 'OWNER' ? '사장님' : '회원'}</strong>
-                                {item.imageUrl && <ChatImage url={`/api/admin/chat/reports/${contextReportId}/images/${item.id}`}
-                                    width={item.imageWidth} height={item.imageHeight} />}
-                                <div style={{ marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                    {item.content}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                {renderContext()}
             </FormModal>
         </section>
     );

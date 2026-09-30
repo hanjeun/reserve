@@ -14,7 +14,6 @@
 
 1. 백업과 격리 `reserve_restore_*` 복원을 확인한 뒤 적용해요([백업·복구](backup.md)).
 2. 운영 MySQL의 `SHOW CREATE TABLE`·인덱스·행 수를 읽기 전용으로 확인하고, 그 결과를 근거로 DDL을 검토해요.
-3. 스키마별 현황은 [현재 상태](current-status.md)를 봐요.
 
 접속:
 ```bash

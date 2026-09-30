@@ -13,11 +13,19 @@ const savedTimeLabel = savedAt => {
     }).format(savedAt);
 };
 
+// 제출 버튼 문구 — 등록/수정 × 진행 중 여부
+const submitLabel = (mode, loading) => {
+    if (loading) return mode === 'create' ? '등록 중...' : '수정 중...';
+    return mode === 'create' ? '등록 완료' : '수정 완료';
+};
+
 const draftLabel = draftState => {
     if (draftState?.status === 'pending') return '변경 내용을 자동 저장할게요.';
     if (draftState?.status === 'saving') return '이 브라우저에 저장 중…';
     if (draftState?.status === 'saved') {
-        return `이 브라우저에 저장됨${savedTimeLabel(draftState.savedAt) ? ` · ${savedTimeLabel(draftState.savedAt)}` : ''}`;
+        const savedTime = savedTimeLabel(draftState.savedAt);
+        const savedSuffix = savedTime ? ' · ' + savedTime : '';
+        return `이 브라우저에 저장됨${savedSuffix}`;
     }
     if (draftState?.status === 'error') return draftState.error || '임시저장에 실패했습니다.';
     return '입력 내용과 새 이미지는 이 브라우저에만 자동 저장돼요.';
@@ -58,9 +66,7 @@ const StoreFormActions = ({ mode = 'create', loading = false, onSaveDraft, draft
                     disabled={savingDraft}
                     block
                 >
-                    {loading
-                        ? (mode === 'create' ? '등록 중...' : '수정 중...')
-                        : (mode === 'create' ? '등록 완료' : '수정 완료')}
+                    {submitLabel(mode, loading)}
                 </Button>
             </Flex>
         </div>

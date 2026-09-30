@@ -11,6 +11,9 @@ const NOTES = {
 
 export default function ChatNotificationControl({ state, onEnable, onDisable }) {
     const unavailable = ['denied', 'unsupported', 'insecure', 'disposed'].includes(state.status);
+    let toggleLabel = 'PC 알림 켜기';
+    if (state.enabled) toggleLabel = 'PC 알림 끄기';
+    else if (state.status === 'requesting') toggleLabel = '권한 확인 중';
     return (
         <section className="reserve-messenger-notification-control" aria-label="PC 세션 알림">
             <Button
@@ -20,7 +23,7 @@ export default function ChatNotificationControl({ state, onEnable, onDisable }) 
                 aria-pressed={state.enabled}
                 disabled={unavailable || state.status === 'requesting'}
                 onClick={state.enabled ? onDisable : onEnable}
-            >{state.enabled ? 'PC 알림 끄기' : state.status === 'requesting' ? '권한 확인 중' : 'PC 알림 켜기'}</Button>
+            >{toggleLabel}</Button>
             <p role="status">{NOTES[state.status] || '대화를 열어둔 동안만 알림 · 이름과 메시지 내용은 표시하지 않아요.'}</p>
         </section>
     );

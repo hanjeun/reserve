@@ -155,10 +155,14 @@ test('list region hover surface stays smaller than its touch target and reduced 
     await recordRegionMotion(page);
     await trigger.click();
     await expect(page.locator('.reserve-region-sheet-root .ant-modal')).toBeVisible();
-    const durations = await page.evaluate(() => window.__regionMotion
-        .filter(entry => entry.className.includes('reserve-region-sheet-motion-'))
-        .flatMap(entry => [entry.duration, entry.containerDuration]));
-    expect(durations).toContain('0s');
+    const sheet = page.locator('.reserve-region-sheet-root .ant-modal');
+    await expect(sheet).toHaveCSS('animation-name', 'none');
+    await sheet.locator('.ant-modal-close').click();
+    await expect(sheet).toBeHidden();
+    await trigger.click();
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
 });
 
 test('mobile region sheet entrance follows one upward path without a snap back', async ({ page, isMobile }) => {

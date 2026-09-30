@@ -79,6 +79,49 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
     const readinessUnavailable = readinessError || (readiness && typeof readiness.canClose !== 'boolean');
     const canDelete = !loadingReadiness && !readinessUnavailable && canClose;
 
+    // 영업 종료 준비 상태 영역 — 확인 중 / 확인 실패 / 결과 중 하나.
+    let readinessContent = null;
+    if (loadingReadiness) {
+        readinessContent = (
+            <ModalLoading text="예약·결제 상태 확인 중..." minHeight="120px" />
+        );
+    } else if (readinessUnavailable) {
+        readinessContent = (
+            <div style={{ marginTop: 16, background: colors.error.light, borderRadius: radius.md, padding: '12px 14px' }}>
+                <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main, display: 'block', marginBottom: 2 }}>
+                    영업 종료 준비 상태를 확인하지 못했습니다
+                </Text>
+                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                    잠시 후 다시 시도해주세요. 확인 전에는 영업을 종료할 수 없습니다.
+                </Text>
+            </div>
+        );
+    } else if (readiness) {
+        readinessContent = (
+            <div style={{ marginTop: 16 }}>
+                {canClose && (
+                    <div style={{ background: colors.success.light, borderRadius: radius.md, padding: '12px 14px' }}>
+                        <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
+                            미결 운영 항목이 없습니다
+                        </Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>거래 원장을 보존한 채 공개 영업을 종료할 수 있습니다.</Text>
+                    </div>
+                )}
+
+                {!canClose && (
+                    <div style={{ background: colors.warning.light, borderRadius: radius.md, padding: '12px 14px' }}>
+                        <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
+                            먼저 처리해야 할 항목이 {blockerCount}건 있습니다
+                        </Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                            예약 {readiness.unresolvedReservations} · 광고 {readiness.activeAdvertisements} · 환불 {readiness.unresolvedRefunds} · 결제 확인 {readiness.openPaymentIssues} · 웹훅 {readiness.unfinishedWebhooks}
+                        </Text>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
         <Modal
             title={
@@ -111,40 +154,7 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
                 </Text>
 
                 {/* 예약 수 로딩 */}
-                {loadingReadiness ? (
-                    <ModalLoading text="예약·결제 상태 확인 중..." minHeight="120px" />
-                ) : readinessUnavailable ? (
-                    <div style={{ marginTop: 16, background: colors.error.light, borderRadius: radius.md, padding: '12px 14px' }}>
-                        <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main, display: 'block', marginBottom: 2 }}>
-                            영업 종료 준비 상태를 확인하지 못했습니다
-                        </Text>
-                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                            잠시 후 다시 시도해주세요. 확인 전에는 영업을 종료할 수 없습니다.
-                        </Text>
-                    </div>
-                ) : readiness && (
-                    <div style={{ marginTop: 16 }}>
-                        {canClose && (
-                            <div style={{ background: colors.success.light, borderRadius: radius.md, padding: '12px 14px' }}>
-                                <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
-                                    미결 운영 항목이 없습니다
-                                </Text>
-                                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>거래 원장을 보존한 채 공개 영업을 종료할 수 있습니다.</Text>
-                            </div>
-                        )}
-
-                        {!canClose && (
-                            <div style={{ background: colors.warning.light, borderRadius: radius.md, padding: '12px 14px' }}>
-                                <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
-                                    먼저 처리해야 할 항목이 {blockerCount}건 있습니다
-                                </Text>
-                                <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                                    예약 {readiness.unresolvedReservations} · 광고 {readiness.activeAdvertisements} · 환불 {readiness.unresolvedRefunds} · 결제 확인 {readiness.openPaymentIssues} · 웹훅 {readiness.unfinishedWebhooks}
-                                </Text>
-                            </div>
-                        )}
-                    </div>
-                )}
+                {readinessContent}
 
                 {/* 공통 경고 */}
                 <div style={{
@@ -163,6 +173,69 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
     );
 };
 
+const resolveOwnerSort = (params) => (OWNER_SORT_OPTIONS.some(option => option.value === params.get('sort'))
+    ? params.get('sort') : 'recent');
+
+// 툴바 값 하나를 URL 에 반영한다 — 빈 값과 기본 정렬(recent)은 URL 에서 뺀다.
+const withToolbarParam = (current, key, value) => {
+    const next = new URLSearchParams(current);
+    if (value && !(key === 'sort' && value === 'recent')) next.set(key, value);
+    else next.delete(key);
+    return next;
+};
+
+const OwnedStoresSkeleton = ({ view }) => (
+    <div className={view === 'list' ? 'reserve-store-list-rows' : 'rsv-mystore-grid'} role="status" aria-label="내 가게를 불러오는 중">
+        <div style={{ display: 'contents' }} aria-hidden="true">
+            {view === 'list' ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
+        </div>
+    </div>
+);
+
+// 가게 목록 본문 — 목록형 / 카드형 / 빈 안내 중 하나.
+const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegister, onResetFilters }) => {
+    if (visibleStores.length > 0 && view === 'list') {
+        return (
+            <>
+                <div className="reserve-store-list-rows reserve-mystore-list-rows">
+                    {visibleStores.map(store => (
+                        <StoreListRow key={store.id} store={store} className="reserve-mystore-list-row"
+                            actions={managedActions(store, onEdit, onDelete, true)} />
+                    ))}
+                </div>
+                <button type="button" className="reserve-mystore-add-row" onClick={onRegister}>
+                    <PlusOutlined aria-hidden="true" /> 새 가게 등록하기
+                </button>
+            </>
+        );
+    }
+    if (visibleStores.length > 0) {
+        return (
+            <div className="rsv-mystore-grid">
+                {/* 가게 전체보기와 같은 StoreCard 를 재사용한다. 관리 화면이라 하트 대신 수정·삭제 줄을 붙인다. */}
+                {visibleStores.map(store => (
+                    <div key={store.id}>
+                        <StoreCard store={store} showFavorite={false}
+                            actions={managedActions(store, onEdit, onDelete)} />
+                    </div>
+                ))}
+                <div>
+                    <Card.Add onClick={onRegister} minHeight="350px">
+                        새 가게 등록하기
+                    </Card.Add>
+                </div>
+            </div>
+        );
+    }
+    return (
+        <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
+            title={stores.length > 0 ? '조건에 맞는 내 가게가 없습니다.' : '등록된 가게가 없습니다.'}
+            action={stores.length > 0
+                ? <Button variant="secondary" size="sm" onClick={onResetFilters}>필터 초기화</Button>
+                : <Button variant="secondary" size="sm" onClick={onRegister}>새 가게 등록하기</Button>} />
+    );
+};
+
 // ─── MyStores 메인 ──────────────────────────────────────────────────────────
 const MyStores = () => {
     const navigate = useNavigate();
@@ -174,16 +247,10 @@ const MyStores = () => {
     const [retrying, setRetrying] = useState(false);
     const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'cards');
     const domain = urlSearchParams.get('domain') || '';
-    const sort = OWNER_SORT_OPTIONS.some(option => option.value === urlSearchParams.get('sort'))
-        ? urlSearchParams.get('sort') : 'recent';
+    const sort = resolveOwnerSort(urlSearchParams);
     const visibleStores = filterAndSortOwnedStores(stores, { domain, sort });
 
-    const setToolbarParam = (key, value) => setUrlSearchParams(current => {
-        const next = new URLSearchParams(current);
-        if (value && !(key === 'sort' && value === 'recent')) next.set(key, value);
-        else next.delete(key);
-        return next;
-    });
+    const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const resetOwnedFilters = () => setUrlSearchParams(current => {
         const next = new URLSearchParams(current);
         next.delete('region'); // 예전 지역 필터 링크로 들어온 경우 URL의 낡은 값도 함께 없앤다.
@@ -222,6 +289,32 @@ const MyStores = () => {
 
     const handleEdit = store => navigate(`/store/${store.id}/edit`);
 
+    // 카드 영역 — 로딩 / 첫 조회 실패 / 목록 중 하나.
+    let storesContent;
+    if (loading) {
+        storesContent = <OwnedStoresSkeleton view={view} />;
+    } else if (error && stores.length === 0) {
+        storesContent = (
+            // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
+            <DataState state="error" kind="store" subject="가게 목록" error={error}
+                onRetry={handleRetry} retrying={retrying} style={{ marginTop: 100 }} />
+        );
+    } else {
+        storesContent = (
+            <>
+                {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
+                {error && (
+                    <DataState state="error" kind="store" subject="가게 목록" error={error}
+                        title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                        onRetry={handleRetry} retrying={retrying} compact style={{ marginBottom: 16 }} />
+                )}
+                <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
+                    onEdit={handleEdit} onDelete={handleDeleteClick}
+                    onRegister={() => navigate('/store/register')} onResetFilters={resetOwnedFilters} />
+            </>
+        );
+    }
+
     return (
         <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page" aria-busy={loading || retrying}>
             {/* 헤더 */}
@@ -250,60 +343,7 @@ const MyStores = () => {
 
             {/* 카드 영역 — 2026-07 수정: 고정 4열 그리드(rsv-mystore-grid)로 통일(위 GRID_STYLE 참고).
                 Card.Add도 같은 시점에 borderRadius를 0(각짐)으로 맞춰서 실제 가게 카드와 모서리가 일치한다. */}
-            {loading ? (
-                <div className={view === 'list' ? 'reserve-store-list-rows' : 'rsv-mystore-grid'} role="status" aria-label="내 가게를 불러오는 중">
-                    <div style={{ display: 'contents' }} aria-hidden="true">
-                        {view === 'list' ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
-                    </div>
-                </div>
-            ) : error && stores.length === 0 ? (
-                // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
-                <DataState state="error" kind="store" subject="가게 목록" error={error}
-                    onRetry={handleRetry} retrying={retrying} style={{ marginTop: 100 }} />
-            ) : (
-                <>
-                    {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
-                    {error && (
-                        <DataState state="error" kind="store" subject="가게 목록" error={error}
-                            title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있습니다."
-                            onRetry={handleRetry} retrying={retrying} compact style={{ marginBottom: 16 }} />
-                    )}
-                    {visibleStores.length > 0 && view === 'list' ? (
-                        <>
-                            <div className="reserve-store-list-rows reserve-mystore-list-rows">
-                                {visibleStores.map(store => (
-                                    <StoreListRow key={store.id} store={store} className="reserve-mystore-list-row"
-                                        actions={managedActions(store, handleEdit, handleDeleteClick, true)} />
-                                ))}
-                            </div>
-                            <button type="button" className="reserve-mystore-add-row" onClick={() => navigate('/store/register')}>
-                                <PlusOutlined aria-hidden="true" /> 새 가게 등록하기
-                            </button>
-                        </>
-                    ) : visibleStores.length > 0 ? (
-                        <div className="rsv-mystore-grid">
-                            {/* 가게 전체보기와 같은 StoreCard 를 재사용한다. 관리 화면이라 하트 대신 수정·삭제 줄을 붙인다. */}
-                            {visibleStores.map(store => (
-                                <div key={store.id}>
-                                    <StoreCard store={store} showFavorite={false}
-                                        actions={managedActions(store, handleEdit, handleDeleteClick)} />
-                                </div>
-                            ))}
-                            <div>
-                                <Card.Add onClick={() => navigate('/store/register')} minHeight="350px">
-                                    새 가게 등록하기
-                                </Card.Add>
-                            </div>
-                        </div>
-                    ) : (
-                        <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
-                            title={stores.length > 0 ? '조건에 맞는 내 가게가 없습니다.' : '등록된 가게가 없습니다.'}
-                            action={stores.length > 0
-                                ? <Button variant="secondary" size="sm" onClick={resetOwnedFilters}>필터 초기화</Button>
-                                : <Button variant="secondary" size="sm" onClick={() => navigate('/store/register')}>새 가게 등록하기</Button>} />
-                    )}
-                </>
-            )}
+            {storesContent}
 
             {/* 삭제 모달 */}
             <DeleteStoreModal

@@ -16,7 +16,7 @@ export default function MockMyReservations() {
             </div>
 
             {RESERVATION_DATA.map((r, i) => (
-                <React.Fragment key={i}>
+                <React.Fragment key={r.storeName}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0' }}>
                         {/* 썸네일 */}
                         <div style={{ width: 52, height: 52, borderRadius: radius.lg, overflow: 'hidden', background: colors.gray[100], flexShrink: 0 }}>

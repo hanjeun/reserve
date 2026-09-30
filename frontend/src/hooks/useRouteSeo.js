@@ -14,9 +14,16 @@ const INDEXABLE_PATHS = [
     /^\/operation-guide$/,
 ];
 
+// 끝의 '/'를 전부 걷어낸다 — /\/+$/ 정규식은 '/'가 길게 이어지면 역추적이 커서 반복문으로 같은 결과를 만든다.
+const trimTrailingSlashes = (path) => {
+    let end = path.length;
+    while (end > 0 && path[end - 1] === '/') end -= 1;
+    return path.slice(0, end);
+};
+
 export const normalizeSeoPath = (pathname) => {
     const safePath = typeof pathname === 'string' && pathname.startsWith('/') ? pathname : '/';
-    return safePath === '/' ? '/' : safePath.replace(/\/+$/, '');
+    return safePath === '/' ? '/' : trimTrailingSlashes(safePath);
 };
 
 export const isIndexablePath = (pathname) => {

@@ -196,7 +196,7 @@ function AppContent() {
                 setLoading(false);
             }
         };
-        initAuth();
+        void initAuth();
     }, [initializeAuth]);
 
     // 로그인 확인 중에도 빈 화면 + 스피너 대신 헤더 자리와 그 페이지 모양의 스켈레톤을 바로 그린다(2026-09-24).

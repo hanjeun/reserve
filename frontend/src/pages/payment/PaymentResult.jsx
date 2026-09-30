@@ -97,7 +97,7 @@ const PaymentResult = () => {
     useEffect(() => {
         if (!confirmed) return;
         // 내 목록뿐 아니라 예약 달력의 빈자리·공개 광고·통계도 결제로 바뀐다(invalidateAfterWrite.js).
-        (isAd ? invalidateAdData : invalidateReservationData)(queryClient);
+        void (isAd ? invalidateAdData : invalidateReservationData)(queryClient);
     }, [confirmed, isAd, queryClient]);
 
     if (verifying) {

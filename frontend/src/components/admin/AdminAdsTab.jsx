@@ -104,7 +104,7 @@ const AdminAdsTab = () => {
         onSuccess: () => {
             message.success('광고가 중단되었습니다.');
             // 관리자 광고 목록(adKeys.admin)뿐 아니라 공개 배너·배지에서도 빠져야 한다.
-            invalidateAdData(queryClient);
+            void invalidateAdData(queryClient);
             setSuspendTarget(null);
         },
         onError: () => message.error('중단 처리에 실패했습니다.'),

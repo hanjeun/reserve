@@ -25,7 +25,7 @@ function useFavoriteToggle(storeId, queryClient, message) {
             const added = res?.isFavorite ?? res?.favorite;
             queryClient.setQueryData(favoriteKeys.status(storeId), added);
             // 하트만 바꾸면 '내 즐겨찾기' 목록은 staleTime(3분) 동안 옛 목록이 남는다.
-            invalidateFavoriteData(queryClient);
+            void invalidateFavoriteData(queryClient);
             message.success(toggleSuccessMessage(added));
         },
         onError: (_err, _vars, ctx) => {
@@ -139,7 +139,7 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', appearance = 'ove
         e.preventDefault();
         if (toggleMutation.isPending) return;
         if (statusUnknown) {
-            if (statusFailed && !statusFetching) refetchStatus();
+            if (statusFailed && !statusFetching) void refetchStatus();
             return;
         }
         toggleMutation.mutate();

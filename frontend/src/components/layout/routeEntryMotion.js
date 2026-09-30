@@ -10,6 +10,24 @@ const isSearchPath = (pathname) => /^\/search\/?$/.test(pathname || '');
 // 들어갈 때도 나올 때도 페이지 전환(옆으로 밀기)을 걸지 않고 화면 자체 애니메이션만 재생한다(2026-09-24).
 const hasOwnMotion = (pathname) => isSearchPath(pathname) || /^\/messages(\/|$)/.test(pathname || '');
 
+// 두 위치가 모두 있고 서로 다르면 앞/뒤 방향을, 아니면 null 을 돌려준다.
+const directionBetween = (previous, current, isKnown) => {
+    if (!isKnown(previous) || !isKnown(current) || previous === current) return null;
+    return current > previous ? 'from-right' : 'from-left';
+};
+const isTabIndex = (index) => index >= 0;
+const isHistoryIndex = (index) => index != null;
+
+// 전환을 걸지 않는 이동 — 같은 화면, 검색 닫기, 자체 애니메이션 화면.
+const skipsRouteMotion = (previousPathname, pathname) => {
+    if (!previousPathname || previousPathname === pathname) return true;
+
+    // 검색 화면을 닫는 이동(검색 실행·빠른 검색·취소·Esc)은 화면을 옮기는 게 아니라 검색창을 닫는 것이다.
+    // 결과(또는 원래 화면)가 전환 없이 바로 보이고, 결과는 스켈레톤으로 채워진다 (2026-09-23).
+    if (isSearchPath(previousPathname)) return true;
+    return hasOwnMotion(previousPathname) || hasOwnMotion(pathname);
+};
+
 export const resolveRouteEntryMotion = ({
     previousPathname,
     pathname,
@@ -20,24 +38,13 @@ export const resolveRouteEntryMotion = ({
     navigationType,
     explicitDirection,
 }) => {
-    if (!previousPathname || previousPathname === pathname) return null;
+    if (skipsRouteMotion(previousPathname, pathname)) return null;
 
-    // 검색 화면을 닫는 이동(검색 실행·빠른 검색·취소·Esc)은 화면을 옮기는 게 아니라 검색창을 닫는 것이다.
-    // 결과(또는 원래 화면)가 전환 없이 바로 보이고, 결과는 스켈레톤으로 채워진다 (2026-09-23).
-    if (isSearchPath(previousPathname)) return null;
-    if (hasOwnMotion(previousPathname) || hasOwnMotion(pathname)) return null;
+    const tabDirection = directionBetween(previousDiscoveryTabIndex, currentDiscoveryTabIndex, isTabIndex);
+    if (tabDirection) return tabDirection;
 
-    if (previousDiscoveryTabIndex >= 0 && currentDiscoveryTabIndex >= 0
-        && previousDiscoveryTabIndex !== currentDiscoveryTabIndex) {
-        return currentDiscoveryTabIndex > previousDiscoveryTabIndex ? 'from-right' : 'from-left';
-    }
-
-    if (navigationType === 'POP') {
-        if (previousHistoryIndex != null && historyIndex != null && previousHistoryIndex !== historyIndex) {
-            return historyIndex > previousHistoryIndex ? 'from-right' : 'from-left';
-        }
-        return 'from-left';
-    }
+    const historyDirection = directionBetween(previousHistoryIndex, historyIndex, isHistoryIndex);
+    if (navigationType === 'POP') return historyDirection ?? 'from-left';
 
     if (ROUTE_ENTRY_DIRECTIONS.has(explicitDirection)) return explicitDirection;
 
@@ -46,9 +53,5 @@ export const resolveRouteEntryMotion = ({
     // 로그인 필요 → 로그인, 로그인 후 원래 가려던 곳)은 호출부가 의미에 맞는 방향을 reserveRouteMotion 으로 명시한다.
     if (navigationType === 'REPLACE') return null;
 
-    if (previousHistoryIndex != null && historyIndex != null && previousHistoryIndex !== historyIndex) {
-        return historyIndex > previousHistoryIndex ? 'from-right' : 'from-left';
-    }
-
-    return 'from-right';
+    return historyDirection ?? 'from-right';
 };

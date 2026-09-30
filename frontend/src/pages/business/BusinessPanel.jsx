@@ -51,6 +51,75 @@ const positivePageOrOne = (value) => {
     return Number.isSafeInteger(page) && page > 0 ? page : 1;
 };
 
+// useManageReservations 조회 조건 — 'ALL'·빈 검색어는 보내지 않는다
+const buildManageQuery = ({ page, debouncedKeyword, statusFilter, storeFilter, sort }) => ({
+    page: page - 1,
+    size: DEFAULT_PAGE_SIZE,
+    search: debouncedKeyword.trim() || undefined,
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
+    storeId: storeFilter === 'ALL' ? undefined : Number(storeFilter),
+    sort,
+});
+
+// 예약 목록 본문 — 로딩 스켈레톤 / 빈 안내 / 목록 중 하나.
+const renderListBody = ({ loading, view, reservations, statusFilter, debouncedKeyword, cardProps }) => {
+    if (loading) {
+        return (
+            view === 'cards'
+                ? <ReservationSummaryCardSkeleton count={5} />
+                : <ReservationCardSkeleton count={5} />
+        );
+    }
+    if (reservations.length === 0) {
+        return (
+            <DataState state="empty" kind="reservation" style={{ marginTop: 80 }}
+                title={statusFilter === 'ALL' && !debouncedKeyword.trim()
+                    ? '예약 내역이 없습니다.'
+                    : '조건에 맞는 예약이 없습니다.'} />
+        );
+    }
+    return (
+        <div className={view === 'cards' ? 'reserve-reservation-card-grid' : undefined} style={view === 'list' ? styles.list : undefined}>
+            {reservations.map((res, i) => (
+                <React.Fragment key={res.id}>
+                    <ReservationCard
+                        view={view}
+                        reservation={res}
+                        {...cardProps}
+                    />
+                    {view === 'list' && i < reservations.length - 1 && <div style={styles.divider} />}
+                </React.Fragment>
+            ))}
+        </div>
+    );
+};
+
+// 가게 목록·예약 목록이 둘 다 실패하면 하나의 오류로, 예약만 실패하면 예약 오류만 보여 준다.
+const renderMainContent = ({ error, myStoresError, myStoresLoading, busy, retryAll, refetch, retryStores, listBody }) => {
+    if (error && myStoresError) {
+        return (
+            <DataState state="error" kind="reservation" subject="예약 관리 데이터"
+                title="예약 관리 데이터를 불러오지 못했습니다." error={error}
+                onRetry={retryAll} retrying={busy} />
+        );
+    }
+    if (error) {
+        return (
+            <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                onRetry={refetch} retrying={busy} />
+        );
+    }
+    return (
+        <>
+            {myStoresError && (
+                <DataState state="error" kind="store" subject="가게별 필터용 가게 목록" error={myStoresError}
+                    onRetry={retryStores} retrying={myStoresLoading} compact style={{ marginBottom: 16 }} />
+            )}
+            {listBody}
+        </>
+    );
+};
+
 const ReservationTab = () => {
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const [reservationParams, setReservationParams] = useQueryParamsState(RESERVATION_QUERY_DEFAULTS);
@@ -65,14 +134,9 @@ const ReservationTab = () => {
     const { stores: myStores, loading: myStoresLoading, error: myStoresError, refetch: refetchStores } = useMyStores();
     const page = positivePageOrOne(reservationParams.reservationPage);
     const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
-    const { reservations, total, totalPages, error, loading, refetching, actionLoading, approve, reject, storeCancel, complete, noShow, refetch } = useManageReservations({
-        page: page - 1,
-        size: DEFAULT_PAGE_SIZE,
-        search: debouncedKeyword.trim() || undefined,
-        status: statusFilter === 'ALL' ? undefined : statusFilter,
-        storeId: storeFilter === 'ALL' ? undefined : Number(storeFilter),
-        sort,
-    });
+    const { reservations, total, totalPages, error, loading, refetching, actionLoading, approve, reject, storeCancel, complete, noShow, refetch } = useManageReservations(
+        buildManageQuery({ page, debouncedKeyword, statusFilter, storeFilter, sort }),
+    );
     const { message, confirm } = useMessage();
     const retryStores = () => refetchStores();
     const retryAll = () => {
@@ -105,68 +169,23 @@ const ReservationTab = () => {
         });
     };
 
-    // 예약 목록 본문 — 로딩 스켈레톤 / 빈 안내 / 목록 중 하나.
-    let listBody;
-    if (loading) {
-        listBody = (
-            view === 'cards'
-                ? <ReservationSummaryCardSkeleton count={5} />
-                : <ReservationCardSkeleton count={5} />
-        );
-    } else if (reservations.length === 0) {
-        listBody = (
-            <DataState state="empty" kind="reservation" style={{ marginTop: 80 }}
-                title={statusFilter === 'ALL' && !debouncedKeyword.trim()
-                    ? '예약 내역이 없습니다.'
-                    : '조건에 맞는 예약이 없습니다.'} />
-        );
-    } else {
-        listBody = (
-            <div className={view === 'cards' ? 'reserve-reservation-card-grid' : undefined} style={view === 'list' ? styles.list : undefined}>
-                {reservations.map((res, i) => (
-                    <React.Fragment key={res.id}>
-                        <ReservationCard
-                            view={view}
-                            reservation={res}
-                            actionLoading={actionLoading}
-                            onApprove={approve}
-                            onReject={reject}
-                            onComplete={complete}
-                            onNoShow={noShow}
-                            onStoreCancel={storeCancel}
-                            onRemove={handleRemove}
-                        />
-                        {view === 'list' && i < reservations.length - 1 && <div style={styles.divider} />}
-                    </React.Fragment>
-                ))}
-            </div>
-        );
-    }
+    const listBody = renderListBody({
+        loading, view, reservations, statusFilter, debouncedKeyword,
+        cardProps: {
+            actionLoading,
+            onApprove: approve,
+            onReject: reject,
+            onComplete: complete,
+            onNoShow: noShow,
+            onStoreCancel: storeCancel,
+            onRemove: handleRemove,
+        },
+    });
 
-    // 가게 목록·예약 목록이 둘 다 실패하면 하나의 오류로, 예약만 실패하면 예약 오류만 보여 준다.
-    let mainContent;
-    if (error && myStoresError) {
-        mainContent = (
-            <DataState state="error" kind="reservation" subject="예약 관리 데이터"
-                title="예약 관리 데이터를 불러오지 못했습니다." error={error}
-                onRetry={retryAll} retrying={loading || refetching} />
-        );
-    } else if (error) {
-        mainContent = (
-            <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                onRetry={refetch} retrying={loading || refetching} />
-        );
-    } else {
-        mainContent = (
-            <>
-                {myStoresError && (
-                    <DataState state="error" kind="store" subject="가게별 필터용 가게 목록" error={myStoresError}
-                        onRetry={retryStores} retrying={myStoresLoading} compact style={{ marginBottom: 16 }} />
-                )}
-                {listBody}
-            </>
-        );
-    }
+    const mainContent = renderMainContent({
+        error, myStoresError, myStoresLoading, busy: loading || refetching,
+        retryAll, refetch, retryStores, listBody,
+    });
 
     return (
         <>

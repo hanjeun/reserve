@@ -172,6 +172,89 @@ const IMAGE_FIXTURES = new Map([
     ['/store-fitness.svg', syntheticStoreImage('FITNESS', '#e1693a', '#f3b15c', '#e98340')],
 ]);
 
+const STORE_STATISTICS = {
+    averageRating: 4.9,
+    reviewCount: 128,
+    totalDepositRevenue: 1840000,
+    reservationTrend: [
+        { date: '2026-08-25', value: 14 },
+        { date: '2026-08-30', value: 22 },
+        { date: '2026-09-04', value: 18 },
+        { date: '2026-09-09', value: 31 },
+        { date: '2026-09-14', value: 27 },
+        { date: '2026-09-19', value: 36 },
+    ],
+    statusBreakdown: { CONFIRMED: 46, COMPLETED: 71, CANCELED: 9, NO_SHOW: 2 },
+    revenueTrend: [
+        { date: '2026-08-25', value: 210000 },
+        { date: '2026-08-30', value: 280000 },
+        { date: '2026-09-04', value: 245000 },
+        { date: '2026-09-09', value: 360000 },
+        { date: '2026-09-14', value: 325000 },
+        { date: '2026-09-19', value: 420000 },
+    ],
+    adSummary: {
+        adType: 'BANNER',
+        daysRemaining: 12,
+        impressionCount: 1240,
+        clickCount: 186,
+        conversionCount: 28,
+        clickThroughRate: 15.0,
+        conversionRate: 15.1,
+    },
+};
+
+const is = expected => pathname => pathname === expected;
+
+// API 경로별 가짜 응답 — 위에서부터 처음 맞는 규칙 하나만 쓴다.
+const MOCK_ROUTES = [
+    [p => p === '/api/member/me' || p === '/api/auth/refresh',
+        (route, { authenticatedUser }) => (authenticatedUser ? ok(route, authenticatedUser) : unauthorized(route))],
+    [p => p.endsWith('/waiting-count') || p.endsWith('/unread'), route => ok(route, 0)],
+    [is('/api/notices/highlights'), route => ok(route, [])],
+    [p => p === '/api/stores/regions' || p.startsWith('/api/tourism/'), route => ok(route, [])],
+
+    [(p, { request }) => p === '/api/stores' && request.method() === 'GET',
+        route => ok(route, pageOf(STORES, STORES.length, 12))],
+    [is('/api/stores/101'), route => ok(route, DETAIL_STORE)],
+    [is('/api/stores/my'), route => ok(route, [{ id: 701, name: '샘플 커피 스튜디오', status: 'ACTIVE' }])],
+    [is('/api/stores/701/statistics'), route => ok(route, STORE_STATISTICS)],
+
+    [is('/api/advertisements/active'), (route, { url }) => {
+        const type = url.searchParams.get('type');
+        return ok(route, type === 'BADGE' ? [{ id: 501, storeId: 101, adType: 'BADGE' }] : []);
+    }],
+    [p => /^\/api\/advertisements\/\d+\/(impression|click)$/.test(p), route => ok(route, null)],
+    [is('/api/advertisements/my'), route => ok(route, pageOf([], 0))],
+
+    [is('/api/reviews/store/101'), route => ok(route, pageOf([], 0))],
+    [p => /^\/api\/favorites\/status\/\d+$/.test(p), route => ok(route, false)],
+    [p => p === '/api/reservations/calendar' || p === '/api/reservations/availability', route => ok(route, [])],
+    [is('/api/reservations/my/store/101/completed'), route => ok(route, [])],
+    [is('/api/reservations/store'), route => ok(route, pageOf([], 0, 15))],
+
+    [is('/api/business-verification/admin/list'), route => ok(route, pageOf([], 18, 1))],
+    [is('/api/reservations/store/status-summary'), route => ok(route, {
+        total: 128,
+        statusCounts: { PENDING: 12, CONFIRMED: 43, COMPLETED: 61, CANCELED: 10, NO_SHOW: 2 },
+    })],
+    [is('/api/admin/trash'), route => ok(route, pageOf([
+        { id: 1, entityType: 'RESERVATION', action: 'SOFT_DELETE' },
+        { id: 2, entityType: 'STORE', action: 'SOFT_DELETE' },
+        { id: 3, entityType: 'REVIEW', action: 'SOFT_DELETE' },
+        { id: 4, entityType: 'RESERVATION', action: 'SOFT_DELETE' },
+    ], 6, 50))],
+    [is('/api/admin/audit-logs'), route => ok(route, pageOf([
+        { id: 11, action: 'SOFT_DELETE', entityType: 'RESERVATION' },
+        { id: 12, action: 'RESTORE', entityType: 'STORE' },
+        { id: 13, action: 'SOFT_DELETE', entityType: 'REVIEW' },
+        { id: 14, action: 'HARD_DELETE', entityType: 'SENT_MAIL' },
+        { id: 15, action: 'RESTORE', entityType: 'RESERVATION' },
+    ], 342, 50))],
+
+    [p => /^\/api\/chat\/rooms\/\d+\/(messages|read)$/.test(p), route => ok(route, [])],
+];
+
 async function mockApi(route, authenticatedUser) {
     const request = route.request();
     const url = new URL(request.url());
@@ -179,94 +262,9 @@ async function mockApi(route, authenticatedUser) {
 
     if (!pathname.startsWith('/api/')) return route.continue();
 
-    if (pathname === '/api/member/me' || pathname === '/api/auth/refresh') {
-        return authenticatedUser ? ok(route, authenticatedUser) : unauthorized(route);
-    }
-    if (pathname.endsWith('/waiting-count') || pathname.endsWith('/unread')) return ok(route, 0);
-    if (pathname === '/api/notices/highlights') return ok(route, []);
-    if (pathname === '/api/stores/regions' || pathname.startsWith('/api/tourism/')) return ok(route, []);
-
-    if (pathname === '/api/stores' && request.method() === 'GET') {
-        return ok(route, pageOf(STORES, STORES.length, 12));
-    }
-    if (pathname === '/api/stores/101') return ok(route, DETAIL_STORE);
-    if (pathname === '/api/stores/my') {
-        return ok(route, [{ id: 701, name: '샘플 커피 스튜디오', status: 'ACTIVE' }]);
-    }
-    if (pathname === '/api/stores/701/statistics') {
-        return ok(route, {
-            averageRating: 4.9,
-            reviewCount: 128,
-            totalDepositRevenue: 1840000,
-            reservationTrend: [
-                { date: '2026-08-25', value: 14 },
-                { date: '2026-08-30', value: 22 },
-                { date: '2026-09-04', value: 18 },
-                { date: '2026-09-09', value: 31 },
-                { date: '2026-09-14', value: 27 },
-                { date: '2026-09-19', value: 36 },
-            ],
-            statusBreakdown: { CONFIRMED: 46, COMPLETED: 71, CANCELED: 9, NO_SHOW: 2 },
-            revenueTrend: [
-                { date: '2026-08-25', value: 210000 },
-                { date: '2026-08-30', value: 280000 },
-                { date: '2026-09-04', value: 245000 },
-                { date: '2026-09-09', value: 360000 },
-                { date: '2026-09-14', value: 325000 },
-                { date: '2026-09-19', value: 420000 },
-            ],
-            adSummary: {
-                adType: 'BANNER',
-                daysRemaining: 12,
-                impressionCount: 1240,
-                clickCount: 186,
-                conversionCount: 28,
-                clickThroughRate: 15.0,
-                conversionRate: 15.1,
-            },
-        });
-    }
-
-    if (pathname === '/api/advertisements/active') {
-        const type = url.searchParams.get('type');
-        return ok(route, type === 'BADGE' ? [{ id: 501, storeId: 101, adType: 'BADGE' }] : []);
-    }
-    if (/^\/api\/advertisements\/\d+\/(impression|click)$/.test(pathname)) return ok(route, null);
-    if (pathname === '/api/advertisements/my') return ok(route, pageOf([], 0));
-
-    if (pathname === '/api/reviews/store/101') return ok(route, pageOf([], 0));
-    if (/^\/api\/favorites\/status\/\d+$/.test(pathname)) return ok(route, false);
-    if (pathname === '/api/reservations/calendar' || pathname === '/api/reservations/availability') return ok(route, []);
-    if (pathname === '/api/reservations/my/store/101/completed') return ok(route, []);
-    if (pathname === '/api/reservations/store') return ok(route, pageOf([], 0, 15));
-
-    if (pathname === '/api/business-verification/admin/list') return ok(route, pageOf([], 18, 1));
-    if (pathname === '/api/reservations/store/status-summary') {
-        return ok(route, {
-            total: 128,
-            statusCounts: { PENDING: 12, CONFIRMED: 43, COMPLETED: 61, CANCELED: 10, NO_SHOW: 2 },
-        });
-    }
-    if (pathname === '/api/admin/trash') {
-        return ok(route, pageOf([
-            { id: 1, entityType: 'RESERVATION', action: 'SOFT_DELETE' },
-            { id: 2, entityType: 'STORE', action: 'SOFT_DELETE' },
-            { id: 3, entityType: 'REVIEW', action: 'SOFT_DELETE' },
-            { id: 4, entityType: 'RESERVATION', action: 'SOFT_DELETE' },
-        ], 6, 50));
-    }
-    if (pathname === '/api/admin/audit-logs') {
-        return ok(route, pageOf([
-            { id: 11, action: 'SOFT_DELETE', entityType: 'RESERVATION' },
-            { id: 12, action: 'RESTORE', entityType: 'STORE' },
-            { id: 13, action: 'SOFT_DELETE', entityType: 'REVIEW' },
-            { id: 14, action: 'HARD_DELETE', entityType: 'SENT_MAIL' },
-            { id: 15, action: 'RESTORE', entityType: 'RESERVATION' },
-        ], 342, 50));
-    }
-
-    if (/^\/api\/chat\/rooms\/\d+\/(messages|read)$/.test(pathname)) return ok(route, []);
-    return ok(route, EMPTY_PAGE);
+    const context = { request, url, authenticatedUser };
+    const matched = MOCK_ROUTES.find(([matches]) => matches(pathname, context));
+    return matched ? matched[1](route, context) : ok(route, EMPTY_PAGE);
 }
 
 async function waitForServer(processHandle) {

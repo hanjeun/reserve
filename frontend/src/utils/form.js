@@ -26,6 +26,32 @@ const appendOptional = (fd, key, val) => {
     if (val != null && val !== '') fd.append(key, val);
 };
 
+// 빈 값(null/undefined/빈 문자열)이면 '' — 서버에서 "제한 없음"으로 읽는다
+const optionalString = (val) => ((val != null && val !== '') ? String(val) : '');
+
+const boolString = (val) => (val ? 'true' : 'false');
+
+// multipart 배열: 같은 키를 여러 번 append, 비었으면 빈 문자열 하나
+const appendList = (fd, key, list) => {
+    if (list.length === 0) fd.append(key, '');
+    else list.forEach(v => fd.append(key, v));
+};
+
+// 문자열이면 그대로, dayjs 면 format — 둘 다 아니면 undefined
+const formatValue = (d, pattern) => (typeof d === 'string' ? d : d?.format?.(pattern));
+
+// 영업 시간 + 브레이크 타임(선택)
+const appendHours = (fd, values) => {
+    if (values.times) {
+        fd.append('openTime',  values.times[0].format('HH:mm'));
+        fd.append('closeTime', values.times[1].format('HH:mm'));
+    }
+    if (values.breakTimes?.[0] && values.breakTimes?.[1]) {
+        fd.append('breakStartTime', values.breakTimes[0].format('HH:mm'));
+        fd.append('breakEndTime',   values.breakTimes[1].format('HH:mm'));
+    }
+};
+
 /**
  * 가게 등록/수정용 FormData 생성
  * @param {Object} values - 폼 값
@@ -55,14 +81,11 @@ export const buildStoreFormData = (values) => {
     fd.append('partialRefundRate', values.partialRefundRate ?? 50);
 
     // 예약 슬롯 정책
-    fd.append('maxCapacityPerSlot',
-        (values.maxCapacityPerSlot != null && values.maxCapacityPerSlot !== '')
-            ? String(values.maxCapacityPerSlot) : ''
-    );
-    fd.append('autoApprovalEnabled',      values.autoApprovalEnabled      ? 'true' : 'false');
-    fd.append('allowLatePayment',          values.allowLatePayment          ? 'true' : 'false');
-    fd.append('allowDuplicateReservation', values.allowDuplicateReservation ? 'true' : 'false');
-    fd.append('emailNotificationEnabled',  values.emailNotificationEnabled  ? 'true' : 'false');
+    fd.append('maxCapacityPerSlot', optionalString(values.maxCapacityPerSlot));
+    fd.append('autoApprovalEnabled',      boolString(values.autoApprovalEnabled));
+    fd.append('allowLatePayment',          boolString(values.allowLatePayment));
+    fd.append('allowDuplicateReservation', boolString(values.allowDuplicateReservation));
+    fd.append('emailNotificationEnabled',  boolString(values.emailNotificationEnabled));
 
     // 예약 마감 시간 (없으면 미전송 → 백엔드 null = 제한 없음)
     appendOptional(fd, 'bookingDeadlineHours', values.bookingDeadlineHours);
@@ -75,15 +98,12 @@ export const buildStoreFormData = (values) => {
     //    서비스는 "항상 덮어쓰기"라 null → 빈 목록이 되어 결과적으로는 같다. 다만 그건 우연히
     //    맞는 것이라, 빈 문자열을 명시적으로 보내 "비우겠다"는 의도를 드러낸다.
     //    (백엔드 normalizeClosedDays/Dates 가 빈 값·형식 오류를 걸러낸다.)
-    const closedDays = values.closedDays ?? [];
-    if (closedDays.length === 0) fd.append('closedDays', '');
-    else closedDays.forEach(d => fd.append('closedDays', String(d)));
+    appendList(fd, 'closedDays', (values.closedDays ?? []).map(d => String(d)));
 
     const closedDates = (values.closedDates ?? [])
-        .map(d => (typeof d === 'string' ? d : d?.format?.('YYYY-MM-DD')))
+        .map(d => formatValue(d, 'YYYY-MM-DD'))
         .filter(Boolean);
-    if (closedDates.length === 0) fd.append('closedDates', '');
-    else closedDates.forEach(d => fd.append('closedDates', d));
+    appendList(fd, 'closedDates', closedDates);
 
     // 예약 방식 (2026-08-24). 값이 없으면 서버가 SLOT 으로 흡수하지만,
     // 명시적으로 보내는 편이 "무엇을 의도했는지"가 드러난다.
@@ -93,39 +113,26 @@ export const buildStoreFormData = (values) => {
     // ★ SESSION 이 아닐 때도 보낸다. 서버가 방식에 따라 버릴지 말지 정한다 —
     //   프론트가 미리 거르면 두 곳이 같은 규칙을 알고 있어야 해서 언젠가 어긋난다.
     const sessionTimes = (values.sessionTimes ?? [])
-        .map(t => (typeof t === 'string' ? t : t?.format?.('HH:mm')))
+        .map(t => formatValue(t, 'HH:mm'))
         .filter(Boolean);
-    if (sessionTimes.length === 0) fd.append('sessionTimes', '');
-    else sessionTimes.forEach(t => fd.append('sessionTimes', t));
+    appendList(fd, 'sessionTimes', sessionTimes);
 
     // 운영 기간 (2026-08-24). 휴무와 같은 이유로 **빈 값이라도 키를 보낸다** —
     // 서버가 항상 덮어쓰기라, 안 보내면 기간을 지우려는 조작이 조용히 무시된다.
     const period = values.operatingPeriod ?? [];
-    const toIso = (d) => (typeof d === 'string' ? d : d?.format?.('YYYY-MM-DD')) || '';
+    const toIso = (d) => formatValue(d, 'YYYY-MM-DD') || '';
     fd.append('openDate',  toIso(period[0]));
     fd.append('closeDate', toIso(period[1]));
 
     // 빈 값 = 제한 없음
-    fd.append('maxAdvanceBookingDays',
-        (values.maxAdvanceBookingDays != null && values.maxAdvanceBookingDays !== '')
-            ? String(values.maxAdvanceBookingDays) : ''
-    );
+    fd.append('maxAdvanceBookingDays', optionalString(values.maxAdvanceBookingDays));
 
     fd.append('paymentTimeoutMinutes',  values.paymentTimeoutMinutes  ?? 30);
     fd.append('reservationSlotMinutes', values.reservationSlotMinutes ?? 30);
     fd.append('nearbyRadiusKm',         values.nearbyRadiusKm ?? 3);
 
-    // 영업 시간
-    if (values.times) {
-        fd.append('openTime',  values.times[0].format('HH:mm'));
-        fd.append('closeTime', values.times[1].format('HH:mm'));
-    }
-
-    // 브레이크 타임 (선택)
-    if (values.breakTimes?.[0] && values.breakTimes?.[1]) {
-        fd.append('breakStartTime', values.breakTimes[0].format('HH:mm'));
-        fd.append('breakEndTime',   values.breakTimes[1].format('HH:mm'));
-    }
+    // 영업 시간 · 브레이크 타임
+    appendHours(fd, values);
 
     return fd;
 };

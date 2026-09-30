@@ -248,19 +248,47 @@ async function writeManifest(captured) {
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 }
 
-async function main() {
+// 로그인 상태만 다루는 보조 명령(--login / --auth / --clean). 실행했으면 true.
+async function runAuthCommand() {
     if (process.argv.includes('--login')) {
         await login();
-        return;
+        return true;
     }
     if (process.argv.includes('--auth')) {
         await importAuthFromChrome();
-        return;
+        return true;
     }
     if (process.argv.includes('--clean')) {
         await cleanAuth();
-        return;
+        return true;
     }
+    return false;
+}
+
+async function captureScenes(browser, publicScenes, authScenes, hasAuth) {
+    const captured = [];
+    if (publicScenes.length) {
+        const publicContext = await newCaptureContext(browser, false);
+        for (const scene of publicScenes) captured.push(await capture(publicContext, scene));
+        await publicContext.close();
+    }
+
+    if (hasAuth && authScenes.length) {
+        // 로그인 화면들은 컨텍스트 하나를 같이 쓴다 — 따로 열면 앞 화면이 회전시킨 리프레시 토큰을
+        // 뒤 화면이 옛 값으로 다시 써서 서버가 재사용(탈취)으로 판단하고 세션을 끊는다.
+        const authContext = await newCaptureContext(browser, true);
+        try {
+            for (const scene of authScenes) captured.push(await capture(authContext, scene));
+        } finally {
+            await authContext.storageState({ path: AUTH_FILE });
+            await authContext.close();
+        }
+    }
+    return captured;
+}
+
+async function main() {
+    if (await runAuthCommand()) return;
     await mkdir(OUTPUT_DIR, { recursive: true });
     const hasAuth = existsSync(AUTH_FILE);
     const wanted = scene => ONLY.length === 0 || ONLY.includes(scene.name);
@@ -282,25 +310,9 @@ async function main() {
     if (!hasAuth && authScenes.length) console.log('저장된 로그인 상태가 없어 사업자·관리자·모니터링 화면은 건너뜁니다(스크립트 맨 위 주석 참고).');
 
     const browser = await chromium.launch({ headless: true });
-    const captured = [];
+    let captured;
     try {
-        if (publicScenes.length) {
-            const publicContext = await newCaptureContext(browser, false);
-            for (const scene of publicScenes) captured.push(await capture(publicContext, scene));
-            await publicContext.close();
-        }
-
-        if (hasAuth && authScenes.length) {
-            // 로그인 화면들은 컨텍스트 하나를 같이 쓴다 — 따로 열면 앞 화면이 회전시킨 리프레시 토큰을
-            // 뒤 화면이 옛 값으로 다시 써서 서버가 재사용(탈취)으로 판단하고 세션을 끊는다.
-            const authContext = await newCaptureContext(browser, true);
-            try {
-                for (const scene of authScenes) captured.push(await capture(authContext, scene));
-            } finally {
-                await authContext.storageState({ path: AUTH_FILE });
-                await authContext.close();
-            }
-        }
+        captured = await captureScenes(browser, publicScenes, authScenes, hasAuth);
     } finally {
         await browser.close();
     }

@@ -92,6 +92,210 @@ const skeletonRowCount = (total, page, pageSize) => {
     return Math.max(1, Math.min(pageSize, remaining));
 };
 
+// 노출 일수(양 끝 포함) — 기간이 비어 있으면 0
+const exposureDaysOf = (dateRange) => (
+    dateRange?.[0] && dateRange?.[1]
+        ? dateRange[1].startOf('day').diff(dateRange[0].startOf('day'), 'day') + 1
+        : 0
+);
+
+const revokeBlobUrl = (url) => {
+    if (url.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(url);
+    }
+};
+
+const errorMessageOr = (err, fallback) => (err instanceof Error ? err.message : fallback);
+
+const fetchMyAds = async (page, storeFilter, debouncedSearch) => {
+    const result = await adService.getMyAds(
+        page,
+        PAGE_SIZE,
+        storeFilter === 'ALL' ? undefined : Number(storeFilter),
+        debouncedSearch,
+    );
+    return {
+        ads: result?.content ?? [],
+        // Spring Boot 3.5는 페이지 메타를 page 아래에 둔다. 구 응답은 호환 폴백으로만 읽는다.
+        totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
+    };
+};
+
+const imagePreviewUrlFor = (file) => (
+    file?.originFileObj && typeof URL.createObjectURL === 'function'
+        ? URL.createObjectURL(file.originFileObj)
+        : file?.thumbUrl || file?.url || ''
+);
+
+const collectCreateErrors = (e, { storeId, dateRange, adType, imageFiles, bannerTitle, bannerDescription }) => {
+    if (!storeId) e.storeId = '가게를 선택해주세요.';
+    if (!dateRange?.[0] || !dateRange?.[1]) {
+        e.dateRange = '노출 기간을 선택해주세요.';
+    } else if (dateRange[0].startOf('day').isBefore(dayjs().startOf('day'))) {
+        e.dateRange = '노출 시작일은 오늘 이후로 선택해주세요.';
+    }
+    if (adType !== 'BANNER') return;
+    if (imageFiles.length === 0) {
+        e.images = '배너 광고는 이미지가 최소 1장 필요합니다.';
+    }
+    if (!bannerTitle.trim()) {
+        e.bannerTitle = '광고 제목을 입력해주세요.';
+    }
+    if (!bannerDescription.trim()) {
+        e.bannerDescription = '광고 내용을 입력해주세요.';
+    }
+};
+
+const buildCreateFormData = ({ storeId, adType, dateRange, bannerCopyKey, bannerTitle, bannerDescription, bannerMotionKey, imageFiles }) => {
+    const formData = new FormData();
+    formData.append('storeId', storeId);
+    formData.append('adType', adType);
+    formData.append('startDate', dateRange[0].format('YYYY-MM-DD'));
+    formData.append('endDate', dateRange[1].format('YYYY-MM-DD'));
+    if (adType === 'BANNER') {
+        formData.append('bannerCopyKey', bannerCopyKey);
+        formData.append('title', bannerTitle.trim());
+        formData.append('description', bannerDescription.trim());
+        formData.append('bannerMotionKey', bannerMotionKey);
+    }
+    imageFiles.forEach((f) => { if (f.originFileObj) formData.append('images', f.originFileObj); });
+    return formData;
+};
+
+const buildUpdateFormData = ({ editBannerCopyKey, editBannerTitle, editBannerDescription, editBannerMotionKey, editImageFiles }) => {
+    const formData = new FormData();
+    if (editBannerCopyKey) formData.append('bannerCopyKey', editBannerCopyKey);
+    formData.append('title', editBannerTitle.trim());
+    formData.append('description', editBannerDescription.trim());
+    formData.append('bannerMotionKey', editBannerMotionKey);
+    // 사용자가 새로 고른 파일(originFileObj 있음)만 보낸다 — 기존 이미지(url만 있고 originFileObj 없음)만
+    // 있고 새로 고른 파일이 하나도 없으면 images 자체를 안 보내서 백엔드가 기존 이미지를 유지하게 한다.
+    const newFiles = editImageFiles.filter((f) => f.originFileObj);
+    newFiles.forEach((f) => formData.append('images', f.originFileObj));
+    return formData;
+};
+
+// 기존 이미지를 antd Upload가 인식하는 최소 형태로 바꾼다.
+const existingImageFiles = (ad) => (ad.imageUrls || []).slice(0, MAX_BANNER_IMAGES).map((url, i) => ({
+    uid: `existing-${i}`,
+    name: `image-${i + 1}`,
+    status: 'done',
+    url: getDetailImageUrl(url),
+}));
+
+const cancelConfirmOptions = (ad) => {
+    const isPaid = ad.status === 'ACTIVE';
+    return {
+        title: '광고 취소',
+        content: isPaid
+            ? `노출을 중단하고 ${ad.amount?.toLocaleString()}원 전액 환불을 요청합니다. 환불 완료는 PG 확인 후 표시됩니다.`
+            : '신청을 취소하고 결제 상태를 확인합니다. 결제 중이었다면 미결 내역이 남을 수 있으며, 확인 후 환불을 처리합니다.',
+        okText: isPaid ? '환불하기' : '취소하기', cancelText: '닫기',
+        okButtonProps: { danger: true }, centered: true,
+    };
+};
+
+const renderStatusTag = (v, r) => {
+    if (PAYABLE_STATUSES.has(v) && isPastStartDate(r)) {
+        return <Tag color="default">기간 경과</Tag>;
+    }
+    return <Tag color={STATUS_LABELS[v]?.color}>{STATUS_LABELS[v]?.label || v}</Tag>;
+};
+
+const isPendingFor = (mutation, id) => mutation.isPending && mutation.variables === id;
+
+const renderAdActions = (r, { payingId, cancelMutation, removeMutation, onPay, onEdit, onCancel, onRemove }) => (
+    <div style={{ display: 'flex', gap: 8 }}>
+        {PAYABLE_STATUSES.has(r.status) && !isPastStartDate(r) && (
+            <Button variant="ghost-sm-primary" loading={payingId === r.id} onClick={() => onPay(r)}>
+                <CreditCardOutlined /> 결제
+            </Button>
+        )}
+        {r.adType === 'BANNER' && EDITABLE_STATUSES.has(r.status) && (
+            <Button variant="ghost-sm" onClick={() => onEdit(r)}>
+                <EditOutlined /> 수정
+            </Button>
+        )}
+        {CANCELLABLE_STATUSES.has(r.status) && (
+            <Button variant="ghost-sm-danger" loading={isPendingFor(cancelMutation, r.id)} onClick={() => onCancel(r)}>
+                <CloseOutlined /> {r.status === 'ACTIVE' ? '환불' : '취소'}
+            </Button>
+        )}
+        {REMOVABLE_STATUSES.has(r.status) && (
+            <Button variant="ghost-sm" loading={isPendingFor(removeMutation, r.id)} onClick={() => onRemove(r)} style={{ color: colors.text.tertiary }}>
+                <DeleteOutlined /> 삭제
+            </Button>
+        )}
+    </div>
+);
+
+const buildAdColumns = (actionDeps) => [
+    { title: '가게', dataIndex: 'storeName', key: 'storeName', width: 220, ellipsis: true },
+    {
+        title: '유형', dataIndex: 'adType', key: 'adType', width: 90,
+        render: (v) => AD_TYPE_LABELS[v] || v,
+    },
+    { title: '기간', key: 'period', width: 190, render: (_, r) => `${r.startDate} ~ ${r.endDate}` },
+    { title: '금액', dataIndex: 'amount', key: 'amount', width: 100, render: (v) => `${v?.toLocaleString()}원` },
+    {
+        title: '상태', dataIndex: 'status', key: 'status', width: 100,
+        render: renderStatusTag,
+    },
+    {
+        title: '처리', key: 'actions', width: 220,
+        render: (_, r) => renderAdActions(r, actionDeps),
+    },
+];
+
+// 광고 목록 영역 — 오류 / 스켈레톤 / 표 중 하나.
+const renderAdsContent = ({ adsError, refetch, isFetching, loading, isPlaceholderData, totalElements, page, columns, ads, onPageChange }) => {
+    if (adsError) {
+        return (
+            <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
+                onRetry={refetch} retrying={isFetching} compact />
+        );
+    }
+    if (loading || isPlaceholderData) {
+        return (
+            <AdminTableSkeleton
+                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                cols={SKELETON_COLS}
+                headers={SKELETON_HEADERS}
+                actionBtns={2}
+                pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
+            />
+        );
+    }
+    return (
+        <DataTable
+            rowKey="id"
+            columns={columns}
+            dataSource={ads}
+            pagination={{
+                current: page + 1,
+                pageSize: PAGE_SIZE,
+                total: totalElements,
+                showSizeChanger: false,
+                onChange: onPageChange,
+            }}
+            locale={{ emptyText: '신청한 광고가 없습니다.' }}
+        />
+    );
+};
+
+// 새 광고 신청 모달의 단계별 제목·폭·버튼 문구
+const createModalText = (createStep) => {
+    if (createStep === 'details') {
+        return { title: '새 광고 신청', width: 520, submitText: '미리보기', cancelText: '취소' };
+    }
+    return {
+        title: '광고 미리보기',
+        width: createStep === 'preview' ? 680 : 520,
+        submitText: '결제하기',
+        cancelText: '이전',
+    };
+};
+
 /**
  * 사업자 광고 관리 탭 — 내 광고 목록 + 새 광고 신청(결제).
  * 가격: BADGE 1,000원/일, BANNER 5,000원/일 (예시값, 추후 조정 가능)
@@ -151,41 +355,23 @@ const AdManageTab = () => {
     const [editBannerMotionKey, setEditBannerMotionKey] = useState(DEFAULT_BANNER_MOTION_KEY);
     const [editImageFiles, setEditImageFiles] = useState([]);
     const selectedStore = myStores.find(store => store.id === storeId);
-    const exposureDays = dateRange?.[0] && dateRange?.[1]
-        ? dateRange[1].startOf('day').diff(dateRange[0].startOf('day'), 'day') + 1
-        : 0;
+    const exposureDays = exposureDaysOf(dateRange);
     const dailyPrice = AD_DAILY_PRICE[adType] ?? 0;
     const estimatedAmount = Math.max(0, exposureDays) * dailyPrice;
 
     const releaseImagePreviewUrl = () => {
-        if (imagePreviewUrlRef.current.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') {
-            URL.revokeObjectURL(imagePreviewUrlRef.current);
-        }
+        revokeBlobUrl(imagePreviewUrlRef.current);
         imagePreviewUrlRef.current = '';
         setImagePreviewUrl('');
     };
 
     useEffect(() => () => {
-        if (imagePreviewUrlRef.current.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') {
-            URL.revokeObjectURL(imagePreviewUrlRef.current);
-        }
+        revokeBlobUrl(imagePreviewUrlRef.current);
     }, []);
 
     const { data, isLoading: loading, isFetching, isPlaceholderData, error: adsError, refetch } = useQuery({
         queryKey: adKeys.my({ page, size: PAGE_SIZE, storeFilter, search: debouncedSearch.trim() }),
-        queryFn: async () => {
-            const result = await adService.getMyAds(
-                page,
-                PAGE_SIZE,
-                storeFilter === 'ALL' ? undefined : Number(storeFilter),
-                debouncedSearch,
-            );
-            return {
-                ads: result?.content ?? [],
-                // Spring Boot 3.5는 페이지 메타를 page 아래에 둔다. 구 응답은 호환 폴백으로만 읽는다.
-                totalElements: result?.page?.totalElements ?? result?.totalElements ?? 0,
-            };
-        },
+        queryFn: () => fetchMyAds(page, storeFilter, debouncedSearch),
         placeholderData: keepPreviousData,
     });
     const ads = data?.ads ?? EMPTY_ADS;
@@ -193,7 +379,7 @@ const AdManageTab = () => {
     const cancelMutation = useMutation({
         mutationFn: (adId) => adService.cancelAd(adId),
         onSuccess: () => message.success('취소 요청을 접수했습니다. 환불 여부는 광고 내역에서 확인해주세요.'),
-        onError: (err) => message.error(err instanceof Error ? err.message : '결과를 확인하지 못했습니다. 내역을 다시 확인해주세요.'),
+        onError: (err) => message.error(errorMessageOr(err, '결과를 확인하지 못했습니다. 내역을 다시 확인해주세요.')),
         // 노출 중이던 광고를 취소하면 공개 배너·배지와 통계의 광고 요약도 바뀐다.
         onSettled: () => invalidateAdData(queryClient),
     });
@@ -206,7 +392,7 @@ const AdManageTab = () => {
             message.success('목록에서 삭제되었습니다.');
             queryClient.invalidateQueries({ queryKey: adKeys.my() });
         },
-        onError: (err) => message.error(err instanceof Error ? err.message : '삭제에 실패했습니다.'),
+        onError: (err) => message.error(errorMessageOr(err, '삭제에 실패했습니다.')),
     });
 
     // 2026-07 추가 — 배너 광고 수정 mutation. 새 이미지를 고르지 않으면 images를 보내지 않아
@@ -220,7 +406,7 @@ const AdManageTab = () => {
             setEditTarget(null);
             resetEditErrors();
         },
-        onError: (err) => message.error(err instanceof Error ? err.message : '수정에 실패했습니다.'),
+        onError: (err) => message.error(errorMessageOr(err, '수정에 실패했습니다.')),
     });
 
     const handleBannerCopyChange = (key) => {
@@ -289,32 +475,15 @@ const AdManageTab = () => {
         if (!withinImageRequestLimit(next)) return;
         setImageFiles(next);
         releaseImagePreviewUrl();
-        const file = next[0];
-        const previewUrl = file?.originFileObj && typeof URL.createObjectURL === 'function'
-            ? URL.createObjectURL(file.originFileObj)
-            : file?.thumbUrl || file?.url || '';
+        const previewUrl = imagePreviewUrlFor(next[0]);
         imagePreviewUrlRef.current = previewUrl;
         setImagePreviewUrl(previewUrl);
         clearError('images');
     };
 
-    const validateCreateForm = () => validate((e) => {
-        if (!storeId) e.storeId = '가게를 선택해주세요.';
-        if (!dateRange?.[0] || !dateRange?.[1]) {
-            e.dateRange = '노출 기간을 선택해주세요.';
-        } else if (dateRange[0].startOf('day').isBefore(dayjs().startOf('day'))) {
-            e.dateRange = '노출 시작일은 오늘 이후로 선택해주세요.';
-        }
-        if (adType === 'BANNER' && imageFiles.length === 0) {
-            e.images = '배너 광고는 이미지가 최소 1장 필요합니다.';
-        }
-        if (adType === 'BANNER' && !bannerTitle.trim()) {
-            e.bannerTitle = '광고 제목을 입력해주세요.';
-        }
-        if (adType === 'BANNER' && !bannerDescription.trim()) {
-            e.bannerDescription = '광고 내용을 입력해주세요.';
-        }
-    });
+    const validateCreateForm = () => validate((e) => collectCreateErrors(e, {
+        storeId, dateRange, adType, imageFiles, bannerTitle, bannerDescription,
+    }));
 
     const handleShowPreview = () => {
         if (!validateCreateForm()) return;
@@ -332,18 +501,9 @@ const AdManageTab = () => {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('storeId', storeId);
-        formData.append('adType', adType);
-        formData.append('startDate', dateRange[0].format('YYYY-MM-DD'));
-        formData.append('endDate', dateRange[1].format('YYYY-MM-DD'));
-        if (adType === 'BANNER') {
-            formData.append('bannerCopyKey', bannerCopyKey);
-            formData.append('title', bannerTitle.trim());
-            formData.append('description', bannerDescription.trim());
-            formData.append('bannerMotionKey', bannerMotionKey);
-        }
-        imageFiles.forEach((f) => { if (f.originFileObj) formData.append('images', f.originFileObj); });
+        const formData = buildCreateFormData({
+            storeId, adType, dateRange, bannerCopyKey, bannerTitle, bannerDescription, bannerMotionKey, imageFiles,
+        });
 
         const result = await pay(formData);
         if (result.success) {
@@ -364,12 +524,7 @@ const AdManageTab = () => {
         setEditBannerDescription(ad.description || DEFAULT_BANNER_COPY.description);
         setEditBannerMotionKey(findBannerMotionKey(ad));
         resetEditErrors();
-        setEditImageFiles((ad.imageUrls || []).slice(0, MAX_BANNER_IMAGES).map((url, i) => ({
-            uid: `existing-${i}`,
-            name: `image-${i + 1}`,
-            status: 'done',
-            url: getDetailImageUrl(url),
-        })));
+        setEditImageFiles(existingImageFiles(ad));
     };
 
     const handleEditImagesChange = ({ fileList }) => {
@@ -383,15 +538,9 @@ const AdManageTab = () => {
             if (!editBannerDescription.trim()) e.bannerDescription = '광고 내용을 입력해주세요.';
         })) return;
 
-        const formData = new FormData();
-        if (editBannerCopyKey) formData.append('bannerCopyKey', editBannerCopyKey);
-        formData.append('title', editBannerTitle.trim());
-        formData.append('description', editBannerDescription.trim());
-        formData.append('bannerMotionKey', editBannerMotionKey);
-        // 사용자가 새로 고른 파일(originFileObj 있음)만 보낸다 — 기존 이미지(url만 있고 originFileObj 없음)만
-        // 있고 새로 고른 파일이 하나도 없으면 images 자체를 안 보내서 백엔드가 기존 이미지를 유지하게 한다.
-        const newFiles = editImageFiles.filter((f) => f.originFileObj);
-        newFiles.forEach((f) => formData.append('images', f.originFileObj));
+        const formData = buildUpdateFormData({
+            editBannerCopyKey, editBannerTitle, editBannerDescription, editBannerMotionKey, editImageFiles,
+        });
 
         await updateMutation.mutateAsync({ adId: editTarget.id, formData });
     };
@@ -399,14 +548,8 @@ const AdManageTab = () => {
     const visibleCount = totalElements;
 
     const handleCancel = (ad) => {
-        const isPaid = ad.status === 'ACTIVE';
         confirm({
-            title: '광고 취소',
-            content: isPaid
-                ? `노출을 중단하고 ${ad.amount?.toLocaleString()}원 전액 환불을 요청합니다. 환불 완료는 PG 확인 후 표시됩니다.`
-                : '신청을 취소하고 결제 상태를 확인합니다. 결제 중이었다면 미결 내역이 남을 수 있으며, 확인 후 환불을 처리합니다.',
-            okText: isPaid ? '환불하기' : '취소하기', cancelText: '닫기',
-            okButtonProps: { danger: true }, centered: true,
+            ...cancelConfirmOptions(ad),
             onOk: () => cancelMutation.mutateAsync(ad.id),
         });
     };
@@ -422,86 +565,17 @@ const AdManageTab = () => {
         });
     };
 
-    const columns = [
-        { title: '가게', dataIndex: 'storeName', key: 'storeName', width: 220, ellipsis: true },
-        {
-            title: '유형', dataIndex: 'adType', key: 'adType', width: 90,
-            render: (v) => AD_TYPE_LABELS[v] || v,
-        },
-        { title: '기간', key: 'period', width: 190, render: (_, r) => `${r.startDate} ~ ${r.endDate}` },
-        { title: '금액', dataIndex: 'amount', key: 'amount', width: 100, render: (v) => `${v?.toLocaleString()}원` },
-        {
-            title: '상태', dataIndex: 'status', key: 'status', width: 100,
-            render: (v, r) => {
-                if (PAYABLE_STATUSES.has(v) && isPastStartDate(r)) {
-                    return <Tag color="default">기간 경과</Tag>;
-                }
-                return <Tag color={STATUS_LABELS[v]?.color}>{STATUS_LABELS[v]?.label || v}</Tag>;
-            },
-        },
-        {
-            title: '처리', key: 'actions', width: 220,
-            render: (_, r) => (
-                <div style={{ display: 'flex', gap: 8 }}>
-                    {PAYABLE_STATUSES.has(r.status) && !isPastStartDate(r) && (
-                        <Button variant="ghost-sm-primary" loading={payingId === r.id} onClick={() => handlePay(r)}>
-                            <CreditCardOutlined /> 결제
-                        </Button>
-                    )}
-                    {r.adType === 'BANNER' && EDITABLE_STATUSES.has(r.status) && (
-                        <Button variant="ghost-sm" onClick={() => handleEdit(r)}>
-                            <EditOutlined /> 수정
-                        </Button>
-                    )}
-                    {CANCELLABLE_STATUSES.has(r.status) && (
-                        <Button variant="ghost-sm-danger" loading={cancelMutation.isPending && cancelMutation.variables === r.id} onClick={() => handleCancel(r)}>
-                            <CloseOutlined /> {r.status === 'ACTIVE' ? '환불' : '취소'}
-                        </Button>
-                    )}
-                    {REMOVABLE_STATUSES.has(r.status) && (
-                        <Button variant="ghost-sm" loading={removeMutation.isPending && removeMutation.variables === r.id} onClick={() => handleRemove(r)} style={{ color: colors.text.tertiary }}>
-                            <DeleteOutlined /> 삭제
-                        </Button>
-                    )}
-                </div>
-            ),
-        },
-    ];
+    const columns = buildAdColumns({
+        payingId, cancelMutation, removeMutation,
+        onPay: handlePay, onEdit: handleEdit, onCancel: handleCancel, onRemove: handleRemove,
+    });
 
-    // 광고 목록 영역 — 오류 / 스켈레톤 / 표 중 하나.
-    let adsContent;
-    if (adsError) {
-        adsContent = (
-            <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
-                onRetry={refetch} retrying={isFetching} compact />
-        );
-    } else if (loading || isPlaceholderData) {
-        adsContent = (
-            <AdminTableSkeleton
-                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                cols={SKELETON_COLS}
-                headers={SKELETON_HEADERS}
-                actionBtns={2}
-                pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
-            />
-        );
-    } else {
-        adsContent = (
-            <DataTable
-                rowKey="id"
-                columns={columns}
-                dataSource={ads}
-                pagination={{
-                    current: page + 1,
-                    pageSize: PAGE_SIZE,
-                    total: totalElements,
-                    showSizeChanger: false,
-                    onChange: (nextPage) => setAdListParams({ advertisementPage: String(nextPage - 1) }),
-                }}
-                locale={{ emptyText: '신청한 광고가 없습니다.' }}
-            />
-        );
-    }
+    const adsContent = renderAdsContent({
+        adsError, refetch, isFetching, loading, isPlaceholderData, totalElements, page, columns, ads,
+        onPageChange: (nextPage) => setAdListParams({ advertisementPage: String(nextPage - 1) }),
+    });
+
+    const createChrome = createModalText(createStep);
 
     return (
         <div className="reserve-ad-manage-tab">
@@ -554,15 +628,15 @@ const AdManageTab = () => {
             {adsContent}
 
             <FormModal
-                title={createStep === 'details' ? '새 광고 신청' : '광고 미리보기'}
+                title={createChrome.title}
                 open={modalOpen}
                 onClose={closeCreateModal}
                 onSubmit={createStep === 'details' ? handleShowPreview : handleSubmit}
                 onCancelAction={createStep === 'details' ? closeCreateModal : () => goToCreateStep('details')}
                 submitting={paying}
-                width={createStep === 'preview' ? 680 : 520}
-                submitText={createStep === 'details' ? '미리보기' : '결제하기'}
-                cancelText={createStep === 'details' ? '취소' : '이전'}
+                width={createChrome.width}
+                submitText={createChrome.submitText}
+                cancelText={createChrome.cancelText}
                 rootClassName="reserve-ad-create-modal"
                 scrollResetKey={createStep}
             >

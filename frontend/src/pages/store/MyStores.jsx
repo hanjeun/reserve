@@ -173,6 +173,69 @@ const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => 
     );
 };
 
+const resolveOwnerSort = (params) => (OWNER_SORT_OPTIONS.some(option => option.value === params.get('sort'))
+    ? params.get('sort') : 'recent');
+
+// 툴바 값 하나를 URL 에 반영한다 — 빈 값과 기본 정렬(recent)은 URL 에서 뺀다.
+const withToolbarParam = (current, key, value) => {
+    const next = new URLSearchParams(current);
+    if (value && !(key === 'sort' && value === 'recent')) next.set(key, value);
+    else next.delete(key);
+    return next;
+};
+
+const OwnedStoresSkeleton = ({ view }) => (
+    <div className={view === 'list' ? 'reserve-store-list-rows' : 'rsv-mystore-grid'} role="status" aria-label="내 가게를 불러오는 중">
+        <div style={{ display: 'contents' }} aria-hidden="true">
+            {view === 'list' ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
+        </div>
+    </div>
+);
+
+// 가게 목록 본문 — 목록형 / 카드형 / 빈 안내 중 하나.
+const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegister, onResetFilters }) => {
+    if (visibleStores.length > 0 && view === 'list') {
+        return (
+            <>
+                <div className="reserve-store-list-rows reserve-mystore-list-rows">
+                    {visibleStores.map(store => (
+                        <StoreListRow key={store.id} store={store} className="reserve-mystore-list-row"
+                            actions={managedActions(store, onEdit, onDelete, true)} />
+                    ))}
+                </div>
+                <button type="button" className="reserve-mystore-add-row" onClick={onRegister}>
+                    <PlusOutlined aria-hidden="true" /> 새 가게 등록하기
+                </button>
+            </>
+        );
+    }
+    if (visibleStores.length > 0) {
+        return (
+            <div className="rsv-mystore-grid">
+                {/* 가게 전체보기와 같은 StoreCard 를 재사용한다. 관리 화면이라 하트 대신 수정·삭제 줄을 붙인다. */}
+                {visibleStores.map(store => (
+                    <div key={store.id}>
+                        <StoreCard store={store} showFavorite={false}
+                            actions={managedActions(store, onEdit, onDelete)} />
+                    </div>
+                ))}
+                <div>
+                    <Card.Add onClick={onRegister} minHeight="350px">
+                        새 가게 등록하기
+                    </Card.Add>
+                </div>
+            </div>
+        );
+    }
+    return (
+        <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
+            title={stores.length > 0 ? '조건에 맞는 내 가게가 없습니다.' : '등록된 가게가 없습니다.'}
+            action={stores.length > 0
+                ? <Button variant="secondary" size="sm" onClick={onResetFilters}>필터 초기화</Button>
+                : <Button variant="secondary" size="sm" onClick={onRegister}>새 가게 등록하기</Button>} />
+    );
+};
+
 // ─── MyStores 메인 ──────────────────────────────────────────────────────────
 const MyStores = () => {
     const navigate = useNavigate();
@@ -184,16 +247,10 @@ const MyStores = () => {
     const [retrying, setRetrying] = useState(false);
     const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'cards');
     const domain = urlSearchParams.get('domain') || '';
-    const sort = OWNER_SORT_OPTIONS.some(option => option.value === urlSearchParams.get('sort'))
-        ? urlSearchParams.get('sort') : 'recent';
+    const sort = resolveOwnerSort(urlSearchParams);
     const visibleStores = filterAndSortOwnedStores(stores, { domain, sort });
 
-    const setToolbarParam = (key, value) => setUrlSearchParams(current => {
-        const next = new URLSearchParams(current);
-        if (value && !(key === 'sort' && value === 'recent')) next.set(key, value);
-        else next.delete(key);
-        return next;
-    });
+    const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const resetOwnedFilters = () => setUrlSearchParams(current => {
         const next = new URLSearchParams(current);
         next.delete('region'); // 예전 지역 필터 링크로 들어온 경우 URL의 낡은 값도 함께 없앤다.
@@ -232,59 +289,10 @@ const MyStores = () => {
 
     const handleEdit = store => navigate(`/store/${store.id}/edit`);
 
-    // 가게 목록 본문 — 목록형 / 카드형 / 빈 안내 중 하나.
-    let storesBody;
-    if (visibleStores.length > 0 && view === 'list') {
-        storesBody = (
-            <>
-                <div className="reserve-store-list-rows reserve-mystore-list-rows">
-                    {visibleStores.map(store => (
-                        <StoreListRow key={store.id} store={store} className="reserve-mystore-list-row"
-                            actions={managedActions(store, handleEdit, handleDeleteClick, true)} />
-                    ))}
-                </div>
-                <button type="button" className="reserve-mystore-add-row" onClick={() => navigate('/store/register')}>
-                    <PlusOutlined aria-hidden="true" /> 새 가게 등록하기
-                </button>
-            </>
-        );
-    } else if (visibleStores.length > 0) {
-        storesBody = (
-            <div className="rsv-mystore-grid">
-                {/* 가게 전체보기와 같은 StoreCard 를 재사용한다. 관리 화면이라 하트 대신 수정·삭제 줄을 붙인다. */}
-                {visibleStores.map(store => (
-                    <div key={store.id}>
-                        <StoreCard store={store} showFavorite={false}
-                            actions={managedActions(store, handleEdit, handleDeleteClick)} />
-                    </div>
-                ))}
-                <div>
-                    <Card.Add onClick={() => navigate('/store/register')} minHeight="350px">
-                        새 가게 등록하기
-                    </Card.Add>
-                </div>
-            </div>
-        );
-    } else {
-        storesBody = (
-            <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
-                title={stores.length > 0 ? '조건에 맞는 내 가게가 없습니다.' : '등록된 가게가 없습니다.'}
-                action={stores.length > 0
-                    ? <Button variant="secondary" size="sm" onClick={resetOwnedFilters}>필터 초기화</Button>
-                    : <Button variant="secondary" size="sm" onClick={() => navigate('/store/register')}>새 가게 등록하기</Button>} />
-        );
-    }
-
     // 카드 영역 — 로딩 / 첫 조회 실패 / 목록 중 하나.
     let storesContent;
     if (loading) {
-        storesContent = (
-            <div className={view === 'list' ? 'reserve-store-list-rows' : 'rsv-mystore-grid'} role="status" aria-label="내 가게를 불러오는 중">
-                <div style={{ display: 'contents' }} aria-hidden="true">
-                    {view === 'list' ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
-                </div>
-            </div>
-        );
+        storesContent = <OwnedStoresSkeleton view={view} />;
     } else if (error && stores.length === 0) {
         storesContent = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
@@ -300,7 +308,9 @@ const MyStores = () => {
                         title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있습니다."
                         onRetry={handleRetry} retrying={retrying} compact style={{ marginBottom: 16 }} />
                 )}
-                {storesBody}
+                <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
+                    onEdit={handleEdit} onDelete={handleDeleteClick}
+                    onRegister={() => navigate('/store/register')} onResetFilters={resetOwnedFilters} />
             </>
         );
     }

@@ -54,6 +54,151 @@ const triggerLabel = (mode, value, placeholder, format) => {
     return validDay(value)?.format(format) ?? placeholder ?? '날짜 선택';
 };
 
+const validDays = value => (Array.isArray(value) ? value : []).map(validDay).filter(Boolean);
+
+const hasPickerValue = (mode, value) => {
+    if (mode === 'range') return Boolean(validDay(value?.[0]) || validDay(value?.[1]));
+    if (mode === 'multiple') return Array.isArray(value) && value.some(item => Boolean(validDay(item)));
+    return Boolean(validDay(value));
+};
+
+const resolveIconColor = (disabled, isError, hasValue) => {
+    if (disabled) return colors.gray[400];
+    if (isError && !hasValue) return colors.error.main;
+    if (hasValue) return colors.primary.main;
+    return field.placeholderColor;
+};
+
+const canCommitRange = (draftRange, allowEmpty) => (
+    (Boolean(draftRange[0]) || allowEmpty[0] === true)
+    && (Boolean(draftRange[1]) || allowEmpty[1] === true)
+    && draftRange.some(Boolean)
+);
+
+// 앞쪽 빈칸(지난달 날짜 키) + 이번 달 날짜
+const buildMonthCells = month => {
+    const cells = [];
+    for (let index = month.day(); index > 0; index -= 1) {
+        cells.push({ blank: true, key: month.subtract(index, 'day').format('YYYY-MM-DD') });
+    }
+    for (let date = 1; date <= month.daysInMonth(); date += 1) {
+        const current = month.date(date);
+        cells.push({ blank: false, key: current.format('YYYY-MM-DD'), date: current });
+    }
+    return cells;
+};
+
+const toggleDate = (current, date) => {
+    const exists = current.some(item => sameDay(item, date));
+    if (exists) return current.filter(item => !sameDay(item, date));
+    return [...current, date].sort((a, b) => a.valueOf() - b.valueOf());
+};
+
+const pickRangeDate = (current, date, rangePart, setRangePart) => {
+    const next = [...current];
+    if (rangePart === 0) {
+        next[0] = date;
+        if (next[1]?.isBefore(date, 'day')) next[1] = null;
+        setRangePart(1);
+    } else if (next[0]?.isAfter(date, 'day')) {
+        // 끝 날짜를 시작 날짜보다 먼저 고르면 선택을 무효화하지 않고 날짜순으로
+        // 정렬한다. 사용자가 시작/종료 탭을 다시 찾아 누르게 만드는 상태를 피한다.
+        next[1] = next[0];
+        next[0] = date;
+    } else {
+        next[1] = date;
+    }
+    return next;
+};
+
+// 가로 스와이프면 이동할 달(+1/-1), 아니면 0
+const swipeMonthDelta = (start, touch) => {
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy)) return 0;
+    return dx < 0 ? 1 : -1;
+};
+
+const cellPresentation = ({ cell, mode, disabledDate, selectedKeys, draftRange, holidays }) => {
+    const date = cell.date;
+    const isDisabled = Boolean(disabledDate?.(date));
+    const isSelected = selectedKeys.has(cell.key);
+    const start = draftRange[0];
+    const end = draftRange[1];
+    const isInsideRange = mode === 'range' && start && end
+        && date.isAfter(start, 'day') && date.isBefore(end, 'day');
+    const isToday = date.isSame(dayjs(), 'day');
+    const classNames = ['rsv-tap-btn', 'reserve-cal-cell', 'reserve-form-cal-cell'];
+    if (isSelected) classNames.push('is-selected');
+    if (isInsideRange) classNames.push('is-range');
+    if (isToday && !isDisabled) classNames.push('is-today');
+    const isPublicHoliday = holidays.has(cell.key);
+    if ((date.day() === 0 || isPublicHoliday) && !isDisabled && !isSelected) classNames.push('is-holiday');
+
+    let stateLabel = isPublicHoliday ? ' 공휴일' : '';
+    if (isDisabled) stateLabel += ' 선택 불가';
+    else if (isSelected) stateLabel += ' 선택됨';
+    else if (isInsideRange) stateLabel += ' 선택 범위';
+
+    return { isDisabled, isSelected, className: classNames.join(' '), stateLabel };
+};
+
+function TriggerLabel({ mode, label, hasValue }) {
+    if (mode === 'range') {
+        return (
+            <span style={styles.rangeTrigger}>
+                <span style={label.hasStart ? styles.value : styles.placeholder}>{label.start}</span>
+                <span aria-hidden="true" style={styles.arrow}>→</span>
+                <span style={label.hasEnd ? styles.value : styles.placeholder}>{label.end}</span>
+            </span>
+        );
+    }
+    return (
+        <span key={hasValue ? String(label) : 'empty'} style={{
+            ...(hasValue ? styles.value : styles.placeholder),
+            animation: animation.slideUpIn,
+        }}>
+            {label}
+        </span>
+    );
+}
+
+TriggerLabel.propTypes = {
+    mode: PropTypes.string,
+    label: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+    hasValue: PropTypes.bool,
+};
+
+function RangePartChoice({ draftRange, rangePart, setRangePart }) {
+    return (
+        <div role="group" style={styles.rangeChoice} aria-label="선택할 날짜 종류">
+            {[0, 1].map(part => {
+                const date = draftRange[part];
+                return (
+                    <button
+                        key={part}
+                        type="button"
+                        className={`reserve-form-cal-part${rangePart === part ? ' is-active' : ''}`}
+                        aria-pressed={rangePart === part}
+                        onClick={() => setRangePart(part)}
+                    >
+                        <span style={styles.partLabel}>{part === 0 ? '시작일' : '종료일'}</span>
+                        <span style={date ? styles.partValue : styles.partPlaceholder}>
+                            {date ? date.format('YYYY. M. D.') : '선택 안 함'}
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+RangePartChoice.propTypes = {
+    draftRange: PropTypes.array.isRequired,
+    rangePart: PropTypes.number.isRequired,
+    setRangePart: PropTypes.func.isRequired,
+};
+
 const FormDatePickerBase = ({
     mode = 'single',
     value,
@@ -76,9 +221,7 @@ const FormDatePickerBase = ({
     // 기본은 꺼 두고 호출부가 켠다 — 단위 테스트·미리보기에서 공통 입력이 네트워크를 부르지 않게.
     const holidays = useHolidayDates(month.format('YYYY-MM'), open && highlightHolidays);
     const [draftSingle, setDraftSingle] = useState(() => validDay(value));
-    const [draftMultiple, setDraftMultiple] = useState(() => (
-        (Array.isArray(value) ? value : []).map(validDay).filter(Boolean)
-    ));
+    const [draftMultiple, setDraftMultiple] = useState(() => validDays(value));
     const [draftRange, setDraftRange] = useState(() => [validDay(value?.[0]), validDay(value?.[1])]);
     const [rangePart, setRangePart] = useState(0);
     const touchRef = useRef(null);
@@ -97,7 +240,7 @@ const FormDatePickerBase = ({
             setDraftRange(next);
             setRangePart(next[0] && !next[1] ? 1 : 0);
         } else if (mode === 'multiple') {
-            setDraftMultiple((Array.isArray(value) ? value : []).map(validDay).filter(Boolean));
+            setDraftMultiple(validDays(value));
         } else {
             setDraftSingle(validDay(value));
         }
@@ -118,30 +261,11 @@ const FormDatePickerBase = ({
         }
 
         if (mode === 'multiple') {
-            setDraftMultiple(current => {
-                const exists = current.some(item => sameDay(item, date));
-                if (exists) return current.filter(item => !sameDay(item, date));
-                return [...current, date].sort((a, b) => a.valueOf() - b.valueOf());
-            });
+            setDraftMultiple(current => toggleDate(current, date));
             return;
         }
 
-        setDraftRange(current => {
-            const next = [...current];
-            if (rangePart === 0) {
-                next[0] = date;
-                if (next[1]?.isBefore(date, 'day')) next[1] = null;
-                setRangePart(1);
-            } else if (next[0]?.isAfter(date, 'day')) {
-                // 끝 날짜를 시작 날짜보다 먼저 고르면 선택을 무효화하지 않고 날짜순으로
-                // 정렬한다. 사용자가 시작/종료 탭을 다시 찾아 누르게 만드는 상태를 피한다.
-                next[1] = next[0];
-                next[0] = date;
-            } else {
-                next[1] = date;
-            }
-            return next;
-        });
+        setDraftRange(current => pickRangeDate(current, date, rangePart, setRangePart));
     };
 
     const clearValue = () => {
@@ -158,21 +282,9 @@ const FormDatePickerBase = ({
         closePicker();
     };
 
-    const rangeCanCommit = mode !== 'range' || (
-        (Boolean(draftRange[0]) || allowEmpty[0] === true)
-        && (Boolean(draftRange[1]) || allowEmpty[1] === true)
-        && draftRange.some(Boolean)
-    );
+    const rangeCanCommit = mode !== 'range' || canCommitRange(draftRange, allowEmpty);
 
-    const leading = month.day();
-    const cells = [];
-    for (let index = leading; index > 0; index -= 1) {
-        cells.push({ blank: true, key: month.subtract(index, 'day').format('YYYY-MM-DD') });
-    }
-    for (let date = 1; date <= month.daysInMonth(); date += 1) {
-        const current = month.date(date);
-        cells.push({ blank: false, key: current.format('YYYY-MM-DD'), date: current });
-    }
+    const cells = buildMonthCells(month);
 
     const goMonth = delta => setMonth(current => current.add(delta, 'month'));
     const goYear = delta => setMonth(current => current.add(delta, 'year'));
@@ -184,41 +296,24 @@ const FormDatePickerBase = ({
         const start = touchRef.current;
         touchRef.current = null;
         if (!start) return;
-        const touch = event.changedTouches[0];
-        const dx = touch.clientX - start.x;
-        const dy = touch.clientY - start.y;
-        if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy)) return;
-        goMonth(dx < 0 ? 1 : -1);
+        const delta = swipeMonthDelta(start, event.changedTouches[0]);
+        if (delta === 0) return;
+        goMonth(delta);
     };
 
     const renderCell = (cell, index) => {
         if (cell.blank) return <span key={cell.key} aria-hidden="true" />;
 
         const date = cell.date;
-        const isDisabled = Boolean(disabledDate?.(date));
-        const isSelected = selectedKeys.has(cell.key);
-        const start = draftRange[0];
-        const end = draftRange[1];
-        const isInsideRange = mode === 'range' && start && end
-            && date.isAfter(start, 'day') && date.isBefore(end, 'day');
-        const isToday = date.isSame(dayjs(), 'day');
-        const classNames = ['rsv-tap-btn', 'reserve-cal-cell', 'reserve-form-cal-cell'];
-        if (isSelected) classNames.push('is-selected');
-        if (isInsideRange) classNames.push('is-range');
-        if (isToday && !isDisabled) classNames.push('is-today');
-        const isPublicHoliday = holidays.has(cell.key);
-        if ((date.day() === 0 || isPublicHoliday) && !isDisabled && !isSelected) classNames.push('is-holiday');
-
-        let stateLabel = isPublicHoliday ? ' 공휴일' : '';
-        if (isDisabled) stateLabel += ' 선택 불가';
-        else if (isSelected) stateLabel += ' 선택됨';
-        else if (isInsideRange) stateLabel += ' 선택 범위';
+        const { isDisabled, isSelected, className: cellClassName, stateLabel } = cellPresentation({
+            cell, mode, disabledDate, selectedKeys, draftRange, holidays,
+        });
 
         return (
             <button
                 key={cell.key}
                 type="button"
-                className={classNames.join(' ')}
+                className={cellClassName}
                 disabled={isDisabled}
                 aria-pressed={isSelected}
                 aria-label={`${date.format('M월 D일')}${stateLabel}`}
@@ -234,19 +329,12 @@ const FormDatePickerBase = ({
         );
     };
 
-    let hasValue;
-    if (mode === 'range') hasValue = Boolean(validDay(value?.[0]) || validDay(value?.[1]));
-    else if (mode === 'multiple') hasValue = Array.isArray(value) && value.some(item => Boolean(validDay(item)));
-    else hasValue = Boolean(validDay(value));
+    const hasValue = hasPickerValue(mode, value);
 
     const label = triggerLabel(mode, value, placeholder, format);
     const dialogLabel = mode === 'range' ? '날짜 범위 선택' : '날짜 선택';
     const isError = status === 'error';
-    let iconColor;
-    if (disabled) iconColor = colors.gray[400];
-    else if (isError && !hasValue) iconColor = colors.error.main;
-    else if (hasValue) iconColor = colors.primary.main;
-    else iconColor = field.placeholderColor;
+    const iconColor = resolveIconColor(disabled, isError, hasValue);
 
     return (
         <>
@@ -265,20 +353,7 @@ const FormDatePickerBase = ({
                     ...style,
                 }}
             >
-                {mode === 'range' ? (
-                    <span style={styles.rangeTrigger}>
-                        <span style={label.hasStart ? styles.value : styles.placeholder}>{label.start}</span>
-                        <span aria-hidden="true" style={styles.arrow}>→</span>
-                        <span style={label.hasEnd ? styles.value : styles.placeholder}>{label.end}</span>
-                    </span>
-                ) : (
-                    <span key={hasValue ? String(label) : 'empty'} style={{
-                        ...(hasValue ? styles.value : styles.placeholder),
-                        animation: animation.slideUpIn,
-                    }}>
-                        {label}
-                    </span>
-                )}
+                <TriggerLabel mode={mode} label={label} hasValue={hasValue} />
                 <CalendarOutlined aria-hidden="true" style={{
                     flexShrink: 0,
                     fontSize: field.iconSize,
@@ -299,25 +374,7 @@ const FormDatePickerBase = ({
                 rootClassName="reserve-cal-modal reserve-form-cal-modal"
             >
                 {mode === 'range' && (
-                    <div role="group" style={styles.rangeChoice} aria-label="선택할 날짜 종류">
-                        {[0, 1].map(part => {
-                            const date = draftRange[part];
-                            return (
-                                <button
-                                    key={part}
-                                    type="button"
-                                    className={`reserve-form-cal-part${rangePart === part ? ' is-active' : ''}`}
-                                    aria-pressed={rangePart === part}
-                                    onClick={() => setRangePart(part)}
-                                >
-                                    <span style={styles.partLabel}>{part === 0 ? '시작일' : '종료일'}</span>
-                                    <span style={date ? styles.partValue : styles.partPlaceholder}>
-                                        {date ? date.format('YYYY. M. D.') : '선택 안 함'}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <RangePartChoice draftRange={draftRange} rangePart={rangePart} setRangePart={setRangePart} />
                 )}
 
                 <div style={styles.header}>

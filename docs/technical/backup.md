@@ -146,23 +146,62 @@ sudo reserve-restore --dry-run /var/backups/reserve/reserve-20260731-031000.sql.
 
 ### 2-3. 실제 복원 (운영)
 
+운영 복원은 별도 승인 후에만 실행해요. 파일의 생성 시각·테이블 수를 현재 스키마와 대조하고,
+`--dry-run`을 통과한 실제 경로로 `RESTORE_FILE`을 바꿔요. 아래 명령은 같은 셸에서 실행해요.
+어느 단계든 실패하면 다음 단계나 다른 색상 기동으로 넘어가지 않아요.
+
 ```bash
-# 1. 쓰기 차단 — 복원 중 들어온 데이터는 어차피 덮어써진다
-sudo docker stop blue green 2>/dev/null || true
+(
+  set -euo pipefail
+  RESTORE_FILE='/var/backups/reserve/reserve-YYYYMMDD-HHMMSS.sql.gz'
+  test -f "$RESTORE_FILE"
+  command -v jq >/dev/null
+  sudo reserve-restore --dry-run "$RESTORE_FILE"
 
-# 2. 지금 상태를 먼저 백업 (복원 자체가 잘못됐을 때의 되돌릴 지점)
-sudo /usr/local/bin/reserve-backup
+  # 1. nginx의 현재 대상을 먼저 확인한다. 잘못된 설정이면 쓰기 차단 전에 중단한다.
+  SERVICE_ENV_LINE=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc | tr -d '\r\n')
+  case "$SERVICE_ENV_LINE" in
+    'set $service_url blue;') ACTIVE_COLOR=blue; ACTIVE_PORT=8080 ;;
+    'set $service_url green;') ACTIVE_COLOR=green; ACTIVE_PORT=8081 ;;
+    *) echo 'Invalid nginx upstream; refusing to restore' >&2; exit 1 ;;
+  esac
+  sudo docker inspect "$ACTIVE_COLOR" >/dev/null
 
-# 3. 복원 — 'RESTORE reserve' 를 입력해야 진행된다
-sudo reserve-restore /var/backups/reserve/reserve-20260731-031000.sql.gz
+  # 2. 쓰기를 차단하고 지금 상태를 백업한다(잘못 복원했을 때의 되돌릴 지점).
+  sudo docker stop blue green 2>/dev/null || true
+  if sudo docker ps --format '{{.Names}}' | grep -Exq 'blue|green'; then
+    echo 'An app container is still running; refusing to restore' >&2
+    exit 1
+  fi
+  sudo /usr/local/bin/reserve-backup
 
-# 4. 앱 재기동 (nginx가 가리키는 쪽으로)
-sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc   # blue/green 확인
-sudo -E docker compose -f /home/ubuntu/docker-compose-blue.yml up -d
+  # 3. 복원 — 'RESTORE reserve'를 입력해야 진행된다.
+  sudo reserve-restore "$RESTORE_FILE"
 
-# 5. 확인
-curl -s localhost:8080/actuator/health
+  # 4. 기존 활성 컨테이너를 시작한다. 수동 셸의 빈 CI 시크릿으로 재생성하지 않는다.
+  sudo docker start "$ACTIVE_COLOR"
+  HEALTH_BODY=
+  for attempt in {1..12}; do
+    HEALTH_BODY=$(curl -fsS --max-time 10 "http://127.0.0.1:${ACTIVE_PORT}/actuator/health" 2>/dev/null) || HEALTH_BODY=
+    if printf '%s\n' "$HEALTH_BODY" | jq -e '.status == "UP"' >/dev/null 2>&1; then break; fi
+    sleep 5
+  done
+  printf '%s\n' "$HEALTH_BODY" | jq -e '.status == "UP"' >/dev/null
+  API_BODY=$(curl -fsS --max-time 20 --resolve reserve.it.kr:443:127.0.0.1 \
+    'https://reserve.it.kr/api/stores?page=0&size=1')
+  printf '%s\n' "$API_BODY" | jq -e '.success == true and (.data.content | type == "array")' >/dev/null
+)
 ```
+
+공개 `/actuator/health`의 HTTP 200만으로 백엔드가 정상이라고 판단하지 않아요.
+그 경로가 HTML SPA를 반환할 수 있으므로, 활성 포트의 Actuator JSON `status=UP`과
+nginx 경유 공개 API JSON을 각각 확인해요. 로컬 덤프 격리 복원 성공도 이 운영 절차의 리허설이나
+S3 원본 복원 성공을 뜻하지 않아요.
+
+명령 분기와 중단 조건은 레포 루트에서 `node --test scripts/tests/backup-runbook.test.mjs`로
+검사할 수 있어요. 모든 외부 명령을 대체한 모의 검사이므로 앱 중단·백업·DB 복원은 실행하지 않아요.
+blue/green 선택, 잘못된 upstream, 남은 쓰기 프로세스, 현재 상태 백업 실패와 HTML 응답 거부를
+검사하며, 실제 격리 DB 복원 훈련을 대신하지 않아요.
 
 ### 2-4. S3에서 복원
 
@@ -216,14 +255,22 @@ sudo reserve-restore /var/backups/reserve/<최신파일>
 
 ## 5. 모니터링
 
-백업 로그는 Loki `{job="reserve"}`에서 봐요.
+백업 전용 Promtail job을 반영한 서버는 Loki `{job="backup"}`에서 봐요.
 
 ```logql
-{job="reserve"} |= "[backup]"
-{job="reserve"} |= "ERROR [backup]"
+{job="backup"} |= "backup done"
+{job="backup"} |= "upload ok"
+{job="backup"} |= "ERROR"
 ```
 
-알림은 최근 26시간 동안 백업 완료가 0건이면 울려요. 규칙은 [모니터링](monitoring.md)의 알림 규칙 7번이에요.
+최근 26시간 동안 완료 로그가 없으면 알리는 규칙은 [모니터링](monitoring.md)의 설계예요.
+설정 파일만으로 설치·발송 성공을 단정하지 않아요. 새 backup 스트림 유입, No data/Error 처리,
+연락처와 실제 수신을 확인한 뒤 규칙을 활성화해요. 기존 positions를 초기화하거나 과거 로그를
+재주입해서 수집 성공으로 만들지 않아요.
+
+Loki 결과가 비어 있으면 root cron, 원본 `backup.log`, 로컬 덤프와 S3 최신 객체를 각각
+읽기 전용으로 대조해요. 수집 실패와 백업 실패는 달라요. 업로더의 PutObject 권한은
+HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없다는 증거가 아니에요.
 
 ## 6. 복구 범위
 

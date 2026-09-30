@@ -217,7 +217,65 @@ GET /api/admin/payment-operations/webhooks?unfinishedOnly=true&page=0&size=50
 POST /api/admin/payment-operations/webhooks/{inboxId}/retry
 ```
 
-관리자 패널 **결제 운영** 탭에서 같은 목록을 보고 READY 재확인과 웹훅 재처리를 실행할 수 있어요. 셋 중 하나라도 있으면 15분마다 `Payment operations queue requires attention` 로그가 나요.
+관리자 패널 **결제 운영** 탭에서 같은 목록을 보고 READY 재확인과 웹훅 재처리를 실행할 수 있어요.
+`PaymentOperationsMonitorScheduler`는 15분마다 아래 다섯 지표를 집계하고,
+하나라도 양수면 `Payment operations queue requires attention` ERROR 로그에 모두 남겨요.
+
+| 지표 | 뜻 |
+|---|---|
+| `openIssues` | 열린 결제 대사 건 |
+| `failedWebhooks` | FAILED 웹훅 inbox 건 |
+| `staleReadyPayments` | 생성 후 7일 넘은 READY 결제 |
+| `ledgerInvariantViolations` | 결제 상태·수납액·확정 환불액의 불변식 위반 |
+| `depositInvariantViolations` | 예약금 플래그와 양수 확정 원장 존재 여부가 다른 예약 |
+
+이 로그는 Grafana 알림의 입력이지 규칙 설치나 발송 성공의 증거는 아니에요.
+두 불변식의 대상은 위 세 큐 목록에 나오지 않아요. 다른 세 지표가 0이어도 무시하지 않아요.
+
+### 예약금 불변식 — 읽기 전용 조사
+
+`depositInvariantViolations`는 `depositPaid`와 **양수 확정 잔액인 결제 행이 하나 이상 있는지**를
+비교해요. 결제는 `paid_at`이 있고 PAID/PARTIAL_REFUNDED/REFUND_PENDING/REFUNDED인 행만
+포함하며, 잔액은 `amount - COALESCE(refund_amount, 0)`이에요. 전체 행의 SUM이 양수인지로
+판정을 바꾸지 않아요. 취소·숨김 예약도 포함하고, REFUND_PENDING은 기록된 확정 환불액만 차감해요.
+불일치 건수는 돈이 잘못 움직였다는 결론이나 PG 실제 상태·원인을 뜻하지 않아요.
+
+로컬 후속 후보에는 관리자 전용
+`GET /api/admin/payment-operations/deposit-invariants?page=0&size=50`을 준비했어요.
+**아직 dev 통합·운영 배포 전이므로 현재 운영에서 사용 가능하다고 가정하지 않아요.**
+이 후보는 COUNT와 목록 조건을 공유하고, size 1~100의 페이지 대상 원장만 일괄 조회해요.
+예약·가게 내부 ID, 예약 상태·삭제 시각, 플래그, 불일치 방향, 확정 순액·환불액·상태별 집계만
+반환해요. 고객 개인정보·주문번호·PG 식별자, PG 호출·행 잠금·상태 변경은 없어요.
+
+- `DEPOSIT_PAID_WITHOUT_POSITIVE_LEDGER`: 플래그 true인데 양수 확정 원장이 없어요.
+- `POSITIVE_LEDGER_WITHOUT_DEPOSIT_PAID`: 플래그 false/null인데 양수 확정 원장이 있어요.
+
+배포 전에는 운영자의 승인된 읽기 전용 DB 접근으로 아래 조건을 사용해요.
+예약·결제 식별자나 조회 결과를 채팅·공개 로그에 붙이지 않아요.
+
+```sql
+WITH deposit_comparison AS (
+  SELECT r.reservation_id, r.deposit_paid,
+         EXISTS (
+           SELECT 1 FROM payment p
+           WHERE p.reservation_id = r.reservation_id
+             AND p.paid_at IS NOT NULL
+             AND p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
+             AND p.amount - COALESCE(p.refund_amount, 0) > 0
+         ) AS has_positive_net
+  FROM reservation r
+)
+SELECT reservation_id, deposit_paid, has_positive_net
+FROM deposit_comparison
+WHERE (deposit_paid = TRUE AND has_positive_net = FALSE)
+   OR ((deposit_paid = FALSE OR deposit_paid IS NULL) AND has_positive_net = TRUE)
+ORDER BY reservation_id
+LIMIT 100;
+```
+
+대상별 예약·결제·환불 상태와 금액을 읽기 전용으로 대조하고, PortOne 콘솔의 실제 결제·취소
+상태·금액을 확인해요. **플래그·원장 직접 수정, 자동 환불, 단순 재취소는 금지**예요.
+원인이 확인될 때까지 운영 조사 항목으로 남겨요.
 
 대사 큐 원인 코드:
 

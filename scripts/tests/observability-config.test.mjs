@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import test from 'node:test';
+import test, { before } from 'node:test';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const config = read('promtail-config.yml');
 const nginxJob = config.slice(config.indexOf('  - job_name: nginx'));
 const quotedPattern = nginxJob.match(/selector: '\{job="nginx"\} !~ (".+")'/)?.[1];
-assert.ok(quotedPattern, 'Promtail 2.9 match selectors require a double-quoted pattern');
-const selector = JSON.parse(quotedPattern);
-// JS lacks RE2's POSIX whitespace class; this one class has the same test meaning.
-const allowedTiming = new RegExp(selector.replaceAll('[[:space:]]', String.raw`\s`));
+let allowedTiming;
+before(() => {
+  assert.ok(quotedPattern, 'Promtail 2.9 match selectors require a double-quoted pattern');
+  // JS lacks RE2's POSIX whitespace class; this one class has the same test meaning.
+  allowedTiming = new RegExp(JSON.parse(quotedPattern).replaceAll('[[:space:]]', String.raw`\s`));
+});
 const timing = {
   time: '1790772000.123', route: 'store_list', method: 'GET', status: 200,
   request_time: '0.019', upstream_connect_time: '0.001', upstream_header_time: '0.018',

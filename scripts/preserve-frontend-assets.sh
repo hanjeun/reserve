@@ -23,7 +23,8 @@ owned_records() {
 }
 
 validate_record() {
-  [[ "$1" =~ ^[0-9a-f]{64}$ && "$2" =~ ^assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8,}\.(js|css|woff2?|ttf|otf|png|jpe?g|webp|svg|gif|avif)$ && -z "$3" ]] || {
+  local digest=$1 relative=$2 extra=$3
+  [[ "$digest" =~ ^[0-9a-f]{64}$ && "$relative" =~ ^assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8,}\.(js|css|woff2?|ttf|otf|png|jpe?g|webp|svg|gif|avif)$ && -z "$extra" ]] || {
     echo 'Invalid hashed asset manifest record' >&2; return 1;
   }
 }

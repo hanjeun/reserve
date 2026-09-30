@@ -89,6 +89,31 @@ export default function BenefitStoreDiscovery() {
         });
     };
 
+    // 툴바의 가게 수 문구 — 로딩 / 실패 / 총 개수
+    let countLabel;
+    if (loading) countLabel = '가게를 불러오는 중';
+    else if (isError) countLabel = '가게 조회 실패';
+    else countLabel = `총 ${total.toLocaleString()}개 가게`;
+
+    // 목록 본문 — 로딩 스켈레톤 / 오류 / 빈 상태 / 가게 그리드
+    let storeListBody;
+    if (loading) {
+        storeListBody = (
+            <div className="reserve-benefit-store-grid" role="status" aria-label="가게 목록을 불러오는 중" aria-busy="true"><StoreCardSkeleton count={BENEFIT_STORE_PAGE_SIZE} /></div>
+        );
+    } else if (isError) {
+        storeListBody = (
+            <DataState state="error" kind="store" subject="가게 목록" error={error}
+                title="가게 목록을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} />
+        );
+    } else if (stores.length === 0) {
+        storeListBody = <DataState state="empty" kind="store" title="선택한 서비스 분야에 등록된 가게가 없어요." />;
+    } else {
+        storeListBody = (
+            <div className="reserve-benefit-store-grid">{stores.map(store => <StoreCard key={store.id} store={store} />)}</div>
+        );
+    }
+
     return (
         <section id="benefit-stores" className="reserve-benefit-store-discovery" aria-labelledby="benefit-stores-title">
             <header className="reserve-benefit-store-heading">
@@ -96,22 +121,13 @@ export default function BenefitStoreDiscovery() {
                 <p>아래는 서비스별 전체 가게예요. 혜택 제공 여부는 각 가게의 소식에서 확인해 주세요.</p>
             </header>
             <div className="reserve-benefit-store-toolbar">
-                <span className="reserve-benefit-store-count">{loading ? '가게를 불러오는 중' : isError ? '가게 조회 실패' : `총 ${total.toLocaleString()}개 가게`}</span>
+                <span className="reserve-benefit-store-count">{countLabel}</span>
                 <div className="reserve-benefit-store-controls">
                     <FilterMenu appearance="plain" aria-label="서비스 분야 선택" value={domain} options={SERVICE_DOMAIN_FILTER_OPTIONS} onChange={value => changeFilter('domain', value)} disabled={loading} />
                     <FilterMenu appearance="plain" aria-label="가게 정렬 선택" value={sort} options={SORT_OPTIONS} onChange={value => changeFilter('sort', value)} disabled={loading} />
                 </div>
             </div>
-            {loading ? (
-                <div className="reserve-benefit-store-grid" role="status" aria-label="가게 목록을 불러오는 중" aria-busy="true"><StoreCardSkeleton count={BENEFIT_STORE_PAGE_SIZE} /></div>
-            ) : isError ? (
-                <DataState state="error" kind="store" subject="가게 목록" error={error}
-                    title="가게 목록을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} />
-            ) : stores.length === 0 ? (
-                <DataState state="empty" kind="store" title="선택한 서비스 분야에 등록된 가게가 없어요." />
-            ) : (
-                <div className="reserve-benefit-store-grid">{stores.map(store => <StoreCard key={store.id} store={store} />)}</div>
-            )}
+            {storeListBody}
             {!isError && total > BENEFIT_STORE_PAGE_SIZE && (
                 <nav className="reserve-benefit-store-pagination" aria-label="함께 둘러볼 가게 페이지">
                     <Pagination current={page} pageSize={BENEFIT_STORE_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} disabled={loading} onChange={changePage} />

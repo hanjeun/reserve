@@ -15,7 +15,7 @@ const replaceOnce = (text, before, after) => {
 
 export function rollbackChanges() {
     const base = file => execFileSync(git, ['show', `${ROLLBACK_BASE}:${file}`],
-        { cwd: repo, encoding: 'utf8', windowsHide: true }).replace(/\r\n/g, '\n');
+        { cwd: repo, encoding: 'utf8', windowsHide: true }).replaceAll('\r\n', '\n');
     const edits = [];
     const edit = (file, transform) => { const before = base(file); edits.push({ file, before, after: transform(before) }); };
     edit('backend/src/main/java/kr/it/reserve/chat/entity/SenderRole.java', text => replaceOnce(text, '    ADMIN\n', '    ADMIN,\n    /** Read compatibility only: the rollback server cannot create store messages. */\n    OWNER\n'));
@@ -67,15 +67,15 @@ export function rollbackChanges() {
             '\n        PaymentResponseDto response = refundPayment(refundDto, false);');
     });
     edits.push({ file: 'backend/src/test/java/kr/it/reserve/chat/ChatRollbackCompatibilityTest.java', before: null,
-        after: readFileSync(new URL('../docs/technical/release-fixtures/v270-rollback/ChatRollbackCompatibilityTest.java', import.meta.url), 'utf8').replace(/\r\n/g, '\n') });
+        after: readFileSync(new URL('../docs/technical/release-fixtures/v270-rollback/ChatRollbackCompatibilityTest.java', import.meta.url), 'utf8').replaceAll('\r\n', '\n') });
     return edits;
 }
 
 const lines = text => text.trimEnd().split('\n');
 export function rollbackPatch(target, format = 'apply') {
     if (!isAbsolute(target)) throw new Error('Use an absolute isolated directory');
-    const root = resolve(target).replace(/\\/g, '/');
-    if (root === repo.replace(/\\/g, '/')) throw new Error('Do not replace the release candidate with rollback sources');
+    const root = resolve(target).replaceAll('\\', '/');
+    if (root === repo.replaceAll('\\', '/')) throw new Error('Do not replace the release candidate with rollback sources');
     const edits = rollbackChanges();
     if (format === 'git') return edits.map(({file,before,after}) => before === null
         ? `diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines(after).length} @@\n${lines(after).map(line => '+'+line).join('\n')}\n`

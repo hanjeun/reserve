@@ -146,7 +146,7 @@ describe('chat intro editor', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('사진 파일만');
         fireEvent.change(file, { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
         await waitFor(() => expect(onUploadAvatar).toHaveBeenCalled());
-        await waitFor(() => expect(screen.getByRole('button', { name: '기본 사진으로' })).toBeInTheDocument());
+        expect(await screen.findByRole('button', { name: '기본 사진으로' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '기본 문구로' }));
         expect(screen.getByLabelText('인사말').value).toContain('관리자가 확인 후 답변드릴게요');
         fireEvent.click(screen.getByRole('button', { name: '저장하기' }));

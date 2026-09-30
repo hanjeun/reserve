@@ -26,8 +26,6 @@ import {
     bannerCopyOptions,
     findBannerCopyKey,
     getBannerCopyPreset,
-} from '../../constants';
-import {
     DEFAULT_BANNER_MOTION_KEY,
     findBannerMotionKey,
 } from '../../constants';
@@ -470,6 +468,41 @@ const AdManageTab = () => {
         },
     ];
 
+    // 광고 목록 영역 — 오류 / 스켈레톤 / 표 중 하나.
+    let adsContent;
+    if (adsError) {
+        adsContent = (
+            <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
+                onRetry={refetch} retrying={isFetching} compact />
+        );
+    } else if (loading || isPlaceholderData) {
+        adsContent = (
+            <AdminTableSkeleton
+                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                cols={SKELETON_COLS}
+                headers={SKELETON_HEADERS}
+                actionBtns={2}
+                pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
+            />
+        );
+    } else {
+        adsContent = (
+            <DataTable
+                rowKey="id"
+                columns={columns}
+                dataSource={ads}
+                pagination={{
+                    current: page + 1,
+                    pageSize: PAGE_SIZE,
+                    total: totalElements,
+                    showSizeChanger: false,
+                    onChange: (nextPage) => setAdListParams({ advertisementPage: String(nextPage - 1) }),
+                }}
+                locale={{ emptyText: '신청한 광고가 없습니다.' }}
+            />
+        );
+    }
+
     return (
         <div className="reserve-ad-manage-tab">
             <div className="reserve-ad-manage-heading">
@@ -518,32 +551,7 @@ const AdManageTab = () => {
 
             {/* 로딩 조건 통일(2026-07 전수조사): 예전엔 ads.length === 0 조건 때문에 새로고침이나
                 광고 신청/취소 후 재조회 시엔 아무 로딩 신호도 없었다 — 관리자 탭들과 동일하게 통일. */}
-            {adsError ? (
-                <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
-                    onRetry={refetch} retrying={isFetching} compact />
-            ) : (loading || isPlaceholderData) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={2}
-                    pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            ) : (
-                <DataTable
-                    rowKey="id"
-                    columns={columns}
-                    dataSource={ads}
-                    pagination={{
-                        current: page + 1,
-                        pageSize: PAGE_SIZE,
-                        total: totalElements,
-                        showSizeChanger: false,
-                        onChange: (nextPage) => setAdListParams({ advertisementPage: String(nextPage - 1) }),
-                    }}
-                    locale={{ emptyText: '신청한 광고가 없습니다.' }}
-                />
-            )}
+            {adsContent}
 
             <FormModal
                 title={createStep === 'details' ? '새 광고 신청' : '광고 미리보기'}

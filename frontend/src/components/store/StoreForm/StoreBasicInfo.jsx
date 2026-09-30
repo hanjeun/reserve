@@ -71,7 +71,7 @@ const FieldRow = ({ children, style, compact = false, className = '' }) => {
     // 여백이 붙어 행 자신의 marginBottom 과 겹친다(아래 cloneElement 가 0 으로 덮는 이유).
     return (
         <Flex
-            className={`reserve-store-form-row${compact ? ' reserve-store-form-row--compact' : ''}${className ? ` ${className}` : ''}`}
+            className={['reserve-store-form-row', compact && 'reserve-store-form-row--compact', className].filter(Boolean).join(' ')}
             vertical={isMobile}
             gap={12}
             style={{ marginBottom: isMobile ? 12 : 18, ...style }}
@@ -246,7 +246,7 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
                     type="number" placeholder="0" suffix="원"
                     min={0} max={100000} precision={0} step={1000}
                     formatter={(v) => (v == null || v === '' ? '' : `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ','))}
-                    parser={(v) => (v ? v.replace(/,/g, '') : v)}
+                    parser={(v) => (v ? v.replaceAll(',', '') : v)}
                 />
             </Form.Item>
         </FieldRow>
@@ -319,7 +319,7 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
                 <FormDatePicker
                     multiple
                     placeholder="날짜 선택"
-                    disabledDate={(d) => d && d.isBefore(dayjs().startOf('day'))}
+                    disabledDate={(d) => d?.isBefore(dayjs().startOf('day'))}
                     highlightHolidays
                 />
             </Form.Item>

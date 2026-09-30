@@ -40,7 +40,7 @@ const OAuthCallback = () => {
         const finalizeLogin = async () => {
             try {
                 const user = await checkAuth(true);
-                if (user && user.email) {
+                if (user?.email) {
                     const isNewUser = params.get('newUser') === 'true';
                     if (isNewUser) {
                         // 약관 동의가 먼저 — 복귀 경로는 소비하지 않고 남겨둔다(SocialAgreement가 소비)

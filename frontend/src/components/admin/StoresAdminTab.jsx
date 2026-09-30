@@ -178,6 +178,36 @@ const StoresAdminTab = () => {
         )},
     ];
 
+    // 가게 목록 본문 — 오류 → 로딩(스켈레톤) → 표 순으로 판정한다.
+    const renderStoreList = () => {
+        if (storesError) {
+            return (
+                <DataState state="error" kind="store" subject="가게 목록" error={storesError}
+                    onRetry={refetch} retrying={isFetching} compact />
+            );
+        }
+        if (storeLoading || isPlaceholderData) {
+            return (
+                <AdminTableSkeleton
+                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                    cols={SKELETON_COLS}
+                    headers={SKELETON_HEADERS}
+                    actionBtns={2}
+                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
+                />
+            );
+        }
+        return (
+            <DataTable
+                columns={storeAdminColumns}
+                dataSource={stores}
+                rowKey="id"
+                pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
+                locale={{ emptyText: '가게가 없습니다.' }}
+            />
+        );
+    };
+
     return (
         <>
             <FilterToolbar
@@ -186,26 +216,7 @@ const StoresAdminTab = () => {
                 onReload={refetch}
                 loading={storeLoading || isFetching}
             />
-            {storesError ? (
-                <DataState state="error" kind="store" subject="가게 목록" error={storesError}
-                    onRetry={refetch} retrying={isFetching} compact />
-            ) : (storeLoading || isPlaceholderData) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={2}
-                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            ) : (
-                <DataTable
-                    columns={storeAdminColumns}
-                    dataSource={stores}
-                    rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                    locale={{ emptyText: '가게가 없습니다.' }}
-                />
-            )}
+            {renderStoreList()}
 
             {/* key 토글 제거 — SanctionModal의 destroyOnHidden이 입력값 초기화를 담당하므로
                 강제 remount 없이도 닫힘 애니메이션이 정상 재생된다 */}

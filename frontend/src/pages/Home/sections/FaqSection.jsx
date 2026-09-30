@@ -11,6 +11,11 @@ const faqItems = FAQS.map((faq, i) => ({
     children: faq.a,
 }));
 
+// 펼침 아이콘 — 클로저 의존이 없어 컴포넌트 밖에 둔다(렌더마다 새 함수를 만들지 않도록).
+const renderFaqExpandIcon = () => (
+    <DownOutlined style={{ fontSize: 12, color: colors.text.tertiary }} />
+);
+
 export default function FaqSection({ isMobile }) {
     // isMobile은 Home/index.jsx에서 한 번만 구독해서 prop으로 내려줌
 
@@ -57,9 +62,7 @@ export default function FaqSection({ isMobile }) {
                         expandIconPlacement="end"
                         // 열림/닫힘 상태는 AntD 가 관리한다(비제어). 회전은 AntD 가 붙여주는
                         // .ant-collapse-item-active 클래스로 CSS 가 판정하므로 상태가 필요 없다.
-                        expandIcon={() => (
-                            <DownOutlined style={{ fontSize: 12, color: colors.text.tertiary }} />
-                        )}
+                        expandIcon={renderFaqExpandIcon}
                         bordered={false}
                     />
                 </div>

@@ -105,7 +105,7 @@ export const VALIDATION_RULES = {
         { required: true, message: '영업 시간을 선택해주세요' },
         {
             validator: (_rule, value) => {
-                if (!value || !value[0] || !value[1]) return Promise.resolve();
+                if (!value?.[0] || !value[1]) return Promise.resolve();
                 if (toHm(value[0]) === toHm(value[1])) {
                     return Promise.reject(new Error('오픈과 마감이 같습니다. 영업 시간을 확인해주세요'));
                 }
@@ -125,7 +125,7 @@ export const VALIDATION_RULES = {
     breakTimes: [
         ({ getFieldValue }) => ({
             validator: (_rule, value) => {
-                if (!value || !value[0] || !value[1]) return Promise.resolve();
+                if (!value?.[0] || !value[1]) return Promise.resolve();
 
                 const bs = toHm(value[0]);
                 const be = toHm(value[1]);
@@ -134,7 +134,7 @@ export const VALIDATION_RULES = {
                 }
 
                 const times = getFieldValue('times');
-                if (!times || !times[0] || !times[1]) return Promise.resolve();
+                if (!times?.[0] || !times[1]) return Promise.resolve();
 
                 const open = toHm(times[0]);
                 const close = toHm(times[1]);

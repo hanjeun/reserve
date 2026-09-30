@@ -47,11 +47,11 @@ export default function MockBookingForm() {
                     <span style={{ fontWeight: fontWeight.medium, fontSize: fontSize.base }}>{count}명</span>
                     <Flex gap={8}>
                         {[
-                            { Icon: MinusOutlined, fn: () => setCount(c => Math.max(1, c - 1)), disabled: count <= 1 },
-                            { Icon: PlusOutlined,  fn: () => setCount(c => c + 1), disabled: false },
-                        ].map((item, k) => (
+                            { key: 'decrease', Icon: MinusOutlined, fn: () => setCount(c => Math.max(1, c - 1)), disabled: count <= 1 },
+                            { key: 'increase', Icon: PlusOutlined,  fn: () => setCount(c => c + 1), disabled: false },
+                        ].map(item => (
                             <button
-                                key={k}
+                                key={item.key}
                                 type="button"
                                 onClick={!item.disabled ? item.fn : undefined}
                                 style={{

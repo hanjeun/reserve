@@ -212,6 +212,35 @@ const MembersTab = () => {
         )},
     ];
 
+    // 목록 영역 — 오류 / 첫 로딩·페이지 전환 스켈레톤 / 표
+    let tableBody;
+    if (membersError) {
+        tableBody = (
+            <DataState state="error" kind="member" subject="회원 목록" error={membersError}
+                onRetry={refetch} retrying={isFetching} compact />
+        );
+    } else if (memberLoading || isPlaceholderData) {
+        tableBody = (
+            <AdminTableSkeleton
+                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                cols={SKELETON_COLS}
+                headers={SKELETON_HEADERS}
+                actionBtns={2}
+                pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
+            />
+        );
+    } else {
+        tableBody = (
+            <DataTable
+                columns={memberColumns}
+                dataSource={members}
+                rowKey="id"
+                pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
+                locale={{ emptyText: '회원이 없습니다.' }}
+            />
+        );
+    }
+
     return (
         <>
             <FilterToolbar
@@ -220,26 +249,7 @@ const MembersTab = () => {
                 onReload={refetch}
                 loading={memberLoading || isFetching}
             />
-            {membersError ? (
-                <DataState state="error" kind="member" subject="회원 목록" error={membersError}
-                    onRetry={refetch} retrying={isFetching} compact />
-            ) : (memberLoading || isPlaceholderData) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={2}
-                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            ) : (
-                <DataTable
-                    columns={memberColumns}
-                    dataSource={members}
-                    rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                    locale={{ emptyText: '회원이 없습니다.' }}
-                />
-            )}
+            {tableBody}
 
             {/* key 토글 제거 — SanctionModal이 destroyOnHidden으로 입력값을 초기화하므로
                 강제 remount가 필요 없고, 그 덕에 닫힘 애니메이션이 정상 재생된다 */}

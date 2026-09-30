@@ -94,8 +94,7 @@ const createReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, 
             : <Button key="review" variant="ghost-sm-primary"
                 onClick={(e) => { e.stopPropagation(); onReview(res, false); }}>
                 <StarOutlined /> 리뷰 쓰기
-              </Button>);
-        actions.push(
+              </Button>,
             <Button key="remove" variant="ghost-sm" size="sm"
                 onClick={(e) => { e.stopPropagation(); onRemove(res); }}
                 style={{ color: colors.text.tertiary }}>
@@ -287,6 +286,50 @@ const MyReservations = () => {
         return <ReservationRow {...itemProps} renderActions={() => actions} />;
     };
 
+    // 목록 영역 — 첫 조회 스켈레톤 / 처음부터 실패 / 목록(재조회 실패 띠 포함)
+    let listBody;
+    if (loading) {
+        listBody = (
+            <div role="status" aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
+                {view === 'cards'
+                    ? <ReservationSummaryCardSkeleton count={4} />
+                    : <MyReservationCardSkeleton count={4} />}
+            </div></div>
+        );
+    } else if (error && reservations.length === 0) {
+        listBody = (
+            // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
+            <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                onRetry={refetch} retrying={loading || refetching} style={{ marginTop: 100 }} />
+        );
+    } else {
+        listBody = (
+            <>
+                {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
+                {error && (
+                    <DataState state="error" kind="reservation" subject="예약 목록" error={error}
+                        title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                        onRetry={refetch} retrying={loading || refetching} compact style={{ marginBottom: 16 }} />
+                )}
+                {filtered.length === 0 ? (
+                    <DataState state="empty" kind="reservation" style={{ marginTop: 100 }}
+                        title={statusFilter === 'ALL' && !debouncedKeyword.trim()
+                            ? '예약 내역이 없습니다.'
+                            : '조건에 맞는 예약이 없습니다.'} />
+                ) : (
+                    <div className={view === 'cards' ? 'reserve-reservation-card-grid' : 'reserve-myreservation-rows'}>
+                        {filtered.map((res, i) => (
+                            <div key={res.id} className={view === 'cards' ? 'reserve-myreservation-card-item' : 'reserve-myreservation-row'}>
+                                {renderReservationItem(res)}
+                                {view === 'list' && i < filtered.length - 1 && <div style={styles.divider} />}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </>
+        );
+    }
+
     return (
         <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page" aria-busy={loading || refetching}>
             <div style={{ marginBottom: 32 }}>
@@ -310,41 +353,7 @@ const MyReservations = () => {
 
             {/* 첫 조회에만 스켈레톤을 표시한다. 폴링·창 포커스·수동 새로고침은 현재 예약과
                 읽던 위치를 유지하고 툴바에서만 진행 상태를 알린다. */}
-            {loading ? (
-                <div role="status" aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
-                    {view === 'cards'
-                        ? <ReservationSummaryCardSkeleton count={4} />
-                        : <MyReservationCardSkeleton count={4} />}
-                </div></div>
-            ) : error && reservations.length === 0 ? (
-                // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
-                <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                    onRetry={refetch} retrying={loading || refetching} style={{ marginTop: 100 }} />
-            ) : (
-                <>
-                    {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
-                    {error && (
-                        <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                            title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있습니다."
-                            onRetry={refetch} retrying={loading || refetching} compact style={{ marginBottom: 16 }} />
-                    )}
-                    {filtered.length === 0 ? (
-                        <DataState state="empty" kind="reservation" style={{ marginTop: 100 }}
-                            title={statusFilter === 'ALL' && !debouncedKeyword.trim()
-                                ? '예약 내역이 없습니다.'
-                                : '조건에 맞는 예약이 없습니다.'} />
-                    ) : (
-                        <div className={view === 'cards' ? 'reserve-reservation-card-grid' : 'reserve-myreservation-rows'}>
-                            {filtered.map((res, i) => (
-                                <div key={res.id} className={view === 'cards' ? 'reserve-myreservation-card-item' : 'reserve-myreservation-row'}>
-                                    {renderReservationItem(res)}
-                                    {view === 'list' && i < filtered.length - 1 && <div style={styles.divider} />}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </>
-            )}
+            {listBody}
             <QrCodeModal
                 reservationId={qrReservationId}
                 open={qrReservationId != null}

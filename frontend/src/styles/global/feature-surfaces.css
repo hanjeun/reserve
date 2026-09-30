@@ -481,8 +481,8 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    background: var(--c-bg-paper, #fff);
 }
-.reserve-messenger-home { background: var(--c-bg-paper, #fff); }
 .reserve-messenger-brand-cover { position: relative; flex-shrink: 0; height: 200px; overflow: hidden; background: var(--c-primary-light, #e8f3ff); }
 .reserve-messenger-cover-image { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 65%; pointer-events: none; }
 .reserve-messenger-brand-cover::after { content: ''; position: absolute; inset: 48% 0 0; background: linear-gradient(transparent, var(--c-bg-paper, #fff)); pointer-events: none; }
@@ -1380,7 +1380,6 @@
     from { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: -4px; }
     to { opacity: 1; transform: translateX(0) scale(1); width: 44px; flex-basis: 44px; margin-right: 0; }
 }
-.reserve-header-back { animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .reserve-header-logo {
     display: flex;
     flex: 0 0 auto;
@@ -1388,6 +1387,7 @@
     align-items: center;
     justify-content: flex-start;
     transform-origin: left center;
+    transition: opacity 0.16s ease, transform 0.16s ease !important;
 }
 .reserve-header-logo-wordmark { display: block; font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 22px; font-weight: 850; letter-spacing: -0.8px; line-height: 1; white-space: nowrap; }
 .reserve-header-query {
@@ -1464,6 +1464,7 @@
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: opacity 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+    animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .reserve-header-back:hover { background: var(--c-gray-50, #f9fafb); }
 .reserve-header-back:active { opacity: 0.65; }
@@ -1494,7 +1495,6 @@
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
 .reserve-header-search:active { color: var(--c-text-primary, #191f28) !important; }
 .reserve-header-search:hover { background: var(--c-gray-50, #f9fafb); }
-.reserve-header-logo { transition: opacity 0.16s ease, transform 0.16s ease !important; }
 .reserve-header-avatar-trigger { transition: transform 0.12s ease, opacity 0.16s ease !important; }
 .reserve-header-logo:hover,
 .reserve-header-avatar-trigger:hover { opacity: 0.8; }
@@ -1835,8 +1835,7 @@
 .reserve-discovery-coming-soon-link { min-height: 44px; margin-top: 8px; display: flex; align-items: center; gap: 8px; color: var(--c-text-secondary, #4e5968); text-decoration: none; font-size: 14px; -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease, opacity 0.16s ease; }
 .reserve-discovery-coming-soon-link:hover { color: var(--c-text-primary, #191f28); }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-discovery-coming-soon-link:active { color: var(--c-text-primary, #191f28); }
-.reserve-discovery-coming-soon-link:active { transform: scale(0.97); opacity: 0.88; }
+.reserve-discovery-coming-soon-link:active { color: var(--c-text-primary, #191f28); transform: scale(0.97); opacity: 0.88; }
 .reserve-discovery-coming-soon-link:focus { outline: none; }
 .reserve-discovery-coming-soon-link:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 3px; }
 .reserve-discovery-location {
@@ -1983,6 +1982,8 @@
     font-weight: 500;
     line-height: 1.5;
     white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease, opacity 0.16s ease;
 }
 .reserve-discovery-shortcut-media {
     width: 100%;
@@ -2000,7 +2001,11 @@
 }
 .reserve-discovery-shortcut:hover { color: var(--c-text-primary, #191f28); }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-discovery-shortcut:active { color: var(--c-text-primary, #191f28); }
+.reserve-discovery-shortcut:active {
+    color: var(--c-text-primary, #191f28);
+    transform: scale(0.97);
+    opacity: 0.88;
+}
 .reserve-discovery-more:hover { color: var(--c-text-secondary, #4e5968); opacity: 0.75; }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
 .reserve-discovery-more:active { color: var(--c-text-secondary, #4e5968); }
@@ -2024,14 +2029,6 @@
 .reserve-discovery-banner:active,
 .reserve-discovery-banner-next:active,
 .reserve-discovery-more:active { opacity: 0.88; }
-.reserve-discovery-shortcut {
-    -webkit-tap-highlight-color: transparent;
-    transition: transform 0.12s ease, opacity 0.16s ease;
-}
-.reserve-discovery-shortcut:active {
-    transform: scale(0.97);
-    opacity: 0.88;
-}
 .reserve-discovery-section-heading {
     display: flex;
     justify-content: space-between;
@@ -2455,8 +2452,7 @@
     color: var(--c-text-primary, #191f28);
 }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-store-contact-action:active { color: var(--c-text-primary, #191f28); }
-.reserve-store-contact-action:active { transform: scale(0.96); }
+.reserve-store-contact-action:active { color: var(--c-text-primary, #191f28); transform: scale(0.96); }
 .reserve-store-contact-action:focus-visible,
 .reserve-store-detail .reserve-store-identity-actions .reserve-favorite-button:focus-visible {
     outline: 2px solid var(--c-text-secondary, #4e5968);

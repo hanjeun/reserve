@@ -343,6 +343,94 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     const emptyText = mode === 'pending' ? '대기 중인 신청이 없습니다.' : '신청 내역이 없습니다.';
 
+    // 목록 영역 — 오류 / 첫 로딩·페이지 전환 스켈레톤 / 표
+    let tableBody;
+    if (error) {
+        tableBody = (
+            <DataState state="error" kind="member" subject="사업자 인증 신청" error={error}
+                onRetry={refetch} retrying={isFetching} compact />
+        );
+    } else if (isLoading || isPlaceholderData) {
+        tableBody = (
+            <AdminTableSkeleton
+                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                cols={SKELETON_COLS}
+                headers={SKELETON_HEADERS}
+                actionBtns={3}
+                stackFirstCol
+                pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
+            />
+        );
+    } else {
+        tableBody = (
+            <DataTable
+                columns={columns}
+                dataSource={items}
+                rowKey="id"
+                pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
+                locale={{ emptyText }}
+            />
+        );
+    }
+
+    // 상세 모달 본문 — 로딩 / 오류 / 상세(항목이 없으면 비움)
+    let detailBody;
+    if (detailLoading && !detailError) {
+        detailBody = (
+            <ModalLoading text="상세 정보를 불러오는 중..." minHeight="160px" />
+        );
+    } else if (detailError) {
+        detailBody = (
+            <DataState
+                state="error"
+                kind="member"
+                subject="사업자 인증 상세"
+                error={detailError}
+                title="상세 정보를 불러오지 못했습니다."
+                onRetry={detailRequestId ? () => loadDetail(detailRequestId, { retainError: true }) : undefined}
+                retrying={detailLoading}
+                compact
+                style={{ minHeight: 160, margin: 0 }}
+            />
+        );
+    } else {
+        detailBody = detailItem && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
+                <DetailRow label="신청자">{`${detailItem.memberName} (${detailItem.memberEmail})`}</DetailRow>
+                <DetailRow label="상호명">{detailItem.businessName}</DetailRow>
+                {detailItem.businessNumber && <DetailRow label="사업자번호">{detailItem.businessNumber}</DetailRow>}
+                <DetailRow label="상태">
+                    <Tag color={BIZ_STATUS_CONFIG[detailItem.status]?.color}>
+                        {BIZ_STATUS_CONFIG[detailItem.status]?.label || detailItem.status}
+                    </Tag>
+                </DetailRow>
+                {detailItem.memo && (
+                    <DetailRow label="메모">
+                        <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', color: colors.text.secondary }}>
+                            {detailItem.memo}
+                        </Paragraph>
+                    </DetailRow>
+                )}
+                {detailItem.rejectionReason && (
+                    <DetailRow label="거절 사유"><Text type="danger">{detailItem.rejectionReason}</Text></DetailRow>
+                )}
+                {detailItem.licenseImageUrl && (
+                    <DetailRow label="사업자등록증">
+                        <Image src={getDetailImageUrl(detailItem.licenseImageUrl)} alt="사업자등록증"
+                            style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }}
+                            classNames={{ popup: { root: 'reserve-image-preview' } }} />
+                    </DetailRow>
+                )}
+                <DetailRow label="신청일">{detailItem.createdAt?.substring(0, 10)}</DetailRow>
+                {detailItem.processedAt && (
+                    <DetailRow label="처리일">
+                        {`${detailItem.processedAt?.substring(0, 10)} (${detailItem.processedByName})`}
+                    </DetailRow>
+                )}
+            </div>
+        );
+    }
+
     return (
         <>
             <FilterToolbar
@@ -356,27 +444,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 loading={isLoading || isFetching}
             />
 
-            {error ? (
-                <DataState state="error" kind="member" subject="사업자 인증 신청" error={error}
-                    onRetry={refetch} retrying={isFetching} compact />
-            ) : (isLoading || isPlaceholderData) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={3}
-                    stackFirstCol
-                    pagination={totalElements ? { current: page, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            ) : (
-                <DataTable
-                    columns={columns}
-                    dataSource={items}
-                    rowKey="id"
-                    pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                    locale={{ emptyText }}
-                />
-            )}
+            {tableBody}
 
             {/* 사업자 인증 상세 */}
             <Modal
@@ -409,55 +477,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 width={560}
                 centered
             >
-                {detailLoading && !detailError ? (
-                    <ModalLoading text="상세 정보를 불러오는 중..." minHeight="160px" />
-                ) : detailError ? (
-                    <DataState
-                        state="error"
-                        kind="member"
-                        subject="사업자 인증 상세"
-                        error={detailError}
-                        title="상세 정보를 불러오지 못했습니다."
-                        onRetry={detailRequestId ? () => loadDetail(detailRequestId, { retainError: true }) : undefined}
-                        retrying={detailLoading}
-                        compact
-                        style={{ minHeight: 160, margin: 0 }}
-                    />
-                ) : detailItem && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 4 }}>
-                        <DetailRow label="신청자">{`${detailItem.memberName} (${detailItem.memberEmail})`}</DetailRow>
-                        <DetailRow label="상호명">{detailItem.businessName}</DetailRow>
-                        {detailItem.businessNumber && <DetailRow label="사업자번호">{detailItem.businessNumber}</DetailRow>}
-                        <DetailRow label="상태">
-                            <Tag color={BIZ_STATUS_CONFIG[detailItem.status]?.color}>
-                                {BIZ_STATUS_CONFIG[detailItem.status]?.label || detailItem.status}
-                            </Tag>
-                        </DetailRow>
-                        {detailItem.memo && (
-                            <DetailRow label="메모">
-                                <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', color: colors.text.secondary }}>
-                                    {detailItem.memo}
-                                </Paragraph>
-                            </DetailRow>
-                        )}
-                        {detailItem.rejectionReason && (
-                            <DetailRow label="거절 사유"><Text type="danger">{detailItem.rejectionReason}</Text></DetailRow>
-                        )}
-                        {detailItem.licenseImageUrl && (
-                            <DetailRow label="사업자등록증">
-                                <Image src={getDetailImageUrl(detailItem.licenseImageUrl)} alt="사업자등록증"
-                                    style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }}
-                                    classNames={{ popup: { root: 'reserve-image-preview' } }} />
-                            </DetailRow>
-                        )}
-                        <DetailRow label="신청일">{detailItem.createdAt?.substring(0, 10)}</DetailRow>
-                        {detailItem.processedAt && (
-                            <DetailRow label="처리일">
-                                {`${detailItem.processedAt?.substring(0, 10)} (${detailItem.processedByName})`}
-                            </DetailRow>
-                        )}
-                    </div>
-                )}
+                {detailBody}
             </Modal>
 
             {/* key 토글 제거 — destroyOnHidden이 입력값 초기화를 담당하므로 닫힘 애니메이션이 살아난다 */}

@@ -160,6 +160,44 @@ const AuditLogTab = () => {
         },
     ];
 
+    // 로그 목록 영역 — 오류 / 스켈레톤 / 표 중 하나.
+    let logsContent;
+    if (error) {
+        logsContent = (
+            <DataState state="error" subject="시스템 로그" error={error}
+                onRetry={refetch} retrying={isFetching} compact />
+        );
+    } else if (loading || isPlaceholderData) {
+        logsContent = (
+            <AdminTableSkeleton
+                rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
+                cols={SKELETON_COLS}
+                headers={SKELETON_HEADERS}
+                actionBtns={0}
+                pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
+            />
+        );
+    } else {
+        logsContent = (
+            <DataTable
+                columns={columns}
+                dataSource={logs}
+                rowKey="id"
+                /* 모바일에서 오른쪽 열(로그 내용·처리자)을 보려고 밀면 "일시"가 사라져
+                   어느 행을 읽고 있는지 알 수 없었다 — 식별 열이므로 왼쪽에 고정한다. */
+                stickyFirstColumn
+                pagination={{
+                    current: page + 1,
+                    pageSize: PAGE_SIZE,
+                    total: totalElements,
+                    showSizeChanger: false,
+                    onChange: (p) => setPage(p - 1),
+                }}
+                locale={{ emptyText: '시스템 로그가 없습니다.' }}
+            />
+        );
+    }
+
     return (
         <div>
             {/* 다른 관리자 탭과 동일한 FilterToolbar 패턴: 필터 Select + 건수 + 새로고침(3초 쿨다운) 한 줄 */}
@@ -187,35 +225,7 @@ const AuditLogTab = () => {
                 소프트 삭제, 복구, 영구 삭제 등 관리자 행위가 기록됩니다. 로그는 90일 후 자동 삭제됩니다.
             </div>
 
-            {error ? (
-                <DataState state="error" subject="시스템 로그" error={error}
-                    onRetry={refetch} retrying={isFetching} compact />
-            ) : (loading || isPlaceholderData) ? (
-                <AdminTableSkeleton
-                    rows={skeletonRowCount(totalElements, page, PAGE_SIZE)}
-                    cols={SKELETON_COLS}
-                    headers={SKELETON_HEADERS}
-                    actionBtns={0}
-                    pagination={totalElements ? { current: page + 1, pageSize: PAGE_SIZE, total: totalElements } : null}
-                />
-            ) : (
-                <DataTable
-                    columns={columns}
-                    dataSource={logs}
-                    rowKey="id"
-                    /* 모바일에서 오른쪽 열(로그 내용·처리자)을 보려고 밀면 "일시"가 사라져
-                       어느 행을 읽고 있는지 알 수 없었다 — 식별 열이므로 왼쪽에 고정한다. */
-                    stickyFirstColumn
-                    pagination={{
-                        current: page + 1,
-                        pageSize: PAGE_SIZE,
-                        total: totalElements,
-                        showSizeChanger: false,
-                        onChange: (p) => setPage(p - 1),
-                    }}
-                    locale={{ emptyText: '시스템 로그가 없습니다.' }}
-                />
-            )}
+            {logsContent}
         </div>
     );
 };

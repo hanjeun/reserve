@@ -12,8 +12,9 @@ const CARD_HEIGHTS = [
  * 사업자 패널·관리자 패널이 같이 쓴다. 모바일은 편집기처럼 미리보기 자리를 숨긴다.
  */
 export default function ChatIntroEditorSkeleton() {
+    // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .reserve-chat-intro-editor 가 grid 로 정한다.
     return (
-        <div className="reserve-chat-intro-editor" role="status" aria-label="채팅 설정을 불러오는 중" aria-busy="true">
+        <output className="reserve-chat-intro-editor" aria-label="채팅 설정을 불러오는 중" aria-busy="true">
             <div className="reserve-chat-intro-switch" aria-hidden="true"><Bone height={40} borderRadius={12} /></div>
             <div className="reserve-chat-intro-settings" aria-hidden="true">
                 {CARD_HEIGHTS.map(([key, height]) => <Bone key={key} height={height} borderRadius={16} />)}
@@ -22,6 +23,6 @@ export default function ChatIntroEditorSkeleton() {
                 <Bone width={160} height={44} />
                 <Bone height={600} borderRadius={20} />
             </div>
-        </div>
+        </output>
     );
 }

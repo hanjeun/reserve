@@ -151,16 +151,18 @@ const PaymentResult = () => {
         );
     }
 
-    const unavailableTitle = !canLookup
-        ? '결제 정보를 확인할 수 없습니다'
-        : result.isError
-            ? '결제 상태를 불러오지 못했습니다'
-            : '결제 상태를 확인하고 있어요';
-    const unavailableDescription = !canLookup
-        ? '결제 정보가 충분하지 않습니다. 결제 내역에서 해당 건을 확인해주세요.'
-        : result.isError
-            ? '서버에서 결제 내역을 확인하지 못했습니다. 이미 금액이 결제됐다면 다시 결제하지 말고 상태를 다시 확인하세요.'
-            : '아직 완료 또는 실패로 확정된 결제가 아닙니다. 상태가 확정될 때까지 같은 결제를 다시 시작하지 마세요.';
+    let unavailableTitle;
+    let unavailableDescription;
+    if (!canLookup) {
+        unavailableTitle = '결제 정보를 확인할 수 없습니다';
+        unavailableDescription = '결제 정보가 충분하지 않습니다. 결제 내역에서 해당 건을 확인해주세요.';
+    } else if (result.isError) {
+        unavailableTitle = '결제 상태를 불러오지 못했습니다';
+        unavailableDescription = '서버에서 결제 내역을 확인하지 못했습니다. 이미 금액이 결제됐다면 다시 결제하지 말고 상태를 다시 확인하세요.';
+    } else {
+        unavailableTitle = '결제 상태를 확인하고 있어요';
+        unavailableDescription = '아직 완료 또는 실패로 확정된 결제가 아닙니다. 상태가 확정될 때까지 같은 결제를 다시 시작하지 마세요.';
+    }
 
     return (
         <PaymentResultFrame>

@@ -30,7 +30,7 @@ const BannerMotionPicker = ({ value, onChange }) => {
                         <span className="reserve-ad-motion-stage" aria-hidden="true">
                             <span
                                 key={`${option.value}-${checked ? replay : 0}`}
-                                className={`reserve-ad-motion-demo${checked ? ` reserve-ad-motion-demo--${motionClass(option.value)}` : ''}`}
+                                className={'reserve-ad-motion-demo' + (checked ? ` reserve-ad-motion-demo--${motionClass(option.value)}` : '')}
                             >
                                 <span className="reserve-ad-motion-demo-image" />
                                 <span className="reserve-ad-motion-demo-copy"><i /><i /></span>

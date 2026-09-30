@@ -28,7 +28,7 @@ const draftOf = (intro) => ({
 // 서버와 같은 정리 규칙. 표시 이름·사진은 바꿀 수 있는 곳(고객지원)에서만 보낸다.
 const bodyOf = (draft, items, identityEditable) => ({
     notice: draft.notice.replace(/\s+/g, ' ').trim() || null,
-    greeting: draft.greeting.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim() || null,
+    greeting: draft.greeting.replaceAll('\r\n', '\n').replace(/\n{3,}/g, '\n\n').trim() || null,
     displayName: identityEditable ? (draft.displayName.replace(/\s+/g, ' ').trim() || null) : null,
     avatarUrl: identityEditable ? (draft.avatarUrl || null) : null,
     items: items.map(item => ({ question: item.question.replace(/\s+/g, ' ').trim(), answer: item.answer.trim() })),

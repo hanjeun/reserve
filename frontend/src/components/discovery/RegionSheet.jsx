@@ -11,6 +11,12 @@ import { storeKeys, tourismKeys } from '../../hooks/queryKeys';
 
 const EMPTY_GROUPS = [];
 const selectionFor = value => ({ base: value, draft: value, activeGroup: value.split(' ')[0] });
+// 세부 시군구가 없을 때 안내 문구.
+const emptyAreaMessage = (groupCount, ownerRegions) => {
+    if (groupCount > 0) return '세부 시군구가 없습니다. 시도 전체를 적용할 수 있어요.';
+    if (ownerRegions) return '이 시도에 등록한 내 가게가 없습니다.';
+    return '현재 등록된 가게가 없습니다. 이 지역으로 검색하면 빈 결과가 표시됩니다.';
+};
 
 /** 홈과 목록이 같은 선택 데이터·적용 행동을 쓰는 지역 시트. */
 export default function RegionSheet({ open, value = '', onClose, onApply, availableGroups }) {
@@ -35,7 +41,9 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
     });
     const isLoading = !availableGroups && queryLoading;
     const ownerRegions = Array.isArray(availableGroups);
-    const actualGroups = Array.isArray(availableGroups) ? availableGroups : Array.isArray(data) ? data : EMPTY_GROUPS;
+    // 사장님 화면이 넘겨준 지역이 있으면 그것을, 없으면 조회 결과를 쓴다.
+    const fetchedGroups = Array.isArray(data) ? data : EMPTY_GROUPS;
+    const actualGroups = Array.isArray(availableGroups) ? availableGroups : fetchedGroups;
     const groups = REGION_OPTIONS.map(option => {
         const actual = actualGroups.find(group => group.name === option.value);
         return { name: option.value, label: option.label, count: actual?.count || 0, areas: actual?.areas || [] };
@@ -83,6 +91,54 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
         setDraft(name);
     };
 
+    // 인기 지역 영역 — 로딩 스켈레톤 / 목록 / 빈 안내 중 하나.
+    let popularContent;
+    if (isLoading) {
+        popularContent = (
+            <div className="reserve-region-sheet-popular-list" role="status" aria-label="인기 지역을 불러오는 중" aria-busy="true">
+                {[0, 1, 2, 3, 4, 5].map(index => (
+                    <div key={index} className="reserve-region-sheet-popular-placeholder" aria-hidden="true">
+                        <Skeleton.Avatar active shape="circle" size={52} />
+                        <Skeleton.Input active size="small" />
+                    </div>
+                ))}
+            </div>
+        );
+    } else if (popularAreas.length > 0) {
+        popularContent = (
+            <div className="reserve-region-sheet-popular-list">
+                {popularAreasWithPhoto.map(area => {
+                    const photoSrc = area.photo?.src ?? area.photo?.imageUrl;
+                    return (
+                    <button
+                        key={area.label}
+                        type="button"
+                        className={'reserve-region-sheet-popular-item' + (draft === area.label ? ' is-selected' : '')}
+                        aria-pressed={draft === area.label}
+                        onClick={() => { setActiveGroup(area.group); setDraft(area.label); }}
+                    >
+                        <span className="reserve-region-sheet-popular-icon" aria-hidden="true">
+                            <EnvironmentOutlined />
+                            {photoSrc && (
+                                <img
+                                    src={photoSrc}
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                    onError={(event) => { event.currentTarget.hidden = true; }}
+                                />
+                            )}
+                        </span>
+                        <span>{area.displayLabel}</span>
+                    </button>
+                    );
+                })}
+            </div>
+        );
+    } else {
+        popularContent = <p className="reserve-region-sheet-popular-empty">{ownerRegions ? '아직 등록한 가게가 없습니다.' : '아직 많이 찾는 지역이 없습니다.'}</p>;
+    }
+
     return (
         <Modal
             open={open}
@@ -106,45 +162,7 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
             <>
                     <section className="reserve-region-sheet-popular" aria-label={ownerRegions ? '내 가게가 있는 지역' : '가게가 많은 지역'}>
                         <h3>{ownerRegions ? '내 가게가 있는 지역' : '가게가 많은 지역'}</h3>
-                        {isLoading ? (
-                            <div className="reserve-region-sheet-popular-list" role="status" aria-label="인기 지역을 불러오는 중" aria-busy="true">
-                                {[0, 1, 2, 3, 4, 5].map(index => (
-                                    <div key={index} className="reserve-region-sheet-popular-placeholder" aria-hidden="true">
-                                        <Skeleton.Avatar active shape="circle" size={52} />
-                                        <Skeleton.Input active size="small" />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : popularAreas.length > 0 ? (
-                            <div className="reserve-region-sheet-popular-list">
-                                {popularAreasWithPhoto.map(area => {
-                                    const photoSrc = area.photo?.src ?? area.photo?.imageUrl;
-                                    return (
-                                    <button
-                                        key={area.label}
-                                        type="button"
-                                        className={'reserve-region-sheet-popular-item' + (draft === area.label ? ' is-selected' : '')}
-                                        aria-pressed={draft === area.label}
-                                        onClick={() => { setActiveGroup(area.group); setDraft(area.label); }}
-                                    >
-                                        <span className="reserve-region-sheet-popular-icon" aria-hidden="true">
-                                            <EnvironmentOutlined />
-                                            {photoSrc && (
-                                                <img
-                                                    src={photoSrc}
-                                                    alt=""
-                                                    loading="lazy"
-                                                    decoding="async"
-                                                    onError={(event) => { event.currentTarget.hidden = true; }}
-                                                />
-                                            )}
-                                        </span>
-                                        <span>{area.displayLabel}</span>
-                                    </button>
-                                    );
-                                })}
-                            </div>
-                        ) : <p className="reserve-region-sheet-popular-empty">{ownerRegions ? '아직 등록한 가게가 없습니다.' : '아직 많이 찾는 지역이 없습니다.'}</p>}
+                        {popularContent}
                         {hasPhotoAttribution && (
                             <Link className="reserve-region-sheet-attribution-link" to="/content-sources#region-photos">
                                 사진·콘텐츠 출처 및 이용조건
@@ -185,7 +203,7 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
                                         </button>;
                                     })}
                                     {!isLoading && selectedGroup.areas.length === 0 &&
-                                        <p>{selectedGroup.count > 0 ? '세부 시군구가 없습니다. 시도 전체를 적용할 수 있어요.' : ownerRegions ? '이 시도에 등록한 내 가게가 없습니다.' : '현재 등록된 가게가 없습니다. 이 지역으로 검색하면 빈 결과가 표시됩니다.'}</p>}
+                                        <p>{emptyAreaMessage(selectedGroup.count, ownerRegions)}</p>}
                                 </>
                             ) : (
                                 <div className="reserve-region-sheet-country">

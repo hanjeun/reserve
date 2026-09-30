@@ -51,6 +51,6 @@ export const field = {
 };
 
 /** 숫자만 필요한 곳(Bone height 등)을 위한 px 제거 헬퍼. */
-export const fieldPx = (v) => parseInt(v, 10);
+export const fieldPx = (v) => Number.parseInt(v, 10);
 
 export default field;

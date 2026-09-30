@@ -53,7 +53,7 @@ const useAuthStore = create(
                 try {
                     const userData = await api.get('/api/member/me', timeout ? { timeout } : undefined);
                     if (!isCurrentSession(started)) return null;
-                    if (userData && userData.email) {
+                    if (userData?.email) {
                         applyUser(set, get, userData);
                         return userData;
                     }

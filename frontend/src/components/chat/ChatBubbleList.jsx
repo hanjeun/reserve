@@ -65,9 +65,12 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
             const timestamp = last ? formatTime(m.createdAt) : '';
             const ownTimestamp = m.pending ? '보내는 중' : timestamp;
 
-            const corner = first
-                ? (isMine ? { borderTopRightRadius: 6 } : { borderTopLeftRadius: 6 })
-                : null;
+            // 덩어리 첫 말풍선만 내 쪽(오른쪽)/상대 쪽(왼쪽) 윗모서리를 깎는다.
+            let corner = null;
+            if (first) corner = isMine ? { borderTopRightRadius: 6 } : { borderTopLeftRadius: 6 };
+            // 덩어리 사이만 벌린다. 첫 줄 위에는 여백을 주지 않는다.
+            let marginTop = first ? 10 : 2;
+            if (i === 0) marginTop = 0;
 
             return (
                 <div key={m.id} className="reserve-chat-message-row"
@@ -76,8 +79,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                         justifyContent: isMine ? 'flex-end' : 'flex-start',
                         alignItems: 'flex-end',
                         gap: 6,
-                        // 덩어리 사이만 벌린다. 첫 줄 위에는 여백을 주지 않는다.
-                        marginTop: i === 0 ? 0 : (first ? 10 : 2),
+                        marginTop,
                     }}>
                     {!isMine && m.senderRole === 'ADMIN' && <span className="reserve-chat-sender-avatar-slot">
                         {first && <SupportAvatar />}

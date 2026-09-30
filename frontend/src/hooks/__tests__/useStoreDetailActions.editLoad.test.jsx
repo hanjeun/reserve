@@ -32,9 +32,9 @@ function renderEditHook(message) {
     const wrapper = ({ children }) => (
         <MemoryRouter initialEntries={['/store/12?edit=91']}>{children}</MemoryRouter>
     );
-    return renderHook(() => useStoreDetailActions({
-        id: '12', store: { id: 12 }, isLoggedIn: true, user: { id: 7 }, form, pay: vi.fn(), message,
-    }), { wrapper });
+    return renderHook(props => useStoreDetailActions({
+        id: '12', store: { id: 12 }, isLoggedIn: true, user: { id: 7 }, form, pay: vi.fn(), message, ...props,
+    }), { wrapper, initialProps: {} });
 }
 
 describe('useStoreDetailActions edit lookup', () => {
@@ -79,5 +79,45 @@ describe('useStoreDetailActions edit lookup', () => {
         await waitFor(() => expect(navigate).toHaveBeenCalledWith('/my-reservations', { replace: true }));
         expect(message.error).toHaveBeenCalledWith(text);
         expect(result.current.editLoadError).toBeNull();
+    });
+
+    it('clears the previous account edit and review state before the next lookup completes', async () => {
+        reservationService.getReservation.mockResolvedValue(editable);
+        reservationService.getMyCompletedForStore.mockResolvedValue({ id: 19, reviewId: 5 });
+        const { result, rerender } = renderEditHook(message);
+        await waitFor(() => expect(result.current.completedReservation).toEqual({ reservationId: 19, reviewId: 5 }));
+        expect(result.current.editingReservation).toEqual(editable);
+        const newEdit = new Promise(() => {});
+        reservationService.getReservation.mockReturnValueOnce(newEdit);
+        reservationService.getMyCompletedForStore.mockReturnValueOnce(new Promise(() => {}));
+        rerender({ user: { id: 8 } });
+        expect(result.current.completedReservation).toBeNull();
+        expect(result.current.editingReservation).toBeNull();
+        expect(result.current.reviewEligibilityLoading).toBe(true);
+        rerender({ isLoggedIn: false, user: null });
+        expect(result.current.reviewEligibilityLoading).toBe(false);
+        expect(result.current.completedReservation).toBeNull();
+    });
+
+    it('ignores a stale review response and exposes retry loading without retaining old eligibility', async () => {
+        reservationService.getReservation.mockResolvedValue(editable);
+        let resolveOld;
+        let resolveNew;
+        reservationService.getMyCompletedForStore
+            .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
+            .mockReturnValueOnce(new Promise(resolve => { resolveNew = resolve; }));
+        const { result, rerender } = renderEditHook(message);
+        rerender({ user: { id: 8 } });
+        await act(async () => { resolveOld({ id: 19 }); });
+        expect(result.current.completedReservation).toBeNull();
+        expect(result.current.reviewEligibilityLoading).toBe(true);
+        await act(async () => { resolveNew({ id: 29 }); });
+        expect(result.current.completedReservation).toEqual({ reservationId: 29, reviewId: null });
+        reservationService.getMyCompletedForStore.mockRejectedValueOnce(new Error('offline'));
+        act(() => { result.current.refetchReviewEligibility(); });
+        expect(result.current.reviewEligibilityLoading).toBe(true);
+        expect(result.current.completedReservation).toBeNull();
+        await waitFor(() => expect(result.current.reviewEligibilityError).toBeInstanceOf(Error));
+        expect(result.current.reviewEligibilityLoading).toBe(false);
     });
 });

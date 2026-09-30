@@ -16,24 +16,19 @@ import { colors, fontSize, fontWeight } from '../../styles/tokens';
 const OfflineBanner = () => {
     const online = useOnlineStatus();
     // 한 번이라도 오프라인이 된 적 있어야 "복구됨"을 보여줌 (첫 로드부터 온라인이면 아무것도 안 뜸)
-    const [wasOffline, setWasOffline] = React.useState(false);
+    const [previousOnline, setPreviousOnline] = React.useState(online);
     const [showReconnected, setShowReconnected] = React.useState(false);
 
+    if (previousOnline !== online) {
+        setPreviousOnline(online);
+        setShowReconnected(online);
+    }
+
     React.useEffect(() => {
-        if (!online) {
-            setWasOffline(true);
-            setShowReconnected(false);
-            return;
-        }
-        if (wasOffline) {
-            setShowReconnected(true);
-            const t = setTimeout(() => {
-                setShowReconnected(false);
-                setWasOffline(false);
-            }, 2500);
-            return () => clearTimeout(t);
-        }
-    }, [online, wasOffline]);
+        if (!online || !showReconnected) return;
+        const timer = setTimeout(() => setShowReconnected(false), 2500);
+        return () => clearTimeout(timer);
+    }, [online, showReconnected]);
 
     if (online && !showReconnected) return null;
 

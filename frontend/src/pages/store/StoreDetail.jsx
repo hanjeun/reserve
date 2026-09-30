@@ -314,21 +314,24 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
     const dateKey = dateValue ? dateValue.format('YYYY-MM-DD') : null;
     const storeId = store?.id;
     const requestKey = dateKey && storeId ? `${storeId}:${dateKey}` : null;
-    const isCurrent = requestKey != null && availability.key === requestKey;
+    const request = React.useMemo(() => ({ key: requestKey, form, editingReservation, onAvailabilityChange }),
+        [requestKey, form, editingReservation, onAvailabilityChange]);
+    const isCurrent = requestKey != null && availability.request === request;
     const loading = requestKey != null && (!isCurrent || availability.status === 'loading');
     const slots = isCurrent && availability.status === 'success' ? availability.slots : [];
     const failed = isCurrent && availability.status === 'error';
     // The displayed state and submit validator must observe the same lookup transition.
     const commitAvailability = React.useCallback(next => {
         onAvailabilityChange?.(next);
-        setAvailability(next);
-    }, [onAvailabilityChange]);
+        setAvailability({ ...next, request });
+    }, [onAvailabilityChange, request]);
 
     React.useEffect(() => {
         if (!requestKey) return;
         let cancelled = false;
         const controller = new AbortController();
-        commitAvailability({ key: requestKey, status: 'loading', slots: [] });
+        // Loading is derived from the request key; only the form's external validator needs notification.
+        onAvailabilityChange?.({ key: requestKey, status: 'loading', slots: [] });
         api.get(API_ENDPOINTS.RESERVATION.AVAILABILITY, { params: { storeId, date: dateKey }, signal: controller.signal })
             .then((data) => {
                 if (cancelled) return;
@@ -343,7 +346,7 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
                 commitAvailability({ key: requestKey, status: 'error', slots: [] });
             });
         return () => { cancelled = true; controller.abort(); };
-    }, [dateKey, storeId, requestKey, retryCount, form, editingReservation, commitAvailability]);
+    }, [dateKey, storeId, requestKey, retryCount, form, editingReservation, commitAvailability, onAvailabilityChange]);
 
     // 날짜가 바뀌면 이전에 고른 시간은 무조건 초기화.
     // 2026-07 버그 수정: 예전엔 "새 날짜에 그 시간이 없거나 마감된 경우에만" 초기화해서,
@@ -371,7 +374,11 @@ const useTimeSlotAvailability = ({ store, dateValue, form, onAvailabilityChange,
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dateKey]);
 
-    return { dateKey, storeId, loading, slots, failed, retry: () => setRetryCount(count => count + 1) };
+    const retry = () => {
+        commitAvailability({ key: requestKey, status: 'loading', slots: [] });
+        setRetryCount(count => count + 1);
+    };
+    return { dateKey, storeId, loading, slots, failed, retry };
 };
 
 export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvailabilityChange, editingReservation }) => {

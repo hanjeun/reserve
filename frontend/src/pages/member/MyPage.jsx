@@ -402,7 +402,7 @@ const BusinessTab = ({ user }) => {
     const { message, confirm } = useMessage();
     const [status, setStatus]     = useState(null);
     const [rejectionReason, setRejectionReason] = useState(null);
-    const [statusLoading, setStatusLoading] = useState(true);
+    const [statusLookup, setStatusLookup] = useState({ scope: null, phase: 'loading' });
     const [form, setForm]         = useState({ businessName: '', businessNumber: '', memo: '' });
     const [licenseList, setLicenseList] = useState([]);
     const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
@@ -411,32 +411,46 @@ const BusinessTab = ({ user }) => {
     const [cancelLoading, setCancelLoading] = useState(false);
     const [resignLoading, setResignLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [statusError, setStatusError] = useState(false);
     const [editState, setEditState] = useState({ scope: null, status: 'idle' });
     const editRequestRef = useRef(null);
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const editScope = `${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
+    const statusRequestRef = useRef(null);
+    const statusLoading = user?.role !== 'BUSINESS'
+        && (statusLookup.scope !== editScope || statusLookup.phase === 'loading');
+    const statusError = statusLookup.scope === editScope && statusLookup.phase === 'error';
     const editLoading = editState.scope === editScope && editState.status === 'loading';
     const editError = editState.scope === editScope && editState.status === 'error';
 
     useLayoutEffect(() => () => { editRequestRef.current = null; }, [editScope]);
+    useLayoutEffect(() => () => { statusRequestRef.current = null; }, [editScope]);
 
     const isBusiness = user?.role === 'BUSINESS';
 
     const loadStatus = useCallback(() => {
-        setStatusLoading(true);
-        setStatusError(false);
+        const request = {};
+        statusRequestRef.current = request;
         return businessService.getMyStatus()
             .then(res => {
+                if (statusRequestRef.current !== request) return;
                 setStatus(res?.status ?? null);
                 setRejectionReason(res?.rejectionReason ?? null);
+                setStatusLookup({ scope: editScope, phase: 'success' });
             })
-            .catch(() => { setStatus(null); setStatusError(true); })
-            .finally(() => setStatusLoading(false));
-    }, []);
+            .catch(() => {
+                if (statusRequestRef.current !== request) return;
+                setStatus(null);
+                setStatusLookup({ scope: editScope, phase: 'error' });
+            });
+    }, [editScope]);
+
+    const retryStatus = () => {
+        setStatusLookup({ scope: editScope, phase: 'loading' });
+        void loadStatus();
+    };
 
     useEffect(() => {
-        if (isBusiness) { setStatusLoading(false); return; }
+        if (isBusiness) return;
         void loadStatus();
     }, [isBusiness, loadStatus]);
 
@@ -579,7 +593,7 @@ const BusinessTab = ({ user }) => {
     if (statusError && !isBusiness) return <DataState state="error" kind="member"
         title="사업자 인증 상태를 불러오지 못했습니다."
         description="신청 상태를 확인한 뒤 인증 신청을 진행할 수 있습니다."
-        onRetry={loadStatus} />;
+        onRetry={retryStatus} />;
 
     // ── 사업자 이미 완료 ──
     if (isBusiness) return (
@@ -840,32 +854,23 @@ const bizStyles = {
 
 const NotificationSection = ({ user }) => {
     const { message } = useMessage();
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
 
     // ── 예약 알림 ──
-    const [notiEnabled, setNotiEnabled] = useState(
-        typeof user?.emailNotificationEnabled === 'boolean' ? user.emailNotificationEnabled : true
-    );
+    const notiEnabled = typeof user?.emailNotificationEnabled === 'boolean' ? user.emailNotificationEnabled : true;
     const [notiLoading, setNotiLoading] = useState(false);
 
     // ── 마케팅 수신 ──
-    const [marketingAgreed, setMarketingAgreed] = useState(user?.marketingAgreed ?? false);
+    const marketingAgreed = user?.marketingAgreed ?? false;
     const [marketingLoading, setMarketingLoading] = useState(false);
-
-    // user 갱신(checkAuth) 시 동기화
-    useEffect(() => {
-        if (typeof user?.emailNotificationEnabled === 'boolean') setNotiEnabled(user.emailNotificationEnabled);
-    }, [user?.emailNotificationEnabled]);
-
-    useEffect(() => {
-        if (typeof user?.marketingAgreed === 'boolean') setMarketingAgreed(user.marketingAgreed);
-    }, [user?.marketingAgreed]);
 
     const handleNotiToggle = async (checked) => {
         setNotiLoading(true);
         try {
             await memberService.updateMember({ emailNotificationEnabled: checked });
-            setNotiEnabled(checked);
-            useAuthStore.getState().updateUser({ ...user, emailNotificationEnabled: checked });
+            const auth = useAuthStore.getState();
+            if (auth.sessionRevision !== sessionRevision || auth.user?.id !== user?.id || auth.user?.role !== user?.role) return;
+            auth.updateUser({ ...auth.user, emailNotificationEnabled: checked });
             message.success(checked ? '메일 알림에 동의했습니다' : '메일 알림 동의를 철회했습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');
@@ -878,8 +883,9 @@ const NotificationSection = ({ user }) => {
         setMarketingLoading(true);
         try {
             await memberService.updateMarketingConsent(checked);
-            setMarketingAgreed(checked);
-            useAuthStore.getState().updateUser({ ...user, marketingAgreed: checked });
+            const auth = useAuthStore.getState();
+            if (auth.sessionRevision !== sessionRevision || auth.user?.id !== user?.id || auth.user?.role !== user?.role) return;
+            auth.updateUser({ ...auth.user, marketingAgreed: checked });
             message.success(checked ? '마케팅 수신에 동의했습니다' : '마케팅 수신 동의를 철회했습니다');
         } catch (err) {
             handleApiError(err, message, '설정 변경에 실패했습니다');

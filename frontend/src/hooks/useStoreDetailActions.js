@@ -17,6 +17,7 @@ import adService from '../services/adService';
 import { consumeAdClickAttribution } from '../utils/adAttribution';
 import { formatDate, formatTimeForApi, formatTime } from '../utils/date';
 import { httpStatusOf } from '../utils/listErrorMessage';
+import useAuthStore from '../store/useAuthStore';
 
 // 에러 메시지 추출 — Error 객체면 message, 문자열이면 그대로, 그 외엔 null.
 // 예전엔 예약 수정/생성 두 곳에 똑같은 중첩 삼항이 복붙돼 있었다
@@ -55,10 +56,15 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const stateOpenReviewId = location.state?.openReviewId ?? null;
     const reviewSectionRef  = useRef(null);
 
-    const [completedReservation, setCompletedReservation] = useState(null);
-    const [reviewEligibilityError, setReviewEligibilityError] = useState(null);
-    const [reviewEligibilityLoading, setReviewEligibilityLoading] = useState(false);
-    const reviewEligibilityRequestRef = useRef(0);
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
+    const lookupScope = `${id}:${isLoggedIn}:${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
+    const [reviewAttempt, setReviewAttempt] = useState(0);
+    const [reviewResult, setReviewResult] = useState({ scope: null, attempt: null, reservation: null, error: null });
+    const currentReview = isLoggedIn && reviewResult.scope === lookupScope && reviewResult.attempt === reviewAttempt;
+    const completedReservation = currentReview ? reviewResult.reservation : null;
+    const reviewEligibilityError = currentReview ? reviewResult.error : null;
+    const reviewEligibilityLoading = isLoggedIn && !currentReview;
+    const loadCompletedReservation = useCallback(() => setReviewAttempt(attempt => attempt + 1), []);
 
     // ── 예약 수정(edit) 모드 ──────────────────────────────────────────────────
     const editId = searchParams.get('edit');
@@ -68,6 +74,14 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const [editLoadError, setEditLoadError] = useState(null);
     const [editRetrying, setEditRetrying] = useState(false);
     const [editLoadAttempt, setEditLoadAttempt] = useState(0);
+    const editScope = `${lookupScope}:${editId ?? ''}`;
+    const [observedEditScope, setObservedEditScope] = useState(editScope);
+    if (observedEditScope !== editScope) {
+        setObservedEditScope(editScope);
+        setEditingReservation(null);
+        setEditLoadError(null);
+        setEditRetrying(false);
+    }
     const retryEditLoad = useCallback(() => {
         setEditRetrying(true);
         setEditLoadAttempt(attempt => attempt + 1);
@@ -76,42 +90,25 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     // 이 가게에서 완료된 예약이 있는지 조회 (리뷰 작성 가능 여부 판단용).
     // "완료 예약 없음"과 "조회 실패"를 같은 null로 두면 작성 가능한 손님의 리뷰 폼이 조용히
     // 사라진다. 실패는 ReviewList에서 재시도 가능한 상태로 보여 준다.
-    const loadCompletedReservation = useCallback(async () => {
-        const requestId = ++reviewEligibilityRequestRef.current;
-        if (!isLoggedIn) {
-            setCompletedReservation(null);
-            setReviewEligibilityError(null);
-            setReviewEligibilityLoading(false);
-            return;
-        }
-
-        setReviewEligibilityLoading(true);
-        setReviewEligibilityError(null);
-        try {
-            const reservation = await reservationService.getMyCompletedForStore(Number(id));
-            if (requestId !== reviewEligibilityRequestRef.current) return;
-            setCompletedReservation(reservation ? {
-                reservationId: reservation.id,
-                reviewId: reservation.reviewId ?? null,
-            } : null);
-        } catch (error) {
-            if (requestId !== reviewEligibilityRequestRef.current) return;
-            setCompletedReservation(null);
-            setReviewEligibilityError(error);
-        } finally {
-            if (requestId === reviewEligibilityRequestRef.current) setReviewEligibilityLoading(false);
-        }
-    }, [id, isLoggedIn]);
-
     useEffect(() => {
-        loadCompletedReservation();
-        return () => { reviewEligibilityRequestRef.current += 1; };
-    }, [loadCompletedReservation]);
+        if (!isLoggedIn) return;
+        let cancelled = false;
+        reservationService.getMyCompletedForStore(Number(id))
+            .then(reservation => {
+                if (cancelled) return;
+                setReviewResult({ scope: lookupScope, attempt: reviewAttempt, error: null,
+                    reservation: reservation ? { reservationId: reservation.id, reviewId: reservation.reviewId ?? null } : null });
+            })
+            .catch(error => {
+                if (!cancelled) setReviewResult({ scope: lookupScope, attempt: reviewAttempt, reservation: null, error });
+            });
+        return () => { cancelled = true; };
+    }, [id, isLoggedIn, lookupScope, reviewAttempt]);
 
     // ?edit={id}로 진입 시 그 예약을 불러와 수정 대상으로 설정.
     // 이 가게의 예약이 아니거나(방어), 결제됐거나 종료된 예약이면 수정 불가로 안내 후 내 예약으로 돌려보낸다.
     useEffect(() => {
-        if (!editId) { setEditingReservation(null); setEditLoadError(null); return; }
+        if (!editId) return;
         if (!isLoggedIn) {
             message.warning('로그인이 필요한 서비스입니다.');
             navigate('/login', { state: { from: { pathname: `/store/${id}` } } });
@@ -151,7 +148,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [editId, isLoggedIn, id, editLoadAttempt]);
+    }, [editId, isLoggedIn, id, editLoadAttempt, editScope]);
 
     // 수정 대상 예약이 준비되면 폼을 기존 값으로 prefill.
     // reservationDate는 dayjs, reservationTime은 TimeSlotPicker가 쓰는 "HH:mm" 문자열로 맞춘다.

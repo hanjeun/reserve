@@ -38,11 +38,16 @@ export default function useEmailVerification({
 } = {}) {
     const { message } = useMessage();
 
-    const [isCodeSent,    setIsCodeSent]   = useState(false);
+    const [restored] = useState(() => {
+        const stored = getStoredState();
+        const remaining = stored?.endTime ? calcRemaining(stored.endTime) : 0;
+        return { stored, remaining: Number.isFinite(remaining) ? remaining : 0 };
+    });
+    const [isCodeSent,    setIsCodeSent]   = useState(restored.remaining > 0);
     const [isVerified,    setIsVerified]   = useState(false);
     const [sendLoading,   setSendLoading]  = useState(false);
     const [verifyLoading, setVerifyLoading]= useState(false);
-    const [timeLeft,      setTimeLeft]     = useState(0);
+    const [timeLeft,      setTimeLeft]     = useState(restored.remaining);
 
     const timerRef   = useRef(null);
     const endTimeRef = useRef(null); // visibilitychange 핸들러에서 참조
@@ -54,7 +59,6 @@ export default function useEmailVerification({
     const startTimer = (endTime) => {
         endTimeRef.current = endTime;
         clearInterval(timerRef.current);
-        setTimeLeft(calcRemaining(endTime));
 
         timerRef.current = setInterval(() => {
             const rem = calcRemaining(endTimeRef.current);
@@ -72,12 +76,11 @@ export default function useEmailVerification({
     // 모바일 OS가 탭을 메모리에서 날리거나, 이메일 확인 후 브라우저로 복귀할 때
     // endTime이 localStorage에 남아있으면 상태를 그대로 복원한다.
     useEffect(() => {
-        const stored = getStoredState();
+        const stored = restored.stored;
         if (stored?.endTime) {
             const remaining = calcRemaining(stored.endTime);
             if (remaining > 0) {
                 if (stored.email) form?.setFieldValue(emailFieldName, stored.email);
-                setIsCodeSent(true);
                 startTimer(stored.endTime);
             } else {
                 // 만료된 항목 즉시 제거
@@ -121,6 +124,7 @@ export default function useEmailVerification({
 
             setIsCodeSent(true);
             setIsVerified(false);
+            setTimeLeft(calcRemaining(endTime));
             startTimer(endTime);
         } catch (err) {
             if (!err?.errorFields) {

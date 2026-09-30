@@ -126,7 +126,7 @@ export const useStoreForm = ({
     const hasChangesRef = useRef(false);
     const mountedRef = useRef(true);
     const confirmRef = useRef(confirm);
-    confirmRef.current = confirm;
+    useEffect(() => { confirmRef.current = confirm; }, [confirm]);
 
     const revokeRestoredUrls = useCallback(nextFiles => {
         const retained = new Set((nextFiles ?? []).map(file => file?.draftObjectUrl).filter(Boolean));

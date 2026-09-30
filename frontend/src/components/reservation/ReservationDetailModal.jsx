@@ -24,16 +24,15 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
     // 유효한 reservation을 캐시해두고 그걸로 렌더링해서, reservation이 null이 되어도 Modal은
     // open=false로만 전환되고 내용은 애니메이션이 끝날 때까지 그대로 남아있게 한다.
     const [cached, setCached] = React.useState(reservation);
-    React.useEffect(() => {
-        if (reservation) setCached(reservation);
-    }, [reservation]);
+    if (reservation && reservation !== cached) setCached(reservation);
 
-    if (!cached) return null;
+    const displayed = reservation ?? cached;
+    if (!displayed) return null;
 
     const {
         storeName, reservationCode, memberName, memberEmail, reservationDate, reservationTime,
         guestCount, depositAmount, status, specialRequest, rejectionReason, cancelReason, checkedInAt,
-    } = cached;
+    } = displayed;
 
     // 거절과 취소는 서로 다른 필드를 다른 라벨로 보여준다 (2026-08-11).
     // 하나로 합치면 취소된 예약에 "거절 사유"가 찍혀 이용자가 오해한다.

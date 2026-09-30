@@ -2,6 +2,7 @@ package kr.it.reserve.payment.repository;
 
 import jakarta.persistence.LockModeType;
 import kr.it.reserve.payment.entity.Payment;
+import kr.it.reserve.reservation.entity.Reservation.ReservationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,23 @@ import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
+
+    String CONFIRMED_DEPOSIT_PAYMENT = """
+            p.paidAt IS NOT NULL
+            AND p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
+            """;
+
+    // COUNT와 관리자 목록은 같은 판정을 공유한다. 숨긴 예약도 금융 대사에서 제외하지 않는다.
+    String RESERVATION_DEPOSIT_INVARIANT_PREDICATE = """
+            (r.depositPaid = true AND NOT EXISTS (
+                SELECT p.id FROM Payment p WHERE p.reservation = r AND
+            """ + CONFIRMED_DEPOSIT_PAYMENT + """
+                AND p.amount - COALESCE(p.refundAmount, 0) > 0))
+            OR ((r.depositPaid = false OR r.depositPaid IS NULL) AND EXISTS (
+                SELECT p.id FROM Payment p WHERE p.reservation = r AND
+            """ + CONFIRMED_DEPOSIT_PAYMENT + """
+                AND p.amount - COALESCE(p.refundAmount, 0) > 0))
+            """;
     
     // 가맹점 주문번호로 조회
     Optional<Payment> findByMerchantUid(String merchantUid);
@@ -153,20 +171,47 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     long countLedgerInvariantViolations();
 
     /** 예약의 결제 플래그와 결제 원장의 확정 순잔액이 어긋난 건수. 자동 보정하지 않는다. */
-    @Query("""
-            SELECT COUNT(r) FROM Reservation r
-             WHERE (r.depositPaid = true AND NOT EXISTS (
-                        SELECT p.id FROM Payment p
-                         WHERE p.reservation = r AND p.paidAt IS NOT NULL
-                           AND p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
-                           AND p.amount - COALESCE(p.refundAmount, 0) > 0))
-                OR ((r.depositPaid = false OR r.depositPaid IS NULL) AND EXISTS (
-                        SELECT p.id FROM Payment p
-                         WHERE p.reservation = r AND p.paidAt IS NOT NULL
-                           AND p.status IN ('PAID', 'PARTIAL_REFUNDED', 'REFUND_PENDING', 'REFUNDED')
-                           AND p.amount - COALESCE(p.refundAmount, 0) > 0))
-            """)
+    @Query("SELECT COUNT(r) FROM Reservation r WHERE " + RESERVATION_DEPOSIT_INVARIANT_PREDICATE)
     long countReservationDepositInvariantViolations();
+
+    /** 집계와 동일한 불변식 대상만 읽는다. 개인정보·주문번호·PG 식별자는 조회하지 않는다. */
+    @Query(value = """
+            SELECT r.id AS reservationId, r.store.id AS storeId,
+                   r.status AS reservationStatus, r.depositPaid AS depositPaid,
+                   r.deletedAt AS reservationDeletedAt
+              FROM Reservation r WHERE
+            """ + RESERVATION_DEPOSIT_INVARIANT_PREDICATE + " ORDER BY r.id ASC",
+            countQuery = "SELECT COUNT(r) FROM Reservation r WHERE " + RESERVATION_DEPOSIT_INVARIANT_PREDICATE)
+    Page<DepositInvariantReservation> findReservationDepositInvariantViolations(Pageable pageable);
+
+    /** 페이지에 포함된 예약의 확정 원장만 상태별로 묶어 한 번에 읽는다. PG 호출·잠금·수정 없음. */
+    @Query("""
+            SELECT p.reservation.id AS reservationId, p.status AS paymentStatus,
+                   COUNT(p) AS paymentCount,
+                   SUM(COALESCE(p.amount, 0) - COALESCE(p.refundAmount, 0)) AS confirmedNetAmount,
+                   SUM(COALESCE(p.refundAmount, 0)) AS confirmedRefundAmount,
+                   SUM(CASE WHEN p.amount - COALESCE(p.refundAmount, 0) > 0 THEN 1 ELSE 0 END) AS positiveBalancePaymentCount
+              FROM Payment p WHERE p.reservation.id IN :reservationIds AND
+            """ + CONFIRMED_DEPOSIT_PAYMENT + " GROUP BY p.reservation.id, p.status ORDER BY p.reservation.id, p.status")
+    List<DepositInvariantLedgerSummary> summarizeConfirmedDepositLedger(
+            @Param("reservationIds") List<Long> reservationIds);
+
+    interface DepositInvariantReservation {
+        Long getReservationId();
+        Long getStoreId();
+        ReservationStatus getReservationStatus();
+        Boolean getDepositPaid();
+        LocalDateTime getReservationDeletedAt();
+    }
+
+    interface DepositInvariantLedgerSummary {
+        Long getReservationId();
+        Payment.PaymentStatus getPaymentStatus();
+        Long getPaymentCount();
+        Long getConfirmedNetAmount();
+        Long getConfirmedRefundAmount();
+        Long getPositiveBalancePaymentCount();
+    }
     
     // 회원 ID와 결제 상태로 조회
     List<Payment> findByMemberIdAndStatus(Long memberId, Payment.PaymentStatus status);

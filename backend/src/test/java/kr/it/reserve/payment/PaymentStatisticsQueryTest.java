@@ -4,19 +4,24 @@ import jakarta.persistence.EntityManager;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.payment.entity.Payment;
+import kr.it.reserve.payment.dto.ReservationDepositInvariantResponse;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.entity.Reservation;
+import kr.it.reserve.reservation.entity.Reservation.ReservationStatus;
 import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -83,6 +88,75 @@ class PaymentStatisticsQueryTest {
         assertThat(paymentRepository.countReservationDepositInvariantViolations()).isEqualTo(depositBefore + 1);
     }
 
+    @Test
+    void depositDiagnosticSharesCountPredicateAndKeepsCanceledHiddenReservations() {
+        long before = paymentRepository.countReservationDepositInvariantViolations();
+        Member customer = persistMember(Role.USER);
+        Store store = Store.builder().name("읽기 전용 대사 검증").owner(persistMember(Role.BUSINESS)).build();
+        entityManager.persist(store);
+        LocalDate date = LocalDate.of(2026, 9, 30);
+        LocalDateTime paidAt = date.atTime(10, 0);
+        LocalDateTime deletedAt = date.atTime(11, 0);
+        Reservation hiddenRefunded = persistReservation(customer, store, date, true, deletedAt);
+        Reservation unpaidFlag = persistReservation(customer, store, date, false, null);
+        Reservation nullFlag = persistReservation(customer, store, date, null, null);
+        Reservation paidCorrectly = persistReservation(customer, store, date, true, null);
+        Reservation refundedCorrectly = persistReservation(customer, store, date, false, null);
+        Reservation ready = persistReservation(customer, store, date, false, null);
+        persistPayment(customer, hiddenRefunded, 10_000, 10_000, Payment.PaymentStatus.REFUNDED, paidAt);
+        persistPayment(customer, unpaidFlag, 5_000, 0, Payment.PaymentStatus.PAID, paidAt);
+        persistPayment(customer, nullFlag, 8_000, 1_000, Payment.PaymentStatus.REFUND_PENDING, paidAt);
+        persistPayment(customer, paidCorrectly, 10_000, 5_000, Payment.PaymentStatus.PARTIAL_REFUNDED, paidAt);
+        persistPayment(customer, refundedCorrectly, 1_000, 1_000, Payment.PaymentStatus.REFUNDED, paidAt);
+        persistPayment(customer, ready, 1_000, 0, Payment.PaymentStatus.READY, null);
+        entityManager.flush();
+        entityManager.clear();
+
+        var page = paymentRepository.findReservationDepositInvariantViolations(PageRequest.of(0, 100));
+        assertThat(page.getTotalElements()).isEqualTo(before + 3);
+        assertThat(page.getTotalElements()).isEqualTo(paymentRepository.countReservationDepositInvariantViolations());
+        assertThat(page.getContent()).extracting(PaymentRepository.DepositInvariantReservation::getReservationId)
+                .contains(hiddenRefunded.getId(), unpaidFlag.getId(), nullFlag.getId())
+                .doesNotContain(paidCorrectly.getId(), refundedCorrectly.getId(), ready.getId());
+        var rows = paymentRepository.summarizeConfirmedDepositLedger(page.getContent().stream()
+                .map(PaymentRepository.DepositInvariantReservation::getReservationId).toList());
+        var ledger = rows.stream().collect(Collectors.groupingBy(PaymentRepository.DepositInvariantLedgerSummary::getReservationId));
+        Map<Long, ReservationDepositInvariantResponse> responses = page.stream().collect(Collectors.toMap(
+                PaymentRepository.DepositInvariantReservation::getReservationId,
+                reservation -> ReservationDepositInvariantResponse.from(reservation, ledger.getOrDefault(reservation.getReservationId(), List.of()))));
+        var hidden = responses.get(hiddenRefunded.getId());
+        assertThat(hidden.reservationStatus()).isEqualTo(ReservationStatus.CANCELLED);
+        assertThat(hidden.reservationDeletedAt()).isEqualTo(deletedAt);
+        assertThat(hidden.direction()).isEqualTo(ReservationDepositInvariantResponse.Direction.DEPOSIT_PAID_WITHOUT_POSITIVE_LEDGER);
+        assertThat(hidden.confirmedNetAmount()).isZero();
+        assertThat(hidden.confirmedRefundAmount()).isEqualTo(10_000);
+        assertThat(hidden.positiveBalancePaymentCount()).isZero();
+        assertThat(hidden.ledgerStatuses().getFirst().status()).isEqualTo(Payment.PaymentStatus.REFUNDED);
+        assertThat(responses.get(unpaidFlag.getId()).direction()).isEqualTo(ReservationDepositInvariantResponse.Direction.POSITIVE_LEDGER_WITHOUT_DEPOSIT_PAID);
+        assertThat(responses.get(nullFlag.getId()).confirmedNetAmount()).isEqualTo(7_000);
+        assertThat(responses.get(nullFlag.getId()).positiveBalancePaymentCount()).isEqualTo(1);
+        assertThat(entityManager.find(Reservation.class, hiddenRefunded.getId()).getDepositPaid()).isTrue();
+    }
+
+    @Test
+    void depositDiagnosticRetainsSettledStatusAndTimestampRequirements() {
+        Member customer = persistMember(Role.USER);
+        Store store = Store.builder().name("복수 원장 검증").owner(persistMember(Role.BUSINESS)).build();
+        entityManager.persist(store);
+        Reservation positive = persistReservation(customer, store, LocalDate.now(), true, null);
+        Reservation missingTimestamp = persistReservation(customer, store, LocalDate.now(), false, null);
+        persistPayment(customer, positive, 1_000, 0, Payment.PaymentStatus.PAID, LocalDateTime.now());
+        persistPayment(customer, missingTimestamp, 1_000, 0, Payment.PaymentStatus.PAID, null);
+        entityManager.flush();
+        var page = paymentRepository.findReservationDepositInvariantViolations(PageRequest.of(0, 100));
+        assertThat(page.getContent()).extracting(PaymentRepository.DepositInvariantReservation::getReservationId)
+                .doesNotContain(positive.getId(), missingTimestamp.getId());
+        assertThat(page.getTotalElements()).isEqualTo(paymentRepository.countReservationDepositInvariantViolations());
+        assertThat(paymentRepository.findReservationDepositInvariantViolations(PageRequest.of(0, 1)).getSize()).isEqualTo(1);
+    }
+
+
+
     private Member persistMember(Role role) {
         Member member = Member.builder()
                 .name("검증 회원")
@@ -97,7 +171,7 @@ class PaymentStatisticsQueryTest {
             Member customer,
             Store store,
             LocalDate reservationDate,
-            boolean depositPaid,
+            Boolean depositPaid,
             LocalDateTime deletedAt) {
         Reservation reservation = Reservation.builder()
                 .member(customer)
@@ -106,6 +180,7 @@ class PaymentStatisticsQueryTest {
                 .reservationTime(LocalTime.NOON)
                 .guestCount(1)
                 .depositPaid(depositPaid)
+                .status(deletedAt == null ? ReservationStatus.PENDING : ReservationStatus.CANCELLED)
                 .depositAmount(10_000)
                 .deletedAt(deletedAt)
                 .build();

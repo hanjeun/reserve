@@ -162,13 +162,11 @@ export default function useEmailVerification({
     };
 
     // ── timerInfo (렌더링용) ──────────────────────────────────────────────────
-    const timerInfo = isVerified
-        ? null
-        : timeLeft > 0
-            ? { text: `남은 시간 ${formatTimer(timeLeft)}`, isWarning: timeLeft <= 60 }
-            : isCodeSent
-                ? { text: '시간 만료 — 재발송해주세요', isWarning: true }
-                : null;
+    let timerInfo = null;
+    if (!isVerified) {
+        if (timeLeft > 0) timerInfo = { text: `남은 시간 ${formatTimer(timeLeft)}`, isWarning: timeLeft <= 60 };
+        else if (isCodeSent) timerInfo = { text: '시간 만료 — 재발송해주세요', isWarning: true };
+    }
 
     return {
         isCodeSent, isVerified,

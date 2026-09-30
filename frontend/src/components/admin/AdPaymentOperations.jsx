@@ -66,20 +66,29 @@ const AdPaymentOperations = () => {
             </div>
         ) },
     ];
+
+    // 원장 본문: 오류 → 첫 조회 중 → 표 순으로 하나만 그린다.
+    let ledgerContent;
+    if (query.isError) {
+        ledgerContent = <DataState state="error" kind="payment" subject="광고 결제 원장" error={query.error}
+            onRetry={query.refetch} retrying={query.isFetching} compact />;
+    } else if (query.isPending) {
+        ledgerContent = <AdminTableSkeleton rows={6} headers={columns.map(column => column.title)}
+            cols={columns.map(column => column.width)} actionBtns={2} />;
+    } else {
+        ledgerContent = <DataTable columns={columns} dataSource={query.data?.content ?? []} rowKey="id"
+            locale={{ emptyText: '표시할 광고 결제 시도가 없습니다.' }}
+            pagination={{ current: page, pageSize: PAGE_SIZE,
+                total: query.data?.page?.totalElements ?? query.data?.totalElements ?? 0, onChange: setPage }} />;
+    }
+
     return (
         <div>
             <p>결제 시도별 기록입니다. 취소 요청과 환불 완료는 다릅니다. 과거에 덮어쓴 주문번호는 별도 PG 이력 대사가 필요합니다.</p>
             <SegmentedControl options={FILTERS} value={openOnly ? 'open' : 'all'} onChange={value => { setOpenOnly(value === 'open'); setPage(1); }} />
             <FilterToolbar count={query.data?.page?.totalElements ?? query.data?.totalElements ?? 0}
                 onReload={query.refetch} loading={query.isFetching} />
-            {query.isError ? <DataState state="error" kind="payment" subject="광고 결제 원장" error={query.error}
-                onRetry={query.refetch} retrying={query.isFetching} compact />
-                : query.isPending ? <AdminTableSkeleton rows={6} headers={columns.map(column => column.title)}
-                    cols={columns.map(column => column.width)} actionBtns={2} />
-                    : <DataTable columns={columns} dataSource={query.data?.content ?? []} rowKey="id"
-                        locale={{ emptyText: '표시할 광고 결제 시도가 없습니다.' }}
-                        pagination={{ current: page, pageSize: PAGE_SIZE,
-                            total: query.data?.page?.totalElements ?? query.data?.totalElements ?? 0, onChange: setPage }} />}
+            {ledgerContent}
         </div>
     );
 };

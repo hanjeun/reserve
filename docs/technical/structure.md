@@ -30,7 +30,6 @@ RESERVE/
 │       ├── backup.md             ← MySQL 백업 · 복원 훈련
 │       ├── deployments.md        ← 릴리스 · 배포 · 배포 후 검증
 │       ├── manual-ddl.md         ← ddl-auto가 만들지 못하는 운영 DDL
-│       ├── current-status.md      ← 코드·로컬·dev·production·외부 실증 상태 정본
 │       ├── quality-roadmap.md     ← 프리뷰 검증 · 미해결 위험 · PR 정리 순서
 │       ├── ui-decisions.md        ← 공통 UI 구현 결정
 │       ├── README.md              ← 기술 문서 안내
@@ -38,6 +37,8 @@ RESERVE/
 │       └── design-system.md      ← 디자인 토큰 · 공통 컴포넌트
 ├── .github/
 │   ├── workflows/CICD.yml        ← dev/main PR 검사 · main push Blue/Green 배포
+│   ├── workflows/pr-labels.yml   ← PR 제목·경로로 라벨 자동 부착
+│   ├── workflows/cache-cleanup.yml ← 닫힌 PR 의 Actions 캐시 삭제
 │   ├── ISSUE_TEMPLATE/           ← 버그/기능 이슈 폼
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── dependabot.yml            ← 의존성 자동 업데이트 (npm · gradle · actions)

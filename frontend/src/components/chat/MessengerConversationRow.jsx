@@ -19,13 +19,21 @@ export default function MessengerConversationRow({ row, selected = false, owner 
     const title = conversationTitle(row, supportIdentity.name);
     const preview = row.lastMessagePreview || '아직 메시지가 없습니다.';
     const unread = Number.isSafeInteger(row.unread) ? Math.max(0, row.unread) : 0;
+    // 아이콘: 사람(관리자·사업자 시점) → 고객지원 → 가게 사진 → 기본 가게 아이콘.
+    let icon;
+    if (row.viewerRole === 'ADMIN' || owner) {
+        icon = <MessengerAvatar imageSrc={row.counterpartProfileImage} variant="person" className="reserve-messenger-row-icon" />;
+    } else if (row.type === 'SUPPORT') {
+        icon = <SupportAvatar className="reserve-messenger-row-icon" />;
+    } else if (row.storeImageUrl) {
+        icon = <MessengerAvatar imageSrc={row.storeImageUrl} variant="store" className="reserve-messenger-row-icon" />;
+    } else {
+        icon = <span className="reserve-messenger-row-icon" aria-hidden="true"><ShopOutlined /></span>;
+    }
     return (
         <button type="button" className={`reserve-messenger-row${selected ? ' is-selected' : ''}`}
             onClick={onSelect} aria-current={selected ? 'true' : undefined}>
-            {row.viewerRole === 'ADMIN' || owner ? <MessengerAvatar imageSrc={row.counterpartProfileImage} variant="person" className="reserve-messenger-row-icon" />
-                : row.type === 'SUPPORT' ? <SupportAvatar className="reserve-messenger-row-icon" />
-                : !owner && row.storeImageUrl ? <MessengerAvatar imageSrc={row.storeImageUrl} variant="store" className="reserve-messenger-row-icon" />
-                    : <span className="reserve-messenger-row-icon" aria-hidden="true"><ShopOutlined /></span>}
+            {icon}
             <span className="reserve-messenger-row-copy">
                 <span className="reserve-messenger-row-line">
                     <strong>{title}</strong>

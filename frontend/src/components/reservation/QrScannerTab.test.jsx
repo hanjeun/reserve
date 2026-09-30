@@ -18,8 +18,7 @@ vi.mock('html5-qrcode', () => ({
     Html5Qrcode: class Html5Qrcode {
         start(_camera, _config, onSuccess) {
             scannerState.onSuccess = onSuccess;
-            scannerState.start();
-            return Promise.resolve();
+            return scannerState.start() ?? Promise.resolve();
         }
 
         stop() {
@@ -44,11 +43,39 @@ vi.mock('../../services/reservationService', () => ({
 describe('QrScannerTab sheet surface', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        scannerState.start.mockReset();
         scannerState.onSuccess = null;
         reservationService.checkInByQr.mockResolvedValue({
             reservation: { memberName: '한재은' },
             alreadyCheckedIn: false,
         });
+    });
+
+    it('uses the same default button spinner as submit buttons while mock camera startup is pending', async () => {
+        let startCamera;
+        const pending = new Promise(resolve => { startCamera = resolve; });
+        scannerState.start.mockReturnValueOnce(pending);
+        const client = new QueryClient();
+        const { container, unmount } = render(<QueryClientProvider client={client}><AntApp>
+            <QrScannerTab sheet onClose={vi.fn()} />
+        </AntApp></QueryClientProvider>);
+        expect(container.querySelector('.reserve-qr-scanner').firstElementChild).toHaveStyle({ background: 'transparent', borderRadius: '0' });
+        const start = await screen.findByRole('button', { name: 'QR 스캔 시작' }, { timeout: 1200 });
+        expect(container.querySelector('.reserve-qr-scanner').firstElementChild).toHaveStyle({ background: 'transparent', borderRadius: '0' });
+        fireEvent.click(start);
+        await waitFor(() => expect(scannerState.start).toHaveBeenCalledTimes(1));
+        expect(start).toBeDisabled();
+        expect(start).toHaveAttribute('aria-busy', 'true');
+        expect(start.querySelector('.reserve-btn-spin')).toBeInTheDocument();
+        expect(start.querySelector('.reserve-btn-loading-icon, .anticon-reload')).toBeNull();
+        await act(async () => { startCamera(); await pending; });
+        expect(screen.getByRole('button', { name: '스캔 중지' })).toBeEnabled();
+        const statusRow = screen.getByText('스캔 대기 중…').parentElement;
+        expect(statusRow.style.backgroundColor).toBe('');
+        expect(statusRow.style.borderRadius).toBe('');
+        expect(reservationService.checkInByQr).not.toHaveBeenCalled();
+        unmount();
+        client.clear();
     });
 
     it('keeps actions at the bottom and reports a scan only through the message layer', async () => {

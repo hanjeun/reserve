@@ -81,10 +81,14 @@ test('first store-detail photo preview animates its entrance after a fresh navig
     expect(firstBackdropFrame).toBeGreaterThanOrEqual(0);
     expect(firstBackdropFrame, JSON.stringify(frames)).toBeLessThanOrEqual(firstScaleFrame + 1);
     expect(frames.some(frame => frame.maskOpacity > 0.05 && frame.maskOpacity < 0.95), JSON.stringify(frames)).toBe(true);
-    expect(frames.some(frame => {
+    // Reuse the intermediate frames already required above. Under CI load, consecutive
+    // samples can jump from 0.17 to 0.84 without entering a second, narrower interval.
+    const intermediateFrames = frames.filter(frame => {
         const scale = scaleAt(frame);
-        return scale > 0.2 && scale < 0.8 && frame.rootOpacity > scale;
-    }), JSON.stringify(frames)).toBe(true);
+        return scale > 0.15 && scale < 0.85;
+    });
+    expect(intermediateFrames.length, JSON.stringify(frames)).toBeGreaterThan(0);
+    expect(intermediateFrames.every(frame => frame.rootOpacity > scaleAt(frame)), JSON.stringify(frames)).toBe(true);
     await page.locator('.reserve-image-preview .ant-image-preview-close').click();
     await expect(page.locator('.reserve-image-preview')).toBeHidden();
     await photo.locator('..').click();

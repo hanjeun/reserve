@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $snapshotRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'docs/design-system/snapshots/2026-09-13-baseline'))
 $sourceRoot = Join-Path $snapshotRoot 'source'
-if (!$snapshotRoot.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+if (-not $snapshotRoot.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Snapshot target must stay inside this repository.'
 }
 
@@ -22,11 +22,11 @@ if ($InstallGitGuard) {
     # info/attributes has higher precedence without editing any snapshot member.
     $attributeRule = 'docs/design-system/snapshots/** -text -eol'
     $attributePath = (& git -C $repoRoot rev-parse --git-path info/attributes).Trim()
-    if ($LASTEXITCODE -ne 0 -or !$attributePath) { throw 'Cannot resolve repository Git attributes.' }
-    if (![IO.Path]::IsPathRooted($attributePath)) { $attributePath = Join-Path $repoRoot $attributePath }
+    if ($LASTEXITCODE -ne 0 -or -not $attributePath) { throw 'Cannot resolve repository Git attributes.' }
+    if (-not [IO.Path]::IsPathRooted($attributePath)) { $attributePath = Join-Path $repoRoot $attributePath }
     $attributePath = [IO.Path]::GetFullPath($attributePath)
     $existingAttributes = if (Test-Path -LiteralPath $attributePath) { [IO.File]::ReadAllText($attributePath) } else { '' }
-    $lastRule = @($existingAttributes -split '\r?\n' | Where-Object { $_.Trim() -and !$_.Trim().StartsWith('#') }) | Select-Object -Last 1
+    $lastRule = @($existingAttributes -split '\r?\n' | Where-Object { $_.Trim() -and -not $_.Trim().StartsWith('#') }) | Select-Object -Last 1
     if ($lastRule -ne $attributeRule) {
         [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($attributePath)) | Out-Null
         [IO.File]::AppendAllText($attributePath, "`n# RESERVE immutable snapshot byte guard`n$attributeRule`n", [Text.UTF8Encoding]::new($false))
@@ -44,14 +44,14 @@ function Write-Json([string]$name, $value) {
 }
 
 function Save-Source([string]$relative, [string]$category, [string]$snapshotRelative = '') {
-    if (!$snapshotRelative) { $snapshotRelative = 'source/' + $relative }
+    if (-not $snapshotRelative) { $snapshotRelative = 'source/' + $relative }
     $source = [IO.Path]::GetFullPath((Join-Path $repoRoot $relative))
     $target = [IO.Path]::GetFullPath((Join-Path $snapshotRoot $snapshotRelative))
-    if (!$source.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
-        !$target.StartsWith($snapshotRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    if (-not $source.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+        -not $target.StartsWith($snapshotRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Path escaped its source/target root: $relative"
     }
-    if (!(Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing explicit source: $relative" }
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing explicit source: $relative" }
     if (Test-Path -LiteralPath $target) { return }
     $before = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
     New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($target)) -Force | Out-Null
@@ -201,14 +201,14 @@ if ($Stage -eq 'Finalize') {
                 source = $record.source_relative_path; specifier = $specifier
                 kind = if ($specifier.StartsWith('.')) { 'relative' } else { 'external-package' }
                 resolved_source_relative_path = $resolvedRelative; included_in_snapshot = $included
-                note = if ($specifier.StartsWith('.') -and !$included) { 'Adapter or app implementation intentionally not preserved; not a runnable-package claim.' } else { '' }
+                note = if ($specifier.StartsWith('.') -and -not $included) { 'Adapter or app implementation intentionally not preserved; not a runnable-package claim.' } else { '' }
             }
         }
     }
     Write-Json 'dependency-boundaries.json' ([ordered]@{
         method = 'static-import-export-regex-not-runtime-or-complete-module-graph'
         edges = @($dependencies)
-        omitted_relative_edges = @($dependencies | Where-Object { $_.kind -eq 'relative' -and !$_.included_in_snapshot })
+        omitted_relative_edges = @($dependencies | Where-Object { $_.kind -eq 'relative' -and -not $_.included_in_snapshot })
     })
     Write-Json 'licenses/provenance.json' @(
         [ordered]@{ file = 'licenses/Pretendard-LICENSE.txt'; source = 'frontend/node_modules/pretendard/dist/LICENSE.txt'; handling = 'byte-identical local installed package copy' },
@@ -259,7 +259,7 @@ foreach ($record in $manifest) {
         throw "Preserved source failed hash check: $($record.source_relative_path)"
     }
     $current = Join-Path $repoRoot $record.source_relative_path
-    if (!(Test-Path -LiteralPath $current) -or (Get-FileHash -LiteralPath $current -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record.sha256) { $diverged += $record.source_relative_path }
+    if (-not (Test-Path -LiteralPath $current) -or (Get-FileHash -LiteralPath $current -Algorithm SHA256).Hash.ToLowerInvariant() -ne $record.sha256) { $diverged += $record.source_relative_path }
 }
 $payload = @(Get-Content -LiteralPath (Join-Path $snapshotRoot 'payload-manifest.json') -Raw | ConvertFrom-Json)
 $zip = [IO.Compression.ZipFile]::OpenRead($zipPath)
@@ -267,7 +267,7 @@ try {
     if ($zip.Entries.Count -ne $payload.Count + 1) { throw 'ZIP entry count differs from explicit payload manifest.' }
     foreach ($item in $payload) {
         $entry = $zip.GetEntry($item.path)
-        if (!$entry -or $entry.Length -ne $item.bytes) { throw "Missing/invalid ZIP entry: $($item.path)" }
+        if (-not $entry -or $entry.Length -ne $item.bytes) { throw "Missing/invalid ZIP entry: $($item.path)" }
         $stream = $entry.Open()
         $sha = [Security.Cryptography.SHA256]::Create()
         try { $actual = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }

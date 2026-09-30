@@ -87,15 +87,19 @@ const HeaderAccountMenu = () => {
         ];
 
         if (user?.role === 'ADMIN') {
-            items.push({ type: 'divider' });
-            items.push({ key: 'admin', icon: <SettingOutlined />, label: '관리자 패널', onClick: () => navigate('/admin') });
+            items.push(
+                { type: 'divider' },
+                { key: 'admin', icon: <SettingOutlined />, label: '관리자 패널', onClick: () => navigate('/admin') },
+            );
         }
 
         if (hasOwnerAccess(user?.role)) {
-            items.push({ key: 'business', icon: <ScheduleOutlined />, label: '사업자 패널', onClick: () => navigate('/business') });
-            items.push({ type: 'divider' });
-            items.push({ key: 'my-stores', icon: <ShopOutlined />, label: '내 가게 관리', onClick: () => navigate('/my-stores') });
-            items.push({ key: 'store-register', icon: <PlusOutlined />, label: '새 가게 등록', onClick: () => navigate('/store/register') });
+            items.push(
+                { key: 'business', icon: <ScheduleOutlined />, label: '사업자 패널', onClick: () => navigate('/business') },
+                { type: 'divider' },
+                { key: 'my-stores', icon: <ShopOutlined />, label: '내 가게 관리', onClick: () => navigate('/my-stores') },
+                { key: 'store-register', icon: <PlusOutlined />, label: '새 가게 등록', onClick: () => navigate('/store/register') },
+            );
         }
 
         items.push(

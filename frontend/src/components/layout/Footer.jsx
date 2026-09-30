@@ -25,7 +25,7 @@ const SocialBtn = ({ href, icon, label, variant }) => (
         target="_blank"
         rel="noopener noreferrer"
         aria-label={label}
-        className={`reserve-social${variant ? ` reserve-social--${variant}` : ''}`}
+        className={'reserve-social' + (variant ? ` reserve-social--${variant}` : '')}
         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '50%', border: `1.5px solid ${colors.border.default}`, color: colors.text.tertiary, background: 'transparent', transition: 'all 0.18s', textDecoration: 'none' }}
     >
         {icon}

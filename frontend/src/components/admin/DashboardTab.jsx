@@ -45,6 +45,35 @@ const DashboardTab = () => {
         ? `전체 ${stats.trashCount}개 중 최근 50개를 유형별로 집계했습니다.`
         : undefined;
 
+    // 감사 로그 요약 카드 본문: 로딩 → 실패 → 집계 순으로 하나만 그린다.
+    const renderAuditSummary = () => {
+        if (loading) {
+            return [1, 2, 3].map((i) => (
+                <div key={i} style={{ flex: '1 1 120px' }}>
+                    <Bone width={64} height={13} style={{ marginBottom: 8 }} />
+                    <Bone width={40} height={26} />
+                </div>
+            ));
+        }
+        if (sourceFailed('audit')) {
+            return (
+                <DataState state="error" title="감사 로그를 불러오지 못했습니다."
+                    onRetry={refetch} retrying={isFetching} compact />
+            );
+        }
+        return [
+            { key: 'SOFT_DELETE', label: '소프트 삭제', color: colors.warning.main },
+            { key: 'RESTORE',     label: '복구',        color: colors.success.main },
+            { key: 'HARD_DELETE', label: '영구 삭제',   color: colors.error.main },
+        ].map(({ key, label, color }) => (
+            <div key={key} style={{ flex: '1 1 120px' }}>
+                <Text style={{ color, fontSize: fontSize.sm, fontWeight: 600, display: 'block', marginBottom: 4 }}>{label}</Text>
+                <span style={{ fontSize: 22, fontWeight: 800, color }}>{stats.actionCount[key] || 0}</span>
+                <span style={{ fontSize: fontSize.sm, color: colors.text.tertiary, marginLeft: 4 }}>건</span>
+            </div>
+        ));
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* 툴바 — 다른 탭과 동일한 FilterToolbar */}
@@ -191,29 +220,7 @@ const DashboardTab = () => {
             {(loading || sourceFailed('audit') || (stats?.actionCount && Object.keys(stats.actionCount).length > 0)) && (
                 <ChartCard title="최근 감사 로그 요약" height="auto">
                     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                        {loading ? (
-                            [1, 2, 3].map((i) => (
-                                <div key={i} style={{ flex: '1 1 120px' }}>
-                                    <Bone width={64} height={13} style={{ marginBottom: 8 }} />
-                                    <Bone width={40} height={26} />
-                                </div>
-                            ))
-                        ) : sourceFailed('audit') ? (
-                            <DataState state="error" title="감사 로그를 불러오지 못했습니다."
-                                onRetry={refetch} retrying={isFetching} compact />
-                        ) : (
-                            [
-                                { key: 'SOFT_DELETE', label: '소프트 삭제', color: colors.warning.main },
-                                { key: 'RESTORE',     label: '복구',        color: colors.success.main },
-                                { key: 'HARD_DELETE', label: '영구 삭제',   color: colors.error.main },
-                            ].map(({ key, label, color }) => (
-                                <div key={key} style={{ flex: '1 1 120px' }}>
-                                    <Text style={{ color, fontSize: fontSize.sm, fontWeight: 600, display: 'block', marginBottom: 4 }}>{label}</Text>
-                                    <span style={{ fontSize: 22, fontWeight: 800, color }}>{stats.actionCount[key] || 0}</span>
-                                    <span style={{ fontSize: fontSize.sm, color: colors.text.tertiary, marginLeft: 4 }}>건</span>
-                                </div>
-                            ))
-                        )}
+                        {renderAuditSummary()}
                     </div>
                 </ChartCard>
             )}

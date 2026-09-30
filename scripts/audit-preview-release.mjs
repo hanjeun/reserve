@@ -33,7 +33,7 @@ for (let index = 0; index < rows.length; index += 1) {
     if (!row) continue;
     const status = row.slice(0, 2);
     const path = row.slice(3);
-    const oldPath = /R|C/.test(status) ? rows[++index] : undefined;
+    const oldPath = /[RC]/.test(status) ? rows[++index] : undefined;
     const absolute = resolve(root, path);
     const bytes = existsSync(absolute) ? readFileSync(absolute) : null;
     // Git's native object ID is metadata, not a security checksum. The manifest uses SHA-256.

@@ -170,14 +170,21 @@ const ForgotPassword = () => {
         }
     };
 
-    const indicatorStep = isVerified ? 2 : isCodeSent ? 1 : 0;
+    let indicatorStep = 0;
+    if (isVerified) {
+        indicatorStep = 2;
+    } else if (isCodeSent) {
+        indicatorStep = 1;
+    }
 
-    const timerInfo = isVerified ? null
-        : timeLeft > 0
-            ? { text: `남은 시간 ${formatTimer(timeLeft)}`, isWarning: timeLeft <= 60 }
-            : isCodeSent
-                ? { text: '시간 만료 — 재발송해주세요', isWarning: true }
-                : null;
+    let timerInfo = null;
+    if (!isVerified) {
+        if (timeLeft > 0) {
+            timerInfo = { text: `남은 시간 ${formatTimer(timeLeft)}`, isWarning: timeLeft <= 60 };
+        } else if (isCodeSent) {
+            timerInfo = { text: '시간 만료 — 재발송해주세요', isWarning: true };
+        }
+    }
 
     return (
         <PageContainer size="sm" paddingTop="60px" center>

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Form, Typography } from 'antd';
 import { PageContainer } from '../../common';
-import { fontWeight, fontSize, heights, radius, spacing } from '../../../styles/tokens';
+import { fontWeight, fontSize } from '../../../styles/tokens';
 import { useWindowWidth } from '../../../hooks';
+import { STORE_FORM_COPY, STORE_FORM_DENSITY_VARS, storeFormFrame } from '../storeFormFrame';
 import { SCROLL_TO_FIRST_ERROR } from '../../../utils/form';
 import StoreBasicInfo from './StoreBasicInfo';
 import StoreImages from './StoreImages';
@@ -27,29 +28,18 @@ const StoreForm = ({
     formRef,
     initialValues: externalInitialValues,
 }) => {
-    const width = useWindowWidth();
-    const isMobile = width < 768;
-    // 768~899px에서 두 주요 컬럼 안에 시간 범위 두 칸을 다시 쪼개면 입력 폭이 부족하다.
-    const isSingleColumn = width < 900;
-    const title     = mode === 'create' ? '가게 등록' : '가게 정보 수정';
-    const subtitle  = mode === 'create'
-        ? '가게 정보를 입력하고 예약을 받아보세요.'
-        : '등록된 가게 정보를 수정합니다.';
-    let container = 'lg';
-    if (isMobile) container = 'sm';
-    else if (isSingleColumn) container = 'md';
+    // 폭·여백·제목 간격은 로딩 뼈대(StoreFormSkeleton)와 같은 관문(storeFormFrame)에서 받는다.
+    const { isSingleColumn, container, headingGap } = storeFormFrame(useWindowWidth());
+    const { title, subtitle } = STORE_FORM_COPY[mode === 'create' ? 'create' : 'edit'];
 
     return (
         <PageContainer
             className="reserve-store-form-page"
-            size={container}
-            paddingTop={isMobile ? spacing[6] : spacing[10]}
-            paddingX={isMobile ? spacing[5] : spacing[7]}
-            paddingBottom={isMobile ? spacing[9] : spacing[12]}
-            style={styles.mobileProperties}
+            {...container}
+            style={STORE_FORM_DENSITY_VARS}
         >
             {/* MyStores 스타일과 동일하게 통일 */}
-            <div className="reserve-store-form-heading" style={{ marginBottom: isMobile ? spacing[6] : spacing[10] }}>
+            <div className="reserve-store-form-heading" style={{ marginBottom: headingGap }}>
                 <Title level={2} style={styles.title}>{title}</Title>
                 <Text type="secondary" style={{ fontSize: fontSize.lg }}>{subtitle}</Text>
             </div>
@@ -101,13 +91,7 @@ const StoreForm = ({
 
 // MyStores와 동일한 스타일 — fontSize 직접 지정 없이 level={2} 기본값 사용
 const styles = {
-    // RESERVE 작업 폼의 모바일 밀도만 바꾼다. 범용 Core 입력(54px)은 그대로 보존한다.
-    mobileProperties: {
-        '--reserve-store-form-control-height': heights.buttonMd,
-        '--reserve-store-form-control-radius': radius.md,
-        '--reserve-store-form-field-gap': spacing[4],
-        '--reserve-store-form-label-gap': spacing[3],
-    },
+    // 모바일 밀도 변수(STORE_FORM_DENSITY_VARS)는 storeFormFrame 으로 옮겼다 — 범용 Core 입력(54px)은 그대로 보존한다.
     title: {
         fontWeight: fontWeight.extrabold,
         margin: '0 0 8px',

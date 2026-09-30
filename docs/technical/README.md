@@ -6,7 +6,6 @@ RESERVE의 설계·운영·도메인 문서를 한곳에 모았어요. 문서와
 
 | 문서 | 내용 |
 |---|---|
-| [현재 상태](current-status.md) | 운영 버전과 설정으로 꺼 둔 기능 |
 | [품질 로드맵](quality-roadmap.md) | 남은 작업과 우선순위 |
 
 ## 구조
@@ -38,7 +37,6 @@ RESERVE의 설계·운영·도메인 문서를 한곳에 모았어요. 문서와
 | [데이터 생명주기](data-lifecycle.md) | 가게 영업 종료·회원 탈퇴·S3 삭제·휴지통 |
 | [통합 메시지](messaging.md) | 고객지원·가게 문의·차단·신고 |
 | [채팅 입력·관리](chat-controls.md) | 입력·설정·전송 취소·신고 증거 |
-| [채팅 설정과 확장](chat-architecture.md) | 채팅 설정 범위와 확장 방향 |
 | [채팅 사진 키](chat-images.md) | `CHAT_IMAGE_ENCRYPTION_KEY` 생성·등록 |
 | [가게 임시저장](store-drafts.md) | 가게 등록·수정 자동 저장 |
 | [검색 화면](search-ui.md) | 검색 전용 화면과 헤더 |

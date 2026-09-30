@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import MessengerFooter from './MessengerFooter';
 import MessengerSettings from './MessengerSettings';
 import MessengerHome from './MessengerHome';
+import Avatar from '../common/Avatar';
 
 describe('MessengerHome headings', () => {
     it.each([1, 2])('keeps one accessible heading at level %s without a visible cover wordmark', headingLevel => {
@@ -82,6 +83,17 @@ describe('MessengerFooter', () => {
 describe('MessengerSettings', () => {
     const renderSettings = props => render(<MemoryRouter><MessengerSettings {...props} /></MemoryRouter>);
 
+    it('reuses the account Avatar renderer instead of a separately cropped settings image', () => {
+        const source = 'https://example.test/account-photo.png';
+        const { container } = render(<MemoryRouter>
+            <MessengerSettings user={{ id: 1, profileImageUrl: source }} />
+            <div data-testid="account-avatar"><Avatar src={source} size={64} draggable={false} referrerPolicy="no-referrer" /></div>
+        </MemoryRouter>);
+        const settingsAvatar = container.querySelector('.reserve-messenger-settings-avatar').firstElementChild;
+        expect(settingsAvatar.outerHTML).toBe(screen.getByTestId('account-avatar').firstElementChild.outerHTML);
+        expect(settingsAvatar.querySelector('img')).toHaveStyle({ objectFit: 'cover', position: 'absolute', inset: '0' });
+    });
+
     it('shows only provided identity and links to the existing account page', () => {
         const { container } = renderSettings({ user: { name: '김회원', email: 'member@example.com' } });
         expect(screen.getByRole('heading', { name: '설정', level: 2 })).toBeInTheDocument();
@@ -139,8 +151,8 @@ describe('MessengerSettings', () => {
         const { container } = renderSettings({ user: { id: 1, name: '김회원', profileImage } });
         const avatar = container.querySelector('.reserve-messenger-settings-avatar');
         const image = avatar.querySelector('img');
-        expect(image).toHaveAttribute('src', profileImage);
-        expect(image).toHaveAttribute('alt', '');
+        expect(image).toHaveAttribute('src', new URL(profileImage, window.location.origin).href);
+        expect(image).toHaveAttribute('alt', '프로필');
         expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
         expect(image).toHaveAttribute('draggable', 'false');
         expect(avatar).toHaveAttribute('aria-hidden', 'true');
@@ -152,7 +164,7 @@ describe('MessengerSettings', () => {
         const { container, rerender } = renderSettings({ user: account });
         expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', account.profileImageUrl);
         rerender(<MemoryRouter><MessengerSettings user={{ ...account, profileImageUrl: 'javascript:alert(1)' }} /></MemoryRouter>);
-        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', account.profileImage);
+        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', new URL(account.profileImage, window.location.origin).href);
     });
 
     it.each(['', '  ', 'javascript:alert(1)', 'data:image/png;base64,example', 'blob:https://example.test/example', 'file:///photo.png', 'ftp://example.test/photo.png', 'https://user:password@example.test/photo.png', 'http://tracker.example/photo.png'])('uses the default profile icon without requesting an unsafe photo: %s', profileImage => {
@@ -189,7 +201,7 @@ describe('MessengerSettings', () => {
         rerender(<MemoryRouter><MessengerSettings user={{ ...user, profileImage: '/icons/RESERVE_logo.png' }} /></MemoryRouter>);
         const currentImage = container.querySelector('.reserve-messenger-settings-avatar img');
         expect(currentImage).not.toBe(oldImage);
-        expect(currentImage).toHaveAttribute('src', '/icons/RESERVE_logo.png');
+        expect(currentImage).toHaveAttribute('src', new URL('/icons/RESERVE_logo.png', window.location.origin).href);
         fireEvent.error(oldImage);
         expect(container.querySelector('.reserve-messenger-settings-avatar img')).toBe(currentImage);
     });
@@ -213,6 +225,6 @@ describe('MessengerSettings', () => {
         const { container, rerender } = renderSettings({ user: { id: 1, name: '김회원', profileImage } });
         fireEvent.error(container.querySelector('.reserve-messenger-settings-avatar img'));
         rerender(<MemoryRouter><MessengerSettings user={{ id: 2, name: '이회원', profileImage }} /></MemoryRouter>);
-        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', profileImage);
+        expect(container.querySelector('.reserve-messenger-settings-avatar img')).toHaveAttribute('src', new URL(profileImage, window.location.origin).href);
     });
 });

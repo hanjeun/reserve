@@ -3,8 +3,8 @@
 <a href="https://reserve.it.kr"><img src="frontend/public/og-image.png" alt="RESERVE — 예약이 필요한 순간" width="760" /></a>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/readme-title-dark.svg" />
-  <img src="docs/images/readme/readme-title-light.svg" alt="예약이 필요한 순간, RESERVE — 업종을 가리지 않고 찾고 · 예약하고 · 결제까지 한 번에" width="640" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/title-dark.svg" />
+  <img src="docs/images/title-light.svg" alt="예약이 필요한 순간, RESERVE — 업종을 가리지 않고 찾고 · 예약하고 · 결제까지 한 번에" width="640" />
 </picture>
 
 [**서비스 바로가기**](https://reserve.it.kr) &nbsp;·&nbsp;
@@ -38,15 +38,15 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 
 | 홈 | 가게 목록 |
 |---|---|
-| ![홈](docs/images/readme-v2.6/home.png) | ![가게 목록](docs/images/readme-v2.6/stores.png) |
+| ![홈](docs/images/home.png) | ![가게 목록](docs/images/stores.png) |
 
 | 가게 상세 | 사업자 패널 |
 |---|---|
-| ![가게 상세](docs/images/readme-v2.6/store-detail.png) | ![사업자 패널](docs/images/readme-v2.6/business.png) |
+| ![가게 상세](docs/images/store-detail.png) | ![사업자 패널](docs/images/business.png) |
 
 | 관리자 패널 | 모니터링 |
 |---|---|
-| ![관리자 패널](docs/images/readme-v2.6/admin.png) | ![Grafana 모니터링](docs/images/readme-v2.6/monitoring.png) |
+| ![관리자 패널](docs/images/admin.png) | ![Grafana 모니터링](docs/images/grafana.png) |
 
 ## 주요 기능
 
@@ -112,7 +112,7 @@ flowchart LR
 |---|---|
 | **사용 안내** | [손님 가이드](docs/guide/user-guide.md) · [사장님 가이드](docs/guide/owner-guide.md) · [업데이트 소식](docs/CHANGELOG.md) |
 | **구조** | [아키텍처](docs/technical/architecture.md) · [코드 구조](docs/technical/structure.md) · [디자인 시스템](docs/technical/design-system.md) · [UI 구현 결정](docs/technical/ui-decisions.md) |
-| **운영** | [배포 운영](docs/technical/deployments.md) · [모니터링](docs/technical/monitoring.md) · [백업 · 복구](docs/technical/backup.md) · [현재 상태](docs/technical/current-status.md) |
+| **운영** | [배포 운영](docs/technical/deployments.md) · [모니터링](docs/technical/monitoring.md) · [백업 · 복구](docs/technical/backup.md) |
 | **도메인** | [결제 · 환불](docs/technical/payments.md) · [통합 메시지](docs/technical/messaging.md) · [가게 임시저장](docs/technical/store-drafts.md) · [데이터 생명주기](docs/technical/data-lifecycle.md) |
 | **보안 · API** | [계정 보안](docs/technical/account-security.md) · [API 버전 관리](docs/technical/api-versioning.md) · [보안 정책](SECURITY.md) |
 | **자산 · 규칙** | [지역 사진 자산](docs/technical/region-photo-assets.md) · [서드파티 고지](THIRD_PARTY_NOTICES.md) · [코드 컨벤션](docs/rules/code-conventions.md) · [Git 워크플로우](docs/rules/git-workflow.md) |

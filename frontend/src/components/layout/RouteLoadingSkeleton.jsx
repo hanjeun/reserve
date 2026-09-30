@@ -1,79 +1,55 @@
 import PropTypes from 'prop-types';
-import { Typography } from 'antd';
 import { useLocation } from 'react-router-dom';
 import Bone from '../common/Bone';
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import { StoreDetailSkeleton, MyReservationCardSkeleton, ReservationSummaryCardSkeleton } from '../common/Skeletons';
 import PageContainer from '../common/PageContainer';
+import { PageStatusSkeleton } from '../common/PageStatus';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
-import StoreFormSkeleton from '../store/StoreFormSkeleton';
+import BenefitDetailSkeleton from '../common/BenefitDetailSkeleton';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
 import { STORE_LIST_PAGE_SIZE } from '../../constants/storeListPageSize';
-import { field } from '../../styles/tokens/field';
-import { fontWeight, fontSize } from '../../styles/tokens';
 import { getRouteSkeletonKind } from './routeSkeletonKind';
 import { resolveViewMode } from '../../utils/viewMode';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
 import MyPageSkeleton from './MyPageSkeleton';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
+import { ListingHeader, ListingToolbarSkeleton, RefreshToolbarSkeleton } from './routeSkeletonParts';
+import { usePageSkeletonModule } from './routeSkeletonLoader';
 
-const ROWS = ['one', 'two', 'three', 'four'];
-const HOME_SHORTCUTS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const PageSkeletonPending = () => <div style={{ minHeight: 'calc(100svh - 64px)' }} />;
 
-function ListingHeader({ title, description, marginBottom = 32 }) {
-    return <div style={{ marginBottom }}>
-        <Typography.Title level={2} style={{ margin: '0 0 8px', fontWeight: fontWeight.extrabold }}>{title}</Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: fontSize.lg }}>{description}</Typography.Text>
-    </div>;
-}
-ListingHeader.propTypes = { title: PropTypes.string.isRequired, description: PropTypes.string.isRequired, marginBottom: PropTypes.number };
+// 별도 청크의 뼈대를 그 이름으로 꺼내 그린다.
+const fromPageSkeletons = name => {
+    function PageSkeleton(props) {
+        const module = usePageSkeletonModule();
+        const Skeleton = module?.[name];
+        return Skeleton ? <Skeleton {...props} /> : <PageSkeletonPending />;
+    }
+    PageSkeleton.displayName = name;
+    return PageSkeleton;
+};
 
-function ListingToolbarSkeleton() {
-    return <div className="reserve-explore-filters" aria-hidden="true">
-        <Bone width={72} height={36} />
-        <span style={{ flex: 1 }} />
-        <div className="reserve-explore-filter-controls"><Bone width={82} height={36} /><Bone width={90} height={36} /></div>
-    </div>;
-}
-
-function RefreshToolbarSkeleton({ search = false }) {
-    return <div className="reserve-filter-toolbar" aria-hidden="true">
-        <div className={`reserve-filter-toolbar-secondary${search ? '' : ' reserve-filter-toolbar-secondary--refresh-only'}`}>
-            {search && <Bone width="100%" height={40} style={{ maxWidth: 480 }} />}
-            <span style={{ flex: 1 }} />
-            <Bone width={36} height={36} />
-        </div>
-    </div>;
-}
-RefreshToolbarSkeleton.propTypes = { search: PropTypes.bool };
-
-function DocumentSkeleton() {
-    return (
-        <div className="reserve-route-skeleton-copy">
-            <Bone width="48%" height={24} />
-            {ROWS.map(key => <Bone key={key} width="90%" height={14} />)}
-        </div>
-    );
-}
-
-function FormSkeleton() {
-    return (
-        <div className="reserve-route-skeleton-form">
-            <Bone width="55%" height={24} />
-            {ROWS.map(key => <Bone key={key} height={field.height} borderRadius={field.radius} />)}
-        </div>
-    );
-}
+// StoreDetail.jsx 의 BREAKPOINT 와 같은 값 — PC 두 칸 배치가 시작되는 폭.
+const STORE_DETAIL_BREAKPOINT = 900;
+// 홈 바로가기 두 묶음 — 서비스 분야별(분야 수만큼) + 빠른 메뉴 4칸(평점순·관심 가게·내 예약·메시지). pages/Home 의 SHORTCUT_GROUPS 와 같은 개수.
+const HOME_SHORTCUT_GROUPS = [
+    { key: 'services', count: SERVICE_DOMAIN_OPTIONS.length },
+    { key: 'quick', count: 4 },
+];
 
 // 페이지가 데이터 로딩 때 그리는 것과 같은 컴포넌트·개수·보기 방식 — 코드 로딩 → 데이터 로딩으로 넘어갈 때 모양이 안 바뀐다(2026-09-24).
 function CardsSkeleton({ pathname = '', search = '' }) {
-    if (/^\/my-favorites/.test(pathname)) {
+    const isList = resolveViewMode(pathname, new URLSearchParams(search), 'cards') === 'list';
+    if (pathname.startsWith('/my-favorites')) {
         return <PageContainer size="xl" paddingTop="40px">
             <ListingHeader title="즐겨찾기" description="즐겨찾기를 불러오는 중입니다." />
-            <RefreshToolbarSkeleton />
-            <div className="rsv-fav-grid"><StoreCardSkeleton count={8} /></div>
+            <RefreshToolbarSkeleton viewControl />
+            <div className={isList ? 'reserve-store-list-rows' : 'rsv-fav-grid'}>
+                {isList ? <StoreListRowSkeleton count={8} /> : <StoreCardSkeleton count={8} />}
+            </div>
         </PageContainer>;
     }
-    const isList = resolveViewMode(pathname, new URLSearchParams(search), 'cards') === 'list';
     return <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page">
         <ListingHeader title="내 가게 관리" description="등록된 가게를 수정하거나 관리할 수 있습니다." marginBottom={40} />
         <ListingToolbarSkeleton />
@@ -121,45 +97,63 @@ function BenefitsRouteSkeleton() {
     </section></section>;
 }
 
+// 가게 소식 상세 — 페이지가 데이터 로딩 때 그리는 뼈대를 그대로 쓴다.
+const BenefitDetailRouteSkeleton = () => <BenefitDetailSkeleton />;
 
+// 가게 상세 — 페이지의 데이터 로딩과 같은 틀(PC xl·32 / 900px 미만 md 700·20)과 같은 뼈대.
+// 예전엔 라우트 틀(최대 1200·여백 32/20)에 넣어 태블릿(768~899)에서 폭·여백이 실제와 달랐다(2026-09-29).
+function DetailRouteSkeleton() {
+    const isPC = useWindowWidth() >= STORE_DETAIL_BREAKPOINT;
+    return <PageContainer size={isPC ? 'xl' : 'md'} paddingTop={isPC ? '32px' : '20px'}>
+        <StoreDetailSkeleton isPC={isPC} />
+    </PageContainer>;
+}
+
+
+// 실제 홈(pages/Home)의 틀 클래스를 그대로 써서 위치·여백·반응형 경계를 홈 CSS 한 곳에서 따라가게 한다(2026-09-29).
+// 예전엔 전용 클래스로 따로 그려 홈에 없는 공지 줄, 한 줄 10칸 바로가기, 89px 제목 줄이 있어 로딩 뒤 모양이 바뀌었다.
 function DiscoverySkeleton() {
     return (
-        <div className="reserve-route-discovery-body">
-            <div className="reserve-route-discovery-location">
+        <div className="reserve-discovery-home">
+            <div className="reserve-discovery-location">
                 <Bone width={112} height={20} />
                 <Bone width={72} height={20} />
             </div>
-            <Bone height="auto" borderRadius={16} style={{ aspectRatio: 'var(--reserve-route-banner-ratio, 3 / 2)' }} />
-            <div className="reserve-route-skeleton-shortcuts">
-                {HOME_SHORTCUTS.map(key => (
-                    <div className="reserve-route-discovery-shortcut" key={key}>
-                        <Bone width={48} height={48} borderRadius="50%" />
-                        <Bone width={42} height={12} />
-                    </div>
-                ))}
+            <div className="reserve-discovery-featured">
+                <div className="reserve-discovery-banner-track">
+                    <Bone height="auto" borderRadius="var(--reserve-home-banner-radius)" style={{ aspectRatio: 'var(--reserve-home-banner-ratio)' }} />
+                </div>
             </div>
-            <div className="reserve-route-discovery-notice">
-                <Bone width={78} height={18} />
-                <Bone width="55%" height={14} />
+            <div className="reserve-discovery-shortcuts">
+                <div className="reserve-discovery-shortcut-grid">
+                    {HOME_SHORTCUT_GROUPS.map(group => (
+                        <div key={group.key} className={'reserve-discovery-shortcut-group reserve-discovery-shortcut-group--' + group.key}>
+                            {/* 그룹 제목은 PC 에서만 보인다(모바일은 홈 CSS 가 숨긴다). 20px 줄 높이에 맞춘다 —
+                                뼈대의 margin 은 부모 밖으로 겹쳐 사라지므로 부모의 padding 으로 높이를 채운다. */}
+                            <div className="reserve-discovery-shortcut-group-title" style={{ paddingBlock: 3 }}><Bone width={96} height={14} /></div>
+                            <div className="reserve-discovery-shortcut-items">
+                                {Array.from({ length: group.count }, (_, index) => (
+                                    <div className="reserve-discovery-shortcut" key={`${group.key}-${index}`}>
+                                        <span className="reserve-discovery-shortcut-media"><Bone width={48} height={48} borderRadius="50%" /></span>
+                                        <span className="reserve-route-discovery-shortcut-label"><Bone width={42} height={12} /></span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
-            <div className="reserve-route-discovery-heading">
-                <div><Bone width={150} height={22} /><Bone width={210} height={13} /></div>
-                <Bone width={58} height={16} />
+            <div className="reserve-discovery-recommended">
+                <div className="reserve-discovery-section-heading">
+                    <div className="reserve-discovery-section-copy"><Bone width={150} height={22} style={{ marginBlock: 3 }} /></div>
+                    {/* '전체 보기' 링크의 44px 터치 높이 */}
+                    <div style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}><Bone width={58} height={16} /></div>
+                </div>
+                {/* 홈 추천은 가게 목록 행(StoreListRow)을 재사용하므로 스켈레톤도 같은 목록 행 스켈레톤이다. */}
+                <div className="reserve-discovery-store-list reserve-store-list-rows">
+                    <StoreListRowSkeleton count={4} />
+                </div>
             </div>
-            {/* 홈 추천은 가게 목록 행(StoreListRow)을 재사용하므로 스켈레톤도 같은 목록 행 스켈레톤이다. */}
-            <div className="reserve-route-discovery-stores reserve-store-list-rows">
-                <StoreListRowSkeleton count={4} />
-            </div>
-        </div>
-    );
-}
-
-function WorkspaceSkeleton() {
-    return (
-        <div className="reserve-route-skeleton-copy">
-            <Bone width="32%" height={24} />
-            <Bone height={44} borderRadius={16} />
-            {ROWS.map(key => <Bone key={key} height={44} />)}
         </div>
     );
 }
@@ -188,20 +182,37 @@ function SearchSkeleton() {
     </div>;
 }
 
+const ComingSoonRouteSkeletonLazy = fromPageSkeletons('ComingSoonRouteSkeleton');
+const AuthRouteSkeletonLazy = fromPageSkeletons('AuthRouteSkeleton');
+const LegalRouteSkeletonLazy = fromPageSkeletons('LegalRouteSkeleton');
+const PaymentResultRouteSkeletonLazy = fromPageSkeletons('PaymentResultRouteSkeleton');
+const AdminRouteSkeletonLazy = fromPageSkeletons('AdminRouteSkeleton');
+const BusinessRouteSkeletonLazy = fromPageSkeletons('BusinessRouteSkeleton');
+const MessagesRouteSkeletonLazy = fromPageSkeletons('MessagesRouteSkeleton');
+
 const KINDS = {
     search: SearchSkeleton,
     'my-page': MyPageSkeleton,
     discovery: DiscoverySkeleton,
-    'store-form': StoreFormSkeleton,
-    // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 스켈레톤
-    detail: StoreDetailSkeleton,
+    'store-form': fromPageSkeletons('StoreFormRouteSkeleton'),
+    // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 틀·스켈레톤
+    detail: DetailRouteSkeleton,
     cards: CardsSkeleton,
     'store-list': StoreListRouteSkeleton,
     reservations: ReservationsSkeleton,
     benefits: BenefitsRouteSkeleton,
-    form: FormSkeleton,
-    workspace: WorkspaceSkeleton,
-    document: DocumentSkeleton,
+    'benefit-detail': BenefitDetailRouteSkeleton,
+    'coming-soon': ComingSoonRouteSkeletonLazy,
+    auth: AuthRouteSkeletonLazy,
+    legal: LegalRouteSkeletonLazy,
+    'payment-result': PaymentResultRouteSkeletonLazy,
+    admin: AdminRouteSkeletonLazy,
+    business: BusinessRouteSkeletonLazy,
+    messages: MessagesRouteSkeletonLazy,
+    // 소셜 로그인 콜백 — 문서형 틀
+    document: LegalRouteSkeletonLazy,
+    // 알 수 없는 주소 — NotFound 와 같은 틀(PageStatus). 작고 오류 폴백과 공유하므로 첫 번들에 둔다.
+    'not-found': PageStatusSkeleton,
 };
 
 export function RouteSkeletonPreview({ pathname, search = '' }) {

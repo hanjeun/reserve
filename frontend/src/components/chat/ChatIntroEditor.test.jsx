@@ -26,7 +26,7 @@ describe('chat intro editor', () => {
         fireEvent.click(within(preview()).getByRole('button', { name: '주차' }));
         expect(within(preview()).getByText('2대 가능')).toBeInTheDocument();
         expect(within(preview()).getByText('가게 문의')).toBeInTheDocument();
-        expect(within(preview()).getByText('메시지를 입력하세요')).toBeInTheDocument();
+        expect(within(preview()).getByPlaceholderText('메시지를 입력하세요')).toBeInTheDocument();
         fireEvent.click(within(preview()).getByRole('button', { name: '처음부터' }));
         expect(within(preview()).getByRole('button', { name: '주차' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '저장하기' })).toBeDisabled();
@@ -146,7 +146,7 @@ describe('chat intro editor', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('사진 파일만');
         fireEvent.change(file, { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
         await waitFor(() => expect(onUploadAvatar).toHaveBeenCalled());
-        await waitFor(() => expect(screen.getByRole('button', { name: '기본 사진으로' })).toBeInTheDocument());
+        expect(await screen.findByRole('button', { name: '기본 사진으로' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '기본 문구로' }));
         expect(screen.getByLabelText('인사말').value).toContain('관리자가 확인 후 답변드릴게요');
         fireEvent.click(screen.getByRole('button', { name: '저장하기' }));

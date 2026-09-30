@@ -421,6 +421,7 @@
     pointer-events: none;
 }
 
+.reserve-app-layout { min-height: 100vh; }
 .reserve-messages-page {
     width: 100%;
     padding: 28px 24px;
@@ -481,8 +482,8 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    background: var(--c-bg-paper, #fff);
 }
-.reserve-messenger-home { background: var(--c-bg-paper, #fff); }
 .reserve-messenger-brand-cover { position: relative; flex-shrink: 0; height: 200px; overflow: hidden; background: var(--c-primary-light, #e8f3ff); }
 .reserve-messenger-cover-image { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 65%; pointer-events: none; }
 .reserve-messenger-brand-cover::after { content: ''; position: absolute; inset: 48% 0 0; background: linear-gradient(transparent, var(--c-bg-paper, #fff)); pointer-events: none; }
@@ -526,8 +527,7 @@
 .reserve-messenger-settings { display: flex; flex-direction: column; min-height: 0; }
 .reserve-messenger-settings-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
 .reserve-messenger-settings-profile { display: flex; flex-direction: column; align-items: center; padding: 16px 0 28px; gap: 12px; text-align: center; }
-.reserve-messenger-settings-avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--c-primary-light, #edf6ff); color: var(--c-primary, #3182f6); font-size: 24px; }
-.reserve-messenger-settings-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.reserve-messenger-settings-avatar { flex-shrink: 0; line-height: 0; }
 .reserve-messenger-settings-name { display: block; font-size: 16px; }
 .reserve-messenger-settings-email { display: block; margin-top: 4px; color: var(--c-text-tertiary, #8b95a1); font-size: 12px; overflow-wrap: anywhere; }
 .reserve-messenger-settings-link { min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 10px; background: var(--c-gray-50, #f9fafb); color: var(--c-text-secondary, #4e5968); font-size: 12px; }
@@ -597,6 +597,15 @@
     color: var(--c-text-primary, #191f28) !important;
     font-size: 22px !important;
     line-height: 1.3 !important;
+}
+.reserve-messenger-list-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+.reserve-messenger-list-refresh[aria-pressed='true'] {
+    color: var(--c-primary, #3182f6);
 }
 .reserve-messenger-list-refresh {
     flex: 0 0 44px;
@@ -958,6 +967,7 @@
 .reserve-messenger-replies > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .reserve-messenger-replies .reserve-btn { min-height: 44px; }
 .reserve-messenger-closed {
+    display: block;
     padding: 14px 18px;
     border-top: 1px solid var(--c-border-light, #f2f4f6);
     background: var(--c-gray-50, #f9fafb);
@@ -966,14 +976,17 @@
     line-height: 1.5;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
     .reserve-messenger-launcher-wrap { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
     .reserve-messenger-launcher { width: 48px; height: 48px; border-radius: 14px; font-size: 20px; }
-    .reserve-messages-page { padding: 0; }
+    /* Safari 주소창 크기가 바뀌어도 /messages만 현재 보이는 높이를 채운다. 홈의 svh는 유지한다. */
+    .reserve-app-layout--messages { height: 100svh; height: 100dvh; min-height: 0; }
+    .reserve-app-layout--messages > .ant-layout-content { flex: 1; min-height: 0; overflow: hidden; }
+    .reserve-messages-page { padding: 0; height: 100%; }
     .reserve-messenger--page {
         width: 100%;
-        height: calc(100svh - 64px);
-        min-height: 420px;
+        height: 100%;
+        min-height: 0;
         margin: 0;
         border: 0;
         border-radius: 0;
@@ -1007,7 +1020,7 @@
 
 /* 목록에서 대화를 열 때는 뒤로가기의 반대 — 대화가 오른쪽에서 들어온다(2026-09-23, 들어가기·나가기 짝). */
 .reserve-messenger--panel > .reserve-messenger-thread { grid-area: 1 / 1 / -1 / 2; }
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
     .reserve-messenger--page > .reserve-messenger-thread { grid-area: 1 / 1 / -1 / 2; }
 }
 .reserve-messenger.is-opening-thread > .reserve-messenger-footer,
@@ -1059,12 +1072,16 @@
 .reserve-chat-message-actions {
     border: 0; background: transparent; color: var(--c-text-secondary, #4e5968); cursor: pointer;
     border-radius: 10px; width: 44px; min-width: 44px; height: 44px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
 }
 .reserve-chat-message-actions::before {
     content: ''; position: absolute; inset: 8px; border-radius: 8px; pointer-events: none;
 }
 .reserve-chat-message-actions > .anticon { position: relative; }
 .reserve-chat-message-meta { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
+.reserve-chat-message-row:has(> .reserve-chat-message-meta) > .reserve-chat-bubble-group {
+    min-height: 44px; align-content: center;
+}
 .reserve-chat-message-time { font-size: 10px; color: var(--c-text-tertiary, #8b95a1); white-space: nowrap; flex-shrink: 0; }
 .reserve-chat-message-meta > .reserve-chat-message-time { position: absolute; bottom: 2px; inset-inline: 0; text-align: center; pointer-events: none; }
 .reserve-chat-message-meta > .reserve-chat-message-actions { position: absolute; inset: 0; height: 44px; }
@@ -1380,7 +1397,6 @@
     from { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: -4px; }
     to { opacity: 1; transform: translateX(0) scale(1); width: 44px; flex-basis: 44px; margin-right: 0; }
 }
-.reserve-header-back { animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .reserve-header-logo {
     display: flex;
     flex: 0 0 auto;
@@ -1388,6 +1404,7 @@
     align-items: center;
     justify-content: flex-start;
     transform-origin: left center;
+    transition: opacity 0.16s ease, transform 0.16s ease !important;
 }
 .reserve-header-logo-wordmark { display: block; font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 22px; font-weight: 850; letter-spacing: -0.8px; line-height: 1; white-space: nowrap; }
 .reserve-header-query {
@@ -1464,6 +1481,7 @@
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: opacity 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+    animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .reserve-header-back:hover { background: var(--c-gray-50, #f9fafb); }
 .reserve-header-back:active { opacity: 0.65; }
@@ -1494,7 +1512,6 @@
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
 .reserve-header-search:active { color: var(--c-text-primary, #191f28) !important; }
 .reserve-header-search:hover { background: var(--c-gray-50, #f9fafb); }
-.reserve-header-logo { transition: opacity 0.16s ease, transform 0.16s ease !important; }
 .reserve-header-avatar-trigger { transition: transform 0.12s ease, opacity 0.16s ease !important; }
 .reserve-header-logo:hover,
 .reserve-header-avatar-trigger:hover { opacity: 0.8; }
@@ -1621,76 +1638,63 @@
     border-bottom: 1px solid var(--c-border-light, #f2f4f6);
 }
 .reserve-route-store-toolbar-spacer { flex: 1; min-width: 0; }
-.reserve-route-skeleton--document { max-width: 700px; }
-.reserve-route-skeleton--reservations,
-.reserve-route-skeleton--cards,
-.reserve-route-skeleton--benefits { padding: 0; }
-.reserve-route-skeleton.reserve-route-skeleton--search { max-width: none; padding: 0; }
+/* 안쪽 PageContainer·실제 페이지 틀이 폭과 여백을 직접 정한다. 바깥 틀이 여백·최대 폭을 또 주면 안 된다.
+   클래스 두 개로 적는 이유: 아래 모바일 규칙(.reserve-route-skeleton { padding-inline: 20px })과 명시도가 같으면
+   뒤에 선언된 그쪽이 이겨 여백이 두 번 들어가고, 1200px 제한이 혜택(1248px) 틀을 좁혀 로딩 뒤 넓어졌다(2026-09-29 실측).
+   2026-09-29: 로그인·약관·결제 결과·관리자·파트너·메시지·가게 상세·준비 중 화면도 실제 틀을 그대로 그리게 바꿔 전부 여기로 모았다. */
+.reserve-route-skeleton.reserve-route-skeleton--reservations,
+.reserve-route-skeleton.reserve-route-skeleton--cards,
+.reserve-route-skeleton.reserve-route-skeleton--benefits,
+.reserve-route-skeleton.reserve-route-skeleton--benefit-detail,
+.reserve-route-skeleton.reserve-route-skeleton--search,
+.reserve-route-skeleton.reserve-route-skeleton--discovery,
+.reserve-route-skeleton.reserve-route-skeleton--coming-soon,
+.reserve-route-skeleton.reserve-route-skeleton--auth,
+.reserve-route-skeleton.reserve-route-skeleton--legal,
+.reserve-route-skeleton.reserve-route-skeleton--document,
+.reserve-route-skeleton.reserve-route-skeleton--payment-result,
+.reserve-route-skeleton.reserve-route-skeleton--admin,
+.reserve-route-skeleton.reserve-route-skeleton--business,
+.reserve-route-skeleton.reserve-route-skeleton--messages,
+.reserve-route-skeleton.reserve-route-skeleton--detail { max-width: none; padding: 0; }
 .reserve-route-skeleton.reserve-route-skeleton--my-page { padding: 0; }
-.reserve-route-skeleton--form { max-width: 420px; }
-.reserve-route-skeleton--store-form { max-width: 1000px; }
-.reserve-route-skeleton--discovery { max-width: 1248px; --reserve-route-banner-ratio: 3 / 2; padding-top: 12px; }
-.reserve-route-skeleton-copy,
-.reserve-route-skeleton-form { display: flex; flex-direction: column; gap: 24px; }
-.reserve-store-form-skeleton { display: flex; flex-direction: column; gap: 32px; }
-.reserve-store-form-skeleton-heading,
-.reserve-store-form-skeleton-column,
-.reserve-store-form-skeleton-upload-group { display: flex; flex-direction: column; gap: 12px; }
-.reserve-store-form-skeleton-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
-    column-gap: 32px;
-    align-items: start;
-}
-.reserve-store-form-skeleton-divider { align-self: stretch; background: var(--c-border-light, #f2f4f6); }
-.reserve-store-form-skeleton-field { display: flex; flex-direction: column; gap: 10px; }
-.reserve-store-form-skeleton-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.reserve-store-form-skeleton-toggles { display: flex; flex-direction: column; gap: 4px; }
-.reserve-store-form-skeleton-toggle { min-height: 38px; display: flex; align-items: center; gap: 12px; }
-.reserve-store-form-skeleton-toggle > div:first-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.reserve-store-form-skeleton-images { display: flex; flex-direction: column; gap: 16px; }
-.reserve-store-form-skeleton-uploads { display: flex; flex-wrap: wrap; gap: 8px; }
-.reserve-store-form-skeleton-actions { display: flex; flex-direction: column; gap: 10px; }
-.reserve-store-form-skeleton-actions > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* 404 스켈레톤은 NotFound 와 같은 PageContainer(sm)를 직접 그린다 — 바깥 여백을 겹치지 않는다. */
+.reserve-route-skeleton.reserve-route-skeleton--not-found { max-width: none; padding: 0; }
+.reserve-route-skeleton-copy { display: flex; flex-direction: column; gap: 24px; }
 .reserve-messenger-skeleton-row { display: flex; align-items: center; gap: 12px; padding: 18px; }
 .reserve-messenger-skeleton-row > div:last-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.reserve-messenger-thread-skeleton { display: block; }
 .reserve-messenger-thread-skeleton > div { display: flex; flex-direction: column; gap: 16px; }
-.reserve-route-skeleton-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
-.reserve-route-skeleton-card { overflow: hidden; border: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-route-skeleton-card-copy { display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 20px; }
-.reserve-route-skeleton-reservation { display: flex; gap: 16px; padding-block: 18px; border-bottom: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-route-skeleton-reservation .reserve-route-skeleton-copy { flex: 1; min-width: 0; gap: 5px; }
-.reserve-route-skeleton-detail { display: grid; gap: 28px; }
-.reserve-route-discovery-body { display: flex; flex-direction: column; }
-.reserve-route-discovery-location { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.reserve-route-skeleton-shortcuts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 22px; margin-block: 28px 24px; }
-.reserve-route-discovery-shortcut { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.reserve-route-discovery-notice { display: flex; min-height: 62px; align-items: center; gap: 18px; border-block: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-route-discovery-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-block: 28px 18px; }
-.reserve-route-discovery-heading > div:first-child { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
-/* 홈 추천과 같은 배치: 900px 미만 1열, 이상 2열 (.reserve-discovery-store-list 와 같다) */
-.reserve-route-discovery-stores { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px 20px; }
-@media (min-width: 900px) { .reserve-route-discovery-stores { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 576px) { .reserve-route-skeleton--reservations { --reserve-route-row-image: 72px; } }
-@media (min-width: 900px) {
-    .reserve-route-skeleton--discovery { --reserve-route-banner-ratio: 5 / 2; }
-    .reserve-route-skeleton-shortcuts { grid-template-columns: repeat(10, minmax(0, 1fr)); }
-    .reserve-route-skeleton--store-form { padding-top: 48px; }
-    .reserve-route-skeleton-detail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .reserve-route-skeleton-detail > :first-child { grid-row: span 2; }
+/* 관리자·파트너 패널의 알약 탭(.reserve-pill-tabs) 자리 — 탭 한 칸 40px(≤768px 38px), 탭 사이 4, 아래 16. */
+.reserve-route-panel-tabs { display: flex; align-items: center; margin-bottom: 16px; }
+.reserve-route-panel-tabs-list { display: flex; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
+.reserve-route-panel-tab {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 10px;
 }
-@media (max-width: 899px) {
-    .reserve-store-form-skeleton-grid { grid-template-columns: minmax(0, 1fr); row-gap: 24px; }
-    .reserve-store-form-skeleton-divider { height: 1px; }
+.reserve-route-panel-tab.is-active { background: var(--c-gray-200, #e5e8eb); }
+.reserve-route-panel-tabs-more { flex-shrink: 0; width: 45px; height: 40px; display: flex; align-items: center; justify-content: center; }
+@media (max-width: 768px) {
+    .reserve-route-panel-tab { height: 38px; padding: 0 10px; }
+    .reserve-route-panel-tabs-more { height: 38px; }
 }
-@media (max-width: 1079px) { .reserve-route-skeleton-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 815px) { .reserve-route-skeleton-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 767px) {
-    .reserve-route-skeleton--store-form { max-width: 420px; }
+/* 바로가기 이름 자리 — 실제 글자 줄 높이(글자 크기 × 1.5)와 같게 둔다. */
+.reserve-route-discovery-shortcut-label { height: 1.5em; display: flex; align-items: center; }
+/* 글자 모양 뼈대 — 고정 문구를 투명 글자로 두고 줄마다 회색 막대를 그린다. 폭에 따른 줄바꿈이 실제 문구와 같아 높이가 어긋나지 않는다. */
+.reserve-route-skeleton-text {
+    color: transparent;
+    border-radius: 6px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    user-select: none;
 }
 @media (max-width: 551px) {
     .reserve-route-skeleton { padding-inline: 20px; }
-    .reserve-route-skeleton-cards { grid-template-columns: minmax(0, 1fr); }
 }
 .reserve-discovery-coming-soon {
     box-sizing: border-box;
@@ -1835,8 +1839,7 @@
 .reserve-discovery-coming-soon-link { min-height: 44px; margin-top: 8px; display: flex; align-items: center; gap: 8px; color: var(--c-text-secondary, #4e5968); text-decoration: none; font-size: 14px; -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease, opacity 0.16s ease; }
 .reserve-discovery-coming-soon-link:hover { color: var(--c-text-primary, #191f28); }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-discovery-coming-soon-link:active { color: var(--c-text-primary, #191f28); }
-.reserve-discovery-coming-soon-link:active { transform: scale(0.97); opacity: 0.88; }
+.reserve-discovery-coming-soon-link:active { color: var(--c-text-primary, #191f28); transform: scale(0.97); opacity: 0.88; }
 .reserve-discovery-coming-soon-link:focus { outline: none; }
 .reserve-discovery-coming-soon-link:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 3px; }
 .reserve-discovery-location {
@@ -1983,6 +1986,8 @@
     font-weight: 500;
     line-height: 1.5;
     white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease, opacity 0.16s ease;
 }
 .reserve-discovery-shortcut-media {
     width: 100%;
@@ -2000,7 +2005,11 @@
 }
 .reserve-discovery-shortcut:hover { color: var(--c-text-primary, #191f28); }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-discovery-shortcut:active { color: var(--c-text-primary, #191f28); }
+.reserve-discovery-shortcut:active {
+    color: var(--c-text-primary, #191f28);
+    transform: scale(0.97);
+    opacity: 0.88;
+}
 .reserve-discovery-more:hover { color: var(--c-text-secondary, #4e5968); opacity: 0.75; }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
 .reserve-discovery-more:active { color: var(--c-text-secondary, #4e5968); }
@@ -2024,14 +2033,6 @@
 .reserve-discovery-banner:active,
 .reserve-discovery-banner-next:active,
 .reserve-discovery-more:active { opacity: 0.88; }
-.reserve-discovery-shortcut {
-    -webkit-tap-highlight-color: transparent;
-    transition: transform 0.12s ease, opacity 0.16s ease;
-}
-.reserve-discovery-shortcut:active {
-    transform: scale(0.97);
-    opacity: 0.88;
-}
 .reserve-discovery-section-heading {
     display: flex;
     justify-content: space-between;
@@ -2455,8 +2456,7 @@
     color: var(--c-text-primary, #191f28);
 }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-store-contact-action:active { color: var(--c-text-primary, #191f28); }
-.reserve-store-contact-action:active { transform: scale(0.96); }
+.reserve-store-contact-action:active { color: var(--c-text-primary, #191f28); transform: scale(0.96); }
 .reserve-store-contact-action:focus-visible,
 .reserve-store-detail .reserve-store-identity-actions .reserve-favorite-button:focus-visible {
     outline: 2px solid var(--c-text-secondary, #4e5968);
@@ -2504,6 +2504,14 @@
     height: auto !important;
     display: block !important;
 }
+/* 각 슬라이드도 자른다 — 이동 중 드러나는 사진 경계까지 둥글게. 원본 미리보기에는 적용하지 않는다. */
+.reserve-store-gallery .ant-image {
+    border-radius: 16px;
+    overflow: hidden;
+    /* hover cover는 사진 위에 그려진다. 이동 중에도 둘을 같은 윤곽으로 자른다. */
+    clip-path: inset(0 round 16px);
+}
+.reserve-store-gallery .ant-image-img { border-radius: inherit; }
 .reserve-store-detail .slick-slide[aria-hidden='true'] * { pointer-events: none; }
 .rsv-tap-btn {
     -webkit-tap-highlight-color: transparent;

@@ -18,7 +18,7 @@ const EMOJI = [
 
 /** 고객·사업자·관리자 입력의 IME/길이/도구/전송 규칙을 한 관문에 둔다. */
 export default function ChatComposer({ value, onChange, onSend, sending = false, disabled = false,
-    file, onFileChange, imageEnabled = false, onCancel }) {
+    file, onFileChange, imageEnabled = false, imageLoading = false, onCancel }) {
     const input = useRef(null);
     const trigger = useRef(null);
     const searchInput = useRef(null);
@@ -39,18 +39,32 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             input.current?.setSelectionRange(start + emoji.length, start + emoji.length);
         });
     };
-    const picker = <div className="reserve-chat-emoji-picker" id={id} role="region" aria-label="이모지 선택"
-        onKeyDown={event => {
-            if (event.key === 'Escape') { setEmojiOpen(false); trigger.current?.focus(); }
-        }}>
+    const closePickerOnEscape = event => {
+        if (event.key === 'Escape') { setEmojiOpen(false); trigger.current?.focus(); }
+    };
+    // Escape belongs to the focusable search and emoji buttons, not the region.
+    const picker = <section className="reserve-chat-emoji-picker" id={id} aria-label="이모지 선택">
         <input ref={searchInput} type="search" value={query} onChange={event => setQuery(event.target.value)}
+            onKeyDown={closePickerOnEscape}
             placeholder="이모지 검색" aria-label="이모지 검색" />
         <div className="reserve-chat-emoji-grid">
             {emojis.map(([emoji, keywords]) => <button key={emoji} type="button" disabled={blocked}
-                aria-label={`${keywords.split(' ')[0]} ${emoji}`} onClick={() => selectEmoji(emoji)}>{emoji}</button>)}
+                aria-label={`${keywords.split(' ')[0]} ${emoji}`} onClick={() => selectEmoji(emoji)}
+                onKeyDown={closePickerOnEscape}>{emoji}</button>)}
         </div>
         {emojis.length === 0 && <p role="status">검색 결과가 없습니다.</p>}
-    </div>;
+    </section>;
+    // 전송 버튼: 보내는 중이면 (중단 가능 시) 중단 · 아니면 로딩, 평소에는 보내기.
+    const canCancel = sending && Boolean(onCancel);
+    let sendLabel = '보내기';
+    let sendIcon = <ArrowRightOutlined />;
+    if (canCancel) {
+        sendLabel = '전송 요청 중단';
+        sendIcon = <StopOutlined />;
+    } else if (sending) {
+        sendLabel = '보내는 중';
+        sendIcon = <LoadingOutlined />;
+    }
     return <div className="reserve-chat-composer reserve-messenger-composer">
         <textarea ref={input} value={value} onChange={event => onChange(event.target.value)}
             onKeyDown={event => {
@@ -61,7 +75,8 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             }} placeholder="메시지를 입력하세요" aria-label="메시지 입력" maxLength={2000} rows={2} disabled={disabled} />
         <div className="reserve-chat-composer-toolbar">
             <div className="reserve-chat-composer-tools">
-                <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled} disabled={blocked} />
+                <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled || imageLoading}
+                    disabled={blocked || imageLoading} />
                 <Popover trigger="click" placement="topLeft" content={picker} open={emojiOpen && !blocked}
                     onOpenChange={open => {
                         setEmojiOpen(open);
@@ -76,9 +91,9 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                 </Popover>
             </div>
             <button type="button" className="reserve-chat-send reserve-messenger-send" onClick={sending && onCancel ? onCancel : onSend}
-                disabled={disabled || (sending ? !onCancel : (!value.trim() && !file))} aria-label={sending && onCancel ? '전송 요청 중단' : sending ? '보내는 중' : '보내기'}
+                disabled={disabled || (sending ? !onCancel : (!value.trim() && !file))} aria-label={sendLabel}
                 aria-busy={sending || undefined}>
-                {sending ? onCancel ? <StopOutlined /> : <LoadingOutlined /> : <ArrowRightOutlined />}
+                {sendIcon}
             </button>
         </div>
     </div>;
@@ -87,6 +102,6 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
 ChatComposer.propTypes = {
     value: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired, onSend: PropTypes.func.isRequired,
     sending: PropTypes.bool, disabled: PropTypes.bool, file: PropTypes.object,
-    onFileChange: PropTypes.func.isRequired, imageEnabled: PropTypes.bool,
+    onFileChange: PropTypes.func.isRequired, imageEnabled: PropTypes.bool, imageLoading: PropTypes.bool,
     onCancel: PropTypes.func,
 };

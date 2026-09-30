@@ -72,21 +72,30 @@ export default function Benefits() {
             return updated;
         }, { replace: true });
     }, [requested, page, isSuccess, isFetching, totalPages, params, setParams]);
+    // 소식 본문 — 첫 로딩 → 실패 → 빈 페이지 → 목록 순으로 판정한다.
+    const renderNews = () => {
+        if (isPending) return <BenefitsSkeleton />;
+        if (isError) {
+            return (
+                <DataState className="reserve-benefits-empty" state="error" kind="news" subject="가게 소식" error={error}
+                    title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} />
+            );
+        }
+        if (items.length === 0) {
+            return <div className="reserve-benefits-empty"><p>{total > 0 ? '이 페이지에는 소식이 없어요.' : '아직 등록된 가게 소식이 없어요.'}</p><Link to={total > 0 ? firstPageTo : '/stores'} className="reserve-benefits-text-link">{total > 0 ? '첫 페이지로' : '가게 둘러보기'} <ArrowRightOutlined aria-hidden="true" /></Link></div>;
+        }
+        return <div className="reserve-benefit-list" aria-busy={isFetching}>{items.map(item => <BenefitRow key={item.id} item={item} />)}</div>;
+    };
     return (
         <section className="reserve-benefits-page" aria-labelledby="benefits-title">
             <h1 id="benefits-title" className="reserve-discovery-visually-hidden">혜택</h1>
             <section id="benefit-news" className="reserve-benefits-news" aria-label="가게 소식">
                 <div className="reserve-benefits-news-content">
-                    {isPending ? <BenefitsSkeleton /> : isError ? (
-                        <DataState className="reserve-benefits-empty" state="error" kind="news" subject="가게 소식" error={error}
-                            title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} />
-                    ) : items.length === 0 ? (
-                        <div className="reserve-benefits-empty"><p>{total > 0 ? '이 페이지에는 소식이 없어요.' : '아직 등록된 가게 소식이 없어요.'}</p><Link to={total > 0 ? firstPageTo : '/stores'} className="reserve-benefits-text-link">{total > 0 ? '첫 페이지로' : '가게 둘러보기'} <ArrowRightOutlined aria-hidden="true" /></Link></div>
-                    ) : <div className="reserve-benefit-list" aria-busy={isFetching}>{items.map(item => <BenefitRow key={item.id} item={item} />)}</div>}
+                    {renderNews()}
                 </div>
                 {isFetching && !isPending && !isError && <p className="reserve-discovery-visually-hidden" role="status">소식을 새로 불러오는 중</p>}
                 {!isPending && !isError && total > BENEFIT_PAGE_SIZE && (
-                    <nav aria-label="가게 소식 페이지" className="reserve-benefits-pagination"><Pagination current={page} pageSize={BENEFIT_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} disabled={isFetching} onChange={next => { const updated = new URLSearchParams(params); if (next === 1) updated.delete('page'); else updated.set('page', String(next)); setParams(updated); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} /></nav>
+                    <nav aria-label="가게 소식 페이지" className="reserve-benefits-pagination"><Pagination current={page} pageSize={BENEFIT_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} disabled={isFetching} onChange={next => { const updated = new URLSearchParams(params); if (next === 1) { updated.delete('page'); } else { updated.set('page', String(next)); } setParams(updated); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} /></nav>
                 )}
             </section>
         </section>

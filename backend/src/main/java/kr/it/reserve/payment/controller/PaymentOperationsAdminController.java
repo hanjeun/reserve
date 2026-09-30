@@ -1,8 +1,10 @@
 package kr.it.reserve.payment.controller;
 
 import kr.it.reserve.global.common.ApiResponse;
+import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.payment.dto.PaymentReconciliationIssueResponse;
 import kr.it.reserve.payment.dto.PaymentWebhookInboxResponse;
+import kr.it.reserve.payment.dto.ReservationDepositInvariantResponse;
 import kr.it.reserve.payment.dto.StaleReadyPaymentResponse;
 import kr.it.reserve.payment.dto.StaleReadyReconciliationResponse;
 import kr.it.reserve.payment.entity.Payment;
@@ -29,6 +31,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 결제 자동 처리에서 결말을 단정하지 못한 건과 durable webhook inbox를 조회하는 관리자 큐.
@@ -90,6 +95,23 @@ public class PaymentOperationsAdminController {
         return ApiResponse.success(
                 inboxRepository.countByStatusIn(PaymentWebhookInbox.UNFINISHED),
                 "조회 성공");
+    }
+
+    /** 집계에서 잡힌 예약을 같은 조건으로 조회한다. PG 조회·결제·환불·플래그 수정은 하지 않는다. */
+    @GetMapping("/deposit-invariants")
+    @Transactional(readOnly = true)
+    public ApiResponse<Page<ReservationDepositInvariantResponse>> depositInvariants(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        Page<PaymentRepository.DepositInvariantReservation> reservations =
+                paymentRepository.findReservationDepositInvariantViolations(PageRequests.bounded(page, size));
+        Map<Long, List<PaymentRepository.DepositInvariantLedgerSummary>> ledger = reservations.hasContent()
+                ? paymentRepository.summarizeConfirmedDepositLedger(reservations.getContent().stream()
+                        .map(PaymentRepository.DepositInvariantReservation::getReservationId).toList())
+                        .stream().collect(Collectors.groupingBy(PaymentRepository.DepositInvariantLedgerSummary::getReservationId))
+                : Map.of();
+        return ApiResponse.success(reservations.map(reservation -> ReservationDepositInvariantResponse.from(
+                reservation, ledger.getOrDefault(reservation.getReservationId(), List.of()))), "예약금 불변식 대상 조회 성공");
     }
 
     /** 자동 만료 대상에서 벗어나 장기간 남은 READY 결제를 오래된 순서로 조회한다. */

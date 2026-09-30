@@ -14,7 +14,7 @@ LOG_FILE="$LOG_DIR/metrics-$(date +%F).log"
 mkdir -p "$LOG_DIR"
 exec 2>>"$LOG_DIR/collector.err"
 
-emit_host() { printf 'kind=host metric=%s value=%s\n' "$1" "$2" >> "$LOG_FILE"; }
+emit_host() { printf 'kind=host metric=%s value=%s\n' "$1" "$2" >> "$LOG_FILE"; return; }
 
 # vmstat's FIRST sample is an average since boot and is useless; the second is real.
 read -r CPU_EXEC CPU_IDLE CPU_WAIT CPU_STEAL <<<"$(vmstat 1 2 | tail -1 | awk '{print $13+$14, $15, $16, $17}')"
@@ -42,7 +42,7 @@ emit_host load15 "$LOAD15"
 
 docker stats --no-stream --format '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}' 2>/dev/null |
 while IFS='|' read -r NAME CPU MEM PCT; do
-  [ -z "${NAME:-}" ] && continue
+  [[ -z "${NAME:-}" ]] && continue
   MEM_MB=$(printf '%s' "$MEM" | awk -F'/' '{gsub(/[[:space:]]/,"",$1); print $1}' | awk '
     /GiB$/ {sub(/GiB$/,""); printf "%.1f", $0*1024; next}
     /MiB$/ {sub(/MiB$/,""); printf "%.1f", $0;      next}

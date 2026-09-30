@@ -64,8 +64,13 @@ export default function SearchPage() {
         inputRef.current?.focus();
     };
 
+    // 페이지 진입/이탈 애니메이션 클래스 — 닫는 중이면 이탈, 검색창에서 들어왔으면 진입
+    let pageMotionClass = '';
+    if (isClosing) pageMotionClass = ' reserve-search-page--leaving';
+    else if (state?.searchEntry === true && !reducedMotion) pageMotionClass = ' reserve-search-page--entering';
+
     return (
-        <div className={'reserve-search-page' + (isClosing ? ' reserve-search-page--leaving' : state?.searchEntry === true && !reducedMotion ? ' reserve-search-page--entering' : '')}>
+        <div className={'reserve-search-page' + pageMotionClass}>
             <h1 className="reserve-discovery-visually-hidden">가게 검색</h1>
             <header className="reserve-search-header">
                 <form className="reserve-search-field" role="search" onSubmit={submitSearch}>

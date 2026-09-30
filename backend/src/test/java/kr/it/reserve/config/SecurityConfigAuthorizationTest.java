@@ -221,6 +221,40 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void depositDiagnosticRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/admin/payment-operations/deposit-invariants"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "USER")
+    void customerCannotReadDepositDiagnostic() throws Exception {
+        mockMvc.perform(get("/api/admin/payment-operations/deposit-invariants"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "BUSINESS")
+    void businessCannotReadDepositDiagnostic() throws Exception {
+        mockMvc.perform(get("/api/admin/payment-operations/deposit-invariants"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
+    void adminCanReadDepositDiagnosticWithoutHttpCaching() throws Exception {
+        mockMvc.perform(get("/api/admin/payment-operations/deposit-invariants").param("size", "1000"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.success").value(true))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.content").isArray())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string(
+                        "Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+        mockMvc.perform(get("/api/admin/payment-operations/deposit-invariants")
+                        .param("page", "2147483647").param("size", "100"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void adPaymentOperationsRequireAuthForReadsAndWrites() throws Exception {
         mockMvc.perform(get("/api/admin/ad-payments")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/admin/ad-payments/1/refund")).andExpect(status().isUnauthorized());

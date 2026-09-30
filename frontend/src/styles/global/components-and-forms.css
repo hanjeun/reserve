@@ -27,8 +27,7 @@
 }
 .reserve-card-link:hover { color: inherit; }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
-.reserve-card-link:active { color: inherit; }
-.reserve-card-link:active { transform: scale(0.98); opacity: 0.88; }
+.reserve-card-link:active { color: inherit; transform: scale(0.98); opacity: 0.88; }
 .reserve-card-link:focus { outline: none; }
 .reserve-card-link:focus-visible {
     outline: 2px solid var(--c-text-secondary, #4e5968);
@@ -42,8 +41,10 @@
 .reserve-card.ant-card-hoverable:hover {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);     /* = shadows.cardHover */
 }
-.reserve-card.ant-card-hoverable:hover .reserve-card-image {
-    transform: scale(1.05);
+@media (hover: hover) and (pointer: fine) {
+    .reserve-card.ant-card-hoverable:hover .reserve-card-image {
+        transform: scale(1.05);
+    }
 }
 /* "모션 줄이기"를 켠 사용자에게는 확대·그림자 전환을 끈다.
    확대·이동 모션은 전정기관 장애가 있는 사용자에게 실제로 불편을 유발한다.
@@ -174,6 +175,51 @@
     .reserve-data-state--compact { align-items: flex-start; flex-wrap: wrap; }
     .reserve-data-state--compact .reserve-data-state__retry { margin-left: 28px; }
 }
+
+/* ── 페이지 자체가 없거나 그리다 실패한 화면 (PageStatus) ───────────────────
+   404 페이지와 오류 경계 폴백이 쓴다. DataState 와 같은 무채색 아이콘·가운데 정렬을 쓰되,
+   화면의 유일한 내용이라 제목을 h1 크기로 올린다. 스켈레톤도 같은 틀을 쓴다. */
+.reserve-page-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+}
+.reserve-page-status__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    color: var(--c-text-tertiary, #8b95a1);
+    font-size: 40px;
+    line-height: 1;
+}
+.reserve-page-status__title {
+    margin: 4px 0 0;
+    color: var(--c-text-primary, #191f28);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.4;
+    word-break: keep-all;
+}
+.reserve-page-status__description {
+    margin: 0;
+    max-width: 340px;
+    color: var(--c-text-tertiary, #8b95a1);
+    font-size: 15px;
+    line-height: 1.6;
+    word-break: keep-all;
+}
+.reserve-page-status__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+.reserve-page-status__actions > .reserve-btn { min-width: 112px; padding: 0 20px; }
 
 /* 결제 결과는 일반 목록 오류가 아니라 거래의 확정 여부를 보여 주는 화면이다.
    URL 파라미터가 아니라 서버 상태를 읽은 결과만 이 면에 넣는다. */
@@ -1007,7 +1053,7 @@ input:disabled {
     border-radius: 8px;
 }
 .reserve-sortable-upload-item:focus-visible {
-    outline: 2px solid var(--c-primary, #3182f6);
+    outline: 2px solid var(--c-text-secondary, #4e5968);
     outline-offset: 2px;
 }
 .reserve-sortable-upload-item.is-dragging {

@@ -477,7 +477,7 @@ describe('shared composer source contract', () => {
         const declarations = (selector, mobile = false) => {
             const result = {};
             css.walkRules(rule => {
-                const isMobile = rule.parent.type === 'atrule' && rule.parent.params === '(max-width: 767px)';
+                const isMobile = rule.parent.type === 'atrule' && rule.parent.params === '(max-width: 767.98px)';
                 if (!rule.selectors.includes(selector) || isMobile !== mobile) return;
                 rule.walkDecls(decl => { result[decl.prop] = decl.value; });
             });

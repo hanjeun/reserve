@@ -1,47 +1,144 @@
 /* RESERVE 등록·수정 작업 폼의 밀도. Core 입력·다른 폼·포털 내부 달력은 변경하지 않는다. */
-@media (min-width: 768px) and (max-width: 899px) {
-    .reserve-route-skeleton--store-form { max-width: 700px; }
+
+/* ── 가게 폼 로딩 뼈대(StoreFormSkeleton) ─────────────────────────────
+   실제 폼은 AntD Form(vertical, size=large) 규칙으로 크기가 정해지지만, 뼈대는 Form 을 그리지 않아
+   그 규칙이 주입되지 않는다. 그래서 같은 숫자를 여기 적는다(2026-09-29 390·820·1280 실측):
+   라벨 상자 40 + 아래 8 / 입력 54(선택칸 53) / 안내 문구 줄 22·최소 24 / 칸 사이 기본 24.
+   768px 미만의 작은 입력·간격은 아래 @media 블록이 실제 폼 규칙과 같은 변수로 바꾼다.
+   바깥 틀(폭·여백)은 StoreFormSkeleton 이 실제 폼과 같은 PageContainer 로 그리므로 라우트 틀은 여백을 주지 않는다. */
+.reserve-route-skeleton.reserve-route-skeleton--store-form { max-width: none; padding: 0; }
+.reserve-store-form-skeleton {
+    --reserve-store-form-skeleton-radius: 14px;
+    --reserve-store-form-skeleton-button-radius: 16px;
 }
+.reserve-store-form-skeleton-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    column-gap: 32px;
+    align-items: start;
+}
+.reserve-store-form-skeleton-column { min-width: 0; }
+.reserve-store-form-skeleton-divider { align-self: stretch; background: var(--c-border-light, #f2f4f6); }
+.reserve-store-form-skeleton-rule { border-top: 1px solid var(--c-border-light, #f2f4f6); }
+.reserve-store-form-skeleton-field { min-width: 0; margin-bottom: 24px; font-size: 14px; line-height: 1.5714; }
+.reserve-store-form-skeleton-field--gap-tight { margin-bottom: 12px; }
+.reserve-store-form-skeleton-field--gap-none { margin-bottom: 0; }
+.reserve-store-form-skeleton-label {
+    display: flex;
+    align-items: center;
+    box-sizing: content-box;
+    height: 40px;
+    padding-bottom: 8px;
+    color: var(--c-text-primary, #191f28);
+    white-space: nowrap;
+    overflow: hidden;
+}
+.reserve-store-form-skeleton-control { display: flex; height: 54px; }
+.reserve-store-form-skeleton-control--select { height: 53px; }
+.reserve-store-form-skeleton-control--textarea { height: 121px; }
+.reserve-store-form-skeleton-control--upload { height: 102px; }
+.reserve-store-form-skeleton-control--check {
+    height: 40px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+    align-items: center;
+}
+.reserve-store-form-skeleton-check { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.reserve-store-form-skeleton-help { min-height: 24px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-store-form-skeleton-row { display: flex; gap: 12px; margin-bottom: 18px; }
+.reserve-store-form-skeleton-row > * { flex: 1; min-width: 0; }
+.reserve-store-form-skeleton-row--gap-tight { margin-bottom: 12px; }
+.reserve-store-form-skeleton-row--gap-none { margin-bottom: 0; }
+.reserve-store-form-skeleton-toggles { display: flex; flex-direction: column; margin-bottom: 16px; }
+.reserve-store-form-skeleton-toggle { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+.reserve-store-form-skeleton-toggle-label.ant-typography {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--c-text-primary, #191f28);
+}
+.reserve-store-form-skeleton-toggle-desc.ant-typography { flex: 1; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
+/* AntD <Divider>이미지 등록</Divider> 와 같은 자리: 위아래 16, 글자 16px 줄. */
+.reserve-store-form-skeleton-images-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 16px 0;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.5714;
+    color: var(--c-text-primary, #191f28);
+    white-space: nowrap;
+}
+.reserve-store-form-skeleton-images-divider::before,
+.reserve-store-form-skeleton-images-divider::after { content: ''; flex: 1; border-top: 1px solid var(--c-border-default, #e5e8eb); }
+.reserve-store-form-skeleton-actions { margin-top: 32px; }
+.reserve-store-form-skeleton-buttons { display: flex; gap: 12px; height: 56px; }
 
 /* 좁은 PC의 주요 두 컬럼을 시간 범위 두 칸으로 다시 쪼개지 않는다. */
 @media (min-width: 900px) and (max-width: 1023px) {
     .reserve-store-form .reserve-store-form-row--time {
         flex-direction: column;
     }
+
+    /* 로딩 뼈대도 같은 폭에서 같이 쌓는다. */
+    .reserve-store-form-skeleton-row--time {
+        flex-direction: column;
+    }
 }
 
 @media (max-width: 767px) {
-    .reserve-route-skeleton--store-form {
-        padding: 20px 16px 40px;
-    }
-
     .reserve-store-form-skeleton {
-        gap: 24px;
+        --reserve-store-form-skeleton-radius: var(--reserve-store-form-control-radius, 10px);
+        --reserve-store-form-skeleton-button-radius: var(--reserve-store-form-control-radius, 10px);
     }
 
-    .reserve-store-form-skeleton-field {
-        gap: 8px;
+    .reserve-store-form-skeleton-field { margin-bottom: var(--reserve-store-form-field-gap, 12px); }
+    .reserve-store-form-skeleton-field--gap-tight { margin-bottom: 12px; }
+    .reserve-store-form-skeleton-field--gap-none { margin-bottom: 0; }
+
+    .reserve-store-form-skeleton-label {
+        height: auto;
+        min-height: 22px;
+        padding-bottom: var(--reserve-store-form-label-gap, 8px);
+        white-space: normal;
     }
 
-    .reserve-store-form-skeleton-field:not(.reserve-store-form-skeleton-field--textarea) > .reserve-skeleton-block:last-child {
-        height: var(--reserve-store-form-control-height, 44px) !important;
-        border-radius: var(--reserve-store-form-control-radius, 10px) !important;
+    .reserve-store-form-skeleton-control,
+    .reserve-store-form-skeleton-control--select { height: var(--reserve-store-form-control-height, 44px); }
+    .reserve-store-form-skeleton-control--textarea { height: 121px; }
+    .reserve-store-form-skeleton-control--upload { height: 102px; }
+    .reserve-store-form-skeleton-control--check { height: 40px; }
+
+    .reserve-store-form-skeleton-help {
+        min-height: 0;
+        padding-top: 4px;
+        font-size: 12px;
+        line-height: 1.5;
     }
 
-    .reserve-store-form-skeleton-grid {
-        row-gap: 20px;
+    .reserve-store-form-skeleton-row { flex-direction: column; margin-bottom: 12px; }
+    .reserve-store-form-skeleton-row--compact {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--reserve-store-form-field-gap, 12px);
     }
+    .reserve-store-form-skeleton-row--gap-none { margin-bottom: 0; }
 
-    .reserve-store-form-skeleton-column,
-    .reserve-store-form-skeleton-heading,
-    .reserve-store-form-skeleton-upload-group {
-        gap: 10px;
+    .reserve-store-form-skeleton-toggle {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: 'label switch' 'desc switch';
+        column-gap: 12px;
+        row-gap: 2px;
     }
+    .reserve-store-form-skeleton-toggle-label.ant-typography { grid-area: label; }
+    .reserve-store-form-skeleton-toggle-desc.ant-typography { grid-area: desc; min-width: 0; }
 
-    .reserve-store-form-skeleton-uploads > .reserve-skeleton-block {
-        width: 84px !important;
-        height: 84px !important;
-    }
+    .reserve-store-form-skeleton-actions { margin-top: 24px; }
+    .reserve-store-form-skeleton-buttons { height: var(--reserve-store-form-control-height, 44px); }
 
     .reserve-store-form-page .reserve-store-form-heading .ant-typography:first-child {
         font-size: 24px;

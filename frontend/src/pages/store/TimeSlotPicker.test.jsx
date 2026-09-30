@@ -301,3 +301,19 @@ describe('reservation edit lookup failure', () => {
         expect(onRetry).toHaveBeenCalledOnce();
     });
 });
+
+describe('reservation date field schedule placement', () => {
+    function SchedulePanelHarness() {
+        const [form] = Form.useForm();
+        return <ReservationPanel store={{ ...store, openDate: '2026-09-01', closeDate: '2026-12-31', closedDays: [6, 7], maxAdvanceBookingDays: 30 }} form={form} onFinish={vi.fn()} isPC={false} />;
+    }
+
+    it('leaves the date field free of operating-period and closure helper copy', () => {
+        const { container } = render(<SchedulePanelHarness />);
+        expect(screen.getByText('예약 날짜')).toBeInTheDocument();
+        expect(container.querySelector('.ant-form-item-extra')).toBeNull();
+        expect(screen.queryByText(/매주 토·일/)).toBeNull();
+        expect(screen.queryByText(/2026-09-01/)).toBeNull();
+        expect(screen.queryByText(/30일 이내/)).toBeNull();
+    });
+});

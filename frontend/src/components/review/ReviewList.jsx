@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Rate, Typography } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, DataState, ReviewCardSkeleton } from '../common';
+import {
+    DataState, ReviewCardSkeleton, FormInput, FormTextArea, FormField,
+} from '../common';
 import {
     UserOutlined, EditOutlined, DeleteOutlined,
     CheckOutlined, CloseOutlined,
@@ -13,7 +15,6 @@ import { reviewKeys } from '../../hooks/queryKeys';
 import { invalidateReviewData } from '../../hooks/invalidateAfterWrite';
 import useAuthStore from '../../store/useAuthStore';
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
-import { FormInput, FormTextArea, FormField } from '../common';
 
 const { Text } = Typography;
 
@@ -24,6 +25,13 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                      errors = {}, clearError = () => {} }) => {
     const [hover, setHover] = useState(0);
     const displayRating = hover || form.rating;
+    // 제출 버튼 문구 — 수정/작성 여부와 진행 중 여부 조합
+    let submitLabel;
+    if (formLoading) {
+        submitLabel = isEdit ? '저장 중...' : '등록 중...';
+    } else {
+        submitLabel = isEdit ? '저장' : '리뷰 등록';
+    }
 
     return (
         <div style={styles.card}>
@@ -93,7 +101,7 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                     disabled={formLoading}
                 >
                     <CheckOutlined style={{ marginRight: 4 }} />
-                    {formLoading ? (isEdit ? '저장 중...' : '등록 중...') : (isEdit ? '저장' : '리뷰 등록')}
+                    {submitLabel}
                 </button>
             </div>
         </div>
@@ -165,7 +173,7 @@ const ReviewList = ({
         onSuccess: (created) => {
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => [created, ...old]);
             // 목록은 위에서 직접 고쳤지만, 가게 별점·리뷰 수와 '내 예약'의 리뷰 버튼은 다른 쿼리다.
-            invalidateReviewData(queryClient);
+            void invalidateReviewData(queryClient);
             message.success('리뷰가 등록되었습니다');
             setWriteForm({ rating: 0, title: '', content: '' });
             setWritten(true);
@@ -200,7 +208,7 @@ const ReviewList = ({
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) =>
                 old.map(r => (r.id === reviewId ? { ...r, ...payload } : r))
             );
-            invalidateReviewData(queryClient);
+            void invalidateReviewData(queryClient);
             message.success('리뷰가 수정되었습니다');
             cancelEdit();
         },
@@ -223,7 +231,7 @@ const ReviewList = ({
         mutationFn: (reviewId) => reviewService.deleteReview(reviewId),
         onSuccess: (_, reviewId) => {
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => old.filter(r => r.id !== reviewId));
-            invalidateReviewData(queryClient);
+            void invalidateReviewData(queryClient);
             message.success('리뷰가 삭제되었습니다');
         },
         onError: () => message.error('리뷰 삭제에 실패했습니다'),

@@ -204,6 +204,9 @@
     border-radius: 999px !important;
     background: #fff !important;
 }
+/* AntD의 3px 진행 레이어가 6px 표시점 위를 덮으면 다크 모드에서 반쪽이 검게 보인다.
+   이 캐러셀은 버튼 자체의 원/알약으로 현재 사진을 표시하므로 중복 레이어를 그리지 않는다. */
+.reserve-carousel .slick-dots li::after { display: none !important; }
 /* 점이 하나뿐이면(사진 1장) 캡슐 자체가 의미 없다 — 감춘다. */
 .reserve-carousel .slick-dots li:only-child { display: none !important; }
 /* 슬라이드 자체 — 이미지가 inline 요소라 아래 여백이 생기는 걸 막는다.

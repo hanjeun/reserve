@@ -260,8 +260,18 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     }
     await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-actions-aligned.png') });
     await messageMenu.click();
-    await page.getByRole('menuitem', { name: '전송 취소' }).click();
-    await page.getByRole('button', { name: '전송 취소', exact: true }).click();
+    const retractMenuItem = page.getByRole('menuitem', { name: '전송 취소' });
+    await expect(retractMenuItem).toBeVisible();
+    // AntD animates the popup ancestor, not the menu item Playwright checks for stability.
+    await expect.poll(() => retractMenuItem.evaluate(element => {
+        const popup = element.closest('.ant-dropdown');
+        return popup && getComputedStyle(popup).opacity === '1'
+            && popup.getAnimations({ subtree: true }).every(animation => ['finished', 'idle'].includes(animation.playState));
+    })).toBe(true);
+    await retractMenuItem.click();
+    const retractDialog = page.getByRole('dialog', { name: '메시지 전송을 취소할까요?' });
+    await expect(retractDialog).toBeVisible();
+    await retractDialog.getByRole('button', { name: '전송 취소', exact: true }).click();
     await expect(page.locator('.reserve-chat-bubble-group')).toContainText(['전송이 취소된 메시지입니다.', '확인했습니다']);
     await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(0);
     expect(retracts).toBe(1);

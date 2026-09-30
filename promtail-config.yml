@@ -1,7 +1,7 @@
 # Deployed to the server at ~/promtail-config.yml, which is what the compose
 # file mounts. Editing this file alone changes nothing on the server:
-#   scp promtail-config.yml ubuntu@<server>:~/ && docker restart promtail
-# See docs/technical/monitoring.md.
+# Apply the validated nginx-directory overlay and recreate only promtail.
+# Preserve the positions volume; see docs/technical/monitoring.md.
 
 server:
   http_listen_port: 9080
@@ -34,7 +34,7 @@ scrape_configs:
           - localhost
         labels:
           job: reserve
-          __path__: /var/log/reserve/*.log
+          __path__: /var/log/reserve/app.log
     pipeline_stages:
       - regex:
           expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +(?P<level>[A-Z]+)'
@@ -44,6 +44,48 @@ scrape_configs:
           source: ts
           format: '2006-01-02 15:04:05'
           location: UTC
+
+  # Backup timestamps differ from the application parser. Preserve both deployed formats.
+  - job_name: backup
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: backup
+          __path__: /var/log/reserve/backup.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +(?:(?P<level>[A-Z]+) +)?\[backup\]'
+      - labels:
+          level:
+      - timestamp:
+          source: ts
+          format: '2006-01-02 15:04:05'
+          location: UTC
+
+  # Only the nginx container's directory is mounted; no Docker socket or other logs.
+  # Drop every line that is not the complete privacy-safe reserve_timing schema.
+  # Docker's timestamp is retained, including on restart; stderr is never shipped.
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          __path__: /var/log/reserve-nginx/*-json.log
+    pipeline_stages:
+      - docker: {}
+      - drop:
+          older_than: 1h
+          drop_counter_reason: nginx_older_than_1h
+      - match:
+          selector: '{job="nginx", stream!="stdout"}'
+          action: drop
+          drop_counter_reason: nginx_non_stdout
+      - match:
+          selector: '{job="nginx"} !~ "^\\{\"time\":\"[0-9]+[.][0-9]+\",\"route\":\"(spa|asset|store_detail|store_list|chat|api_other|health)\",\"method\":\"(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)\",\"status\":[1-5][0-9]{2},\"request_time\":\"[0-9]+[.][0-9]+\",\"upstream_connect_time\":\"[-0-9.,: ]*\",\"upstream_header_time\":\"[-0-9.,: ]*\",\"upstream_response_time\":\"[-0-9.,: ]*\",\"cache\":\"(HIT|MISS|BYPASS|EXPIRED|STALE|UPDATING|REVALIDATED|-|)\"\\}[[:space:]]*$"'
+          action: drop
+          drop_counter_reason: nginx_non_timing
 
   # Host/container metrics from scripts/collect-metrics.sh (cron, every minute).
   #

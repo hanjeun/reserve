@@ -1,0 +1,11 @@
+# Add to the existing monitoring compose; recreate only promtail with --no-deps.
+# Set this to the validated directory of nginxserver's Docker LogPath before applying.
+services:
+  promtail:
+    volumes:
+      - type: bind
+        source: ${RESERVE_NGINX_LOG_DIR:?Set the verified nginxserver log directory}
+        target: /var/log/reserve-nginx
+        read_only: true
+        bind:
+          create_host_path: false

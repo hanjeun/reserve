@@ -8,7 +8,7 @@
 |---|---|---|
 | **Grafana** | 대시보드 · 알림 | [grafana.reserve.it.kr](https://grafana.reserve.it.kr) |
 | **Loki** | 로그 · 지표 저장 | 내부 (포트 3100) |
-| **Promtail** | 파일 → Loki 전송 | 내부 |
+| **Promtail** | 기존 파일 → Loki 전송 (지원 종료, Alloy 전환 필요) | 내부 |
 | **Logback** | Spring Boot 로그 파일 (30일 rotation) | `/var/log/reserve/` |
 | **collect-metrics.sh** | 호스트·컨테이너 지표 수집 (cron 1분) | `/var/log/metrics/` |
 | **Sentry** | 런타임 에러 트래킹 | [sentry.io](https://sentry.io) |
@@ -18,6 +18,7 @@
 ```
 Spring Boot ─ Logback ─→ /var/log/reserve/app.log ─┐
 cron ─ collect-metrics.sh ─→ /var/log/metrics/*.log ─┴─ Promtail ─→ Loki ─→ Grafana
+nginx ─ privacy-safe Docker timing 로그 ─────────────┘
 ```
 
 ## 컨테이너
@@ -36,6 +37,10 @@ docker ps | grep -E "loki|promtail|grafana"
 | `promtail-positions` | 파일별 읽은 위치 |
 
 `promtail-config.yml`은 서버의 `~/promtail-config.yml`이 마운트돼요. 레포에서 고친 뒤 서버로 복사하고 재시작해요.
+
+앱은 `app.log`, 백업은 `backup.log`를 서로 다른 job과 UTC 파서로 읽어요. 기존 positions 볼륨을 보존해요. 과거 로그를 다시 넣으려고 positions를 초기화하거나 백업을 강제 실행하지 않아요.
+
+[Promtail은 2026년 3월 2일 지원이 종료됐어요](https://grafana.com/docs/loki/latest/send-data/promtail/). 아래 설정은 기존 2.9.0 수집 공백에 대한 작은 후속이고, 지원되는 Alloy로의 전환·메모리 예산·positions 이관은 별도 검증 대상이에요. 이 설정만으로 유지보수 문제가 해결되지는 않아요.
 
 ```bash
 scp promtail-config.yml ubuntu@<서버>:~/
@@ -80,7 +85,7 @@ zgrep -c 'Email send failed' /var/log/reserve/app.*.log.gz
 
 `scripts/collect-metrics.sh`가 원본이고, 서버 `~/collect-metrics.sh`로 배포해요. cron이 1분마다 `vmstat`·`free`·`df`·`docker stats` 값을 logfmt로 남겨요.
 
-- CPU는 `cpu_exec_pct`(us+sy), `cpu_iowait_pct`(wa), `cpu_steal_pct`(st)를 내요. `cpu_pct`(100-idle)는 호환용이에요
+- CPU는 `cpu_user_pct`(us), `cpu_system_pct`(sy), `cpu_exec_pct`(us+sy), `cpu_iowait_pct`(wa), `cpu_steal_pct`(st)를 내요. `cpu_pct`(100-idle)는 호환용이에요
 - 새 CPU 지표를 쓰는 대시보드는 새 collector를 서버에 설치한 뒤 import해요
 
 ### 설치
@@ -139,7 +144,7 @@ node scripts/validate-grafana-dashboards.mjs
 
 UptimeRobot은 서비스 다운을, 아래 규칙은 다운은 아니지만 이상한 상태를 알려요.
 
-알림은 **Discord webhook**으로 받아요. Alerting → Contact points → Add → Integration `Discord`로 만들고 **Test**로 수신을 확인해요.
+아래 쿼리는 설계/런북 예시이고, 설치·평가·실수신 증거를 대신하지 않아요. 2026년 9월 30일 운영 경로는 기존 Resend SMTP를 사용하는 지정된 이메일이에요. TestAlert와 실제 Firing은 별도로 확인해요. SMTP와 앱 메일은 같은 Resend 장애에 영향을 받으므로 독립 수신 채널은 아직 별도 후속이에요. 이메일·비밀번호·토큰은 공개 문서에 넣지 않아요.
 
 각 규칙은 Query A (Loki, **Instant**) → Expression B (Reduce, Last) → Expression C (Threshold) 구조예요. `Configure no data and error handling`에서 **No data를 `Alerting`**으로 둬요.
 
@@ -179,10 +184,10 @@ sum(count_over_time({job="reserve"} |= `Refund stuck unresolved` [1h]))
 sum(count_over_time({job="reserve"} |= `Payment operations queue requires attention` [20m]))
 ```
 
-**7. 백업 미실행** — BELOW 1 / 1시간 주기. 백업 cron 등록과 첫 수동 실행 뒤에 켜요
+**7. 백업 미실행** — BELOW 1 / 1시간 주기. 다음 정상 정기 실행의 원본 로그·파일/gzip와 새 `job="backup"` Loki 이벤트가 일치한 뒤 평가창·No data를 검증하고 켜요. 강제 백업이나 positions 초기화로 검증하지 않아요
 
 ```logql
-sum(count_over_time({job="reserve"} |= `[backup]` |= `=== backup done` [26h])) or vector(0)
+sum(count_over_time({job="backup"} |= `[backup]` |= `=== backup done` [26h])) or vector(0)
 ```
 
 **8. OAuth 탈퇴 연동 해제 미결** — ABOVE 0 / 15분 주기 / pending 0m. 대상은 `oauth_unlink_task`의 status·provider·member_id·last_error_type으로 봐요
@@ -272,10 +277,26 @@ sudo mkdir -p /var/log/reserve && sudo chown -R 1000:1000 /var/log/reserve
 
 ## nginx 로그 수집
 
-`{job="nginx"}`로 보려면 서버에서 두 가지를 함께 해요.
+`nginx/default.conf`의 `reserve_timing`은 IP·동적 ID·쿼리·쿠키·토큰·본문 없이 route 종류와 지연만 기록해요. 현재 Docker json-file을 그대로 읽으므로 nginx는 재시작하지 않아요.
 
-1. `nginxserver`를 재생성하며 `-v /var/log/nginx-host:/var/log/nginx`를 추가해 access 로그를 파일로 남겨요
-2. promtail에 그 경로를 read-only로 마운트하고 `nginx` job을 추가해요
+- `docker-compose-observability.yml`을 기존 monitoring compose에 더해 nginx 컨테이너의 **검증된 로그 디렉터리 하나만** read-only 마운트해요. Docker socket이나 전체 containers 경로는 마운트하지 않아요.
+- Docker 시각을 보존하고 stdout의 완전한 allowlist 스키마만 전송해요. stderr·다른 형식·추가 식별 필드·1시간보다 오래된 nginx 항목은 버려요. 기존 app/backup positions는 그대로예요.
+- nginx 컨테이너가 나중에 재생성되면 LogPath도 달라지므로 새 경로를 다시 확인하고 Promtail 마운트만 갱신해요. 수집 부재는 지연/오류 0건이 아니에요.
+
+기존 설정과 positions를 보존하고 새 config의 2.9.0 syntax·합성 파이프라인 검사를 통과한 뒤, 적용은 **Promtail만** 해요. Grafana·Loki·앱·DB는 재생성하지 않아요.
+
+```bash
+NGINX_LOG_PATH=$(docker inspect --format '{{.LogPath}}' nginxserver)
+NGINX_LOG_DIR=${NGINX_LOG_PATH%/*}
+[[ "$NGINX_LOG_DIR" =~ ^/var/lib/docker/containers/[0-9a-f]{64}$ ]] || exit 1
+test -f "$NGINX_LOG_PATH" || exit 1
+sudo env RESERVE_NGINX_LOG_DIR="$NGINX_LOG_DIR" docker compose \
+  -f /home/ubuntu/docker-compose-monitoring.yml \
+  -f /home/ubuntu/docker-compose-observability.yml \
+  up -d --no-deps --force-recreate promtail
+```
+
+적용 뒤 새 원본 CPU 표본과 Loki `job="metrics"`, 새 nginx 요청과 `job="nginx"`의 시각·스키마를 대조해요. 이전 compose와 config로 Promtail만 복구할 수 있어야 해요. 호스트 CPU 표본 한 개로 장기 지연 원인을 단정하지 않아요.
 
 ## Sentry
 

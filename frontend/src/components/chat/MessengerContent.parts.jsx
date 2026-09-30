@@ -242,9 +242,9 @@ function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onR
 function ThreadBody({ loading, loadError, onReload, intro, emptyText, messageProps }) {
     if (loading) {
         return (
-            <div className="reserve-messenger-thread-skeleton" role="status" aria-label="대화를 불러오는 중" aria-busy="true">
+            <output className="reserve-messenger-thread-skeleton" aria-label="대화를 불러오는 중" aria-busy="true">
                 <div aria-hidden="true"><Bone width="65%" height={44} borderRadius={14} /><Bone width="50%" height={44} borderRadius={14} style={{ marginLeft: 'auto' }} /><Bone width="75%" height={44} borderRadius={14} /></div>
-            </div>
+            </output>
         );
     }
     if (loadError) {
@@ -295,9 +295,9 @@ function OwnerReplies({ draft, sending, onInsert }) {
 function ThreadComposerArea({ closed, disabledMessage, showOwnerReplies, draft, sending, onDraftChange, composerProps }) {
     if (closed) {
         return (
-            <div className="reserve-messenger-closed" role="status">
+            <output className="reserve-messenger-closed">
                 {disabledMessage}
-            </div>
+            </output>
         );
     }
     return (

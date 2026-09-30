@@ -70,6 +70,12 @@ const validateMessages = {
     },
 };
 
+const buildNeutralFocus = isDark => ({
+    activeBorderColor: isDark ? '#8b939e' : rawColors.gray[500],
+    hoverBorderColor: isDark ? '#5c636d' : rawColors.gray[400],
+    activeShadow: 'none',
+});
+
 /**
  * AntD 테마 설정.
  *
@@ -92,11 +98,7 @@ const validateMessages = {
  *                 둘 다 같은 출처(ACCENT_OPTIONS)에서 나오므로 어긋나지 않는다.
  */
 const buildThemeConfig = (isDark, accent) => {
-    const neutralFocus = {
-        activeBorderColor: isDark ? '#8b939e' : rawColors.gray[500],
-        hoverBorderColor: isDark ? '#5c636d' : rawColors.gray[400],
-        activeShadow: 'none',
-    };
+    const neutralFocus = buildNeutralFocus(isDark);
     return {
         algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         token: {

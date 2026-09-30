@@ -73,6 +73,18 @@ describe('shared chat composer', () => {
         expect(screen.getByRole('textbox')).not.toHaveFocus();
         media.mockRestore();
     });
+    it('supports Escape from an emoji button without selecting or sending it', async () => {
+        const inputProps = props();
+        render(<ChatComposer {...inputProps} />);
+        const trigger = screen.getByRole('button', { name: '이모지 선택' });
+        fireEvent.click(trigger);
+        const emoji = await screen.findByRole('button', { name: '커피 ☕' });
+        emoji.focus();
+        fireEvent.keyDown(emoji, { key: 'Escape' });
+        expect(trigger).toHaveFocus();
+        expect(inputProps.onChange).not.toHaveBeenCalled();
+        expect(inputProps.onSend).not.toHaveBeenCalled();
+    });
     it('keeps the interrupt button usable during sending without allowing another send', () => {
         const inputProps = { ...props(), sending: true, onCancel: vi.fn() };
         render(<ChatComposer {...inputProps} imageEnabled />);

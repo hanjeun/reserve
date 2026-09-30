@@ -967,6 +967,7 @@
 .reserve-messenger-replies > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .reserve-messenger-replies .reserve-btn { min-height: 44px; }
 .reserve-messenger-closed {
+    display: block;
     padding: 14px 18px;
     border-top: 1px solid var(--c-border-light, #f2f4f6);
     background: var(--c-gray-50, #f9fafb);
@@ -1662,6 +1663,7 @@
 .reserve-route-skeleton-copy { display: flex; flex-direction: column; gap: 24px; }
 .reserve-messenger-skeleton-row { display: flex; align-items: center; gap: 12px; padding: 18px; }
 .reserve-messenger-skeleton-row > div:last-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.reserve-messenger-thread-skeleton { display: block; }
 .reserve-messenger-thread-skeleton > div { display: flex; flex-direction: column; gap: 16px; }
 /* 관리자·파트너 패널의 알약 탭(.reserve-pill-tabs) 자리 — 탭 한 칸 40px(≤768px 38px), 탭 사이 4, 아래 16. */
 .reserve-route-panel-tabs { display: flex; align-items: center; margin-bottom: 16px; }

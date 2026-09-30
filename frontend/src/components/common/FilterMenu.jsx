@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import { Dropdown } from 'antd';
 import { CheckOutlined, DownOutlined, LoadingOutlined } from '@ant-design/icons';
 
+const renderFilterPopup = (menu, popupRef) => <div ref={popupRef}>{menu}</div>;
+
 /** 입력 없는 목록 조작 메뉴. 모바일 키보드와 Select 내부 입력의 포커스 링을 만들지 않는다. */
 export default function FilterMenu({ value, options, onChange, appearance = 'chip', icon, disabled = false, loading = false, className, ...rest }) {
     const [open, setOpen] = useState(false);
@@ -37,7 +39,7 @@ export default function FilterMenu({ value, options, onChange, appearance = 'chi
             open={open && !disabled}
             disabled={disabled}
             onOpenChange={nextOpen => setOpen(nextOpen)}
-            popupRender={menu => <div ref={popupRef}>{menu}</div>}
+            popupRender={menu => renderFilterPopup(menu, popupRef)}
             menu={{
                 className: 'reserve-filter-menu-options',
                 selectable: true,

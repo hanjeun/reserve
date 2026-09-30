@@ -111,8 +111,10 @@ const buildClosedDaysRow = (store) => {
 };
 
 const buildAdvanceBookingRow = (store) => {
-    if (!(store.maxAdvanceBookingDays > 0)) return null;
-    return { Icon: FieldTimeOutlined, label: '예약 범위', value: `${store.maxAdvanceBookingDays}일 이내만 예약 가능` };
+    if (store.maxAdvanceBookingDays > 0) {
+        return { Icon: FieldTimeOutlined, label: '예약 범위', value: `${store.maxAdvanceBookingDays}일 이내만 예약 가능` };
+    }
+    return null;
 };
 
 const buildRefundRow = (store) => {

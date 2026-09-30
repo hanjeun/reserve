@@ -79,8 +79,8 @@ describe('store operating schedule information', () => {
         expect(screen.getByText(value)).toBeInTheDocument();
     });
 
-    it('omits unspecified schedule rows', () => {
-        render(<StoreInfoSection store={{ description: '기존 소개', closedDays: [], maxAdvanceBookingDays: 0 }} />);
+    it.each([undefined, Number.NaN, -1, 0])('omits unspecified schedule rows for an invalid advance range: %s', maxAdvanceBookingDays => {
+        render(<StoreInfoSection store={{ description: '기존 소개', closedDays: [], maxAdvanceBookingDays }} />);
         expect(screen.queryByText('운영 기간')).toBeNull();
         expect(screen.queryByText('정기 휴무')).toBeNull();
         expect(screen.queryByText('예약 범위')).toBeNull();

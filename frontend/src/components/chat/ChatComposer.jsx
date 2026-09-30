@@ -39,16 +39,18 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             input.current?.setSelectionRange(start + emoji.length, start + emoji.length);
         });
     };
-    // aria-label 이 있는 <section> 은 암묵 role=region 이다(기본 display 는 div 와 같은 block).
-    const picker = <section className="reserve-chat-emoji-picker" id={id} aria-label="이모지 선택"
-        onKeyDown={event => {
-            if (event.key === 'Escape') { setEmojiOpen(false); trigger.current?.focus(); }
-        }}>
+    const closePickerOnEscape = event => {
+        if (event.key === 'Escape') { setEmojiOpen(false); trigger.current?.focus(); }
+    };
+    // Escape belongs to the focusable search and emoji buttons, not the region.
+    const picker = <section className="reserve-chat-emoji-picker" id={id} aria-label="이모지 선택">
         <input ref={searchInput} type="search" value={query} onChange={event => setQuery(event.target.value)}
+            onKeyDown={closePickerOnEscape}
             placeholder="이모지 검색" aria-label="이모지 검색" />
         <div className="reserve-chat-emoji-grid">
             {emojis.map(([emoji, keywords]) => <button key={emoji} type="button" disabled={blocked}
-                aria-label={`${keywords.split(' ')[0]} ${emoji}`} onClick={() => selectEmoji(emoji)}>{emoji}</button>)}
+                aria-label={`${keywords.split(' ')[0]} ${emoji}`} onClick={() => selectEmoji(emoji)}
+                onKeyDown={closePickerOnEscape}>{emoji}</button>)}
         </div>
         {emojis.length === 0 && <p role="status">검색 결과가 없습니다.</p>}
     </section>;

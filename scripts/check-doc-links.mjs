@@ -42,7 +42,7 @@ function collectMarkdownFiles(directory, result = []) {
 // 이전 정규식 /^(?: {0,3})(`{3,}|~{3,})[^\n]*\n[\s\S]*?^(?: {0,3})\1[ \t]*$/gm 의 백트래킹 순서를 그대로 따른다.
 function findFencedBlockEnd(markdown, fenceRun, bodyStart) {
   for (let length = fenceRun.length; length >= 3; length -= 1) {
-    const closingFence = new RegExp(`^ {0,3}${fenceRun.slice(0, length)}[ \\t]*$`, 'gm');
+    const closingFence = new RegExp(String.raw`^ {0,3}${fenceRun.slice(0, length)}[ \t]*$`, 'gm');
     closingFence.lastIndex = bodyStart;
     const closing = closingFence.exec(markdown);
     if (closing) return closing.index + closing[0].length;
@@ -82,7 +82,7 @@ function normalizeTarget(rawTarget) {
   const titleMatch = target.match(/^(\S+?)(?:\s+["'(].*)$/);
   if (titleMatch) target = titleMatch[1];
 
-  return target.replaceAll(/\\ /g, ' ');
+  return target.replaceAll('\\ ', ' ');
 }
 
 function shouldIgnore(target) {

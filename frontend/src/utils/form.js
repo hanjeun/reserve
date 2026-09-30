@@ -98,7 +98,7 @@ export const buildStoreFormData = (values) => {
     //    서비스는 "항상 덮어쓰기"라 null → 빈 목록이 되어 결과적으로는 같다. 다만 그건 우연히
     //    맞는 것이라, 빈 문자열을 명시적으로 보내 "비우겠다"는 의도를 드러낸다.
     //    (백엔드 normalizeClosedDays/Dates 가 빈 값·형식 오류를 걸러낸다.)
-    appendList(fd, 'closedDays', (values.closedDays ?? []).map(d => String(d)));
+    appendList(fd, 'closedDays', (values.closedDays ?? []).map(String));
 
     const closedDates = (values.closedDates ?? [])
         .map(d => formatValue(d, 'YYYY-MM-DD'))

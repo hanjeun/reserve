@@ -131,11 +131,11 @@ export function createChatNotifier({
         // 사용자 제스처를 유지하고 동기 예외도 같은 rejection 경로로 처리한다.
         let request;
         try {
-            request = Promise.resolve(NotificationApi.requestPermission());
+            request = NotificationApi.requestPermission();
         } catch (error) {
             request = Promise.reject(error);
         }
-        const pending = request
+        const pending = Promise.resolve(request)
             .then((result) => {
                 if (disposed || ticket !== generation) return getState();
                 const unavailable = availability();

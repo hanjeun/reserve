@@ -446,9 +446,12 @@ test('messenger: every internal view keeps a close X and shared refresh feedback
     await expect(refresh.locator('.anticon-sync')).toHaveCount(1);
     const refreshBox = await refresh.boundingBox();
     expect(refreshBox.x + refreshBox.width).toBeLessThanOrEqual((await close.boundingBox()).x);
+    const refreshed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/chat/conversations'
+        && response.request().method() === 'GET');
     await refresh.click();
-    await expect(refresh).not.toHaveAttribute('aria-busy', 'true');
     await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+    await refreshed;
+    await expect(refresh).not.toHaveAttribute('aria-busy', 'true');
     await expect(refresh.locator('.anticon-sync')).not.toHaveClass(/anticon-spin/);
     await surface.getByRole('button', { name: /테스트 가게/ }).click();
     await expect(messenger).toHaveClass(/has-thread/);

@@ -33,11 +33,16 @@ describe('route chunk loading patterns', () => {
         expect(container.querySelector('input,button,a,form')).toBeNull();
     });
 
-    it('mirrors my page profile, account editing and three app settings cards', () => {
+    it('restores the original my page skeleton without page containers or card surfaces', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/my-page" />);
-        expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth: '1000px', padding: '48px 24px 80px' });
-        expect(container.querySelectorAll('.reserve-my-page-skeleton-card')).toHaveLength(5);
-        expect(container.querySelector('.reserve-my-page-skeleton-grid')).toHaveStyle({ flexDirection: 'row' });
+        const form = container.querySelector('.reserve-route-skeleton-form');
+        const bones = form.querySelectorAll('.reserve-skeleton-block');
+        expect(bones).toHaveLength(5);
+        expect(bones[0]).toHaveStyle({ width: '55%', height: '24px' });
+        for (const bone of Array.from(bones).slice(1)) {
+            expect(bone).toHaveStyle({ height: '54px', borderRadius: '14px' });
+        }
+        expect(container.querySelector('.reserve-page-container, .reserve-my-page-skeleton-card, .reserve-my-page-skeleton-grid')).toBeNull();
         expect(container.querySelector('input,button,a')).toBeNull();
     });
     it.each(Object.entries(routes))('covers %s without mounting interactive controls', (path, kind) => {

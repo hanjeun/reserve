@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+const (
+	paymentQueryHeading = "확인 요청 로그 · 최근 20분"
+	rejectedURLMarker   = "#ZgotmplZ"
+)
+
 // Only synthetic data is used. No SMTP connection or production API is called.
 type pair struct{ Name, Value string }
 type labels map[string]string
@@ -102,7 +107,7 @@ func render(t *testing.T, data message) string {
 func TestFiring(t *testing.T) {
 	data := sampleMessage()
 	body := render(t, data)
-	for _, expected := range []string{"확인 필요 · 1건", "결제 기록을 확인해주세요", "알림 상세 확인", "확인 방법", "대시보드", "패널", "알림 일시 중지 설정", "확인 요청 로그 · 최근 20분", "A = 2", "owner", "2026-09-30 02:15:00 UTC", "Grafana v10.2.0"} {
+	for _, expected := range []string{"확인 필요 · 1건", "결제 기록을 확인해주세요", "알림 상세 확인", "확인 방법", "대시보드", "패널", "알림 일시 중지 설정", paymentQueryHeading, "A = 2", "owner", "2026-09-30 02:15:00 UTC", "Grafana v10.2.0"} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("missing %q", expected)
 		}
@@ -110,7 +115,7 @@ func TestFiring(t *testing.T) {
 	if *data.Subject != "[FIRING:1] RESERVE · 결제 운영 큐 미결" {
 		t.Fatal("subject contract changed")
 	}
-	if strings.Contains(body, "#ZgotmplZ") {
+	if strings.Contains(body, rejectedURLMarker) {
 		t.Fatal("a normal link was rejected")
 	}
 	if directory := os.Getenv("RESERVE_EMAIL_PREVIEW_DIR"); directory != "" {
@@ -157,7 +162,7 @@ func TestNoDecorativeCopy(t *testing.T) {
 
 func TestPaymentSignalIsNotAReservationCount(t *testing.T) {
 	body := render(t, sampleMessage())
-	for _, expected := range []string{"확인 요청 로그 · 최근 20분", "2회 남았어요. 영향받는 예약 수와는 달라요.", "중복 결제나 환불 실패가 확인된 것은 아니에요.", "진단용 값"} {
+	for _, expected := range []string{paymentQueryHeading, "2회 남았어요. 영향받는 예약 수와는 달라요.", "중복 결제나 환불 실패가 확인된 것은 아니에요.", "진단용 값"} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("missing %q", expected)
 		}
@@ -167,7 +172,7 @@ func TestPaymentSignalIsNotAReservationCount(t *testing.T) {
 	}
 	data := sampleMessage()
 	delete(data.Alerts.Firing[0].Values, "A")
-	if strings.Contains(render(t, data), "확인 요청 로그 · 최근 20분") {
+	if strings.Contains(render(t, data), paymentQueryHeading) {
 		t.Fatal("missing query value was invented")
 	}
 }
@@ -191,7 +196,7 @@ func TestOptionalFieldsAndEmptyAlerts(t *testing.T) {
 	data := sampleMessage()
 	data.Alerts.Firing = []alert{{Labels: labels{}, Annotations: labels{}, StartsAt: time.Time{}}}
 	body := render(t, data)
-	if strings.Contains(body, "<no value>") || strings.Contains(body, "#ZgotmplZ") {
+	if strings.Contains(body, "<no value>") || strings.Contains(body, rejectedURLMarker) {
 		t.Fatal("missing optional field leaked")
 	}
 	data.Alerts.Firing = nil
@@ -222,7 +227,7 @@ func TestUntrustedDataAndLinks(t *testing.T) {
 	if strings.Contains(body, "<script>") || strings.Contains(body, "<img src=x") || strings.Contains(body, "javascript:") {
 		t.Fatal("untrusted HTML or URL rendered")
 	}
-	if !strings.Contains(body, "&lt;script&gt;") || !strings.Contains(body, "#ZgotmplZ") {
+	if !strings.Contains(body, "&lt;script&gt;") || !strings.Contains(body, rejectedURLMarker) {
 		t.Fatal("HTML-template autoescaping not exercised")
 	}
 }

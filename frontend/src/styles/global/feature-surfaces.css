@@ -1662,7 +1662,7 @@
 .reserve-route-skeleton.reserve-route-skeleton--business,
 .reserve-route-skeleton.reserve-route-skeleton--messages,
 .reserve-route-skeleton.reserve-route-skeleton--detail { max-width: none; padding: 0; }
-.reserve-route-skeleton-form { display: flex; flex-direction: column; gap: 24px; }
+.reserve-route-skeleton.reserve-route-skeleton--my-page { padding: 0; }
 /* 404 스켈레톤은 NotFound 와 같은 PageContainer(sm)를 직접 그린다 — 바깥 여백을 겹치지 않는다. */
 .reserve-route-skeleton.reserve-route-skeleton--not-found { max-width: none; padding: 0; }
 .reserve-route-skeleton-copy { display: flex; flex-direction: column; gap: 24px; }

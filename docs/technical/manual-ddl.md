@@ -274,3 +274,34 @@ CREATE TABLE chat_report_access_audit (
 
 - 실행 전 `SHOW CREATE TABLE`로 컬럼·인덱스 존재 여부를 확인해요.
 - 파기 worker는 `CHAT_RETENTION_ENABLED`로 켜요(기본 `false`).
+
+## 8. 비밀번호 재설정 코드 해시 후보 (운영 미적용)
+
+새 코드는 BCrypt 해시를 `password_reset_token.token_hash VARCHAR(60) NULL`에 저장한다.
+기존 `token VARCHAR(10) NOT NULL`은 유지하며 새 행에는 코드 대신 `HASHED`를 기록한다.
+`token_hash IS NULL`인 기존 6자리 코드는 원래의 5분 만료·실패 상한을 그대로 적용한다.
+평문 코드를 일괄 조회하거나 백필하지 않는다.
+
+```sql
+-- 배포 전 실제 타입·컬럼 존재 여부를 읽기 전용으로 확인한다.
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_token'
+  AND COLUMN_NAME IN ('token', 'token_hash');
+
+-- 컬럼이 없을 때의 추가 DDL 예시. 운영 실행은 별도 승인 대상이다.
+ALTER TABLE password_reset_token ADD COLUMN token_hash VARCHAR(60) NULL;
+```
+
+`ddl-auto: update`로도 추가되는 nullable 컬럼이지만, 실제 MySQL 생성·복원·조회 호환을 확인한 뒤
+배포한다. 재발송과 재설정은 회원 잠금 다음 토큰 ID 한 행 잠금 순서를 유지한다.
+실패 횟수는 예외가 나도 커밋하고, 성공 시 비밀번호·세션 세대 변경과 코드 소비를 함께 커밋한다.
+
+2026-10-01 로컬 격리 MySQL 8.0.45에서 실제 Spring 서비스 검사 11건을 통과했고,
+생성된 해시 컬럼의 `VARCHAR(60) NULL`과 테스트 행을 MySQL에서 직접 확인했다.
+동시 실패 요청 8건의 카운터는 5로 멈췄으며, 동시 재설정 2건 중 하나만 성공했다.
+H2 백엔드 전체 603건도 통과했다. 운영 DB에 적용한 기록은 아니다.
+
+구버전 앱은 추가 컬럼이 있는 DB를 읽을 수 있으나 새 해시 코드의 `HASHED` 표식을 인증할 수 없다.
+롤백 뒤에는 해당 사용자가 코드를 재발송해야 한다. 새 코드가 구버전에서 그대로 인증된다고
+가정하지 않으며, 컬럼 삭제나 기존 토큰 타입 변경은 롤백 절차에 넣지 않는다.

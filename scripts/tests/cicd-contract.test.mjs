@@ -25,7 +25,7 @@ test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled s
 
 test('PR body edits do not allocate a labeling runner', () => {
     const labels = require('js-yaml').load(read('.github/workflows/pr-labels.yml'));
-    assert.equal(labels.jobs.label.if, "github.actor != 'dependabot[bot]' && (github.event.action != 'edited' || github.event.changes.title != null)");
+    assert.equal(labels.jobs.label.if, "github.event.pull_request.user.login != 'dependabot[bot]' && (github.event.action != 'edited' || github.event.changes.title != null)");
     assert.ok(labels.on.pull_request.types.includes('synchronize'));
     assert.ok(labels.on.pull_request.types.includes('edited'));
 });

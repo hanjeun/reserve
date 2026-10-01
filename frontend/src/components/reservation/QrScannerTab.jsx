@@ -220,7 +220,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                 message.success(`${who}님 체크인이 완료되었습니다.`);
                 // 예약 관리 목록은 이 탭(또는 시트)으로 오면서 가려졌지만 캐시는 남아 있다.
                 // 무효화하지 않으면 돌아갔을 때 상세 모달에 체크인 시각이 빠진 목록이 보인다.
-                invalidateReservationData(queryClient);
+                void invalidateReservationData(queryClient);
             }
         } catch (err) {
             message.error(err?.message || 'QR 체크인에 실패했습니다.');

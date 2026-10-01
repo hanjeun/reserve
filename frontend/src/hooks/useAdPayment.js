@@ -88,7 +88,7 @@ const useAdPayment = () => {
     const invalidateMyAds = useCallback(() => {
         // SDK 취소·오류여도 신청과 미결 원장이 생성됐을 수 있다.
         // 결제가 끝나면 공개 배너·배지와 통계의 광고 요약도 바뀐다(invalidateAfterWrite.js).
-        invalidateAdData(queryClient);
+        void invalidateAdData(queryClient);
     }, [queryClient]);
 
     const createMutation = useMutation({

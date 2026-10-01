@@ -653,8 +653,8 @@ const BusinessTab = ({ user }) => {
                         <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>관리자 검토 후 승인 여부를 알려드립니다</Text>
                     </div>
                 </div>
-                {editLoading && <div role="status" aria-label="사업자 신청 내용을 불러오는 중" aria-busy="true">
-                    기존 신청 내용을 확인하고 있습니다.
+                {editLoading && <div aria-busy="true">
+                    <output aria-label="사업자 신청 내용을 불러오는 중">기존 신청 내용을 확인하고 있습니다.</output>
                 </div>}
                 {editError && <DataState state="error" kind="member"
                     title="사업자 신청 내용을 불러오지 못했습니다."

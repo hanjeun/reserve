@@ -128,8 +128,13 @@ export function createChatNotifier({
         change('requesting');
 
         // requestPermission을 await 앞에서 호출해야 사용자 제스처를 잃지 않는다.
-        // executor는 동기 호출이므로 사용자 제스처를 유지하고 동기 예외도 rejection으로 처리한다.
-        const request = new Promise(resolve => resolve(NotificationApi.requestPermission()));
+        // 사용자 제스처를 유지하고 동기 예외도 같은 rejection 경로로 처리한다.
+        let request;
+        try {
+            request = Promise.resolve(NotificationApi.requestPermission());
+        } catch (error) {
+            request = Promise.reject(error);
+        }
         const pending = request
             .then((result) => {
                 if (disposed || ticket !== generation) return getState();

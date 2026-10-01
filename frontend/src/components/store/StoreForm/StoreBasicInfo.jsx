@@ -223,14 +223,14 @@ const CAPACITY_HINTS = {
 
 const formatDeposit = (value) => {
     if (value == null || value === '') return '';
-    return `${value}`.replace(/[0-9]+/g, (digits, offset, text) => {
+    return `${value}`.replace(/\d+/g, (digits, offset, text) => {
         const firstGroupLength = digits.length % 3 || 3;
         const groups = [digits.slice(0, firstGroupLength)];
         for (let i = firstGroupLength; i < digits.length; i += 3) {
             groups.push(digits.slice(i, i + 3));
         }
         // 기존 formatter의 단어 경계 동작도 유지한다(입력 중인 문자열 포함).
-        const prefix = digits.length % 3 === 0 && offset > 0 && /[A-Za-z0-9_]/.test(text[offset - 1]) ? ',' : '';
+        const prefix = digits.length % 3 === 0 && offset > 0 && /\w/.test(text[offset - 1]) ? ',' : '';
         return prefix + groups.join(',');
     });
 };

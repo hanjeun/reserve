@@ -52,7 +52,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                 aria-label={`${keywords.split(' ')[0]} ${emoji}`} onClick={() => selectEmoji(emoji)}
                 onKeyDown={closePickerOnEscape}>{emoji}</button>)}
         </div>
-        {emojis.length === 0 && <p role="status">검색 결과가 없습니다.</p>}
+        {emojis.length === 0 && <p><output>검색 결과가 없습니다.</output></p>}
     </section>;
     // 전송 버튼: 보내는 중이면 (중단 가능 시) 중단 · 아니면 로딩, 평소에는 보내기.
     const canCancel = sending && Boolean(onCancel);

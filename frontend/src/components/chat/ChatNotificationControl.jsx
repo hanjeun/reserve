@@ -24,7 +24,7 @@ export default function ChatNotificationControl({ state, onEnable, onDisable }) 
                 disabled={unavailable || state.status === 'requesting'}
                 onClick={state.enabled ? onDisable : onEnable}
             >{toggleLabel}</Button>
-            <p role="status">{NOTES[state.status] || '대화를 열어둔 동안만 알림 · 이름과 메시지 내용은 표시하지 않아요.'}</p>
+            <p><output>{NOTES[state.status] || '대화를 열어둔 동안만 알림 · 이름과 메시지 내용은 표시하지 않아요.'}</output></p>
         </section>
     );
 }

@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { test } from 'node:test';
+import { before, test } from 'node:test';
 
 const document = fs.readFileSync(new URL('../../docs/technical/backup.md', import.meta.url), 'utf8');
 const section = document.split('### 2-3. 실제 복원 (운영)')[1]?.split('### 2-4.')[0];
 const procedure = section?.match(/```bash\r?\n([\s\S]*?)```/)?.[1];
-assert.ok(procedure, 'The operating restore procedure must exist');
+before(() => {
+    assert.ok(procedure, 'The operating restore procedure must exist');
+});
 
 const bash = process.platform === 'win32'
     ? `${process.env.ProgramFiles ?? 'C:/Program Files'}/Git/bin/bash.exe`

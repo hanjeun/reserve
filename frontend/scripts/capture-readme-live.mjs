@@ -143,7 +143,7 @@ async function waitReady(page, { grafana = false } = {}) {
 // 이메일·전화번호를 화면에서 가린다(스크린샷에만 적용, 서버 데이터는 그대로).
 async function maskPersonalText(page) {
     await page.evaluate(() => {
-        const email = /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+        const email = /(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
         const phone = /(01[016789]|0\d{1,2})[-\s]?\d{3,4}[-\s]?(\d{4})/g;
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {

@@ -10,6 +10,7 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.store.entity.ServiceDomain;
+import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.Test;
@@ -64,11 +65,11 @@ class StoreSearchOrderingTest {
         Store two = Store.builder().owner(owner).name("고유검색100XX정확").rating(4.0).build();
         em.persist(one); em.persist(two); em.flush();
         assertThat(service.searchStores("고유검색100%_", "rating"))
-                .extracting(value -> value.getId()).containsExactly(one.getId());
+                .extracting(StoreResponse::getId).containsExactly(one.getId());
         assertThat(service.searchStores("고유검색100%_", "rating", null))
-                .extracting(value -> value.getId()).containsExactly(one.getId());
+                .extracting(StoreResponse::getId).containsExactly(one.getId());
         assertThat(service.searchStoresPaged("고유검색100%_", "rating", 0, 15, null, null, null).getContent())
-                .extracting(value -> value.getId()).containsExactly(one.getId());
+                .extracting(StoreResponse::getId).containsExactly(one.getId());
         assertThat(service.searchStoresPaged("고유검색100%_", "rating", 0, 15, null, null).getContent())
                 .extracting(value -> value.getId()).containsExactly(one.getId());
         assertThat(service.searchStoresPaged("고유검색", "distance", 0, 15, Double.NaN, 127.0).getContent())

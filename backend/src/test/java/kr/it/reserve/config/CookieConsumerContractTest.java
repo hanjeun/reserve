@@ -60,7 +60,8 @@ class CookieConsumerContractTest {
         authenticate();
         doThrow(new IllegalStateException("active reservation")).when(memberService).deleteMember(7L);
         var response = new MockHttpServletResponse();
-        assertThatThrownBy(() -> new MemberApiController(memberService, new CookieUtil("prod")).deleteMember(response))
+        var controller = new MemberApiController(memberService, new CookieUtil("prod"));
+        assertThatThrownBy(() -> controller.deleteMember(response))
                 .isInstanceOf(IllegalStateException.class).hasMessage("active reservation");
         assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).isEmpty();
     }

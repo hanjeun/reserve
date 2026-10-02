@@ -161,7 +161,7 @@ const ForgotPassword = () => {
                 newPasswordConfirm: values.confirmNewPassword,
             });
             message.success('비밀번호가 변경되었습니다.');
-            void returnToLogin();
+            returnToLogin();
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
             message.error(msg || '변경에 실패했습니다.');

@@ -45,7 +45,7 @@ const Signup = () => {
     const toggle    = (key) => setAgreements(prev => ({ ...prev, [key]: !prev[key] }));
 
     useEffect(() => {
-        if (isLoggedIn) void navigate('/', { replace: true });
+        if (isLoggedIn) navigate('/', { replace: true });
     }, [isLoggedIn, navigate]);
 
     const onSignupSubmit = async (values) => {
@@ -71,9 +71,9 @@ const Signup = () => {
                 login(res);
                 message.success(`${res.name || ''}님, 환영합니다!`);
                 // 가입 완료 → 홈. 홈으로 가는 다른 이동(로고·로그아웃)과 같은 방향.
-                void navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
+                navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
             } else {
-                void navigate('/login', { state: { signupSuccess: true } });
+                navigate('/login', { state: { signupSuccess: true } });
             }
         } catch (err) {
             if (err?.isSessionExpired) return;

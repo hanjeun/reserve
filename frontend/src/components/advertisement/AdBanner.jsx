@@ -55,7 +55,7 @@ const AdBanner = ({ ads }) => {
     const handleBannerClick = () => {
         void adService.recordClick(ad.id);
         recordAdClick(ad.id, ad.storeId);
-        void navigate(`/store/${ad.storeId}`);
+        navigate(`/store/${ad.storeId}`);
     };
 
     return (

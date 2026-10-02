@@ -85,7 +85,7 @@ const Header = () => {
         // 메시지 화면에서는 뒤로가기 버튼과 같이 닫힘 애니메이션을 먼저 재생하고 홈으로 간다.
         // 메시지 화면을 떠나는 이동에는 페이지 전환 슬라이드가 걸리지 않아 두 애니메이션이 겹치지 않는다.
         if (currentPath === '/messages' && requestMessengerRouteClose('/')) return;
-        void navigate('/', { state: { reserveRouteMotion: 'from-left' } });
+        navigate('/', { state: { reserveRouteMotion: 'from-left' } });
     };
 
     // 주의: 정지/영구정지 회원은 이제 로그인 자체가 차단되므로(이메일/소셜 공통)

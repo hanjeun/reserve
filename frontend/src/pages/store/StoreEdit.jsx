@@ -49,7 +49,7 @@ const StoreEdit = () => {
         const isOwner = store.ownerId && user?.id === store.ownerId;
         if (!isAdmin && !isOwner) {
             message.error('접근 권한이 없습니다.');
-            void navigate('/', { replace: true });
+            navigate('/', { replace: true });
         }
     }, [store, user, message, navigate]);
     

@@ -199,7 +199,7 @@ const MyReservations = () => {
             message.warning({ content: location.state.warnMsg, key: 'review_warn' });
         }
         if (location.state?.refetch) void refetch();
-        if (location.state) void navigate(location.pathname, { replace: true, state: {} });
+        if (location.state) navigate(location.pathname, { replace: true, state: {} });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const filtered = useMemo(

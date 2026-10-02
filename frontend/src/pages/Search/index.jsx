@@ -42,8 +42,8 @@ export default function SearchPage() {
     };
 
     const closeSearch = () => leaveSearch(() => {
-        if (state?.searchEntry === true) void navigate(-1);
-        else void navigate('/', { replace: true });
+        if (state?.searchEntry === true) navigate(-1);
+        else navigate('/', { replace: true });
     });
 
     const searchFor = value => {

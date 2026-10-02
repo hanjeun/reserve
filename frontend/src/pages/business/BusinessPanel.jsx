@@ -252,13 +252,13 @@ const BusinessPanel = () => {
     useDocumentTitle('파트너 패널');
 
     const writeTabToUrl = (tab) => {
-        void navigate('?' + businessTabSearch(location.search, tab), { replace: true });
+        navigate('?' + businessTabSearch(location.search, tab), { replace: true });
     };
 
     useEffect(() => {
         const current = location.search.replace(/^\?/, '');
         const normalized = businessTabSearch(location.search, activeTab);
-        if (normalized !== current) void navigate('?' + normalized, { replace: true });
+        if (normalized !== current) navigate('?' + normalized, { replace: true });
     }, [activeTab, location.search, navigate]);
 
     const tabItems = [

@@ -431,7 +431,7 @@ export const useStoreForm = ({
             await saveQueueRef.current.catch(() => undefined);
             await deleteStoreDraft(draftKey).catch(() => undefined);
             message.success(mode === 'create' ? '가게가 등록되었습니다' : '가게 정보가 수정되었습니다');
-            void navigate('/my-stores');
+            navigate('/my-stores');
         } catch (error) {
             void persistDraft().catch(() => undefined);
             handleApiError(error, message, mode === 'create' ? '가게 등록에 실패했습니다' : '가게 수정에 실패했습니다');

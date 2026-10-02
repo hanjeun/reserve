@@ -76,12 +76,12 @@ const Login = () => {
     useEffect(() => {
         if (hasHandledRef.current) return;
         // 계정 경계에서 재마운트돼도 원래 요청한 경로로 돌아간다.
-        if (isLoggedIn) { void navigate(fromRef.current || consumeRedirect() || '/', { replace: true }); return; }
+        if (isLoggedIn) { navigate(fromRef.current || consumeRedirect() || '/', { replace: true }); return; }
 
         if (location.state?.signupSuccess) {
             hasHandledRef.current = true;
             message.success('회원가입이 완료되었습니다! 로그인해주세요.');
-            void navigate('/login', { replace: true, state: {} });
+            navigate('/login', { replace: true, state: {} });
             return;
         }
 
@@ -93,7 +93,7 @@ const Login = () => {
             // 안내 메시지를 띄우는 순간 복귀 경로가 사라지고 로그인 성공 후 항상 '/'로 가버렸다.
             // (아래 onLoginSubmit에 navigate(from) 복귀 코드가 이미 있었는데도 이 한 줄 때문에 무력화)
             // -> 메시지를 한 번만 띄우기 위해 prevented 플래그만 지우고 from은 그대로 남긴다.
-            void navigate('/login', { replace: true, state: { from: location.state.from } });
+            navigate('/login', { replace: true, state: { from: location.state.from } });
             return;
         }
 
@@ -130,7 +130,7 @@ const Login = () => {
                 const target = fromRef.current || consumeRedirect() || '/';
                 // 로그인 필요로 막혔던 곳이면 가려던 길을 계속 간다(오른쪽에서). 스스로 로그인했으면 있던 곳으로 돌아간다(왼쪽에서).
                 const direction = preventedRef.current && target !== '/' ? 'from-right' : 'from-left';
-                void navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
+                navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
             }
         } catch (err) {
             if (err?.isSessionExpired) return;

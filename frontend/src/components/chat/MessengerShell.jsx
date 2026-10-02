@@ -153,7 +153,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                             const mobileAtClick = window.innerWidth < breakpoints.tablet;
                             if (mobileAtClick) {
                                 showHome();
-                                void navigate('/messages', { state: { messengerEntry: true } });
+                                navigate('/messages', { state: { messengerEntry: true } });
                             }
                             else togglePanel();
                         }}

@@ -99,7 +99,7 @@ const usePayment = () => {
                     reservationId: reservation.id,
                 });
                 // 검증이 끝났으므로 결과 페이지는 재검증하지 않는다(imp_uid 를 넘기지 않는다).
-                void navigate(
+                navigate(
                     `/payment/result?success=true` +
                     `&merchant_uid=${encodeURIComponent(payment.paymentId)}` +
                     `&reservation_id=${reservation.id}`
@@ -107,7 +107,7 @@ const usePayment = () => {
                 return { success: true };
             } catch (err) {
                 const msg = err instanceof Error ? err.message : '결제 검증에 실패했습니다.';
-                void navigate(
+                navigate(
                     `/payment/result?success=false` +
                     `&merchant_uid=${encodeURIComponent(payment.paymentId)}` +
                     `&error_msg=${encodeURIComponent(msg)}`

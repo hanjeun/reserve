@@ -102,7 +102,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         const target = notificationTargetRef.current;
         if (target?.roomId !== roomId
             || target.identity !== messengerIdentityOf(useAuthStore.getState())) return;
-        if (routeSelection) void navigate('/messages', { replace: true });
+        if (routeSelection) navigate('/messages', { replace: true });
         select(target.selection);
         setMobileThreadOpen(true);
         window.focus();
@@ -296,14 +296,14 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
 
     const choose = (next) => {
         if (returningToList || openingThread) return;
-        if (routeSelection) void navigate('/messages', { replace: true });
+        if (routeSelection) navigate('/messages', { replace: true });
         select(next);
         setMobileThreadOpen(true);
         // 한 화면에 목록·대화가 같이 보이는 넓은 메시지 페이지는 자리만 바뀌므로 애니메이션이 없다.
         if (!(surface === 'page' && isWide)) setOpeningThread(true);
     };
     const finishConversationList = useCallback(() => {
-        if (routeSelection) void navigate('/messages', { replace: true });
+        if (routeSelection) navigate('/messages', { replace: true });
         showConversations();
         setMobileThreadOpen(false);
         setReturningToList(false);
@@ -364,7 +364,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const changeDraft = value => setDraft(selectionKey, value);
 
     const handleFooterChange = value => {
-        if (routeSelection) void navigate('/messages', { replace: true });
+        if (routeSelection) navigate('/messages', { replace: true });
         setMobileThreadOpen(false);
         if (value === 'home') showHome();
         else if (value === 'settings') showSettings();

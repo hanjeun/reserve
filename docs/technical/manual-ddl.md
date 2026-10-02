@@ -44,7 +44,8 @@ SHOW INDEX FROM store WHERE Index_type = 'FULLTEXT';
 
 ### 적용 후 켜기
 
-DDL을 적용한 뒤 `application-prod.yml`에서 켜요.
+DDL과 검색 계약 검증을 마친 뒤 별도 승인으로 `application-prod.yml`에서 켜요.
+아래 격리 검증에서 검색 결과 차이가 발견되어 현재는 활성화를 보류해요.
 
 ```yaml
 search:
@@ -73,6 +74,26 @@ EXPLAIN SELECT * FROM store
 
 참고 문서: [MySQL FULLTEXT 제한](https://dev.mysql.com/doc/refman/8.0/en/fulltext-restrictions.html),
 [ngram 파서](https://dev.mysql.com/doc/refman/8.0/en/fulltext-search-ngram.html).
+
+### 2026-10-02 격리 MySQL 8.0.45 검증
+
+H2에서는 LIKE·분야·지역·추천·거리 후보/정렬·205건 페이지 경계를 확인했고, FULLTEXT는 Mockito로 호출 계약을 확인했다.
+2026-10-02에는 네트워크·포트가 없는 격리 **MySQL 8.0.45 / ngram_token_size=2**에서 합성 215행으로
+현재 StoreRepository의 FULLTEXT 내용/count SQL을 실행했다. LIKE는 현재 Specification의 조건·정렬을 SQL로 재현했다.
+사진·공방 단일 검색어 × 최신·리뷰·별점순 6조합에서 삭제/정지 제외, 유효 배지 우선, 동점 ID 내림차순,
+20행씩 깊은 페이지의 중복·누락·count를 대조했다. `EXPLAIN`의 `fulltext / ft_store_search`와
+`EXPLAIN ANALYZE` 실행, MATCH 컬럼 불일치의 1191 오류도 확인했다.
+
+**전체 검색 결과 동등성은 성립하지 않는다.** `강남 사진`은 LIKE의 연속 문구 1행과 달리
+FULLTEXT가 순서 반전·서로 다른 컬럼의 단어까지 3행을 반환했고, `100%`도 LIKE 1행 / FULLTEXT 3행이었다.
+따라서 `search.store.fulltext-enabled`는 계속 끈다. 문구/단어·특수문자 검색 계약을 먼저 확정하고,
+실제 앱의 Hibernate 경로와 운영 데이터 분포까지 검증한 뒤 별도 승인으로 적용한다.
+운영 DDL은 실행하지 않았다. 격리 데이터와 컨테이너는 검증 후 제거했다.
+
+같은 격리 엔진에서 경쟁 행 잠금의 1205 오류, deadlock의 단일 1213 victim과 양쪽 rollback을 확인했다.
+ALTER TABLE은 앞선 DML까지 암묵적으로 commit하므로 ROLLBACK으로 되돌릴 수 없다는 점도 실증했다.
+DDL 변경의 복구에는 별도의 역방향 DDL·복원 절차가 필요하다.
+
 
 ## 1-b. 가게 거리순 bounding-box 후보 인덱스
 

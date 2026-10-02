@@ -278,6 +278,12 @@ function AppRoutes() {
         // 검색은 헤더를 고정하는 전용 진입·닫힘 모션이 이미 있어, 부모 전환을 겹치지 않는다.
         const routeMotion = isSearchPage ? null : resolvedRouteMotion;
 
+        // 검색을 닫으며 재생성된 헤더도 이전 위치로 바로 돌아온다. 쿼리 정규화에서는 유지한다.
+        if (previousPathname !== pathname) {
+            content?.parentElement?.toggleAttribute('data-search-restored',
+                /^\/search\/?$/.test(previousPathname || '') && !isSearchPage);
+        }
+
         if (content && previousPathname !== null && previousPathname !== pathname) {
             // 헤더·탭은 정지한 채 도착한 화면만 움직인다. 같은 pathname의 필터·보기 전환은 제외한다.
             content.classList.remove('reserve-route-entry--from-right', 'reserve-route-entry--from-left');

@@ -178,6 +178,11 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 - 오늘은 작은 중립 점으로 표시해요.
 - 월·연도 이동, 일요일 색, 비활성 날짜, 모바일 좌우 swipe를 제공해요.
 
+확정된 단일 날짜와 기간의 양끝, 예약 인원은 `RollingFieldValue`로 표시한다. 날짜가 미래로 또는
+인원이 증가하면 위로, 이전 날짜로 또는 인원이 감소하면 아래로 200ms 동안 이동하며 살짝 회전한다.
+날짜는 모달이 닫힌 뒤 전환하고, 연속 입력은 이전 전환을 중단해 최신 값을 표시한다.
+현재 값은 접근성 이름에 즉시 반영하고, `prefers-reduced-motion`에서는 전환 없이 표시한다.
+
 ### FormModal
 
 ```jsx

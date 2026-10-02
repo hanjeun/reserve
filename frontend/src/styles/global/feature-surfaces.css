@@ -1550,6 +1550,8 @@
     transition: opacity 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
     animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+/* 검색 닫힘은 이전 헤더의 복원이다. 다음 일반 이동과 실제 뒤로가기의 닫힘 모션은 유지한다. */
+.reserve-app-layout[data-search-restored] > .reserve-header .reserve-header-back:not(.reserve-header-back--leaving) { animation: none; }
 .reserve-header-back:hover { background: var(--c-gray-50, #f9fafb); }
 .reserve-header-back:active { opacity: 0.65; }
 .reserve-header-back--leaving { pointer-events: none; animation: reserve-header-back-leave 0.18s cubic-bezier(0.4, 0, 1, 1) both; }

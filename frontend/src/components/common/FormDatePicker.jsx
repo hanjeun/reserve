@@ -17,6 +17,7 @@ import {
 import dayjs from 'dayjs';
 import Button from './Button';
 import ModalActions from './ModalActions';
+import RollingFieldValue from './RollingFieldValue';
 import useHolidayDates from '../../hooks/useHolidayDates';
 import { animation, colors, field, fontSize, fontWeight, radius } from '../../styles/tokens';
 
@@ -144,16 +145,25 @@ const cellPresentation = ({ cell, mode, disabledDate, selectedKeys, draftRange, 
     return { isDisabled, isSelected, className: classNames.join(' '), stateLabel };
 };
 
-function TriggerLabel({ mode, label, hasValue }) {
+function TriggerLabel({ mode, label, hasValue, value, modalOpen }) {
     if (mode === 'range') {
         return (
             <span style={styles.rangeTrigger}>
-                <span style={label.hasStart ? styles.value : styles.placeholder}>{label.start}</span>
+                <span style={label.hasStart ? styles.value : styles.placeholder}>
+                    <RollingFieldValue value={validDay(value?.[0])?.startOf('day').valueOf()} modalOpen={modalOpen}>{label.start}</RollingFieldValue>
+                </span>
                 <span aria-hidden="true" style={styles.arrow}>→</span>
-                <span style={label.hasEnd ? styles.value : styles.placeholder}>{label.end}</span>
+                <span style={label.hasEnd ? styles.value : styles.placeholder}>
+                    <RollingFieldValue value={validDay(value?.[1])?.startOf('day').valueOf()} modalOpen={modalOpen}>{label.end}</RollingFieldValue>
+                </span>
             </span>
         );
     }
+    if (mode !== 'multiple') return (
+        <span style={hasValue ? styles.value : styles.placeholder}>
+            <RollingFieldValue value={validDay(value)?.startOf('day').valueOf()} modalOpen={modalOpen}>{label}</RollingFieldValue>
+        </span>
+    );
     return (
         <span key={hasValue ? String(label) : 'empty'} style={{
             ...(hasValue ? styles.value : styles.placeholder),
@@ -168,6 +178,8 @@ TriggerLabel.propTypes = {
     mode: PropTypes.string,
     label: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
     hasValue: PropTypes.bool,
+    value: PropTypes.oneOfType([PropTypes.object, PropTypes.arrayOf(PropTypes.object)]),
+    modalOpen: PropTypes.bool,
 };
 
 function RangePartChoice({ draftRange, rangePart, setRangePart }) {
@@ -354,7 +366,7 @@ const FormDatePickerBase = ({
                     ...style,
                 }}
             >
-                <TriggerLabel mode={mode} label={label} hasValue={hasValue} />
+                <TriggerLabel mode={mode} label={label} hasValue={hasValue} value={value} modalOpen={open} />
                 <CalendarOutlined aria-hidden="true" style={{
                     flexShrink: 0,
                     fontSize: field.iconSize,

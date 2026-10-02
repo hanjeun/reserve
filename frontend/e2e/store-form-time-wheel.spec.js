@@ -39,6 +39,7 @@ const openHours = async page => {
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: '시간 범위 선택' });
     await expect(dialog).toBeVisible();
+    await expect(dialog).not.toHaveClass(/ant-zoom-(appear|enter)(?:-[a-z]+)?(?:\s|$)/);
     const hours = dialog.getByRole('listbox', { name: '시', exact: true });
     await expect(hours.getByRole('option', { selected: true })).toHaveText('09');
     await expect.poll(() => hours.getByRole('option', { selected: true }).evaluate(element => {
@@ -274,17 +275,19 @@ const equalActions = async (dialog, confirmText) => {
         const style = getComputedStyle(element);
         return { height: rect.height, width: rect.width, radius: style.borderRadius, border: style.borderTopStyle, borderWidth: style.borderTopWidth };
     });
-    // Compare after the panel's opening transform has finished.
+    // Pointer targets and physical widths are meaningful after the modal entrance finishes.
+    await expect(dialog).not.toHaveClass(/ant-zoom-(appear|enter)(?:-[a-z]+)?(?:\s|$)/);
     await expect.poll(async () => (await details(cancel)).height).toBe(36);
     const cancelSize = await details(cancel);
     const confirmSize = await details(confirm);
-    expect(cancelSize.width).toBe(104);
-    expect(cancelSize.width).toBe(confirmSize.width);
+    expect(confirmSize.width).toBeGreaterThanOrEqual(cancelSize.width);
+    if (confirmText === '선택 완료' || confirmText === '보내기') expect(confirmSize.width).toBeGreaterThan(cancelSize.width);
     expect(cancelSize.height).toBe(confirmSize.height);
     expect(cancelSize.radius).toBe(confirmSize.radius);
     expect(cancelSize.border).toBe('solid');
     expect(cancelSize.borderWidth).toBe('1px');
     expect(confirmSize.borderWidth).toBe('1px');
+    return cancelSize.width;
 };
 
 const nativeSwipe = async (page, x, y, dx, dy) => {
@@ -358,9 +361,9 @@ test('paired picker actions stay inside a 320px viewport', async ({ page }) => {
     await page.goto('/store/register');
     await page.getByLabel('영업 시간', { exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '시간 범위 선택' });
-    await equalActions(dialog, '다음');
+    const cancelWidth = await equalActions(dialog, '다음');
     await dialog.getByRole('button', { name: '다음', exact: true }).click();
-    await equalActions(dialog, '선택 완료');
+    expect(await equalActions(dialog, '선택 완료')).toBe(cancelWidth);
     expect(await dialog.locator('.reserve-time-footer button').evaluateAll(elements => elements.every(element => {
         const rect = element.getBoundingClientRect();
         return rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight;

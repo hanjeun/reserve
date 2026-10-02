@@ -6,7 +6,7 @@ import { colors } from '../../styles/tokens';
 export const ModalActionGroup = ({ children }) => <div className="reserve-modal-actions">{children}</div>;
 ModalActionGroup.propTypes = { children: PropTypes.node };
 
-/** Paired modal decisions share size and shape; cancellation always has a visible border. */
+/** Modal decisions share height and padding; each label determines its own width. */
 const ModalActions = ({ onCancel, onConfirm, cancelText = '취소', confirmText = '확인', loading = false, disabled = false, cancelDisabled = false }) => (
     <ModalActionGroup>
         <Button variant="outline" size="sm" onClick={onCancel} disabled={cancelDisabled}>{cancelText}</Button>

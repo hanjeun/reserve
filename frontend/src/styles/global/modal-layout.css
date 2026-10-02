@@ -1,13 +1,10 @@
 /* Shared modal decisions and background scroll containment. */
 html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
 .ant-modal-wrap, .ant-modal-body { overscroll-behavior: contain; }
-.reserve-modal-actions,
-.ant-modal-footer,
-.ant-modal-confirm-btns { --reserve-modal-action-width: 104px; }
 .reserve-modal-actions {
-    display: inline-grid;
-    grid-auto-flow: column;
-    grid-auto-columns: var(--reserve-modal-action-width);
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 8px;
     max-width: 100%;
     margin-left: auto;
@@ -17,7 +14,9 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
     min-width: 0;
     min-height: 36px;
     height: auto !important;
-    padding: 6px 12px !important;
+    padding: 6px 20px !important;
+    max-width: 100%;
+    line-height: 20px;
     border-radius: 16px;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -26,9 +25,9 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
 .ant-modal-confirm-btns .ant-btn { box-sizing: border-box; min-width: 0; min-height: 36px; border-radius: 16px; }
 .ant-modal-footer:has(> .ant-btn),
 .ant-modal-confirm-btns {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: var(--reserve-modal-action-width);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 8px;
     width: max-content;
     max-width: 100%;
@@ -37,7 +36,10 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
 .ant-modal-footer > .ant-btn,
 .ant-modal-confirm-btns > .ant-btn {
     margin-inline-start: 0;
-    padding: 6px 12px;
+    padding: 6px 20px;
+    max-width: 100%;
+    font-size: 13px;
+    line-height: 20px;
     white-space: normal;
     overflow-wrap: anywhere;
     height: auto;
@@ -106,10 +108,9 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
 }
 
 .reserve-confirm-root .ant-modal-confirm-btns {
-    display: grid;
+    display: flex;
     flex: none;
-    grid-auto-flow: column;
-    grid-auto-columns: var(--reserve-modal-action-width);
+    flex-wrap: wrap;
     width: max-content;
     max-width: 100%;
     margin-left: auto;

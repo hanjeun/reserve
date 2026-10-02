@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const SITE_ORIGIN = 'https://reserve.it.kr';
@@ -103,7 +103,7 @@ const syncBreadcrumbJsonLd = (pathname) => {
 const useRouteSeo = () => {
     const { pathname } = useLocation();
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const canonicalUrl = canonicalUrlForPath(pathname);
         const robots = isIndexablePath(pathname) ? 'index, follow' : 'noindex, nofollow';
 

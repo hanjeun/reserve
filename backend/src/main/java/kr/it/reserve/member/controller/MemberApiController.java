@@ -23,6 +23,7 @@ import jakarta.validation.Valid;
 public class MemberApiController {
 
     private final MemberService memberService;
+    private final CookieUtil cookieUtil;
 
     // 내 정보 조회 (SecurityContext의 id로 DB 조회 - 최신 정보 보장)
     @GetMapping("/me")
@@ -48,8 +49,8 @@ public class MemberApiController {
             HttpServletResponse response) {
         Member member = SecurityUtil.getCurrentMember("비밀번호 변경 권한이 없습니다.");
         memberService.changePassword(member.getId(), request);
-        CookieUtil.deleteCookie(httpRequest, response, "access_token");
-        CookieUtil.deleteCookie(httpRequest, response, "refresh_token");
+        cookieUtil.deleteCookie(httpRequest, response, "access_token");
+        cookieUtil.deleteCookie(httpRequest, response, "refresh_token");
         return ApiResponse.success(null, "비밀번호가 변경되었습니다. 다시 로그인해주세요.");
     }
 
@@ -99,8 +100,8 @@ public class MemberApiController {
     public ApiResponse<Void> deleteMember(HttpServletRequest request, HttpServletResponse response) {
         Member member = SecurityUtil.getCurrentMember("탈퇴 권한이 없습니다.");
         memberService.deleteMember(member.getId());
-        CookieUtil.deleteCookie(request, response, "access_token");
-        CookieUtil.deleteCookie(request, response, "refresh_token");
+        cookieUtil.deleteCookie(request, response, "access_token");
+        cookieUtil.deleteCookie(request, response, "refresh_token");
         return ApiResponse.success(null, "회원 탈퇴가 완료되었습니다.");
     }
 }

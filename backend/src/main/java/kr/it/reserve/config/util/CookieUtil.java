@@ -11,11 +11,10 @@ import java.util.Arrays;
 @Component
 public class CookieUtil {
 
-    private static boolean secureCookie = false;
+    private final boolean secureCookie;
 
-    @Value("${server.env:prod}")
-    public void setServerEnv(String env) {
-        secureCookie = !"local".equals(env);  // local이 아니면 Secure=true
+    public CookieUtil(@Value("${server.env:prod}") String env) {
+        this.secureCookie = !"local".equals(env);
     }
 
     public static String getCookie(HttpServletRequest request, String name) {
@@ -48,7 +47,7 @@ public class CookieUtil {
     //    (Strict였다면 이 둘이 깨진다 — Strict로 올리지 말 것)
     private static final String SAME_SITE = "Lax";
 
-    public static void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
+    public void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
         String sameSite = SAME_SITE;
 
         StringBuilder sb = new StringBuilder();
@@ -62,7 +61,7 @@ public class CookieUtil {
         response.addHeader("Set-Cookie", sb.toString());
     }
 
-    public static void deleteCookie(HttpServletRequest request, HttpServletResponse response, String name) {
+    public void deleteCookie(HttpServletRequest request, HttpServletResponse response, String name) {
         // addCookie와 동일한 SameSite/Secure 속성으로 삭제해야 브라우저가 매칭해서 삭제함
         String sameSite = SAME_SITE;
 

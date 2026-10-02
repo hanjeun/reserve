@@ -50,10 +50,9 @@ class AuthRefreshCookieContractTest {
         JwtProperties.TokenConfig access = new JwtProperties.TokenConfig();
         access.setExpirationMinutes(30);
         properties.setAccessToken(access);
-        new CookieUtil().setServerEnv("prod");
 
         AuthApiController controller = new AuthApiController(
-                memberService, tokenProvider, passwordEncoder, properties, tokenService, rateLimiter);
+                memberService, tokenProvider, passwordEncoder, properties, tokenService, rateLimiter, new CookieUtil("prod"));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

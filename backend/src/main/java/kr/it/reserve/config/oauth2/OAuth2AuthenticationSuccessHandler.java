@@ -27,6 +27,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     private final TokenProvider tokenProvider;
     private final JwtProperties jwtProperties;
+    private final CookieUtil cookieUtil;
 
     @Value("${server.env:prod}")
     private String serverEnv;
@@ -73,8 +74,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         int accessMaxAge = (int) jwtProperties.getAccessTokenExpiration().toSeconds();
         int refreshMaxAge = (int) jwtProperties.getRefreshTokenExpiration().toSeconds();
 
-        CookieUtil.addCookie(response, "access_token", accessToken, accessMaxAge);
-        CookieUtil.addCookie(response, "refresh_token", refreshToken, refreshMaxAge);
+        cookieUtil.addCookie(response, "access_token", accessToken, accessMaxAge);
+        cookieUtil.addCookie(response, "refresh_token", refreshToken, refreshMaxAge);
 
         // 3. 세션 및 기존 쿠키 정리
         clearSessionAndCookies(request, response);
@@ -94,6 +95,6 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         if (session != null) {
             session.invalidate();
         }
-        CookieUtil.deleteCookie(request, response, "JSESSIONID");
+        cookieUtil.deleteCookie(request, response, "JSESSIONID");
     }
 }

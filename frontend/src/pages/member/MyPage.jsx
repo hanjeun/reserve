@@ -428,6 +428,7 @@ const BusinessTab = ({ user }) => {
     const isBusiness = user?.role === 'BUSINESS';
 
     const loadStatus = useCallback(() => {
+        /** @type {Record<string, never>} */
         const request = {};
         statusRequestRef.current = request;
         return businessService.getMyStatus()

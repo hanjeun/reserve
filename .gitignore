@@ -54,6 +54,7 @@ dist-ssr/
 test-results/
 playwright-report/
 blob-report/
+/frontend/coverage/
 
 # ========================
 # 환경변수 (보안)
@@ -119,3 +120,5 @@ docs/images/*.new.png
 /docs/technical/modularization-plan.md
 /docs/technical/history/
 /Claude outputs/
+
+/coverage/

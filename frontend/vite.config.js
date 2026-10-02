@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import process from 'node:process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { bundleNotices } from './scripts/bundle-notices.mjs';
 
 const messengerCoverRevision = createHash('sha256')
     .update(readFileSync(new URL('./public/og-image.png', import.meta.url)))
@@ -14,6 +15,7 @@ export default defineConfig({
     },
     plugins: [
         react(),
+        bundleNotices(),
     ],
 
     build: {
@@ -51,6 +53,12 @@ export default defineConfig({
         environment: 'jsdom',
         setupFiles: './src/test/setup.js',
         clearMocks: true,
+        coverage: {
+            provider: 'v8',
+            include: ['src/**/*.{js,jsx}'],
+            exclude: ['src/**/*.{test,spec}.{js,jsx}', 'src/test/**'],
+            reporter: [['lcovonly', { projectRoot: '..' }], 'text-summary'],
+        },
         css: true,
         // AntD/jsdom 테스트를 Windows에서 동시에 여러 워커로 띄우면 초기화가 크게 지연된다.
         // 로컬은 단일 fork, Linux CI에서는 격리된 두 fork로만 병렬화한다.

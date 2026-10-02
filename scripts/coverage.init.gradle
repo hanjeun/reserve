@@ -1,0 +1,31 @@
+// Coverage tooling stays outside the application's locked runtime dependencies.
+allprojects {
+    apply plugin: 'jacoco'
+    afterEvaluate {
+        jacoco { toolVersion = '0.8.14' }
+        ['jacocoAgent', 'jacocoAnt'].each { name ->
+            configurations.named(name) { resolutionStrategy.deactivateDependencyLocking() }
+        }
+        def toolAgent = tasks.register('prepareSchemaToolAgent', Copy) {
+            from { zipTree(configurations.jacocoAgent.singleFile) }
+            include 'jacocoagent.jar'
+            into layout.buildDirectory.dir('jacoco/tool-agent')
+        }
+        tasks.named('test') {
+            dependsOn toolAgent
+            systemProperty 'reserve.schemaToolAgent', layout.buildDirectory.file('jacoco/tool-agent/jacocoagent.jar').get().asFile.absolutePath
+            systemProperty 'reserve.schemaToolExecutionData', layout.buildDirectory.file('jacoco/schema-tool.exec').get().asFile.absolutePath
+        }
+        tasks.named('jacocoTestReport') {
+            dependsOn tasks.named('test')
+            executionData layout.buildDirectory.file('jacoco/schema-tool.exec')
+            classDirectories.from fileTree(layout.buildDirectory.dir('classes/java/test')) { include 'VerifyDatabaseSchema*.class' }
+            sourceDirectories.from project.file('../scripts')
+            reports {
+                xml.required = true
+                html.required = false
+                csv.required = false
+            }
+        }
+    }
+}

@@ -36,6 +36,7 @@ public class PaymentOperationsMonitorScheduler {
                 LocalDateTime.now().minusDays(STALE_READY_DAYS));
         long ledgerInvariantViolations = paymentRepository.countLedgerInvariantViolations();
         long depositInvariantViolations = paymentRepository.countReservationDepositInvariantViolations();
+        log.info("Application log heartbeat: paymentOperations=checked");
 
         if (openIssues > 0 || failedWebhooks > 0 || staleReadyPayments > 0
                 || ledgerInvariantViolations > 0 || depositInvariantViolations > 0) {

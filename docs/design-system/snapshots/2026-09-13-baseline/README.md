@@ -42,6 +42,17 @@ SUITE 전문 고지는 [공식 SUITE 저장소 LICENSE](https://raw.githubuserco
 
 `.env` 계열, backend·서버·AWS 운영 설정, `.git` 데이터/이력, API·서비스 구현, 실제 auth store·세션 저장 내용, 회원/가게 DB 데이터, 실제 개인 정보/대화/업로드, 캐시·로그·덤프, `node_modules`/`dist` 전체는 제외합니다. 테스트 파일은 공통 UI의 synthetic mock 예제이며 실제 사용자 자료가 아닙니다. 선택한 문서/lock/코드 텍스트에 알려진 credential·JWT/private-key 형태와 URL user/password 패턴을 검사하되 이 좁은 검사는 모든 종류의 비밀 부재 증명이 아닙니다. ZIP은 공개 업로드하지 않았습니다.
 
+## 동결 의존성 정책
+
+`source/frontend/package.json`과 lockfile은 2026-09-13 원본의 바이트 증거예요.
+현재 앱·CI·배포는 이 경로에서 의존성을 설치하거나 실행하지 않아요. 현재 앱의 의존성은
+저장소 루트의 `frontend/`에서 따로 관리해요. 원본의 취약 의존성을 실행 가능한 샘플로 취급하지 않아요.
+재사용할 때는 별도 폴더로 복사하고 현재 지원 버전으로 갱신·검증한 뒤 실행해요.
+
+이 동결 lockfile만 가리키는 Dependabot 알림은 각각 경로와 실제 실행 범위를 확인한 뒤
+`not_used` 근거를 남겨 정리해요. 원본 취약점이 수정됐다고 표시하거나 해시를 갱신하지 않아요.
+현재 앱·다른 경로의 알림에는 이 정책을 적용하지 않으며, 원본을 실행하는 경로가 추가되면 재검토해요.
+
 ## 검증 및 재현
 
 원래 repo에서 `scripts/design-system-snapshot.ps1 -Stage Header`는 초기 헤더 보존본을 만들고 이미 존재하는 소스를 덮어쓰지 않습니다. `-Stage Finalize`는 좁은 allowlist를 추가하고 manifest·ZIP을 만듭니다. `-Stage Verify`는 보관 파일/ZIP을 읽기 전용 검사합니다. 이미 완료된 스냅샷을 새 기준선으로 갱신하지 않으며 다른 날짜 기준선을 만들 때는 명시적인 새 대상 경로를 검토합니다.

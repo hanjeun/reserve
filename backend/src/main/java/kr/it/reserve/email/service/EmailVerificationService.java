@@ -24,6 +24,7 @@ public class EmailVerificationService {
     private final EmailService emailService;
 
     private static final int CODE_LENGTH = 6;
+    private static final SecureRandom CODE_RANDOM = new SecureRandom();
     private static final int EXPIRATION_MINUTES = 5;
 
     @Transactional
@@ -102,10 +103,9 @@ public class EmailVerificationService {
     }
 
     private String generateVerificationCode() {
-        SecureRandom random = new SecureRandom();
         StringBuilder code = new StringBuilder();
         for (int i = 0; i < CODE_LENGTH; i++) {
-            code.append(random.nextInt(10));
+            code.append(CODE_RANDOM.nextInt(10));
         }
         return code.toString();
     }

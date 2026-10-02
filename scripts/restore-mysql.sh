@@ -16,7 +16,10 @@
 set -euo pipefail
 umask 077
 
-CONFIG_FILE="${RESERVE_BACKUP_ENV:-/etc/reserve-backup.env}"
+CONFIG_FILE="${RESERVE_RESTORE_ENV:-${RESERVE_BACKUP_ENV:-/etc/reserve-restore.env}}"
+if [[ ! -f "$CONFIG_FILE" && -z "${RESERVE_RESTORE_ENV+x}" && -z "${RESERVE_BACKUP_ENV+x}" ]]; then
+    CONFIG_FILE=/etc/reserve-backup.env
+fi
 if [[ -f "$CONFIG_FILE" ]]; then
     # shellcheck disable=SC1090
     . "$CONFIG_FILE"

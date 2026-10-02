@@ -29,6 +29,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DataLifecycleGuard {
 
     /** 노출 상태와 금융 상태를 함께 확인한다. 로컬 CANCELLED/FAILED는 PG 종결 증거가 아니다. */
@@ -43,7 +44,6 @@ public class DataLifecycleGuard {
     private final PaymentReconciliationIssueRepository issueRepository;
     private final PaymentWebhookInboxRepository webhookInboxRepository;
 
-    @Transactional(readOnly = true)
     public StoreClosureReadiness inspectStore(Long storeId) {
         return new StoreClosureReadiness(
                 reservationRepository.countLifecycleBlockingByStoreId(storeId),
@@ -58,7 +58,6 @@ public class DataLifecycleGuard {
                         storeId, PaymentWebhookInbox.UNFINISHED));
     }
 
-    @Transactional(readOnly = true)
     public MemberWithdrawalReadiness inspectMember(Long memberId) {
         return new MemberWithdrawalReadiness(
                 storeRepository.countByOwnerIdAndDeletedAtIsNull(memberId),

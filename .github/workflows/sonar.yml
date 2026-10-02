@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: sonar-${{ github.ref }}
@@ -26,6 +27,8 @@ jobs:
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
+    env:
+      NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/tooling-v8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +48,38 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew classes testClasses --console=plain
+      - name: Restore verified backend coverage
+        id: backend_coverage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+          CI_REQUIRE_COVERAGE: 'true'
+          CI_COVERAGE_WAIT_SECONDS: ${{ github.event_name == 'pull_request' && '900' || '0' }}
+        run: node scripts/ci-evidence.mjs restore backend
+      - name: Restore verified frontend coverage
+        id: frontend_coverage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+          CI_REQUIRE_COVERAGE: 'true'
+          CI_COVERAGE_WAIT_SECONDS: ${{ github.event_name == 'pull_request' && '900' || '0' }}
+        run: node scripts/ci-evidence.mjs restore frontend
+      - name: Generate backend coverage when no reusable report exists
+        if: steps.backend_coverage.outputs.reused != 'true'
+        working-directory: backend
+        run: ./gradlew -I ../scripts/coverage.init.gradle test jacocoTestReport --console=plain
+      - name: Install frontend analysis tools
+        working-directory: frontend
+        run: npm ci
+      - name: Generate frontend coverage when no reusable report exists
+        if: steps.frontend_coverage.outputs.reused != 'true'
+        working-directory: frontend
+        run: npm run test:coverage
+      - name: Collect coverage from the build and evidence tools
+        run: |
+          npm run test:policy --prefix frontend
+          npm run build --prefix frontend -- --configLoader native
+          node frontend/node_modules/c8/bin/c8.js report --temp-directory coverage/tooling-v8 --reporter lcov --reports-dir coverage/tooling --all --src scripts --src frontend/scripts --include 'scripts/**/*.mjs' --include 'frontend/scripts/**/*.mjs'
       - name: Analyze backend and frontend
         working-directory: backend
         env:

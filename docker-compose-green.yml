@@ -39,7 +39,9 @@ services:
       # QR 체크인 서명 키(선택). 비면 로그인 시크릿에서 파생한다 — 비어 있는 게 정상이다.
       - QR_TOKEN_SECRET=${QR_TOKEN_SECRET}
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_APP_PASSWORD:-${DB_PASSWORD}}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=${DB_DDL_AUTO:-update}
       - MAIL_FROM=${MAIL_FROM}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}

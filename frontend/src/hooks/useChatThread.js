@@ -168,7 +168,7 @@ export default function useChatThread({
         let changeRevision = 0;
 
         const tick = () => {
-            if (inFlight || !alive || activeRef.current !== active || active.invalidated || !active.ready) return;
+            if (document.visibilityState === 'hidden' || inFlight || !alive || activeRef.current !== active || active.invalidated || !active.ready) return;
             inFlight = true;
             // 낙관적(음수 id) 항목은 커서에서 제외한다. 서버가 모르는 id 다.
             const list = messagesRef.current;
@@ -199,8 +199,7 @@ export default function useChatThread({
         tick();                                   // 즉시 한 번. 없으면 첫 응답이 pollMs 뒤에나 온다
         const timer = setInterval(tick, pollMs);
 
-        // 탭으로 돌아오는 순간 최신을 받는다. 백그라운드 탭에서는 브라우저가 타이머를
-        // 늦추므로(throttling) 돌아왔을 때 눈에 띄게 밀려 있다.
+        // 숨긴 탭에서는 새 폴링을 멈추고, 돌아오는 순간 최신을 받는다.
         const onWake = () => { if (document.visibilityState === 'visible') tick(); };
         window.addEventListener('focus', onWake);
         document.addEventListener('visibilitychange', onWake);

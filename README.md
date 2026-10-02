@@ -4,14 +4,10 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/title-dark.svg" />
-  <img src="docs/images/title-light.svg" alt="예약이 필요한 순간, RESERVE — 업종을 가리지 않고 찾고 · 예약하고 · 결제까지 한 번에" width="640" />
+  <img src="docs/images/title-light.svg" alt="예약이 필요한 순간, RESERVE" width="640" />
 </picture>
 
-[**서비스 바로가기**](https://reserve.it.kr) &nbsp;·&nbsp;
-[손님 가이드](docs/guide/user-guide.md) &nbsp;·&nbsp;
-[사장님 가이드](docs/guide/owner-guide.md) &nbsp;·&nbsp;
-[업데이트 소식](docs/CHANGELOG.md) &nbsp;·&nbsp;
-[기술 문서](docs/technical/README.md)
+[**서비스 바로가기**](https://reserve.it.kr)
 
 <br />
 

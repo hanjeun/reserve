@@ -34,6 +34,7 @@ import {
 import {
     Button, AdminTableSkeleton, DataState, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
 } from '../common';
+import { ModalActionGroup } from '../common/ModalActions';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -457,14 +458,14 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 open={detailOpen}
                 onCancel={() => setDetailOpen(false)}
                 footer={
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20 }}>
+                    <ModalActionGroup>
                         {detailItem?.status === 'PENDING' ? (
                             <>
-                                <Button variant="ghost-sm-danger"
+                                <Button variant="outline" size="sm" style={{ color: colors.error.main, borderColor: colors.error.main }}
                                     onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>
                                     <CloseOutlined /> 거절
                                 </Button>
-                                <Button variant="ghost-sm-success" loading={actionLoading}
+                                <Button variant="outline" size="sm" loading={actionLoading} style={{ color: colors.success.main, borderColor: colors.success.main }}
                                     onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>
                                     <CheckOutlined /> 승인
                                 </Button>
@@ -477,7 +478,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                                 닫기
                             </Button>
                         )}
-                    </div>
+                    </ModalActionGroup>
                 }
                 width={560}
                 centered

@@ -1,0 +1,40 @@
+// Keep scanner tooling outside runtime dependencies and their lockfile.
+initscript {
+    repositories {
+        maven { url = uri('https://plugins.gradle.org/m2/') }
+    }
+    dependencies {
+        classpath 'org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:7.5.0.8588'
+    }
+}
+
+allprojects { project ->
+    if (project == rootProject) {
+        apply plugin: org.sonarqube.gradle.SonarQubePlugin
+        afterEvaluate {
+            def repositoryRoot = project.projectDir.parentFile
+            def configuration = new Properties()
+            new File(repositoryRoot, '.sonarcloud.properties').withReader('UTF-8') {
+                configuration.load(it)
+            }
+            sonar {
+                properties {
+                    property 'sonar.projectKey', 'hanjeun_reserve'
+                    property 'sonar.organization', 'hanjeun'
+                    property 'sonar.host.url', 'https://sonarcloud.io'
+                    property 'sonar.projectBaseDir', repositoryRoot.absolutePath
+                    property 'sonar.qualitygate.wait', 'true'
+                    // Reuse explicit source/test boundaries; do not import rule suppressions.
+                    ['sonar.sources', 'sonar.tests', 'sonar.exclusions', 'sonar.sourceEncoding'].each { key ->
+                        def value = configuration.getProperty(key)
+                        if (value == null || value.isBlank()) {
+                            throw new GradleException('Missing analysis scope property: ' + key)
+                        }
+                        property key, value
+                    }
+                    // The Gradle scanner derives Java binaries and libraries from source sets.
+                }
+            }
+        }
+    }
+}

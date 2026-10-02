@@ -14,6 +14,16 @@ RESERVE MySQL의 백업 구성과 복원 절차예요.
 
 DB 비밀번호는 `/etc/reserve-backup.env`의 `DB_PASSWORD`를 기준으로 써요.
 
+> **2026-10-02 검증:** 별도 읽기 접근으로 받은 S3 객체 `mysql/reserve-20260930-181001.sql.gz`는
+> 13,883바이트이며 SHA-256은 `8c886711714827452cbb9e813c49520b58ddbed784791e830e0428c06064f1d6`이다.
+> Linux MySQL **8.0.45**에 독립 복원해 34테이블·66행과 34개 테이블의 `CHECK TABLE` 성공을 확인했다.
+> 암호화 채팅 사진 1건도 독립 다운로드·무결성 확인 후 사용자가 별도 보관 키를 숨김 입력해 복호화 `PASS`를 확인했다.
+> 운영 설치 스크립트 3개 동기화와 읽기 전용 verifier 확인은 끝났다. 이 설치본의 첫 **10/2 03:10 KST 정기 실행은 아직 미확인**이다.
+> 아래 최소 권한 후보와 로컬 `--no-tablespaces` 변경은 운영 설치본에 반영하지 않았다.
+> 현재 운영 이미지까지 사용하는 격리 복구도 통과했다. 이전 백업에 없는
+> `store.image_autoplay_enabled`는 스키마 갱신으로 추가한 뒤 검증 모드로 재기동했고,
+> 기존 34테이블의 원래 컬럼 값·66행을 유지했다. 상세 범위와 미검증 항목은 2-5를 따른다.
+
 ## 1. 설치 (서버에서 1회)
 
 ### 1-1. 스크립트 배치
@@ -30,7 +40,7 @@ sudo install -d -m 700 -o root -g root /var/backups/reserve
 서버에 레포가 없으면 배포된 태그의 파일을 받아 해시를 대조한 뒤 설치해요. `TAG`는 운영에 배포된 태그로 바꿔요.
 
 ```bash
-TAG=v2.6.0
+TAG=v2.8.3
 curl -fsSL -o /tmp/reserve-backup  https://raw.githubusercontent.com/hanjeun/reserve/$TAG/scripts/backup-mysql.sh
 curl -fsSL -o /tmp/reserve-restore https://raw.githubusercontent.com/hanjeun/reserve/$TAG/scripts/restore-mysql.sh
 sha256sum /tmp/reserve-backup /tmp/reserve-restore   # 레포의 같은 태그 파일 해시와 같아야 한다
@@ -52,6 +62,44 @@ sudo stat -c '%a %U %n' /etc/reserve-backup.env   # 600 root
 ```
 
 AWS 키는 백업 전용 사용자 `reserve-backup-uploader`의 키를 써요.
+
+### DB 계정 분리 후보 — 운영 미적용
+
+10/2 읽기 전용 확인에서 백업 연결 계정은 root였다. 앱의 `application-prod.yml`도
+`DB_USERNAME`의 기본값이 root이므로, 실제 연결 계정을 확인한 뒤 앱·DDL·백업 역할을 분리한다.
+현재 `ddl-auto: update`를 사용하는 앱에서 DDL 권한부터 제거하면 스키마 변경이 실패할 수 있다.
+전용 DDL 단계로 필요한 스키마를 먼저 맞추고 앱은 `ddl-auto: validate`로 검증하는 전환안을 준비한다.
+운영 계정 생성·권한 변경·앱 설정 전환은 별도 승인 대상이다.
+
+MySQL **8.0.45** 격리 시험에서 검증한 권한 후보는 다음과 같다. 호스트 범위는 실제 컨테이너
+접속 경로에 맞춰 제한하고, 계정 암호는 보호된 입력으로 생성한다. 아래 `localhost`는 시험 범위다.
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON reserve.* TO 'reserve_app'@'localhost';
+GRANT SELECT, CREATE, ALTER, DROP, INDEX, REFERENCES ON reserve.* TO 'reserve_ddl'@'localhost';
+GRANT SELECT, SHOW VIEW, TRIGGER, EVENT ON reserve.* TO 'reserve_backup'@'localhost';
+GRANT SHOW_ROUTINE ON *.* TO 'reserve_backup'@'localhost';
+```
+
+`SHOW_ROUTINE`이 없으면 `mysqldump --routines`가 **종료 코드 0으로도 프로시저 본문을 생략**했다.
+이때 `information_schema.routines`에서도 해당 객체가 숨겨져 0건 조회가 안전한 근거가 되지 않았다.
+로컬 후보는 덤프 전에 전용 계정의 직접 `SHOW_ROUTINE` 권한을 확인하고, 없으면 파일 생성·업로드 전에
+중단한다. 기존 관리자와의 호환을 위해 직접 전역 `SELECT` 권한도 인식하지만 백업 전용 계정에는
+부여하지 않는다. 역할을 통해 간접 부여하는 구성은 이 후보의 검증 범위 밖이다.
+이 권한은 전역 프로시저·함수 정의를 조회하지만 전역 테이블 `SELECT` 권한은 주지 않는다.
+`TRIGGER`·`EVENT`는 해당 객체를 만드는 권한도 포함하므로 백업 계정을 절대적인 읽기 전용 계정으로
+표현하지 않는다. 시험에서는 백업 계정의 데이터 쓰기, 앱 계정의 DDL, DDL 계정의 데이터 쓰기가 거부됐다.
+데이터 마이그레이션에 필요한 별도 DML 권한은 해당 변경의 승인 범위에서만 추가한다.
+
+로컬 백업 후보는 `--no-tablespaces`로 불필요한 `PROCESS` 권한 요구를 제거했다.
+운영 앱 테이블은 사용자 정의 general tablespace에 속하지 않았고 GTID는 OFF였다.
+사용자 정의 general tablespace·GTID·엔진 구성이 바뀌면 이 전제를 다시 검증한다.
+12개 InnoDB 테이블과 뷰·프로시저·트리거·이벤트를 만든 뒤 **현재 백업 스크립트 → gzip → 실제 복원**을
+통과했다. S3 업로드만 stub으로 대체했으므로 이 시험은 업로드나 운영 권한 변경의 증거가 아니다.
+
+```powershell
+python -B scripts/tests/backup-mysql-roles_test.py --run --docker-host npipe:////./pipe/dockerDesktopLinuxEngine --bash 'C:\Program Files\Git\bin\bash.exe'
+```
 
 ### 1-3. 백업 전용 S3·IAM
 
@@ -217,6 +265,30 @@ curl -fsSL -o /var/backups/reserve/reserve-20260731-031000.sql.gz '<presigned UR
 sudo reserve-restore --dry-run /var/backups/reserve/reserve-20260731-031000.sql.gz
 ```
 
+### 2-5. 백업과 앱 버전의 스키마 호환 확인
+
+백업 생성 뒤 필드가 추가됐으면 SQL 복원이 성공해도 최신 앱이 바로 기동하지 않을 수 있다.
+**백업 객체 → MySQL 복원 → 해당 앱 이미지의 스키마 대조 → 앱 기동 → 실제 API 본문**을
+한 묶음으로 확인한다. 변경 전 백업과 이미지를 보존하고, 필요한 DDL을 승인한 뒤 적용한다.
+백업의 스키마를 최신 스키마와 같다고 가정하지 않는다.
+
+10/2에는 실제 운영 이미지
+`hanjeun/reserve@sha256:be607831a3a095a47c3b92eacf83956400bd34f0036d6c0653077ae9b47b21fe`
+와 독립 S3 백업을 Linux MySQL 8.0.45 격리 컨테이너에서 함께 확인했다.
+처음 `ddl-auto: validate` 기동은 `store.image_autoplay_enabled` 누락으로 실패했다.
+격리 DDL 계정으로 현재 앱의 `update`를 실행하자 이 컬럼 하나가 추가됐고,
+원래 컬럼 값을 행별로 직렬화한 해시와 행 수가 모두 같았다.
+그 뒤 데이터 조회 권한만 가진 시험 계정으로 `validate` 기동과 컨테이너 재시작을 통과했다.
+
+- 직접 Actuator는 JSON `status=UP`, 가게 목록 API는 `success=true`·배열 본문이었다.
+- 재시작 전후 34테이블의 `CHECKSUM TABLE ... EXTENDED` 결과와 기존 데이터 해시가 같았다.
+- `JAVA_OPTS`의 heap·GC·시스템 속성이 실제 PID 1의 Java 인자에 포함됐고 실행 UID는 100이었다.
+- 외부 통신은 차단했고, 메일·PG·AWS·OAuth에는 합성 키만 사용했다. 시험 컨테이너는 제거했다.
+
+이 검증은 **DB와 현재 백엔드 이미지의 격리 복구** 범위다. 운영 서버 중단·재부팅,
+nginx Blue/Green 실패 전환, 이전 프론트 lazy 자산의 보존, 실제 PG·S3 호출과
+앱에서의 전체 사진·과거 암호화 키 호환은 별도 검증한다.
+
 ## 3. 복원 훈련 (분기 1회)
 
 운영 DB를 건드리지 않고 별도 DB로 복원해 확인해요.
@@ -263,9 +335,9 @@ sudo reserve-restore /var/backups/reserve/<최신파일>
 {job="backup"} |= "ERROR"
 ```
 
-최근 26시간 동안 완료 로그가 없으면 알리는 규칙은 [모니터링](monitoring.md)의 설계예요.
-설정 파일만으로 설치·발송 성공을 단정하지 않아요. 새 backup 스트림 유입, No data/Error 처리,
-연락처와 실제 수신을 확인한 뒤 규칙을 활성화해요. 기존 positions를 초기화하거나 과거 로그를
+최근 26시간 동안 완료 로그가 없으면 알리는 규칙은 [모니터링](monitoring.md)을 따라요.
+운영 설치본의 26시간 창·No data/Error Alerting과 활성 상태를 확인했어요. 실제 정기 실행의 새
+backup 스트림과 자연 평가·메일 수신은 별도로 확인해요. 기존 메일 한 경로를 유지해요. 기존 positions를 초기화하거나 과거 로그를
 재주입해서 수집 성공으로 만들지 않아요.
 
 Loki 결과가 비어 있으면 root cron, 원본 `backup.log`, 로컬 덤프와 S3 최신 객체를 각각
@@ -331,3 +403,10 @@ sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -
 curl -s -o /dev/null -w '%{http_code}\n' 'https://reserve.it.kr/api/stores?size=1'
 unset NEWPW MYSQL_PWD
 ```
+
+## 복원 훈련 이력
+
+| 날짜 | 대상 | 확인한 범위 |
+|---|---|---|
+| 2026-10-02 | S3 `reserve-20260930-181001.sql.gz`, 34 tables·13,883 bytes | Linux MySQL 8.0.45 독립 복원 34테이블·66행, `CHECK TABLE` 34건 성공; 원본 객체 해시 확인, 운영 DB 불변; 새 정기 백업은 별도 확인 |
+| 2026-10-02 | 최소 권한 합성 fixture | 현재 백업 스크립트로 12테이블·뷰·프로시저·트리거·이벤트 복원 성공; `SHOW_ROUTINE` 누락 시 성공 코드의 프로시저 생략 재현; S3 업로드 stub, 운영 계정 불변 |

@@ -155,6 +155,11 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 - 모든 입력 필드는 `variant="filled"`, `border: none`, `colors.gray[50]` 배경, `radius.lg`, `heights.input`, 16px 글꼴이에요. `.reserve-form-field` 클래스가 전역으로 강제해요.
 - 포커스는 `components-and-forms.css`의 규칙 한 곳에서 1px 중간 회색(`gray-500`) 안쪽 테두리로 보여요. 오류 상태의 빨간 링은 덮지 않아요.
 
+시간 범위 모달의 시작·종료 숫자는 직접 입력할 수 있다. `10:52` 또는 `1052` 같은 24시간 입력이
+완성되면 오전·오후·시·분 휠도 같은 값으로 정렬한다. 이후 입력·선택 값이 바뀌면 기존 시간 휠의 0.2초 전환을 사용하며, 동작 줄이기 설정에서는 즉시 정렬한다.
+잘못된 시간은 확정을 막고, 취소는 원래 값을 유지한다.
+모바일 숫자 입력창은 16px를 유지해 입력할 때 화면이 확대되지 않게 한다.
+
 입력창 옆 실행 버튼은 두 패턴이에요.
 
 | 용도 | 패턴 |
@@ -178,6 +183,11 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 - 오늘은 작은 중립 점으로 표시해요.
 - 월·연도 이동, 일요일 색, 비활성 날짜, 모바일 좌우 swipe를 제공해요.
 
+확정된 단일 날짜와 기간의 양끝, 예약 인원은 `RollingFieldValue`로 표시한다. 날짜가 미래로 또는
+인원이 증가하면 위로, 이전 날짜로 또는 인원이 감소하면 아래로 200ms 동안 이동하며 살짝 회전한다.
+날짜는 모달이 닫힌 뒤 전환하고, 연속 입력은 이전 전환을 중단해 최신 값을 표시한다.
+현재 값은 접근성 이름에 즉시 반영하고, `prefers-reduced-motion`에서는 전환 없이 표시한다.
+
 ### FormModal
 
 ```jsx
@@ -193,7 +203,22 @@ import { FormModal, FormField } from '../components/common';
 
 - 다단계 폼은 `Modal`에 `key`를 주지 않고, `scrollResetKey`에 현재 단계를 넘겨요.
 - AntD popup 레이어는 `spacing.js`의 `zIndex.modal`(1100)이고, `App.jsx`의 `zIndexPopupBase`에서 적용해요.
-- 확인 모달은 `useMessage.confirm`(`reserve-confirm-root`)을 써요. 좌우 16px·safe-area·`100svh` 안에 들어가고, 긴 본문만 스크롤하며 버튼 행은 최소 44px이에요.
+- 확인 모달은 `useMessage.confirm`(`reserve-confirm-root`)을 써요. 좌우 16px·safe-area·`100svh` 안에 들어가고, 긴 본문만 스크롤하며 버튼은 문구에 따른 너비·최소 36px 높이를 사용해요.
+
+모달의 취소·확인 버튼은 `ModalActions`를 사용한다. 테두리 있는 취소와 채운 확인 버튼을
+기본 높이 36px·좌우 여백 20px·모서리 반경 16px를 공유한다. 너비는 각 버튼의 문구 길이로 정하며
+고정 너비나 같은 너비의 열을 쓰지 않는다. `다음`이 `선택 완료`로 바뀌면 확인만 길어지고 취소는
+자기 문구에 맞는 너비를 유지한다. `modal-layout.css`에서 강제하며, 화면 폭보다 긴 문구는 줄바꿈한다.
+서로 다른 두 결정(인증 거절·승인)은 `ModalActionGroup`에서 기존 의미 색을 유지한다.
+날짜·시간의 전체 해제는 별도 텍스트 동작으로 두고, 좁은 화면에서는 버튼 묶음을 다음 줄로 옮긴다.
+QR 스캐너 시트의 큰 터치 버튼은 같은 높이와 동일한 두 열을 사용한다.
+모달 밖의 편집 폼도 취소는 `outline`, 저장은 `primary`를 같은 높이로 사용한다.
+
+배경 스크롤은 `App`의 `useModalScrollLock`에서 모든 열린 모달과 사진 프리뷰에 공통 적용한다.
+마지막 모달이 닫히면 기존 페이지 위치와 body 위치 속성을 복원한다. 모달 본문·휠·포털로 열린
+선택 목록의 내부 스크롤은 허용하고, 경계에서 배경으로 넘어가는 터치를 막는다.
+달력 가로 스와이프·사진 확대/이동·핀치는 유지한다. 사진이 아닌 메신저 패널은 비모달이므로 잠그지 않는다.
+
 
 ### PageContainer
 

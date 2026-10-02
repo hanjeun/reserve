@@ -24,7 +24,7 @@ RESERVE가 쓰는 제3자 소프트웨어와 글꼴의 라이선스 안내예요
 
 - 포함·재배포할 때 [SIL Open Font License 1.1 원문](https://openfontlicense.org/open-font-license-official-text/)과 각 글꼴의 저작권 고지를 함께 유지해야 해요.
 - npm 밖에 저장한 글꼴은 npm 라이선스 도구 검사만으로 확인되지 않아요.
-- 현재 vendored SUITE 파일 옆에는 원문 고지 파일이 없어요. 배포 산출물에 원문이 동봉되는지는 따로 확인해야 해요.
+- SUITE 2.0.4 원본과 글꼴 파일의 해시가 같아요. [SUITE-LICENSE.txt](frontend/public/fonts/SUITE-LICENSE.txt)에 원문 고지를 함께 보관해요. 실제 릴리스 산출물에 원문이 동봉되는지도 확인해요.
 
 ### 백엔드 (Gradle)
 
@@ -56,7 +56,7 @@ Upstream: [Pretendard](https://github.com/orioncactus/pretendard), [SUITE](https
 
 - Retain the [SIL Open Font License 1.1](https://openfontlicense.org/open-font-license-official-text/) and each font's copyright notices when bundling or redistributing.
 - Fonts vendored outside npm require separate verification.
-- No upstream notice file currently accompanies the vendored SUITE file in its directory; inclusion in release artifacts remains to be checked.
+- The font matches the upstream SUITE 2.0.4 file by hash. Its original notice accompanies it in [SUITE-LICENSE.txt](frontend/public/fonts/SUITE-LICENSE.txt). Verify inclusion in actual release artifacts separately.
 
 ### Backend (Gradle)
 

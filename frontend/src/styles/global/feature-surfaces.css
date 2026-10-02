@@ -182,6 +182,72 @@
 
 /* 달력 모달 — 시간 pill 이 놓인 배경과 같은 흰 바탕. 여백만 조금 좁힌다. */
 .reserve-cal-modal .ant-modal-body { padding: 10px 6px 6px; }
+
+/* 시간 입력도 날짜 모달의 중립 선택면을 사용한다. 스크롤은 브라우저가 맡는다. */
+.reserve-time-parts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: 0; margin: 0 0 14px; padding: 0; border: 0; }
+.reserve-time-part-label { display: block; margin-bottom: 3px; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-part-value { display: block; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--c-text-primary, #191f28); }
+.reserve-time-parts button.reserve-time-part-label { width: 100%; padding: 0; border: 0; background: transparent; text-align: left; font-family: inherit; cursor: pointer; }
+.reserve-time-parts input.reserve-time-part-value { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; font-family: inherit; font-size: 16px; line-height: 1.5; }
+.reserve-time-parts input.reserve-time-part-value:focus { outline: none; }
+.reserve-time-parts button.reserve-time-part-label:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; border-radius: 4px; }
+.reserve-time-heading { margin-bottom: 14px; text-align: center; font-size: 18px; font-weight: 600; color: var(--c-text-primary, #191f28); }
+.reserve-time-wheels { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.reserve-time-wheels::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--reserve-time-row-height) * 2);
+    height: var(--reserve-time-row-height);
+    border-radius: 10px;
+    background: var(--c-gray-100, #f2f4f6);
+    pointer-events: none;
+}
+.reserve-time-column { position: relative; min-width: 0; text-align: center; }
+.reserve-time-column-label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-wheel {
+    height: calc(var(--reserve-time-row-height) * 5);
+    padding: calc(var(--reserve-time-row-height) * 2) 0;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y pinch-zoom;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+    user-select: none;
+    cursor: grab;
+    border-radius: 10px;
+    mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
+}
+.reserve-time-wheel::-webkit-scrollbar { display: none; }
+.reserve-time-wheel:focus { outline: none; }
+.reserve-time-wheel:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
+.reserve-time-wheel[data-dragging="true"], .reserve-time-wheel[data-dragging="true"] .reserve-time-option { cursor: grabbing; }
+.reserve-time-option {
+    display: block;
+    width: 100%;
+    height: var(--reserve-time-row-height);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-tertiary, #8b95a1);
+    font: inherit;
+    font-size: 20px;
+    line-height: var(--reserve-time-row-height);
+    font-variant-numeric: tabular-nums;
+    scroll-snap-align: center;
+    cursor: grab;
+}
+.reserve-time-option[aria-selected="true"] { color: var(--c-text-primary, #191f28); font-weight: 600; }
+.reserve-time-hint { margin: 10px 0 0; text-align: center; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-sessions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 14px; }
+.reserve-time-session-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; max-height: 120px; overflow-y: auto; }
+.reserve-time-session { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--c-gray-100, #f2f4f6); color: var(--c-text-primary, #191f28); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.reserve-time-session .anticon { font-size: 11px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-session:hover { background: var(--c-gray-200, #e5e8eb); }
+.reserve-time-session:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
+.reserve-time-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--c-border-light, #f2f4f6); }
 /* ══ 인앱 채팅 — 런처·패널·입력칸 (MessengerShell / 관리자 ChatTab 공용) ═══════
    ★ 2026-08-24 2차 수정. 1차 때 JSX 에 className 만 써두고 **여기에 대응하는 규칙을
      한 줄도 안 넣었다.** 그래서 열고 닫을 때 창이 그냥 뿅 나타났다 사라졌고
@@ -511,7 +577,7 @@
 .reserve-messenger-welcome-sender { display: flex; align-items: center; gap: 10px; }
 .reserve-messenger-welcome-sender strong { font-size: 14px; }
 .reserve-messenger-welcome p { margin: 14px 0 18px; font-size: 14px; line-height: 1.65; color: var(--c-text-secondary, #4e5968); }
-.reserve-messenger-primary-action { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--c-primary, #3182f6); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s ease, transform 0.12s ease; }
+.reserve-messenger-primary-action { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--c-primary, #3182f6) 50%, #000); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s ease, transform 0.12s ease; }
 .reserve-messenger-primary-action:hover { opacity: 0.88; }
 .reserve-messenger-primary-action:active { opacity: 0.78; transform: scale(0.98); }
 .reserve-messenger-primary-action:focus { outline: none; }
@@ -525,7 +591,7 @@
 .reserve-messenger-footer-tab.is-active { color: var(--c-primary, #3182f6); font-weight: 700; }
 .reserve-messenger-footer-tab:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: -2px; }
 .reserve-messenger-footer-icon { position: relative; display: inline-flex; font-size: 21px; transition: color 0.15s ease; }
-.reserve-messenger-footer-badge { position: absolute; top: 3px; left: calc(50% + 8px); min-width: 16px; padding: 2px 4px; border-radius: 20px; background: var(--c-error, #f04452); color: #fff; font-size: 9px; }
+.reserve-messenger-footer-badge { position: absolute; top: 3px; left: calc(50% + 8px); min-width: 16px; padding: 2px 4px; border-radius: 20px; background: color-mix(in srgb, var(--c-error, #f04452) 50%, #000); color: #fff; font-size: 9px; }
 .reserve-messenger-settings { display: flex; flex-direction: column; min-height: 0; }
 .reserve-messenger-settings-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
 .reserve-messenger-settings-profile { display: flex; flex-direction: column; align-items: center; padding: 16px 0 28px; gap: 12px; text-align: center; }
@@ -544,9 +610,9 @@
 .reserve-messenger-settings-environment > p { font-size: 11px; line-height: 1.65; color: var(--c-text-tertiary, #8b95a1); }
 .reserve-messenger-notification-control .reserve-btn { min-height: 44px; }
 .reserve-messenger-notification-control p {
-    margin: 0;
+    margin: 4px 0 0;
     color: var(--c-text-tertiary, #8b95a1);
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.65;
 }
 .reserve-messenger-notification-control {
@@ -559,7 +625,6 @@
     border-top: 1px solid var(--c-border-light, #f2f4f6);
     border-bottom: 0;
 }
-.reserve-messenger-notification-control p { margin-top: 4px; font-size: 11px; }
 .reserve-messenger-list,
 .reserve-messenger-thread {
     min-width: 0;
@@ -735,7 +800,7 @@
     height: 20px;
     padding: 0 6px;
     border-radius: 999px;
-    background: var(--c-error, #f04452);
+    background: color-mix(in srgb, var(--c-error, #f04452) 50%, #000);
     color: #fff;
     display: inline-flex;
     align-items: center;
@@ -1488,6 +1553,8 @@
     transition: opacity 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
     animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+/* 검색 닫힘은 이전 헤더의 복원이다. 다음 일반 이동과 실제 뒤로가기의 닫힘 모션은 유지한다. */
+.reserve-app-layout[data-search-restored] > .reserve-header .reserve-header-back:not(.reserve-header-back--leaving) { animation: none; }
 .reserve-header-back:hover { background: var(--c-gray-50, #f9fafb); }
 .reserve-header-back:active { opacity: 0.65; }
 .reserve-header-back--leaving { pointer-events: none; animation: reserve-header-back-leave 0.18s cubic-bezier(0.4, 0, 1, 1) both; }

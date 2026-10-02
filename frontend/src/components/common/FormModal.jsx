@@ -27,9 +27,9 @@
 import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Typography } from 'antd';
-import Button from './Button';
+import ModalActions from './ModalActions';
 // colors 는 더 이상 쓰지 않는다 — 에러 텍스트 색은 index.css 의 .reserve-field-error 가 맡는다.
-import { fontSize, radius } from '../../styles/tokens';
+import { fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
 
@@ -109,15 +109,9 @@ const FormModal = ({
             footer={
                 footer !== undefined ? footer : (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-                        {/* 취소 = 테두리 있는 outline (위 컨벤션 주석 참고) */}
-                        <Button variant="outline" size="sm" onClick={onCancelAction || onClose} disabled={submitting}
-                            style={{ borderRadius: radius.xl }}>
-                            {cancelText}
-                        </Button>
-                        <Button variant="primary" size="sm" loading={submitting} disabled={submitDisabled} onClick={onSubmit}
-                            style={{ borderRadius: radius.xl }}>
-                            {submitText}
-                        </Button>
+                        <ModalActions onCancel={onCancelAction || onClose} onConfirm={onSubmit}
+                            cancelText={cancelText} confirmText={submitText}
+                            loading={submitting} disabled={submitDisabled} cancelDisabled={submitting} />
                     </div>
                 )
             }

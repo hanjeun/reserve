@@ -1,0 +1,90 @@
+{{ define "reserve.alert" }}
+{{ $payment := eq .Labels.alertname "RESERVE · 결제 운영 큐 미결" }}
+{{ $unavailable := or (eq .Labels.alertname "DatasourceError") (eq .Labels.alertname "DatasourceNoData") (eq .Annotations.grafana_state_reason "Error") (eq .Annotations.grafana_state_reason "NoData") }}
+<tr><td class="content-padding" style="padding:0 32px 24px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="table-layout:fixed;border:1px solid #e5e8eb;border-radius:16px;background:#ffffff;">
+    <tr><td style="padding:24px;overflow-wrap:anywhere;word-break:break-word;">
+      <h2 style="margin:0 0 12px;color:#1a1f27;font-size:18px;font-weight:700;line-height:1.5;">{{ if $unavailable }}알림을 점검할 데이터를 읽지 못했어요{{ else if $payment }}결제 기록을 확인해주세요{{ else if .Labels.alertname }}{{ .Labels.alertname }}{{ else }}운영 알림{{ end }}</h2>
+      {{ if $unavailable }}
+      <p style="margin:0 0 20px;color:#4e5968;font-size:14px;line-height:1.7;">로그가 없거나 조회 중 오류가 났어요. 실제 서비스 장애와는 구분해서 확인해야 해요.<br>알림 상세에서 조회 오류와 로그 수집 상태를 먼저 확인해주세요.</p>
+      {{ else if $payment }}
+      <p style="margin:0 0 12px;color:#1a1f27;font-size:15px;line-height:1.7;">결제 처리나 예약금 표시에 확인할 내용이 있어요.</p>
+      <p style="margin:0 0 20px;color:#4e5968;font-size:14px;line-height:1.7;">새 결제 오류뿐 아니라 예전 기록의 표시 차이로도 알림이 올 수 있어요. 이 알림만으로 중복 결제나 환불 실패가 확인된 것은 아니에요.<br>운영 대시보드에서 항목별 건수를 확인하고, 예약·결제·환불 기록을 읽기 전용으로 대조해주세요.<br>확인 전에는 결제 표시를 직접 바꾸거나 환불을 다시 실행하지 않아요.</p>
+      {{ else }}
+      {{ if .Annotations.summary }}<p style="margin:0 0 12px;color:#1a1f27;font-size:15px;line-height:1.7;">{{ .Annotations.summary }}</p>{{ end }}
+      {{ if .Annotations.description }}<p style="margin:0 0 20px;color:#4e5968;font-size:14px;line-height:1.7;">{{ range $line := splitList "\n" .Annotations.description }}{{ $line }}<br>{{ end }}</p>{{ end }}
+      {{ end }}
+      {{ if .Values }}
+      {{ if and $payment (not $unavailable) }}
+      {{ range $ref, $value := .Values }}{{ if eq $ref "A" }}
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px;border-radius:10px;background:#f9fafb;">
+        <tr><td style="padding:12px 16px;color:#4e5968;font-size:13px;line-height:1.7;word-break:break-word;"><strong style="color:#1a1f27;">확인 요청 로그 · 최근 20분</strong><br>{{ $value }}회 남았어요. 영향받는 예약 수와는 달라요.</td></tr>
+      </table>
+      {{ end }}{{ end }}
+      {{ end }}
+      {{ end }}
+      {{ if .ImageURL }}<img src="{{ .ImageURL }}" alt="알림 관련 그래프" width="496" style="display:block;width:100%;max-width:496px;height:auto;margin:0 0 16px;border:0;border-radius:10px;">{{ end }}
+      {{ if .EmbeddedImage }}<img src="cid:{{ .EmbeddedImage }}" alt="알림 관련 그래프" width="496" style="display:block;width:100%;max-width:496px;height:auto;margin:0 0 16px;border:0;border-radius:10px;">{{ end }}
+      {{ if .GeneratorURL }}<p style="margin:0 0 16px;"><a href="{{ .GeneratorURL }}" style="display:inline-block;padding:12px 20px;border-radius:16px;background:#1a1f27;color:#ffffff;font-size:14px;font-weight:700;line-height:20px;text-decoration:none;">알림 상세 확인</a></p>{{ end }}
+      <p style="margin:0 0 16px;font-size:13px;line-height:2;">
+        {{ if .Annotations.runbook_url }}<a href="{{ .Annotations.runbook_url }}" style="color:#4e5968;text-decoration:underline;">확인 방법</a>&nbsp;&nbsp;{{ end }}
+        {{ if .DashboardURL }}<a href="{{ .DashboardURL }}" style="color:#4e5968;text-decoration:underline;">대시보드</a>&nbsp;&nbsp;{{ end }}
+        {{ if .PanelURL }}<a href="{{ .PanelURL }}" style="color:#4e5968;text-decoration:underline;">패널</a>&nbsp;&nbsp;{{ end }}
+        {{ if .SilenceURL }}<a href="{{ .SilenceURL }}" style="color:#4e5968;text-decoration:underline;">알림 일시 중지 설정</a>{{ end }}
+      </p>
+      <table aria-label="알림 기술 정보" width="100%" cellspacing="0" cellpadding="0" style="table-layout:fixed;border-top:1px solid #f2f4f6;font-size:12px;line-height:1.6;">
+        {{ if .Values }}<tr><th scope="row" width="36%" align="left" style="padding:8px 12px 0 0;vertical-align:top;color:#6b7684;font-weight:500;">진단용 값</th><td style="padding:8px 0 0;color:#6b7684;">{{ range $ref, $value := .Values }}{{ $ref }} = {{ $value }}&nbsp;&nbsp;{{ end }}<br>조회·집계·조건 판정에 쓰는 값이에요.</td></tr>{{ end }}
+        {{ range .Labels.SortedPairs }}<tr><th scope="row" width="36%" align="left" style="padding:8px 12px 0 0;vertical-align:top;color:#6b7684;font-weight:500;overflow-wrap:anywhere;word-break:break-word;">{{ .Name }}</th><td style="padding:8px 0 0;color:#4e5968;overflow-wrap:anywhere;word-break:break-word;">{{ .Value }}</td></tr>{{ end }}
+        {{ if or $payment $unavailable }}{{ if .Annotations.summary }}<tr><th scope="row" width="36%" align="left" style="padding:8px 12px 0 0;vertical-align:top;color:#6b7684;font-weight:500;">원본 요약</th><td style="padding:8px 0 0;color:#6b7684;overflow-wrap:anywhere;word-break:break-word;">{{ .Annotations.summary }}</td></tr>{{ end }}{{ if .Annotations.description }}<tr><th scope="row" width="36%" align="left" style="padding:8px 12px 0 0;vertical-align:top;color:#6b7684;font-weight:500;">원본 설명</th><td style="padding:8px 0 0;color:#6b7684;overflow-wrap:anywhere;word-break:break-word;">{{ .Annotations.description }}</td></tr>{{ end }}{{ end }}
+        {{ range .Annotations.SortedPairs }}{{ if and (ne .Name "summary") (ne .Name "description") (ne .Name "runbook_url") }}<tr><th scope="row" width="36%" align="left" style="padding:8px 12px 0 0;vertical-align:top;color:#6b7684;font-weight:500;overflow-wrap:anywhere;word-break:break-word;">{{ .Name }}</th><td style="padding:8px 0 0;color:#4e5968;overflow-wrap:anywhere;word-break:break-word;">{{ .Value }}</td></tr>{{ end }}{{ end }}
+      </table>
+      {{ if not .StartsAt.IsZero }}<p style="margin:16px 0 0;color:#6b7684;font-size:12px;line-height:1.6;">발생 시각 · {{ .StartsAt.UTC.Format "2006-01-02 15:04:05" }} UTC</p>{{ end }}
+    </td></tr>
+  </table>
+</td></tr>
+{{ end }}
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ Subject .Subject .TemplateData "{{ .Title }}" }}</title>
+  <style>
+    body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
+    table { border-collapse:separate; border-spacing:0; }
+    img { border:0; }
+    @media only screen and (max-width:600px) {
+      .outer-padding { padding:16px 12px !important; }
+      .content-padding { padding-left:20px !important; padding-right:20px !important; }
+      .headline { font-size:24px !important; }
+    }
+  </style>
+</head>
+<body style="background:#f9fafb;color:#1a1f27;font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">RESERVE 운영 알림 · 확인 필요 {{ len .Alerts.Firing }}건 · 조건 해제 {{ len .Alerts.Resolved }}건</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f9fafb;">
+    <tr><td class="outer-padding" align="center" style="padding:40px 16px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:608px;table-layout:fixed;background:#ffffff;border:1px solid #e5e8eb;border-radius:20px;">
+        <tr><td class="content-padding" style="padding:32px 32px 0;">
+          <p style="margin:0;color:#3182f6;font-size:22px;font-weight:800;letter-spacing:-0.8px;line-height:1.4;">RESERVE</p>
+        </td></tr>
+        <tr><td class="content-padding" style="padding:32px 32px 24px;">
+          <h1 class="headline" style="margin:0 0 12px;color:#1a1f27;font-size:28px;font-weight:800;letter-spacing:-0.8px;line-height:1.4;">{{ if .Alerts.Firing }}확인이 필요한<br>알림이 있어요.{{ else if .Alerts.Resolved }}알림 조건이<br>해제됐어요.{{ else }}운영 알림을<br>확인해주세요.{{ end }}</h1>
+          {{ if .Alerts.Firing }}<span style="display:inline-block;margin:0 8px 8px 0;padding:6px 12px;border-radius:10px;background:#fff0f1;color:#b42332;font-size:13px;font-weight:700;line-height:20px;">확인 필요 · {{ len .Alerts.Firing }}건</span>{{ end }}
+          {{ if .Alerts.Resolved }}<span style="display:inline-block;margin:0 8px 8px 0;padding:6px 12px;border-radius:10px;background:#e8f9ee;color:#08783e;font-size:13px;font-weight:700;line-height:20px;">알림 조건 해제 · {{ len .Alerts.Resolved }}건</span>{{ end }}
+        </td></tr>
+        {{ if .Message }}
+        <tr><td class="content-padding" style="padding:0 32px 24px;"><div style="padding:24px;border-radius:16px;background:#f9fafb;color:#4e5968;font-size:14px;line-height:1.7;overflow-wrap:anywhere;word-break:break-word;">{{ range $line := splitList "\n" .Message }}{{ $line }}<br>{{ end }}</div></td></tr>
+        {{ else }}
+        {{ if .Alerts.Firing }}{{ range .Alerts.Firing }}{{ template "reserve.alert" . }}{{ end }}{{ end }}
+        {{ if .Alerts.Resolved }}<tr><td class="content-padding" style="padding:0 32px 12px;color:#08783e;font-size:13px;font-weight:700;line-height:1.6;">조건이 해제된 알림</td></tr>{{ range .Alerts.Resolved }}{{ template "reserve.alert" . }}{{ end }}{{ end }}
+        {{ end }}
+        <tr><td class="content-padding" style="padding:0 32px 24px;"><p style="margin:0;font-size:13px;line-height:1.7;"><a href="{{ .AlertPageUrl }}" style="color:#4e5968;font-weight:600;text-decoration:underline;">전체 알림 상태 보기</a></p></td></tr>
+        <tr><td class="content-padding" style="padding:24px 32px 32px;border-top:1px solid #f2f4f6;">
+          <p style="margin:0;color:#6b7684;font-size:12px;line-height:1.7;">Sent by <a href="{{ .AppUrl }}" style="color:#6b7684;text-decoration:underline;">Grafana v{{ .BuildVersion }}</a> · Grafana Labs</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

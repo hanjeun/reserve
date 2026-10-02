@@ -127,9 +127,9 @@ export function createChatNotifier({
         if (permission() === 'granted') return Promise.resolve(change('enabled', true));
         change('requesting');
 
-        // requestPermission을 await 앞에서 호출해야 사용자 제스처를 잃지 않는다.
-        // executor는 동기 호출이므로 사용자 제스처를 유지하고 동기 예외도 rejection으로 처리한다.
-        const request = new Promise(resolve => resolve(NotificationApi.requestPermission()));
+        // requestPermission을 지연 없이 호출해 사용자 제스처를 유지한다.
+        // async 본문은 즉시 실행되고 동기 예외도 아래 catch로 전달된다.
+        const request = (async () => NotificationApi.requestPermission())();
         const pending = request
             .then((result) => {
                 if (disposed || ticket !== generation) return getState();

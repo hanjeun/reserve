@@ -123,6 +123,8 @@ test('ordinary routes and the password return use the same content-only directio
 test('top tab switch is immediate with reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
+    await expect(page.locator('.reserve-boot-shell')).toHaveCount(0);
+    await expect(page.locator('.ant-layout-content > .reserve-discovery-home')).toBeVisible();
     await page.getByRole('link', { name: '웨이팅', exact: true }).click();
     const content = page.locator('.ant-layout-content');
     await expect(content).toHaveClass(/reserve-route-entry--from-right/);

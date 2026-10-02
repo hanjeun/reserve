@@ -43,6 +43,7 @@ public class AuthApiController {
     private final TokenService tokenService;
     private final RateLimiter rateLimiter;
     private final CookieUtil cookieUtil;
+    private static final String ACCESS_TOKEN_COOKIE = "access_token";
 
     /**
      * 로그인 실패 시 내보내는 <b>유일한</b> 문구. 미가입·소셜계정·비번불일치를 구분하지 않는다.
@@ -165,7 +166,7 @@ public class AuthApiController {
         // 로그인 14일째에 쿠키를 지우지 않는다 — 토큰만 바꾸고 쿠키를 안 바꾸면 연장이 의미 없다.
         TokenService.RefreshResult result = tokenService.refresh(refreshToken);
 
-        cookieUtil.addCookie(response, "access_token", result.accessToken(),
+        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, result.accessToken(),
                 (int) jwtProperties.getAccessTokenExpiration().toSeconds());
         cookieUtil.addCookie(response, "refresh_token", result.refreshToken(),
                 (int) result.refreshMaxAge().toSeconds());
@@ -194,8 +195,8 @@ public class AuthApiController {
         if (refreshToken != null && !refreshToken.isBlank()) {
             tokenService.revoke(refreshToken);
         }
-        cookieUtil.deleteCookie(request, response, "access_token");
-        cookieUtil.deleteCookie(request, response, "refresh_token");
+        cookieUtil.deleteCookie(response, ACCESS_TOKEN_COOKIE);
+        cookieUtil.deleteCookie(response, "refresh_token");
 
         return ApiResponse.success(null, "로그아웃 성공");
     }
@@ -204,7 +205,7 @@ public class AuthApiController {
         String accessToken = tokenProvider.generateAccessToken(member);
         String refreshToken = tokenProvider.generateRefreshToken(member);
 
-        cookieUtil.addCookie(response, "access_token", accessToken, (int) jwtProperties.getAccessTokenExpiration().toSeconds());
+        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, accessToken, (int) jwtProperties.getAccessTokenExpiration().toSeconds());
         cookieUtil.addCookie(response, "refresh_token", refreshToken, (int) jwtProperties.getRefreshTokenExpiration().toSeconds());
     }
 }

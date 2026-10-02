@@ -13,7 +13,6 @@ import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
@@ -45,12 +44,11 @@ public class MemberApiController {
     @PutMapping("/password")
     public ApiResponse<Void> changePassword(
             @Valid @RequestBody PasswordChangeRequest request,
-            HttpServletRequest httpRequest,
             HttpServletResponse response) {
         Member member = SecurityUtil.getCurrentMember("비밀번호 변경 권한이 없습니다.");
         memberService.changePassword(member.getId(), request);
-        cookieUtil.deleteCookie(httpRequest, response, "access_token");
-        cookieUtil.deleteCookie(httpRequest, response, "refresh_token");
+        cookieUtil.deleteCookie(response, "access_token");
+        cookieUtil.deleteCookie(response, "refresh_token");
         return ApiResponse.success(null, "비밀번호가 변경되었습니다. 다시 로그인해주세요.");
     }
 
@@ -97,11 +95,11 @@ public class MemberApiController {
     }
 
     @DeleteMapping("/delete")
-    public ApiResponse<Void> deleteMember(HttpServletRequest request, HttpServletResponse response) {
+    public ApiResponse<Void> deleteMember(HttpServletResponse response) {
         Member member = SecurityUtil.getCurrentMember("탈퇴 권한이 없습니다.");
         memberService.deleteMember(member.getId());
-        cookieUtil.deleteCookie(request, response, "access_token");
-        cookieUtil.deleteCookie(request, response, "refresh_token");
+        cookieUtil.deleteCookie(response, "access_token");
+        cookieUtil.deleteCookie(response, "refresh_token");
         return ApiResponse.success(null, "회원 탈퇴가 완료되었습니다.");
     }
 }

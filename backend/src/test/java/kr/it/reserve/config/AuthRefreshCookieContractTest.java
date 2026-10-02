@@ -50,12 +50,36 @@ class AuthRefreshCookieContractTest {
         JwtProperties.TokenConfig access = new JwtProperties.TokenConfig();
         access.setExpirationMinutes(30);
         properties.setAccessToken(access);
+        properties.getRefreshToken().setExpirationDays(14);
 
         AuthApiController controller = new AuthApiController(
                 memberService, tokenProvider, passwordEncoder, properties, tokenService, rateLimiter, new CookieUtil("prod"));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @Test
+    void loginIssuesBothSecureCookiesWithoutReturningTokenValues() throws Exception {
+        var member = kr.it.reserve.member.entity.Member.builder().id(7L).name("시험 회원")
+                .email("member@example.test").password("stored-test-hash")
+                .role(kr.it.reserve.member.entity.Role.USER).build();
+        when(rateLimiter.tryConsume(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(RateLimiter.Policy.LOGIN))).thenReturn(true);
+        when(memberService.findByEmailOrNull("member@example.test")).thenReturn(member);
+        when(passwordEncoder.matches("test-password", "stored-test-hash")).thenReturn(true);
+        when(tokenProvider.generateAccessToken(member)).thenReturn("login-access");
+        when(tokenProvider.generateRefreshToken(member)).thenReturn("login-refresh");
+        var response = mockMvc.perform(post("/api/auth/login").contentType("application/json")
+                        .content("{\"email\":\"member@example.test\",\"password\":\"test-password\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(7))
+                .andReturn().getResponse();
+        assertThat(response.getContentAsString()).doesNotContain("login-access", "login-refresh");
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(2)
+                .anySatisfy(cookie -> assertThat(cookie).startsWith("access_token=login-access;")
+                        .contains("Max-Age=1800", "Secure", "HttpOnly", "SameSite=Lax"))
+                .anySatisfy(cookie -> assertThat(cookie).startsWith("refresh_token=login-refresh;")
+                        .contains("Max-Age=1209600", "Secure", "HttpOnly", "SameSite=Lax"));
     }
 
     @Test

@@ -3,7 +3,6 @@ package kr.it.reserve.config;
 import kr.it.reserve.config.util.CookieUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,9 +16,9 @@ class CookieEnvironmentIsolationTest {
         MockHttpServletResponse localResponse = new MockHttpServletResponse();
 
         production.addCookie(productionResponse, "session", "value", 60);
-        production.deleteCookie(new MockHttpServletRequest(), productionResponse, "session");
+        production.deleteCookie(productionResponse, "session");
         local.addCookie(localResponse, "session", "value", 60);
-        local.deleteCookie(new MockHttpServletRequest(), localResponse, "session");
+        local.deleteCookie(localResponse, "session");
 
         assertThat(productionResponse.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(2)
                 .allSatisfy(cookie -> assertThat(cookie).contains("Secure", "HttpOnly", "SameSite=Lax", "Path=/"));

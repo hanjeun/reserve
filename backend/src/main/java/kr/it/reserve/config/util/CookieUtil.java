@@ -61,7 +61,7 @@ public class CookieUtil {
         response.addHeader("Set-Cookie", sb.toString());
     }
 
-    public void deleteCookie(HttpServletRequest request, HttpServletResponse response, String name) {
+    public void deleteCookie(HttpServletResponse response, String name) {
         // addCookie와 동일한 SameSite/Secure 속성으로 삭제해야 브라우저가 매칭해서 삭제함
         String sameSite = SAME_SITE;
 

@@ -95,6 +95,6 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         if (session != null) {
             session.invalidate();
         }
-        cookieUtil.deleteCookie(request, response, "JSESSIONID");
+        cookieUtil.deleteCookie(response, "JSESSIONID");
     }
 }

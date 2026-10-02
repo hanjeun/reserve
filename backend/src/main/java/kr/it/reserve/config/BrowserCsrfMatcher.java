@@ -48,4 +48,3 @@ final class BrowserCsrfMatcher implements RequestMatcher {
         }
     }
 }
-

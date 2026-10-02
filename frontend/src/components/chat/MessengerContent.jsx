@@ -96,7 +96,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const showThread = isConversations && ((isWide && activeThread) || mobileThreadVisible);
     const threadKey = showThread ? selectionKey : null;
     const imageDraft = useChatImageDraft(threadKey);
-    const readScopeRef = useRef(null);
+    const readScopeRef = useRef(/** @type {{threadKey: string | null, identity: string, loading: boolean, roomId: number | null} | null} */ (null));
     const notificationTargetRef = useRef(null);
     const openNotifiedConversation = useCallback(roomId => {
         const target = notificationTargetRef.current;
@@ -165,10 +165,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         if (readCount > 0) {
             queryClient.setQueryData(chatKeys.unread(), (count) => Math.max(0, Number(count ?? 0) - readCount));
         }
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     }, [queryClient, selection]);
     const onLoaded = useCallback((loadedThread) => {
         const readCount = selectedUnreadRef.current;
@@ -182,10 +182,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         clearUnreadCaches(readCount);
     }, [clearUnreadCaches, selectionKey]);
     const onSent = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     }, [queryClient]);
     const onError = useCallback((text) => message.error(text), [message]);
     const onPolled = useCallback((roomId, fresh) => {
@@ -235,14 +235,14 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     }, [threadKey, sessionIdentity, loading, thread?.roomId]);
     const handleModerationChanged = useCallback(() => {
         reload();
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
     }, [queryClient, reload]);
 
     const draft = useMessengerStore((state) => state.drafts[selectionKey] ?? '');
     const threadBodyRef = useRef(null);
     const historyScrollRef = useRef(null);
-    const historyScopeRef = useRef(null);
+    const historyScopeRef = useRef(/** @type {{threadKey: string | null, roomId: number | null} | null} */ (null));
     useLayoutEffect(() => {
         // 같은 방으로 돌아와도 전환 전 과거 조회와 스크롤 위치는 재사용하지 않는다.
         const scope = { threadKey, roomId: thread?.roomId ?? null };
@@ -309,9 +309,9 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         setReturningToList(false);
     }, [navigate, routeSelection, showConversations]);
     const handleVisibilityChanged = () => {
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
         finishConversationList();
     };
     const showConversationList = () => {

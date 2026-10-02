@@ -1,0 +1,19 @@
+Source archive: https://repo.maven.apache.org/maven2/software/amazon/eventstream/eventstream/1.0.1/eventstream-1.0.1-sources.jar
+SHA-256: 8953ddf1af1680008d7ae96877df9fcfff9b8d909998d5c52519dbd583215636
+
+Files: software/amazon/eventstream/Checksums.java, software/amazon/eventstream/Header.java, software/amazon/eventstream/HeaderType.java, software/amazon/eventstream/HeaderValue.java, software/amazon/eventstream/Message.java, software/amazon/eventstream/MessageBuilder.java, software/amazon/eventstream/MessageDecoder.java, software/amazon/eventstream/Prelude.java, software/amazon/eventstream/Utils.java
+/*
+ * Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+

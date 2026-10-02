@@ -38,7 +38,7 @@ const AdBanner = ({ ads }) => {
     useEffect(() => {
         if (!ad?.id || impressionSentFor.current === ad.id) return;
         impressionSentFor.current = ad.id;
-        adService.recordImpression(ad.id);
+        void adService.recordImpression(ad.id);
     }, [ad]);
 
     if (!ad || !shouldRender) return null;
@@ -53,7 +53,7 @@ const AdBanner = ({ ads }) => {
         : 'translateY(0) scale(1)';
 
     const handleBannerClick = () => {
-        adService.recordClick(ad.id);
+        void adService.recordClick(ad.id);
         recordAdClick(ad.id, ad.storeId);
         navigate(`/store/${ad.storeId}`);
     };

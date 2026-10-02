@@ -140,8 +140,8 @@ const ReservationTab = () => {
     const { message, confirm } = useMessage();
     const retryStores = () => refetchStores();
     const retryAll = () => {
-        retryStores();
-        refetch();
+        void retryStores();
+        void refetch();
     };
 
     // 마지막 행의 삭제·상태 변경으로 현재 페이지가 없어지면 마지막 유효 페이지로 이동한다.
@@ -163,7 +163,7 @@ const ReservationTab = () => {
                 try {
                     await reservationService.removeReservation(id);
                     message.success('목록에서 제거되었습니다.');
-                    refetch();
+                    void refetch();
                 } catch { message.error('제거에 실패했습니다.'); }
             },
         });

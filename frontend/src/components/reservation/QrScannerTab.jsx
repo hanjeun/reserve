@@ -101,7 +101,7 @@ const MAX_ASPECT_FIXES = 3;
 const QrScannerTab = ({ sheet = false, onClose }) => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
-    const html5QrRef = useRef(null);
+    const html5QrRef = useRef(/** @type {import('html5-qrcode').Html5Qrcode | null} */ (null));
     // 같은 프레임에서 같은 QR이 연속으로 감지되어 중복 요청되는 것을 막는 락
     const processingRef = useRef(false);
 
@@ -377,7 +377,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     useEffect(() => {
         if (!restartForAspectRef.current) return;
         restartForAspectRef.current = false;
-        startScanning();
+        void startScanning();
     }, [decodeAspect, startScanning]);
 
     // ★ isScanning으로 가드하지 않는다 (2026-08-09).

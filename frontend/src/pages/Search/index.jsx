@@ -27,15 +27,11 @@ export default function SearchPage() {
 
     useEffect(() => () => window.clearTimeout(exitTimerRef.current), []);
 
-    // 취소·Esc 는 검색창이 아래로 내려가는 애니메이션만 재생한다. 그 뒤 원래 화면은 옆으로 밀리지 않고 바로 보인다
+    // 검색 실행·취소·Esc 모두 같은 아래로 내려가는 모션 뒤 이동한다. 원래 화면은 옆으로 밀리지 않는다.
     // (routeEntryMotion 이 검색 화면을 떠나는 이동에는 페이지 전환을 걸지 않는다, 2026-09-23).
-    const closeSearch = () => {
+    const leaveSearch = leave => {
         if (closingRef.current) return;
         closingRef.current = true;
-        const leave = () => {
-            if (state?.searchEntry === true) navigate(-1);
-            else navigate('/', { replace: true });
-        };
         inputRef.current?.blur();
         if (reducedMotion) {
             leave();
@@ -45,13 +41,18 @@ export default function SearchPage() {
         exitTimerRef.current = window.setTimeout(leave, SEARCH_EXIT_DURATION_MS);
     };
 
+    const closeSearch = () => leaveSearch(() => {
+        if (state?.searchEntry === true) navigate(-1);
+        else navigate('/', { replace: true });
+    });
+
     const searchFor = value => {
         const normalized = value.trim();
         if (!normalized) {
             inputRef.current?.focus();
             return;
         }
-        navigate('/stores?keyword=' + encodeURIComponent(normalized));
+        leaveSearch(() => navigate('/stores?keyword=' + encodeURIComponent(normalized)));
     };
 
     const submitSearch = event => {
@@ -64,13 +65,16 @@ export default function SearchPage() {
         inputRef.current?.focus();
     };
 
-    // 페이지 진입/이탈 애니메이션 클래스 — 닫는 중이면 이탈, 검색창에서 들어왔으면 진입
-    let pageMotionClass = '';
-    if (isClosing) pageMotionClass = ' reserve-search-page--leaving';
-    else if (state?.searchEntry === true && !reducedMotion) pageMotionClass = ' reserve-search-page--entering';
+    const followSearchLink = event => {
+        // 새 탭·창 열기는 현재 검색 화면을 닫지 않는다.
+        if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        const destination = event.currentTarget.getAttribute('href');
+        leaveSearch(() => navigate(destination));
+    };
 
     return (
-        <div className={'reserve-search-page' + pageMotionClass}>
+        <div className={'reserve-search-page' + (isClosing ? ' reserve-search-page--leaving' : !reducedMotion ? ' reserve-search-page--entering' : '')}>
             <h1 className="reserve-discovery-visually-hidden">가게 검색</h1>
             <header className="reserve-search-header">
                 <form className="reserve-search-field" role="search" onSubmit={submitSearch}>
@@ -116,7 +120,7 @@ export default function SearchPage() {
                         {SERVICE_DOMAIN_OPTIONS.map(domain => {
                             const image = SERVICE_DOMAIN_IMAGES[domain.value];
                             return (
-                                <Link key={domain.value} to={'/stores?domain=' + encodeURIComponent(domain.value)} className="reserve-search-domain">
+                                <Link key={domain.value} to={'/stores?domain=' + encodeURIComponent(domain.value)} className="reserve-search-domain" onClick={followSearchLink}>
                                     <span className="reserve-search-domain-media" aria-hidden="true">
                                         <img src={DISCOVERY_ASSET_ROOT + image.asset + '.webp'} alt="" width={image.width} height={image.height} />
                                     </span>
@@ -136,7 +140,7 @@ export default function SearchPage() {
                     </div>
                 </section>
 
-                <Link to="/stores" className="reserve-search-browse-all">
+                <Link to="/stores" className="reserve-search-browse-all" onClick={followSearchLink}>
                     <span>가게 전체 보기</span>
                     <ArrowRightOutlined aria-hidden="true" />
                 </Link>

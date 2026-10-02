@@ -60,9 +60,9 @@ const CopyableText = ({ value, label = '내용', fallback = '-', className = '',
                     {copied ? <CheckOutlined aria-hidden="true" /> : <CopyOutlined aria-hidden="true" />}
                 </button>
             )}
-            <span className="reserve-copyable-text__status" role="status">
+            <output className="reserve-copyable-text__status">
                 {copied ? `${label}를 복사했습니다.` : ''}
-            </span>
+            </output>
         </span>
     );
 };

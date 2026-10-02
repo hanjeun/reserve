@@ -17,7 +17,7 @@ const adService = {
         headers: { 'Content-Type': 'multipart/form-data' },
     }),
     getActiveAds: (adType) => api.get(API_ENDPOINTS.ADVERTISEMENT.ACTIVE, { params: { type: adType } }),
-    getMyAds: (page = 0, size = 20, storeId, search) => api.get(API_ENDPOINTS.ADVERTISEMENT.MY_ADS, {
+    getMyAds: (page = 0, size = 20, storeId = null, search = '') => api.get(API_ENDPOINTS.ADVERTISEMENT.MY_ADS, {
         params: {
             page,
             size,

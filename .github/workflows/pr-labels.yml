@@ -1,7 +1,8 @@
 name: PR Labels
+run-name: >-
+  ${{ format('라벨 정리 · PR #{0}', github.event.pull_request.number) }}
 
-# PR 제목의 type(feat, fix …)과 바뀐 경로(frontend, backend …)로 라벨을 붙인다.
-# Dependabot PR은 dependabot.yml 의 labels 로 이미 붙어서 건너뛴다.
+# 제목의 유형 라벨 하나를 붙인다. 본문만 편집한 경우에는 러너를 시작하지 않는다.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
@@ -18,7 +19,7 @@ permissions:
 
 jobs:
   label:
-    if: github.actor != 'dependabot[bot]' && (github.event.action != 'edited' || github.event.changes.title != null)
+    if: github.event.pull_request.user.login != 'dependabot[bot]' && (github.event.action != 'edited' || github.event.changes.title != null)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -35,18 +36,9 @@ jobs:
               test: { name: 'test', color: 'bfd4f2', description: 'Tests only' },
               perf: { name: 'perf', color: 'fbca04', description: 'Performance improvement' },
             };
-            const AREA_LABELS = [
-              { name: 'frontend', color: '61dafb', description: 'Frontend (React)', match: (f) => f.startsWith('frontend/') },
-              { name: 'backend', color: '6db33f', description: 'Backend (Spring Boot)', match: (f) => f.startsWith('backend/') },
-              {
-                name: 'infra', color: 'ff9900', description: 'CI, deploy, server and monitoring',
-                match: (f) => /^(\.github\/|nginx\/|scripts\/|grafana\/|docker-compose[^/]*\.yml$|promtail-config\.yml$|\.sonarcloud\.properties$)/.test(f),
-              },
-              { name: 'documentation', color: '0075ca', description: 'Improvements or additions to documentation', match: (f) => f.startsWith('docs/') || /^[^/]+\.md$/.test(f) },
-            ];
-
             const { owner, repo } = context.repo;
             const pr = context.payload.pull_request;
+            if (pr.user.login === 'dependabot[bot]') return;
 
             const ensureLabel = async ({ name, color, description }) => {
               try {
@@ -59,22 +51,27 @@ jobs:
 
             const typeMatch = /^(\w+)(\([^)]*\))?!?:/.exec(pr.title);
             const typeLabel = typeMatch ? TYPE_LABELS[typeMatch[1]] : undefined;
+            if (!typeLabel) return;
 
-            const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: pr.number, per_page: 100 });
-            const paths = files.flatMap((file) => [file.filename, file.previous_filename].filter(Boolean));
-            const areaLabels = AREA_LABELS.filter((area) => paths.some(area.match));
+            await ensureLabel(typeLabel);
+            const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+              owner, repo, issue_number: pr.number, per_page: 100,
+            });
 
-            const wanted = [typeLabel, ...areaLabels].filter(Boolean);
-            for (const label of wanted) await ensureLabel(label);
-
-            // 제목의 type 이 바뀌면 이전 type 라벨은 뗀다(경로 라벨과 겹치는 documentation 은 남긴다).
-            const wantedNames = new Set(wanted.map((label) => label.name));
-            const typeNames = new Set(Object.values(TYPE_LABELS).map((label) => label.name));
-            for (const label of pr.labels) {
-              if (typeNames.has(label.name) && !wantedNames.has(label.name)) {
-                await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: label.name });
+            // 자동 유형·영역 라벨과 옛 중복 유형만 정리하고 수동 상태 라벨은 보존한다.
+            const managedNames = new Set([
+              ...Object.values(TYPE_LABELS).map((label) => label.name),
+              'frontend', 'backend', 'infra', 'bug', 'enhancement',
+            ]);
+            for (const label of labels) {
+              if (managedNames.has(label.name) && label.name !== typeLabel.name) {
+                try {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: label.name });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
               }
             }
-            if (wantedNames.size > 0) {
-              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [...wantedNames] });
+            if (!labels.some((label) => label.name === typeLabel.name)) {
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [typeLabel.name] });
             }

@@ -139,7 +139,7 @@ describe('benefits-only query integration; general store pagination remains on /
         benefitService.getList.mockReturnValueOnce(next.promise);
         let refresh;
         await act(async () => { refresh = client.invalidateQueries({ queryKey: benefitKeys.list({ page: 1, size: 12 }) }); });
-        expect(await screen.findByText('소식을 새로 불러오는 중')).toHaveAttribute('role', 'status');
+        expect(await screen.findByText('소식을 새로 불러오는 중')).toHaveRole('status');
         expect(document.querySelector('.reserve-benefit-list')).toHaveAttribute('aria-busy', 'true');
         expect(await newsLink(2)).toBeInTheDocument();
         expect(screen.queryByText('아직 등록된 가게 소식이 없어요.')).not.toBeInTheDocument();

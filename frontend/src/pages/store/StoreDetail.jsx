@@ -26,6 +26,7 @@ import { breakpoints, colors, radius, fontWeight, fontSize, heights, animation, 
 import { VALIDATION_RULES } from '../../utils/validation';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
+import RollingFieldValue from '../../components/common/RollingFieldValue';
 
 const { Title, Text } = Typography;
 
@@ -37,7 +38,7 @@ const GuestCountInput = ({ value = 1, onChange }) => {
     const inc = () => { if (value < 99) onChange?.(value + 1); };
     return (
         <div style={inputStyles.wrapper}>
-            <span style={inputStyles.count}>{value}명</span>
+            <span style={inputStyles.count}><RollingFieldValue value={value}>{`${value}명`}</RollingFieldValue></span>
             <div style={inputStyles.btnGroup}>
                 <button type="button" className="rsv-tap-btn" onClick={dec} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : 1 }}>
                     <MinusOutlined style={{ fontSize: 12 }} />

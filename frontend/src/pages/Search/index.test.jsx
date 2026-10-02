@@ -148,6 +148,17 @@ describe('dedicated search submission and result editing', () => {
         expect(path()).toBe('/stores');
     });
 
+    it('uses its own entrance even for a direct opening after a route skeleton', () => {
+        reducedMotionMock.value = false;
+        const { container } = renderSearch();
+        expect(container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--entering');
+    });
+
+    it('does not animate a direct opening when reduced motion is requested', () => {
+        const { container } = renderSearch();
+        expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--entering');
+    });
+
     it('uses the same slide-down for Escape as the cancel button', () => {
         vi.useFakeTimers();
         try {
@@ -161,6 +172,48 @@ describe('dedicated search submission and result editing', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it('uses the same slide-down for submitting a search and ignores repeated submissions', () => {
+        vi.useFakeTimers();
+        try {
+            reducedMotionMock.value = false;
+            const { container } = renderSearch(['/search?keyword=' + encodeURIComponent('카페')]);
+            fireEvent.submit(screen.getByRole('search'));
+            fireEvent.submit(screen.getByRole('search'));
+            expect(container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--leaving');
+            expect(path()).toBe('/search?keyword=' + encodeURIComponent('카페'));
+            act(() => vi.advanceTimersByTime(220));
+            expect(path()).toBe('/stores?keyword=' + encodeURIComponent('카페'));
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it.each([
+        ['맛집·카페', '/stores?domain=FOOD'],
+        ['가게 전체 보기', '/stores'],
+    ])('closes search with the same motion before following %s', (name, destination) => {
+        vi.useFakeTimers();
+        try {
+            reducedMotionMock.value = false;
+            const { container } = renderSearch();
+            fireEvent.click(screen.getByRole('link', { name, exact: true }));
+            expect(container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--leaving');
+            expect(path()).toBe('/search');
+            act(() => vi.advanceTimersByTime(220));
+            expect(path()).toBe(destination);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('keeps the current search screen open when a link is opened in a new tab', () => {
+        reducedMotionMock.value = false;
+        const { container } = renderSearch();
+        expect(fireEvent.click(screen.getByRole('link', { name: '가게 전체 보기' }), { ctrlKey: true })).toBe(true);
+        expect(path()).toBe('/search');
+        expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--leaving');
     });
 
     it('keeps quick searches and service links working', async () => {

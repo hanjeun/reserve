@@ -202,8 +202,8 @@
     },
     {
       "type": "stat",
-      "title": "ERROR (최근 1시간)",
-      "description": "0이 정상입니다. 1건이라도 있으면 아래 '무엇이 터지나'와 로그 보기에서 원인을 확인하세요.",
+      "title": "오류 로그 · 최근 1시간",
+      "description": "오류 로그가 남은 횟수예요. 문제가 생긴 예약 수와는 달라요. 아래 '오류 분석'과 '로그 상세'에서 반복되는 원인을 확인해주세요. 결제 점검 알림은 예전 기록의 표시 차이 때문에 반복될 수도 있어요. 0이어도 로그 수집이 정상인지 확인해야 해요.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -271,8 +271,8 @@
     },
     {
       "type": "stat",
-      "title": "WARN (최근 1시간)",
-      "description": "인증 실패·잘못된 요청 등. 평소 수치를 알아두면 급증이 눈에 띕니다.",
+      "title": "주의 로그 · 최근 1시간",
+      "description": "인증 실패나 잘못된 요청처럼 확인이 필요한 로그예요. 평소보다 늘었을 때 아래 원본 로그와 비교해주세요.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -341,7 +341,7 @@
     {
       "type": "stat",
       "title": "로그인 실패 (최근 1시간)",
-      "description": "급증하면 크리덴셜 스터핑 징후입니다. rate limiter가 막고 있어도 막고 있다는 사실은 알아야 합니다.",
+      "description": "실패가 갑자기 늘면 사용자 입력 실수와 다른 사람의 계정을 노린 시도를 구분해서 확인해주세요. 요청이 차단됐다는 기록만으로 공격이라고 단정하지 않아요.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -410,7 +410,7 @@
     {
       "type": "stat",
       "title": "결제 연동 오류 (최근 24시간)",
-      "description": "PortOne 호출 실패. 0이 아니면 결제가 실제로 막히고 있을 수 있습니다.",
+      "description": "결제사(PortOne) 호출이 실패한 로그 횟수예요. 값이 있으면 결제·환불 기록과 결제사 응답을 확인해주세요. 예약금 표시 불일치 알림과는 다른 항목이에요.",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
@@ -878,7 +878,7 @@
         {
           "type": "timeseries",
           "title": "주요 활동",
-          "description": "전부 동시에 바닥에 붙으면 서비스가 멈춘 것이고, 하나만 떨어지면 그 기능이 고장난 것입니다.",
+          "description": "활동이 줄면 이용자가 적은 시간인지, 로그 수집이나 서비스에 문제가 있는지 함께 확인해주세요. 그래프가 비었다는 이유만으로 장애라고 단정하지 않아요.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
@@ -1227,7 +1227,7 @@
         {
           "type": "timeseries",
           "title": "결제 · 환불",
-          "description": "환불이 결제에 근접하면 정책이나 품질에 문제가 있다는 신호입니다.",
+          "description": "결제·환불 기록의 흐름을 비교하는 그래프예요. 환불이 늘면 취소 사유와 결제사 기록을 함께 확인해주세요. 횟수만으로 금액이나 환불 실패를 판단하지 않아요.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
@@ -1371,7 +1371,7 @@
         {
           "type": "timeseries",
           "title": "로그인 성공 vs 실패",
-          "description": "실패만 치솟고 성공이 평소와 같으면 남의 계정을 노린 시도입니다. 둘 다 떨어지면 로그인 자체가 고장난 것입니다.",
+          "description": "실패가 늘면 입력 실수와 비정상 접근을 구분해주세요. 성공·실패 기록이 모두 줄면 이용량과 로그 수집 상태도 함께 확인해야 해요.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
@@ -2030,8 +2030,8 @@
         },
         {
           "type": "table",
-          "title": "ERROR가 나는 클래스 (최근 24시간)",
-          "description": "특정 클래스가 상위에 고정돼 있으면 그 기능이 계속 실패하고 있다는 뜻입니다.",
+          "title": "오류가 반복되는 기능 · 최근 24시간",
+          "description": "같은 기능에서 오류 로그가 반복되는지 보여줘요. 아래 로그 상세에서 실제 실패와 주기적인 점검 알림을 구분해주세요.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
@@ -2141,8 +2141,8 @@
       "panels": [
         {
           "type": "logs",
-          "title": "필터링된 로그",
-          "description": "위 드롭다운 세 개로 걸러집니다. 영역을 고르면 그 도메인만, 검색어를 넣으면 그 문자열이 든 줄만 보입니다.",
+          "title": "원인 확인 · 최신 로그부터",
+          "description": "위에서 로그 종류·영역·검색어를 골라주세요. 결제 점검 로그는 결제 대조 / 결제 알림 처리 실패 / 7일 넘게 결제 대기 / 결제 기록 불일치 / 예약금 표시 불일치 순서로 보여요. 같은 상태를 15분마다 다시 확인하므로 로그 횟수는 예약 수와 달라요. 화면의 문구만 바꾸며 원본 로그와 알림 조건은 그대로예요.",
           "datasource": {
             "type": "loki",
             "uid": "${DS_LOKI}"
@@ -2170,7 +2170,7 @@
                 "type": "loki",
                 "uid": "${DS_LOKI}"
               },
-              "expr": "{job=\"reserve\", level=~\"$level\"} |~ \"$domain\" |~ \"$search\"",
+              "expr": "{job=\"reserve\", level=~\"$level\"} |~ \"$domain\" |~ \"$search\" | line_format `{{ regexReplaceAll \"^.*Payment operations queue requires attention: openIssues=([0-9]+), failedWebhooks=([0-9]+), staleReadyPayments=([0-9]+), ledgerInvariantViolations=([0-9]+), depositInvariantViolations=([0-9]+)$\" (__line__) \"결제 기록을 확인해주세요 · 결제 대조 ${1}건 / 결제 알림 처리 실패 ${2}건 / 7일 넘게 결제 대기 ${3}건 / 결제 기록 불일치 ${4}건 / 예약금 표시 불일치 ${5}건\" }}`",
               "refId": "A",
               "queryType": "range"
             }

@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,13 +39,15 @@ class PasswordResetSessionInvalidationTest {
         String email = "reset@example.com";
         String password = "NewPassword123!";
         PasswordResetToken token = PasswordResetToken.builder()
+                .id(55L)
                 .email(email)
                 .token("123456")
                 .expiresAt(LocalDateTime.now().plusMinutes(5))
                 .build();
         token.markVerified();
         Member member = Member.builder().id(33L).email(email).password("old-hash").build();
-        when(tokenRepository.findTopByEmailOrderByIdDesc(email)).thenReturn(Optional.of(token));
+        when(tokenRepository.findIdsByEmail(email)).thenReturn(List.of(token.getId()));
+        when(tokenRepository.findByIdForUpdate(token.getId())).thenReturn(Optional.of(token));
         when(memberRepository.findActiveByEmailForUpdate(email)).thenReturn(Optional.of(member));
         when(pwnedPasswordChecker.isPwned(password)).thenReturn(false);
         when(passwordEncoder.encode(password)).thenReturn("new-hash");

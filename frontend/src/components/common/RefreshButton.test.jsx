@@ -38,6 +38,8 @@ describe.each(['toolbar', 'messenger'])('shared refresh cooldown: %s', surface =
         const refresh = button();
         act(() => { refresh.click(); refresh.click(); });
         expect(onReload).toHaveBeenCalledTimes(1);
+        if (surface === 'messenger') expect(refresh).toHaveAttribute('aria-disabled', 'true');
+        else expect(refresh).toBeDisabled();
         expect(container.querySelector('.anticon-sync')).not.toHaveClass('anticon-spin');
         expect(refresh).not.toHaveAttribute('aria-busy', 'true');
         act(() => vi.advanceTimersByTime(2999));
@@ -58,8 +60,12 @@ describe.each(['toolbar', 'messenger'])('shared refresh cooldown: %s', surface =
         fireEvent.click(button());
         expect(onReload).toHaveBeenCalledTimes(1);
         expect(container.querySelector('.anticon-sync')).toHaveClass('anticon-spin');
+        if (surface === 'messenger') expect(button()).toHaveAttribute('aria-disabled', 'true');
+        else expect(button()).toBeDisabled();
         rerender(renderRefresh(onReload));
         expect(container.querySelector('.anticon-sync')).not.toHaveClass('anticon-spin');
+        if (surface === 'messenger') expect(button()).not.toHaveAttribute('aria-disabled', 'true');
+        else expect(button()).toBeEnabled();
         fireEvent.click(button());
         expect(onReload).toHaveBeenCalledTimes(2);
     });

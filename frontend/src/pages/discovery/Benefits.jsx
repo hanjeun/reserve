@@ -93,7 +93,7 @@ export default function Benefits() {
                 <div className="reserve-benefits-news-content">
                     {renderNews()}
                 </div>
-                {isFetching && !isPending && !isError && <p className="reserve-discovery-visually-hidden" role="status">소식을 새로 불러오는 중</p>}
+                {isFetching && !isPending && !isError && <p className="reserve-discovery-visually-hidden"><output>소식을 새로 불러오는 중</output></p>}
                 {!isPending && !isError && total > BENEFIT_PAGE_SIZE && (
                     <nav aria-label="가게 소식 페이지" className="reserve-benefits-pagination"><Pagination current={page} pageSize={BENEFIT_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} disabled={isFetching} onChange={next => { const updated = new URLSearchParams(params); if (next === 1) { updated.delete('page'); } else { updated.set('page', String(next)); } setParams(updated); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} /></nav>
                 )}

@@ -98,6 +98,17 @@ if [[ "$AVAIL_MB" -lt 500 ]]; then
     fail "not enough disk space in $BACKUP_DIR (${AVAIL_MB}MB available, need >=500MB)"
 fi
 
+# MySQL은 --routines 권한이 부족해도 성공 코드로 본문을 생략할 수 있다.
+# 권한이 없으면 information_schema.routines에서도 객체가 숨겨지므로 0건을 믿지 않는다.
+# 전용 계정의 직접 SHOW_ROUTINE(또는 기존 관리자의 전역 SELECT) 권한만 확인한다.
+ROUTINE_ACCESS="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
+    mysql --user="$DB_USER" --batch --skip-column-names "$DB_NAME" \
+    -e "SELECT COUNT(*) FROM information_schema.user_privileges WHERE privilege_type IN ('SHOW_ROUTINE','SELECT') AND grantee = CONCAT(QUOTE(SUBSTRING_INDEX(CURRENT_USER(), '@', 1)), '@', QUOTE(SUBSTRING_INDEX(CURRENT_USER(), '@', -1)));")" \
+    || fail "cannot verify stored routine definition access"
+[[ "$ROUTINE_ACCESS" =~ ^[0-9]+$ ]] || fail "invalid stored routine access result"
+[[ "$ROUTINE_ACCESS" -gt 0 ]] \
+    || fail "stored routine definitions are not readable; check SHOW_ROUTINE before backup"
+
 # ─────────────────────────────────────────────────────────
 # 덤프
 # ─────────────────────────────────────────────────────────
@@ -105,6 +116,8 @@ fi
 #                        MyISAM 테이블이 섞이면 이 보장이 깨지므로 아래에서 엔진을 확인한다.
 # --routines/--triggers/--events : 스키마만 복원되고 프로시저·트리거가 빠지는 사고를 막는다.
 # --set-gtid-purged=OFF : 복원 대상이 다른 서버여도 GTID 충돌이 나지 않게.
+# --no-tablespaces : 일반 InnoDB 파일 단위 백업에 불필요한 전역 PROCESS 권한을 요구하지 않는다.
+#                    사용자 정의 general tablespace가 있는 DB는 별도 복원 설계가 필요하다.
 log "dumping..."
 set +e
 docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
@@ -112,6 +125,7 @@ docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
         --user="$DB_USER" \
         --single-transaction \
         --quick \
+        --no-tablespaces \
         --routines \
         --triggers \
         --events \

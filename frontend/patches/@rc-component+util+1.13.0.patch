@@ -1,0 +1,16 @@
+diff --git a/node_modules/@rc-component/util/es/hooks/useDelayState.js b/node_modules/@rc-component/util/es/hooks/useDelayState.js
+--- a/node_modules/@rc-component/util/es/hooks/useDelayState.js
++++ b/node_modules/@rc-component/util/es/hooks/useDelayState.js
+@@ -33,3 +33,4 @@
+     }
+   });
++  React.useEffect(() => cancelPending, [cancelPending]);
+   return [value, setDelayValue];
+diff --git a/node_modules/@rc-component/util/lib/hooks/useDelayState.js b/node_modules/@rc-component/util/lib/hooks/useDelayState.js
+--- a/node_modules/@rc-component/util/lib/hooks/useDelayState.js
++++ b/node_modules/@rc-component/util/lib/hooks/useDelayState.js
+@@ -42,3 +42,4 @@
+     }
+   });
++  React.useEffect(() => cancelPending, [cancelPending]);
+   return [value, setDelayValue];

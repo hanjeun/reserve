@@ -386,7 +386,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                     onRetry={() => search(state.query)} compact />
             )}
             {state.searchStatus === 'success' && state.results.length === 0 && (
-                <p id={searchStatusId} role="status" style={{ margin: 0, fontSize: fontSize.sm, color: colors.text.tertiary }}>검색 결과가 없어요. 도로명이나 지번을 확인해 주세요.</p>
+                <p style={{ margin: 0, fontSize: fontSize.sm, color: colors.text.tertiary }}><output id={searchStatusId}>검색 결과가 없어요. 도로명이나 지번을 확인해 주세요.</output></p>
             )}
 
             {/* ② 선택 후 — 우편번호 + 상세주소. 사용자가 드롭다운에서 직접 선택했을 때만

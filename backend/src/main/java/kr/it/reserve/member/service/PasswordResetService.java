@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -40,7 +41,7 @@ public class PasswordResetService {
      */
     @Transactional
     public boolean sendResetCode(String email) {
-        var memberOpt = memberRepository.findByEmailAndDeletedAtIsNull(email);
+        var memberOpt = memberRepository.findActiveByEmailForUpdate(email);
         if (memberOpt.isEmpty()) {
             log.info("Password reset request not deliverable");
             return false;
@@ -56,7 +57,8 @@ public class PasswordResetService {
         String code = generateCode();
         PasswordResetToken token = PasswordResetToken.builder()
                 .email(email)
-                .token(code)
+                .token("HASHED")
+                .tokenHash(passwordEncoder.encode(code))
                 .expiresAt(LocalDateTime.now().plusMinutes(EXPIRES_MINUTES))
                 .build();
         tokenRepository.save(token);
@@ -79,7 +81,7 @@ public class PasswordResetService {
      */
     @Transactional(noRollbackFor = BusinessException.class)
     public void verifyCode(String email, String code) {
-        PasswordResetToken token = tokenRepository.findTopByEmailOrderByIdDesc(email)
+        PasswordResetToken token = findLatestTokenForUpdate(email)
                 .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST));
 
         if (token.isExpired()) {
@@ -87,7 +89,7 @@ public class PasswordResetService {
         }
         requireAttemptsLeft(token, email);
 
-        if (!token.getToken().equals(code)) {
+        if (!matchesCode(token, code)) {
             token.recordFailedAttempt();
             log.warn("Password reset code mismatch: attempt={}/{}",
                     token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
@@ -126,7 +128,9 @@ public class PasswordResetService {
      */
     @Transactional(noRollbackFor = BusinessException.class)
     public void resetPassword(String email, String code, String newPassword) {
-        PasswordResetToken token = tokenRepository.findTopByEmailOrderByIdDesc(email)
+        // 재발송과 같은 member → token 순서를 지켜 잠금 순환과 중복 소비를 막는다.
+        var memberOpt = memberRepository.findActiveByEmailForUpdate(email);
+        PasswordResetToken token = findLatestTokenForUpdate(email)
                 .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
 
         if (token.isExpired()) {
@@ -134,7 +138,7 @@ public class PasswordResetService {
         }
         requireAttemptsLeft(token, email);
 
-        if (!token.getToken().equals(code)) {
+        if (!matchesCode(token, code)) {
             token.recordFailedAttempt();
             log.warn("Password reset code mismatch on reset: attempt={}/{}",
                     token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
@@ -144,8 +148,7 @@ public class PasswordResetService {
             throw new MemberException("코드 인증을 먼저 완료해주세요.", HttpStatus.BAD_REQUEST);
         }
 
-        Member member = memberRepository.findActiveByEmailForUpdate(email)
-                .orElseThrow(MemberException::notFound);
+        Member member = memberOpt.orElseThrow(MemberException::notFound);
 
         String policyViolation = PasswordPolicy.violation(newPassword);
         if (policyViolation != null) {
@@ -166,6 +169,22 @@ public class PasswordResetService {
         refreshTokenRepository.deleteByMemberId(member.getId());
         tokenRepository.deleteByEmail(email);
         log.info("Password reset completed: memberId={}", member.getId());
+    }
+
+    private Optional<PasswordResetToken> findLatestTokenForUpdate(String email) {
+        return tokenRepository.findIdsByEmail(email).stream()
+                .findFirst()
+                .flatMap(tokenRepository::findByIdForUpdate);
+    }
+
+    private boolean matchesCode(PasswordResetToken token, String code) {
+        if (code == null || !code.matches("[0-9]{6}")) {
+            return false;
+        }
+        if (token.getTokenHash() != null) {
+            return passwordEncoder.matches(code, token.getTokenHash());
+        }
+        return code.equals(token.getToken());
     }
 
     private String generateCode() {

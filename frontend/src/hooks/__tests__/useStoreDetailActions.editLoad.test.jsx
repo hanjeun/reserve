@@ -1,4 +1,5 @@
 import React from 'react';
+import dayjs from 'dayjs';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +8,8 @@ const navigate = vi.hoisted(() => vi.fn());
 const reservationService = vi.hoisted(() => ({
     getReservation: vi.fn(),
     getMyCompletedForStore: vi.fn(),
+    updateReservation: vi.fn(),
+    createReservation: vi.fn(),
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -43,8 +46,37 @@ describe('useStoreDetailActions edit lookup', () => {
     beforeEach(() => {
         navigate.mockReset();
         reservationService.getReservation.mockReset();
+        reservationService.updateReservation.mockReset().mockResolvedValue(null);
+        reservationService.createReservation.mockReset();
         reservationService.getMyCompletedForStore.mockReset().mockResolvedValue(null);
         message = { error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() };
+    });
+
+    it('updates only the loaded reservation with normalized date and time', async () => {
+        reservationService.getReservation.mockResolvedValue(editable);
+        const { result } = renderEditHook(message);
+        await waitFor(() => expect(result.current.editingReservation).toEqual(editable));
+        const date = dayjs().add(1, 'day');
+        await act(async () => { await result.current.onFinish({
+            reservationDate: date, reservationTime: '11:30', guestCount: 3, specialRequest: '창가 자리',
+        }); });
+        expect(reservationService.updateReservation).toHaveBeenCalledWith(91, {
+            reservationDate: date.format('YYYY-MM-DD'), reservationTime: '11:30',
+            guestCount: 3, specialRequest: '창가 자리',
+        });
+        expect(reservationService.createReservation).not.toHaveBeenCalled();
+        expect(navigate).toHaveBeenCalledWith('/my-reservations', { state: { refetch: true } });
+    });
+
+    it('does not create or update a reservation while the edit target is still loading', async () => {
+        reservationService.getReservation.mockReturnValue(new Promise(() => {}));
+        const { result } = renderEditHook(message);
+        await act(async () => { await result.current.onFinish({
+            reservationDate: dayjs().add(1, 'day'), reservationTime: '11:30', guestCount: 3,
+        }); });
+        expect(reservationService.updateReservation).not.toHaveBeenCalled();
+        expect(reservationService.createReservation).not.toHaveBeenCalled();
+        expect(message.info).toHaveBeenCalledWith('예약 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
     });
 
     it('keeps the customer on the page and retries after a network failure', async () => {

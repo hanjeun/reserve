@@ -533,6 +533,7 @@ const AdManageTab = () => {
     };
 
     const handleUpdateSubmit = async () => {
+        if (!editTarget) return;
         if (!validateEdit((e) => {
             if (!editBannerTitle.trim()) e.bannerTitle = '광고 제목을 입력해주세요.';
             if (!editBannerDescription.trim()) e.bannerDescription = '광고 내용을 입력해주세요.';
@@ -740,7 +741,7 @@ const AdManageTab = () => {
                     </div>
                 ) : (
                     <div key="ad-preview" className="reserve-ad-create-page reserve-ad-create-page--preview">
-                        <AdCreationPreview
+                        {dateRange?.[0] && dateRange?.[1] && <AdCreationPreview
                             adType={adType}
                             store={selectedStore}
                             copy={{ title: bannerTitle, description: bannerDescription }}
@@ -751,7 +752,7 @@ const AdManageTab = () => {
                             exposureDays={exposureDays}
                             dailyPrice={dailyPrice}
                             amount={estimatedAmount}
-                        />
+                        />}
                     </div>
                 )}
             </FormModal>

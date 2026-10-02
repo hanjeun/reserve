@@ -22,7 +22,7 @@ const TimeWheelColumn = ({ label, options, value, onChange }) => {
     const suppressClickRef = useRef(false);
     const touchActiveRef = useRef(false);
     const settleTimerRef = useRef(null);
-    const motionRef = useRef(null);
+    const motionRef = useRef(/** @type {{ from: number, to: number, start: number | null, frame: number | null } | null} */ (null));
     const changeRef = useRef(onChange);
     const reducedMotion = useReducedMotion();
     const selectedIndex = Math.max(0, options.findIndex(option => option.value === value));

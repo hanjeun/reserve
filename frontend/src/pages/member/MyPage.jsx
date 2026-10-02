@@ -400,9 +400,9 @@ const LocationTab = ({ user }) => {
 // ─── 사업자 전환 탭 ───────────────────────────────────────────────────────────
 const BusinessTab = ({ user }) => {
     const { message, confirm } = useMessage();
-    const [status, setStatus]     = useState(null);
+    const [status, setStatus]     = useState(/** @type {string | null} */ (null));
     const [rejectionReason, setRejectionReason] = useState(null);
-    const [statusLookup, setStatusLookup] = useState({ scope: null, phase: 'loading' });
+    const [statusLookup, setStatusLookup] = useState({ scope: /** @type {string | null} */ (null), phase: 'loading' });
     const [form, setForm]         = useState({ businessName: '', businessNumber: '', memo: '' });
     const [licenseList, setLicenseList] = useState([]);
     const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
@@ -411,11 +411,11 @@ const BusinessTab = ({ user }) => {
     const [cancelLoading, setCancelLoading] = useState(false);
     const [resignLoading, setResignLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [editState, setEditState] = useState({ scope: null, status: 'idle' });
-    const editRequestRef = useRef(null);
+    const [editState, setEditState] = useState({ scope: /** @type {string | null} */ (null), status: 'idle' });
+    const editRequestRef = useRef(/** @type {{ scope: string } | null} */ (null));
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const editScope = `${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
-    const statusRequestRef = useRef(null);
+    const statusRequestRef = useRef(/** @type {Record<string, never> | null} */ (null));
     const statusLoading = user?.role !== 'BUSINESS'
         && (statusLookup.scope !== editScope || statusLookup.phase === 'loading');
     const statusError = statusLookup.scope === editScope && statusLookup.phase === 'error';
@@ -1030,8 +1030,8 @@ const MyPage = () => {
     const { user, logout, checkAuth, sessionRevision } = useAuthStore();
     const { message, confirm } = useMessage();
     useDocumentTitle('마이페이지');
-    const [withdrawState, setWithdrawState] = useState({ scope: null, checking: false });
-    const withdrawRequestRef = useRef(null);
+    const [withdrawState, setWithdrawState] = useState({ scope: /** @type {string | null} */ (null), checking: false });
+    const withdrawRequestRef = useRef(/** @type {{ scope: string } | null} */ (null));
     const withdrawalMountedRef = useRef(false);
     const withdrawScope = `${user?.id}:${user?.role}:${sessionRevision}`;
     const withdrawChecking = withdrawState.scope === withdrawScope && withdrawState.checking;

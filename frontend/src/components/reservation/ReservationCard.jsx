@@ -46,7 +46,7 @@ const REASON_MODALS = {
 
 const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow, onStoreCancel, onRemove, view = 'list' }) => {
     // null | 'reject' | 'cancel'
-    const [reasonModal, setReasonModal] = useState(null);
+    const [reasonModal, setReasonModal] = useState(/** @type {'reject' | 'cancel' | null} */ (null));
     const [reason, setReason] = useState('');
     const [detailOpen, setDetailOpen] = useState(false);
     const { confirm } = useMessage();

@@ -1026,7 +1026,7 @@ public class PaymentService {
             return false;
         }
 
-        RefundCalculationResult calculation = calculateRefundAmount(reservationId);
+        RefundCalculationResult calculation = computeRefundAmount(reservationId);
 
         if (calculation.getRefundAmount() > 0) {
             PaymentRefundDto refundDto = PaymentRefundDto.builder()
@@ -1113,11 +1113,15 @@ public class PaymentService {
             throw new PaymentException("본인의 예약만 조회할 수 있습니다.", HttpStatus.FORBIDDEN);
         }
 
-        return calculateRefundAmount(reservationId);
+        return computeRefundAmount(reservationId);
     }
 
     @Transactional(readOnly = true)
     public RefundCalculationResult calculateRefundAmount(Long reservationId) {
+        return computeRefundAmount(reservationId);
+    }
+
+    private RefundCalculationResult computeRefundAmount(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new PaymentException("예약 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 

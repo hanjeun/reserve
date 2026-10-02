@@ -1071,21 +1071,28 @@ public class StoreService {
     /** 검색·공개 정책·전체 정렬 후 페이지를 자른다. 첫 페이지 안에서만 다시 정렬하지 않는다. */
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(String keyword, String sort, int page, int size, Double lat, Double lng) {
-        return searchStoresPaged(keyword, sort, page, size, lat, lng, null);
+        return searchStoresPage(keyword, sort, page, size, lat, lng, new SearchScope(null, null));
     }
 
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(
             String keyword, String sort, int page, int size, Double lat, Double lng, String domain) {
-        return searchStoresPaged(keyword, sort, page, size, lat, lng, domain, null);
+        return searchStoresPage(keyword, sort, page, size, lat, lng, new SearchScope(domain, null));
     }
 
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(
             String keyword, String sort, int page, int size, Double lat, Double lng, String domain, String region) {
-        Pageable pageable = PageRequests.bounded(page, size);
-        return sortedSearch(keyword, sort, pageable, lat, lng, domain, region).map(StoreResponse::fromEntity);
+        return searchStoresPage(keyword, sort, page, size, lat, lng, new SearchScope(domain, region));
     }
+
+    private Page<StoreResponse> searchStoresPage(
+            String keyword, String sort, int page, int size, Double lat, Double lng, SearchScope scope) {
+        Pageable pageable = PageRequests.bounded(page, size);
+        return sortedSearch(keyword, sort, pageable, lat, lng, scope.domain(), scope.region()).map(StoreResponse::fromEntity);
+    }
+
+    private record SearchScope(String domain, String region) {}
 
     private Page<Store> sortedSearch(
             String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
@@ -1148,16 +1155,20 @@ public class StoreService {
     /** 내부 전체 조회도 공개 정책과 안정 정렬을 공유한다. */
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort) {
-        return searchStores(keyword, sort, null);
+        return searchStoreList(keyword, sort, null, null);
     }
 
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort, String domain) {
-        return searchStores(keyword, sort, domain, null);
+        return searchStoreList(keyword, sort, domain, null);
     }
 
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort, String domain, String region) {
+        return searchStoreList(keyword, sort, domain, region);
+    }
+
+    private List<StoreResponse> searchStoreList(String keyword, String sort, String domain, String region) {
         return sortedSearch(keyword, sort, Pageable.unpaged(), null, null, domain, region)
                 .map(StoreResponse::fromEntity).getContent();
     }

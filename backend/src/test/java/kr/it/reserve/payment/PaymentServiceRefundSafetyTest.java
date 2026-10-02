@@ -388,6 +388,24 @@ class PaymentServiceRefundSafetyTest {
         when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(payment));
     }
 
+    @Test
+    void refundPreviewUsesPaidLedgerAmountAndRejectsAnotherCustomersReservation() {
+        Member customer = Member.builder().id(7L).role(Role.USER).build();
+        Reservation reservation = Reservation.builder().id(100L).member(customer)
+                .store(kr.it.reserve.store.entity.Store.builder().fullRefundDays(3).build())
+                .reservationDate(kr.it.reserve.global.common.ServiceTime.today().plusDays(4))
+                .depositAmount(500).build();
+        when(reservationRepository.findById(100L)).thenReturn(Optional.of(reservation));
+        Payment ledgerPayment = paidPayment();
+        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(ledgerPayment));
+        assertThat(paymentService.calculateRefundAmount(100L).getRefundAmount()).isEqualTo(10_000);
+        assertThat(paymentService.calculateRefundAmountForMember(100L, customer).getRefundAmount()).isEqualTo(10_000);
+        var stranger = Member.builder().id(8L).role(Role.USER).build();
+        assertThatThrownBy(() -> paymentService.calculateRefundAmountForMember(100L, stranger))
+                .isInstanceOf(PaymentException.class).hasMessage("본인의 예약만 조회할 수 있습니다.");
+        org.mockito.Mockito.verifyNoInteractions(portoneService, refundLedgerService);
+    }
+
     private Payment paidPayment() {
         Reservation reservation = org.mockito.Mockito.mock(Reservation.class);
         org.mockito.Mockito.lenient().when(reservation.getId()).thenReturn(100L);

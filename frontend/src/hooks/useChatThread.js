@@ -111,7 +111,7 @@ export default function useChatThread({
     }
 
     // A → B → A와 같은 방 재조회에서도 이전 응답을 재사용하지 않는다.
-    const activeRef = useRef(null);
+    const activeRef = useRef(/** @type {{ scope: typeof scope, sending: boolean, ready: boolean, invalidated: boolean, requestController?: AbortController | null, pollingChanges?: boolean } | null} */ (null));
     // 응답을 받지 못한 전송은 서버에 저장됐을 수도 있다. 같은 본문을 다시 누르면
     // 같은 식별자를 보내 서버가 기존 한 줄을 돌려주게 한다.
     const retryRef = useRef(null);

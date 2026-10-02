@@ -90,7 +90,7 @@ function reducer(state, action) {
 const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetail: addressDetailProp = '', onChange, onMeta, onDetailChange, placeholder = '도로명 또는 지번 주소를 검색하세요' }) => {
     const [state, dispatch] = useReducer(reducer, initialState);
     // focused/detailFocused 통합 — 동시에 둘 다 포커스될 수 없으므로 하나의 필드로 표현
-    const [activeField, setActiveField] = useState(null); // null | 'query' | 'detail'
+    const [activeField, setActiveField] = useState(/** @type {'query' | 'detail' | null} */ (null)); // null | 'query' | 'detail'
 
     const containerRef   = useRef(null);
     const skipBlurRef    = useRef(false);

@@ -96,7 +96,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const showThread = isConversations && ((isWide && activeThread) || mobileThreadVisible);
     const threadKey = showThread ? selectionKey : null;
     const imageDraft = useChatImageDraft(threadKey);
-    const readScopeRef = useRef(null);
+    const readScopeRef = useRef(/** @type {{threadKey: string | null, identity: string, loading: boolean, roomId: number | null} | null} */ (null));
     const notificationTargetRef = useRef(null);
     const openNotifiedConversation = useCallback(roomId => {
         const target = notificationTargetRef.current;
@@ -242,7 +242,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const draft = useMessengerStore((state) => state.drafts[selectionKey] ?? '');
     const threadBodyRef = useRef(null);
     const historyScrollRef = useRef(null);
-    const historyScopeRef = useRef(null);
+    const historyScopeRef = useRef(/** @type {{threadKey: string | null, roomId: number | null} | null} */ (null));
     useLayoutEffect(() => {
         // 같은 방으로 돌아와도 전환 전 과거 조회와 스크롤 위치는 재사용하지 않는다.
         const scope = { threadKey, roomId: thread?.roomId ?? null };

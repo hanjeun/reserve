@@ -181,7 +181,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const [detailError, setDetailError]     = useState(null);
     const [detailRequestId, setDetailRequestId] = useState(null);
     const detailRequestRef = React.useRef(0);
-    const [rejectTarget, setRejectTarget]   = useState(null);
+    const [rejectTarget, setRejectTarget]   = useState(/** @type {{id: number, memberName: string} | null} */ (null));
     const [rejectOpen, setRejectOpen]       = useState(false);
     const [{ search, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
     const debouncedSearch = useDebounce(search, 300);
@@ -250,6 +250,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     // 빈 사유 검사는 RejectModal 안에서 인라인으로 처리한다 — 여기까지 오면 이미 채워져 있다.
     const handleReject = (reason) => {
+        if (!rejectTarget) return;
         rejectMutation.mutate({ id: rejectTarget.id, reason });
     };
 

@@ -10,9 +10,9 @@ export default function useChatNotifications(onOpen) {
     const user = useAuthStore(state => state.user);
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const identity = messengerIdentityOf({ user, sessionRevision });
-    const notifierRef = useRef(null);
+    const notifierRef = useRef(/** @type {ReturnType<typeof createChatNotifier> | null} */ (null));
     const onOpenRef = useRef(onOpen);
-    const [snapshot, setSnapshot] = useState({ identity: null, state: OFF });
+    const [snapshot, setSnapshot] = useState({ identity: /** @type {string | null} */ (null), state: OFF });
 
     useEffect(() => { onOpenRef.current = onOpen; }, [onOpen]);
     useEffect(() => {

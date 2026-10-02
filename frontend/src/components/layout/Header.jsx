@@ -25,7 +25,7 @@ const Header = () => {
     const goBack = useGoBack(currentPath === '/stores' || currentPath.startsWith('/store/') ? '/stores' : '/');
     const [navigationIntent, setNavigationIntent] = useState(null);
     const navigationTimerRef = useRef(null);
-    const navigationStartRef = useRef(null);
+    const navigationStartRef = useRef(/** @type {string | null} */ (null));
     // 뒤로가기 버튼은 사라질 때도 나타날 때와 같은 접힘 모션을 탄다(2026-09-26).
     // 예전엔 ← 를 직접 눌렀을 때만 접혔고, 로고·하단 탭·브라우저 뒤로가기로 탐색 루트에 돌아갈 때는
     // 버튼이 그 자리에서 언마운트돼 RESERVE 로고가 48px 뚝 튀었다(사용자 지적).

@@ -277,6 +277,7 @@ const MyStores = () => {
     }, []);
 
     const handleDeleteConfirm = useCallback(async () => {
+        if (!targetStore) return;
         try {
             await deleteStore(targetStore.id);
             setDeleteModalOpen(false);

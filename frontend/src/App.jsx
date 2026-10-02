@@ -251,7 +251,7 @@ function AppRoutes() {
     const navigationType = useNavigationType();
     const isSearchPage = isSearchPath(pathname);
     const routeContentRef = useRef(null);
-    const previousPathnameRef = useRef(null);
+    const previousPathnameRef = useRef(/** @type {string | null} */ (null));
     const previousDiscoveryTabRef = useRef(null);
     const previousHistoryIndexRef = useRef(null);
     useRouteSeo();

@@ -546,7 +546,7 @@ export const ReservationPanel = ({
     editLoadError = null, editRetrying = false, onRetryEditLoad,
 }) => {
     const dateValue = Form.useWatch('reservationDate', form);
-    const timeAvailabilityRef = React.useRef({ key: null, status: 'idle', slots: [] });
+    const timeAvailabilityRef = React.useRef({ key: /** @type {string | null} */ (null), status: 'idle', slots: [] });
     // DAY auto-fill runs in the same effect batch as lookup completion. Validation must see that
     // completion immediately, rather than the previous render's pending state.
     const handleAvailabilityChange = React.useCallback(next => { timeAvailabilityRef.current = next; }, []);

@@ -59,7 +59,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const lookupScope = `${id}:${isLoggedIn}:${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
     const [reviewAttempt, setReviewAttempt] = useState(0);
-    const [reviewResult, setReviewResult] = useState({ scope: null, attempt: null, reservation: null, error: null });
+    const [reviewResult, setReviewResult] = useState({ scope: /** @type {string | null} */ (null), attempt: /** @type {number | null} */ (null), reservation: null, error: null });
     const currentReview = isLoggedIn && reviewResult.scope === lookupScope && reviewResult.attempt === reviewAttempt;
     const completedReservation = currentReview ? reviewResult.reservation : null;
     const reviewEligibilityError = currentReview ? reviewResult.error : null;
@@ -200,6 +200,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
 
     // ── 예약 수정 제출 (onFinish에서 분리) ────────────────────────────────────
     const handleUpdateSubmit = async (values) => {
+        if (!editingReservation) return;
         try {
             await reservationService.updateReservation(editingReservation.id, {
                 reservationDate: formatDate(values.reservationDate),

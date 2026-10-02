@@ -89,6 +89,7 @@ const ChatReportsPanel = () => {
         if (!review.isPending) setSelected(null);
     };
     const submitResolution = async () => {
+        if (!selected) return;
         const note = resolutionNote.trim();
         if (!note) {
             setNoteError('처리 근거를 입력해주세요.');

@@ -1,0 +1,77 @@
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+import java.util.zip.ZipInputStream
+
+// Applied scripts have a separate classloader; use the installed plugin's public tool library.
+def jarModeTools = tasks.named('bootJar').get().class.classLoader
+        .loadClass('org.springframework.boot.loader.tools.JarModeLibrary').getField('TOOLS').get(null)
+
+// Follow bootJar's filtered classpath and its injected tool; never fetch notices during a build.
+def dependencyNotices = tasks.register('generateDependencyNotices') {
+    def directory = project.file('licenses')
+    def output = layout.buildDirectory.file('generated/notices/THIRD_PARTY_NOTICES.txt')
+    inputs.files configurations.productionRuntimeClasspath
+    inputs.dir directory
+    inputs.property 'jarmodeVersion', jarModeTools.coordinates.version
+    inputs.property 'includeTools', { tasks.named('bootJar').get().includeTools.get() }
+    outputs.file output
+
+    doLast {
+        def manifest = new JsonSlurper().parse(new File(directory, 'supplemental.json'))
+        def digest = { byte[] bytes -> MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString() }
+        def sections = ['RESERVE backend third-party notices\nOriginal dependency JARs are retained in BOOT-INF/lib.\n'
+                + 'This inventory preserves notices; it does not certify every distribution obligation.\n']
+        def packagedFiles = tasks.named('bootJar').get().classpath.files
+        def artifacts = configurations.productionRuntimeClasspath.resolvedConfiguration.resolvedArtifacts
+                .findAll { it.extension == 'jar' && packagedFiles.contains(it.file) }
+                .collect { artifact -> [coordinate: artifact.moduleVersion.id.toString(), bytes: { artifact.file.bytes }] }
+        if (tasks.named('bootJar').get().includeTools.get()) {
+            def tools = jarModeTools
+            artifacts.add([coordinate: tools.coordinates.groupId + ':' + tools.coordinates.artifactId + ':' + tools.coordinates.version,
+                           bytes: { tools.openStream().withCloseable { it.readAllBytes() } }])
+        }
+        artifacts.sort { it.coordinate }.each { artifact ->
+            def coordinate = artifact.coordinate
+            byte[] contents = artifact.bytes()
+            def notices = []
+            def archive = new ZipInputStream(new ByteArrayInputStream(contents))
+            try {
+                for (def entry = archive.nextEntry; entry != null; entry = archive.nextEntry) {
+                    if (!entry.directory && entry.name.tokenize('/').last() ==~ /(?i)(license|licence|notice|copying)([._-].*)?/) {
+                        notices.add('--- ' + entry.name + ' ---\n' + new String(archive.readAllBytes(), 'UTF-8'))
+                    }
+                }
+            } finally {
+                archive.close()
+            }
+            def supplement = manifest.packages[coordinate]
+            if (supplement != null) {
+                if (digest(contents) != supplement.jarSha256) {
+                    throw new GradleException('Dependency bytes changed; review original notices: ' + coordinate)
+                }
+                supplement.documents.each { key ->
+                    def document = manifest.documents[key]
+                    if (document == null) throw new GradleException('Unknown notice: ' + key)
+                    def original = new File(directory, document.file)
+                    if (!original.isFile() || digest(original.bytes) != document.sha256) {
+                        throw new GradleException('Original notice is missing or changed: ' + key)
+                    }
+                    notices.add('--- ' + document.file + ' ---\nSource: ' + document.source + '\n'
+                            + original.getText('UTF-8'))
+                }
+            }
+            if (notices.isEmpty()) throw new GradleException('Missing original dependency notices: ' + coordinate)
+            sections.add('\n' + '=' * 72 + '\n' + coordinate + '\n'
+                    + 'JAR SHA-256: ' + digest(contents) + '\n' + notices.sort().join('\n\n'))
+        }
+        def destination = output.get().asFile
+        destination.parentFile.mkdirs()
+        destination.setText(sections.join('\n') + '\n', 'UTF-8')
+        logger.lifecycle('Bundled backend notices: {} production artifacts', artifacts.size())
+    }
+}
+
+tasks.named('bootJar') {
+    dependsOn dependencyNotices
+    from(dependencyNotices) { into 'META-INF' }
+}

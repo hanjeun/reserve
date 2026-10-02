@@ -88,6 +88,8 @@ tasks.named('bootJar') {
     }
 }
 
+apply from: '../scripts/dependency-notices.gradle'
+
 // plain.jar 생성 비활성화 (실행 가능한 bootJar만 생성)
 jar {
     enabled = false

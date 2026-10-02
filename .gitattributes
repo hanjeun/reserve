@@ -25,3 +25,6 @@
 
 # 불변 증거는 ZIP/manifest와 바이트가 같아야 하므로 원래 줄바꿈도 보존한다.
 docs/design-system/snapshots/** -text -eol
+
+# Preserve the exact bytes of upstream license texts used by the notice manifest.
+backend/licenses/upstream/** -text -eol

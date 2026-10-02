@@ -266,3 +266,16 @@ nginx `root`가 SHA 절대 경로에 고정되므로 두 nginx 파일을 함께 
 3. `nginx -t` 뒤 한 번 reload해요.
 
 로컬 회귀 검사는 `bash scripts/test-frontend-release-swap.sh`와 `bash scripts/test-frontend-assets.sh`예요.
+
+### TLS 갱신과 원본 가게 HTML
+
+2026-10-02부터 Certbot의 HTTP-01은 nginx의 `/.well-known/acme-challenge/` webroot로 처리해요.
+기존 nginx 정지·시작 pre/post 훅은 원본 보관함으로 옮겼고, 갱신 후 reload 훅은 유지해요.
+세 도메인 challenge 읽기, 두 인증서의 staging 갱신과 deploy 훅, 별도로 복원한 인증서·키의
+일치·체인은 통과했어요. 실제 새 운영 인증서 발급과 staging 시험은 구분해요.
+원본과 복원 자료는 `/var/backups/reserve-scripts/20261002-before-tls-webroot/`(root 전용)에 있어요.
+
+가게 상세 원본 HTML은 같은 실행의 frontend-release 아티팩트를 백엔드 JAR에 동봉해 만들어요.
+패키징은 프론트 빌드 성공 후 진행하며 HTML 없이 만든 JAR는 거부해요. 공개 가게 조회 정책,
+HTML 이스케이프, 공개 썸네일 경로 검사를 거친 이름·설명·사진을 넣고 기존 SPA 자산은 보존해요.
+삭제·정지 가게는 404·noindex로 응답해요. 이 변경의 운영 적용은 해당 릴리스 배포에 포함돼요.

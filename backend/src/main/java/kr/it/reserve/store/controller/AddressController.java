@@ -83,7 +83,8 @@ public class AddressController {
 
         } catch (Exception e) {
             log.error("Kakao address search failed: errorType={}", e.getClass().getSimpleName());
-            return ResponseEntity.ok(ApiResponse.success(empty, "주소 검색에 실패했습니다."));
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(ApiResponse.error("주소 검색에 실패했습니다."));
         }
     }
 }

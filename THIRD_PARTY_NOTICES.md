@@ -36,6 +36,13 @@ Spring Boot, Jackson, JJWT, AWS SDK 등의 원문 라이선스·고지를 보존
 
 ## English
 
+
+Vite 빌드는 실제 출력 청크가 사용한 npm 패키지의 LICENSE·NOTICE를 `THIRD_PARTY_NOTICES.txt`에 동봉해요.
+루트 고지가 없는 icons-svg·victory-vendor는 해당 버전의 공식 저장소 원문을 함께 보관해요.
+is-mobile의 원문은 패키지 README의 License 절에 있어요. victory-vendor 내부의 D3 고지도 포함해요.
+PortOne browser-sdk 0.1.11 패키지에는 OSS 라이선스 선언·원문이 없어요. 공식 연동 안내와 배포 README를
+보존하되 MIT 등으로 간주하지 않아요. 서비스 계약상의 권리 범위까지 검증한 결과는 아니에요.
+
 This notice describes third-party software and fonts used by RESERVE. Rights in RESERVE and licenses of its dependencies are separate. This summary does not replace upstream license texts or individual copyright notices; the applicable version's original terms control.
 
 ### Frontend (npm)

@@ -71,7 +71,7 @@ jobs:
         working-directory: backend
         run: |
           chmod +x ./gradlew
-          ./gradlew test --console=plain
+          ./gradlew -I ../scripts/coverage.init.gradle test jacocoTestReport --console=plain
       - name: Record successful backend test evidence
         id: record
         env:
@@ -85,6 +85,14 @@ jobs:
           name: ci-evidence-backend-${{ steps.record.outputs.key }}
           overwrite: true
           path: .ci-evidence/backend/evidence.json
+          retention-days: 7
+      - name: Upload backend coverage for analysis
+        if: steps.evidence.outputs.reused != 'true' && success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-coverage-backend-${{ steps.record.outputs.key }}
+          path: backend/build/reports/jacoco/test/jacocoTestReport.xml
+          if-no-files-found: error
           retention-days: 7
       - name: Upload test report on failure
         if: failure()
@@ -147,7 +155,7 @@ jobs:
       - name: Test frontend (unit and React components)
         if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
-        run: npm run test:run
+        run: npm run test:coverage
       - name: Install Playwright Chromium
         if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
@@ -176,6 +184,14 @@ jobs:
           overwrite: true
           path: .ci-evidence/frontend/evidence.json
           retention-days: 7
+      - name: Upload frontend coverage for analysis
+        if: steps.evidence.outputs.reused != 'true' && success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-coverage-frontend-${{ steps.record.outputs.key }}
+          path: frontend/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -189,7 +205,10 @@ jobs:
   # 1. 백엔드 빌드 + Docker 이미지 푸시
   # ─────────────────────────────────────────────────────────
   build-backend:
-    needs: test-backend
+    permissions:
+      contents: read
+      actions: read
+    needs: [test-backend, build-frontend]
     # 필수 build 체크가 의존 테스트 실패를 skipped/success로 숨기지 않게 직접 실패시킨다.
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
@@ -197,7 +216,10 @@ jobs:
       - name: Require backend test success
         env:
           TEST_RESULT: ${{ needs.test-backend.result }}
-        run: test "$TEST_RESULT" = success
+          FRONTEND_RESULT: ${{ needs.build-frontend.result }}
+        run: |
+          test "$TEST_RESULT" = success
+          test "$FRONTEND_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install JDK 21
@@ -206,6 +228,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: gradle
+
+      - name: Download frontend HTML from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "frontend-release-$GITHUB_SHA" --dir frontend/dist
 
       # 앞 단계가 성공해야 패키징한다. test를 다시 실행하거나 -x test로 우회하지 않는다.
       - name: Package backend bootJar
@@ -258,16 +285,14 @@ jobs:
   # 2. 프론트엔드 빌드 + 실행 ID에 묶인 dist 아티팩트. 서버 쓰기는 stage-release에만 둔다.
   # ─────────────────────────────────────────────────────────
   build-frontend:
-    needs: [build-backend, test-frontend]
+    needs: test-frontend
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Require backend build and frontend test success
+      - name: Require frontend test success
         env:
-          BACKEND_RESULT: ${{ needs.build-backend.result }}
           TEST_RESULT: ${{ needs.test-frontend.result }}
         run: |
-          test "$BACKEND_RESULT" = success
           test "$TEST_RESULT" = success
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -547,6 +572,9 @@ jobs:
           PORTONE_WEBHOOK_SECRET: ${{ secrets.PORTONE_WEBHOOK_SECRET }}
           QR_TOKEN_SECRET: ${{ secrets.QR_TOKEN_SECRET }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_USERNAME: ${{ vars.DB_USERNAME }}
+          DB_APP_PASSWORD: ${{ secrets.DB_APP_PASSWORD }}
+          DB_DDL_AUTO: ${{ vars.DB_DDL_AUTO }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -562,7 +590,7 @@ jobs:
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY
+          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_PASSWORD,DB_USERNAME,DB_APP_PASSWORD,DB_DDL_AUTO,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY
           script: |
             set -e
             # 커밋 SHA로 고정된 이미지를 배포한다. :latest는 언제든 다른 커밋으로 바뀔 수 있어

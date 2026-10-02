@@ -10,16 +10,16 @@ RESERVE MySQL의 백업 구성과 복원 절차예요.
 | 보관 | 로컬 7일 + S3 `reserve-it-kr-backup/mysql/` 90일(Standard, 옛 버전은 7일 뒤 삭제) |
 | 스크립트 | `scripts/backup-mysql.sh`, `scripts/restore-mysql.sh` |
 | 설치 위치 | `/usr/local/bin/reserve-backup`·`reserve-restore`, 설정 `/etc/reserve-backup.env`(600 root), 덤프 `/var/backups/reserve` |
-| 로그 | `/var/log/reserve/backup.log` → Promtail → Loki → Grafana |
+| 로그 | `/var/log/reserve/backup.log` → Alloy → Loki → Grafana |
 
-DB 비밀번호는 `/etc/reserve-backup.env`의 `DB_PASSWORD`를 기준으로 써요.
+백업은 `/etc/reserve-backup.env`, 관리자 복원은 `/etc/reserve-restore.env`의 해당 계정 비밀번호를 사용해요. 앱·백업·관리자 비밀번호를 서로 복사하지 않아요.
 
 > **2026-10-02 검증:** 별도 읽기 접근으로 받은 S3 객체 `mysql/reserve-20260930-181001.sql.gz`는
 > 13,883바이트이며 SHA-256은 `8c886711714827452cbb9e813c49520b58ddbed784791e830e0428c06064f1d6`이다.
 > Linux MySQL **8.0.45**에 독립 복원해 34테이블·66행과 34개 테이블의 `CHECK TABLE` 성공을 확인했다.
 > 암호화 채팅 사진 1건도 독립 다운로드·무결성 확인 후 사용자가 별도 보관 키를 숨김 입력해 복호화 `PASS`를 확인했다.
-> 운영 설치 스크립트 3개 동기화와 읽기 전용 verifier 확인은 끝났다. 이 설치본의 첫 **10/2 03:10 KST 정기 실행은 아직 미확인**이다.
-> 아래 최소 권한 후보와 로컬 `--no-tablespaces` 변경은 운영 설치본에 반영하지 않았다.
+> 운영 설치본과 **10/2 03:10 KST 정기 백업의 34테이블 검증·업로드·종료 기록**을 확인했다.
+> 이후 백업 역할과 `--no-tablespaces`를 적용했다. 새 역할의 정기 실행은 10/3 03:10 KST 이후 별도로 확인한다.
 > 현재 운영 이미지까지 사용하는 격리 복구도 통과했다. 이전 백업에 없는
 > `store.image_autoplay_enabled`는 스키마 갱신으로 추가한 뒤 검증 모드로 재기동했고,
 > 기존 34테이블의 원래 컬럼 값·66행을 유지했다. 상세 범위와 미검증 항목은 2-5를 따른다.
@@ -63,13 +63,21 @@ sudo stat -c '%a %U %n' /etc/reserve-backup.env   # 600 root
 
 AWS 키는 백업 전용 사용자 `reserve-backup-uploader`의 키를 써요.
 
-### DB 계정 분리 후보 — 운영 미적용
+### DB 역할 분리와 복원 설정
 
-10/2 읽기 전용 확인에서 백업 연결 계정은 root였다. 앱의 `application-prod.yml`도
-`DB_USERNAME`의 기본값이 root이므로, 실제 연결 계정을 확인한 뒤 앱·DDL·백업 역할을 분리한다.
-현재 `ddl-auto: update`를 사용하는 앱에서 DDL 권한부터 제거하면 스키마 변경이 실패할 수 있다.
-전용 DDL 단계로 필요한 스키마를 먼저 맞추고 앱은 `ddl-auto: validate`로 검증하는 전환안을 준비한다.
-운영 계정 생성·권한 변경·앱 설정 전환은 별도 승인 대상이다.
+2026-10-02 승인된 운영 변경으로 백업은 `reserve_backup@localhost`를 사용해요.
+`SELECT`·`SHOW VIEW`·`SHOW_ROUTINE`·`TRIGGER`·`EVENT`와 `--no-tablespaces`로
+34개 테이블의 덤프 정의·종료 표식을 확인한 뒤 `/etc/reserve-backup.env`를 전환했어요.
+앱용 DML 계정과 DDL 계정은 실제 Docker 서브넷에 한정했으며, 현재 운영 이미지의 앱 접속도 전환했어요.
+앱의 `ddl-auto: update`에 DDL 권한부터 제거하지 않아요. 필요한 스키마를 DDL 단계에서 맞춘 뒤
+앱은 `ddl-auto: validate`로 기동해야 해요.
+
+복원 관리자 설정은 `/etc/reserve-restore.env`(root 소유, 600)에 따로 보관해요.
+`RESERVE_RESTORE_ENV`로 명시한 경로가 우선이며, 기존 `RESERVE_BACKUP_ENV` 명시도 호환돼요.
+두 변수를 지정하지 않았고 복원 설정이 없을 때만 기존 `/etc/reserve-backup.env`로 돌아가요.
+백업 계정은 데이터 쓰기 권한이 없으므로 복원이나 관리자 SQL에 쓰지 않아요.
+변경 전 원본은 `/var/backups/reserve-scripts/20261002-before-db-roles/`에 보관했어요.
+이후 첫 정기 백업의 실제 업로드·종료는 해당 cron 실행 후 별도로 확인해요.
 
 MySQL **8.0.45** 격리 시험에서 검증한 권한 후보는 다음과 같다. 호스트 범위는 실제 컨테이너
 접속 경로에 맞춰 제한하고, 계정 암호는 보호된 입력으로 생성한다. 아래 `localhost`는 시험 범위다.
@@ -349,60 +357,36 @@ HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없�
 - RPO는 24시간이에요. 마지막 백업 이후 데이터는 복구되지 않아요
 - `--single-transaction`은 InnoDB 테이블을 전제로 해요. 확인: `SELECT table_name, engine FROM information_schema.tables WHERE table_schema='reserve' AND engine <> 'InnoDB';`
 
-## 7. DB root 비밀번호 무중단 교체
+## 7. 운영 DB 계정과 비밀번호 교체
 
-MySQL 8의 이중 비밀번호(`RETAIN CURRENT PASSWORD`)로 옛 값과 새 값을 잠시 함께 허용하고, 쓰는 곳을 하나씩 옮긴 뒤 옛 값을 폐기해요.
+2026-10-02 같은 운영 이미지에서 앱 접속을 `reserve_app`으로 바꾸고 Hibernate를
+`validate`로 전환했어요. 엔티티 33개를 제한된 계정으로 먼저 검증했고, 전환 뒤
+건강 검사·공개 JSON API·앱 연결 10개·읽기 전용 verifier가 통과했어요.
+원래 컨테이너와 설정은 `/var/backups/reserve-scripts/20261002-before-db-roles/`에
+보존해요. 계정 전환은 새 앱 버전 배포와 별개예요.
 
-| 쓰는 곳 | 계정 | 값이 들어가는 경로 |
+| 대상 | 계정·권한 | 설정 위치 |
 |---|---|---|
-| 앱(blue/green) | root (`DB_USERNAME` 미설정 → 기본값 root) | GitHub Secret `DB_PASSWORD` → 배포 때 컨테이너 환경 변수 |
-| 백업·복원 스크립트 | root | `/etc/reserve-backup.env` |
-| 개발 PC IntelliJ `reserve-prod` 데이터 소스 | root | IntelliJ 저장값(SSH 터널) |
+| 앱 | `reserve_app@172.18.0.0/255.255.0.0`, SELECT·INSERT·UPDATE·DELETE | 서버 컨테이너; GitHub `DB_USERNAME=reserve_app`, Secret `DB_APP_PASSWORD`, `DB_DDL_AUTO=validate` |
+| DDL | `reserve_ddl@172.18.0.0/255.255.0.0`, SELECT·CREATE·ALTER·DROP·INDEX·REFERENCES | 서버 역할 보관본; 자동 실행하지 않음 |
+| 백업 | `reserve_backup@localhost`, SELECT·SHOW VIEW·TRIGGER·EVENT·SHOW_ROUTINE | `/etc/reserve-backup.env` |
+| 복원·관리자 | root | `/etc/reserve-restore.env`; 기존 GitHub 관리자 Secret `DB_PASSWORD` |
 
-- 새 비밀번호는 영문·숫자만 써요([Git 워크플로우](../rules/git-workflow.md))
-- 서버에서는 `read -rsp`로 받고, `docker exec`에는 환경 변수 이름만 넘겨요
-- GitHub Secret에 넣기 전에 SHA-256 지문(앞 12자)으로 서버 값과 대조해요
+백업 역할은 데이터 쓰기 권한이 없지만 TRIGGER·EVENT 정의 권한을 포함하므로
+절대적인 읽기 전용 계정으로 설명하지 않아요. 역할 보관본은 `/etc/reserve-db-roles.json`
+(root 600)에 있어요. 키·비밀번호 값은 명령 출력이나 문서에 남기지 않아요.
 
-```bash
-# 1. 서버 — 새 비밀번호를 두 root 계정에 추가한다(옛 비밀번호는 유지). 이 SSH 창은 끝날 때까지 닫지 않는다.
-read -rsp 'NEW DB PASSWORD: ' NEWPW; echo; echo "length: ${#NEWPW}"
-export NEWPW MYSQL_PWD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"   # MYSQL_PWD = 지금(옛) 비밀번호
-sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -c 'mysql -uroot -e "ALTER USER \"root\"@\"%\" IDENTIFIED BY \"$NEWPW\" RETAIN CURRENT PASSWORD; ALTER USER \"root\"@\"localhost\" IDENTIFIED BY \"$NEWPW\" RETAIN CURRENT PASSWORD;"'
-sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -c 'mysql -uroot -N -e "SELECT \"old ok\""; MYSQL_PWD="$NEWPW" mysql -uroot -N -e "SELECT \"new ok\""'
-printf '%s' "$NEWPW" | sha256sum | cut -c1-12   # 지문
-```
+새 릴리스의 스키마는 해당 JAR로 `scripts/VerifyDatabaseSchema.java`를 실행해
+확인해요. 이 도구는 앱을 부팅하지 않고 제한된 앱 계정으로 스키마만 검증해요.
+필요한 DDL은 대상·롤백을 검토해 별도로 적용하며 검증 실패를 `update`로 우회하지 않아요.
 
-```powershell
-# 2. 개발 PC — 클립보드 값의 지문이 서버 지문과 같을 때만 GitHub Secret 을 바꾼다
-$cb = (Get-Clipboard | Out-String).Trim(); $h = [Security.Cryptography.SHA256]::Create()
-(($h.ComputeHash([Text.Encoding]::UTF8.GetBytes($cb)) | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0,12)
-$cb | gh secret set DB_PASSWORD -R hanjeun/reserve; Remove-Variable cb
-
-# 3. 재배포 — main 의 최신 CICD 실행을 다시 실행한다(빌드·배포 세 단계뿐, 태그·릴리즈 없음)
-gh run list -R hanjeun/reserve --branch main --workflow CICD.yml --limit 1
-gh run rerun <run id> -R hanjeun/reserve
-```
-
-```bash
-# 3-확인 — 새 앱이 새 비밀번호로 떴는지 (지문이 같고, Access denied 가 없고, 200)
-C=$(sudo docker ps --format '{{.Names}}' | grep -E '^(blue|green)$'); echo "active: $C"
-sudo docker exec "$C" sh -c 'printf %s "$DB_PASSWORD"' | sha256sum | cut -c1-12
-sudo docker logs --since 20m "$C" 2>&1 | grep -iE "Access denied|Started ReserveApplication" | tail -3
-curl -s -o /dev/null -w '%{http_code}\n' 'https://reserve.it.kr/api/stores?size=1'
-
-# 4. 백업 설정 — 값을 바꾸고 지문·권한 확인 후 백업을 한 번 돌린다
-sudo --preserve-env=NEWPW sh -c 'sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$NEWPW/" /etc/reserve-backup.env'
-sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"' | sha256sum | cut -c1-12; sudo stat -c '%a %U' /etc/reserve-backup.env
-sudo /usr/local/bin/reserve-backup
-
-# 5. IntelliJ — Database 창 → reserve-prod → 데이터 소스 속성 → 비밀번호 교체 → 연결 테스트 → 확인
-
-# 6. 옛 비밀번호 폐기 — 2~5 가 전부 확인된 뒤에만
-sudo --preserve-env=NEWPW docker exec -e NEWPW mysql sh -c 'MYSQL_PWD="$NEWPW" mysql -uroot -e "ALTER USER \"root\"@\"%\" DISCARD OLD PASSWORD; ALTER USER \"root\"@\"localhost\" DISCARD OLD PASSWORD;"'
-sudo --preserve-env=NEWPW,MYSQL_PWD docker exec -e NEWPW -e MYSQL_PWD mysql sh -c 'MYSQL_PWD="$NEWPW" mysql -uroot -N -e "SELECT \"new ok\""; mysql -uroot -N -e "SELECT \"old still ok\"" 2>&1 | head -1'   # old 는 Access denied 여야 한다
-curl -s -o /dev/null -w '%{http_code}\n' 'https://reserve.it.kr/api/stores?size=1'
-unset NEWPW MYSQL_PWD
-```
+비밀번호는 역할마다 독립적으로 교체해요. root 교체 시 앱·백업 비밀번호를 root 값으로
+바꾸거나 기존 main CI를 재실행하지 않아요. 해당 계정에 새 비밀번호를 추가하고
+(RETAIN CURRENT PASSWORD), 해당 계정의 설정만 갱신해 연결을 검증해요.
+관리자는 복원 설정과 GitHub 관리자 Secret, 앱은 앱 Secret과 접속 설정,
+백업은 백업 설정과 실제 덤프를 확인해요. 해당 사용처가 전부 전환된 뒤 그 계정의
+옛 비밀번호만 DISCARD OLD PASSWORD로 폐기해요. 교체 전에는 구체적인 운영 승인과
+복구 경로를 확인해요.
 
 ## 복원 훈련 이력
 

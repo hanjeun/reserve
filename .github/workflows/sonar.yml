@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: sonar-${{ github.ref }}
@@ -45,6 +46,32 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew classes testClasses --console=plain
+      - name: Restore verified backend coverage
+        id: backend_coverage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+          CI_REQUIRE_COVERAGE: 'true'
+          CI_COVERAGE_WAIT_SECONDS: ${{ github.event_name == 'pull_request' && '900' || '0' }}
+        run: node scripts/ci-evidence.mjs restore backend
+      - name: Restore verified frontend coverage
+        id: frontend_coverage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
+          CI_REQUIRE_COVERAGE: 'true'
+          CI_COVERAGE_WAIT_SECONDS: ${{ github.event_name == 'pull_request' && '900' || '0' }}
+        run: node scripts/ci-evidence.mjs restore frontend
+      - name: Generate backend coverage when no reusable report exists
+        if: steps.backend_coverage.outputs.reused != 'true'
+        working-directory: backend
+        run: ./gradlew -I ../scripts/coverage.init.gradle test jacocoTestReport --console=plain
+      - name: Generate frontend coverage when no reusable report exists
+        if: steps.frontend_coverage.outputs.reused != 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run test:coverage
       - name: Analyze backend and frontend
         working-directory: backend
         env:

@@ -28,6 +28,29 @@ class SecurityConfigAuthorizationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Test
+    void authenticatedCookieWithoutBrowserOriginProofIsForbidden() throws Exception {
+        mockMvc.perform(post("/api/chat/support/open")
+                        .cookie(new jakarta.servlet.http.Cookie("access_token", "invalid-test-token")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void foreignRefererCannotUseAuthenticationCookie() throws Exception {
+        mockMvc.perform(post("/api/chat/support/open")
+                        .header("Referer", "https://reserve.it.kr.attacker.test/")
+                        .cookie(new jakarta.servlet.http.Cookie("access_token", "invalid-test-token")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void trustedRefererReachesAuthenticationWithoutCsrfToken() throws Exception {
+        mockMvc.perform(post("/api/chat/support/open")
+                        .header("Referer", "https://reserve.it.kr/stores")
+                        .cookie(new jakarta.servlet.http.Cookie("access_token", "invalid-test-token")))
+                .andExpect(status().isUnauthorized());
+    }
+
     // ── 공개 API — 비로그인 상태에서도 401이 아니어야 함 (200/404 등은 데이터 유무에 따라 달라질 수 있어 허용) ──
 
     @Test

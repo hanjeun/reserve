@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,7 +107,8 @@ public class TokenService {
                 liftExpiredSuspension(member);
                 log.info("Refresh reused within grace: memberId={}", member.getId());
                 return new RefreshResult(tokenProvider.generateAccessToken(member), row.getRefreshToken(),
-                        Duration.between(now, row.getExpiresAt()));
+                        Duration.between(now.atZone(ZoneId.systemDefault()),
+                                row.getExpiresAt().atZone(ZoneId.systemDefault())));
             }
             refreshTokenRepository.delete(row);
             throw reject(Reason.REUSED_TOKEN, member.getId());

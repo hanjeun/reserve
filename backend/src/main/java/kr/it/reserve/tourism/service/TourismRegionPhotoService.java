@@ -23,6 +23,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Objects;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -333,5 +335,22 @@ public class TourismRegionPhotoService {
     private record CachedImage(String imageUrl, ImagePayload payload, Instant expiresAt) { }
     private record ImageFailure(String imageUrl, Instant retryAt) { }
 
-    public record ImagePayload(byte[] bytes, MediaType contentType) { }
+    public record ImagePayload(byte[] bytes, MediaType contentType) {
+        @Override
+        public boolean equals(Object other) {
+            return this == other || other instanceof ImagePayload image
+                    && Arrays.equals(bytes, image.bytes)
+                    && Objects.equals(contentType, image.contentType);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType);
+        }
+
+        @Override
+        public String toString() {
+            return "ImagePayload[byteCount=" + (bytes == null ? 0 : bytes.length) + ", contentType=" + contentType + "]";
+        }
+    }
 }

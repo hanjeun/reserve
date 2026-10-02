@@ -48,6 +48,7 @@ public class MailConfig {
         props.put("mail.transport.protocol", "smtp");
         props.put("mail.smtp.auth", String.valueOf(auth));
         props.put("mail.smtp.ssl.enable", "true");
+        props.put("mail.smtp.ssl.checkserveridentity", "true");
         props.put("mail.smtp.port", "465");
         props.put("mail.smtp.socketFactory.port", "465");
         props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");

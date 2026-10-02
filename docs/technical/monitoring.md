@@ -408,19 +408,31 @@ sudo env RESERVE_NGINX_LOG_DIR="$NGINX_LOG_DIR" docker compose \
 
 5분 간격으로 `https://reserve.it.kr`를 헬스체크하고, 다운 시 이메일로 알려요.
 
-## SonarCloud
+## SonarQube Cloud
 
-**Automatic Analysis**로 SonarCloud가 저장소를 직접 분석해요. 워크플로에 sonar 스텝과 `sonar-project.properties`가 없어서 CI와 독립적으로 돌아요.
+2026-10-02부터 `.github/workflows/sonar.yml`의 Java 21·Gradle CI 분석을 사용해요.
+자동 분석은 껐고 `SONAR_CI_ENABLED=true`를 적용했어요. `SONAR_TOKEN`은 GitHub Actions
+Secret으로만 전달하며 IntelliJ 실행 환경변수에는 필요하지 않아요.
 
-2026-10-02 dev의 공개 분석 API를 읽기 전용으로 확인했을 때 언어별 코드 목록에 Java가 없었어요.
-백엔드는 `backend/build.gradle`을 쓰고 저장소 루트에는 Gradle·Maven 빌드 파일이 없어요.
-[공식 자동 분석 문서](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/automatic-analysis)는
-하위 폴더 Gradle 프로젝트에 CI 기반 분석이 필요하다고 안내해요. 현재 구조와 Java 부재가
-일치하므로 자동 분석의 범위 공백으로 판단하지만, 제공되지 않는 자동 분석 로그로 내부 원인까지 확정하지는 않아요.
-백엔드 테스트 통과와 Sonar의 Java 분석 완료는 각각 확인해요.
+첫 dev 전체 분석은 Java를 포함해 400건을 찾았어요. 이전 57건은 Java가 빠진 범위였어요.
+실제 보안·신뢰성 문제를 수정한 뒤 같은 범위를 다시 분석해요. PR 분석과 dev 전체 분석은
+별개이며, Quality Gate 통과 전에는 검증 완료라고 표시하지 않아요.
 
-CI 기반 분석을 준비하려면 Java 21·Gradle 빌드와 분석용 최소 권한을 정하고, 실제 후보에서
-백엔드 Java 파일이 분석된 증거를 확인해요. 자동 분석과 CI 분석은 동시에 켜지 않아요.
-분석 방식 변경·토큰 등록·프로젝트 설정 변경은 별도 승인 단계예요. 현재는 변경하지 않았어요.
-자동 분석의 지원 속성 목록에 없는 npm 무시 설정만으로 기존 설치 스크립트 경고 두 건이
-해결됐다고 판단하지 않아요. 필요한 postinstall의 실제 권한·입력·비밀정보 경계를 검토한 뒤 처리해요.
+CI의 기존 테스트에서 JaCoCo XML과 Vitest LCOV를 만들어요. 같은 입력·도구·성공 실행·해시·
+유효기간이 검증된 보고서만 재사용하며, 검증할 수 없으면 새로 생성해요. 임계값을 낮추거나
+검사 범위를 줄여서 통과시키지 않아요.
+
+## Alloy 운영 전환
+
+2026-10-02 Alloy 1.20.1의 고정 이미지로 운영 수집을 전환했어요. Promtail을 정상 종료한 뒤
+positions를 보존하고, 네 수집원의 offset을 이어받았어요. Promtail 컨테이너·볼륨은 복구용으로
+유지하며 Alloy와 동시에 활성화하지 않아요. 기존 Loki 2.9.0·query-ready 옵션·보존기간은 유지해요.
+원본 설정과 종료 당시 positions는 `/var/backups/reserve-scripts/20261002-before-alloy/`에 있어요.
+롤백할 때는 Alloy를 먼저 멈추고 최신 positions를 내보낸 뒤 Promtail로 돌아가요.
+
+운영 readiness와 새 metrics·nginx 로그는 확인했어요. 앱·백업의 과거 조회도 유지돼요.
+새 앱 heartbeat와 새 정기 백업은 실제 생성 시각 이후에 확인해야 해요. 앱 수집 중단 알림은
+15분 주기의 `Application log heartbeat: paymentOperations=checked`가 배포되어 처음 수집된 뒤
+활성화해요. 그 전에는 조용한 정상 앱을 수집 장애로 오인하지 않게 일시 중지해요.
+기존 메일 하나를 유지하고 Resolved 발송도 켜요. 2026-10-02 Gmail 받은편지함에서
+19:13 KST 시험 Firing과 19:35 KST 결제 운영 큐 Resolved 수신을 확인했어요.

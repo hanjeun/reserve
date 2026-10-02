@@ -10,7 +10,7 @@ import { resolveBin } from './resolve-bin.mjs';
 const VERSION = 1;
 const MAX_AGE_MS = 7 * 86_400_000;
 const scopes = {
-    backend: ['backend', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs',
+    backend: ['backend', 'frontend/index.html', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle',
         '.github/workflows/CICD.yml', '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml'],
     frontend: ['frontend', 'backend/src/main', 'scripts', '.github', '.gitattributes', 'nginx', 'monitoring', 'docs/design-system/snapshots'],
 };
@@ -107,6 +107,45 @@ async function readProof(artifact) {
         }));
     } finally { rmSync(directory, { recursive: true, force: true }); }
 }
+async function restoreCoverage(component, key, proof, runtime) {
+    const origin = await api(`actions/runs/${proof.originRunId}`);
+    if (!eligibleRun(origin, process.env.GITHUB_REPOSITORY)) return false;
+    git(['fetch', '--no-tags', '--depth=1', 'origin', origin.head_sha]);
+    if (keyAt(component, origin.head_sha, runtime) !== key) return false;
+    const name = `ci-coverage-${component}-${key}`;
+    const { artifacts } = await api(`actions/runs/${origin.id}/artifacts?per_page=100`);
+    const artifact = artifacts.find(item => !item.expired && item.name === name);
+    if (!artifact || !/^sha256:[a-f0-9]{64}$/.test(artifact.digest || '')
+            || artifact.size_in_bytes > 5 * 1024 * 1024) return false;
+    const redirect = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts/${artifact.id}/zip`, {
+        headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
+        redirect: 'manual', signal: AbortSignal.timeout(10_000),
+    });
+    if (redirect.status !== 302) return false;
+    const location = new URL(redirect.headers.get('location'));
+    if (location.protocol !== 'https:') return false;
+    const response = await fetch(location, { signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) return false;
+    const archive = Buffer.from(await response.arrayBuffer());
+    if (archive.length > 5 * 1024 * 1024
+            || `sha256:${createHash('sha256').update(archive).digest('hex')}` !== artifact.digest) return false;
+    const report = component === 'backend'
+        ? { entry: 'jacocoTestReport.xml', path: 'backend/build/reports/jacoco/test/jacocoTestReport.xml' }
+        : { entry: 'lcov.info', path: 'frontend/coverage/lcov.info' };
+    const temporary = mkdtempSync(join(tmpdir(), 'reserve-ci-coverage-'));
+    try {
+        const zip = join(temporary, 'coverage.zip');
+        writeFileSync(zip, archive);
+        const content = execFileSync('/usr/bin/unzip', ['-p', zip, report.entry], {
+            maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        if (!content.length) return false;
+        mkdirSync(resolve(report.path, '..'), { recursive: true });
+        writeFileSync(report.path, content);
+        return true;
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+}
+
 async function restore(component, key, runtime) {
     if (!process.env.GITHUB_TOKEN || process.env.CI_FORCE_TESTS === 'true') return null;
     const result = await api(`actions/artifacts?per_page=100&name=ci-evidence-${component}-${key}`);
@@ -122,6 +161,7 @@ async function restore(component, key, runtime) {
         const proof = await readProof(artifact);
         if (proof?.version !== VERSION || proof.component !== component || proof.key !== key
             || !/^\d+$/.test(String(proof.originRunId)) || !freshProof(proof)) continue;
+        if (process.env.CI_REQUIRE_COVERAGE === 'true' && !await restoreCoverage(component, key, proof, runtime)) continue;
         return { runId: run.id, originRunId: proof.originRunId, executedAt: proof.executedAt };
     }
     return null;
@@ -136,6 +176,14 @@ export async function main(mode, requestedComponent) {
         let proof = null;
         try { proof = await restore(component, key, runtime); }
         catch { summary(`${component}: no trustworthy reusable evidence; execute tests normally.`); }
+        const waitSeconds = process.env.CI_REQUIRE_COVERAGE === 'true'
+            ? Math.min(900, Math.max(0, Number(process.env.CI_COVERAGE_WAIT_SECONDS) || 0)) : 0;
+        const deadline = Date.now() + waitSeconds * 1000;
+        if (!proof && waitSeconds) summary(`${component}: waiting for the existing CI coverage; no duplicate tests yet.`);
+        while (!proof && Date.now() < deadline) {
+            await new Promise(resolveWait => setTimeout(resolveWait, 30_000));
+            try { proof = await restore(component, key, runtime); } catch { /* Fall back to fresh tests. */ }
+        }
         if (proof) {
             output({ reused: true, origin_run: proof.originRunId, executed_at: proof.executedAt });
             summary(`${component}: reused identical-input successful tests from run ${proof.runId} (original ${proof.originRunId}).`);

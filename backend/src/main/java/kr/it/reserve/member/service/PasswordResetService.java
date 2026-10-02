@@ -27,6 +27,7 @@ import java.util.Optional;
 public class PasswordResetService {
 
     private static final int EXPIRES_MINUTES = 5;
+    private static final SecureRandom CODE_RANDOM = new SecureRandom();
 
     private final MemberRepository memberRepository;
     private final PasswordResetTokenRepository tokenRepository;
@@ -188,7 +189,6 @@ public class PasswordResetService {
     }
 
     private String generateCode() {
-        SecureRandom random = new SecureRandom();
-        return String.valueOf(random.nextInt(900000) + 100000);
+        return String.valueOf(CODE_RANDOM.nextInt(900000) + 100000);
     }
 }

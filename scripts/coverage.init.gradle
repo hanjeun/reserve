@@ -1,0 +1,19 @@
+// Coverage tooling stays outside the application's locked runtime dependencies.
+allprojects {
+    apply plugin: 'jacoco'
+    afterEvaluate {
+        jacoco { toolVersion = '0.8.14' }
+        ['jacocoAgent', 'jacocoAnt'].each { name ->
+            configurations.named(name) { resolutionStrategy.deactivateDependencyLocking() }
+        }
+        tasks.named('jacocoTestReport') {
+            dependsOn tasks.named('test')
+            reports {
+                xml.required = true
+                html.required = false
+                csv.required = false
+            }
+        }
+    }
+}
+

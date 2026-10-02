@@ -33,8 +33,8 @@ test('required checks remain present and deployment waits for both builds', () =
     assert.ok(backend && frontend && deployment && backendTests && frontendTests);
     assert.equal(backendTests.if, undefined);
     assert.equal(frontendTests.if, undefined);
-    assert.equal(backend.needs, 'test-backend');
-    assert.deepEqual(frontend.needs, ['build-backend', 'test-frontend']);
+    assert.deepEqual(backend.needs, ['test-backend', 'build-frontend']);
+    assert.equal(frontend.needs, 'test-frontend');
     assert.deepEqual(deployment.needs, ['build-backend', 'build-frontend', 'test-backend', 'test-frontend', 'stage-release']);
     assert.deepEqual(staging.needs, ['build-backend', 'build-frontend']);
     assert.equal(staging.if, deployment.if);
@@ -46,7 +46,11 @@ test('required checks remain present and deployment waits for both builds', () =
         assert.match(job.steps[0].run, /test "\$TEST_RESULT" = success/);
         assert.equal(job.steps[0]['continue-on-error'], undefined);
     }
-    assert.match(frontend.steps[0].run, /test "\$BACKEND_RESULT" = success/);
+    assert.match(backend.steps[0].run, /test "\$FRONTEND_RESULT" = success/);
+    const shell = backend.steps.find(entry => entry.name === 'Download frontend HTML from this run');
+    assert.match(shell.run, /GITHUB_RUN_ID/);
+    assert.match(shell.run, /frontend-release-\$GITHUB_SHA/);
+    assert.ok(backend.steps.indexOf(shell) < backend.steps.indexOf(step(backend, 'backend_package')));
     assert.match(deployment.if, /github\.ref == 'refs\/heads\/main'/);
     assert.match(deployment.if, /github\.event_name == 'push'/);
     assert.equal(workflow.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
@@ -56,7 +60,7 @@ test('backend tests are explicit, required, and run before packaging', () => {
     const tests = step(backendTests, 'backend_tests');
     const packaging = step(backend, 'backend_package');
     assert.ok(tests && packaging);
-    assert.match(tests.run, /\.\/gradlew test --console=plain/);
+    assert.match(tests.run, /\.\/gradlew -I \.\.\/scripts\/coverage\.init\.gradle test jacocoTestReport --console=plain/);
     assert.match(packaging.run, /\.\/gradlew bootJar --console=plain/);
     assert.equal(step(backend, 'backend_tests'), undefined);
     assert.equal(tests['continue-on-error'], undefined);
@@ -81,7 +85,7 @@ test('PC and mobile browser checks use separate projects and failure evidence', 
     assert.equal(mobile.if, "!cancelled() && steps.evidence.outputs.reused != 'true' && (success() || (failure() && steps.browser_pc.outcome == 'failure'))");
     assert.ok(frontendTests.steps.indexOf(pc) < frontendTests.steps.indexOf(mobile));
     for (const entry of [pc, mobile]) assert.equal(entry['continue-on-error'], undefined);
-    assert.ok(frontendTests.steps.some(entry => entry.run === 'npm run test:run'));
+    assert.ok(frontendTests.steps.some(entry => entry.run === 'npm run test:coverage'));
     assert.ok(frontend.steps.some(entry => entry.run === 'npm run build'));
 });
 
@@ -108,7 +112,7 @@ test('only verified successful evidence can skip tests; records and required che
         assert.equal(record['continue-on-error'], undefined);
         assert.equal(record.if, undefined);
         assert.equal(job.permissions.actions, 'read');
-        for (const entry of job.steps.filter(entry => /gradlew test|npm run test:run|npm run test:e2e/.test(entry.run ?? ''))) {
+        for (const entry of job.steps.filter(entry => /gradlew .*\btest\b|npm run test:coverage|npm run test:e2e/.test(entry.run ?? ''))) {
             assert.match(entry.if, /steps\.evidence\.outputs\.reused != 'true'/);
             assert.equal(entry['continue-on-error'], undefined);
         }

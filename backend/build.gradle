@@ -76,6 +76,18 @@ dependencies {
     runtimeOnly 'com.h2database:h2'
 }
 
+// 공개 가게 HTML은 동일 릴리스의 프론트 빌드와 묶는다.
+tasks.named('processResources') {
+    from('../frontend/dist/index.html') { into 'store-shell' }
+}
+tasks.named('bootJar') {
+    doFirst {
+        if (!file('../frontend/dist/index.html').isFile()) {
+            throw new GradleException('Build the frontend before packaging store pages')
+        }
+    }
+}
+
 // plain.jar 생성 비활성화 (실행 가능한 bootJar만 생성)
 jar {
     enabled = false

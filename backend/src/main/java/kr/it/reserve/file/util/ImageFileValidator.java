@@ -12,6 +12,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
@@ -318,5 +319,24 @@ public final class ImageFileValidator {
             String extension,
             int width,
             int height) {
+        @Override
+        public boolean equals(Object other) {
+            return this == other || other instanceof ValidatedImage image
+                    && Arrays.equals(bytes, image.bytes)
+                    && Objects.equals(contentType, image.contentType)
+                    && Objects.equals(extension, image.extension)
+                    && width == image.width
+                    && height == image.height;
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType, extension, width, height);
+        }
+
+        @Override
+        public String toString() {
+            return "ValidatedImage[byteCount=" + (bytes == null ? 0 : bytes.length) + ", contentType=" + contentType + ", extension=" + extension + ", width=" + width + ", height=" + height + "]";
+        }
     }
 }

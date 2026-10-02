@@ -54,6 +54,7 @@ dist-ssr/
 test-results/
 playwright-report/
 blob-report/
+/frontend/coverage/
 
 # ========================
 # 환경변수 (보안)

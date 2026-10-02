@@ -10,7 +10,7 @@ const entries = '100644 blob aaaa\tfrontend/src/App.jsx\0' +
 const runtime = { node: 'v22.21.0', image: 'ubuntu24', imageVersion: '1', configRevision: '1' };
 test('backend evidence covers its code and test executor, not unrelated frontend tooling or PR labels', () => {
     assert.deepEqual(evidenceInputPaths('backend'), [
-        'backend', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', '.github/workflows/CICD.yml',
+        'backend', 'frontend/index.html', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', '.github/workflows/CICD.yml',
         '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml',
     ]);
     assert.ok(evidenceInputPaths('frontend').includes('backend/src/main'));

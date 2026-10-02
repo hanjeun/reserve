@@ -71,6 +71,10 @@ public class ChatService {
      */
     @Transactional
     public ChatRoom openMyRoom(Member member) {
+        return findOrCreateSupportRoom(member);
+    }
+
+    private ChatRoom findOrCreateSupportRoom(Member member) {
         // 회원 행을 먼저 잠그면 같은 회원의 첫 두 요청이 동시에 빈 방을 보고 중복 생성하지 못한다.
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new ChatException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -90,19 +94,19 @@ public class ChatService {
      */
     @Transactional
     public List<ChatMessageResponse> readMyMessages(Member member) {
-        ChatRoom room = openMyRoom(member);
+        ChatRoom room = findOrCreateSupportRoom(member);
         room.markRead(SenderRole.MEMBER);
         return recentWindow(room.getId(), member.getId()).messages();
     }
 
     @Transactional
     public ChatMessageResponse sendAsMember(Member member, String content) {
-        return sendAsMember(member, content, null);
+        return append(findOrCreateSupportRoom(member), SenderRole.MEMBER, member.getId(), content, null);
     }
 
     @Transactional
     public ChatMessageResponse sendAsMember(Member member, String content, String clientMessageId) {
-        ChatRoom room = openMyRoom(member);
+        ChatRoom room = findOrCreateSupportRoom(member);
         return append(room, SenderRole.MEMBER, member.getId(), content, clientMessageId);
     }
 
@@ -165,7 +169,7 @@ public class ChatService {
 
     @Transactional
     public ConversationThreadResponse openSupportConversation(Member member) {
-        ChatRoom room = openMyRoom(member);
+        ChatRoom room = findOrCreateSupportRoom(member);
         room.markRead(SenderRole.MEMBER);
         MessageWindow window = recentWindow(room.getId(), member.getId());
         return ConversationThreadResponse.from(
@@ -206,6 +210,10 @@ public class ChatService {
     /** 가게 문의방은 손님·가게 조합마다 하나다. 회원 행 잠금이 첫 동시 생성을 직렬화한다. */
     @Transactional
     public ChatRoom openStoreRoom(Member member, Long storeId) {
+        return findOrCreateStoreRoom(member, storeId);
+    }
+
+    private ChatRoom findOrCreateStoreRoom(Member member, Long storeId) {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new ChatException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         return roomRepository.findStoreChatForUpdate(
@@ -226,7 +234,7 @@ public class ChatService {
 
     @Transactional
     public ConversationThreadResponse openStoreConversation(Member member, Long storeId) {
-        ChatRoom room = openStoreRoom(member, storeId);
+        ChatRoom room = findOrCreateStoreRoom(member, storeId);
         room.markRead(SenderRole.MEMBER);
         return threadForMember(room);
     }
@@ -234,7 +242,7 @@ public class ChatService {
     @Transactional
     public ChatMessageResponse sendAsMemberToStore(
             Member member, Long storeId, String content, String clientMessageId) {
-        ChatRoom room = openStoreRoom(member, storeId);
+        ChatRoom room = findOrCreateStoreRoom(member, storeId);
         findMessageableStore(storeId);
         assertNotBlocked(room);
         return append(room, SenderRole.MEMBER, member.getId(), content, clientMessageId);
@@ -302,11 +310,15 @@ public class ChatService {
 
     @Transactional
     public List<ChatMessageResponse> readRoomAsAdmin(Long roomId) {
-        return readRoomAsAdmin(roomId, null);
+        return readSupportMessagesAsAdmin(roomId, null);
     }
 
     @Transactional
     public List<ChatMessageResponse> readRoomAsAdmin(Long roomId, Long viewerId) {
+        return readSupportMessagesAsAdmin(roomId, viewerId);
+    }
+
+    private List<ChatMessageResponse> readSupportMessagesAsAdmin(Long roomId, Long viewerId) {
         ChatRoom room = findRoomForUpdate(roomId);
         requireType(room, ChatRoom.RoomType.SUPPORT);
         room.markRead(SenderRole.ADMIN);
@@ -333,11 +345,16 @@ public class ChatService {
 
     @Transactional
     public ChatMessageResponse sendAsAdmin(Member admin, Long roomId, String content) {
-        return sendAsAdmin(admin, roomId, content, null);
+        return sendAdminMessage(admin, roomId, content, null);
     }
 
     @Transactional
     public ChatMessageResponse sendAsAdmin(
+            Member admin, Long roomId, String content, String clientMessageId) {
+        return sendAdminMessage(admin, roomId, content, clientMessageId);
+    }
+
+    private ChatMessageResponse sendAdminMessage(
             Member admin, Long roomId, String content, String clientMessageId) {
         ChatRoom room = findRoomForUpdate(roomId);
         requireType(room, ChatRoom.RoomType.SUPPORT);

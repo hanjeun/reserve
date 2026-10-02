@@ -193,7 +193,22 @@ import { FormModal, FormField } from '../components/common';
 
 - 다단계 폼은 `Modal`에 `key`를 주지 않고, `scrollResetKey`에 현재 단계를 넘겨요.
 - AntD popup 레이어는 `spacing.js`의 `zIndex.modal`(1100)이고, `App.jsx`의 `zIndexPopupBase`에서 적용해요.
-- 확인 모달은 `useMessage.confirm`(`reserve-confirm-root`)을 써요. 좌우 16px·safe-area·`100svh` 안에 들어가고, 긴 본문만 스크롤하며 버튼 행은 최소 44px이에요.
+- 확인 모달은 `useMessage.confirm`(`reserve-confirm-root`)을 써요. 좌우 16px·safe-area·`100svh` 안에 들어가고, 긴 본문만 스크롤하며 버튼은 같은 104px 너비·최소 36px 높이를 사용해요.
+
+모달의 취소·확인 버튼은 `ModalActions`를 사용한다. 테두리 있는 취소와 채운 확인 버튼을
+같은 너비 104px·기본 높이 36px·모서리 반경 16px로 배치한다. `다음`·`선택 완료`처럼 확인 문구가
+바뀌어도 취소 너비는 그대로다. 크기는 `modal-layout.css` 한 곳에서 강제하며, 긴 문구는 너비를
+늘리지 않고 줄바꿈해 필요한 높이를 확보한다.
+서로 다른 두 결정(인증 거절·승인)은 `ModalActionGroup`에서 기존 의미 색을 유지한다.
+날짜·시간의 전체 해제는 별도 텍스트 동작으로 두고, 좁은 화면에서는 버튼 묶음을 다음 줄로 옮긴다.
+QR 스캐너 시트의 큰 터치 버튼은 같은 높이와 동일한 두 열을 사용한다.
+모달 밖의 편집 폼도 취소는 `outline`, 저장은 `primary`를 같은 크기로 사용한다.
+
+배경 스크롤은 `App`의 `useModalScrollLock`에서 모든 열린 모달과 사진 프리뷰에 공통 적용한다.
+마지막 모달이 닫히면 기존 페이지 위치와 body 위치 속성을 복원한다. 모달 본문·휠·포털로 열린
+선택 목록의 내부 스크롤은 허용하고, 경계에서 배경으로 넘어가는 터치를 막는다.
+달력 가로 스와이프·사진 확대/이동·핀치는 유지한다. 사진이 아닌 메신저 패널은 비모달이므로 잠그지 않는다.
+
 
 ### PageContainer
 

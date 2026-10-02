@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Button from './Button';
+import ModalActions from './ModalActions';
 import useHolidayDates from '../../hooks/useHolidayDates';
 import { animation, colors, field, fontSize, fontWeight, radius } from '../../styles/tokens';
 
@@ -411,10 +412,7 @@ const FormDatePickerBase = ({
                 {mode !== 'single' && (
                     <div style={styles.footer}>
                         <Button variant="ghost-sm" size="sm" onClick={clearValue}>전체 해제</Button>
-                        <Button variant="primary" size="sm" disabled={!rangeCanCommit} onClick={commitDraft}
-                            style={{ minWidth: 92, padding: '0 18px' }}>
-                            선택 완료
-                        </Button>
+                        <ModalActions onCancel={closePicker} onConfirm={commitDraft} disabled={!rangeCanCommit} confirmText="선택 완료" />
                     </div>
                 )}
             </Modal>
@@ -483,7 +481,7 @@ const styles = {
     },
     footer: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 12, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${colors.border.light}`,
+        flexWrap: 'wrap', gap: 12, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${colors.border.light}`,
     },
     visuallyHiddenHeader: { height: 0, margin: 0, overflow: 'hidden' },
     visuallyHidden: {

@@ -241,7 +241,7 @@ const ProfileImageTab = ({ user }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 4 }}>
                 {buttonsShouldRender ? (
                     <div style={{ display: 'flex', gap: 8, animation: buttonsClosing ? animation.slideUpOut : animation.slideUpIn }}>
-                        <Button variant="secondary" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
+                        <Button variant="outline" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
                             취소
                         </Button>
                         <Button variant="primary" onClick={handleSave} loading={loading} style={{ flex: 1 }}>
@@ -811,7 +811,7 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
                 세로로 쌓으면 두 버튼이 같은 무게로 보이고 저장 버튼이 폼 안, 취소가 폼 밖으로 갈라진다. */}
             {onCancel ? (
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <Button variant="secondary" onClick={onCancel} disabled={loading} style={{ flex: 1 }}>취소</Button>
+                    <Button variant="outline" onClick={onCancel} disabled={loading} style={{ flex: 1 }}>취소</Button>
                     <Button variant="primary" loading={loading} onClick={() => antdForm.submit()} style={{ flex: 1 }}>{submitLabel}</Button>
                 </div>
             ) : (

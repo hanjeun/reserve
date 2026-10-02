@@ -182,6 +182,68 @@
 
 /* 달력 모달 — 시간 pill 이 놓인 배경과 같은 흰 바탕. 여백만 조금 좁힌다. */
 .reserve-cal-modal .ant-modal-body { padding: 10px 6px 6px; }
+
+/* 시간 입력도 날짜 모달의 중립 선택면을 사용한다. 스크롤은 브라우저가 맡는다. */
+.reserve-time-parts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: 0; margin: 0 0 14px; padding: 0; border: 0; }
+.reserve-time-part-label { display: block; margin-bottom: 3px; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-part-value { display: block; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--c-text-primary, #191f28); }
+.reserve-time-heading { margin-bottom: 14px; text-align: center; font-size: 18px; font-weight: 600; color: var(--c-text-primary, #191f28); }
+.reserve-time-wheels { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.reserve-time-wheels::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--reserve-time-row-height) * 2);
+    height: var(--reserve-time-row-height);
+    border-radius: 10px;
+    background: var(--c-gray-100, #f2f4f6);
+    pointer-events: none;
+}
+.reserve-time-column { position: relative; min-width: 0; text-align: center; }
+.reserve-time-column-label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-wheel {
+    height: calc(var(--reserve-time-row-height) * 5);
+    padding: calc(var(--reserve-time-row-height) * 2) 0;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y pinch-zoom;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+    user-select: none;
+    cursor: grab;
+    border-radius: 10px;
+    mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
+}
+.reserve-time-wheel::-webkit-scrollbar { display: none; }
+.reserve-time-wheel:focus { outline: none; }
+.reserve-time-wheel:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
+.reserve-time-wheel[data-dragging="true"], .reserve-time-wheel[data-dragging="true"] .reserve-time-option { cursor: grabbing; }
+.reserve-time-option {
+    display: block;
+    width: 100%;
+    height: var(--reserve-time-row-height);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-tertiary, #8b95a1);
+    font: inherit;
+    font-size: 20px;
+    line-height: var(--reserve-time-row-height);
+    font-variant-numeric: tabular-nums;
+    scroll-snap-align: center;
+    cursor: grab;
+}
+.reserve-time-option[aria-selected="true"] { color: var(--c-text-primary, #191f28); font-weight: 600; }
+.reserve-time-hint { margin: 10px 0 0; text-align: center; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-sessions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 14px; }
+.reserve-time-session-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; max-height: 120px; overflow-y: auto; }
+.reserve-time-session { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--c-gray-100, #f2f4f6); color: var(--c-text-primary, #191f28); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.reserve-time-session .anticon { font-size: 11px; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-time-session:hover { background: var(--c-gray-200, #e5e8eb); }
+.reserve-time-session:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
+.reserve-time-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--c-border-light, #f2f4f6); }
 /* ══ 인앱 채팅 — 런처·패널·입력칸 (MessengerShell / 관리자 ChatTab 공용) ═══════
    ★ 2026-08-24 2차 수정. 1차 때 JSX 에 className 만 써두고 **여기에 대응하는 규칙을
      한 줄도 안 넣었다.** 그래서 열고 닫을 때 창이 그냥 뿅 나타났다 사라졌고

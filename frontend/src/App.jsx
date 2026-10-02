@@ -7,6 +7,7 @@ import useAuthStore from './store/useAuthStore';
 import { colors, rawColors, field, fieldPx, zIndex } from './styles/tokens';
 import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
+import useModalScrollLock from './hooks/useModalScrollLock';
 import useRouteSeo from './hooks/useRouteSeo';
 
 // 라우트 단위 Code Splitting (2026-07): 예전엔 모든 페이지를 정적 import해서 첫 번들 JS에
@@ -371,6 +372,7 @@ function App() {
     // 프리뷰를 여는 경로가 두 가지(useImagePreview 훅 / PreviewGroup 직접 사용)라
     // 어느 한쪽 state 에 묶으면 반쪽만 동작한다. DOM 을 기준으로 붙는다.
     useImagePreviewSwipe();
+    useModalScrollLock();
     const themeConfig = useMemo(
         () => buildThemeConfig(resolvedTheme === 'dark', accentColors),
         // accentColors 는 **안정 참조**다 — useTheme 이 모듈 상수 ACCENT_OPTIONS 안의

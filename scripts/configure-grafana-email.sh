@@ -75,7 +75,8 @@ state = {}
 for table in ('alert_rule', 'alert_configuration', 'ngalert_configuration'):
     rows = db.execute('select * from ' + table + ' order by id').fetchall()
     state[table] = [[value.hex() if isinstance(value, bytes) else value for value in row] for row in rows]
-assert len(state['alert_rule']) == 9, 'Expected exactly 9 installed alert rules; aborting without changing routing.'
+uids = {row[0] for row in db.execute('select uid from alert_rule')}
+assert len(uids) == 9 or (len(uids) == 10 and 'reserve-app-log-heartbeat' in uids), 'Expected 9 base rules with at most the known heartbeat watch; aborting without changing routing.'
 assert len(state['alert_configuration']) == 1
 print(hashlib.sha256(json.dumps(state, sort_keys=True, separators=(',', ':')).encode()).hexdigest())
 db.rollback()
@@ -164,4 +165,4 @@ curl -fsS "http://127.0.0.1:$port/actuator/health" | python3 -c \
     'import json,sys; assert json.load(sys.stdin)["status"] == "UP"; print("app_health=UP")'
 trap - ERR
 unset RESEND_API_KEY MAIL_FROM GRAFANA_ADMIN_PASSWORD
-printf 'grafana_health=ok\nemail_template=verified\nnon_url_environment=unchanged\n9_rules_and_contact_routing=unchanged\nunrelated_containers=unchanged\nrollback_configuration=%s\n' "$backup_dir"
+printf 'grafana_health=ok\nemail_template=verified\nnon_url_environment=unchanged\ninstalled_rules_and_contact_routing=unchanged\nunrelated_containers=unchanged\nrollback_configuration=%s\n' "$backup_dir"

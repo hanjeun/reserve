@@ -94,9 +94,9 @@ public class ChatImageService {
     public record ImageContent(byte[] bytes, String contentType) {
         @Override
         public boolean equals(Object other) {
-            return this == other || other instanceof ImageContent image
-                    && Arrays.equals(bytes, image.bytes)
-                    && Objects.equals(contentType, image.contentType);
+            return this == other || other instanceof ImageContent(var imageBytes, var imageContentType)
+                    && Arrays.equals(bytes, imageBytes)
+                    && Objects.equals(contentType, imageContentType);
         }
 
         @Override

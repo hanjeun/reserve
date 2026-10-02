@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 @Service
 public class StorePageService {
     private static final String ORIGIN = "https://reserve.it.kr";
+    private static final String META_PROPERTY = "property";
     private static final Set<String> IMAGE_HOSTS = Set.of("cdn.reserve.it.kr", "reserve.it.kr");
     private static final Pattern TITLE = Pattern.compile("<title>[^<]*</title>");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
@@ -49,18 +50,18 @@ public class StorePageService {
         String html = title(requireShell(), pageTitle);
         html = meta(html, "name", "description", description);
         html = meta(html, "name", "robots", "index, follow");
-        html = meta(html, "property", "og:title", pageTitle);
-        html = meta(html, "property", "og:description", description);
-        html = meta(html, "property", "og:url", canonical);
-        html = meta(html, "property", "og:image:alt", pageTitle);
+        html = meta(html, META_PROPERTY, "og:title", pageTitle);
+        html = meta(html, META_PROPERTY, "og:description", description);
+        html = meta(html, META_PROPERTY, "og:url", canonical);
+        html = meta(html, META_PROPERTY, "og:image:alt", pageTitle);
         html = meta(html, "name", "twitter:title", pageTitle);
         html = meta(html, "name", "twitter:description", description);
         html = html.replaceAll("(<link\\s+rel=\"canonical\"\\s+href=\")[^\"]*(\"\\s*/?>)",
                 "$1" + Matcher.quoteReplacement(canonical) + "$2");
         String image = publicThumbnail(store);
         if (image != null) {
-            html = meta(html, "property", "og:image", image);
-            html = meta(html, "property", "og:image:secure_url", image);
+            html = meta(html, META_PROPERTY, "og:image", image);
+            html = meta(html, META_PROPERTY, "og:image:secure_url", image);
             html = meta(html, "name", "twitter:image", image);
             html = removeMeta(html, "og:image:type");
             html = imageDimension(html, "og:image:width", store.getMainImageWidth());
@@ -102,7 +103,7 @@ public class StorePageService {
     }
 
     private static String imageDimension(String html, String key, Integer value) {
-        return value != null && value > 0 ? meta(html, "property", key, value.toString()) : removeMeta(html, key);
+        return value != null && value > 0 ? meta(html, META_PROPERTY, key, value.toString()) : removeMeta(html, key);
     }
 
     private static String removeMeta(String html, String key) {

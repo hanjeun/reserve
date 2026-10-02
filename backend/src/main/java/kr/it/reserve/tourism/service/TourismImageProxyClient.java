@@ -209,9 +209,9 @@ public class TourismImageProxyClient {
     record FetchedImage(byte[] bytes, MediaType contentType) {
         @Override
         public boolean equals(Object other) {
-            return this == other || other instanceof FetchedImage image
-                    && Arrays.equals(bytes, image.bytes)
-                    && Objects.equals(contentType, image.contentType);
+            return this == other || other instanceof FetchedImage(var imageBytes, var imageContentType)
+                    && Arrays.equals(bytes, imageBytes)
+                    && Objects.equals(contentType, imageContentType);
         }
 
         @Override

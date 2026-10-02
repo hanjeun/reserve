@@ -166,6 +166,22 @@ async function restore(component, key, runtime) {
     }
     return null;
 }
+async function restoreWithCoverageWait(component, key, runtime) {
+    let proof = null;
+    try { proof = await restore(component, key, runtime); }
+    catch { summary(`${component}: no trustworthy reusable evidence; execute tests normally.`); }
+    const waitSeconds = process.env.CI_REQUIRE_COVERAGE === 'true'
+        ? Math.min(900, Math.max(0, Number(process.env.CI_COVERAGE_WAIT_SECONDS) || 0)) : 0;
+    const deadline = Date.now() + waitSeconds * 1000;
+    if (!proof && waitSeconds) summary(`${component}: waiting for the existing CI coverage; no duplicate tests yet.`);
+    // Polls depend on the preceding result; parallel requests would bypass the bounded wait.
+    while (!proof && Date.now() < deadline) {
+        await new Promise(resolveWait => setTimeout(resolveWait, 30_000));
+        try { proof = await restore(component, key, runtime); } catch { /* Fall back to fresh tests. */ }
+    }
+    return proof;
+}
+
 export async function main(mode, requestedComponent) {
     if (mode !== 'restore' && mode !== 'record') throw new Error('Expected restore or record');
     const { component, directory } = componentConfig(requestedComponent);
@@ -173,17 +189,7 @@ export async function main(mode, requestedComponent) {
     const key = keyAt(component, 'HEAD', runtime);
     if (mode === 'restore') {
         output({ key, reused: false });
-        let proof = null;
-        try { proof = await restore(component, key, runtime); }
-        catch { summary(`${component}: no trustworthy reusable evidence; execute tests normally.`); }
-        const waitSeconds = process.env.CI_REQUIRE_COVERAGE === 'true'
-            ? Math.min(900, Math.max(0, Number(process.env.CI_COVERAGE_WAIT_SECONDS) || 0)) : 0;
-        const deadline = Date.now() + waitSeconds * 1000;
-        if (!proof && waitSeconds) summary(`${component}: waiting for the existing CI coverage; no duplicate tests yet.`);
-        while (!proof && Date.now() < deadline) {
-            await new Promise(resolveWait => setTimeout(resolveWait, 30_000));
-            try { proof = await restore(component, key, runtime); } catch { /* Fall back to fresh tests. */ }
-        }
+        const proof = await restoreWithCoverageWait(component, key, runtime);
         if (proof) {
             output({ reused: true, origin_run: proof.originRunId, executed_at: proof.executedAt });
             summary(`${component}: reused identical-input successful tests from run ${proof.runId} (original ${proof.originRunId}).`);

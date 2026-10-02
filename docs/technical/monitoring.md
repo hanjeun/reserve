@@ -436,3 +436,10 @@ positions를 보존하고, 네 수집원의 offset을 이어받았어요. Promta
 활성화해요. 그 전에는 조용한 정상 앱을 수집 장애로 오인하지 않게 일시 중지해요.
 기존 메일 하나를 유지하고 Resolved 발송도 켜요. 2026-10-02 Gmail 받은편지함에서
 19:13 KST 시험 Firing과 19:35 KST 결제 운영 큐 Resolved 수신을 확인했어요.
+
+앱 로그 감시 원본은 `grafana/alerts/reserve-app-log-heartbeat.json`이에요. 설치 시
+기존 Loki UID를 대입해요. 45분 동안 heartbeat가 없고 15분 더 지속되면 경고하며,
+No data·Error도 Alerting으로 처리해요. 현재 운영에는 일시 중지 상태로 설치했어요.
+기존 9개 알림은 유지했고, 대시보드·알림 참조가 0건인 URL 없는 Prometheus만
+공식 datasource provisioning으로 제거했어요. 변경 전 Grafana DB와 복구 설정은
+`/var/backups/reserve-scripts/20261002-before-grafana-cleanup/`에 있어요.

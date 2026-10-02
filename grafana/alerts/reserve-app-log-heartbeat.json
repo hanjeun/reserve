@@ -1,0 +1,111 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "reserve-app-log-watch",
+      "folder": "RESERVE Operations",
+      "interval": "5m",
+      "rules": [
+        {
+          "uid": "reserve-app-log-heartbeat",
+          "title": "RESERVE · 앱 로그 수집 확인",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "instant",
+              "relativeTimeRange": {
+                "from": 2700,
+                "to": 0
+              },
+              "datasourceUid": "${LOKI_DATASOURCE_UID}",
+              "model": {
+                "datasource": {
+                  "type": "loki",
+                  "uid": "${LOKI_DATASOURCE_UID}"
+                },
+                "editorMode": "code",
+                "expr": "sum(count_over_time({job=\"reserve\"} |= `Application log heartbeat: paymentOperations=checked` [45m])) or vector(0)",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "queryType": "instant",
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": {
+                "from": 2700,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "A",
+                "reducer": "last",
+                "refId": "B",
+                "type": "reduce"
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 2700,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "datasource": {
+                  "type": "__expr__",
+                  "uid": "__expr__"
+                },
+                "expression": "B",
+                "refId": "C",
+                "type": "threshold",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        1
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "15m",
+          "isPaused": true,
+          "annotations": {
+            "summary": "앱 로그 수집을 확인해주세요",
+            "description": "최근 45분 동안 정기 앱 로그가 보이지 않아요. 앱 상태와 원본 로그, Alloy·Loki 수집을 각각 확인해주세요. 로그가 없다는 이유만으로 앱 장애를 단정하지 않아요."
+          },
+          "labels": {
+            "severity": "warning",
+            "service": "reserve"
+          }
+        }
+      ]
+    }
+  ]
+}

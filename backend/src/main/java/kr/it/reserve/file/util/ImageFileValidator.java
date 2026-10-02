@@ -321,12 +321,12 @@ public final class ImageFileValidator {
             int height) {
         @Override
         public boolean equals(Object other) {
-            return this == other || other instanceof ValidatedImage image
-                    && Arrays.equals(bytes, image.bytes)
-                    && Objects.equals(contentType, image.contentType)
-                    && Objects.equals(extension, image.extension)
-                    && width == image.width
-                    && height == image.height;
+            return this == other || other instanceof ValidatedImage(var imageBytes, var imageContentType, var imageExtension, var imageWidth, var imageHeight)
+                    && Arrays.equals(bytes, imageBytes)
+                    && Objects.equals(contentType, imageContentType)
+                    && Objects.equals(extension, imageExtension)
+                    && width == imageWidth
+                    && height == imageHeight;
         }
 
         @Override

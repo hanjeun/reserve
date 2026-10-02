@@ -259,4 +259,32 @@ describe('chat initial-load and same-room retry boundaries', () => {
         await act(async () => { expect(await hook.result.current.send('같은 문의')).toBe(true); });
         expect(send.mock.calls[1][2]).toBe(send.mock.calls[0][2]);
     });
+    it('pauses both polling cursors while hidden and refreshes immediately when visible', async () => {
+        const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+        const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [] });
+        const poll = vi.fn().mockResolvedValue([]);
+        const pollChanges = vi.fn().mockResolvedValue({ messages: [], nextRevision: 0 });
+        vi.useFakeTimers();
+        let hook;
+        try {
+            await act(async () => {
+                hook = renderHook(() => useChatThread({ threadKey: 'A', myRole: 'MEMBER', load, poll, pollChanges, send: vi.fn() }));
+            });
+            expect(poll).toHaveBeenCalledTimes(1);
+            expect(pollChanges).toHaveBeenCalledTimes(1);
+            visibility.mockReturnValue('hidden');
+            await act(async () => { await vi.advanceTimersByTimeAsync(12000); });
+            expect(poll).toHaveBeenCalledTimes(1);
+            expect(pollChanges).toHaveBeenCalledTimes(1);
+            visibility.mockReturnValue('visible');
+            await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+            expect(poll).toHaveBeenCalledTimes(2);
+            expect(pollChanges).toHaveBeenCalledTimes(2);
+        } finally {
+            hook?.unmount();
+            vi.useRealTimers();
+            visibility.mockRestore();
+        }
+    });
+
 });

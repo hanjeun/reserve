@@ -22,11 +22,13 @@ class ImageValueSemanticsTest {
         var original = images(new byte[]{42, 43});
         var sameContents = images(new byte[]{42, 43});
         var differentContents = images(new byte[]{43, 42});
+        var withoutBytes = images(null);
         for (int i = 0; i < original.size(); i++) {
             Object image = original.get(i);
+            assertThat(withoutBytes.get(i)).isEqualTo(images(null).get(i));
             assertThat(image).isEqualTo(image).isEqualTo(sameContents.get(i))
                     .isNotEqualTo(differentContents.get(i)).isNotEqualTo(null).isNotEqualTo("image");
-            assertThat(image.hashCode()).isEqualTo(sameContents.get(i).hashCode());
+            assertThat(image).hasSameHashCodeAs(sameContents.get(i));
             assertThat(image.toString()).contains("byteCount=2").doesNotContain("[42, 43]", "[B@");
         }
     }

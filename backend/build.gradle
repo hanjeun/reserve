@@ -95,4 +95,10 @@ jar {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'reserve.toolTestClasspath', sourceSets.test.runtimeClasspath.asPath
+}
+
+// Compile the standalone operator tool for its isolated, read-only fixture checks.
+tasks.named('compileTestJava') {
+    source '../scripts/VerifyDatabaseSchema.java'
 }

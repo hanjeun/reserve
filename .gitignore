@@ -120,3 +120,5 @@ docs/images/*.new.png
 /docs/technical/modularization-plan.md
 /docs/technical/history/
 /Claude outputs/
+
+/coverage/

@@ -314,8 +314,10 @@ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_token'
 ALTER TABLE password_reset_token ADD COLUMN token_hash VARCHAR(60) NULL;
 ```
 
-`ddl-auto: update`로도 추가되는 nullable 컬럼이지만, 실제 MySQL 생성·복원·조회 호환을 확인한 뒤
-배포한다. 재발송과 재설정은 회원 잠금 다음 토큰 ID 한 행 잠금 순서를 유지한다.
+현재 운영은 최소 권한 앱 계정과 `ddl-auto: validate`를 사용하므로 이 컬럼을 자동 생성하지 않는다.
+2026-10-02 새 후보 JAR의 읽기 전용 검증에서 실제 운영의 `token_hash` 누락을 확인했다.
+컬럼 추가는 별도 운영 DDL 승인 후 실행하고, 같은 후보 JAR로 다시 검증한 뒤 배포한다.
+재발송과 재설정은 회원 잠금 다음 토큰 ID 한 행 잠금 순서를 유지한다.
 실패 횟수는 예외가 나도 커밋하고, 성공 시 비밀번호·세션 세대 변경과 코드 소비를 함께 커밋한다.
 
 2026-10-01 로컬 격리 MySQL 8.0.45에서 실제 Spring 서비스 검사 11건을 통과했고,

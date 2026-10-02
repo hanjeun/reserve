@@ -33,8 +33,8 @@
 |---|---|---|
 | `test-backend` | — | 백엔드 unit·Spring/H2 통합 테스트 |
 | `test-frontend` | — | 문서 링크·Grafana·스냅샷·운영 스크립트 검사, ESLint, 품질 정책, Vitest, PC·모바일 Playwright |
-| `build-backend` | `test-backend` | bootJar, Docker 이미지 push |
-| `build-frontend` | `build-backend`, `test-frontend` | Vite 빌드 후 이 실행의 dist 아티팩트 업로드 |
+| `build-frontend` | `test-frontend` | Vite 빌드 후 이 실행의 dist 아티팩트 업로드 |
+| `build-backend` | `test-backend`, `build-frontend` | 같은 실행의 HTML을 포함한 bootJar, main에서 Docker 이미지 push |
 | `stage-release` | `build-backend`, `build-frontend` | 아티팩트를 서버 `releases/<SHA>`에 staging. live는 바꾸지 않아요 |
 | `deploy-backend` | 위 전부 | 새 서버 기동, 준비 확인, 원자 전환, smoke, 실패 복구 |
 

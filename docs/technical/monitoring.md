@@ -4,17 +4,21 @@
 
 ## 운영 적용 경계
 
-- 2026-10-02 00:08 KST 재확인: 기존 백업 6줄이 운영 Loki에서 조회된다. 독립 접근으로 내려받은
+- 2026-10-02 확인: 기존 백업 6줄이 운영 Loki에서 조회된다. 독립 접근으로 내려받은
   `reserve-20260930-181001.sql.gz`는 격리 MySQL 8.0.45에서 현재 main 복원 스크립트로 복원했고,
   34테이블·66행과 34테이블의 `CHECK TABLE` 정상 응답을 확인했다. 별도 보관 키로 사진 한 건을
-  복호화한 결과는 사용자가 직접 PASS로 확인했다. 새 설치본의 다음 정규 백업은 10/2 03:10 KST이며
-  이 실행과 운영 앱 전체 복구·롤백은 아직 확인하지 않았다. 과거 로그를 다시 전송하지 않는다.
+  복호화한 결과는 사용자가 직접 PASS로 확인했다. 10/2 03:10 KST 정규 백업의 34테이블 검증·
+  업로드·정상 종료도 확인했다. 최소 권한 백업 계정의 다음 정규 실행은 10/3 03:10 KST다.
+- 2026-10-02 22:09 KST 운영 호스트를 재부팅했다. 같은 v2.8.3 이미지·최소 권한 앱 계정·
+  Hibernate validate를 유지하며 앱·공개 API·Grafana·Loki가 복구됐고, 새 앱·metrics·nginx
+  로그를 확인했다. Promtail과 계정 전환 전 앱 컨테이너는 정지 상태를 유지했다.
+  새 버전에서 이전 버전으로 돌아오는 실제 릴리스 롤백은 다음 릴리스에서 확인한다.
 - 운영 `metrics` 스트림에서 `cpu_exec_pct`(us+sy), `cpu_user_pct`, `cpu_system_pct`,
   `cpu_iowait_pct`(wa), `cpu_steal_pct`(st)를 확인했다. 기존 `cpu_pct`는 호환용으로 유지한다.
   운영 대시보드 표시와 알림 전달은 지표 수집과 별도로 확인한다.
 - OAuth 알림 정본은 현재 코드의 `OAuth unlink queue requires attention`다. 이것은 연동 해제 **완료**가 아니라
   미결 집계다. 토큰 없는 `BLOCKED`와 재시도 가능한 `FAILED`를 구분하고 완료 문구로 안내하지 않는다.
-- CSP는 Report-Only를 유지한다. 앱 로그·Promtail positions·level/시각·Loki 스트림을 확인한 뒤
+- CSP는 Report-Only를 유지한다. 앱 로그·Alloy positions·level/시각·Loki 스트림을 확인한 뒤
   결제·지도·Sentry를 포함한 7일 관측을 진행한다. 백업 로그 1건은 CSP 정상 수집 7일의 증거가 아니다.
   쿼리 0건과 스트림 부재를 구분하며 Unsplash 허용을 제거하거나 enforcement를 켜지 않는다.
 
@@ -24,12 +28,13 @@
 |---|---|---|
 | **Grafana** | 대시보드 · 알림 | [grafana.reserve.it.kr](https://grafana.reserve.it.kr) |
 | **Loki** | 로그 · 지표 저장 | 내부 (포트 3100) |
-| **Promtail** | 기존 파일 → Loki 전송 (지원 종료, Alloy 전환 필요) | 내부 |
+| **Alloy** | 운영 파일 → Loki 전송, 1.20.1 고정 이미지 | 내부 |
+| **Promtail** | 정지 상태로 보존한 이전 수집기·복구 경로 | 내부 |
 | **Logback** | Spring Boot 로그 파일 (30일 rotation) | `/var/log/reserve/` |
 | **collect-metrics.sh** | 호스트·컨테이너 지표 수집 (cron 1분) | `/var/log/metrics/` |
 | **Sentry** | 런타임 에러 트래킹 | [sentry.io](https://sentry.io) |
 | **UptimeRobot** | 업타임 모니터링 | [uptimerobot.com](https://uptimerobot.com) |
-| **SonarCloud** | 정적 분석 (Automatic Analysis) | [sonarcloud.io](https://sonarcloud.io/projects) |
+| **SonarCloud** | Java·프론트 CI 정적 분석 | [sonarcloud.io](https://sonarcloud.io/projects) |
 
 ```
 Spring Boot ─ Logback ─→ /var/log/reserve/app.log ─┐
@@ -430,7 +435,7 @@ positions를 보존하고, 네 수집원의 offset을 이어받았어요. Promta
 원본 설정과 종료 당시 positions는 `/var/backups/reserve-scripts/20261002-before-alloy/`에 있어요.
 롤백할 때는 Alloy를 먼저 멈추고 최신 positions를 내보낸 뒤 Promtail로 돌아가요.
 
-운영 readiness와 새 metrics·nginx 로그는 확인했어요. 앱·백업의 과거 조회도 유지돼요.
+운영 readiness와 새 앱·metrics·nginx 로그는 확인했어요. 앱·백업의 과거 조회도 유지돼요.
 새 앱 heartbeat와 새 정기 백업은 실제 생성 시각 이후에 확인해야 해요. 앱 수집 중단 알림은
 15분 주기의 `Application log heartbeat: paymentOperations=checked`가 배포되어 처음 수집된 뒤
 활성화해요. 그 전에는 조용한 정상 앱을 수집 장애로 오인하지 않게 일시 중지해요.

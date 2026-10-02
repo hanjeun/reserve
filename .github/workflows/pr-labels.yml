@@ -2,10 +2,10 @@ name: PR Labels
 run-name: >-
   ${{ format('라벨 정리 · PR #{0}', github.event.pull_request.number) }}
 
-# 제목의 유형 라벨 하나를 붙인다. 본문만 편집한 경우에는 러너를 시작하지 않는다.
+# 제목의 유형 라벨 하나를 붙인다. 코드 푸시에는 실행하지 않고, 본문만 편집한 경우에는 러너를 시작하지 않는다.
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize]
+    types: [opened, edited, reopened]
     branches: [ "main", "dev" ]
 
 concurrency:

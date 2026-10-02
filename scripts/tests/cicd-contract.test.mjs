@@ -23,11 +23,10 @@ test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled s
     assert.equal(scan.jobs.analyze['continue-on-error'], undefined);
 });
 
-test('PR body edits do not allocate a labeling runner', () => {
+test('PR labeling runs only for creation, reopening and title edits', () => {
     const labels = require('js-yaml').load(read('.github/workflows/pr-labels.yml'));
     assert.equal(labels.jobs.label.if, "github.event.pull_request.user.login != 'dependabot[bot]' && (github.event.action != 'edited' || github.event.changes.title != null)");
-    assert.ok(labels.on.pull_request.types.includes('synchronize'));
-    assert.ok(labels.on.pull_request.types.includes('edited'));
+    assert.deepEqual(labels.on.pull_request.types, ['opened', 'edited', 'reopened']);
 });
 
 test('required checks remain present and deployment waits for both builds', () => {

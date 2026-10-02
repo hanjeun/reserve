@@ -15,10 +15,17 @@
 1. 백업과 격리 `reserve_restore_*` 복원을 확인한 뒤 적용해요([백업·복구](backup.md)).
 2. 운영 MySQL의 `SHOW CREATE TABLE`·인덱스·행 수를 읽기 전용으로 확인하고, 그 결과를 근거로 DDL을 검토해요.
 
+현재 운영 앱은 `reserve_app`과 `ddl-auto: validate`를 사용해요. 승인된 DDL은
+`reserve_ddl` 계정으로만 적용하며, 역할의 보호된 보관본은 `/etc/reserve-db-roles.json`이에요.
 접속:
 ```bash
-export DB_PASSWORD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"   # 비밀번호 기준: /etc/reserve-backup.env (backup.md 7장)
-docker exec -it -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -u root reserve
+(
+  set -eu
+  MYSQL_IP=$(sudo docker inspect mysql --format '{{(index .NetworkSettings.Networks "app-network").IPAddress}}')
+  test -n "$MYSQL_IP"
+  # 비밀번호는 MySQL의 숨김 입력창에 직접 입력한다. 명령 인자나 출력에 넣지 않는다.
+  sudo docker exec -it mysql mysql --protocol=TCP --host="$MYSQL_IP" --user=reserve_ddl --password reserve
+)
 ```
 
 ## 1. 가게 검색 FULLTEXT 인덱스 (ngram)

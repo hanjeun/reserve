@@ -17,38 +17,41 @@ package kr.it.reserve.file.util;
  */
 public final class FileStoragePaths {
 
+    private static final String USER_ROOT = "users/";
+    private static final String STORE_SEGMENT = "/stores/";
+
     private FileStoragePaths() {}
 
     // ========== 사용자 영역 ==========
 
     /** 프로필 이미지: users/{memberId}/profiles */
     public static String userProfile(Long memberId) {
-        return "users/" + memberId + "/profiles";
+        return USER_ROOT + memberId + "/profiles";
     }
 
     /** 가게 메인(썸네일) 이미지: users/{memberId}/stores/{storeId}/thumbnails */
     public static String storeThumbnail(Long memberId, Long storeId) {
-        return "users/" + memberId + "/stores/" + storeId + "/thumbnails";
+        return USER_ROOT + memberId + STORE_SEGMENT + storeId + "/thumbnails";
     }
 
     /** 가게 상세 이미지: users/{memberId}/stores/{storeId}/images */
     public static String storeImage(Long memberId, Long storeId) {
-        return "users/" + memberId + "/stores/" + storeId + "/images";
+        return USER_ROOT + memberId + STORE_SEGMENT + storeId + "/images";
     }
 
     /** 사업자 인증 이미지: users/{memberId}/businesses */
     public static String business(Long memberId) {
-        return "users/" + memberId + "/businesses";
+        return USER_ROOT + memberId + "/businesses";
     }
 
     /** 광고 배너 이미지: users/{memberId}/stores/{storeId}/advertisements */
     public static String advertisement(Long memberId, Long storeId) {
-        return "users/" + memberId + "/stores/" + storeId + "/advertisements";
+        return USER_ROOT + memberId + STORE_SEGMENT + storeId + "/advertisements";
     }
 
     /** 비공개 대화 사진. 공개 CDN에 보관되는 바이트도 암호문이며 조회는 인증 API만 사용한다. */
     public static String chatImage(Long memberId, Long roomId) {
-        return "users/" + memberId + "/chat/" + roomId;
+        return USER_ROOT + memberId + "/chat/" + roomId;
     }
 
     public static String supportAvatar() {

@@ -46,6 +46,7 @@ import java.util.stream.Collectors;
 public class PaymentOperationsAdminController {
 
     private static final int MAX_PAGE_SIZE = 100;
+    private static final String QUERY_SUCCESS = "조회 성공";
     private static final String DEFAULT_STALE_READY_DAYS = "7";
     private static final int MAX_STALE_READY_DAYS = 3650;
 
@@ -66,14 +67,14 @@ public class PaymentOperationsAdminController {
                 ? issueRepository.findByStatusOrderByLastSeenAtDesc(
                         PaymentReconciliationIssue.IssueStatus.OPEN, pageable)
                 : issueRepository.findAllByOrderByLastSeenAtDesc(pageable);
-        return ApiResponse.success(issues.map(PaymentReconciliationIssueResponse::from), "조회 성공");
+        return ApiResponse.success(issues.map(PaymentReconciliationIssueResponse::from), QUERY_SUCCESS);
     }
 
     @GetMapping("/issues/open-count")
     public ApiResponse<Long> openIssueCount() {
         return ApiResponse.success(
                 issueRepository.countByStatus(PaymentReconciliationIssue.IssueStatus.OPEN),
-                "조회 성공");
+                QUERY_SUCCESS);
     }
 
     @GetMapping("/webhooks")
@@ -87,14 +88,14 @@ public class PaymentOperationsAdminController {
                 ? inboxRepository.findByStatusInOrderByReceivedAtDesc(
                         PaymentWebhookInbox.UNFINISHED, pageable)
                 : inboxRepository.findAllByOrderByReceivedAtDesc(pageable);
-        return ApiResponse.success(webhooks.map(PaymentWebhookInboxResponse::from), "조회 성공");
+        return ApiResponse.success(webhooks.map(PaymentWebhookInboxResponse::from), QUERY_SUCCESS);
     }
 
     @GetMapping("/webhooks/unfinished-count")
     public ApiResponse<Long> unfinishedWebhookCount() {
         return ApiResponse.success(
                 inboxRepository.countByStatusIn(PaymentWebhookInbox.UNFINISHED),
-                "조회 성공");
+                QUERY_SUCCESS);
     }
 
     /** 집계에서 잡힌 예약을 같은 조건으로 조회한다. PG 조회·결제·환불·플래그 수정은 하지 않는다. */
@@ -121,7 +122,7 @@ public class PaymentOperationsAdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(defaultValue = DEFAULT_STALE_READY_DAYS) int olderThanDays) {
-        int safeDays = Math.min(Math.max(1, olderThanDays), MAX_STALE_READY_DAYS);
+        int safeDays = Math.clamp(olderThanDays, 1, MAX_STALE_READY_DAYS);
         LocalDateTime cutoff = LocalDateTime.now().minusDays(safeDays);
         Page<Payment> payments = paymentRepository.findStaleReadyPayments(
                 cutoff,
@@ -153,6 +154,6 @@ public class PaymentOperationsAdminController {
     private Pageable boundedPage(int page, int size) {
         return PageRequest.of(
                 Math.max(0, page),
-                Math.min(Math.max(1, size), MAX_PAGE_SIZE));
+                Math.clamp(size, 1, MAX_PAGE_SIZE));
     }
 }

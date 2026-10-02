@@ -20,6 +20,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PaymentWebhookInboxStateService {
 
+    private static final String ROW_NOT_FOUND = "Webhook inbox row not found";
+
     private static final int RETRY_BATCH_SIZE = 50;
     private static final int PROCESSING_LEASE_MINUTES = 5;
 
@@ -46,13 +48,13 @@ public class PaymentWebhookInboxStateService {
     public InboxSnapshot getRequired(String webhookId) {
         return inboxRepository.findByWebhookId(webhookId)
                 .map(InboxSnapshot::from)
-                .orElseThrow(() -> new IllegalStateException("Webhook inbox row not found"));
+                .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<InboxWork> claim(String webhookId) {
         PaymentWebhookInbox inbox = inboxRepository.findByWebhookIdForUpdate(webhookId)
-                .orElseThrow(() -> new IllegalStateException("Webhook inbox row not found"));
+                .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND));
         LocalDateTime now = LocalDateTime.now();
         if (!inbox.canClaim(now, now.minusMinutes(PROCESSING_LEASE_MINUTES))) {
             return Optional.empty();
@@ -64,7 +66,7 @@ public class PaymentWebhookInboxStateService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<InboxWork> forceClaim(String webhookId) {
         PaymentWebhookInbox inbox = inboxRepository.findByWebhookIdForUpdate(webhookId)
-                .orElseThrow(() -> new IllegalStateException("Webhook inbox row not found"));
+                .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND));
         LocalDateTime now = LocalDateTime.now();
         if (!inbox.canForceClaim(now.minusMinutes(PROCESSING_LEASE_MINUTES))) {
             return Optional.empty();
@@ -76,21 +78,21 @@ public class PaymentWebhookInboxStateService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markProcessed(String webhookId) {
         inboxRepository.findByWebhookIdForUpdate(webhookId)
-                .orElseThrow(() -> new IllegalStateException("Webhook inbox row not found"))
+                .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND))
                 .markProcessed(LocalDateTime.now());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markIgnored(String webhookId) {
         inboxRepository.findByWebhookIdForUpdate(webhookId)
-                .orElseThrow(() -> new IllegalStateException("Webhook inbox row not found"))
+                .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND))
                 .markIgnored(LocalDateTime.now());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(String webhookId, String errorType) {
         inboxRepository.findByWebhookIdForUpdate(webhookId)
-                .orElseThrow(() -> new IllegalStateException("Webhook inbox row not found"))
+                .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND))
                 .markFailed(LocalDateTime.now(), errorType);
     }
 

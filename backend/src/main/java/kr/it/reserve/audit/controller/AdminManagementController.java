@@ -45,6 +45,7 @@ public class AdminManagementController {
 
     /** 한 번에 내려줄 수 있는 최대 건수. 호출측이 {@code size=100000} 을 보내 전량을 끌어가지 못하게 막는다. */
     private static final int MAX_PAGE_SIZE = 100;
+    private static final String REASON_KEY = "reason";
 
     /**
      * 회원 목록. {@code search} 가 있으면 이름·이메일로 <b>서버에서</b> 걸러낸다.
@@ -59,7 +60,7 @@ public class AdminManagementController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String search
     ) {
-        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safeSize = Math.clamp(size, 1, MAX_PAGE_SIZE);
         int safePage = Math.max(page, 0);
         PageRequest pageRequest = PageRequest.of(safePage, safeSize);
 
@@ -89,7 +90,7 @@ public class AdminManagementController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         int days = parseDays(body.getOrDefault("days", "7"));
-        String reason = body.getOrDefault("reason", "");
+        String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.suspendMember(id, days, reason);
         return ApiResponse.success(null, days + "일간 정지 처리되었습니다.");
     }
@@ -98,7 +99,7 @@ public class AdminManagementController {
     public ApiResponse<Void> banMember(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        String reason = body.getOrDefault("reason", "");
+        String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.banMember(id, reason);
         return ApiResponse.success(null, "영구 정지 처리되었습니다.");
     }
@@ -117,7 +118,7 @@ public class AdminManagementController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String search
     ) {
-        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safeSize = Math.clamp(size, 1, MAX_PAGE_SIZE);
         int safePage = Math.max(page, 0);
         String keyword = search != null ? search.trim() : "";
         Page<StoreResponse> stores = storeRepository
@@ -135,7 +136,7 @@ public class AdminManagementController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         int days = parseDays(body.getOrDefault("days", "7"));
-        String reason = body.getOrDefault("reason", "");
+        String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.suspendStore(id, days, reason);
         return ApiResponse.success(null, days + "일간 영업정지 처리되었습니다.");
     }
@@ -144,7 +145,7 @@ public class AdminManagementController {
     public ApiResponse<Void> banStore(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
-        String reason = body.getOrDefault("reason", "");
+        String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.banStore(id, reason);
         return ApiResponse.success(null, "영구 폐업 처리되었습니다.");
     }

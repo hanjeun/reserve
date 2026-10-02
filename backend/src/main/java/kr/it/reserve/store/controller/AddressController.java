@@ -53,7 +53,7 @@ public class AddressController {
             return ResponseEntity.ok(ApiResponse.success(empty, "검색어가 너무 짧습니다."));
         }
         // size 최대 10개 제한
-        int safeSize = Math.min(Math.max(size, 1), 10);
+        int safeSize = Math.clamp(size, 1, 10);
         if (kakaoRestApiKey == null || kakaoRestApiKey.isBlank()) {
             log.warn("KAKAO_REST_API_KEY is not configured");
             return ResponseEntity.ok(ApiResponse.success(empty, "API 키가 설정되지 않았습니다."));

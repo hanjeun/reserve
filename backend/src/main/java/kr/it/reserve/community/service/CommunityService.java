@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class CommunityService {
 
+    private static final String POST_NOT_FOUND = "게시글을 찾을 수 없습니다.";
+
     private final CommunityPostRepository postRepository;
     private final CommunityCommentRepository commentRepository;
     private final PostLikeRepository postLikeRepository;
@@ -63,20 +65,20 @@ public class CommunityService {
         List<CommunityPost> posts = postPage.getContent();
         if (posts.isEmpty()) return postPage.map(p -> CommunityDto.PostResponse.fromEntity(p, 0));
 
-        List<Long> postIds = posts.stream().map(CommunityPost::getId).collect(Collectors.toList());
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).toList();
         Map<Long, Long> commentCountMap = postRepository.countCommentsByPostIds(postIds).stream()
                 .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
 
         List<CommunityDto.PostResponse> responses = posts.stream()
                 .map(p -> CommunityDto.PostResponse.fromEntity(p, commentCountMap.getOrDefault(p.getId(), 0L).intValue()))
-                .collect(Collectors.toList());
+                .toList();
 
         return new PageImpl<>(responses, pageable, postPage.getTotalElements());
     }
 
     public CommunityDto.PostResponse getPost(Long postId, Long memberId) {
         CommunityPost post = postRepository.findByIdWithAuthorAndComments(postId)
-                .orElseThrow(() -> new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CommunityException(POST_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         boolean isLiked = memberId != null && postLikeRepository.existsByPostIdAndMemberId(postId, memberId);
         return CommunityDto.PostResponse.fromEntity(post, memberId != null ? memberId : -1L, isLiked);
@@ -124,7 +126,7 @@ public class CommunityService {
         Long userId = memberId != null ? memberId : -1L;
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
                 .map(comment -> CommunityDto.CommentResponse.fromEntity(comment, userId))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
@@ -155,7 +157,7 @@ public class CommunityService {
         // 회원 → 게시글 순으로 잠근다. 회원 탈퇴도 회원 행을 먼저 잠그므로 역순 교착을 피한다.
         Member member = findMemberOrThrow(memberId);
         CommunityPost post = postRepository.findByIdForUpdate(postId)
-                .orElseThrow(() -> new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CommunityException(POST_NOT_FOUND, HttpStatus.NOT_FOUND));
 
         return postLikeRepository.findByPostIdAndMemberId(postId, memberId)
                 .map(like -> {
@@ -178,7 +180,7 @@ public class CommunityService {
 
     private CommunityPost findPostOrThrow(Long postId) {
         return postRepository.findById(postId)
-                .orElseThrow(() -> new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CommunityException(POST_NOT_FOUND, HttpStatus.NOT_FOUND));
     }
 
     private Member findMemberOrThrow(Long memberId) {

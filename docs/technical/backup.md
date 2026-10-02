@@ -21,7 +21,12 @@ RESERVE MySQL의 백업 구성과 복원 절차예요.
 > 운영 설치본과 **10/2 03:10 KST 정기 백업의 34테이블 검증·업로드·종료 기록**을 확인했다.
 > 이후 백업 역할과 `--no-tablespaces`를 적용했다. 10/3 03:10 KST 정기 실행은 `reserve_backup` 계정으로
 > 34테이블·13,943바이트·gzip 무결성·덤프 종료 표시·업로드·정상 종료를 확인했다. 같은 실행의 로그 6줄도 Loki에서 조회됐다.
-> 새 객체의 독립 다운로드는 AWS 콘솔 세션이 만료돼 미확인이다. 앞선 독립 복원 증명과 이번 업로드 성공 기록을 구분한다.
+> 10/3 재로그인한 AWS CloudShell의 별도 읽기 접근으로 `mysql/reserve-20261002-181001.sql.gz`를 내려받았다.
+> 서버 원본·CloudShell·PC 다운로드의 SHA-256은 모두
+> `ef3e38c17bc8ab657f5578b8bf313371b145066cd0a598a5eb5dd902cef28feb`였다.
+> PC의 격리 MySQL **8.0.45**에서 34테이블·62행을 복원하고 `CHECK TABLE` 34건을 통과했다.
+> 같은 격리 DB의 `token_hash VARCHAR(60) NULL` 추가도 `ALGORITHM=INSTANT`로 확인했다.
+> 이 새 백업의 DB 복원과 앞선 운영 이미지·사진 복구 검증은 서로 다른 검증 범위다.
 > 현재 운영 이미지까지 사용하는 격리 복구도 통과했다. 이전 백업에 없는
 > `store.image_autoplay_enabled`는 스키마 갱신으로 추가한 뒤 검증 모드로 재기동했고,
 > 기존 34테이블의 원래 컬럼 값·66행을 유지했다. 상세 범위와 미검증 항목은 2-5를 따른다.
@@ -39,28 +44,37 @@ sudo chmod +x /usr/local/bin/reserve-backup /usr/local/bin/reserve-restore
 sudo install -d -m 700 -o root -g root /var/backups/reserve
 ```
 
-서버에 레포가 없으면 배포된 태그의 파일을 받아 해시를 대조한 뒤 설치해요. `TAG`는 운영에 배포된 태그로 바꿔요.
+서버에 레포가 없으면 승인된 스크립트 커밋의 파일을 받아 해시를 대조한 뒤 설치해요.
+현재 계정 분리 스크립트는 운영 앱 v2.8.3보다 새 버전이에요. 앱 태그만 보고 옛 설치본으로 되돌리지 않아요.
 
 ```bash
-TAG=v2.8.3
-curl -fsSL -o /tmp/reserve-backup  https://raw.githubusercontent.com/hanjeun/reserve/$TAG/scripts/backup-mysql.sh
-curl -fsSL -o /tmp/reserve-restore https://raw.githubusercontent.com/hanjeun/reserve/$TAG/scripts/restore-mysql.sh
-sha256sum /tmp/reserve-backup /tmp/reserve-restore   # 레포의 같은 태그 파일 해시와 같아야 한다
+SCRIPT_REF=228d1dfbbc7050f282c2d6efe8e8d178c10dd0a3
+curl -fsSL -o /tmp/reserve-backup  https://raw.githubusercontent.com/hanjeun/reserve/$SCRIPT_REF/scripts/backup-mysql.sh
+curl -fsSL -o /tmp/reserve-restore https://raw.githubusercontent.com/hanjeun/reserve/$SCRIPT_REF/scripts/restore-mysql.sh
+sha256sum /tmp/reserve-backup /tmp/reserve-restore   # 레포의 같은 커밋 파일 해시와 같아야 한다
 sudo install -m 0755 /tmp/reserve-backup /tmp/reserve-restore /usr/local/bin/
 ```
 
 ### 1-2. 설정 파일
 
-키는 화면에 보이지 않게 입력받고, DB 비밀번호는 실행 중인 앱 컨테이너(blue/green)에서 읽어요. 업로드는 스크립트의 docker 폴백(`amazon/aws-cli`)이 해요.
+신규 서버에서는 백업 전용 계정을 먼저 만들고 그 비밀번호를 숨김 입력해요. 앱 비밀번호를 복사하지 않아요.
+기존 설정이 있으면 아래 신규 생성 절차를 중단하고 해당 계정의 교체 절차를 따라요.
+업로드는 스크립트의 docker 폴백(`amazon/aws-cli`)이 해요.
 
 ```bash
-read -rp 'AWS_ACCESS_KEY_ID: ' AK; read -rsp 'AWS_SECRET_ACCESS_KEY: ' SK; echo
-C=$(sudo docker ps --format '{{.Names}}' | grep -E '^(blue|green)$'); DBPW="$(sudo docker exec "$C" printenv DB_PASSWORD)"; echo "lengths: ${#DBPW} ${#AK} ${#SK}"   # 셋 다 0이 아니어야 한다
-sudo install -m 600 -o root -g root /dev/null /etc/reserve-backup.env
-printf 'DB_PASSWORD=%q\nBACKUP_S3_BUCKET=reserve-it-kr-backup\nBACKUP_S3_PREFIX=mysql\nLOCAL_RETENTION_DAYS=7\nAWS_ACCESS_KEY_ID=%q\nAWS_SECRET_ACCESS_KEY=%q\nAWS_DEFAULT_REGION=ap-northeast-2\n' \
-  "$DBPW" "$AK" "$SK" | sudo tee /etc/reserve-backup.env >/dev/null
-unset AK SK DBPW
-sudo stat -c '%a %U %n' /etc/reserve-backup.env   # 600 root
+(
+  set -euo pipefail
+  sudo test ! -e /etc/reserve-backup.env
+  read -rsp 'reserve_backup DB_PASSWORD: ' DBPW; echo
+  read -rsp 'AWS_ACCESS_KEY_ID: ' AK; echo
+  read -rsp 'AWS_SECRET_ACCESS_KEY: ' SK; echo
+  test -n "$DBPW" && test -n "$AK" && test -n "$SK"
+  sudo install -m 600 -o root -g root /dev/null /etc/reserve-backup.env
+  printf 'DB_USER=reserve_backup\nDB_PASSWORD=%q\nBACKUP_S3_BUCKET=reserve-it-kr-backup\nBACKUP_S3_PREFIX=mysql\nLOCAL_RETENTION_DAYS=7\nAWS_ACCESS_KEY_ID=%q\nAWS_SECRET_ACCESS_KEY=%q\nAWS_DEFAULT_REGION=ap-northeast-2\n' \
+    "$DBPW" "$AK" "$SK" | sudo tee /etc/reserve-backup.env >/dev/null
+  unset AK SK DBPW
+  sudo stat -c '%a %U %n' /etc/reserve-backup.env
+)
 ```
 
 AWS 키는 백업 전용 사용자 `reserve-backup-uploader`의 키를 써요.
@@ -79,7 +93,7 @@ AWS 키는 백업 전용 사용자 `reserve-backup-uploader`의 키를 써요.
 두 변수를 지정하지 않았고 복원 설정이 없을 때만 기존 `/etc/reserve-backup.env`로 돌아가요.
 백업 계정은 데이터 쓰기 권한이 없으므로 복원이나 관리자 SQL에 쓰지 않아요.
 변경 전 원본은 `/var/backups/reserve-scripts/20261002-before-db-roles/`에 보관했어요.
-이후 첫 정기 백업의 실제 업로드·종료는 해당 cron 실행 후 별도로 확인해요.
+전환 후 첫 10/3 03:10 KST 정기 백업은 이 계정으로 덤프 검증·업로드·종료를 마쳤고, 위 독립 복원도 통과했어요.
 
 MySQL **8.0.45** 격리 시험에서 검증한 권한 후보는 다음과 같다. 호스트 범위는 실제 컨테이너
 접속 경로에 맞춰 제한하고, 계정 암호는 보호된 입력으로 생성한다. 아래 `localhost`는 시험 범위다.
@@ -304,20 +318,32 @@ nginx Blue/Green 실패 전환, 이전 프론트 lazy 자산의 보존, 실제 P
 운영 DB를 건드리지 않고 별도 DB로 복원해 확인해요.
 
 ```bash
-# DB 접속 준비 — 비밀번호의 기준은 /etc/reserve-backup.env (7장)
-export DB_PASSWORD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"; echo "length: ${#DB_PASSWORD}"
+# 관리자 복원 설정은 root 셸 안에서만 읽는다. 백업 계정으로 복원하지 않는다.
+sudo bash <<'BASH'
+set -euo pipefail
+. /etc/reserve-restore.env
+export MYSQL_PWD="${DB_PASSWORD:?}"
 
-# 검증 → 별도 DB로 복원 (운영 DB는 건드리지 않는다)
-F=$(ls -t /var/backups/reserve/reserve-*.sql.gz | head -1); echo "$F"
-sudo reserve-restore --dry-run "$F"
-sudo reserve-restore --target reserve_restore_test "$F"    # "restored tables" 가 덤프 테이블 수와 같아야 한다
+# 아래 고정 이름의 기존 훈련 DB가 있으면 덮어쓴다. 운영 DB는 대상이 아니다.
+F=$(find /var/backups/reserve -maxdepth 1 -name 'reserve-*.sql.gz' -type f | sort | tail -n 1)
+test -n "$F"
+reserve-restore --dry-run "$F"
+reserve-restore --target reserve_restore_test "$F"
 
-# 전체 테이블 행 수 대조 — 백업 시각 이후 바뀐 테이블만 DIFF가 날 수 있다
-sudo docker exec -e MYSQL_PWD="$DB_PASSWORD" mysql sh -c 'for t in $(mysql -uroot -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema=\"reserve\""); do a=$(mysql -uroot -N -e "SELECT COUNT(*) FROM reserve.$t"); b=$(mysql -uroot -N -e "SELECT COUNT(*) FROM reserve_restore_test.$t"); [ "$a" = "$b" ] && echo "same $t $a" || echo "DIFF $t prod=$a restored=$b"; done'
+# 백업 시각 이후의 운영 변경은 DIFF가 날 수 있다.
+docker exec -e MYSQL_PWD -e DB_USER="${DB_USER:-root}" mysql sh -c '
+  set -eu
+  tables=$(mysql --user="$DB_USER" -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema=\"reserve\"")
+  for t in $tables; do
+    a=$(mysql --user="$DB_USER" -N -e "SELECT COUNT(*) FROM reserve.$t")
+    b=$(mysql --user="$DB_USER" -N -e "SELECT COUNT(*) FROM reserve_restore_test.$t")
+    if [ "$a" = "$b" ]; then echo "same $t $a"; else echo "DIFF $t prod=$a restored=$b"; fi
+  done'
 
-# 정리 — 이름이 reserve_restore_test 인지 확인하고 실행한다
-sudo docker exec -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -uroot -e "DROP DATABASE reserve_restore_test; SHOW DATABASES;"
-unset DB_PASSWORD
+# 대조 후 훈련 DB 하나만 제거한다. 운영 데이터베이스 이름으로 바꾸지 않는다.
+docker exec -e MYSQL_PWD mysql mysql --user="${DB_USER:-root}" -e 'DROP DATABASE reserve_restore_test;'
+unset MYSQL_PWD DB_PASSWORD
+BASH
 ```
 
 ## 4. 서버 재구축 시 MySQL 되살리기
@@ -396,3 +422,4 @@ HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없�
 |---|---|---|
 | 2026-10-02 | S3 `reserve-20260930-181001.sql.gz`, 34 tables·13,883 bytes | Linux MySQL 8.0.45 독립 복원 34테이블·66행, `CHECK TABLE` 34건 성공; 원본 객체 해시 확인, 운영 DB 불변; 새 정기 백업은 별도 확인 |
 | 2026-10-02 | 최소 권한 합성 fixture | 현재 백업 스크립트로 12테이블·뷰·프로시저·트리거·이벤트 복원 성공; `SHOW_ROUTINE` 누락 시 성공 코드의 프로시저 생략 재현; S3 업로드 stub, 운영 계정 불변 |
+| 2026-10-03 | S3 `reserve-20261002-181001.sql.gz`, 34 tables·13,943 bytes | CloudShell·PC 독립 다운로드와 서버 SHA-256 일치; 격리 MySQL 8.0.45 복원 34테이블·62행 및 `CHECK TABLE` 34건 성공; `token_hash` INSTANT DDL 확인; 운영 DB 복원 아님 |

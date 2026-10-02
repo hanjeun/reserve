@@ -10,6 +10,9 @@ public class PromotionDto {
 
     public static final int PUBLIC_EXCERPT_LENGTH = 160;
 
+    private PromotionDto() {
+    }
+
     /** 공개 목록에는 작성자·임의 홍보 이미지·긴 본문을 포함하지 않는다. */
     @Getter
     @Builder
@@ -38,6 +41,14 @@ public class PromotionDto {
                     .createdAt(promotion.getCreatedAt())
                     .updatedAt(promotion.getUpdatedAt())
                     .build();
+        }
+
+        private static String plainTextExcerpt(String content) {
+            if (content == null) return "";
+            String text = content.strip().replaceAll("\\s+", " ");
+            if (text.codePointCount(0, text.length()) <= PUBLIC_EXCERPT_LENGTH) return text;
+            int end = text.offsetByCodePoints(0, PUBLIC_EXCERPT_LENGTH - 1);
+            return text.substring(0, end) + "…";
         }
     }
 
@@ -70,14 +81,6 @@ public class PromotionDto {
                     .updatedAt(promotion.getUpdatedAt())
                     .build();
         }
-    }
-
-    private static String plainTextExcerpt(String content) {
-        if (content == null) return "";
-        String text = content.strip().replaceAll("\\s+", " ");
-        if (text.codePointCount(0, text.length()) <= PUBLIC_EXCERPT_LENGTH) return text;
-        int end = text.offsetByCodePoints(0, PUBLIC_EXCERPT_LENGTH - 1);
-        return text.substring(0, end) + "…";
     }
 
     @Getter

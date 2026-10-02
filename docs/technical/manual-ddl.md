@@ -296,7 +296,7 @@ CREATE TABLE chat_report_access_audit (
 - 실행 전 `SHOW CREATE TABLE`로 컬럼·인덱스 존재 여부를 확인해요.
 - 파기 worker는 `CHAT_RETENTION_ENABLED`로 켜요(기본 `false`).
 
-## 8. 비밀번호 재설정 코드 해시 후보 (운영 미적용)
+## 8. 비밀번호 재설정 코드 해시 (컬럼 적용, 새 앱 배포 전)
 
 새 코드는 BCrypt 해시를 `password_reset_token.token_hash VARCHAR(60) NULL`에 저장한다.
 기존 `token VARCHAR(10) NOT NULL`은 유지하며 새 행에는 코드 대신 `HASHED`를 기록한다.
@@ -310,13 +310,20 @@ FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_token'
   AND COLUMN_NAME IN ('token', 'token_hash');
 
--- 컬럼이 없을 때의 추가 DDL 예시. 운영 실행은 별도 승인 대상이다.
-ALTER TABLE password_reset_token ADD COLUMN token_hash VARCHAR(60) NULL;
+-- 컬럼이 없을 때만 승인된 DDL 계정으로 실행한다. 재실행하지 않는다.
+SET SESSION lock_wait_timeout = 5;
+ALTER TABLE password_reset_token ADD COLUMN token_hash VARCHAR(60) NULL, ALGORITHM=INSTANT;
 ```
 
 현재 운영은 최소 권한 앱 계정과 `ddl-auto: validate`를 사용하므로 이 컬럼을 자동 생성하지 않는다.
 2026-10-02 새 후보 JAR의 읽기 전용 검증에서 실제 운영의 `token_hash` 누락을 확인했다.
-컬럼 추가는 별도 운영 DDL 승인 후 실행하고, 같은 후보 JAR로 다시 검증한 뒤 배포한다.
+2026-10-03 승인 범위에서 DDL 계정으로 nullable 컬럼 하나를 `ALGORITHM=INSTANT`로 추가했다.
+변경 전 테이블 정의와 단일 테이블 gzip 덤프는
+`/var/backups/reserve-scripts/20261003-before-token-hash/`에 보존했다(디렉터리 700, 파일 600).
+기존 1행의 원래 컬럼 집계 해시는 전후 같고 새 컬럼은 `VARCHAR(60) NULL`이다.
+같은 10/2 후보 JAR의 엔티티 33개가 제한된 `reserve_app` 계정으로 읽기 전용 스키마 검증을 통과했다.
+검증은 Spring·스케줄러·외부 연동을 기동하지 않았다. 기존 운영 앱의 Actuator JSON도 `status=UP`이었다.
+현재 운영은 구버전 앱이며, 새 코드의 해시 저장은 새 앱 배포 후에 시작한다.
 재발송과 재설정은 회원 잠금 다음 토큰 ID 한 행 잠금 순서를 유지한다.
 실패 횟수는 예외가 나도 커밋하고, 성공 시 비밀번호·세션 세대 변경과 코드 소비를 함께 커밋한다.
 

@@ -87,7 +87,7 @@ const PasswordTab = () => {
             useAuthStore.getState().logout();
             message.success('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
             // 비밀번호 변경 → 다시 로그인: 흐름이 이어지는 이동(오른쪽에서)
-            navigate('/login', { replace: true, state: { reserveRouteMotion: 'from-right' } });
+            void navigate('/login', { replace: true, state: { reserveRouteMotion: 'from-right' } });
         } catch (err) {
             handleApiError(err, message, '비밀번호 변경에 실패했습니다');
         } finally {
@@ -1101,7 +1101,7 @@ const MyPage = () => {
                     withdrawRequestRef.current = null;
                     logout();
                     // 탈퇴 → 홈: 로그아웃과 같은 방향(왼쪽에서)
-                    navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
+                    void navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
                     message.success('탈퇴가 완료되었습니다');
                 } catch (err) {
                     if (isCurrent()) handleApiError(err, message, request.phase === 'deleting'

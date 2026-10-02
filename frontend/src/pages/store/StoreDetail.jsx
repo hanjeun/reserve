@@ -790,7 +790,7 @@ const StoreDetail = () => {
         const target = `/messages?storeId=${id}`;
         // 모바일은 브라우저 뒤로가기가 자연스러운 전체 페이지, 태블릿 이상은 현재 맥락을
         // 유지하는 오른쪽 패널을 쓴다. 비로그인은 PrivateRoute를 거쳐 로그인 뒤 돌아온다.
-        if (!isLoggedIn || windowWidth < breakpoints.tablet) navigate(target);
+        if (!isLoggedIn || windowWidth < breakpoints.tablet) void navigate(target);
         else openStoreMessenger(Number(id));
     };
 

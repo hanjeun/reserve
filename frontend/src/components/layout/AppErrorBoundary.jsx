@@ -55,7 +55,7 @@ function RouteErrorFallback({ error, resetError }) {
     }, [pathname, errorPathname, resetError]);
 
     const goHome = () => {
-        navigate('/');
+        void navigate('/');
         resetError();
     };
     return <ErrorFallback error={error} resetError={resetError} goHome={goHome} />;

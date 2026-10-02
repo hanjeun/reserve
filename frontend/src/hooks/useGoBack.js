@@ -37,11 +37,11 @@ const useGoBack = (fallback = '/') => {
     return useCallback(() => {
         const idx = window.history.state?.idx;
         if (typeof idx === 'number' && idx > 0) {
-            navigate(-1);
+            void navigate(-1);
             return;
         }
         // 히스토리가 없는 직접 진입에서는 fallback도 "뒤로"의 의미를 유지한다.
-        navigate(fallback, { replace: true, state: { reserveRouteMotion: 'from-left' } });
+        void navigate(fallback, { replace: true, state: { reserveRouteMotion: 'from-left' } });
     }, [navigate, fallback]);
 };
 

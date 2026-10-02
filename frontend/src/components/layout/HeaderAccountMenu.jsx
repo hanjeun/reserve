@@ -43,7 +43,7 @@ const HeaderAccountMenu = () => {
             dismissProgress?.();
             useAuthStore.getState().logout();
             // 로그아웃 → 홈. 로고로 홈에 갈 때와 같은 방향(왼쪽에서)으로 돌아간다.
-            navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
+            void navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
             if (serverLogoutFailed) {
                 message.warning('이 기기에서 로그아웃했습니다. 서버 연결은 확인하지 못했습니다.');
             } else {

@@ -33,7 +33,7 @@ const OAuthCallback = () => {
         const oauthMessage = params.get('message');
         if (oauthError === 'oauth2' && oauthMessage) {
             message.error(decodeURIComponent(oauthMessage));
-            navigate('/login', { replace: true });
+            void navigate('/login', { replace: true });
             return;
         }
 
@@ -44,12 +44,12 @@ const OAuthCallback = () => {
                     const isNewUser = params.get('newUser') === 'true';
                     if (isNewUser) {
                         // 약관 동의가 먼저 — 복귀 경로는 소비하지 않고 남겨둔다(SocialAgreement가 소비)
-                        navigate('/signup/social', { replace: true });
+                        void navigate('/signup/social', { replace: true });
                     } else {
                         const greeting = user.name ? `${user.name}님, 반갑습니다!` : '로그인되었습니다.';
                         message.success(greeting);
                         // 원래 보던 페이지로 복귀 (없으면 홈)
-                        navigate(consumeRedirect() || '/', { replace: true });
+                        void navigate(consumeRedirect() || '/', { replace: true });
                     }
                 } else {
                     throw new Error('유저 정보가 올바르지 않습니다.');
@@ -57,7 +57,7 @@ const OAuthCallback = () => {
             } catch (err) {
                 console.error('OAuth 인증 실패:', err);
                 message.error('로그인 정보를 가져오는데 실패했습니다.');
-                navigate('/login', { replace: true });
+                void navigate('/login', { replace: true });
             }
         };
         void finalizeLogin();

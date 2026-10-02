@@ -162,4 +162,19 @@ for (const method of ['post', 'put', 'patch']) {
 }
 api.request = config => instance(scopedConfig(config));
 
-export default api;
+// The response interceptor returns ApiResponse.data (or null/Blob), not AxiosResponse.
+// In particular, a payload's `status` is a business value, not an HTTP status number.
+/**
+ * @typedef {Omit<import('axios').AxiosInstance, 'request' | 'get' | 'delete' | 'head' | 'options' | 'post' | 'put' | 'patch'> & {
+ *   <T = any>(config: import('axios').AxiosRequestConfig): Promise<T>,
+ *   request<T = any>(config: import('axios').AxiosRequestConfig): Promise<T>,
+ *   get<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   delete<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   head<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   options<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   post<T = any>(url: string, data?: any, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   put<T = any>(url: string, data?: any, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   patch<T = any>(url: string, data?: any, config?: import('axios').AxiosRequestConfig): Promise<T>
+ * }} PayloadApi
+ */
+export default /** @type {PayloadApi} */ (api);

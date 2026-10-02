@@ -219,19 +219,19 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     const approveMutation = useMutation({
         mutationFn: (id) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_APPROVE(id)),
-        onSuccess: () => { message.success('승인되었습니다.'); invalidateBiz(); },
+        onSuccess: () => { message.success('승인되었습니다.'); void invalidateBiz(); },
         onError: (err) => message.error(err instanceof Error ? err.message : '승인에 실패했습니다.'),
     });
 
     const rejectMutation = useMutation({
         mutationFn: ({ id, reason }) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_REJECT(id), { reason }),
-        onSuccess: () => { message.success('거절 처리되었습니다.'); setRejectOpen(false); invalidateBiz(); },
+        onSuccess: () => { message.success('거절 처리되었습니다.'); setRejectOpen(false); void invalidateBiz(); },
         onError: (err) => message.error(err instanceof Error ? err.message : '거절 처리에 실패했습니다.'),
     });
 
     const revokeMutation = useMutation({
         mutationFn: (memberId) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_REVOKE(memberId)),
-        onSuccess: () => { message.success('사업자 자격이 취소되었습니다.'); invalidateBiz(); },
+        onSuccess: () => { message.success('사업자 자격이 취소되었습니다.'); void invalidateBiz(); },
         onError: (err) => message.error(err instanceof Error ? err.message : '처리에 실패했습니다.'),
     });
 
@@ -288,7 +288,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
         setDetailItem(null);
         setDetailRequestId(record.id);
         setDetailOpen(true);
-        loadDetail(record.id);
+        void loadDetail(record.id);
     };
 
     // 검색은 서버 전체 신청 집합에서 수행한다. 검색어 변경 시 페이지를 초기화한다.

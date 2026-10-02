@@ -43,7 +43,7 @@ const SocialAgreement = () => {
             // (OAuthCallback은 신규 가입자의 복귀 경로를 일부러 소비하지 않고 남겨둔다)
             const target = consumeRedirect();
             // 가려던 곳이 있으면 이어서(오른쪽에서), 없으면 홈으로(왼쪽에서).
-            navigate(target || '/', { replace: true, state: { reserveRouteMotion: target ? 'from-right' : 'from-left' } });
+            void navigate(target || '/', { replace: true, state: { reserveRouteMotion: target ? 'from-right' : 'from-left' } });
         } catch {
             message.error('오류가 발생했습니다. 다시 시도해주세요.');
         } finally {
@@ -55,7 +55,7 @@ const SocialAgreement = () => {
         // 동의를 거절하고 나가는 경우라 복귀 경로도 같이 버린다(다음 로그인 때 엉뚜한 곳으로 가는 걸 방지)
         clearRedirect();
         logout();
-        navigate('/login', { replace: true });
+        void navigate('/login', { replace: true });
     };
 
     return (

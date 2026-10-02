@@ -35,7 +35,7 @@ const MessagesPage = () => {
     const finishClose = useCallback(() => {
         if (completedRef.current) return;
         completedRef.current = true;
-        if (closeTargetRef.current) navigate(closeTargetRef.current);
+        if (closeTargetRef.current) void navigate(closeTargetRef.current);
         else goBack();
     }, [goBack, navigate]);
     const requestClose = useCallback(() => {

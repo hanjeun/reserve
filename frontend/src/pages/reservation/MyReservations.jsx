@@ -198,8 +198,8 @@ const MyReservations = () => {
         if (location.state?.warnMsg) {
             message.warning({ content: location.state.warnMsg, key: 'review_warn' });
         }
-        if (location.state?.refetch) refetch();
-        if (location.state) navigate(location.pathname, { replace: true, state: {} });
+        if (location.state?.refetch) void refetch();
+        if (location.state) void navigate(location.pathname, { replace: true, state: {} });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const filtered = useMemo(
@@ -224,7 +224,7 @@ const MyReservations = () => {
                 try {
                     await api.delete(API_ENDPOINTS.RESERVATION.REMOVE(res.id));
                     message.success('목록에서 제거되었습니다.');
-                    refetch();
+                    void refetch();
                 } catch { message.error('제거에 실패했습니다.'); }
             },
         });

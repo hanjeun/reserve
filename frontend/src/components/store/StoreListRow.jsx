@@ -20,7 +20,7 @@ const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, ad
     const fallbackImage = getThumbnailUrl();
 
     React.useEffect(() => {
-        if (!preview && isAdvertised && adId) adService.recordImpression(adId);
+        if (!preview && isAdvertised && adId) void adService.recordImpression(adId);
     }, [isAdvertised, adId, preview]);
 
     const handleImageError = (event) => {

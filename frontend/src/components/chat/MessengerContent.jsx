@@ -102,7 +102,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         const target = notificationTargetRef.current;
         if (target?.roomId !== roomId
             || target.identity !== messengerIdentityOf(useAuthStore.getState())) return;
-        if (routeSelection) navigate('/messages', { replace: true });
+        if (routeSelection) void navigate('/messages', { replace: true });
         select(target.selection);
         setMobileThreadOpen(true);
         window.focus();
@@ -165,10 +165,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         if (readCount > 0) {
             queryClient.setQueryData(chatKeys.unread(), (count) => Math.max(0, Number(count ?? 0) - readCount));
         }
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     }, [queryClient, selection]);
     const onLoaded = useCallback((loadedThread) => {
         const readCount = selectedUnreadRef.current;
@@ -182,10 +182,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         clearUnreadCaches(readCount);
     }, [clearUnreadCaches, selectionKey]);
     const onSent = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     }, [queryClient]);
     const onError = useCallback((text) => message.error(text), [message]);
     const onPolled = useCallback((roomId, fresh) => {
@@ -235,8 +235,8 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     }, [threadKey, sessionIdentity, loading, thread?.roomId]);
     const handleModerationChanged = useCallback(() => {
         reload();
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
     }, [queryClient, reload]);
 
     const draft = useMessengerStore((state) => state.drafts[selectionKey] ?? '');
@@ -296,22 +296,22 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
 
     const choose = (next) => {
         if (returningToList || openingThread) return;
-        if (routeSelection) navigate('/messages', { replace: true });
+        if (routeSelection) void navigate('/messages', { replace: true });
         select(next);
         setMobileThreadOpen(true);
         // 한 화면에 목록·대화가 같이 보이는 넓은 메시지 페이지는 자리만 바뀌므로 애니메이션이 없다.
         if (!(surface === 'page' && isWide)) setOpeningThread(true);
     };
     const finishConversationList = useCallback(() => {
-        if (routeSelection) navigate('/messages', { replace: true });
+        if (routeSelection) void navigate('/messages', { replace: true });
         showConversations();
         setMobileThreadOpen(false);
         setReturningToList(false);
     }, [navigate, routeSelection, showConversations]);
     const handleVisibilityChanged = () => {
-        queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
-        queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+        void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
         finishConversationList();
     };
     const showConversationList = () => {
@@ -364,7 +364,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const changeDraft = value => setDraft(selectionKey, value);
 
     const handleFooterChange = value => {
-        if (routeSelection) navigate('/messages', { replace: true });
+        if (routeSelection) void navigate('/messages', { replace: true });
         setMobileThreadOpen(false);
         if (value === 'home') showHome();
         else if (value === 'settings') showSettings();

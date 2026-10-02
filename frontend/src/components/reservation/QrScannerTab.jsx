@@ -377,7 +377,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     useEffect(() => {
         if (!restartForAspectRef.current) return;
         restartForAspectRef.current = false;
-        startScanning();
+        void startScanning();
     }, [decodeAspect, startScanning]);
 
     // ★ isScanning으로 가드하지 않는다 (2026-08-09).

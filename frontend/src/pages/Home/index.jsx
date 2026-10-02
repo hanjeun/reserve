@@ -408,7 +408,7 @@ export default function Home() {
         if (!distanceParams) return;
         const params = new URLSearchParams(distanceParams);
         if (region) params.set('region', region);
-        navigate('/stores?' + params.toString());
+        void navigate('/stores?' + params.toString());
     }, [requestLocation, setLiveLocation, user, message, navigate, region]);
 
     useEffect(() => { window.scrollTo(0, 0); }, []);

@@ -182,7 +182,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         }
     }, []);
 
-    useEffect(() => { search(debouncedQuery); }, [debouncedQuery, search]);
+    useEffect(() => { void search(debouncedQuery); }, [debouncedQuery, search]);
     useEffect(() => () => { searchRequestRef.current += 1; }, []);
 
     useEffect(() => {

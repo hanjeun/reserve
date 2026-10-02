@@ -73,7 +73,7 @@ const StoreList = () => {
     const recordImpressionOnce = React.useCallback((adId) => {
         if (recordedAdIdsRef.current.has(adId)) return;
         recordedAdIdsRef.current.add(adId);
-        adService.recordImpression(adId);
+        void adService.recordImpression(adId);
     }, []);
     const resultClassName = view === 'list' ? 'reserve-store-list-rows' : 'rsv-store-grid';
     let resultMotionClassName = '';

@@ -103,4 +103,6 @@ tasks.named('test') {
 // Compile the standalone operator tool for its isolated, read-only fixture checks.
 tasks.named('compileTestJava') {
     source '../scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java'
+    source '../scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java'
+    source '../scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java'
 }

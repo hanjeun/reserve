@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.function.Supplier;
 
 /** Offline recovery verification. Reads the key only from a person's hidden console input. */
 public final class VerifyChatImageRecovery {
@@ -31,10 +32,22 @@ public final class VerifyChatImageRecovery {
     private VerifyChatImageRecovery() {}
 
     public static void main(String[] args) {
+        System.exit(run(args, VerifyChatImageRecovery::readHiddenKey));
+    }
+
+    private static char[] readHiddenKey() {
+        var console = System.console();
+        if (console == null) {
+            throw new IllegalStateException("An interactive console is required; no key was read");
+        }
+        return console.readPassword("Paste the separately stored CHAT_IMAGE_ENCRYPTION_KEY (hidden): ");
+    }
+
+    static int run(String[] args, Supplier<char[]> hiddenKeyInput) {
         try {
             if (args.length != 7) {
                 System.err.println("Usage: java scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java <cipher-file> <AAD> <cipher-SHA256> <plain-bytes> <width> <height> <image/png|image/jpeg>");
-                System.exit(2);
+                return 2;
             }
             Path path = Path.of(args[0]);
             if (Files.size(path) > MAX_BYTES + IV_BYTES + TAG_BYTES) {
@@ -46,11 +59,7 @@ public final class VerifyChatImageRecovery {
             int height = Integer.parseInt(args[5]);
             ExpectedImage expected = new ExpectedImage(bytes, width, height, args[6]);
             validateInput(ciphertext, args[1], args[2], expected);
-            var console = System.console();
-            if (console == null) {
-                throw new IllegalStateException("An interactive console is required; no key was read");
-            }
-            char[] encodedKey = console.readPassword("Paste the separately stored CHAT_IMAGE_ENCRYPTION_KEY (hidden): ");
+            char[] encodedKey = hiddenKeyInput.get();
             byte[] ascii = null;
             byte[] key = null;
             try {
@@ -69,10 +78,11 @@ public final class VerifyChatImageRecovery {
                 if (ascii != null) Arrays.fill(ascii, (byte) 0);
                 if (key != null) Arrays.fill(key, (byte) 0);
             }
+            return 0;
         } catch (Exception failure) {
             // Do not print exception messages: input or provider messages could contain a secret.
             System.err.printf("FAIL (%s): recovery verification did not complete. No plaintext was written.%n", failure.getClass().getSimpleName());
-            System.exit(1);
+            return 1;
         }
     }
 

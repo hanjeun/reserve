@@ -90,6 +90,17 @@ gh api repos/hanjeun/reserve/deployments/<id>/statuses \
   --jq '.[0] | {state,created_at,environment_url}'
 ```
 
+### 2-2. v2.8.5 배포 확인 (2026-10-03)
+
+릴리스 PR #299를 squash로 머지한 main `c999f6369a098b755cdb8cc9fcd9a32d3c41c766`의
+[CI/CD 실행](https://github.com/hanjeun/reserve/actions/runs/37128806865)이 성공했어요.
+23:16 KST green 앱·nginx upstream·공개 `release-id.txt`가 같은 SHA를 가리키는 것을 확인했어요.
+Actuator health `UP`, 읽기 전용 배포 verifier, 새 heartbeat와 사진 집계의 원본·Loki 수집을
+확인했어요. DB 보정이나 스키마 변경은 이번 배포에서 실행하지 않았어요.
+
+릴리스 직후 dev와 main의 파일이 같은지 확인하고 `merge -s ours`로 squash 계보를 연결했어요.
+후속 정리는 dev 대상 PR로 검증하며, 운영 배포와 관측 결과는 [모니터링 런북](monitoring.md)을 따라요.
+
 ## 3. 저장소 보호 & PR/브랜치 정리
 
 ### 3-1. 브랜치 보호 (main / dev)

@@ -41,8 +41,7 @@ describe('ChatReportsPanel', () => {
         renderPanel();
 
         const alert = await screen.findByRole('alert');
-        expect(alert).toHaveTextContent('비어 있는 상태가 아닙니다');
-        expect(alert).toHaveTextContent('채팅 신고 기능을 찾지 못했습니다');
+        expect(alert).toHaveTextContent('요청한 채팅 신고를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
         expect(screen.queryByText('해당 상태의 채팅 신고가 없습니다.')).not.toBeInTheDocument();
     });
 

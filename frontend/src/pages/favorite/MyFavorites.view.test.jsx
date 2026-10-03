@@ -52,7 +52,7 @@ afterEach(() => { clients.splice(0).forEach(client => client.clear()); });
 describe('favorites reuse the store card/list view contract', () => {
     it('switches with the keyboard without refetching or losing URL fields and follows history', async () => {
         const user = userEvent.setup();
-        show('/my-favorites?keep=yes&page=3');
+        show('/my-favorites?utm_source=yes&page=3');
         const card = await screen.findByTestId('card');
         const originalStore = card.getAttribute('data-store');
         const toggle = screen.getByRole('button', { name: '목록형 보기로 전환' });
@@ -61,7 +61,7 @@ describe('favorites reuse the store card/list view contract', () => {
         await user.keyboard('{Enter}');
         expect(screen.getByTestId('list-row')).toHaveAttribute('data-store', originalStore);
         expect(screen.queryByTestId('card')).toBeNull();
-        expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route').textContent))).toEqual({ keep: 'yes', page: '3', view: 'list' });
+        expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route').textContent))).toEqual({ utm_source: 'yes', view: 'list' });
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toHaveFocus();
         await user.keyboard(' ');
         expect(screen.getByTestId('card')).toHaveTextContent(favorite.storeName);

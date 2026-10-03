@@ -308,7 +308,7 @@ describe('MessengerContent', () => {
         useMessengerStore.getState().showConversations();
         renderMessenger({ surface: 'panel' });
         expect(await screen.findByRole('alert')).toHaveTextContent(
-            '목록이 비어 있는 상태가 아닙니다. 현재 서버에서 대화 목록 기능을 찾지 못했습니다.',
+            '요청한 대화 목록을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.',
         );
         expect(chatService.listConversations).toHaveBeenCalledTimes(1);
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));

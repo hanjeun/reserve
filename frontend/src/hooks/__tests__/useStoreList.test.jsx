@@ -49,10 +49,10 @@ describe('공개 가게 서버 페이지네이션', () => {
     });
 
     it('1-based URL을 0-based API·12건으로 전달하고 누적하지 않는다', async () => {
-        const { result } = renderList('/stores?keyword=카페&domain=DINING&page=2');
+        const { result } = renderList('/stores?keyword=카페&domain=FOOD&page=2');
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(storeService.getStores).toHaveBeenLastCalledWith({
-            keyword: '카페', domain: 'DINING', sort: 'recommended', page: 1, size: 12,
+            keyword: '카페', domain: 'FOOD', sort: 'recommended', page: 1, size: 12,
         });
         expect(result.current.page).toBe(2);
         expect(result.current.totalElements).toBe(25);

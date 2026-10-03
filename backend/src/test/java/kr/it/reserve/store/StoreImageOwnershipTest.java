@@ -18,11 +18,14 @@ import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -128,6 +132,35 @@ class StoreImageOwnershipTest {
                 DETAIL_A, "STORE_DETAIL_IMAGE", STORE_ID);
         verify(fileDeletionOutboxService, never()).enqueue(
                 MAIN, "STORE_MAIN_IMAGE", STORE_ID);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void replacesOwnedMainImageAndRefreshesDimensionsWithoutDeletingKeptDetails(boolean readableDimensions) {
+        String mainPrefix = "users/1/stores/7/thumbnails";
+        String newKey = mainPrefix + "/new.png";
+        String newUrl = "https://cdn.example.test/" + newKey;
+        var image = new MockMultipartFile("mainImage", "new.png", "image/png", new byte[] {1, 2, 3});
+        store.setMainImageWidth(300);
+        store.setMainImageHeight(200);
+        StoreUpdateRequest request = new StoreUpdateRequest();
+        request.setMainImage(image);
+        request.setExistingDetailImageUrls(List.of(DETAIL_A, DETAIL_B));
+        when(fileStorageService.storeFile(image, mainPrefix)).thenReturn(newKey);
+        when(fileStorageService.getPublicUrl(newKey)).thenReturn(newUrl);
+        when(fileStorageService.readImageDimensions(image))
+                .thenReturn(readableDimensions ? new int[] {600, 400} : null);
+        when(fileStorageService.isManagedFileUnderPrefix(MAIN, mainPrefix)).thenReturn(true);
+        when(storeRepository.save(store)).thenReturn(store);
+
+        var response = storeService.updateStore(STORE_ID, request, owner);
+
+        assertThat(response.getMainImageUrl()).isEqualTo(newUrl);
+        assertThat(response.getMainImageWidth()).isEqualTo(readableDimensions ? 600 : null);
+        assertThat(response.getMainImageHeight()).isEqualTo(readableDimensions ? 400 : null);
+        assertThat(store.getDetailImageList()).containsExactly(DETAIL_A, DETAIL_B);
+        verify(fileDeletionOutboxService).enqueue(MAIN, "STORE_MAIN_IMAGE", STORE_ID);
+        verifyNoMoreInteractions(fileDeletionOutboxService);
     }
 
     @Test

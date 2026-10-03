@@ -23,7 +23,7 @@ class ChatImageRecoveryToolTest {
     @TempDir Path temporary;
 
     @Test
-    void verifiesSyntheticPixelsAndRejectsSevenIntegrityFailures() throws Exception {
+    void verifiesSyntheticPixelsAndRejectsSevenIntegrityFailures() {
         assertThatCode(() -> VerifyChatImageRecoveryTest.main(new String[0])).doesNotThrowAnyException();
     }
 

@@ -173,7 +173,7 @@ public class PaymentWebhookInbox {
         lastErrorType = truncate(errorType);
         long delayMinutes = Math.min(
                 MAX_BACKOFF_MINUTES,
-                1L << Math.clamp(attemptCount - 1, 0, MAX_BACKOFF_SHIFT));
+                1L << Math.clamp((long) attemptCount - 1, 0, MAX_BACKOFF_SHIFT));
         nextRetryAt = now.plusMinutes(delayMinutes);
     }
 

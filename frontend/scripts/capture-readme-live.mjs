@@ -228,17 +228,18 @@ async function writeManifest(captured) {
     const manifestPath = path.join(OUTPUT_DIR, 'screenshots.json');
     const previous = existsSync(manifestPath) ? JSON.parse(await readFile(manifestPath, 'utf8')) : { files: [] };
     const files = new Map((previous.files ?? []).map(file => [file.path, file]));
-    for (const name of captured) {
+    const entries = await Promise.all(captured.map(async name => {
         const filename = README_IMAGE_FILENAMES[name];
         const contents = await readFile(path.join(OUTPUT_DIR, filename));
-        files.set(filename, {
+        return [filename, {
             path: filename,
             bytes: contents.byteLength,
             sha256: createHash('sha256').update(contents).digest('hex'),
             source: name === 'monitoring' ? new URL(GRAFANA_URL).origin : BASE_URL,
             capturedAt: new Date().toISOString(),
-        });
-    }
+        }];
+    }));
+    for (const [filename, entry] of entries) files.set(filename, entry);
     const manifest = {
         schemaVersion: 2,
         purpose: 'README screenshots captured from a real site.',

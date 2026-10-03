@@ -103,13 +103,7 @@ public class AdPaymentLedgerService {
         Advertisement ad = lockAd(adId);
         requireOwner(ad, ownerId);
         AdPaymentAttempt attempt = current(ad);
-        if (ad.isDeleted() || ad.getStore().isDeleted() || ad.getStore().isSuspended()
-                || ad.getStartDate().isBefore(ServiceTime.today())
-                || attempt.isCancelRequested()
-                || (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED)) {
-            throw conflict("이 광고는 다시 결제할 수 없습니다. 광고 내역을 확인해주세요.");
-        }
-        if (attempt.getLeaseToken() != null) throw conflict("결제 상태를 확인 중입니다. 잠시 후 다시 확인해주세요.");
+        requirePayable(ad, attempt);
         boolean reusable = !attempt.isEverPaid() && ("READY".equals(attempt.getPgStatus())
                 || "NOT_FOUND".equals(attempt.getPgStatus()));
         if (!reusable && attempt.getState() != State.FAILED) {
@@ -129,6 +123,16 @@ public class AdPaymentLedgerService {
                 .productName(ad.getStore().getName() + (ad.getAdType() == AdType.BADGE ? " 노출형 광고" : " 배너 광고"))
                 .buyerName(owner.getName() == null || owner.getName().isBlank() ? "고객" : owner.getName())
                 .buyerEmail(owner.getEmail()).buyerTel("").storeId(portoneStoreId).build();
+    }
+
+    private void requirePayable(Advertisement ad, AdPaymentAttempt attempt) {
+        if (ad.isDeleted() || ad.getStore().isDeleted() || ad.getStore().isSuspended()
+                || ad.getStartDate().isBefore(ServiceTime.today())
+                || attempt.isCancelRequested()
+                || (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED)) {
+            throw conflict("이 광고는 다시 결제할 수 없습니다. 광고 내역을 확인해주세요.");
+        }
+        if (attempt.getLeaseToken() != null) throw conflict("결제 상태를 확인 중입니다. 잠시 후 다시 확인해주세요.");
     }
 
     public List<String> requestOwnerCancellation(Long adId, Long ownerId) {
@@ -176,33 +180,73 @@ public class AdPaymentLedgerService {
         String status = pg.getStatus();
         attempt.observed(status == null ? "UNKNOWN" : status, pg.getCancelledAmount(), LocalDateTime.now(Clock.systemDefaultZone()));
         boolean currentAttempt = ad.getMerchantUid().equals(attempt.getMerchantUid());
+        RefundCommand refund = applyObservedPayment(claim, pg, ad, attempt, currentAttempt);
+        if (refund != null) return refund;
+        attempt.release();
+        return null;
+    }
+
+    private RefundCommand applyObservedPayment(
+            Claim claim, PortoneV2PaymentResponse pg, Advertisement ad,
+            AdPaymentAttempt attempt, boolean currentAttempt) {
+        String status = pg.getStatus();
         if ("CANCELLED".equals(status) && Objects.equals(pg.getCancelledAmount(), attempt.getAmount().longValue())) {
             attempt.reviewed(State.REFUNDED, null);
             if (currentAttempt) ad.setStatus(AdStatus.REFUNDED);
-        } else if ("PAID".equals(status) && Objects.equals(pg.getCancelledAmount(), 0L)) {
-            if (attempt.getRefundConfirmedAt() != null || "REFUNDED".equals(attempt.getLegacyStatus())) {
-                attempt.requireReview("PAID_AFTER_CONFIRMED_REFUND");
-                if (currentAttempt) ad.setStatus(AdStatus.REVIEW_REQUIRED);
-            } else if (pg.hasUnsettledCancellation()) {
-                attempt.requireReview("PG_CANCELLATION_UNSETTLED");
-                if (currentAttempt) ad.setStatus(AdStatus.REFUND_PENDING);
-            } else if (attempt.isCancelRequested()) {
-                if (currentAttempt) ad.setStatus(AdStatus.REFUND_PENDING);
-                if (attempt.dispatchRefund(LocalDateTime.now(Clock.systemDefaultZone()))) {
-                    return new RefundCommand(attempt.getMerchantUid(), claim.token(), attempt.getAmount(), attempt.getRefundKey());
-                }
-                // PAID 상태만으로 비동기 환불 실패를 판정하지 않는다. 재발신 없이 계속 대사한다.
-                attempt.requireReview("REFUND_OUTCOME_PENDING");
-            } else if (!currentAttempt || ad.isDeleted() || ad.getStore().isDeleted() || ad.getStore().isSuspended()
-                    || (!List.of(AdStatus.PENDING_PAYMENT, AdStatus.ACTIVE, AdStatus.EXPIRED, AdStatus.SUSPENDED).contains(ad.getStatus()))
-                    || (ad.getStatus() == AdStatus.PENDING_PAYMENT && ad.getStartDate().isBefore(ServiceTime.today()))) {
-                attempt.requireReview("PAID_WITHOUT_DELIVERABLE_AD");
-                if (currentAttempt && ad.getStatus() != AdStatus.SUSPENDED) ad.setStatus(AdStatus.REVIEW_REQUIRED);
-            } else {
-                attempt.reviewed(State.PAID, null);
-                if (ad.getStatus() == AdStatus.PENDING_PAYMENT) ad.setStatus(AdStatus.ACTIVE);
-            }
-        } else if ("FAILED".equals(status) && !attempt.isEverPaid() && attempt.getRefundDispatchedAt() == null) {
+            return null;
+        }
+        if ("PAID".equals(status) && Objects.equals(pg.getCancelledAmount(), 0L)) {
+            return applyPaidPayment(claim, pg, ad, attempt, currentAttempt);
+        }
+        applyUnpaidPayment(status, ad, attempt, currentAttempt);
+        return null;
+    }
+
+    private RefundCommand applyPaidPayment(
+            Claim claim, PortoneV2PaymentResponse pg, Advertisement ad,
+            AdPaymentAttempt attempt, boolean currentAttempt) {
+        if (attempt.getRefundConfirmedAt() != null || "REFUNDED".equals(attempt.getLegacyStatus())) {
+            attempt.requireReview("PAID_AFTER_CONFIRMED_REFUND");
+            if (currentAttempt) ad.setStatus(AdStatus.REVIEW_REQUIRED);
+            return null;
+        }
+        if (pg.hasUnsettledCancellation()) {
+            attempt.requireReview("PG_CANCELLATION_UNSETTLED");
+            if (currentAttempt) ad.setStatus(AdStatus.REFUND_PENDING);
+            return null;
+        }
+        if (attempt.isCancelRequested()) {
+            return prepareRequestedRefund(claim, ad, attempt, currentAttempt);
+        }
+        if (isUndeliverablePaidAd(ad, currentAttempt)) {
+            attempt.requireReview("PAID_WITHOUT_DELIVERABLE_AD");
+            if (currentAttempt && ad.getStatus() != AdStatus.SUSPENDED) ad.setStatus(AdStatus.REVIEW_REQUIRED);
+            return null;
+        }
+        attempt.reviewed(State.PAID, null);
+        if (ad.getStatus() == AdStatus.PENDING_PAYMENT) ad.setStatus(AdStatus.ACTIVE);
+        return null;
+    }
+
+    private RefundCommand prepareRequestedRefund(
+            Claim claim, Advertisement ad, AdPaymentAttempt attempt, boolean currentAttempt) {
+        if (currentAttempt) ad.setStatus(AdStatus.REFUND_PENDING);
+        if (attempt.dispatchRefund(LocalDateTime.now(Clock.systemDefaultZone()))) {
+            return new RefundCommand(attempt.getMerchantUid(), claim.token(), attempt.getAmount(), attempt.getRefundKey());
+        }
+        // PAID 상태만으로 비동기 환불 실패를 판정하지 않는다. 재발신 없이 계속 대사한다.
+        attempt.requireReview("REFUND_OUTCOME_PENDING");
+        return null;
+    }
+
+    private boolean isUndeliverablePaidAd(Advertisement ad, boolean currentAttempt) {
+        return !currentAttempt || ad.isDeleted() || ad.getStore().isDeleted() || ad.getStore().isSuspended()
+                || (!List.of(AdStatus.PENDING_PAYMENT, AdStatus.ACTIVE, AdStatus.EXPIRED, AdStatus.SUSPENDED).contains(ad.getStatus()))
+                || (ad.getStatus() == AdStatus.PENDING_PAYMENT && ad.getStartDate().isBefore(ServiceTime.today()));
+    }
+
+    private void applyUnpaidPayment(String status, Advertisement ad, AdPaymentAttempt attempt, boolean currentAttempt) {
+        if ("FAILED".equals(status) && !attempt.isEverPaid() && attempt.getRefundDispatchedAt() == null) {
             attempt.reviewed(State.FAILED, null);
             if (currentAttempt) ad.setStatus(attempt.isCancelRequested() ? AdStatus.CANCELLED : AdStatus.PAYMENT_FAILED);
         } else if ("READY".equals(status) && !attempt.isEverPaid() && attempt.getRefundDispatchedAt() == null) {
@@ -212,8 +256,6 @@ public class AdPaymentLedgerService {
         } else {
             attempt.requireReview("PG_STATE_OR_CANCELLED_AMOUNT_UNCERTAIN");
         }
-        attempt.release();
-        return null;
     }
 
     public void recordLookupFailure(Claim claim, boolean notFound) {

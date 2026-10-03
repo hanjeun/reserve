@@ -1,3 +1,5 @@
+package kr.it.reserve.tools;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -22,6 +24,8 @@ public final class VerifyChatImageRecovery {
     private static final int IV_BYTES = 12;
     private static final int TAG_BYTES = 16;
 
+    record ExpectedImage(int bytes, int width, int height, String mime) {}
+
     record Result(int bytes, int width, int height, String mime, String plaintextSha256) {}
 
     private VerifyChatImageRecovery() {}
@@ -40,7 +44,8 @@ public final class VerifyChatImageRecovery {
             int bytes = Integer.parseInt(args[3]);
             int width = Integer.parseInt(args[4]);
             int height = Integer.parseInt(args[5]);
-            validateInput(ciphertext, args[1], args[2], bytes, width, height, args[6]);
+            ExpectedImage expected = new ExpectedImage(bytes, width, height, args[6]);
+            validateInput(ciphertext, args[1], args[2], expected);
             var console = System.console();
             if (console == null) {
                 throw new IllegalStateException("An interactive console is required; no key was read");
@@ -56,7 +61,7 @@ public final class VerifyChatImageRecovery {
                     ascii[i] = (byte) encodedKey[i];
                 }
                 key = Base64.getDecoder().decode(ascii);
-                Result result = verify(ciphertext, key, args[1], args[2], bytes, width, height, args[6]);
+                Result result = verify(ciphertext, key, args[1], args[2], expected);
                 System.out.printf("PASS: S3 ciphertext hash, AES-256-GCM authentication, and decoded image match.%nbytes=%d width=%d height=%d mime=%s plaintext_sha256=%s%nNo plaintext image or key file was written.%n",
                         result.bytes(), result.width(), result.height(), result.mime(), result.plaintextSha256());
             } finally {
@@ -72,8 +77,12 @@ public final class VerifyChatImageRecovery {
     }
 
     static Result verify(byte[] ciphertext, byte[] key, String aad, String expectedSha256,
-                         int expectedBytes, int width, int height, String mime) throws GeneralSecurityException, IOException {
-        validateInput(ciphertext, aad, expectedSha256, expectedBytes, width, height, mime);
+                         ExpectedImage expected) throws GeneralSecurityException, IOException {
+        validateInput(ciphertext, aad, expectedSha256, expected);
+        int expectedBytes = expected.bytes();
+        int width = expected.width();
+        int height = expected.height();
+        String mime = expected.mime();
         if (key.length != 32) throw new IllegalArgumentException("AES-256 requires a 32-byte decoded key");
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"),
@@ -110,8 +119,12 @@ public final class VerifyChatImageRecovery {
         }
     }
 
-    private static void validateInput(byte[] ciphertext, String aad, String hash, int bytes,
-                                      int width, int height, String mime) throws NoSuchAlgorithmException {
+    private static void validateInput(byte[] ciphertext, String aad, String hash, ExpectedImage expected)
+            throws NoSuchAlgorithmException {
+        int bytes = expected.bytes();
+        int width = expected.width();
+        int height = expected.height();
+        String mime = expected.mime();
         if (!aad.matches("users/\\d+/chat/\\d+") || !hash.matches("[a-fA-F0-9]{64}")) {
             throw new IllegalArgumentException("Invalid expected context or hash");
         }

@@ -159,13 +159,19 @@ public class ReservationService {
         ReservationResponse response = ReservationResponse.fromEntity(reservationRepository.save(reservation));
 
         // 사장님에게 새 예약 알림 (비동기) — 이메일 알림 설정 ON일 때만
+        notifyOwnerOfNewReservation(store, freshMember, request);
+
+        return response;
+    }
+
+    private void notifyOwnerOfNewReservation(Store store, Member member, ReservationCreateRequest request) {
         if (Boolean.TRUE.equals(store.getEmailNotificationEnabled())) {
             try {
                 String ownerEmail = store.getOwner().getEmail();
                 String ownerName  = store.getOwner().getName() != null ? store.getOwner().getName() : "사장님";
                 emailService.sendNewReservationAlertToOwner(
                         ownerEmail, ownerName, store.getName(),
-                        freshMember.getName(), freshMember.getEmail(),
+                        member.getName(), member.getEmail(),
                         request.getReservationDate().toString(),
                         request.getReservationTime().toString().substring(0, 5),
                         request.getGuestCount()
@@ -178,7 +184,6 @@ public class ReservationService {
             log.debug("사장님 이메일 알림 비활성화 상태 — 발송 건너뜀");
         }
 
-        return response;
     }
 
     /**
@@ -220,29 +225,7 @@ public class ReservationService {
                     HttpStatus.BAD_REQUEST);
         }
 
-        // ★ 예약 가능 범위 검증 (2026-08-11 신설).
-        //   그 전까지 미래 날짜 제한이 없어 1년 뒤 예약도 들어왔다. 그렇게 먼 예약은 가게가 운영
-        //   계획을 세울 수 없고 이용자도 잊어버린다. null = 제한 없음(기존 가게의 동작 유지).
-        Integer maxAdvance = store.getMaxAdvanceBookingDays();
-        if (maxAdvance != null && maxAdvance > 0) {
-            // 사장님이 정한 "오늘부터 N일"의 오늘은 한국 날짜다(ServiceTime 참고).
-            LocalDate lastBookable = ServiceTime.today().plusDays(maxAdvance);
-            if (date.isAfter(lastBookable)) {
-                throw new ReservationException(
-                        "이 가게는 " + maxAdvance + "일 이내의 날짜만 예약할 수 있습니다.", HttpStatus.BAD_REQUEST);
-            }
-        }
-
-        // 예약 마감 시간 검증 (예약 시간 N시간 전까지만 예약 가능)
-        if (store.getBookingDeadlineHours() != null && store.getBookingDeadlineHours() > 0) {
-            LocalDateTime deadline = reservationDateTime.minusHours(store.getBookingDeadlineHours());
-            if (now.isAfter(deadline)) {
-                throw new ReservationException(
-                    "예약 마감 시간이 지났습니다. 예약 시간 " + store.getBookingDeadlineHours() + "시간 전까지만 예약 가능합니다.",
-                    HttpStatus.BAD_REQUEST
-                );
-            }
-        }
+        validateBookingWindow(store, date, reservationDateTime, now);
 
         // 브레이크 타임 검증 (breakStartTime 이상, breakEndTime 미만은 예약 불가)
         //
@@ -296,6 +279,39 @@ public class ReservationService {
         }
 
         // 동시간대 인원 체크 (수정 시 자기 자신의 기존 인원은 제외)
+        validateSlotCapacity(store, date, time, guestCount, excludeReservationId);
+    }
+
+    private void validateBookingWindow(
+            Store store, LocalDate date, LocalDateTime reservationDateTime, LocalDateTime now) {
+        // ★ 예약 가능 범위 검증 (2026-08-11 신설).
+        //   그 전까지 미래 날짜 제한이 없어 1년 뒤 예약도 들어왔다. 그렇게 먼 예약은 가게가 운영
+        //   계획을 세울 수 없고 이용자도 잊어버린다. null = 제한 없음(기존 가게의 동작 유지).
+        Integer maxAdvance = store.getMaxAdvanceBookingDays();
+        if (maxAdvance != null && maxAdvance > 0) {
+            // 사장님이 정한 "오늘부터 N일"의 오늘은 한국 날짜다(ServiceTime 참고).
+            LocalDate lastBookable = ServiceTime.today().plusDays(maxAdvance);
+            if (date.isAfter(lastBookable)) {
+                throw new ReservationException(
+                        "이 가게는 " + maxAdvance + "일 이내의 날짜만 예약할 수 있습니다.", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        // 예약 마감 시간 검증 (예약 시간 N시간 전까지만 예약 가능)
+        if (store.getBookingDeadlineHours() != null && store.getBookingDeadlineHours() > 0) {
+            LocalDateTime deadline = reservationDateTime.minusHours(store.getBookingDeadlineHours());
+            if (now.isAfter(deadline)) {
+                throw new ReservationException(
+                    "예약 마감 시간이 지났습니다. 예약 시간 " + store.getBookingDeadlineHours() + "시간 전까지만 예약 가능합니다.",
+                    HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+
+    }
+
+    private void validateSlotCapacity(
+            Store store, LocalDate date, LocalTime time, Integer guestCount, Long excludeReservationId) {
         int currentGuests = (excludeReservationId == null)
                 ? reservationRepository.sumActiveGuestsBySlot(store.getId(), date, time)
                 : reservationRepository.sumActiveGuestsBySlotExcluding(store.getId(), date, time, excludeReservationId);
@@ -443,7 +459,6 @@ public class ReservationService {
         }
 
         Integer capacity = store.getMaxCapacityPerSlot();
-        boolean capped = capacity != null && capacity > 0;
 
         LocalDate today = ServiceTime.today();
         Integer maxAdvance = store.getMaxAdvanceBookingDays();
@@ -455,7 +470,7 @@ public class ReservationService {
 
         List<CalendarDayResponse> days = new ArrayList<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
-            days.add(describeDay(store, date, today, lastBookable, capped, capacity,
+            days.add(describeDay(store, date, today, lastBookable, capacity,
                     bookedByDate.getOrDefault(date, Map.of()), holidays.contains(date)));
         }
         return days;
@@ -463,7 +478,7 @@ public class ReservationService {
 
     /** 달력 한 칸. 순서가 곧 사유의 우선순위다 — {@link #getMonthCalendar} 주석 참고. */
     private CalendarDayResponse describeDay(Store store, LocalDate date, LocalDate today,
-                                            LocalDate lastBookable, boolean capped, Integer capacity,
+                                            LocalDate lastBookable, Integer capacity,
                                             Map<LocalTime, Long> booked, boolean holiday) {
         String ymd = date.toString();
 
@@ -481,6 +496,7 @@ public class ReservationService {
             return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.TOO_FAR.name(), 0, 0, holiday);
         }
 
+        boolean capped = capacity != null && capacity > 0;
         int total = bookableSlotTimes(store, date).size();
         long open = bookableSlotTimesNow(store, date).stream()
                 .filter(t -> !capped || booked.getOrDefault(t, 0L) < capacity)

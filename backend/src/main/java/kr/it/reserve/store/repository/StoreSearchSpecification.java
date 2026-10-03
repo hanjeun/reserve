@@ -117,14 +117,13 @@ public final class StoreSearchSpecification {
 
     private static Predicate categoryContainsAny(
             Root<Store> root, CriteriaBuilder builder, List<String> categoryWords) {
-        List<Predicate> matches = new ArrayList<>(categoryWords.size());
-        for (String word : categoryWords) {
-            matches.add(builder.like(
-                    builder.lower(root.get(CATEGORY_FIELD)),
-                    "%" + escapeLike(word.toLowerCase(Locale.ROOT)) + "%",
-                    LIKE_ESCAPE));
-        }
-        return builder.or(matches.toArray(Predicate[]::new));
+        Predicate[] matches = categoryWords.stream()
+                .map(word -> builder.like(
+                        builder.lower(root.get(CATEGORY_FIELD)),
+                        "%" + escapeLike(word.toLowerCase(Locale.ROOT)) + "%",
+                        LIKE_ESCAPE))
+                .toArray(Predicate[]::new);
+        return builder.or(matches);
     }
 
     private static void addRegionPredicate(

@@ -78,6 +78,7 @@ public class TourismRegionPhotoService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final TourismImageProxyClient imageProxyClient;
+    private final TourismPhotoMetrics metrics;
     private final Map<String, Instant> failedRefreshes = new ConcurrentHashMap<>();
     // 고정된 17개 시도만 관문을 통과하므로 잠금·실패 기록도 사용자 입력에 따라 늘어나지 않는다.
     private final Map<String, Object> regionLocks = new ConcurrentHashMap<>();
@@ -132,14 +133,19 @@ public class TourismRegionPhotoService {
 
         String imageUrl = TourismImageProxyClient.toHttpsImageUrl(photo.get().getImageUrl());
         Optional<ImagePayload> cached = cachedImage(region, imageUrl);
-        if (cached.isPresent()) return cached;
+        if (cached.isPresent()) {
+            metrics.cacheHit();
+            return cached;
+        }
         ImageFailure failure = failedImageLoads.get(region);
         if (failure != null && failure.imageUrl().equals(imageUrl) && failure.retryAt().isAfter(imageCacheClock.instant())) {
+            metrics.imageBackoff();
             return Optional.empty();
         }
 
+        metrics.cacheMiss();
         try {
-            Optional<TourismImageProxyClient.FetchedImage> fetched = imageProxyClient.fetch(imageUrl);
+            Optional<TourismImageProxyClient.FetchedImage> fetched = fetchImageWithMetrics(imageUrl);
             if (fetched.isPresent()) {
                 var image = fetched.get();
                 ImagePayload payload = new ImagePayload(image.bytes(), image.contentType());
@@ -153,6 +159,18 @@ public class TourismRegionPhotoService {
         }
         failedImageLoads.put(region, new ImageFailure(imageUrl, imageCacheClock.instant().plus(IMAGE_FAILURE_BACKOFF)));
         return Optional.empty();
+    }
+
+    private Optional<TourismImageProxyClient.FetchedImage> fetchImageWithMetrics(String imageUrl) {
+        long started = System.nanoTime();
+        boolean successful = false;
+        try {
+            Optional<TourismImageProxyClient.FetchedImage> image = imageProxyClient.fetch(imageUrl);
+            successful = image.isPresent();
+            return image;
+        } finally {
+            metrics.imageProxyRequest(System.nanoTime() - started, successful);
+        }
     }
 
     private Optional<TourismRegionPhotoResponse> findRegionPhoto(String region) {
@@ -274,7 +292,17 @@ public class TourismRegionPhotoService {
                 .queryParam("MobileApp", "RESERVE")
                 .queryParam("_type", "json");
         URI uri = extra.apply(builder).build(true).toUri();
-        return parseItems(restTemplate.getForObject(uri, String.class));
+        TourismPhotoMetrics.ApiEndpoint metricsEndpoint = LIST_ENDPOINT.equals(endpoint)
+                ? TourismPhotoMetrics.ApiEndpoint.AREA_LIST : TourismPhotoMetrics.ApiEndpoint.DETAIL_IMAGE;
+        long started = System.nanoTime();
+        boolean successful = false;
+        try {
+            List<JsonNode> items = parseItems(restTemplate.getForObject(uri, String.class));
+            successful = true;
+            return items;
+        } finally {
+            metrics.apiRequest(metricsEndpoint, System.nanoTime() - started, successful);
+        }
     }
 
     private String encodedServiceKey() {

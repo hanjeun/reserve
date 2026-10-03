@@ -325,31 +325,8 @@ public class StoreService {
         }
 
         try {
-            if (request.getName() != null) store.setName(request.getName());
-            if (request.getDescription() != null) store.setDescription(request.getDescription());
-            if (request.getAddress() != null) store.setAddress(request.getAddress());
-            if (request.getZipCode() != null) store.setZipCode(request.getZipCode());
-            if (request.getAddressDetail() != null) store.setAddressDetail(request.getAddressDetail());
-            if (request.getLatitude() != null) store.setLatitude(request.getLatitude());
-            if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
-            if (request.getPhone() != null) store.setPhone(request.getPhone());
-            if (request.getCategory() != null) store.setCategory(request.getCategory());
-            if (request.getServiceDomain() != null && !request.getServiceDomain().isBlank()) {
-                store.setServiceDomain(parseServiceDomain(request.getServiceDomain(), store.getCategory()));
-            } else if (store.getServiceDomain() == null) {
-                // 구버전 클라이언트가 기존 행을 수정해도 이후 탐색 결과가 안정되도록 한 번만 고정한다.
-                store.setServiceDomain(ServiceDomain.inferFromCategory(store.getCategory()));
-            }
-            // 옵션 값은 전부 clamp/normalize 를 거친다(생성 경로와 동일) — "가게 옵션 정규화" 절 참고.
-            if (request.getNoShowDeposit() != null) store.setNoShowDeposit(clampDeposit(request.getNoShowDeposit()));
-            if (request.getFullRefundDays() != null) store.setFullRefundDays(clampFullRefundDays(request.getFullRefundDays()));
-            if (request.getPartialRefundDays() != null) {
-                // 비교 기준은 "이번 요청의 fullDays"가 아니라 **최종 저장될 fullDays** 여야 한다.
-                // 전액 기준일을 안 보낸 부분 수정 요청이면 기존 값과 비교해야 구간이 맞는지 판단된다.
-                store.setPartialRefundDays(clampPartialRefundDays(
-                        request.getPartialRefundDays(), store.getFullRefundDays()));
-            }
-            if (request.getPartialRefundRate() != null) store.setPartialRefundRate(clampPartialRefundRate(request.getPartialRefundRate()));
+            applyStoreDetails(store, request);
+            applyRefundPolicy(store, request);
             // maxCapacityPerSlot: 항상 업데이트 (null = 무제한, 프론트가 명시적으로 보냄)
             store.setMaxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()));
             // autoApprovalEnabled: 항상 업데이트 (null-safe, 기본 false)
@@ -398,6 +375,37 @@ public class StoreService {
             log.error("Store update failed: storeId={}", id, e);
             throw e;
         }
+    }
+
+    private void applyStoreDetails(Store store, StoreUpdateRequest request) {
+        if (request.getName() != null) store.setName(request.getName());
+        if (request.getDescription() != null) store.setDescription(request.getDescription());
+        if (request.getAddress() != null) store.setAddress(request.getAddress());
+        if (request.getZipCode() != null) store.setZipCode(request.getZipCode());
+        if (request.getAddressDetail() != null) store.setAddressDetail(request.getAddressDetail());
+        if (request.getLatitude() != null) store.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) store.setLongitude(request.getLongitude());
+        if (request.getPhone() != null) store.setPhone(request.getPhone());
+        if (request.getCategory() != null) store.setCategory(request.getCategory());
+        if (request.getServiceDomain() != null && !request.getServiceDomain().isBlank()) {
+            store.setServiceDomain(parseServiceDomain(request.getServiceDomain(), store.getCategory()));
+        } else if (store.getServiceDomain() == null) {
+            // 구버전 클라이언트가 기존 행을 수정해도 이후 탐색 결과가 안정되도록 한 번만 고정한다.
+            store.setServiceDomain(ServiceDomain.inferFromCategory(store.getCategory()));
+        }
+    }
+
+    private void applyRefundPolicy(Store store, StoreUpdateRequest request) {
+        // 옵션 값은 전부 clamp/normalize 를 거친다(생성 경로와 동일) — "가게 옵션 정규화" 절 참고.
+        if (request.getNoShowDeposit() != null) store.setNoShowDeposit(clampDeposit(request.getNoShowDeposit()));
+        if (request.getFullRefundDays() != null) store.setFullRefundDays(clampFullRefundDays(request.getFullRefundDays()));
+        if (request.getPartialRefundDays() != null) {
+            // 비교 기준은 "이번 요청의 fullDays"가 아니라 **최종 저장될 fullDays** 여야 한다.
+            // 전액 기준일을 안 보낸 부분 수정 요청이면 기존 값과 비교해야 구간이 맞는지 판단된다.
+            store.setPartialRefundDays(clampPartialRefundDays(
+                    request.getPartialRefundDays(), store.getFullRefundDays()));
+        }
+        if (request.getPartialRefundRate() != null) store.setPartialRefundRate(clampPartialRefundRate(request.getPartialRefundRate()));
     }
 
     /**
@@ -598,20 +606,7 @@ public class StoreService {
         // 순서 정보도 업로드 전에 푼다 — 잘못된 순서를 거절하면서 새 파일만 S3 에 남기지 않게.
         List<DetailImageSlot> detailOrder = resolveDetailImageOrder(request);
 
-        if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
-            String oldMainImage = store.getMainImageUrl();
-            String key = fileStorageService.storeFile(
-                    request.getMainImage(), mainImagePrefix);
-            store.setMainImageUrl(fileStorageService.getPublicUrl(key));
-            int[] dim = fileStorageService.readImageDimensions(request.getMainImage());
-            store.setMainImageWidth(dim != null ? dim[0] : null);
-            store.setMainImageHeight(dim != null ? dim[1] : null);
-            enqueueManagedFileDeletion(
-                    oldMainImage, mainImagePrefix, "STORE_MAIN_IMAGE", storeId);
-        } else if (request.getExistingMainImageUrl() != null) {
-            store.setMainImageUrl(request.getExistingMainImageUrl());
-            // 기존 이미지를 그대로 유지하는 경우에는 width/height도 이미 저장된 값 그대로 유지된다(건드리지 않음)
-        }
+        updateMainImage(store, request, mainImagePrefix);
 
         // 상세 이미지: 이전 URL → 이전 크기 매핑을 미리 구성해둔다(순서가 바뀌어도 URL 기준으로 찾음)
         List<String> oldUrls = store.getDetailImageList();
@@ -628,7 +623,47 @@ public class StoreService {
 
         List<String> finalDetailImages = new ArrayList<>();
         List<ImageDimension> finalDetailDims = new ArrayList<>();
-        if (detailOrder == null) {
+        appendDetailImagesInOrder(detailOrder, keptUrls, uploaded, urlToDim, finalDetailImages, finalDetailDims);
+
+        // 삭제된 파일 처리
+        List<String> currentDetailImages = store.getDetailImageList();
+        if (currentDetailImages != null) {
+            for (String existingUrl : currentDetailImages) {
+                if (!finalDetailImages.contains(existingUrl)) {
+                    enqueueManagedFileDeletion(
+                            existingUrl, detailImagePrefix, "STORE_DETAIL_IMAGE", storeId);
+                }
+            }
+        }
+        store.setDetailImageList(finalDetailImages);
+        store.setDetailImagesMeta(toDetailImagesMetaJson(finalDetailDims));
+    }
+
+    private void updateMainImage(Store store, StoreUpdateRequest request, String mainImagePrefix) {
+        if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
+            String oldMainImage = store.getMainImageUrl();
+            String key = fileStorageService.storeFile(
+                    request.getMainImage(), mainImagePrefix);
+            store.setMainImageUrl(fileStorageService.getPublicUrl(key));
+            int[] dim = fileStorageService.readImageDimensions(request.getMainImage());
+            store.setMainImageWidth(dim != null ? dim[0] : null);
+            store.setMainImageHeight(dim != null ? dim[1] : null);
+            enqueueManagedFileDeletion(
+                    oldMainImage, mainImagePrefix, "STORE_MAIN_IMAGE", store.getId());
+        } else if (request.getExistingMainImageUrl() != null) {
+            store.setMainImageUrl(request.getExistingMainImageUrl());
+            // 기존 이미지를 그대로 유지하는 경우에는 width/height도 이미 저장된 값 그대로 유지된다(건드리지 않음)
+        }
+    }
+
+    private void appendDetailImagesInOrder(
+            List<DetailImageSlot> detailOrder,
+            List<String> keptUrls,
+            List<UploadedDetailImage> uploaded,
+            Map<String, ImageDimension> urlToDim,
+            List<String> finalDetailImages,
+            List<ImageDimension> finalDetailDims) {
+        if (detailOrder.isEmpty()) {
             // 순서 정보가 없는 예전 클라이언트: 기존 이미지 → 새 이미지
             for (String url : keptUrls) {
                 finalDetailImages.add(url);
@@ -651,19 +686,6 @@ public class StoreService {
                 }
             }
         }
-
-        // 삭제된 파일 처리
-        List<String> currentDetailImages = store.getDetailImageList();
-        if (currentDetailImages != null) {
-            for (String existingUrl : currentDetailImages) {
-                if (!finalDetailImages.contains(existingUrl)) {
-                    enqueueManagedFileDeletion(
-                            existingUrl, detailImagePrefix, "STORE_DETAIL_IMAGE", storeId);
-                }
-            }
-        }
-        store.setDetailImageList(finalDetailImages);
-        store.setDetailImagesMeta(toDetailImagesMetaJson(finalDetailDims));
     }
 
     /**
@@ -700,14 +722,14 @@ public class StoreService {
     private record DetailImageSlot(boolean existing, int index) {}
 
     /**
-     * {@code detailImageOrder} 를 칸 목록으로 푼다. 비어 있으면 {@code null} — 기존 → 새 순서를 그대로 쓴다.
+     * {@code detailImageOrder} 를 칸 목록으로 푼다. 빈 목록이면 기존 → 새 순서를 그대로 쓴다.
      *
      * <p>기존 개수 + 새 개수와 길이가 같고, 모든 항목이 범위 안이며 중복이 없어야 한다 = 정확히 한 번씩 쓰는 순열.
      * 하나라도 어긋나면 사진이 빠지거나 두 번 들어가므로 저장하지 않고 거절한다.
      */
     private List<DetailImageSlot> resolveDetailImageOrder(StoreUpdateRequest request) {
         List<String> order = request.getDetailImageOrder();
-        if (order == null || order.isEmpty()) return null;
+        if (order == null || order.isEmpty()) return List.of();
 
         int existingCount = request.getExistingDetailImageUrls() != null ? request.getExistingDetailImageUrls().size() : 0;
         int newCount = request.getDetailImages() == null ? 0
@@ -883,7 +905,7 @@ public class StoreService {
     //
     // ★ 그리고 이건 조용히 두면 안 되는 종류다. 지금까지는 검증이 없어서 저장은 성공하고
     //   화면도 정상인데 **슬롯 생성 루프가 한 번도 안 돌아 손님 쪽 예약 가능 시간이 0개**가 됐다
-    //   (ReservationService: while (!cursor.plusMinutes(slotMin).isAfter(close))).
+    //   (ReservationService: 남은 당일 시간이 예약 단위보다 짧으면 슬롯 생성 종료).
     //   사장님은 예약이 안 들어오는 이유를 알 방법이 없다. 시끄러운 실패가 맞다.
 
     /**

@@ -194,6 +194,11 @@ function FeaturedCarousel({ region = '' }) {
         return () => window.clearTimeout(timer);
     }, [isPageVisible, isInViewport, isPointerOver, isKeyboardFocusWithin, manualNavigationCount, reducedMotion, showNextSlide]);
 
+    const handleKeyboardInput = () => {
+        pointerInputRef.current = false;
+        setIsKeyboardFocusWithin(true);
+    };
+
     const handleNextClick = () => {
         setManualNavigationCount(count => count + 1);
         showNextSlide();
@@ -212,10 +217,6 @@ function FeaturedCarousel({ region = '' }) {
                 if (event.pointerType === 'mouse' || event.pointerType === 'pen') setIsPointerOver(false);
             }}
             onPointerDown={() => { pointerInputRef.current = true; }}
-            onKeyDown={() => {
-                pointerInputRef.current = false;
-                setIsKeyboardFocusWithin(true);
-            }}
             onFocus={() => {
                 if (!pointerInputRef.current) setIsKeyboardFocusWithin(true);
             }}
@@ -236,6 +237,7 @@ function FeaturedCarousel({ region = '' }) {
                         key={slide.key}
                         to={withRegion(slide.to, region)}
                         state={{ reserveDiscoveryEntry: 'featured-banner' }}
+                        onKeyDown={handleKeyboardInput}
                         className={'reserve-discovery-banner' + (index === activeIndex ? ' reserve-discovery-banner--current' : '')}
                         aria-label={slide.accessibleLabel ?? (slide.title.join(' ') + ' — ' + slide.kicker + ' 둘러보기')}
                     >
@@ -266,6 +268,7 @@ function FeaturedCarousel({ region = '' }) {
                 type="button"
                 className="reserve-discovery-banner-next"
                 onClick={handleNextClick}
+                onKeyDown={handleKeyboardInput}
                 aria-label="다음 추천 배너 보기"
             >
                 <span>{activeIndex + 1} / {FEATURED_SLIDES.length}</span>

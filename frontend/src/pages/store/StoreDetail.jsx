@@ -1,3 +1,4 @@
+import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
@@ -233,7 +234,7 @@ export const StoreIdentity = ({ store, nearby, canContact, onContact }) => {
         <div className="reserve-store-identity">
             <div className="reserve-store-identity-title-row">
                 <Title level={1}>{store.name}</Title>
-                <div className="reserve-store-identity-actions" role="group" aria-label="가게 빠른 작업">
+                <fieldset className="reserve-store-identity-actions" aria-label="가게 빠른 작업" style={{ border: 0, padding: 0, minWidth: 0, marginInline: 0 }}>
                     <FavoriteButton storeId={store.id} size="md" appearance="plain" />
                     {canContact && onContact && (
                         <button type="button" className="reserve-store-contact-action"
@@ -247,7 +248,7 @@ export const StoreIdentity = ({ store, nearby, canContact, onContact }) => {
                             <PhoneOutlined aria-hidden="true" />
                         </a>
                     )}
-                </div>
+                </fieldset>
             </div>
             <div className="reserve-store-identity-rating">
                 <StarFilled aria-hidden="true" />
@@ -450,11 +451,11 @@ export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvai
 };
 
 const TimeSlotLoading = () => (
-    <div role="status" aria-label="예약 가능한 시간을 불러오는 중" aria-busy="true">
+    <LoadingStatus aria-label="예약 가능한 시간을 불러오는 중" aria-busy="true">
         <div style={timeSlotStyles.grid} aria-hidden="true">
             {[1, 2, 3, 4].map(key => <Bone key={key} height={38} borderRadius={radius.md} />)}
         </div>
-    </div>
+    </LoadingStatus>
 );
 
 // 오전/오후 한 묶음 — 라벨 한 줄 + pill 그리드.

@@ -1,3 +1,4 @@
+import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Pagination } from 'antd';
@@ -201,9 +202,9 @@ const StoreList = () => {
         if (loading) {
             return (
                 <div style={styles.skeletonWrap}>
-                    <div className={resultClassName} role="status" aria-label="가게 목록을 불러오는 중" aria-busy="true">
+                    <LoadingStatus className={resultClassName} aria-label="가게 목록을 불러오는 중" aria-busy="true">
                         {view === 'list' ? <StoreListRowSkeleton count={STORE_LIST_PAGE_SIZE} /> : <StoreCardSkeleton count={STORE_LIST_PAGE_SIZE} />}
-                    </div>
+                    </LoadingStatus>
                     <div style={styles.fadeOut} />
                 </div>
             );

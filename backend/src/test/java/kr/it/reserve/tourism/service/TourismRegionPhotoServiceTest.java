@@ -1,6 +1,7 @@
 package kr.it.reserve.tourism.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import kr.it.reserve.tourism.entity.TourismRegionPhoto;
 import kr.it.reserve.tourism.repository.TourismRegionPhotoRepository;
 import org.junit.jupiter.api.Test;
@@ -63,10 +64,11 @@ class TourismRegionPhotoServiceTest {
     @Mock private TourismRegionPhotoRepository repository;
     @Mock private RestTemplate restTemplate;
     @Mock private TourismImageProxyClient imageProxyClient;
+    private final SimpleMeterRegistry metrics = new SimpleMeterRegistry();
 
     private TourismRegionPhotoService service(String key) {
         TourismRegionPhotoService service = new TourismRegionPhotoService(
-                repository, restTemplate, new ObjectMapper(), imageProxyClient);
+                repository, restTemplate, new ObjectMapper(), imageProxyClient, new TourismPhotoMetrics(metrics));
         ReflectionTestUtils.setField(service, "serviceKey", key);
         return service;
     }
@@ -106,6 +108,8 @@ class TourismRegionPhotoServiceTest {
                 .contains("serviceKey=aB%2BcD%3D")
                 .doesNotContain("%25")
                 .contains("areaCode=1");
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "areaBasedList2").timer().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "detailImage2").timer().count()).isEqualTo(1);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -254,6 +258,10 @@ class TourismRegionPhotoServiceTest {
         assertThat(target.loadImage("서울").orElseThrow().bytes()).containsExactly((byte) 1, (byte) 2, (byte) 3);
         verify(imageProxyClient, times(1)).fetch(url);
         verifyNoInteractions(restTemplate);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "hit").counter().count()).isEqualTo(2);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "miss").counter().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.image.proxy").timer().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.image.proxy.errors").counter().count()).isZero();
     }
 
     @Test
@@ -299,6 +307,10 @@ class TourismRegionPhotoServiceTest {
         assertThat(target.loadImage("서울")).isPresent();
         assertThat(target.loadImage("서울")).isPresent();
         verify(imageProxyClient, times(2)).fetch(url);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "backoff").counter().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "miss").counter().count()).isEqualTo(2);
+        assertThat(metrics.get("reserve.tourism.image.proxy").timer().count()).isEqualTo(2);
+        assertThat(metrics.get("reserve.tourism.image.proxy.errors").counter().count()).isEqualTo(1);
     }
 
     @Test
@@ -411,16 +423,24 @@ class TourismRegionPhotoServiceTest {
         assertThat(target.findRegionPhotos(List.of("서울"))).hasSize(1);
         verify(restTemplate, times(1)).getForObject(any(URI.class), eq(String.class));
         verify(repository, never()).save(any());
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "areaBasedList2").timer().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.api.errors").tag("endpoint", "areaBasedList2").counter().count()).isEqualTo(1);
     }
 
     @Test
     void arbitraryRegionInputDoesNotGrowCachesOrReachTheRepository() {
         var target = service("key");
+        int meterCount = metrics.getMeters().size();
         for (int i = 0; i < 100; i++) {
             assertThat(target.loadImage("untrusted-" + i)).isEmpty();
             assertThat(target.findRegionPhotos(List.of("untrusted-" + i))).isEmpty();
         }
         assertThat((java.util.Map<?, ?>) ReflectionTestUtils.getField(target, "regionLocks")).isEmpty();
         verifyNoInteractions(repository, restTemplate, imageProxyClient);
+        assertThat(metrics.getMeters()).hasSize(meterCount).allSatisfy(meter ->
+                assertThat(meter.getId().getTags()).allSatisfy(tag ->
+                        assertThat(tag.getKey()).isIn("outcome", "endpoint")));
+        assertThat(metrics.get("reserve.tourism.image.proxy").timer().count()).isZero();
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "areaBasedList2").timer().count()).isZero();
     }
 }

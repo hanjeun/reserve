@@ -1,3 +1,4 @@
+import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Typography, Divider, Form, Switch, Upload, Input, Tabs } from 'antd';
 import {
@@ -579,7 +580,7 @@ const BusinessTab = ({ user }) => {
     };
 
     if (statusLoading) return (
-        <div role="status" aria-label="사업자 인증 상태를 불러오는 중" aria-busy="true">
+        <LoadingStatus aria-label="사업자 인증 상태를 불러오는 중" aria-busy="true">
             <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <Bone height={36} borderRadius={radius.lg} />
                 <Bone height={44} borderRadius={radius.lg} />
@@ -588,7 +589,7 @@ const BusinessTab = ({ user }) => {
                 <Bone height={100} borderRadius={radius.lg} />
                 <Bone height={46} borderRadius={radius.xl} />
             </div>
-        </div>
+        </LoadingStatus>
     );
 
     if (statusError && !isBusiness) return <DataState state="error" kind="member"

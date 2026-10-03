@@ -367,34 +367,7 @@ public class PaymentService {
 
         String pgStatus = pgPayment.getStatus();
         if (pgPayment.isPaid()) {
-            if (isPaymentClosedFor(payment.getReservation())) {
-                recordIssue(
-                        STALE_READY_CHECK_SOURCE,
-                        PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
-                        payment,
-                        payment.getReservation().getStatus().name());
-                return staleReadyResult(
-                        payment,
-                        pgStatus,
-                        StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
-            }
-            if (pgPayment.getAmount() != payment.getAmount()) {
-                recordIssue(
-                        STALE_READY_CHECK_SOURCE,
-                        PaymentReconciliationIssue.IssueType.PAID_AMOUNT_MISMATCH,
-                        payment,
-                        "EXPECTED_" + payment.getAmount() + "_ACTUAL_" + pgPayment.getAmount());
-                return staleReadyResult(
-                        payment,
-                        pgStatus,
-                        StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
-            }
-
-            completeLockedReadyPayment(payment, pgPayment, null);
-            return staleReadyResult(
-                    payment,
-                    pgStatus,
-                    StaleReadyReconciliationResponse.Outcome.PAID_RECOVERED);
+            return reconcileStalePaidPayment(payment, pgPayment);
         }
 
         if ("FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)
@@ -428,6 +401,39 @@ public class PaymentService {
                 payment,
                 pgStatus,
                 StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+    }
+
+    private StaleReadyReconciliationResponse reconcileStalePaidPayment(
+            Payment payment, PortoneV2PaymentResponse pgPayment) {
+        String pgStatus = pgPayment.getStatus();
+        if (isPaymentClosedFor(payment.getReservation())) {
+            recordIssue(
+                    STALE_READY_CHECK_SOURCE,
+                    PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
+                    payment,
+                    payment.getReservation().getStatus().name());
+            return staleReadyResult(
+                    payment,
+                    pgStatus,
+                    StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+        }
+        if (pgPayment.getAmount() != payment.getAmount()) {
+            recordIssue(
+                    STALE_READY_CHECK_SOURCE,
+                    PaymentReconciliationIssue.IssueType.PAID_AMOUNT_MISMATCH,
+                    payment,
+                    "EXPECTED_" + payment.getAmount() + "_ACTUAL_" + pgPayment.getAmount());
+            return staleReadyResult(
+                    payment,
+                    pgStatus,
+                    StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+        }
+
+        completeLockedReadyPayment(payment, pgPayment, null);
+        return staleReadyResult(
+                payment,
+                pgStatus,
+                StaleReadyReconciliationResponse.Outcome.PAID_RECOVERED);
     }
 
     private StaleReadyReconciliationResponse staleReadyResult(
@@ -535,9 +541,7 @@ public class PaymentService {
             PaymentReconciliationIssue.IssueType issueType,
             Payment payment,
             String detailCode) {
-        String identity = payment != null && payment.getId() != null
-                ? payment.getId().toString()
-                : payment != null ? payment.getMerchantUid() : "UNKNOWN";
+        String identity = paymentIssueIdentity(payment);
         try {
             reconciliationIssueService.recordIssue(
                     category + ":" + identity,
@@ -554,6 +558,13 @@ public class PaymentService {
                     issueType,
                     e.getClass().getSimpleName());
         }
+    }
+
+    private String paymentIssueIdentity(Payment payment) {
+        if (payment == null) {
+            return "UNKNOWN";
+        }
+        return payment.getId() != null ? payment.getId().toString() : payment.getMerchantUid();
     }
 
     private void resolveIssues(Payment payment) {
@@ -618,21 +629,7 @@ public class PaymentService {
                     HttpStatus.CONFLICT);
         }
 
-        Integer refundAmount = refundDto.getRefundAmount() != null ? refundDto.getRefundAmount() : payment.getAmount();
-
-        // ★ 마지막 방어선 — 환불액은 결제액을 넘을 수 없다(2026-08-09).
-        //   넘는 값이 들어오면 PG 가 거절하거나, 받아버리면 결제액보다 많은 돈이 나간다.
-        //   호출측을 믿지 않고 여기서 한 번 더 자른다.
-        if (refundAmount == null || refundAmount <= 0) {
-            throw new PaymentException("환불 금액이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
-        }
-        // 2026-08-23: 비교 대상이 결제액 → **남은 환불 가능액** 으로 바뀌었다.
-        // 부분 환불이 이미 있었다면 결제액 기준으로는 통과하면서 총액을 넘길 수 있었다.
-        if (refundAmount > payment.remainingRefundable()) {
-            log.warn("Refund amount exceeds refundable balance: paymentId={}, requested={}, paid={}, alreadyRefunded={}",
-                    payment.getId(), refundAmount, payment.getAmount(), payment.refundedSoFar());
-            throw new PaymentException("환불 금액이 남은 환불 가능 금액을 초과합니다.", HttpStatus.BAD_REQUEST);
-        }
+        Integer refundAmount = resolveRefundAmount(payment, refundDto.getRefundAmount());
 
         // ★ PG 를 부르기 **직전**에 원장을 남기고 즉시 커밋한다(별도 트랜잭션).
         //   여기서부터 PG 응답을 받기 전까지가 유일한 "돈은 움직였는데 기록이 없는" 구간이다.
@@ -716,6 +713,26 @@ public class PaymentService {
         }
 
         return PaymentResponseDto.fromEntity(payment);
+    }
+
+    private Integer resolveRefundAmount(Payment payment, Integer requestedAmount) {
+        Integer refundAmount = requestedAmount != null ? requestedAmount : payment.getAmount();
+
+        // ★ 마지막 방어선 — 환불액은 결제액을 넘을 수 없다(2026-08-09).
+        //   넘는 값이 들어오면 PG 가 거절하거나, 받아버리면 결제액보다 많은 돈이 나간다.
+        //   호출측을 믿지 않고 여기서 한 번 더 자른다.
+        if (refundAmount == null || refundAmount <= 0) {
+            throw new PaymentException("환불 금액이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+        }
+        // 2026-08-23: 비교 대상이 결제액 → **남은 환불 가능액** 으로 바뀌었다.
+        // 부분 환불이 이미 있었다면 결제액 기준으로는 통과하면서 총액을 넘길 수 있었다.
+        if (refundAmount > payment.remainingRefundable()) {
+            log.warn("Refund amount exceeds refundable balance: paymentId={}, requested={}, paid={}, alreadyRefunded={}",
+                    payment.getId(), refundAmount, payment.getAmount(), payment.refundedSoFar());
+            throw new PaymentException("환불 금액이 남은 환불 가능 금액을 초과합니다.", HttpStatus.BAD_REQUEST);
+        }
+
+        return refundAmount;
     }
 
     private void completeRefundLedgerAfterCommit(
@@ -977,9 +994,7 @@ public class PaymentService {
         }
 
         Integer retryAmount = lastAttempt.getRequestedAmount();
-        String retryReason = reason != null && !reason.isBlank()
-                ? reason
-                : (lastAttempt.getReason() != null ? lastAttempt.getReason() : "환불 재시도");
+        String retryReason = resolveRefundRetryReason(reason, lastAttempt);
 
         PaymentRefundDto safeDto = PaymentRefundDto.builder()
                 .reservationId(reservationId)
@@ -991,6 +1006,13 @@ public class PaymentService {
                 reservationId, currentRequester.getId(), isAdmin, retryAmount, lastAttempt.getId());
 
         return refundPayment(safeDto);
+    }
+
+    private String resolveRefundRetryReason(String reason, RefundAttempt lastAttempt) {
+        if (reason != null && !reason.isBlank()) {
+            return reason;
+        }
+        return lastAttempt.getReason() != null ? lastAttempt.getReason() : "환불 재시도";
     }
 
     /**

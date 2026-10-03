@@ -85,7 +85,7 @@ const AdCreationPreview = ({
                         </div>
                     </section>
                     <p className="reserve-ad-preview-caption">
-                        검색·분야·지역 목록의 맨 위에 보여요. 광고가 여러 개면 순서가 바뀔 수 있어요.
+                        가게 목록의 일반 가게보다 먼저 보여요. 여러 광고는 최근 등록된 순서로 보여요.
                     </p>
                 </div>
             )}
@@ -104,7 +104,12 @@ const AdCreationPreview = ({
                         <dd>{`하루 ${won(dailyPrice)} × ${exposureDays}일`}</dd>
                     </div>
                 </dl>
-                <p className="reserve-ad-checkout__note">결제할 때 서버가 기간·금액·노출 가능 여부를 한 번 더 확인해요.</p>
+                <p className="reserve-ad-checkout__note">
+                    {adType === 'BANNER'
+                        ? '배너는 최근 등록된 활성 광고 한 개가 보여요. 여러 광고가 있으면 내 광고가 표시되지 않을 수 있어요.'
+                        : '노출형 광고는 가게 목록의 일반 가게보다 먼저 보여요.'}
+                    {' '}요금은 선택한 기간 기준이며, 노출 횟수·클릭 수는 보장하지 않아요.
+                </p>
             </section>
         </div>
     );

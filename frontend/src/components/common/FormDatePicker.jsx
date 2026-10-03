@@ -179,7 +179,7 @@ TriggerLabel.propTypes = {
 
 function RangePartChoice({ draftRange, rangePart, setRangePart }) {
     return (
-        <div role="group" style={styles.rangeChoice} aria-label="선택할 날짜 종류">
+        <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0, ...styles.rangeChoice }} aria-label="선택할 날짜 종류">
             {[0, 1].map(part => {
                 const date = draftRange[part];
                 return (
@@ -197,7 +197,7 @@ function RangePartChoice({ draftRange, rangePart, setRangePart }) {
                     </button>
                 );
             })}
-        </div>
+        </fieldset>
     );
 }
 

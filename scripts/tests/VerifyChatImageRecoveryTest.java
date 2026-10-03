@@ -1,3 +1,5 @@
+package kr.it.reserve.tools;
+
 import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -41,17 +43,17 @@ public final class VerifyChatImageRecoveryTest {
         System.arraycopy(iv, 0, encrypted, 0, iv.length);
         System.arraycopy(body, 0, encrypted, iv.length, body.length);
         String hash = VerifyChatImageRecovery.sha256(encrypted);
-        var result = VerifyChatImageRecovery.verify(encrypted, key, aad, hash, plaintext.length, 2, 3, "image/png");
+        var result = VerifyChatImageRecovery.verify(encrypted, key, aad, hash, new VerifyChatImageRecovery.ExpectedImage(plaintext.length, 2, 3, "image/png"));
         if (!result.plaintextSha256().equals(VerifyChatImageRecovery.sha256(plaintext))) throw new AssertionError("Recovered bytes differ");
         byte[] wrongKey = key.clone(); wrongKey[0] ^= 1;
-        rejects(AEADBadTagException.class, () -> VerifyChatImageRecovery.verify(encrypted, wrongKey, aad, hash, plaintext.length, 2, 3, "image/png"));
-        rejects(AEADBadTagException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, "users/8/chat/9", hash, plaintext.length, 2, 3, "image/png"));
+        rejects(AEADBadTagException.class, () -> VerifyChatImageRecovery.verify(encrypted, wrongKey, aad, hash, new VerifyChatImageRecovery.ExpectedImage(plaintext.length, 2, 3, "image/png")));
+        rejects(AEADBadTagException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, "users/8/chat/9", hash, new VerifyChatImageRecovery.ExpectedImage(plaintext.length, 2, 3, "image/png")));
         byte[] tampered = encrypted.clone(); tampered[tampered.length - 1] ^= 1;
-        rejects(AEADBadTagException.class, () -> VerifyChatImageRecovery.verify(tampered, key, aad, VerifyChatImageRecovery.sha256(tampered), plaintext.length, 2, 3, "image/png"));
-        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, "0".repeat(64), plaintext.length, 2, 3, "image/png"));
-        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, hash, plaintext.length + 1, 2, 3, "image/png"));
-        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, hash, plaintext.length, 3, 3, "image/png"));
-        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, hash, plaintext.length, 2, 3, "image/jpeg"));
+        rejects(AEADBadTagException.class, () -> VerifyChatImageRecovery.verify(tampered, key, aad, VerifyChatImageRecovery.sha256(tampered), new VerifyChatImageRecovery.ExpectedImage(plaintext.length, 2, 3, "image/png")));
+        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, "0".repeat(64), new VerifyChatImageRecovery.ExpectedImage(plaintext.length, 2, 3, "image/png")));
+        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, hash, new VerifyChatImageRecovery.ExpectedImage(plaintext.length + 1, 2, 3, "image/png")));
+        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, hash, new VerifyChatImageRecovery.ExpectedImage(plaintext.length, 3, 3, "image/png")));
+        rejects(IllegalArgumentException.class, () -> VerifyChatImageRecovery.verify(encrypted, key, aad, hash, new VerifyChatImageRecovery.ExpectedImage(plaintext.length, 2, 3, "image/jpeg")));
         Arrays.fill(key, (byte) 0); Arrays.fill(wrongKey, (byte) 0); Arrays.fill(plaintext, (byte) 0);
         System.out.println("PASS: recovered pixels/bytes and seven rejection cases (key, AAD, tag, hash, length, dimensions, MIME)");
     }

@@ -5,6 +5,7 @@ import BenefitDetailSkeleton from '../../components/common/BenefitDetailSkeleton
 import { benefitKeys } from '../../hooks/queryKeys';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import benefitService from '../../services/benefitService';
+import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
 import { BENEFIT_IMAGE_FALLBACK, formatBenefitDate, getBenefitImageUrl } from './benefitPresentation';
 
 export default function BenefitDetail() {
@@ -14,14 +15,19 @@ export default function BenefitDetail() {
         queryKey: benefitKeys.detail(id),
         queryFn: ({ signal }) => benefitService.getDetail(id, signal),
         enabled: validId,
-        retry: (count, failure) => failure.status !== 404 && count < 1,
+        retry: (count, failure) => {
+            const status = httpStatusOf(failure);
+            if (status >= 400 && status < 500 && status !== 408 && status !== 429) return false;
+            return count < 1;
+        },
         staleTime: 60000,
     });
-    useDocumentTitle(item?.title ? `${item.title} · 가게 소식` : '가게 소식');
-    if (!validId || error?.status === 404) return <section className="reserve-benefits-page"><DataState state="empty" kind="news" title="현재 공개된 가게 소식이 아니에요."
+    const missing = !validId || isMissingRequestError(error);
+    useDocumentTitle(!missing && item?.title ? `${item.title} · 가게 소식` : '가게 소식');
+    if (missing) return <section className="reserve-benefits-page"><DataState state="empty" requestType="detail" kind="news" title="현재 공개된 가게 소식이 아니에요."
         action={<Link className="reserve-benefits-text-link" to="/benefits">소식 목록으로</Link>} /></section>;
     if (isPending) return <BenefitDetailSkeleton role="status" aria-label="가게 소식을 불러오는 중" aria-busy="true" />;
-    if (isError) return <section className="reserve-benefits-page"><DataState state="error" kind="news" subject="가게 소식" error={error}
+    if (isError) return <section className="reserve-benefits-page"><DataState state="error" requestType="detail" kind="news" subject="가게 소식" error={error}
         title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} /></section>;
     return (
         <article className="reserve-benefits-page reserve-benefit-detail" aria-labelledby="benefit-detail-title">

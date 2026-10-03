@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+// ChatService의 증분 조회 한도와 맞춘다. 가득 찬 배치는 이어받기를 마칠 때까지 읽음을 보류한다.
+const POLL_BATCH_SIZE = 50;
+
 /**
  * 손님·사장님·관리자의 대화 로드, 증분 폴링, 낙관적 전송을 공유한다.
- * 폴링은 messagesRef로 커서를 읽고 messages 변경만으로 타이머를 다시 만들지 않는다.
- * 폴링·전송 결과는 서버 id로 병합한다. 음수 임시 id는 폴링 커서에서 제외한다.
+ * 최초 로드와 성공한 폴링만 커서를 전진시킨다. 전송 응답은 미조회 메시지를 건너뛰지 않는다.
+ * 폴링·전송 결과는 서버 id 순으로 병합하고 음수 임시 id는 끝에 유지한다.
  * 전송 실패는 false를 반환하며 입력 원문 복원은 호출부가 맡는다.
  * 선택 이유와 전송 응답 격리: docs/technical/ui-decisions.md.
  */
@@ -14,8 +17,17 @@ const mergeById = (prev, incoming) => {
     const seen = new Set(prev.map((m) => m.id));
     const add = incoming.filter((m) => m && !seen.has(m.id));
     // 참조를 유지하는 게 중요하다 — 매번 새 배열을 만들면 스크롤 이펙트가 헛돈다.
-    return add.length ? [...prev, ...add] : prev;
+    return add.length ? [...prev, ...add].sort((first, second) => {
+        if (first.id > 0 && second.id > 0) return first.id - second.id;
+        if (first.id > 0) return -1;
+        if (second.id > 0) return 1;
+        return 0;
+    }) : prev;
 };
+
+const newestServerId = (messages, cursor = 0) => (messages ?? []).reduce(
+    (latest, message) => message?.id > latest ? message.id : latest, cursor,
+);
 
 const prependById = (prev, incoming) => {
     if (!incoming || incoming.length === 0) return prev;
@@ -76,7 +88,7 @@ const sendFailureText = (error, controller) => {
  * @param {Function} o.send      (roomId, content, clientMessageId) => Promise<message>
  * @param {Function} [o.onLoaded] 최초 로드 성공 후 (배지 무효화 등)
  * @param {Function} [o.onSent]   전송 성공 후 (목록 갱신 등)
- * @param {Function} [o.onPolled] 새 메시지를 폴링한 뒤 (가시 화면 읽음 처리 등)
+ * @param {Function} [o.onPolled] (roomId, messages, { caughtUp, readThroughId }) 동기·비동기 false 반환 시 다음 성공 조회에서 재알림
  * @param {Function} [o.onError]  사용자에게 알릴 실패
  * @param {number}   [o.pollMs]
  */
@@ -111,12 +123,12 @@ export default function useChatThread({
     }
 
     // A → B → A와 같은 방 재조회에서도 이전 응답을 재사용하지 않는다.
-    const activeRef = useRef(/** @type {{ scope: typeof scope, sending: boolean, ready: boolean, invalidated: boolean, requestController?: AbortController | null, pollingChanges?: boolean } | null} */ (null));
+    const activeRef = useRef(/** @type {{ scope: typeof scope, sending: boolean, ready: boolean, invalidated: boolean, pollAfterId: number, changeRevision: number, catchingUp: boolean, pendingPolled: boolean, requestController?: AbortController | null, pollingChanges?: boolean } | null} */ (null));
     // 응답을 받지 못한 전송은 서버에 저장됐을 수도 있다. 같은 본문을 다시 누르면
     // 같은 식별자를 보내 서버가 기존 한 줄을 돌려주게 한다.
     const retryRef = useRef(null);
     useLayoutEffect(() => {
-        const active = { scope, sending: false, ready: false, invalidated: false };
+        const active = { scope, sending: false, ready: false, invalidated: false, pollAfterId: 0, changeRevision: 0, catchingUp: false, pendingPolled: false };
         activeRef.current = active;
         return () => {
             active.requestController?.abort();
@@ -128,10 +140,6 @@ export default function useChatThread({
         retryRef.current = null;
     }, [scope]);
 
-    // 폴링 tick 이 최신 목록을 보되, 목록이 바뀌어도 타이머를 다시 만들지 않기 위한 거울.
-    const messagesRef = useRef(messages);
-    useEffect(() => { messagesRef.current = messages; }, [messages]);
-
     // 최초 로드 — 이 호출이 곧 읽음 처리다. 별도 API 로 두면 화면이 부르는 걸 잊는 순간
     // 배지가 영영 안 사라진다.
     useEffect(() => {
@@ -141,6 +149,7 @@ export default function useChatThread({
         load()
             .then((res) => {
                 if (cancelled || activeRef.current !== active || active?.invalidated) return;
+                active.pollAfterId = newestServerId(res?.messages);
                 active.ready = true;
                 setRoomId(res?.roomId ?? null);
                 setMessages(res?.messages ?? []);
@@ -165,35 +174,44 @@ export default function useChatThread({
         if (threadKey == null || roomId == null || loading || loadError || !active?.ready) return undefined;
         let alive = true;
         let inFlight = false;
-        let changeRevision = 0;
 
         const tick = () => {
             if (document.visibilityState === 'hidden' || inFlight || !alive || activeRef.current !== active || active.invalidated || !active.ready) return;
             inFlight = true;
-            // 낙관적(음수 id) 항목은 커서에서 제외한다. 서버가 모르는 id 다.
-            const list = messagesRef.current;
-            let afterId = 0;
-            for (let i = list.length - 1; i >= 0; i -= 1) {
-                if (list[i].id > afterId) afterId = list[i].id;
-            }
-            poll(roomId, afterId)
-                .then((fresh) => {
+            // 전송 응답의 높은 ID 대신, 실제로 이어받은 배치의 마지막 ID를 사용한다.
+            poll(roomId, active.pollAfterId)
+                .then(async (fresh) => {
                     if (!alive || activeRef.current !== active || active.invalidated) return;
+                    active.pollAfterId = newestServerId(fresh, active.pollAfterId);
                     setMessages((prev) => mergeById(prev, fresh));
-                    if (fresh?.length) onPolled?.(roomId, fresh);
+                    const wasCatchingUp = active.catchingUp;
+                    const caughtUp = (fresh?.length ?? 0) < POLL_BATCH_SIZE;
+                    active.catchingUp = !caughtUp;
+                    // 정확히 50건으로 끝난 경우 다음 빈 응답에서도 읽음 완료를 알린다.
+                    if (fresh?.length || wasCatchingUp || active.pendingPolled) {
+                        active.pendingPolled = true;
+                        const handled = await onPolled?.(roomId, fresh ?? [], {
+                            caughtUp, readThroughId: active.pollAfterId,
+                        });
+                        if (!alive || activeRef.current !== active || active.invalidated) return;
+                        active.pendingPolled = handled === false;
+                    }
                 })
                 .catch(() => { /* 폴링 실패는 다음 주기에 재시도한다. */ })
+                .then(() => {
+                    // 메시지 응답을 먼저 합쳐야 같은 ID의 취소를 미표시 이력으로 버리지 않는다.
+                    if (!pollChanges || active.pollingChanges || document.visibilityState === 'hidden'
+                        || !alive || activeRef.current !== active || active.invalidated || !active.ready) return;
+                    active.pollingChanges = true;
+                    return pollChanges(roomId, active.changeRevision).then(changes => {
+                        if (!alive || activeRef.current !== active || active.invalidated) return;
+                        setMessages(previous => applyChanges(previous, changes?.messages));
+                        active.changeRevision = changes?.nextRevision ?? active.changeRevision;
+                        if (changes?.messages?.length) onChanged?.();
+                    }).catch(() => { /* 커서는 성공했을 때만 진행한다. 다음 폴링에서 재조회한다. */ })
+                        .finally(() => { active.pollingChanges = false; });
+                })
                 .finally(() => { inFlight = false; });
-            if (pollChanges && !active.pollingChanges) {
-                active.pollingChanges = true;
-                pollChanges(roomId, changeRevision).then(changes => {
-                    if (!alive || activeRef.current !== active || active.invalidated) return;
-                    setMessages(previous => applyChanges(previous, changes?.messages));
-                    changeRevision = changes?.nextRevision ?? changeRevision;
-                    if (changes?.messages?.length) onChanged?.();
-                }).catch(() => { /* 커서는 성공했을 때만 진행한다. 다음 폴링에서 재조회한다. */ })
-                    .finally(() => { active.pollingChanges = false; });
-            }
         };
 
         tick();                                   // 즉시 한 번. 없으면 첫 응답이 pollMs 뒤에나 온다
@@ -287,12 +305,24 @@ export default function useChatThread({
         setReloadRevision((value) => value + 1);
     }, [threadKey, scope]);
 
-    const prepend = useCallback((olderMessages) => {
+    const captureHistory = useCallback(() => {
+        const active = activeRef.current;
+        if (!active || active.scope !== scope || !active.ready || active.invalidated) return null;
+        return { active, changeRevision: active.changeRevision };
+    }, [scope]);
+
+    const prepend = useCallback((olderMessages, snapshot) => {
+        const active = activeRef.current;
+        if (!active || active.scope !== scope || !active.ready || active.invalidated) return false;
+        // 조회 사이 취소 커서가 진행했다면 오래된 원문을 붙이지 않고 호출부가 재조회한다.
+        if (snapshot !== undefined && (!snapshot || snapshot.active !== active
+            || snapshot.changeRevision !== active.changeRevision)) return false;
         setMessages((prev) => prependById(prev, olderMessages));
-    }, []);
+        return true;
+    }, [scope]);
 
     return {
         messages, roomId, thread, loading, loadError, sending,
-        send: submit, reload, prepend, cancelSend, updateMessage,
+        send: submit, reload, prepend, captureHistory, cancelSend, updateMessage,
     };
 }

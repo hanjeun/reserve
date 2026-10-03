@@ -1,6 +1,4 @@
 name: CICD
-run-name: >-
-  ${{ github.event_name == 'push' && '운영 배포 · main' || github.event_name == 'pull_request' && format('검증 · PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title) || format('수동 검증 · {0}', github.ref_name) }}
 
 on:
   push:
@@ -71,7 +69,7 @@ jobs:
         working-directory: backend
         run: |
           chmod +x ./gradlew
-          ./gradlew -I ../scripts/coverage.init.gradle test jacocoTestReport --console=plain
+          ./gradlew test --console=plain
       - name: Record successful backend test evidence
         id: record
         env:
@@ -85,14 +83,6 @@ jobs:
           name: ci-evidence-backend-${{ steps.record.outputs.key }}
           overwrite: true
           path: .ci-evidence/backend/evidence.json
-          retention-days: 7
-      - name: Upload backend coverage for analysis
-        if: steps.evidence.outputs.reused != 'true' && success()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ci-coverage-backend-${{ steps.record.outputs.key }}
-          path: backend/build/reports/jacoco/test/jacocoTestReport.xml
-          if-no-files-found: error
           retention-days: 7
       - name: Upload test report on failure
         if: failure()
@@ -155,7 +145,7 @@ jobs:
       - name: Test frontend (unit and React components)
         if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
-        run: npm run test:coverage
+        run: npm run test:run
       - name: Install Playwright Chromium
         if: steps.evidence.outputs.reused != 'true'
         working-directory: frontend
@@ -183,14 +173,6 @@ jobs:
           name: ci-evidence-frontend-${{ steps.record.outputs.key }}
           overwrite: true
           path: .ci-evidence/frontend/evidence.json
-          retention-days: 7
-      - name: Upload frontend coverage for analysis
-        if: steps.evidence.outputs.reused != 'true' && success()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ci-coverage-frontend-${{ steps.record.outputs.key }}
-          path: frontend/coverage/lcov.info
-          if-no-files-found: error
           retention-days: 7
       - name: Upload browser evidence on failure
         if: failure()
@@ -318,6 +300,7 @@ jobs:
         run: |
           cat > .env.production << EOF
           VITE_API_BASE_URL=$VITE_API_BASE_URL
+          VITE_API_VERSION=v1
           VITE_PORTONE_CHANNEL_KEY=$VITE_PORTONE_CHANNEL_KEY
           VITE_SKELETON_DELAY=0
           VITE_SENTRY_DSN=$VITE_SENTRY_DSN

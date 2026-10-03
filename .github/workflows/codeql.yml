@@ -1,6 +1,4 @@
 name: CodeQL
-run-name: >-
-  ${{ github.event_name == 'pull_request' && format('보안 검사 · PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title) || format('보안 검사 · {0}', github.ref_name) }}
 
 # GitHub 무료 코드 스캐닝(public 레포 한정). CICD.yml과 분리한 이유:
 #  - dev/main PR과 main push를 검사한다. dev push의 동일 변경 중복 스캔은 생략한다.

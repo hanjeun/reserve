@@ -69,8 +69,10 @@ public class AdminChatController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/rooms/{roomId}/read")
-    public ResponseEntity<ApiResponse<Boolean>> markRead(@PathVariable Long roomId) {
-        chatService.markRoomReadAsAdmin(roomId);
+    public ResponseEntity<ApiResponse<Boolean>> markRead(
+            @PathVariable Long roomId,
+            @RequestParam(required = false) Long readThroughId) {
+        chatService.markRoomReadAsAdmin(roomId, readThroughId);
         return ResponseEntity.ok(ApiResponse.success(true, "읽음 처리 완료"));
     }
 

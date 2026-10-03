@@ -19,7 +19,7 @@ import Button from './Button';
 import ModalActions from './ModalActions';
 import RollingFieldValue from './RollingFieldValue';
 import useHolidayDates from '../../hooks/useHolidayDates';
-import { animation, colors, field, fontSize, fontWeight, radius } from '../../styles/tokens';
+import { animation, colors, field, fontSize, fontWeight, radius, transitions } from '../../styles/tokens';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const SWIPE_MIN_PX = 45;
@@ -465,6 +465,7 @@ const styles = {
         width: '100%', height: field.height, padding: '0 11px', boxSizing: 'border-box',
         border: 'none', borderRadius: field.radius, background: field.bg,
         cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        transition: `all ${transitions.fast} ${transitions.easing}`,
     },
     triggerDisabled: { background: colors.gray[100], cursor: 'not-allowed', opacity: 0.7 },
     triggerError: { boxShadow: field.errorRing },

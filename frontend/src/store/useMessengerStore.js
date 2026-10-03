@@ -14,6 +14,7 @@ const MAX_DRAFT_LENGTH = 2000;
  */
 const useMessengerStore = create((set, get) => ({
     open: false,
+    storeOpenRevision: 0,
     view: 'home',
     activeThread: false,
     selection: memberSupport(),
@@ -22,15 +23,16 @@ const useMessengerStore = create((set, get) => ({
 
     syncIdentity: (identity) => {
         if (get().sessionIdentity === identity) return;
-        set({ open: false, view: 'home', activeThread: false, selection: memberSupport(), drafts: {}, sessionIdentity: identity });
+        set({ open: false, storeOpenRevision: 0, view: 'home', activeThread: false, selection: memberSupport(), drafts: {}, sessionIdentity: identity });
     },
     openSupport: () => set({ open: true, view: 'conversations', activeThread: true, selection: memberSupport() }),
-    openStore: (storeId) => set({
+    openStore: (storeId) => set((state) => ({
         open: true,
+        storeOpenRevision: state.open ? state.storeOpenRevision + 1 : state.storeOpenRevision,
         view: 'conversations',
         activeThread: true,
         selection: { kind: 'store', storeId: Number(storeId) },
-    }),
+    })),
     openOwnerRoom: (roomId) => set({
         open: true,
         view: 'conversations',

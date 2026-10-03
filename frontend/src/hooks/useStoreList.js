@@ -10,6 +10,7 @@ import { storeKeys } from './queryKeys';
 import { rememberImageHints } from '../utils/imageHintCache';
 import { hasDistanceCoordinates } from '../utils/distanceSort';
 import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
+import { normalizeListQueryParams } from '../utils/listQueryParams';
 
 export { STORE_LIST_PAGE_SIZE };
 const FILTER_KEYS = new Set(['keyword', 'domain', 'region', 'sort', 'lat', 'lng']);
@@ -25,13 +26,14 @@ const readCount = (value, fallback) =>
 
 const useStoreList = () => {
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+    const normalizedParams = normalizeListQueryParams('/stores', urlSearchParams);
 
-    const keyword = urlSearchParams.get('keyword') || '';
-    const sort    = urlSearchParams.get('sort')    || 'recommended';
-    const lat     = urlSearchParams.get('lat');
-    const lng     = urlSearchParams.get('lng');
-    const domain  = urlSearchParams.get('domain') || '';
-    const region  = urlSearchParams.get('region') || '';
+    const keyword = normalizedParams.get('keyword') || '';
+    const sort    = normalizedParams.get('sort')    || 'recommended';
+    const lat     = normalizedParams.get('lat');
+    const lng     = normalizedParams.get('lng');
+    const domain  = normalizedParams.get('domain') || '';
+    const region  = normalizedParams.get('region') || '';
     const rawPage = urlSearchParams.get('page');
     const page = readPage(rawPage);
 

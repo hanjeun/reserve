@@ -109,14 +109,14 @@ for (const [mode, scheme] of [['light', 'dark'], ['dark', 'light'], ['system', '
 test('favorites switch card/list layouts without refetching and preserve list-shaped refetch skeletons', async ({ page }) => {
     const mock = await mockUiApi(page);
     await theme(page, 'dark');
-    await page.goto('/my-favorites?view=cards&keep=yes');
+    await page.goto('/my-favorites?view=cards&utm_source=yes');
     await expect(page.locator('.rsv-fav-grid .reserve-store-card-shell')).toHaveCount(1);
     const toggle = page.getByRole('button', { name: '목록형 보기로 전환' });
     await toggle.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('.reserve-store-list-rows .reserve-store-list-row')).toHaveCount(1);
     await expect(page.getByRole('link', { name: '관심 가게 상세 보기', exact: true })).toHaveAttribute('href', '/store/81');
-    await expect(page).toHaveURL(/view=list&keep=yes$/);
+    await expect(page).toHaveURL(/view=list&utm_source=yes$/);
     expect(mock.requests.favorites).toBe(1);
     await expect(page.getByRole('button', { name: '사진형 보기로 전환' })).toBeFocused();
     await page.keyboard.press('Space');

@@ -178,9 +178,10 @@ public class ChatApiController {
     @PostMapping("/rooms/{roomId}/read")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> markConversationRead(
             @PathVariable Long roomId,
-            @RequestParam(defaultValue = "MEMBER") String viewerRole) {
+            @RequestParam(defaultValue = "MEMBER") String viewerRole,
+            @RequestParam(required = false) Long readThroughId) {
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
-        chatService.markReadAsParticipant(roomId, me, viewerRole);
+        chatService.markReadAsParticipant(roomId, me, viewerRole, readThroughId);
         return ResponseEntity.ok(ApiResponse.success(Map.of("read", true), "읽음 처리 성공"));
     }
 

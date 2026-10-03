@@ -187,6 +187,14 @@ public class ChatRoom {
         }
     }
 
+    /** 늦게 도착한 이전 커서가 이미 읽은 메시지의 수를 다시 늘리지 않도록 감소만 허용한다. */
+    public void markRead(SenderRole reader, long unreadAfterCursor) {
+        int remaining = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, unreadAfterCursor));
+        if (reader == SenderRole.ADMIN) this.adminUnread = Math.min(this.adminUnread, remaining);
+        else if (reader == SenderRole.OWNER) this.ownerUnread = Math.min(this.ownerUnread, remaining);
+        else this.memberUnread = Math.min(this.memberUnread, remaining);
+    }
+
     /** 한쪽이라도 차단하면 상대가 계속 보내는 우회가 없도록 양쪽 전송을 모두 멈춘다. */
     public boolean isBlocked() {
         return memberBlockedAt != null || ownerBlockedAt != null;

@@ -41,7 +41,9 @@ describe('store detail for an address that is not a store', () => {
         renderAt('/store/999');
 
         expect(useStoreData).toHaveBeenCalledWith('999');
-        expect(screen.getByText('요청하신 가게를 찾을 수 없습니다.')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('요청하신 가게 정보를 찾을 수 없습니다.');
+        expect(screen.getByRole('alert').querySelector('[data-icon="file-unknown"]')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '가게 목록으로' })).toBeInTheDocument();
         expect(screen.queryByText(/기능을 찾지 못했습니다/)).toBeNull();
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();
     });

@@ -85,7 +85,7 @@ Nginx `root`는 전환 때 고른 `releases/<commit-sha>` 절대 경로예요. �
 | 거래·회원·예약 | 단일 MySQL |
 | 이미지 | S3 + CloudFront |
 | 외부 작업 재시도 | MySQL outbox + scheduler → [계정 보안](account-security.md) |
-| 로그·자원 지표 | collect-metrics.sh / Promtail / Loki / Grafana |
+| 로그·자원 지표 | collect-metrics.sh / Alloy / Loki / Grafana |
 | 배포 | Lightsail Blue/Green, JVM heap 상한 512MB |
 
 ## 백업

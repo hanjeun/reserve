@@ -261,7 +261,7 @@ class ChatControllerResponseContractTest {
                         f -> f.chat.replyStoreMessage(ROOM_ID, f.sendRequest, f.httpRequest)),
                 login("ChatApi.pollConversation", false, f -> f.chat.pollConversation(ROOM_ID, AFTER_ID)),
                 login("ChatApi.conversationHistory", false, f -> f.chat.conversationHistory(ROOM_ID, MESSAGE_ID, 37)),
-                login("ChatApi.markConversationRead", false, f -> f.chat.markConversationRead(ROOM_ID, "OWNER")),
+                login("ChatApi.markConversationRead", false, f -> f.chat.markConversationRead(ROOM_ID, "OWNER", null)),
                 login("ChatApi.setConversationBlocked", false,
                         f -> f.chat.setConversationBlocked(ROOM_ID, "MEMBER", true)),
                 login("ChatApi.setVisibility", false, f -> f.chat.setVisibility(ROOM_ID, "OWNER", true)),

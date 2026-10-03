@@ -35,6 +35,16 @@ public final class StoreSearchSpecification {
     private StoreSearchSpecification() {
     }
 
+    /** FULLTEXT는 후보만 좁힌다. 원문 LIKE와 공개 필터·정렬은 반드시 함께 적용한다. */
+    public static Specification<Store> withFulltextCandidate(
+            Specification<Store> literalSearch, String candidate) {
+        return literalSearch.and((root, query, builder) -> builder.greaterThan(
+                builder.function("store_search_match", Double.class,
+                        root.get("name"), root.get("description"), root.get(ADDRESS_FIELD),
+                        root.get(CATEGORY_FIELD), root.get("keywords"), builder.literal(candidate)),
+                0.0));
+    }
+
     public static Specification<Store> publicSearch(
             String keyword,
             String sort,

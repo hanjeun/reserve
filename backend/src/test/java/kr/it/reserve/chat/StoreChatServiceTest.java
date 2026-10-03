@@ -149,13 +149,13 @@ class StoreChatServiceTest {
         ChatMessage second = ChatMessage.builder()
                 .id(57L).room(room).senderRole(SenderRole.ADMIN).content("답변").build();
         when(roomRepository.findById(21L)).thenReturn(Optional.of(room));
-        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 55L))
-                .thenReturn(List.of(first, second));
+        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 55L, PageRequest.of(0, 50)))
+                .thenReturn(new SliceImpl<>(List.of(first, second)));
 
         var responses = chatService.getNewMessagesAsAdmin(21L, 55L);
 
         assertThat(responses).extracting(ChatMessageResponse::getId).containsExactly(56L, 57L);
-        verify(messageRepository).findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 55L);
+        verify(messageRepository).findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 55L, PageRequest.of(0, 50));
         assertThat(room.getMemberUnread()).isEqualTo(3);
         assertThat(room.getAdminUnread()).isEqualTo(2);
         assertThat(room.getOwnerUnread()).isZero();

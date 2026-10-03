@@ -20,7 +20,7 @@ export default function ChatIntroTab() {
     const [{ chatIntroStore }, setParams] = useQueryParamsState(CHAT_INTRO_QUERY_DEFAULTS);
     const store = stores.find(item => String(item.id) === chatIntroStore) ?? stores[0] ?? null;
     const scope = store ? `store:${store.id}` : null;
-    const { intro, isLoading, isError, isFetching, refetch } = useChatIntro(scope, { enabled: Boolean(store) });
+    const { intro, isLoading, isError, error, isFetching, refetch } = useChatIntro(scope, { enabled: Boolean(store) });
     const queryClient = useQueryClient();
     const { message } = useMessage();
 
@@ -42,7 +42,7 @@ export default function ChatIntroTab() {
     } else if (!store) {
         content = <DataState state="empty" kind="store" title="등록된 가게가 없습니다." style={{ marginTop: 80 }} />;
     } else if (isError) {
-        content = <DataState state="error" kind="message" subject="채팅 설정" onRetry={refetch} retrying={isFetching} compact />;
+        content = <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error} onRetry={refetch} retrying={isFetching} compact />;
     } else {
         content = (
             <ChatIntroEditor

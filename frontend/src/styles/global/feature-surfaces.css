@@ -1364,6 +1364,9 @@
 .reserve-store-list-row-link:hover { color: var(--c-text-primary); }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
 .reserve-store-list-row-link:active { color: var(--c-text-primary); }
+/* 목록 행은 크기를 바꾸지 않고 카드의 눌림 투명도·기간만 쓴다. 미리보기 span은 제외한다. */
+a.reserve-store-list-row-link[href] { transition: opacity 0.12s ease; -webkit-tap-highlight-color: transparent; }
+a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 .reserve-store-list-row-link:hover .reserve-store-list-row-image img { opacity: 0.88; }
 .reserve-store-list-row-image {
     display: block;
@@ -1409,6 +1412,7 @@
 .reserve-store-card-favorite:empty { display: none; }
 @media (prefers-reduced-motion: reduce) {
     .reserve-store-card-shell { transition: none; }
+    a.reserve-store-list-row-link[href] { transition: none; }
     .reserve-store-card-shell:has(.reserve-store-card-hit:active) { transform: none; }
 }
 @media (min-width: 768px) {
@@ -2692,6 +2696,8 @@
     .ant-pagination-prev,
     .ant-pagination-next,
     .rsv-time-pill,
+    .reserve-cal-trigger:not(.reserve-form-time-trigger),
+    .reserve-guest-count-step,
     .faq-collapse .ant-collapse-arrow,
     .mock-card-image { transition: none !important; }
     .ant-btn:not(.reserve-btn):active:not(:disabled):not(.ant-btn-loading),
@@ -2701,6 +2707,8 @@
     .ant-pagination .ant-pagination-item-active,
     .rsv-time-pill:active,
     .rsv-time-pill.rsv-selected,
+    .reserve-cal-trigger:not(.reserve-form-time-trigger):active,
+    .reserve-guest-count-step:active,
     .mock-card:hover .mock-card-image,
     .mock-card-m:hover .mock-card-image { transform: none !important; }
     .ant-pagination .ant-pagination-item-active { transition: none !important; }

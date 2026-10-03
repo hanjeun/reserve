@@ -43,14 +43,16 @@ public class RateLimiter {
          * 회사·학교·모바일 캐리어 NAT 뒤의 정상 사용자들이 한 사람 때문에 함께 막힌다.
          * 두 축이 서로의 사각지대를 메운다.
          *
-         * <h3>실패할 때만 소모한다</h3>
-         * 호출측(AuthApiController)이 <b>비밀번호 검증에 실패한 뒤에만</b> 토큰을 소모한다.
-         * 성공한 로그인은 카운터를 쓰지 않으므로, 기기를 여러 대 쓰거나 자주 재로그인하는
-         * 정상 사용자가 이 제한에 걸리지 않는다.
+         * <h3>검증 전에 예약하고 성공한 1회만 반환한다</h3>
+         * 호출측(AuthApiController)이 <b>비밀번호 검증 전에</b> 토큰을 예약한다.
+         * 한도를 다 쓰면 계정 조회와 비밀번호 대조 없이 차단하고, 검증에 성공하면 예약한
+         * 토큰 1개만 반환한다. 성공이 이전 실패 누적을 초기화하지는 않는다.
+         * 따라서 기기를 여러 대 쓰거나 자주 재로그인해도 성공한 로그인은 한도를 쓰지 않는다.
          *
          * <h3>알고 감수하는 트레이드오프</h3>
          * 공격자가 남의 계정에 일부러 실패를 쌓아 <b>계정 잠금 DoS</b>를 만들 수 있다.
-         * 그래서 창을 짧게(10분) 두고 영구 잠금은 하지 않는다 — 완전 잠금은 그 DoS 를 훨씬 키운다.
+         * 그래서 창을 10분으로 제한하고 영구 잠금은 하지 않는다. 거절 요청은 리필 시점을
+         * 갱신하지 않으므로 재시도만으로 현재 차단 기간을 연장하지 않는다.
          * 근본 방어는 유출 비밀번호 차단과 2FA 쪽이다(크리덴셜 스터핑은 계정당 1회만 시도하므로
          * 어떤 카운터에도 걸리지 않는다).
          */
@@ -234,6 +236,15 @@ public class RateLimiter {
         );
         entry.lastAccessMs.set(System.currentTimeMillis());
         return entry.bucket.tryConsume(1);
+    }
+
+    /** 성공한 검증이 예약했던 토큰 1개만 반환한다. 기존 실패와 리필 시점은 유지한다. */
+    public void refund(String key, Policy policy) {
+        buckets.computeIfPresent(policy.name() + ":" + key, (ignored, entry) -> {
+            entry.lastAccessMs.set(System.currentTimeMillis());
+            entry.bucket.addTokens(1);
+            return entry;
+        });
     }
 
     /**

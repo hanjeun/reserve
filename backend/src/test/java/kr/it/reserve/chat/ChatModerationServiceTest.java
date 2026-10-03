@@ -195,7 +195,7 @@ class ChatModerationServiceTest {
         assertThat(context.getReportedMessage().getId()).isEqualTo(90L);
         assertThat(context.getRecentMessages()).extracting("id").containsExactly(89L, 90L);
         verify(roomRepository, never()).findByIdForUpdate(any());
-        verify(auditService).record(any(Member.class), org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.isNull(),
+        verify(auditService).recordAccess(any(Member.class), org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.eq(kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.CONTEXT));
     }
 
@@ -223,7 +223,7 @@ class ChatModerationServiceTest {
                 .reason(ChatReport.Reason.SPAM).evidenceCapturedAt(java.time.LocalDateTime.now()).build();
         when(reportRepository.findById(5L)).thenReturn(Optional.of(report));
         doThrow(new IllegalStateException("audit unavailable")).when(auditService)
-                .record(any(), any(), org.mockito.ArgumentMatchers.isNull(), any());
+                .recordAccess(any(), any(), org.mockito.ArgumentMatchers.isNull(), any());
         Member administrator = admin();
         assertThatThrownBy(() -> service.reportContext(administrator, 5L)).hasMessageContaining("audit unavailable");
         verifyNoMessageReads();

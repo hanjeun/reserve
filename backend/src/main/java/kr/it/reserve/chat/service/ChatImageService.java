@@ -74,7 +74,7 @@ public class ChatImageService {
             content = bounded(() -> new ImageContent(cipher.decrypt(storage.readEncryptedChatImage(item.getImageKey(), prefix), prefix), item.getImageContentType()));
         } else content = readContent(messages.findById(messageId)
                 .orElseThrow(() -> new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND)));
-        audit.record(admin, reportId, messageId, ChatReportAccessAudit.Action.IMAGE);
+        audit.recordAccess(admin, reportId, messageId, ChatReportAccessAudit.Action.IMAGE);
         return content;
     }
 

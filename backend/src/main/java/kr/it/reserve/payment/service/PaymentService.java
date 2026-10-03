@@ -539,7 +539,7 @@ public class PaymentService {
                 ? payment.getId().toString()
                 : payment != null ? payment.getMerchantUid() : "UNKNOWN";
         try {
-            reconciliationIssueService.record(
+            reconciliationIssueService.recordIssue(
                     category + ":" + identity,
                     issueType,
                     payment != null ? payment.getId() : null,

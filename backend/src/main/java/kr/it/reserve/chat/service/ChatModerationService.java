@@ -122,7 +122,7 @@ public class ChatModerationService {
     public ChatReportContextResponse reportContext(Member admin, Long reportId) {
         assertAdmin(admin);
         ChatReportContextResponse context = contextForImage(admin, reportId);
-        auditService.record(admin, reportId, null, ChatReportAccessAudit.Action.CONTEXT);
+        auditService.recordAccess(admin, reportId, null, ChatReportAccessAudit.Action.CONTEXT);
         return context;
     }
 

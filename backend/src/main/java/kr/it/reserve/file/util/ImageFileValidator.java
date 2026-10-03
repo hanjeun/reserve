@@ -116,11 +116,13 @@ public final class ImageFileValidator {
             acquired = true;
             Dimensions header = readStandardDimensions(bytes);
             validateDimensions(header);
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-            if (image == null || image.getWidth() != header.width || image.getHeight() != header.height) {
-                throw unsupported(INVALID_IMAGE_MESSAGE);
+            try (ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
+                BufferedImage image = ImageIO.read(input);
+                if (image == null || image.getWidth() != header.width || image.getHeight() != header.height) {
+                    throw unsupported(INVALID_IMAGE_MESSAGE);
+                }
+                return header;
             }
-            return header;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw FileException.uploadFailed();

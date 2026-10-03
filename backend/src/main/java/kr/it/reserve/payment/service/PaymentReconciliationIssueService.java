@@ -18,7 +18,7 @@ public class PaymentReconciliationIssueService {
     private final PaymentReconciliationIssueRepository issueRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(
+    public void recordIssue(
             String issueKey,
             PaymentReconciliationIssue.IssueType issueType,
             Long paymentId,

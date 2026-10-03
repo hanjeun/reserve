@@ -193,7 +193,7 @@ public class RefundReconciliationScheduler {
 
     private void recordIssue(UnresolvedRefundView view, String detailCode) {
         try {
-            reconciliationIssueService.record(
+            reconciliationIssueService.recordIssue(
                     "REFUND:" + view.paymentId(),
                     PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                     view.paymentId(),

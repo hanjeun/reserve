@@ -10,15 +10,19 @@ import kr.it.reserve.audit.entity.AuditLog;
 import kr.it.reserve.audit.repository.AuditLogRepository;
 import kr.it.reserve.audit.service.AuditCleanupWorker;
 import kr.it.reserve.audit.service.AuditLogService;
+import kr.it.reserve.audit.service.AdminSanctionService;
 import kr.it.reserve.global.error.AuditException;
 import kr.it.reserve.mailbox.entity.AdminSentMail;
 import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.repository.ReviewRepository;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +34,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -47,6 +54,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class AuditLogSnapshotContractTest {
@@ -61,6 +70,8 @@ class AuditLogSnapshotContractTest {
     @Mock private ReviewRepository reviewRepository;
     @Mock private AdvertisementRepository advertisementRepository;
     @Mock private AuditCleanupWorker auditCleanupWorker;
+    @Mock private MemberRepository memberRepository;
+    @Mock private StoreRepository storeRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private AuditLogService service;
@@ -217,6 +228,65 @@ class AuditLogSnapshotContractTest {
                 .member(Member.builder().id(7L).name("예약 고객").build())
                 .reservationDate(LocalDate.of(2026, 10, 3))
                 .status(Reservation.ReservationStatus.CANCELLED).build();
+    }
+
+    @Test
+    @DisplayName("회원 정지는 기간·정규화된 사유와 같은 관리자의 90일 감사 기록을 남긴다")
+    void memberSuspensionKeepsItsReasonAndAuditIdentity() throws Exception {
+        Member member = Member.builder().id(7L).email("customer@example.test").role(Role.USER).build();
+        when(memberRepository.findByIdAndDeletedAtIsNull(7L)).thenReturn(Optional.of(member));
+        LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
+
+        new AdminSanctionService(memberRepository, storeRepository, service)
+                .suspendMember(7L, 3, "  반복 위반  ");
+
+        assertThat(member.getSuspendedUntil()).isBetween(started.plusDays(3),
+                LocalDateTime.now(Clock.systemDefaultZone()).plusDays(3));
+        assertThat(member.getSuspendReason()).isEqualTo("반복 위반");
+        assertThat(member.isSuspended()).isTrue();
+        assertThat(member.isDeleted()).isFalse();
+        assertRecordedLog("MEMBER", 7L, "SUSPEND",
+                Map.of("이메일", "customer@example.test", "사유", "3일 정지 / 반복 위반"), started, 90);
+        verifyNoInteractions(storeRepository, auditCleanupWorker);
+    }
+
+    @Test
+    @DisplayName("가게 정지는 행 잠금 조회 후 기간과 감사 기록을 남기며 가게를 삭제하지 않는다")
+    void storeSuspensionLocksTheStoreAndPreservesItsRow() throws Exception {
+        Store store = store();
+        when(storeRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(store));
+        LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
+
+        new AdminSanctionService(memberRepository, storeRepository, service)
+                .suspendStore(3L, 2, " ");
+
+        assertThat(store.getSuspendedUntil()).isBetween(started.plusDays(2),
+                LocalDateTime.now(Clock.systemDefaultZone()).plusDays(2));
+        assertThat(store.getSuspendReason()).isNull();
+        assertThat(store.isSuspended()).isTrue();
+        assertThat(store.isDeleted()).isFalse();
+        assertRecordedLog("STORE", 3L, "SUSPEND",
+                Map.of("가게명", "스냅샷 가게", "사유", "2일 영업정지"), started, 90);
+        verify(storeRepository).findByIdForUpdate(3L);
+        verifyNoInteractions(memberRepository, auditCleanupWorker);
+    }
+
+    @Test
+    @DisplayName("휴지통 타입 조회는 현재 만료 기준과 페이지 조건을 저장소에 전달한다")
+    void trashQueryPreservesTheExpiryCutoffAndPage() {
+        PageRequest page = PageRequest.of(1, 5);
+        Page<AuditLog> result = new PageImpl<>(List.of(), page, 0);
+        when(auditLogRepository.findRestorableByType(eq(RESERVATION_TYPE), any(), eq(page)))
+                .thenReturn(result);
+        LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
+
+        assertThat(service.getTrashItems("reservation", page)).isSameAs(result);
+
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(auditLogRepository).findRestorableByType(eq(RESERVATION_TYPE), cutoff.capture(), eq(page));
+        assertThat(cutoff.getValue()).isBetween(started, LocalDateTime.now(Clock.systemDefaultZone()));
+        verifyNoMoreInteractions(auditLogRepository);
+        verifyNoInteractions(auditCleanupWorker);
     }
 
     private Store store() {

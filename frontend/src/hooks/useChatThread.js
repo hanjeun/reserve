@@ -221,7 +221,7 @@ export default function useChatThread({
     const submit = useCallback(async (content, attachment = null) => {
         const text = String(content ?? '').trim();
         const active = activeRef.current;
-        if (!active || active.scope !== scope) return null;
+        if (active?.scope !== scope) return null;
         if ((!text && !attachment) || active.sending || roomId == null || !active.ready || active.invalidated) return false;
         const clientMessageId = reuseOrNewClientMessageId(retryRef.current, text, attachment);
         if (!clientMessageId) { onError?.('안전한 연결에서 다시 시도해주세요.'); return false; }
@@ -277,7 +277,7 @@ export default function useChatThread({
 
     const reload = useCallback(() => {
         const active = activeRef.current;
-        if (threadKey == null || !active || active.scope !== scope || active.invalidated) return;
+        if (threadKey == null || active?.scope !== scope || active.invalidated) return;
         // 다음 커밋 전 도착한 이전 응답과 같은 tick의 전송도 즉시 차단한다.
         active.ready = false;
         active.invalidated = true;

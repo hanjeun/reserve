@@ -1,3 +1,4 @@
+import LoadingStatus from '../common/LoadingStatus';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -415,10 +416,9 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     // 탭 마운트 직후 짧게 보여주는 카드 모양 skeleton (위 ready 관련 주석 참고)
     if (!ready) {
         return (
-            <div
+            <LoadingStatus
                 className="reserve-qr-scanner"
                 style={styles.wrapper}
-                role="status"
                 aria-label="QR 스캐너를 준비하는 중"
                 aria-busy="true"
             >
@@ -429,7 +429,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                     <Bone width="100%" height="auto" borderRadius={radius.xl}
                         style={{ aspectRatio: `${DECODE_WIDTH} / ${decodeHeight}` }} />
                 </div>
-            </div>
+            </LoadingStatus>
         );
     }
 

@@ -71,14 +71,14 @@ export default function ChatIntro({
                 </div>
             )}
             {remaining.length > 0 && (
-                <div className="reserve-messenger-support-questions" role="group" aria-label="자주 묻는 질문">
+                <fieldset className="reserve-messenger-support-questions" aria-label="자주 묻는 질문" style={{ border: 0, margin: 0, minWidth: 0, paddingInline: 0, paddingBottom: 0 }}>
                     {remaining.map(item => (
                         <button key={item.question} type="button" className="reserve-messenger-support-question"
                             disabled={!item.answer && (disabled
                                 || draftLength + item.question.length + (draftLength ? 1 : 0) > 2000)}
                             onClick={() => ask(item)}>{item.question}</button>
                     ))}
-                </div>
+                </fieldset>
             )}
         </section>
     );

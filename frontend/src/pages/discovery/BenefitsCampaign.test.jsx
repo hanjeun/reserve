@@ -73,14 +73,14 @@ describe('actual photo benefits banners without invented campaign or general sto
         expectNewsOnlyStructure();
         const loading = screen.getByRole('status', { name: '가게 소식을 불러오는 중' });
         expect(loading).toHaveAttribute('aria-busy', 'true');
-        const rows = loading.querySelectorAll('.reserve-benefit-row--skeleton');
+        const rows = loading.parentElement.querySelectorAll('.reserve-benefit-row--skeleton');
         expect(rows).toHaveLength(6);
         for (const row of rows) {
             expect(row).toHaveAttribute('aria-hidden', 'true');
             expect(row.querySelector('.reserve-benefit-media')).not.toBeNull();
             expect(row.querySelector('.reserve-benefit-row-copy')).not.toBeNull();
         }
-        expect(loading.querySelector('img, a, button')).toBeNull();
+        expect(loading.parentElement.querySelector('img, a, button')).toBeNull();
         expect(screen.queryByText(/쿠폰|발급|선착순|할인|오늘만/)).not.toBeInTheDocument();
     });
 

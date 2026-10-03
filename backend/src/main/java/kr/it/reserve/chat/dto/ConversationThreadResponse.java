@@ -31,14 +31,13 @@ public class ConversationThreadResponse {
 
     public static ConversationThreadResponse from(
             ChatRoom room, String title, String viewerRole, boolean canSend,
-            List<ChatMessageResponse> messages, boolean hasOlderMessages, Long nextBeforeId) {
-        return from(room, title, viewerRole, canSend, messages, hasOlderMessages, nextBeforeId, null);
+            ChatHistoryResponse history) {
+        return from(room, title, viewerRole, canSend, history, null);
     }
 
     public static ConversationThreadResponse from(
             ChatRoom room, String title, String viewerRole, boolean canSend,
-            List<ChatMessageResponse> messages, boolean hasOlderMessages, Long nextBeforeId,
-            String storeImageUrl) {
+            ChatHistoryResponse history, String storeImageUrl) {
         boolean blocked = room.isBlocked();
         boolean blockedByMe = room.isBlockedBy(SenderRole.valueOf(viewerRole));
         boolean support = room.getType() == ChatRoom.RoomType.SUPPORT;
@@ -60,9 +59,9 @@ public class ConversationThreadResponse {
                 .blocked(blocked)
                 .blockedByMe(blockedByMe)
                 .sendDisabledReason(disabledReason(canSend, blocked, blockedByMe))
-                .hasOlderMessages(hasOlderMessages)
-                .nextBeforeId(nextBeforeId)
-                .messages(messages)
+                .hasOlderMessages(history.isHasMore())
+                .nextBeforeId(history.getNextBeforeId())
+                .messages(history.getMessages())
                 .build();
     }
 

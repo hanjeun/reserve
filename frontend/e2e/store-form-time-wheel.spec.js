@@ -162,6 +162,7 @@ test('fine pixel wheel deltas support trackpad-style scrolling', async ({ page }
 });
 
 test('native touch scrolling selects a centered row without scrolling the form', async ({ page, isMobile }) => {
+    // CDP touch gestures require mobile emulation; the mobile project runs these same assertions.
     test.skip(!isMobile, 'Native touch input is covered by the mobile browser project.');
     const { dialog } = await openHours(page);
     const minutes = dialog.getByRole('listbox', { name: '분', exact: true });

@@ -32,11 +32,17 @@ const splitIntoSentenceLines = (content) => {
         return content;
     }
 
+    // 같은 문장이 반복되어도 문장 내용과 등장 횟수로 키를 구분한다.
+    const occurrences = new Map();
     // 이 파일은 .js라 JSX를 쓸 수 없다(Vite는 .jsx/.tsx만 JSX로 처리한다).
     return React.createElement(
         React.Fragment,
         null,
-        ...sentences.map((sentence, i) => React.createElement('div', { key: i }, sentence)),
+        ...sentences.map(sentence => {
+            const occurrence = (occurrences.get(sentence) ?? 0) + 1;
+            occurrences.set(sentence, occurrence);
+            return React.createElement('div', { key: `${sentence}:${occurrence}` }, sentence);
+        }),
     );
 };
 

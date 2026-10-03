@@ -46,7 +46,8 @@ class StoreFulltextRoutingTest {
         when(repository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
 
         service.searchStoresPaged(
-                "강남 카페", "recommended", 0, 20, null, null, "FOOD", "서울 강남구");
+                new StoreService.SearchScope("FOOD", "서울 강남구"),
+                "강남 카페", "recommended", 0, 20, null, null);
 
         verify(repository, never()).searchStoresFulltextPaged(anyString(), anyString(), any(LocalDate.class), any(Pageable.class));
         verify(repository).findAll(any(Specification.class), any(Pageable.class));

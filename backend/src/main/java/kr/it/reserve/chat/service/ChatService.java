@@ -101,7 +101,7 @@ public class ChatService {
     public List<ChatMessageResponse> readMyMessages(Member member) {
         ChatRoom room = findOrCreateSupportRoom(member);
         room.markRead(SenderRole.MEMBER);
-        return recentWindow(room.getId(), member.getId()).messages();
+        return recentWindow(room.getId(), member.getId()).getMessages();
     }
 
     @Transactional
@@ -176,10 +176,10 @@ public class ChatService {
     public ConversationThreadResponse openSupportConversation(Member member) {
         ChatRoom room = findOrCreateSupportRoom(member);
         room.markRead(SenderRole.MEMBER);
-        MessageWindow window = recentWindow(room.getId(), member.getId());
+        ChatHistoryResponse window = recentWindow(room.getId(), member.getId());
         return ConversationThreadResponse.from(
                 room, ConversationSummaryResponse.SUPPORT_NAME, MEMBER_VIEWER_ROLE, true,
-                window.messages(), window.hasOlder(), window.nextBeforeId());
+                window);
     }
 
     /** GET은 방 생성·읽음 변경 없이 조회한다. 새 방을 여는 동작은 POST/open 전용이다. */
@@ -198,9 +198,9 @@ public class ChatService {
     public ConversationThreadResponse getRoomAsOwner(Member owner, Long roomId) {
         ChatRoom room = findRoom(roomId);
         assertStoreOwner(room, owner);
-        MessageWindow window = recentWindow(roomId, owner.getId());
+        ChatHistoryResponse window = recentWindow(roomId, owner.getId());
         return ConversationThreadResponse.from(room, room.getMember().getName(), OWNER_VIEWER_ROLE, isStoreMessageable(room.getStoreId()),
-                window.messages(), window.hasOlder(), window.nextBeforeId());
+                window);
     }
 
     public List<ChatMessageResponse> getRoomAsAdmin(Long roomId) {
@@ -209,7 +209,7 @@ public class ChatService {
 
     public List<ChatMessageResponse> getRoomAsAdmin(Long roomId, Long viewerId) {
         requireType(findRoom(roomId), ChatRoom.RoomType.SUPPORT);
-        return recentWindow(roomId, viewerId).messages();
+        return recentWindow(roomId, viewerId).getMessages();
     }
 
     /** 가게 문의방은 손님·가게 조합마다 하나다. 회원 행 잠금이 첫 동시 생성을 직렬화한다. */
@@ -287,10 +287,10 @@ public class ChatService {
         assertStoreOwner(room, owner);
         room.markRead(SenderRole.OWNER);
         String title = room.getMember().getName();
-        MessageWindow window = recentWindow(roomId, owner.getId());
+        ChatHistoryResponse window = recentWindow(roomId, owner.getId());
         return ConversationThreadResponse.from(
                 room, title, OWNER_VIEWER_ROLE, isStoreMessageable(room.getStoreId()),
-                window.messages(), window.hasOlder(), window.nextBeforeId());
+                window);
     }
 
     @Transactional
@@ -327,7 +327,7 @@ public class ChatService {
         ChatRoom room = findRoomForUpdate(roomId);
         requireType(room, ChatRoom.RoomType.SUPPORT);
         room.markRead(SenderRole.ADMIN);
-        return recentWindow(roomId, viewerId).messages();
+        return recentWindow(roomId, viewerId).getMessages();
     }
 
     /** 열린 관리자 메신저에 새 문의가 도착한 경우 별도 POST로 읽음 축을 맞춘다. */
@@ -453,18 +453,15 @@ public class ChatService {
                 .orElseThrow(() -> new ChatException("대화를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
     }
 
-    private MessageWindow recentWindow(Long roomId, Long viewerId) {
+    private ChatHistoryResponse recentWindow(Long roomId, Long viewerId) {
         var slice = messageRepository.findByRoomIdOrderByIdDesc(
                 roomId, PageRequest.of(0, PAGE_SIZE));
         List<ChatMessageResponse> desc = messageResponses(slice.getContent(), viewerId);
         // 저장소는 최신부터 주고 화면은 오래된 것부터 그린다 — 뒤집는 곳을 한 군데로 모은다.
         List<ChatMessageResponse> messages = desc.reversed();
         Long nextBeforeId = messages.isEmpty() ? null : messages.getFirst().getId();
-        return new MessageWindow(messages, slice.hasNext(), nextBeforeId);
+        return ChatHistoryResponse.of(messages, slice.hasNext(), nextBeforeId);
     }
-
-    private record MessageWindow(
-            List<ChatMessageResponse> messages, boolean hasOlder, Long nextBeforeId) {}
 
     /**
      * 메시지를 넣고 방 요약을 갱신한다.
@@ -538,13 +535,13 @@ public class ChatService {
     private ConversationThreadResponse threadForMember(ChatRoom room) {
         String title = room.getType() == ChatRoom.RoomType.SUPPORT
                 ? ConversationSummaryResponse.SUPPORT_NAME : room.getStoreNameSnapshot();
-        MessageWindow window = recentWindow(room.getId(), room.getMember().getId());
+        ChatHistoryResponse window = recentWindow(room.getId(), room.getMember().getId());
         Store store = room.getType() == ChatRoom.RoomType.STORE
                 ? storeRepository.findById(room.getStoreId()).orElse(null) : null;
         return ConversationThreadResponse.from(
                 room, title, MEMBER_VIEWER_ROLE, room.getType() == ChatRoom.RoomType.SUPPORT
                         || (store != null && !store.isDeleted() && !store.isSuspended()),
-                window.messages(), window.hasOlder(), window.nextBeforeId(),
+                window,
                 store == null ? null : store.getMainImageUrl());
     }
 

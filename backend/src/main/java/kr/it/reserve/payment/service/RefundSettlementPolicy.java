@@ -28,36 +28,12 @@ public final class RefundSettlementPolicy {
             Integer requestedAmount,
             String cancellationId,
             PortoneV2PaymentResponse pgPayment) {
-        if (locallyRefundedAmount < 0) {
-            return review("LOCAL_REFUNDED_AMOUNT_INVALID");
+        Assessment invalidAmounts = validateAmounts(locallyRefundedAmount, requestedAmount, pgPayment);
+        if (invalidAmounts != null) {
+            return invalidAmounts;
         }
-        if (requestedAmount == null || requestedAmount <= 0) {
-            return review("LOCAL_REQUESTED_AMOUNT_INVALID");
-        }
-        if (pgPayment == null) {
-            return review("PG_PAYMENT_RESPONSE_MISSING");
-        }
-
-        Long pgCancelledValue = pgPayment.getCancelledAmount();
-        if (pgCancelledValue == null) {
-            return review("PG_CANCELLED_AMOUNT_MISSING");
-        }
-        if (pgCancelledValue < 0 || pgCancelledValue > Integer.MAX_VALUE) {
-            return review("PG_CANCELLED_AMOUNT_INVALID");
-        }
-
         long expectedCancelledAmount = (long) locallyRefundedAmount + requestedAmount;
-        if (expectedCancelledAmount > Integer.MAX_VALUE) {
-            return review("EXPECTED_CANCELLED_AMOUNT_INVALID");
-        }
-
-        int pgCancelledAmount = pgCancelledValue.intValue();
-        if (pgCancelledAmount < locallyRefundedAmount) {
-            return review("PG_CANCELLED_BELOW_LOCAL_LEDGER");
-        }
-        if (pgCancelledAmount > expectedCancelledAmount) {
-            return review("PG_CANCELLED_EXCEEDS_EXPECTED");
-        }
+        int pgCancelledAmount = pgPayment.getCancelledAmount().intValue();
 
         List<PortoneV2CancelResponse.Cancellation> cancellations = pgPayment.getCancellations();
         if (cancellations == null) {
@@ -127,6 +103,44 @@ public final class RefundSettlementPolicy {
                     pgPayment.getStatus(),
                     expectedCancellationId);
         };
+    }
+
+    private static Assessment validateAmounts(
+            int locallyRefundedAmount,
+            Integer requestedAmount,
+            PortoneV2PaymentResponse pgPayment) {
+        if (locallyRefundedAmount < 0) {
+            return review("LOCAL_REFUNDED_AMOUNT_INVALID");
+        }
+        if (requestedAmount == null || requestedAmount <= 0) {
+            return review("LOCAL_REQUESTED_AMOUNT_INVALID");
+        }
+        if (pgPayment == null) {
+            return review("PG_PAYMENT_RESPONSE_MISSING");
+        }
+
+        Long pgCancelledValue = pgPayment.getCancelledAmount();
+        if (pgCancelledValue == null) {
+            return review("PG_CANCELLED_AMOUNT_MISSING");
+        }
+        if (pgCancelledValue < 0 || pgCancelledValue > Integer.MAX_VALUE) {
+            return review("PG_CANCELLED_AMOUNT_INVALID");
+        }
+
+        long expectedCancelledAmount = (long) locallyRefundedAmount + requestedAmount;
+        if (expectedCancelledAmount > Integer.MAX_VALUE) {
+            return review("EXPECTED_CANCELLED_AMOUNT_INVALID");
+        }
+
+        long pgCancelledAmount = pgCancelledValue;
+        if (pgCancelledAmount < locallyRefundedAmount) {
+            return review("PG_CANCELLED_BELOW_LOCAL_LEDGER");
+        }
+        if (pgCancelledAmount > expectedCancelledAmount) {
+            return review("PG_CANCELLED_EXCEEDS_EXPECTED");
+        }
+
+        return null;
     }
 
     private static Assessment assessSucceededCancellation(

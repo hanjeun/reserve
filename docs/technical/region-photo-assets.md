@@ -52,3 +52,19 @@ cd backend
 ```
 
 운영은 GitHub Secret `TOURISM_API_SERVICE_KEY` → CI/CD SSH 환경변수 → Blue/Green Compose 환경변수 순으로 전달돼요.
+
+
+## 적중률과 외부 호출 측정
+
+`TourismPhotoMetrics`는 고정된 결과·API 이름만 Micrometer로 집계해요. 사용자·지역 입력·URL·키를 태그로 기록하지 않아요.
+
+- `reserve.tourism.image.cache`: `outcome=hit/miss/backoff`. 캐시 적중률은 같은 프로세스·기간의 `hit / (hit + miss)`이고, 실패 후 대기 요청은 분모에서 제외해요.
+- `reserve.tourism.image.proxy`: 이미지 다운로드 시도 횟수·총 소요 시간. 한 시도 안의 리다이렉트 각각을 세는 지표는 아니에요. 빈 결과·예외는 `.errors`에 기록해요.
+- `reserve.tourism.api`: `endpoint=areaBasedList2/detailImage2`별 실제 API 요청·응답 검증 횟수와 소요 시간. 실패는 `.errors`에 기록해요.
+
+배포 후 첫 집계는 시작 1분 뒤, 이후 1시간마다 `Tourism photo metrics: scope=process` 로그로 남겨요.
+Loki에서 `{job="reserve"} |= "Tourism photo metrics:"`로 조회해요. 같은 `startedAt`의 누적값 차이만 계산하고,
+재시작·Blue/Green 전환의 서로 다른 프로세스 값을 빼지 않아요. 빈 조회를 적중률 0%나 외부 호출 0건으로 해석하지 않아요.
+
+지표 구현·모의 검사와 운영의 실제 적중률은 별개예요. 최소 24시간 표본과 제공기관 콘솔의 할당량을 대조한 뒤 호출 예산을 판단해요.
+기존 캐시·지역별 잠금은 인스턴스별이므로 여러 앱이 실행되면 외부 호출이 중복될 수 있어요. 분산 캐시·저장 위치·호출 제한을 자동으로 바꾸지는 않아요.

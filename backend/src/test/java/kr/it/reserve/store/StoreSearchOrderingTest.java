@@ -192,7 +192,9 @@ class StoreSearchOrderingTest {
                 .doesNotContain("부산 해운대구", "제주 제주시");
         assertThat(service.getAvailableRegions()).extracting(group -> group.name())
                 .contains("서울", "경기").doesNotContain("부산", "제주");
-        assertThat(service.searchStoresPaged(null, "rating", 0, 12, null, null, null, "서울")
+        assertThat(service.searchStoresPaged(
+                new StoreService.SearchScope(null, "서울"),
+                null, "rating", 0, 12, null, null)
                 .getContent()).extracting(StoreResponse::getId).contains(seoul.getId()).doesNotContain(gyeonggi.getId());
     }
 }

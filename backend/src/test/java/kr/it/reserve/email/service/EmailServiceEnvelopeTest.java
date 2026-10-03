@@ -95,8 +95,8 @@ class EmailServiceEnvelopeTest {
                         MEMBER_EMAIL, "[RESERVE] 예약이 취소되었습니다", null,
                         List.of(MEMBER_HTML, STORE_HTML, "2026-10-03", "오후 2시", "3명", REASON_HTML)),
                 new MailCase("사업자 신규 예약", service -> service.sendNewReservationAlertToOwner(
-                        OWNER_EMAIL, "점주 한글 🏠 <b>김사장</b>", STORE_NAME, MEMBER_NAME, MEMBER_EMAIL,
-                        "2026-10-03", "오후 2시", 3),
+                        OWNER_EMAIL, "점주 한글 🏠 <b>김사장</b>", MEMBER_NAME, MEMBER_EMAIL,
+                        new EmailService.ReservationMailDetails(STORE_NAME, "2026-10-03", "오후 2시", 3)),
                         OWNER_EMAIL, "[RESERVE] 새로운 예약이 접수되었습니다", MEMBER_EMAIL,
                         List.of("점주 한글 🏠 &lt;b&gt;김사장&lt;/b&gt;", STORE_HTML, MEMBER_HTML,
                                 "mailto:" + MEMBER_EMAIL, "오후 2시", "3명")),

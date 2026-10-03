@@ -34,23 +34,27 @@ class StoreRegionFilteringTest {
         entityManager.flush();
 
         var seoul = service.searchStoresPaged(
-                "지역필터검증", "rating", 0, 1, null, null, null, "서울");
+                new StoreService.SearchScope(null, "서울"),
+                "지역필터검증", "rating", 0, 1, null, null);
         assertThat(seoul.getTotalElements()).isEqualTo(2);
         assertThat(seoul.getContent()).extracting(StoreResponse::getId)
                 .containsExactly(seoulJung.getId());
 
         var district = service.searchStoresPaged(
-                "지역필터검증", "rating", 0, 10, null, null, null, "서울 종로구");
+                new StoreService.SearchScope(null, "서울 종로구"),
+                "지역필터검증", "rating", 0, 10, null, null);
         assertThat(district.getTotalElements()).isEqualTo(1);
         assertThat(district.getContent()).extracting(StoreResponse::getId)
                 .containsExactly(seoulJongno.getId());
 
         var shortProvince = service.searchStoresPaged(
-                "지역필터검증", "rating", 0, 10, null, null, null, "경기");
+                new StoreService.SearchScope(null, "경기"),
+                "지역필터검증", "rating", 0, 10, null, null);
         assertThat(shortProvince.getContent()).extracting(StoreResponse::getId)
                 .containsExactly(gyeonggi.getId());
         assertThat(service.searchStoresPaged(
-                "지역필터검증", "rating", 0, 10, null, null, null, "제주").getTotalElements())
+                new StoreService.SearchScope(null, "제주"),
+                "지역필터검증", "rating", 0, 10, null, null).getTotalElements())
                 .isZero();
     }
 

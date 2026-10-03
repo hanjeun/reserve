@@ -1,3 +1,4 @@
+import LoadingStatus from '../common/LoadingStatus';
 import React, { useEffect, useRef, useState } from 'react';
 import { Rate, Typography } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -248,7 +249,7 @@ const ReviewList = ({
 
     // 2026-07 추가: PC에서는 2열 그리드라 한 화면에 더 많이 채워지는 게 자연스러워서 개수를 4로 늘림
     // (3개면 2열 그리드에서 한 칸이 어중간하게 비어 보인다). 모바일은 기존과 동일하게 3.
-    if (loading) return <div role="status" aria-label="리뷰를 불러오는 중" aria-busy="true"><ReviewCardSkeleton count={isPC ? 4 : 3} isPC={isPC} /></div>;
+    if (loading) return <LoadingStatus aria-label="리뷰를 불러오는 중" aria-busy="true"><ReviewCardSkeleton count={isPC ? 4 : 3} isPC={isPC} /></LoadingStatus>;
     if (isError) return <DataState state="error" kind="review" subject="리뷰" error={error}
         onRetry={refetch} retrying={isFetching} />;
 

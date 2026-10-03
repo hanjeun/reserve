@@ -120,7 +120,7 @@ import { Button } from '../components/common';
 
 - 키보드 포커스는 `.reserve-btn:focus-visible` 공통 링(본문 보조색 2px)이에요. 호출부에서 덮지 않아요.
 - 로딩 중에는 `disabled`와 `aria-busy`가 함께 적용돼요.
-- `size="sm"`(36px) 좌우 여백은 primary·danger 24px, outline·secondary 20px이에요.
+- `size="sm"`(36px) 좌우 여백은 채움·테두리 버튼 모두 20px이에요. 너비는 문구 길이에 맞추고 인접한 버튼과 같게 늘리지 않아요.
 - 패널 안의 저장·취소 한 쌍은 `outline sm` + `primary sm`, 8px 간격, 오른쪽 정렬이에요. 44px(`md`)·56px(`lg`)는 페이지 단위 폼의 주 행동에 써요.
 
 ### CopyableText

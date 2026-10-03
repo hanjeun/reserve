@@ -1,3 +1,4 @@
+import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useState, useCallback } from 'react';
 import { Typography, Modal, Flex } from 'antd';
 import { EditOutlined, DeleteOutlined, ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons';
@@ -189,11 +190,11 @@ const withToolbarParam = (current, key, value) => {
 };
 
 const OwnedStoresSkeleton = ({ view }) => (
-    <div className={view === 'list' ? 'reserve-store-list-rows' : 'rsv-mystore-grid'} role="status" aria-label="내 가게를 불러오는 중">
+    <LoadingStatus className={view === 'list' ? 'reserve-store-list-rows' : 'rsv-mystore-grid'} aria-label="내 가게를 불러오는 중">
         <div style={{ display: 'contents' }} aria-hidden="true">
             {view === 'list' ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
         </div>
-    </div>
+    </LoadingStatus>
 );
 
 // 가게 목록 본문 — 목록형 / 카드형 / 빈 안내 중 하나.

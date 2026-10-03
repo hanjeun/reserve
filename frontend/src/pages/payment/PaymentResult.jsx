@@ -1,3 +1,4 @@
+import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -126,7 +127,7 @@ const PaymentResult = () => {
 
 const PaymentVerifying = ({ isAd, onRecover }) => (
     <PaymentResultFrame busy>
-        <section className="reserve-payment-result__content" role="status" aria-label="결제 상태를 확인하는 중">
+        <LoadingStatus as="section" className="reserve-payment-result__content" aria-label="결제 상태를 확인하는 중">
             <div className="reserve-payment-result__icon reserve-payment-result__icon--progress" aria-hidden="true">
                 <LoadingOutlined spin />
             </div>
@@ -138,7 +139,7 @@ const PaymentVerifying = ({ isAd, onRecover }) => (
                 결제 수단 화면에서 돌아온 뒤에도 확인이 끝날 때까지 잠시 기다려주세요.
             </p>
             <PaymentRecoveryLink isAd={isAd} onRecover={onRecover} />
-        </section>
+        </LoadingStatus>
     </PaymentResultFrame>
 );
 

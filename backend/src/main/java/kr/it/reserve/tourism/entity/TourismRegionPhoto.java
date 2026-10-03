@@ -47,20 +47,23 @@ public class TourismRegionPhoto {
     @Column(name = "checked_at", nullable = false)
     private LocalDateTime checkedAt;
 
-    public TourismRegionPhoto(String regionCode, String contentId, String providerName, String workTitle,
-                              String imageUrl, String sourceUrl, String licenseType, LocalDateTime checkedAt) {
-        refresh(regionCode, contentId, providerName, workTitle, imageUrl, sourceUrl, licenseType, checkedAt);
+    public TourismRegionPhoto(String regionCode, PhotoDetails details) {
+        refresh(regionCode, details);
     }
 
-    public void refresh(String regionCode, String contentId, String providerName, String workTitle,
-                        String imageUrl, String sourceUrl, String licenseType, LocalDateTime checkedAt) {
+    public void refresh(String regionCode, PhotoDetails details) {
         this.regionCode = regionCode;
-        this.contentId = contentId;
-        this.providerName = providerName;
-        this.workTitle = workTitle;
-        this.imageUrl = imageUrl;
-        this.sourceUrl = sourceUrl;
-        this.licenseType = licenseType;
-        this.checkedAt = checkedAt;
+        this.contentId = details.contentId();
+        this.providerName = details.providerName();
+        this.workTitle = details.workTitle();
+        this.imageUrl = details.imageUrl();
+        this.sourceUrl = details.sourceUrl();
+        this.licenseType = details.licenseType();
+        this.checkedAt = details.checkedAt();
     }
+
+    /** 원본 이미지와 출처·권리 확인 시점을 함께 갱신하는 카탈로그 정보. */
+    public record PhotoDetails(
+            String contentId, String providerName, String workTitle, String imageUrl,
+            String sourceUrl, String licenseType, LocalDateTime checkedAt) {}
 }

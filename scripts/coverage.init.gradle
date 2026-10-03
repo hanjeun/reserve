@@ -19,8 +19,12 @@ allprojects {
         tasks.named('jacocoTestReport') {
             dependsOn tasks.named('test')
             executionData layout.buildDirectory.file('jacoco/schema-tool.exec')
-            classDirectories.from fileTree(layout.buildDirectory.dir('classes/java/test')) { include 'kr/it/reserve/tools/VerifyDatabaseSchema*.class' }
-            sourceDirectories.from project.file('../scripts')
+            classDirectories.from fileTree(layout.buildDirectory.dir('classes/java/test')) {
+                include 'kr/it/reserve/tools/VerifyDatabaseSchema*.class',
+                        'kr/it/reserve/tools/VerifyChatImageRecovery.class',
+                        'kr/it/reserve/tools/VerifyChatImageRecovery$*.class'
+            }
+            sourceDirectories.from project.file('../scripts/java')
             reports {
                 xml.required = true
                 html.required = false

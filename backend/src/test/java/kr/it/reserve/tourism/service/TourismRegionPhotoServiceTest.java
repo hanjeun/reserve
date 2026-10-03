@@ -437,9 +437,11 @@ class TourismRegionPhotoServiceTest {
         }
         assertThat((java.util.Map<?, ?>) ReflectionTestUtils.getField(target, "regionLocks")).isEmpty();
         verifyNoInteractions(repository, restTemplate, imageProxyClient);
-        assertThat(metrics.getMeters()).hasSize(meterCount).allSatisfy(meter ->
-                assertThat(meter.getId().getTags()).allSatisfy(tag ->
-                        assertThat(tag.getKey()).isIn("outcome", "endpoint")));
+        assertThat(metrics.getMeters()).isNotEmpty().hasSize(meterCount);
+        assertThat(metrics.getMeters().stream()
+                .flatMap(meter -> meter.getId().getTags().stream()).toList())
+                .isNotEmpty().allSatisfy(tag ->
+                        assertThat(tag.getKey()).isIn("outcome", "endpoint"));
         assertThat(metrics.get("reserve.tourism.image.proxy").timer().count()).isZero();
         assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "areaBasedList2").timer().count()).isZero();
     }

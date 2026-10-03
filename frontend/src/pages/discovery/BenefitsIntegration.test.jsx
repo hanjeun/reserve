@@ -185,7 +185,7 @@ describe('benefits-only query integration; general store pagination remains on /
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
         await waitFor(() => expect(params()).toEqual({ domain: 'FOOD', storePage: '4', keep: '1' }));
         expect(benefitService.getList).toHaveBeenNthCalledWith(1, { page: 2, size: 12 }, expect.any(AbortSignal));
-        expect(benefitService.getList).toHaveBeenNthCalledWith(2, { page: 0, size: 12 }, expect.any(AbortSignal));
+        await waitFor(() => expect(benefitService.getList).toHaveBeenNthCalledWith(2, { page: 0, size: 12 }, expect.any(AbortSignal)));
         expect(await screen.findByRole('link', { name: '가게 둘러보기' })).toHaveAttribute('href', '/stores');
         expect(document.querySelector('.reserve-benefits-empty img')).toBeNull();
         expect(screen.queryByRole('navigation', { name: '가게 소식 페이지' })).not.toBeInTheDocument();

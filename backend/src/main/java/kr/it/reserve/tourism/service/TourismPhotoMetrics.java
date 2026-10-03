@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 public class TourismPhotoMetrics {
+    private static final String IMAGE_CACHE_METRIC = "reserve.tourism.image.cache";
+    private static final String OUTCOME_TAG = "outcome";
 
     public enum ApiEndpoint {
         AREA_LIST("areaBasedList2"), DETAIL_IMAGE("detailImage2");
@@ -35,9 +37,9 @@ public class TourismPhotoMetrics {
     private final Map<ApiEndpoint, ApiMeters> apiMeters = new EnumMap<>(ApiEndpoint.class);
 
     public TourismPhotoMetrics(MeterRegistry registry) {
-        cacheHits = registry.counter("reserve.tourism.image.cache", "outcome", "hit");
-        cacheMisses = registry.counter("reserve.tourism.image.cache", "outcome", "miss");
-        imageBackoffs = registry.counter("reserve.tourism.image.cache", "outcome", "backoff");
+        cacheHits = registry.counter(IMAGE_CACHE_METRIC, OUTCOME_TAG, "hit");
+        cacheMisses = registry.counter(IMAGE_CACHE_METRIC, OUTCOME_TAG, "miss");
+        imageBackoffs = registry.counter(IMAGE_CACHE_METRIC, OUTCOME_TAG, "backoff");
         imageProxyRequests = registry.timer("reserve.tourism.image.proxy");
         imageProxyErrors = registry.counter("reserve.tourism.image.proxy.errors");
         for (ApiEndpoint endpoint : ApiEndpoint.values()) {

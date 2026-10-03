@@ -17,13 +17,14 @@ import java.util.Arrays;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 class ChatImageRecoveryToolTest {
     @TempDir Path temporary;
 
     @Test
     void verifiesSyntheticPixelsAndRejectsSevenIntegrityFailures() throws Exception {
-        VerifyChatImageRecoveryTest.main(new String[0]);
+        assertThatCode(() -> VerifyChatImageRecoveryTest.main(new String[0])).doesNotThrowAnyException();
     }
 
     @Test

@@ -24,6 +24,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/stores")
 public class StoreApiController {
+    private static final String EDIT_LOGIN_REQUIRED_MESSAGE = "가게 수정을 위해 로그인이 필요합니다.";
+
 
     private final StoreService storeService;
 
@@ -89,7 +91,7 @@ public class StoreApiController {
     // 미인증 사용자가 URL을 조작해 다른 가게의 수정 데이터를 추적하는 것을 원천 차단
     @GetMapping("/{id}/edit")
     public ApiResponse<StoreResponse> getStoreForEdit(@PathVariable Long id) {
-        Member member = SecurityUtil.getCurrentMember("가게 수정을 위해 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(EDIT_LOGIN_REQUIRED_MESSAGE);
         validateBusinessAuth(member);
         StoreResponse store = storeService.getStoreForEdit(id, member);
         return ApiResponse.success(store, "가게 수정 정보 조회 성공");
@@ -101,7 +103,7 @@ public class StoreApiController {
             @PathVariable Long id,
             @ModelAttribute StoreUpdateRequest request
     ) {
-        Member member = SecurityUtil.getCurrentMember("가게 수정을 위해 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(EDIT_LOGIN_REQUIRED_MESSAGE);
         validateBusinessAuth(member);
 
         StoreResponse store = storeService.updateStore(id, request, member);
@@ -114,7 +116,7 @@ public class StoreApiController {
             @PathVariable Long id,
             @RequestParam boolean enabled
     ) {
-        Member member = SecurityUtil.getCurrentMember("가게 수정을 위해 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(EDIT_LOGIN_REQUIRED_MESSAGE);
         validateBusinessAuth(member);
         StoreResponse store = storeService.toggleAutoApproval(id, enabled, member);
         return ApiResponse.success(store, "자동 승인 설정이 변경되었습니다.");

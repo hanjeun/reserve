@@ -7,10 +7,15 @@ import ch.qos.logback.core.read.ListAppender;
 import kr.it.reserve.security.controller.CspReportController;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,6 +77,56 @@ class CspReportControllerTest {
                             .contains("directive=script, blockedScheme=eval, sourceCategory=browser-extension")
                             .doesNotContain("private-extension-id")
                             .doesNotContain("injected.js"));
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @ParameterizedTest(name = "{0}: {1}")
+    @CsvSource(textBlock = """
+            reserve.it.kr, first-party
+            ASSETS.RESERVE.IT.KR, first-party
+            notreserve.it.kr, external-web
+            reserve.it.kr.attacker.example, external-web
+            cdn.portone.io, portone
+            pay.portone.io, portone
+            checkout.iamport.kr, portone
+            notportone.io, external-web
+            dapi.kakao.com, kakao
+            assets.kakao.com, kakao
+            t1.kakaocdn.net, kakao
+            t1.daumcdn.net, kakao
+            notkakao.com, external-web
+            o1.ingest.sentry.io, sentry
+            notsentry.io, external-web
+            """)
+    void classifiesWebHostBoundariesWithoutLoggingPrivateReportData(String host, String expectedCategory)
+            throws Exception {
+        String sourceFile = "https://private-user:private-password@" + host
+                + "/private-source.js?token=private-source-token#private-fragment";
+        String body = new ObjectMapper().writeValueAsString(Map.of("csp-report", Map.of(
+                "effective-directive", "script-src",
+                "blocked-uri", "https://blocked.example/private-resource?token=private-blocked-token",
+                "source-file", sourceFile,
+                "document-uri", "https://reserve.it.kr/account/private-document?token=private-document-token"
+        )));
+        Logger logger = (Logger) LoggerFactory.getLogger(CspReportController.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            mockMvc.perform(post("/api/csp-reports")
+                            .contentType("application/csp-report")
+                            .content(body))
+                    .andExpect(status().isNoContent());
+
+            assertThat(appender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .containsExactly("CSP violation observed: directive=script, blockedScheme=https, sourceCategory="
+                            + expectedCategory);
+            assertThat(appender.list.getFirst().getArgumentArray())
+                    .containsExactly("script", "https", expectedCategory);
         } finally {
             logger.detachAppender(appender);
             appender.stop();

@@ -46,6 +46,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Service
 public class MemberService {
+    private static final String PROFILE_IMAGE_DELETION_SOURCE = "MEMBER_PROFILE_IMAGE";
+
 
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -210,7 +212,7 @@ public class MemberService {
         member.setProfileImage(null);
         member.setProfileImageLocked(true);
         Member updated = memberRepository.save(member);
-        fileDeletionOutboxService.enqueue(oldImage, "MEMBER_PROFILE_IMAGE", memberId);
+        fileDeletionOutboxService.enqueue(oldImage, PROFILE_IMAGE_DELETION_SOURCE, memberId);
         log.info("Profile image delete completed: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);
     }
@@ -225,7 +227,7 @@ public class MemberService {
         member.setProfileImage(fileStorageService.getPublicUrl(key));
         member.setProfileImageLocked(true);
         Member updated = memberRepository.save(member);
-        fileDeletionOutboxService.enqueue(oldImage, "MEMBER_PROFILE_IMAGE", memberId);
+        fileDeletionOutboxService.enqueue(oldImage, PROFILE_IMAGE_DELETION_SOURCE, memberId);
         log.info("Profile image update completed: memberId={}", memberId);
         return MemberResponse.fromEntity(updated);
     }
@@ -324,7 +326,7 @@ public class MemberService {
                     member.getId(), member.getProvider(), member.getOauthAccessToken());
         }
 
-        fileDeletionOutboxService.enqueue(profileImage, "MEMBER_PROFILE_IMAGE", memberId);
+        fileDeletionOutboxService.enqueue(profileImage, PROFILE_IMAGE_DELETION_SOURCE, memberId);
         businessVerificationRepository.findByMemberOrderByCreatedAtDesc(member).forEach(verification ->
                 fileDeletionOutboxService.enqueue(
                         verification.getLicenseImageKey(),

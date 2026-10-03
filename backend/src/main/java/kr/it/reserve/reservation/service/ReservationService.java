@@ -49,6 +49,9 @@ import java.util.stream.Collectors;
 @Service
 public class ReservationService {
 
+    private static final String STORE_NOT_FOUND_MESSAGE = "가게를 찾을 수 없습니다.";
+    private static final String RESERVATION_NOT_FOUND_MESSAGE = "예약을 찾을 수 없습니다.";
+
     private final ReservationRepository reservationRepository;
     private final StoreRepository storeRepository;
     /** 달력을 빨갛게 칠하는 용도. 죽어도 예약 판정에는 영향이 없다(HolidayService 주석 참고). */
@@ -101,10 +104,10 @@ public class ReservationService {
         // 비관적 락으로 조회 — 이 store row에 대한 동시 예약 요청을 트랜잭션 종료까지 순차화해서
         // 아래 잔여 인원 체크(check) → 저장(act) 사이의 레이스 컨디션(오버부킹)을 막는다.
         Store store = storeRepository.findByIdForUpdate(request.getStoreId())
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (store.isDeleted()) {
-            throw new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
         }
         if (store.isSuspended()) {
             throw new ReservationException("현재 운영이 중단된 가게입니다. 신규 예약을 받지 않습니다.", HttpStatus.BAD_REQUEST);
@@ -117,14 +120,13 @@ public class ReservationService {
 
         // 나중 결제 허용 검증: allowLatePayment=false + 예약금 있으면 즉시 결제 필수
         boolean hasDeposit = store.getNoShowDeposit() != null && store.getNoShowDeposit() > 0;
-        if (hasDeposit && !Boolean.TRUE.equals(store.getAllowLatePayment())) {
+        if (hasDeposit && !Boolean.TRUE.equals(store.getAllowLatePayment())
+                && Boolean.TRUE.equals(request.getSkipPayment())) {
             // request에 skipPayment 플래그가 있으면(=나중 결제 시도) 거부
-            if (Boolean.TRUE.equals(request.getSkipPayment())) {
-                throw new ReservationException(
-                        "이 가게는 나중 결제를 허용하지 않습니다. 예약금을 즉시 결제해주세요.",
-                        HttpStatus.BAD_REQUEST
-                );
-            }
+            throw new ReservationException(
+                    "이 가게는 나중 결제를 허용하지 않습니다. 예약금을 즉시 결제해주세요.",
+                    HttpStatus.BAD_REQUEST
+            );
         }
 
         // 슬롯 검증(날짜/시간/인원 유효성 + 브레이크타임·영업시간·마감·중복·정원) — 생성/수정 공용.
@@ -249,15 +251,14 @@ public class ReservationService {
         //   DAY 는 시각 자체가 의미를 갖지 않는다.
         //   아래 목록 포함 검사만으로도 막히지만, 이 분기가 있어야 **왜 막혔는지**를 말해줄 수 있다.
         if (store.resolveBookingType() == Store.BookingType.SLOT
-                && store.getBreakStartTime() != null && store.getBreakEndTime() != null) {
-            if (!time.isBefore(store.getBreakStartTime()) && time.isBefore(store.getBreakEndTime())) {
-                String breakStr = store.getBreakStartTime().toString().substring(0, 5)
-                    + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
-                throw new ReservationException(
-                    "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
-                    HttpStatus.BAD_REQUEST
-                );
-            }
+                && store.getBreakStartTime() != null && store.getBreakEndTime() != null
+                && !time.isBefore(store.getBreakStartTime()) && time.isBefore(store.getBreakEndTime())) {
+            String breakStr = store.getBreakStartTime().toString().substring(0, 5)
+                + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
+            throw new ReservationException(
+                "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
+                HttpStatus.BAD_REQUEST
+            );
         }
 
         // ★ 예약 시각 검증 — getAvailability 와 **같은 목록**을 써서 포함 여부만 본다 (2026-08-24).
@@ -328,7 +329,7 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         Map<LocalTime, Long> guestSumByTime = reservationRepository
                 .sumActiveGuestsGroupedByTime(storeId, date).stream()
@@ -428,7 +429,7 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
@@ -570,7 +571,7 @@ public class ReservationService {
 
         // 슬롯 재검증을 위해 가게를 비관적 락으로 조회 (생성과 동일하게 오버부킹 레이스 차단)
         Store store = storeRepository.findByIdForUpdate(reservation.getStore().getId())
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         // 운영 중단된 가게로는 예약을 옮길 수 없음
         if (store.getOwner() != null && store.getOwner().isSuspended()) {
@@ -664,7 +665,7 @@ public class ReservationService {
     public QrCheckinResponse checkInByQrToken(String token, Member owner) {
         Long reservationId = qrCheckinTokenProvider.parseReservationId(token);
         Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
-                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         validateStoreOwner(reservation, owner);
 
         // ★★ 방문 당일에만 체크인할 수 있다 (2026-08-19 신설).
@@ -1024,7 +1025,7 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public Page<ReservationResponse> searchReservations(Long storeId, ReservationSearchDto searchDto, Member owner) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (!store.getOwner().getId().equals(owner.getId())) {
             throw new ReservationException("본인 가게의 예약만 조회 가능합니다.", HttpStatus.FORBIDDEN);
@@ -1167,13 +1168,13 @@ public class ReservationService {
 
     private Reservation findByIdOrThrow(Long id) {
         return reservationRepository.findById(id)
-                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
     }
 
     /** 모든 예약 상태 변경이 거치는 행 잠금 관문. QR·취소·완료가 서로 값을 덮어쓰지 않게 한다. */
     private Reservation findByIdForUpdateOrThrow(Long id) {
         return reservationRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
     }
 
     private void validateOwnership(Reservation reservation, Member member) {

@@ -117,16 +117,20 @@ public class CspReportController {
                 return scheme.isBlank() ? "relative" : OTHER_CATEGORY;
             }
 
-            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-            if (host.equals("reserve.it.kr") || host.endsWith(".reserve.it.kr")) return "first-party";
-            if (host.equals("cdn.portone.io") || host.endsWith(".portone.io")
-                    || host.endsWith(".iamport.kr")) return "portone";
-            if (host.equals("dapi.kakao.com") || host.endsWith(".kakao.com")
-                    || host.endsWith(".kakaocdn.net") || host.endsWith(".daumcdn.net")) return "kakao";
-            if (host.endsWith(".sentry.io")) return "sentry";
-            return "external-web";
+            return webSourceCategory(uri);
         } catch (IllegalArgumentException ignored) {
             return "invalid";
         }
+    }
+
+    private String webSourceCategory(URI uri) {
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        if (host.equals("reserve.it.kr") || host.endsWith(".reserve.it.kr")) return "first-party";
+        if (host.equals("cdn.portone.io") || host.endsWith(".portone.io")
+                || host.endsWith(".iamport.kr")) return "portone";
+        if (host.equals("dapi.kakao.com") || host.endsWith(".kakao.com")
+                || host.endsWith(".kakaocdn.net") || host.endsWith(".daumcdn.net")) return "kakao";
+        if (host.endsWith(".sentry.io")) return "sentry";
+        return "external-web";
     }
 }

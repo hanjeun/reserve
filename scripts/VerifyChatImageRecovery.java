@@ -9,6 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.security.GeneralSecurityException;
+import java.security.NoSuchAlgorithmException;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -69,7 +72,7 @@ public final class VerifyChatImageRecovery {
     }
 
     static Result verify(byte[] ciphertext, byte[] key, String aad, String expectedSha256,
-                         int expectedBytes, int width, int height, String mime) throws Exception {
+                         int expectedBytes, int width, int height, String mime) throws GeneralSecurityException, IOException {
         validateInput(ciphertext, aad, expectedSha256, expectedBytes, width, height, mime);
         if (key.length != 32) throw new IllegalArgumentException("AES-256 requires a 32-byte decoded key");
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -108,8 +111,8 @@ public final class VerifyChatImageRecovery {
     }
 
     private static void validateInput(byte[] ciphertext, String aad, String hash, int bytes,
-                                      int width, int height, String mime) throws Exception {
-        if (!aad.matches("users/[0-9]+/chat/[0-9]+") || !hash.matches("[a-fA-F0-9]{64}")) {
+                                      int width, int height, String mime) throws NoSuchAlgorithmException {
+        if (!aad.matches("users/\\d+/chat/\\d+") || !hash.matches("[a-fA-F0-9]{64}")) {
             throw new IllegalArgumentException("Invalid expected context or hash");
         }
         if (bytes < 1 || bytes > MAX_BYTES || ciphertext.length != bytes + IV_BYTES + TAG_BYTES) {
@@ -122,7 +125,7 @@ public final class VerifyChatImageRecovery {
         if (!sha256(ciphertext).equalsIgnoreCase(hash)) throw new IllegalArgumentException("Ciphertext hash mismatch");
     }
 
-    static String sha256(byte[] bytes) throws Exception {
+    static String sha256(byte[] bytes) throws NoSuchAlgorithmException {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 }

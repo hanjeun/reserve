@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,12 +29,12 @@ public class NoticeService {
         return noticeRepository.findAllOrderByImportantAndCreatedAt()
                 .stream()
                 .map(NoticeDTO::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /** 홈에 표시할 중요·최신 공지를 최대 5개까지만 반환한다. */
     public List<NoticeSummaryDTO> getHighlights(int requestedLimit) {
-        int limit = Math.max(1, Math.min(requestedLimit, 5));
+        int limit = Math.clamp(requestedLimit, 1, 5);
         return noticeRepository.findHighlights(PageRequest.of(0, limit))
                 .stream()
                 .map(NoticeSummaryDTO::fromEntity)

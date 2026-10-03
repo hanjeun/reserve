@@ -1,6 +1,7 @@
 package kr.it.reserve.advertisement.service;
 
 import jakarta.persistence.EntityManager;
+import kr.it.reserve.advertisement.dto.AdvertisementResponse;
 import kr.it.reserve.advertisement.entity.AdType;
 import kr.it.reserve.advertisement.entity.Advertisement;
 import kr.it.reserve.global.common.ServiceTime;
@@ -46,16 +47,16 @@ class AdvertisementMyAdsRepositoryTest {
 
         assertThat(first.getTotalElements()).isEqualTo(2);
         assertThat(first.getTotalPages()).isEqualTo(2);
-        assertThat(first.getContent()).extracting(response -> response.getId())
+        assertThat(first.getContent()).extracting(AdvertisementResponse::getId)
                 .containsExactly(newer.getId());
         assertThat(second.getTotalElements()).isEqualTo(2);
-        assertThat(second.getContent()).extracting(response -> response.getId())
+        assertThat(second.getContent()).extracting(AdvertisementResponse::getId)
                 .containsExactly(older.getId());
 
         var exactStore = advertisementService.getMyAds(
                 owner, 0, 20, wildcardOnlyStore.getId(), "Studio");
         assertThat(exactStore.getTotalElements()).isEqualTo(1);
-        assertThat(exactStore.getContent()).extracting(response -> response.getStoreId())
+        assertThat(exactStore.getContent()).extracting(AdvertisementResponse::getStoreId)
                 .containsExactly(wildcardOnlyStore.getId());
     }
 

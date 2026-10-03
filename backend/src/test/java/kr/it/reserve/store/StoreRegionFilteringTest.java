@@ -3,6 +3,7 @@ package kr.it.reserve.store;
 import jakarta.persistence.EntityManager;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.Test;
@@ -35,18 +36,18 @@ class StoreRegionFilteringTest {
         var seoul = service.searchStoresPaged(
                 "지역필터검증", "rating", 0, 1, null, null, null, "서울");
         assertThat(seoul.getTotalElements()).isEqualTo(2);
-        assertThat(seoul.getContent()).extracting(result -> result.getId())
+        assertThat(seoul.getContent()).extracting(StoreResponse::getId)
                 .containsExactly(seoulJung.getId());
 
         var district = service.searchStoresPaged(
                 "지역필터검증", "rating", 0, 10, null, null, null, "서울 종로구");
         assertThat(district.getTotalElements()).isEqualTo(1);
-        assertThat(district.getContent()).extracting(result -> result.getId())
+        assertThat(district.getContent()).extracting(StoreResponse::getId)
                 .containsExactly(seoulJongno.getId());
 
         var shortProvince = service.searchStoresPaged(
                 "지역필터검증", "rating", 0, 10, null, null, null, "경기");
-        assertThat(shortProvince.getContent()).extracting(result -> result.getId())
+        assertThat(shortProvince.getContent()).extracting(StoreResponse::getId)
                 .containsExactly(gyeonggi.getId());
         assertThat(service.searchStoresPaged(
                 "지역필터검증", "rating", 0, 10, null, null, null, "제주").getTotalElements())

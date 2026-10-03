@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PaymentStatusService {
+
+    private static final String REVIEW_REQUIRED_STATUS = "REVIEW_REQUIRED";
     private final PaymentRepository paymentRepository;
     private final AdvertisementRepository advertisementRepository;
     private final AdPaymentAttemptRepository adPaymentAttempts;
@@ -37,15 +39,15 @@ public class PaymentStatusService {
                     .filter(value -> value.getStore().getOwner() != null
                             && value.getStore().getOwner().getId().equals(memberId))
                     .orElseThrow(PaymentException::notFound);
-            String status = "REVIEW_REQUIRED";
+            String status = REVIEW_REQUIRED_STATUS;
             if (attempt != null) {
                 status = switch (attempt.getState()) {
                     case READY -> "PENDING_PAYMENT";
                     case FAILED -> "PAYMENT_FAILED";
                     case REFUNDED -> "REFUNDED";
                     case REFUND_PENDING -> "REFUND_PENDING";
-                    case REVIEW_REQUIRED -> "REVIEW_REQUIRED";
-                    case PAID -> merchantUid.equals(ad.getMerchantUid()) ? ad.getStatus().name() : "REVIEW_REQUIRED";
+                    case REVIEW_REQUIRED -> REVIEW_REQUIRED_STATUS;
+                    case PAID -> merchantUid.equals(ad.getMerchantUid()) ? ad.getStatus().name() : REVIEW_REQUIRED_STATUS;
                 };
             }
             return new PaymentStatusResponse(type, merchantUid, status, attempt == null ? ad.getAmount() : attempt.getAmount(), null);

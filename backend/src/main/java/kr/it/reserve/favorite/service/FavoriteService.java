@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -64,7 +63,7 @@ public class FavoriteService {
         return favoriteRepository.findByMemberOrderByCreatedAtDesc(member)
                 .stream()
                 .map(FavoriteDto.Response::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private FavoriteDto.ToggleResponse createToggleResponse(boolean isFavorite, Store store) {

@@ -4,6 +4,7 @@ import kr.it.reserve.payment.dto.PortoneV2CancelResponse;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * PG 환불 조회 결과를 로컬 원장에 반영해도 되는지 판정하는 단일 정책 관문.
@@ -15,6 +16,9 @@ import java.util.List;
  * 애매한 경우에는 결제와 원장을 그대로 두고 운영 대사 대상으로 남긴다.
  */
 public final class RefundSettlementPolicy {
+
+    private static final String CANCELLATION_SUCCEEDED = "SUCCEEDED";
+    private static final String PAYMENT_STATUS_CONFLICT = "PG_PAYMENT_STATUS_CONFLICT";
 
     private RefundSettlementPolicy() {
     }
@@ -59,12 +63,12 @@ public final class RefundSettlementPolicy {
         if (cancellations == null) {
             return review("PG_CANCELLATIONS_MISSING");
         }
-        if (cancellations.stream().anyMatch(value -> value == null)) {
+        if (cancellations.stream().anyMatch(Objects::isNull)) {
             return review("PG_CANCELLATION_ENTRY_INVALID");
         }
         long succeededTotal = 0;
         for (PortoneV2CancelResponse.Cancellation cancellation : cancellations) {
-            if (!"SUCCEEDED".equals(cancellation.getStatus())) {
+            if (!CANCELLATION_SUCCEEDED.equals(cancellation.getStatus())) {
                 continue;
             }
             if (cancellation.getTotalAmount() == null || cancellation.getTotalAmount() < 0) {
@@ -106,7 +110,7 @@ public final class RefundSettlementPolicy {
         }
 
         return switch (target.getStatus() == null ? "" : target.getStatus()) {
-            case "SUCCEEDED" -> assessSucceededCancellation(
+            case CANCELLATION_SUCCEEDED -> assessSucceededCancellation(
                     requestedAmount,
                     expectedCancelledAmount,
                     pgCancelledAmount,
@@ -138,7 +142,7 @@ public final class RefundSettlementPolicy {
             return review("PG_CUMULATIVE_CANCELLED_MISMATCH");
         }
         if (!isCancelledPaymentStatus(pgStatus)) {
-            return review("PG_PAYMENT_STATUS_CONFLICT");
+            return review(PAYMENT_STATUS_CONFLICT);
         }
         return new Assessment(
                 Outcome.SUCCEEDED,
@@ -156,7 +160,7 @@ public final class RefundSettlementPolicy {
             return review("PG_CANCELLED_CHANGED_AFTER_FAILURE");
         }
         if (!isBasePaymentStatus(pgStatus, locallyRefundedAmount)) {
-            return review("PG_PAYMENT_STATUS_CONFLICT");
+            return review(PAYMENT_STATUS_CONFLICT);
         }
         return new Assessment(
                 Outcome.FAILED,
@@ -174,7 +178,7 @@ public final class RefundSettlementPolicy {
             return review("PG_CANCELLED_CHANGED_WHILE_PENDING");
         }
         if (!isBasePaymentStatus(pgStatus, locallyRefundedAmount)) {
-            return review("PG_PAYMENT_STATUS_CONFLICT");
+            return review(PAYMENT_STATUS_CONFLICT);
         }
         return new Assessment(
                 Outcome.PENDING,
@@ -196,7 +200,7 @@ public final class RefundSettlementPolicy {
                 return review("PG_CANCELLED_CHANGED_WHILE_PENDING");
             }
             if (!isBasePaymentStatus(pgStatus, locallyRefundedAmount)) {
-                return review("PG_PAYMENT_STATUS_CONFLICT");
+                return review(PAYMENT_STATUS_CONFLICT);
             }
             return new Assessment(
                     Outcome.PENDING,
@@ -219,7 +223,7 @@ public final class RefundSettlementPolicy {
     }
 
     private static boolean isUnsettled(PortoneV2CancelResponse.Cancellation cancellation) {
-        return !"SUCCEEDED".equals(cancellation.getStatus())
+        return !CANCELLATION_SUCCEEDED.equals(cancellation.getStatus())
                 && !"FAILED".equals(cancellation.getStatus());
     }
 

@@ -22,6 +22,8 @@ import java.util.concurrent.Semaphore;
 /** 업로드 이미지의 클라이언트 메타데이터가 아니라 실제 바이트를 검사하는 단일 관문. */
 public final class ImageFileValidator {
 
+    private static final String INVALID_IMAGE_MESSAGE = "손상되었거나 디코딩할 수 없는 이미지입니다.";
+
     public static final long MAX_FILE_BYTES = 8L * 1024 * 1024;
     public static final int MAX_DIMENSION = 8_192;
     public static final long MAX_PIXELS = 20_000_000L;
@@ -116,7 +118,7 @@ public final class ImageFileValidator {
             validateDimensions(header);
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
             if (image == null || image.getWidth() != header.width || image.getHeight() != header.height) {
-                throw unsupported("손상되었거나 디코딩할 수 없는 이미지입니다.");
+                throw unsupported(INVALID_IMAGE_MESSAGE);
             }
             return header;
         } catch (InterruptedException exception) {
@@ -124,7 +126,7 @@ public final class ImageFileValidator {
             throw FileException.uploadFailed();
         } catch (IOException | RuntimeException exception) {
             if (exception instanceof FileException fileException) throw fileException;
-            throw unsupported("손상되었거나 디코딩할 수 없는 이미지입니다.");
+            throw unsupported(INVALID_IMAGE_MESSAGE);
         } finally {
             if (acquired) DECODE_SLOT.release();
         }
@@ -142,7 +144,7 @@ public final class ImageFileValidator {
                 reader.dispose();
             }
         } catch (IOException exception) {
-            throw unsupported("손상되었거나 디코딩할 수 없는 이미지입니다.");
+            throw unsupported(INVALID_IMAGE_MESSAGE);
         }
     }
 
@@ -280,7 +282,7 @@ public final class ImageFileValidator {
 
     private static long unsignedIntLe(byte[] bytes, int offset) {
         if (offset < 0 || offset + 4 > bytes.length) throw unsupported("잘린 이미지 헤더입니다.");
-        return (long) unsigned(bytes[offset])
+        return unsigned(bytes[offset])
                 | ((long) unsigned(bytes[offset + 1]) << 8)
                 | ((long) unsigned(bytes[offset + 2]) << 16)
                 | ((long) unsigned(bytes[offset + 3]) << 24);

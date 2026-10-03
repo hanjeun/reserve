@@ -42,4 +42,32 @@ class PaymentWebhookInboxStateTest {
         assertThat(inbox.isTerminal()).isTrue();
         assertThat(inbox.canClaim(now.plusDays(1), now)).isFalse();
     }
+
+    @Test
+    @DisplayName("반복 실패한 웹훅은 최대 한 시간까지 기다린 뒤 다시 처리할 수 있다")
+    void repeatedFailuresKeepRetryDelayWithinOneHour() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 3, 0, 0);
+        PaymentWebhookInbox inbox = PaymentWebhookInbox.receive(
+                "wh-retry", "Transaction.Paid", "order-retry", "c".repeat(64), now);
+
+        for (int attempt = 1; attempt <= 9; attempt++) {
+            assertThat(inbox.canClaim(now, now.minusMinutes(5))).isTrue();
+            inbox.claim(now);
+            inbox.markFailed(now, "TemporaryGatewayFailure");
+
+            LocalDateTime retryAt = inbox.getNextRetryAt();
+            assertThat(retryAt).isAfter(now).isBeforeOrEqualTo(now.plusHours(1));
+            assertThat(inbox.canClaim(retryAt.minusSeconds(1), now.minusMinutes(5))).isFalse();
+            assertThat(inbox.canClaim(retryAt, now.minusMinutes(5))).isTrue();
+            if (attempt >= 7) {
+                assertThat(retryAt).isEqualTo(now.plusHours(1));
+            }
+            now = retryAt;
+        }
+
+        inbox.claim(now);
+        inbox.markProcessed(now.plusSeconds(1));
+        assertThat(inbox.isTerminal()).isTrue();
+        assertThat(inbox.canClaim(now.plusDays(1), now)).isFalse();
+    }
 }

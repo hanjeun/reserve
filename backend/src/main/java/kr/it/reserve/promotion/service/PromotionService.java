@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -128,7 +127,7 @@ public class PromotionService {
                         .phone(store.getPhone())
                         .mainImageUrl(store.getMainImageUrl())
                         .build())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     // 내 홍보글 목록 조회

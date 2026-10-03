@@ -32,6 +32,7 @@ import java.util.List;
 public class RefundLedgerAdminController {
 
     private static final int MAX_PAGE_SIZE = 100;
+    private static final String QUERY_SUCCESS = "조회 성공";
 
     private final RefundAttemptRepository refundAttemptRepository;
 
@@ -48,20 +49,20 @@ public class RefundLedgerAdminController {
             @RequestParam(defaultValue = "false") boolean unresolvedOnly) {
 
         // size 를 그대로 믿지 않는다 — 큰 값이 들어오면 한 번에 전건을 끌어온다.
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), MAX_PAGE_SIZE));
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, MAX_PAGE_SIZE));
 
         Page<RefundAttempt> attempts = unresolvedOnly
                 ? refundAttemptRepository.findByStatusInOrderByCreatedAtDesc(RefundAttempt.UNRESOLVED, pageable)
                 : refundAttemptRepository.findAllByOrderByCreatedAtDesc(pageable);
 
-        return ApiResponse.success(attempts.map(RefundAttemptResponse::from), "조회 성공");
+        return ApiResponse.success(attempts.map(RefundAttemptResponse::from), QUERY_SUCCESS);
     }
 
     /** 미결 건수만. 대시보드 타일용 — <b>0 이 정상</b>이다. */
     @GetMapping("/unresolved-count")
     public ApiResponse<Long> unresolvedCount() {
         return ApiResponse.success(
-                refundAttemptRepository.countByStatusIn(RefundAttempt.UNRESOLVED), "조회 성공");
+                refundAttemptRepository.countByStatusIn(RefundAttempt.UNRESOLVED), QUERY_SUCCESS);
     }
 
     /** 특정 결제의 시도 이력 — 대사용. */
@@ -73,6 +74,6 @@ public class RefundLedgerAdminController {
                 .stream()
                 .map(RefundAttemptResponse::from)
                 .toList();
-        return ApiResponse.success(history, "조회 성공");
+        return ApiResponse.success(history, QUERY_SUCCESS);
     }
 }

@@ -11,10 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class SitemapService {
+
+    private static final String MONTHLY_CHANGE_FREQ = "monthly";
 
     private static final String ORIGIN = "https://reserve.it.kr";
     private static final int MAX_STORE_URLS = 49_996;
@@ -33,7 +36,7 @@ public class SitemapService {
 
         LocalDate storesLastModified = stores.stream()
                 .map(StoreSitemapEntry::lastModifiedAt)
-                .filter(value -> value != null)
+                .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .map(value -> value.toLocalDate())
                 .orElse(null);
@@ -44,10 +47,10 @@ public class SitemapService {
 
         appendUrl(xml, ORIGIN + "/", null, "weekly", "1.0");
         appendUrl(xml, ORIGIN + "/stores", storesLastModified, "daily", "0.9");
-        appendUrl(xml, ORIGIN + "/terms", null, "monthly", "0.3");
-        appendUrl(xml, ORIGIN + "/privacy", null, "monthly", "0.3");
-        appendUrl(xml, ORIGIN + "/content-sources", null, "monthly", "0.3");
-        appendUrl(xml, ORIGIN + "/operation-guide", null, "monthly", "0.3");
+        appendUrl(xml, ORIGIN + "/terms", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, ORIGIN + "/privacy", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, ORIGIN + "/content-sources", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, ORIGIN + "/operation-guide", null, MONTHLY_CHANGE_FREQ, "0.3");
 
         for (StoreSitemapEntry store : stores) {
             LocalDate lastModified = store.lastModifiedAt() == null

@@ -121,6 +121,53 @@ class ReservationAvailabilityTest {
         assertThat(times).containsExactly("09:00");
     }
 
+    @Test
+    void lateClosingTimesDoNotWrapPastMidnight() {
+        for (LocalTime close : List.of(LocalTime.of(23, 30), LocalTime.of(23, 59))) {
+            List<String> times = availableTimes(storeWithHours(LocalTime.of(9, 0), close, 30));
+
+            assertThat(times).hasSize(29).startsWith("09:00").endsWith("23:00");
+            assertThat(times).doesNotHaveDuplicates().doesNotContain("23:30", "00:00");
+        }
+    }
+
+    @Test
+    void slotThatWouldCrossMidnightIsExcluded() {
+        List<String> times = availableTimes(
+                storeWithHours(LocalTime.of(23, 0), LocalTime.of(23, 30), 60));
+
+        assertThat(times).isEmpty();
+    }
+
+    @Test
+    void invalidSameDayBusinessHoursYieldNoSlots() {
+        assertThat(availableTimes(storeWithHours(LocalTime.of(22, 0), LocalTime.of(2, 0), 30)))
+                .isEmpty();
+        assertThat(availableTimes(storeWithHours(LocalTime.of(9, 0), LocalTime.of(9, 0), 30)))
+                .isEmpty();
+    }
+
+    @Test
+    void lateClosingTimeStillExcludesBreakStarts() {
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(23, 30), 30);
+        store.setBreakStartTime(LocalTime.of(12, 0));
+        store.setBreakEndTime(LocalTime.of(13, 0));
+
+        assertThat(availableTimes(store)).hasSize(27).endsWith("23:00")
+                .contains("11:30", "13:00").doesNotContain("12:00", "12:30");
+    }
+
+    @Test
+    void advanceBookingLimitAlsoAppliesToAvailableTimes() {
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(11, 0), 30);
+        store.setMaxAdvanceBookingDays(29);
+
+        assertThat(availableTimes(store)).isEmpty();
+
+        store.setMaxAdvanceBookingDays(30);
+        assertThat(availableTimes(store)).containsExactly("09:00", "09:30", "10:00", "10:30");
+    }
+
     // ── 예약 방식 (2026-08-24) ─────────────────────────────────────────────
     //
     // 세 방식이 **같은 관문**(bookableSlotTimes)을 지나므로, 여기서 방식별 결과만 고정하면

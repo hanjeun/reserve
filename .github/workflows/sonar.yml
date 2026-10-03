@@ -80,6 +80,50 @@ jobs:
           npm run test:policy --prefix frontend
           npm run build --prefix frontend -- --configLoader native
           node frontend/node_modules/c8/bin/c8.js report --temp-directory coverage/tooling-v8 --reporter lcov --reports-dir coverage/tooling --all --src scripts --src frontend/scripts --include 'scripts/**/*.mjs' --include 'frontend/scripts/**/*.mjs'
+      - name: Collect Python operations coverage
+        run: |
+          python3 -B - <<'PY'
+          import dis
+          from pathlib import Path
+          import runpy
+          import trace
+          from types import CodeType
+          import xml.etree.ElementTree as ET
+
+          root = Path.cwd()
+          source = root / "scripts/export-alloy-positions.py"
+          tracer = trace.Trace(count=True, trace=False)
+          try:
+              tracer.runfunc(runpy.run_path, "scripts/tests/export-alloy-positions_test.py", run_name="__main__")
+          except SystemExit as result:
+              if result.code not in (None, 0):
+                  raise
+
+          def executable_lines(code):
+              lines = {line for _, line in dis.findlinestarts(code) if line is not None and line > 0}
+              for constant in code.co_consts:
+                  if isinstance(constant, CodeType):
+                      lines.update(executable_lines(constant))
+              return lines
+
+          lines = executable_lines(compile(source.read_text(encoding="utf-8"), str(source), "exec"))
+          counts = {line: hits for (filename, line), hits in tracer.results().counts.items()
+                    if Path(filename).resolve() == source}
+          covered = sum(counts.get(line, 0) > 0 for line in lines)
+          coverage = ET.Element("coverage", {"version": "1", "lines-valid": str(len(lines)),
+                                "lines-covered": str(covered), "line-rate": str(covered / len(lines))})
+          ET.SubElement(ET.SubElement(coverage, "sources"), "source").text = str(root)
+          package = ET.SubElement(ET.SubElement(coverage, "packages"), "package", name="scripts")
+          classes = ET.SubElement(package, "classes")
+          item = ET.SubElement(classes, "class", name=source.stem, filename="scripts/export-alloy-positions.py")
+          report_lines = ET.SubElement(item, "lines")
+          for line in sorted(lines):
+              ET.SubElement(report_lines, "line", number=str(line), hits=str(counts.get(line, 0)))
+          output = root / "backend/build/reports/python/coverage.xml"
+          output.parent.mkdir(parents=True, exist_ok=True)
+          ET.ElementTree(coverage).write(output, encoding="utf-8", xml_declaration=True)
+          print(f"Python operations coverage: {covered}/{len(lines)} executable lines")
+          PY
       - name: Analyze backend and frontend
         working-directory: backend
         env:

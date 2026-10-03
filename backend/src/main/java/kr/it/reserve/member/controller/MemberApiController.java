@@ -21,7 +21,7 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/member")
 public class MemberApiController {
 
-    private static final String AUTHENTICATED_MEMBER_NOT_FOUND_MESSAGE = "인증된 사용자 정보를 찾을 수 없습니다.";
+    private static final String MEMBER_NOT_FOUND_MESSAGE = "인증된 사용자 정보를 찾을 수 없습니다.";
     private static final String UPDATE_PERMISSION_DENIED_MESSAGE = "수정 권한이 없습니다.";
 
     private final MemberService memberService;
@@ -30,7 +30,7 @@ public class MemberApiController {
     // 내 정보 조회 (SecurityContext의 id로 DB 조회 - 최신 정보 보장)
     @GetMapping("/me")
     public ApiResponse<MemberResponse> getCurrentMember() {
-        Long memberId = SecurityUtil.getCurrentMember(AUTHENTICATED_MEMBER_NOT_FOUND_MESSAGE).getId();
+        Long memberId = SecurityUtil.getCurrentMember(MEMBER_NOT_FOUND_MESSAGE).getId();
         MemberResponse member = memberService.getMemberResponse(memberId);
         return ApiResponse.success(member, "내 정보 조회 성공");
     }
@@ -74,7 +74,7 @@ public class MemberApiController {
     // 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경 가능)
     @PatchMapping("/me/marketing-consent")
     public ApiResponse<MemberResponse> updateMarketingConsent(@RequestBody java.util.Map<String, Boolean> body) {
-        Member member = SecurityUtil.getCurrentMember(AUTHENTICATED_MEMBER_NOT_FOUND_MESSAGE);
+        Member member = SecurityUtil.getCurrentMember(MEMBER_NOT_FOUND_MESSAGE);
         boolean agreed = Boolean.TRUE.equals(body.get("marketingAgreed"));
         MemberResponse updated = memberService.updateMarketingConsent(member.getId(), agreed);
         return ApiResponse.success(updated, agreed ? "마케팅 수신에 동의했습니다." : "마케팅 수신 동의를 철회했습니다.");
@@ -83,7 +83,7 @@ public class MemberApiController {
     // 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 거부/미지원 시 주소 검색 폴백으로 호출
     @PatchMapping("/me/location")
     public ApiResponse<MemberResponse> updateLocation(@RequestBody LocationUpdateRequest body) {
-        Member member = SecurityUtil.getCurrentMember(AUTHENTICATED_MEMBER_NOT_FOUND_MESSAGE);
+        Member member = SecurityUtil.getCurrentMember(MEMBER_NOT_FOUND_MESSAGE);
         MemberResponse updated = memberService.updateLocation(member.getId(), body);
         return ApiResponse.success(updated, "위치가 등록되었습니다.");
     }

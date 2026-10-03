@@ -1,5 +1,6 @@
 package kr.it.reserve.member.entity;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import lombok.*;
@@ -191,7 +192,7 @@ public class Member {
         if (this.status == MemberStatus.BANNED) return true;
         if (this.status == MemberStatus.SUSPENDED) {
             return this.suspendedUntil == null
-                    || !LocalDateTime.now().isAfter(this.suspendedUntil);
+                    || !LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.suspendedUntil);
         }
         return false;
     }

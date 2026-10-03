@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -305,7 +306,7 @@ public class Store {
         if (this.status == StoreStatus.BANNED) return true;
         if (this.status == StoreStatus.SUSPENDED) {
             return this.suspendedUntil == null
-                    || !LocalDateTime.now().isAfter(this.suspendedUntil);
+                    || !LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.suspendedUntil);
         }
         return false;
     }

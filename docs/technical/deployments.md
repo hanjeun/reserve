@@ -59,11 +59,11 @@
 
 ### API v1과 프론트 동시 릴리스
 
-다음 API v1 전환 릴리스는 같은 SHA의 백엔드와 프론트를 함께 배포해요.
+v2.8.6부터 같은 SHA의 백엔드와 프론트를 함께 배포해 API v1을 사용해요.
 백엔드는 기존 `/api/*`와 `/api/v1/*`를 같은 컨트롤러·권한·본문 계약으로 제공하고,
 CI 프론트 빌드는 `VITE_API_VERSION=v1`을 사용해 공통 axios 요청 관문에서 경로를 전환해요.
 새 백엔드 준비 확인 후 그 릴리스의 프론트를 활성화하는 기존 원자적 배포 순서를 유지해요.
-이 정책은 아래 v2.8.5 운영 이력에 API v1 전환이 이미 완료됐다는 뜻이 아니에요.
+API v1 전환은 아래 v2.8.6 운영 이력부터 적용돼요.
 
 기존 `/api/*`는 열린 구 화면·PG 웹훅·CSP 수집과 호환되도록 유지해요.
 OAuth·헬스 체크 경로는 그대로이며, 지원하지 않는 숫자 API 버전은 JSON 404를 반환해요.
@@ -115,6 +115,27 @@ Actuator health `UP`, 읽기 전용 배포 verifier, 새 heartbeat와 사진 집
 
 릴리스 직후 dev와 main의 파일이 같은지 확인하고 `merge -s ours`로 squash 계보를 연결했어요.
 후속 정리는 dev 대상 PR로 검증하며, 운영 배포와 관측 결과는 [모니터링 런북](monitoring.md)을 따라요.
+
+### 2-3. v2.8.6 배포 확인 (2026-10-04)
+
+제품 통합 PR #304와 릴리스 PR #305를 거친 main `3199e48fb9aa6f8c5204c946ec2382487f4c22a0`의
+[CI/CD 실행](https://github.com/hanjeun/reserve/actions/runs/37144813467)이 성공했어요.
+blue 앱·nginx upstream·공개 `release-id.txt`가 같은 SHA를 가리키고, health는 `UP`예요.
+앱 계정은 `reserve_app`, 스키마 모드는 `validate`를 유지해요.
+
+기존 `/api/stores`와 `/api/v1/stores`의 공개 목록·정렬 결과가 같았어요.
+없는 가게 5·1000000과 지원하지 않는 `/api/v2/stores`는 404,
+미인증 회원 조회는 기존·v1 모두 401로 끝났어요. 브라우저에서도 두 가게 주소는
+가게 없음 안내·목록 이동, 없는 화면 주소는 404 안내·홈 이동을 표시했어요.
+
+앱 계정의 원문 LIKE·MATCH+LIKE와 공개 API의 검색 표본은 모두 2행이었어요.
+ngram 크기 2·다섯 컬럼 FULLTEXT를 확인했고, 새 앱의 FULLTEXT 폴백 경고는 없었어요.
+인덱스 적용 이력·복구 사본은 [`manual-ddl.md`](manual-ddl.md)를 따라요.
+
+릴리스와 main CI는 입력이 같은 성공한 단위·PC·모바일 검사 증거를 재사용했어요.
+필수 빌드와 CodeQL은 통과했고 자동 Sonar는 실행하지 않았어요.
+릴리스 이름은 `v2.8.6`이며 설명은 CHANGELOG와 동기화했어요.
+main과 dev의 파일이 같은 것을 확인한 뒤 `merge -s ours`로 squash 계보를 연결했어요.
 
 ## 3. 저장소 보호 & PR/브랜치 정리
 
@@ -243,7 +264,8 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
 2026-10-04 02:30:57 KST 전후 승인된 `reserve_ddl` 계정으로 운영 `ft_store_search` ngram 인덱스를 설치했어요.
 ngram 크기 2·InnoDB·정확한 다섯 컬럼의 FULLTEXT와 기존 가게 3행 유지, MATCH 실행 성공을 확인했어요
 (해당 조회 0행). 원래 구조·행의 보호된 백업과 적용 이력은 [`manual-ddl.md`](manual-ddl.md)에 있어요.
-현재 v2.8.5의 검색 동작은 유지하며, 새 후보 검색 기능의 활성화는 다음 v2.8.6 배포 예정이에요.
+v2.8.6 blue 앱으로 후보 검색 기능을 배포했어요. 앱 계정의 원문 LIKE·MATCH+LIKE와
+공개 API 검색 표본은 모두 2행이었고, 새 앱의 FULLTEXT 폴백 경고는 없었어요.
 미설치 판정은 캐시하므로 실행 중 설치했다면 새 앱 기동 때 다시 탐지해요.
 실행 SQL과 접속 절차는 [`manual-ddl.md`](manual-ddl.md)를 따라요. 백업 계정으로 관리자 SQL에 접속하지 않아요.
 

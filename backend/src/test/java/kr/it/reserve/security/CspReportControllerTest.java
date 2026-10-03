@@ -83,6 +83,38 @@ class CspReportControllerTest {
         }
     }
 
+    @Test
+    void malformedSourceUriDoesNotLeakPrivateReportData() throws Exception {
+        String sourceFile = "https://private-user:private-password@reserve.it.kr/private-source.js"
+                + "?token=private%zz-token#private-fragment";
+        String body = new ObjectMapper().writeValueAsString(Map.of("csp-report", Map.of(
+                "effective-directive", "script-src",
+                "blocked-uri", "https://blocked.example/private-resource?token=private-blocked-token",
+                "source-file", sourceFile,
+                "document-uri", "https://reserve.it.kr/account/private-document?token=private-document-token"
+        )));
+        Logger logger = (Logger) LoggerFactory.getLogger(CspReportController.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            mockMvc.perform(post("/api/csp-reports")
+                            .contentType("application/csp-report")
+                            .content(body))
+                    .andExpect(status().isNoContent());
+
+            assertThat(appender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .containsExactly("CSP violation observed: directive=script, blockedScheme=https, sourceCategory=invalid");
+            assertThat(appender.list.getFirst().getArgumentArray())
+                    .containsExactly("script", "https", "invalid");
+            assertThat(appender.list.getFirst().getThrowableProxy()).isNull();
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
     @ParameterizedTest(name = "{0}: {1}")
     @CsvSource(textBlock = """
             reserve.it.kr, first-party

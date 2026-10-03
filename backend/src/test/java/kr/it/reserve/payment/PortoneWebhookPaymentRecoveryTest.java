@@ -17,6 +17,9 @@ import kr.it.reserve.payment.service.RefundLedgerService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -29,9 +32,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -272,6 +278,65 @@ class PortoneWebhookPaymentRecoveryTest {
                 null,
                 MERCHANT_UID,
                 "MULTIPLE_UNRESOLVED_REFUND_ATTEMPTS");
+    }
+
+    @ParameterizedTest(name = "PG {0}: {2}")
+    @CsvSource(textBlock = """
+            SUCCEEDED, 5000, LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_SUCCESS
+            FAILED, 2000, LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_FAILURE
+            """)
+    @DisplayName("PG 환불 결말 반영이 로컬 상태 충돌로 거절되면 미결 원장과 대사 증거를 보존한다")
+    void rejectedLocalRefundTransitionPreservesLedgerAndRecordsEvidence(
+            String cancellationStatus, int pgCancelledAmount, String expectedDetailCode) {
+        Payment payment = pendingPayment(16L, 2_000);
+        RefundAttempt pending = RefundAttempt.start(16L, MERCHANT_UID, 3_000, "부분 환불");
+        pending.markPending("cancel-26", "PG acknowledged");
+        PortoneV2PaymentResponse pgPayment = pgPayment("""
+                {
+                  "status": "PARTIAL_CANCELLED",
+                  "amount": {"total": 10000, "cancelled": %d},
+                  "cancellations": [
+                    {"id": "cancel-old", "status": "SUCCEEDED", "totalAmount": 2000},
+                    {"id": "cancel-26", "status": "%s", "totalAmount": 3000}
+                  ]
+                }
+                """.formatted(pgCancelledAmount, cancellationStatus));
+        stubPendingRefund(payment, pending, pgPayment);
+        if ("SUCCEEDED".equals(cancellationStatus)) {
+            when(paymentService.confirmPendingRefund(16L, 2_000, 3_000, "부분 환불"))
+                    .thenReturn(false);
+        } else {
+            when(paymentService.revertPendingRefund(
+                    16L, 2_000, "PG cancellation is explicitly FAILED"))
+                    .thenReturn(false);
+        }
+
+        assertThat(webhookService.processMerchantUid(MERCHANT_UID))
+                .isEqualTo(PortoneWebhookService.ProcessingResult.PROCESSED);
+
+        InOrder order = inOrder(paymentService, reconciliationIssueService);
+        if ("SUCCEEDED".equals(cancellationStatus)) {
+            order.verify(paymentService).confirmPendingRefund(16L, 2_000, 3_000, "부분 환불");
+        } else {
+            order.verify(paymentService).revertPendingRefund(
+                    16L, 2_000, "PG cancellation is explicitly FAILED");
+        }
+        order.verify(reconciliationIssueService).recordIssue(
+                "REFUND:16",
+                PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
+                16L,
+                null,
+                MERCHANT_UID,
+                expectedDetailCode);
+        verifyNoMoreInteractions(paymentService, reconciliationIssueService);
+        verifyNoInteractions(refundLedgerService);
+        assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING);
+        assertThat(payment.refundedSoFar()).isEqualTo(2_000);
+        assertThat(pending.getStatus()).isEqualTo(RefundAttempt.Status.PENDING);
+        assertThat(pending.isUnresolved()).isTrue();
+        assertThat(pending.getCancellationId()).isEqualTo("cancel-26");
+        assertThat(pending.getCancelledAmount()).isNull();
+        assertThat(pending.getFailureReason()).isEqualTo("PG acknowledged");
     }
 
     @Test

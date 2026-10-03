@@ -165,9 +165,7 @@ public final class ImageFileValidator {
         while (offset < bytes.length) {
             if (offset + 8 > bytes.length) throw unsupported("손상된 WebP chunk입니다.");
             String type = new String(bytes, offset, 4, StandardCharsets.US_ASCII);
-            long chunkSizeLong = unsignedIntLe(bytes, offset + 4);
-            if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("WebP chunk가 너무 큽니다.");
-            int chunkSize = (int) chunkSizeLong;
+            int chunkSize = readWebpChunkSize(bytes, offset + 4);
             int data = offset + 8;
             long next = (long) data + chunkSize + (chunkSize & 1);
             if (next > bytes.length) throw unsupported("잘린 WebP chunk입니다.");
@@ -191,6 +189,12 @@ public final class ImageFileValidator {
             throw unsupported("이미지 프레임이 없는 WebP 파일입니다.");
         }
         return dimensions;
+    }
+
+    private static int readWebpChunkSize(byte[] bytes, int offset) {
+        long chunkSizeLong = unsignedIntLe(bytes, offset);
+        if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("WebP chunk가 너무 큽니다.");
+        return (int) chunkSizeLong;
     }
 
     private static Dimensions dimensionsVp8x(byte[] bytes, int data, int size) {

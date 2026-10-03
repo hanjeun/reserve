@@ -63,13 +63,9 @@ public class TourismImageProxyClient {
                     configure(connection);
                     int status = connection.getResponseCode();
                     if (REDIRECT_STATUSES.contains(status)) {
-                        if (redirects == MAX_REDIRECTS) return Optional.empty();
-
-                        String location = connection.getHeaderField("Location");
-                        if (location == null || location.isBlank()) return Optional.empty();
-                        URI redirected = current.resolve(location);
-                        if (!isAllowedImageUri(redirected)) return Optional.empty();
-                        current = redirected;
+                        Optional<URI> redirected = resolveRedirect(connection, current, redirects);
+                        if (redirected.isEmpty()) return Optional.empty();
+                        current = redirected.get();
                         continue;
                     }
 
@@ -86,6 +82,16 @@ public class TourismImageProxyClient {
             log.warn("Tourism image proxy failed: errorType={}", exception.getClass().getSimpleName());
         }
         return Optional.empty();
+    }
+
+    private static Optional<URI> resolveRedirect(HttpsURLConnection connection, URI current, int redirects) {
+        if (redirects == MAX_REDIRECTS) return Optional.empty();
+
+        String location = connection.getHeaderField("Location");
+        if (location == null || location.isBlank()) return Optional.empty();
+        URI redirected = current.resolve(location);
+        if (!isAllowedImageUri(redirected)) return Optional.empty();
+        return Optional.of(redirected);
     }
 
     private void configure(HttpsURLConnection connection) throws IOException {

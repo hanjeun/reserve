@@ -190,10 +190,8 @@ public class Member {
     public boolean isSuspended() {
         if (this.status == MemberStatus.BANNED) return true;
         if (this.status == MemberStatus.SUSPENDED) {
-            if (this.suspendedUntil != null && LocalDateTime.now().isAfter(this.suspendedUntil)) {
-                return false;
-            }
-            return true;
+            return this.suspendedUntil == null
+                    || !LocalDateTime.now().isAfter(this.suspendedUntil);
         }
         return false;
     }

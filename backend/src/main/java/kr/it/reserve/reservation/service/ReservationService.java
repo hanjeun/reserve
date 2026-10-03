@@ -1081,7 +1081,7 @@ public class ReservationService {
             Reservation.ReservationStatus status,
             Long storeId,
             String sort) {
-        int safeSize = Math.min(Math.max(size, 1), 100);
+        int safeSize = Math.clamp(size, 1, 100);
         Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize, reservationManagementSort(sort));
         String keyword = search == null ? "" : search.trim();
         if (owner.isAdmin()) {

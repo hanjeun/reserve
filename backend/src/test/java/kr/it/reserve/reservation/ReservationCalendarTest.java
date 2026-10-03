@@ -129,9 +129,9 @@ class ReservationCalendarTest {
     void coversEveryDayOfMonth() {
         Map<String, CalendarDayResponse> days = calendar(openStore());
 
-        assertThat(days).hasSize(NEXT_MONTH.lengthOfMonth());
-        assertThat(days).containsKey(ymd(NEXT_MONTH.atDay(1)));
-        assertThat(days).containsKey(ymd(NEXT_MONTH.atEndOfMonth()));
+        assertThat(days).hasSize(NEXT_MONTH.lengthOfMonth())
+                .containsKey(ymd(NEXT_MONTH.atDay(1)))
+                .containsKey(ymd(NEXT_MONTH.atEndOfMonth()));
     }
 
     @Test

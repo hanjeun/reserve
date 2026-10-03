@@ -102,10 +102,10 @@ const FormModal = ({
             onCancel={onClose}
             afterClose={afterClose}
             rootClassName={rootClassName}
-            /* maskClosable={false}: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
+            /* mask.closable=false: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
-            maskClosable={false}
+            mask={{ closable: false }}
             footer={
                 footer !== undefined ? footer : (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>

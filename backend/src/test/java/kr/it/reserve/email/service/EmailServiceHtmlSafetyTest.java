@@ -26,11 +26,11 @@ class EmailServiceHtmlSafetyTest {
                 payload,
                 "first line\n" + payload);
 
-        assertThat(html).doesNotContain("<img");
-        assertThat(html).doesNotContain("onclick=\"alert(1)\"");
-        assertThat(html).contains("&lt;img src=x onerror=alert(1)&gt;");
-        assertThat(html).contains("mailto:member@example.test&quot; onclick=&quot;alert(1)");
-        assertThat(html).contains("first line<br>&lt;img src=x onerror=alert(1)&gt;");
+        assertThat(html)
+                .doesNotContain("<img", "onclick=\"alert(1)\"")
+                .contains("&lt;img src=x onerror=alert(1)&gt;",
+                        "mailto:member@example.test&quot; onclick=&quot;alert(1)",
+                        "first line<br>&lt;img src=x onerror=alert(1)&gt;");
     }
 
     @Test

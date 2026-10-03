@@ -40,8 +40,8 @@ class ReservationManagementPaginationTest {
             assertThat(result.getTotalElements()).isEqualTo(count);
             actual.addAll(result.map(Reservation::getId).getContent());
         }
-        assertThat(actual).hasSize(count).doesNotHaveDuplicates();
-        assertThat(actual).isSortedAccordingTo(java.util.Comparator.reverseOrder());
+        assertThat(actual).hasSize(count).doesNotHaveDuplicates()
+                .isSortedAccordingTo(java.util.Comparator.reverseOrder());
     }
 
     @Test

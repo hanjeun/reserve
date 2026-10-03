@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -90,7 +91,7 @@ class StoreDeletionSafetyTest {
         Store store = Store.builder().id(storeId).owner(owner).build();
 
         when(storeRepository.findByIdForUpdate(storeId)).thenReturn(Optional.of(store));
-        org.mockito.Mockito.doThrow(new StoreException(
+        doThrow(new StoreException(
                         "가게 영업을 종료하기 전에 미결 항목을 처리해주세요. 예약 2건",
                         org.springframework.http.HttpStatus.CONFLICT))
                 .when(dataLifecycleGuard).requireStoreClosureAllowed(storeId);

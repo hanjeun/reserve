@@ -304,10 +304,8 @@ public class Store {
     public boolean isSuspended() {
         if (this.status == StoreStatus.BANNED) return true;
         if (this.status == StoreStatus.SUSPENDED) {
-            if (this.suspendedUntil != null && LocalDateTime.now().isAfter(this.suspendedUntil)) {
-                return false;
-            }
-            return true;
+            return this.suspendedUntil == null
+                    || !LocalDateTime.now().isAfter(this.suspendedUntil);
         }
         return false;
     }

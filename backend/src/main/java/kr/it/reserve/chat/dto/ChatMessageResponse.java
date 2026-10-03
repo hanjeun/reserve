@@ -59,7 +59,7 @@ public class ChatMessageResponse {
                 .senderRole(m.getSenderRole().name())
                 .canRetract(!reportContext && !m.isPurged() && !m.isRetracted() && viewerId != null && viewerId.equals(m.getSenderMemberId()))
                 .senderName(supportAdmin ? ConversationSummaryResponse.SUPPORT_NAME : null)
-                .content(m.isPurged() ? "보존 기간이 지난 메시지입니다." : m.isRetracted() && !reportContext ? "전송이 취소된 메시지입니다." : m.getContent())
+                .content(resolveContent(m, reportContext))
                 .clientMessageId(m.getClientMessageId())
                 .imageUrl(m.getImageKey() == null || (m.isRetracted() && !reportContext) ? null : "/api/chat/images/" + m.getId())
                 .imageWidth(m.isRetracted() && !reportContext ? null : m.getImageWidth())
@@ -69,6 +69,16 @@ public class ChatMessageResponse {
                 .expired(m.isPurged())
                 .retractionRevision(m.getRetractionRevision())
                 .build();
+    }
+
+    private static String resolveContent(ChatMessage message, boolean reportContext) {
+        if (message.isPurged()) {
+            return "보존 기간이 지난 메시지입니다.";
+        }
+        if (message.isRetracted() && !reportContext) {
+            return "전송이 취소된 메시지입니다.";
+        }
+        return message.getContent();
     }
 
     /** 보낸 사람이 나인지 — 화면이 좌/우 정렬을 정하는 데 쓴다. */

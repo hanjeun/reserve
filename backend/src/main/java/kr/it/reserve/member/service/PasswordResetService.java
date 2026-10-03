@@ -88,7 +88,7 @@ public class PasswordResetService {
         if (token.isExpired()) {
             throw new MemberException("인증 시간이 만료되었습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
         }
-        requireAttemptsLeft(token, email);
+        requireAttemptsLeft(token);
 
         if (!matchesCode(token, code)) {
             token.recordFailedAttempt();
@@ -105,7 +105,7 @@ public class PasswordResetService {
      * <p>메시지를 "재발송해주세요"로 두는 건 의도적이다 — 남은 횟수를 숫자로 알려주면
      * 공격자가 언제 리셋되는지 계산할 수 있고, 정상 사용자에게는 다음에 할 행동만 알려주면 된다.
      */
-    private void requireAttemptsLeft(PasswordResetToken token, String email) {
+    private void requireAttemptsLeft(PasswordResetToken token) {
         if (token.isAttemptExhausted()) {
             log.warn("Password reset code attempts exhausted");
             throw new MemberException(
@@ -137,7 +137,7 @@ public class PasswordResetService {
         if (token.isExpired()) {
             throw new MemberException("인증 시간이 만료되었습니다. 다시 시도해주세요.", HttpStatus.BAD_REQUEST);
         }
-        requireAttemptsLeft(token, email);
+        requireAttemptsLeft(token);
 
         if (!matchesCode(token, code)) {
             token.recordFailedAttempt();
@@ -179,7 +179,7 @@ public class PasswordResetService {
     }
 
     private boolean matchesCode(PasswordResetToken token, String code) {
-        if (code == null || !code.matches("[0-9]{6}")) {
+        if (code == null || !code.matches("\\d{6}")) {
             return false;
         }
         if (token.getTokenHash() != null) {

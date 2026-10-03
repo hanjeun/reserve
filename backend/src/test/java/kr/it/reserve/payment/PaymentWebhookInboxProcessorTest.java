@@ -22,6 +22,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,9 +49,9 @@ class PaymentWebhookInboxProcessorTest {
         when(webhookService.parseSignal(BODY))
                 .thenReturn(new PortoneWebhookSignal("Transaction.Paid", MERCHANT_UID, true));
         when(inboxStateService.register(
-                org.mockito.ArgumentMatchers.eq(WEBHOOK_ID),
-                org.mockito.ArgumentMatchers.eq("Transaction.Paid"),
-                org.mockito.ArgumentMatchers.eq(MERCHANT_UID),
+                eq(WEBHOOK_ID),
+                eq("Transaction.Paid"),
+                eq(MERCHANT_UID),
                 anyString()))
                 .thenAnswer(invocation -> new InboxSnapshot(
                         WEBHOOK_ID,
@@ -63,9 +66,9 @@ class PaymentWebhookInboxProcessorTest {
 
         InOrder order = inOrder(inboxStateService, webhookService);
         order.verify(inboxStateService).register(
-                org.mockito.ArgumentMatchers.eq(WEBHOOK_ID),
-                org.mockito.ArgumentMatchers.eq("Transaction.Paid"),
-                org.mockito.ArgumentMatchers.eq(MERCHANT_UID),
+                eq(WEBHOOK_ID),
+                eq("Transaction.Paid"),
+                eq(MERCHANT_UID),
                 anyString());
         order.verify(inboxStateService).claim(WEBHOOK_ID);
         order.verify(webhookService).processMerchantUid(MERCHANT_UID);
@@ -84,7 +87,7 @@ class PaymentWebhookInboxProcessorTest {
                         PaymentWebhookInbox.InboxStatus.RECEIVED));
         when(inboxStateService.claim(WEBHOOK_ID))
                 .thenReturn(Optional.of(new InboxWork(WEBHOOK_ID, MERCHANT_UID)));
-        org.mockito.Mockito.doThrow(new PaymentException("temporary", HttpStatus.INTERNAL_SERVER_ERROR))
+        doThrow(new PaymentException("temporary", HttpStatus.INTERNAL_SERVER_ERROR))
                 .when(webhookService).processMerchantUid(MERCHANT_UID);
 
         assertThatThrownBy(() -> processor.receive(WEBHOOK_ID, BODY))
@@ -101,9 +104,9 @@ class PaymentWebhookInboxProcessorTest {
         when(webhookService.parseSignal(body))
                 .thenReturn(new PortoneWebhookSignal("BillingKey.Issued", null, true));
         when(inboxStateService.register(
-                org.mockito.ArgumentMatchers.eq(WEBHOOK_ID),
-                org.mockito.ArgumentMatchers.eq("BillingKey.Issued"),
-                org.mockito.ArgumentMatchers.isNull(),
+                eq(WEBHOOK_ID),
+                eq("BillingKey.Issued"),
+                isNull(),
                 anyString()))
                 .thenAnswer(invocation -> new InboxSnapshot(
                         WEBHOOK_ID,

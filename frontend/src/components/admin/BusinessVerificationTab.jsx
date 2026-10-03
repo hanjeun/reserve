@@ -147,10 +147,10 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
             open={open}
             onCancel={handleCancel}
             onOk={handleOk}
-            /* maskClosable={false}: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
+            /* mask.closable=false: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
-            maskClosable={false}
+            mask={{ closable: false }}
             okText="거절 처리"
             cancelText="취소"
             okButtonProps={{ danger: true, loading }}

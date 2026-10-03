@@ -113,7 +113,7 @@ class PortoneWebhookPaymentRecoveryTest {
     @DisplayName("REFUND_PENDING에서 취소가 아직 REQUESTED면 PAID 상태여도 원복하지 않는다")
     void requestedCancellationRemainsPending() {
         Payment payment = pendingPayment(12L, 0);
-        RefundAttempt pending = pendingAttempt(22L, 3_000, "cancel-22");
+        RefundAttempt pending = pendingAttempt(3_000, "cancel-22");
         PortoneV2PaymentResponse pgPayment = pgPayment("""
                 {
                   "status": "PAID",
@@ -149,7 +149,7 @@ class PortoneWebhookPaymentRecoveryTest {
     @DisplayName("REFUND_PENDING은 누적 취소액과 이번 취소 금액이 정확할 때 성공 확정한다")
     void exactCancellationConfirmsPendingRefund() {
         Payment payment = pendingPayment(13L, 2_000);
-        RefundAttempt pending = pendingAttempt(23L, 3_000, "cancel-23");
+        RefundAttempt pending = pendingAttempt(3_000, "cancel-23");
         when(pending.getId()).thenReturn(23L);
         when(pending.getReason()).thenReturn("부분 환불");
         PortoneV2PaymentResponse pgPayment = pgPayment("""
@@ -176,7 +176,7 @@ class PortoneWebhookPaymentRecoveryTest {
     @DisplayName("PG 취소 금액이 원장과 다르면 결제를 바꾸지 않고 대사 큐에 남긴다")
     void mismatchedCancellationCreatesReconciliationIssue() {
         Payment payment = pendingPayment(14L, 2_000);
-        RefundAttempt pending = pendingAttempt(24L, 3_000, "cancel-24");
+        RefundAttempt pending = pendingAttempt(3_000, "cancel-24");
         PortoneV2PaymentResponse pgPayment = pgPayment("""
                 {
                   "status": "PARTIAL_CANCELLED",
@@ -320,7 +320,7 @@ class PortoneWebhookPaymentRecoveryTest {
                 .build();
     }
 
-    private RefundAttempt pendingAttempt(Long id, int requestedAmount, String cancellationId) {
+    private RefundAttempt pendingAttempt(int requestedAmount, String cancellationId) {
         RefundAttempt pending = mock(RefundAttempt.class);
         when(pending.isUnresolved()).thenReturn(true);
         when(pending.getRequestedAmount()).thenReturn(requestedAmount);

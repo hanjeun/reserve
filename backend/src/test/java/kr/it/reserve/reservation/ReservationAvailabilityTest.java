@@ -101,8 +101,7 @@ class ReservationAvailabilityTest {
         // 09:00 ~ 21:00, 30분 단위 → 마지막 슬롯 20:30, 21:00은 제외
         List<String> times = availableTimes(storeWithHours(LocalTime.of(9, 0), LocalTime.of(21, 0), 30));
 
-        assertThat(times).contains("09:00", "20:30");
-        assertThat(times).doesNotContain("21:00");
+        assertThat(times).contains("09:00", "20:30").doesNotContain("21:00");
         assertThat(times.get(times.size() - 1)).isEqualTo("20:30");
     }
 
@@ -111,8 +110,7 @@ class ReservationAvailabilityTest {
         // 10:00 ~ 18:00, 60분 단위 → 마지막 슬롯 17:00, 18:00은 제외
         List<String> times = availableTimes(storeWithHours(LocalTime.of(10, 0), LocalTime.of(18, 0), 60));
 
-        assertThat(times).contains("10:00", "17:00");
-        assertThat(times).doesNotContain("18:00");
+        assertThat(times).contains("10:00", "17:00").doesNotContain("18:00");
     }
 
     @Test

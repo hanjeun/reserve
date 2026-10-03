@@ -167,9 +167,9 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
             centered
             /* destroyOnHidden: 닫힘 애니메이션이 끝난 뒤에 children을 파괴 —
                호출부의 key 토글 없이도 다음 오픈 때 입력값이 깨끗하게 초기화된다. */
-            // maskClosable={false}: 정지 기간/사유 입력 — 작성 중인 내용 유실 방지
+            // mask.closable=false: 정지 기간/사유 입력 — 작성 중인 내용 유실 방지
             // (읽기 전용 모달 — 상세보기/QR/예약상세 — 은 기본값 true 유지)
-            maskClosable={false}
+            mask={{ closable: false }}
             destroyOnHidden
         >
             <SanctionBody preset={preset} onReady={(v) => { valuesRef.current = v; }} />

@@ -78,7 +78,7 @@ public class AddressController {
                     uri, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> body = (Map<String, Object>) response.getBody();
+            Map<String, Object> body = response.getBody();
             return ResponseEntity.ok(ApiResponse.success(body != null ? body : empty, ""));
 
         } catch (Exception e) {

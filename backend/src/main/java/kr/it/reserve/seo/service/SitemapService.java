@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +36,7 @@ public class SitemapService {
 
         LocalDate storesLastModified = stores.stream()
                 .map(StoreSitemapEntry::lastModifiedAt)
-                .filter(value -> value != null)
+                .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .map(value -> value.toLocalDate())
                 .orElse(null);

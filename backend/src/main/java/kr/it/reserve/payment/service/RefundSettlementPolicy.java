@@ -4,6 +4,7 @@ import kr.it.reserve.payment.dto.PortoneV2CancelResponse;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * PG 환불 조회 결과를 로컬 원장에 반영해도 되는지 판정하는 단일 정책 관문.
@@ -62,7 +63,7 @@ public final class RefundSettlementPolicy {
         if (cancellations == null) {
             return review("PG_CANCELLATIONS_MISSING");
         }
-        if (cancellations.stream().anyMatch(value -> value == null)) {
+        if (cancellations.stream().anyMatch(Objects::isNull)) {
             return review("PG_CANCELLATION_ENTRY_INVALID");
         }
         long succeededTotal = 0;

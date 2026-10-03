@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
@@ -519,7 +520,7 @@ public class ChatService {
     /** 현재 대표 사진을 한 페이지당 한 번에 읽는다. 방 생성 당시의 사진 스냅샷에 고정하지 않는다. */
     private Map<Long, String> storeImageUrls(List<ChatRoom> rooms) {
         List<Long> storeIds = rooms.stream().map(ChatRoom::getStoreId)
-                .filter(id -> id != null).distinct().toList();
+                .filter(Objects::nonNull).distinct().toList();
         if (storeIds.isEmpty()) return Map.of();
         Map<Long, String> imageUrls = new HashMap<>();
         for (Store store : storeRepository.findAllById(storeIds)) {

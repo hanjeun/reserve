@@ -212,7 +212,7 @@ public class TourismRegionPhotoService {
             }
 
             LocalDateTime checkedAt = LocalDateTime.now();
-            TourismRegionPhoto stored = existing.orElseGet(() -> new TourismRegionPhoto());
+            TourismRegionPhoto stored = existing.orElseGet(TourismRegionPhoto::new);
             Candidate accepted = candidate.get();
             stored.refresh(region, accepted.contentId(), PROVIDER_NAME, accepted.workTitle(), accepted.imageUrl(),
                     SOURCE_URL, LICENSE_TYPE, checkedAt);

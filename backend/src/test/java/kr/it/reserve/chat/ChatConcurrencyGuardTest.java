@@ -2,7 +2,6 @@ package kr.it.reserve.chat;
 
 import kr.it.reserve.chat.entity.ChatMessage;
 import kr.it.reserve.chat.entity.ChatRoom;
-import kr.it.reserve.chat.entity.SenderRole;
 import kr.it.reserve.chat.repository.ChatMessageRepository;
 import kr.it.reserve.chat.repository.ChatRoomRepository;
 import kr.it.reserve.chat.service.ChatService;

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.advertisement.service.AdPaymentService;
 import kr.it.reserve.payment.dto.PortoneWebhookSignal;
-import kr.it.reserve.advertisement.service.AdPaymentService;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.entity.PaymentReconciliationIssue;

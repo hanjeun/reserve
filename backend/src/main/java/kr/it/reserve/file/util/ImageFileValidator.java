@@ -282,7 +282,7 @@ public final class ImageFileValidator {
 
     private static long unsignedIntLe(byte[] bytes, int offset) {
         if (offset < 0 || offset + 4 > bytes.length) throw unsupported("잘린 이미지 헤더입니다.");
-        return (long) unsigned(bytes[offset])
+        return unsigned(bytes[offset])
                 | ((long) unsigned(bytes[offset + 1]) << 8)
                 | ((long) unsigned(bytes[offset + 2]) << 16)
                 | ((long) unsigned(bytes[offset + 3]) << 24);

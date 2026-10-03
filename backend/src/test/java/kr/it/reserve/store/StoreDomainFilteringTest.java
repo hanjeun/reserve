@@ -3,6 +3,7 @@ package kr.it.reserve.store;
 import jakarta.persistence.EntityManager;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.entity.ServiceDomain;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.service.StoreService;
@@ -42,7 +43,7 @@ class StoreDomainFilteringTest {
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent())
-                .extracting(response -> response.getId())
+                .extracting(StoreResponse::getId)
                 .containsExactly(legacySports.getId());
         assertThat(result.getContent().getFirst().getServiceDomain()).isEqualTo("SPORTS");
     }
@@ -61,7 +62,7 @@ class StoreDomainFilteringTest {
 
         assertThat(service.searchStoresPaged(
                 "기타분야필터검증", "rating", 0, 10, null, null, "OTHER").getContent())
-                .extracting(response -> response.getId())
+                .extracting(StoreResponse::getId)
                 .containsExactly(legacyOther.getId());
     }
 
@@ -80,7 +81,7 @@ class StoreDomainFilteringTest {
         assertThat(ServiceDomain.inferFromCategory("카페 클래스")).isEqualTo(ServiceDomain.FOOD);
         assertThat(service.searchStoresPaged(
                 "중첩분야필터검증", "rating", 0, 10, null, null, "FOOD").getContent())
-                .extracting(response -> response.getId())
+                .extracting(StoreResponse::getId)
                 .containsExactly(overlapping.getId());
         assertThat(service.searchStoresPaged(
                 "중첩분야필터검증", "rating", 0, 10, null, null, "PERFORMANCE").getContent())

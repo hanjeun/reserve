@@ -72,8 +72,12 @@ class EmailServiceEnvelopeTest {
         assertThat(new ContentType(body.getContentType()).getParameter("charset"))
                 .isEqualToIgnoringCase(StandardCharsets.UTF_8.name());
         String html = (String) body.getContent();
-        Matcher meta = Pattern.compile("(?is)<head>.*?<meta\\s+charset=[\"']([^\"']+)[\"']\\s*/?>.*?</head>")
-                .matcher(html);
+        Matcher headStart = Pattern.compile("<head>", Pattern.CASE_INSENSITIVE).matcher(html);
+        assertThat(headStart.find()).as("HTML head starts").isTrue();
+        Matcher headEnd = Pattern.compile("</head>", Pattern.CASE_INSENSITIVE).matcher(html);
+        assertThat(headEnd.find(headStart.end())).as("HTML head ends").isTrue();
+        Matcher meta = Pattern.compile("<meta\\s+charset=[\"']([^\"']+)[\"']\\s*/?>", Pattern.CASE_INSENSITIVE)
+                .matcher(html.substring(headStart.end(), headEnd.start()));
         assertThat(meta.find()).as("HTML head declares its charset").isTrue();
         assertThat(meta.group(1)).isEqualToIgnoringCase(StandardCharsets.UTF_8.name());
         assertThat(html)

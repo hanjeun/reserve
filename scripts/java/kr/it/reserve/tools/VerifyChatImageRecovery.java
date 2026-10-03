@@ -33,7 +33,7 @@ public final class VerifyChatImageRecovery {
     public static void main(String[] args) {
         try {
             if (args.length != 7) {
-                System.err.println("Usage: java scripts/VerifyChatImageRecovery.java <cipher-file> <AAD> <cipher-SHA256> <plain-bytes> <width> <height> <image/png|image/jpeg>");
+                System.err.println("Usage: java scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java <cipher-file> <AAD> <cipher-SHA256> <plain-bytes> <width> <height> <image/png|image/jpeg>");
                 System.exit(2);
             }
             Path path = Path.of(args[0]);

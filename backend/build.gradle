@@ -102,5 +102,5 @@ tasks.named('test') {
 
 // Compile the standalone operator tool for its isolated, read-only fixture checks.
 tasks.named('compileTestJava') {
-    source '../scripts/VerifyDatabaseSchema.java'
+    source '../scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java'
 }

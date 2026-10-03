@@ -132,7 +132,8 @@ class QrCheckinAttendanceTest {
         Reservation reservation = reservation(member(1L), Reservation.ReservationStatus.PENDING);
         when(reservationRepository.findById(20L)).thenReturn(Optional.of(reservation));
 
-        assertThatThrownBy(() -> reservationService.generateQrCheckinToken(20L, member(7L)))
+        Member owner = member(7L);
+        assertThatThrownBy(() -> reservationService.generateQrCheckinToken(20L, owner))
                 .isInstanceOf(ReservationException.class)
                 .hasMessageContaining("승인된 예약");
         verify(tokenProvider, never()).generateToken(org.mockito.ArgumentMatchers.anyLong(),

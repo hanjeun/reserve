@@ -88,7 +88,8 @@ class PaymentRecoveryTest {
         Payment payment = readyPayment(3L, reservation);
         when(paymentRepository.findByMerchantUidForUpdate(MERCHANT_UID)).thenReturn(Optional.of(payment));
 
-        assertThatThrownBy(() -> paymentService.recoverPaidPaymentFromPg(MERCHANT_UID, paidPgPayment()))
+        var pgPayment = paidPgPayment();
+        assertThatThrownBy(() -> paymentService.recoverPaidPaymentFromPg(MERCHANT_UID, pgPayment))
                 .isInstanceOf(PaymentException.class)
                 .hasMessageContaining("관리자 확인");
 

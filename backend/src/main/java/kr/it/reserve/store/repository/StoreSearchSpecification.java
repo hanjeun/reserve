@@ -24,6 +24,9 @@ import java.util.Locale;
 /** 공개 가게 탐색의 필터와 전체 결과 정렬을 DB 한 관문에서 강제한다. */
 public final class StoreSearchSpecification {
 
+    private static final String ADDRESS_FIELD = "address";
+    private static final String CATEGORY_FIELD = "category";
+
     private static final char LIKE_ESCAPE = '!';
     private static final double EARTH_RADIUS_KM = 6_371.0088;
 
@@ -70,8 +73,8 @@ public final class StoreSearchSpecification {
         predicates.add(builder.or(
                 likeLower(root, builder, "name", pattern),
                 likeLower(root, builder, "description", pattern),
-                likeLower(root, builder, "address", pattern),
-                likeLower(root, builder, "category", pattern),
+                likeLower(root, builder, ADDRESS_FIELD, pattern),
+                likeLower(root, builder, CATEGORY_FIELD, pattern),
                 likeLower(root, builder, "keywords", pattern)));
     }
 
@@ -104,7 +107,7 @@ public final class StoreSearchSpecification {
                                 builder.not(categoryContainsAny(root, builder, higherPriorityWords)));
             }
             case OTHER -> builder.or(
-                    builder.isNull(root.get("category")),
+                    builder.isNull(root.get(CATEGORY_FIELD)),
                     builder.not(categoryContainsAny(
                             root,
                             builder,
@@ -117,7 +120,7 @@ public final class StoreSearchSpecification {
         List<Predicate> matches = new ArrayList<>(categoryWords.size());
         for (String word : categoryWords) {
             matches.add(builder.like(
-                    builder.lower(root.get("category")),
+                    builder.lower(root.get(CATEGORY_FIELD)),
                     "%" + escapeLike(word.toLowerCase(Locale.ROOT)) + "%",
                     LIKE_ESCAPE));
         }
@@ -140,8 +143,8 @@ public final class StoreSearchSpecification {
         for (String variant : StoreRegionNames.variants(normalizedRegion)) {
             String prefix = district == null ? variant : variant + " " + district;
             String escapedPrefix = escapeLike(prefix);
-            matches.add(builder.equal(root.get("address"), prefix));
-            matches.add(builder.like(root.get("address"), escapedPrefix + " %", LIKE_ESCAPE));
+            matches.add(builder.equal(root.get(ADDRESS_FIELD), prefix));
+            matches.add(builder.like(root.get(ADDRESS_FIELD), escapedPrefix + " %", LIKE_ESCAPE));
         }
         predicates.add(matches.isEmpty()
                 ? builder.disjunction()

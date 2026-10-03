@@ -38,6 +38,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PaymentService {
 
+    private static final String PG_READY_STATUS = "READY";
+    private static final String EXPIRY_CHECK_SOURCE = "EXPIRY";
+    private static final String STALE_READY_CHECK_SOURCE = "STALE_READY";
+
     private final PaymentRepository paymentRepository;
     private final ReservationRepository reservationRepository;
     private final MemberRepository memberRepository;
@@ -266,7 +270,7 @@ public class PaymentService {
                 return ExpiryPaymentDecision.NOT_PAID;
             }
             recordIssue(
-                    "EXPIRY",
+                    EXPIRY_CHECK_SOURCE,
                     PaymentReconciliationIssue.IssueType.LOCAL_STATUS_UNCERTAIN,
                     latest,
                     latest.getStatus().name());
@@ -278,7 +282,7 @@ public class PaymentService {
             portonePayment = portoneService.getPaymentInfo(payment.getMerchantUid());
         } catch (RuntimeException e) {
             recordIssue(
-                    "EXPIRY",
+                    EXPIRY_CHECK_SOURCE,
                     PaymentReconciliationIssue.IssueType.EXPIRY_RECHECK_FAILED,
                     payment,
                     e.getClass().getSimpleName());
@@ -293,14 +297,14 @@ public class PaymentService {
         }
 
         String pgStatus = portonePayment.getStatus();
-        if ("READY".equals(pgStatus) || "FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)) {
+        if (PG_READY_STATUS.equals(pgStatus) || "FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)) {
             payment.failPayment("Payment window expired before completion");
             resolveIssues(payment);
             return ExpiryPaymentDecision.NOT_PAID;
         }
 
         recordIssue(
-                "EXPIRY",
+                EXPIRY_CHECK_SOURCE,
                 PaymentReconciliationIssue.IssueType.EXPIRY_STATUS_UNCERTAIN,
                 payment,
                 pgStatus == null ? "NULL" : pgStatus);
@@ -341,7 +345,7 @@ public class PaymentService {
                         StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
             }
             recordIssue(
-                    "STALE_READY",
+                    STALE_READY_CHECK_SOURCE,
                     PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
                     payment,
                     e.getStatus().name());
@@ -351,7 +355,7 @@ public class PaymentService {
                     StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
         } catch (RuntimeException e) {
             recordIssue(
-                    "STALE_READY",
+                    STALE_READY_CHECK_SOURCE,
                     PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
                     payment,
                     e.getClass().getSimpleName());
@@ -365,7 +369,7 @@ public class PaymentService {
         if (pgPayment.isPaid()) {
             if (isPaymentClosedFor(payment.getReservation())) {
                 recordIssue(
-                        "STALE_READY",
+                        STALE_READY_CHECK_SOURCE,
                         PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
                         payment,
                         payment.getReservation().getStatus().name());
@@ -376,7 +380,7 @@ public class PaymentService {
             }
             if (pgPayment.getAmount() != payment.getAmount()) {
                 recordIssue(
-                        "STALE_READY",
+                        STALE_READY_CHECK_SOURCE,
                         PaymentReconciliationIssue.IssueType.PAID_AMOUNT_MISMATCH,
                         payment,
                         "EXPECTED_" + payment.getAmount() + "_ACTUAL_" + pgPayment.getAmount());
@@ -394,7 +398,7 @@ public class PaymentService {
         }
 
         if ("FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)
-                || ("READY".equals(pgStatus) && isPaymentClosedFor(payment.getReservation()))) {
+                || (PG_READY_STATUS.equals(pgStatus) && isPaymentClosedFor(payment.getReservation()))) {
             payment.failPayment("Stale payment reconciled from PG status: " + pgStatus);
             resolveIssues(payment);
             return staleReadyResult(
@@ -403,9 +407,9 @@ public class PaymentService {
                     StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
         }
 
-        if ("READY".equals(pgStatus)) {
+        if (PG_READY_STATUS.equals(pgStatus)) {
             recordIssue(
-                    "STALE_READY",
+                    STALE_READY_CHECK_SOURCE,
                     PaymentReconciliationIssue.IssueType.STALE_READY_STILL_PENDING,
                     payment,
                     pgStatus);
@@ -416,7 +420,7 @@ public class PaymentService {
         }
 
         recordIssue(
-                "STALE_READY",
+                STALE_READY_CHECK_SOURCE,
                 PaymentReconciliationIssue.IssueType.STALE_READY_STATUS_UNCERTAIN,
                 payment,
                 pgStatus == null ? "NULL" : pgStatus);

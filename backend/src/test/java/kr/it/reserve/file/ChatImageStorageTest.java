@@ -37,7 +37,8 @@ class ChatImageStorageTest {
         var input = spy(new ByteArrayInputStream(new byte[1]));
         var stream = spy(new ResponseInputStream<>(GetObjectResponse.builder().contentLength(9L * 1024 * 1024).build(), input));
         when(s3.getObject(any(GetObjectRequest.class))).thenReturn(stream);
-        assertThatThrownBy(() -> storage().readEncryptedChatImage("local/users/1/chat/10/photo.bin", "users/1/chat/10"))
+        var storage = storage();
+        assertThatThrownBy(() -> storage.readEncryptedChatImage("local/users/1/chat/10/photo.bin", "users/1/chat/10"))
                 .isInstanceOf(FileException.class);
         verify(stream).abort();
         verify(input, never()).readNBytes(anyInt());
@@ -46,7 +47,8 @@ class ChatImageStorageTest {
         var stream = spy(new ResponseInputStream<>(GetObjectResponse.builder().build(),
                 new ByteArrayInputStream(new byte[8 * 1024 * 1024 + 29])));
         when(s3.getObject(any(GetObjectRequest.class))).thenReturn(stream);
-        assertThatThrownBy(() -> storage().readEncryptedChatImage("local/users/1/chat/10/photo.bin", "users/1/chat/10"))
+        var storage = storage();
+        assertThatThrownBy(() -> storage.readEncryptedChatImage("local/users/1/chat/10/photo.bin", "users/1/chat/10"))
                 .isInstanceOf(FileException.class);
         verify(stream).abort();
     }

@@ -60,11 +60,8 @@ public class AuditCleanupWorker {
             return paymentRepository.existsByReservationId(item.getEntityId())
                     || reviewRepository.existsByReservationId(item.getEntityId());
         }
-        if ("ADVERTISEMENT".equalsIgnoreCase(item.getEntityType())) {
-            // 과거에 덮어쓴 UID도 있어 로컬 취소/실패만으로 무결제임을 입증할 수 없다.
-            return true;
-        }
-        return false;
+        // 과거에 덮어쓴 UID도 있어 로컬 취소/실패만으로 무결제임을 입증할 수 없다.
+        return "ADVERTISEMENT".equalsIgnoreCase(item.getEntityType());
     }
 
     private void hardDeleteEntity(String entityType, Long entityId) {

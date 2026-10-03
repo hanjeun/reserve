@@ -36,6 +36,11 @@ import java.util.Map;
 @RequestMapping("/api/advertisements")
 public class AdvertisementApiController {
 
+    private static final String LOGIN_REQUIRED = "로그인이 필요합니다.";
+    private static final String QUERY_SUCCESS = "조회 성공";
+    private static final String FAILED_REDIRECT_QUERY = "?success=false&type=ad&merchant_uid=";
+    private static final String ERROR_MESSAGE_QUERY = "&error_msg=";
+
     private final AdvertisementService advertisementService;
     private final RateLimiter rateLimiter;
 
@@ -75,8 +80,8 @@ public class AdvertisementApiController {
                 paymentId != null && !paymentId.isBlank(), code != null && !code.isBlank());
 
         if (!isSuccess) {
-            return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+            return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
+                    + ERROR_MESSAGE_QUERY + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         }
 
         try {
@@ -85,14 +90,14 @@ public class AdvertisementApiController {
         } catch (BusinessException e) {
             // 외부 API 래퍼의 도메인 예외에도 원문이 섞일 수 있으므로 URL에 전달하지 않는다.
             log.warn("Ad mobile redirect verification failed: errorType={}", e.getClass().getSimpleName());
-            return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+            return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
+                    + ERROR_MESSAGE_QUERY + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
             // URL과 일반 로그에는 원문 대신 고정 문구·오류 종류만 남긴다.
             log.error("Ad mobile redirect error: errorType={}", e.getClass().getSimpleName());
-            return redirect(redirectBase + "?success=false&type=ad&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("광고 결제 처리 중 오류가 발생했습니다."));
+            return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
+                    + ERROR_MESSAGE_QUERY + enc("광고 결제 처리 중 오류가 발생했습니다."));
         }
     }
 
@@ -118,7 +123,7 @@ public class AdvertisementApiController {
     // 광고 신청 + 결제 준비 (사업자용)
     @PostMapping
     public ApiResponse<AdPaymentPrepareResponse> createAd(@ModelAttribute AdCreateRequest request) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         AdPaymentPrepareResponse response = advertisementService.createAd(request, member);
         return ApiResponse.success(response, "광고 결제 준비 완료");
@@ -127,7 +132,7 @@ public class AdvertisementApiController {
     // 결제 재시도 준비 (사업자용) — 결제 대기/실패 상태에서 다시 결제창을 여는 버튼용
     @PostMapping("/{id}/prepare-payment")
     public ApiResponse<AdPaymentPrepareResponse> preparePayment(@PathVariable Long id) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         AdPaymentPrepareResponse response = advertisementService.preparePayment(id, member);
         return ApiResponse.success(response, "광고 결제 준비 완료");
@@ -136,7 +141,7 @@ public class AdvertisementApiController {
     // 결제 검증 + 활성화 (사업자용)
     @PostMapping("/verify-payment")
     public ApiResponse<AdvertisementResponse> verifyPayment(@RequestBody Map<String, String> body) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         String merchantUid = body.get("merchantUid");
         AdvertisementResponse response = advertisementService.verifyPayment(merchantUid, member);
@@ -146,7 +151,7 @@ public class AdvertisementApiController {
     // 노출용 — 공개 API (StoreList 배지/배너 위젯)
     @GetMapping("/active")
     public ApiResponse<List<AdvertisementResponse>> getActiveAds(@RequestParam AdType type) {
-        return ApiResponse.success(advertisementService.getActiveAds(type), "조회 성공");
+        return ApiResponse.success(advertisementService.getActiveAds(type), QUERY_SUCCESS);
     }
 
     // 광고 성과 지표(2026-07 추가) — 노출·클릭만 공개 API(로그인 불필요)다. 두 지표는 장식적 요소라
@@ -172,7 +177,7 @@ public class AdvertisementApiController {
         advertisementService.recordConversion(
                 id,
                 request.reservationId(),
-                SecurityUtil.getCurrentMember("로그인이 필요합니다."));
+                SecurityUtil.getCurrentMember(LOGIN_REQUIRED));
         return ApiResponse.success(null, "기록됨");
     }
 
@@ -217,10 +222,10 @@ public class AdvertisementApiController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Long storeId,
             @RequestParam(required = false) String search) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         return ApiResponse.success(
-                advertisementService.getMyAds(member, page, size, storeId, search), "조회 성공");
+                advertisementService.getMyAds(member, page, size, storeId, search), QUERY_SUCCESS);
     }
 
     // 전체 광고 목록 (관리자용)
@@ -232,15 +237,15 @@ public class AdvertisementApiController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String search) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateAdminAuth(member);
-        return ApiResponse.success(advertisementService.getAllAds(page, size, search), "조회 성공");
+        return ApiResponse.success(advertisementService.getAllAds(page, size, search), QUERY_SUCCESS);
     }
 
     // 광고 강제 중단 (관리자용) — 사전 승인 대신 사후 제재
     @PatchMapping("/admin/{id}/suspend")
     public ApiResponse<Void> suspendAd(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateAdminAuth(member);
         String reason = body != null ? body.get("reason") : null;
         advertisementService.suspendAd(id, reason);
@@ -250,7 +255,7 @@ public class AdvertisementApiController {
     // 배너 광고 콘텐츠(제목/설명/이미지) 수정 (사업자용, 본인 가게만)
     @PatchMapping("/{id}")
     public ApiResponse<AdvertisementResponse> updateAd(@PathVariable Long id, @ModelAttribute AdUpdateRequest request) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         AdvertisementResponse response = advertisementService.updateAd(id, request, member);
         return ApiResponse.success(response, "광고가 수정되었습니다.");
@@ -259,7 +264,7 @@ public class AdvertisementApiController {
     // 광고 취소 (사업자용, 본인 가게만) — 결제 전이면 그냥 취소, 결제 후면 전액 환불
     @DeleteMapping("/{id}")
     public ApiResponse<Void> cancelAd(@PathVariable Long id) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         advertisementService.cancelAd(id, member);
         return ApiResponse.success(null, "광고 취소 요청을 접수했습니다. 환불 여부는 광고 내역에서 확인해주세요.");
@@ -268,7 +273,7 @@ public class AdvertisementApiController {
     // 종료상태(만료/취소/환불/중단) 광고를 목록에서 숨기기(소프트삭제) — 2026-07 추가, 사업자용
     @DeleteMapping("/{id}/remove")
     public ApiResponse<Void> removeAd(@PathVariable Long id) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         advertisementService.removeAd(id, member);
         return ApiResponse.success(null, "목록에서 삭제되었습니다.");

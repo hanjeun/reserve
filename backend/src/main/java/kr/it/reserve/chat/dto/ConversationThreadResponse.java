@@ -11,6 +11,8 @@ import java.util.List;
 @Getter
 @Builder
 public class ConversationThreadResponse {
+
+    private static final String MEMBER_VIEWER_ROLE = "MEMBER";
     private Long roomId;
     private String type;
     private Long storeId;
@@ -45,13 +47,13 @@ public class ConversationThreadResponse {
                 .type(room.getType().name())
                 .storeId(room.getStoreId())
                 .storeImageUrl(support ? null : storeImageUrl)
-                .title(support && "MEMBER".equals(viewerRole)
+                .title(support && MEMBER_VIEWER_ROLE.equals(viewerRole)
                         ? ConversationSummaryResponse.SUPPORT_NAME : title)
-                .counterpartName(support && "MEMBER".equals(viewerRole)
+                .counterpartName(support && MEMBER_VIEWER_ROLE.equals(viewerRole)
                         ? ConversationSummaryResponse.SUPPORT_NAME : title)
                 // 회원 화면에는 고객지원 담당자의 개인 정보를 노출하지 않는다. 관리자·사장님
                 // 화면에서 상대인 회원의 공개 프로필 사진만 전달한다.
-                .counterpartProfileImage("MEMBER".equals(viewerRole)
+                .counterpartProfileImage(MEMBER_VIEWER_ROLE.equals(viewerRole)
                         ? null : room.getMember().getProfileImage())
                 .viewerRole(viewerRole)
                 .canSend(canSend && !blocked)

@@ -102,11 +102,6 @@ const pickRangeDate = (current, date, rangePart, setRangePart) => {
         next[0] = date;
         if (next[1]?.isBefore(date, 'day')) next[1] = null;
         setRangePart(1);
-    } else if (next[0]?.isAfter(date, 'day')) {
-        // 끝 날짜를 시작 날짜보다 먼저 고르면 선택을 무효화하지 않고 날짜순으로
-        // 정렬한다. 사용자가 시작/종료 탭을 다시 찾아 누르게 만드는 상태를 피한다.
-        next[1] = next[0];
-        next[0] = date;
     } else {
         next[1] = date;
     }
@@ -265,7 +260,13 @@ const FormDatePickerBase = ({
         onBlur?.();
     };
 
+    const isDateDisabled = date => Boolean(disabledDate?.(date)) || (
+        mode === 'range' && rangePart === 1 && Boolean(draftRange[0])
+        && date.isBefore(draftRange[0], 'day')
+    );
+
     const pickDate = date => {
+        if (isDateDisabled(date)) return;
         if (mode === 'single') {
             setDraftSingle(date);
             onChange?.(date);
@@ -319,7 +320,7 @@ const FormDatePickerBase = ({
 
         const date = cell.date;
         const { isDisabled, isSelected, className: cellClassName, stateLabel } = cellPresentation({
-            cell, mode, disabledDate, selectedKeys, draftRange, holidays,
+            cell, mode, disabledDate: isDateDisabled, selectedKeys, draftRange, holidays,
         });
 
         return (

@@ -15,6 +15,7 @@ import kr.it.reserve.store.dto.StoreUpdateRequest;
 import kr.it.reserve.store.dto.StoreCreateRequest;
 import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.entity.ServiceDomain;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,6 +100,65 @@ class StoreDetailImageOrderTest {
 
     private static MultipartFile newImage() {
         return new MockMultipartFile("detailImages", "new.png", "image/png", new byte[] {1, 2, 3});
+    }
+
+    @Test
+    void savesUpdatedDetailsAndRefundPolicyTogether() {
+        StoreUpdateRequest request = new StoreUpdateRequest();
+        request.setName("updated store");
+        request.setDescription("updated description");
+        request.setAddress("updated address");
+        request.setZipCode("12345");
+        request.setAddressDetail("second floor");
+        request.setLatitude(37.5);
+        request.setLongitude(127.0);
+        request.setPhone("02-000-0000");
+        request.setCategory("스튜디오");
+        request.setServiceDomain("POPUP");
+        request.setNoShowDeposit(5000);
+        request.setFullRefundDays(10);
+        request.setPartialRefundDays(3);
+        request.setPartialRefundRate(75);
+
+        StoreResponse response = storeService.updateStore(STORE_ID, request, owner);
+
+        assertThat(response.getName()).isEqualTo("updated store");
+        assertThat(response.getDescription()).isEqualTo("updated description");
+        assertThat(response.getAddress()).isEqualTo("updated address");
+        assertThat(response.getZipCode()).isEqualTo("12345");
+        assertThat(response.getAddressDetail()).isEqualTo("second floor");
+        assertThat(response.getLatitude()).isEqualTo(37.5);
+        assertThat(response.getLongitude()).isEqualTo(127.0);
+        assertThat(response.getPhone()).isEqualTo("02-000-0000");
+        assertThat(response.getCategory()).isEqualTo("스튜디오");
+        assertThat(store.getServiceDomain()).isEqualTo(ServiceDomain.POPUP);
+        assertThat(response.getNoShowDeposit()).isEqualTo(5000);
+        assertThat(response.getFullRefundDays()).isEqualTo(10);
+        assertThat(response.getPartialRefundDays()).isEqualTo(3);
+        assertThat(response.getPartialRefundRate()).isEqualTo(75);
+        verify(storeRepository).save(store);
+    }
+
+    @Test
+    void partialRefundUpdateUsesStoredFullRefundDaysAndPreservesOmittedDetails() {
+        store.setDescription("keep description");
+        store.setCategory("카페");
+        store.setNoShowDeposit(5000);
+        store.setFullRefundDays(10);
+        store.setPartialRefundRate(75);
+        StoreUpdateRequest request = new StoreUpdateRequest();
+        request.setPartialRefundDays(10);
+        request.setServiceDomain(" ");
+
+        StoreResponse response = storeService.updateStore(STORE_ID, request, owner);
+
+        assertThat(response.getName()).isEqualTo("store");
+        assertThat(response.getDescription()).isEqualTo("keep description");
+        assertThat(response.getNoShowDeposit()).isEqualTo(5000);
+        assertThat(response.getFullRefundDays()).isEqualTo(10);
+        assertThat(response.getPartialRefundDays()).isZero();
+        assertThat(response.getPartialRefundRate()).isEqualTo(75);
+        assertThat(store.getServiceDomain()).isEqualTo(ServiceDomain.FOOD);
     }
 
     @ParameterizedTest

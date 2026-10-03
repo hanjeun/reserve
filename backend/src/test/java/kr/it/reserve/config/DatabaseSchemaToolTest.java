@@ -72,12 +72,12 @@ class DatabaseSchemaToolTest {
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         String agent = System.getProperty("reserve.schemaToolAgent");
         if (agent != null) {
-            command.add("-javaagent:" + agent + "=includes=VerifyDatabaseSchema*,destfile="
+            command.add("-javaagent:" + agent + "=includes=kr.it.reserve.tools.VerifyDatabaseSchema*,destfile="
                     + System.getProperty("reserve.schemaToolExecutionData"));
         }
         command.add("--class-path");
         command.add(System.getProperty("reserve.toolTestClasspath", System.getProperty("java.class.path")));
-        command.add("VerifyDatabaseSchema");
+        command.add("kr.it.reserve.tools.VerifyDatabaseSchema");
         command.add(jar.toAbsolutePath().toString());
         var builder = new ProcessBuilder(command).redirectErrorStream(true);
         builder.environment().put("DB_USERNAME", username);

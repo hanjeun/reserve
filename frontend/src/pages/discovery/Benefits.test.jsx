@@ -54,7 +54,7 @@ describe('public store news and benefit guidance', () => {
         renderPage();
         const loading = screen.getByRole('status', { name: '가게 소식을 불러오는 중' });
         expect(loading).toBeInTheDocument();
-        expect(loading.querySelectorAll('.reserve-benefit-row--skeleton')).toHaveLength(6);
+        expect(loading.parentElement.querySelectorAll('.reserve-benefit-row--skeleton')).toHaveLength(6);
         const link = await screen.findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' });
         expect(link).toHaveAttribute('href', '/benefits/1');
         fireEvent.click(link);

@@ -16,7 +16,7 @@
  *    공통 청크로 딸려 들어가 번들 예산(청크 600KiB)을 넘긴다(2026-09-28 빌드 실측 637KiB).
  *    쓰는 곳에서 '../../common/SortableImageUpload' 처럼 파일로 직접 import 하면 가게 폼 청크에만 들어간다.
  */
-import React from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Upload } from 'antd';
 import {
@@ -72,6 +72,10 @@ const SortableImageUpload = ({ fileList = [], onReorder, children, ...uploadProp
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
+    const renderSortableItem = useCallback((originNode, file) => (
+        <SortableItem file={file} originNode={originNode} reducedMotion={reducedMotion} />
+    ), [reducedMotion]);
+
     const handleDragEnd = ({ active, over }) => {
         if (!over || active.id === over.id) return;
         const from = fileList.findIndex(file => file.uid === active.id);
@@ -86,9 +90,7 @@ const SortableImageUpload = ({ fileList = [], onReorder, children, ...uploadProp
                 <Upload
                     {...uploadProps}
                     fileList={fileList}
-                    itemRender={(originNode, file) => (
-                        <SortableItem file={file} originNode={originNode} reducedMotion={reducedMotion} />
-                    )}
+                    itemRender={renderSortableItem}
                 >
                     {children}
                 </Upload>

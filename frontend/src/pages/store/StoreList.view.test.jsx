@@ -127,7 +127,7 @@ describe('store list view selection with real URL pagination', () => {
         await user.click(screen.getByRole('button', { name: '목록형 보기로 전환' }));
         expect(container.querySelector('.reserve-explore-result--page-next')).toBeNull();
         await user.click(screen.getByRole('button', { name: '다음 페이지' }));
-        expect(screen.getByRole('status', { name: '가게 목록을 불러오는 중' })).not.toHaveClass('reserve-explore-result--page-next');
+        expect(screen.getByRole('status', { name: '가게 목록을 불러오는 중' }).parentElement).not.toHaveClass('reserve-explore-result--page-next');
         expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'smooth' });
         await act(async () => resolveNext({ content: [{ id: 2, name: '두 번째 페이지 가게' }], page: { totalElements: 36, totalPages: 3 } }));
         expect(await screen.findByTestId('list-row')).toHaveTextContent('두 번째 페이지 가게');

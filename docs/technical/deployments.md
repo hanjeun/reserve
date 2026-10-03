@@ -108,8 +108,8 @@ gh api repos/hanjeun/reserve/branches/dev/protection
 ```powershell
 @'
 {
-  "required_status_checks": { "strict": false, "contexts": ["build-backend", "build-frontend"] },
-  "enforce_admins": false,
+  "required_status_checks": { "strict": true, "contexts": ["build-backend", "build-frontend"] },
+  "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": 0 },
   "restrictions": null,
   "required_linear_history": true,
@@ -142,11 +142,11 @@ gh pr comment 79 -R $REPO --body "@dependabot ignore this major version"
 gh pr comment 76 -R $REPO --body "@dependabot ignore this major version"
 ```
 
-마이너/패치 PR은 직접 머지해요.
+마이너/패치 PR은 승인 뒤 직접 머지해요. dev 대상은 merge commit, main 릴리스는 squash를 사용해요.
 
 ```bash
 gh pr list -R $REPO --label dependencies       # 목록 확인
-gh pr merge <번호> -R $REPO --squash --delete-branch
+gh pr merge <번호> -R $REPO --merge
 ```
 
 ## 4. 배포 직후 서버 작업
@@ -160,8 +160,11 @@ scp scripts/verify-post-deploy-readonly.sh scripts/verify-mysql-row-lock.sh ubun
 ssh ubuntu@<server>
 sudo install -m 0755 /tmp/verify-post-deploy-readonly.sh /usr/local/bin/reserve-post-deploy-verify
 sudo install -m 0755 /tmp/verify-mysql-row-lock.sh /usr/local/bin/reserve-mysql-row-lock
-sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env /usr/local/bin/reserve-post-deploy-verify
+sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env RESERVE_VERIFY_PREVIEW_SCHEMA=1 \
+  /usr/local/bin/reserve-post-deploy-verify
 ```
+
+v2.8.4부터 `RESERVE_VERIFY_PREVIEW_SCHEMA=1`로 광고·채팅의 추가 구조도 검사해요.
 
 읽는 항목:
 
@@ -182,7 +185,7 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env /usr/local/bin/reserve-post-depl
 MySQL 행 잠금 점검은 선택한 결제 행을 약 5초간 `FOR UPDATE`로 잠가요. 트래픽이 없는 TEST 결제 ID로 승인된 점검 창에서 실행하고, 두 번째 세션이 lock wait timeout으로 막히면 통과예요.
 
 ```bash
-sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env \
+sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
   /usr/local/bin/reserve-mysql-row-lock <idle-test-payment-id>
 ```
 

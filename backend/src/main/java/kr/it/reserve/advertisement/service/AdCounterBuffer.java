@@ -32,11 +32,14 @@ public class AdCounterBuffer {
     private final AtomicReference<ConcurrentHashMap<Long, LongAdder>> clicks =
             new AtomicReference<>(new ConcurrentHashMap<>());
 
+    private final Object impressionsLock = new Object();
+    private final Object clicksLock = new Object();
+
     public void increment(Long adId, CounterType type) {
         AtomicReference<ConcurrentHashMap<Long, LongAdder>> ref = bucketRef(type);
         // ref.get()과 increment 사이에 swap이 끼면 이미 배출된 버킷에 늦게 더해져 유실될 수 있다.
         // 타입별 짧은 임계구역으로 그 틈을 닫는다.
-        synchronized (ref) {
+        synchronized (bucketLock(type)) {
             ref.get().computeIfAbsent(adId, k -> new LongAdder()).increment();
         }
     }
@@ -48,7 +51,7 @@ public class AdCounterBuffer {
      */
     public Map<Long, LongAdder> swapAndGet(CounterType type) {
         AtomicReference<ConcurrentHashMap<Long, LongAdder>> ref = bucketRef(type);
-        synchronized (ref) {
+        synchronized (bucketLock(type)) {
             return ref.getAndSet(new ConcurrentHashMap<>());
         }
     }
@@ -62,7 +65,7 @@ public class AdCounterBuffer {
             return;
         }
         AtomicReference<ConcurrentHashMap<Long, LongAdder>> ref = bucketRef(type);
-        synchronized (ref) {
+        synchronized (bucketLock(type)) {
             ConcurrentHashMap<Long, LongAdder> current = ref.get();
             drained.forEach((adId, adder) -> {
                 long delta = adder.sum();
@@ -71,6 +74,13 @@ public class AdCounterBuffer {
                 }
             });
         }
+    }
+
+    private Object bucketLock(CounterType type) {
+        return switch (type) {
+            case IMPRESSION -> impressionsLock;
+            case CLICK -> clicksLock;
+        };
     }
 
     private AtomicReference<ConcurrentHashMap<Long, LongAdder>> bucketRef(CounterType type) {

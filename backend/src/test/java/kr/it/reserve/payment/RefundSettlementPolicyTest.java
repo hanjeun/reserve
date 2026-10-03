@@ -5,6 +5,8 @@ import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.service.RefundSettlementPolicy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -179,6 +181,23 @@ class RefundSettlementPolicyTest {
 
         assertThat(result.outcome()).isEqualTo(RefundSettlementPolicy.Outcome.REVIEW_REQUIRED);
         assertThat(result.detailCode()).isEqualTo("PG_CANCELLED_AMOUNT_MISSING");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "-1, 3000, LOCAL_REFUNDED_AMOUNT_INVALID",
+            "0, , LOCAL_REQUESTED_AMOUNT_INVALID",
+            "0, 0, LOCAL_REQUESTED_AMOUNT_INVALID",
+            "0, -1, LOCAL_REQUESTED_AMOUNT_INVALID",
+            "0, 3000, PG_PAYMENT_RESPONSE_MISSING"
+    })
+    @DisplayName("잘못된 로컬 금액과 누락된 PG 응답은 정책 우선순서대로 대사 대상으로 남긴다")
+    void rejectsInvalidInputsInPolicyOrder(int refundedAmount, Integer requestedAmount, String detailCode) {
+        RefundSettlementPolicy.Assessment result = RefundSettlementPolicy.assess(
+                refundedAmount, requestedAmount, "cancel-current", null);
+
+        assertThat(result).isEqualTo(new RefundSettlementPolicy.Assessment(
+                RefundSettlementPolicy.Outcome.REVIEW_REQUIRED, null, null, detailCode));
     }
 
     private PortoneV2PaymentResponse payment(String json) throws Exception {

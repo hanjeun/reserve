@@ -128,11 +128,9 @@ public class PwnedPasswordChecker {
     private boolean containsSuffixOverThreshold(String body, String suffix) {
         for (String line : body.split("\n")) {
             int sep = line.indexOf(':');
-            if (sep < 0) continue;
-            if (sep != suffix.length()) continue;
-
             // 서버가 대문자로 주지만 대소문자를 가리지 않도록 한다.
-            if (!line.regionMatches(true, 0, suffix, 0, sep)) continue;
+            if (sep < 0 || sep != suffix.length()
+                    || !line.regionMatches(true, 0, suffix, 0, sep)) continue;
 
             try {
                 int count = Integer.parseInt(line.substring(sep + 1).trim());

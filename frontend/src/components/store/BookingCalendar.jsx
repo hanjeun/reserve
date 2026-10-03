@@ -1,3 +1,4 @@
+import LoadingStatus from '../common/LoadingStatus';
 /**
  * 예약 날짜 선택 — **필드는 그대로 두고, 누르면 달력 모달이 뜬다.**
  *
@@ -211,11 +212,11 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
         }
         if (loading || fetching) {
             return (
-                <div role="status" aria-label="예약 가능한 날짜를 불러오는 중" aria-busy="true">
+                <LoadingStatus aria-label="예약 가능한 날짜를 불러오는 중" aria-busy="true">
                     <div style={styles.grid} aria-hidden="true">
                         {cells.map(cell => cell.blank ? <span key={cell.key} /> : <Bone key={cell.date.format('YYYY-MM-DD')} height={40} borderRadius={radius.md} />)}
                     </div>
-                </div>
+                </LoadingStatus>
             );
         }
         return (

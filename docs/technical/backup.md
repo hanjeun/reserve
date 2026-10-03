@@ -410,7 +410,7 @@ HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없�
 절대적인 읽기 전용 계정으로 설명하지 않아요. 역할 보관본은 `/etc/reserve-db-roles.json`
 (root 600)에 있어요. 키·비밀번호 값은 명령 출력이나 문서에 남기지 않아요.
 
-새 릴리스의 스키마는 해당 JAR로 `scripts/VerifyDatabaseSchema.java`를 실행해
+새 릴리스의 스키마는 해당 JAR로 `scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java`를 실행해
 확인해요. 이 도구는 앱을 부팅하지 않고 제한된 앱 계정으로 스키마만 검증해요.
 필요한 DDL은 대상·롤백을 검토해 별도로 적용하며 검증 실패를 `update`로 우회하지 않아요.
 

@@ -1,3 +1,5 @@
+package kr.it.reserve.tools;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -15,6 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.function.Supplier;
 
 /** Offline recovery verification. Reads the key only from a person's hidden console input. */
 public final class VerifyChatImageRecovery {
@@ -22,15 +25,29 @@ public final class VerifyChatImageRecovery {
     private static final int IV_BYTES = 12;
     private static final int TAG_BYTES = 16;
 
+    record ExpectedImage(int bytes, int width, int height, String mime) {}
+
     record Result(int bytes, int width, int height, String mime, String plaintextSha256) {}
 
     private VerifyChatImageRecovery() {}
 
     public static void main(String[] args) {
+        System.exit(run(args, VerifyChatImageRecovery::readHiddenKey));
+    }
+
+    private static char[] readHiddenKey() {
+        var console = System.console();
+        if (console == null) {
+            throw new IllegalStateException("An interactive console is required; no key was read");
+        }
+        return console.readPassword("Paste the separately stored CHAT_IMAGE_ENCRYPTION_KEY (hidden): ");
+    }
+
+    static int run(String[] args, Supplier<char[]> hiddenKeyInput) {
         try {
             if (args.length != 7) {
-                System.err.println("Usage: java scripts/VerifyChatImageRecovery.java <cipher-file> <AAD> <cipher-SHA256> <plain-bytes> <width> <height> <image/png|image/jpeg>");
-                System.exit(2);
+                System.err.println("Usage: java scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java <cipher-file> <AAD> <cipher-SHA256> <plain-bytes> <width> <height> <image/png|image/jpeg>");
+                return 2;
             }
             Path path = Path.of(args[0]);
             if (Files.size(path) > MAX_BYTES + IV_BYTES + TAG_BYTES) {
@@ -40,12 +57,9 @@ public final class VerifyChatImageRecovery {
             int bytes = Integer.parseInt(args[3]);
             int width = Integer.parseInt(args[4]);
             int height = Integer.parseInt(args[5]);
-            validateInput(ciphertext, args[1], args[2], bytes, width, height, args[6]);
-            var console = System.console();
-            if (console == null) {
-                throw new IllegalStateException("An interactive console is required; no key was read");
-            }
-            char[] encodedKey = console.readPassword("Paste the separately stored CHAT_IMAGE_ENCRYPTION_KEY (hidden): ");
+            ExpectedImage expected = new ExpectedImage(bytes, width, height, args[6]);
+            validateInput(ciphertext, args[1], args[2], expected);
+            char[] encodedKey = hiddenKeyInput.get();
             byte[] ascii = null;
             byte[] key = null;
             try {
@@ -56,7 +70,7 @@ public final class VerifyChatImageRecovery {
                     ascii[i] = (byte) encodedKey[i];
                 }
                 key = Base64.getDecoder().decode(ascii);
-                Result result = verify(ciphertext, key, args[1], args[2], bytes, width, height, args[6]);
+                Result result = verify(ciphertext, key, args[1], args[2], expected);
                 System.out.printf("PASS: S3 ciphertext hash, AES-256-GCM authentication, and decoded image match.%nbytes=%d width=%d height=%d mime=%s plaintext_sha256=%s%nNo plaintext image or key file was written.%n",
                         result.bytes(), result.width(), result.height(), result.mime(), result.plaintextSha256());
             } finally {
@@ -64,16 +78,21 @@ public final class VerifyChatImageRecovery {
                 if (ascii != null) Arrays.fill(ascii, (byte) 0);
                 if (key != null) Arrays.fill(key, (byte) 0);
             }
+            return 0;
         } catch (Exception failure) {
             // Do not print exception messages: input or provider messages could contain a secret.
             System.err.printf("FAIL (%s): recovery verification did not complete. No plaintext was written.%n", failure.getClass().getSimpleName());
-            System.exit(1);
+            return 1;
         }
     }
 
     static Result verify(byte[] ciphertext, byte[] key, String aad, String expectedSha256,
-                         int expectedBytes, int width, int height, String mime) throws GeneralSecurityException, IOException {
-        validateInput(ciphertext, aad, expectedSha256, expectedBytes, width, height, mime);
+                         ExpectedImage expected) throws GeneralSecurityException, IOException {
+        validateInput(ciphertext, aad, expectedSha256, expected);
+        int expectedBytes = expected.bytes();
+        int width = expected.width();
+        int height = expected.height();
+        String mime = expected.mime();
         if (key.length != 32) throw new IllegalArgumentException("AES-256 requires a 32-byte decoded key");
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"),
@@ -110,8 +129,12 @@ public final class VerifyChatImageRecovery {
         }
     }
 
-    private static void validateInput(byte[] ciphertext, String aad, String hash, int bytes,
-                                      int width, int height, String mime) throws NoSuchAlgorithmException {
+    private static void validateInput(byte[] ciphertext, String aad, String hash, ExpectedImage expected)
+            throws NoSuchAlgorithmException {
+        int bytes = expected.bytes();
+        int width = expected.width();
+        int height = expected.height();
+        String mime = expected.mime();
         if (!aad.matches("users/\\d+/chat/\\d+") || !hash.matches("[a-fA-F0-9]{64}")) {
             throw new IllegalArgumentException("Invalid expected context or hash");
         }

@@ -48,12 +48,12 @@ const DashboardTab = () => {
     // 감사 로그 요약 카드 본문: 로딩 → 실패 → 집계 순으로 하나만 그린다.
     const renderAuditSummary = () => {
         if (loading) {
-            return [1, 2, 3].map((i) => (
+            return <>{[1, 2, 3].map((i) => (
                 <div key={i} style={{ flex: '1 1 120px' }}>
                     <Bone width={64} height={13} style={{ marginBottom: 8 }} />
                     <Bone width={40} height={26} />
                 </div>
-            ));
+            ))}</>;
         }
         if (sourceFailed('audit')) {
             return (
@@ -61,7 +61,7 @@ const DashboardTab = () => {
                     onRetry={refetch} retrying={isFetching} compact />
             );
         }
-        return [
+        return <>{[
             { key: 'SOFT_DELETE', label: '소프트 삭제', color: colors.warning.main },
             { key: 'RESTORE',     label: '복구',        color: colors.success.main },
             { key: 'HARD_DELETE', label: '영구 삭제',   color: colors.error.main },
@@ -71,7 +71,7 @@ const DashboardTab = () => {
                 <span style={{ fontSize: 22, fontWeight: 800, color }}>{stats.actionCount[key] || 0}</span>
                 <span style={{ fontSize: fontSize.sm, color: colors.text.tertiary, marginLeft: 4 }}>건</span>
             </div>
-        ));
+        ))}</>;
     };
 
     return (

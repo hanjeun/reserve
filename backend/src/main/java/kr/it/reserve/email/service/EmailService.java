@@ -81,8 +81,8 @@ public class EmailService {
                                               String reservationTime, int guestCount) {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 승인되었습니다",
-                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "승인", "#1db954", "예약이 확정되었습니다! 방문 당일 즐거운 시간 되세요.", null, null));
+                buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
+                        reservationTime, guestCount), "승인", "#1db954", "예약이 확정되었습니다! 방문 당일 즐거운 시간 되세요.", null, null));
     }
 
     /**
@@ -99,8 +99,8 @@ public class EmailService {
                                                      String cancelReason) {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 취소되었습니다",
-                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "취소", DECLINED_COLOR,
+                buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
+                        reservationTime, guestCount), "취소", DECLINED_COLOR,
                         "가게 사정으로 예약이 취소되었습니다. 결제하신 예약금은 전액 환불됩니다.",
                         cancelReason, "취소 사유"));
     }
@@ -113,8 +113,8 @@ public class EmailService {
                                              String rejectionReason) {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 거절되었습니다",
-                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "거절", DECLINED_COLOR, "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.",
+                buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
+                        reservationTime, guestCount), "거절", DECLINED_COLOR, "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.",
                         rejectionReason, "거절 사유"));
     }
 
@@ -131,18 +131,20 @@ public class EmailService {
                                                     String reservationTime, int guestCount) {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약 승인이 취소되었습니다",
-                buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "대기", "#faad14",
+                buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
+                        reservationTime, guestCount), "대기", "#faad14",
                         "앞서 보내드린 승인 안내를 취소합니다. 예약은 다시 승인 대기 상태입니다.",
                         null, null));
     }
 
+    public record ReservationMailDetails(String storeName, String reservationDate,
+                                         String reservationTime, int guestCount) {}
+
     /** 신규 예약 알림 → 사장님 */
     @Async
     public void sendNewReservationAlertToOwner(String ownerEmail, String ownerName,
-                                               String storeName, String memberName, String memberEmail,
-                                               String reservationDate, String reservationTime,
-                                               int guestCount) {
+                                               String memberName, String memberEmail,
+                                               ReservationMailDetails details) {
         String oName = resolveName(ownerName, ownerEmail);
         String mName = resolveName(memberName, memberEmail);
         try {
@@ -154,7 +156,8 @@ public class EmailService {
                 helper.setReplyTo(memberEmail);  // 사장님이 이 메일에 바로 "답장" 누르면 예약자한테 감
             }
             helper.setSubject("[RESERVE] 새로운 예약이 접수되었습니다");
-            helper.setText(buildOwnerAlertContent(oName, storeName, mName, memberEmail, reservationDate, reservationTime, guestCount), true);
+            helper.setText(buildOwnerAlertContent(oName, details.storeName(), mName, memberEmail,
+                    details.reservationDate(), details.reservationTime(), details.guestCount()), true);
             mailSender.send(message);
             log.info("Reservation notification email sent: recipient=owner");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
@@ -184,14 +187,14 @@ public class EmailService {
      * @param reasonLabel 사유 행의 라벨. <b>"거절 사유"로 고정하면 안 된다</b> (2026-08-11) —
      *                    취소 메일에 "거절 사유"가 찍히면 이용자가 무슨 일이 있었는지 오해한다.
      */
-    private String buildReservationStatusContent(String memberName, String storeName,
-                                                  String reservationDate, String reservationTime,
-                                                  int guestCount, String statusLabel, String statusColor,
+    private String buildReservationStatusContent(String memberName, ReservationMailDetails details,
+                                                  String statusLabel, String statusColor,
                                                   String statusMessage, String reason, String reasonLabel) {
         String safeMemberName = escapeHtml(memberName);
-        String safeStoreName = escapeHtml(storeName);
-        String safeReservationDate = escapeHtml(reservationDate);
-        String safeReservationTime = escapeHtml(reservationTime);
+        String safeStoreName = escapeHtml(details.storeName());
+        String safeReservationDate = escapeHtml(details.reservationDate());
+        String safeReservationTime = escapeHtml(details.reservationTime());
+        int guestCount = details.guestCount();
         String safeStatusLabel = escapeHtml(statusLabel);
         String safeStatusMessage = escapeHtml(statusMessage);
         String safeReason = escapeHtmlWithLineBreaks(reason);

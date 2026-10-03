@@ -138,7 +138,8 @@ describe('route chunk loading patterns', () => {
     it('reuses the benefit detail data skeleton and the coming-soon frame', () => {
         const { container, rerender } = render(<RouteSkeletonPreview pathname="/benefits/3" />);
         expect(container.querySelector('.reserve-benefits-page.reserve-benefit-detail .reserve-route-skeleton-copy')).toBeInTheDocument();
-        expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
+        expect(screen.getAllByRole('status')).toHaveLength(1);
+        expect(screen.getByRole('status').tagName).toBe('OUTPUT');
         rerender(<RouteSkeletonPreview pathname="/waiting" />);
         expect(container.querySelector('.reserve-discovery-coming-soon h1')).toHaveTextContent('웨이팅은 아직 준비 중이에요');
         expect(container.querySelector('.reserve-discovery-coming-soon .reserve-route-skeleton-text')).toBeInTheDocument();

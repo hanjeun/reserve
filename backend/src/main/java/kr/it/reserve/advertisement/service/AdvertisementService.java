@@ -121,15 +121,7 @@ public class AdvertisementService {
                             HttpStatus.CONFLICT);
                 });
 
-        if (request.getStartDate() == null || request.getEndDate() == null) {
-            throw new AdvertisementException("노출 시작일과 종료일을 입력해주세요.", HttpStatus.BAD_REQUEST);
-        }
-        if (request.getStartDate().isBefore(ServiceTime.today())) {
-            throw new AdvertisementException("시작일은 오늘 이후여야 합니다.", HttpStatus.BAD_REQUEST);
-        }
-        if (request.getEndDate().isBefore(request.getStartDate())) {
-            throw new AdvertisementException("종료일은 시작일 이후여야 합니다.", HttpStatus.BAD_REQUEST);
-        }
+        validateAdDates(request.getStartDate(), request.getEndDate());
 
         long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
         int amount = calculateAmount(adType, days);
@@ -140,22 +132,7 @@ public class AdvertisementService {
                 ? resolveBannerMotion(request.getBannerMotionKey())
                 : null;
 
-        List<String> imageUrls = new java.util.ArrayList<>();
-        if (adType == AdType.BANNER) {
-            List<MultipartFile> images = request.getImages();
-            if (images == null || images.isEmpty() || images.stream().allMatch(MultipartFile::isEmpty)) {
-                throw new AdvertisementException("배너 광고는 이미지가 최소 1장 필요합니다.", HttpStatus.BAD_REQUEST);
-            }
-            if (images.size() > MAX_BANNER_IMAGES) {
-                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
-            }
-            for (MultipartFile image : images) {
-                if (image.isEmpty()) continue;
-                String key = fileStorageService.storeFile(
-                        image, FileStoragePaths.advertisement(owner.getId(), store.getId()));
-                imageUrls.add(fileStorageService.getPublicUrl(key));
-            }
-        }
+        List<String> imageUrls = uploadRequiredBannerImages(adType, request, owner.getId(), store.getId());
 
         String merchantUid = "AD-" + UUID.randomUUID();
 
@@ -188,6 +165,41 @@ public class AdvertisementService {
                 .buyerTel("")
                 .storeId(portoneService.getStoreId())
                 .build();
+    }
+
+    private void validateAdDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new AdvertisementException("노출 시작일과 종료일을 입력해주세요.", HttpStatus.BAD_REQUEST);
+        }
+        if (startDate.isBefore(ServiceTime.today())) {
+            throw new AdvertisementException("시작일은 오늘 이후여야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+        if (endDate.isBefore(startDate)) {
+            throw new AdvertisementException("종료일은 시작일 이후여야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+
+    }
+
+    private List<String> uploadRequiredBannerImages(
+            AdType adType, AdCreateRequest request, Long ownerId, Long storeId) {
+        List<String> imageUrls = new java.util.ArrayList<>();
+        if (adType == AdType.BANNER) {
+            List<MultipartFile> images = request.getImages();
+            if (images == null || images.isEmpty() || images.stream().allMatch(MultipartFile::isEmpty)) {
+                throw new AdvertisementException("배너 광고는 이미지가 최소 1장 필요합니다.", HttpStatus.BAD_REQUEST);
+            }
+            if (images.size() > MAX_BANNER_IMAGES) {
+                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
+            }
+            for (MultipartFile image : images) {
+                if (image.isEmpty()) continue;
+                String key = fileStorageService.storeFile(
+                        image, FileStoragePaths.advertisement(ownerId, storeId));
+                imageUrls.add(fileStorageService.getPublicUrl(key));
+            }
+        }
+
+        return imageUrls;
     }
 
     static int calculateAmount(AdType adType, long days) {
@@ -393,7 +405,13 @@ public class AdvertisementService {
 
         // images가 null이면 기존 이미지 유지 — 값이 있으면 통째로 교체(createAd와 동일한 검증/업로드 규칙).
         // 새 파일은 트랜잭션 롤백 시 보상 삭제되고, 기존 파일은 커밋 뒤 outbox worker가 삭제한다.
-        List<MultipartFile> images = request.getImages();
+        replaceBannerImages(ad, request.getImages(), owner.getId());
+
+        log.info("Advertisement updated: adId={}", adId);
+        return AdvertisementResponse.fromEntity(ad);
+    }
+
+    private void replaceBannerImages(Advertisement ad, List<MultipartFile> images, Long ownerId) {
         if (images != null && !images.isEmpty() && images.stream().anyMatch(f -> !f.isEmpty())) {
             if (images.size() > MAX_BANNER_IMAGES) {
                 throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
@@ -402,7 +420,7 @@ public class AdvertisementService {
             for (MultipartFile image : images) {
                 if (image.isEmpty()) continue;
                 String key = fileStorageService.storeFile(
-                        image, FileStoragePaths.advertisement(owner.getId(), ad.getStore().getId()));
+                        image, FileStoragePaths.advertisement(ownerId, ad.getStore().getId()));
                 newImageUrls.add(fileStorageService.getPublicUrl(key));
             }
             List<String> oldImageUrls = ad.getImageUrlList();
@@ -413,8 +431,6 @@ public class AdvertisementService {
             }
         }
 
-        log.info("Advertisement updated: adId={}", adId);
-        return AdvertisementResponse.fromEntity(ad);
     }
 
     /** 광고별 독립 잠금으로 결제·취소와 직렬화한다. */

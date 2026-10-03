@@ -374,7 +374,7 @@
     .reserve-region-sheet-popular { margin: 18px 20px 12px; }
     .reserve-region-sheet-popular-item,
     .reserve-region-sheet-popular-placeholder { flex-basis: 92px; }
-    .reserve-region-sheet-popular-placeholder:nth-child(n + 5) { display: none; }
+    .reserve-region-sheet-popular-placeholder:nth-of-type(n + 5) { display: none; }
     .reserve-region-sheet-regions { grid-template-columns: minmax(116px, 35%) minmax(0, 1fr); }
     .reserve-region-sheet-groups button,
     .reserve-region-sheet-areas button { padding-inline: 14px; }

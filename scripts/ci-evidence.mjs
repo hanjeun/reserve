@@ -10,7 +10,7 @@ import { resolveBin } from './resolve-bin.mjs';
 const VERSION = 1;
 const MAX_AGE_MS = 7 * 86_400_000;
 const scopes = {
-    backend: ['backend', 'frontend/index.html', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', 'scripts/dependency-notices.gradle',
+    backend: ['backend', 'frontend/index.html', 'scripts/java/kr/it/reserve/tools/VerifyDatabaseSchema.java', 'scripts/java/kr/it/reserve/tools/VerifyChatImageRecovery.java', 'scripts/tests/kr/it/reserve/tools/VerifyChatImageRecoveryTest.java', 'scripts/ci-evidence.mjs', 'scripts/resolve-bin.mjs', 'scripts/coverage.init.gradle', 'scripts/dependency-notices.gradle',
         '.github/workflows/CICD.yml', '.gitattributes', 'docker-compose-blue.yml', 'docker-compose-green.yml'],
     frontend: ['frontend', 'backend/src/main', 'scripts', '.github', '.gitattributes', 'nginx', 'monitoring', 'docs/design-system/snapshots'],
 };
@@ -110,7 +110,7 @@ async function readProof(artifact) {
 async function restoreCoverage(component, key, proof, runtime) {
     const origin = await api(`actions/runs/${proof.originRunId}`);
     if (!eligibleRun(origin, process.env.GITHUB_REPOSITORY)) return false;
-    git(['fetch', '--no-tags', '--depth=1', 'origin', origin.head_sha]);
+    git(['fetch', '--no-tags', 'origin', origin.head_sha]);
     if (keyAt(component, origin.head_sha, runtime) !== key) return false;
     const name = `ci-coverage-${component}-${key}`;
     const { artifacts } = await api(`actions/runs/${origin.id}/artifacts?per_page=100`);
@@ -155,7 +155,7 @@ async function restore(component, key, runtime) {
         if (!eligibleRun(run, process.env.GITHUB_REPOSITORY)) continue;
         const jobs = await api(`actions/runs/${run.id}/jobs?filter=latest&per_page=100`);
         if (!jobs.jobs.some(job => job.name === `test-${component}` && job.conclusion === 'success')) continue;
-        git(['fetch', '--no-tags', '--depth=1', 'origin', run.head_sha]);
+        git(['fetch', '--no-tags', 'origin', run.head_sha]);
         // Do not trust a key claimed by an artifact: recompute from that run's actual Git tree.
         if (keyAt(component, run.head_sha, runtime) !== key) continue;
         const proof = await readProof(artifact);

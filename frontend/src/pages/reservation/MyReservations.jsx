@@ -1,3 +1,4 @@
+import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Typography } from 'antd';
@@ -320,11 +321,11 @@ const MyReservations = () => {
     let listBody;
     if (loading) {
         listBody = (
-            <div role="status" aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
+            <LoadingStatus aria-label="예약 목록을 불러오는 중"><div aria-hidden="true">
                 {view === 'cards'
                     ? <ReservationSummaryCardSkeleton count={4} />
                     : <MyReservationCardSkeleton count={4} />}
-            </div></div>
+            </div></LoadingStatus>
         );
     } else if (error && reservations.length === 0) {
         listBody = (

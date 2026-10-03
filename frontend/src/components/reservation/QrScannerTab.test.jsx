@@ -59,9 +59,9 @@ describe('QrScannerTab sheet surface', () => {
         const { container, unmount } = render(<QueryClientProvider client={client}><AntApp>
             <QrScannerTab sheet onClose={vi.fn()} />
         </AntApp></QueryClientProvider>);
-        expect(container.querySelector('.reserve-qr-scanner').firstElementChild).toHaveStyle({ background: 'transparent', borderRadius: '0' });
+        expect(container.querySelector('.reserve-qr-scanner > div')).toHaveStyle({ background: 'transparent', borderRadius: '0' });
         const start = await screen.findByRole('button', { name: 'QR 스캔 시작' }, { timeout: 1200 });
-        expect(container.querySelector('.reserve-qr-scanner').firstElementChild).toHaveStyle({ background: 'transparent', borderRadius: '0' });
+        expect(container.querySelector('.reserve-qr-scanner > div')).toHaveStyle({ background: 'transparent', borderRadius: '0' });
         fireEvent.click(start);
         await waitFor(() => expect(scannerState.start).toHaveBeenCalledTimes(1));
         expect(start).toBeDisabled();

@@ -1,6 +1,7 @@
 package kr.it.reserve.tourism.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import kr.it.reserve.tourism.entity.TourismRegionPhoto;
 import kr.it.reserve.tourism.repository.TourismRegionPhotoRepository;
 import org.junit.jupiter.api.Test;
@@ -63,10 +64,11 @@ class TourismRegionPhotoServiceTest {
     @Mock private TourismRegionPhotoRepository repository;
     @Mock private RestTemplate restTemplate;
     @Mock private TourismImageProxyClient imageProxyClient;
+    private final SimpleMeterRegistry metrics = new SimpleMeterRegistry();
 
     private TourismRegionPhotoService service(String key) {
         TourismRegionPhotoService service = new TourismRegionPhotoService(
-                repository, restTemplate, new ObjectMapper(), imageProxyClient);
+                repository, restTemplate, new ObjectMapper(), imageProxyClient, new TourismPhotoMetrics(metrics));
         ReflectionTestUtils.setField(service, "serviceKey", key);
         return service;
     }
@@ -106,6 +108,8 @@ class TourismRegionPhotoServiceTest {
                 .contains("serviceKey=aB%2BcD%3D")
                 .doesNotContain("%25")
                 .contains("areaCode=1");
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "areaBasedList2").timer().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "detailImage2").timer().count()).isEqualTo(1);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -188,10 +192,10 @@ class TourismRegionPhotoServiceTest {
     @Test
     void keepsARecentlyVerifiedCatalogEntryWithoutCallingTheExternalApiAgain() {
         TourismRegionPhoto photo = new TourismRegionPhoto(
-                "서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+                "서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 "https://tong.visitkorea.or.kr/cms/resource/00/123456_image2_1.jpg",
                 "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(photo));
 
         assertThat(service("key").findRegionPhotos(List.of("서울")))
@@ -204,10 +208,10 @@ class TourismRegionPhotoServiceTest {
     @Test
     void imageProxyRefusesAnUnexpectedHostBeforeMakingANetworkRequest() {
         TourismRegionPhoto photo = new TourismRegionPhoto(
-                "서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+                "서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 "https://example.invalid/image.jpg",
                 "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(photo));
 
         assertThat(service("key").loadImage("서울")).isEmpty();
@@ -218,10 +222,10 @@ class TourismRegionPhotoServiceTest {
     @Test
     void imageProxyReturnsAnEmptyResultWhenTheDedicatedClientRejectsTheResponse() {
         TourismRegionPhoto photo = new TourismRegionPhoto(
-                "서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+                "서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 "https://tong.visitkorea.or.kr/cms/resource/00/123456_image2_1.jpg",
                 "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(photo));
         when(imageProxyClient.fetch(photo.getImageUrl())).thenReturn(Optional.empty());
 
@@ -230,9 +234,9 @@ class TourismRegionPhotoServiceTest {
     }
 
     private TourismRegionPhoto photo(String region, String imageUrl) {
-        return new TourismRegionPhoto(region, "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+        return new TourismRegionPhoto(region, new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 imageUrl, "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
     }
 
     private void imageClock(TourismRegionPhotoService target, Instant now) {
@@ -254,6 +258,10 @@ class TourismRegionPhotoServiceTest {
         assertThat(target.loadImage("서울").orElseThrow().bytes()).containsExactly((byte) 1, (byte) 2, (byte) 3);
         verify(imageProxyClient, times(1)).fetch(url);
         verifyNoInteractions(restTemplate);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "hit").counter().count()).isEqualTo(2);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "miss").counter().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.image.proxy").timer().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.image.proxy.errors").counter().count()).isZero();
     }
 
     @Test
@@ -299,6 +307,10 @@ class TourismRegionPhotoServiceTest {
         assertThat(target.loadImage("서울")).isPresent();
         assertThat(target.loadImage("서울")).isPresent();
         verify(imageProxyClient, times(2)).fetch(url);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "backoff").counter().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.image.cache").tag("outcome", "miss").counter().count()).isEqualTo(2);
+        assertThat(metrics.get("reserve.tourism.image.proxy").timer().count()).isEqualTo(2);
+        assertThat(metrics.get("reserve.tourism.image.proxy.errors").counter().count()).isEqualTo(1);
     }
 
     @Test
@@ -401,8 +413,8 @@ class TourismRegionPhotoServiceTest {
     @Test
     void failedCatalogRefreshKeepsTheOldPhotoAndDoesNotRetryOnEveryVisit() {
         var old = photo("서울", "https://tong.visitkorea.or.kr/first.jpg");
-        old.refresh("서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진", old.getImageUrl(),
-                old.getSourceUrl(), "공공누리 제1유형", LocalDateTime.now().minusDays(31));
+        old.refresh("서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진", old.getImageUrl(),
+                old.getSourceUrl(), "공공누리 제1유형", LocalDateTime.now().minusDays(31)));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(old));
         when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                 .thenThrow(new org.springframework.web.client.ResourceAccessException("simulated upstream failure"));
@@ -411,16 +423,26 @@ class TourismRegionPhotoServiceTest {
         assertThat(target.findRegionPhotos(List.of("서울"))).hasSize(1);
         verify(restTemplate, times(1)).getForObject(any(URI.class), eq(String.class));
         verify(repository, never()).save(any());
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "areaBasedList2").timer().count()).isEqualTo(1);
+        assertThat(metrics.get("reserve.tourism.api.errors").tag("endpoint", "areaBasedList2").counter().count()).isEqualTo(1);
     }
 
     @Test
     void arbitraryRegionInputDoesNotGrowCachesOrReachTheRepository() {
         var target = service("key");
+        int meterCount = metrics.getMeters().size();
         for (int i = 0; i < 100; i++) {
             assertThat(target.loadImage("untrusted-" + i)).isEmpty();
             assertThat(target.findRegionPhotos(List.of("untrusted-" + i))).isEmpty();
         }
         assertThat((java.util.Map<?, ?>) ReflectionTestUtils.getField(target, "regionLocks")).isEmpty();
         verifyNoInteractions(repository, restTemplate, imageProxyClient);
+        assertThat(metrics.getMeters()).isNotEmpty().hasSize(meterCount);
+        assertThat(metrics.getMeters().stream()
+                .flatMap(meter -> meter.getId().getTags().stream()).toList())
+                .isNotEmpty().allSatisfy(tag ->
+                        assertThat(tag.getKey()).isIn("outcome", "endpoint"));
+        assertThat(metrics.get("reserve.tourism.image.proxy").timer().count()).isZero();
+        assertThat(metrics.get("reserve.tourism.api").tag("endpoint", "areaBasedList2").timer().count()).isZero();
     }
 }

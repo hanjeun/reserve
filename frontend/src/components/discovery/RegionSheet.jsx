@@ -1,3 +1,4 @@
+import LoadingStatus from '../common/LoadingStatus';
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Skeleton } from 'antd';
@@ -65,14 +66,14 @@ const PopularAreaButton = ({ area, draft, onPick }) => {
 const PopularAreaList = ({ isLoading, hasAreas, areas, draft, ownerRegions, onPick }) => {
     if (isLoading) {
         return (
-            <div className="reserve-region-sheet-popular-list" role="status" aria-label="인기 지역을 불러오는 중" aria-busy="true">
+            <LoadingStatus className="reserve-region-sheet-popular-list" aria-label="인기 지역을 불러오는 중" aria-busy="true">
                 {[0, 1, 2, 3, 4, 5].map(index => (
                     <div key={index} className="reserve-region-sheet-popular-placeholder" aria-hidden="true">
                         <Skeleton.Avatar active shape="circle" size={52} />
                         <Skeleton.Input active size="small" />
                     </div>
                 ))}
-            </div>
+            </LoadingStatus>
         );
     }
     if (hasAreas) {
@@ -96,7 +97,7 @@ const GroupAreaList = ({ group, isLoading, draft, ownerRegions, onSelect }) => (
             <span>{group.label} 전체</span>
             {!isLoading && <span className="reserve-region-sheet-count">{group.count}</span>}
         </button>
-        {isLoading ? <div className="reserve-region-sheet-loading" role="status" aria-label="세부 지역을 불러오는 중" aria-busy="true"><Skeleton active title={false} paragraph={{ rows: 4 }} /></div>
+        {isLoading ? <LoadingStatus className="reserve-region-sheet-loading" aria-label="세부 지역을 불러오는 중" aria-busy="true"><Skeleton active title={false} paragraph={{ rows: 4 }} /></LoadingStatus>
             : group.areas.map(area => {
             const areaValue = `${group.name} ${area.name}`;
             return <button key={area.name} type="button" className={draft === areaValue ? 'is-selected' : ''}

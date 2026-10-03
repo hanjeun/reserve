@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -39,7 +40,7 @@ public class ChatRetractionService {
         }
         if (message.isPurged()) throw new ChatException("보존 기간이 지난 메시지입니다.", HttpStatus.GONE);
         if (!message.isRetracted()) {
-            message.retract(LocalDateTime.now(), room.nextRetractionRevision());
+            message.retract(LocalDateTime.now(Clock.systemDefaultZone()), room.nextRetractionRevision());
             var latest = messages.findLatestByRoomIds(List.of(roomId));
             if (latest.stream().anyMatch(item -> messageId.equals(item.getId()))) {
                 room.replaceLastMessagePreview("전송이 취소된 메시지입니다.");

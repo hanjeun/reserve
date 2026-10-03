@@ -3,6 +3,7 @@ package kr.it.reserve.mailbox.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -28,13 +29,13 @@ public class AdminSentMail {
 
     @Column(name = "sent_at", nullable = false)
     @Builder.Default
-    private LocalDateTime sentAt = LocalDateTime.now();
+    private LocalDateTime sentAt = LocalDateTime.now(Clock.systemDefaultZone());
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
     public void softDelete() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     public boolean isDeleted() {

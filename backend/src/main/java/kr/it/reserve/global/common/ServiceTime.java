@@ -33,12 +33,12 @@ import java.time.ZoneOffset;
  *   <tr><td><b>사용자가 고른 날짜·시각</b>(예약일, 광고 기간) 또는 "오늘"</td>
  *       <td><b>{@code ServiceTime.today()} / {@code ServiceTime.now()}</b></td></tr>
  *   <tr><td><b>DB 에 저장된 타임스탬프</b>(createdAt, expiresAt, suspendedUntil …)</td>
- *       <td>인자 없는 {@code LocalDateTime.now()} — 저장할 때도 같은 시계를 썼으므로 일관된다</td></tr>
+ *       <td>{@code LocalDateTime.now(Clock.systemDefaultZone())} — 저장할 때와 같은 JVM 시계를 명시한다</td></tr>
  * </table>
  *
  * <p>후자를 KST 로 바꾸면 <b>오히려 기존 데이터와 9시간 어긋난다.</b>
  * {@code ReservationService#undo} 와 {@code ReservationExpiryScheduler} 가 그래서 의도적으로
- * 인자 없는 {@code now()} 를 쓴다 — 각 호출부 주석에 이유를 적어두었으니 지우지 말 것.
+ * 같은 JVM 기본 시계를 명시한다 — 각 호출부 주석에 이유를 적어두었으니 지우지 말 것.
  *
  * <p>예전엔 이 상수가 {@code ReservationElapsedScheduler} 와 {@code QrCheckinTokenProvider} 에
  * 각각 복사돼 있었고, 규칙은 그 두 파일의 주석에만 있었다. 주석은 강제력이 0이라 나머지 열 몇 곳이

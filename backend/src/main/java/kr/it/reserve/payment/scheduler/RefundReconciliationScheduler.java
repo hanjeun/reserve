@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -66,7 +67,7 @@ public class RefundReconciliationScheduler {
      */
     @Scheduled(fixedDelay = 5 * 60 * 1000, initialDelay = 60 * 1000)
     public void reconcileUnresolvedRefunds() {
-        LocalDateTime cutoff = LocalDateTime.now().minus(SETTLE_DELAY);
+        LocalDateTime cutoff = LocalDateTime.now(Clock.systemDefaultZone()).minus(SETTLE_DELAY);
         List<UnresolvedRefundView> unresolved =
                 refundAttemptRepository.findUnresolvedBefore(RefundAttempt.UNRESOLVED, cutoff);
 

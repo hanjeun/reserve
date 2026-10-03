@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -69,7 +70,7 @@ public class TokenProvider {
     public String generateRefreshToken(Member member) {
         Duration expiration = jwtProperties.getRefreshTokenExpiration();
         String token = createRefreshJwt(member);
-        LocalDateTime expiresAt = LocalDateTime.now().plus(expiration);
+        LocalDateTime expiresAt = LocalDateTime.now(Clock.systemDefaultZone()).plus(expiration);
 
         // 새 토큰 저장
         refreshTokenRepository.save(new RefreshToken(member.getId(), token, expiresAt));

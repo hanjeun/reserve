@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -93,7 +94,7 @@ public class AdPaymentLedgerService {
         requireOwner(ad, ownerId);
         current(ad);
         AdPaymentAttempt attempt = attempts.findForUpdate(uid).orElseThrow(AdvertisementException::notFound);
-        String token = attempt.claim(LocalDateTime.now());
+        String token = attempt.claim(LocalDateTime.now(Clock.systemDefaultZone()));
         return token == null ? null : new Claim(uid, token);
     }
 
@@ -173,7 +174,7 @@ public class AdPaymentLedgerService {
             return null;
         }
         String status = pg.getStatus();
-        attempt.observed(status == null ? "UNKNOWN" : status, pg.getCancelledAmount(), LocalDateTime.now());
+        attempt.observed(status == null ? "UNKNOWN" : status, pg.getCancelledAmount(), LocalDateTime.now(Clock.systemDefaultZone()));
         boolean currentAttempt = ad.getMerchantUid().equals(attempt.getMerchantUid());
         if ("CANCELLED".equals(status) && Objects.equals(pg.getCancelledAmount(), attempt.getAmount().longValue())) {
             attempt.reviewed(State.REFUNDED, null);
@@ -187,7 +188,7 @@ public class AdPaymentLedgerService {
                 if (currentAttempt) ad.setStatus(AdStatus.REFUND_PENDING);
             } else if (attempt.isCancelRequested()) {
                 if (currentAttempt) ad.setStatus(AdStatus.REFUND_PENDING);
-                if (attempt.dispatchRefund(LocalDateTime.now())) {
+                if (attempt.dispatchRefund(LocalDateTime.now(Clock.systemDefaultZone()))) {
                     return new RefundCommand(attempt.getMerchantUid(), claim.token(), attempt.getAmount(), attempt.getRefundKey());
                 }
                 // PAID 상태만으로 비동기 환불 실패를 판정하지 않는다. 재발신 없이 계속 대사한다.
@@ -219,7 +220,7 @@ public class AdPaymentLedgerService {
         lockByUid(claim.merchantUid());
         AdPaymentAttempt attempt = attempts.findForUpdate(claim.merchantUid()).orElseThrow();
         if (!attempt.ownsLease(claim.token())) return;
-        attempt.observed(notFound ? "NOT_FOUND" : "UNAVAILABLE", null, LocalDateTime.now());
+        attempt.observed(notFound ? "NOT_FOUND" : "UNAVAILABLE", null, LocalDateTime.now(Clock.systemDefaultZone()));
         attempt.requireReview(notFound ? "PG_NOT_FOUND_NOT_TERMINAL" : "PG_LOOKUP_FAILED");
         attempt.release();
     }

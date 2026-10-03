@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -31,7 +32,7 @@ public class ReservationExpiryScheduler {
 
     @Scheduled(fixedDelay = 5 * 60 * 1000) // 5분마다 실행
     public void expireUnpaidReservations() {
-        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(QUERY_BUFFER_MINUTES);
+        LocalDateTime cutoff = LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(QUERY_BUFFER_MINUTES);
 
         List<Reservation> candidates = reservationRepository.findExpiredUnpaidReservations(cutoff);
 
@@ -39,7 +40,7 @@ public class ReservationExpiryScheduler {
             return;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         int expiredCount = 0;
         int recoveredCount = 0;
         int deferredCount = 0;

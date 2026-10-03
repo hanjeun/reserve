@@ -14,6 +14,25 @@ const frontendTests = workflow.jobs['test-frontend'];
 const staging = workflow.jobs['stage-release'];
 const step = (job, id) => job.steps.find(entry => entry.id === id);
 
+test('production deployment requires the restricted app account and cannot fall back to root or DDL update', () => {
+    for (const color of ['blue', 'green']) {
+        const compose = require('js-yaml').load(read(`docker-compose-${color}.yml`));
+        const environment = compose.services[color].environment;
+        assert.ok(environment.includes('DB_USERNAME=reserve_app'));
+        assert.ok(environment.includes('SPRING_JPA_HIBERNATE_DDL_AUTO=validate'));
+        assert.ok(environment.includes('DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required for deployment}'));
+        assert.ok(!environment.some(value => /DB_USERNAME=.*root|DDL_AUTO=.*update|DB_PASSWORD.*\$\{DB_PASSWORD/.test(value)));
+    }
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    assert.ok(launch);
+    assert.equal(launch.env.DB_APP_PASSWORD, '${{ secrets.DB_APP_PASSWORD }}');
+    assert.equal(launch.env.DB_PASSWORD, undefined);
+    assert.ok(!launch.with.envs.split(',').includes('DB_PASSWORD'));
+    const guard = ': "${DB_APP_PASSWORD:?DB_APP_PASSWORD is required for deployment}"';
+    assert.ok(launch.with.script.includes(guard));
+    assert.ok(launch.with.script.indexOf(guard) < launch.with.script.indexOf('sudo docker pull'));
+});
+
 test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled security scans', () => {
     const scan = require('js-yaml').load(read('.github/workflows/codeql.yml'));
     assert.deepEqual(scan.on.push.branches, ['main']);

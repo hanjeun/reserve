@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -33,7 +34,7 @@ public class PaymentOperationsMonitorScheduler {
                 Set.of(PaymentWebhookInbox.InboxStatus.FAILED));
         long staleReadyPayments = paymentRepository.countByStatusAndCreatedAtBefore(
                 kr.it.reserve.payment.entity.Payment.PaymentStatus.READY,
-                LocalDateTime.now().minusDays(STALE_READY_DAYS));
+                LocalDateTime.now(Clock.systemDefaultZone()).minusDays(STALE_READY_DAYS));
         long ledgerInvariantViolations = paymentRepository.countLedgerInvariantViolations();
         long depositInvariantViolations = paymentRepository.countReservationDepositInvariantViolations();
         log.info("Application log heartbeat: paymentOperations=checked");

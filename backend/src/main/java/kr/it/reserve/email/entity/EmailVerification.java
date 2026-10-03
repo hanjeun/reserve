@@ -3,6 +3,7 @@ package kr.it.reserve.email.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -50,7 +51,7 @@ public class EmailVerification {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     /** 코드가 틀렸을 때 호출. */
@@ -67,7 +68,7 @@ public class EmailVerification {
      * 인증 코드 만료 여부 확인
      */
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(this.expiresAt);
+        return LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.expiresAt);
     }
 
     /**

@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 
@@ -30,7 +31,7 @@ public class FileDeletionOutboxService {
                 hash,
                 sourceType,
                 sourceId,
-                LocalDateTime.now()));
+                LocalDateTime.now(Clock.systemDefaultZone())));
     }
 
     private String sha256(String value) {

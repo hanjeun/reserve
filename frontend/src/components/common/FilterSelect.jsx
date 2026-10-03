@@ -45,8 +45,6 @@ const FilterSelect = ({ className, size, components, ...rest }) => (
     />
 );
 
-FilterSelect.Option = Select.Option;
-
 FilterSelect.propTypes = {
     className: PropTypes.string,
     size: PropTypes.oneOf(['small', 'middle', 'large']),

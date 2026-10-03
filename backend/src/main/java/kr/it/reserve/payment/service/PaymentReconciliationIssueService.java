@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 /** 문제 기록은 결제 롤백과 무관하게 남기고, 해소는 결제 상태 변경과 함께 커밋한다. */
@@ -24,7 +25,7 @@ public class PaymentReconciliationIssueService {
             Long reservationId,
             String merchantUid,
             String detailCode) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         PaymentReconciliationIssue issue = issueRepository.findByIssueKeyForUpdate(issueKey)
                 .orElse(null);
         if (issue == null) {
@@ -46,7 +47,7 @@ public class PaymentReconciliationIssueService {
         if (paymentId == null) {
             return;
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         issueRepository.findByPaymentIdAndStatus(
                         paymentId,
                         PaymentReconciliationIssue.IssueStatus.OPEN)

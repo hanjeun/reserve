@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Getter
@@ -23,7 +24,7 @@ public class ApiResponse<T> {
                 .success(true)
                 .data(data)
                 .message(message)
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(Clock.systemDefaultZone()))
                 .build();
     }
 
@@ -32,7 +33,7 @@ public class ApiResponse<T> {
         return ApiResponse.<T>builder()
                 .success(false)
                 .message(message)
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(Clock.systemDefaultZone()))
                 .build();
     }
 }

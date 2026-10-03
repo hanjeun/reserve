@@ -2,6 +2,7 @@ package kr.it.reserve.member.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -60,7 +61,7 @@ public class PasswordResetToken {
     private int attemptCount = 0;
 
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+        return LocalDateTime.now(Clock.systemDefaultZone()).isAfter(expiresAt);
     }
 
     public void markVerified() {

@@ -151,7 +151,7 @@ public class Member {
     }
 
     public void softDelete() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     public boolean isDeleted() {
@@ -183,7 +183,7 @@ public class Member {
         this.status = MemberStatus.ACTIVE;
         this.suspendedUntil = null;
         this.suspendReason = null;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     // 제재 상태 체크
@@ -200,7 +200,7 @@ public class Member {
     public boolean isSuspensionExpired() {
         return this.status == MemberStatus.SUSPENDED
             && this.suspendedUntil != null
-            && LocalDateTime.now().isAfter(this.suspendedUntil);
+            && LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.suspendedUntil);
     }
 
     public void suspend(LocalDateTime until, String reason) {

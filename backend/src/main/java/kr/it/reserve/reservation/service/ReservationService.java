@@ -32,6 +32,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -707,7 +708,7 @@ public class ReservationService {
 
         // DB timestamp는 createdAt과 같은 JVM(운영 컨테이너 UTC) 시계를 사용하고,
         // 사용자에게 내보낼 때 ReservationResponse에서 한국 시각으로 바꾼다.
-        reservation.setCheckedInAt(LocalDateTime.now());
+        reservation.setCheckedInAt(LocalDateTime.now(Clock.systemDefaultZone()));
 
         // 개인정보 없이 출석 사실을 운영 로그에 남긴다. checkedInAt은 DB의 장기 근거다.
         //
@@ -969,14 +970,14 @@ public class ReservationService {
      * 사실상 무제한 상태 되돌리기가 되고, 이용자가 이미 안내받은 내용과 어긋난다.
      * 오래된 건을 되돌려야 한다면 그건 Undo 가 아니라 취소·거절로 처리할 일이다.
      *
-     * <p>⚠️ 여기서는 {@code LocalDateTime.now()} 가 맞다 — KST 로 바꾸면 안 된다.
+     * <p>⚠️ 여기서는 {@code LocalDateTime.now(Clock.systemDefaultZone())} 가 맞다 — KST 로 바꾸면 안 된다.
      * {@code updatedAt} 은 {@code @LastModifiedDate} 가 <b>JVM 시계</b>로 찍은 값이라
      * 같은 시계끼리 비교해야 한다. (예약 날짜·시각은 이용자에게 보이는 KST 값이라 반대다 —
      * ReservationElapsedScheduler 가 그래서 SERVICE_ZONE 을 쓴다.)
      */
     private void requireWithinUndoWindow(Reservation reservation) {
         LocalDateTime changedAt = reservation.getUpdatedAt();
-        if (changedAt == null || changedAt.isBefore(LocalDateTime.now().minusMinutes(UNDO_WINDOW_MINUTES))) {
+        if (changedAt == null || changedAt.isBefore(LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(UNDO_WINDOW_MINUTES))) {
             throw new ReservationException(
                     "되돌릴 수 있는 시간이 지났습니다. 취소 또는 거절을 사용해주세요.", HttpStatus.BAD_REQUEST);
         }
@@ -1057,7 +1058,7 @@ public class ReservationService {
                             ? ReservationResponse.fromEntityWithReviewId(r, reviewId)
                             : ReservationResponse.fromEntity(r);
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**

@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -141,7 +142,7 @@ public class ChatService {
                 .senderMemberId(member.getId()).clientMessageId(clientMessageId).content(caption)
                 .imageKey(image.key()).imageContentType(image.contentType()).imageWidth(image.width())
                 .imageHeight(image.height()).imageBytes(image.bytes()).build());
-        room.onMessageSent(sender, LocalDateTime.now(), caption.isEmpty() ? "사진" : "사진 · " + caption);
+        room.onMessageSent(sender, LocalDateTime.now(Clock.systemDefaultZone()), caption.isEmpty() ? "사진" : "사진 · " + caption);
         return ChatMessageResponse.from(saved, member.getId());
     }
 
@@ -491,7 +492,7 @@ public class ChatService {
                 .content(trimmed)
                 .build());
 
-        room.onMessageSent(sender, LocalDateTime.now(), trimmed);
+        room.onMessageSent(sender, LocalDateTime.now(Clock.systemDefaultZone()), trimmed);
         log.info("Chat message sent: roomId={}, sender={}", room.getId(), sender);
         return messageResponses(List.of(saved), senderId).getFirst();
     }

@@ -22,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -187,7 +188,7 @@ public class AuditLogService {
      */
     @Transactional
     public void performScheduledCleanup() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         List<AuditLog> expired = auditLogRepository.findExpiredSoftDeletes(now);
         log.info("Scheduled cleanup started: {} items to hard-delete", expired.size());
 
@@ -215,7 +216,7 @@ public class AuditLogService {
 
     @Transactional(readOnly = true)
     public Page<AuditLog> getTrashItems(String entityType, Pageable pageable) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         if (entityType == null || entityType.isBlank()) {
             return auditLogRepository.findRestorable(now, pageable);
         }
@@ -235,7 +236,7 @@ public class AuditLogService {
     private void saveAuditLogWithActor(String entityType, Long entityId, String action,
                                        Map<String, String> snapshotData, String actorEmail) {
         String snapshot = toJson(snapshotData);
-        LocalDateTime expiresAt = LocalDateTime.now().plusDays(AuditRetentionPolicy.AUDIT_DAYS);
+        LocalDateTime expiresAt = LocalDateTime.now(Clock.systemDefaultZone()).plusDays(AuditRetentionPolicy.AUDIT_DAYS);
         auditLogRepository.save(AuditLog.builder()
                 .entityType(entityType)
                 .entityId(entityId)
@@ -249,7 +250,7 @@ public class AuditLogService {
     private void saveAuditLog(String entityType, Long entityId, String action, Map<String, String> snapshotData) {
         String actorEmail = getCurrentUserEmail();
         String snapshot = toJson(snapshotData);
-        LocalDateTime expiresAt = LocalDateTime.now().plusDays(
+        LocalDateTime expiresAt = LocalDateTime.now(Clock.systemDefaultZone()).plusDays(
                 SOFT_DELETE_ACTION.equals(action)
                         ? AuditRetentionPolicy.TRASH_DAYS
                         : AuditRetentionPolicy.AUDIT_DAYS

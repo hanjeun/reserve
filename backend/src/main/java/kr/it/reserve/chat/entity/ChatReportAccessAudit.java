@@ -3,6 +3,7 @@ package kr.it.reserve.chat.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 /** 원문은 넣지 않는 append-only 관리자 열람 원장. 서비스에 갱신/삭제 경로를 두지 않는다. */
@@ -25,6 +26,6 @@ public class ChatReportAccessAudit {
         this.messageId = messageId;
         this.action = action;
         this.purpose = "REPORT_REVIEW";
-        this.accessedAt = LocalDateTime.now();
+        this.accessedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 }

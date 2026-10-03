@@ -77,7 +77,7 @@ class PaymentServiceRefundSafetyTest {
                 20L, null, "PG cancellation call outcome unknown: IllegalStateException");
         verify(refundLedgerService, never()).failed(
                 any(), anyString());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 10L,
@@ -116,7 +116,7 @@ class PaymentServiceRefundSafetyTest {
                 any(),
                 any(),
                 any());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 10L,

@@ -25,12 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -539,7 +539,7 @@ public class PaymentService {
                 ? payment.getId().toString()
                 : payment != null ? payment.getMerchantUid() : "UNKNOWN";
         try {
-            reconciliationIssueService.record(
+            reconciliationIssueService.recordIssue(
                     category + ":" + identity,
                     issueType,
                     payment != null ? payment.getId() : null,
@@ -1194,11 +1194,11 @@ public class PaymentService {
         return paymentRepository.findByMemberIdOrderByCreatedAtDesc(memberId)
                 .stream()
                 .map(PaymentResponseDto::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private String generateMerchantUid() {
-        return "ORD-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + "-" + UUID.randomUUID().toString().substring(0, 6);
+        return "ORD-" + LocalDateTime.now(Clock.systemDefaultZone()).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + "-" + UUID.randomUUID().toString().substring(0, 6);
     }
 
     @lombok.Getter

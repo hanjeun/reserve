@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -76,7 +77,7 @@ public class TokenService {
             throw reject(Reason.UNKNOWN_TOKEN, inspection.memberId());
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         if (row.isExpired()) {
             refreshTokenRepository.delete(row);
             throw reject(Reason.EXPIRED_SESSION, row.getMemberId());

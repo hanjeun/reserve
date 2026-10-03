@@ -118,7 +118,7 @@ class RefundReconciliationSchedulerTest {
 
         verify(paymentService, never()).confirmPendingRefund(anyLong(), anyInt(), anyInt(), anyString());
         verify(paymentService, never()).revertPendingRefund(anyLong(), anyInt(), anyString());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 10L,
@@ -150,7 +150,7 @@ class RefundReconciliationSchedulerTest {
         scheduler.reconcileOne(view);
 
         verify(refundLedgerService, never()).succeeded(anyLong(), anyString(), anyInt());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 10L,
@@ -174,7 +174,7 @@ class RefundReconciliationSchedulerTest {
         scheduler.reconcileUnresolvedRefunds();
 
         verify(portoneService, never()).getPaymentInfo(org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 10L,

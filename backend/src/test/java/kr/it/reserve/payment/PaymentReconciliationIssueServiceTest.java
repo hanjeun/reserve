@@ -27,14 +27,14 @@ class PaymentReconciliationIssueServiceTest {
     @Test
     @DisplayName("같은 결제 문제는 중복 행 대신 횟수와 최신 원인을 갱신하고, 성공 시 해소된다")
     void repeatedIssueIsCoalescedAndResolved() {
-        issueService.record(
+        issueService.recordIssue(
                 "EXPIRY:77",
                 PaymentReconciliationIssue.IssueType.EXPIRY_RECHECK_FAILED,
                 77L,
                 88L,
                 "order-77",
                 "IllegalStateException");
-        issueService.record(
+        issueService.recordIssue(
                 "EXPIRY:77",
                 PaymentReconciliationIssue.IssueType.EXPIRY_STATUS_UNCERTAIN,
                 77L,

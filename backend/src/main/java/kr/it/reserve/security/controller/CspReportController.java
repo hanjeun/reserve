@@ -45,17 +45,17 @@ public class CspReportController {
                 int count = 0;
                 for (JsonNode report : root) {
                     if (count++ >= MAX_REPORTS_PER_REQUEST) break;
-                    record(report.path("body"));
+                    logReport(report.path("body"));
                 }
                 return;
             }
-            record(root.has("csp-report") ? root.path("csp-report") : root);
+            logReport(root.has("csp-report") ? root.path("csp-report") : root);
         } catch (Exception ignored) {
             // 브라우저 진단 전용 엔드포인트이므로 잘못된 외부 입력이 사용자 요청을 실패시키지 않는다.
         }
     }
 
-    private void record(JsonNode report) {
+    private void logReport(JsonNode report) {
         String directive = firstText(
                 report,
                 "effective-directive", "effectiveDirective",

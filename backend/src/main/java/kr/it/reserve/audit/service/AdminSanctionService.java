@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 /** 제재 상태 변경과 감사로그 저장을 같은 트랜잭션으로 묶는 쓰기 관문. */
@@ -31,7 +32,7 @@ public class AdminSanctionService {
                 .orElseThrow(MemberException::notFound);
         requireSanctionable(member);
         String reason = normalize(rawReason);
-        LocalDateTime until = LocalDateTime.now().plusDays(days);
+        LocalDateTime until = LocalDateTime.now(Clock.systemDefaultZone()).plusDays(days);
         member.suspend(until, reason);
         auditLogService.logMemberSanction(id, member.getEmail(), "SUSPEND",
                 days + "일 정지" + suffix(reason));
@@ -64,7 +65,7 @@ public class AdminSanctionService {
         validateDays(days);
         Store store = findOpenStore(id);
         String reason = normalize(rawReason);
-        LocalDateTime until = LocalDateTime.now().plusDays(days);
+        LocalDateTime until = LocalDateTime.now(Clock.systemDefaultZone()).plusDays(days);
         store.suspend(until, reason);
         auditLogService.logStoreSanction(id, store.getName(), "SUSPEND",
                 days + "일 영업정지" + suffix(reason));

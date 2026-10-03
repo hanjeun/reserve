@@ -28,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -52,10 +53,10 @@ public class ChatModerationService {
         ChatRoom room = findRoomForUpdate(roomId);
         SenderRole role = participantRole(viewerRole);
         if (role == SenderRole.MEMBER && room.getMember().getId().equals(actor.getId())) {
-            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now());
+            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
         } else {
             assertStoreParticipant(room, actor, role);
-            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now());
+            room.setHidden(role, hidden, actor.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
         }
     }
 
@@ -65,7 +66,7 @@ public class ChatModerationService {
         ChatRoom room = findRoomForUpdate(roomId);
         SenderRole role = participantRole(viewerRole);
         assertStoreParticipant(room, actor, role);
-        room.setBlocked(role, blocked, LocalDateTime.now());
+        room.setBlocked(role, blocked, LocalDateTime.now(Clock.systemDefaultZone()));
         log.info("Store conversation block changed: roomId={}, role={}, blocked={}", roomId, role, blocked);
         return ConversationModerationStateResponse.from(room, role);
     }
@@ -100,11 +101,11 @@ public class ChatModerationService {
                 .reason(reason)
                 .details(details)
                 .reportKey(reportKey)
-                .evidenceCapturedAt(LocalDateTime.now())
+                .evidenceCapturedAt(LocalDateTime.now(Clock.systemDefaultZone()))
                 .build());
         List<ChatMessage> context = captureWindow(room.getId(), messageId);
         evidenceRepository.saveAll(context.stream().filter(item -> !item.isPurged())
-                .map(item -> ChatReportEvidence.capture(report.getId(), item, LocalDateTime.now())).toList());
+                .map(item -> ChatReportEvidence.capture(report.getId(), item, LocalDateTime.now(Clock.systemDefaultZone()))).toList());
         log.info("Chat report created: reportId={}, roomId={}", report.getId(), roomId);
         return ChatReportResponse.from(report);
     }
@@ -121,7 +122,7 @@ public class ChatModerationService {
     public ChatReportContextResponse reportContext(Member admin, Long reportId) {
         assertAdmin(admin);
         ChatReportContextResponse context = contextForImage(admin, reportId);
-        auditService.record(admin, reportId, null, ChatReportAccessAudit.Action.CONTEXT);
+        auditService.recordAccess(admin, reportId, null, ChatReportAccessAudit.Action.CONTEXT);
         return context;
     }
 
@@ -166,7 +167,7 @@ public class ChatModerationService {
         if ((status == ChatReport.Status.RESOLVED || status == ChatReport.Status.DISMISSED) && note == null) {
             throw new ChatException("처리 완료 사유를 입력해주세요.");
         }
-        report.review(status, note, admin.getId(), LocalDateTime.now());
+        report.review(status, note, admin.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
         log.info("Chat report reviewed: reportId={}, status={}", reportId, status);
         return ChatReportResponse.from(report);
     }

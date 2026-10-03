@@ -9,6 +9,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -72,7 +73,7 @@ public class Review {
     private LocalDateTime deletedAt;
 
     public void softDelete() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     public boolean isDeleted() {

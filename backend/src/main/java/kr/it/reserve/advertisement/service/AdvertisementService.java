@@ -35,6 +35,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Duration;
@@ -45,7 +46,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 
 /**
  * 가게 광고 서비스.
@@ -306,7 +306,7 @@ public class AdvertisementService {
                 .stream()
                 .filter(ad -> !ad.isDeleted() && !ad.getStore().isDeleted() && !ad.getStore().isSuspended())
                 .map(AdvertisementResponse::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /** 내 광고 신청 내역 (사업자용) — 사용자 입력 페이지 크기는 공통 관문에서 최대 100으로 제한한다. */
@@ -539,7 +539,7 @@ public class AdvertisementService {
                 member.getId(),
                 ad.getStore().getId(),
                 ad.getId(),
-                LocalDateTime.now().minus(Duration.ofHours(24)),
+                LocalDateTime.now(Clock.systemDefaultZone()).minus(Duration.ofHours(24)),
                 List.of(Reservation.ReservationStatus.PENDING, Reservation.ReservationStatus.CONFIRMED));
 
         if (claimed == 1) {

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -60,7 +61,7 @@ public class PasswordResetService {
                 .email(email)
                 .token("HASHED")
                 .tokenHash(passwordEncoder.encode(code))
-                .expiresAt(LocalDateTime.now().plusMinutes(EXPIRES_MINUTES))
+                .expiresAt(LocalDateTime.now(Clock.systemDefaultZone()).plusMinutes(EXPIRES_MINUTES))
                 .build();
         tokenRepository.save(token);
         emailService.sendPasswordResetEmail(email, code);

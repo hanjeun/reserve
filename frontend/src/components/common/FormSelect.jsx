@@ -7,9 +7,6 @@
  *
  * 사용법:
  *   <FormSelect placeholder="선택" options={[{ value: '한식', label: '한식' }]} />
- *   <FormSelect placeholder="선택">
- *       <FormSelect.Option value="한식">한식</FormSelect.Option>
- *   </FormSelect>
  *
  * ★ 스타일은 이 파일에 없다 — `index.css` 의 "폼 입력용 Select" 블록에 있다.
  *   2026-08-04에 이 파일 안의 <style> 태그를 걷어냈다. 컴포넌트 안에 전역 CSS를 넣으면
@@ -41,8 +38,6 @@ const FormSelect = ({ placeholder, disabled = false, options, children, style, c
         {children}
     </Select>
 );
-
-FormSelect.Option = Select.Option;
 
 FormSelect.propTypes = {
     placeholder: PropTypes.string,

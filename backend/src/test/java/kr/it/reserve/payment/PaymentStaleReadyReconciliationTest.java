@@ -78,7 +78,7 @@ class PaymentStaleReadyReconciliationTest {
                 .isEqualTo(StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
         assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.READY);
         assertThat(reservation.getDepositPaid()).isFalse();
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "STALE_READY:2",
                 PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
                 2L,
@@ -119,7 +119,7 @@ class PaymentStaleReadyReconciliationTest {
         assertThat(result.outcome())
                 .isEqualTo(StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
         assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.READY);
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "STALE_READY:4",
                 PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
                 4L,

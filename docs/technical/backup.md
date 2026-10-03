@@ -393,9 +393,15 @@ HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없�
 원래 컨테이너와 설정은 `/var/backups/reserve-scripts/20261002-before-db-roles/`에
 보존해요. 계정 전환은 새 앱 버전 배포와 별개예요.
 
+새 릴리스의 blue/green Compose는 앱 계정과 `validate`를 고정해요.
+`DB_APP_PASSWORD`가 비면 Compose와 배포 시작 단계가 실패하며 root 비밀번호로 대체하지 않아요.
+새 배포 작업에는 관리자 Secret `DB_PASSWORD`를 전달하지 않아요. 이전 main의 재실행은
+여전히 옛 설정을 사용하므로 피하고, 기존 `DB_USERNAME`·`DB_DDL_AUTO` Variables는
+새 릴리스 적용 전까지 유지해요.
+
 | 대상 | 계정·권한 | 설정 위치 |
 |---|---|---|
-| 앱 | `reserve_app@172.18.0.0/255.255.0.0`, SELECT·INSERT·UPDATE·DELETE | 서버 컨테이너; GitHub `DB_USERNAME=reserve_app`, Secret `DB_APP_PASSWORD`, `DB_DDL_AUTO=validate` |
+| 앱 | `reserve_app@172.18.0.0/255.255.0.0`, SELECT·INSERT·UPDATE·DELETE | 서버 컨테이너; 새 Compose는 `reserve_app`·`validate` 고정, GitHub Secret `DB_APP_PASSWORD` |
 | DDL | `reserve_ddl@172.18.0.0/255.255.0.0`, SELECT·CREATE·ALTER·DROP·INDEX·REFERENCES | 서버 역할 보관본; 자동 실행하지 않음 |
 | 백업 | `reserve_backup@localhost`, SELECT·SHOW VIEW·TRIGGER·EVENT·SHOW_ROUTINE | `/etc/reserve-backup.env` |
 | 복원·관리자 | root | `/etc/reserve-restore.env`; 기존 GitHub 관리자 Secret `DB_PASSWORD` |

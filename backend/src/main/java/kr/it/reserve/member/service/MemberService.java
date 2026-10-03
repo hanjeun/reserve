@@ -301,7 +301,7 @@ public class MemberService {
             Member member,
             boolean agreed,
             MarketingConsentHistory.Source source) {
-        marketingConsentHistoryRepository.save(MarketingConsentHistory.record(member, agreed, source));
+        marketingConsentHistoryRepository.save(MarketingConsentHistory.create(member, agreed, source));
     }
 
     @Transactional(readOnly = true)

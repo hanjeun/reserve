@@ -16,6 +16,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,6 +111,6 @@ public class ChatIntro {
         this.items.clear();
         this.items.addAll(items);
         this.updatedByMemberId = memberId;
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 }

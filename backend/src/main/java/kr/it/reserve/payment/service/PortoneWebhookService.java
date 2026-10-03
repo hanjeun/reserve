@@ -251,7 +251,7 @@ public class PortoneWebhookService {
             PaymentReconciliationIssue.IssueType issueType,
             String detailCode) {
         try {
-            reconciliationIssueService.record(
+            reconciliationIssueService.recordIssue(
                     issueKey,
                     issueType,
                     payment.getId(),

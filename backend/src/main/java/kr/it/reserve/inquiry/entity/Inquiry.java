@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -114,6 +115,6 @@ public class Inquiry {
     public void answer(String answerContent) {
         this.answer = answerContent;
         this.status = InquiryStatus.ANSWERED;
-        this.answeredAt = LocalDateTime.now();
+        this.answeredAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 }

@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -123,7 +124,7 @@ public class PaymentOperationsAdminController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(defaultValue = DEFAULT_STALE_READY_DAYS) int olderThanDays) {
         int safeDays = Math.clamp(olderThanDays, 1, MAX_STALE_READY_DAYS);
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(safeDays);
+        LocalDateTime cutoff = LocalDateTime.now(Clock.systemDefaultZone()).minusDays(safeDays);
         Page<Payment> payments = paymentRepository.findStaleReadyPayments(
                 cutoff,
                 boundedPage(page, size));

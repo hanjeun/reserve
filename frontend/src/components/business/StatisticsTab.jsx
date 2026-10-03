@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import {
-    AreaChart, Area, PieChart, Pie, Cell,
+    AreaChart, Area, PieChart, Pie,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '@ant-design/icons';
@@ -210,16 +210,16 @@ const renderStatusPie = (loading, statusPieData) => {
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
-                                data={statusPieData}
+                                data={statusPieData.map((entry, i) => ({
+                                    ...entry,
+                                    fill: chartPalette[i % chartPalette.length],
+                                    stroke: 'none',
+                                }))}
                                 cx="50%" cy="50%"
                                 innerRadius={40} outerRadius={65}
                                 paddingAngle={3} dataKey="value"
                                 cornerRadius={chartPieCornerRadius}
-                            >
-                                {statusPieData.map((entry, i) => (
-                                    <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
-                                ))}
-                            </Pie>
+                            />
                             <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
                         </PieChart>
                     </ResponsiveContainer>

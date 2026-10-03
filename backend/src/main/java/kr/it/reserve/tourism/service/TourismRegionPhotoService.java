@@ -211,7 +211,7 @@ public class TourismRegionPhotoService {
                 return existing.map(TourismRegionPhotoResponse::from);
             }
 
-            LocalDateTime checkedAt = LocalDateTime.now();
+            LocalDateTime checkedAt = LocalDateTime.now(Clock.systemDefaultZone());
             TourismRegionPhoto stored = existing.orElseGet(TourismRegionPhoto::new);
             Candidate accepted = candidate.get();
             stored.refresh(region, accepted.contentId(), PROVIDER_NAME, accepted.workTitle(), accepted.imageUrl(),
@@ -229,7 +229,7 @@ public class TourismRegionPhotoService {
 
     private boolean isFresh(TourismRegionPhoto photo) {
         return photo.getCheckedAt() != null
-                && photo.getCheckedAt().isAfter(LocalDateTime.now().minus(REFRESH_AFTER));
+                && photo.getCheckedAt().isAfter(LocalDateTime.now(Clock.systemDefaultZone()).minus(REFRESH_AFTER));
     }
 
     private boolean shouldBackOff(String region) {

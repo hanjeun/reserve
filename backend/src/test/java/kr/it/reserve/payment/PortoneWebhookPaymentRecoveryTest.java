@@ -136,7 +136,7 @@ class PortoneWebhookPaymentRecoveryTest {
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService, never()).record(
+        verify(reconciliationIssueService, never()).recordIssue(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
@@ -200,7 +200,7 @@ class PortoneWebhookPaymentRecoveryTest {
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:14",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 14L,
@@ -225,7 +225,7 @@ class PortoneWebhookPaymentRecoveryTest {
         assertThat(webhookService.processMerchantUid(MERCHANT_UID))
                 .isEqualTo(PortoneWebhookService.ProcessingResult.PROCESSED);
 
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:11",
                 PaymentReconciliationIssue.IssueType.REFUND_LEDGER_MISSING,
                 11L,
@@ -265,7 +265,7 @@ class PortoneWebhookPaymentRecoveryTest {
         verify(refundLedgerService, never()).failed(
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:15",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 15L,

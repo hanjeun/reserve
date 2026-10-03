@@ -48,7 +48,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
@@ -268,7 +267,7 @@ public class StoreService {
         List<Store> stores = storeRepository.findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(member);
         return stores.stream()
                 .map(StoreResponse::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**

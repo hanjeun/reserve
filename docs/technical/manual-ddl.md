@@ -328,7 +328,9 @@ ALTER TABLE password_reset_token ADD COLUMN token_hash VARCHAR(60) NULL, ALGORIT
 변경 전 테이블 정의와 단일 테이블 gzip 덤프는
 `/var/backups/reserve-scripts/20261003-before-token-hash/`에 보존했다(디렉터리 700, 파일 600).
 기존 1행의 원래 컬럼 집계 해시는 전후 같고 새 컬럼은 `VARCHAR(60) NULL`이다.
-같은 10/2 후보 JAR의 엔티티 33개가 제한된 `reserve_app` 계정으로 읽기 전용 스키마 검증을 통과했다.
+10/2 후보와 10/3 `01ce08e` 후보의 엔티티 33개가 제한된 `reserve_app` 계정으로 읽기 전용 스키마 검증을 통과했다.
+10/3 검증 JAR의 SHA-256은 `f995cc530fea75dd90caae4da3558a9f0d3d97705d7f949145910563ac78152b`이며,
+같은 운영 이미지의 별도 컨테이너에서 메모리 256 MiB·접속 풀 1개로 확인했다.
 검증은 Spring·스케줄러·외부 연동을 기동하지 않았다. 기존 운영 앱의 Actuator JSON도 `status=UP`이었다.
 현재 운영은 구버전 앱이며, 새 코드의 해시 저장은 새 앱 배포 후에 시작한다.
 재발송과 재설정은 회원 잠금 다음 토큰 ID 한 행 잠금 순서를 유지한다.

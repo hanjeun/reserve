@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +42,7 @@ public class PaymentWebhookInboxStateService {
                                 eventType,
                                 merchantUid,
                                 payloadSha256,
-                                LocalDateTime.now()))));
+                                LocalDateTime.now(Clock.systemDefaultZone())))));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
@@ -55,7 +56,7 @@ public class PaymentWebhookInboxStateService {
     public Optional<InboxWork> claim(String webhookId) {
         PaymentWebhookInbox inbox = inboxRepository.findByWebhookIdForUpdate(webhookId)
                 .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND));
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         if (!inbox.canClaim(now, now.minusMinutes(PROCESSING_LEASE_MINUTES))) {
             return Optional.empty();
         }
@@ -67,7 +68,7 @@ public class PaymentWebhookInboxStateService {
     public Optional<InboxWork> forceClaim(String webhookId) {
         PaymentWebhookInbox inbox = inboxRepository.findByWebhookIdForUpdate(webhookId)
                 .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND));
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         if (!inbox.canForceClaim(now.minusMinutes(PROCESSING_LEASE_MINUTES))) {
             return Optional.empty();
         }
@@ -79,26 +80,26 @@ public class PaymentWebhookInboxStateService {
     public void markProcessed(String webhookId) {
         inboxRepository.findByWebhookIdForUpdate(webhookId)
                 .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND))
-                .markProcessed(LocalDateTime.now());
+                .markProcessed(LocalDateTime.now(Clock.systemDefaultZone()));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markIgnored(String webhookId) {
         inboxRepository.findByWebhookIdForUpdate(webhookId)
                 .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND))
-                .markIgnored(LocalDateTime.now());
+                .markIgnored(LocalDateTime.now(Clock.systemDefaultZone()));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(String webhookId, String errorType) {
         inboxRepository.findByWebhookIdForUpdate(webhookId)
                 .orElseThrow(() -> new IllegalStateException(ROW_NOT_FOUND))
-                .markFailed(LocalDateTime.now(), errorType);
+                .markFailed(LocalDateTime.now(Clock.systemDefaultZone()), errorType);
     }
 
     @Transactional(readOnly = true)
     public List<String> findRetryableWebhookIds() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
         return inboxRepository.findRetryableWebhookIds(
                 List.of(
                         PaymentWebhookInbox.InboxStatus.RECEIVED,

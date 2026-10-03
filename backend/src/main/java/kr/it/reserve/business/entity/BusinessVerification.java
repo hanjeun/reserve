@@ -6,6 +6,7 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -88,7 +89,7 @@ public class BusinessVerification {
     // 승인 처리
     public void approve(Member admin) {
         this.status = VerificationStatus.APPROVED;
-        this.processedAt = LocalDateTime.now();
+        this.processedAt = LocalDateTime.now(Clock.systemDefaultZone());
         this.processedBy = admin;
         this.rejectionReason = null;
     }
@@ -96,7 +97,7 @@ public class BusinessVerification {
     // 거절 처리
     public void reject(Member admin, String reason) {
         this.status = VerificationStatus.REJECTED;
-        this.processedAt = LocalDateTime.now();
+        this.processedAt = LocalDateTime.now(Clock.systemDefaultZone());
         this.processedBy = admin;
         this.rejectionReason = reason;
     }

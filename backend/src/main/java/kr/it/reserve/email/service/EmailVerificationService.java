@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -36,7 +37,7 @@ public class EmailVerificationService {
         // 연속 안전장치: 1분 이내 재발송 차단
         verificationRepository.findTopByEmailOrderByCreatedAtDesc(email).ifPresent(existing -> {
             if (existing.getCreatedAt() != null &&
-                existing.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(1))) {
+                existing.getCreatedAt().isAfter(LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(1))) {
                 throw new EmailException("인증 코드를 이미 발송했습니다. 1분 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
             }
         });
@@ -48,7 +49,7 @@ public class EmailVerificationService {
         EmailVerification verification = EmailVerification.builder()
                 .email(email)
                 .verificationCode(code)
-                .expiresAt(LocalDateTime.now().plusMinutes(EXPIRATION_MINUTES))
+                .expiresAt(LocalDateTime.now(Clock.systemDefaultZone()).plusMinutes(EXPIRATION_MINUTES))
                 .verified(false)
                 .build();
 

@@ -95,7 +95,7 @@ class PaymentRecoveryTest {
 
         assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.READY);
         assertThat(reservation.getDepositPaid()).isFalse();
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "PAID:3",
                 kr.it.reserve.payment.entity.PaymentReconciliationIssue.IssueType.LATE_PAID_RESERVATION,
                 3L,
@@ -134,7 +134,7 @@ class PaymentRecoveryTest {
 
         assertThat(decision).isEqualTo(PaymentService.ExpiryPaymentDecision.UNCERTAIN);
         assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.READY);
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "EXPIRY:5",
                 kr.it.reserve.payment.entity.PaymentReconciliationIssue.IssueType.EXPIRY_RECHECK_FAILED,
                 5L,

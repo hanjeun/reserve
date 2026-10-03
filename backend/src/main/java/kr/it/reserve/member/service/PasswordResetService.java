@@ -18,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -26,6 +28,7 @@ import java.time.LocalDateTime;
 public class PasswordResetService {
 
     private static final int EXPIRES_MINUTES = 5;
+    private static final SecureRandom CODE_RANDOM = new SecureRandom();
 
     private final MemberRepository memberRepository;
     private final PasswordResetTokenRepository tokenRepository;
@@ -40,7 +43,7 @@ public class PasswordResetService {
      */
     @Transactional
     public boolean sendResetCode(String email) {
-        var memberOpt = memberRepository.findByEmailAndDeletedAtIsNull(email);
+        var memberOpt = memberRepository.findActiveByEmailForUpdate(email);
         if (memberOpt.isEmpty()) {
             log.info("Password reset request not deliverable");
             return false;
@@ -56,8 +59,9 @@ public class PasswordResetService {
         String code = generateCode();
         PasswordResetToken token = PasswordResetToken.builder()
                 .email(email)
-                .token(code)
-                .expiresAt(LocalDateTime.now().plusMinutes(EXPIRES_MINUTES))
+                .token("HASHED")
+                .tokenHash(passwordEncoder.encode(code))
+                .expiresAt(LocalDateTime.now(Clock.systemDefaultZone()).plusMinutes(EXPIRES_MINUTES))
                 .build();
         tokenRepository.save(token);
         emailService.sendPasswordResetEmail(email, code);
@@ -79,15 +83,15 @@ public class PasswordResetService {
      */
     @Transactional(noRollbackFor = BusinessException.class)
     public void verifyCode(String email, String code) {
-        PasswordResetToken token = tokenRepository.findTopByEmailOrderByIdDesc(email)
+        PasswordResetToken token = findLatestTokenForUpdate(email)
                 .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST));
 
         if (token.isExpired()) {
             throw new MemberException("인증 시간이 만료되었습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
         }
-        requireAttemptsLeft(token, email);
+        requireAttemptsLeft(token);
 
-        if (!token.getToken().equals(code)) {
+        if (!matchesCode(token, code)) {
             token.recordFailedAttempt();
             log.warn("Password reset code mismatch: attempt={}/{}",
                     token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
@@ -102,7 +106,7 @@ public class PasswordResetService {
      * <p>메시지를 "재발송해주세요"로 두는 건 의도적이다 — 남은 횟수를 숫자로 알려주면
      * 공격자가 언제 리셋되는지 계산할 수 있고, 정상 사용자에게는 다음에 할 행동만 알려주면 된다.
      */
-    private void requireAttemptsLeft(PasswordResetToken token, String email) {
+    private void requireAttemptsLeft(PasswordResetToken token) {
         if (token.isAttemptExhausted()) {
             log.warn("Password reset code attempts exhausted");
             throw new MemberException(
@@ -126,15 +130,17 @@ public class PasswordResetService {
      */
     @Transactional(noRollbackFor = BusinessException.class)
     public void resetPassword(String email, String code, String newPassword) {
-        PasswordResetToken token = tokenRepository.findTopByEmailOrderByIdDesc(email)
+        // 재발송과 같은 member → token 순서를 지켜 잠금 순환과 중복 소비를 막는다.
+        var memberOpt = memberRepository.findActiveByEmailForUpdate(email);
+        PasswordResetToken token = findLatestTokenForUpdate(email)
                 .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
 
         if (token.isExpired()) {
             throw new MemberException("인증 시간이 만료되었습니다. 다시 시도해주세요.", HttpStatus.BAD_REQUEST);
         }
-        requireAttemptsLeft(token, email);
+        requireAttemptsLeft(token);
 
-        if (!token.getToken().equals(code)) {
+        if (!matchesCode(token, code)) {
             token.recordFailedAttempt();
             log.warn("Password reset code mismatch on reset: attempt={}/{}",
                     token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
@@ -144,8 +150,7 @@ public class PasswordResetService {
             throw new MemberException("코드 인증을 먼저 완료해주세요.", HttpStatus.BAD_REQUEST);
         }
 
-        Member member = memberRepository.findActiveByEmailForUpdate(email)
-                .orElseThrow(MemberException::notFound);
+        Member member = memberOpt.orElseThrow(MemberException::notFound);
 
         String policyViolation = PasswordPolicy.violation(newPassword);
         if (policyViolation != null) {
@@ -168,8 +173,23 @@ public class PasswordResetService {
         log.info("Password reset completed: memberId={}", member.getId());
     }
 
+    private Optional<PasswordResetToken> findLatestTokenForUpdate(String email) {
+        return tokenRepository.findIdsByEmail(email).stream()
+                .findFirst()
+                .flatMap(tokenRepository::findByIdForUpdate);
+    }
+
+    private boolean matchesCode(PasswordResetToken token, String code) {
+        if (code == null || !code.matches("\\d{6}")) {
+            return false;
+        }
+        if (token.getTokenHash() != null) {
+            return passwordEncoder.matches(code, token.getTokenHash());
+        }
+        return code.equals(token.getToken());
+    }
+
     private String generateCode() {
-        SecureRandom random = new SecureRandom();
-        return String.valueOf(random.nextInt(900000) + 100000);
+        return String.valueOf(CODE_RANDOM.nextInt(900000) + 100000);
     }
 }

@@ -1,0 +1,133 @@
+// Production uses Alloy 1.20.1 since 2026-10-02; Promtail 2.9.0 stays stopped for recovery.
+// Strictly converted from the pre-cutover Promtail config; never run both collectors.
+// Source SHA-256: fa2ae2bfdf8bbf8388b6eae96d799780880557ef7d4c567668b65b7a941b0253
+// Preserve the legacy /tmp/positions.yaml volume as read-only on cutover.
+// Persist Alloy state using --storage.path=/var/lib/alloy/data.
+// Keep the same four log mounts and the nginx-directory bind overlay.
+// Further production configuration changes require separate approval; see docs/technical/monitoring.md.
+
+loki.process "reserve" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.regex {
+		expression = "^(?P<ts>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}) +(?P<level>[A-Z]+)"
+	}
+
+	stage.labels {
+		values = {
+			level = null,
+		}
+	}
+
+	stage.timestamp {
+		source   = "ts"
+		format   = "2006-01-02 15:04:05"
+		location = "UTC"
+	}
+}
+
+loki.source.file "reserve" {
+	targets = [{
+		__address__ = "localhost",
+		__path__    = "/var/log/reserve/app.log",
+		job         = "reserve",
+	}]
+	forward_to = [loki.process.reserve.receiver]
+
+	file_match {
+		enabled = true
+	}
+	legacy_positions_file = "/tmp/positions.yaml"
+}
+
+loki.process "backup" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.regex {
+		expression = "^(?P<ts>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}) +(?:(?P<level>[A-Z]+) +)?\\[backup\\]"
+	}
+
+	stage.labels {
+		values = {
+			level = null,
+		}
+	}
+
+	stage.timestamp {
+		source   = "ts"
+		format   = "2006-01-02 15:04:05"
+		location = "UTC"
+	}
+}
+
+loki.source.file "backup" {
+	targets = [{
+		__address__ = "localhost",
+		__path__    = "/var/log/reserve/backup.log",
+		job         = "backup",
+	}]
+	forward_to = [loki.process.backup.receiver]
+
+	file_match {
+		enabled = true
+	}
+	legacy_positions_file = "/tmp/positions.yaml"
+}
+
+loki.process "nginx" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.docker { }
+
+	stage.drop {
+		drop_counter_reason = "nginx_older_than_1h"
+		older_than          = "1h0m0s"
+	}
+
+	stage.match {
+		selector            = "{job=\"nginx\", stream!=\"stdout\"}"
+		action              = "drop"
+		drop_counter_reason = "nginx_non_stdout"
+	}
+
+	stage.match {
+		selector            = "{job=\"nginx\"} !~ \"^\\\\{\\\"time\\\":\\\"[0-9]+[.][0-9]+\\\",\\\"route\\\":\\\"(spa|asset|store_detail|store_list|chat|api_other|health)\\\",\\\"method\\\":\\\"(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)\\\",\\\"status\\\":[1-5][0-9]{2},\\\"request_time\\\":\\\"[0-9]+[.][0-9]+\\\",\\\"upstream_connect_time\\\":\\\"[-0-9.,: ]*\\\",\\\"upstream_header_time\\\":\\\"[-0-9.,: ]*\\\",\\\"upstream_response_time\\\":\\\"[-0-9.,: ]*\\\",\\\"cache\\\":\\\"(HIT|MISS|BYPASS|EXPIRED|STALE|UPDATING|REVALIDATED|-|)\\\"\\\\}[[:space:]]*$\""
+		action              = "drop"
+		drop_counter_reason = "nginx_non_timing"
+	}
+}
+
+loki.source.file "nginx" {
+	targets = [{
+		__address__ = "localhost",
+		__path__    = "/var/log/reserve-nginx/*-json.log",
+		job         = "nginx",
+	}]
+	forward_to = [loki.process.nginx.receiver]
+
+	file_match {
+		enabled = true
+	}
+	legacy_positions_file = "/tmp/positions.yaml"
+}
+
+loki.source.file "metrics" {
+	targets = [{
+		__address__ = "localhost",
+		__path__    = "/var/log/metrics/*.log",
+		job         = "metrics",
+	}]
+	forward_to = [loki.write.default.receiver]
+
+	file_match {
+		enabled = true
+	}
+	legacy_positions_file = "/tmp/positions.yaml"
+}
+
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+	external_labels = {}
+}

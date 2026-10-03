@@ -12,6 +12,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
@@ -20,6 +21,8 @@ import java.util.concurrent.Semaphore;
 
 /** 업로드 이미지의 클라이언트 메타데이터가 아니라 실제 바이트를 검사하는 단일 관문. */
 public final class ImageFileValidator {
+
+    private static final String INVALID_IMAGE_MESSAGE = "손상되었거나 디코딩할 수 없는 이미지입니다.";
 
     public static final long MAX_FILE_BYTES = 8L * 1024 * 1024;
     public static final int MAX_DIMENSION = 8_192;
@@ -113,17 +116,19 @@ public final class ImageFileValidator {
             acquired = true;
             Dimensions header = readStandardDimensions(bytes);
             validateDimensions(header);
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-            if (image == null || image.getWidth() != header.width || image.getHeight() != header.height) {
-                throw unsupported("손상되었거나 디코딩할 수 없는 이미지입니다.");
+            try (ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
+                BufferedImage image = ImageIO.read(input);
+                if (image == null || image.getWidth() != header.width || image.getHeight() != header.height) {
+                    throw unsupported(INVALID_IMAGE_MESSAGE);
+                }
+                return header;
             }
-            return header;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw FileException.uploadFailed();
         } catch (IOException | RuntimeException exception) {
             if (exception instanceof FileException fileException) throw fileException;
-            throw unsupported("손상되었거나 디코딩할 수 없는 이미지입니다.");
+            throw unsupported(INVALID_IMAGE_MESSAGE);
         } finally {
             if (acquired) DECODE_SLOT.release();
         }
@@ -141,7 +146,7 @@ public final class ImageFileValidator {
                 reader.dispose();
             }
         } catch (IOException exception) {
-            throw unsupported("손상되었거나 디코딩할 수 없는 이미지입니다.");
+            throw unsupported(INVALID_IMAGE_MESSAGE);
         }
     }
 
@@ -160,9 +165,7 @@ public final class ImageFileValidator {
         while (offset < bytes.length) {
             if (offset + 8 > bytes.length) throw unsupported("손상된 WebP chunk입니다.");
             String type = new String(bytes, offset, 4, StandardCharsets.US_ASCII);
-            long chunkSizeLong = unsignedIntLe(bytes, offset + 4);
-            if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("WebP chunk가 너무 큽니다.");
-            int chunkSize = (int) chunkSizeLong;
+            int chunkSize = readWebpChunkSize(bytes, offset + 4);
             int data = offset + 8;
             long next = (long) data + chunkSize + (chunkSize & 1);
             if (next > bytes.length) throw unsupported("잘린 WebP chunk입니다.");
@@ -186,6 +189,12 @@ public final class ImageFileValidator {
             throw unsupported("이미지 프레임이 없는 WebP 파일입니다.");
         }
         return dimensions;
+    }
+
+    private static int readWebpChunkSize(byte[] bytes, int offset) {
+        long chunkSizeLong = unsignedIntLe(bytes, offset);
+        if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("WebP chunk가 너무 큽니다.");
+        return (int) chunkSizeLong;
     }
 
     private static Dimensions dimensionsVp8x(byte[] bytes, int data, int size) {
@@ -279,7 +288,7 @@ public final class ImageFileValidator {
 
     private static long unsignedIntLe(byte[] bytes, int offset) {
         if (offset < 0 || offset + 4 > bytes.length) throw unsupported("잘린 이미지 헤더입니다.");
-        return (long) unsigned(bytes[offset])
+        return unsigned(bytes[offset])
                 | ((long) unsigned(bytes[offset + 1]) << 8)
                 | ((long) unsigned(bytes[offset + 2]) << 16)
                 | ((long) unsigned(bytes[offset + 3]) << 24);
@@ -318,5 +327,24 @@ public final class ImageFileValidator {
             String extension,
             int width,
             int height) {
+        @Override
+        public boolean equals(Object other) {
+            return this == other || other instanceof ValidatedImage(var imageBytes, var imageContentType, var imageExtension, var imageWidth, var imageHeight)
+                    && Arrays.equals(bytes, imageBytes)
+                    && Objects.equals(contentType, imageContentType)
+                    && Objects.equals(extension, imageExtension)
+                    && width == imageWidth
+                    && height == imageHeight;
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType, extension, width, height);
+        }
+
+        @Override
+        public String toString() {
+            return "ValidatedImage[byteCount=" + (bytes == null ? 0 : bytes.length) + ", contentType=" + contentType + ", extension=" + extension + ", width=" + width + ", height=" + height + "]";
+        }
     }
 }

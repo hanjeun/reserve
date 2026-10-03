@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -105,13 +104,13 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public List<ReviewResponse> getStoreReviews(Long storeId) {
         return reviewRepository.findByStoreIdOrderByCreatedAtDesc(storeId).stream()
-                .map(ReviewResponse::fromEntity).collect(Collectors.toList());
+                .map(ReviewResponse::fromEntity).toList();
     }
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getMyReviews(Member member) {
         return reviewRepository.findByMemberOrderByCreatedAtDesc(member).stream()
-                .map(ReviewResponse::fromEntity).collect(Collectors.toList());
+                .map(ReviewResponse::fromEntity).toList();
     }
 
     @Transactional(readOnly = true)

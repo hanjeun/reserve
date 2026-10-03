@@ -33,8 +33,8 @@
 |---|---|---|
 | `test-backend` | — | 백엔드 unit·Spring/H2 통합 테스트 |
 | `test-frontend` | — | 문서 링크·Grafana·스냅샷·운영 스크립트 검사, ESLint, 품질 정책, Vitest, PC·모바일 Playwright |
-| `build-backend` | `test-backend` | bootJar, Docker 이미지 push |
-| `build-frontend` | `build-backend`, `test-frontend` | Vite 빌드 후 이 실행의 dist 아티팩트 업로드 |
+| `build-frontend` | `test-frontend` | Vite 빌드 후 이 실행의 dist 아티팩트 업로드 |
+| `build-backend` | `test-backend`, `build-frontend` | 같은 실행의 HTML을 포함한 bootJar, main에서 Docker 이미지 push |
 | `stage-release` | `build-backend`, `build-frontend` | 아티팩트를 서버 `releases/<SHA>`에 staging. live는 바꾸지 않아요 |
 | `deploy-backend` | 위 전부 | 새 서버 기동, 준비 확인, 원자 전환, smoke, 실패 복구 |
 
@@ -203,37 +203,19 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env \
 3. 수동 시나리오를 모두 통과하고 **최소 7일** 동안 설명되지 않는 위반이 없으면 헤더명에서 `-Report-Only`를 지우는 별도 PR을 만들어요.
 4. 경고가 있으면 필요한 출처만 해당 지시문에 추가해요. script-src에는 `unsafe-inline`을 넣지 않아요.
 
-### 4-2. 가게 검색 FULLTEXT
+### 4-2. 가게 검색 FULLTEXT (활성화 보류)
 
-DDL을 먼저 적용하고, 그다음 별도 배포로 플래그를 켜요. 상세: [`manual-ddl.md`](manual-ddl.md)
+격리 MySQL 8.0.45에서 다중 단어와 `%` 검색의 결과 차이가 발견돼 `fulltext-enabled=false`를 유지해요.
+검색 결과의 동등성을 먼저 해결한 뒤, 승인된 DDL 계정으로 인덱스를 추가하고 별도 배포로 켜요.
+실행 SQL과 접속 절차는 [`manual-ddl.md`](manual-ddl.md)를 따라요. 백업 계정으로 관리자 SQL에 접속하지 않아요.
 
-```bash
-# ① (권장) 먼저 백업
-/usr/local/bin/reserve-backup
+### 4-3. nginx 로그 수집
 
-# ② DDL 적용
-export DB_PASSWORD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"   # 비밀번호 기준: /etc/reserve-backup.env (backup.md 7장)
-docker exec -it -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -u root reserve -e "
-ALTER TABLE store ADD FULLTEXT INDEX ft_store_search
-  (store_name, description, address, category, keywords) WITH PARSER ngram;
-SHOW INDEX FROM store WHERE Index_type = 'FULLTEXT';"
-```
+운영 nginx는 호스트의 `/var/log/nginx`에 로그를 남기고 Alloy가 Loki로 전송해요.
+2026-10-02 수집을 Alloy로 전환했으므로 옛 Promtail을 다시 시작하지 않아요.
+설정·positions 보존과 롤백은 [`monitoring.md`](monitoring.md)의 "Alloy 운영 전환"을 따라요.
 
-③ 별도 배포로 `application-prod.yml`의 `fulltext-enabled` 주석을 해제해요.
-
-### 4-3. nginx 로그를 실제 파일로
-
-상세: [`monitoring.md`](monitoring.md) — "nginx 로그 수집"
-
-호스트 디렉터리를 마운트해 nginx access 로그를 파일로 남기고 promtail 설정을 반영해요.
-
-```bash
-sudo mkdir -p /var/log/nginx
-# nginxserver 재생성 시  -v /var/log/nginx:/var/log/nginx  추가
-scp promtail-config.yml ubuntu@<서버>:~/ && ssh ubuntu@<서버> 'docker restart promtail'
-```
-
-확인: Grafana에서 `{job="nginx"}`를 조회해요.
+확인: Grafana에서 `{job="nginx"}`를 조회하고 같은 시각의 원본 access 로그와 대조해요.
 
 ### 4-4. 알림 규칙
 
@@ -266,3 +248,16 @@ nginx `root`가 SHA 절대 경로에 고정되므로 두 nginx 파일을 함께 
 3. `nginx -t` 뒤 한 번 reload해요.
 
 로컬 회귀 검사는 `bash scripts/test-frontend-release-swap.sh`와 `bash scripts/test-frontend-assets.sh`예요.
+
+### TLS 갱신과 원본 가게 HTML
+
+2026-10-02부터 Certbot의 HTTP-01은 nginx의 `/.well-known/acme-challenge/` webroot로 처리해요.
+기존 nginx 정지·시작 pre/post 훅은 원본 보관함으로 옮겼고, 갱신 후 reload 훅은 유지해요.
+세 도메인 challenge 읽기, 두 인증서의 staging 갱신과 deploy 훅, 별도로 복원한 인증서·키의
+일치·체인은 통과했어요. 실제 새 운영 인증서 발급과 staging 시험은 구분해요.
+원본과 복원 자료는 `/var/backups/reserve-scripts/20261002-before-tls-webroot/`(root 전용)에 있어요.
+
+가게 상세 원본 HTML은 같은 실행의 frontend-release 아티팩트를 백엔드 JAR에 동봉해 만들어요.
+패키징은 프론트 빌드 성공 후 진행하며 HTML 없이 만든 JAR는 거부해요. 공개 가게 조회 정책,
+HTML 이스케이프, 공개 썸네일 경로 검사를 거친 이름·설명·사진을 넣고 기존 SPA 자산은 보존해요.
+삭제·정지 가게는 404·noindex로 응답해요. 이 변경의 운영 적용은 해당 릴리스 배포에 포함돼요.

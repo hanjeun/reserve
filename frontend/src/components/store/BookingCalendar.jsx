@@ -41,6 +41,7 @@
  */
 import React, { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import RollingFieldValue from '../common/RollingFieldValue';
 import { Form, Modal } from 'antd';
 import { LeftOutlined, RightOutlined, DoubleLeftOutlined, DoubleRightOutlined, CalendarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -235,11 +236,10 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
                 onClick={openCalendar}
                 style={{ ...styles.trigger, ...(isError ? styles.triggerError : null), ...style }}
             >
-                {/* key 를 값에 걸어 두면 날짜가 바뀔 때마다 다시 마운트돼 슬라이드-인이 다시 돈다. */}
-                <span key={selectedKey ?? 'empty'}
-                      style={{ ...styles.triggerText, ...(value ? null : styles.placeholder),
-                               animation: animation.slideUpIn }}>
-                    {value ? `${value.format('YYYY. M. D.')} (${WEEKDAYS[value.day()]})` : '날짜 선택'}
+                <span style={{ ...styles.triggerText, ...(value ? null : styles.placeholder) }}>
+                    <RollingFieldValue value={value?.startOf('day').valueOf()} modalOpen={open}>
+                        {value ? `${value.format('YYYY. M. D.')} (${WEEKDAYS[value.day()]})` : '날짜 선택'}
+                    </RollingFieldValue>
                 </span>
                 <CalendarOutlined aria-hidden="true" style={{
                     fontSize: field.iconSize,

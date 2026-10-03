@@ -34,6 +34,7 @@ import {
 import {
     Button, AdminTableSkeleton, DataState, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
 } from '../common';
+import { ModalActionGroup } from '../common/ModalActions';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -146,10 +147,10 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
             open={open}
             onCancel={handleCancel}
             onOk={handleOk}
-            /* maskClosable={false}: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
+            /* mask.closable=false: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
-            maskClosable={false}
+            mask={{ closable: false }}
             okText="거절 처리"
             cancelText="취소"
             okButtonProps={{ danger: true, loading }}
@@ -180,7 +181,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const [detailError, setDetailError]     = useState(null);
     const [detailRequestId, setDetailRequestId] = useState(null);
     const detailRequestRef = React.useRef(0);
-    const [rejectTarget, setRejectTarget]   = useState(null);
+    const [rejectTarget, setRejectTarget]   = useState(/** @type {{id: number, memberName: string} | null} */ (null));
     const [rejectOpen, setRejectOpen]       = useState(false);
     const [{ search, page: pageStr }, setQuery] = useQueryParamsState(QUERY_DEFAULTS);
     const debouncedSearch = useDebounce(search, 300);
@@ -218,19 +219,19 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     const approveMutation = useMutation({
         mutationFn: (id) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_APPROVE(id)),
-        onSuccess: () => { message.success('승인되었습니다.'); invalidateBiz(); },
+        onSuccess: () => { message.success('승인되었습니다.'); void invalidateBiz(); },
         onError: (err) => message.error(err instanceof Error ? err.message : '승인에 실패했습니다.'),
     });
 
     const rejectMutation = useMutation({
         mutationFn: ({ id, reason }) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_REJECT(id), { reason }),
-        onSuccess: () => { message.success('거절 처리되었습니다.'); setRejectOpen(false); invalidateBiz(); },
+        onSuccess: () => { message.success('거절 처리되었습니다.'); setRejectOpen(false); void invalidateBiz(); },
         onError: (err) => message.error(err instanceof Error ? err.message : '거절 처리에 실패했습니다.'),
     });
 
     const revokeMutation = useMutation({
         mutationFn: (memberId) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_REVOKE(memberId)),
-        onSuccess: () => { message.success('사업자 자격이 취소되었습니다.'); invalidateBiz(); },
+        onSuccess: () => { message.success('사업자 자격이 취소되었습니다.'); void invalidateBiz(); },
         onError: (err) => message.error(err instanceof Error ? err.message : '처리에 실패했습니다.'),
     });
 
@@ -249,6 +250,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     // 빈 사유 검사는 RejectModal 안에서 인라인으로 처리한다 — 여기까지 오면 이미 채워져 있다.
     const handleReject = (reason) => {
+        if (!rejectTarget) return;
         rejectMutation.mutate({ id: rejectTarget.id, reason });
     };
 
@@ -287,7 +289,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
         setDetailItem(null);
         setDetailRequestId(record.id);
         setDetailOpen(true);
-        loadDetail(record.id);
+        void loadDetail(record.id);
     };
 
     // 검색은 서버 전체 신청 집합에서 수행한다. 검색어 변경 시 페이지를 초기화한다.
@@ -457,14 +459,14 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 open={detailOpen}
                 onCancel={() => setDetailOpen(false)}
                 footer={
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20 }}>
+                    <ModalActionGroup>
                         {detailItem?.status === 'PENDING' ? (
                             <>
-                                <Button variant="ghost-sm-danger"
+                                <Button variant="outline" size="sm" style={{ color: colors.error.main, borderColor: colors.error.main }}
                                     onClick={() => { setDetailOpen(false); openRejectModal(detailItem); }}>
                                     <CloseOutlined /> 거절
                                 </Button>
-                                <Button variant="ghost-sm-success" loading={actionLoading}
+                                <Button variant="outline" size="sm" loading={actionLoading} style={{ color: colors.success.main, borderColor: colors.success.main }}
                                     onClick={() => { setDetailOpen(false); handleApprove(detailItem); }}>
                                     <CheckOutlined /> 승인
                                 </Button>
@@ -477,7 +479,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                                 닫기
                             </Button>
                         )}
-                    </div>
+                    </ModalActionGroup>
                 }
                 width={560}
                 centered

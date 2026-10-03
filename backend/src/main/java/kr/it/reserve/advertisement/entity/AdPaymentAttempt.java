@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
@@ -61,7 +62,7 @@ public class AdPaymentAttempt {
         attempt.amount = ad.getAmount();
         attempt.legacy = legacy;
         attempt.legacyStatus = legacy ? ad.getStatus().name() : null;
-        attempt.createdAt = LocalDateTime.now();
+        attempt.createdAt = LocalDateTime.now(Clock.systemDefaultZone());
         attempt.state = legacy ? State.REVIEW_REQUIRED : State.READY;
         attempt.issueCode = legacy ? "LEGACY_RECHECK_REQUIRED" : null;
         attempt.nextCheckAt = attempt.createdAt.plusMinutes(5);
@@ -93,13 +94,13 @@ public class AdPaymentAttempt {
         state = newState;
         issueCode = issue;
         if (newState == State.PAID || newState == State.REFUNDED) everPaid = true;
-        if (newState == State.REFUNDED && refundConfirmedAt == null) refundConfirmedAt = LocalDateTime.now();
+        if (newState == State.REFUNDED && refundConfirmedAt == null) refundConfirmedAt = LocalDateTime.now(Clock.systemDefaultZone());
         if (!UNRESOLVED.contains(newState)) nextCheckAt = null;
     }
 
     public void requireReview(String code) {
         reviewed(refundDispatchedAt == null ? State.REVIEW_REQUIRED : State.REFUND_PENDING, code);
-        nextCheckAt = LocalDateTime.now().plusMinutes(5);
+        nextCheckAt = LocalDateTime.now(Clock.systemDefaultZone()).plusMinutes(5);
     }
 
     public void requestCancel(Long actorId) {

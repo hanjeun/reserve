@@ -10,7 +10,7 @@ export default function ChatImage({ url, width, height }) {
     const revision = useAuthStore(state => state.sessionRevision);
     const scope = `${revision}:${url}`;
     const [result, setResult] = useState(null);
-    const [previewScope, setPreviewScope] = useState(null);
+    const [previewScope, setPreviewScope] = useState(/** @type {string | null} */ (null));
     useEffect(() => {
         const controller = new AbortController();
         let alive = true;

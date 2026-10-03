@@ -96,7 +96,7 @@ class ChatImageAccessTest {
 
         assertThat(images.readForReport(admin, 20L, 33L).bytes()).isEqualTo(plaintext);
         verifyNoInteractions(messages);
-        verify(audit).record(admin, 20L, 33L, kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.IMAGE);
+        verify(audit).recordAccess(admin, 20L, 33L, kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.IMAGE);
         assertThat(photo.getImageKey()).isNull();
     }
 
@@ -108,7 +108,7 @@ class ChatImageAccessTest {
         when(storage.readEncryptedChatImage(captured.getImageKey(), "users/1/chat/10"))
                 .thenReturn(cipher.encrypt(new byte[] {1}, "users/1/chat/10"));
         doThrow(new IllegalStateException("audit unavailable")).when(audit)
-                .record(admin, 20L, 33L, kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.IMAGE);
+                .recordAccess(admin, 20L, 33L, kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.IMAGE);
 
         assertThatThrownBy(() -> images.readForReport(admin, 20L, 33L)).hasMessageContaining("audit unavailable");
     }

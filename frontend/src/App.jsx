@@ -7,6 +7,7 @@ import useAuthStore from './store/useAuthStore';
 import { colors, rawColors, field, fieldPx, zIndex } from './styles/tokens';
 import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
+import useModalScrollLock from './hooks/useModalScrollLock';
 import useRouteSeo from './hooks/useRouteSeo';
 
 // 라우트 단위 Code Splitting (2026-07): 예전엔 모든 페이지를 정적 import해서 첫 번들 JS에
@@ -250,7 +251,7 @@ function AppRoutes() {
     const navigationType = useNavigationType();
     const isSearchPage = isSearchPath(pathname);
     const routeContentRef = useRef(null);
-    const previousPathnameRef = useRef(null);
+    const previousPathnameRef = useRef(/** @type {string | null} */ (null));
     const previousDiscoveryTabRef = useRef(null);
     const previousHistoryIndexRef = useRef(null);
     useRouteSeo();
@@ -276,6 +277,12 @@ function AppRoutes() {
         });
         // 검색은 헤더를 고정하는 전용 진입·닫힘 모션이 이미 있어, 부모 전환을 겹치지 않는다.
         const routeMotion = isSearchPage ? null : resolvedRouteMotion;
+
+        // 검색을 닫으며 재생성된 헤더도 이전 위치로 바로 돌아온다. 쿼리 정규화에서는 유지한다.
+        if (previousPathname !== pathname) {
+            content?.parentElement?.toggleAttribute('data-search-restored',
+                /^\/search\/?$/.test(previousPathname || '') && !isSearchPage);
+        }
 
         if (content && previousPathname !== null && previousPathname !== pathname) {
             // 헤더·탭은 정지한 채 도착한 화면만 움직인다. 같은 pathname의 필터·보기 전환은 제외한다.
@@ -371,6 +378,7 @@ function App() {
     // 프리뷰를 여는 경로가 두 가지(useImagePreview 훅 / PreviewGroup 직접 사용)라
     // 어느 한쪽 state 에 묶으면 반쪽만 동작한다. DOM 을 기준으로 붙는다.
     useImagePreviewSwipe();
+    useModalScrollLock();
     const themeConfig = useMemo(
         () => buildThemeConfig(resolvedTheme === 'dark', accentColors),
         // accentColors 는 **안정 참조**다 — useTheme 이 모듈 상수 ACCENT_OPTIONS 안의

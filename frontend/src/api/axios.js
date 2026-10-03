@@ -52,9 +52,10 @@ const handle401 = async (originalRequest) => {
         await flight.promise;
         assertCurrentSession(scope);
         return instance(originalRequest);
-    } catch {
+    } catch (error) {
         // 이전 계정의 refresh 실패가 새 계정을 로그아웃시키거나 요청을 재전송하면 안 된다.
         assertCurrentSession(scope);
+        if (error?.status !== 401 && error?.status !== 403) throw error;
         if (!originalRequest.url?.includes('/api/member/me')) {
             localStorage.removeItem('auth-storage');
             if (!globalThis.location.pathname.includes('/login')) globalThis.location.href = '/login';
@@ -162,4 +163,19 @@ for (const method of ['post', 'put', 'patch']) {
 }
 api.request = config => instance(scopedConfig(config));
 
-export default api;
+// The response interceptor returns ApiResponse.data (or null/Blob), not AxiosResponse.
+// In particular, a payload's `status` is a business value, not an HTTP status number.
+/**
+ * @typedef {Omit<import('axios').AxiosInstance, 'request' | 'get' | 'delete' | 'head' | 'options' | 'post' | 'put' | 'patch'> & {
+ *   <T = any>(config: import('axios').AxiosRequestConfig): Promise<T>,
+ *   request<T = any>(config: import('axios').AxiosRequestConfig): Promise<T>,
+ *   get<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   delete<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   head<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   options<T = any>(url: string, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   post<T = any>(url: string, data?: any, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   put<T = any>(url: string, data?: any, config?: import('axios').AxiosRequestConfig): Promise<T>,
+ *   patch<T = any>(url: string, data?: any, config?: import('axios').AxiosRequestConfig): Promise<T>
+ * }} PayloadApi
+ */
+export default /** @type {PayloadApi} */ (api);

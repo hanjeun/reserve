@@ -2,6 +2,7 @@ package kr.it.reserve.member.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,6 +31,10 @@ public class PasswordResetToken {
     @Column(name = "token", nullable = false, length = 10)
     private String token;
 
+    /** 새 코드는 해시만 보관한다. NULL은 배포 전 발급된 5분짜리 코드의 호환 경로다. */
+    @Column(name = "token_hash", length = 60)
+    private String tokenHash;
+
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
@@ -56,7 +61,7 @@ public class PasswordResetToken {
     private int attemptCount = 0;
 
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiresAt);
+        return LocalDateTime.now(Clock.systemDefaultZone()).isAfter(expiresAt);
     }
 
     public void markVerified() {

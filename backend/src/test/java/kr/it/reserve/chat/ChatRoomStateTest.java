@@ -3,8 +3,12 @@ package kr.it.reserve.chat;
 import kr.it.reserve.chat.entity.ChatRoom;
 import kr.it.reserve.chat.entity.SenderRole;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.LocalDateTime;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,6 +53,44 @@ class ChatRoomStateTest {
         assertThat(room.isBlockedBy(SenderRole.OWNER)).isTrue();
         assertThatThrownBy(() -> room.setBlocked(SenderRole.ADMIN, true, now))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @ParameterizedTest(name = "role={0}")
+    @MethodSource("unsupportedParticipantRoles")
+    void unsupportedParticipantRolesPreserveStateAndNullReadUsesMemberAxis(
+            SenderRole role, int memberUnreadAfterRead, int adminUnreadAfterRead) {
+        LocalDateTime original = LocalDateTime.of(2026, 10, 3, 14, 0);
+        LocalDateTime requested = original.plusHours(1);
+        ChatRoom room = ChatRoom.builder()
+                .type(ChatRoom.RoomType.STORE)
+                .memberHiddenAt(original)
+                .ownerHiddenAt(original.minusMinutes(1))
+                .ownerHiddenByMemberId(99L)
+                .memberBlockedAt(original.minusMinutes(2))
+                .ownerBlockedAt(original.minusMinutes(3))
+                .memberUnread(7).adminUnread(5).ownerUnread(3)
+                .build();
+
+        assertThatThrownBy(() -> room.setHidden(role, true, 101L, requested))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Only participants can hide their conversations");
+        assertThatThrownBy(() -> room.setBlocked(role, false, requested))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Only store conversation participants can block a room");
+        assertThat(room).extracting(ChatRoom::getMemberHiddenAt, ChatRoom::getOwnerHiddenAt,
+                        ChatRoom::getOwnerHiddenByMemberId, ChatRoom::getMemberBlockedAt,
+                        ChatRoom::getOwnerBlockedAt, ChatRoom::getMemberUnread,
+                        ChatRoom::getAdminUnread, ChatRoom::getOwnerUnread)
+                .containsExactly(original, original.minusMinutes(1), 99L,
+                        original.minusMinutes(2), original.minusMinutes(3), 7, 5, 3);
+
+        room.markRead(role);
+        assertThat(room).extracting(ChatRoom::getMemberUnread, ChatRoom::getAdminUnread, ChatRoom::getOwnerUnread)
+                .containsExactly(memberUnreadAfterRead, adminUnreadAfterRead, 3);
+    }
+
+    private static Stream<Arguments> unsupportedParticipantRoles() {
+        return Stream.of(Arguments.of(SenderRole.ADMIN, 7, 0), Arguments.of(null, 0, 5));
     }
 
     private ChatRoom room(ChatRoom.RoomType type) {

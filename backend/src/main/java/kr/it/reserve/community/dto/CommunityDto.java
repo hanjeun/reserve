@@ -9,6 +9,11 @@ import java.time.format.DateTimeFormatter;
 
 public class CommunityDto {
 
+    private static final DateTimeFormatter DISPLAY_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    private CommunityDto() {
+    }
+
     @Getter
     @Setter
     @NoArgsConstructor
@@ -40,7 +45,6 @@ public class CommunityDto {
         private String updatedAt;
 
         public static PostResponse fromEntity(CommunityPost post) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
             
             return PostResponse.builder()
                     .id(post.getId())
@@ -53,8 +57,8 @@ public class CommunityDto {
                     .viewCount(post.getViewCount())
                     .likeCount(post.getLikeCount())
                     .commentCount(post.getComments().size())
-                    .createdAt(post.getCreatedAt().format(formatter))
-                    .updatedAt(post.getUpdatedAt().format(formatter))
+                    .createdAt(post.getCreatedAt().format(DISPLAY_TIME))
+                    .updatedAt(post.getUpdatedAt().format(DISPLAY_TIME))
                     .isLiked(false)
                     .isAuthor(false)
                     .build();
@@ -62,7 +66,6 @@ public class CommunityDto {
 
         /** 게시글 목록용: commentCount를 외부에서 주입받아 컬렉션 LAZY 로딩 방지 */
         public static PostResponse fromEntity(CommunityPost post, int commentCount) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
             return PostResponse.builder()
                     .id(post.getId())
@@ -75,15 +78,14 @@ public class CommunityDto {
                     .viewCount(post.getViewCount())
                     .likeCount(post.getLikeCount())
                     .commentCount(commentCount)
-                    .createdAt(post.getCreatedAt().format(formatter))
-                    .updatedAt(post.getUpdatedAt().format(formatter))
+                    .createdAt(post.getCreatedAt().format(DISPLAY_TIME))
+                    .updatedAt(post.getUpdatedAt().format(DISPLAY_TIME))
                     .isLiked(false)
                     .isAuthor(false)
                     .build();
         }
 
         public static PostResponse fromEntity(CommunityPost post, Long currentUserId, boolean isLiked) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
             
             return PostResponse.builder()
                     .id(post.getId())
@@ -96,8 +98,8 @@ public class CommunityDto {
                     .viewCount(post.getViewCount())
                     .likeCount(post.getLikeCount())
                     .commentCount(post.getComments().size())
-                    .createdAt(post.getCreatedAt().format(formatter))
-                    .updatedAt(post.getUpdatedAt().format(formatter))
+                    .createdAt(post.getCreatedAt().format(DISPLAY_TIME))
+                    .updatedAt(post.getUpdatedAt().format(DISPLAY_TIME))
                     .isLiked(isLiked)
                     .isAuthor(post.getAuthor().getId().equals(currentUserId))
                     .build();
@@ -133,15 +135,14 @@ public class CommunityDto {
         private String updatedAt;
 
         public static CommentResponse fromEntity(CommunityComment comment, Long currentUserId) {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
             
             return CommentResponse.builder()
                     .id(comment.getId())
                     .content(comment.getContent())
                     .authorName(comment.getAuthor().getName())
                     .authorId(comment.getAuthor().getId())
-                    .createdAt(comment.getCreatedAt().format(formatter))
-                    .updatedAt(comment.getUpdatedAt().format(formatter))
+                    .createdAt(comment.getCreatedAt().format(DISPLAY_TIME))
+                    .updatedAt(comment.getUpdatedAt().format(DISPLAY_TIME))
                     .isAuthor(comment.getAuthor().getId().equals(currentUserId))
                     .build();
         }

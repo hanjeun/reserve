@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
@@ -64,7 +65,7 @@ public class RefreshToken {
 
     public boolean isExpired() {
         if (this.expiresAt == null) return true; // null이면 만료된 것으로 처리
-        return LocalDateTime.now().isAfter(this.expiresAt);
+        return LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.expiresAt);
     }
 
     /** 제시된 토큰이 이 행의 바로 직전 토큰인가. */

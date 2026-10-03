@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.concurrent.Semaphore;
+import java.util.Objects;
+import java.util.Arrays;
 import java.util.function.Supplier;
 
 @Service
@@ -72,7 +74,7 @@ public class ChatImageService {
             content = bounded(() -> new ImageContent(cipher.decrypt(storage.readEncryptedChatImage(item.getImageKey(), prefix), prefix), item.getImageContentType()));
         } else content = readContent(messages.findById(messageId)
                 .orElseThrow(() -> new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND)));
-        audit.record(admin, reportId, messageId, ChatReportAccessAudit.Action.IMAGE);
+        audit.recordAccess(admin, reportId, messageId, ChatReportAccessAudit.Action.IMAGE);
         return content;
     }
 
@@ -89,5 +91,22 @@ public class ChatImageService {
         finally { transfers.release(); }
     }
 
-    public record ImageContent(byte[] bytes, String contentType) { }
+    public record ImageContent(byte[] bytes, String contentType) {
+        @Override
+        public boolean equals(Object other) {
+            return this == other || other instanceof ImageContent(var imageBytes, var imageContentType)
+                    && Arrays.equals(bytes, imageBytes)
+                    && Objects.equals(contentType, imageContentType);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType);
+        }
+
+        @Override
+        public String toString() {
+            return "ImageContent[byteCount=" + (bytes == null ? 0 : bytes.length) + ", contentType=" + contentType + "]";
+        }
+    }
 }

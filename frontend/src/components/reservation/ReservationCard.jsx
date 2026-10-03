@@ -46,7 +46,7 @@ const REASON_MODALS = {
 
 const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onComplete, onNoShow, onStoreCancel, onRemove, view = 'list' }) => {
     // null | 'reject' | 'cancel'
-    const [reasonModal, setReasonModal] = useState(null);
+    const [reasonModal, setReasonModal] = useState(/** @type {'reject' | 'cancel' | null} */ (null));
     const [reason, setReason] = useState('');
     const [detailOpen, setDetailOpen] = useState(false);
     const { confirm } = useMessage();
@@ -160,10 +160,10 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                     </Flex>
                 }
                 open={reasonModal != null}
-                /* maskClosable={false}: 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
+                /* mask.closable=false: 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
                    컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                    (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
-                maskClosable={false}
+                mask={{ closable: false }}
                 onOk={handleReasonConfirm}
                 onCancel={closeReasonModal}
                 okText={REASON_MODALS[reasonModal]?.okText ?? '확인'} cancelText="닫기"

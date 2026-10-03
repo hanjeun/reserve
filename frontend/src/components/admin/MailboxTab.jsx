@@ -104,7 +104,7 @@ const useComposeMail = ({ message }) => {
         onSuccess: () => {
             message.success('메일을 보냈습니다.');
             resetCompose();
-            queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
+            void queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
         },
         onError: () => message.error('메일 발송에 실패했습니다.'),
     });
@@ -143,9 +143,9 @@ const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
             // 지운 메일을 보고 있었다면 상세를 비운다 — 안 비우면 목록에서 사라진 메일이
             // 오른쪽 패널에 계속 남아 "지워졌는데 아직 있다"처럼 보인다.
             if (selectedSent?.id === id) setSelectedSent(null);
-            queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
+            void queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
             // 휴지통 탭이 이 메일을 새로 받아야 한다.
-            queryClient.invalidateQueries({ queryKey: adminKeys.trash() });
+            void queryClient.invalidateQueries({ queryKey: adminKeys.trash() });
         },
         onError: () => message.error('휴지통으로 옮기지 못했습니다.'),
     });

@@ -7,6 +7,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 public class SecurityUtil {
 
+    private SecurityUtil() {
+    }
+
     // 인증된 사용자 정보 가져오기
     public static Member getCurrentMember() {
         return getCurrentMember("인증되지 않은 사용자입니다.");

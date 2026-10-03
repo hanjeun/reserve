@@ -30,6 +30,8 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class BusinessVerificationService {
 
+    private static final String MEMBER_NOT_FOUND_MESSAGE = "회원을 찾을 수 없습니다.";
+
     private final BusinessVerificationRepository verificationRepository;
     private final MemberRepository memberRepository;
     private final FileStorageService fileStorageService;
@@ -43,7 +45,7 @@ public class BusinessVerificationService {
     @Transactional
     public BusinessVerificationResponse submitVerification(Member member, BusinessVerificationRequest request) {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
-                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         // 1. 이미 사업자인지 확인
         if (activeMember.getRole() == Role.BUSINESS) {
@@ -92,7 +94,7 @@ public class BusinessVerificationService {
 
         // 회원 권한을 BUSINESS로 변경
         Member member = memberRepository.findActiveByIdForUpdate(verification.getMember().getId())
-                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         member.setRole(Role.BUSINESS);
         memberRepository.save(member);
 
@@ -128,7 +130,7 @@ public class BusinessVerificationService {
 
         // 거절 이메일 발송 (비동기)
         Member member = memberRepository.findActiveByIdForUpdate(verification.getMember().getId())
-                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         emailService.sendBusinessRejectedEmail(
             member.getEmail(),
             member.getName(),
@@ -147,7 +149,7 @@ public class BusinessVerificationService {
     @Transactional
     public void revokeBusinessRole(Long memberId, Member admin) {
         Member targetMember = memberRepository.findActiveByIdForUpdate(memberId)
-                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (targetMember.getRole() != Role.BUSINESS) {
             throw new BizVerificationException("해당 회원은 사업자 권한이 없습니다.");
@@ -171,7 +173,7 @@ public class BusinessVerificationService {
     public void resignBusinessRole(Member member) {
         // thin Member 대신 DB에서 fresh 로드 후 수정 (null 덮어쓰기 방지)
         Member freshMember = memberRepository.findActiveByIdForUpdate(member.getId())
-                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (freshMember.getRole() != Role.BUSINESS) {
             throw new BizVerificationException("사업자 권한을 보유하고 있지 않습니다.");
@@ -189,7 +191,7 @@ public class BusinessVerificationService {
     @Transactional
     public BusinessVerificationResponse updateVerification(Member member, BusinessVerificationRequest request) {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
-                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(activeMember.getId())
                 .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
 
@@ -228,7 +230,7 @@ public class BusinessVerificationService {
     @Transactional
     public void cancelVerification(Member member) {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
-                .orElseThrow(() -> new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(activeMember.getId())
                 .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
 

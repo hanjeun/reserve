@@ -2,7 +2,7 @@ import React from 'react';
 import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import {
-    BarChart, Bar, PieChart, Pie, Cell,
+    BarChart, Bar, PieChart, Pie,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
@@ -154,16 +154,16 @@ const DashboardTab = () => {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
-                                            data={stats.reservationPieData}
+                                            data={stats.reservationPieData.map((entry, i) => ({
+                                                ...entry,
+                                                fill: chartPalette[i % chartPalette.length],
+                                                stroke: 'none',
+                                            }))}
                                             cx="50%" cy="50%"
                                             innerRadius={40} outerRadius={65}
                                             paddingAngle={3} dataKey="value"
                                             cornerRadius={chartPieCornerRadius}
-                                        >
-                                            {stats.reservationPieData.map((entry, i) => (
-                                                <Cell key={entry.key} fill={chartPalette[i % chartPalette.length]} stroke="none" />
-                                            ))}
-                                        </Pie>
+                                        />
                                         <Tooltip formatter={(v) => `${v}건`} {...chartTooltipStyle} />
                                     </PieChart>
                                 </ResponsiveContainer>

@@ -101,7 +101,7 @@ const MAX_ASPECT_FIXES = 3;
 const QrScannerTab = ({ sheet = false, onClose }) => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
-    const html5QrRef = useRef(null);
+    const html5QrRef = useRef(/** @type {import('html5-qrcode').Html5Qrcode | null} */ (null));
     // 같은 프레임에서 같은 QR이 연속으로 감지되어 중복 요청되는 것을 막는 락
     const processingRef = useRef(false);
 
@@ -220,7 +220,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                 message.success(`${who}님 체크인이 완료되었습니다.`);
                 // 예약 관리 목록은 이 탭(또는 시트)으로 오면서 가려졌지만 캐시는 남아 있다.
                 // 무효화하지 않으면 돌아갔을 때 상세 모달에 체크인 시각이 빠진 목록이 보인다.
-                invalidateReservationData(queryClient);
+                void invalidateReservationData(queryClient);
             }
         } catch (err) {
             message.error(err?.message || 'QR 체크인에 실패했습니다.');
@@ -377,7 +377,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     useEffect(() => {
         if (!restartForAspectRef.current) return;
         restartForAspectRef.current = false;
-        startScanning();
+        void startScanning();
     }, [decodeAspect, startScanning]);
 
     // ★ isScanning으로 가드하지 않는다 (2026-08-09).

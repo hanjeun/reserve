@@ -59,7 +59,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const lookupScope = `${id}:${isLoggedIn}:${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
     const [reviewAttempt, setReviewAttempt] = useState(0);
-    const [reviewResult, setReviewResult] = useState({ scope: null, attempt: null, reservation: null, error: null });
+    const [reviewResult, setReviewResult] = useState({ scope: /** @type {string | null} */ (null), attempt: /** @type {number | null} */ (null), reservation: null, error: null });
     const currentReview = isLoggedIn && reviewResult.scope === lookupScope && reviewResult.attempt === reviewAttempt;
     const completedReservation = currentReview ? reviewResult.reservation : null;
     const reviewEligibilityError = currentReview ? reviewResult.error : null;
@@ -176,7 +176,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const handleReservationResult = async (reservation) => {
         // 목록으로 넘어가기 전에 무효화한다 — 결제 분기로 빠지는 경우까지 포함해
         // 모든 경로가 한 번은 지나가는 지점이라 여기 한 곳에 두면 빠뜨릴 일이 없다.
-        invalidateReservations();
+        void invalidateReservations();
         if ((Number(reservation?.depositAmount) || 0) <= 0) {
             message.success('예약이 완료되었습니다.');
             navigate('/my-reservations');
@@ -200,6 +200,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
 
     // ── 예약 수정 제출 (onFinish에서 분리) ────────────────────────────────────
     const handleUpdateSubmit = async (values) => {
+        if (!editingReservation) return;
         try {
             await reservationService.updateReservation(editingReservation.id, {
                 reservationDate: formatDate(values.reservationDate),
@@ -211,7 +212,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             // 수정 경로는 원래 state.refetch로 강제 재조회를 시켜서 동작은 했다.
             // invalidate가 정석이라 같이 걸어두고, state.refetch는 호환을 위해 남긴다
             // (둘이 겹쳐도 TanStack Query가 중복 요청을 합쳐서 한 번만 나간다).
-            invalidateReservations();
+            void invalidateReservations();
             navigate('/my-reservations', { state: { refetch: true } });
         } catch (err) {
             const errMsg = toErrorMessage(err);

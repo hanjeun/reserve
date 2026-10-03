@@ -32,6 +32,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -72,8 +73,8 @@ class ChatModerationServiceTest {
         assertThatThrownBy(() -> service.setBlocked(formerOwner, 21L, "OWNER", true))
                 .isInstanceOf(ChatException.class)
                 .extracting("status").isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
-        assertThatThrownBy(() -> service.createReport(
-                formerOwner, 21L, "OWNER", reportRequest(null, ChatReport.Reason.SPAM, null)))
+        var report = reportRequest(null, ChatReport.Reason.SPAM, null);
+        assertThatThrownBy(() -> service.createReport(formerOwner, 21L, "OWNER", report))
                 .isInstanceOf(ChatException.class)
                 .extracting("status").isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
         verify(storeRepository, never()).findById(31L);
@@ -194,7 +195,7 @@ class ChatModerationServiceTest {
         assertThat(context.getReportedMessage().getId()).isEqualTo(90L);
         assertThat(context.getRecentMessages()).extracting("id").containsExactly(89L, 90L);
         verify(roomRepository, never()).findByIdForUpdate(any());
-        verify(auditService).record(any(Member.class), org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.isNull(),
+        verify(auditService).recordAccess(any(Member.class), org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.eq(kr.it.reserve.chat.entity.ChatReportAccessAudit.Action.CONTEXT));
     }
 
@@ -205,7 +206,8 @@ class ChatModerationServiceTest {
         service.setHidden(customer, 21L, "MEMBER", true);
         assertThat(room.getMemberHiddenAt()).isNotNull();
         assertThat(room.getOwnerHiddenAt()).isNull();
-        assertThatThrownBy(() -> service.setHidden(member(99L), 21L, "MEMBER", true)).isInstanceOf(ChatException.class);
+        Member unrelatedMember = member(99L);
+        assertThatThrownBy(() -> service.setHidden(unrelatedMember, 21L, "MEMBER", true)).isInstanceOf(ChatException.class);
         assertThatThrownBy(() -> service.setHidden(customer, 21L, "ADMIN", true)).isInstanceOf(ChatException.class);
         service.setHidden(customer, 21L, "MEMBER", false);
         assertThat(room.getMemberHiddenAt()).isNull();
@@ -213,15 +215,17 @@ class ChatModerationServiceTest {
     }
 
     @Test void nonAdminCannotReadTheOriginalAndAuditFailureFailsClosed() {
-        assertThatThrownBy(() -> service.reportContext(member(7L), 5L)).isInstanceOf(ChatException.class);
+        Member nonAdmin = member(7L);
+        assertThatThrownBy(() -> service.reportContext(nonAdmin, 5L)).isInstanceOf(ChatException.class);
         verify(reportRepository, never()).findById(any());
         ChatRoom room = room(member(7L));
         ChatReport report = ChatReport.builder().id(5L).room(room).reporterRole(SenderRole.MEMBER)
                 .reason(ChatReport.Reason.SPAM).evidenceCapturedAt(java.time.LocalDateTime.now()).build();
         when(reportRepository.findById(5L)).thenReturn(Optional.of(report));
-        org.mockito.Mockito.doThrow(new IllegalStateException("audit unavailable")).when(auditService)
-                .record(any(), any(), org.mockito.ArgumentMatchers.isNull(), any());
-        assertThatThrownBy(() -> service.reportContext(admin(), 5L)).hasMessageContaining("audit unavailable");
+        doThrow(new IllegalStateException("audit unavailable")).when(auditService)
+                .recordAccess(any(), any(), org.mockito.ArgumentMatchers.isNull(), any());
+        Member administrator = admin();
+        assertThatThrownBy(() -> service.reportContext(administrator, 5L)).hasMessageContaining("audit unavailable");
         verifyNoMessageReads();
     }
 

@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 /** 미결 대사와 소량의 기존 광고 이관. 전체 광고/기간을 매 주기 PG에 조회하지 않는다. */
@@ -29,7 +30,7 @@ public class AdPaymentReconciliationScheduler {
             try { ledger.importLegacy(id); }
             catch (RuntimeException e) { log.error("Advertisement ledger import failed: adId={}, errorType={}", id, e.getClass().getSimpleName()); }
         }
-        for (String uid : attempts.findDue(LocalDateTime.now(), PageRequest.of(0, 10))) {
+        for (String uid : attempts.findDue(LocalDateTime.now(Clock.systemDefaultZone()), PageRequest.of(0, 10))) {
             try { payments.reconcile(uid, null); }
             catch (RuntimeException e) { log.error("Advertisement payment reconciliation failed: errorType={}", e.getClass().getSimpleName()); }
         }

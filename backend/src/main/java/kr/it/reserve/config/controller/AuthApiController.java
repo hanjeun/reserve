@@ -35,6 +35,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthApiController {
+    private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
+
 
     private final MemberService memberService;
     private final TokenProvider tokenProvider;
@@ -42,6 +44,8 @@ public class AuthApiController {
     private final JwtProperties jwtProperties;
     private final TokenService tokenService;
     private final RateLimiter rateLimiter;
+    private final CookieUtil cookieUtil;
+    private static final String ACCESS_TOKEN_COOKIE = "access_token";
 
     /**
      * 로그인 실패 시 내보내는 <b>유일한</b> 문구. 미가입·소셜계정·비번불일치를 구분하지 않는다.
@@ -155,7 +159,7 @@ public class AuthApiController {
 
     @PostMapping("/refresh")
     public ApiResponse<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = CookieUtil.getCookie(request, "refresh_token");
+        String refreshToken = CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE);
         if (refreshToken == null || refreshToken.isBlank()) {
             throw tokenService.rejectMissingCookie();
         }
@@ -164,9 +168,9 @@ public class AuthApiController {
         // 로그인 14일째에 쿠키를 지우지 않는다 — 토큰만 바꾸고 쿠키를 안 바꾸면 연장이 의미 없다.
         TokenService.RefreshResult result = tokenService.refresh(refreshToken);
 
-        CookieUtil.addCookie(response, "access_token", result.accessToken(),
+        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, result.accessToken(),
                 (int) jwtProperties.getAccessTokenExpiration().toSeconds());
-        CookieUtil.addCookie(response, "refresh_token", result.refreshToken(),
+        cookieUtil.addCookie(response, REFRESH_TOKEN_COOKIE, result.refreshToken(),
                 (int) result.refreshMaxAge().toSeconds());
 
         // 토큰은 HttpOnly 쿠키로만 전달한다. 응답 본문에 복제하면 XSS 노출면만 넓어진다.
@@ -189,12 +193,12 @@ public class AuthApiController {
 
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = CookieUtil.getCookie(request, "refresh_token");
+        String refreshToken = CookieUtil.getCookie(request, REFRESH_TOKEN_COOKIE);
         if (refreshToken != null && !refreshToken.isBlank()) {
             tokenService.revoke(refreshToken);
         }
-        CookieUtil.deleteCookie(request, response, "access_token");
-        CookieUtil.deleteCookie(request, response, "refresh_token");
+        cookieUtil.deleteCookie(response, ACCESS_TOKEN_COOKIE);
+        cookieUtil.deleteCookie(response, REFRESH_TOKEN_COOKIE);
 
         return ApiResponse.success(null, "로그아웃 성공");
     }
@@ -203,7 +207,7 @@ public class AuthApiController {
         String accessToken = tokenProvider.generateAccessToken(member);
         String refreshToken = tokenProvider.generateRefreshToken(member);
 
-        CookieUtil.addCookie(response, "access_token", accessToken, (int) jwtProperties.getAccessTokenExpiration().toSeconds());
-        CookieUtil.addCookie(response, "refresh_token", refreshToken, (int) jwtProperties.getRefreshTokenExpiration().toSeconds());
+        cookieUtil.addCookie(response, ACCESS_TOKEN_COOKIE, accessToken, (int) jwtProperties.getAccessTokenExpiration().toSeconds());
+        cookieUtil.addCookie(response, REFRESH_TOKEN_COOKIE, refreshToken, (int) jwtProperties.getRefreshTokenExpiration().toSeconds());
     }
 }

@@ -27,9 +27,9 @@
 import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Typography } from 'antd';
-import Button from './Button';
+import ModalActions from './ModalActions';
 // colors 는 더 이상 쓰지 않는다 — 에러 텍스트 색은 index.css 의 .reserve-field-error 가 맡는다.
-import { fontSize, radius } from '../../styles/tokens';
+import { fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
 
@@ -102,22 +102,16 @@ const FormModal = ({
             onCancel={onClose}
             afterClose={afterClose}
             rootClassName={rootClassName}
-            /* maskClosable={false}: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
+            /* mask.closable=false: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
-            maskClosable={false}
+            mask={{ closable: false }}
             footer={
                 footer !== undefined ? footer : (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-                        {/* 취소 = 테두리 있는 outline (위 컨벤션 주석 참고) */}
-                        <Button variant="outline" size="sm" onClick={onCancelAction || onClose} disabled={submitting}
-                            style={{ borderRadius: radius.xl }}>
-                            {cancelText}
-                        </Button>
-                        <Button variant="primary" size="sm" loading={submitting} disabled={submitDisabled} onClick={onSubmit}
-                            style={{ borderRadius: radius.xl }}>
-                            {submitText}
-                        </Button>
+                        <ModalActions onCancel={onCancelAction || onClose} onConfirm={onSubmit}
+                            cancelText={cancelText} confirmText={submitText}
+                            loading={submitting} disabled={submitDisabled} cancelDisabled={submitting} />
                     </div>
                 )
             }

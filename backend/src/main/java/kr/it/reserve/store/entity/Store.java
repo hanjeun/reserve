@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -293,7 +294,7 @@ public class Store {
     private String suspendReason;
 
     public void softDelete() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     public boolean isDeleted() {
@@ -304,10 +305,8 @@ public class Store {
     public boolean isSuspended() {
         if (this.status == StoreStatus.BANNED) return true;
         if (this.status == StoreStatus.SUSPENDED) {
-            if (this.suspendedUntil != null && LocalDateTime.now().isAfter(this.suspendedUntil)) {
-                return false;
-            }
-            return true;
+            return this.suspendedUntil == null
+                    || !LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.suspendedUntil);
         }
         return false;
     }
@@ -404,17 +403,6 @@ public class Store {
     }
 
     /**
-     * 그 날짜에 <b>예약을 받을 수 있는가</b> — 운영 기간 안이고 휴무가 아니면 {@code true}.
-     *
-     * <p><b>★ 예약 검증·가능시간 조회·달력이 전부 이 메서드 하나를 지나야 한다.</b>
-     * 휴무 판정이 {@link #isClosedOn} 한 곳에 모여 있어서 지금까지 어긋난 적이 없었다.
-     * 운영 기간을 새 판정으로 따로 만들면 그 이점이 사라진다 — "화면엔 되는데 누르면 안 되는"
-     * 상태는 판정이 흩어질 때 생긴다.
-     *
-     * <p>경계는 <b>양쪽 모두 포함</b>이다. 사장님이 "9/1~9/30 운영"이라고 적으면
-     * 9월 30일은 여는 날이라고 읽는 게 자연스럽다.
-     */
-    /**
      * 예약 방식. <b>화면은 이 값 하나만 고르고 나머지는 따라온다</b> —
      * 체크박스를 여러 개 주면 사장님이 조합을 만들지 못한다.
      */
@@ -459,6 +447,17 @@ public class Store {
         return openTime != null ? openTime : LocalTime.MIDNIGHT;
     }
 
+    /**
+     * 그 날짜에 <b>예약을 받을 수 있는가</b> — 운영 기간 안이고 휴무가 아니면 {@code true}.
+     *
+     * <p><b>★ 예약 검증·가능시간 조회·달력이 전부 이 메서드 하나를 지나야 한다.</b>
+     * 휴무 판정이 {@link #isClosedOn} 한 곳에 모여 있어서 지금까지 어긋난 적이 없었다.
+     * 운영 기간을 새 판정으로 따로 만들면 그 이점이 사라진다 — "화면엔 되는데 누르면 안 되는"
+     * 상태는 판정이 흩어질 때 생긴다.
+     *
+     * <p>경계는 <b>양쪽 모두 포함</b>이다. 사장님이 "9/1~9/30 운영"이라고 적으면
+     * 9월 30일은 여는 날이라고 읽는 게 자연스럽다.
+     */
     public boolean isBookableOn(LocalDate date) {
         if (date == null) return false;
         if (openDate != null && date.isBefore(openDate)) return false;

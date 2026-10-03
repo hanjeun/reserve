@@ -203,7 +203,7 @@ describe('route chunk loading patterns', () => {
         const { container } = render(<FreshPreview pathname="/login" />);
         expect(container.querySelector('[aria-hidden="true"] > div')).toHaveStyle({ minHeight: 'calc(100svh - 64px)' });
         expect(container.querySelector('h2')).toBeNull();
-        await act(async () => release({ AuthRouteSkeleton: () => <h2>로그인</h2> }));
+        await act(async () => release({ default: () => <h2>로그인</h2> }));
         expect(container.querySelector('h2')).toHaveTextContent('로그인');
         vi.doUnmock('./RouteSkeletonPages');
     });

@@ -48,7 +48,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
@@ -57,6 +56,9 @@ import org.springframework.data.domain.Pageable;
 @RequiredArgsConstructor
 @Service
 public class StoreService {
+    private static final String EDIT_FORBIDDEN_MESSAGE = "가게를 수정할 권한이 없습니다.";
+    private static final String DISTANCE_SORT = "distance";
+
 
     private final StoreRepository storeRepository;
     private final FileStorageService fileStorageService;
@@ -192,14 +194,14 @@ public class StoreService {
                         request.getPartialRefundDays(), clampFullRefundDays(request.getFullRefundDays())))
                 .partialRefundRate(clampPartialRefundRate(request.getPartialRefundRate()))
                 .maxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()))
-                .autoApprovalEnabled(request.getAutoApprovalEnabled() != null ? request.getAutoApprovalEnabled() : false)
+                .autoApprovalEnabled(Boolean.TRUE.equals(request.getAutoApprovalEnabled()))
                 .bookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()))
                 .paymentTimeoutMinutes(clampPaymentTimeout(request.getPaymentTimeoutMinutes()))
                 .reservationSlotMinutes(clampSlotMinutes(request.getReservationSlotMinutes()))
                 .nearbyRadiusKm(clampNearbyRadiusKm(request.getNearbyRadiusKm()))
-                .allowLatePayment(request.getAllowLatePayment() != null ? request.getAllowLatePayment() : false)
-                .allowDuplicateReservation(request.getAllowDuplicateReservation() != null ? request.getAllowDuplicateReservation() : false)
-                .emailNotificationEnabled(request.getEmailNotificationEnabled() != null ? request.getEmailNotificationEnabled() : true)
+                .allowLatePayment(Boolean.TRUE.equals(request.getAllowLatePayment()))
+                .allowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()))
+                .emailNotificationEnabled(!Boolean.FALSE.equals(request.getEmailNotificationEnabled()))
                 .imageAutoplayEnabled(!Boolean.FALSE.equals(request.getImageAutoplayEnabled()))
                 .maxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()))
                 .build();
@@ -268,7 +270,7 @@ public class StoreService {
         List<Store> stores = storeRepository.findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(member);
         return stores.stream()
                 .map(StoreResponse::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**
@@ -286,7 +288,7 @@ public class StoreService {
         boolean isAdmin = member.isAdmin();
         boolean isOwner = store.getOwner() != null && store.getOwner().getId().equals(member.getId());
         if (!isAdmin && !isOwner) {
-            throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
+            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
         }
         return StoreResponse.fromEntity(store);
     }
@@ -319,7 +321,7 @@ public class StoreService {
 
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
             log.error("Unauthorized store access: storeOwnerId={}, requestMemberId={}", store.getOwner().getId(), member.getId());
-            throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
+            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
         }
 
         try {
@@ -406,7 +408,7 @@ public class StoreService {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
+            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
         }
         store.setAutoApprovalEnabled(enabled);
         return StoreResponse.fromEntity(storeRepository.save(store));
@@ -1071,26 +1073,33 @@ public class StoreService {
     /** 검색·공개 정책·전체 정렬 후 페이지를 자른다. 첫 페이지 안에서만 다시 정렬하지 않는다. */
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(String keyword, String sort, int page, int size, Double lat, Double lng) {
-        return searchStoresPaged(keyword, sort, page, size, lat, lng, null);
+        return searchStoresPage(keyword, sort, page, size, lat, lng, new SearchScope(null, null));
     }
 
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(
             String keyword, String sort, int page, int size, Double lat, Double lng, String domain) {
-        return searchStoresPaged(keyword, sort, page, size, lat, lng, domain, null);
+        return searchStoresPage(keyword, sort, page, size, lat, lng, new SearchScope(domain, null));
     }
 
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(
             String keyword, String sort, int page, int size, Double lat, Double lng, String domain, String region) {
-        Pageable pageable = PageRequests.bounded(page, size);
-        return sortedSearch(keyword, sort, pageable, lat, lng, domain, region).map(StoreResponse::fromEntity);
+        return searchStoresPage(keyword, sort, page, size, lat, lng, new SearchScope(domain, region));
     }
+
+    private Page<StoreResponse> searchStoresPage(
+            String keyword, String sort, int page, int size, Double lat, Double lng, SearchScope scope) {
+        Pageable pageable = PageRequests.bounded(page, size);
+        return sortedSearch(keyword, sort, pageable, lat, lng, scope.domain(), scope.region()).map(StoreResponse::fromEntity);
+    }
+
+    private record SearchScope(String domain, String region) {}
 
     private Page<Store> sortedSearch(
             String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
         String normalizedSort = normalizeSort(sort);
-        if ("distance".equals(normalizedSort) && !validCoordinates(lat, lng)) {
+        if (DISTANCE_SORT.equals(normalizedSort) && !validCoordinates(lat, lng)) {
             normalizedSort = "rating";
         }
         ServiceDomain domainFilter = ServiceDomain.parseOrNull(domain);
@@ -1100,7 +1109,7 @@ public class StoreService {
         boolean fulltextCompatible = domainFilter == null
                 && regionFilter.isEmpty()
                 && !"recommended".equals(normalizedSort)
-                && !"distance".equals(normalizedSort);
+                && !DISTANCE_SORT.equals(normalizedSort);
         if (fulltextEnabled && fulltextCompatible && !booleanQuery.isEmpty()) {
             // 네이티브 컬럼명은 JPQL 속성명과 다르다. 허용한 sort를 명시적 CASE ORDER BY에 전달한다.
             return storeRepository.searchStoresFulltextPaged(booleanQuery, normalizedSort, ServiceTime.today(), pageable);
@@ -1124,7 +1133,7 @@ public class StoreService {
     private String normalizeSort(String sort) {
         if ("reviewCount".equals(sort)) return "reviews";
         return "recommended".equals(sort) || "recent".equals(sort) || "reviews".equals(sort)
-                || "distance".equals(sort) ? sort : "rating";
+                || DISTANCE_SORT.equals(sort) ? sort : "rating";
     }
 
     /** 연산자만 있거나 색인되지 않는 짧은 토큰이 섞이면 원문 LIKE 검색으로 보낸다. */
@@ -1148,16 +1157,20 @@ public class StoreService {
     /** 내부 전체 조회도 공개 정책과 안정 정렬을 공유한다. */
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort) {
-        return searchStores(keyword, sort, null);
+        return searchStoreList(keyword, sort, null, null);
     }
 
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort, String domain) {
-        return searchStores(keyword, sort, domain, null);
+        return searchStoreList(keyword, sort, domain, null);
     }
 
     @Transactional(readOnly = true)
     public List<StoreResponse> searchStores(String keyword, String sort, String domain, String region) {
+        return searchStoreList(keyword, sort, domain, region);
+    }
+
+    private List<StoreResponse> searchStoreList(String keyword, String sort, String domain, String region) {
         return sortedSearch(keyword, sort, Pageable.unpaged(), null, null, domain, region)
                 .map(StoreResponse::fromEntity).getContent();
     }

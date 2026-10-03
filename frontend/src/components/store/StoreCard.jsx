@@ -35,7 +35,7 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId,
     // 로드된 카드까지 다 카운트하지 않도록 마운트 시점에만 1회 전송 — React.memo라 props가 같으면 재렌더링도
     // 안 되니 중복 전송도 자연스럽게 막힌다).
     React.useEffect(() => {
-        if (!preview && isAdvertised && adId) adService.recordImpression(adId);
+        if (!preview && isAdvertised && adId) void adService.recordImpression(adId);
     }, [isAdvertised, adId, preview]);
 
     return (

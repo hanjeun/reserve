@@ -111,7 +111,7 @@ export default function useChatThread({
     }
 
     // A → B → A와 같은 방 재조회에서도 이전 응답을 재사용하지 않는다.
-    const activeRef = useRef(null);
+    const activeRef = useRef(/** @type {{ scope: typeof scope, sending: boolean, ready: boolean, invalidated: boolean, requestController?: AbortController | null, pollingChanges?: boolean } | null} */ (null));
     // 응답을 받지 못한 전송은 서버에 저장됐을 수도 있다. 같은 본문을 다시 누르면
     // 같은 식별자를 보내 서버가 기존 한 줄을 돌려주게 한다.
     const retryRef = useRef(null);
@@ -168,7 +168,7 @@ export default function useChatThread({
         let changeRevision = 0;
 
         const tick = () => {
-            if (inFlight || !alive || activeRef.current !== active || active.invalidated || !active.ready) return;
+            if (document.visibilityState === 'hidden' || inFlight || !alive || activeRef.current !== active || active.invalidated || !active.ready) return;
             inFlight = true;
             // 낙관적(음수 id) 항목은 커서에서 제외한다. 서버가 모르는 id 다.
             const list = messagesRef.current;
@@ -199,8 +199,7 @@ export default function useChatThread({
         tick();                                   // 즉시 한 번. 없으면 첫 응답이 pollMs 뒤에나 온다
         const timer = setInterval(tick, pollMs);
 
-        // 탭으로 돌아오는 순간 최신을 받는다. 백그라운드 탭에서는 브라우저가 타이머를
-        // 늦추므로(throttling) 돌아왔을 때 눈에 띄게 밀려 있다.
+        // 숨긴 탭에서는 새 폴링을 멈추고, 돌아오는 순간 최신을 받는다.
         const onWake = () => { if (document.visibilityState === 'visible') tick(); };
         window.addEventListener('focus', onWake);
         document.addEventListener('visibilitychange', onWake);
@@ -222,7 +221,7 @@ export default function useChatThread({
     const submit = useCallback(async (content, attachment = null) => {
         const text = String(content ?? '').trim();
         const active = activeRef.current;
-        if (!active || active.scope !== scope) return null;
+        if (active?.scope !== scope) return null;
         if ((!text && !attachment) || active.sending || roomId == null || !active.ready || active.invalidated) return false;
         const clientMessageId = reuseOrNewClientMessageId(retryRef.current, text, attachment);
         if (!clientMessageId) { onError?.('안전한 연결에서 다시 시도해주세요.'); return false; }
@@ -278,7 +277,7 @@ export default function useChatThread({
 
     const reload = useCallback(() => {
         const active = activeRef.current;
-        if (threadKey == null || !active || active.scope !== scope || active.invalidated) return;
+        if (threadKey == null || active?.scope !== scope || active.invalidated) return;
         // 다음 커밋 전 도착한 이전 응답과 같은 tick의 전송도 즉시 차단한다.
         active.ready = false;
         active.invalidated = true;

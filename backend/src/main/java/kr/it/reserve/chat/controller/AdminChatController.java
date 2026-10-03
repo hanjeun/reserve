@@ -28,6 +28,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminChatController {
 
+    private static final String LOGIN_REQUIRED_MESSAGE = "로그인이 필요합니다.";
+    private static final String QUERY_SUCCESS_MESSAGE = "조회 성공";
+
     private final ChatService chatService;
     private final ChatModerationService moderationService;
     private final ChatImageService imageService;
@@ -37,21 +40,21 @@ public class AdminChatController {
     @GetMapping("/rooms")
     public ResponseEntity<ApiResponse<Page<ChatRoomResponse>>> rooms(
             @RequestParam(defaultValue = "0") int page) {
-        return ResponseEntity.ok(ApiResponse.success(chatService.listRoomsForAdmin(page), "조회 성공"));
+        return ResponseEntity.ok(ApiResponse.success(chatService.listRoomsForAdmin(page), QUERY_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/rooms/{roomId}")
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> messages(@PathVariable Long roomId) {
-        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
-        return ResponseEntity.ok(ApiResponse.success(chatService.getRoomAsAdmin(roomId, admin.getId()), "조회 성공"));
+        Member admin = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return ResponseEntity.ok(ApiResponse.success(chatService.getRoomAsAdmin(roomId, admin.getId()), QUERY_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/rooms/{roomId}/open")
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> openRoom(@PathVariable Long roomId) {
-        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
-        return ResponseEntity.ok(ApiResponse.success(chatService.readRoomAsAdmin(roomId, admin.getId()), "조회 성공"));
+        Member admin = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return ResponseEntity.ok(ApiResponse.success(chatService.readRoomAsAdmin(roomId, admin.getId()), QUERY_SUCCESS_MESSAGE));
     }
 
     /** 증분 폴링 — 관리자가 방을 열어둔 동안. */
@@ -60,8 +63,8 @@ public class AdminChatController {
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> poll(
             @PathVariable Long roomId,
             @RequestParam(required = false) Long afterId) {
-        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
-        return ResponseEntity.ok(ApiResponse.success(chatService.getNewMessagesAsAdmin(roomId, afterId, admin.getId()), "조회 성공"));
+        Member admin = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return ResponseEntity.ok(ApiResponse.success(chatService.getNewMessagesAsAdmin(roomId, afterId, admin.getId()), QUERY_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -76,7 +79,7 @@ public class AdminChatController {
     public ResponseEntity<ApiResponse<ChatMessageResponse>> reply(
             @PathVariable Long roomId,
             @Valid @RequestBody SendMessageRequest request) {
-        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member admin = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsAdmin(
                         admin, roomId, request.getContent(), request.getClientMessageId()), "전송 완료"));
@@ -86,7 +89,7 @@ public class AdminChatController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/waiting-count")
     public ResponseEntity<ApiResponse<Long>> waitingCount() {
-        return ResponseEntity.ok(ApiResponse.success(chatService.adminWaitingRoomCount(), "조회 성공"));
+        return ResponseEntity.ok(ApiResponse.success(chatService.adminWaitingRoomCount(), QUERY_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -103,7 +106,7 @@ public class AdminChatController {
     public ResponseEntity<ApiResponse<ChatReportContextResponse>> reportContext(
             @PathVariable Long reportId) {
         return ResponseEntity.ok(ApiResponse.success(
-                moderationService.reportContext(SecurityUtil.getCurrentMember("로그인이 필요합니다."), reportId), "채팅 신고 문맥 조회 성공"));
+                moderationService.reportContext(SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), reportId), "채팅 신고 문맥 조회 성공"));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -111,7 +114,7 @@ public class AdminChatController {
     public ResponseEntity<ApiResponse<ChatReportResponse>> reviewReport(
             @PathVariable Long reportId,
             @Valid @RequestBody ReviewChatReportRequest request) {
-        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member admin = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 moderationService.reviewReport(admin, reportId, request), "채팅 신고 처리 완료"));
     }
@@ -120,6 +123,6 @@ public class AdminChatController {
     @GetMapping("/reports/{reportId}/images/{messageId}")
     public ResponseEntity<byte[]> reportImage(@PathVariable Long reportId, @PathVariable Long messageId) {
         return ChatImageController.imageResponse(imageService.readForReport(
-                SecurityUtil.getCurrentMember("로그인이 필요합니다."), reportId, messageId));
+                SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), reportId, messageId));
     }
 }

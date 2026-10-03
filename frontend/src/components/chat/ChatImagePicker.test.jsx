@@ -3,6 +3,24 @@ import { describe, expect, it, vi } from 'vitest';
 import ChatImagePicker from './ChatImagePicker';
 
 describe('chat photo picker', () => {
+    it('restarts attachment entry for replacement files even when their names match', async () => {
+        const create = vi.spyOn(URL, 'createObjectURL').mockReturnValueOnce('blob:first').mockReturnValueOnce('blob:second');
+        const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+        const first = new File(['first'], 'photo.png', { type: 'image/png' });
+        const second = new File(['second'], 'photo.png', { type: 'image/png' });
+        const view = render(<ChatImagePicker enabled file={first} onChange={vi.fn()} />);
+        await screen.findByRole('button', { name: '첨부 사진 크게 보기' });
+        const firstAttachment = view.container.querySelector('.reserve-chat-attachment');
+        view.rerender(<ChatImagePicker enabled file={second} onChange={vi.fn()} />);
+        await waitFor(() => expect(screen.getByAltText('전송할 사진')).toHaveAttribute('src', 'blob:second'));
+        const secondAttachment = view.container.querySelector('.reserve-chat-attachment');
+        expect(secondAttachment).not.toBe(firstAttachment);
+        expect(secondAttachment.style.animation).toContain('slideUpIn');
+        expect(revoke).toHaveBeenCalledWith('blob:first');
+        view.unmount();
+        expect(revoke).toHaveBeenCalledWith('blob:second');
+        create.mockRestore(); revoke.mockRestore();
+    });
     it('disables the affordance until the server is configured', () => {
         render(<ChatImagePicker enabled={false} onChange={vi.fn()} />);
         expect(screen.queryByRole('button', { name: '사진 첨부' })).toBeNull();
@@ -74,7 +92,6 @@ describe('chat photo picker', () => {
         expect(exiting.style.animation).toContain('slideUpOut');
         expect(screen.queryByRole('button', { name: '첨부 사진 크게 보기' })).toBeNull();
         expect(revoke).not.toHaveBeenCalled();
-        // DOM removal can precede the passive effect that releases its object URL.
         await waitFor(() => {
             expect(view.container.querySelector('.reserve-chat-attachment')).toBeNull();
             expect(revoke).toHaveBeenCalledWith('blob:exit');

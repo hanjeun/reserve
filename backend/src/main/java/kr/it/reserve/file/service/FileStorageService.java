@@ -22,7 +22,6 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import jakarta.annotation.PostConstruct;
 import java.net.URI;
 import java.io.IOException;
-import java.net.URI;
 import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
@@ -32,6 +31,7 @@ import java.util.UUID;
 public class FileStorageService {
 
     private static final Set<String> MANAGED_ROOTS = Set.of("users", "notices", "system");
+    private static final String HTTPS_PREFIX = "https://";
 
     @Value("${s3.bucket}")
     private String bucket;
@@ -83,7 +83,7 @@ public class FileStorageService {
             String key = fullPrefix + "/" + UUID.randomUUID() + image.extension();
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucket).key(key).contentType(image.contentType()).contentLength((long) image.bytes().length)
-                    .cacheControl(prefixPath.matches("users/[0-9]+/businesses") ? "no-store" : "public, max-age=86400, must-revalidate")
+                    .cacheControl(prefixPath.matches("users/\\d+/businesses") ? "no-store" : "public, max-age=86400, must-revalidate")
                     .build();
             s3Client.putObject(request, RequestBody.fromBytes(image.bytes()));
             registerRollbackCleanup(key);
@@ -99,7 +99,7 @@ public class FileStorageService {
     public String storeEncryptedChatImage(byte[] encrypted, String prefixPath) {
         if (encrypted == null || encrypted.length == 0
                 || encrypted.length > ImageFileValidator.MAX_FILE_BYTES + 28
-                || prefixPath == null || !prefixPath.matches("users/[0-9]+/chat/[0-9]+")) {
+                || prefixPath == null || !prefixPath.matches("users/\\d+/chat/\\d+")) {
             throw FileException.invalid("올바른 대화 사진이 아닙니다.");
         }
         String key = withEnvironmentPrefix(prefixPath) + "/" + UUID.randomUUID() + ".bin";
@@ -117,7 +117,7 @@ public class FileStorageService {
 
     /** 객체를 읽기 전에 현재 환경·발신자·방 경계를 검증하고, 8 MiB + GCM overhead에서 중단한다. */
     public byte[] readEncryptedChatImage(String key, String prefixPath) {
-        if (prefixPath == null || !prefixPath.matches("users/[0-9]+/chat/[0-9]+") || !isManagedFileUnderPrefix(key, prefixPath)) {
+        if (prefixPath == null || !prefixPath.matches("users/\\d+/chat/\\d+") || !isManagedFileUnderPrefix(key, prefixPath)) {
             throw FileException.invalid("올바른 대화 사진이 아닙니다.");
         }
         int limit = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
@@ -176,7 +176,7 @@ public class FileStorageService {
     /** Public 파일용 CloudFront URL 생성 (프로필, 가게 이미지 등) */
     public String getPublicUrl(String key) {
         if (key == null) return null;
-        return "https://" + cloudfrontDomain + "/" + key;
+        return HTTPS_PREFIX + cloudfrontDomain + "/" + key;
     }
 
     /**
@@ -248,7 +248,7 @@ public class FileStorageService {
         String value = fileUrlOrKey.trim();
         String key;
         if (value.regionMatches(true, 0, "http://", 0, 7)
-                || value.regionMatches(true, 0, "https://", 0, 8)) {
+                || value.regionMatches(true, 0, HTTPS_PREFIX, 0, 8)) {
             key = keyFromCloudfrontUrl(value);
         } else {
             if (value.contains("://")) return null;
@@ -296,7 +296,7 @@ public class FileStorageService {
         if (cloudfrontDomain == null || cloudfrontDomain.isBlank()) return "";
         try {
             String value = cloudfrontDomain.trim();
-            URI uri = new URI(value.contains("://") ? value : "https://" + value);
+            URI uri = new URI(value.contains("://") ? value : HTTPS_PREFIX + value);
             return uri.getHost() != null ? uri.getHost() : "";
         } catch (Exception exception) {
             return "";

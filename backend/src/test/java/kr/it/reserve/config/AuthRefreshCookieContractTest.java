@@ -50,13 +50,36 @@ class AuthRefreshCookieContractTest {
         JwtProperties.TokenConfig access = new JwtProperties.TokenConfig();
         access.setExpirationMinutes(30);
         properties.setAccessToken(access);
-        new CookieUtil().setServerEnv("prod");
+        properties.getRefreshToken().setExpirationDays(14);
 
         AuthApiController controller = new AuthApiController(
-                memberService, tokenProvider, passwordEncoder, properties, tokenService, rateLimiter);
+                memberService, tokenProvider, passwordEncoder, properties, tokenService, rateLimiter, new CookieUtil("prod"));
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+    }
+
+    @Test
+    void loginIssuesBothSecureCookiesWithoutReturningTokenValues() throws Exception {
+        var member = kr.it.reserve.member.entity.Member.builder().id(7L).name("시험 회원")
+                .email("member@example.test").password("stored-test-hash")
+                .role(kr.it.reserve.member.entity.Role.USER).build();
+        when(rateLimiter.tryConsume(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(RateLimiter.Policy.LOGIN))).thenReturn(true);
+        when(memberService.findByEmailOrNull("member@example.test")).thenReturn(member);
+        when(passwordEncoder.matches("test-password", "stored-test-hash")).thenReturn(true);
+        when(tokenProvider.generateAccessToken(member)).thenReturn("login-access");
+        when(tokenProvider.generateRefreshToken(member)).thenReturn("login-refresh");
+        var response = mockMvc.perform(post("/api/auth/login").contentType("application/json")
+                        .content("{\"email\":\"member@example.test\",\"password\":\"test-password\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(7))
+                .andReturn().getResponse();
+        assertThat(response.getContentAsString()).doesNotContain("login-access", "login-refresh");
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(2)
+                .anySatisfy(cookie -> assertThat(cookie).startsWith("access_token=login-access;")
+                        .contains("Max-Age=1800", "Secure", "HttpOnly", "SameSite=Lax"))
+                .anySatisfy(cookie -> assertThat(cookie).startsWith("refresh_token=login-refresh;")
+                        .contains("Max-Age=1209600", "Secure", "HttpOnly", "SameSite=Lax"));
     }
 
     @Test
@@ -74,14 +97,14 @@ class AuthRefreshCookieContractTest {
         List<String> setCookies = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
 
         assertThat(body).doesNotContain("new-access-value", "new-refresh-value", "accessToken", "refreshToken");
-        assertThat(setCookies).hasSize(2);
-        assertThat(setCookies).anySatisfy(cookie -> assertThat(cookie)
-                .startsWith("access_token=new-access-value;")
-                .contains("Path=/", "Max-Age=1800", "HttpOnly", "Secure", "SameSite=Lax"));
-        // refresh 쿠키도 매번 다시 심어야 브라우저 쪽 만료(Max-Age)가 사용 시점부터 다시 14일이 된다.
-        assertThat(setCookies).anySatisfy(cookie -> assertThat(cookie)
-                .startsWith("refresh_token=new-refresh-value;")
-                .contains("Path=/", "Max-Age=1209600", "HttpOnly", "Secure", "SameSite=Lax"));
+        assertThat(setCookies).hasSize(2)
+                .anySatisfy(cookie -> assertThat(cookie)
+                        .startsWith("access_token=new-access-value;")
+                        .contains("Path=/", "Max-Age=1800", "HttpOnly", "Secure", "SameSite=Lax"))
+                // refresh 쿠키도 매번 다시 심어야 브라우저 쪽 만료(Max-Age)가 사용 시점부터 다시 14일이 된다.
+                .anySatisfy(cookie -> assertThat(cookie)
+                        .startsWith("refresh_token=new-refresh-value;")
+                        .contains("Path=/", "Max-Age=1209600", "HttpOnly", "Secure", "SameSite=Lax"));
         verify(tokenService).refresh("refresh-value");
     }
 

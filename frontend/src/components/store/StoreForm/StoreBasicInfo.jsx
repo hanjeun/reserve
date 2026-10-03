@@ -221,6 +221,20 @@ const CAPACITY_HINTS = {
     DAY: '하루 인원 합계, 비워두면 무제한',
 };
 
+const formatDeposit = (value) => {
+    if (value == null || value === '') return '';
+    return `${value}`.replace(/\d+/g, (digits, offset, text) => {
+        const firstGroupLength = digits.length % 3 || 3;
+        const groups = [digits.slice(0, firstGroupLength)];
+        for (let i = firstGroupLength; i < digits.length; i += 3) {
+            groups.push(digits.slice(i, i + 3));
+        }
+        // 기존 formatter의 단어 경계 동작도 유지한다(입력 중인 문자열 포함).
+        const prefix = digits.length % 3 === 0 && offset > 0 && /\w/.test(text[offset - 1]) ? ',' : '';
+        return prefix + groups.join(',');
+    });
+};
+
 // 운영 설정 (오른쪽 컬럼)
 const SettingsSection = ({ bookingType = 'SLOT' }) => (
     <>
@@ -245,7 +259,7 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
                 <FormInput
                     type="number" placeholder="0" suffix="원"
                     min={0} max={100000} precision={0} step={1000}
-                    formatter={(v) => (v == null || v === '' ? '' : `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ','))}
+                    formatter={formatDeposit}
                     parser={(v) => (v ? v.replaceAll(',', '') : v)}
                 />
             </Form.Item>

@@ -12,7 +12,7 @@ public final class PageRequests {
     }
 
     public static PageRequest bounded(int page, int size) {
-        PageRequest request = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, MAX_SIZE)));
+        PageRequest request = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, MAX_SIZE));
         // JPA의 offset은 int 범위다. 큰 페이지 입력이 서버 오류로 번지지 않게 경계에서 거부한다.
         if (request.getOffset() > Integer.MAX_VALUE) {
             throw new BusinessException("조회 가능한 페이지 범위를 초과했습니다.", HttpStatus.BAD_REQUEST);

@@ -7,6 +7,9 @@ import java.time.LocalDateTime;
 
 public class FavoriteDto {
 
+    private FavoriteDto() {
+    }
+
     @Getter
     @Builder
     @NoArgsConstructor

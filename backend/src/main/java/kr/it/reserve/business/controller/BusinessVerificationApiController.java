@@ -163,7 +163,7 @@ public class BusinessVerificationApiController {
     private Pageable boundedPage(int page, int size) {
         return PageRequest.of(
                 Math.max(0, page),
-                Math.min(Math.max(1, size), MAX_PAGE_SIZE));
+                Math.clamp(size, 1, MAX_PAGE_SIZE));
     }
 
     private VerificationStatus parseStatus(String status) {

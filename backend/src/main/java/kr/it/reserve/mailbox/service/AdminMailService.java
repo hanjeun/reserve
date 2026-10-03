@@ -106,7 +106,7 @@ public class AdminMailService {
      * 보낸 메일은 계속 쌓이기만 하는 데이터라 시간이 지날수록 응답이 커진다.
      */
     public Page<AdminSentMailResponse> getSentMailList(int page, int size, String search) {
-        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safeSize = Math.clamp(size, 1, MAX_PAGE_SIZE);
         int safePage = Math.max(page, 0);
         Pageable pageable = PageRequest.of(safePage, safeSize);
 

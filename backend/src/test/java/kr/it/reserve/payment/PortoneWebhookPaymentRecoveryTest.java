@@ -17,6 +17,9 @@ import kr.it.reserve.payment.service.RefundLedgerService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -29,9 +32,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -113,7 +119,7 @@ class PortoneWebhookPaymentRecoveryTest {
     @DisplayName("REFUND_PENDING에서 취소가 아직 REQUESTED면 PAID 상태여도 원복하지 않는다")
     void requestedCancellationRemainsPending() {
         Payment payment = pendingPayment(12L, 0);
-        RefundAttempt pending = pendingAttempt(22L, 3_000, "cancel-22");
+        RefundAttempt pending = pendingAttempt(3_000, "cancel-22");
         PortoneV2PaymentResponse pgPayment = pgPayment("""
                 {
                   "status": "PAID",
@@ -136,7 +142,7 @@ class PortoneWebhookPaymentRecoveryTest {
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService, never()).record(
+        verify(reconciliationIssueService, never()).recordIssue(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
@@ -149,7 +155,7 @@ class PortoneWebhookPaymentRecoveryTest {
     @DisplayName("REFUND_PENDING은 누적 취소액과 이번 취소 금액이 정확할 때 성공 확정한다")
     void exactCancellationConfirmsPendingRefund() {
         Payment payment = pendingPayment(13L, 2_000);
-        RefundAttempt pending = pendingAttempt(23L, 3_000, "cancel-23");
+        RefundAttempt pending = pendingAttempt(3_000, "cancel-23");
         when(pending.getId()).thenReturn(23L);
         when(pending.getReason()).thenReturn("부분 환불");
         PortoneV2PaymentResponse pgPayment = pgPayment("""
@@ -176,7 +182,7 @@ class PortoneWebhookPaymentRecoveryTest {
     @DisplayName("PG 취소 금액이 원장과 다르면 결제를 바꾸지 않고 대사 큐에 남긴다")
     void mismatchedCancellationCreatesReconciliationIssue() {
         Payment payment = pendingPayment(14L, 2_000);
-        RefundAttempt pending = pendingAttempt(24L, 3_000, "cancel-24");
+        RefundAttempt pending = pendingAttempt(3_000, "cancel-24");
         PortoneV2PaymentResponse pgPayment = pgPayment("""
                 {
                   "status": "PARTIAL_CANCELLED",
@@ -200,7 +206,7 @@ class PortoneWebhookPaymentRecoveryTest {
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:14",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 14L,
@@ -225,7 +231,7 @@ class PortoneWebhookPaymentRecoveryTest {
         assertThat(webhookService.processMerchantUid(MERCHANT_UID))
                 .isEqualTo(PortoneWebhookService.ProcessingResult.PROCESSED);
 
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:11",
                 PaymentReconciliationIssue.IssueType.REFUND_LEDGER_MISSING,
                 11L,
@@ -265,13 +271,72 @@ class PortoneWebhookPaymentRecoveryTest {
         verify(refundLedgerService, never()).failed(
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService).record(
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:15",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 15L,
                 null,
                 MERCHANT_UID,
                 "MULTIPLE_UNRESOLVED_REFUND_ATTEMPTS");
+    }
+
+    @ParameterizedTest(name = "PG {0}: {2}")
+    @CsvSource(textBlock = """
+            SUCCEEDED, 5000, LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_SUCCESS
+            FAILED, 2000, LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_FAILURE
+            """)
+    @DisplayName("PG 환불 결말 반영이 로컬 상태 충돌로 거절되면 미결 원장과 대사 증거를 보존한다")
+    void rejectedLocalRefundTransitionPreservesLedgerAndRecordsEvidence(
+            String cancellationStatus, int pgCancelledAmount, String expectedDetailCode) {
+        Payment payment = pendingPayment(16L, 2_000);
+        RefundAttempt pending = RefundAttempt.start(16L, MERCHANT_UID, 3_000, "부분 환불");
+        pending.markPending("cancel-26", "PG acknowledged");
+        PortoneV2PaymentResponse pgPayment = pgPayment("""
+                {
+                  "status": "PARTIAL_CANCELLED",
+                  "amount": {"total": 10000, "cancelled": %d},
+                  "cancellations": [
+                    {"id": "cancel-old", "status": "SUCCEEDED", "totalAmount": 2000},
+                    {"id": "cancel-26", "status": "%s", "totalAmount": 3000}
+                  ]
+                }
+                """.formatted(pgCancelledAmount, cancellationStatus));
+        stubPendingRefund(payment, pending, pgPayment);
+        if ("SUCCEEDED".equals(cancellationStatus)) {
+            when(paymentService.confirmPendingRefund(16L, 2_000, 3_000, "부분 환불"))
+                    .thenReturn(false);
+        } else {
+            when(paymentService.revertPendingRefund(
+                    16L, 2_000, "PG cancellation is explicitly FAILED"))
+                    .thenReturn(false);
+        }
+
+        assertThat(webhookService.processMerchantUid(MERCHANT_UID))
+                .isEqualTo(PortoneWebhookService.ProcessingResult.PROCESSED);
+
+        InOrder order = inOrder(paymentService, reconciliationIssueService);
+        if ("SUCCEEDED".equals(cancellationStatus)) {
+            order.verify(paymentService).confirmPendingRefund(16L, 2_000, 3_000, "부분 환불");
+        } else {
+            order.verify(paymentService).revertPendingRefund(
+                    16L, 2_000, "PG cancellation is explicitly FAILED");
+        }
+        order.verify(reconciliationIssueService).recordIssue(
+                "REFUND:16",
+                PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
+                16L,
+                null,
+                MERCHANT_UID,
+                expectedDetailCode);
+        verifyNoMoreInteractions(paymentService, reconciliationIssueService);
+        verifyNoInteractions(refundLedgerService);
+        assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING);
+        assertThat(payment.refundedSoFar()).isEqualTo(2_000);
+        assertThat(pending.getStatus()).isEqualTo(RefundAttempt.Status.PENDING);
+        assertThat(pending.isUnresolved()).isTrue();
+        assertThat(pending.getCancellationId()).isEqualTo("cancel-26");
+        assertThat(pending.getCancelledAmount()).isNull();
+        assertThat(pending.getFailureReason()).isEqualTo("PG acknowledged");
     }
 
     @Test
@@ -320,7 +385,7 @@ class PortoneWebhookPaymentRecoveryTest {
                 .build();
     }
 
-    private RefundAttempt pendingAttempt(Long id, int requestedAmount, String cancellationId) {
+    private RefundAttempt pendingAttempt(int requestedAmount, String cancellationId) {
         RefundAttempt pending = mock(RefundAttempt.class);
         when(pending.isUnresolved()).thenReturn(true);
         when(pending.getRequestedAmount()).thenReturn(requestedAmount);

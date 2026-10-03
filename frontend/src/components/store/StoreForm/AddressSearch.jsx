@@ -90,7 +90,7 @@ function reducer(state, action) {
 const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetail: addressDetailProp = '', onChange, onMeta, onDetailChange, placeholder = '도로명 또는 지번 주소를 검색하세요' }) => {
     const [state, dispatch] = useReducer(reducer, initialState);
     // focused/detailFocused 통합 — 동시에 둘 다 포커스될 수 없으므로 하나의 필드로 표현
-    const [activeField, setActiveField] = useState(null); // null | 'query' | 'detail'
+    const [activeField, setActiveField] = useState(/** @type {'query' | 'detail' | null} */ (null)); // null | 'query' | 'detail'
 
     const containerRef   = useRef(null);
     const skipBlurRef    = useRef(false);
@@ -182,7 +182,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
         }
     }, []);
 
-    useEffect(() => { search(debouncedQuery); }, [debouncedQuery, search]);
+    useEffect(() => { void search(debouncedQuery); }, [debouncedQuery, search]);
     useEffect(() => () => { searchRequestRef.current += 1; }, []);
 
     useEffect(() => {
@@ -386,7 +386,7 @@ const AddressSearch = ({ id, value = '', zipCode: zipCodeProp = '', addressDetai
                     onRetry={() => search(state.query)} compact />
             )}
             {state.searchStatus === 'success' && state.results.length === 0 && (
-                <p id={searchStatusId} role="status" style={{ margin: 0, fontSize: fontSize.sm, color: colors.text.tertiary }}>검색 결과가 없어요. 도로명이나 지번을 확인해 주세요.</p>
+                <p style={{ margin: 0, fontSize: fontSize.sm, color: colors.text.tertiary }}><output id={searchStatusId}>검색 결과가 없어요. 도로명이나 지번을 확인해 주세요.</output></p>
             )}
 
             {/* ② 선택 후 — 우편번호 + 상세주소. 사용자가 드롭다운에서 직접 선택했을 때만

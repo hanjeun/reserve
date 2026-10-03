@@ -191,7 +191,10 @@ const AdminAdsTab = () => {
                 target={{ name: suspendTarget?.storeName }}
                 loading={suspendMutation.isPending}
                 onCancel={() => setSuspendTarget(null)}
-                onOk={({ reason }) => suspendMutation.mutateAsync({ adId: suspendTarget.id, reason })}
+                onOk={({ reason }) => {
+                    if (!suspendTarget) return;
+                    return suspendMutation.mutateAsync({ adId: suspendTarget.id, reason });
+                }}
             />
         </div>
     );

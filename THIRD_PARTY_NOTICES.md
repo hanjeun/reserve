@@ -24,17 +24,26 @@ RESERVE가 쓰는 제3자 소프트웨어와 글꼴의 라이선스 안내예요
 
 - 포함·재배포할 때 [SIL Open Font License 1.1 원문](https://openfontlicense.org/open-font-license-official-text/)과 각 글꼴의 저작권 고지를 함께 유지해야 해요.
 - npm 밖에 저장한 글꼴은 npm 라이선스 도구 검사만으로 확인되지 않아요.
-- 현재 vendored SUITE 파일 옆에는 원문 고지 파일이 없어요. 배포 산출물에 원문이 동봉되는지는 따로 확인해야 해요.
+- SUITE 2.0.4 원본과 글꼴 파일의 해시가 같아요. [SUITE-LICENSE.txt](frontend/public/fonts/SUITE-LICENSE.txt)에 원문 고지를 함께 보관해요. 실제 릴리스 산출물에 원문이 동봉되는지도 확인해요.
 
 ### 백엔드 (Gradle)
 
+`bootJar`는 실제 production runtime JAR의 원문 고지와, JAR에 빠진 해당 버전의 공식 원문을 `META-INF/THIRD_PARTY_NOTICES.txt`에 동봉해요. `backend/licenses/supplemental.json`에 원본 출처와 JAR·문서 SHA-256을 고정하며, 누락·변경이 있으면 빌드를 중단해요. 빌드 중에는 고지를 새로 다운로드하지 않아요. 원문 동봉은 바이너리 배포 방식에 따른 모든 의무를 충족했다는 보장이 아니에요.
+
 Spring Boot, Jackson, JJWT, AWS SDK 등의 원문 라이선스·고지를 보존해야 해요. 백엔드 전체가 MIT/Apache-2.0이라고 단정하지 않아요.
 
-**MySQL Connector/J** — 현재 lockfile의 `9.4.0`은 GPLv2와 추가 허용 및 Universal FOSS Exception 적용 대상이에요. [해당 버전 원문](https://github.com/mysql/mysql-connector-j/blob/9.4.0/LICENSE)을 확인해요. runtime 의존성도 실행 JAR·Docker 이미지에 포함되므로, 서버에서만 쓴다고 재배포 의무가 없다고 단정할 수 없어요. 외부에 바이너리/이미지를 제공한다면 배포 방식과 예외 적용 조건을 따로 검토해야 해요.
+**MySQL Connector/J** — 현재 lockfile의 `9.7.0`은 GPLv2와 추가 허용 및 Universal FOSS Exception 적용 대상이에요. [해당 버전 원문](https://github.com/mysql/mysql-connector-j/blob/9.7.0/LICENSE)을 확인해요. runtime 의존성도 실행 JAR·Docker 이미지에 포함되므로, 서버에서만 쓴다고 재배포 의무가 없다고 단정할 수 없어요. 외부에 바이너리/이미지를 제공한다면 배포 방식과 예외 적용 조건을 따로 검토해야 해요.
 
 **MariaDB Connector/J** — LGPL 계열 라이선스라 무조건적인 copyleft 회피책이 아니에요. 드라이버 교체는 라이선스 판단과 JDBC URL·옵션·트랜잭션 호환성 검증이 필요한 별도 변경이에요. [MariaDB 공식 안내](https://mariadb.com/docs/connectors/mariadb-connector-j/about-mariadb-connector-j)
 
+Vite 빌드는 실제 출력 청크가 사용한 npm 패키지의 LICENSE·NOTICE를 `THIRD_PARTY_NOTICES.txt`에 동봉해요.
+루트 고지가 없는 icons-svg·victory-vendor는 해당 버전의 공식 저장소 원문을 함께 보관해요.
+is-mobile의 원문은 패키지 README의 License 절에 있어요. victory-vendor 내부의 D3 고지도 포함해요.
+PortOne browser-sdk 0.1.11 패키지에는 OSS 라이선스 선언·원문이 없어요. 공식 연동 안내와 배포 README를
+보존하되 MIT 등으로 간주하지 않아요. 서비스 계약상의 권리 범위까지 검증한 결과는 아니에요.
+
 ## English
+
 
 This notice describes third-party software and fonts used by RESERVE. Rights in RESERVE and licenses of its dependencies are separate. This summary does not replace upstream license texts or individual copyright notices; the applicable version's original terms control.
 
@@ -56,12 +65,14 @@ Upstream: [Pretendard](https://github.com/orioncactus/pretendard), [SUITE](https
 
 - Retain the [SIL Open Font License 1.1](https://openfontlicense.org/open-font-license-official-text/) and each font's copyright notices when bundling or redistributing.
 - Fonts vendored outside npm require separate verification.
-- No upstream notice file currently accompanies the vendored SUITE file in its directory; inclusion in release artifacts remains to be checked.
+- The font matches the upstream SUITE 2.0.4 file by hash. Its original notice accompanies it in [SUITE-LICENSE.txt](frontend/public/fonts/SUITE-LICENSE.txt). Verify inclusion in actual release artifacts separately.
 
 ### Backend (Gradle)
 
+`bootJar` bundles the actual production dependencies' original notices into `META-INF/THIRD_PARTY_NOTICES.txt`. Version-specific supplemental texts and source/JAR/document hashes are pinned in `backend/licenses/supplemental.json`; missing or changed originals fail the build. Builds never fetch notice texts. Notice inclusion does not certify every external binary distribution obligation.
+
 Retain upstream licenses and notices for Spring Boot, Jackson, JJWT, AWS SDK and other dependencies. Do not assume the entire backend is MIT/Apache-2.0 licensed.
 
-**MySQL Connector/J** — The locked `9.4.0` is GPLv2 with additional permissions and the Universal FOSS Exception. See its [original license](https://github.com/mysql/mysql-connector-j/blob/9.4.0/LICENSE). Runtime dependencies are bundled into the executable JAR/Docker image. Server use alone does not establish absence of distribution obligations; review external binary/image distribution separately.
+**MySQL Connector/J** — The locked `9.7.0` is GPLv2 with additional permissions and the Universal FOSS Exception. See its [original license](https://github.com/mysql/mysql-connector-j/blob/9.7.0/LICENSE). Runtime dependencies are bundled into the executable JAR/Docker image. Server use alone does not establish absence of distribution obligations; review external binary/image distribution separately.
 
 **MariaDB Connector/J** — LGPL licensed, not an unconditional copyleft workaround. Switching drivers requires separate licensing and JDBC compatibility review. [MariaDB documentation](https://mariadb.com/docs/connectors/mariadb-connector-j/about-mariadb-connector-j)

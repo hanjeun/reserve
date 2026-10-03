@@ -10,6 +10,9 @@ import java.util.Map;
  */
 public class OAuth2UserInfoFactory {
 
+    private OAuth2UserInfoFactory() {
+    }
+
     public static OAuth2UserInfo getOAuth2UserInfo(AuthProvider provider, Map<String, Object> attributes) {
         return switch (provider) {
             case GOOGLE -> new GoogleOAuth2UserInfo(attributes);

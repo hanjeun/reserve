@@ -8,6 +8,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
@@ -132,7 +133,7 @@ public class Payment {
         this.payMethod = payMethod;
         this.pgProvider = pgProvider;
         this.status = PaymentStatus.PAID;
-        this.paidAt = LocalDateTime.now();
+        this.paidAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     // 결제 실패 처리
@@ -176,7 +177,7 @@ public class Payment {
         int added = refundAmount == null ? 0 : refundAmount;
         this.refundAmount = refundedSoFar() + added;
         this.refundReason = refundReason;
-        this.refundedAt = LocalDateTime.now();
+        this.refundedAt = LocalDateTime.now(Clock.systemDefaultZone());
 
         if (this.amount != null && this.refundAmount >= this.amount) {
             this.status = PaymentStatus.REFUNDED;

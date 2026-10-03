@@ -1,5 +1,6 @@
 package kr.it.reserve.chat;
 
+import kr.it.reserve.chat.dto.ChatMessageResponse;
 import kr.it.reserve.chat.entity.ChatMessage;
 import kr.it.reserve.chat.entity.ChatRoom;
 import kr.it.reserve.chat.entity.SenderRole;
@@ -153,7 +154,7 @@ class StoreChatServiceTest {
 
         var responses = chatService.getNewMessagesAsAdmin(21L, 55L);
 
-        assertThat(responses).extracting(response -> response.getId()).containsExactly(56L, 57L);
+        assertThat(responses).extracting(ChatMessageResponse::getId).containsExactly(56L, 57L);
         verify(messageRepository).findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 55L);
         assertThat(room.getMemberUnread()).isEqualTo(3);
         assertThat(room.getAdminUnread()).isEqualTo(2);

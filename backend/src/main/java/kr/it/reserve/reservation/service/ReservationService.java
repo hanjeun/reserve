@@ -32,6 +32,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -46,6 +48,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class ReservationService {
+
+    private static final String STORE_NOT_FOUND_MESSAGE = "가게를 찾을 수 없습니다.";
+    private static final String RESERVATION_NOT_FOUND_MESSAGE = "예약을 찾을 수 없습니다.";
 
     private final ReservationRepository reservationRepository;
     private final StoreRepository storeRepository;
@@ -99,10 +104,10 @@ public class ReservationService {
         // 비관적 락으로 조회 — 이 store row에 대한 동시 예약 요청을 트랜잭션 종료까지 순차화해서
         // 아래 잔여 인원 체크(check) → 저장(act) 사이의 레이스 컨디션(오버부킹)을 막는다.
         Store store = storeRepository.findByIdForUpdate(request.getStoreId())
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (store.isDeleted()) {
-            throw new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
         }
         if (store.isSuspended()) {
             throw new ReservationException("현재 운영이 중단된 가게입니다. 신규 예약을 받지 않습니다.", HttpStatus.BAD_REQUEST);
@@ -115,14 +120,13 @@ public class ReservationService {
 
         // 나중 결제 허용 검증: allowLatePayment=false + 예약금 있으면 즉시 결제 필수
         boolean hasDeposit = store.getNoShowDeposit() != null && store.getNoShowDeposit() > 0;
-        if (hasDeposit && !Boolean.TRUE.equals(store.getAllowLatePayment())) {
+        if (hasDeposit && !Boolean.TRUE.equals(store.getAllowLatePayment())
+                && Boolean.TRUE.equals(request.getSkipPayment())) {
             // request에 skipPayment 플래그가 있으면(=나중 결제 시도) 거부
-            if (Boolean.TRUE.equals(request.getSkipPayment())) {
-                throw new ReservationException(
-                        "이 가게는 나중 결제를 허용하지 않습니다. 예약금을 즉시 결제해주세요.",
-                        HttpStatus.BAD_REQUEST
-                );
-            }
+            throw new ReservationException(
+                    "이 가게는 나중 결제를 허용하지 않습니다. 예약금을 즉시 결제해주세요.",
+                    HttpStatus.BAD_REQUEST
+            );
         }
 
         // 슬롯 검증(날짜/시간/인원 유효성 + 브레이크타임·영업시간·마감·중복·정원) — 생성/수정 공용.
@@ -247,15 +251,14 @@ public class ReservationService {
         //   DAY 는 시각 자체가 의미를 갖지 않는다.
         //   아래 목록 포함 검사만으로도 막히지만, 이 분기가 있어야 **왜 막혔는지**를 말해줄 수 있다.
         if (store.resolveBookingType() == Store.BookingType.SLOT
-                && store.getBreakStartTime() != null && store.getBreakEndTime() != null) {
-            if (!time.isBefore(store.getBreakStartTime()) && time.isBefore(store.getBreakEndTime())) {
-                String breakStr = store.getBreakStartTime().toString().substring(0, 5)
-                    + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
-                throw new ReservationException(
-                    "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
-                    HttpStatus.BAD_REQUEST
-                );
-            }
+                && store.getBreakStartTime() != null && store.getBreakEndTime() != null
+                && !time.isBefore(store.getBreakStartTime()) && time.isBefore(store.getBreakEndTime())) {
+            String breakStr = store.getBreakStartTime().toString().substring(0, 5)
+                + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
+            throw new ReservationException(
+                "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
+                HttpStatus.BAD_REQUEST
+            );
         }
 
         // ★ 예약 시각 검증 — getAvailability 와 **같은 목록**을 써서 포함 여부만 본다 (2026-08-24).
@@ -326,7 +329,7 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         Map<LocalTime, Long> guestSumByTime = reservationRepository
                 .sumActiveGuestsGroupedByTime(storeId, date).stream()
@@ -376,7 +379,7 @@ public class ReservationService {
     }
 
     /**
-     * <b>지금 실제로 고를 수 있는 시각 목록.</b> = 구조적 목록 − (이미 지난 시각) − (마감이 지난 시각)
+     * <b>지금 실제로 고를 수 있는 시각 목록.</b> = 구조적 목록 − (이미 지난 시각) − (예약 가능 기간 밖) − (마감이 지난 시각)
      *
      * <p>★ {@link #bookableSlotTimes} 와 나눠 둔 이유 — 저쪽은 <b>가게의 성질</b>이고
      * (영업시간·회차·휴무로 정해지며 "지금"과 무관하다), 이쪽은 <b>지금 시점의 사실</b>이다.
@@ -395,6 +398,11 @@ public class ReservationService {
     private List<LocalTime> bookableSlotTimesNow(Store store, LocalDate date) {
         LocalDateTime now = ServiceTime.now();
         Integer deadlineHours = store.getBookingDeadlineHours();
+        Integer maxAdvance = store.getMaxAdvanceBookingDays();
+        if (date != null && maxAdvance != null && maxAdvance > 0
+                && date.isAfter(now.toLocalDate().plusDays(maxAdvance))) {
+            return List.of();
+        }
 
         return bookableSlotTimes(store, date).stream()
                 .filter(t -> {
@@ -421,7 +429,7 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
@@ -512,7 +520,8 @@ public class ReservationService {
         // 마지막 슬롯 + slotMin 이 close 를 넘어가면 제외한다.
         // 예) 09:00~21:00 / 30분 → 마지막 슬롯 20:30. 21:00 은 21:30 이 되어 제외.
         // (close 가 자정을 넘어가는 가게는 지원하지 않는다 — StoreService 가 저장 단계에서 거절한다.)
-        while (!cursor.plusMinutes(slotMin).isAfter(close)) {
+        // LocalTime.plusMinutes 는 자정을 돌면 00시로 돌아오므로, 남은 당일 시간을 먼저 비교한다.
+        while (Duration.between(cursor, close).toMinutes() >= slotMin) {
             boolean inBreak = hasBreak && !cursor.isBefore(breakStart) && cursor.isBefore(breakEnd);
             if (!inBreak) result.add(cursor);
             cursor = cursor.plusMinutes(slotMin);
@@ -562,7 +571,7 @@ public class ReservationService {
 
         // 슬롯 재검증을 위해 가게를 비관적 락으로 조회 (생성과 동일하게 오버부킹 레이스 차단)
         Store store = storeRepository.findByIdForUpdate(reservation.getStore().getId())
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         // 운영 중단된 가게로는 예약을 옮길 수 없음
         if (store.getOwner() != null && store.getOwner().isSuspended()) {
@@ -656,7 +665,7 @@ public class ReservationService {
     public QrCheckinResponse checkInByQrToken(String token, Member owner) {
         Long reservationId = qrCheckinTokenProvider.parseReservationId(token);
         Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
-                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         validateStoreOwner(reservation, owner);
 
         // ★★ 방문 당일에만 체크인할 수 있다 (2026-08-19 신설).
@@ -700,7 +709,7 @@ public class ReservationService {
 
         // DB timestamp는 createdAt과 같은 JVM(운영 컨테이너 UTC) 시계를 사용하고,
         // 사용자에게 내보낼 때 ReservationResponse에서 한국 시각으로 바꾼다.
-        reservation.setCheckedInAt(LocalDateTime.now());
+        reservation.setCheckedInAt(LocalDateTime.now(Clock.systemDefaultZone()));
 
         // 개인정보 없이 출석 사실을 운영 로그에 남긴다. checkedInAt은 DB의 장기 근거다.
         //
@@ -962,14 +971,14 @@ public class ReservationService {
      * 사실상 무제한 상태 되돌리기가 되고, 이용자가 이미 안내받은 내용과 어긋난다.
      * 오래된 건을 되돌려야 한다면 그건 Undo 가 아니라 취소·거절로 처리할 일이다.
      *
-     * <p>⚠️ 여기서는 {@code LocalDateTime.now()} 가 맞다 — KST 로 바꾸면 안 된다.
+     * <p>⚠️ 여기서는 {@code LocalDateTime.now(Clock.systemDefaultZone())} 가 맞다 — KST 로 바꾸면 안 된다.
      * {@code updatedAt} 은 {@code @LastModifiedDate} 가 <b>JVM 시계</b>로 찍은 값이라
      * 같은 시계끼리 비교해야 한다. (예약 날짜·시각은 이용자에게 보이는 KST 값이라 반대다 —
      * ReservationElapsedScheduler 가 그래서 SERVICE_ZONE 을 쓴다.)
      */
     private void requireWithinUndoWindow(Reservation reservation) {
         LocalDateTime changedAt = reservation.getUpdatedAt();
-        if (changedAt == null || changedAt.isBefore(LocalDateTime.now().minusMinutes(UNDO_WINDOW_MINUTES))) {
+        if (changedAt == null || changedAt.isBefore(LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(UNDO_WINDOW_MINUTES))) {
             throw new ReservationException(
                     "되돌릴 수 있는 시간이 지났습니다. 취소 또는 거절을 사용해주세요.", HttpStatus.BAD_REQUEST);
         }
@@ -1016,7 +1025,7 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public Page<ReservationResponse> searchReservations(Long storeId, ReservationSearchDto searchDto, Member owner) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (!store.getOwner().getId().equals(owner.getId())) {
             throw new ReservationException("본인 가게의 예약만 조회 가능합니다.", HttpStatus.FORBIDDEN);
@@ -1035,7 +1044,7 @@ public class ReservationService {
         List<Long> completedIds = reservations.stream()
                 .filter(r -> r.getStatus() == Reservation.ReservationStatus.COMPLETED)
                 .map(Reservation::getId)
-                .collect(Collectors.toList());
+                .toList();
 
         Map<Long, Long> reviewIdByReservationId = new java.util.HashMap<>();
         if (!completedIds.isEmpty()) {
@@ -1050,7 +1059,7 @@ public class ReservationService {
                             ? ReservationResponse.fromEntityWithReviewId(r, reviewId)
                             : ReservationResponse.fromEntity(r);
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**
@@ -1081,7 +1090,7 @@ public class ReservationService {
             Reservation.ReservationStatus status,
             Long storeId,
             String sort) {
-        int safeSize = Math.min(Math.max(size, 1), 100);
+        int safeSize = Math.clamp(size, 1, 100);
         Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize, reservationManagementSort(sort));
         String keyword = search == null ? "" : search.trim();
         if (owner.isAdmin()) {
@@ -1159,13 +1168,13 @@ public class ReservationService {
 
     private Reservation findByIdOrThrow(Long id) {
         return reservationRepository.findById(id)
-                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
     }
 
     /** 모든 예약 상태 변경이 거치는 행 잠금 관문. QR·취소·완료가 서로 값을 덮어쓰지 않게 한다. */
     private Reservation findByIdForUpdateOrThrow(Long id) {
         return reservationRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
     }
 
     private void validateOwnership(Reservation reservation, Member member) {

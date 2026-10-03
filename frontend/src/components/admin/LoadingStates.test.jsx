@@ -17,7 +17,7 @@ import BusinessPanel from '../../pages/business/BusinessPanel';
 
 const state = vi.hoisted(() => ({
     query: {}, stores: {}, thread: {}, reload: vi.fn(), apiGet: vi.fn(), renderBusinessRows: false,
-    queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null,
+    queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null, manage: {},
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -46,7 +46,7 @@ vi.mock('../../hooks/useWindowWidth', () => ({ useWindowWidth: () => 390 }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/useManageReservations', () => ({ default: () => ({
     reservations: [], total: 0, totalPages: 0, error: null, loading: false, refetching: false,
-    actionLoading: null, refetch: vi.fn(),
+    actionLoading: null, refetch: vi.fn(), ...state.manage,
 }) }));
 vi.mock('../reservation/QrScannerTab', () => ({ default: () => null }));
 vi.mock('../chat/ChatBubbleList', () => ({ default: () => <div data-testid="chat-bubbles" /> }));
@@ -106,6 +106,7 @@ beforeEach(() => {
     state.dataTableProps = null;
     state.queryParams = null;
     state.renderBusinessRows = false;
+    state.manage = {};
     state.query = {
         data: undefined, isLoading: false, isPending: false, isFetching: false, isPlaceholderData: false,
         error: null, isError: false, refetch: vi.fn(),
@@ -333,4 +334,20 @@ it('marks QR check-in as the active partner tab only while its sheet is open', a
 
     fireEvent.click(document.querySelector('.reserve-qr-sheet .ant-modal-close'));
     await waitFor(() => expect(reservationsTab).toHaveAttribute('aria-selected', 'true'));
+});
+
+it('retries both independent lookups when partner stores and reservations fail together', () => {
+    const refetchStores = vi.fn().mockResolvedValue(null);
+    const refetchReservations = vi.fn().mockResolvedValue(null);
+    state.stores = { stores: [], loading: false, error: new Error('stores offline'), refetch: refetchStores };
+    state.manage = { error: new Error('reservations offline'), refetch: refetchReservations };
+    const { rerender } = render(<MemoryRouter><BusinessPanel /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    expect(refetchStores).toHaveBeenCalledOnce();
+    expect(refetchReservations).toHaveBeenCalledOnce();
+    state.stores.error = null;
+    state.manage.error = null;
+    rerender(<MemoryRouter><BusinessPanel /></MemoryRouter>);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('예약 내역이 없습니다.')).toBeInTheDocument();
 });

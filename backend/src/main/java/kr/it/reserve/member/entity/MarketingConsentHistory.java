@@ -59,7 +59,7 @@ public class MarketingConsentHistory {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public static MarketingConsentHistory record(Member member, boolean agreed, Source source) {
+    public static MarketingConsentHistory create(Member member, boolean agreed, Source source) {
         MarketingConsentHistory history = new MarketingConsentHistory();
         history.member = member;
         history.agreed = agreed;

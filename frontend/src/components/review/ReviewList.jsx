@@ -182,6 +182,7 @@ const ReviewList = ({
     });
 
     const handleWriteSubmit = () => {
+        if (!completedReservation) return;
         if (!writeValidate((e) => {
             if (!writeForm.rating) e.rating = '별점을 선택해주세요';
             if (!writeForm.title.trim()) e.title = '제목을 입력해주세요';

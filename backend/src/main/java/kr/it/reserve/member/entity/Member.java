@@ -1,5 +1,6 @@
 package kr.it.reserve.member.entity;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import lombok.*;
@@ -150,7 +151,7 @@ public class Member {
     }
 
     public void softDelete() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     public boolean isDeleted() {
@@ -182,7 +183,7 @@ public class Member {
         this.status = MemberStatus.ACTIVE;
         this.suspendedUntil = null;
         this.suspendReason = null;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 
     // 제재 상태 체크
@@ -190,10 +191,8 @@ public class Member {
     public boolean isSuspended() {
         if (this.status == MemberStatus.BANNED) return true;
         if (this.status == MemberStatus.SUSPENDED) {
-            if (this.suspendedUntil != null && LocalDateTime.now().isAfter(this.suspendedUntil)) {
-                return false;
-            }
-            return true;
+            return this.suspendedUntil == null
+                    || !LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.suspendedUntil);
         }
         return false;
     }
@@ -201,7 +200,7 @@ public class Member {
     public boolean isSuspensionExpired() {
         return this.status == MemberStatus.SUSPENDED
             && this.suspendedUntil != null
-            && LocalDateTime.now().isAfter(this.suspendedUntil);
+            && LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.suspendedUntil);
     }
 
     public void suspend(LocalDateTime until, String reason) {

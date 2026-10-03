@@ -29,8 +29,7 @@ class LifecycleReadinessSerializationTest {
     @DisplayName("가게 폐업 준비도 JSON 에 canClose 플래그가 반드시 포함된다")
     void storeClosureReadinessSerializesCanCloseFlag() throws Exception {
         Map<String, Object> clear = toMap(new StoreClosureReadiness(0, 0L, 0L, 0L, 0L));
-        assertThat(clear).containsEntry("canClose", true);
-        assertThat(clear).containsKeys(
+        assertThat(clear).containsEntry("canClose", true).containsKeys(
                 "unresolvedReservations", "activeAdvertisements",
                 "unresolvedRefunds", "openPaymentIssues", "unfinishedWebhooks");
 
@@ -42,8 +41,7 @@ class LifecycleReadinessSerializationTest {
     @DisplayName("회원 탈퇴 준비도 JSON 에 canWithdraw 플래그가 반드시 포함된다")
     void memberWithdrawalReadinessSerializesCanWithdrawFlag() throws Exception {
         Map<String, Object> clear = toMap(new MemberWithdrawalReadiness(0L, 0, 0L, 0L, 0L));
-        assertThat(clear).containsEntry("canWithdraw", true);
-        assertThat(clear).containsKeys(
+        assertThat(clear).containsEntry("canWithdraw", true).containsKeys(
                 "openStores", "unresolvedReservations",
                 "unresolvedRefunds", "openPaymentIssues", "unfinishedWebhooks");
 

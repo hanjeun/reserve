@@ -1,4 +1,6 @@
 name: CodeQL
+run-name: >-
+  ${{ github.event_name == 'pull_request' && format('보안 검사 · PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title) || format('보안 검사 · {0}', github.ref_name) }}
 
 # GitHub 무료 코드 스캐닝(public 레포 한정). CICD.yml과 분리한 이유:
 #  - dev/main PR과 main push를 검사한다. dev push의 동일 변경 중복 스캔은 생략한다.
@@ -50,7 +52,7 @@ jobs:
 
       - name: Install JDK 21
         if: matrix.language == 'java-kotlin'
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -62,14 +64,14 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
 
       # autobuild 대신 수동 빌드 — 백엔드가 하위 디렉토리(backend/)에 있어 autobuild가
-      # 루트에서 빌드 파일을 못 찾을 수 있다. assemble은 컴파일+jar만 하고 테스트는 건너뛴다
-      # (테스트는 CICD.yml의 build-backend가 이미 돌린다).
+      # 루트에서 빌드 파일을 못 찾을 수 있다. 분석에는 classes만 필요하고 릴리스 포장은 하지 않는다.
+      # 테스트와 동일 릴리스의 HTML·JAR 포장은 CICD.yml에서 검증한다.
       - name: Build backend for analysis
         if: matrix.language == 'java-kotlin'
         working-directory: backend
         run: |
           chmod +x ./gradlew
-          ./gradlew assemble
+          ./gradlew classes --console=plain
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@4c0873ef8656cb3c50b3f42fb63bc1ade0cfa827 # v4

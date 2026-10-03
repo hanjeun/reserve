@@ -30,7 +30,7 @@ function AnimatedAttachment({ file, active, closing, disabled, onRemove }) {
     useEffect(() => {
         const objectUrl = URL.createObjectURL(file);
         let mounted = true;
-        Promise.resolve().then(() => { if (mounted) setUrl(objectUrl); });
+        queueMicrotask(() => { if (mounted) setUrl(objectUrl); });
         return () => { mounted = false; URL.revokeObjectURL(objectUrl); };
     }, [file]);
     return <div className="reserve-chat-attachment" aria-hidden={!active || undefined}
@@ -50,8 +50,10 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled }) {
     const revision = useAuthStore(state => state.sessionRevision);
     const input = useRef(null);
     const [error, setError] = useState('');
-    const [retained, setRetained] = useState({ file, revision });
-    if (revision !== retained.revision || (file && file !== retained.file)) setRetained({ file, revision });
+    const [retained, setRetained] = useState({ file, revision, version: 0 });
+    if (revision !== retained.revision || (file && file !== retained.file)) {
+        setRetained({ file, revision, version: retained.version + 1 });
+    }
     const { shouldRender, isClosing } = useExitAnimation(Boolean(file), 200);
     const select = event => {
         const selected = event.target.files?.[0];
@@ -72,7 +74,7 @@ export default function ChatImagePicker({ file, onChange, disabled, enabled }) {
             onChange={select} disabled={disabled} hidden aria-label="첨부할 사진 선택" />
         <button type="button" className="reserve-chat-tool" aria-label="사진 첨부"
             disabled={disabled} onClick={() => input.current?.click()}><PaperClipOutlined /></button>
-        {shouldRender && retained.file && retained.revision === revision && <AnimatedAttachment key={revision}
+        {shouldRender && retained.file && retained.revision === revision && <AnimatedAttachment key={`${revision}:${retained.version}`}
             file={retained.file} active={Boolean(file) && !isClosing} closing={isClosing || !file}
             disabled={disabled} onRemove={() => { setError(''); onChange(null); }} />}
         {error && <span role="alert" style={{ color: colors.error.main, fontSize: 12, flexBasis: '100%' }}>{error}</span>}

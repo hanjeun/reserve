@@ -2,18 +2,40 @@
 
 로그와 서버 지표를 Loki 하나로 모으고, Grafana 대시보드와 알림으로 이상 상태를 잡아요.
 
+## 운영 적용 경계
+
+- 2026-10-02 확인: 기존 백업 6줄이 운영 Loki에서 조회된다. 독립 접근으로 내려받은
+  `reserve-20260930-181001.sql.gz`는 격리 MySQL 8.0.45에서 현재 main 복원 스크립트로 복원했고,
+  34테이블·66행과 34테이블의 `CHECK TABLE` 정상 응답을 확인했다. 별도 보관 키로 사진 한 건을
+  복호화한 결과는 사용자가 직접 PASS로 확인했다. 10/2 03:10 KST 정규 백업의 34테이블 검증·
+  업로드·정상 종료도 확인했다. 10/3 03:10 KST에는 최소 권한 `reserve_backup` 계정의 정규 실행도
+  34테이블·gzip 무결성·업로드·정상 종료와 Loki 로그 6줄로 확인했다.
+- 2026-10-02 22:09 KST 운영 호스트를 재부팅했다. 같은 v2.8.3 이미지·최소 권한 앱 계정·
+  Hibernate validate를 유지하며 앱·공개 API·Grafana·Loki가 복구됐고, 새 앱·metrics·nginx
+  로그를 확인했다. Promtail과 계정 전환 전 앱 컨테이너는 정지 상태를 유지했다.
+  새 버전에서 이전 버전으로 돌아오는 실제 릴리스 롤백은 다음 릴리스에서 확인한다.
+- 운영 `metrics` 스트림에서 `cpu_exec_pct`(us+sy), `cpu_user_pct`, `cpu_system_pct`,
+  `cpu_iowait_pct`(wa), `cpu_steal_pct`(st)를 확인했다. 기존 `cpu_pct`는 호환용으로 유지한다.
+  운영 대시보드 표시와 알림 전달은 지표 수집과 별도로 확인한다.
+- OAuth 알림 정본은 현재 코드의 `OAuth unlink queue requires attention`다. 이것은 연동 해제 **완료**가 아니라
+  미결 집계다. 토큰 없는 `BLOCKED`와 재시도 가능한 `FAILED`를 구분하고 완료 문구로 안내하지 않는다.
+- CSP는 Report-Only를 유지한다. 앱 로그·Alloy positions·level/시각·Loki 스트림을 확인한 뒤
+  결제·지도·Sentry를 포함한 7일 관측을 진행한다. 백업 로그 1건은 CSP 정상 수집 7일의 증거가 아니다.
+  쿼리 0건과 스트림 부재를 구분하며 Unsplash 허용을 제거하거나 enforcement를 켜지 않는다.
+
 ## 구성
 
 | 도구 | 역할 | 접근 |
 |---|---|---|
 | **Grafana** | 대시보드 · 알림 | [grafana.reserve.it.kr](https://grafana.reserve.it.kr) |
 | **Loki** | 로그 · 지표 저장 | 내부 (포트 3100) |
-| **Promtail** | 기존 파일 → Loki 전송 (지원 종료, Alloy 전환 필요) | 내부 |
+| **Alloy** | 운영 파일 → Loki 전송, 1.20.1 고정 이미지 | 내부 |
+| **Promtail** | 정지 상태로 보존한 이전 수집기·복구 경로 | 내부 |
 | **Logback** | Spring Boot 로그 파일 (30일 rotation) | `/var/log/reserve/` |
 | **collect-metrics.sh** | 호스트·컨테이너 지표 수집 (cron 1분) | `/var/log/metrics/` |
 | **Sentry** | 런타임 에러 트래킹 | [sentry.io](https://sentry.io) |
 | **UptimeRobot** | 업타임 모니터링 | [uptimerobot.com](https://uptimerobot.com) |
-| **SonarCloud** | 정적 분석 (Automatic Analysis) | [sonarcloud.io](https://sonarcloud.io/projects) |
+| **SonarCloud** | Java·프론트 CI 정적 분석 | [sonarcloud.io](https://sonarcloud.io/projects) |
 
 ```
 Spring Boot ─ Logback ─→ /var/log/reserve/app.log ─┐
@@ -23,7 +45,7 @@ nginx ─ privacy-safe Docker timing 로그 ────────────
 
 ## 컨테이너
 
-`docker-compose-monitoring.yml`이 `app-network`에 붙어요. nginx는 `grafana:3000`, Promtail은 `loki:3100`으로 접근하고, Grafana·Loki는 호스트 포트를 publish하지 않아요.
+`docker-compose-monitoring.yml`이 `app-network`에 붙어요. nginx는 `grafana:3000`, Promtail은 `loki:3100`으로 접근해요. 레포 기본 구성은 호스트 포트를 publish하지 않아요. 현재 운영 설치본은 기존 Loki 3100 publish를 유지하며, 승인된 옵션 하나만 바꿨어요. 포트 변경은 별도 운영 승인 대상이에요.
 
 ```bash
 docker compose -f ~/docker-compose-monitoring.yml up -d
@@ -80,6 +102,88 @@ Loki는 스트림의 가장 최근 엔트리에서 약 1시간 밖의 타임스�
 zgrep 'ERROR' /var/log/reserve/app.2026-07-29.0.log.gz
 zgrep -c 'Email send failed' /var/log/reserve/app.*.log.gz
 ```
+
+### Loki 백업 조회 누락 — 승인된 옵션 적용 (2026-10-02 KST)
+
+2026-09-30 18:00–18:30 UTC의 백업 원본은 6줄인데 운영 조회는 0줄이었다.
+격리 reader에서는 같은 저장 데이터를 6줄 읽었고, 승인된 Loki 단독 1회 재시작 뒤
+운영 조회도 6줄로 복구됐다. 설정·저장 인덱스의 해시는 바뀌지 않았다.
+현재는 조회가 복구된 상태이며, 이것만으로 다음 날짜에도 재발하지 않는다고 판단하지 않는다.
+
+Loki 2.9.0의
+[table manager 코드](https://github.com/grafana/loki/blob/v2.9.0/pkg/storage/stores/indexshipper/downloads/table_manager.go)는
+공통·tenant별 query-ready 일수가 모두 0이면 주기적인 table-name 캐시 갱신 전에 반환한다.
+운영의 두 query-ready 설정은 모두 0이었다. 이 경로가 원인 후보이며,
+레포와 운영 Compose에 `-boltdb.shipper.query-ready-num-days=1`을 추가했다.
+현재 날짜와 전날의 인덱스를 미리 읽고 기존 5분 resync에서 table 목록도 갱신하도록 하는 후보다.
+실제 미래 날짜 전환에서의 효과와 메모리·디스크 비용은 아직 확인하지 않았다.
+
+현재 운영 바이너리의 아래 읽기 전용 검사는 성공했다. `-verify-config=true`는 설정 검증 뒤
+서비스 초기화 전에 종료한다. 검사 전후 기존 Loki 시작 시각과 설정 해시가 같았다.
+
+```bash
+docker exec loki /usr/bin/loki \
+  -config.file=/etc/loki/local-config.yaml \
+  -boltdb.shipper.query-ready-num-days=1 \
+  -verify-config=true
+```
+
+사용자의 이 변경 승인에 따라 10/2 00:02 KST에 Loki만 재생성했다. 이전 Compose는
+`/var/backups/reserve-scripts/20261001-before-loki-query-ready/docker-compose-monitoring.yml`에 보존했다.
+원본 SHA-256은 `144e9337c41085ecc15c56615036ff50e7c84f23e87ada8e141765d1ef9084a0`,
+적용본은 `e27217a2118fd78dd527b5c521c0d28abf6cf3463c1f5cb4def1069a20e8bb1b`다.
+이미지 ID·데이터 볼륨·포트·네트워크·restart 정책은 그대로이며, 동일한 고정 시간 구간에서
+백업 6줄·앱 로그 4줄의 적용 전후 결과가 일치했고 readiness는 `ready`였다.
+00:08 KST 표본에서 Loki 메모리는 44.36 MiB였다. 이 한 번의 표본은 장시간 자원 비용 증거가 아니다.
+
+새 UTC 날짜와 정규 백업의 자연 평가 관측은 남아 있다. 추가 운영 변경은 별도 승인 대상이다.
+변경 전에는 서버 Compose와 실제 컨테이너의 이미지·실행 인자·
+포트·볼륨을 대조하고 기존 파일을 보존한다. 승인된 차이만 서버 파일에 반영한 뒤 Loki만
+재생성한다. 전체 모니터링 스택 재생성, 볼륨 삭제, 캐시 파일 삭제는 이 작업에 포함하지 않는다.
+readiness, 기존 6줄, 앱 로그, 새 날짜의 정기 백업과 알림의 다음 자연 평가를 대조하고,
+가용 메모리·swap·인덱스 디스크 사용량도 확인한다.
+새 로그 누락이나 자원 악화가 생기면 보존한 실행 인자로 Loki만 되돌리고 같은 조회를 반복한다.
+기존 데이터 볼륨과 Promtail positions는 유지한다.
+
+### Promtail → Alloy 전환 후보 (운영 미적용)
+
+[Promtail 공식 안내](https://grafana.com/docs/loki/latest/send-data/promtail/)의 지원 종료일은
+2026-03-02다. 현재 운영 Promtail 2.9.0을 임의로 제거하지 않고 전환 후보를 먼저 검증했다.
+`alloy-config.alloy`는 운영과 동일한 Promtail 설정을 Alloy 1.20.1의 엄격 변환으로 생성했다.
+변환 오류 우회 없이 일반 공개 컴포넌트 수준의 `validate`도 통과했다.
+`docker-compose-alloy.yml`은 이미지 digest를 고정한 추가 overlay이며 호스트 포트를 열지 않는다.
+앱·백업·지표·현재 nginx 로그 디렉터리와 이전 positions는 읽기 전용이고 Alloy 상태만 별도 볼륨에 쓴다.
+
+격리 Linux의 Promtail 2.9.0·Alloy 1.20.1·Loki 2.9.0에서 합성 로그로 다음을 확인했다.
+운영 로그나 자격증명은 시험에 쓰지 않았다.
+
+- 네 job의 동일한 7줄이 같은 라벨·본문으로 조회됐다. 앱·백업·nginx의 UTC 시각도 일치했다.
+- nginx stderr·1시간보다 오래된 줄·형식 밖 개인정보 표본은 두 수집기 모두 버렸다.
+- legacy positions를 가져온 뒤 Alloy를 재시작해도 기존 줄의 재독은 0줄이었다.
+  새 파일 두 개와 추가 로그 세 줄만 읽었다.
+- Alloy를 중지하고 여섯 파일의 최신 byte offset을 Promtail 형식으로 내보내 되돌렸다.
+  Promtail도 기존 줄을 다시 읽지 않았고 이후 추가한 한 줄만 수집했다.
+
+[파일 수집기 공식 문서](https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.file/)에 따라
+legacy positions는 새 Alloy positions가 없을 때만 가져온다. `--storage.path`와 볼륨을 유지해야 한다.
+운영 전환은 다음 순서의 별도 승인 대상이다.
+
+1. 서버의 실제 Compose 두 파일, 네 job, 현재 nginx Docker 로그 디렉터리, 이미지와 볼륨을 대조한다.
+   `RESERVE_NGINX_LOG_DIR`에는 `nginxserver`의 현재 로그 디렉터리 하나만 지정한다.
+2. Promtail을 정상 중지해 positions를 반영한 뒤 설정과 positions를 보존한다.
+   원본 positions 볼륨은 삭제하지 않고 Alloy에 읽기 전용으로 연결한다.
+3. 새 Alloy 상태 볼륨에서 Alloy 서비스만 시작한다. 두 수집기를 동시에 실행하지 않는다.
+   새 자연 로그의 시각·라벨·개인정보 필터·byte offset과 자원 사용량을 대조한다.
+4. 롤백할 때는 Alloy를 먼저 정상 중지한다. `scripts/export-alloy-positions.py`로 중지된
+   Alloy 상태 디렉터리의 최신 positions를 **새 후보 파일**에 출력한다. 이 도구는 읽기 전용이며,
+   네 source·경로·라벨·형식이 다르거나 파일이 누락되면 실패한다. 원본 snapshot을 덮어쓰지 않는다.
+   회전·잘림 여부와 offset을 대조한 뒤에만 Promtail의 현재 positions에 후보를 설치하고 Promtail만 시작한다.
+   이 과정에서 Loki의 인덱스·데이터·캐시는 건드리지 않는다.
+5. 롤백 뒤 다시 Alloy로 전환할 때 오래된 Alloy 상태를 그대로 재사용하지 않는다.
+   기존 상태를 보존하고 새 상태 볼륨으로 최신 Promtail positions를 가져오는 별도 변경안을 검증한다.
+
+내보내기 도구의 거부·우선순위 검사 7건과 격리 왕복 검사는 통과했다. 운영 환경의 파일 회전·
+nginx 재생성·자연 날짜 전환과 장시간 메모리 사용은 전환 전후 확인이 남아 있다.
 
 ## 지표 수집 (collect-metrics.sh)
 
@@ -144,7 +248,7 @@ node scripts/validate-grafana-dashboards.mjs
 
 UptimeRobot은 서비스 다운을, 아래 규칙은 다운은 아니지만 이상한 상태를 알려요.
 
-아래 쿼리는 설계/런북 예시이고, 설치·평가·실수신 증거를 대신하지 않아요. 2026년 9월 30일 운영 경로는 기존 Resend SMTP를 사용하는 지정된 이메일이에요. TestAlert와 실제 Firing은 별도로 확인해요. SMTP와 앱 메일은 같은 Resend 장애에 영향을 받으므로 독립 수신 채널은 아직 별도 후속이에요. 이메일·비밀번호·토큰은 공개 문서에 넣지 않아요.
+아래 쿼리는 설계/런북 예시이고, 설치·평가·실수신 증거를 대신하지 않아요. 2026년 9월 30일 운영 경로는 기존 Resend SMTP를 사용하는 지정된 이메일이에요. TestAlert와 실제 Firing은 별도로 확인해요. SMTP와 앱 메일은 같은 Resend 장애에 영향을 받아요. 사용자의 2026-10-02 선택에 따라 기존 이메일 한 경로를 유지하고, 독립 보조 채널은 추가하지 않아요. 이메일·비밀번호·토큰은 공개 문서에 넣지 않아요.
 
 각 규칙은 Query A (Loki, **Instant**) → Expression B (Reduce, Last) → Expression C (Threshold) 구조예요. `Configure no data and error handling`에서 **No data를 `Alerting`**으로 둬요.
 
@@ -184,7 +288,7 @@ sum(count_over_time({job="reserve"} |= `Refund stuck unresolved` [1h]))
 sum(count_over_time({job="reserve"} |= `Payment operations queue requires attention` [20m]))
 ```
 
-**7. 백업 미실행** — BELOW 1 / 1시간 주기. 다음 정상 정기 실행의 원본 로그·파일/gzip와 새 `job="backup"` Loki 이벤트가 일치한 뒤 평가창·No data를 검증하고 켜요. 강제 백업이나 positions 초기화로 검증하지 않아요
+**7. 백업 미실행** — BELOW 1 / 1시간 주기. 운영 설치본은 26시간 창과 No data/Error의 Alerting 처리를 확인했고, 규칙은 활성 상태예요. 다음 정상 정기 실행의 원본 로그·파일/gzip와 새 `job="backup"` Loki 이벤트, 자연 평가와 실제 수신은 별도로 확인해요. 강제 백업이나 positions 초기화로 검증하지 않아요
 
 ```logql
 sum(count_over_time({job="backup"} |= `[backup]` |= `=== backup done` [26h])) or vector(0)
@@ -310,6 +414,38 @@ sudo env RESERVE_NGINX_LOG_DIR="$NGINX_LOG_DIR" docker compose \
 
 5분 간격으로 `https://reserve.it.kr`를 헬스체크하고, 다운 시 이메일로 알려요.
 
-## SonarCloud
+## SonarQube Cloud
 
-**Automatic Analysis**로 SonarCloud가 저장소를 직접 분석해요. 워크플로에 sonar 스텝과 `sonar-project.properties`가 없어서 CI와 독립적으로 돌아요.
+2026-10-02부터 `.github/workflows/sonar.yml`의 Java 21·Gradle CI 분석을 사용해요.
+자동 분석은 껐고 `SONAR_CI_ENABLED=true`를 적용했어요. `SONAR_TOKEN`은 GitHub Actions
+Secret으로만 전달하며 IntelliJ 실행 환경변수에는 필요하지 않아요.
+
+첫 dev 전체 분석은 Java를 포함해 400건을 찾았어요. 이전 57건은 Java가 빠진 범위였어요.
+실제 보안·신뢰성 문제를 수정한 뒤 같은 범위를 다시 분석해요. PR 분석과 dev 전체 분석은
+별개이며, Quality Gate 통과 전에는 검증 완료라고 표시하지 않아요.
+
+CI의 기존 테스트에서 JaCoCo XML과 Vitest LCOV를 만들어요. 같은 입력·도구·성공 실행·해시·
+유효기간이 검증된 보고서만 재사용하며, 검증할 수 없으면 새로 생성해요. 임계값을 낮추거나
+검사 범위를 줄여서 통과시키지 않아요.
+
+## Alloy 운영 전환
+
+2026-10-02 Alloy 1.20.1의 고정 이미지로 운영 수집을 전환했어요. Promtail을 정상 종료한 뒤
+positions를 보존하고, 네 수집원의 offset을 이어받았어요. Promtail 컨테이너·볼륨은 복구용으로
+유지하며 Alloy와 동시에 활성화하지 않아요. 기존 Loki 2.9.0·query-ready 옵션·보존기간은 유지해요.
+원본 설정과 종료 당시 positions는 `/var/backups/reserve-scripts/20261002-before-alloy/`에 있어요.
+롤백할 때는 Alloy를 먼저 멈추고 최신 positions를 내보낸 뒤 Promtail로 돌아가요.
+
+운영 readiness와 새 앱·metrics·nginx 로그는 확인했어요. 앱·백업의 과거 조회도 유지돼요.
+새 앱 heartbeat와 새 정기 백업은 실제 생성 시각 이후에 확인해야 해요. 앱 수집 중단 알림은
+15분 주기의 `Application log heartbeat: paymentOperations=checked`가 배포되어 처음 수집된 뒤
+활성화해요. 그 전에는 조용한 정상 앱을 수집 장애로 오인하지 않게 일시 중지해요.
+기존 메일 하나를 유지하고 Resolved 발송도 켜요. 2026-10-02 Gmail 받은편지함에서
+19:13 KST 시험 Firing과 19:35 KST 결제 운영 큐 Resolved 수신을 확인했어요.
+
+앱 로그 감시 원본은 `grafana/alerts/reserve-app-log-heartbeat.json`이에요. 설치 시
+기존 Loki UID를 대입해요. 45분 동안 heartbeat가 없고 15분 더 지속되면 경고하며,
+No data·Error도 Alerting으로 처리해요. 현재 운영에는 일시 중지 상태로 설치했어요.
+기존 9개 알림은 유지했고, 대시보드·알림 참조가 0건인 URL 없는 Prometheus만
+공식 datasource provisioning으로 제거했어요. 변경 전 Grafana DB와 복구 설정은
+`/var/backups/reserve-scripts/20261002-before-grafana-cleanup/`에 있어요.

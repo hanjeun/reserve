@@ -16,6 +16,8 @@ import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -298,6 +300,51 @@ class SupportDisplayContractTest {
         assertThat(json.toString()).doesNotContain("912345");
         reply.retract(java.time.LocalDateTime.now(), 1L);
         assertThat(ChatMessageResponse.from(reply, 912345L).isCanRetract()).isFalse();
+    }
+
+    @Test
+    void memberReadClearsOnlyTheCustomerUnreadCount() {
+        ChatRoom room = supportRoom(21L);
+        when(memberRepository.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(customer));
+        when(roomRepository.findByMemberIdAndTypeForUpdate(7L, ChatRoom.RoomType.SUPPORT)).thenReturn(Optional.of(room));
+        when(messageRepository.findByRoomIdOrderByIdDesc(21L, PageRequest.of(0, 50)))
+                .thenReturn(new SliceImpl<>(List.of(message(88L, room, SenderRole.ADMIN, 1L, "답변"))));
+        assertThat(chatService.readMyMessages(customer)).extracting(ChatMessageResponse::getContent).containsExactly("답변");
+        assertThat(room.getMemberUnread()).isZero();
+        assertThat(room.getAdminUnread()).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void memberSendOverloadsTrimContentIncrementRecipientUnreadAndClearSenderUnread(boolean withClientId) {
+        ChatRoom room = supportRoom(21L);
+        when(memberRepository.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(customer));
+        when(roomRepository.findByMemberIdAndTypeForUpdate(7L, ChatRoom.RoomType.SUPPORT)).thenReturn(Optional.of(room));
+        when(messageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var response = withClientId
+                ? chatService.sendAsMember(customer, "  문의  ", "client-2")
+                : chatService.sendAsMember(customer, "  문의  ");
+        assertThat(response.getContent()).isEqualTo("문의");
+        assertThat(room.getAdminUnread()).isEqualTo(3);
+        assertThat(room.getMemberUnread()).isZero();
+        verify(messageRepository).save(org.mockito.ArgumentMatchers.argThat(saved ->
+                "문의".equals(saved.getContent()) && saved.getSenderMemberId().equals(7L)
+                        && java.util.Objects.equals(saved.getClientMessageId(), withClientId ? "client-2" : null)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void adminReadOverloadsKeepCustomerUnreadAndHideTheSupportAgentsIdentity(boolean withViewer) {
+        ChatRoom room = supportRoom(21L);
+        when(roomRepository.findByIdForUpdate(21L)).thenReturn(Optional.of(room));
+        when(messageRepository.findByRoomIdOrderByIdDesc(21L, PageRequest.of(0, 50)))
+                .thenReturn(new SliceImpl<>(List.of(message(88L, room, SenderRole.ADMIN, 912L, "답변"))));
+        var messages = withViewer ? chatService.readRoomAsAdmin(21L, 912L) : chatService.readRoomAsAdmin(21L);
+        assertThat(messages).extracting(ChatMessageResponse::getSenderName).containsExactly("RESERVE 고객지원");
+        assertThat(messages).extracting(ChatMessageResponse::getSenderProfileImage).containsOnlyNulls();
+        assertThat(room.getAdminUnread()).isZero();
+        assertThat(room.getMemberUnread()).isEqualTo(3);
+        verifyNoInteractions(memberRepository);
     }
 
     private ChatRoom supportRoom(Long id) {

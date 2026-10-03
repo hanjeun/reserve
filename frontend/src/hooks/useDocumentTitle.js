@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 
 const SITE_NAME = 'RESERVE';
 const DEFAULT_DESCRIPTION = '예약이 필요한 순간, 원하는 가게를 찾고 가장 빠르게 예약하세요.';
@@ -12,7 +12,8 @@ const DEFAULT_DESCRIPTION = '예약이 필요한 순간, 원하는 가게를 찾
  *   useDocumentTitle(null); // 홈 — "RESERVE | 예약이 필요한 순간"
  */
 const useDocumentTitle = (pageTitle, description) => {
-    useEffect(() => {
+    // 새 페이지가 보이는 프레임에 제목과 공유 메타정보도 함께 갱신한다.
+    useLayoutEffect(() => {
         // ── title ──────────────────────────────────────────
         const title = pageTitle
             ? `${pageTitle} | ${SITE_NAME}`

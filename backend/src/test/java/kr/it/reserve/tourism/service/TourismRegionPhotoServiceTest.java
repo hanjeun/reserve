@@ -5,11 +5,15 @@ import kr.it.reserve.tourism.entity.TourismRegionPhoto;
 import kr.it.reserve.tourism.repository.TourismRegionPhotoRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -18,6 +22,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -96,11 +101,77 @@ class TourismRegionPhotoServiceTest {
         assertThat(stored.getValue().getWorkTitle()).isEqualTo("서울 대표 관광 사진");
 
         ArgumentCaptor<URI> uri = ArgumentCaptor.forClass(URI.class);
-        verify(restTemplate, org.mockito.Mockito.times(2)).getForObject(uri.capture(), eq(String.class));
+        verify(restTemplate, times(2)).getForObject(uri.capture(), eq(String.class));
         assertThat(uri.getAllValues().getFirst().getRawQuery())
                 .contains("serviceKey=aB%2BcD%3D")
                 .doesNotContain("%25")
                 .contains("areaCode=1");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("candidateRequestCases")
+    void candidateLookupSkipsBlankIdsAndPreservesRequestOrder(
+            String caseName, String typeOneContentId,
+            List<String> expectedRequestedIds, String expectedStoredId) {
+        String listResponse = """
+                {"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[
+                  {"title":"ID 없음"},
+                  {"contentid":"  "},
+                  {"contentid":"10001","title":"첫 후보"},
+                  {"contentid":""},
+                  {"contentid":"10002","title":"둘째 후보"},
+                  {"contentid":null},
+                  {"contentid":"10002","title":"중복 ID 후보"},
+                  {"contentid":"10004","title":"넷째 후보"},
+                  {"contentid":"10005","title":"다섯째 후보"}
+                ]}}}}
+                """;
+        when(repository.findByRegionCode("서울")).thenReturn(Optional.empty());
+        when(restTemplate.getForObject(any(URI.class), eq(String.class))).thenAnswer(invocation -> {
+            URI uri = invocation.getArgument(0);
+            if (uri.getPath().endsWith("areaBasedList2")) return listResponse;
+            assertThat(uri.getPath()).endsWith("detailImage2");
+            String requestedId = UriComponentsBuilder.fromUri(uri).build()
+                    .getQueryParams().getFirst("contentId");
+            return typeOneContentId.equals(requestedId)
+                    ? TYPE_ONE_IMAGE_RESPONSE : TYPE_THREE_IMAGE_RESPONSE;
+        });
+        var target = service("key");
+
+        var photos = target.findRegionPhotos(List.of("서울"));
+
+        if (expectedStoredId == null) {
+            assertThat(photos).isEmpty();
+            verify(repository, never()).save(any());
+            assertThat(target.findRegionPhotos(List.of("서울"))).isEmpty();
+        } else {
+            assertThat(photos).singleElement()
+                    .satisfies(photo -> assertThat(photo.contentId()).isEqualTo(expectedStoredId));
+            verify(repository).save(any());
+        }
+
+        ArgumentCaptor<URI> requests = ArgumentCaptor.forClass(URI.class);
+        verify(restTemplate, times(1 + expectedRequestedIds.size()))
+                .getForObject(requests.capture(), eq(String.class));
+        List<URI> requestedUris = requests.getAllValues();
+        assertThat(requestedUris.getFirst().getPath()).endsWith("areaBasedList2");
+        List<URI> detailRequests = requestedUris.subList(1, requestedUris.size());
+        assertThat(detailRequests).allSatisfy(uri -> assertThat(uri.getPath()).endsWith("detailImage2"));
+        assertThat(detailRequests)
+                .extracting(uri -> UriComponentsBuilder.fromUri(uri).build()
+                        .getQueryParams().getFirst("contentId"))
+                .containsExactlyElementsOf(expectedRequestedIds);
+        verifyNoInteractions(imageProxyClient);
+    }
+
+    private static Stream<Arguments> candidateRequestCases() {
+        return Stream.of(
+                Arguments.of("first candidate succeeds", "10001", List.of("10001"), "10001"),
+                Arguments.of("fourth valid candidate succeeds", "10004",
+                        List.of("10001", "10002", "10002", "10004"), "10004"),
+                Arguments.of("fifth valid candidate is never requested", "10005",
+                        List.of("10001", "10002", "10002", "10004"), null)
+        );
     }
 
     @Test

@@ -34,6 +34,10 @@ import org.springframework.web.util.HtmlUtils;
 @RequiredArgsConstructor
 public class EmailService {
 
+    private static final String MAIL_CHARSET = "UTF-8";
+    private static final String DECLINED_COLOR = "#ff4d4f";
+    private static final String HTML_HEAD_OPEN = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
+
     // Gmail은 @import CSS를 차단하므로 웹폰트 대신 시스템 폰트 스택 사용
     private static final String FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif";
     private static final String FONT_IMPORT = ""; // Gmail은 @import 차단, 사용 안 함
@@ -53,7 +57,7 @@ public class EmailService {
     public void sendVerificationEmail(String toEmail, String verificationCode) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 이메일 인증 코드");
@@ -96,7 +100,7 @@ public class EmailService {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 취소되었습니다",
                 buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "취소", "#ff4d4f",
+                        guestCount, "취소", DECLINED_COLOR,
                         "가게 사정으로 예약이 취소되었습니다. 결제하신 예약금은 전액 환불됩니다.",
                         cancelReason, "취소 사유"));
     }
@@ -110,7 +114,7 @@ public class EmailService {
         String name = resolveName(memberName, toEmail);
         sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 거절되었습니다",
                 buildReservationStatusContent(name, storeName, reservationDate, reservationTime,
-                        guestCount, "거절", "#ff4d4f", "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.",
+                        guestCount, "거절", DECLINED_COLOR, "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.",
                         rejectionReason, "거절 사유"));
     }
 
@@ -143,7 +147,7 @@ public class EmailService {
         String mName = resolveName(memberName, memberEmail);
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(ownerEmail);
             if (memberEmail != null && !memberEmail.isBlank()) {
@@ -162,7 +166,7 @@ public class EmailService {
     private void sendReservationStatusEmail(String toEmail, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject(subject);
@@ -196,7 +200,7 @@ public class EmailService {
                 ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">" + safeReasonLabel
                   + "</td><td style=\"color:#191f28;font-weight:600;\">" + safeReason + "</td></tr>"
                 : "";
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
+        return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
             + "<div style=\"width:100%;background:#f9fafb;padding:40px 0;\">"
             + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
@@ -229,7 +233,7 @@ public class EmailService {
         String emailRow = (memberEmail != null && !memberEmail.isBlank())
             ? "<tr><td style=\"color:#8b95a1;padding:8px 0;\">고객 이메일</td><td style=\"color:#191f28;font-weight:600;\"><a href=\"mailto:" + safeMemberEmail + "\" style=\"color:#3182f6;text-decoration:none;\">" + safeMemberEmail + "</a></td></tr>"
             : "";
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
+        return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background:#f9fafb;\">"
             + "<div style=\"width:100%;background:#f9fafb;padding:40px 0;\">"
             + "  <div style=\"max-width:500px;margin:0 auto;background:#fff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
@@ -261,7 +265,7 @@ public class EmailService {
         String name = resolveName(memberName, toEmail);
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 사업자 인증이 승인되었습니다");
@@ -284,13 +288,13 @@ public class EmailService {
         String name = resolveName(memberName, toEmail);
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 사업자 인증이 반려되었습니다");
             helper.setText(buildBusinessStatusContent(
                 name, businessName,
-                "반려", "#ff4d4f",
+                "반려", DECLINED_COLOR,
                 "아쉽게도 사업자 인증이 반려되었습니다.",
                 "반려 사유를 확인하신 후 서류를 수정하여 다시 신청해주세요.",
                 rejectionReason
@@ -316,7 +320,7 @@ public class EmailService {
     public void sendNewInquiryAlert(String memberName, String memberEmail, String categoryDisplayName, String title, String content) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(adminNotifyEmail);
             if (memberEmail != null && !memberEmail.isBlank()) {
@@ -410,7 +414,7 @@ public class EmailService {
     public void sendPasswordResetEmail(String toEmail, String code) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
             helper.setSubject("[RESERVE] 비밀번호 재설정 코드");
@@ -423,7 +427,7 @@ public class EmailService {
     }
 
     private String buildPasswordResetEmailContent(String code) {
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
+        return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
             + "  <div style=\"width:100%;background-color:#f9fafb;padding:40px 0;\">"
             + "    <div style=\"max-width:500px;margin:0 auto;background-color:#ffffff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
@@ -444,7 +448,7 @@ public class EmailService {
     }
 
     private String buildVerificationEmailContent(String code) {
-        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">" + FONT_IMPORT + "</head>"
+        return HTML_HEAD_OPEN + FONT_IMPORT + "</head>"
             + "<body style=\"margin:0;padding:0;font-family:" + FONT_FAMILY + ";background-color:#f9fafb;\">"
             + "  <div style=\"width:100%;background-color:#f9fafb;padding:40px 0;\">"
             + "    <div style=\"max-width:500px;margin:0 auto;background-color:#ffffff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"

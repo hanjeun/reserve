@@ -23,6 +23,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CspReportController {
 
+    private static final String OTHER_CATEGORY = "other";
+
     private static final int MAX_BODY_LENGTH = 32_768;
     private static final int MAX_REPORTS_PER_REQUEST = 10;
     private static final Set<String> DIRECTIVE_CATEGORIES = Set.of(
@@ -43,17 +45,17 @@ public class CspReportController {
                 int count = 0;
                 for (JsonNode report : root) {
                     if (count++ >= MAX_REPORTS_PER_REQUEST) break;
-                    record(report.path("body"));
+                    logReport(report.path("body"));
                 }
                 return;
             }
-            record(root.has("csp-report") ? root.path("csp-report") : root);
+            logReport(root.has("csp-report") ? root.path("csp-report") : root);
         } catch (Exception ignored) {
             // 브라우저 진단 전용 엔드포인트이므로 잘못된 외부 입력이 사용자 요청을 실패시키지 않는다.
         }
     }
 
-    private void record(JsonNode report) {
+    private void logReport(JsonNode report) {
         String directive = firstText(
                 report,
                 "effective-directive", "effectiveDirective",
@@ -77,7 +79,7 @@ public class CspReportController {
         String normalized = directive.toLowerCase(Locale.ROOT);
         int separator = normalized.indexOf('-');
         String category = separator < 0 ? normalized : normalized.substring(0, separator);
-        return DIRECTIVE_CATEGORIES.contains(category) ? category : "other";
+        return DIRECTIVE_CATEGORIES.contains(category) ? category : OTHER_CATEGORY;
     }
 
     private String blockedScheme(String blockedUri) {
@@ -91,7 +93,7 @@ public class CspReportController {
             if (scheme == null) return "relative";
             return switch (scheme.toLowerCase(Locale.ROOT)) {
                 case "http", "https", "data", "blob" -> scheme.toLowerCase(Locale.ROOT);
-                default -> "other";
+                default -> OTHER_CATEGORY;
             };
         } catch (IllegalArgumentException ignored) {
             return "invalid";
@@ -112,19 +114,23 @@ public class CspReportController {
                 return "browser-extension";
             }
             if (!scheme.equals("http") && !scheme.equals("https")) {
-                return scheme.isBlank() ? "relative" : "other";
+                return scheme.isBlank() ? "relative" : OTHER_CATEGORY;
             }
 
-            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-            if (host.equals("reserve.it.kr") || host.endsWith(".reserve.it.kr")) return "first-party";
-            if (host.equals("cdn.portone.io") || host.endsWith(".portone.io")
-                    || host.endsWith(".iamport.kr")) return "portone";
-            if (host.equals("dapi.kakao.com") || host.endsWith(".kakao.com")
-                    || host.endsWith(".kakaocdn.net") || host.endsWith(".daumcdn.net")) return "kakao";
-            if (host.endsWith(".sentry.io")) return "sentry";
-            return "external-web";
+            return webSourceCategory(uri);
         } catch (IllegalArgumentException ignored) {
             return "invalid";
         }
+    }
+
+    private String webSourceCategory(URI uri) {
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        if (host.equals("reserve.it.kr") || host.endsWith(".reserve.it.kr")) return "first-party";
+        if (host.equals("cdn.portone.io") || host.endsWith(".portone.io")
+                || host.endsWith(".iamport.kr")) return "portone";
+        if (host.equals("dapi.kakao.com") || host.endsWith(".kakao.com")
+                || host.endsWith(".kakaocdn.net") || host.endsWith(".daumcdn.net")) return "kakao";
+        if (host.endsWith(".sentry.io")) return "sentry";
+        return "external-web";
     }
 }

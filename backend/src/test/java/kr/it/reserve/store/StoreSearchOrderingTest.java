@@ -10,6 +10,7 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.store.entity.ServiceDomain;
+import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class StoreSearchOrderingTest {
             for (int page = 0; page < 3; page++) {
                 var result = service.searchStoresPaged("정렬검증", sort, page, 100, 37.0, 127.0);
                 assertThat(result.getTotalElements()).isEqualTo(205);
-                actual.addAll(result.getContent().stream().map(value -> value.getId()).toList());
+                actual.addAll(result.getContent().stream().map(StoreResponse::getId).toList());
             }
             assertThat(actual).containsExactlyElementsOf(ids);
         }
@@ -63,10 +64,16 @@ class StoreSearchOrderingTest {
         Store one = Store.builder().owner(owner).name("고유검색100%_정확").rating(3.0).build();
         Store two = Store.builder().owner(owner).name("고유검색100XX정확").rating(4.0).build();
         em.persist(one); em.persist(two); em.flush();
+        assertThat(service.searchStores("고유검색100%_", "rating"))
+                .extracting(StoreResponse::getId).containsExactly(one.getId());
+        assertThat(service.searchStores("고유검색100%_", "rating", null))
+                .extracting(StoreResponse::getId).containsExactly(one.getId());
+        assertThat(service.searchStoresPaged("고유검색100%_", "rating", 0, 15, null, null, null).getContent())
+                .extracting(StoreResponse::getId).containsExactly(one.getId());
         assertThat(service.searchStoresPaged("고유검색100%_", "rating", 0, 15, null, null).getContent())
-                .extracting(value -> value.getId()).containsExactly(one.getId());
+                .extracting(StoreResponse::getId).containsExactly(one.getId());
         assertThat(service.searchStoresPaged("고유검색", "distance", 0, 15, Double.NaN, 127.0).getContent())
-                .extracting(value -> value.getId()).containsExactly(two.getId(), one.getId());
+                .extracting(StoreResponse::getId).containsExactly(two.getId(), one.getId());
     }
 
     @Test void distanceUsesBoundedCoordinateCandidatesAndStableDatabaseOrdering() {
@@ -91,7 +98,7 @@ class StoreSearchOrderingTest {
         var result = service.searchStoresPaged("거리DB검증", "distance", 0, 20, 37.0, 127.0);
 
         assertThat(result.getTotalElements()).isEqualTo(3);
-        assertThat(result.getContent()).extracting(value -> value.getId())
+        assertThat(result.getContent()).extracting(StoreResponse::getId)
                 .containsExactly(sameDistanceNewer.getId(), sameDistanceOlder.getId(), farther.getId());
     }
 
@@ -109,10 +116,10 @@ class StoreSearchOrderingTest {
 
         assertThat(service.searchStoresPaged(
                 "날짜변경선검증", "distance", 0, 10, 0.0, 179.0).getContent())
-                .extracting(value -> value.getId()).containsExactly(acrossDateline.getId());
+                .extracting(StoreResponse::getId).containsExactly(acrossDateline.getId());
         assertThat(service.searchStoresPaged(
                 "극점검증", "distance", 0, 10, 85.0, 0.0).getContent())
-                .extracting(value -> value.getId()).containsExactly(acrossPole.getId());
+                .extracting(StoreResponse::getId).containsExactly(acrossPole.getId());
     }
 
     @Test void recommendationPlacesOnlyCurrentlyActiveBadgeStoresFirst() {
@@ -133,7 +140,7 @@ class StoreSearchOrderingTest {
         em.flush();
 
         assertThat(service.searchStoresPaged("추천정렬검증", "recommended", 0, 12, null, null).getContent())
-                .extracting(value -> value.getId())
+                .extracting(StoreResponse::getId)
                 .containsExactly(promoted.getId(), highestRated.getId(), expiredBadge.getId());
     }
 
@@ -162,12 +169,12 @@ class StoreSearchOrderingTest {
             var all = service.searchStoresPaged("노출형정렬", sort, 0, 1, 37.0, 127.0);
             assertThat(all.getTotalElements()).as(sort + " 전체").isEqualTo(3);
             assertThat(all.getContent()).as(sort + " 전체 첫 페이지")
-                    .extracting(value -> value.getId()).containsExactly(promoted.getId());
+                    .extracting(StoreResponse::getId).containsExactly(promoted.getId());
 
             var food = service.searchStoresPaged("노출형정렬", sort, 0, 1, 37.0, 127.0, "FOOD");
             assertThat(food.getTotalElements()).as(sort + " 분야").isEqualTo(2);
             assertThat(food.getContent()).as(sort + " 분야 첫 페이지")
-                    .extracting(value -> value.getId()).containsExactly(promoted.getId());
+                    .extracting(StoreResponse::getId).containsExactly(promoted.getId());
         }
     }
 
@@ -186,6 +193,6 @@ class StoreSearchOrderingTest {
         assertThat(service.getAvailableRegions()).extracting(group -> group.name())
                 .contains("서울", "경기").doesNotContain("부산", "제주");
         assertThat(service.searchStoresPaged(null, "rating", 0, 12, null, null, null, "서울")
-                .getContent()).extracting(result -> result.getId()).contains(seoul.getId()).doesNotContain(gyeonggi.getId());
+                .getContent()).extracting(StoreResponse::getId).contains(seoul.getId()).doesNotContain(gyeonggi.getId());
     }
 }

@@ -241,7 +241,7 @@ const ProfileImageTab = ({ user }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 4 }}>
                 {buttonsShouldRender ? (
                     <div style={{ display: 'flex', gap: 8, animation: buttonsClosing ? animation.slideUpOut : animation.slideUpIn }}>
-                        <Button variant="secondary" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
+                        <Button variant="outline" onClick={handleCancel} disabled={loading} style={{ flex: 1 }}>
                             취소
                         </Button>
                         <Button variant="primary" onClick={handleSave} loading={loading} style={{ flex: 1 }}>
@@ -400,9 +400,9 @@ const LocationTab = ({ user }) => {
 // ─── 사업자 전환 탭 ───────────────────────────────────────────────────────────
 const BusinessTab = ({ user }) => {
     const { message, confirm } = useMessage();
-    const [status, setStatus]     = useState(null);
+    const [status, setStatus]     = useState(/** @type {string | null} */ (null));
     const [rejectionReason, setRejectionReason] = useState(null);
-    const [statusLookup, setStatusLookup] = useState({ scope: null, phase: 'loading' });
+    const [statusLookup, setStatusLookup] = useState({ scope: /** @type {string | null} */ (null), phase: 'loading' });
     const [form, setForm]         = useState({ businessName: '', businessNumber: '', memo: '' });
     const [licenseList, setLicenseList] = useState([]);
     const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
@@ -411,11 +411,11 @@ const BusinessTab = ({ user }) => {
     const [cancelLoading, setCancelLoading] = useState(false);
     const [resignLoading, setResignLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [editState, setEditState] = useState({ scope: null, status: 'idle' });
-    const editRequestRef = useRef(null);
+    const [editState, setEditState] = useState({ scope: /** @type {string | null} */ (null), status: 'idle' });
+    const editRequestRef = useRef(/** @type {{ scope: string } | null} */ (null));
     const sessionRevision = useAuthStore(state => state.sessionRevision);
     const editScope = `${user?.id ?? user?.email}:${user?.role}:${sessionRevision}`;
-    const statusRequestRef = useRef(null);
+    const statusRequestRef = useRef(/** @type {Record<string, never> | null} */ (null));
     const statusLoading = user?.role !== 'BUSINESS'
         && (statusLookup.scope !== editScope || statusLookup.phase === 'loading');
     const statusError = statusLookup.scope === editScope && statusLookup.phase === 'error';
@@ -428,6 +428,7 @@ const BusinessTab = ({ user }) => {
     const isBusiness = user?.role === 'BUSINESS';
 
     const loadStatus = useCallback(() => {
+        /** @type {Record<string, never>} */
         const request = {};
         statusRequestRef.current = request;
         return businessService.getMyStatus()
@@ -653,8 +654,8 @@ const BusinessTab = ({ user }) => {
                         <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>관리자 검토 후 승인 여부를 알려드립니다</Text>
                     </div>
                 </div>
-                {editLoading && <div role="status" aria-label="사업자 신청 내용을 불러오는 중" aria-busy="true">
-                    기존 신청 내용을 확인하고 있습니다.
+                {editLoading && <div aria-busy="true">
+                    <output aria-label="사업자 신청 내용을 불러오는 중">기존 신청 내용을 확인하고 있습니다.</output>
                 </div>}
                 {editError && <DataState state="error" kind="member"
                     title="사업자 신청 내용을 불러오지 못했습니다."
@@ -811,7 +812,7 @@ const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, on
                 세로로 쌓으면 두 버튼이 같은 무게로 보이고 저장 버튼이 폼 안, 취소가 폼 밖으로 갈라진다. */}
             {onCancel ? (
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <Button variant="secondary" onClick={onCancel} disabled={loading} style={{ flex: 1 }}>취소</Button>
+                    <Button variant="outline" onClick={onCancel} disabled={loading} style={{ flex: 1 }}>취소</Button>
                     <Button variant="primary" loading={loading} onClick={() => antdForm.submit()} style={{ flex: 1 }}>{submitLabel}</Button>
                 </div>
             ) : (
@@ -1030,8 +1031,8 @@ const MyPage = () => {
     const { user, logout, checkAuth, sessionRevision } = useAuthStore();
     const { message, confirm } = useMessage();
     useDocumentTitle('마이페이지');
-    const [withdrawState, setWithdrawState] = useState({ scope: null, checking: false });
-    const withdrawRequestRef = useRef(null);
+    const [withdrawState, setWithdrawState] = useState({ scope: /** @type {string | null} */ (null), checking: false });
+    const withdrawRequestRef = useRef(/** @type {{ scope: string } | null} */ (null));
     const withdrawalMountedRef = useRef(false);
     const withdrawScope = `${user?.id}:${user?.role}:${sessionRevision}`;
     const withdrawChecking = withdrawState.scope === withdrawScope && withdrawState.checking;

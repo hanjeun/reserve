@@ -24,7 +24,7 @@ export default function MockBookingForm() {
         }}>
             {/* 예약 날짜 — 표시만 */}
             <div style={{ marginBottom: 16 }}>
-                <label style={mockFormLabel}>예약 날짜</label>
+                <span style={mockFormLabel}>예약 날짜</span>
                 <div style={{ ...mockInputBase, justifyContent: 'space-between', cursor: 'not-allowed' }}>
                     <span style={{ color: colors.text.tertiary }}>날짜 선택</span>
                     <CalendarOutlined style={pickerIcon} />
@@ -33,7 +33,7 @@ export default function MockBookingForm() {
 
             {/* 예약 시간 — 표시만 */}
             <div style={{ marginBottom: 16 }}>
-                <label style={mockFormLabel}>예약 시간</label>
+                <span style={mockFormLabel}>예약 시간</span>
                 <div style={{ ...mockInputBase, justifyContent: 'space-between', cursor: 'not-allowed' }}>
                     <span style={{ color: colors.text.tertiary }}>09:00 ~ 22:00</span>
                     <ClockCircleOutlined style={pickerIcon} />
@@ -42,7 +42,7 @@ export default function MockBookingForm() {
 
             {/* 인원 수 — 실제 동작 */}
             <div style={{ marginBottom: 16 }}>
-                <label style={mockFormLabel}>인원 수</label>
+                <span style={mockFormLabel}>인원 수</span>
                 <div style={{ ...mockInputBase, justifyContent: 'space-between' }}>
                     <span style={{ fontWeight: fontWeight.medium, fontSize: fontSize.base }}>{count}명</span>
                     <Flex gap={8}>

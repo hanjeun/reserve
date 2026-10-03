@@ -15,11 +15,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -55,17 +57,19 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        CookieCsrfTokenRepository csrfTokens = new CookieCsrfTokenRepository();
+        csrfTokens.setCookieName("__Host-XSRF-TOKEN");
+        csrfTokens.setCookieCustomizer(cookie -> cookie.secure(true).path("/"));
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // CSRF 토큰을 쓰지 않는 대신 SameSite=Lax 쿠키가 방어선이다(CookieUtil 참고).
-                // 인증 토큰은 Authorization 헤더 또는 쿠키로 오는데(JwtAuthenticationFilter.resolveToken),
-                // 쿠키 경로가 있는 이상 cross-site 요청에 쿠키가 붙지 않도록 막는 쪽이 핵심이다.
-                // Lax는 cross-site POST/PUT/PATCH/DELETE에 쿠키를 보내지 않으므로 상태 변경 요청이 차단된다.
-                // ⚠️ CookieUtil의 SameSite를 None으로 되돌리면 이 방어가 통째로 사라진다.
-                .csrf(csrf -> csrf.disable())
-                .httpBasic(httpBasic -> httpBasic.disable())
-                .formLogin(form -> form.disable())
-                .logout(logout -> logout.disable())
+                // SameSite와 CORS에 더해 Origin/Referer/Fetch Metadata를 한 관문에서 검사한다.
+                // 신뢰할 수 없는 브라우저 요청에는 Spring의 CSRF 검증을 적용한다.
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokens)
+                        .requireCsrfProtectionMatcher(new BrowserCsrfMatcher(allowedOrigins)))
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
@@ -111,6 +115,10 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/notices", "/api/notices/highlights", "/api/notices/{id:\\d+}").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/notices/{id:\\d+}/view").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/public/store-pages/{id:\\d+}").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.HEAD,
+                                "/api/public/store-pages/{id:\\d+}").permitAll()
                         // 지역 사진은 공개 탐색 보조 정보다. 키·원본 URL은 서버 안에서만 처리한다.
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/tourism/region-photos/**").permitAll()
                         // 가게 소식 v1의 최소 공개 응답만 허용한다. 기존 /my·/my-stores·CUD는 인증 유지.

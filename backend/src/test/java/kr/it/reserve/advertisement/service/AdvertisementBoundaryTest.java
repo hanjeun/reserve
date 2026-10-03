@@ -32,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -97,12 +98,12 @@ class AdvertisementBoundaryTest {
 
         assertThrows(AdvertisementException.class,
                 () -> AdvertisementService.resolveBannerContent("AVAILABLE_NOW", "제목만", " "));
+        String longTitle = "가".repeat(Advertisement.BANNER_TITLE_MAX_LENGTH + 1);
         assertThrows(AdvertisementException.class,
-                () -> AdvertisementService.resolveBannerContent(
-                        "AVAILABLE_NOW", "가".repeat(Advertisement.BANNER_TITLE_MAX_LENGTH + 1), "내용"));
+                () -> AdvertisementService.resolveBannerContent("AVAILABLE_NOW", longTitle, "내용"));
+        String longDescription = "가".repeat(Advertisement.BANNER_DESCRIPTION_MAX_LENGTH + 1);
         assertThrows(AdvertisementException.class,
-                () -> AdvertisementService.resolveBannerContent(
-                        "AVAILABLE_NOW", "제목", "가".repeat(Advertisement.BANNER_DESCRIPTION_MAX_LENGTH + 1)));
+                () -> AdvertisementService.resolveBannerContent("AVAILABLE_NOW", "제목", longDescription));
         assertThrows(AdvertisementException.class,
                 () -> AdvertisementService.resolveBannerContent("UNTRUSTED_PRESET", "제목", "내용"));
     }
@@ -112,7 +113,7 @@ class AdvertisementBoundaryTest {
         Member owner = Member.builder()
                 .id(7L).name("사업자").email("owner@example.test").role(Role.BUSINESS).build();
         Store store = Store.builder().id(11L).name("가게").owner(owner).status(StoreStatus.ACTIVE).build();
-        MultipartFile image = org.mockito.Mockito.mock(MultipartFile.class);
+        MultipartFile image = mock(MultipartFile.class);
         when(storeRepository.findByIdForUpdate(11L)).thenReturn(Optional.of(store));
         when(repository.findFirstByStoreIdAndAdTypeAndStatusInAndStartDateGreaterThanEqual(
                 eq(11L), eq(AdType.BANNER), anyList(), any())).thenReturn(Optional.empty());

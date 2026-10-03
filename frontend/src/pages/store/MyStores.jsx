@@ -137,10 +137,10 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
             open={open}
             onOk={handleOk}
             onCancel={onCancel}
-            /* maskClosable={false}: 가게 영업 종료 — 명시적으로 버튼을 눌러야 닫히게 한다.
+            /* mask.closable=false: 가게 영업 종료 — 명시적으로 버튼을 눌러야 닫히게 한다.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
-            maskClosable={false}
+            mask={{ closable: false }}
             okText="영업 종료"
             cancelText="취소"
             okButtonProps={{
@@ -277,6 +277,7 @@ const MyStores = () => {
     }, []);
 
     const handleDeleteConfirm = useCallback(async () => {
+        if (!targetStore) return;
         try {
             await deleteStore(targetStore.id);
             setDeleteModalOpen(false);

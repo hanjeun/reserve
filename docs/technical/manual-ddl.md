@@ -15,10 +15,17 @@
 1. 백업과 격리 `reserve_restore_*` 복원을 확인한 뒤 적용해요([백업·복구](backup.md)).
 2. 운영 MySQL의 `SHOW CREATE TABLE`·인덱스·행 수를 읽기 전용으로 확인하고, 그 결과를 근거로 DDL을 검토해요.
 
+현재 운영 앱은 `reserve_app`과 `ddl-auto: validate`를 사용해요. 승인된 DDL은
+`reserve_ddl` 계정으로만 적용하며, 역할의 보호된 보관본은 `/etc/reserve-db-roles.json`이에요.
 접속:
 ```bash
-export DB_PASSWORD="$(sudo sh -c '. /etc/reserve-backup.env; printf %s "$DB_PASSWORD"')"   # 비밀번호 기준: /etc/reserve-backup.env (backup.md 7장)
-docker exec -it -e MYSQL_PWD="$DB_PASSWORD" mysql mysql -u root reserve
+(
+  set -eu
+  MYSQL_IP=$(sudo docker inspect mysql --format '{{(index .NetworkSettings.Networks "app-network").IPAddress}}')
+  test -n "$MYSQL_IP"
+  # 비밀번호는 MySQL의 숨김 입력창에 직접 입력한다. 명령 인자나 출력에 넣지 않는다.
+  sudo docker exec -it mysql mysql --protocol=TCP --host="$MYSQL_IP" --user=reserve_ddl --password reserve
+)
 ```
 
 ## 1. 가게 검색 FULLTEXT 인덱스 (ngram)
@@ -44,7 +51,8 @@ SHOW INDEX FROM store WHERE Index_type = 'FULLTEXT';
 
 ### 적용 후 켜기
 
-DDL을 적용한 뒤 `application-prod.yml`에서 켜요.
+DDL과 검색 계약 검증을 마친 뒤 별도 승인으로 `application-prod.yml`에서 켜요.
+아래 격리 검증에서 검색 결과 차이가 발견되어 현재는 활성화를 보류해요.
 
 ```yaml
 search:
@@ -73,6 +81,26 @@ EXPLAIN SELECT * FROM store
 
 참고 문서: [MySQL FULLTEXT 제한](https://dev.mysql.com/doc/refman/8.0/en/fulltext-restrictions.html),
 [ngram 파서](https://dev.mysql.com/doc/refman/8.0/en/fulltext-search-ngram.html).
+
+### 2026-10-02 격리 MySQL 8.0.45 검증
+
+H2에서는 LIKE·분야·지역·추천·거리 후보/정렬·205건 페이지 경계를 확인했고, FULLTEXT는 Mockito로 호출 계약을 확인했다.
+2026-10-02에는 네트워크·포트가 없는 격리 **MySQL 8.0.45 / ngram_token_size=2**에서 합성 215행으로
+현재 StoreRepository의 FULLTEXT 내용/count SQL을 실행했다. LIKE는 현재 Specification의 조건·정렬을 SQL로 재현했다.
+사진·공방 단일 검색어 × 최신·리뷰·별점순 6조합에서 삭제/정지 제외, 유효 배지 우선, 동점 ID 내림차순,
+20행씩 깊은 페이지의 중복·누락·count를 대조했다. `EXPLAIN`의 `fulltext / ft_store_search`와
+`EXPLAIN ANALYZE` 실행, MATCH 컬럼 불일치의 1191 오류도 확인했다.
+
+**전체 검색 결과 동등성은 성립하지 않는다.** `강남 사진`은 LIKE의 연속 문구 1행과 달리
+FULLTEXT가 순서 반전·서로 다른 컬럼의 단어까지 3행을 반환했고, `100%`도 LIKE 1행 / FULLTEXT 3행이었다.
+따라서 `search.store.fulltext-enabled`는 계속 끈다. 문구/단어·특수문자 검색 계약을 먼저 확정하고,
+실제 앱의 Hibernate 경로와 운영 데이터 분포까지 검증한 뒤 별도 승인으로 적용한다.
+운영 DDL은 실행하지 않았다. 격리 데이터와 컨테이너는 검증 후 제거했다.
+
+같은 격리 엔진에서 경쟁 행 잠금의 1205 오류, deadlock의 단일 1213 victim과 양쪽 rollback을 확인했다.
+ALTER TABLE은 앞선 DML까지 암묵적으로 commit하므로 ROLLBACK으로 되돌릴 수 없다는 점도 실증했다.
+DDL 변경의 복구에는 별도의 역방향 DDL·복원 절차가 필요하다.
+
 
 ## 1-b. 가게 거리순 bounding-box 후보 인덱스
 
@@ -274,3 +302,45 @@ CREATE TABLE chat_report_access_audit (
 
 - 실행 전 `SHOW CREATE TABLE`로 컬럼·인덱스 존재 여부를 확인해요.
 - 파기 worker는 `CHAT_RETENTION_ENABLED`로 켜요(기본 `false`).
+
+## 8. 비밀번호 재설정 코드 해시 (컬럼 적용, 새 앱 배포 전)
+
+새 코드는 BCrypt 해시를 `password_reset_token.token_hash VARCHAR(60) NULL`에 저장한다.
+기존 `token VARCHAR(10) NOT NULL`은 유지하며 새 행에는 코드 대신 `HASHED`를 기록한다.
+`token_hash IS NULL`인 기존 6자리 코드는 원래의 5분 만료·실패 상한을 그대로 적용한다.
+평문 코드를 일괄 조회하거나 백필하지 않는다.
+
+```sql
+-- 배포 전 실제 타입·컬럼 존재 여부를 읽기 전용으로 확인한다.
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_token'
+  AND COLUMN_NAME IN ('token', 'token_hash');
+
+-- 컬럼이 없을 때만 승인된 DDL 계정으로 실행한다. 재실행하지 않는다.
+SET SESSION lock_wait_timeout = 5;
+ALTER TABLE password_reset_token ADD COLUMN token_hash VARCHAR(60) NULL, ALGORITHM=INSTANT;
+```
+
+현재 운영은 최소 권한 앱 계정과 `ddl-auto: validate`를 사용하므로 이 컬럼을 자동 생성하지 않는다.
+2026-10-02 새 후보 JAR의 읽기 전용 검증에서 실제 운영의 `token_hash` 누락을 확인했다.
+2026-10-03 승인 범위에서 DDL 계정으로 nullable 컬럼 하나를 `ALGORITHM=INSTANT`로 추가했다.
+변경 전 테이블 정의와 단일 테이블 gzip 덤프는
+`/var/backups/reserve-scripts/20261003-before-token-hash/`에 보존했다(디렉터리 700, 파일 600).
+기존 1행의 원래 컬럼 집계 해시는 전후 같고 새 컬럼은 `VARCHAR(60) NULL`이다.
+10/2 후보와 10/3 `01ce08e` 후보의 엔티티 33개가 제한된 `reserve_app` 계정으로 읽기 전용 스키마 검증을 통과했다.
+10/3 검증 JAR의 SHA-256은 `f995cc530fea75dd90caae4da3558a9f0d3d97705d7f949145910563ac78152b`이며,
+같은 운영 이미지의 별도 컨테이너에서 메모리 256 MiB·접속 풀 1개로 확인했다.
+검증은 Spring·스케줄러·외부 연동을 기동하지 않았다. 기존 운영 앱의 Actuator JSON도 `status=UP`이었다.
+현재 운영은 구버전 앱이며, 새 코드의 해시 저장은 새 앱 배포 후에 시작한다.
+재발송과 재설정은 회원 잠금 다음 토큰 ID 한 행 잠금 순서를 유지한다.
+실패 횟수는 예외가 나도 커밋하고, 성공 시 비밀번호·세션 세대 변경과 코드 소비를 함께 커밋한다.
+
+2026-10-01 로컬 격리 MySQL 8.0.45에서 실제 Spring 서비스 검사 11건을 통과했고,
+생성된 해시 컬럼의 `VARCHAR(60) NULL`과 테스트 행을 MySQL에서 직접 확인했다.
+동시 실패 요청 8건의 카운터는 5로 멈췄으며, 동시 재설정 2건 중 하나만 성공했다.
+H2 백엔드 전체 603건도 통과했다. 운영 DB에 적용한 기록은 아니다.
+
+구버전 앱은 추가 컬럼이 있는 DB를 읽을 수 있으나 새 해시 코드의 `HASHED` 표식을 인증할 수 없다.
+롤백 뒤에는 해당 사용자가 코드를 재발송해야 한다. 새 코드가 구버전에서 그대로 인증된다고
+가정하지 않으며, 컬럼 삭제나 기존 토큰 타입 변경은 롤백 절차에 넣지 않는다.

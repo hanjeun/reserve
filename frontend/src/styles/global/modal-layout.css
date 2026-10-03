@@ -1,3 +1,50 @@
+/* Shared modal decisions and background scroll containment. */
+html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
+.ant-modal-wrap, .ant-modal-body { overscroll-behavior: contain; }
+.reserve-modal-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    max-width: 100%;
+    margin-left: auto;
+}
+.reserve-modal-actions > .reserve-btn {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 36px;
+    height: auto !important;
+    padding: 6px 20px !important;
+    max-width: 100%;
+    line-height: 20px;
+    border-radius: 16px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.ant-modal-footer .ant-btn,
+.ant-modal-confirm-btns .ant-btn { box-sizing: border-box; min-width: 0; min-height: 36px; border-radius: 16px; }
+.ant-modal-footer:has(> .ant-btn),
+.ant-modal-confirm-btns {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    width: max-content;
+    max-width: 100%;
+    margin-left: auto;
+}
+.ant-modal-footer > .ant-btn,
+.ant-modal-confirm-btns > .ant-btn {
+    margin-inline-start: 0;
+    padding: 6px 20px;
+    max-width: 100%;
+    font-size: 13px;
+    line-height: 20px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    height: auto;
+}
+
 /* Scoped confirmation layout. AntD 6 uses ant-modal-container, not ant-modal-content.
    Keep AntD portal/mask/focus/motion behavior; only bound the visible panel and body. */
 .reserve-confirm-root {
@@ -64,13 +111,16 @@
     display: flex;
     flex: none;
     flex-wrap: wrap;
+    width: max-content;
+    max-width: 100%;
+    margin-left: auto;
     justify-content: flex-end;
     gap: 8px;
 }
 
 .reserve-confirm-root .ant-modal-confirm-btns .ant-btn {
-    /* AntD 확인 버튼의 원래 32px 높이를 유지하고, 긴 문구는 줄바꿈만 허용한다. */
-    min-height: 32px;
+    /* 긴 문구는 줄바꿈을 허용하면서 공통 모달 버튼의 최소 높이를 유지한다. */
+    min-height: 36px;
     margin: 0;
     white-space: normal;
     height: auto;

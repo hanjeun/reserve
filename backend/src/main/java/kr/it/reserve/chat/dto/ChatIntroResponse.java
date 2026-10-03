@@ -44,11 +44,25 @@ public record ChatIntroResponse(boolean configured, String notice, String greeti
         return new ChatIntroResponse(
                 true,
                 intro.getNotice(),
-                intro.getGreeting() != null ? intro.getGreeting() : (support ? DEFAULT_SUPPORT_GREETING : DEFAULT_STORE_GREETING),
-                support ? (intro.getDisplayName() != null ? intro.getDisplayName() : SUPPORT_DISPLAY_NAME) : null,
+                resolveGreeting(intro, support),
+                resolveDisplayName(intro, support),
                 support ? intro.getAvatarUrl() : null,
                 intro.getItems().stream().map(item -> new Item(item.getQuestion(), item.getAnswer())).toList(),
                 intro.getUpdatedAt());
+    }
+
+    private static String resolveGreeting(ChatIntro intro, boolean support) {
+        if (intro.getGreeting() != null) {
+            return intro.getGreeting();
+        }
+        return support ? DEFAULT_SUPPORT_GREETING : DEFAULT_STORE_GREETING;
+    }
+
+    private static String resolveDisplayName(ChatIntro intro, boolean support) {
+        if (!support) {
+            return null;
+        }
+        return intro.getDisplayName() != null ? intro.getDisplayName() : SUPPORT_DISPLAY_NAME;
     }
 
     public static ChatIntroResponse supportDefault() {

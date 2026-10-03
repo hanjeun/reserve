@@ -1,5 +1,6 @@
 package kr.it.reserve.tourism.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.tourism.dto.TourismRegionPhotoResponse;
@@ -23,6 +24,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Objects;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -209,8 +212,8 @@ public class TourismRegionPhotoService {
                 return existing.map(TourismRegionPhotoResponse::from);
             }
 
-            LocalDateTime checkedAt = LocalDateTime.now();
-            TourismRegionPhoto stored = existing.orElseGet(() -> new TourismRegionPhoto());
+            LocalDateTime checkedAt = LocalDateTime.now(Clock.systemDefaultZone());
+            TourismRegionPhoto stored = existing.orElseGet(TourismRegionPhoto::new);
             Candidate accepted = candidate.get();
             stored.refresh(region, accepted.contentId(), PROVIDER_NAME, accepted.workTitle(), accepted.imageUrl(),
                     SOURCE_URL, LICENSE_TYPE, checkedAt);
@@ -227,7 +230,7 @@ public class TourismRegionPhotoService {
 
     private boolean isFresh(TourismRegionPhoto photo) {
         return photo.getCheckedAt() != null
-                && photo.getCheckedAt().isAfter(LocalDateTime.now().minus(REFRESH_AFTER));
+                && photo.getCheckedAt().isAfter(LocalDateTime.now(Clock.systemDefaultZone()).minus(REFRESH_AFTER));
     }
 
     private boolean shouldBackOff(String region) {
@@ -239,33 +242,32 @@ public class TourismRegionPhotoService {
         failedRefreshes.put(region, Instant.now().plus(FAILURE_BACKOFF));
     }
 
-    private Optional<Candidate> fetchCandidate(String region) throws Exception {
+    private Optional<Candidate> fetchCandidate(String region) throws JsonProcessingException {
         List<JsonNode> listItems = requestItems(LIST_ENDPOINT, builder -> builder
                 .queryParam("areaCode", AREA_CODES.get(region))
                 .queryParam("pageNo", 1)
                 .queryParam("numOfRows", 20));
 
-        int inspected = 0;
-        for (JsonNode item : listItems) {
+        for (JsonNode item : listItems.stream()
+                .filter(candidate -> StringUtils.hasText(text(candidate, "contentid")))
+                .limit(CANDIDATE_LIMIT)
+                .toList()) {
             String contentId = text(item, "contentid");
-            if (!StringUtils.hasText(contentId)) continue;
             String fallbackTitle = text(item, "title");
             List<JsonNode> imageItems = requestItems(IMAGE_ENDPOINT, builder -> builder
                     .queryParam("contentId", contentId));
-            inspected++;
             for (JsonNode image : imageItems) {
                 String imageUrl = firstText(image, "originimgurl", "smallimageurl");
                 if (!isTypeOne(image) || !TourismImageProxyClient.isAllowedImageUrl(imageUrl)) continue;
                 String title = firstNonBlank(text(image, "imgname"), fallbackTitle, "대표 관광 사진");
                 return Optional.of(new Candidate(contentId, trim(title, 500), TourismImageProxyClient.toHttpsImageUrl(imageUrl)));
             }
-            if (inspected >= CANDIDATE_LIMIT) break;
         }
         return Optional.empty();
     }
 
     private List<JsonNode> requestItems(String endpoint, java.util.function.UnaryOperator<UriComponentsBuilder> extra)
-            throws Exception {
+            throws JsonProcessingException {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(endpoint)
                 .queryParam("serviceKey", encodedServiceKey())
                 .queryParam("MobileOS", "ETC")
@@ -281,7 +283,7 @@ public class TourismRegionPhotoService {
                 : URLEncoder.encode(serviceKey, StandardCharsets.UTF_8);
     }
 
-    private List<JsonNode> parseItems(String body) throws Exception {
+    private List<JsonNode> parseItems(String body) throws JsonProcessingException {
         if (body == null || !body.stripLeading().startsWith("{")) {
             throw new IllegalStateException("Tourism API did not return JSON");
         }
@@ -333,5 +335,22 @@ public class TourismRegionPhotoService {
     private record CachedImage(String imageUrl, ImagePayload payload, Instant expiresAt) { }
     private record ImageFailure(String imageUrl, Instant retryAt) { }
 
-    public record ImagePayload(byte[] bytes, MediaType contentType) { }
+    public record ImagePayload(byte[] bytes, MediaType contentType) {
+        @Override
+        public boolean equals(Object other) {
+            return this == other || other instanceof ImagePayload(var imageBytes, var imageContentType)
+                    && Arrays.equals(bytes, imageBytes)
+                    && Objects.equals(contentType, imageContentType);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType);
+        }
+
+        @Override
+        public String toString() {
+            return "ImagePayload[byteCount=" + (bytes == null ? 0 : bytes.length) + ", contentType=" + contentType + "]";
+        }
+    }
 }

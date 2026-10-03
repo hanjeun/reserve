@@ -9,7 +9,7 @@ class ChatImageResponseTest {
         var response = ChatImageController.imageResponse(new ChatImageService.ImageContent(new byte[]{1}, "image/png"));
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
         assertThat(response.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
-        assertThat(response.getHeaders().getContentType().toString()).isEqualTo("image/png");
+        assertThat(response.getHeaders().getContentType()).hasToString("image/png");
         assertThat(response.getHeaders().getFirst("Content-Disposition")).isEqualTo("inline; filename=chat-image");
     }
 }

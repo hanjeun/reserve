@@ -1,6 +1,7 @@
 package kr.it.reserve.tourism.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,8 @@ import java.net.URI;
 import java.net.URLConnection;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
 
@@ -36,6 +39,7 @@ public class TourismImageProxyClient {
 
     private final ConnectionFactory connectionFactory;
 
+    @Autowired
     public TourismImageProxyClient() {
         this(uri -> {
             URLConnection connection = uri.toURL().openConnection();
@@ -59,13 +63,9 @@ public class TourismImageProxyClient {
                     configure(connection);
                     int status = connection.getResponseCode();
                     if (REDIRECT_STATUSES.contains(status)) {
-                        if (redirects == MAX_REDIRECTS) return Optional.empty();
-
-                        String location = connection.getHeaderField("Location");
-                        if (location == null || location.isBlank()) return Optional.empty();
-                        URI redirected = current.resolve(location);
-                        if (!isAllowedImageUri(redirected)) return Optional.empty();
-                        current = redirected;
+                        Optional<URI> redirected = resolveRedirect(connection, current, redirects);
+                        if (redirected.isEmpty()) return Optional.empty();
+                        current = redirected.get();
                         continue;
                     }
 
@@ -82,6 +82,16 @@ public class TourismImageProxyClient {
             log.warn("Tourism image proxy failed: errorType={}", exception.getClass().getSimpleName());
         }
         return Optional.empty();
+    }
+
+    private static Optional<URI> resolveRedirect(HttpsURLConnection connection, URI current, int redirects) {
+        if (redirects == MAX_REDIRECTS) return Optional.empty();
+
+        String location = connection.getHeaderField("Location");
+        if (location == null || location.isBlank()) return Optional.empty();
+        URI redirected = current.resolve(location);
+        if (!isAllowedImageUri(redirected)) return Optional.empty();
+        return Optional.of(redirected);
     }
 
     private void configure(HttpsURLConnection connection) throws IOException {
@@ -202,5 +212,22 @@ public class TourismImageProxyClient {
         HttpsURLConnection open(URI uri) throws IOException;
     }
 
-    record FetchedImage(byte[] bytes, MediaType contentType) { }
+    record FetchedImage(byte[] bytes, MediaType contentType) {
+        @Override
+        public boolean equals(Object other) {
+            return this == other || other instanceof FetchedImage(var imageBytes, var imageContentType)
+                    && Arrays.equals(bytes, imageBytes)
+                    && Objects.equals(contentType, imageContentType);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType);
+        }
+
+        @Override
+        public String toString() {
+            return "FetchedImage[byteCount=" + (bytes == null ? 0 : bytes.length) + ", contentType=" + contentType + "]";
+        }
+    }
 }

@@ -1,0 +1,129 @@
+Source archive: https://repo.maven.apache.org/maven2/com/bucket4j/bucket4j-core/8.10.1/bucket4j-core-8.10.1-sources.jar
+SHA-256: fb9270f4aef9d0688e12f9b83553fe2bc1fa0c15bd98894579c3f19b489ef4dc
+
+Files: io/github/bucket4j/AbstractBucket.java, io/github/bucket4j/Bandwidth.java, io/github/bucket4j/BlockingBucket.java, io/github/bucket4j/BlockingStrategy.java, io/github/bucket4j/Bucket.java, io/github/bucket4j/BucketState.java, io/github/bucket4j/ConsumptionProbe.java, io/github/bucket4j/EstimationProbe.java, io/github/bucket4j/SchedulingBucket.java, io/github/bucket4j/distributed/AsyncBucketProxy.java, io/github/bucket4j/distributed/proxy/RecoveryStrategy.java, io/github/bucket4j/distributed/remote/RemoteBucketState.java, io/github/bucket4j/distributed/remote/commands/CreateSnapshotCommand.java, io/github/bucket4j/distributed/remote/commands/EstimateAbilityToConsumeCommand.java, io/github/bucket4j/distributed/remote/commands/GetAvailableTokensCommand.java, io/github/bucket4j/distributed/remote/commands/ReserveAndCalculateTimeToSleepCommand.java, io/github/bucket4j/distributed/remote/commands/SyncCommand.java, io/github/bucket4j/local/LockFreeBucket.java, io/github/bucket4j/local/SynchronizedBucket.java, io/github/bucket4j/local/ThreadUnsafeBucket.java
+/*-
+ * ========================LICENSE_START=================================
+ * Bucket4j
+ * %%
+ * Copyright (C) 2015 - 2020 Vladimir Bukhtoyarov
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================LICENSE_END==================================
+ */
+
+Files: io/github/bucket4j/BucketConfiguration.java, io/github/bucket4j/BucketExceptions.java, io/github/bucket4j/BucketListener.java, io/github/bucket4j/BucketState64BitsInteger.java, io/github/bucket4j/ConfigurationBuilder.java, io/github/bucket4j/LimitChecker.java, io/github/bucket4j/MathType.java, io/github/bucket4j/Nothing.java, io/github/bucket4j/Refill.java, io/github/bucket4j/SimpleBucketListener.java, io/github/bucket4j/TimeMeter.java, io/github/bucket4j/TokensInheritanceStrategy.java, io/github/bucket4j/UninterruptibleBlockingStrategy.java, io/github/bucket4j/VerboseBucket.java, io/github/bucket4j/VerboseResult.java, io/github/bucket4j/distributed/AsyncBucketProxyAdapter.java, io/github/bucket4j/distributed/AsyncVerboseBucket.java, io/github/bucket4j/distributed/BucketProxy.java, io/github/bucket4j/distributed/proxy/AbstractProxyManager.java, io/github/bucket4j/distributed/proxy/AsyncCommandExecutor.java, io/github/bucket4j/distributed/proxy/AsyncProxyManager.java, io/github/bucket4j/distributed/proxy/BucketNotFoundException.java, io/github/bucket4j/distributed/proxy/ClientSideConfig.java, io/github/bucket4j/distributed/proxy/CommandExecutor.java, io/github/bucket4j/distributed/proxy/ConfigurationNeedToBeReplacedException.java, io/github/bucket4j/distributed/proxy/DefaultAsyncBucketProxy.java, io/github/bucket4j/distributed/proxy/DefaultBucketProxy.java, io/github/bucket4j/distributed/proxy/ProxyManager.java, io/github/bucket4j/distributed/proxy/RemoteAsyncBucketBuilder.java, io/github/bucket4j/distributed/proxy/RemoteBucketBuilder.java, io/github/bucket4j/distributed/proxy/generic/compare_and_swap/AbstractCompareAndSwapBasedProxyManager.java, io/github/bucket4j/distributed/proxy/generic/compare_and_swap/AsyncCompareAndSwapOperation.java, io/github/bucket4j/distributed/proxy/generic/compare_and_swap/CompareAndSwapOperation.java, io/github/bucket4j/distributed/proxy/generic/pessimistic_locking/AbstractLockBasedProxyManager.java, io/github/bucket4j/distributed/proxy/generic/pessimistic_locking/LockBasedTransaction.java, io/github/bucket4j/distributed/proxy/generic/select_for_update/AbstractSelectForUpdateBasedProxyManager.java, io/github/bucket4j/distributed/proxy/generic/select_for_update/SelectForUpdateBasedTransaction.java, io/github/bucket4j/distributed/proxy/optimization/DefaultOptimizationListener.java, io/github/bucket4j/distributed/proxy/optimization/DelayParameters.java, io/github/bucket4j/distributed/proxy/optimization/NopeOptimizationListener.java, io/github/bucket4j/distributed/proxy/optimization/Optimization.java, io/github/bucket4j/distributed/proxy/optimization/OptimizationListener.java, io/github/bucket4j/distributed/proxy/optimization/Optimizations.java, io/github/bucket4j/distributed/proxy/optimization/PredictionParameters.java, io/github/bucket4j/distributed/proxy/optimization/batch/AsyncBatchingExecutor.java, io/github/bucket4j/distributed/proxy/optimization/batch/BatchingExecutor.java, io/github/bucket4j/distributed/proxy/optimization/batch/BatchingOptimization.java, io/github/bucket4j/distributed/proxy/optimization/delay/DelayOptimization.java, io/github/bucket4j/distributed/proxy/optimization/delay/DelayedCommandExecutor.java, io/github/bucket4j/distributed/proxy/optimization/manual/ManuallySyncingCommandExecutor.java, io/github/bucket4j/distributed/proxy/optimization/manual/ManuallySyncingOptimization.java, io/github/bucket4j/distributed/proxy/optimization/predictive/PredictiveCommandExecutor.java, io/github/bucket4j/distributed/proxy/optimization/predictive/PredictiveOptimization.java, io/github/bucket4j/distributed/proxy/optimization/predictive/Sampling.java, io/github/bucket4j/distributed/proxy/optimization/skiponzero/SkipSyncOnZeroCommandExecutor.java, io/github/bucket4j/distributed/proxy/optimization/skiponzero/SkipSyncOnZeroOptimization.java, io/github/bucket4j/distributed/remote/AbstractBinaryTransaction.java, io/github/bucket4j/distributed/remote/BucketNotFoundError.java, io/github/bucket4j/distributed/remote/CommandError.java, io/github/bucket4j/distributed/remote/CommandResult.java, io/github/bucket4j/distributed/remote/ConfigurationNeedToBeReplacedError.java, io/github/bucket4j/distributed/remote/MultiResult.java, io/github/bucket4j/distributed/remote/MutableBucketEntry.java, io/github/bucket4j/distributed/remote/RemoteCommand.java, io/github/bucket4j/distributed/remote/RemoteStat.java, io/github/bucket4j/distributed/remote/RemoteVerboseResult.java, io/github/bucket4j/distributed/remote/Request.java, io/github/bucket4j/distributed/remote/UnsupportedNamedTypeError.java, io/github/bucket4j/distributed/remote/UnsupportedTypeError.java, io/github/bucket4j/distributed/remote/UsageOfObsoleteApiError.java, io/github/bucket4j/distributed/remote/UsageOfUnsupportedApiError.java, io/github/bucket4j/distributed/remote/commands/AddTokensCommand.java, io/github/bucket4j/distributed/remote/commands/CheckConfigurationVersionAndExecuteCommand.java, io/github/bucket4j/distributed/remote/commands/ConsumeAsMuchAsPossibleCommand.java, io/github/bucket4j/distributed/remote/commands/ConsumeIgnoringRateLimitsCommand.java, io/github/bucket4j/distributed/remote/commands/CreateInitialStateAndExecuteCommand.java, io/github/bucket4j/distributed/remote/commands/CreateInitialStateWithVersionOrReplaceConfigurationAndExecuteCommand.java, io/github/bucket4j/distributed/remote/commands/ForceAddTokensCommand.java, io/github/bucket4j/distributed/remote/commands/GetConfigurationCommand.java, io/github/bucket4j/distributed/remote/commands/MultiCommand.java, io/github/bucket4j/distributed/remote/commands/ReplaceConfigurationCommand.java, io/github/bucket4j/distributed/remote/commands/ResetCommand.java, io/github/bucket4j/distributed/remote/commands/TryConsumeAndReturnRemainingTokensCommand.java, io/github/bucket4j/distributed/remote/commands/TryConsumeCommand.java, io/github/bucket4j/distributed/remote/commands/VerboseCommand.java, io/github/bucket4j/distributed/serialization/DataOutputSerializationAdapter.java, io/github/bucket4j/distributed/serialization/DeserializationAdapter.java, io/github/bucket4j/distributed/serialization/InternalSerializationHelper.java, io/github/bucket4j/distributed/serialization/PrimitiveSerializationHandles.java, io/github/bucket4j/distributed/serialization/SerializationAdapter.java, io/github/bucket4j/distributed/serialization/SerializationHandle.java, io/github/bucket4j/distributed/serialization/SerializationHandles.java, io/github/bucket4j/distributed/versioning/BackwardCompatibilityException.java, io/github/bucket4j/distributed/versioning/UnsupportedNamedTypeException.java, io/github/bucket4j/distributed/versioning/UnsupportedTypeException.java, io/github/bucket4j/distributed/versioning/UsageOfObsoleteApiException.java, io/github/bucket4j/distributed/versioning/UsageOfUnsupportedApiException.java, io/github/bucket4j/distributed/versioning/Version.java, io/github/bucket4j/distributed/versioning/Versions.java, io/github/bucket4j/local/LocalBucket.java, io/github/bucket4j/local/LocalBucketBuilder.java, io/github/bucket4j/local/SynchronizationStrategy.java, io/github/bucket4j/util/ComparableByContent.java
+/*-
+ * ========================LICENSE_START=================================
+ * Bucket4j
+ * %%
+ * Copyright (C) 2015 - 2020 Vladimir Bukhtoyarov
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================LICENSE_END==================================
+ */
+
+Files: io/github/bucket4j/Experimental.java, io/github/bucket4j/distributed/AsyncOptimizationController.java, io/github/bucket4j/distributed/OptimizationController.java
+/*-
+ * ========================LICENSE_START=================================
+ * Bucket4j
+ * %%
+ * Copyright (C) 2015 - 2021 Vladimir Bukhtoyarov
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================LICENSE_END==================================
+ */
+
+Files: io/github/bucket4j/distributed/ExpirationAfterWriteStrategy.java, io/github/bucket4j/distributed/jdbc/BucketTableSettings.java, io/github/bucket4j/distributed/jdbc/SQLProxyConfiguration.java, io/github/bucket4j/distributed/jdbc/SQLProxyConfigurationBuilder.java, io/github/bucket4j/distributed/proxy/ExecutionStrategy.java, io/github/bucket4j/distributed/proxy/ImplicitConfigurationReplacement.java, io/github/bucket4j/distributed/proxy/generic/select_for_update/LockAndGetResult.java, io/github/bucket4j/distributed/serialization/Scope.java, io/github/bucket4j/local/LocalBucketSerializationHelper.java, io/github/bucket4j/util/concurrent/batch/AsyncBatchHelper.java, io/github/bucket4j/util/concurrent/batch/BatchHelper.java
+/*-
+ * ========================LICENSE_START=================================
+ * Bucket4j
+ * %%
+ * Copyright (C) 2015 - 2022 Vladimir Bukhtoyarov
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================LICENSE_END==================================
+ */
+
+Files: io/github/bucket4j/BandwidthBuilder.java, io/github/bucket4j/distributed/jdbc/PrimaryKeyMapper.java, io/github/bucket4j/distributed/serialization/Mapper.java
+/*-
+ * ========================LICENSE_START=================================
+ * Bucket4j
+ * %%
+ * Copyright (C) 2015 - 2023 Vladimir Bukhtoyarov
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================LICENSE_END==================================
+ */
+
+Files: io/github/bucket4j/TimeoutException.java, io/github/bucket4j/distributed/expiration/BasedOnTimeForRefillingBucketUpToMaxExpirationAfterWriteStrategy.java, io/github/bucket4j/distributed/expiration/FixedTtlExpirationAfterWriteStrategy.java, io/github/bucket4j/distributed/expiration/NoneExpirationAfterWriteStrategy.java, io/github/bucket4j/distributed/proxy/Timeout.java
+/*-
+ * ========================LICENSE_START=================================
+ * Bucket4j
+ * %%
+ * Copyright (C) 2015 - 2024 Vladimir Bukhtoyarov
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================LICENSE_END==================================
+ */
+

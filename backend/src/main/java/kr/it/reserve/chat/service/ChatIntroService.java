@@ -181,19 +181,23 @@ public class ChatIntroService {
             if (item == null) throw new ChatException("질문과 답변을 입력해주세요.");
             String question = item.question() == null ? "" : item.question().replaceAll("\\s+", " ").strip();
             String answer = item.answer() == null ? "" : item.answer().replace("\r\n", "\n").strip();
-            if (question.isEmpty()) throw new ChatException("질문을 입력해주세요.");
-            if (answer.isEmpty()) throw new ChatException("답변을 입력해주세요.");
-            if (question.length() > MAX_QUESTION) {
-                throw new ChatException("질문은 " + MAX_QUESTION + "자까지 입력할 수 있습니다.");
-            }
-            if (answer.length() > MAX_ANSWER) {
-                throw new ChatException("답변은 " + MAX_ANSWER + "자까지 입력할 수 있습니다.");
-            }
+            validateItemText(question, answer);
             if (!seen.add(question.toLowerCase(Locale.ROOT))) {
                 throw new ChatException("같은 질문이 두 번 들어 있습니다.");
             }
             result.add(new ChatIntroItem(question, answer));
         }
         return List.copyOf(result);
+    }
+
+    private static void validateItemText(String question, String answer) {
+        if (question.isEmpty()) throw new ChatException("질문을 입력해주세요.");
+        if (answer.isEmpty()) throw new ChatException("답변을 입력해주세요.");
+        if (question.length() > MAX_QUESTION) {
+            throw new ChatException("질문은 " + MAX_QUESTION + "자까지 입력할 수 있습니다.");
+        }
+        if (answer.length() > MAX_ANSWER) {
+            throw new ChatException("답변은 " + MAX_ANSWER + "자까지 입력할 수 있습니다.");
+        }
     }
 }

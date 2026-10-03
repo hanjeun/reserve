@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
@@ -55,7 +55,7 @@ describe('FormDatePicker', () => {
         expect(onChange.mock.calls[0][0].map(value => value.format('D'))).toEqual(['10', '15']);
     });
 
-    it('normalizes a range when the end date is selected before the start date', async () => {
+    it('disables earlier end dates while keeping the start date editable', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         const month = dayjs().month() + 1;
@@ -63,6 +63,16 @@ describe('FormDatePicker', () => {
         render(<FormDatePicker.RangePicker onChange={onChange} />);
         await user.click(screen.getByRole('button', { name: /시작일.*종료일/ }));
         await user.click(screen.getByRole('button', { name: `${month}월 15일` }));
+        const earlierEnd = screen.getByRole('button', { name: `${month}월 10일 선택 불가` });
+        expect(earlierEnd).toBeDisabled();
+        await user.click(earlierEnd);
+        expect(screen.getByRole('button', { name: '선택 완료' })).toBeDisabled();
+        expect(onChange).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole('button', { name: `${month}월 15일 선택됨` }));
+        expect(screen.getByRole('button', { name: '선택 완료' })).toBeEnabled();
+        await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^시작일/ }));
+        expect(screen.getByRole('button', { name: `${month}월 10일` })).toBeEnabled();
         await user.click(screen.getByRole('button', { name: `${month}월 10일` }));
         await user.click(screen.getByRole('button', { name: '선택 완료' }));
 

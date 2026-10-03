@@ -10,6 +10,9 @@ import java.time.format.DateTimeFormatter;
 
 public class InquiryDto {
 
+    private InquiryDto() {
+    }
+
     @Getter
     @Setter
     @NoArgsConstructor

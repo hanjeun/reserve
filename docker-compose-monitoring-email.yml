@@ -1,0 +1,15 @@
+# Optional, version-specific alert-email appearance override. Apply with the
+# existing production base + SMTP override only after Grafana-only approval.
+# Keep ng_alert_notification.txt and all account/security emails unchanged.
+services:
+  grafana:
+    # Public URL correction was separately approved; SMTP and routing stay as-is.
+    environment:
+      GF_SERVER_ROOT_URL: https://grafana.reserve.it.kr/
+    volumes:
+      - type: bind
+        source: ./grafana/emails/ng_alert_notification.html
+        target: /usr/share/grafana/public/emails/ng_alert_notification.html
+        read_only: true
+        bind:
+          create_host_path: false

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.advertisement.service.AdPaymentService;
 import kr.it.reserve.payment.dto.PortoneWebhookSignal;
-import kr.it.reserve.advertisement.service.AdPaymentService;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
@@ -41,6 +40,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class PortoneWebhookService {
+    private static final String REFUND_ISSUE_PREFIX = "REFUND:";
+
 
     private final ObjectMapper objectMapper;
     private final AdPaymentService adPaymentService;
@@ -134,14 +135,14 @@ public class PortoneWebhookService {
                 .toList();
 
         if (unresolved.isEmpty()) {
-            recordIssue(payment, "REFUND:" + payment.getId(),
+            recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                     PaymentReconciliationIssue.IssueType.REFUND_LEDGER_MISSING,
                     "REFUND_PENDING_WITHOUT_UNRESOLVED_ATTEMPT");
             log.error("Payment is REFUND_PENDING but has no unresolved ledger entry: merchantUid={}", merchantUid);
             return;
         }
         if (unresolved.size() > 1) {
-            recordIssue(payment, "REFUND:" + payment.getId(),
+            recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                     PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                     "MULTIPLE_UNRESOLVED_REFUND_ATTEMPTS");
             log.error("Refund webhook skipped - multiple unresolved attempts: merchantUid={}, count={}",
@@ -161,7 +162,7 @@ public class PortoneWebhookService {
                 boolean accepted = paymentService.confirmPendingRefund(
                         payment.getId(), payment.refundedSoFar(), assessment.confirmedAmount(), pending.getReason());
                 if (!accepted) {
-                    recordIssue(payment, "REFUND:" + payment.getId(),
+                    recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                             PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                             "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_SUCCESS");
                     log.error("Refund webhook success conflicts with current local state: merchantUid={}", merchantUid);
@@ -178,7 +179,7 @@ public class PortoneWebhookService {
                 boolean accepted = paymentService.revertPendingRefund(
                         payment.getId(), payment.refundedSoFar(), note);
                 if (!accepted) {
-                    recordIssue(payment, "REFUND:" + payment.getId(),
+                    recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                             PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                             "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_FAILURE");
                     log.error("Refund webhook failure conflicts with current local state: merchantUid={}", merchantUid);
@@ -193,7 +194,7 @@ public class PortoneWebhookService {
                     "Refund remains pending after webhook: merchantUid={}, pgStatus={}, detailCode={}",
                     merchantUid, pgStatus, assessment.detailCode());
             case REVIEW_REQUIRED -> {
-                recordIssue(payment, "REFUND:" + payment.getId(),
+                recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                         PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                         assessment.detailCode());
                 log.error("Refund webhook requires manual reconciliation: merchantUid={}, pgStatus={}, detailCode={}",
@@ -252,7 +253,7 @@ public class PortoneWebhookService {
             PaymentReconciliationIssue.IssueType issueType,
             String detailCode) {
         try {
-            reconciliationIssueService.record(
+            reconciliationIssueService.recordIssue(
                     issueKey,
                     issueType,
                     payment.getId(),

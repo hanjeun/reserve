@@ -26,10 +26,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
@@ -49,6 +51,9 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ChatService {
+    private static final String MEMBER_VIEWER_ROLE = "MEMBER";
+    private static final String OWNER_VIEWER_ROLE = "OWNER";
+
 
     /** 한 번에 내려줄 메시지 수. 채팅은 끝에서 시작하므로 이 정도면 첫 화면이 다 찬다. */
     private static final int PAGE_SIZE = 50;
@@ -71,6 +76,10 @@ public class ChatService {
      */
     @Transactional
     public ChatRoom openMyRoom(Member member) {
+        return findOrCreateSupportRoom(member);
+    }
+
+    private ChatRoom findOrCreateSupportRoom(Member member) {
         // 회원 행을 먼저 잠그면 같은 회원의 첫 두 요청이 동시에 빈 방을 보고 중복 생성하지 못한다.
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new ChatException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -90,19 +99,19 @@ public class ChatService {
      */
     @Transactional
     public List<ChatMessageResponse> readMyMessages(Member member) {
-        ChatRoom room = openMyRoom(member);
+        ChatRoom room = findOrCreateSupportRoom(member);
         room.markRead(SenderRole.MEMBER);
         return recentWindow(room.getId(), member.getId()).messages();
     }
 
     @Transactional
     public ChatMessageResponse sendAsMember(Member member, String content) {
-        return sendAsMember(member, content, null);
+        return append(findOrCreateSupportRoom(member), SenderRole.MEMBER, member.getId(), content, null);
     }
 
     @Transactional
     public ChatMessageResponse sendAsMember(Member member, String content, String clientMessageId) {
-        ChatRoom room = openMyRoom(member);
+        ChatRoom room = findOrCreateSupportRoom(member);
         return append(room, SenderRole.MEMBER, member.getId(), content, clientMessageId);
     }
 
@@ -136,7 +145,7 @@ public class ChatService {
                 .senderMemberId(member.getId()).clientMessageId(clientMessageId).content(caption)
                 .imageKey(image.key()).imageContentType(image.contentType()).imageWidth(image.width())
                 .imageHeight(image.height()).imageBytes(image.bytes()).build());
-        room.onMessageSent(sender, LocalDateTime.now(), caption.isEmpty() ? "사진" : "사진 · " + caption);
+        room.onMessageSent(sender, LocalDateTime.now(Clock.systemDefaultZone()), caption.isEmpty() ? "사진" : "사진 · " + caption);
         return ChatMessageResponse.from(saved, member.getId());
     }
 
@@ -165,11 +174,11 @@ public class ChatService {
 
     @Transactional
     public ConversationThreadResponse openSupportConversation(Member member) {
-        ChatRoom room = openMyRoom(member);
+        ChatRoom room = findOrCreateSupportRoom(member);
         room.markRead(SenderRole.MEMBER);
         MessageWindow window = recentWindow(room.getId(), member.getId());
         return ConversationThreadResponse.from(
-                room, ConversationSummaryResponse.SUPPORT_NAME, "MEMBER", true,
+                room, ConversationSummaryResponse.SUPPORT_NAME, MEMBER_VIEWER_ROLE, true,
                 window.messages(), window.hasOlder(), window.nextBeforeId());
     }
 
@@ -190,7 +199,7 @@ public class ChatService {
         ChatRoom room = findRoom(roomId);
         assertStoreOwner(room, owner);
         MessageWindow window = recentWindow(roomId, owner.getId());
-        return ConversationThreadResponse.from(room, room.getMember().getName(), "OWNER", isStoreMessageable(room.getStoreId()),
+        return ConversationThreadResponse.from(room, room.getMember().getName(), OWNER_VIEWER_ROLE, isStoreMessageable(room.getStoreId()),
                 window.messages(), window.hasOlder(), window.nextBeforeId());
     }
 
@@ -206,6 +215,10 @@ public class ChatService {
     /** 가게 문의방은 손님·가게 조합마다 하나다. 회원 행 잠금이 첫 동시 생성을 직렬화한다. */
     @Transactional
     public ChatRoom openStoreRoom(Member member, Long storeId) {
+        return findOrCreateStoreRoom(member, storeId);
+    }
+
+    private ChatRoom findOrCreateStoreRoom(Member member, Long storeId) {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new ChatException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         return roomRepository.findStoreChatForUpdate(
@@ -226,7 +239,7 @@ public class ChatService {
 
     @Transactional
     public ConversationThreadResponse openStoreConversation(Member member, Long storeId) {
-        ChatRoom room = openStoreRoom(member, storeId);
+        ChatRoom room = findOrCreateStoreRoom(member, storeId);
         room.markRead(SenderRole.MEMBER);
         return threadForMember(room);
     }
@@ -234,7 +247,7 @@ public class ChatService {
     @Transactional
     public ChatMessageResponse sendAsMemberToStore(
             Member member, Long storeId, String content, String clientMessageId) {
-        ChatRoom room = openStoreRoom(member, storeId);
+        ChatRoom room = findOrCreateStoreRoom(member, storeId);
         findMessageableStore(storeId);
         assertNotBlocked(room);
         return append(room, SenderRole.MEMBER, member.getId(), content, clientMessageId);
@@ -276,7 +289,7 @@ public class ChatService {
         String title = room.getMember().getName();
         MessageWindow window = recentWindow(roomId, owner.getId());
         return ConversationThreadResponse.from(
-                room, title, "OWNER", isStoreMessageable(room.getStoreId()),
+                room, title, OWNER_VIEWER_ROLE, isStoreMessageable(room.getStoreId()),
                 window.messages(), window.hasOlder(), window.nextBeforeId());
     }
 
@@ -302,11 +315,15 @@ public class ChatService {
 
     @Transactional
     public List<ChatMessageResponse> readRoomAsAdmin(Long roomId) {
-        return readRoomAsAdmin(roomId, null);
+        return readSupportMessagesAsAdmin(roomId, null);
     }
 
     @Transactional
     public List<ChatMessageResponse> readRoomAsAdmin(Long roomId, Long viewerId) {
+        return readSupportMessagesAsAdmin(roomId, viewerId);
+    }
+
+    private List<ChatMessageResponse> readSupportMessagesAsAdmin(Long roomId, Long viewerId) {
         ChatRoom room = findRoomForUpdate(roomId);
         requireType(room, ChatRoom.RoomType.SUPPORT);
         room.markRead(SenderRole.ADMIN);
@@ -333,11 +350,16 @@ public class ChatService {
 
     @Transactional
     public ChatMessageResponse sendAsAdmin(Member admin, Long roomId, String content) {
-        return sendAsAdmin(admin, roomId, content, null);
+        return sendAdminMessage(admin, roomId, content, null);
     }
 
     @Transactional
     public ChatMessageResponse sendAsAdmin(
+            Member admin, Long roomId, String content, String clientMessageId) {
+        return sendAdminMessage(admin, roomId, content, clientMessageId);
+    }
+
+    private ChatMessageResponse sendAdminMessage(
             Member admin, Long roomId, String content, String clientMessageId) {
         ChatRoom room = findRoomForUpdate(roomId);
         requireType(room, ChatRoom.RoomType.SUPPORT);
@@ -377,7 +399,7 @@ public class ChatService {
         if (beforeId == null || beforeId <= 0) {
             throw new ChatException("메시지 기준값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
-        int size = Math.max(10, Math.min(requestedSize, PAGE_SIZE));
+        int size = Math.clamp(requestedSize, 10, PAGE_SIZE);
         var slice = messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(
                 roomId, beforeId, PageRequest.of(0, size));
         List<ChatMessageResponse> messages = messageResponses(slice.getContent(), viewerId).reversed();
@@ -405,12 +427,12 @@ public class ChatService {
     @Transactional
     public void markReadAsParticipant(Long roomId, Member member, String viewerRole) {
         ChatRoom room = findRoomForUpdate(roomId);
-        if ("OWNER".equalsIgnoreCase(viewerRole)) {
+        if (OWNER_VIEWER_ROLE.equalsIgnoreCase(viewerRole)) {
             assertStoreOwner(room, member);
             room.markRead(SenderRole.OWNER);
             return;
         }
-        if (!"MEMBER".equalsIgnoreCase(viewerRole)) {
+        if (!MEMBER_VIEWER_ROLE.equalsIgnoreCase(viewerRole)) {
             throw new ChatException("읽음 처리 역할이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
         if (!room.getMember().getId().equals(member.getId())) {
@@ -473,7 +495,7 @@ public class ChatService {
                 .content(trimmed)
                 .build());
 
-        room.onMessageSent(sender, LocalDateTime.now(), trimmed);
+        room.onMessageSent(sender, LocalDateTime.now(Clock.systemDefaultZone()), trimmed);
         log.info("Chat message sent: roomId={}, sender={}", room.getId(), sender);
         return messageResponses(List.of(saved), senderId).getFirst();
     }
@@ -502,7 +524,7 @@ public class ChatService {
     /** 현재 대표 사진을 한 페이지당 한 번에 읽는다. 방 생성 당시의 사진 스냅샷에 고정하지 않는다. */
     private Map<Long, String> storeImageUrls(List<ChatRoom> rooms) {
         List<Long> storeIds = rooms.stream().map(ChatRoom::getStoreId)
-                .filter(id -> id != null).distinct().toList();
+                .filter(Objects::nonNull).distinct().toList();
         if (storeIds.isEmpty()) return Map.of();
         Map<Long, String> imageUrls = new HashMap<>();
         for (Store store : storeRepository.findAllById(storeIds)) {
@@ -520,7 +542,7 @@ public class ChatService {
         Store store = room.getType() == ChatRoom.RoomType.STORE
                 ? storeRepository.findById(room.getStoreId()).orElse(null) : null;
         return ConversationThreadResponse.from(
-                room, title, "MEMBER", room.getType() == ChatRoom.RoomType.SUPPORT
+                room, title, MEMBER_VIEWER_ROLE, room.getType() == ChatRoom.RoomType.SUPPORT
                         || (store != null && !store.isDeleted() && !store.isSuspended()),
                 window.messages(), window.hasOlder(), window.nextBeforeId(),
                 store == null ? null : store.getMainImageUrl());

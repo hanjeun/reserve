@@ -126,11 +126,14 @@ public class ChatRoom {
 
     /** 목록에서만 숨긴다. 참가 권한·원장·차단 상태는 바꾸지 않는다. */
     public void setHidden(SenderRole role, boolean hidden, Long actorId, LocalDateTime at) {
-        if (role == SenderRole.MEMBER) memberHiddenAt = hidden ? at : null;
-        else if (role == SenderRole.OWNER) {
-            ownerHiddenAt = hidden ? at : null;
-            ownerHiddenByMemberId = hidden ? actorId : null;
-        } else throw new IllegalArgumentException("Only participants can hide their conversations");
+        switch (role) {
+            case MEMBER -> memberHiddenAt = hidden ? at : null;
+            case OWNER -> {
+                ownerHiddenAt = hidden ? at : null;
+                ownerHiddenByMemberId = hidden ? actorId : null;
+            }
+            case null, default -> throw new IllegalArgumentException("Only participants can hide their conversations");
+        }
         if (hidden) markRead(role);
     }
 
@@ -177,9 +180,11 @@ public class ChatRoom {
 
     /** 그 쪽이 방을 열었다 — 안 읽은 수를 0으로. */
     public void markRead(SenderRole reader) {
-        if (reader == SenderRole.ADMIN) this.adminUnread = 0;
-        else if (reader == SenderRole.OWNER) this.ownerUnread = 0;
-        else this.memberUnread = 0;
+        switch (reader) {
+            case ADMIN -> this.adminUnread = 0;
+            case OWNER -> this.ownerUnread = 0;
+            case null, default -> this.memberUnread = 0;
+        }
     }
 
     /** 한쪽이라도 차단하면 상대가 계속 보내는 우회가 없도록 양쪽 전송을 모두 멈춘다. */
@@ -195,9 +200,11 @@ public class ChatRoom {
 
     /** 서비스가 참가자 권한과 STORE 유형을 확인한 뒤 호출한다. 같은 요청은 멱등이다. */
     public void setBlocked(SenderRole role, boolean blocked, LocalDateTime at) {
-        if (role == SenderRole.MEMBER) memberBlockedAt = blocked ? at : null;
-        else if (role == SenderRole.OWNER) ownerBlockedAt = blocked ? at : null;
-        else throw new IllegalArgumentException("Only store conversation participants can block a room");
+        switch (role) {
+            case MEMBER -> memberBlockedAt = blocked ? at : null;
+            case OWNER -> ownerBlockedAt = blocked ? at : null;
+            case null, default -> throw new IllegalArgumentException("Only store conversation participants can block a room");
+        }
     }
 
     /** 저장된 요약이 없는 이전 방의 읽기 전용 미리보기에도 같은 길이 규칙을 적용한다. */

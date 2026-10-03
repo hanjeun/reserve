@@ -33,8 +33,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,8 +76,8 @@ class PaymentServiceRefundSafetyTest {
         verify(refundLedgerService).pending(
                 20L, null, "PG cancellation call outcome unknown: IllegalStateException");
         verify(refundLedgerService, never()).failed(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString());
-        verify(reconciliationIssueService).record(
+                any(), anyString());
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 10L,
@@ -108,10 +113,10 @@ class PaymentServiceRefundSafetyTest {
         verify(refundLedgerService).pending(
                 20L, "cancel-20", "PG succeeded amount does not match request");
         verify(refundLedgerService, never()).succeeded(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any());
-        verify(reconciliationIssueService).record(
+                any(),
+                any(),
+                any());
+        verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
                 10L,
@@ -156,20 +161,20 @@ class PaymentServiceRefundSafetyTest {
         when(refundAttemptRepository.existsByPaymentIdAndStatusIn(10L, RefundAttempt.UNRESOLVED))
                 .thenReturn(true);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> paymentService.refundPayment(request()))
                 .isInstanceOf(kr.it.reserve.global.error.PaymentException.class)
                 .hasMessageContaining("직전 환불 요청");
 
         verify(portoneService, never()).cancelPayment(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString());
+                anyString(),
+                any(),
+                anyString());
         verify(refundLedgerService, never()).start(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString());
+                any(),
+                anyString(),
+                any(),
+                anyString());
     }
 
     @Test
@@ -180,15 +185,15 @@ class PaymentServiceRefundSafetyTest {
         when(refundLedgerService.start(10L, MERCHANT_UID, 3_000, "예약 취소"))
                 .thenReturn(null);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> paymentService.refundPayment(request()))
                 .isInstanceOf(kr.it.reserve.global.error.PaymentException.class)
                 .hasMessageContaining("안전하게 기록하지 못했습니다");
 
         verify(portoneService, never()).cancelPayment(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString());
+                anyString(),
+                any(),
+                anyString());
     }
 
     @Test
@@ -276,9 +281,9 @@ class PaymentServiceRefundSafetyTest {
 
         verify(paymentRepository, never()).findPaidByReservationIdForUpdate(100L);
         verify(portoneService, never()).cancelPayment(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString());
+                anyString(),
+                any(),
+                anyString());
     }
 
     @Test
@@ -337,9 +342,9 @@ class PaymentServiceRefundSafetyTest {
 
         verify(paymentRepository, never()).findPaidByReservationIdForUpdate(100L);
         verify(portoneService, never()).cancelPayment(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString());
+                anyString(),
+                any(),
+                anyString());
     }
 
     @Test
@@ -359,9 +364,9 @@ class PaymentServiceRefundSafetyTest {
                 .hasMessageContaining("처리 결과를 확인하는 중");
 
         verify(portoneService, never()).cancelPayment(
-                org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString());
+                anyString(),
+                any(),
+                anyString());
     }
 
     private Member requester() {
@@ -388,9 +393,27 @@ class PaymentServiceRefundSafetyTest {
         when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(payment));
     }
 
+    @Test
+    void refundPreviewUsesPaidLedgerAmountAndRejectsAnotherCustomersReservation() {
+        Member customer = Member.builder().id(7L).role(Role.USER).build();
+        Reservation reservation = Reservation.builder().id(100L).member(customer)
+                .store(kr.it.reserve.store.entity.Store.builder().fullRefundDays(3).build())
+                .reservationDate(kr.it.reserve.global.common.ServiceTime.today().plusDays(4))
+                .depositAmount(500).build();
+        when(reservationRepository.findById(100L)).thenReturn(Optional.of(reservation));
+        Payment ledgerPayment = paidPayment();
+        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(ledgerPayment));
+        assertThat(paymentService.calculateRefundAmount(100L).getRefundAmount()).isEqualTo(10_000);
+        assertThat(paymentService.calculateRefundAmountForMember(100L, customer).getRefundAmount()).isEqualTo(10_000);
+        var stranger = Member.builder().id(8L).role(Role.USER).build();
+        assertThatThrownBy(() -> paymentService.calculateRefundAmountForMember(100L, stranger))
+                .isInstanceOf(PaymentException.class).hasMessage("본인의 예약만 조회할 수 있습니다.");
+        verifyNoInteractions(portoneService, refundLedgerService);
+    }
+
     private Payment paidPayment() {
-        Reservation reservation = org.mockito.Mockito.mock(Reservation.class);
-        org.mockito.Mockito.lenient().when(reservation.getId()).thenReturn(100L);
+        Reservation reservation = mock(Reservation.class);
+        lenient().when(reservation.getId()).thenReturn(100L);
         return Payment.builder()
                 .id(10L)
                 .reservation(reservation)

@@ -1,5 +1,6 @@
 package kr.it.reserve.global.holiday;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -125,7 +126,7 @@ public class HolidayService {
      * ⚠️ {@code _type=json} 을 줘도 <b>에러일 때는 XML 이 온다</b>(키 미등록, 트래픽 초과 등).
      * 그래서 JSON 인지부터 확인하고, 아니면 예외로 보내 위에서 빈 집합이 되게 한다.
      */
-    private Set<LocalDate> parse(String body) throws Exception {
+    private Set<LocalDate> parse(String body) throws JsonProcessingException {
         if (body == null || !body.stripLeading().startsWith("{")) {
             throw new IllegalStateException("JSON 이 아닌 응답: " + abbreviate(body));
         }

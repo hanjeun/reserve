@@ -160,8 +160,11 @@ scp scripts/verify-post-deploy-readonly.sh scripts/verify-mysql-row-lock.sh ubun
 ssh ubuntu@<server>
 sudo install -m 0755 /tmp/verify-post-deploy-readonly.sh /usr/local/bin/reserve-post-deploy-verify
 sudo install -m 0755 /tmp/verify-mysql-row-lock.sh /usr/local/bin/reserve-mysql-row-lock
-sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env /usr/local/bin/reserve-post-deploy-verify
+sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env RESERVE_VERIFY_PREVIEW_SCHEMA=1 \
+  /usr/local/bin/reserve-post-deploy-verify
 ```
+
+v2.8.4부터 `RESERVE_VERIFY_PREVIEW_SCHEMA=1`로 광고·채팅의 추가 구조도 검사해요.
 
 읽는 항목:
 
@@ -182,7 +185,7 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env /usr/local/bin/reserve-post-depl
 MySQL 행 잠금 점검은 선택한 결제 행을 약 5초간 `FOR UPDATE`로 잠가요. 트래픽이 없는 TEST 결제 ID로 승인된 점검 창에서 실행하고, 두 번째 세션이 lock wait timeout으로 막히면 통과예요.
 
 ```bash
-sudo RESERVE_VERIFY_ENV=/etc/reserve-verify.env \
+sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
   /usr/local/bin/reserve-mysql-row-lock <idle-test-payment-id>
 ```
 

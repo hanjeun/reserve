@@ -424,6 +424,10 @@ Secret으로만 전달하며 IntelliJ 실행 환경변수에는 필요하지 않
 실제 보안·신뢰성 문제를 수정한 뒤 같은 범위를 다시 분석해요. PR 분석과 dev 전체 분석은
 별개이며, Quality Gate 통과 전에는 검증 완료라고 표시하지 않아요.
 
+2026-10-03 dev `d455a1a`의 Java 포함 전체 분석은 Quality Gate `OK`, 버그·취약점 0건,
+유지보수 지적 85건이에요. 같은 소스의 main 대상 릴리스 분석도 `OK`이고 새 지적은 0건,
+변경 코드 커버리지는 81.9%예요. 유지보수 지적은 별도 검토 대상으로 남아 있어요.
+
 CI의 기존 테스트에서 JaCoCo XML과 Vitest LCOV를 만들어요. 같은 입력·도구·성공 실행·해시·
 유효기간이 검증된 보고서만 재사용하며, 검증할 수 없으면 새로 생성해요. 임계값을 낮추거나
 검사 범위를 줄여서 통과시키지 않아요.
@@ -437,15 +441,19 @@ positions를 보존하고, 네 수집원의 offset을 이어받았어요. Promta
 롤백할 때는 Alloy를 먼저 멈추고 최신 positions를 내보낸 뒤 Promtail로 돌아가요.
 
 운영 readiness와 새 앱·metrics·nginx 로그는 확인했어요. 앱·백업의 과거 조회도 유지돼요.
-새 앱 heartbeat와 새 정기 백업은 실제 생성 시각 이후에 확인해야 해요. 앱 수집 중단 알림은
-15분 주기의 `Application log heartbeat: paymentOperations=checked`가 배포되어 처음 수집된 뒤
-활성화해요. 그 전에는 조용한 정상 앱을 수집 장애로 오인하지 않게 일시 중지해요.
+2026-10-03 v2.8.4(운영 `2251a9a`)의 첫 heartbeat가 19:34:35 KST에 원본 로그와
+Loki에서 확인됐어요. 앱 수집 중단 알림의 일시 중지를 해제하고 Grafana만 재시작했으며,
+운영 UI의 Normal·health ok와 기존 9개 규칙의 보존을 확인했어요. 새 서버에 설치할 때도
+15분 주기의 `Application log heartbeat: paymentOperations=checked` 수집을 먼저 확인해요.
 기존 메일 하나를 유지하고 Resolved 발송도 켜요. 2026-10-02 Gmail 받은편지함에서
 19:13 KST 시험 Firing과 19:35 KST 결제 운영 큐 Resolved 수신을 확인했어요.
 
 앱 로그 감시 원본은 `grafana/alerts/reserve-app-log-heartbeat.json`이에요. 설치 시
 기존 Loki UID를 대입해요. 45분 동안 heartbeat가 없고 15분 더 지속되면 경고하며,
-No data·Error도 Alerting으로 처리해요. 현재 운영에는 일시 중지 상태로 설치했어요.
+No data·Error도 Alerting으로 처리해요. 현재 운영에는 활성 상태로 설치했어요.
+변경 전 규칙과 Grafana DB는 `/var/backups/reserve-scripts/20261003-before-heartbeat-enable/`에
+보존했어요. CSP는 Report-Only를 유지하며, 첫 heartbeat 시각부터 최소 7일간 수집 연속성과
+위반을 관측해요. 2026-10-10 19:34:35 KST 이전에는 7일 관측 완료로 판단하지 않아요.
 기존 9개 알림은 유지했고, 대시보드·알림 참조가 0건인 URL 없는 Prometheus만
 공식 datasource provisioning으로 제거했어요. 변경 전 Grafana DB와 복구 설정은
 `/var/backups/reserve-scripts/20261002-before-grafana-cleanup/`에 있어요.

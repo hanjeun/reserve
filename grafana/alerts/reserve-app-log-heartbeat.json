@@ -95,7 +95,7 @@
           "noDataState": "Alerting",
           "execErrState": "Alerting",
           "for": "15m",
-          "isPaused": true,
+          "isPaused": false,
           "annotations": {
             "summary": "앱 로그 수집을 확인해주세요",
             "description": "최근 45분 동안 정기 앱 로그가 보이지 않아요. 앱 상태와 원본 로그, Alloy·Loki 수집을 각각 확인해주세요. 로그가 없다는 이유만으로 앱 장애를 단정하지 않아요."

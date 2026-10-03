@@ -333,9 +333,14 @@ public class ChatService {
     /** 열린 관리자 메신저에 새 문의가 도착한 경우 별도 POST로 읽음 축을 맞춘다. */
     @Transactional
     public void markRoomReadAsAdmin(Long roomId) {
+        markRoomReadAsAdmin(roomId, null);
+    }
+
+    @Transactional
+    public void markRoomReadAsAdmin(Long roomId, Long readThroughId) {
         ChatRoom room = findRoomForUpdate(roomId);
         requireType(room, ChatRoom.RoomType.SUPPORT);
-        room.markRead(SenderRole.ADMIN);
+        markReadThrough(room, SenderRole.ADMIN, readThroughId);
     }
 
     /** 관리자 고객지원의 증분 조회. 가게 대화는 신고 문맥 조회로만 검토하고 읽음 수는 바꾸지 않는다. */
@@ -375,8 +380,8 @@ public class ChatService {
     /**
      * {@code afterId} 뒤에 온 메시지만. 화면이 3~5초마다 부른다.
      *
-     * <p>전체를 다시 받지 않는 게 요점이다 — 대화가 길어질수록 폴링 비용이 커지면
-     * 오래 쓴 사람이 벌을 받는 구조가 된다.
+     * <p>한 번에 최대 50건을 오래된 것부터 반환한다. 누적된 메시지는 마지막으로 받은
+     * 서버 ID를 다음 커서로 보내 이어받는다.
      *
      * <p><b>읽음 처리를 하지 않는다.</b> 폴링은 "화면이 살아 있다"는 뜻일 뿐,
      * 사람이 보고 있다는 뜻이 아니다. 탭을 띄워만 놓아도 안 읽은 수가 0이 되면 배지가 거짓말을 한다.
@@ -386,8 +391,9 @@ public class ChatService {
     }
 
     public List<ChatMessageResponse> getNewMessages(Long roomId, Long afterId, Long viewerId) {
-        return messageResponses(messageRepository
-                .findByRoomIdAndIdGreaterThanOrderByIdAsc(roomId, afterId == null ? 0L : afterId), viewerId);
+        var slice = messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(
+                roomId, afterId == null ? 0L : Math.max(0L, afterId), PageRequest.of(0, PAGE_SIZE));
+        return messageResponses(slice.getContent(), viewerId);
     }
 
     /** 위로 스크롤할 때만 부르는 오래된 메시지 cursor 조회. 전체 건수 집계는 하지 않는다. */
@@ -426,10 +432,15 @@ public class ChatService {
     /** 활성 화면이 새 메시지를 실제로 받은 뒤 호출한다. 회원/사장님 읽음 축을 섞지 않는다. */
     @Transactional
     public void markReadAsParticipant(Long roomId, Member member, String viewerRole) {
+        markReadAsParticipant(roomId, member, viewerRole, null);
+    }
+
+    @Transactional
+    public void markReadAsParticipant(Long roomId, Member member, String viewerRole, Long readThroughId) {
         ChatRoom room = findRoomForUpdate(roomId);
         if (OWNER_VIEWER_ROLE.equalsIgnoreCase(viewerRole)) {
             assertStoreOwner(room, member);
-            room.markRead(SenderRole.OWNER);
+            markReadThrough(room, SenderRole.OWNER, readThroughId);
             return;
         }
         if (!MEMBER_VIEWER_ROLE.equalsIgnoreCase(viewerRole)) {
@@ -438,10 +449,23 @@ public class ChatService {
         if (!room.getMember().getId().equals(member.getId())) {
             throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
         }
-        room.markRead(SenderRole.MEMBER);
+        markReadThrough(room, SenderRole.MEMBER, readThroughId);
     }
 
     // ── 내부 ────────────────────────────────────────────────────────────────
+
+    /** 송신과 같은 방 잠금 안에서 권한 확인 후 호출한다. cursor 없는 기존 요청은 전체 읽음이다. */
+    private void markReadThrough(ChatRoom room, SenderRole reader, Long readThroughId) {
+        if (readThroughId == null) {
+            room.markRead(reader);
+            return;
+        }
+        if (readThroughId == 0L) return;
+        if (readThroughId < 0L || messageRepository.findByIdAndRoomId(readThroughId, room.getId()).isEmpty()) {
+            throw new ChatException("읽음 기준값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+        }
+        room.markRead(reader, messageRepository.countUnreadAfter(room.getId(), readThroughId, reader));
+    }
 
     private ChatRoom findRoom(Long roomId) {
         return roomRepository.findById(roomId)

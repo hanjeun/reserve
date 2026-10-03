@@ -20,10 +20,9 @@ import { getDetailImageUrl } from '../../utils';
 import { formatTime } from '../../utils/date';
 import { isNearby } from '../../utils/distance';
 import { normalizeStoreRating } from '../../utils/storeRating';
-import { httpStatusOf } from '../../utils/listErrorMessage';
 import useLocationStore from '../../store/useLocationStore';
 import useMessengerStore from '../../store/useMessengerStore';
-import { breakpoints, colors, radius, fontWeight, fontSize, heights, animation, field } from '../../styles/tokens';
+import { breakpoints, colors, radius, fontWeight, fontSize, heights, animation, field, transitions } from '../../styles/tokens';
 import { VALIDATION_RULES } from '../../utils/validation';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
@@ -41,10 +40,10 @@ const GuestCountInput = ({ value = 1, onChange }) => {
         <div style={inputStyles.wrapper}>
             <span style={inputStyles.count}><RollingFieldValue value={value}>{`${value}명`}</RollingFieldValue></span>
             <div style={inputStyles.btnGroup}>
-                <button type="button" className="rsv-tap-btn" onClick={dec} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : 1 }}>
+                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={dec} disabled={value <= 1} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : undefined }}>
                     <MinusOutlined style={{ fontSize: 12 }} />
                 </button>
-                <button type="button" className="rsv-tap-btn" onClick={inc} style={inputStyles.btn}>
+                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={inc} disabled={value >= 99} style={{ ...inputStyles.btn, opacity: value >= 99 ? 0.35 : undefined }}>
                     <PlusOutlined style={{ fontSize: 12 }} />
                 </button>
             </div>
@@ -64,7 +63,7 @@ const inputStyles = {
         width: 32, height: 32, borderRadius: radius.md,
         background: colors.gray[100], border: 'none',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', color: colors.text.secondary, transition: 'background 0.15s',
+        cursor: 'pointer', color: colors.text.secondary, transition: `all ${transitions.fast} ${transitions.easing}`,
     },
 };
 
@@ -453,7 +452,7 @@ export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvai
 const TimeSlotLoading = () => (
     <LoadingStatus aria-label="예약 가능한 시간을 불러오는 중" aria-busy="true">
         <div style={timeSlotStyles.grid} aria-hidden="true">
-            {[1, 2, 3, 4].map(key => <Bone key={key} height={38} borderRadius={radius.md} />)}
+            {[1, 2, 3, 4].map(key => <Bone key={key} pageLoading={false} height={38} borderRadius={radius.md} />)}
         </div>
     </LoadingStatus>
 );
@@ -657,14 +656,16 @@ const storeDocumentDescription = (store) => {
     return `${store.name} 예약 | ${categoryPart}${addressPart}RESERVE에서 간편하게 예약하세요.`;
 };
 
-const StoreNotFound = ({ error, onRetry }) => (
+const StoreNotFound = ({ error, onRetry, onGoToList }) => (
     <DataState
         state={error ? 'error' : 'empty'}
+        requestType="detail"
         kind="store"
         subject="가게 정보"
         error={error}
         title={error ? undefined : '요청하신 가게를 찾을 수 없습니다.'}
         onRetry={error ? onRetry : undefined}
+        missingAction={<Button variant="ghost" size="sm" onClick={onGoToList}>가게 목록으로</Button>}
         style={{ marginTop: 100 }}
     />
 );
@@ -772,8 +773,6 @@ const StoreDetail = () => {
     const { isLoggedIn, user } = useAuthStore();
     const { pay, paying } = usePayment();
     const { store, loading, error, refetch } = useStoreData(validId ? id : null);
-    // 삭제·제재된 가게(404)도 "없는 가게"다. 일시 장애처럼 재시도를 권하지 않는다.
-    const notFound = !validId || httpStatusOf(error) === 404;
     const imageHint = useStoreImageHint(id);
 
     // 상세 데이터가 도착하면 이 가게의 커버 이미지 비율도 적어둔다 (2026-07 추가).
@@ -834,7 +833,7 @@ const StoreDetail = () => {
     );
     if (!store) return (
         <PageContainer size={containerSize} paddingTop={paddingTop}>
-            <StoreNotFound error={notFound ? undefined : error} onRetry={refetch} />
+            <StoreNotFound error={error} onRetry={refetch} onGoToList={() => navigate('/stores')} />
         </PageContainer>
     );
 

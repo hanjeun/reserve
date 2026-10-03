@@ -43,6 +43,10 @@
 - `deploy-backend`는 공개 가게 목록 GET 준비 확인(2회 연속 2.5초 미만)이 실패하면 구 운영 경로를 유지해요.
 - Actions는 전체 커밋 SHA로 고정해요.
 - CI에서만 Vitest/Playwright 워커를 2개 써요(로컬은 1개). Playwright trace는 첫 재시도에만 수집해요.
+- 2026-10-04부터 Sonar 자동 실행과 커버리지 80% 목표를 맞추기 위한 반복 테스트·빌드·PR을 중지해요.
+  일반 CI는 커버리지 계측 없이 기존 테스트를 실행하고 필수 빌드·보안 검사는 유지해요.
+  `.github/workflows/sonar.yml`은 요청한 수동 `workflow_dispatch` 정적 분석에만 사용해요.
+  분석 입력을 컴파일하지만 테스트 실행이나 커버리지 수집을 추가하지 않아요.
 
 ### 테스트 증거 재사용
 
@@ -52,6 +56,17 @@
 - 조건이 맞지 않거나 오류가 나면 정상 테스트 실행으로 돌아가요.
 - 재사용 대상은 백엔드 unit/Spring-H2와 프론트 unit/PC·모바일 Chromium 검사예요. build와 운영 smoke는 매번 실행해요.
 - 수동 `workflow_dispatch` 또는 저장소 변수 `CI_FORCE_TESTS=true`는 재사용을 꺼요. 테스트 환경 설정이 바뀌면 `CI_TEST_CONFIG_REVISION`을 올려요.
+
+### API v1과 프론트 동시 릴리스
+
+다음 API v1 전환 릴리스는 같은 SHA의 백엔드와 프론트를 함께 배포해요.
+백엔드는 기존 `/api/*`와 `/api/v1/*`를 같은 컨트롤러·권한·본문 계약으로 제공하고,
+CI 프론트 빌드는 `VITE_API_VERSION=v1`을 사용해 공통 axios 요청 관문에서 경로를 전환해요.
+새 백엔드 준비 확인 후 그 릴리스의 프론트를 활성화하는 기존 원자적 배포 순서를 유지해요.
+이 정책은 아래 v2.8.5 운영 이력에 API v1 전환이 이미 완료됐다는 뜻이 아니에요.
+
+기존 `/api/*`는 열린 구 화면·PG 웹훅·CSP 수집과 호환되도록 유지해요.
+OAuth·헬스 체크 경로는 그대로이며, 지원하지 않는 숫자 API 버전은 JSON 404를 반환해요.
 
 ### nginx 지연 로그
 
@@ -217,10 +232,19 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
 3. 수동 시나리오를 모두 통과하고 **최소 7일** 동안 설명되지 않는 위반이 없으면 헤더명에서 `-Report-Only`를 지우는 별도 PR을 만들어요.
 4. 경고가 있으면 필요한 출처만 해당 지시문에 추가해요. script-src에는 `unsafe-inline`을 넣지 않아요.
 
-### 4-2. 가게 검색 FULLTEXT (활성화 보류)
+### 4-2. 가게 검색 FULLTEXT 후보 방식
 
-격리 MySQL 8.0.45에서 다중 단어와 `%` 검색의 결과 차이가 발견돼 `fulltext-enabled=false`를 유지해요.
-검색 결과의 동등성을 먼저 해결한 뒤, 승인된 DDL 계정으로 인덱스를 추가하고 별도 배포로 켜요.
+10/2 격리 MySQL 8.0.45의 순수 MATCH 실험은 다중 단어와 `%` 결과 차이 때문에 당시 활성화를 보류했어요.
+새 구현은 기본 `fulltext-enabled=true`지만 MySQL·ngram 크기 2·정확한 다섯 컬럼의 ngram 인덱스를
+처음 한 번 확인한 뒤에만 MATCH 후보를 사용해요. 후보에 원문 LIKE와 같은 공개 필터·정렬을 적용하고,
+독립 repeatable-read 조회에서 count가 같을 때만 반환해요. 누락·미설치·실행 오류는 LIKE로 돌아가요.
+동등성용 LIKE count 비용을 유지하므로 속도 향상을 약속하지 않아요.
+
+2026-10-04 02:30:57 KST 전후 승인된 `reserve_ddl` 계정으로 운영 `ft_store_search` ngram 인덱스를 설치했어요.
+ngram 크기 2·InnoDB·정확한 다섯 컬럼의 FULLTEXT와 기존 가게 3행 유지, MATCH 실행 성공을 확인했어요
+(해당 조회 0행). 원래 구조·행의 보호된 백업과 적용 이력은 [`manual-ddl.md`](manual-ddl.md)에 있어요.
+현재 v2.8.5의 검색 동작은 유지하며, 새 후보 검색 기능의 활성화는 다음 v2.8.6 배포 예정이에요.
+미설치 판정은 캐시하므로 실행 중 설치했다면 새 앱 기동 때 다시 탐지해요.
 실행 SQL과 접속 절차는 [`manual-ddl.md`](manual-ddl.md)를 따라요. 백업 계정으로 관리자 SQL에 접속하지 않아요.
 
 ### 4-3. nginx 로그 수집

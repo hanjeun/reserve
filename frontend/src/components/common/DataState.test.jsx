@@ -25,12 +25,27 @@ describe('DataState', () => {
     });
 
     it('uses a lock icon for a permission failure without exposing a server message', () => {
-        const { container } = render(<DataState state="error" subject="회원 목록"
-            error={{ status: 403, message: 'private permission trace' }} />);
+        const { container } = render(<DataState state="error" requestType="detail" subject="가게 정보"
+            error={{ status: 403, message: 'private permission trace' }} onRetry={vi.fn()} />);
 
         expect(screen.getByRole('alert')).toHaveTextContent('권한');
         expect(screen.queryByText('private permission trace')).not.toBeInTheDocument();
         expect(container.querySelector('.anticon-lock')).toBeTruthy();
+        expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeInTheDocument();
+    });
+
+    it.each([404, 410])('offers navigation instead of retry for detail status %s', (status) => {
+        const goToList = vi.fn();
+        const { container } = render(<DataState state="error" requestType="detail" kind="store" subject="가게 정보"
+            error={{ response: { status }, message: 'private missing trace' }} onRetry={vi.fn()}
+            missingAction={<button onClick={goToList}>가게 목록으로</button>} />);
+
+        expect(screen.getByRole('alert')).toHaveTextContent(status === 404 ? '찾을 수 없습니다' : '더 이상 볼 수 없습니다');
+        expect(screen.getByRole('alert')).not.toHaveTextContent('목록이 비어 있는');
+        expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+        expect(container.querySelector('.anticon-file-unknown')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: '가게 목록으로' }));
+        expect(goToList).toHaveBeenCalledOnce();
     });
 
     it('keeps the refresh arrow and rotates it while a retry request is in flight', () => {

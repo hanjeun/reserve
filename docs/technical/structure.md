@@ -244,12 +244,22 @@ StatCard, UnreadPill, pickerSuffix, index.js`
 - 프론트 `useRouteSeo`도 같은 공개 집합(`/`, `/stores`, 숫자형 `/store/:id`, `/terms`, `/privacy`, `/content-sources`, `/operation-guide`)만 `index, follow`로 두고 나머지는 `noindex, nofollow`예요.
 - canonical과 `og:url`에는 쿼리·해시를 넣지 않아요.
 
+## API 버전과 URL 복구
+
+- `ApiVersionConfiguration`은 기존 `/api/...` 컨트롤러의 같은 동작을 `/api/v1/...`에도 매핑해요. 기존 주소는 유지하고 요청 URI를 내부적으로 바꾸지 않아요.
+- `ApiPaths`가 공개·관리자·CSRF 경로의 두 버전을 함께 확장해요. `/api/v2/...`처럼 지원하지 않는 숫자 버전은 인증 화면 대신 JSON 404로 끝나요. OAuth 진입·콜백과 `/actuator/health`는 기존 경로를 유지해요.
+- 프론트 `apiVersion.js`는 `VITE_API_VERSION=v1`일 때 `/api/...` 요청에 v1을 붙여요. 인증·세션 판정에는 `canonicalApiPath`를 사용하며 legacy·v1 요청도 같은 갱신 대기열을 공유해요.
+- 로컬 기본값은 `legacy`예요. CI의 운영 빌드는 `v1`을 넣고, v1을 지원하는 백엔드와 같은 릴리스에서 함께 전환해요. 구 백엔드만 실행하는 로컬 환경은 `legacy`를 유지해요.
+- `/stores`, `/my-stores`, `/my-favorites`, `/my-reservations`의 쿼리는 `normalizeListQueryParams` 관문에서 지원 옵션으로 정리해요. 알 수 없는 키·빈 값·잘못된 정렬·중복 옵션·유효하지 않은 좌표를 제거하고 보기 기본값을 보충해요. 알려진 지역 별칭과 `utm_*`의 지정 키·`gclid`·`fbclid`는 유지해요. 잘못된 옵션 하나 때문에 정상 목록을 오류 화면으로 바꾸지 않아요.
+- 상세 조회의 삭제·없는 대상(404/410)은 대상 없음 안내와 목록 이동을 제공해요. 목록 API 404는 기능 경로 실패로 구분하고, 네트워크·403·5xx는 해당 실패 안내와 재시도를 제공해요. `DataState`의 `requestType="detail"` 계약을 사용해요.
+
 ## 환경변수
 
 ### 프론트엔드 (`frontend/.env.local`)
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
+VITE_API_VERSION=legacy
 VITE_PORTONE_CHANNEL_KEY=your_channel_key
 VITE_SKELETON_DELAY=0
 ```

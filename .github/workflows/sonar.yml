@@ -1,18 +1,11 @@
 name: Sonar CI
-run-name: >-
-  ${{ github.event_name == 'pull_request' && format('코드 분석 · PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title) || format('전체 코드 분석 · {0}', github.ref_name) }}
 
+# Static analysis is opt-in. Coverage targets do not trigger tests or block delivery.
 on:
-  push:
-    branches: [dev]
-  pull_request:
-    branches: [dev, main]
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
   group: sonar-${{ github.ref }}
@@ -20,15 +13,7 @@ concurrency:
 
 jobs:
   analyze:
-    # Enable after SONAR_TOKEN is registered and automatic analysis is disabled.
-    # Fork code never receives the analysis credential.
-    if: >-
-      vars.SONAR_CI_ENABLED == 'true' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
-    env:
-      NODE_V8_COVERAGE: ${{ github.workspace }}/coverage/tooling-v8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,82 +33,9 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew classes testClasses --console=plain
-      - name: Restore verified backend coverage
-        id: backend_coverage
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
-          CI_REQUIRE_COVERAGE: 'true'
-          CI_COVERAGE_WAIT_SECONDS: ${{ github.event_name == 'pull_request' && '900' || '0' }}
-        run: node scripts/ci-evidence.mjs restore backend
-      - name: Restore verified frontend coverage
-        id: frontend_coverage
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          CI_TEST_CONFIG_REVISION: ${{ vars.CI_TEST_CONFIG_REVISION }}
-          CI_REQUIRE_COVERAGE: 'true'
-          CI_COVERAGE_WAIT_SECONDS: ${{ github.event_name == 'pull_request' && '900' || '0' }}
-        run: node scripts/ci-evidence.mjs restore frontend
-      - name: Generate backend coverage when no reusable report exists
-        if: steps.backend_coverage.outputs.reused != 'true'
-        working-directory: backend
-        run: ./gradlew -I ../scripts/coverage.init.gradle test jacocoTestReport --console=plain
       - name: Install frontend analysis tools
         working-directory: frontend
         run: npm ci
-      - name: Generate frontend coverage when no reusable report exists
-        if: steps.frontend_coverage.outputs.reused != 'true'
-        working-directory: frontend
-        run: npm run test:coverage
-      - name: Collect coverage from the build and evidence tools
-        run: |
-          npm run test:policy --prefix frontend
-          npm run build --prefix frontend -- --configLoader native
-          node frontend/node_modules/c8/bin/c8.js report --temp-directory coverage/tooling-v8 --reporter lcov --reports-dir coverage/tooling --all --src scripts --src frontend/scripts --include 'scripts/**/*.mjs' --include 'frontend/scripts/**/*.mjs'
-      - name: Collect Python operations coverage
-        run: |
-          python3 -B - <<'PY'
-          import dis
-          from pathlib import Path
-          import runpy
-          import trace
-          from types import CodeType
-          import xml.etree.ElementTree as ET
-
-          root = Path.cwd()
-          source = root / "scripts/export-alloy-positions.py"
-          tracer = trace.Trace(count=True, trace=False)
-          try:
-              tracer.runfunc(runpy.run_path, "scripts/tests/export-alloy-positions_test.py", run_name="__main__")
-          except SystemExit as result:
-              if result.code not in (None, 0):
-                  raise
-
-          def executable_lines(code):
-              lines = {line for _, line in dis.findlinestarts(code) if line is not None and line > 0}
-              for constant in code.co_consts:
-                  if isinstance(constant, CodeType):
-                      lines.update(executable_lines(constant))
-              return lines
-
-          lines = executable_lines(compile(source.read_text(encoding="utf-8"), str(source), "exec"))
-          counts = {line: hits for (filename, line), hits in tracer.results().counts.items()
-                    if Path(filename).resolve() == source}
-          covered = sum(counts.get(line, 0) > 0 for line in lines)
-          coverage = ET.Element("coverage", {"version": "1", "lines-valid": str(len(lines)),
-                                "lines-covered": str(covered), "line-rate": str(covered / len(lines))})
-          ET.SubElement(ET.SubElement(coverage, "sources"), "source").text = str(root)
-          package = ET.SubElement(ET.SubElement(coverage, "packages"), "package", name="scripts")
-          classes = ET.SubElement(package, "classes")
-          item = ET.SubElement(classes, "class", name=source.stem, filename="scripts/export-alloy-positions.py")
-          report_lines = ET.SubElement(item, "lines")
-          for line in sorted(lines):
-              ET.SubElement(report_lines, "line", number=str(line), hits=str(counts.get(line, 0)))
-          output = root / "backend/build/reports/python/coverage.xml"
-          output.parent.mkdir(parents=True, exist_ok=True)
-          ET.ElementTree(coverage).write(output, encoding="utf-8", xml_declaration=True)
-          print(f"Python operations coverage: {covered}/{len(lines)} executable lines")
-          PY
       - name: Analyze backend and frontend
         working-directory: backend
         env:

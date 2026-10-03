@@ -57,9 +57,10 @@ const RollingFieldValue = ({ value, children, modalOpen = false }) => {
 
 const layer = { gridArea: '1 / 1', backfaceVisibility: 'hidden' };
 const styles = {
-    surface: { display: 'inline-grid', overflow: 'hidden', maxWidth: '100%', verticalAlign: 'bottom', perspective: '300px', fontVariantNumeric: 'tabular-nums' },
+    // 이전 값은 크기 계산에서 빼고, 값 교체의 레이아웃·페인트 범위를 이 칸 안에 둔다.
+    surface: { position: 'relative', display: 'inline-grid', contain: 'layout paint', overflow: 'hidden', maxWidth: '100%', verticalAlign: 'bottom', perspective: '300px', fontVariantNumeric: 'tabular-nums' },
     layer,
-    previous: { ...layer, visibility: 'hidden', pointerEvents: 'none' },
+    previous: { ...layer, position: 'absolute', inset: 0, whiteSpace: 'nowrap', visibility: 'hidden', pointerEvents: 'none' },
 };
 
 RollingFieldValue.propTypes = {

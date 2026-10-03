@@ -4,6 +4,23 @@ import api from '../api/axios';
 
 vi.mock('../api/axios', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 describe('chat transport contracts', () => {
+    it('sends the received cursor for each reader while preserving legacy read calls', () => {
+        api.post.mockClear();
+        chatService.markRead(10, 'MEMBER', 51);
+        chatService.markRead(10, 'OWNER', 0);
+        chatService.markAdminSupportRead(11, 72);
+        chatService.markRead(10, 'MEMBER');
+        chatService.markAdminSupportRead(11);
+        expect(api.post.mock.calls).toEqual([
+            ['/api/chat/rooms/10/read', undefined, { params: { viewerRole: 'MEMBER', readThroughId: 51 } }],
+            ['/api/chat/rooms/10/read', undefined, { params: { viewerRole: 'OWNER', readThroughId: 0 } }],
+            ['/api/admin/chat/rooms/11/read', undefined, { params: { readThroughId: 72 } }],
+            ['/api/chat/rooms/10/read', undefined, { params: { viewerRole: 'MEMBER' } }],
+            ['/api/admin/chat/rooms/11/read'],
+        ]);
+        api.post.mockClear();
+    });
+
     it('opens rooms with explicit POST writes, not GET reads', () => {
         chatService.getSupport(); chatService.getStore(5); chatService.getStoreInboxRoom(6); chatService.getAdminSupportRoom(7);
         expect(api.post.mock.calls.map(([path]) => path)).toEqual([

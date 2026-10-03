@@ -267,15 +267,19 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(document.querySelectorAll('.reserve-benefit-thumbnail')).toHaveLength(1);
     });
 
-    it('distinguishes a real detail 404 without retrying or presenting stale news', async () => {
-        benefitService.getDetail.mockRejectedValue(Object.assign(new Error('not public'), { status: 404 }));
+    it.each([404, 410, 403])('does not automatically retry permanent detail status %s and keeps a safe fallback', async (status) => {
+        benefitService.getDetail.mockRejectedValue(Object.assign(new Error('not public'), { response: { status } }));
         renderPage('/benefits/7');
 
-        await screen.findByText('현재 공개된 가게 소식이 아니에요.');
+        await screen.findByText(status === 403 ? '가게 소식을 불러오지 못했어요.' : '현재 공개된 가게 소식이 아니에요.');
         expect(benefitService.getDetail).toHaveBeenCalledWith('7', expect.any(AbortSignal));
         expect(benefitService.getDetail).toHaveBeenCalledTimes(1);
-        expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '소식 목록으로' })).toHaveAttribute('href', '/benefits');
+        if (status === 403) {
+            expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeInTheDocument();
+        } else {
+            expect(screen.queryByRole('button', { name: '다시 불러오기' })).not.toBeInTheDocument();
+            expect(screen.getByRole('link', { name: '소식 목록으로' })).toHaveAttribute('href', '/benefits');
+        }
     });
 
     it('permits explicit detail retry and renders only original text and guarded store photo', async () => {

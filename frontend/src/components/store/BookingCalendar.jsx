@@ -47,7 +47,7 @@ import { Form, Modal } from 'antd';
 import { LeftOutlined, RightOutlined, DoubleLeftOutlined, DoubleRightOutlined, CalendarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useBookingCalendar } from '../../hooks';
-import { colors, radius, fontSize, fontWeight, animation, field } from '../../styles/tokens';
+import { colors, radius, fontSize, fontWeight, animation, field, transitions } from '../../styles/tokens';
 import { DataState } from '../common';
 import { Bone } from '../common/Skeletons';
 
@@ -214,7 +214,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
             return (
                 <LoadingStatus aria-label="예약 가능한 날짜를 불러오는 중" aria-busy="true">
                     <div style={styles.grid} aria-hidden="true">
-                        {cells.map(cell => cell.blank ? <span key={cell.key} /> : <Bone key={cell.date.format('YYYY-MM-DD')} height={40} borderRadius={radius.md} />)}
+                        {cells.map(cell => cell.blank ? <span key={cell.key} /> : <Bone key={cell.date.format('YYYY-MM-DD')} pageLoading={false} height={40} borderRadius={radius.md} />)}
                     </div>
                 </LoadingStatus>
             );
@@ -319,6 +319,7 @@ const styles = {
         boxSizing: 'border-box',
         border: 'none', borderRadius: field.radius, background: field.bg,
         cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        transition: `all ${transitions.fast} ${transitions.easing}`,
     },
     // 에러 링은 field.errorRing 관문 하나에서만 온다 —
     // 바로 아래 "예약 시간" 자리표시자와 같은 값을 써야 두 칸이 같은 말을 한다.

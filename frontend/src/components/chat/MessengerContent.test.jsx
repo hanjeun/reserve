@@ -26,6 +26,7 @@ vi.mock('../../services', () => ({
         sendAdminSupportRoom: vi.fn(),
         markAdminSupportRead: vi.fn(),
         pollRoom: vi.fn(),
+        pollRetractions: vi.fn(),
         getHistory: vi.fn(),
         markRead: vi.fn(),
         setBlocked: vi.fn(),
@@ -77,6 +78,7 @@ describe('MessengerContent', () => {
         chatService.pollAdminSupportRoom.mockResolvedValue([]);
         chatService.markAdminSupportRead.mockResolvedValue({});
         chatService.pollRoom.mockResolvedValue([]);
+        chatService.pollRetractions.mockResolvedValue({ messages: [], nextRevision: 0 });
         chatService.markRead.mockResolvedValue({});
         chatService.setBlocked.mockResolvedValue({ blocked: false, blockedByMe: false });
         chatService.setHidden.mockResolvedValue(null);
@@ -476,6 +478,38 @@ describe('MessengerContent', () => {
         expect(notifications[0].close).toHaveBeenCalled();
     });
 
+    it('reads through the received cursor after focus returns and retries a failed acknowledgement', async () => {
+        const focused = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+        const batch = Array.from({ length: 50 }, (_, index) => ({
+            id: index + 1, senderRole: 'ADMIN', content: `수신 ${index + 1}`, createdAt: '2026-09-12T22:00:00',
+        }));
+        chatService.pollRoom.mockResolvedValueOnce(batch).mockResolvedValue([]);
+        chatService.markRead.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({});
+        renderMessenger();
+        await screen.findByText('수신 50');
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(1));
+        expect(chatService.markRead).not.toHaveBeenCalled();
+
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(2));
+        expect(chatService.pollRoom).toHaveBeenLastCalledWith(1, 50);
+        expect(chatService.markRead).not.toHaveBeenCalled();
+
+        focused.mockReturnValue(true);
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(3));
+        expect(chatService.markRead).toHaveBeenCalledTimes(1);
+        expect(chatService.markRead).toHaveBeenLastCalledWith(1, 'MEMBER', 50);
+
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(4));
+        expect(chatService.markRead).toHaveBeenCalledTimes(2);
+        expect(chatService.markRead).toHaveBeenLastCalledWith(1, 'MEMBER', 50);
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(5));
+        expect(chatService.markRead).toHaveBeenCalledTimes(2);
+    });
+
     it('opens a deep-linked store thread and sends with a client message id', async () => {
         const user = userEvent.setup();
         chatService.getStore.mockResolvedValue({
@@ -619,6 +653,60 @@ describe('MessengerContent', () => {
 
         await waitFor(() => expect(chatService.getHistory).toHaveBeenCalledWith(1, 51, 50));
         expect(screen.getByText('이전 메시지')).toBeInTheDocument();
+        expect(screen.getByText('최근 메시지')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '이전 메시지 보기' })).not.toBeInTheDocument();
+    });
+
+    it('retries stale history once and keeps its cursor available after another retraction', async () => {
+        const user = userEvent.setup();
+        let resolveFirst;
+        let resolveRetry;
+        const firstRequest = new Promise(resolve => { resolveFirst = resolve; });
+        const retryRequest = new Promise(resolve => { resolveRetry = resolve; });
+        const cancelled = {
+            id: 1, senderRole: 'ADMIN', content: '전송이 취소된 메시지입니다.',
+            retracted: true, retractionRevision: 1, createdAt: '2026-09-01T09:00:00',
+        };
+        chatService.getSupport.mockResolvedValue({
+            roomId: 1, type: 'SUPPORT', title: 'RESERVE 고객지원', viewerRole: 'MEMBER', canSend: true,
+            hasOlderMessages: true, nextBeforeId: 51,
+            messages: [{ id: 51, senderRole: 'MEMBER', content: '최근 메시지', createdAt: '2026-09-12T22:00:00' }],
+        });
+        chatService.getHistory
+            .mockReturnValueOnce(firstRequest)
+            .mockReturnValueOnce(retryRequest)
+            .mockResolvedValue({ hasMore: false, nextBeforeId: 1, messages: [cancelled] });
+        renderMessenger();
+        await screen.findByText('최근 메시지');
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(1));
+        await user.click(screen.getByRole('button', { name: '이전 메시지 보기' }));
+
+        chatService.pollRetractions.mockResolvedValue({ messages: [cancelled], nextRevision: 1 });
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(2));
+        await act(async () => resolveFirst({
+            hasMore: false, nextBeforeId: 1,
+            messages: [{ ...cancelled, content: '폐기할 과거 원문', retracted: false, retractionRevision: null }],
+        }));
+        expect(chatService.getHistory).toHaveBeenCalledTimes(2);
+        expect(chatService.getHistory).toHaveBeenNthCalledWith(2, 1, 51, 50);
+        expect(screen.queryByText('폐기할 과거 원문')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '이전 메시지 보기' })).toBeDisabled();
+
+        chatService.pollRetractions.mockResolvedValue({
+            messages: [{ ...cancelled, id: 2, retractionRevision: 2 }], nextRevision: 2,
+        });
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        await waitFor(() => expect(chatService.pollRetractions).toHaveBeenCalledTimes(3));
+        await act(async () => resolveRetry({ hasMore: false, nextBeforeId: 1, messages: [cancelled] }));
+        expect(chatService.getHistory).toHaveBeenCalledTimes(2);
+        expect(screen.getByRole('button', { name: '이전 메시지 보기' })).toBeEnabled();
+        expect(screen.queryByText('전송이 취소된 메시지입니다.')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: '이전 메시지 보기' }));
+        expect(chatService.getHistory).toHaveBeenNthCalledWith(3, 1, 51, 50);
+        expect(await screen.findByText('전송이 취소된 메시지입니다.')).toBeInTheDocument();
+        expect(screen.queryByText('폐기할 과거 원문')).not.toBeInTheDocument();
         expect(screen.getByText('최근 메시지')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '이전 메시지 보기' })).not.toBeInTheDocument();
     });

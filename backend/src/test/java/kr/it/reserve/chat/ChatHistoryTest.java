@@ -18,11 +18,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.SliceImpl;
 
 import java.util.List;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class ChatHistoryTest {
@@ -48,6 +50,28 @@ class ChatHistoryTest {
         assertThat(result.getMessages()).extracting("id").containsExactly(2L, 3L);
         assertThat(result.getNextBeforeId()).isEqualTo(2L);
         assertThat(result.isHasMore()).isTrue();
+    }
+
+    @Test
+    void pollsBoundedBatchesWithoutSkippingTheNextMessage() {
+        Member member = Member.builder().id(7L).build();
+        ChatRoom room = ChatRoom.builder().id(11L).member(member).build();
+        PageRequest page = PageRequest.of(0, 50);
+        List<ChatMessage> batch = LongStream.rangeClosed(51, 100)
+                .mapToObj(id -> message(id, room, "메시지" + id)).toList();
+        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(11L, 50L, page))
+                .thenReturn(new SliceImpl<>(batch, page, true));
+        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(11L, 100L, page))
+                .thenReturn(new SliceImpl<>(List.of(message(101L, room, "다음 메시지"))));
+
+        var first = chatService.getNewMessages(11L, 50L);
+        var next = chatService.getNewMessages(11L, first.getLast().getId());
+
+        assertThat(first).hasSize(50);
+        assertThat(first).extracting("id").startsWith(51L).endsWith(100L);
+        assertThat(next).extracting("id").containsExactly(101L);
+        verify(messageRepository).findByRoomIdAndIdGreaterThanOrderByIdAsc(11L, 50L, page);
+        verify(messageRepository).findByRoomIdAndIdGreaterThanOrderByIdAsc(11L, 100L, page);
     }
 
     private ChatMessage message(Long id, ChatRoom room, String content) {

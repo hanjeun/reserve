@@ -13,7 +13,7 @@ import { chatService } from '../../services';
  * 기본 문답 4개)이 칸에 채워져 있고, 고쳐서 저장하면 그 내용이 메신저 전체(헤더·목록·답변 말풍선)에 쓰인다.
  */
 export default function SupportIntroTab() {
-    const { intro, isLoading, isError, isFetching, refetch } = useChatIntro('support');
+    const { intro, isLoading, isError, error, isFetching, refetch } = useChatIntro('support');
     const queryClient = useQueryClient();
     const { message } = useMessage();
 
@@ -33,7 +33,7 @@ export default function SupportIntroTab() {
             return <ChatIntroEditorSkeleton />;
         }
         if (isError) {
-            return <DataState state="error" kind="message" subject="채팅 설정" onRetry={refetch} retrying={isFetching} compact />;
+            return <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error} onRetry={refetch} retrying={isFetching} compact />;
         }
         return (
             <ChatIntroEditor

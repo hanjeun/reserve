@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { currentSession, assertCurrentSession, StaleSessionError } from './sessionScope';
 import { skeletonDelayInterceptor } from '../utils/skeletonDelay';
+import { canonicalApiPath, versionedApiUrl } from './apiVersion';
 
 const instance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -27,7 +28,10 @@ const AUTH_BYPASS_ROUTES = [
     '/api/email',
 ];
 
-const isAuthEndpoint = (url) => AUTH_BYPASS_ROUTES.some(route => url?.includes(route));
+const isAuthEndpoint = (url) => {
+    const path = canonicalApiPath(url);
+    return AUTH_BYPASS_ROUTES.some(route => path === route || path.startsWith(`${route}/`));
+};
 
 // 상태 코드별 기본 에러 메시지
 const getStatusMessage = (status) => {
@@ -56,7 +60,7 @@ const handle401 = async (originalRequest) => {
         // 이전 계정의 refresh 실패가 새 계정을 로그아웃시키거나 요청을 재전송하면 안 된다.
         assertCurrentSession(scope);
         if (error?.status !== 401 && error?.status !== 403) throw error;
-        if (!originalRequest.url?.includes('/api/member/me')) {
+        if (canonicalApiPath(originalRequest.url) !== '/api/member/me') {
             localStorage.removeItem('auth-storage');
             if (!globalThis.location.pathname.includes('/login')) globalThis.location.href = '/login';
         }
@@ -73,6 +77,7 @@ instance.interceptors.request.use(
         config._sessionEpoch ??= session.epoch;
         assertCurrentSession(config._sessionEpoch);
         config.signal = config.signal ? AbortSignal.any([config.signal, session.signal]) : session.signal;
+        config.url = versionedApiUrl(config.url);
         await skeletonDelayInterceptor(config);
         assertCurrentSession(config._sessionEpoch);
         if (!(config.data instanceof FormData)) {
@@ -108,7 +113,7 @@ instance.interceptors.response.use(
             originalRequest &&
             !originalRequest._retry &&
             !originalRequest.skipAuthRefresh &&
-            !originalRequest.url?.includes('/api/auth/refresh') &&
+            canonicalApiPath(originalRequest.url) !== '/api/auth/refresh' &&
             !isAuthEndpoint(originalRequest.url)
         ) {
             return handle401(originalRequest);

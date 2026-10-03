@@ -170,7 +170,7 @@ const ChatReportsPanel = () => {
         }
         if (contextQuery.isError) {
             return (
-                <DataState state="error" kind="message" subject="신고된 대화 내용" error={contextQuery.error}
+                <DataState state="error" requestType="detail" kind="message" subject="신고된 대화 내용" error={contextQuery.error}
                     onRetry={contextQuery.refetch} retrying={contextQuery.isFetching} compact />
             );
         }

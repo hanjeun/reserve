@@ -82,12 +82,19 @@ public class AuthApiController {
         }
 
         String email = normalizeEmail(loginRequest.get("email"));
-        String rawPassword = loginRequest.getOrDefault("password", "");
+        String suppliedPassword = loginRequest.get("password");
+        // JSON의 명시적 null도 누락과 같은 실패 입력으로 처리한다. BCrypt는 null에 예외를 던진다.
+        String rawPassword = suppliedPassword == null ? "" : suppliedPassword;
 
         // ── 계정 단위 제한 ────────────────────────────────────────────────
         // IP 기준(위)만으로는 공격자가 프록시로 IP 를 돌리면 한 계정에 무제한 시도가 된다.
-        // 여기서 "소모"는 하지 않고, 아래에서 **검증에 실패했을 때만** 소모한다.
-        // (성공한 로그인이 카운터를 쓰면 기기 여러 대를 쓰는 정상 사용자가 걸린다)
+        // 검증 전에 1회를 예약해야 한도를 소진한 계정의 비밀번호 대조도 멈춘다.
+        // 성공하면 예약한 1회만 반환하므로 기존 실패 횟수는 유지된다.
+        if (!rateLimiter.tryConsume(email, RateLimiter.Policy.LOGIN_ACCOUNT)) {
+            log.warn("Login failed: accountQuotaLeft=false");
+            throw new AuthException(
+                    "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
 
         // ── ★ 응답을 갈라놓지 않는다 (user enumeration 차단) ──────────────
         // 예전에는 세 갈래였다:
@@ -113,16 +120,12 @@ public class AuthApiController {
         boolean authenticated = member != null && member.getPassword() != null && passwordMatches;
 
         if (!authenticated) {
-            // 실패한 시도만 계정 카운터를 소모한다.
-            boolean accountQuotaLeft = rateLimiter.tryConsume(email, RateLimiter.Policy.LOGIN_ACCOUNT);
             // 알림 규칙이 쓰는 "Login failed" 문구는 유지하되 이메일·IP는 로그에 남기지 않는다.
-            log.warn("Login failed: accountQuotaLeft={}", accountQuotaLeft);
-            if (!accountQuotaLeft) {
-                throw new AuthException(
-                        "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
-            }
+            log.warn("Login failed: accountQuotaLeft=true");
             throw new AuthException(LOGIN_FAILED_MESSAGE, HttpStatus.UNAUTHORIZED);
         }
+
+        rateLimiter.refund(email, RateLimiter.Policy.LOGIN_ACCOUNT);
 
         // 자격 증명 검증 통과 후 정지 여부 확인 — 정지 회원은 토큰 발급 없이 로그인 자체를 차단
         // (소셜 로그인의 URL 리다이렉트 방식과 달리, 여기는 일반 JSON 응답이라

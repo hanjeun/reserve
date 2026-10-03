@@ -30,54 +30,62 @@
 
 ## 1. 가게 검색 FULLTEXT 인덱스 (ngram)
 
-가게 키워드 검색이 `store` 풀스캔 없이 인덱스를 타게 해요.
+가게 검색에서 FULLTEXT로 후보를 좁히되 기존 LIKE 검색 결과·필터·정렬을 유지해요.
+동등성 확인용 LIKE count도 실행하므로 전체 검색의 속도 향상을 보장하지 않아요.
 
 ### DDL
 
 ```sql
 -- ① ngram 파서 확인 (한글은 단어 경계가 없어 기본 파서로는 색인되지 않는다)
-SHOW VARIABLES LIKE 'ngram_token_size';        -- 기본 2. 이 값이 최소 검색어 길이가 된다.
+SHOW VARIABLES LIKE 'ngram_token_size';        -- 현재 후보 구현은 2일 때만 FULLTEXT를 사용한다.
 
 -- ② 인덱스 생성
 --    MATCH() 대상 컬럼 목록과 FULLTEXT 인덱스 정의가 일치해야 한다.
---    StoreRepository.searchStoresFulltextPaged 의 MATCH(...) 와 함께 관리한다.
+--    StoreSearchSpecification.withFulltextCandidate 의 MATCH 대상과 함께 관리한다.
 ALTER TABLE store
   ADD FULLTEXT INDEX ft_store_search (store_name, description, address, category, keywords)
   WITH PARSER ngram;
 
 -- ③ 확인
 SHOW INDEX FROM store WHERE Index_type = 'FULLTEXT';
+SHOW CREATE TABLE store;                       -- 다섯 컬럼과 WITH PARSER ngram 확인
 ```
 
-### 적용 후 켜기
+### 적용 후 자동 선택과 폴백
 
-DDL과 검색 계약 검증을 마친 뒤 별도 승인으로 `application-prod.yml`에서 켜요.
-아래 격리 검증에서 검색 결과 차이가 발견되어 현재는 활성화를 보류해요.
+현재 구현의 `search.store.fulltext-enabled` 기본값은 `true`예요. 명시적으로 `false`를 지정하면
+탐지 없이 LIKE를 사용해요. `true`여도 무조건 MATCH를 실행하지 않아요.
 
-```yaml
-search:
-  store:
-    fulltext-enabled: true
-```
+- `StoreFulltextSearch`가 MySQL, `ngram_token_size=2`, MATCH 대상 다섯 컬럼의 정확한
+  FULLTEXT 인덱스와 `WITH PARSER ngram`을 처음 한 번 확인해요.
+- H2·인덱스 미설치·파서/토큰 크기 불일치·탐지 실패는 LIKE로 처리하고 탐지를 반복하지 않아요.
+- 사용 불가 판정을 캐시하므로 실행 중 인덱스를 설치했으면 새 앱 기동으로 다시 확인해요.
+  인덱스는 승인된 `reserve_ddl` 계정으로 설치하고, 설정 주석을 푸는 별도 작업은 필요하지 않아요.
 
 ### 확인 방법
 
 ```sql
--- 풀스캔이 사라졌는지: type=fulltext, key=ft_store_search 가 나와야 한다
+-- 인덱스 접근 확인용. 앱의 원문 LIKE·count·정렬 동등성을 증명하는 쿼리는 아니다.
 EXPLAIN SELECT * FROM store
  WHERE MATCH(store_name, description, address, category, keywords)
-       AGAINST('+강남' IN BOOLEAN MODE);
+       AGAINST('+"강남"' IN BOOLEAN MODE);
 ```
 
 ### 검색 코드 규칙
 
-- LIKE와 FULLTEXT 모두 `deleted_at IS NULL AND status = 'ACTIVE'`를 적용하고, 내용 쿼리와 count 조건을 맞춰요.
-- 별점·리뷰·최신순은 DB 전체 정렬 후 페이지예요. 동점은 `store_id DESC`로 고정해요.
+- FULLTEXT 후보는 원문에 있는 연속 두 글자의 문자·숫자로 만들어요. 한글 두 글자를 우선하고,
+  연산자나 여러 단어를 새 검색 의미로 해석하지 않아요. 두 글자 후보가 없는 짧은 문자·기호 검색은 LIKE예요.
+- `StoreSearchSpecification.withFulltextCandidate`는 기존 공개 Specification에 MATCH를 **AND**해요.
+  원문 LIKE의 연속 문구와 `%`·`_`·escape 문자 그대로의 검색 조건을 함께 유지해요.
+- LIKE와 후보 모두 `deleted_at IS NULL AND status = 'ACTIVE'`, 분야·지역·거리 후보를 공유해요.
+  유효 배지 우선과 별점·리뷰·최신·추천·거리순을 DB 전체 정렬 후 페이지로 반환하며,
+  동점은 `store_id DESC`로 고정해요. 분야·지역이 있는 검색도 같은 후보 경로를 사용할 수 있어요.
 - 거리순은 1,000km bounding-box 좌표 후보만 DB에서 고르고, cosine 내림차순·`store_id DESC`로 정렬해요.
-- 1글자 토큰·BOOLEAN 연산자를 걷어 낸 뒤 빈 검색어는 LIKE로 돌아가요.
-- LIKE의 `%`·`_`·escape 문자는 문자 그대로 검색해요.
-- 짧은 토큰 분기는 `ngram_token_size=2`를 전제로 해요.
-- 분야·지역·추천·거리 조건이 있으면 LIKE Specification 경로를 써요.
+- 독립 `REPEATABLE_READ` 읽기 트랜잭션에서 원문 LIKE count와 후보 페이지의 전체 개수를 비교해요.
+  후보는 LIKE 결과의 부분집합이므로 개수가 같을 때만 후보 페이지를 사용해요.
+  불용어·콜레이션 등의 차이로 누락되면 같은 스냅샷의 LIKE 페이지로 돌아가요.
+- MATCH 실행 오류는 독립 트랜잭션 종료 후 LIKE로 폴백하고, 해당 앱 실행 중 FULLTEXT를 비활성화해
+  반복 오류를 막아요. 응답 DTO도 독립 트랜잭션 안에서 변환해요.
 
 참고 문서: [MySQL FULLTEXT 제한](https://dev.mysql.com/doc/refman/8.0/en/fulltext-restrictions.html),
 [ngram 파서](https://dev.mysql.com/doc/refman/8.0/en/fulltext-search-ngram.html).
@@ -86,20 +94,38 @@ EXPLAIN SELECT * FROM store
 
 H2에서는 LIKE·분야·지역·추천·거리 후보/정렬·205건 페이지 경계를 확인했고, FULLTEXT는 Mockito로 호출 계약을 확인했다.
 2026-10-02에는 네트워크·포트가 없는 격리 **MySQL 8.0.45 / ngram_token_size=2**에서 합성 215행으로
-현재 StoreRepository의 FULLTEXT 내용/count SQL을 실행했다. LIKE는 현재 Specification의 조건·정렬을 SQL로 재현했다.
+당시 StoreRepository의 순수 MATCH 내용/count SQL을 실행했다. LIKE는 당시 Specification의 조건·정렬을 SQL로 재현했다.
 사진·공방 단일 검색어 × 최신·리뷰·별점순 6조합에서 삭제/정지 제외, 유효 배지 우선, 동점 ID 내림차순,
 20행씩 깊은 페이지의 중복·누락·count를 대조했다. `EXPLAIN`의 `fulltext / ft_store_search`와
 `EXPLAIN ANALYZE` 실행, MATCH 컬럼 불일치의 1191 오류도 확인했다.
 
-**전체 검색 결과 동등성은 성립하지 않는다.** `강남 사진`은 LIKE의 연속 문구 1행과 달리
+**당시 순수 MATCH의 전체 검색 결과 동등성은 성립하지 않았다.** `강남 사진`은 LIKE의 연속 문구 1행과 달리
 FULLTEXT가 순서 반전·서로 다른 컬럼의 단어까지 3행을 반환했고, `100%`도 LIKE 1행 / FULLTEXT 3행이었다.
-따라서 `search.store.fulltext-enabled`는 계속 끈다. 문구/단어·특수문자 검색 계약을 먼저 확정하고,
-실제 앱의 Hibernate 경로와 운영 데이터 분포까지 검증한 뒤 별도 승인으로 적용한다.
-운영 DDL은 실행하지 않았다. 격리 데이터와 컨테이너는 검증 후 제거했다.
+이 결과로 당시 `search.store.fulltext-enabled=false`를 유지하고 활성화를 보류했다.
+당시 운영 DDL은 실행하지 않았다. 격리 데이터와 컨테이너는 검증 후 제거했다.
 
 같은 격리 엔진에서 경쟁 행 잠금의 1205 오류, deadlock의 단일 1213 victim과 양쪽 rollback을 확인했다.
 ALTER TABLE은 앞선 DML까지 암묵적으로 commit하므로 ROLLBACK으로 되돌릴 수 없다는 점도 실증했다.
 DDL 변경의 복구에는 별도의 역방향 DDL·복원 절차가 필요하다.
+
+### 2026-10-04 후보 방식 구현과 운영 인덱스 적용
+
+통합 구현은 위 순수 MATCH 대체 방식을 사용하지 않는다. 후보 MATCH에 원문 LIKE를 함께 적용하고,
+같은 읽기 스냅샷의 count가 다르면 LIKE로 돌아가도록 검색 관문을 변경했다.
+다중 단어·기호의 기존 검색 의미를 유지하는 방식이며, 10/2 실험의 결과 차이를 없었던 일로 보지 않는다.
+
+운영 DDL 직전 `ngram_token_size=2`, InnoDB, `store` 3행과 FULLTEXT 인덱스 미설치를 확인했다.
+제한된 `reserve_app` 계정으로 원래 테이블 구조·행을 백업하고, 승인된 `reserve_ddl` 계정으로
+`ft_store_search (store_name, description, address, category, keywords) WITH PARSER ngram`을 생성했다.
+백업은 `/var/backups/reserve-manual/store-fulltext-20261003T173057Z/store.sql`에 보존한다
+(6,904바이트, root 소유, 파일 권한 600). 백업 원문은 문서나 실행 로그에 출력하지 않는다.
+
+| 적용 시각 | 변경 | 확인 결과 |
+|---|---|---|
+| 2026-10-04 02:30:57 KST 전후 (UTC 2026-10-03 17:30:57) | `reserve_ddl`로 다섯 컬럼의 `ft_store_search` ngram FULLTEXT 생성 | 정확한 다섯 컬럼의 FULLTEXT 인덱스 확인, 기존 3행 유지, MATCH 실행 성공(해당 조회 0행) |
+
+현재 운영 v2.8.5의 검색 동작은 유지한다. 새 앱의 후보 검색 기능은 아직 배포 전이며,
+다음 v2.8.6 배포에서 활성화할 예정이다. 인덱스 설치 성공을 새 후보 검색의 운영 검증으로 대신하지 않는다.
 
 
 ## 1-b. 가게 거리순 bounding-box 후보 인덱스

@@ -80,6 +80,7 @@ export default function useChatIntro(scope, { enabled = true } = {}) {
         intro: normalizeChatIntro(query.data, fallback),
         isLoading: query.isLoading,
         isError: query.isError,
+        error: query.error,
         isFetching: query.isFetching,
         refetch: query.refetch,
     };

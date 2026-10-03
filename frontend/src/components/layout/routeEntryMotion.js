@@ -6,6 +6,20 @@ export const getRouteHistoryIndex = () => {
 };
 
 const isSearchPath = (pathname) => /^\/search\/?$/.test(pathname || '');
+export const clearRouteEntryMotion = content => {
+    content?.classList.remove('reserve-route-entry--from-right', 'reserve-route-entry--from-left');
+};
+
+// 같은 화면의 view 정규화·필터 변경은 새 진입이 아니며, 진행 중인 진입을 취소하지도 않는다.
+export const applyRouteEntryMotion = (content, { pathnameChanged, direction, skeletonShown }) => {
+    if (!content || (!pathnameChanged && !skeletonShown)) return;
+    clearRouteEntryMotion(content);
+    if (direction && !skeletonShown) {
+        content.getBoundingClientRect();
+        content.classList.add('reserve-route-entry--' + direction);
+    }
+};
+
 // 자기 열기·닫기 애니메이션이 있는 화면 — 모바일 메시지(/messages)는 채팅이 열리고 닫히는 것이지 페이지 이동이 아니다.
 // 들어갈 때도 나올 때도 페이지 전환(옆으로 밀기)을 걸지 않고 화면 자체 애니메이션만 재생한다(2026-09-24).
 const hasOwnMotion = (pathname) => isSearchPath(pathname) || /^\/messages(\/|$)/.test(pathname || '');

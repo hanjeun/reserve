@@ -73,8 +73,12 @@ export default function SearchPage() {
         leaveSearch(() => navigate(destination));
     };
 
+    let motionClass = '';
+    if (isClosing) motionClass = ' reserve-search-page--leaving';
+    else if (!reducedMotion) motionClass = ' reserve-search-page--entering';
+
     return (
-        <div className={'reserve-search-page' + (isClosing ? ' reserve-search-page--leaving' : !reducedMotion ? ' reserve-search-page--entering' : '')}>
+        <div className={'reserve-search-page' + motionClass}>
             <h1 className="reserve-discovery-visually-hidden">가게 검색</h1>
             <header className="reserve-search-header">
                 <form className="reserve-search-field" role="search" onSubmit={submitSearch}>

@@ -165,6 +165,19 @@ describe('FormTimePicker', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
+    it('keeps form validation on the editable fields and the error description on the trigger', async () => {
+        const user = userEvent.setup();
+        render(<FormTimePicker.RangePicker aria-invalid="true" aria-describedby="times-error" />);
+        const trigger = screen.getByRole('button', { name: /시작 시간.*종료 시간/ });
+        expect(trigger).not.toHaveAttribute('aria-invalid');
+        expect(trigger).toHaveAttribute('aria-describedby', 'times-error');
+        await user.click(trigger);
+        for (const input of screen.getAllByRole('textbox')) {
+            expect(input).toHaveAttribute('aria-invalid', 'true');
+            expect(input).toHaveAttribute('aria-describedby', 'times-error');
+        }
+    });
+
     it('keeps the form label linked to a disabled trigger and opens no modal', async () => {
         const user = userEvent.setup();
         render(<><label htmlFor="times">영업 시간</label><FormTimePicker.RangePicker id="times" disabled /></>);

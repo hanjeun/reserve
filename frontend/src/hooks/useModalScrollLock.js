@@ -36,7 +36,7 @@ export default function useModalScrollLock() {
                 if (value) body.style.setProperty(property, value, priority);
                 else body.style.removeProperty(property);
             }
-            html.removeAttribute('data-reserve-modal-open');
+            delete html.dataset.reserveModalOpen;
             const position = saved.page === pageIdentity() ? saved : { x: 0, y: 0 };
             window.scrollTo({ left: position.x, top: position.y, behavior: 'instant' });
             saved = null;
@@ -56,7 +56,7 @@ export default function useModalScrollLock() {
             body.style.top = `${-saved.y}px`;
             body.style.left = `${-saved.x}px`;
             body.style.right = '0';
-            html.setAttribute('data-reserve-modal-open', 'true');
+            html.dataset.reserveModalOpen = 'true';
         };
 
         const onTouchStart = event => {

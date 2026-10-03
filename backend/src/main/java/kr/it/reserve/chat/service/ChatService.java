@@ -51,6 +51,9 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ChatService {
+    private static final String MEMBER_VIEWER_ROLE = "MEMBER";
+    private static final String OWNER_VIEWER_ROLE = "OWNER";
+
 
     /** 한 번에 내려줄 메시지 수. 채팅은 끝에서 시작하므로 이 정도면 첫 화면이 다 찬다. */
     private static final int PAGE_SIZE = 50;
@@ -175,7 +178,7 @@ public class ChatService {
         room.markRead(SenderRole.MEMBER);
         MessageWindow window = recentWindow(room.getId(), member.getId());
         return ConversationThreadResponse.from(
-                room, ConversationSummaryResponse.SUPPORT_NAME, "MEMBER", true,
+                room, ConversationSummaryResponse.SUPPORT_NAME, MEMBER_VIEWER_ROLE, true,
                 window.messages(), window.hasOlder(), window.nextBeforeId());
     }
 
@@ -196,7 +199,7 @@ public class ChatService {
         ChatRoom room = findRoom(roomId);
         assertStoreOwner(room, owner);
         MessageWindow window = recentWindow(roomId, owner.getId());
-        return ConversationThreadResponse.from(room, room.getMember().getName(), "OWNER", isStoreMessageable(room.getStoreId()),
+        return ConversationThreadResponse.from(room, room.getMember().getName(), OWNER_VIEWER_ROLE, isStoreMessageable(room.getStoreId()),
                 window.messages(), window.hasOlder(), window.nextBeforeId());
     }
 
@@ -286,7 +289,7 @@ public class ChatService {
         String title = room.getMember().getName();
         MessageWindow window = recentWindow(roomId, owner.getId());
         return ConversationThreadResponse.from(
-                room, title, "OWNER", isStoreMessageable(room.getStoreId()),
+                room, title, OWNER_VIEWER_ROLE, isStoreMessageable(room.getStoreId()),
                 window.messages(), window.hasOlder(), window.nextBeforeId());
     }
 
@@ -396,7 +399,7 @@ public class ChatService {
         if (beforeId == null || beforeId <= 0) {
             throw new ChatException("메시지 기준값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
-        int size = Math.max(10, Math.min(requestedSize, PAGE_SIZE));
+        int size = Math.clamp(requestedSize, 10, PAGE_SIZE);
         var slice = messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(
                 roomId, beforeId, PageRequest.of(0, size));
         List<ChatMessageResponse> messages = messageResponses(slice.getContent(), viewerId).reversed();
@@ -424,12 +427,12 @@ public class ChatService {
     @Transactional
     public void markReadAsParticipant(Long roomId, Member member, String viewerRole) {
         ChatRoom room = findRoomForUpdate(roomId);
-        if ("OWNER".equalsIgnoreCase(viewerRole)) {
+        if (OWNER_VIEWER_ROLE.equalsIgnoreCase(viewerRole)) {
             assertStoreOwner(room, member);
             room.markRead(SenderRole.OWNER);
             return;
         }
-        if (!"MEMBER".equalsIgnoreCase(viewerRole)) {
+        if (!MEMBER_VIEWER_ROLE.equalsIgnoreCase(viewerRole)) {
             throw new ChatException("읽음 처리 역할이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
         }
         if (!room.getMember().getId().equals(member.getId())) {
@@ -539,7 +542,7 @@ public class ChatService {
         Store store = room.getType() == ChatRoom.RoomType.STORE
                 ? storeRepository.findById(room.getStoreId()).orElse(null) : null;
         return ConversationThreadResponse.from(
-                room, title, "MEMBER", room.getType() == ChatRoom.RoomType.SUPPORT
+                room, title, MEMBER_VIEWER_ROLE, room.getType() == ChatRoom.RoomType.SUPPORT
                         || (store != null && !store.isDeleted() && !store.isSuspended()),
                 window.messages(), window.hasOlder(), window.nextBeforeId(),
                 store == null ? null : store.getMainImageUrl());

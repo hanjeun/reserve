@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,5 +62,35 @@ class MemberProfileImageAtomicityTest {
         verify(fileStorageService, never()).deleteFile("https://cdn.example.test/old.png");
         assertThat(member.getProfileImage())
                 .isEqualTo("https://cdn.example.test/users/7/new.png");
+    }
+
+    @Test
+    @DisplayName("프로필 삭제는 이미지 자동 복구를 잠그고 DB 저장 후 기존 파일을 outbox에 넘긴다")
+    void deletesProfileAfterSavingLockedEmptyImage() {
+        Member member = Member.builder()
+                .id(7L)
+                .name("회원")
+                .email("member@example.com")
+                .profileImage("https://cdn.example.test/old.png")
+                .build();
+        when(memberRepository.findActiveByIdForUpdate(7L)).thenReturn(Optional.of(member));
+        when(memberRepository.save(member)).thenAnswer(invocation -> {
+            assertThat(member.getProfileImage()).isNull();
+            assertThat(member.isProfileImageLocked()).isTrue();
+            return member;
+        });
+
+        var response = memberService.deleteProfileImage(7L);
+
+        InOrder order = inOrder(memberRepository, fileDeletionOutboxService);
+        order.verify(memberRepository).findActiveByIdForUpdate(7L);
+        order.verify(memberRepository).save(member);
+        order.verify(fileDeletionOutboxService).enqueue(
+                "https://cdn.example.test/old.png", "MEMBER_PROFILE_IMAGE", 7L);
+        assertThat(member.getProfileImage()).isNull();
+        assertThat(member.isProfileImageLocked()).isTrue();
+        assertThat(response.getId()).isEqualTo(7L);
+        assertThat(response.getProfileImage()).isNull();
+        verifyNoInteractions(fileStorageService);
     }
 }

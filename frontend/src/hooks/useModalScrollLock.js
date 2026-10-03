@@ -6,6 +6,8 @@ const BODY_PROPERTIES = ['position', 'top', 'left', 'right'];
 const pageIdentity = () => window.location.pathname + window.location.search;
 const isVisible = element => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
 
+const hasScrollRoom = (position, maximum, delta) => delta < 0 ? position < maximum - 1 : position > 1;
+
 const canScroll = (target, boundary, deltaX, deltaY) => {
     const vertical = Math.abs(deltaY) >= Math.abs(deltaX);
     for (let element = target; element && boundary.contains(element); element = element.parentElement) {
@@ -15,7 +17,7 @@ const canScroll = (target, boundary, deltaX, deltaY) => {
         const maximum = vertical ? element.scrollHeight - element.clientHeight : element.scrollWidth - element.clientWidth;
         const delta = vertical ? deltaY : deltaX;
         if (/auto|scroll/.test(overflow) && maximum > 1
-            && (delta < 0 ? position < maximum - 1 : position > 1)) return true;
+            && hasScrollRoom(position, maximum, delta)) return true;
         if (element === boundary) break;
     }
     return false;

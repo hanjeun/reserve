@@ -56,6 +56,9 @@ import org.springframework.data.domain.Pageable;
 @RequiredArgsConstructor
 @Service
 public class StoreService {
+    private static final String EDIT_FORBIDDEN_MESSAGE = "가게를 수정할 권한이 없습니다.";
+    private static final String DISTANCE_SORT = "distance";
+
 
     private final StoreRepository storeRepository;
     private final FileStorageService fileStorageService;
@@ -285,7 +288,7 @@ public class StoreService {
         boolean isAdmin = member.isAdmin();
         boolean isOwner = store.getOwner() != null && store.getOwner().getId().equals(member.getId());
         if (!isAdmin && !isOwner) {
-            throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
+            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
         }
         return StoreResponse.fromEntity(store);
     }
@@ -318,7 +321,7 @@ public class StoreService {
 
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
             log.error("Unauthorized store access: storeOwnerId={}, requestMemberId={}", store.getOwner().getId(), member.getId());
-            throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
+            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
         }
 
         try {
@@ -405,7 +408,7 @@ public class StoreService {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게를 수정할 권한이 없습니다.");
+            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
         }
         store.setAutoApprovalEnabled(enabled);
         return StoreResponse.fromEntity(storeRepository.save(store));
@@ -1096,7 +1099,7 @@ public class StoreService {
     private Page<Store> sortedSearch(
             String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
         String normalizedSort = normalizeSort(sort);
-        if ("distance".equals(normalizedSort) && !validCoordinates(lat, lng)) {
+        if (DISTANCE_SORT.equals(normalizedSort) && !validCoordinates(lat, lng)) {
             normalizedSort = "rating";
         }
         ServiceDomain domainFilter = ServiceDomain.parseOrNull(domain);
@@ -1106,7 +1109,7 @@ public class StoreService {
         boolean fulltextCompatible = domainFilter == null
                 && regionFilter.isEmpty()
                 && !"recommended".equals(normalizedSort)
-                && !"distance".equals(normalizedSort);
+                && !DISTANCE_SORT.equals(normalizedSort);
         if (fulltextEnabled && fulltextCompatible && !booleanQuery.isEmpty()) {
             // 네이티브 컬럼명은 JPQL 속성명과 다르다. 허용한 sort를 명시적 CASE ORDER BY에 전달한다.
             return storeRepository.searchStoresFulltextPaged(booleanQuery, normalizedSort, ServiceTime.today(), pageable);
@@ -1130,7 +1133,7 @@ public class StoreService {
     private String normalizeSort(String sort) {
         if ("reviewCount".equals(sort)) return "reviews";
         return "recommended".equals(sort) || "recent".equals(sort) || "reviews".equals(sort)
-                || "distance".equals(sort) ? sort : "rating";
+                || DISTANCE_SORT.equals(sort) ? sort : "rating";
     }
 
     /** 연산자만 있거나 색인되지 않는 짧은 토큰이 섞이면 원문 LIKE 검색으로 보낸다. */

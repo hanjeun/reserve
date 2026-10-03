@@ -23,6 +23,42 @@ const parseTypedTime = text => {
     return { hour: Number(match[1]), minute: Number(match[2]) };
 };
 
+const pickerDialogLabel = mode => {
+    let dialogLabel = '시간 선택';
+    if (mode === 'range') dialogLabel = '시간 범위 선택';
+    else if (mode === 'multiple') dialogLabel = '회차 시각 선택';
+    return dialogLabel;
+};
+const pickerInputErrors = (mode, typedRange, draftRange) => mode === 'range'
+    ? typedRange.map((text, part) => Boolean(text || draftRange[part]) && !parseTypedTime(text)) : [];
+const pickerHasValue = (mode, currentValue) => mode === 'single'
+    ? Boolean(validTime(currentValue)) : Array.isArray(currentValue) && currentValue.some(validTime);
+const pickerIconColor = (disabled, isError, hasValue) => {
+    let iconColor = field.placeholderColor;
+    if (disabled) iconColor = colors.gray[400];
+    else if (isError && !hasValue) iconColor = colors.error.main;
+    else if (hasValue) iconColor = colors.primary.main;
+    return iconColor;
+};
+const pickerValueLabel = (mode, currentValue, format, placeholder) => {
+    let label = validTime(currentValue)?.format(format) ?? placeholder ?? '시간 선택';
+    if (mode === 'multiple') {
+        const times = uniqueTimes(Array.isArray(currentValue) ? currentValue : []);
+        label = placeholder ?? '회차 시각 선택';
+        if (times.length) {
+            label = times[0].format(format);
+            if (times.length > 1) label += ` 외 ${times.length - 1}개`;
+        }
+    }
+    return label;
+};
+const pickerHintText = (hasInputError, mode) => {
+    let hintText = '위아래로 밀거나 스크롤해서 선택해주세요.';
+    if (hasInputError) hintText = '00:00부터 23:59까지 입력해주세요. 예: 1052 또는 10:52';
+    else if (mode === 'range') hintText = '숫자를 눌러 입력하거나 위아래로 밀어 선택해주세요.';
+    return hintText;
+};
+
 const FormTimePickerBase = ({
     mode, controlled, value, defaultValue, onChange, onBlur, onFocus, placeholder,
     disabled = false, format = 'HH:mm', style, id, className = '',
@@ -39,11 +75,8 @@ const FormTimePickerBase = ({
     const [draftMultiple, setDraftMultiple] = useState([]);
     const hintId = useId();
     const rangeLabels = Array.isArray(placeholder) ? placeholder : ['시작 시간', '종료 시간'];
-    let dialogLabel = '시간 선택';
-    if (mode === 'range') dialogLabel = '시간 범위 선택';
-    else if (mode === 'multiple') dialogLabel = '회차 시각 선택';
-    const inputErrors = mode === 'range'
-        ? typedRange.map((text, part) => Boolean(text || draftRange[part]) && !parseTypedTime(text)) : [];
+    const dialogLabel = pickerDialogLabel(mode);
+    const inputErrors = pickerInputErrors(mode, typedRange, draftRange);
     const hasInputError = inputErrors.some(Boolean);
 
     const closePicker = () => {
@@ -131,25 +164,12 @@ const FormTimePickerBase = ({
     };
 
     const clearValue = () => commitValue(mode === 'multiple' ? [] : null);
-    const hasValue = mode === 'single' ? Boolean(validTime(currentValue)) : Array.isArray(currentValue) && currentValue.some(validTime);
+    const hasValue = pickerHasValue(mode, currentValue);
     const isError = status === 'error';
     const fieldInvalid = ariaInvalid ?? (isError || undefined);
-    let iconColor = field.placeholderColor;
-    if (disabled) iconColor = colors.gray[400];
-    else if (isError && !hasValue) iconColor = colors.error.main;
-    else if (hasValue) iconColor = colors.primary.main;
-    let label = validTime(currentValue)?.format(format) ?? placeholder ?? '시간 선택';
-    if (mode === 'multiple') {
-        const times = uniqueTimes(Array.isArray(currentValue) ? currentValue : []);
-        label = placeholder ?? '회차 시각 선택';
-        if (times.length) {
-            label = times[0].format(format);
-            if (times.length > 1) label += ` 외 ${times.length - 1}개`;
-        }
-    }
-    let hintText = '위아래로 밀거나 스크롤해서 선택해주세요.';
-    if (hasInputError) hintText = '00:00부터 23:59까지 입력해주세요. 예: 1052 또는 10:52';
-    else if (mode === 'range') hintText = '숫자를 눌러 입력하거나 위아래로 밀어 선택해주세요.';
+    const iconColor = pickerIconColor(disabled, isError, hasValue);
+    const label = pickerValueLabel(mode, currentValue, format, placeholder);
+    const hintText = pickerHintText(hasInputError, mode);
 
     return (
         <>

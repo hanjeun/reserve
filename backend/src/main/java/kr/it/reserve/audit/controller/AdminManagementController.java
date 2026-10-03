@@ -55,7 +55,7 @@ public class AdminManagementController {
      * {@code AdminAdsTab} 이 같은 문제를 먼저 서버로 옮겼고, 여기도 같은 패턴을 따른다.
      */
     @GetMapping("/members")
-    public ApiResponse<?> getMembers(
+    public ApiResponse<Page<Map<String, Object>>> getMembers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String search
@@ -69,7 +69,7 @@ public class AdminManagementController {
                 ? memberRepository.findByDeletedAtIsNullOrderByIdDesc(pageRequest)
                 : memberRepository.searchByNameOrEmail(keyword, pageRequest);
 
-        Page<?> result = members.map(m -> Map.of(
+        Page<Map<String, Object>> result = members.map(m -> Map.<String, Object>of(
                 "id",       m.getId(),
                 "name",     m.getName() != null ? m.getName() : "",
                 "email",    m.getEmail(),
@@ -113,7 +113,7 @@ public class AdminManagementController {
     // ── 가게 목록 조회 ────────────────────────────────────────────
 
     @GetMapping("/stores")
-    public ApiResponse<?> getStores(
+    public ApiResponse<Page<StoreResponse>> getStores(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String search

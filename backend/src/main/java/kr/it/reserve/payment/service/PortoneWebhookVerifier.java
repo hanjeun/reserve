@@ -102,24 +102,28 @@ public class PortoneWebhookVerifier {
 
         // 헤더에 여러 서명이 공백으로 올 수 있다(키 교체 기간). 하나라도 맞으면 통과.
         for (String part : signatureHeader.trim().split("\\s+")) {
-            int comma = part.indexOf(',');
-            if (comma < 0) {
-                continue;
-            }
-            String version = part.substring(0, comma);
-            String value = part.substring(comma + 1);
-            if (!"v1".equals(version)) {
-                continue;   // v1a(비대칭)는 이 프로젝트에서 쓰지 않는다
-            }
-            // ★ 반드시 상수 시간 비교. equals 는 앞에서부터 비교하다 다르면 즉시 빠져나가므로
-            //   응답 시간 차이로 서명을 한 바이트씩 알아낼 수 있다(타이밍 공격).
-            if (MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
-                    value.getBytes(StandardCharsets.UTF_8))) {
+            if (matchesSignaturePart(part, expected)) {
                 return true;
             }
         }
         log.warn("PortOne webhook rejected - signature mismatch: webhookId={}", webhookId);
         return false;
+    }
+
+    private static boolean matchesSignaturePart(String part, String expected) {
+        int comma = part.indexOf(',');
+        if (comma < 0) {
+            return false;
+        }
+        String version = part.substring(0, comma);
+        String value = part.substring(comma + 1);
+        if (!"v1".equals(version)) {
+            return false;   // v1a(비대칭)는 이 프로젝트에서 쓰지 않는다
+        }
+        // ★ 반드시 상수 시간 비교. equals 는 앞에서부터 비교하다 다르면 즉시 빠져나가므로
+        //   응답 시간 차이로 서명을 한 바이트씩 알아낼 수 있다(타이밍 공격).
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+                value.getBytes(StandardCharsets.UTF_8));
     }
 
     /**

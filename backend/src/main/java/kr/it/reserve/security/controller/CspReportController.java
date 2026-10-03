@@ -23,6 +23,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CspReportController {
 
+    private static final String OTHER_CATEGORY = "other";
+
     private static final int MAX_BODY_LENGTH = 32_768;
     private static final int MAX_REPORTS_PER_REQUEST = 10;
     private static final Set<String> DIRECTIVE_CATEGORIES = Set.of(
@@ -77,7 +79,7 @@ public class CspReportController {
         String normalized = directive.toLowerCase(Locale.ROOT);
         int separator = normalized.indexOf('-');
         String category = separator < 0 ? normalized : normalized.substring(0, separator);
-        return DIRECTIVE_CATEGORIES.contains(category) ? category : "other";
+        return DIRECTIVE_CATEGORIES.contains(category) ? category : OTHER_CATEGORY;
     }
 
     private String blockedScheme(String blockedUri) {
@@ -91,7 +93,7 @@ public class CspReportController {
             if (scheme == null) return "relative";
             return switch (scheme.toLowerCase(Locale.ROOT)) {
                 case "http", "https", "data", "blob" -> scheme.toLowerCase(Locale.ROOT);
-                default -> "other";
+                default -> OTHER_CATEGORY;
             };
         } catch (IllegalArgumentException ignored) {
             return "invalid";
@@ -112,7 +114,7 @@ public class CspReportController {
                 return "browser-extension";
             }
             if (!scheme.equals("http") && !scheme.equals("https")) {
-                return scheme.isBlank() ? "relative" : "other";
+                return scheme.isBlank() ? "relative" : OTHER_CATEGORY;
             }
 
             String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);

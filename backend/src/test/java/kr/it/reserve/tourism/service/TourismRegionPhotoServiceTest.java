@@ -96,7 +96,7 @@ class TourismRegionPhotoServiceTest {
         assertThat(stored.getValue().getWorkTitle()).isEqualTo("서울 대표 관광 사진");
 
         ArgumentCaptor<URI> uri = ArgumentCaptor.forClass(URI.class);
-        verify(restTemplate, org.mockito.Mockito.times(2)).getForObject(uri.capture(), eq(String.class));
+        verify(restTemplate, times(2)).getForObject(uri.capture(), eq(String.class));
         assertThat(uri.getAllValues().getFirst().getRawQuery())
                 .contains("serviceKey=aB%2BcD%3D")
                 .doesNotContain("%25")

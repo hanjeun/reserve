@@ -101,8 +101,7 @@ class ReservationAvailabilityTest {
         // 09:00 ~ 21:00, 30분 단위 → 마지막 슬롯 20:30, 21:00은 제외
         List<String> times = availableTimes(storeWithHours(LocalTime.of(9, 0), LocalTime.of(21, 0), 30));
 
-        assertThat(times).contains("09:00", "20:30");
-        assertThat(times).doesNotContain("21:00");
+        assertThat(times).contains("09:00", "20:30").doesNotContain("21:00");
         assertThat(times.get(times.size() - 1)).isEqualTo("20:30");
     }
 
@@ -111,8 +110,7 @@ class ReservationAvailabilityTest {
         // 10:00 ~ 18:00, 60분 단위 → 마지막 슬롯 17:00, 18:00은 제외
         List<String> times = availableTimes(storeWithHours(LocalTime.of(10, 0), LocalTime.of(18, 0), 60));
 
-        assertThat(times).contains("10:00", "17:00");
-        assertThat(times).doesNotContain("18:00");
+        assertThat(times).contains("10:00", "17:00").doesNotContain("18:00");
     }
 
     @Test
@@ -121,6 +119,53 @@ class ReservationAvailabilityTest {
         List<String> times = availableTimes(storeWithHours(LocalTime.of(9, 0), LocalTime.of(9, 45), 30));
 
         assertThat(times).containsExactly("09:00");
+    }
+
+    @Test
+    void lateClosingTimesDoNotWrapPastMidnight() {
+        for (LocalTime close : List.of(LocalTime.of(23, 30), LocalTime.of(23, 59))) {
+            List<String> times = availableTimes(storeWithHours(LocalTime.of(9, 0), close, 30));
+
+            assertThat(times).hasSize(29).startsWith("09:00").endsWith("23:00");
+            assertThat(times).doesNotHaveDuplicates().doesNotContain("23:30", "00:00");
+        }
+    }
+
+    @Test
+    void slotThatWouldCrossMidnightIsExcluded() {
+        List<String> times = availableTimes(
+                storeWithHours(LocalTime.of(23, 0), LocalTime.of(23, 30), 60));
+
+        assertThat(times).isEmpty();
+    }
+
+    @Test
+    void invalidSameDayBusinessHoursYieldNoSlots() {
+        assertThat(availableTimes(storeWithHours(LocalTime.of(22, 0), LocalTime.of(2, 0), 30)))
+                .isEmpty();
+        assertThat(availableTimes(storeWithHours(LocalTime.of(9, 0), LocalTime.of(9, 0), 30)))
+                .isEmpty();
+    }
+
+    @Test
+    void lateClosingTimeStillExcludesBreakStarts() {
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(23, 30), 30);
+        store.setBreakStartTime(LocalTime.of(12, 0));
+        store.setBreakEndTime(LocalTime.of(13, 0));
+
+        assertThat(availableTimes(store)).hasSize(27).endsWith("23:00")
+                .contains("11:30", "13:00").doesNotContain("12:00", "12:30");
+    }
+
+    @Test
+    void advanceBookingLimitAlsoAppliesToAvailableTimes() {
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(11, 0), 30);
+        store.setMaxAdvanceBookingDays(29);
+
+        assertThat(availableTimes(store)).isEmpty();
+
+        store.setMaxAdvanceBookingDays(30);
+        assertThat(availableTimes(store)).containsExactly("09:00", "09:30", "10:00", "10:30");
     }
 
     // ── 예약 방식 (2026-08-24) ─────────────────────────────────────────────

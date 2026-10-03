@@ -41,6 +41,9 @@ import java.util.Map;
 @Slf4j
 public class AuditLogService {
 
+    private static final String SOFT_DELETE_ACTION = "SOFT_DELETE";
+    private static final String RESERVATION_ENTITY_TYPE = "RESERVATION";
+
     private final AuditLogRepository auditLogRepository;
     private final AdminSentMailRepository adminSentMailRepository;
     private final ReservationRepository reservationRepository;
@@ -56,7 +59,7 @@ public class AuditLogService {
         AdminSentMail mail = adminSentMailRepository.findById(mailId)
                 .orElseThrow(() -> AuditException.notFound("SentMail not found: " + mailId));
         mail.softDelete();
-        saveAuditLog("SENT_MAIL", mailId, "SOFT_DELETE",
+        saveAuditLog("SENT_MAIL", mailId, SOFT_DELETE_ACTION,
                 Map.of("toEmail", mail.getToEmail(), "subject", nullSafe(mail.getSubject())));
         log.info("SentMail soft-deleted: id={}", mailId);
     }
@@ -66,7 +69,7 @@ public class AuditLogService {
      * 사용자/사업자가 내 예약에서 삭제 시 호출
      */
     public void logReservationDelete(Reservation reservation) {
-        saveAuditLog("RESERVATION", reservation.getId(), "SOFT_DELETE", Map.of(
+        saveAuditLog(RESERVATION_ENTITY_TYPE, reservation.getId(), SOFT_DELETE_ACTION, Map.of(
                 "가게",   reservation.getStore().getName(),
                 "예약자", nullSafe(reservation.getMember().getName()),
                 "날짜",   reservation.getReservationDate().toString(),
@@ -79,7 +82,7 @@ public class AuditLogService {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> AuditException.notFound("Reservation not found: " + reservationId));
         reservation.softDelete();
-        saveAuditLog("RESERVATION", reservationId, "SOFT_DELETE", Map.of(
+        saveAuditLog(RESERVATION_ENTITY_TYPE, reservationId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   reservation.getStore().getName(),
                 "예약자", nullSafe(reservation.getMember().getName()),
                 "날짜",   reservation.getReservationDate().toString(),
@@ -93,7 +96,7 @@ public class AuditLogService {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> AuditException.notFound("Review not found: " + reviewId));
         review.softDelete();
-        saveAuditLog("REVIEW", reviewId, "SOFT_DELETE", Map.of(
+        saveAuditLog("REVIEW", reviewId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   review.getStore().getName(),
                 "작성자", nullSafe(review.getMember().getName()),
                 "별점",   review.getRating().toString() + "점",
@@ -112,7 +115,7 @@ public class AuditLogService {
         Advertisement ad = advertisementRepository.findById(adId)
                 .orElseThrow(() -> AuditException.notFound("Advertisement not found: " + adId));
         ad.softDelete();
-        saveAuditLog("ADVERTISEMENT", adId, "SOFT_DELETE", Map.of(
+        saveAuditLog("ADVERTISEMENT", adId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   ad.getStore().getName(),
                 "유형",   ad.getAdType().name(),
                 "기간",   ad.getStartDate() + " ~ " + ad.getEndDate(),
@@ -127,7 +130,7 @@ public class AuditLogService {
     public void restore(String entityType, Long entityId) {
         switch (entityType.toUpperCase()) {
             case "SENT_MAIL"      -> adminSentMailRepository.restoreById(entityId);
-            case "RESERVATION"    -> reservationRepository.restoreById(entityId);
+            case RESERVATION_ENTITY_TYPE    -> reservationRepository.restoreById(entityId);
             case "REVIEW"         -> reviewRepository.restoreById(entityId);
             case "ADVERTISEMENT"  -> advertisementRepository.restoreById(entityId);
             default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목입니다: " + entityType);
@@ -247,7 +250,7 @@ public class AuditLogService {
         String actorEmail = getCurrentUserEmail();
         String snapshot = toJson(snapshotData);
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(
-                "SOFT_DELETE".equals(action)
+                SOFT_DELETE_ACTION.equals(action)
                         ? AuditRetentionPolicy.TRASH_DAYS
                         : AuditRetentionPolicy.AUDIT_DAYS
         );

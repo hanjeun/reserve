@@ -21,13 +21,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PaymentRefundAccountingTest {
 
     private Payment paidPayment(int amount) {
-        Payment payment = Payment.builder()
+        return Payment.builder()
                 .merchantUid("test-merchant-uid")
                 .amount(amount)
                 .status(Payment.PaymentStatus.PAID)
                 .refundAmount(0)
                 .build();
-        return payment;
     }
 
     @Test

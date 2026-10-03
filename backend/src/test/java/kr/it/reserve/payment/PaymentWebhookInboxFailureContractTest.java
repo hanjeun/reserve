@@ -2,6 +2,7 @@ package kr.it.reserve.payment;
 
 import kr.it.reserve.payment.repository.PaymentWebhookInboxRepository;
 import kr.it.reserve.payment.service.PaymentWebhookInboxStateService;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -29,16 +30,15 @@ class PaymentWebhookInboxFailureContractTest {
             when(inbox.findByWebhookId(MISSING_WEBHOOK_ID)).thenReturn(Optional.empty());
         }
 
-        assertThatThrownBy(() -> {
-            switch (operation) {
-                case GET_REQUIRED -> state.getRequired(MISSING_WEBHOOK_ID);
-                case CLAIM -> state.claim(MISSING_WEBHOOK_ID);
-                case FORCE_CLAIM -> state.forceClaim(MISSING_WEBHOOK_ID);
-                case MARK_PROCESSED -> state.markProcessed(MISSING_WEBHOOK_ID);
-                case MARK_IGNORED -> state.markIgnored(MISSING_WEBHOOK_ID);
-                case MARK_FAILED -> state.markFailed(MISSING_WEBHOOK_ID, "CONTRACT_FAILURE");
-            }
-        }).isExactlyInstanceOf(IllegalStateException.class)
+        ThrowingCallable action = switch (operation) {
+            case GET_REQUIRED -> () -> state.getRequired(MISSING_WEBHOOK_ID);
+            case CLAIM -> () -> state.claim(MISSING_WEBHOOK_ID);
+            case FORCE_CLAIM -> () -> state.forceClaim(MISSING_WEBHOOK_ID);
+            case MARK_PROCESSED -> () -> state.markProcessed(MISSING_WEBHOOK_ID);
+            case MARK_IGNORED -> () -> state.markIgnored(MISSING_WEBHOOK_ID);
+            case MARK_FAILED -> () -> state.markFailed(MISSING_WEBHOOK_ID, "CONTRACT_FAILURE");
+        };
+        assertThatThrownBy(action).isExactlyInstanceOf(IllegalStateException.class)
                 .hasMessage("Webhook inbox row not found");
 
         if (lockingLookup) {

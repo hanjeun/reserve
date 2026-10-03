@@ -15,6 +15,7 @@ import java.net.SocketTimeoutException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -39,7 +40,7 @@ class TourismImageProxyClientTest {
 
         assertThat(result).hasValueSatisfying(image -> {
             assertThat(image.bytes()).containsExactly(bytes);
-            assertThat(image.contentType().toString()).isEqualTo("image/jpeg");
+            assertThat(image.contentType()).hasToString("image/jpeg");
         });
         verify(firstConnection).setInstanceFollowRedirects(false);
         verify(firstConnection).setConnectTimeout(3_000);
@@ -94,7 +95,7 @@ class TourismImageProxyClientTest {
 
         var result = new TourismImageProxyClient(connectionFactory).fetch(IMAGE_URL);
 
-        assertThat(result).hasValueSatisfying(image -> assertThat(image.contentType().toString()).isEqualTo("image/jpeg"));
+        assertThat(result).hasValueSatisfying(image -> assertThat(image.contentType()).hasToString("image/jpeg"));
     }
 
     @Test
@@ -119,8 +120,8 @@ class TourismImageProxyClientTest {
 
         assertThat(new TourismImageProxyClient(connectionFactory).fetch(IMAGE_URL)).isEmpty();
 
-        verify(connectionFactory, org.mockito.Mockito.times(4)).open(any(URI.class));
-        verify(firstConnection, org.mockito.Mockito.times(4)).disconnect();
+        verify(connectionFactory, times(4)).open(any(URI.class));
+        verify(firstConnection, times(4)).disconnect();
     }
 
     @Test

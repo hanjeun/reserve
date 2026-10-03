@@ -87,7 +87,9 @@ class ChatIntroServiceTest {
     void anotherBusinessCannotEditTheStore() {
         when(storeRepository.findById(31L)).thenReturn(Optional.of(store(31L, business(8L))));
 
-        assertThatThrownBy(() -> introService.updateStoreIntro(business(9L), 31L, request(1)))
+        Member otherOwner = business(9L);
+        ChatIntroRequest edit = request(1);
+        assertThatThrownBy(() -> introService.updateStoreIntro(otherOwner, 31L, edit))
                 .isInstanceOf(ChatException.class)
                 .satisfies(error -> assertThat(((ChatException) error).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
         verify(introRepository, never()).save(any());
@@ -98,7 +100,8 @@ class ChatIntroServiceTest {
         Member former = Member.builder().id(8L).name("회원8").email("m8@example.com").role(Role.USER).build();
         when(storeRepository.findById(31L)).thenReturn(Optional.of(store(31L, former)));
 
-        assertThatThrownBy(() -> introService.updateStoreIntro(former, 31L, request(1)))
+        ChatIntroRequest edit = request(1);
+        assertThatThrownBy(() -> introService.updateStoreIntro(former, 31L, edit))
                 .isInstanceOf(ChatException.class);
     }
 
@@ -111,7 +114,9 @@ class ChatIntroServiceTest {
         assertThatThrownBy(() -> introService.getStoreIntro(31L))
                 .isInstanceOf(ChatException.class)
                 .satisfies(error -> assertThat(((ChatException) error).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
-        assertThatThrownBy(() -> introService.updateStoreIntro(business(8L), 31L, request(1)))
+        Member owner = business(8L);
+        ChatIntroRequest edit = request(1);
+        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, edit))
                 .isInstanceOf(ChatException.class);
     }
 
@@ -120,25 +125,32 @@ class ChatIntroServiceTest {
         Member owner = business(8L);
         when(storeRepository.findById(31L)).thenReturn(Optional.of(store(31L, owner)));
 
-        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, request(6)))
+        ChatIntroRequest excessiveItems = request(6);
+        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, excessiveItems))
                 .hasMessageContaining("5개까지");
-        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, new ChatIntroRequest(null, null, null, null, List.of(
-                new ChatIntroRequest.Item("주차", "가능"), new ChatIntroRequest.Item(" 주차 ", "불가")))))
+        ChatIntroRequest duplicateQuestions = new ChatIntroRequest(null, null, null, null, List.of(
+                new ChatIntroRequest.Item("주차", "가능"), new ChatIntroRequest.Item(" 주차 ", "불가")));
+        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, duplicateQuestions))
                 .hasMessageContaining("같은 질문");
-        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, new ChatIntroRequest(null, null, null, null, List.of(
-                new ChatIntroRequest.Item("주차", "   ")))))
+        ChatIntroRequest blankAnswer = new ChatIntroRequest(null, null, null, null, List.of(
+                new ChatIntroRequest.Item("주차", "   ")));
+        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, blankAnswer))
                 .hasMessageContaining("답변을 입력");
-        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, new ChatIntroRequest(null, null, null, null, List.of(
-                new ChatIntroRequest.Item("질".repeat(41), "답")))))
+        ChatIntroRequest longQuestion = new ChatIntroRequest(null, null, null, null, List.of(
+                new ChatIntroRequest.Item("질".repeat(41), "답")));
+        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, longQuestion))
                 .hasMessageContaining("40자");
-        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, new ChatIntroRequest("공".repeat(101), null, null, null, null)))
+        ChatIntroRequest longNotice = new ChatIntroRequest("공".repeat(101), null, null, null, null);
+        assertThatThrownBy(() -> introService.updateStoreIntro(owner, 31L, longNotice))
                 .hasMessageContaining("100자");
         verify(introRepository, never()).save(any());
     }
 
     @Test
     void onlyAdminsSaveTheSupportIntro() {
-        assertThatThrownBy(() -> introService.updateSupportIntro(business(8L), request(1)))
+        Member nonAdmin = business(8L);
+        ChatIntroRequest edit = request(1);
+        assertThatThrownBy(() -> introService.updateSupportIntro(nonAdmin, edit))
                 .isInstanceOf(ChatException.class);
 
         Member admin = Member.builder().id(1L).name("관리자").email("admin@example.com").role(Role.ADMIN).build();

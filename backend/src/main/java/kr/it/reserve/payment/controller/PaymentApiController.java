@@ -29,6 +29,9 @@ import java.util.Map;
 @RequestMapping("/api/payment")
 public class PaymentApiController {
 
+    private static final String FAILED_REDIRECT_QUERY = "?success=false&merchant_uid=";
+    private static final String ERROR_MESSAGE_QUERY = "&error_msg=";
+
     private final PaymentService paymentService;
     private final PortoneService portoneService;
     private final PaymentRepository paymentRepository;
@@ -71,8 +74,8 @@ public class PaymentApiController {
         String merchantUid = paymentId;
 
         if (!isSuccess) {
-            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+            return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
+                    + ERROR_MESSAGE_QUERY + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         }
 
         try {
@@ -89,14 +92,14 @@ public class PaymentApiController {
         } catch (BusinessException e) {
             // 외부 API 래퍼의 도메인 예외에도 원문이 섞일 수 있으므로 URL에 전달하지 않는다.
             log.warn("Mobile payment redirect failed: errorType={}", e.getClass().getSimpleName());
-            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+            return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
+                    + ERROR_MESSAGE_QUERY + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
             // URL과 일반 로그에는 원문 대신 고정 문구·오류 종류만 남긴다.
             log.error("Mobile payment redirect error: errorType={}", e.getClass().getSimpleName());
-            return redirect(redirectBase + "?success=false&merchant_uid=" + enc(merchantUid)
-                    + "&error_msg=" + enc("결제 처리 중 오류가 발생했습니다."));
+            return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
+                    + ERROR_MESSAGE_QUERY + enc("결제 처리 중 오류가 발생했습니다."));
         }
     }
 

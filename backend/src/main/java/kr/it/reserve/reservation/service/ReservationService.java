@@ -32,6 +32,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -376,7 +377,7 @@ public class ReservationService {
     }
 
     /**
-     * <b>지금 실제로 고를 수 있는 시각 목록.</b> = 구조적 목록 − (이미 지난 시각) − (마감이 지난 시각)
+     * <b>지금 실제로 고를 수 있는 시각 목록.</b> = 구조적 목록 − (이미 지난 시각) − (예약 가능 기간 밖) − (마감이 지난 시각)
      *
      * <p>★ {@link #bookableSlotTimes} 와 나눠 둔 이유 — 저쪽은 <b>가게의 성질</b>이고
      * (영업시간·회차·휴무로 정해지며 "지금"과 무관하다), 이쪽은 <b>지금 시점의 사실</b>이다.
@@ -395,6 +396,11 @@ public class ReservationService {
     private List<LocalTime> bookableSlotTimesNow(Store store, LocalDate date) {
         LocalDateTime now = ServiceTime.now();
         Integer deadlineHours = store.getBookingDeadlineHours();
+        Integer maxAdvance = store.getMaxAdvanceBookingDays();
+        if (date != null && maxAdvance != null && maxAdvance > 0
+                && date.isAfter(now.toLocalDate().plusDays(maxAdvance))) {
+            return List.of();
+        }
 
         return bookableSlotTimes(store, date).stream()
                 .filter(t -> {
@@ -512,7 +518,8 @@ public class ReservationService {
         // 마지막 슬롯 + slotMin 이 close 를 넘어가면 제외한다.
         // 예) 09:00~21:00 / 30분 → 마지막 슬롯 20:30. 21:00 은 21:30 이 되어 제외.
         // (close 가 자정을 넘어가는 가게는 지원하지 않는다 — StoreService 가 저장 단계에서 거절한다.)
-        while (!cursor.plusMinutes(slotMin).isAfter(close)) {
+        // LocalTime.plusMinutes 는 자정을 돌면 00시로 돌아오므로, 남은 당일 시간을 먼저 비교한다.
+        while (Duration.between(cursor, close).toMinutes() >= slotMin) {
             boolean inBreak = hasBreak && !cursor.isBefore(breakStart) && cursor.isBefore(breakEnd);
             if (!inBreak) result.add(cursor);
             cursor = cursor.plusMinutes(slotMin);
@@ -1035,7 +1042,7 @@ public class ReservationService {
         List<Long> completedIds = reservations.stream()
                 .filter(r -> r.getStatus() == Reservation.ReservationStatus.COMPLETED)
                 .map(Reservation::getId)
-                .collect(Collectors.toList());
+                .toList();
 
         Map<Long, Long> reviewIdByReservationId = new java.util.HashMap<>();
         if (!completedIds.isEmpty()) {
@@ -1081,7 +1088,7 @@ public class ReservationService {
             Reservation.ReservationStatus status,
             Long storeId,
             String sort) {
-        int safeSize = Math.min(Math.max(size, 1), 100);
+        int safeSize = Math.clamp(size, 1, 100);
         Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize, reservationManagementSort(sort));
         String keyword = search == null ? "" : search.trim();
         if (owner.isAdmin()) {

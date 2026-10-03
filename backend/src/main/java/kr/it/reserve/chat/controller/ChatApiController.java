@@ -38,6 +38,10 @@ import org.springframework.data.domain.Page;
 @RequiredArgsConstructor
 public class ChatApiController {
 
+    private static final String LOGIN_REQUIRED_MESSAGE = "로그인이 필요합니다.";
+    private static final String QUERY_SUCCESS_MESSAGE = "조회 성공";
+    private static final String SEND_SUCCESS_MESSAGE = "전송 완료";
+
     private final ChatService chatService;
     private final ChatModerationService moderationService;
     private final RateLimiter rateLimiter;
@@ -48,7 +52,7 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<Page<ConversationSummaryResponse>>> conversations(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "false") boolean hidden) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.listMyConversations(me, page, hidden), "대화 목록 조회 성공"));
     }
@@ -56,14 +60,14 @@ public class ChatApiController {
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/support")
     public ResponseEntity<ApiResponse<ConversationThreadResponse>> support() {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(chatService.getSupportConversation(me), "고객지원 대화 조회 성공"));
     }
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/support/open")
     public ResponseEntity<ApiResponse<ConversationThreadResponse>> openSupport() {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.openSupportConversation(me), "고객지원 대화 조회 성공"));
     }
@@ -74,23 +78,23 @@ public class ChatApiController {
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
         if (!canSend(httpRequest)) return tooManyRequests();
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), "전송 완료"));
+                chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/stores/{storeId}")
     public ResponseEntity<ApiResponse<ConversationThreadResponse>> storeConversation(
             @PathVariable Long storeId) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(chatService.getStoreConversation(me, storeId), "가게 대화 조회 성공"));
     }
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/stores/{storeId}/open")
     public ResponseEntity<ApiResponse<ConversationThreadResponse>> openStoreConversation(@PathVariable Long storeId) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.openStoreConversation(me, storeId), "가게 대화 조회 성공"));
     }
@@ -102,10 +106,10 @@ public class ChatApiController {
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
         if (!canSend(httpRequest)) return tooManyRequests();
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMemberToStore(
-                        me, storeId, request.getContent(), request.getClientMessageId()), "전송 완료"));
+                        me, storeId, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -113,7 +117,7 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<Page<ConversationSummaryResponse>>> storeInbox(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "false") boolean hidden) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.listStoreInbox(me, page, hidden), "가게 받은 문의 조회 성공"));
     }
@@ -122,14 +126,14 @@ public class ChatApiController {
     @GetMapping("/store-inbox/{roomId}")
     public ResponseEntity<ApiResponse<ConversationThreadResponse>> openStoreInbox(
             @PathVariable Long roomId) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(chatService.getRoomAsOwner(me, roomId), "가게 문의 조회 성공"));
     }
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/store-inbox/{roomId}/open")
     public ResponseEntity<ApiResponse<ConversationThreadResponse>> markStoreInboxOpened(@PathVariable Long roomId) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.readRoomAsOwner(me, roomId), "가게 문의 조회 성공"));
     }
@@ -141,10 +145,10 @@ public class ChatApiController {
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
         if (!canSend(httpRequest)) return tooManyRequests();
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsOwner(
-                        me, roomId, request.getContent(), request.getClientMessageId()), "전송 완료"));
+                        me, roomId, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -152,10 +156,10 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> pollConversation(
             @PathVariable Long roomId,
             @RequestParam(required = false) Long afterId) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         chatService.assertParticipant(roomId, me);
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.getNewMessages(roomId, afterId, me.getId()), "조회 성공"));
+                chatService.getNewMessages(roomId, afterId, me.getId()), QUERY_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -164,7 +168,7 @@ public class ChatApiController {
             @PathVariable Long roomId,
             @RequestParam Long beforeId,
             @RequestParam(defaultValue = "50") int size) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         chatService.assertParticipant(roomId, me);
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.getOlderMessages(roomId, beforeId, size, me.getId()), "이전 대화 조회 성공"));
@@ -175,7 +179,7 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> markConversationRead(
             @PathVariable Long roomId,
             @RequestParam(defaultValue = "MEMBER") String viewerRole) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         chatService.markReadAsParticipant(roomId, me, viewerRole);
         return ResponseEntity.ok(ApiResponse.success(Map.of("read", true), "읽음 처리 성공"));
     }
@@ -186,7 +190,7 @@ public class ChatApiController {
             @PathVariable Long roomId,
             @RequestParam String viewerRole,
             @RequestParam(defaultValue = "true") boolean blocked) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 moderationService.setBlocked(me, roomId, viewerRole, blocked),
                 blocked ? "대화를 차단했습니다." : "대화 차단을 해제했습니다."));
@@ -196,7 +200,7 @@ public class ChatApiController {
     @PutMapping("/rooms/{roomId}/visibility")
     public ResponseEntity<ApiResponse<Void>> setVisibility(@PathVariable Long roomId,
             @RequestParam String viewerRole, @RequestParam boolean hidden) {
-        moderationService.setHidden(SecurityUtil.getCurrentMember("로그인이 필요합니다."), roomId, viewerRole, hidden);
+        moderationService.setHidden(SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), roomId, viewerRole, hidden);
         return ResponseEntity.ok(ApiResponse.success(null, hidden ? "내 목록에서 숨겼습니다." : "대화를 복원했습니다."));
     }
 
@@ -206,7 +210,7 @@ public class ChatApiController {
             @PathVariable Long roomId,
             @RequestParam String viewerRole,
             @Valid @RequestBody CreateChatReportRequest request) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         if (!rateLimiter.tryConsume("member-" + me.getId(), RateLimiter.Policy.CHAT_REPORT)) {
             return ResponseEntity.status(429)
                     .body(ApiResponse.error("신고 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
@@ -218,15 +222,15 @@ public class ChatApiController {
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/unread")
     public ResponseEntity<ApiResponse<Long>> totalUnread() {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
-        return ResponseEntity.ok(ApiResponse.success(chatService.totalUnreadCount(me), "조회 성공"));
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return ResponseEntity.ok(ApiResponse.success(chatService.totalUnreadCount(me), QUERY_SUCCESS_MESSAGE));
     }
 
     /** 내 대화 열기 — 방이 없으면 만들고, 최근 메시지를 주고, 안 읽음을 0으로. */
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<Map<String, Object>>> openMy() {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         ChatRoom room = chatService.openMyRoom(me);
         List<ChatMessageResponse> messages = chatService.readMyMessages(me);
         return ResponseEntity.ok(ApiResponse.success(
@@ -245,13 +249,13 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<ChatMessageResponse>> send(
             @Valid @RequestBody SendMessageRequest request,
             HttpServletRequest httpRequest) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)) {
             return ResponseEntity.status(429)
                     .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해주세요."));
         }
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), "전송 완료"));
+                chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
     }
 
     /**
@@ -263,18 +267,18 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> poll(
             @RequestParam Long roomId,
             @RequestParam(required = false) Long afterId) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         chatService.assertOwnedBy(roomId, me);
         return ResponseEntity.ok(ApiResponse.success(
-                chatService.getNewMessages(roomId, afterId, me.getId()), "조회 성공"));
+                chatService.getNewMessages(roomId, afterId, me.getId()), QUERY_SUCCESS_MESSAGE));
     }
 
     /** 배지용 — 패널이 닫혀 있을 때 훨씬 긴 주기로 부른다. */
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/my/unread")
     public ResponseEntity<ApiResponse<Long>> unread() {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
-        return ResponseEntity.ok(ApiResponse.success(chatService.myUnreadCount(me), "조회 성공"));
+        Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return ResponseEntity.ok(ApiResponse.success(chatService.myUnreadCount(me), QUERY_SUCCESS_MESSAGE));
     }
 
     private boolean canSend(HttpServletRequest request) {

@@ -40,7 +40,6 @@ class StoreImageOwnershipTest {
 
     private static final Long OWNER_ID = 1L;
     private static final Long STORE_ID = 7L;
-    private static final String MAIN_PREFIX = "users/1/stores/7/thumbnails";
     private static final String DETAIL_PREFIX = "users/1/stores/7/images";
     private static final String MAIN = "https://cdn.example.test/users/1/stores/7/thumbnails/main.png";
     private static final String DETAIL_A = "https://cdn.example.test/users/1/stores/7/images/a.png";

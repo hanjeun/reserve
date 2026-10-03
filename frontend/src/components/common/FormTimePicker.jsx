@@ -39,7 +39,9 @@ const FormTimePickerBase = ({
     const [draftMultiple, setDraftMultiple] = useState([]);
     const hintId = useId();
     const rangeLabels = Array.isArray(placeholder) ? placeholder : ['시작 시간', '종료 시간'];
-    const dialogLabel = mode === 'range' ? '시간 범위 선택' : mode === 'multiple' ? '회차 시각 선택' : '시간 선택';
+    let dialogLabel = '시간 선택';
+    if (mode === 'range') dialogLabel = '시간 범위 선택';
+    else if (mode === 'multiple') dialogLabel = '회차 시각 선택';
     const inputErrors = mode === 'range'
         ? typedRange.map((text, part) => Boolean(text || draftRange[part]) && !parseTypedTime(text)) : [];
     const hasInputError = inputErrors.some(Boolean);
@@ -131,14 +133,23 @@ const FormTimePickerBase = ({
     const clearValue = () => commitValue(mode === 'multiple' ? [] : null);
     const hasValue = mode === 'single' ? Boolean(validTime(currentValue)) : Array.isArray(currentValue) && currentValue.some(validTime);
     const isError = status === 'error';
-    const iconColor = disabled ? colors.gray[400]
-        : isError && !hasValue ? colors.error.main
-            : hasValue ? colors.primary.main : field.placeholderColor;
+    const fieldInvalid = ariaInvalid ?? (isError || undefined);
+    let iconColor = field.placeholderColor;
+    if (disabled) iconColor = colors.gray[400];
+    else if (isError && !hasValue) iconColor = colors.error.main;
+    else if (hasValue) iconColor = colors.primary.main;
     let label = validTime(currentValue)?.format(format) ?? placeholder ?? '시간 선택';
     if (mode === 'multiple') {
         const times = uniqueTimes(Array.isArray(currentValue) ? currentValue : []);
-        label = times.length ? `${times[0].format(format)}${times.length > 1 ? ` 외 ${times.length - 1}개` : ''}` : placeholder ?? '회차 시각 선택';
+        label = placeholder ?? '회차 시각 선택';
+        if (times.length) {
+            label = times[0].format(format);
+            if (times.length > 1) label += ` 외 ${times.length - 1}개`;
+        }
     }
+    let hintText = '위아래로 밀거나 스크롤해서 선택해주세요.';
+    if (hasInputError) hintText = '00:00부터 23:59까지 입력해주세요. 예: 1052 또는 10:52';
+    else if (mode === 'range') hintText = '숫자를 눌러 입력하거나 위아래로 밀어 선택해주세요.';
 
     return (
         <>
@@ -149,7 +160,6 @@ const FormTimePickerBase = ({
                 aria-haspopup="dialog"
                 aria-expanded={open}
                 aria-describedby={describedBy}
-                aria-invalid={ariaInvalid ?? (isError || undefined)}
                 className={`rsv-tap-btn reserve-cal-trigger reserve-form-date-trigger reserve-form-time-trigger ${className}`.trim()}
                 onClick={openPicker}
                 onBlur={() => { if (!open) onBlur?.(); }}
@@ -192,8 +202,8 @@ const FormTimePickerBase = ({
                                 </button>
                                 <input type="text" inputMode="numeric" maxLength={5} autoComplete="off"
                                     className="reserve-time-part-value" aria-label={`${rangeLabels[part]} 직접 입력`}
-                                    aria-invalid={inputErrors[part] || undefined}
-                                    aria-describedby={inputErrors[part] ? hintId : undefined}
+                                    aria-invalid={inputErrors[part] ? true : fieldInvalid}
+                                    aria-describedby={inputErrors[part] ? [describedBy, hintId].filter(Boolean).join(' ') : describedBy}
                                     placeholder="선택 전" value={typedRange[part]}
                                     onFocus={event => { selectRangePart(part); event.currentTarget.select(); }}
                                     onChange={event => typeRangeTime(part, event.target.value)}
@@ -210,9 +220,7 @@ const FormTimePickerBase = ({
                     <TimeWheelColumn label="분" options={MINUTES} value={cursor.minute()} onChange={changeMinute} />
                 </div>
                 <p id={hintId} className="reserve-time-hint" style={hasInputError ? { color: colors.error.main } : undefined}>
-                    {hasInputError ? '00:00부터 23:59까지 입력해주세요. 예: 1052 또는 10:52'
-                        : mode === 'range' ? '숫자를 눌러 입력하거나 위아래로 밀어 선택해주세요.'
-                            : '위아래로 밀거나 스크롤해서 선택해주세요.'}
+                    {hintText}
                 </p>
 
                 {mode === 'multiple' && (

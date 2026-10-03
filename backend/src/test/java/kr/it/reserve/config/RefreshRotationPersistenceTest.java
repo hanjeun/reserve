@@ -78,7 +78,8 @@ class RefreshRotationPersistenceTest {
         assertThat(refreshTokenRepository.findById(row.getId())).isEmpty();
 
         // 같은 기기의 새 토큰도 함께 끊긴다.
-        assertThatThrownBy(() -> tokenService.refresh(rotated.refreshToken()))
+        String rotatedToken = rotated.refreshToken();
+        assertThatThrownBy(() -> tokenService.refresh(rotatedToken))
                 .isInstanceOf(RefreshRejectedException.class)
                 .extracting(e -> ((RefreshRejectedException) e).getReason())
                 .isEqualTo(RefreshRejectedException.Reason.UNKNOWN_TOKEN);

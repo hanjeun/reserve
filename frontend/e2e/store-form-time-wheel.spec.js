@@ -210,7 +210,11 @@ test('break-time bounds remain enforced by the existing form validation', async 
     await dialog.getByRole('button', { name: '선택 완료' }).click();
     await expect(trigger).toHaveText(/01:00.*13:00/);
     await expect(page.getByText(/브레이크 타임은 영업시간/)).toBeVisible();
-    await expect(trigger).toHaveAttribute('aria-invalid', 'true');
+    await expect(trigger).not.toHaveAttribute('aria-invalid', /.*/);
+    await expect(trigger).toHaveAttribute('aria-describedby', /breakTimes_help/);
+    await trigger.click();
+    await expect(dialog.getByRole('textbox', { name: '시작 직접 입력' })).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog.getByRole('textbox', { name: '종료 직접 입력' })).toHaveAttribute('aria-invalid', 'true');
 });
 
 test('keyboard selection also works with reduced motion enabled', async ({ page }) => {

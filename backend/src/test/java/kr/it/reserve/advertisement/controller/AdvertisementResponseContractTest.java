@@ -1,6 +1,8 @@
 package kr.it.reserve.advertisement.controller;
 
 import kr.it.reserve.advertisement.dto.AdConversionRequest;
+import kr.it.reserve.advertisement.dto.AdCreateRequest;
+import kr.it.reserve.advertisement.dto.AdPaymentPrepareResponse;
 import kr.it.reserve.advertisement.dto.AdvertisementResponse;
 import kr.it.reserve.advertisement.entity.AdType;
 import kr.it.reserve.advertisement.service.AdvertisementService;
@@ -67,6 +69,65 @@ class AdvertisementResponseContractTest {
         assertThatThrownBy(() -> action.accept(controller))
                 .isInstanceOf(MemberException.class).hasMessage("로그인이 필요합니다.");
         verifyNoInteractions(service, limiter);
+    }
+
+    private Member authenticateBusiness() {
+        Member business = Member.builder().id(7L).role(Role.BUSINESS).build();
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(business, null, List.of()));
+        return business;
+    }
+
+    @Test
+    void businessCreationPreservesThePaymentPayloadAndAuthenticatedPrincipal() {
+        Member business = authenticateBusiness();
+        AdCreateRequest request = mock(AdCreateRequest.class);
+        AdPaymentPrepareResponse prepared = AdPaymentPrepareResponse.builder()
+                .adId(11L).merchantUid("ad-create-test").amount(10_000).build();
+        when(service.createAd(request, business)).thenReturn(prepared);
+
+        var response = controller.createAd(request);
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getData()).isSameAs(prepared);
+        assertThat(response.getMessage()).isEqualTo("광고 결제 준비 완료");
+        verify(service).createAd(request, business);
+        verifyNoMoreInteractions(service);
+        verifyNoInteractions(limiter);
+    }
+
+    @Test
+    void businessRetryUsesTheExistingAdvertisementAndPreservesThePaymentPayload() {
+        Member business = authenticateBusiness();
+        AdPaymentPrepareResponse prepared = AdPaymentPrepareResponse.builder()
+                .adId(11L).merchantUid("ad-retry-test").amount(10_000).build();
+        when(service.preparePayment(11L, business)).thenReturn(prepared);
+
+        var response = controller.preparePayment(11L);
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getData()).isSameAs(prepared);
+        assertThat(response.getMessage()).isEqualTo("광고 결제 준비 완료");
+        verify(service).preparePayment(11L, business);
+        verifyNoMoreInteractions(service);
+        verifyNoInteractions(limiter);
+    }
+
+    @Test
+    void businessVerificationPassesTheExactPaymentIdAndPreservesActivationResponse() {
+        Member business = authenticateBusiness();
+        String paymentId = "ad-verify-test";
+        AdvertisementResponse activated = AdvertisementResponse.builder().id(11L).status("ACTIVE").build();
+        when(service.verifyPayment(paymentId, business)).thenReturn(activated);
+
+        var response = controller.verifyPayment(Map.of("merchantUid", paymentId));
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getData()).isSameAs(activated);
+        assertThat(response.getMessage()).isEqualTo("광고가 활성화되었습니다.");
+        verify(service).verifyPayment(paymentId, business);
+        verifyNoMoreInteractions(service);
+        verifyNoInteractions(limiter);
     }
 
     @Test

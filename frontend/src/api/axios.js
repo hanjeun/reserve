@@ -52,9 +52,10 @@ const handle401 = async (originalRequest) => {
         await flight.promise;
         assertCurrentSession(scope);
         return instance(originalRequest);
-    } catch {
+    } catch (error) {
         // 이전 계정의 refresh 실패가 새 계정을 로그아웃시키거나 요청을 재전송하면 안 된다.
         assertCurrentSession(scope);
+        if (error?.status !== 401 && error?.status !== 403) throw error;
         if (!originalRequest.url?.includes('/api/member/me')) {
             localStorage.removeItem('auth-storage');
             if (!globalThis.location.pathname.includes('/login')) globalThis.location.href = '/login';

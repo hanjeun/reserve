@@ -152,9 +152,14 @@
 }
 
 /* 광고 배너는 대표 이미지 한 장을 쓰는 가로형 카드다. */
-.ad-banner-click-area { transition: background-color 0.14s ease, transform 0.14s ease; }
-.ad-banner-click-area:hover { background: var(--c-hover-surface) !important; }
-.ad-banner-click-area:active { transform: scale(0.985); }
+.reserve-ad-final-banner { transition: scale 0.14s ease; }
+:is(.reserve-ad-banner, .reserve-ad-final-banner):has(> button.ad-banner-click-area:active) { scale: 0.985; }
+@media (hover: hover) and (pointer: fine) {
+    :is(.reserve-ad-banner, .reserve-ad-final-banner):has(> button.ad-banner-click-area:hover) { background: var(--c-hover-surface) !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .reserve-ad-banner, .reserve-ad-final-banner { scale: none !important; }
+}
 /* ── 공용 Carousel 톤 (.reserve-carousel) ─────────────────────────────────
    2026-08-06 신설. 그동안 "점 인디케이터를 우리 톤으로"라는 규칙이
    `.ad-banner-carousel` **한 곳에만** 있었고, 가게 상세의 Carousel 두 개는
@@ -313,8 +318,7 @@
     .reserve-carousel .slick-arrow { display: none !important; }
 }
 
-.ad-banner-close-btn        { transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background 0.12s ease; }
-.ad-banner-close-btn:hover  { background: #fff !important; }
+.ad-banner-close-btn        { transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1); }
 .ad-banner-close-btn:active { transform: scale(0.9); }
 .ad-banner-close-btn:focus,
 .ad-banner-click-area:focus { outline: none; }

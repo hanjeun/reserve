@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import AdBanner from './AdBanner';
+import AdBannerSurface from './AdBannerSurface';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 
@@ -29,4 +30,13 @@ it('still opens the store when impression and click requests fail', async () => 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('/store/42'));
     expect(api.patch).toHaveBeenCalledWith(API_ENDPOINTS.ADVERTISEMENT.CLICK(17));
     await act(async () => { await Promise.resolve(); });
+});
+it('offers a pressable preview without activating or dismissing the advertisement', () => {
+    const onActivate = vi.fn();
+    const onClose = vi.fn();
+    render(<AdBannerSurface ad={ad} imageSrc="/preview.png" interactive={false} onActivate={onActivate} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: '시험 광고 광고 — 눌림 효과 미리보기' }));
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '광고 닫기' })).not.toBeInTheDocument();
 });

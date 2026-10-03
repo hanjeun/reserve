@@ -52,6 +52,8 @@ const AdBanner = ({ ads }) => {
         ? 'perspective(900px) translate3d(0, 0, 0) rotateX(0deg) scale(1)'
         : 'translateY(0) scale(1)';
 
+    const pressTransition = prefersReducedMotion ? 'none' : 'scale 0.14s ease';
+
     const handleBannerClick = () => {
         void adService.recordClick(ad.id);
         recordAdClick(ad.id, ad.storeId);
@@ -71,8 +73,8 @@ const AdBanner = ({ ads }) => {
                     ? `reserve-ad-banner-tilt-up ${bannerMotionMs}ms cubic-bezier(0.18, 0.82, 0.24, 1) both`
                     : 'none',
                 transition: prefersReducedMotion || (shown && tilt3d)
-                    ? 'none'
-                    : `transform ${bannerMotionMs}ms cubic-bezier(0.16, 1.32, 0.3, 1), opacity 0.22s ease-out`,
+                    ? pressTransition
+                    : `transform ${bannerMotionMs}ms cubic-bezier(0.16, 1.32, 0.3, 1), opacity 0.22s ease-out, ${pressTransition}`,
             }}
         >
             <AdBannerSurface

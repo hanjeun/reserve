@@ -32,21 +32,15 @@ const AdBannerSurface = ({ ad, imageSrc, interactive = true, onActivate, onClose
                 <CloseOutlined style={{ fontSize: 20 }} />
             </span>
         )}
-        {interactive ? (
-            <button
-                type="button"
-                className="ad-banner-click-area"
-                style={styles.clickArea}
-                onClick={onActivate}
-                aria-label={`${ad.title} 광고 — 가게 상세로 이동`}
-            >
-                <BannerContent ad={ad} imageSrc={imageSrc} />
-            </button>
-        ) : (
-            <div className="ad-banner-click-area" style={{ ...styles.clickArea, cursor: 'default' }}>
-                <BannerContent ad={ad} imageSrc={imageSrc} />
-            </div>
-        )}
+        <button
+            type="button"
+            className="ad-banner-click-area"
+            style={styles.clickArea}
+            onClick={interactive ? onActivate : undefined}
+            aria-label={`${ad.title} 광고 — ${interactive ? '가게 상세로 이동' : '눌림 효과 미리보기'}`}
+        >
+            <BannerContent ad={ad} imageSrc={imageSrc} />
+        </button>
     </>
 );
 
@@ -92,8 +86,8 @@ BannerContent.propTypes = {
 const styles = {
     closeBtn: {
         position: 'absolute',
-        top: 8,
-        right: 8,
+        top: 4,
+        right: 4,
         zIndex: 1,
         width: 44,
         height: 44,

@@ -674,6 +674,7 @@ const AdManageTab = () => {
                         <FormField label="노출 기간" error={errors.dateRange}>
                             <FormDatePicker.RangePicker
                                 value={dateRange}
+                                disabledDate={date => date.isBefore(dayjs(), 'day')}
                                 onChange={(v) => { setDateRange(v); clearError('dateRange'); }}
                                 highlightHolidays
                             />

@@ -1042,7 +1042,7 @@ public class ReservationService {
         List<Long> completedIds = reservations.stream()
                 .filter(r -> r.getStatus() == Reservation.ReservationStatus.COMPLETED)
                 .map(Reservation::getId)
-                .collect(Collectors.toList());
+                .toList();
 
         Map<Long, Long> reviewIdByReservationId = new java.util.HashMap<>();
         if (!completedIds.isEmpty()) {

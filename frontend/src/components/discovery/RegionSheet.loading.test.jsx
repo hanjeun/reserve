@@ -46,7 +46,7 @@ describe('RegionSheet loading placeholders', () => {
 
         root.walkRules(rule => {
             if (rule.selector === '.reserve-region-sheet-popular-placeholder') desktopRule = rule;
-            if (rule.selector === '.reserve-region-sheet-popular-placeholder:nth-child(n + 5)') mobileRule = rule;
+            if (rule.selector === '.reserve-region-sheet-popular-placeholder:nth-of-type(n + 5)') mobileRule = rule;
         });
 
         expect(desktopRule.nodes.find(node => node.prop === 'display').value).toBe('flex');

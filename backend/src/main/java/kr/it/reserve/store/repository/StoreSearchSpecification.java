@@ -30,6 +30,8 @@ public final class StoreSearchSpecification {
     private static final char LIKE_ESCAPE = '!';
     private static final double EARTH_RADIUS_KM = 6_371.0088;
 
+    public record DistanceCandidates(Double latitude, Double longitude, double radiusKm) {}
+
     private StoreSearchSpecification() {
     }
 
@@ -38,10 +40,11 @@ public final class StoreSearchSpecification {
             String sort,
             ServiceDomain domain,
             String region,
-            Double latitude,
-            Double longitude,
-            double distanceCandidateRadiusKm,
+            DistanceCandidates distanceCandidates,
             LocalDate today) {
+        Double latitude = distanceCandidates.latitude();
+        Double longitude = distanceCandidates.longitude();
+        double distanceCandidateRadiusKm = distanceCandidates.radiusKm();
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(builder.isNull(root.get("deletedAt")));

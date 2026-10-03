@@ -42,7 +42,7 @@ class EmailServiceHtmlSafetyTest {
         String reservationHtml = ReflectionTestUtils.invokeMethod(
                 service,
                 "buildReservationStatusContent",
-                payload, payload, payload, payload, 1,
+                payload, new EmailService.ReservationMailDetails(payload, payload, payload, 1),
                 payload, "#000000", payload, payload, payload);
         String businessHtml = ReflectionTestUtils.invokeMethod(
                 service,

@@ -233,8 +233,9 @@ public class TourismRegionPhotoService {
             LocalDateTime checkedAt = LocalDateTime.now(Clock.systemDefaultZone());
             TourismRegionPhoto stored = existing.orElseGet(TourismRegionPhoto::new);
             Candidate accepted = candidate.get();
-            stored.refresh(region, accepted.contentId(), PROVIDER_NAME, accepted.workTitle(), accepted.imageUrl(),
-                    SOURCE_URL, LICENSE_TYPE, checkedAt);
+            stored.refresh(region, new TourismRegionPhoto.PhotoDetails(
+                    accepted.contentId(), PROVIDER_NAME, accepted.workTitle(), accepted.imageUrl(),
+                    SOURCE_URL, LICENSE_TYPE, checkedAt));
             repository.save(stored);
             failedRefreshes.remove(region);
             return Optional.of(TourismRegionPhotoResponse.from(stored));

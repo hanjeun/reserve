@@ -108,8 +108,8 @@ gh api repos/hanjeun/reserve/branches/dev/protection
 ```powershell
 @'
 {
-  "required_status_checks": { "strict": false, "contexts": ["build-backend", "build-frontend"] },
-  "enforce_admins": false,
+  "required_status_checks": { "strict": true, "contexts": ["build-backend", "build-frontend"] },
+  "enforce_admins": true,
   "required_pull_request_reviews": { "required_approving_review_count": 0 },
   "restrictions": null,
   "required_linear_history": true,
@@ -142,11 +142,11 @@ gh pr comment 79 -R $REPO --body "@dependabot ignore this major version"
 gh pr comment 76 -R $REPO --body "@dependabot ignore this major version"
 ```
 
-마이너/패치 PR은 직접 머지해요.
+마이너/패치 PR은 승인 뒤 직접 머지해요. dev 대상은 merge commit, main 릴리스는 squash를 사용해요.
 
 ```bash
 gh pr list -R $REPO --label dependencies       # 목록 확인
-gh pr merge <번호> -R $REPO --squash --delete-branch
+gh pr merge <번호> -R $REPO --merge
 ```
 
 ## 4. 배포 직후 서버 작업

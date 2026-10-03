@@ -72,7 +72,9 @@ public class StoreApiController {
             @RequestParam(required = false) String region
     ) {
         if (page != null) {
-            Page<StoreResponse> storePage = storeService.searchStoresPaged(keyword, sort, page, size, lat, lng, domain, region);
+            Page<StoreResponse> storePage = storeService.searchStoresPaged(
+                    new StoreService.SearchScope(domain, region),
+                    keyword, sort, page, size, lat, lng);
             return ApiResponse.success(storePage, "가게 목록 조회 성공");
         }
         // 기존 클라이언트 하위 호환

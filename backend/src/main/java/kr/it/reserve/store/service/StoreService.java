@@ -1106,8 +1106,8 @@ public class StoreService {
 
     @Transactional(readOnly = true)
     public Page<StoreResponse> searchStoresPaged(
-            String keyword, String sort, int page, int size, Double lat, Double lng, String domain, String region) {
-        return searchStoresPage(keyword, sort, page, size, lat, lng, new SearchScope(domain, region));
+            SearchScope scope, String keyword, String sort, int page, int size, Double lat, Double lng) {
+        return searchStoresPage(keyword, sort, page, size, lat, lng, scope);
     }
 
     private Page<StoreResponse> searchStoresPage(
@@ -1116,7 +1116,7 @@ public class StoreService {
         return sortedSearch(keyword, sort, pageable, lat, lng, scope.domain(), scope.region()).map(StoreResponse::fromEntity);
     }
 
-    private record SearchScope(String domain, String region) {}
+    public record SearchScope(String domain, String region) {}
 
     private Page<Store> sortedSearch(
             String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
@@ -1145,9 +1145,7 @@ public class StoreService {
                         normalizedSort,
                         domainFilter,
                         regionFilter,
-                        lat,
-                        lng,
-                        DISTANCE_CANDIDATE_RADIUS_KM,
+                        new StoreSearchSpecification.DistanceCandidates(lat, lng, DISTANCE_CANDIDATE_RADIUS_KM),
                         ServiceTime.today()),
                 pageable);
     }

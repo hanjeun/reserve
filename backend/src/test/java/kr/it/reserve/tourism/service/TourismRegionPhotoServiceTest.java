@@ -192,10 +192,10 @@ class TourismRegionPhotoServiceTest {
     @Test
     void keepsARecentlyVerifiedCatalogEntryWithoutCallingTheExternalApiAgain() {
         TourismRegionPhoto photo = new TourismRegionPhoto(
-                "서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+                "서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 "https://tong.visitkorea.or.kr/cms/resource/00/123456_image2_1.jpg",
                 "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(photo));
 
         assertThat(service("key").findRegionPhotos(List.of("서울")))
@@ -208,10 +208,10 @@ class TourismRegionPhotoServiceTest {
     @Test
     void imageProxyRefusesAnUnexpectedHostBeforeMakingANetworkRequest() {
         TourismRegionPhoto photo = new TourismRegionPhoto(
-                "서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+                "서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 "https://example.invalid/image.jpg",
                 "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(photo));
 
         assertThat(service("key").loadImage("서울")).isEmpty();
@@ -222,10 +222,10 @@ class TourismRegionPhotoServiceTest {
     @Test
     void imageProxyReturnsAnEmptyResultWhenTheDedicatedClientRejectsTheResponse() {
         TourismRegionPhoto photo = new TourismRegionPhoto(
-                "서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+                "서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 "https://tong.visitkorea.or.kr/cms/resource/00/123456_image2_1.jpg",
                 "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(photo));
         when(imageProxyClient.fetch(photo.getImageUrl())).thenReturn(Optional.empty());
 
@@ -234,9 +234,9 @@ class TourismRegionPhotoServiceTest {
     }
 
     private TourismRegionPhoto photo(String region, String imageUrl) {
-        return new TourismRegionPhoto(region, "123", "한국관광공사 관광정보 서비스", "검증된 사진",
+        return new TourismRegionPhoto(region, new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진",
                 imageUrl, "https://www.data.go.kr/data/15101578/openapi.do?recommendDataYn=Y",
-                "공공누리 제1유형", LocalDateTime.now());
+                "공공누리 제1유형", LocalDateTime.now()));
     }
 
     private void imageClock(TourismRegionPhotoService target, Instant now) {
@@ -413,8 +413,8 @@ class TourismRegionPhotoServiceTest {
     @Test
     void failedCatalogRefreshKeepsTheOldPhotoAndDoesNotRetryOnEveryVisit() {
         var old = photo("서울", "https://tong.visitkorea.or.kr/first.jpg");
-        old.refresh("서울", "123", "한국관광공사 관광정보 서비스", "검증된 사진", old.getImageUrl(),
-                old.getSourceUrl(), "공공누리 제1유형", LocalDateTime.now().minusDays(31));
+        old.refresh("서울", new TourismRegionPhoto.PhotoDetails("123", "한국관광공사 관광정보 서비스", "검증된 사진", old.getImageUrl(),
+                old.getSourceUrl(), "공공누리 제1유형", LocalDateTime.now().minusDays(31)));
         when(repository.findByRegionCode("서울")).thenReturn(Optional.of(old));
         when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                 .thenThrow(new org.springframework.web.client.ResourceAccessException("simulated upstream failure"));

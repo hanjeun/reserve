@@ -170,11 +170,11 @@ public class ReservationService {
                 String ownerEmail = store.getOwner().getEmail();
                 String ownerName  = store.getOwner().getName() != null ? store.getOwner().getName() : "사장님";
                 emailService.sendNewReservationAlertToOwner(
-                        ownerEmail, ownerName, store.getName(),
-                        member.getName(), member.getEmail(),
-                        request.getReservationDate().toString(),
-                        request.getReservationTime().toString().substring(0, 5),
-                        request.getGuestCount()
+                        ownerEmail, ownerName, member.getName(), member.getEmail(),
+                        new EmailService.ReservationMailDetails(store.getName(),
+                                request.getReservationDate().toString(),
+                                request.getReservationTime().toString().substring(0, 5),
+                                request.getGuestCount())
                 );
             } catch (Exception e) {
                 log.warn("Owner reservation notification email failed (service continues): errorType={}",

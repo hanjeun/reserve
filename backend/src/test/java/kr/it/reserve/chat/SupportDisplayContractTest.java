@@ -2,6 +2,7 @@ package kr.it.reserve.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.chat.dto.ChatMessageResponse;
+import kr.it.reserve.chat.dto.ChatHistoryResponse;
 import kr.it.reserve.chat.dto.ConversationSummaryResponse;
 import kr.it.reserve.chat.dto.ConversationThreadResponse;
 import kr.it.reserve.chat.entity.ChatMessage;
@@ -155,7 +156,7 @@ class SupportDisplayContractTest {
         assertThat(response.getViewerRole()).isEqualTo("OWNER");
         assertThat(response.getLastMessagePreview()).isEqualTo("예약 가능한가요?");
         var thread = ConversationThreadResponse.from(
-                room, "손님", "OWNER", true, List.of(), false, null);
+                room, "손님", "OWNER", true, ChatHistoryResponse.of(List.of(), false, null));
         assertThat(thread.getCounterpartProfileImage())
                 .isEqualTo("https://images.example.com/customer.png");
         verifyNoInteractions(memberRepository);
@@ -257,7 +258,7 @@ class SupportDisplayContractTest {
                 88L, room, SenderRole.ADMIN, 912345L, "답변"));
         var memberSummary = ConversationSummaryResponse.forMember(room);
         var thread = ConversationThreadResponse.from(room,
-                "한재은", "MEMBER", true, List.of(reply), false, 88L);
+                "한재은", "MEMBER", true, ChatHistoryResponse.of(List.of(reply), false, 88L));
         var storeAdmin = ChatMessageResponse.from(message(
                 89L, storeRoom(31L), SenderRole.ADMIN, 912345L, "잘못된 역할"));
         var mapper = new ObjectMapper();

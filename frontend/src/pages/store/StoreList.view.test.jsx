@@ -76,7 +76,7 @@ describe('store list view selection with real URL pagination', () => {
 
     it('writes both card and list modes explicitly without refetching or resetting filters/page', async () => {
         const user = userEvent.setup();
-        renderList('/stores?keyword=카페&domain=FOOD&sort=reviewCount&page=3&keep=yes');
+        renderList('/stores?keyword=카페&domain=FOOD&sort=reviewCount&page=3&utm_source=yes');
         await screen.findByTestId('original-card');
         expect(routeParams().get('view')).toBe('cards');
         const toggle = screen.getByRole('button', { name: '목록형 보기로 전환' });
@@ -87,7 +87,7 @@ describe('store list view selection with real URL pagination', () => {
         expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 3 가게');
         expect(screen.queryByTestId('original-card')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' }).querySelector('[data-icon="appstore"]')).toBeInTheDocument();
-        expect(Object.fromEntries(routeParams())).toEqual({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: '3', keep: 'yes', view: 'list' });
+        expect(Object.fromEntries(routeParams())).toEqual({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: '3', utm_source: 'yes', view: 'list' });
         expect(storeService.getStores).toHaveBeenCalledTimes(1);
         expect(storeService.getStores).toHaveBeenLastCalledWith({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 2, size: 12 });
         await user.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));
@@ -99,7 +99,7 @@ describe('store list view selection with real URL pagination', () => {
 
     it('loads a shared list URL, preserves view through filter/page changes, and follows browser history', async () => {
         const user = userEvent.setup();
-        renderList('/stores?view=list&page=2&keyword=검색&keep=yes');
+        renderList('/stores?view=list&page=2&keyword=검색&utm_source=yes');
         await screen.findByTestId('list-row');
         await user.selectOptions(screen.getByLabelText('가게 정렬'), 'reviewCount');
         await waitFor(() => expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 1 가게'));
@@ -109,7 +109,7 @@ describe('store list view selection with real URL pagination', () => {
         await waitFor(() => expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 2 가게'));
         expect(routeParams().get('view')).toBe('list');
         expect(routeParams().get('keyword')).toBe('검색');
-        expect(routeParams().get('keep')).toBe('yes');
+        expect(routeParams().get('utm_source')).toBe('yes');
         await user.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));
         await user.click(screen.getByRole('button', { name: '이전 보기' }));
         expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 2 가게');
@@ -171,10 +171,10 @@ describe('store list view selection with real URL pagination', () => {
     });
 
     it('normalizes an unknown view to explicit cards without discarding other URL values', async () => {
-        renderList('/stores?view=unknown&page=2&keep=yes');
+        renderList('/stores?view=unknown&page=2&utm_source=yes');
         expect(await screen.findByTestId('original-card')).toHaveTextContent('페이지 2 가게');
         expect(routeParams().get('view')).toBe('cards');
-        expect(routeParams().get('keep')).toBe('yes');
+        expect(routeParams().get('utm_source')).toBe('yes');
     });
 
     it('retains errors and explicit retry after changing the view instead of presenting an empty list', async () => {

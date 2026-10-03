@@ -51,21 +51,31 @@ describe('HTTP session boundary', () => {
         expect(calls).toEqual(['/private/write']);
     });
 
-    it('same-session requests share one refresh and retry only once', async () => {
-        const refresh = deferred();
-        const configs = [];
-        api.defaults.adapter = config => {
-            configs.push(config);
-            if (config.url === '/api/auth/refresh') return refresh.promise.then(() => response(config, null));
-            if (!config._retry) return Promise.reject({ config, response: { status: 401 } });
-            return Promise.resolve(response(config, 'fresh'));
-        };
-        const one = api.get('/one'), two = api.get('/two');
-        await vi.waitFor(() => expect(configs.filter(c => c.url === '/api/auth/refresh')).toHaveLength(1));
-        refresh.resolve();
-        expect(await Promise.all([one, two])).toEqual(['fresh', 'fresh']);
-        expect(configs.every(c => c._sessionEpoch === currentSession().epoch)).toBe(true);
-        expect(configs.filter(c => c.url === '/one')).toHaveLength(2);
+    it.each([
+        { mode: 'legacy', version: '', prefix: '/api' },
+        { mode: 'v1', version: 'v1', prefix: '/api/v1' },
+    ])('same-session requests share one refresh and retry only once ($mode)', async ({ version, prefix }) => {
+        vi.stubEnv('VITE_API_VERSION', version);
+        try {
+            const refresh = deferred();
+            const configs = [];
+            api.defaults.adapter = config => {
+                configs.push(config);
+                if (config.url === `${prefix}/auth/refresh`) return refresh.promise.then(() => response(config, null));
+                if (!config._retry) return Promise.reject({ config, response: { status: 401 } });
+                return Promise.resolve(response(config, 'fresh'));
+            };
+            const one = api.get('/api/one'), two = api.get('/api/two');
+            await vi.waitFor(() => expect(configs.filter(c => c.url === `${prefix}/auth/refresh`)).toHaveLength(1));
+            refresh.resolve();
+            expect(await Promise.all([one, two])).toEqual(['fresh', 'fresh']);
+            expect(configs.every(c => c._sessionEpoch === currentSession().epoch)).toBe(true);
+            expect(configs.filter(c => c.url === `${prefix}/one`)).toHaveLength(2);
+            expect(configs.filter(c => c.url === `${prefix}/two`)).toHaveLength(2);
+            expect(configs).toHaveLength(5);
+        } finally {
+            vi.unstubAllEnvs();
+        }
     });
 
     it.each([

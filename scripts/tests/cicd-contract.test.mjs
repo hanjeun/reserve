@@ -79,7 +79,7 @@ test('backend tests are explicit, required, and run before packaging', () => {
     const tests = step(backendTests, 'backend_tests');
     const packaging = step(backend, 'backend_package');
     assert.ok(tests && packaging);
-    assert.match(tests.run, /\.\/gradlew -I \.\.\/scripts\/coverage\.init\.gradle test jacocoTestReport --console=plain/);
+    assert.match(tests.run, /\.\/gradlew test --console=plain/);
     assert.match(packaging.run, /\.\/gradlew bootJar --console=plain/);
     assert.equal(step(backend, 'backend_tests'), undefined);
     assert.equal(tests['continue-on-error'], undefined);
@@ -104,7 +104,7 @@ test('PC and mobile browser checks use separate projects and failure evidence', 
     assert.equal(mobile.if, "!cancelled() && steps.evidence.outputs.reused != 'true' && (success() || (failure() && steps.browser_pc.outcome == 'failure'))");
     assert.ok(frontendTests.steps.indexOf(pc) < frontendTests.steps.indexOf(mobile));
     for (const entry of [pc, mobile]) assert.equal(entry['continue-on-error'], undefined);
-    assert.ok(frontendTests.steps.some(entry => entry.run === 'npm run test:coverage'));
+    assert.ok(frontendTests.steps.some(entry => entry.run === 'npm run test:run'));
     assert.ok(frontend.steps.some(entry => entry.run === 'npm run build'));
 });
 
@@ -131,7 +131,7 @@ test('only verified successful evidence can skip tests; records and required che
         assert.equal(record['continue-on-error'], undefined);
         assert.equal(record.if, undefined);
         assert.equal(job.permissions.actions, 'read');
-        for (const entry of job.steps.filter(entry => /gradlew .*\btest\b|npm run test:coverage|npm run test:e2e/.test(entry.run ?? ''))) {
+        for (const entry of job.steps.filter(entry => /gradlew .*\btest\b|npm run test:run|npm run test:e2e/.test(entry.run ?? ''))) {
             assert.match(entry.if, /steps\.evidence\.outputs\.reused != 'true'/);
             assert.equal(entry['continue-on-error'], undefined);
         }

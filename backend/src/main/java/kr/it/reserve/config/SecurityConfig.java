@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.client.web.HttpSessionOAuth2Authoriza
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -84,22 +85,25 @@ public class SecurityConfig {
                         // ★ 이 엔드포인트의 인증은 **본문 서명 검증**(PortoneWebhookVerifier)이 전담한다.
                         //   시크릿이 비어 있으면 전부 거부하는 fail-closed 다.
                         //   경로를 넓히지 말 것 — "/api/payment/**" 로 풀면 결제·환불 API 가 통째로 열린다.
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/payment/webhook/portone").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                ApiPaths.withV1Aliases("/api/payment/webhook/portone")).permitAll()
                         // CSP Report-Only 브라우저 진단. 인증 쿠키가 없는 브라우저도 보낼 수 있어야 한다.
                         // 본문은 CspReportController가 URL을 버리고 고정 범주만 기록한다.
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/csp-reports").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                ApiPaths.withV1Aliases("/api/csp-reports")).permitAll()
 
                         // 인증 진입점만 공개한다. agree-terms는 로그인 직후의 회원 상태를 바꾸므로
                         // /api/auth/**로 함께 열면 @AuthenticationPrincipal null 경로가 생긴다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                "/api/auth/login", "/api/auth/signup", "/api/auth/refresh", "/api/auth/logout")
+                                ApiPaths.withV1Aliases("/api/auth/login", "/api/auth/signup", "/api/auth/refresh", "/api/auth/logout"))
                                 .permitAll()
                         // 가입 전 이메일 인증에 필요한 두 요청만 공개한다. 인증 상태를 이메일로
                         // 조회하는 공개 API는 계정·인증 진행 여부를 추측하게 하므로 두지 않는다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
-                                "/api/email/send-code", "/api/email/verify-code").permitAll()
-                        .requestMatchers("/api/password-reset/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/agree-terms").authenticated()
+                                ApiPaths.withV1Aliases("/api/email/send-code", "/api/email/verify-code")).permitAll()
+                        .requestMatchers(ApiPaths.withV1Aliases("/api/password-reset/**")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                ApiPaths.withV1Aliases("/api/auth/agree-terms")).authenticated()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/login/**").permitAll()
 
                         // 공개 API — 공개 화면이 실제로 쓰는 GET 만 연다(2026-09-21).
@@ -108,43 +112,51 @@ public class SecurityConfig {
                         // /api/reviews/reservation/{id} 는 그 한 겹조차 없어 예약 번호만으로 남의 리뷰를 꺼낼 수 있었다.
                         // 상세 경로는 숫자만 받는다 — /my 같은 경로가 {id} 로 잘못 매칭돼 공개되지 않게.
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                "/api/stores", "/api/stores/regions", "/api/stores/{id:\\d+}").permitAll()
+                                ApiPaths.withV1Aliases("/api/stores", "/api/stores/regions", "/api/stores/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                "/api/reviews/store/{storeId:\\d+}", "/api/reviews/store/{storeId:\\d+}/stats",
-                                "/api/reviews/{id:\\d+}").permitAll()
+                                ApiPaths.withV1Aliases("/api/reviews/store/{storeId:\\d+}", "/api/reviews/store/{storeId:\\d+}/stats",
+                                        "/api/reviews/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                "/api/notices", "/api/notices/highlights", "/api/notices/{id:\\d+}").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/notices/{id:\\d+}/view").permitAll()
+                                ApiPaths.withV1Aliases("/api/notices", "/api/notices/highlights", "/api/notices/{id:\\d+}")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                ApiPaths.withV1Aliases("/api/notices/{id:\\d+}/view")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                "/api/public/store-pages/{id:\\d+}").permitAll()
+                                ApiPaths.withV1Aliases("/api/public/store-pages/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.HEAD,
-                                "/api/public/store-pages/{id:\\d+}").permitAll()
+                                ApiPaths.withV1Aliases("/api/public/store-pages/{id:\\d+}")).permitAll()
                         // 지역 사진은 공개 탐색 보조 정보다. 키·원본 URL은 서버 안에서만 처리한다.
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/tourism/region-photos/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/tourism/region-photos/**")).permitAll()
                         // 가게 소식 v1의 최소 공개 응답만 허용한다. 기존 /my·/my-stores·CUD는 인증 유지.
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                "/api/promotions/public", "/api/promotions/public/{promotionId}").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/favorites/status/**").permitAll()
+                                ApiPaths.withV1Aliases("/api/promotions/public", "/api/promotions/public/{promotionId}")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/favorites/status/**")).permitAll()
                         // 실시간 잔여 슬롯 조회 — 로그인 여부와 무관하게 누구나 시간대만 볼 수 있어야 함
                         // (실제 예약 생성은 여전히 아래 "/api/reservations/**" 규칙에 걸려 인증 필요 — 미로그인 사용자는
                         //  '예약하기' 버튼 클릭 시 프론트에서 isLoggedIn 체크 후 로그인 안내로 자연스럽게 유도됨)
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/availability").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/reservations/availability")).permitAll()
                         // 달력(월 단위)도 같은 성격의 공개 조회다 — 예약 가능 여부는 로그인 전에 보여야 고를 수 있다.
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/calendar").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/reservations/calendar")).permitAll()
                         // 공휴일 목록 — 가게 등록 폼 달력(가게 id 없음)이 빨간날을 칠하는 색칠 전용 공개 조회다.
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/holidays").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/holidays")).permitAll()
 
                         // 광고 노출 목록 — 공개 API (StoreList 배지/배너 위젯이 로그인 여부와 무관하게 보여야 함)
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/advertisements/active").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/advertisements/active")).permitAll()
                         // 노출·클릭은 비로그인 방문자에게도 일어나므로 공개·IP 제한을 유지한다.
                         // 전환은 회원 본인의 예약과 광고 가게를 대조해야 하므로 아래 anyRequest 인증 규칙을 탄다.
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH,
-                                "/api/advertisements/*/impression", "/api/advertisements/*/click")
+                                ApiPaths.withV1Aliases("/api/advertisements/*/impression", "/api/advertisements/*/click"))
                                 .permitAll()
 
                         // 예약 - 공개 조회만 허용, 나머지는 인증 필요
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reservations/{id}").authenticated()
-                        .requestMatchers("/api/reservations/**").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/reservations/{id}")).authenticated()
+                        .requestMatchers(ApiPaths.withV1Aliases("/api/reservations/**")).authenticated()
 
                         // 주소 검색 (Kakao Local API 서버사이드 프록시)
                         // 2026-07 전수조사: 예전 주석은 "비로그인도 검색 가능"이라고 되어 있었지만 실제 매처는
@@ -155,13 +167,15 @@ public class SecurityConfig {
                         //  2) 이 엔드포인트는 서버가 보관한 Kakao REST 키로 카카오 API를 프록시하는 것이라
                         //     permitAll이면 누구나 우리 카카오 쿼터를 무료 지오코딩 서비스로 소진시킬 수 있다.
                         // → authenticated() 유지, 사실과 다른 주석만 제거.
-                        .requestMatchers("/api/address/**").authenticated()
+                        .requestMatchers(ApiPaths.withV1Aliases("/api/address/**")).authenticated()
 
                         // 문의하기 작성 — 정지된 회원도 문의할 수 있어야 해서 비로그인 허용 (나머지 /api/inquiries/**는 인증 필요, 아래 anyRequest에 걸림)
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/inquiries").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                ApiPaths.withV1Aliases("/api/inquiries")).permitAll()
 
                         // 관리자 전용
-                        .requestMatchers("/admin/**", "/api/business-verification/admin/**", "/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers(ApiPaths.withV1Aliases("/admin/**", "/api/business-verification/admin/**", "/api/admin/**"))
+                                .hasRole("ADMIN")
 
                         // 나머지는 인증 필요
                         .anyRequest().authenticated())
@@ -176,6 +190,8 @@ public class SecurityConfig {
 
                 // JWT 필터 등록
                 .addFilterBefore(new JwtAuthenticationFilter(tokenProvider), UsernamePasswordAuthenticationFilter.class)
+                // firewall·CORS 이후, 인증·CSRF 전에 미지원 API 버전만 404로 종료한다.
+                .addFilterBefore(new UnsupportedApiVersionFilter(objectMapper), CsrfFilter.class)
 
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {

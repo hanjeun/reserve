@@ -212,11 +212,11 @@ class SupportDisplayContractTest {
     @Test
     void pollKeepsOrderAndBrandEvenForLegacyAdminReplyWithoutSenderId() {
         ChatRoom room = supportRoom(21L);
-        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 50L))
-                .thenReturn(List.of(
+        when(messageRepository.findByRoomIdAndIdGreaterThanOrderByIdAsc(21L, 50L, PageRequest.of(0, 50)))
+                .thenReturn(new SliceImpl<>(List.of(
                         message(51L, room, SenderRole.MEMBER, 7L, "질문"),
                         message(52L, room, SenderRole.ADMIN, 1L, "답변1"),
-                        message(53L, room, SenderRole.ADMIN, null, "답변2")));
+                        message(53L, room, SenderRole.ADMIN, null, "답변2"))));
 
         var messages = chatService.getNewMessages(21L, 50L);
 

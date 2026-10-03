@@ -3,11 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Form } from 'antd';
 import StoreFormSkeleton from "../../components/store/StoreFormSkeleton";
 import StoreForm from "../../components/store/StoreForm";
-import { DataState, PageContainer } from '../../components/common';
+import { Button, DataState, PageContainer } from '../../components/common';
 import { useStoreData, useMessage, useFormReady, useImagePreview, useStoreForm } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useAuthStore from '../../store/useAuthStore';
-import { httpStatusOf } from '../../utils/listErrorMessage';
 
 /**
  * 가게 수정 페이지
@@ -39,8 +38,6 @@ const StoreEdit = () => {
     // 예전엔 400/404 가 "요청을 처리할 수 없습니다 · 다시 불러오기" 오류로 보였다.
     const validId = /^\d+$/.test(id ?? '') && Number.isSafeInteger(Number(id)) && Number(id) > 0;
     const { store, loading, error, refetch } = useStoreData(validId ? id : null, { forEdit: true });
-    const notFound = !validId || httpStatusOf(error) === 404;
-    const loadFailed = Boolean(error && !notFound);
 
     // 소유자 검증 — store 로딩 후 본인 가게가 아니면 리다이렉트
     useEffect(() => {
@@ -83,12 +80,14 @@ const StoreEdit = () => {
         return (
             <PageContainer size="lg" paddingTop="32px">
                 <DataState
-                    state={loadFailed ? 'error' : 'empty'}
+                    state={error ? 'error' : 'empty'}
+                    requestType="detail"
                     kind="store"
                     subject="내 가게 정보"
-                    error={notFound ? undefined : error}
-                    title={loadFailed ? undefined : '수정할 가게를 찾을 수 없습니다.'}
-                    onRetry={loadFailed ? refetch : undefined}
+                    error={error}
+                    title={error ? undefined : '수정할 가게를 찾을 수 없습니다.'}
+                    onRetry={error ? refetch : undefined}
+                    missingAction={<Button variant="ghost" size="sm" onClick={() => navigate('/my-stores')}>내 가게 목록으로</Button>}
                     style={{ marginTop: 100 }}
                 />
             </PageContainer>

@@ -1,6 +1,7 @@
 package kr.it.reserve.chat.repository;
 
 import kr.it.reserve.chat.entity.ChatMessage;
+import kr.it.reserve.chat.entity.SenderRole;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +23,16 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             Long roomId, Long revision, Pageable pageable);
 
     java.util.Optional<ChatMessage> findByIdAndRoomId(Long id, Long roomId);
+
+    /** 실제로 수신한 커서 뒤에 남은 상대 메시지 수. 방 쓰기 잠금 아래에서만 읽음 갱신에 사용한다. */
+    @Query("""
+            SELECT COUNT(message) FROM ChatMessage message
+             WHERE message.room.id = :roomId AND message.id > :readThroughId
+               AND message.senderRole <> :reader
+            """)
+    long countUnreadAfter(@Param("roomId") Long roomId,
+                          @Param("readThroughId") Long readThroughId,
+                          @Param("reader") SenderRole reader);
 
     java.util.Optional<ChatMessage> findByRoomIdAndSenderMemberIdAndClientMessageId(
             Long roomId, Long senderMemberId, String clientMessageId);
@@ -49,8 +60,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     Slice<ChatMessage> findByRoomIdAndIdLessThanOrderByIdDesc(
             Long roomId, Long beforeId, Pageable pageable);
 
-    /** 폴링용 — 이 ID 보다 뒤에 온 메시지만. 전체를 다시 받지 않기 위한 것이다. */
-    java.util.List<ChatMessage> findByRoomIdAndIdGreaterThanOrderByIdAsc(Long roomId, Long afterId);
-
+    /** 폴링용 — 이 ID보다 뒤에 온 메시지를 오래된 것부터 제한 조회한다. */
     Slice<ChatMessage> findByRoomIdAndIdGreaterThanOrderByIdAsc(Long roomId, Long afterId, Pageable pageable);
 }

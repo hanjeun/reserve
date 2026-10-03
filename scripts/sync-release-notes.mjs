@@ -18,10 +18,8 @@
  *
  * 요구사항: Node 18+, gh CLI(로그인됨). REPO 환경변수로 대상 지정 가능(기본 hanjeun/reserve).
  */
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { resolveBin } from './resolve-bin.mjs';
 
 const REPO = process.env.REPO || 'hanjeun/reserve';
@@ -115,9 +113,7 @@ for (const { version, body } of targets) {
     continue;
   }
 
-  const tmp = join(mkdtempSync(join(tmpdir(), 'relnote-')), `${version}.md`);
-  writeFileSync(tmp, newBody, 'utf8');
-  gh(['release', 'edit', version, '-R', REPO, '--title', version, '--notes-file', tmp]);
+  gh(['release', 'edit', version, '-R', REPO, '--title', version, '--notes-file', '-'], newBody);
   console.log(`✔ ${version}: 릴리즈 설명 갱신 완료`);
 }
 

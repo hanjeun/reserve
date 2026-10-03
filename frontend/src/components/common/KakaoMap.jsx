@@ -116,6 +116,7 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
             />
             {mapStatus !== 'ready' && mapStatus !== 'error' && (
                 <Bone
+                    pageLoading={false}
                     width="100%"
                     height={height}
                     borderRadius={0}

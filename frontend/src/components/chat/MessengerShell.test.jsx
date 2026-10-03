@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -45,6 +45,7 @@ describe('MessengerShell accessibility', () => {
         });
         useMessengerStore.setState({
             open: false,
+            storeOpenRevision: 0,
             view: 'home',
             activeThread: false,
             drafts: {},
@@ -90,6 +91,32 @@ describe('MessengerShell accessibility', () => {
 
         await waitFor(() => expect(screen.queryByRole('dialog', { name: '메시지' })).not.toBeInTheDocument());
         expect(launcher).toHaveFocus();
+    });
+
+    it('replays the existing opening animation for store contact in an open panel without remounting its conversation', async () => {
+        const user = userEvent.setup();
+        renderShell();
+        await user.click(await screen.findByRole('button', { name: '메시지, 읽지 않은 메시지 2개 열기' }));
+        const dialog = await screen.findByRole('dialog', { name: '메시지' });
+        const input = screen.getByRole('textbox', { name: '테스트 입력' });
+        const animation = { animationName: 'reserve-chat-in', currentTime: 320, play: vi.fn() };
+        const getAnimations = vi.fn(() => [animation]);
+        dialog.getAnimations = getAnimations;
+        act(() => {
+            useMessengerStore.getState().setDraft('store:42', '작성 중인 문의');
+            useMessengerStore.getState().openStore(42);
+        });
+        expect(screen.getByRole('dialog', { name: '메시지' })).toBe(dialog);
+        expect(screen.getByRole('textbox', { name: '테스트 입력' })).toBe(input);
+        expect(dialog).toHaveClass('reserve-chat-panel');
+        expect(animation.currentTime).toBe(0);
+        expect(animation.play).toHaveBeenCalledTimes(1);
+        expect(useMessengerStore.getState().selection).toEqual({ kind: 'store', storeId: 42 });
+        expect(useMessengerStore.getState().drafts['store:42']).toBe('작성 중인 문의');
+        act(() => useMessengerStore.getState().select({ kind: 'store', storeId: 43 }));
+        expect(animation.play).toHaveBeenCalledTimes(1);
+        act(() => useMessengerStore.getState().openStore(42));
+        expect(animation.play).toHaveBeenCalledTimes(2);
     });
 
     it('supports a decorative launcher photo but keeps the open-panel close action', async () => {

@@ -19,7 +19,7 @@ import {
     WifiOutlined,
 } from '@ant-design/icons';
 import Button from './Button';
-import { listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
+import { isMissingRequestError, listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
 
 const EMPTY_ICON_BY_KIND = {
     advertisement: NotificationOutlined,
@@ -50,6 +50,7 @@ const ERROR_ICON_BY_KIND = {
  */
 const DataState = ({
     state = 'empty',
+    requestType = 'list',
     kind = 'generic',
     subject,
     error,
@@ -59,17 +60,19 @@ const DataState = ({
     retrying = false,
     retryLabel = '다시 불러오기',
     action,
+    missingAction,
     compact = false,
     className,
     style,
     ...rest
 }) => {
     const isError = state === 'error';
+    const isMissingDetail = requestType === 'detail' && (!isError || isMissingRequestError(error));
     const errorKind = isError ? listRequestErrorKind(error) : null;
     const Icon = isError
         ? (ERROR_ICON_BY_KIND[errorKind] ?? ERROR_ICON_BY_KIND.unknown)
         : (EMPTY_ICON_BY_KIND[kind] ?? InboxOutlined);
-    const message = title ?? (isError ? listRequestErrorMessage(error, subject ?? '목록') : '표시할 항목이 없습니다.');
+    const message = title ?? (isError ? listRequestErrorMessage(error, subject ?? '목록', requestType) : '표시할 항목이 없습니다.');
 
     return (
         <section
@@ -89,7 +92,7 @@ const DataState = ({
                 <p className="reserve-data-state__title">{message}</p>
                 {description && <p className="reserve-data-state__description">{description}</p>}
             </div>
-            {action ?? (onRetry && (
+            {action ?? (isMissingDetail ? missingAction : onRetry && (
                 <Button
                     variant="ghost"
                     size="sm"
@@ -108,6 +111,7 @@ const DataState = ({
 
 DataState.propTypes = {
     state: PropTypes.oneOf(['empty', 'error']),
+    requestType: PropTypes.oneOf(['list', 'detail']),
     kind: PropTypes.oneOf(['advertisement', 'favorite', 'generic', 'mail', 'member', 'message', 'news', 'payment', 'reservation', 'review', 'store']),
     subject: PropTypes.string,
     // Axios 오류뿐 아니라 훅이 정규화한 문자열도 받을 수 있다.
@@ -118,6 +122,7 @@ DataState.propTypes = {
     retrying: PropTypes.bool,
     retryLabel: PropTypes.string,
     action: PropTypes.node,
+    missingAction: PropTypes.node,
     compact: PropTypes.bool,
     className: PropTypes.string,
     style: PropTypes.object,

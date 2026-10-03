@@ -9,8 +9,9 @@ const parse = file => postcss.parse(readFileSync(resolve(cwd(), `src/styles/glob
 const declarations = rule => Object.fromEntries(rule.nodes.filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
 const findRule = (root, selector, media) => {
     let found;
-    root.walkRules(selector, rule => {
-        if (!media || rule.parent.type === 'atrule' && rule.parent.params === media) found = rule;
+    root.walkRules(rule => {
+        if (rule.selectors.includes(selector)
+            && (!media || rule.parent.type === 'atrule' && rule.parent.params === media)) found = rule;
     });
     return found;
 };
@@ -50,10 +51,35 @@ describe('scoped UI interaction styles', () => {
     it('does not apply route entry motion to any page that still contains data skeletons', () => {
         const css = parse('discovery-motion.css');
         for (const direction of ['right', 'left']) {
-            const selector = `.reserve-route-entry--from-${direction} > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block))`;
+            const child = ' > :not(.reserve-route-skeleton):not(.reserve-data-skeleton):not(:has(.reserve-skeleton-block:not(.reserve-skeleton-block--local)))';
+            const parent = `.reserve-route-entry--from-${direction}`;
+            const selector = `${parent}:not([data-skeleton-shown="true"])${child}`;
             expect(declarations(findRule(css, selector, '(prefers-reduced-motion: no-preference)')).animation).toContain(`reserve-discovery-page-from-${direction}`);
-            expect(declarations(findRule(css, selector)).animation).toBeDefined();
+            expect(findRule(css, `${parent}${child}`, '(prefers-reduced-motion: no-preference)')).toBeUndefined();
+            expect(declarations(findRule(css, `${parent}${child}`, '(prefers-reduced-motion: reduce)')).animation).toBe('none');
         }
+    });
+
+    it('shares existing press feedback with date fields, guest steps and store links while preserving reduced motion', () => {
+        const buttons = parse('components-and-forms.css');
+        const surfaces = parse('feature-surfaces.css');
+        const date = '.reserve-cal-trigger:not(.reserve-form-time-trigger)';
+        const step = '.reserve-guest-count-step';
+        const pressed = findRule(buttons, '.reserve-btn--secondary:active:not(:disabled)');
+        for (const selector of [date, step]) {
+            expect(findRule(buttons, `${selector}:active:not(:disabled)`)).toBe(pressed);
+            expect(declarations(findRule(surfaces, selector, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
+            expect(declarations(findRule(surfaces, `${selector}:active`, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
+        }
+        expect(pressed.selectors).not.toContain('.rsv-tap-btn:active:not(:disabled)');
+        const link = 'a.reserve-store-list-row-link[href]';
+        const normalRule = selector => surfaces.nodes.find(node => node.type === 'rule' && node.selectors.includes(selector));
+        const card = declarations(normalRule('.reserve-store-card-shell:has(.reserve-store-card-hit:active)'));
+        expect(declarations(normalRule(`${link}:active`)).opacity).toBe(card.opacity);
+        expect(declarations(normalRule(`${link}:active`)).transform).toBeUndefined();
+        expect(declarations(normalRule(link))).toMatchObject({ transition: 'opacity 0.12s ease', '-webkit-tap-highlight-color': 'transparent' });
+        expect(declarations(findRule(surfaces, link, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
+        expect(declarations(normalRule('.reserve-store-list-row-link:active')).opacity).toBeUndefined();
     });
 
     it('fills the mobile message route dynamically without changing the home viewport or removing the safe area', () => {

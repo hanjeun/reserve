@@ -428,6 +428,13 @@ Secret으로만 전달하며 IntelliJ 실행 환경변수에는 필요하지 않
 유지보수 지적 85건이에요. 같은 소스의 main 대상 릴리스 분석도 `OK`이고 새 지적은 0건,
 변경 코드 커버리지는 81.9%예요. 유지보수 지적은 별도 검토 대상으로 남아 있어요.
 
+같은 날 dev `3a50244`의 전체 분석은 Gate `OK`, 변경 코드 커버리지 81.9%, 미해결 지적
+29건이에요. v2.8.5 릴리스 분석은 새 지적·보안 hotspot 0건, 변경 코드 커버리지 83.4%로
+통과했어요. 후속 정리에서 사용하지 않는 `CommunityService` import 1건을 제거했어요.
+나머지 28건은 IME 조합 입력·구형 복사 fallback·JJWT/AntD API·ReactNode·채팅 키보드 처리·
+CLI 결과 출력·순차 재시도/화면 캡처·계산된 색 대비의 기존 계약을 확인해 유지해요.
+지적을 숨기거나 Quality Gate 기준을 낮추지 않아요.
+
 CI의 기존 테스트에서 JaCoCo XML과 Vitest LCOV를 만들어요. 같은 입력·도구·성공 실행·해시·
 유효기간이 검증된 보고서만 재사용하며, 검증할 수 없으면 새로 생성해요. 임계값을 낮추거나
 검사 범위를 줄여서 통과시키지 않아요.
@@ -454,6 +461,11 @@ No data·Error도 Alerting으로 처리해요. 현재 운영에는 활성 상태
 변경 전 규칙과 Grafana DB는 `/var/backups/reserve-scripts/20261003-before-heartbeat-enable/`에
 보존했어요. CSP는 Report-Only를 유지하며, 첫 heartbeat 시각부터 최소 7일간 수집 연속성과
 위반을 관측해요. 2026-10-10 19:34:35 KST 이전에는 7일 관측 완료로 판단하지 않아요.
+2026-10-03 23:16 KST v2.8.5(`c999f63`)의 green 앱으로 전환한 뒤에도 같은 수집 설정을
+유지했어요. 새 앱 heartbeat는 23:16:39 KST에 원본과 Loki 양쪽에서 확인했고,
+Actuator health `UP`과 읽기 전용 배포 verifier도 통과했어요. 사진 집계 로그도 두 곳에서
+확인했으며, 첫 표본만으로 실제 적중률을 판단하지 않아요. 일일 관측 자동화의 첫 7일 이후
+실행은 2026-10-11 19:30 KST예요. 수집 공백이나 CSP 설정 변경이 생기면 관측 기간을 다시 평가해요.
 기존 9개 알림은 유지했고, 대시보드·알림 참조가 0건인 URL 없는 Prometheus만
 공식 datasource provisioning으로 제거했어요. 변경 전 Grafana DB와 복구 설정은
 `/var/backups/reserve-scripts/20261002-before-grafana-cleanup/`에 있어요.

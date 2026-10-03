@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Badge } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
@@ -24,6 +24,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const user = useAuthStore((state) => state.user);
     const sessionRevision = useAuthStore((state) => state.sessionRevision);
     const open = useMessengerStore((state) => state.open);
+    const storeOpenRevision = useMessengerStore((state) => state.storeOpenRevision);
     const togglePanel = useMessengerStore((state) => state.togglePanel);
     const closePanel = useMessengerStore((state) => state.closePanel);
     const syncIdentity = useMessengerStore((state) => state.syncIdentity);
@@ -36,6 +37,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const launcherRef = useRef(null);
     const returnFocusRef = useRef(null);
     const previousOpenRef = useRef(false);
+    const previousStoreOpenRevisionRef = useRef(storeOpenRevision);
 
     useEffect(() => { syncIdentity(identity); }, [identity, syncIdentity]);
 
@@ -57,6 +59,18 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     if (open !== panelState.open) {
         setPanelState({ open, visible: open || panelState.visible });
     }
+    useLayoutEffect(() => {
+        const previousRevision = previousStoreOpenRevisionRef.current;
+        previousStoreOpenRevisionRef.current = storeOpenRevision;
+        if (storeOpenRevision === previousRevision || !open || isMobile || isMessagesPage) return;
+        // 이미 열린 패널의 가게 문의도 기존 CSS 모션만 다시 재생한다. 대화 DOM·초안은 유지한다.
+        for (const animation of panelRef.current?.getAnimations?.() ?? []) {
+            if ('animationName' in animation && animation.animationName === 'reserve-chat-in') {
+                animation.currentTime = 0;
+                animation.play();
+            }
+        }
+    }, [open, storeOpenRevision, isMobile, isMessagesPage]);
     const handleAnimationEnd = (event) => {
         if (event.target === event.currentTarget && !open) {
             setPanelState({ open: false, visible: false });

@@ -66,6 +66,7 @@ class AuthRefreshCookieContractTest {
                 .role(kr.it.reserve.member.entity.Role.USER).build();
         when(rateLimiter.tryConsume(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.eq(RateLimiter.Policy.LOGIN))).thenReturn(true);
+        when(rateLimiter.tryConsume("member@example.test", RateLimiter.Policy.LOGIN_ACCOUNT)).thenReturn(true);
         when(memberService.findByEmailOrNull("member@example.test")).thenReturn(member);
         when(passwordEncoder.matches("test-password", "stored-test-hash")).thenReturn(true);
         when(tokenProvider.generateAccessToken(member)).thenReturn("login-access");

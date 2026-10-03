@@ -40,7 +40,7 @@ describe('chat list automatic refetch policy', () => {
 
     it('separates permission, route, throttling, server, and connection failures without exposing raw server text', () => {
         expect(chatListErrorMessage({ status: 403 })).toContain('권한');
-        expect(chatListErrorMessage({ status: 404 })).toContain('비어 있는 상태가 아닙니다');
+        expect(chatListErrorMessage({ status: 404 })).toBe('요청한 대화 목록을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
         expect(chatListErrorMessage({ status: 429 })).toContain('제한');
         expect(chatListErrorMessage({ status: 500, message: 'private stack trace' })).toContain('서버에서');
         expect(chatListErrorMessage(new Error('서버에 연결할 수 없어요.'))).toContain('서버에 연결할 수 없어');

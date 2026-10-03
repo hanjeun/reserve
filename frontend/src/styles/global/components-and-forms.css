@@ -113,7 +113,9 @@
 .reserve-btn--primary:active:not(:disabled),
 .reserve-btn--secondary:active:not(:disabled),
 .reserve-btn--danger:active:not(:disabled),
-.reserve-btn--hero:active:not(:disabled) {
+.reserve-btn--hero:active:not(:disabled),
+.reserve-cal-trigger:not(.reserve-form-time-trigger):active:not(:disabled),
+.reserve-guest-count-step:active:not(:disabled) {
     transform: scale(0.96);
     opacity: 0.88;
 }

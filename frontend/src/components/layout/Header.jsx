@@ -9,12 +9,14 @@ import { isDiscoveryRootPath } from '../../constants/discovery';
 import useAuthStore from '../../store/useAuthStore';
 import Button from '../common/Button';
 import { requestMessengerRouteClose } from '../chat/messengerRouteTransition';
+import { useSkeletonShown } from './loadingPresentation';
 import { colors, heights, fontWeight, radius } from '../../styles/tokens';
 
 const HeaderAccountMenu = lazy(() => import('./HeaderAccountMenu'));
 const HEADER_ACTION_MOTION_MS = 180;
 
 const Header = () => {
+    const skeletonShown = useSkeletonShown();
     const navigate = useNavigate();
     const location = useLocation();
     const reducedMotion = useReducedMotion();
@@ -91,7 +93,7 @@ const Header = () => {
     // 주의: 정지/영구정지 회원은 이제 로그인 자체가 차단되므로(이메일/소셜 공통)
     // 로그인된 상태에서 배너를 띄우는 분기는 더 이상 필요하지 않음 — 완전히 제거됨
     return (
-        <header className={'reserve-header' + (keyword ? ' reserve-header-has-query' : '') + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '')} style={isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header}>
+        <header data-skeleton-shown={skeletonShown ? 'true' : undefined} className={'reserve-header' + (keyword ? ' reserve-header-has-query' : '') + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '')} style={isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header}>
             <div className="reserve-header-inner" style={styles.inner}>
                 <div className="reserve-header-brand">
                     {renderBack && (

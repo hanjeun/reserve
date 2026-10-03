@@ -48,7 +48,8 @@ const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
 import Header, { HeaderPlaceholder } from './components/layout/Header';
 import DiscoveryNav from './components/layout/DiscoveryNav';
 import RouteLoadingSkeleton from './components/layout/RouteLoadingSkeleton';
-import { getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
+import { applyRouteEntryMotion, clearRouteEntryMotion, getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
+import { LoadingPresentationContext, createLoadingPresentation, useSkeletonShown } from './components/layout/loadingPresentation';
 import { DISCOVERY_NAV_ITEMS, isDiscoveryRootPath } from './constants/discovery';
 import AppFooter from './components/layout/Footer';
 import OfflineBanner from './components/layout/OfflineBanner';
@@ -203,7 +204,8 @@ function appLayoutClassName(pathname) {
 }
 
 function AppContent() {
-    const { pathname, search } = useLocation();
+    const { pathname, search, key: locationKey } = useLocation();
+    const presentation = useMemo(() => createLoadingPresentation(locationKey), [locationKey]);
     const { initializeAuth, sessionRevision } = useAuthStore();
     const [loading, setLoading] = useState(true);
 
@@ -226,6 +228,7 @@ function AppContent() {
     if (loading) {
         const discoveryRoot = isDiscoveryRootPath(pathname, search);
         return (
+            <LoadingPresentationContext.Provider value={presentation}>
             <Layout className={appLayoutClassName(pathname) + ' reserve-boot-shell'} style={appLayoutStyle}>
                 {!isSearchPath(pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} />}
                 {discoveryRoot && <DiscoveryNav />}
@@ -233,21 +236,25 @@ function AppContent() {
                     <RouteLoadingSkeleton />
                 </Content>
             </Layout>
+            </LoadingPresentationContext.Provider>
         );
     }
 
     return (
+        <LoadingPresentationContext.Provider value={presentation}>
         <AntApp message={{ maxCount: 3 }}>
             <SessionQueryProvider key={sessionRevision}>
                 <AppRoutes />
             </SessionQueryProvider>
         </AntApp>
+        </LoadingPresentationContext.Provider>
     );
 }
 
 function AppRoutes() {
     const isLoggedIn = useAuthStore((state) => !!state.user);
-    const { pathname, search, state: locationState } = useLocation();
+    const { pathname, search, key: locationKey, state: locationState } = useLocation();
+    const skeletonShown = useSkeletonShown();
     const navigationType = useNavigationType();
     const isSearchPage = isSearchPath(pathname);
     const routeContentRef = useRef(null);
@@ -284,19 +291,15 @@ function AppRoutes() {
                 /^\/search\/?$/.test(previousPathname || '') && !isSearchPage);
         }
 
-        if (content && previousPathname !== null && previousPathname !== pathname) {
-            // 헤더·탭은 정지한 채 도착한 화면만 움직인다. 같은 pathname의 필터·보기 전환은 제외한다.
-            content.classList.remove('reserve-route-entry--from-right', 'reserve-route-entry--from-left');
-            if (routeMotion) {
-                // 같은 방향을 연달아 재생할 때도 브라우저가 새 애니메이션으로 인식하게 한다.
-                content.getBoundingClientRect();
-                content.classList.add('reserve-route-entry--' + routeMotion);
-            }
-        }
+        applyRouteEntryMotion(content, {
+            pathnameChanged: previousPathname !== pathname,
+            direction: routeMotion,
+            skeletonShown,
+        });
         previousPathnameRef.current = pathname;
         previousDiscoveryTabRef.current = currentTabIndex;
         previousHistoryIndexRef.current = historyIndex;
-    }, [pathname, search, locationState, navigationType, isSearchPage]);
+    }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, skeletonShown]);
 
     return (
         <Layout className={appLayoutClassName(pathname)} style={appLayoutStyle}>
@@ -304,7 +307,12 @@ function AppRoutes() {
             <OfflineBanner />
             {!isSearchPage && <Header />}
             {isDiscoveryRootPath(pathname, search) && <DiscoveryNav />}
-            <Content ref={routeContentRef}>
+            <Content ref={routeContentRef} data-skeleton-shown={skeletonShown ? 'true' : undefined}
+                onAnimationEnd={event => {
+                    if (['reserve-discovery-page-from-right', 'reserve-discovery-page-from-left'].includes(event.animationName)) {
+                        clearRouteEntryMotion(routeContentRef.current);
+                    }
+                }}>
                 {/* 라우트 콘텐츠의 렌더 오류는 여기서 멈춘다 — 헤더·푸터는 남아 다른 화면으로 갈 수 있다. */}
                 <RouteErrorBoundary>
                 <Suspense fallback={<RouteLoadingSkeleton />}>
@@ -360,9 +368,11 @@ function AppRoutes() {
             {!isMessagesPath(pathname) && !isSearchPage && <AppFooter />}
             {/* 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다. 익명 사용자는 청크도 받지 않는다. */}
             {isLoggedIn && (
+                <LoadingPresentationContext.Provider value={null}>
                 <Suspense fallback={null}>
                     <MessengerShell launcherImageSrc="/icons/R_logo.png" />
                 </Suspense>
+                </LoadingPresentationContext.Provider>
             )}
         </Layout>
     );

@@ -24,7 +24,8 @@ final class BrowserCsrfMatcher implements RequestMatcher {
         if (SAFE_METHODS.contains(request.getMethod())) return false;
         String path = request.getServletPath();
         if ("POST".equals(request.getMethod())
-                && ("/api/payment/webhook/portone".equals(path) || "/api/csp-reports".equals(path))) {
+                && (ApiPaths.matchesAlias(path, "/api/payment/webhook/portone")
+                || ApiPaths.matchesAlias(path, "/api/csp-reports"))) {
             return false;
         }
         String origin = request.getHeader("Origin");

@@ -27,13 +27,16 @@ const chatService = {
         API_ENDPOINTS.CHAT.ADMIN_REPLY(roomId), messageBody(content, clientMessageId), config),
     retract: (roomId, messageId) => api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`),
     pollRetractions: (roomId, afterRevision = 0) => api.get(`/api/chat/rooms/${roomId}/retractions`, { params: { afterRevision } }),
-    markAdminSupportRead: (roomId) => api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId)),
+    markAdminSupportRead: (roomId, readThroughId) => readThroughId == null
+        ? api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId))
+        : api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId), undefined, { params: { readThroughId } }),
     pollRoom: (roomId, afterId) => api.get(
         API_ENDPOINTS.CHAT.ROOM_MESSAGES(roomId), { params: { afterId } }),
     getHistory: (roomId, beforeId, size = 50) => api.get(
         API_ENDPOINTS.CHAT.ROOM_HISTORY(roomId), { params: { beforeId, size } }),
-    markRead: (roomId, viewerRole) => api.post(
-        API_ENDPOINTS.CHAT.ROOM_READ(roomId), undefined, { params: { viewerRole } }),
+    markRead: (roomId, viewerRole, readThroughId) => api.post(
+        API_ENDPOINTS.CHAT.ROOM_READ(roomId), undefined,
+        { params: { viewerRole, ...(readThroughId == null ? {} : { readThroughId }) } }),
     setBlocked: (roomId, viewerRole, blocked) => api.put(
         API_ENDPOINTS.CHAT.ROOM_BLOCK(roomId), undefined, { params: { viewerRole, blocked } }),
     setHidden: (roomId, viewerRole, hidden) => api.put(`/api/chat/rooms/${roomId}/visibility`, undefined,

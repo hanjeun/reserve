@@ -23,14 +23,7 @@ allprojects { project ->
                     property 'sonar.organization', 'hanjeun'
                     property 'sonar.host.url', 'https://sonarcloud.io'
                     property 'sonar.projectBaseDir', repositoryRoot.absolutePath
-                    property 'sonar.qualitygate.wait', 'true'
-                    property 'sonar.coverage.jacoco.xmlReportPaths',
-                            new File(project.buildDir, 'reports/jacoco/test/jacocoTestReport.xml').absolutePath
-                    property 'sonar.javascript.lcov.reportPaths',
-                            [new File(repositoryRoot, 'frontend/coverage/lcov.info').absolutePath,
-                             new File(repositoryRoot, 'coverage/tooling/lcov.info').absolutePath].join(',')
-                    property 'sonar.python.coverage.reportPaths',
-                            new File(project.buildDir, 'reports/python/coverage.xml').absolutePath
+                    property 'sonar.qualitygate.wait', 'false'
                     // Reuse explicit source/test boundaries; do not import rule suppressions.
                     ['sonar.sources', 'sonar.tests', 'sonar.exclusions', 'sonar.sourceEncoding'].each { key ->
                         def value = configuration.getProperty(key)

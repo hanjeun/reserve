@@ -12,6 +12,7 @@ const owner = { id: 7, email: 'owner@example.test', role: 'BUSINESS' };
 const other = { id: 8, email: 'other@example.test', role: 'USER' };
 const initialState = () => ({
     open: false,
+    storeOpenRevision: 0,
     view: 'home',
     activeThread: false,
     selection: { kind: 'support' },
@@ -95,6 +96,20 @@ describe('useMessengerStore session drafts and entry points', () => {
         expect(store()).toMatchObject({
             open: true, view: 'conversations', activeThread: true, selection,
         });
+    });
+
+    it('requests replay only for store contact in an already open panel and resets it with the session', () => {
+        store().openStore(31);
+        expect(store().storeOpenRevision).toBe(0);
+        store().openStore(31);
+        expect(store().storeOpenRevision).toBe(1);
+        store().select({ kind: 'store', storeId: 32 });
+        expect(store().storeOpenRevision).toBe(1);
+        store().closePanel();
+        store().openStore(31);
+        expect(store().storeOpenRevision).toBe(1);
+        useAuthStore.setState({ user: owner, sessionRevision: 2 });
+        expect(store().storeOpenRevision).toBe(0);
     });
 
     it('keeps drafts when closing a panel or moving back to home and conversations', () => {

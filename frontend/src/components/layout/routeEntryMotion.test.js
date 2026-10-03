@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveRouteEntryMotion } from './routeEntryMotion';
+import { applyRouteEntryMotion, clearRouteEntryMotion, resolveRouteEntryMotion } from './routeEntryMotion';
 
 const base = {
     previousPathname: '/stores',
@@ -67,5 +67,32 @@ describe('resolveRouteEntryMotion', () => {
         expect(resolveRouteEntryMotion({ ...base, previousPathname: '/messages', pathname: '/', navigationType: 'POP', historyIndex: 2 })).toBeNull();
         expect(resolveRouteEntryMotion({ ...base, previousPathname: '/', pathname: '/messages/12', navigationType: 'PUSH' })).toBeNull();
         expect(resolveRouteEntryMotion({ ...base, previousPathname: '/', pathname: '/messagesx', navigationType: 'PUSH' })).toBe('from-right');
+    });
+});
+
+describe('route entry lifetime', () => {
+    it('preserves an entrance through query-only view normalization without restarting it', () => {
+        const content = document.createElement('main');
+        applyRouteEntryMotion(content, { pathnameChanged: true, direction: 'from-right', skeletonShown: false });
+        expect(content).toHaveClass('reserve-route-entry--from-right');
+        applyRouteEntryMotion(content, { pathnameChanged: false, direction: null, skeletonShown: false });
+        expect(content).toHaveClass('reserve-route-entry--from-right');
+        clearRouteEntryMotion(content);
+        applyRouteEntryMotion(content, { pathnameChanged: false, direction: null, skeletonShown: false });
+        expect(content).not.toHaveClass('reserve-route-entry--from-right');
+    });
+
+    it('clears an entrance as soon as a full page skeleton appears', () => {
+        const content = document.createElement('main');
+        content.classList.add('reserve-route-entry--from-left');
+        applyRouteEntryMotion(content, { pathnameChanged: false, direction: null, skeletonShown: true });
+        expect(content).not.toHaveClass('reserve-route-entry--from-left');
+    });
+
+    it('clears the old direction on a route with its own motion', () => {
+        const content = document.createElement('main');
+        content.classList.add('reserve-route-entry--from-left');
+        applyRouteEntryMotion(content, { pathnameChanged: true, direction: null, skeletonShown: false });
+        expect(content).not.toHaveClass('reserve-route-entry--from-left');
     });
 });

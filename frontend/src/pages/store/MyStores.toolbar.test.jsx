@@ -56,7 +56,7 @@ const routeParams = () => new URLSearchParams(screen.getByTestId('route').textCo
 describe('my stores shared toolbar', () => {
     it('switches cards and rows while preserving URL state and management actions', async () => {
         const user = userEvent.setup();
-        renderMyStores('/my-stores?keep=yes');
+        renderMyStores('/my-stores?utm_source=yes');
         expect(screen.getAllByTestId('manage-card')).toHaveLength(2);
         expect(routeParams().get('view')).toBe('cards');
         await user.click(screen.getByRole('button', { name: '목록형 보기로 전환' }));
@@ -64,12 +64,12 @@ describe('my stores shared toolbar', () => {
         expect(screen.getAllByRole('article')).toHaveLength(2);
         expect(screen.getByRole('button', { name: '안산 한식 수정' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '안산 한식 삭제' })).toBeInTheDocument();
-        expect(Object.fromEntries(routeParams())).toEqual({ keep: 'yes', view: 'list' });
+        expect(Object.fromEntries(routeParams())).toEqual({ utm_source: 'yes', view: 'list' });
     });
 
     it('filters owned stores locally and keeps the view without offering a region control', async () => {
         const user = userEvent.setup();
-        renderMyStores('/my-stores?view=list&region=부산&keep=yes');
+        renderMyStores('/my-stores?view=list&region=부산&utm_source=yes');
         expect(screen.getAllByRole('article')).toHaveLength(2);
         await user.selectOptions(screen.getByLabelText('서비스 분야'), 'FOOD');
         expect(screen.getAllByRole('article')).toHaveLength(1);
@@ -78,18 +78,18 @@ describe('my stores shared toolbar', () => {
         expect(screen.queryByRole('dialog', { name: '지역 선택' })).not.toBeInTheDocument();
         expect(routeParams().get('domain')).toBe('FOOD');
         expect(routeParams().get('view')).toBe('list');
-        expect(routeParams().get('keep')).toBe('yes');
+        expect(routeParams().get('utm_source')).toBe('yes');
     });
 
     it('offers a filter reset when a management filter has no matches', async () => {
         const user = userEvent.setup();
-        renderMyStores('/my-stores?view=list&domain=NOT_A_DOMAIN&region=부산&keep=yes');
+        renderMyStores('/my-stores?view=list&domain=SPORTS&region=부산&utm_source=yes');
         expect(screen.getByText('조건에 맞는 내 가게가 없습니다.')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '필터 초기화' }));
         expect(screen.getAllByRole('article')).toHaveLength(2);
         expect(routeParams().get('domain')).toBeNull();
         expect(routeParams().get('region')).toBeNull();
         expect(routeParams().get('view')).toBe('list');
-        expect(routeParams().get('keep')).toBe('yes');
+        expect(routeParams().get('utm_source')).toBe('yes');
     });
 });

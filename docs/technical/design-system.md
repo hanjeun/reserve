@@ -187,6 +187,7 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 인원이 증가하면 위로, 이전 날짜로 또는 인원이 감소하면 아래로 200ms 동안 이동하며 살짝 회전한다.
 날짜는 모달이 닫힌 뒤 전환하고, 연속 입력은 이전 전환을 중단해 최신 값을 표시한다.
 현재 값은 접근성 이름에 즉시 반영하고, `prefers-reduced-motion`에서는 전환 없이 표시한다.
+이전 값은 절대 위치의 장식 레이어로 두어 부모 크기 계산에서 제외한다. 현재 값만 레이아웃을 결정하고, `contain: layout paint`로 날짜·인원 칸 안에서 전환한다. 값 교체를 위해 페이지나 예약 폼에 새 `key`를 주지 않는다.
 
 ### FormModal
 
@@ -378,6 +379,9 @@ if (items.length === 0) {
 - 홈 이동은 도착한 홈만 왼쪽에서 들어와요.
 - 검색 화면은 내용만 PC 8px·모바일 24px을 220ms 동안 위로 들이고, 취소·Escape는 반대로 닫아요.
 - 같은 pathname의 필터·정렬·보기 전환과 데이터 로딩 스켈레톤에는 전환을 넣지 않아요.
+- `LoadingPresentationContext`는 이동 키마다 실제로 표시된 페이지 골격을 기록해요. 그 이동에서 골격이 보였다면 데이터 도착 뒤 페이지·헤더 등장 효과를 다시 재생하지 않아요. 지도·시간 슬롯·달력 같은 부분 로딩은 `Bone pageLoading={false}`로 구분해요.
+- 검색·채팅 패널의 전용 열림·닫힘은 예외예요. 첫 채팅 조회가 골격을 보여도 `MessengerShell`의 기존 열림 효과를 유지하고, 열린 패널에서 가게 문의로 전환할 때는 `storeOpenRevision`으로 같은 효과를 다시 재생해요. 동작 줄이기 설정에서는 즉시 열어요.
+- 알려지지 않은 경로의 준비 골격도 `routeSkeletonKind`와 기존 `RouteSkeletonPages`의 404 화면 규격을 사용해요. 로딩 상태의 문구는 `LoadingStatus`의 접근성 안내로 제공해요.
 - 모션 감소 설정에서는 즉시 이동해요.
 
 ### 집중형 작업 화면

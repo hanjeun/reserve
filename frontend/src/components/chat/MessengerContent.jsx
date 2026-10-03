@@ -188,9 +188,9 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     }, [queryClient]);
     const onError = useCallback((text) => message.error(text), [message]);
-    const onPolled = useCallback((roomId, fresh) => {
+    const onPolled = useCallback((roomId, fresh, { caughtUp = true, readThroughId } = {}) => {
         const readScope = readScopeRef.current;
-        if (readScope?.threadKey !== threadKey || readScope.loading || readScope.roomId !== roomId
+        if (!readScope || readScope.threadKey !== threadKey || readScope.loading || readScope.roomId !== roomId
             || readScope.identity !== messengerIdentityOf(useAuthStore.getState())) return;
         const viewerRole = viewerRoleOf(selection);
         if (isWide && notify({ roomId, messages: fresh, viewerRole })) {
@@ -199,20 +199,22 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                 roomId, selection, identity: messengerIdentityOf(useAuthStore.getState()),
             };
         }
-        if (document.visibilityState !== 'visible' || !document.hasFocus()) return;
+        if (!caughtUp || document.visibilityState !== 'visible' || !document.hasFocus()) return false;
         const markRead = viewerRole === 'ADMIN'
-            ? chatService.markAdminSupportRead(roomId)
-            : chatService.markRead(roomId, viewerRole);
-        markRead
+            ? chatService.markAdminSupportRead(roomId, readThroughId)
+            : chatService.markRead(roomId, viewerRole, readThroughId);
+        return markRead
             .then(() => {
-                if (readScopeRef.current !== readScope || readScope.identity !== messengerIdentityOf(useAuthStore.getState())) return;
-                clearUnreadCaches();
+                if (readScopeRef.current !== readScope || readScope.identity !== messengerIdentityOf(useAuthStore.getState())) return true;
+                // 수신 커서 뒤에 도착한 메시지가 남을 수 있어 서버의 배지를 다시 조회한다.
+                onSent();
+                return true;
             })
-            .catch(() => { /* 다음 방 열기에서 다시 읽음 처리한다. */ });
-    }, [clearUnreadCaches, isWide, notify, selection, threadKey]);
+            .catch(() => false); // 현재 수신 커서를 보관해 다음 성공 조회에서 다시 읽음 처리한다.
+    }, [isWide, notify, onSent, selection, threadKey]);
 
     const {
-        messages, thread, loading, loadError, sending, send, reload, prepend, cancelSend, updateMessage,
+        messages, thread, loading, loadError, sending, send, reload, captureHistory, prepend, cancelSend, updateMessage,
     } = useChatThread({
         threadKey,
         myRole: viewerRoleOf(selection),
@@ -268,21 +270,28 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const loadOlderMessages = async () => {
         if (!thread?.roomId || !currentHistory.nextBeforeId || currentHistory.loading) return;
         const scope = historyScopeRef.current;
-        if (scope?.threadKey !== threadKey || scope.roomId !== thread.roomId) return;
-        const body = threadBodyRef.current;
-        if (body) historyScrollRef.current = { height: body.scrollHeight, top: body.scrollTop };
+        if (!scope || scope.threadKey !== threadKey || scope.roomId !== thread.roomId) return;
         setHistory((state) => ({ ...state, loading: true }));
         try {
-            const result = await chatService.getHistory(
-                scope.roomId, currentHistory.nextBeforeId, 50);
-            if (historyScopeRef.current !== scope) return;
-            prepend(result?.messages ?? []);
-            setHistory({
-                key: selectionKey,
-                hasMore: Boolean(result?.hasMore),
-                nextBeforeId: result?.nextBeforeId ?? null,
-                loading: false,
-            });
+            // 조회 중 취소가 도착한 원문은 버리고 같은 페이지를 한 번만 다시 받는다.
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+                const snapshot = captureHistory();
+                if (!snapshot) return;
+                const result = await chatService.getHistory(
+                    scope.roomId, currentHistory.nextBeforeId, 50);
+                if (historyScopeRef.current !== scope) return;
+                const body = threadBodyRef.current;
+                const position = body ? { height: body.scrollHeight, top: body.scrollTop } : null;
+                if (!prepend(result?.messages ?? [], snapshot)) continue;
+                historyScrollRef.current = result?.messages?.length ? position : null;
+                setHistory({
+                    key: selectionKey,
+                    hasMore: Boolean(result?.hasMore),
+                    nextBeforeId: result?.nextBeforeId ?? null,
+                    loading: false,
+                });
+                return;
+            }
         } catch {
             if (historyScopeRef.current !== scope) return;
             historyScrollRef.current = null;

@@ -18,6 +18,7 @@ import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.repository.StoreSearchSpecification;
+import kr.it.reserve.store.search.StoreFulltextSearch;
 import kr.it.reserve.store.dto.StoreCreateRequest;
 import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.dto.StoreRegionGroup;
@@ -30,6 +31,8 @@ import kr.it.reserve.store.util.StoreRegionNames;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +64,7 @@ public class StoreService {
 
 
     private final StoreRepository storeRepository;
+    private final StoreFulltextSearch storeFulltextSearch;
     private final FileStorageService fileStorageService;
     private final FileDeletionOutboxService fileDeletionOutboxService;
     private final DataLifecycleGuard dataLifecycleGuard;
@@ -72,11 +76,9 @@ public class StoreService {
     private final ObjectMapper objectMapper;
 
     /**
-     * 가게 검색에 MySQL FULLTEXT(ngram)를 쓸지 여부.
-     *
-     * <p>별도 MySQL에서 DDL·EXPLAIN·LIKE 결과 동등성을 확인한 뒤에만 true로 바꿀 수 있다.
-     * 현재 prod·local·test 기본값은 모두 false다. 테스트 H2에는 {@code MATCH ... AGAINST}가 없고,
-     * MySQL도 FULLTEXT 인덱스 없이 켜면 검색 전체가 실패한다.
+     * MySQL ngram=2와 일치하는 인덱스가 확인되면 FULLTEXT 후보 검색을 사용한다.
+     * 원문 LIKE와 같은 결과 수가 보장되는 요청만 사용하며 H2·미설치·오류는 LIKE로 폴백한다.
+     * 명시적으로 false를 지정하면 탐지도 수행하지 않는다.
      *
      * <p>★ 이 필드는 <b>final이 아니어야 한다.</b> 이 클래스는 Lombok {@code @RequiredArgsConstructor}를
      * 쓰는데, final 필드는 생성자 파라미터가 되고 그때 {@code @Value}는 (copyableAnnotations 설정 없이는)
@@ -84,11 +86,9 @@ public class StoreService {
      *
      * <p>선행 조건: {@code docs/technical/manual-ddl.md}의 FULLTEXT 인덱스 DDL 적용.
      */
-    @Value("${search.store.fulltext-enabled:false}")
+    @Value("${search.store.fulltext-enabled:true}")
     private boolean fulltextEnabled;
 
-    /** ngram 파서의 최소 토큰 길이. 이보다 짧은 검색어는 FULLTEXT로 잡히지 않아 LIKE로 폴백한다. */
-    private static final int NGRAM_TOKEN_SIZE = 2;
     /** 국내 서비스 전체를 포함하면서 좌표 없는/비정상 원거리 행을 거리 계산에서 배제하는 1차 후보 범위. */
     private static final double DISTANCE_CANDIDATE_RADIUS_KM = 1_000.0;
     // 이름을 "imageUploadExecutor"로 맞춰서 AsyncConfig의 @Bean(name = "imageUploadExecutor")와
@@ -1113,12 +1113,12 @@ public class StoreService {
     private Page<StoreResponse> searchStoresPage(
             String keyword, String sort, int page, int size, Double lat, Double lng, SearchScope scope) {
         Pageable pageable = PageRequests.bounded(page, size);
-        return sortedSearch(keyword, sort, pageable, lat, lng, scope.domain(), scope.region()).map(StoreResponse::fromEntity);
+        return sortedSearch(keyword, sort, pageable, lat, lng, scope.domain(), scope.region());
     }
 
     public record SearchScope(String domain, String region) {}
 
-    private Page<Store> sortedSearch(
+    private Page<StoreResponse> sortedSearch(
             String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
         String normalizedSort = normalizeSort(sort);
         if (DISTANCE_SORT.equals(normalizedSort) && !validCoordinates(lat, lng)) {
@@ -1127,46 +1127,33 @@ public class StoreService {
         ServiceDomain domainFilter = ServiceDomain.parseOrNull(domain);
         String regionFilter = region == null ? "" : region.trim();
         String normalized = keyword == null ? "" : keyword.trim();
-        String booleanQuery = toBooleanModeQuery(normalized);
-        boolean fulltextCompatible = domainFilter == null
-                && regionFilter.isEmpty()
-                && !"recommended".equals(normalizedSort)
-                && !DISTANCE_SORT.equals(normalizedSort);
-        if (fulltextEnabled && fulltextCompatible && !booleanQuery.isEmpty()) {
-            // 네이티브 컬럼명은 JPQL 속성명과 다르다. 허용한 sort를 명시적 CASE ORDER BY에 전달한다.
-            return storeRepository.searchStoresFulltextPaged(booleanQuery, normalizedSort, ServiceTime.today(), pageable);
-        }
-
         // 공개 상태·검색·분야(legacy null 추론)·지역·노출형 우선순위·거리 후보를 같은 DB 쿼리/count에 적용한다.
         // Pageable은 그대로 전달하되 정렬은 Specification이 허용 목록으로만 구성한다.
-        return storeRepository.findAll(
-                StoreSearchSpecification.publicSearch(
+        Specification<Store> literalSearch = StoreSearchSpecification.publicSearch(
                         normalized,
                         normalizedSort,
                         domainFilter,
                         regionFilter,
                         new StoreSearchSpecification.DistanceCandidates(lat, lng, DISTANCE_CANDIDATE_RADIUS_KM),
-                        ServiceTime.today()),
-                pageable);
+                        ServiceTime.today());
+        if (fulltextEnabled) {
+            String candidate = storeFulltextSearch.candidateQuery(normalized);
+            if (!candidate.isEmpty()) {
+                try {
+                    return storeFulltextSearch.search(literalSearch, candidate, pageable);
+                } catch (DataAccessException exception) {
+                    // 독립 읽기 트랜잭션이 끝난 뒤 LIKE로 돌아가므로 실패한 MATCH가 폴백을 오염시키지 않는다.
+                    storeFulltextSearch.disable();
+                }
+            }
+        }
+        return storeRepository.findAll(literalSearch, pageable).map(StoreResponse::fromEntity);
     }
 
     private String normalizeSort(String sort) {
         if ("reviewCount".equals(sort)) return "reviews";
         return "recommended".equals(sort) || "recent".equals(sort) || "reviews".equals(sort)
                 || DISTANCE_SORT.equals(sort) ? sort : "rating";
-    }
-
-    /** 연산자만 있거나 색인되지 않는 짧은 토큰이 섞이면 원문 LIKE 검색으로 보낸다. */
-    private String toBooleanModeQuery(String keyword) {
-        String cleaned = keyword.replaceAll("[+\\-><()~*\\\"@]", " ").trim();
-        if (cleaned.isEmpty()) return "";
-        StringBuilder result = new StringBuilder();
-        for (String token : cleaned.split("\\s+")) {
-            if (token.length() < NGRAM_TOKEN_SIZE) return "";
-            if (!result.isEmpty()) result.append(' ');
-            result.append('+').append(token);
-        }
-        return result.toString();
     }
 
     private static boolean validCoordinates(Double lat, Double lng) {
@@ -1192,7 +1179,7 @@ public class StoreService {
 
     private List<StoreResponse> searchStoreList(String keyword, String sort, String domain, String region) {
         return sortedSearch(keyword, sort, Pageable.unpaged(), null, null, domain, region)
-                .map(StoreResponse::fromEntity).getContent();
+                .getContent();
     }
 
     /** 현재 가게가 실제로 있는 시도·시군구만 모아 인기 지역과 계층 목록에 공유한다. */

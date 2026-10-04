@@ -51,7 +51,7 @@ feature/기능명  ← 기능별 작업 브랜치
 | `docs` | 문서 수정 | `docs: add branch strategy to README` |
 | `chore` | 빌드, 설정, 패키지 | `chore: update gitignore` |
 | `style` | 코드 스타일 | `style: fix indentation in StoreCard` |
-| `release` | 배포 | `release: home page mobile/PC layout improvements` |
+| `release` | 배포 | `release: deploy v2.5.1` |
 
 - 커밋·PR 제목은 영어 `type: subject` 형식이에요. 소문자로 시작하고, 마침표는 붙이지 않아요.
 - 현재형 동사를 써요. (`add`, `fix`, `remove` 등)

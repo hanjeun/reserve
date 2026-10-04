@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import api from './axios';
 import { advanceSession, currentSession } from './sessionScope';
 import useAuthStore from '../store/useAuthStore';
+import chatRetentionService from '../services/chatRetentionService';
 
 vi.mock('../utils/skeletonDelay', () => ({ skeletonDelayInterceptor: async () => {} }));
 const deferred = () => {
@@ -162,6 +163,41 @@ describe('HTTP session boundary', () => {
         expect(calls).toEqual(['/api/promotions/public']);
         expect(localStorage.getItem('auth-storage')).toBe('preserved');
         localStorage.removeItem('auth-storage');
+    });
+
+    it('public retention policy failure does not start an authentication flow', async () => {
+        const calls = [];
+        api.defaults.adapter = config => {
+            calls.push(config.url);
+            return Promise.reject({ config, response: { status: 401 } });
+        };
+        await expect(chatRetentionService.policy()).rejects.toMatchObject({ status: 401 });
+        expect(calls).toEqual(['/api/chat/retention-policy']);
+    });
+
+    it.each(['/privacy', '/terms', '/'])('private expiry clears personal data while staying on public %s', async path => {
+        const previousUrl = window.location.href;
+        window.history.replaceState({}, '', path);
+        useAuthStore.getState().login({ id: 1, email: 'session@example.test', role: 'USER' });
+        const scope = currentSession().epoch;
+        const calls = [];
+        try {
+            api.defaults.adapter = config => {
+                calls.push(config.url);
+                return Promise.reject({ config, response: { status: 401 } });
+            };
+            await expect(api.get('/api/chat/unread')).rejects.toMatchObject({ isSessionExpired: true });
+            expect(calls).toEqual(['/api/chat/unread', '/api/auth/refresh']);
+            expect(window.location.pathname).toBe(path);
+            expect(useAuthStore.getState().user).toBeNull();
+            expect(useAuthStore.getState().isLoggedIn).toBe(false);
+            expect(useAuthStore.getState().isLoggingOut).toBe(false);
+            expect(currentSession().epoch).toBeGreaterThan(scope);
+            expect(JSON.parse(localStorage.getItem('auth-storage')).state.user).toBeNull();
+        } finally {
+            useAuthStore.getState().expireSession();
+            window.history.replaceState({}, '', previousUrl);
+        }
     });
 
     it('returns authenticated image blobs without JSON unwrapping and rejects old-session blobs', async () => {

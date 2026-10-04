@@ -8,7 +8,7 @@ import { preloadRouteSkeletons } from './routeSkeletonLoader';
 
 const routes = {
     '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'benefit-detail', '/waiting': 'coming-soon', '/feed': 'coming-soon',
-    '/login': 'auth', '/signup': 'auth', '/forgot-password': 'auth', '/oauth2/callback': 'document', '/signup/social': 'auth',
+    '/login': 'auth', '/signup': 'auth', '/forgot-password': 'auth', '/oauth2/callback': 'discovery', '/signup/social': 'auth',
     '/stores': 'store-list', '/store/12': 'detail', '/terms': 'legal', '/privacy': 'legal', '/operation-guide': 'legal', '/content-sources': 'legal',
     '/my-stores': 'cards', '/store/register': 'store-form', '/store/12/edit': 'store-form', '/business': 'business', '/admin': 'admin',
     '/my-reservations': 'reservations', '/my-favorites': 'cards', '/payment/result': 'payment-result', '/my-page': 'my-page', '/messages': 'messages',

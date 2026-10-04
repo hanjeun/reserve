@@ -105,9 +105,9 @@ class CspReportControllerTest {
 
             assertThat(appender.list)
                     .extracting(ILoggingEvent::getFormattedMessage)
-                    .containsExactly("CSP violation observed: directive=script, blockedScheme=https, sourceCategory=invalid");
+                    .containsExactly("CSP violation observed: directive=script, blockedScheme=https, sourceCategory=invalid, blockedCategory=external-web");
             assertThat(appender.list.getFirst().getArgumentArray())
-                    .containsExactly("script", "https", "invalid");
+                    .containsExactly("script", "https", "invalid", "external-web");
             assertThat(appender.list.getFirst().getThrowableProxy()).isNull();
         } finally {
             logger.detachAppender(appender);
@@ -132,6 +132,10 @@ class CspReportControllerTest {
             notkakao.com, external-web
             o1.ingest.sentry.io, sentry
             notsentry.io, external-web
+            lh3.googleusercontent.com, google-profile
+            lh3.googleusercontent.com.attacker.example, external-web
+            images.unsplash.com, unsplash
+            placehold.co, placeholder
             """)
     void classifiesWebHostBoundariesWithoutLoggingPrivateReportData(String host, String expectedCategory)
             throws Exception {
@@ -156,9 +160,30 @@ class CspReportControllerTest {
             assertThat(appender.list)
                     .extracting(ILoggingEvent::getFormattedMessage)
                     .containsExactly("CSP violation observed: directive=script, blockedScheme=https, sourceCategory="
-                            + expectedCategory);
+                            + expectedCategory + ", blockedCategory=external-web");
             assertThat(appender.list.getFirst().getArgumentArray())
-                    .containsExactly("script", "https", expectedCategory);
+                    .containsExactly("script", "https", expectedCategory, "external-web");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
+    void recordsBlockedImageCategoryWithoutItsPrivatePathOrQuery() throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(CspReportController.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            mockMvc.perform(post("/api/csp-reports").contentType("application/csp-report").content("""
+                    {"csp-report":{"effective-directive":"img-src",
+                    "blocked-uri":"https://lh3.googleusercontent.com/private-photo?token=private-token",
+                    "source-file":"https://reserve.it.kr/assets/private.js"}}
+                    """)).andExpect(status().isNoContent());
+            assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage).containsExactly(
+                    "CSP violation observed: directive=img, blockedScheme=https, sourceCategory=first-party, blockedCategory=google-profile");
+            assertThat(appender.list.getFirst().getArgumentArray()).containsExactly("img", "https", "first-party", "google-profile");
         } finally {
             logger.detachAppender(appender);
             appender.stop();

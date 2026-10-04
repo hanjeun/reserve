@@ -29,6 +29,8 @@ const useAuthStore = create(
 
             setLoggingOut: (val) => set({ isLoggingOut: val }),
 
+            expireSession: () => applyUser(set, get, null),
+
             login: (userData) => applyUser(set, get, userData, true),
 
             // 프로필 표시 갱신은 새 로그인과 다르다. 다른 계정의 늦은 콜백은 반영하지 않는다.
@@ -127,7 +129,14 @@ if (typeof window !== 'undefined') {
         }
     };
     window.addEventListener('storage', onStorage);
-    import.meta.hot?.dispose(() => window.removeEventListener('storage', onStorage));
+    const onSessionExpired = event => {
+        if (isCurrentSession(event.detail?.epoch)) useAuthStore.getState().expireSession();
+    };
+    window.addEventListener('reserve:session-expired', onSessionExpired);
+    import.meta.hot?.dispose(() => {
+        window.removeEventListener('storage', onStorage);
+        window.removeEventListener('reserve:session-expired', onSessionExpired);
+    });
 }
 
 export default useAuthStore;

@@ -1062,7 +1062,8 @@
     font-size: 11px;
     line-height: 1.6;
 }
-.reserve-messenger-replies > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.reserve-messenger-replies[open] .reserve-messenger-replies-content { animation: slideUpIn 0.2s ease both; }
+.reserve-messenger-replies-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .reserve-messenger-replies .reserve-btn { min-height: 44px; }
 .reserve-messenger-closed {
     display: block;
@@ -1188,7 +1189,11 @@
 .reserve-chat-attachment-preview::after { content: ''; position: absolute; inset: 0; background: var(--c-gray-500, #8b95a1); opacity: 0; transition: opacity 0.15s ease; }
 .reserve-chat-attachment-preview:hover::after { opacity: 0.2; }
 .reserve-chat-attachment-preview:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
+.reserve-chat-photo-image { transition: filter 0.15s ease; }
+/* 원본의 투명한 모양을 유지하며 사진 픽셀에만 hover·키보드 피드백을 준다. */
+.reserve-chat-photo:focus-visible .reserve-chat-photo-image { filter: brightness(0.9); }
 @media (hover: hover) and (pointer: fine) {
+    .reserve-chat-photo:hover .reserve-chat-photo-image { filter: brightness(0.9); }
     .reserve-chat-message-actions { opacity: 0; }
     .reserve-chat-message-row:hover .reserve-chat-message-actions,
     .reserve-chat-message-row:focus-within .reserve-chat-message-actions,
@@ -1234,6 +1239,8 @@
     .reserve-messenger.is-returning-to-list > .reserve-messenger-list,
     .reserve-messenger.is-returning-to-list > .reserve-messenger-thread { animation-duration: 0.01ms; }
     .reserve-messenger-list-refresh.is-refreshing .anticon { animation: none; }
+    .reserve-messenger-replies[open] .reserve-messenger-replies-content { animation: none; }
+    .reserve-chat-photo-image { transition: none; }
     .reserve-messenger-launcher-wrap,
     .reserve-chat-launcher,
     .reserve-chat-launcher .anticon,

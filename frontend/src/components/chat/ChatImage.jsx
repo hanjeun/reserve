@@ -33,6 +33,7 @@ export default function ChatImage({ url, width, height }) {
     if (current?.error) return <output>사진을 불러오지 못했습니다.</output>;
     if (!current?.src) return <Bone width={180} height={140} />;
     return <Image src={current.src} alt="대화에 첨부한 사진" style={style}
+        classNames={{ root: 'reserve-chat-photo', image: 'reserve-chat-photo-image' }}
         styles={{ root: { width: 240, maxWidth: '100%' } }}
         role="button" tabIndex={0} aria-label="사진 크게 보기"
         onKeyDown={event => {

@@ -258,7 +258,7 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
 
 ### 4-1. CSP 위반 관측
 
-`nginx/default.conf`의 CSP는 **Report-Only**로 나가요. 위반 보고는 `POST /api/csp-reports`로 들어오고, 서버는 지시문 종류와 차단된 URI의 scheme만 `CSP violation observed` 로그로 남겨요.
+`nginx/default.conf`의 CSP는 **Report-Only**로 나가요. 위반 보고는 `POST /api/csp-reports`로 들어오고, 서버는 지시문 종류·차단 URI의 scheme·코드 출처 범주·차단 대상 범주만 `CSP violation observed` 로그로 남겨요. URL 경로·쿼리·파일명·원본 호스트는 기록하지 않아요. v2.8.8부터 차단 대상 범주(`blockedCategory`)를 추가했고, 실제 사용 중인 Google 프로필 사진 호스트 `lh3.googleusercontent.com`만 이미지 허용 목록에 보완해요. 이전 이미지 보고 10건은 차단 대상 범주가 없어 전부 Google 사진 때문이라고 확정할 수 없어요.
 
 1. 배포 후 https://reserve.it.kr 에서 개발자도구 콘솔을 열고 **PC와 실제 모바일에서 주요 화면을 한 바퀴 돌며**
    `[Report Only]` 경고를 모아요.

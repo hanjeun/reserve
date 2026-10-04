@@ -18,6 +18,7 @@ import { API_ENDPOINTS } from '../../constants';
 import { USER_ROLE_LABELS, hasOwnerAccess } from '../../constants/roles';
 import { colors, fontWeight, radius } from '../../styles/tokens';
 import Avatar from '../common/Avatar';
+import { SpinIndicator } from '../common/Loading';
 
 const { Text } = Typography;
 
@@ -30,7 +31,7 @@ const HeaderAccountMenu = () => {
     const handleLogout = async () => {
         if (isLoggingOut) return;
         setLoggingOut(true);
-        const dismissProgress = message.loading('로그아웃하는 중입니다.', 0);
+        const dismissProgress = message.loading({ content: '로그아웃하는 중입니다.', duration: 0, icon: <SpinIndicator /> });
         let serverLogoutFailed = false;
         try {
             // 로그아웃은 더 이상 토큰이 필요 없는 단방향 요청이다. 401 refresh를 시도하거나

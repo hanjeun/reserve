@@ -16,7 +16,7 @@ import java.util.Set;
 
 /**
  * CSP Report-Only 위반 수집기. URL 경로·쿼리·문서 주소는 로그에 남기지 않고
- * 지시문 범주와 차단 URI의 scheme만 남겨 인증값이나 개인정보 유출을 막는다.
+ * 지시문·출처 범주와 차단 URI의 scheme만 남겨 인증값이나 개인정보 유출을 막는다.
  */
 @Slf4j
 @RestController
@@ -63,8 +63,8 @@ public class CspReportController {
         );
         String blockedUri = firstText(report, "blocked-uri", "blockedURL", "blockedUrl");
         String sourceFile = firstText(report, "source-file", "sourceFile");
-        log.warn("CSP violation observed: directive={}, blockedScheme={}, sourceCategory={}",
-                directiveCategory(directive), blockedScheme(blockedUri), sourceCategory(sourceFile));
+        log.warn("CSP violation observed: directive={}, blockedScheme={}, sourceCategory={}, blockedCategory={}",
+                directiveCategory(directive), blockedScheme(blockedUri), sourceCategory(sourceFile), sourceCategory(blockedUri));
     }
 
     private String firstText(JsonNode node, String... fields) {
@@ -126,6 +126,9 @@ public class CspReportController {
     private String webSourceCategory(URI uri) {
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
         if (host.equals("reserve.it.kr") || host.endsWith(".reserve.it.kr")) return "first-party";
+        if (host.equals("lh3.googleusercontent.com")) return "google-profile";
+        if (host.equals("images.unsplash.com")) return "unsplash";
+        if (host.equals("placehold.co")) return "placeholder";
         if (host.equals("cdn.portone.io") || host.endsWith(".portone.io")
                 || host.endsWith(".iamport.kr")) return "portone";
         if (host.equals("dapi.kakao.com") || host.endsWith(".kakao.com")

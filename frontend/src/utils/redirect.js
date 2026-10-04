@@ -44,15 +44,22 @@ export const saveRedirect = (path) => {
     }
 };
 
-/**
- * 저장된 복귀 경로를 꺼내면서 지운다 (한 번만 쓰이도록).
- * 저장된 게 없거나 안전하지 않으면 null.
- */
-export const consumeRedirect = () => {
+/** 인증 대기 화면에서 복귀 경로를 읽는다. 실제 이동 전까지 저장값을 유지한다. */
+export const peekRedirect = () => {
     try {
         const path = sessionStorage.getItem(KEY);
-        sessionStorage.removeItem(KEY);
         return isSafeInternalPath(path) ? path : null;
+    } catch {
+        return null;
+    }
+};
+
+/** 저장된 안전한 복귀 경로를 꺼내고 지운다. 실제 인증 완료 후 한 번만 소비한다. */
+export const consumeRedirect = () => {
+    try {
+        const path = peekRedirect();
+        sessionStorage.removeItem(KEY);
+        return path;
     } catch {
         return null;
     }

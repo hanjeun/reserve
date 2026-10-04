@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App } from 'antd';
 import useAuthStore from '../../store/useAuthStore';
-import Loading from '../../components/common/Loading';
+import RouteLoadingSkeleton from '../../components/layout/RouteLoadingSkeleton';
 import { consumeRedirect } from '../../utils/redirect';
 
 /**
@@ -22,9 +22,12 @@ const OAuthCallback = () => {
     const navigate = useNavigate();
     const { checkAuth } = useAuthStore();
     const hasCalled = useRef(false);
+    const mounted = useRef(false);
 
     useEffect(() => {
-        if (hasCalled.current) return;
+        mounted.current = true;
+        const cleanup = () => { mounted.current = false; };
+        if (hasCalled.current) return cleanup;
         hasCalled.current = true;
 
         // OAuth2 실패 콜백 체크 (FailureHandler가 ?error=oauth2&message=... 형식으로 보냄)
@@ -34,12 +37,13 @@ const OAuthCallback = () => {
         if (oauthError === 'oauth2' && oauthMessage) {
             message.error(decodeURIComponent(oauthMessage));
             navigate('/login', { replace: true });
-            return;
+            return cleanup;
         }
 
         const finalizeLogin = async () => {
             try {
                 const user = await checkAuth(true);
+                if (!mounted.current) return;
                 if (user?.email) {
                     const isNewUser = params.get('newUser') === 'true';
                     if (isNewUser) {
@@ -55,15 +59,17 @@ const OAuthCallback = () => {
                     throw new Error('유저 정보가 올바르지 않습니다.');
                 }
             } catch (err) {
+                if (!mounted.current) return;
                 console.error('OAuth 인증 실패:', err);
                 message.error('로그인 정보를 가져오는데 실패했습니다.');
                 navigate('/login', { replace: true });
             }
         };
         void finalizeLogin();
+        return cleanup;
     }, [checkAuth, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return <Loading fullPage />;
+    return <RouteLoadingSkeleton />;
 };
 
 export default OAuthCallback;

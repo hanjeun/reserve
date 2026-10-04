@@ -61,8 +61,8 @@ const handle401 = async (originalRequest) => {
         assertCurrentSession(scope);
         if (error?.status !== 401 && error?.status !== 403) throw error;
         if (canonicalApiPath(originalRequest.url) !== '/api/member/me') {
-            localStorage.removeItem('auth-storage');
-            if (!globalThis.location.pathname.includes('/login')) globalThis.location.href = '/login';
+            // 공개 화면은 API에서 이동시키지 않는다. 개인 캐시를 비우고 보호 라우트의 가드에 맡긴다.
+            globalThis.dispatchEvent(new CustomEvent('reserve:session-expired', { detail: { epoch: scope } }));
         }
         throw new SessionExpiredError();
     } finally {

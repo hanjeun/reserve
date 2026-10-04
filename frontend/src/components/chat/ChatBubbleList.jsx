@@ -99,7 +99,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                             ...(m.pending ? styles.bubblePending : null),
                             ...(m.retracted || m.expired ? { background: colors.background.subtle, color: colors.text.secondary, border: `1px solid ${colors.border.default}` } : null),
                         }}>
-                            {m.content}
+                            <span>{m.content}</span>
                         </div>}
                     </div>
                     {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole}

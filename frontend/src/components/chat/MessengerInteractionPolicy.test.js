@@ -19,8 +19,12 @@ function declarations(selector, media = null) {
 
 describe('messenger interaction roles', () => {
     it('keeps unread badges red and overlays message actions without reserving an extra column', () => {
+        for (const scope of ['.reserve-messenger', '.reserve-messenger-launcher-wrap']) {
+            expect(declarations(scope)['--reserve-messenger-unread-bg'])
+                .toBe('color-mix(in srgb, var(--c-error, #f04452) 50%, #000)');
+        }
         for (const selector of ['.reserve-messenger-unread', '.reserve-messenger-footer-badge']) {
-            expect(declarations(selector).background).toBe('color-mix(in srgb, var(--c-error, #f04452) 50%, #000)');
+            expect(declarations(selector).background).toBe('var(--reserve-messenger-unread-bg)');
         }
         expect(declarations('.reserve-chat-message-meta > .reserve-chat-message-actions').position).toBe('absolute');
         expect(declarations('.reserve-chat-message-meta > .reserve-chat-message-time').position).toBe('absolute');

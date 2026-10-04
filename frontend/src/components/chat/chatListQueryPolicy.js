@@ -20,10 +20,13 @@ export const shouldAutoRefreshChatMetadata = query => {
 };
 
 // 조회 실패는 그대로 표시한다. 경로/권한 오류를 반복 요청해도 복구되지 않는다.
+// 전역 3분 캐시는 대화 목록에 적용하지 않는다. 다시 열기·포커스 복귀 때 바로 최신 배지를 읽는다.
 // 네트워크·서버 장애는 기존 30초 갱신과 포커스/재연결에서 복구를 시도한다.
 export const chatListQueryPolicy = {
+    staleTime: 0,
     retry: shouldRetryChatList,
     refetchInterval: query => shouldAutoRefreshChatMetadata(query) ? POLL_LIST_MS : false,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: shouldAutoRefreshChatMetadata,
     refetchOnReconnect: shouldAutoRefreshChatMetadata,
 };

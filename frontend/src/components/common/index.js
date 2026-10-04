@@ -30,6 +30,7 @@ export { default as FilterToolbar } from './FilterToolbar';
 // 사용되지 않는 죽은 코드였음(모든 테이블은 DataTable의 AntD 기본 pagination을 쓴다).
 export { default as InquiryModal } from './InquiryModal';
 export { default as FormModal, FormField } from './FormModal';
+export { default as ResponsiveModal } from './ResponsiveModal';
 export { default as SegmentedControl } from './SegmentedControl';
 // 여러 줄이 필요한 선택은 SegmentedGrid (문의 유형 등). 어느 쪽을 쓸지는 각 파일 상단 주석 참고.
 export { default as SegmentedGrid } from './SegmentedGrid';

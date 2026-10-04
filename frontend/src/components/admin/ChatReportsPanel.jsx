@@ -228,6 +228,7 @@ const ChatReportsPanel = () => {
                 onSubmit={submitResolution}
                 submitting={review.isPending}
                 submitText="처리 저장"
+                mobileSheet={false}
             >
                 <FormField label="처리 결과">
                     <FormSelect value={resolutionStatus} onChange={setResolutionStatus}
@@ -247,6 +248,7 @@ const ChatReportsPanel = () => {
                 onClose={() => setContextReportId(null)}
                 footer={null}
                 width={640}
+                mobileSize="tall"
             >
                 {renderContext()}
             </FormModal>

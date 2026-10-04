@@ -35,6 +35,7 @@ import {
     Button, AdminTableSkeleton, DataState, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
 } from '../common';
 import { ModalActionGroup } from '../common/ModalActions';
+import ResponsiveModal from '../common/ResponsiveModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -454,7 +455,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
             {tableBody}
 
             {/* 사업자 인증 상세 */}
-            <Modal
+            <ResponsiveModal
                 title="사업자 인증 상세"
                 open={detailOpen}
                 onCancel={() => setDetailOpen(false)}
@@ -482,10 +483,11 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                     </ModalActionGroup>
                 }
                 width={560}
+                mobileSize="tall"
                 centered
             >
                 {detailBody}
-            </Modal>
+            </ResponsiveModal>
 
             {/* key 토글 제거 — destroyOnHidden이 입력값 초기화를 담당하므로 닫힘 애니메이션이 살아난다 */}
             <RejectModal

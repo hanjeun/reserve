@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { Modal } from 'antd';
+import ResponsiveModal from '../common/ResponsiveModal';
 import QrScannerTab from './QrScannerTab';
 import useReducedMotion from '../../hooks/useReducedMotion';
 
@@ -7,7 +7,9 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 export default function QrScannerSheet({ open, onClose }) {
     const reducedMotion = useReducedMotion();
     return (
-        <Modal
+        <ResponsiveModal
+            mobileSheet={false}
+            centered={false}
             open={open}
             onCancel={onClose}
             footer={null}
@@ -22,7 +24,7 @@ export default function QrScannerSheet({ open, onClose }) {
             aria-labelledby="reserve-qr-sheet-title"
         >
             <QrScannerTab sheet onClose={onClose} />
-        </Modal>
+        </ResponsiveModal>
     );
 }
 

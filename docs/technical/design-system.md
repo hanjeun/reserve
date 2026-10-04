@@ -191,6 +191,14 @@ import { FormInput, FormTextArea, FormSelect, FormDatePicker, FormTimePicker } f
 
 ### FormModal
 
+모바일 상세·작성 표면은 `ResponsiveModal`을 사용해요. `mobileSize="content"`는 내용 높이,
+`tall`은 서류·신고 대화처럼 긴 상세, `form`은 거의 전체 높이의 작성 시트예요.
+PC의 기존 너비·중앙 모달은 유지하고, 모바일 본문만 스크롤하며 제목과 하단 버튼은 고정해요.
+작성 중 키보드 높이·위치는 visualViewport를 CSS 변수로 반영해 입력값을 다시 렌더하지 않아요.
+`FormModal`은 `form`이 기본이며, 최종 처리 확인은 `mobileSheet={false}`로 중앙창을 유지해요.
+초기 초점은 제목으로 옮기고, Tab 이동·Escape·닫힌 뒤 호출 버튼 복원과 키보드 링은 유지해요.
+지역·QR 시트는 기존 높이와 모션을 유지하면서 같은 초기 초점 처리를 사용해요.
+
 ```jsx
 import { FormModal, FormField } from '../components/common';
 

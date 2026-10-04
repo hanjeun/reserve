@@ -28,6 +28,7 @@ function ErrorFallback({ error, resetError, goHome }) {
     return (
         <PageStatus
             role="alert"
+            className="reserve-error-fallback"
             icon={<ExclamationCircleFilled />}
             title={chunkError ? '화면을 불러오지 못했어요' : '문제가 생겼어요'}
             description={chunkError

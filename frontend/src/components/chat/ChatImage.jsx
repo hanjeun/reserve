@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Image } from 'antd';
-import chatService from '../../services/chatService';
+import { getChatImageBlob } from '../../utils/chatImageTransfer';
 import useAuthStore from '../../store/useAuthStore';
 import Bone from '../common/Bone';
 
@@ -15,11 +15,8 @@ export default function ChatImage({ url, width, height }) {
         const controller = new AbortController();
         let alive = true;
         let objectUrl;
-        chatService.getImage(url, controller.signal).then(blob => {
+        getChatImageBlob(url, controller.signal).then(blob => {
             if (!alive) return;
-            if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(blob.type) || blob.size > 8 * 1024 * 1024) {
-                throw new Error('사진 응답 형식이 올바르지 않습니다.');
-            }
             objectUrl = URL.createObjectURL(blob);
             setResult({ scope, src: objectUrl });
         }).catch(() => { if (alive) setResult({ scope, error: true }); });

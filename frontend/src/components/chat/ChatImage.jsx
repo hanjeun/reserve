@@ -47,7 +47,7 @@ export default function ChatImage({ url, width, height }) {
                 setPreviewScope(scope);
             }
         }}
-        preview={{ cover: '사진 크게 보기', rootClassName: 'reserve-image-preview',
+        preview={{ cover: false, rootClassName: 'reserve-image-preview',
             open: previewScope === scope, onOpenChange: open => setPreviewScope(open ? scope : null) }} />;
 }
 ChatImage.propTypes = { url: PropTypes.string.isRequired, width: PropTypes.number, height: PropTypes.number };

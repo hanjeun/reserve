@@ -1,6 +1,7 @@
 package kr.it.reserve.chat.repository;
 
 import kr.it.reserve.chat.entity.ChatMessage;
+import kr.it.reserve.chat.entity.ChatReport;
 import kr.it.reserve.chat.entity.SenderRole;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -9,15 +10,31 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Collection;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
+    interface RetentionCandidate {
+        Long getId();
+        Long getRoomId();
+    }
+
     @Query("""
-            SELECT m FROM ChatMessage m WHERE m.purgedAt IS NULL AND m.createdAt < :cutoff
-              AND NOT EXISTS (SELECT r.id FROM ChatReport r WHERE r.room.id = m.room.id AND r.evidenceCapturedAt IS NULL)
+            SELECT m.id AS id, m.room.id AS roomId FROM ChatMessage m
+             WHERE m.purgedAt IS NULL AND m.createdAt < :cutoff
+              AND NOT EXISTS (SELECT r.id FROM ChatReport r WHERE r.room.id = m.room.id AND (
+                r.evidenceCapturedAt IS NULL OR r.retentionHold = true OR r.status IN :activeStatuses
+                OR r.retentionCategory IN :heldCategories OR r.retentionCategory IS NULL
+                OR r.minimumRetentionUntil >= :now))
              ORDER BY m.createdAt, m.id
             """)
-    List<ChatMessage> findExpired(@Param("cutoff") java.time.LocalDateTime cutoff, Pageable pageable);
+    List<RetentionCandidate> findExpired(@Param("cutoff") java.time.LocalDateTime cutoff,
+            @Param("activeStatuses") Collection<ChatReport.Status> activeStatuses,
+            @Param("heldCategories") Collection<ChatReport.RetentionCategory> heldCategories,
+            @Param("now") java.time.LocalDateTime now, Pageable pageable);
+
+    boolean existsByImageKey(String imageKey);
+    boolean existsByImageKeyAndIdNot(String imageKey, Long id);
 
     Slice<ChatMessage> findByRoomIdAndRetractionRevisionGreaterThanOrderByRetractionRevisionAsc(
             Long roomId, Long revision, Pageable pageable);

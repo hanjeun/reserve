@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Pagination, Typography, Tabs } from 'antd';
 import {
@@ -7,6 +7,7 @@ import {
     QrcodeOutlined,
     NotificationOutlined,
     MessageOutlined,
+    ClockCircleOutlined,
 } from '@ant-design/icons';
 import { PageContainer, ReservationCardSkeleton, ReservationSummaryCardSkeleton, DataState, FilterToolbar } from '../../components/common';
 import ReservationCard from '../../components/reservation/ReservationCard';
@@ -29,6 +30,7 @@ import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import businessTabSearch from './businessTabQuery';
 
 const { Title, Text } = Typography;
+const WaitingTab = lazy(() => import('../../components/business/WaitingTab'));
 
 // 상태 필터 목록은 constants/status.js 하나에서만 온다 —
 // 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
@@ -244,7 +246,7 @@ const BusinessPanel = () => {
     const navigate = useNavigate();
     // 결제 리다이렉트 뒤 새 문서에서도 광고 탭을 복원할 수 있게 URL을 지원한다.
     const requestedTab = new URLSearchParams(location.search).get('tab') || location.state?.activeTab;
-    const initialContentTab = ['reservations', 'ads', 'analytics', 'chat-intro'].includes(requestedTab)
+    const initialContentTab = ['reservations', 'ads', 'analytics', 'chat-intro', 'waiting'].includes(requestedTab)
         ? requestedTab
         : 'reservations';
     const activeTab = requestedTab === 'qr-checkin' ? 'qr-checkin' : initialContentTab;
@@ -270,6 +272,15 @@ const BusinessPanel = () => {
                 </span>
             ),
             children: <ReservationTab />,
+        },
+        {
+            key: 'waiting',
+            label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <ClockCircleOutlined />웨이팅
+                </span>
+            ),
+            children: <Suspense fallback={<ReservationSummaryCardSkeleton count={3} />}><WaitingTab /></Suspense>,
         },
         {
             key: 'qr-checkin',

@@ -21,6 +21,7 @@ public class ChatMessageResponse {
     private String content;
     private String clientMessageId;
     private String imageUrl;
+    private String imageOriginalFilename;
     private Integer imageWidth;
     private Integer imageHeight;
     private LocalDateTime createdAt;
@@ -32,6 +33,7 @@ public class ChatMessageResponse {
         return builder().id(evidence.getMessageId()).senderRole(evidence.getSenderRole().name())
                 .content(evidence.getContent()).imageUrl(evidence.getImageKey() == null ? null
                         : "/api/admin/chat/reports/" + evidence.getReportId() + "/images/" + evidence.getMessageId())
+                .imageOriginalFilename(evidence.getImageKey() == null ? null : evidence.getImageOriginalFilename())
                 .imageWidth(evidence.getImageWidth()).imageHeight(evidence.getImageHeight())
                 .createdAt(evidence.getMessageCreatedAt()).retracted(evidence.isRetractedAtCapture()).build();
     }
@@ -62,6 +64,7 @@ public class ChatMessageResponse {
                 .content(resolveContent(m, reportContext))
                 .clientMessageId(m.getClientMessageId())
                 .imageUrl(m.getImageKey() == null || (m.isRetracted() && !reportContext) ? null : "/api/chat/images/" + m.getId())
+                .imageOriginalFilename(m.getImageKey() == null || (m.isRetracted() && !reportContext) ? null : m.getImageOriginalFilename())
                 .imageWidth(m.isRetracted() && !reportContext ? null : m.getImageWidth())
                 .imageHeight(m.isRetracted() && !reportContext ? null : m.getImageHeight())
                 .createdAt(m.getCreatedAt())

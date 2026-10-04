@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ImageFileValidatorTest {
 
     @Test
-    void acceptsDecodedImageAndUsesItsActualMetadata() {
+    void acceptsDecodedImageAndUsesItsActualMetadata() throws Exception {
         MockMultipartFile file = png("photo.png", "image/png", 12, 7);
 
         ImageFileValidator.ValidatedImage image = ImageFileValidator.inspect(file);
@@ -24,6 +24,7 @@ class ImageFileValidatorTest {
         assertThat(image.extension()).isEqualTo(".png");
         assertThat(image.width()).isEqualTo(12);
         assertThat(image.height()).isEqualTo(7);
+        assertThat(image.bytes()).isEqualTo(file.getBytes());
     }
 
     @Test

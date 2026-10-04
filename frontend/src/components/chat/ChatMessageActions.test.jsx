@@ -38,12 +38,13 @@ describe('message-scoped actions', () => {
     it('offers a saved photo download and invalidates it when history marks the photo retracted', async () => {
         let finishDownload;
         downloadChatImage.mockImplementation(() => new Promise(resolve => { finishDownload = resolve; }));
-        const view = render(<ChatMessageActions roomId={7} message={{ id: 33, imageUrl: '/api/chat/images/33' }} />);
+        const view = render(<ChatMessageActions roomId={7} message={{ id: 33, imageUrl: '/api/chat/images/33', imageOriginalFilename: '가게 사진.png' }} />);
         fireEvent.click(screen.getByRole('button', { name: '메시지 관리' }));
         fireEvent.click(await screen.findByText('다운로드'));
         await waitFor(() => expect(downloadChatImage).toHaveBeenCalledTimes(1));
-        const [url, signal, isCurrent] = downloadChatImage.mock.calls[0];
+        const [url, signal, isCurrent, filename] = downloadChatImage.mock.calls[0];
         expect(url).toBe('/api/chat/images/33');
+        expect(filename).toBe('가게 사진.png');
         expect(signal.aborted).toBe(false);
         expect(isCurrent()).toBe(true);
         view.rerender(<ChatMessageActions roomId={7} message={{ id: 33, imageUrl: '/api/chat/images/33', retracted: true }} />);

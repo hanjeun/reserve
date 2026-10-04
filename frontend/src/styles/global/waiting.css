@@ -1,0 +1,36 @@
+.reserve-waiting-tab { display: flex; flex-direction: column; gap: 20px; }
+.reserve-waiting-tab > .reserve-filter-toolbar { margin-bottom: 0; }
+.reserve-waiting-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.reserve-waiting-summary h3, .reserve-waiting-finished h3 { margin: 0; color: var(--c-text-primary); font-size: 18px; font-weight: 700; line-height: 28px; }
+.reserve-waiting-summary p { margin: 4px 0 0; color: var(--c-text-secondary); font-size: 13px; line-height: 20px; }
+.reserve-waiting-summary > .reserve-btn { flex: 0 0 auto; min-height: 44px; }
+.reserve-waiting-entries { margin: 0; padding: 0; list-style: none; background: var(--c-bg-paper); }
+.reserve-waiting-entry { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; border-top: 1px solid var(--c-border-light); }
+.reserve-waiting-entry:first-child { border-top: 0; }
+.reserve-waiting-entry-content { min-width: 0; }
+.reserve-waiting-entry-head { display: flex; align-items: center; gap: 12px; }
+.reserve-waiting-number { color: var(--c-text-primary); font-size: 20px; font-weight: 700; line-height: 28px; font-variant-numeric: tabular-nums; }
+.reserve-waiting-status { padding: 2px 8px; border-radius: 6px; background: var(--c-gray-100); color: var(--c-text-secondary); font-size: 12px; line-height: 20px; white-space: nowrap; }
+.reserve-waiting-status[data-status="WAITING"] { color: var(--c-text-primary); background: var(--c-primary-light); }
+.reserve-waiting-status[data-status="CALLED"] { color: var(--c-text-primary); background: var(--c-warning-light); }
+.reserve-waiting-status[data-status="SEATED"] { color: var(--c-text-primary); background: var(--c-success-light); }
+.reserve-waiting-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-top: 8px; color: var(--c-text-primary); font-size: 15px; overflow-wrap: anywhere; }
+.reserve-waiting-name > span { color: var(--c-text-secondary); font-size: 14px; white-space: nowrap; }
+.reserve-waiting-times { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: var(--c-text-tertiary); font-size: 12px; line-height: 18px; }
+.reserve-waiting-times > span { white-space: nowrap; }
+.reserve-waiting-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.reserve-waiting-actions > .reserve-btn { min-height: 44px; min-width: 64px; }
+.reserve-waiting-entries--cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 16px; background: transparent; }
+.reserve-waiting-entries--cards .reserve-waiting-entry { flex-direction: column; align-items: stretch; padding: 20px; border: 1px solid var(--c-border-light); border-radius: 16px; background: var(--c-bg-paper); }
+.reserve-waiting-entries--cards .reserve-waiting-actions { justify-content: flex-end; margin-top: auto; }
+.reserve-waiting-finished { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+.reserve-waiting-finished h3 { font-size: 16px; }
+.reserve-waiting-finished h3 > span { margin-left: 8px; color: var(--c-text-tertiary); font-size: 13px; font-weight: 500; }
+.reserve-waiting-form-help { margin: 0; color: var(--c-text-secondary); font-size: 13px; line-height: 20px; }
+@media (max-width: 575px) {
+    .reserve-waiting-summary { gap: 12px; }
+    .reserve-waiting-summary h3 { font-size: 16px; }
+    .reserve-waiting-entry { align-items: stretch; flex-direction: column; gap: 12px; padding: 16px 0; }
+    .reserve-waiting-actions { align-self: flex-end; }
+    .reserve-waiting-entries--cards { grid-template-columns: minmax(0, 1fr); }
+}

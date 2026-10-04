@@ -3,8 +3,21 @@ import { Typography } from 'antd';
 import { PageContainer } from '../../components/common';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import { useQuery } from '@tanstack/react-query';
+import chatRetentionService from '../../services/chatRetentionService';
 
 const { Title, Paragraph, Text } = Typography;
+
+const RetentionDates = () => {
+    const { data } = useQuery({ queryKey: ['public', 'chatRetentionPolicy'], queryFn: chatRetentionService.policy,
+        staleTime: 60_000, retry: false });
+    if (!data?.noticePublishedAt || !data?.effectiveAt) return null;
+    if ([data.noticePublishedAt, data.effectiveAt].some((value) => Number.isNaN(new Date(value).getTime()))) return null;
+    const format = (value) => new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'short',
+    }).format(new Date(value));
+    return <Paragraph>보존기간 변경 고지: {format(data.noticePublishedAt)} · 적용 시작: {format(data.effectiveAt)}</Paragraph>;
+};
 
 const Section = ({ title, children }) => (
     <div style={{ marginBottom: 32 }}>
@@ -20,7 +33,7 @@ const Privacy = () => {
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
                 <Title level={2} style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary, marginBottom: 8 }}>개인정보 처리방침</Title>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 9월 1일</Text>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 4일</Text>
             </div>
 
             <Section title="1. 수집하는 개인정보 항목">
@@ -29,6 +42,8 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}><strong>회원가입 시:</strong> 이메일 주소, 이름, 비밀번호(암호화 저장)</li>
                     <li style={{ marginBottom: 6 }}><strong>소셜 로그인 시:</strong> 이메일, 이름, 프로필 사진 (Google/Naver/Kakao 제공 정보)</li>
                     <li style={{ marginBottom: 6 }}><strong>예약 시:</strong> 예약 정보(날짜, 시간, 인원), 요청사항</li>
+                    <li style={{ marginBottom: 6 }}><strong>채팅·신고 시:</strong> 대화 내용, 첨부 사진과 원래 파일명, 신고 내용·처리 기록 및 검토에 필요한 대화 증거</li>
+                    <li style={{ marginBottom: 6 }}><strong>직원 웨이팅 접수 시:</strong> 선택한 팀 표시명, 인원, 접수 번호와 접수·호출·입장·취소 시각. 연락처는 수집하지 않습니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>결제 시:</strong> 결제 수단 정보 (카카오페이 처리, 카드·계좌 정보는 서버에 저장하지 않음)</li>
                     <li style={{ marginBottom: 6 }}><strong>자동 수집:</strong> 서비스 이용 기록, IP 주소, 접속 로그</li>
                 </ul>
@@ -43,20 +58,26 @@ const Privacy = () => {
             </Section>
 
             <Section title="3. 개인정보 보유 및 이용 기간">
-                <Paragraph>회원 탈퇴 또는 서비스 종료 시까지 보유합니다.</Paragraph>
+                <Paragraph>처리 목적과 자료 종류에 따라 다음 기간 동안 보유합니다.</Paragraph>
                 <ul style={{ paddingLeft: 20 }}>
                     <li style={{ marginBottom: 6 }}>감사 로그(Audit Log): 90일 보관 후 파기</li>
                     <li style={{ marginBottom: 6 }}>계정 식별정보(이메일, 비밀번호, 위치, 소셜 로그인 토큰): 탈퇴 처리 시 제거 또는 비식별 값으로 치환</li>
-                    <li style={{ marginBottom: 6 }}>예약·결제·환불·후기·문의·채팅 기록: 거래 대사와 분쟁 대응을 위해 비식별 회원 ID와 연결하여 보관</li>
+                    <li style={{ marginBottom: 6 }}>일반 채팅의 글·사진·원래 파일명: 전송일로부터 90일. 만료되면 원문과 사진 참조를 제거하고 사진 파일을 파기합니다.</li>
+                    <li style={{ marginBottom: 6 }}>처리된 일반 채팅 신고·증거: 처리 완료일로부터 1년</li>
+                    <li style={{ marginBottom: 6 }}>소비자 불만·거래 분쟁 처리 기록: 처리 완료일로부터 3년</li>
+                    <li style={{ marginBottom: 6 }}>계약·청약철회·대금결제·재화 공급 기록: 해당 거래일을 기준으로 5년. 관련 채팅 증거는 일반 채팅과 구분하여 보관합니다.</li>
+                    <li style={{ marginBottom: 6 }}>관리자의 신고 원문·사진 열람 기록: 각 열람일부터 1년 이상. 법령상 2년 보관 대상이면 2년 이상 보관합니다.</li>
+                    <li style={{ marginBottom: 6 }}>웨이팅: 입장·취소가 끝난 팀의 표시명은 다음 한국 시간 날짜에 제거하고, 종료 접수 기록은 7일 후 파기합니다. 진행 중인 접수는 처리할 때까지 보관하며, 가게가 삭제되면 남은 접수를 취소하고 표시명을 제거합니다.</li>
                     <li style={{ marginBottom: 6 }}>예약 자유 입력 요청사항 및 결제 구매자 이름·이메일·전화번호: 탈퇴 처리 시 제거 또는 비식별화</li>
                     <li style={{ marginBottom: 6 }}>법령에 따라 보존이 필요한 경우 해당 기간 동안 별도 보관</li>
                 </ul>
-                <Paragraph>거래·분쟁 기록의 구체적인 자동 파기 기간은 관련 의무와 운영상 복원 가능성을 함께 검토해 확정할 예정이며, 그 전까지는 탈퇴 회원을 직접 식별하는 계정 정보와 분리된 상태로 유지합니다.</Paragraph>
+                <Paragraph>미처리·미분류 신고, 진행 중인 분쟁·조사와 미결 거래 자료는 파기를 보류합니다. 법정 보존 자료는 일반 이용 자료와 분리하여 접근을 제한합니다. 채팅·신고의 보존기간 변경은 실제 서비스 고지 게시일부터 30일 유예 후 기존 자료에도 적용하며, 유예 중에는 이미 기간이 지난 자료도 자동 파기하지 않습니다.</Paragraph>
+                <RetentionDates />
             </Section>
 
             <Section title="4. 개인정보 파기 절차 및 방법">
                 <Paragraph><strong>파기 절차:</strong> 탈퇴 전 운영 중인 가게와 미결 예약·환불·결제 상태를 확인합니다. 처리가 완료되면 계정 식별정보를 같은 트랜잭션에서 비식별화하고, 보존 목적이 없는 개인화·커뮤니티 데이터는 삭제합니다.</Paragraph>
-                <Paragraph><strong>파기 방법:</strong> 전자적 정보는 DB 삭제 또는 비식별 값 치환으로 처리합니다. S3의 프로필 사진·사업자등록증·폐업 가게 이미지는 DB에 삭제 작업을 먼저 기록한 뒤 별도 작업자가 영구 삭제하며, 일시적인 AWS 오류가 발생하면 완료될 때까지 재시도합니다.</Paragraph>
+                <Paragraph><strong>파기 방법:</strong> 전자적 정보는 DB 삭제 또는 비식별 값 치환으로 처리합니다. S3의 프로필 사진·사업자등록증·폐업 가게 이미지·만료 채팅 사진은 DB에 삭제 작업을 먼저 기록한 뒤 별도 작업자가 삭제하며, 일시적인 AWS 오류가 발생하면 완료될 때까지 재시도합니다. 신고 증거가 보존 중인 사진은 그 보존이 끝나고 다른 대화·신고 참조가 없을 때 삭제합니다.</Paragraph>
             </Section>
 
             <Section title="5. 개인정보의 안전성 확보 조치">

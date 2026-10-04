@@ -126,8 +126,16 @@ management:
 
 chat:
   retention:
-    # 90일 파기 worker. 스키마/기존 신고 보류/개인정보 고지 확인 전에는 켜지 않는다.
+    # 실제 고지 시각부터 30일이 지나야 글·사진·신고 증거 파기를 시작한다.
     enabled: ${CHAT_RETENTION_ENABLED:false}
+    notice-published-at: ${CHAT_RETENTION_NOTICE_PUBLISHED_AT:}
+    access-audit-years: ${CHAT_RETENTION_ACCESS_AUDIT_YEARS:1}
+
+waiting:
+  retention:
+    # 새 접수 자료에만 적용한다. 실제 게시 시각이 없으면 실행하지 않는다.
+    enabled: ${WAITING_RETENTION_ENABLED:true}
+    notice-published-at: ${WAITING_RETENTION_NOTICE_PUBLISHED_AT:}
 
 # Sentry 에러 모니터링
 sentry:

@@ -73,6 +73,9 @@ public class ChatMessage {
     @Column(name = "image_content_type", length = 40)
     private String imageContentType;
 
+    @Column(name = "image_original_filename", length = 255)
+    private String imageOriginalFilename;
+
     @Column(name = "image_width")
     private Integer imageWidth;
 
@@ -99,6 +102,7 @@ public class ChatMessage {
         content = "";
         imageKey = null;
         imageContentType = null;
+        imageOriginalFilename = null;
         imageWidth = null;
         imageHeight = null;
         imageBytes = null;

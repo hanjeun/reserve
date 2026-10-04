@@ -6,9 +6,12 @@ import lombok.NoArgsConstructor;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
-/** 원문은 넣지 않는 append-only 관리자 열람 원장. 서비스에 갱신/삭제 경로를 두지 않는다. */
+/** 원문 없는 append-only 관리자 열람 원장. 승인한 접근 기록 보존 정책만 파기를 허용한다. */
 @Entity
-@Table(name = "chat_report_access_audit", indexes = @Index(name = "idx_chat_audit_report_time", columnList = "report_id, accessed_at"))
+@Table(name = "chat_report_access_audit", indexes = {
+        @Index(name = "idx_chat_audit_report_time", columnList = "report_id, accessed_at"),
+        @Index(name = "idx_chat_audit_retention", columnList = "accessed_at, id")
+})
 @Getter
 @NoArgsConstructor
 public class ChatReportAccessAudit {
@@ -19,13 +22,13 @@ public class ChatReportAccessAudit {
     @Enumerated(EnumType.STRING) @Column(name = "action", length = 20, nullable = false, updatable = false) private Action action;
     @Column(name = "purpose", length = 40, nullable = false, updatable = false) private String purpose;
     @Column(name = "accessed_at", nullable = false, updatable = false) private LocalDateTime accessedAt;
-    public enum Action { CONTEXT, IMAGE }
+    public enum Action { CONTEXT, IMAGE, RETENTION_CHANGE }
     public ChatReportAccessAudit(Long reportId, Long adminId, Long messageId, Action action) {
         this.reportId = reportId;
         this.adminMemberId = adminId;
         this.messageId = messageId;
         this.action = action;
-        this.purpose = "REPORT_REVIEW";
+        this.purpose = action == Action.RETENTION_CHANGE ? "REPORT_RETENTION" : "REPORT_REVIEW";
         this.accessedAt = LocalDateTime.now(Clock.systemDefaultZone());
     }
 }

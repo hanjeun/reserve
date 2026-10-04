@@ -60,7 +60,7 @@ export default function ChatMessageActions({ message: item, roomId, onRetracted,
         };
         setBusyScope(scope);
         try {
-            await downloadChatImage(item.imageUrl, controller.signal, isCurrent);
+            await downloadChatImage(item.imageUrl, controller.signal, isCurrent, item.imageOriginalFilename);
         } catch (error) {
             if (!controller.signal.aborted && isCurrent()) message.error(error.message || '사진을 내려받지 못했습니다.');
         } finally {

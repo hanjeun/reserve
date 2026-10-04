@@ -118,6 +118,8 @@ public class SecurityConfig {
                                         "/api/reviews/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/notices", "/api/notices/highlights", "/api/notices/{id:\\d+}")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/chat/retention-policy")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/notices/{id:\\d+}/view")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,

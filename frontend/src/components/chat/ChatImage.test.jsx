@@ -37,15 +37,27 @@ it('revokes the old account photo, closes its preview and aborts its request on 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:second');
 });
 
-it('downloads a protected image with its MIME extension and releases the temporary URL', async () => {
+it.each([
+    { label: 'legacy fallback', filename: undefined, type: 'image/png', expected: 'reserve-chat-photo-33.png' },
+    { label: 'original Korean name', filename: '가게 사진 2026-10-04.png', type: 'image/png', expected: '가게 사진 2026-10-04.png' },
+    { label: 'JPEG alias', filename: '사진.JPEG', type: 'image/jpeg', expected: '사진.JPEG' },
+    { label: 'unsafe path and extension', filename: 'C:\\fakepath\\사진\r\n.html', type: 'image/png', expected: '사진.png' },
+    { label: 'long Unicode name', filename: '사진🍊'.repeat(100) + '.png', type: 'image/png' },
+])('downloads a protected image with $label and releases the temporary URL', async ({ filename, type, expected }) => {
     vi.useFakeTimers();
+    chatService.getImage.mockResolvedValue(new Blob(['image'], { type }));
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
-        expect(this.download).toBe('reserve-chat-photo-33.png');
+        if (expected) expect(this.download).toBe(expected);
+        else {
+            expect(new TextEncoder().encode(this.download).length).toBeLessThanOrEqual(255);
+            expect(this.download).toMatch(/^사진.*\.png$/u);
+            expect(this.download).not.toContain('\uFFFD');
+        }
         expect(this.href).toBe('blob:first');
         expect(this.isConnected).toBe(true);
     });
     const controller = new AbortController();
-    await downloadChatImage('/api/v1/chat/images/33', controller.signal, () => true);
+    await downloadChatImage('/api/v1/chat/images/33', controller.signal, () => true, filename);
     expect(chatService.getImage).toHaveBeenCalledWith('/api/v1/chat/images/33', controller.signal);
     expect(click).toHaveBeenCalledTimes(1);
     expect(document.querySelector('a[download]')).toBeNull();

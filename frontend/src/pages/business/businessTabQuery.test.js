@@ -24,4 +24,15 @@ describe('businessTabSearch', () => {
         expect(result.get('utm_source')).toBe('portfolio');
         expect(result.has('statisticsRange')).toBe(false);
     });
+
+    it('keeps waiting selection and view only in tabs that use them', () => {
+        const waiting = new URLSearchParams(businessTabSearch('?waitingStore=5&view=cards&reservationPage=2', 'waiting'));
+        expect(waiting.get('tab')).toBe('waiting');
+        expect(waiting.get('waitingStore')).toBe('5');
+        expect(waiting.get('view')).toBe('cards');
+        expect(waiting.has('reservationPage')).toBe(false);
+        const analytics = new URLSearchParams(businessTabSearch(waiting, 'analytics'));
+        expect(analytics.has('waitingStore')).toBe(false);
+        expect(analytics.has('view')).toBe(false);
+    });
 });

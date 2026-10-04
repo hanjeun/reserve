@@ -1,9 +1,11 @@
 package kr.it.reserve.chat.service;
 
 import kr.it.reserve.chat.repository.ChatMessageRepository;
+import kr.it.reserve.chat.repository.ChatReportRepository;
+import kr.it.reserve.chat.repository.ChatReportAccessAuditRepository;
+import kr.it.reserve.chat.entity.ChatReport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -18,16 +20,32 @@ import java.time.LocalDateTime;
 public class ChatRetentionScheduler {
     private final ChatMessageRepository messages;
     private final ChatRetentionService retention;
-    @Value("${chat.retention.enabled:false}") private boolean enabled;
+    private final ChatReportRepository reports;
+    private final ChatReportAccessAuditRepository audits;
+    private final ChatRetentionPolicy policy;
 
     @Scheduled(initialDelay = 600_000, fixedDelay = 600_000)
     @Transactional(readOnly = true)
     public void sweep() {
-        if (!enabled) return;
-        LocalDateTime now = LocalDateTime.now(Clock.systemDefaultZone());
-        for (var item : messages.findExpired(now.minusDays(ChatRetentionService.RETENTION_DAYS), PageRequest.of(0, 50))) {
-            try { retention.purge(item.getRoom().getId(), item.getId(), now); }
+        LocalDateTime now = LocalDateTime.now(Clock.systemUTC());
+        if (!policy.isActive(now)) return;
+        var batch = PageRequest.of(0, 50);
+        for (var report : reports.findRetentionCandidates(ChatRetentionPolicy.TERMINAL_STATUSES,
+                ChatReport.RetentionCategory.GENERAL_REPORT, now.minusYears(1),
+                ChatReport.RetentionCategory.CONSUMER_DISPUTE, now.minusYears(3),
+                ChatReport.RetentionCategory.CONTRACT_PAYMENT, now.minusYears(5).minusDays(1), now, batch)) {
+            try { retention.purgeReport(report.getRoomId(), report.getId(), now); }
+            catch (RuntimeException failure) { log.warn("Chat report retention failed: reportId={}, errorType={}", report.getId(), failure.getClass().getSimpleName()); }
+        }
+        for (var item : messages.findExpired(policy.messageCutoff(now), ChatRetentionPolicy.ACTIVE_STATUSES,
+                ChatRetentionPolicy.ORIGINAL_HOLD_CATEGORIES, now, batch)) {
+            try { retention.purge(item.getRoomId(), item.getId(), now); }
             catch (RuntimeException failure) { log.warn("Chat retention failed: messageId={}, errorType={}", item.getId(), failure.getClass().getSimpleName()); }
+        }
+        for (var audit : audits.findRetentionCandidates(policy.auditCutoff(now),
+                ChatRetentionPolicy.ACTIVE_STATUSES, ChatReport.RetentionCategory.UNCLASSIFIED, batch)) {
+            try { retention.purgeAccessAudit(audit.getId(), now); }
+            catch (RuntimeException failure) { log.warn("Chat access audit retention failed: auditId={}, errorType={}", audit.getId(), failure.getClass().getSimpleName()); }
         }
     }
 }

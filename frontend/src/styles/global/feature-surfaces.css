@@ -422,7 +422,7 @@
 /* ══ 통합 MessengerShell — 고객지원·가게 문의·사장님 받은 문의 ══════════════ */
 .reserve-messenger,
 .reserve-messenger-launcher-wrap {
-    --reserve-messenger-unread-bg: color-mix(in srgb, var(--c-error, #f04452) 50%, #000);
+    --reserve-messenger-unread-bg: var(--c-error, #f04452);
 }
 .reserve-messenger-panel-shell {
     box-sizing: border-box;
@@ -573,6 +573,9 @@
 .reserve-chat-sender-avatar-slot .reserve-messenger-avatar { width: 28px; height: 28px; border-radius: 11px; font-size: 14px; }
 .reserve-chat-bubble-group { min-width: 0; }
 .reserve-chat-image-message { background: transparent; border: 0; padding: 0; }
+.reserve-chat-image-message .ant-image { display: block; overflow: hidden; border-radius: 10px; background: transparent; }
+.reserve-chat-retention-notice { margin: 0 0 14px; color: var(--c-text-tertiary, #8b95a1); font-size: 12px; line-height: 1.5; }
+.reserve-chat-retention-notice a { color: var(--c-text-secondary, #4e5968); text-decoration: underline; }
 .reserve-chat-image-message + .reserve-chat-message-bubble { margin-top: 8px; }
 .reserve-chat-sender-name { display: block; margin-bottom: 4px; font-size: 11px; line-height: 1.5; color: var(--c-text-secondary, #4e5968); overflow-wrap: anywhere; }
 .reserve-messenger-home-scroll {

@@ -105,6 +105,10 @@ class SecurityConfigAuthorizationTest {
 
     @Test
     void chatPhotosAndOpenWritesRequireLoginWhileNoticeViewIsPublic() throws Exception {
+        mockMvc.perform(get("/api/chat/retention-policy")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/chat/retention-policy")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/stores/1/waiting")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/stores/1/waiting")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/chat/images/1")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/admin/chat/reports/1/images/1")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/chat/support/open")).andExpect(status().isUnauthorized());

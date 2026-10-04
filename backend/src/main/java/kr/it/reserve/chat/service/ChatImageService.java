@@ -44,7 +44,8 @@ public class ChatImageService {
             var image = ImageFileValidator.inspect(file);
             String prefix = FileStoragePaths.chatImage(member.getId(), roomId);
             String key = storage.storeEncryptedChatImage(cipher.encrypt(image.bytes(), prefix), prefix);
-            return new ChatImagePayload(key, image.contentType(), image.width(), image.height(), image.bytes().length);
+            return new ChatImagePayload(key, image.contentType(), image.width(), image.height(), image.bytes().length,
+                    file.getOriginalFilename());
         }));
     }
 
@@ -71,7 +72,8 @@ public class ChatImageService {
             var item = snapshot.get();
             if (item.getImageKey() == null) throw new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
             String prefix = FileStoragePaths.chatImage(item.getSenderMemberId(), item.getRoomId());
-            content = bounded(() -> new ImageContent(cipher.decrypt(storage.readEncryptedChatImage(item.getImageKey(), prefix), prefix), item.getImageContentType()));
+            content = bounded(() -> new ImageContent(cipher.decrypt(storage.readEncryptedChatImage(item.getImageKey(), prefix), prefix),
+                    item.getImageContentType(), item.getImageOriginalFilename()));
         } else content = readContent(messages.findById(messageId)
                 .orElseThrow(() -> new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND)));
         audit.recordAccess(admin, reportId, messageId, ChatReportAccessAudit.Action.IMAGE);
@@ -82,7 +84,7 @@ public class ChatImageService {
         if (message.getImageKey() == null) throw new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
         String prefix = FileStoragePaths.chatImage(message.getSenderMemberId(), message.getRoom().getId());
         return bounded(() -> new ImageContent(cipher.decrypt(storage.readEncryptedChatImage(message.getImageKey(), prefix), prefix),
-                message.getImageContentType()));
+                message.getImageContentType(), message.getImageOriginalFilename()));
     }
 
     private <T> T bounded(Supplier<T> transfer) {
@@ -91,17 +93,20 @@ public class ChatImageService {
         finally { transfers.release(); }
     }
 
-    public record ImageContent(byte[] bytes, String contentType) {
+    public record ImageContent(byte[] bytes, String contentType, String originalFilename) {
+        public ImageContent(byte[] bytes, String contentType) { this(bytes, contentType, null); }
+
         @Override
         public boolean equals(Object other) {
-            return this == other || other instanceof ImageContent(var imageBytes, var imageContentType)
+            return this == other || other instanceof ImageContent(var imageBytes, var imageContentType, var imageOriginalFilename)
                     && Arrays.equals(bytes, imageBytes)
-                    && Objects.equals(contentType, imageContentType);
+                    && Objects.equals(contentType, imageContentType)
+                    && Objects.equals(originalFilename, imageOriginalFilename);
         }
 
         @Override
         public int hashCode() {
-            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType);
+            return 31 * Arrays.hashCode(bytes) + Objects.hash(contentType, originalFilename);
         }
 
         @Override

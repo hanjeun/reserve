@@ -21,7 +21,7 @@ describe('messenger interaction roles', () => {
     it('keeps unread badges red and overlays message actions without reserving an extra column', () => {
         for (const scope of ['.reserve-messenger', '.reserve-messenger-launcher-wrap']) {
             expect(declarations(scope)['--reserve-messenger-unread-bg'])
-                .toBe('color-mix(in srgb, var(--c-error, #f04452) 50%, #000)');
+                .toBe('var(--c-error, #f04452)');
         }
         for (const selector of ['.reserve-messenger-unread', '.reserve-messenger-footer-badge']) {
             expect(declarations(selector).background).toBe('var(--reserve-messenger-unread-bg)');

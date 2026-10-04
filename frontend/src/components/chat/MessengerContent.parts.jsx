@@ -341,6 +341,10 @@ export function ThreadPanel({
             </header>
 
             <div ref={threadBodyRef} className={`reserve-messenger-thread-body${isSupport ? ' reserve-messenger-thread-body--support' : ''}`}>
+                <p className="reserve-chat-retention-notice">
+                    일반 글·사진은 90일 보관합니다. 신고·분쟁 자료는 별도 보관하며,
+                    정책 고지 후 30일 유예를 거쳐 적용합니다. <a href="/privacy" target="_blank" rel="noopener noreferrer">보관 정책 보기</a>
+                </p>
                 <ThreadBody {...bodyProps} />
             </div>
 

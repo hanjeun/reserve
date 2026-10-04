@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Table } from 'antd';
+import DataState from './DataState';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 
@@ -53,7 +54,7 @@ import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants
  * <DataTable columns={columns} dataSource={data} rowKey="id" fitContent />          // 모든 열이 고정폭, 늘어나지 않음
  * <DataTable columns={columns} dataSource={data} rowKey="id" stickyFirstColumn />   // 모바일에서 첫 열 고정
  */
-const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', fitContent = false, stickyFirstColumn = false, columns, className, ...rest }) => {
+const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', fitContent = false, stickyFirstColumn = false, columns, className, locale, ...rest }) => {
     const isMobile = useWindowWidth() < MOBILE_PAGINATION_BREAKPOINT;
 
     const paginationConfig = pagination === false ? false : {
@@ -69,6 +70,10 @@ const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', 
     const resolvedColumns = stickyFirstColumn && isMobile && Array.isArray(columns) && columns.length > 0
         ? [{ ...columns[0], fixed: 'left' }, ...columns.slice(1)]
         : columns;
+    const emptyText = locale?.emptyText;
+    const resolvedEmptyText = emptyText === undefined || (typeof emptyText === 'string' && emptyText.trim())
+        ? <DataState state="empty" title={emptyText} />
+        : emptyText;
 
     return (
         <Table
@@ -79,6 +84,7 @@ const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', 
             pagination={paginationConfig}
             columns={resolvedColumns}
             {...rest}
+            locale={{ ...locale, emptyText: resolvedEmptyText }}
         />
     );
 };
@@ -100,6 +106,8 @@ DataTable.propTypes = {
     /** AntD Table columns — stickyFirstColumn 처리를 위해 직접 받는다 */
     columns: PropTypes.array,
     className: PropTypes.string,
+    /** 문자열 빈 결과는 공통 DataState로 표시하고, 사용자 정의 노드·함수는 그대로 둔다 */
+    locale: PropTypes.object,
 };
 
 export default DataTable;

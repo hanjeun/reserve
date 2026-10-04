@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { PageContainer } from '../../components/common';
+import { DataState, PageContainer } from '../../components/common';
 import { formatRegionLabel } from '../../constants/regions';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -94,7 +94,7 @@ const ContentSources = () => {
                             {photoAttributions.length === 0 && (
                                 <tr>
                                     <td colSpan="5" style={{ ...tableCellStyle, textAlign: 'center', color: colors.text.tertiary }}>
-                                        아직 확인된 지역 대표 사진이 없습니다.
+                                        <DataState state="empty" kind="store" title="아직 확인된 지역 대표 사진이 없습니다." />
                                     </td>
                                 </tr>
                             )}

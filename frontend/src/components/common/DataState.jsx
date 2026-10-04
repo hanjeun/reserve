@@ -19,6 +19,7 @@ import {
     WifiOutlined,
 } from '@ant-design/icons';
 import Button from './Button';
+import { fontSize, spacing } from '../../styles/tokens';
 import { isMissingRequestError, listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
 
 const EMPTY_ICON_BY_KIND = {
@@ -32,6 +33,13 @@ const EMPTY_ICON_BY_KIND = {
     reservation: CalendarOutlined,
     review: StarOutlined,
     store: ShopOutlined,
+    waiting: ClockCircleOutlined,
+};
+
+const DATA_STATE_SIZE = {
+    '--data-state-icon-size': spacing[10],
+    '--data-state-title-size': fontSize['2xl'],
+    '--data-state-description-size': fontSize.base,
 };
 
 const ERROR_ICON_BY_KIND = {
@@ -82,7 +90,7 @@ const DataState = ({
                 isError && 'reserve-data-state--error',
                 className,
             ].filter(Boolean).join(' ')}
-            style={style}
+            style={{ ...DATA_STATE_SIZE, ...style }}
             role={isError ? 'alert' : undefined}
             aria-live={isError ? 'assertive' : undefined}
             {...rest}
@@ -112,7 +120,7 @@ const DataState = ({
 DataState.propTypes = {
     state: PropTypes.oneOf(['empty', 'error']),
     requestType: PropTypes.oneOf(['list', 'detail']),
-    kind: PropTypes.oneOf(['advertisement', 'favorite', 'generic', 'mail', 'member', 'message', 'news', 'payment', 'reservation', 'review', 'store']),
+    kind: PropTypes.oneOf(['advertisement', 'favorite', 'generic', 'mail', 'member', 'message', 'news', 'payment', 'reservation', 'review', 'store', 'waiting']),
     subject: PropTypes.string,
     // Axios 오류뿐 아니라 훅이 정규화한 문자열도 받을 수 있다.
     error: PropTypes.any,

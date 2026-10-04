@@ -1850,8 +1850,6 @@ a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 .reserve-benefit-store-discovery h2 { margin: 0 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
 .reserve-benefits-heading p { margin: 0; font-size: 13px; color: var(--c-text-secondary, #4e5968); line-height: 1.6; }
 .reserve-benefits-count { color: var(--c-text-secondary, #4e5968); font-size: 12px; flex-shrink: 0; }
-.reserve-benefits-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 16px; color: var(--c-text-secondary, #4e5968); text-align: center; }
-.reserve-benefits-empty p { margin: 0; font-size: 13px; line-height: 1.6; }
 .reserve-benefit-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .reserve-benefit-row {
     --reserve-benefit-banner-min-height: 120px;

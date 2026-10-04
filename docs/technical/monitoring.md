@@ -13,7 +13,7 @@
 - 2026-10-02 22:09 KST 운영 호스트를 재부팅했다. 같은 v2.8.3 이미지·최소 권한 앱 계정·
   Hibernate validate를 유지하며 앱·공개 API·Grafana·Loki가 복구됐고, 새 앱·metrics·nginx
   로그를 확인했다. Promtail과 계정 전환 전 앱 컨테이너는 정지 상태를 유지했다.
-  새 버전에서 이전 버전으로 돌아오는 실제 릴리스 롤백은 다음 릴리스에서 확인한다.
+  새 버전에서 이전 버전으로 돌아오는 실제 릴리스 롤백은 미실행이며, 현재 필수 작업에서 제외한다.
 - 운영 `metrics` 스트림에서 `cpu_exec_pct`(us+sy), `cpu_user_pct`, `cpu_system_pct`,
   `cpu_iowait_pct`(wa), `cpu_steal_pct`(st)를 확인했다. 기존 `cpu_pct`는 호환용으로 유지한다.
   운영 대시보드 표시와 알림 전달은 지표 수집과 별도로 확인한다.

@@ -72,6 +72,7 @@ vi.mock('../common', () => {
         FilterMenu: ({ value, options = [], disabled, loading, ...props }) => <button disabled={disabled} aria-busy={loading || undefined} {...props}>{options.find(option => option.value === value)?.label}</button>,
         PageContainer: ({ children }) => <div>{children}</div>,
         ReservationCardSkeleton: Placeholder,
+        ReservationSummaryCardSkeleton: Placeholder,
         RefreshButton: ({ onReload }) => <button onClick={onReload}>새로고침</button>,
         Button: ({ children, onClick, disabled }) => <button onClick={onClick} disabled={disabled}>{children}</button>,
         UnreadPill: Placeholder,

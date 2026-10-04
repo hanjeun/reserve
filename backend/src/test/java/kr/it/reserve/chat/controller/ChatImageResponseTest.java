@@ -30,6 +30,7 @@ class ChatImageResponseTest {
         assertThat(ChatImageFilename.sanitize("../사진.JPEG", "image/jpeg")).isEqualTo("사진.JPEG");
         assertThat(ChatImageFilename.sanitize("NUL.png", "image/png")).isEqualTo("_NUL.png");
         assertThat(ChatImageFilename.forDownload("\r\n", "image/png")).isEqualTo("chat-image.png");
+        assertThat(ChatImageFilename.sanitize("photo" + " .".repeat(10_000), "image/png")).isEqualTo("photo.png");
         String longName = ChatImageFilename.sanitize("사진🍊".repeat(100) + ".png", "image/png");
         assertThat(longName.getBytes(StandardCharsets.UTF_8)).hasSizeLessThanOrEqualTo(255);
         assertThat(longName).endsWith(".png").doesNotContain("\uFFFD");

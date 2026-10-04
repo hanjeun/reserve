@@ -21,7 +21,8 @@ public final class ChatImageFilename {
         if (originalFilename == null || originalFilename.isBlank()) return null;
         String name = originalFilename.substring(1 + Math.max(originalFilename.lastIndexOf('/'), originalFilename.lastIndexOf('\\')))
                 .replaceAll("[\\p{Cc}\\p{Cs}\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]", "")
-                .replaceAll("[<>:\"|?*]", "_").strip().replaceAll("[. ]+$", "");
+                .replaceAll("[<>:\"|?*]", "_").strip();
+        name = trimTrailingDotsAndSpaces(name);
         int dot = name.lastIndexOf('.');
         String suffix = "." + extension;
         if (dot >= 0) {
@@ -38,6 +39,12 @@ public final class ChatImageFilename {
     public static String forDownload(String originalFilename, String contentType) {
         String name = sanitize(originalFilename, contentType);
         return name == null ? "chat-image." + EXTENSIONS.get(contentType) : name;
+    }
+
+    private static String trimTrailingDotsAndSpaces(String value) {
+        int end = value.length();
+        while (end > 0 && (value.charAt(end - 1) == '.' || value.charAt(end - 1) == ' ')) end--;
+        return value.substring(0, end);
     }
 
     private static String truncateUtf8(String value, int maxBytes) {

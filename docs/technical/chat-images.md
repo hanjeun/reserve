@@ -36,4 +36,12 @@ try {
 
 등록한 값은 다음 배포 때 compose를 거쳐 Blue/Green 서버에 똑같이 주입돼요. 설정 여부는 로그인 후 `/api/chat/images/config`의 `enabled`로 확인할 수 있어요.
 
+## 원본과 다운로드 이름
+
+- 업로드한 바이트를 재인코딩하지 않고 AES-GCM으로 암호화해요. 권한 확인 후 복호화한 바이트가 사진 조회·다운로드 원본이에요.
+- 새 사진의 원래 파일명은 `chat_message.image_original_filename`에 저장하고, 신고 스냅샷에도 복사해요. 파일명은 S3 키나 로그에 넣지 않아요.
+- 경로·제어문자·방향 제어문자·운영체제 금지 문자를 제거하고 실제 MIME에 맞는 확장자를 유지해요. UTF-8 255바이트를 넘지 않아요.
+- 사진 조회의 `Content-Disposition`과 다운로드 메뉴는 이 안전한 파일명을 써요. 파일명을 저장하지 않은 이전 사진은 `reserve-chat-photo-{id}.{ext}`를 써요.
+- 투명 사진의 알파와 원래 비율을 유지하고, 채팅 썸네일에는 회색 미리보기 덮개를 사용하지 않아요.
+
 참고: [GitHub Secret 안내](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets), [수동 DDL](manual-ddl.md), [S3 경로](architecture.md).

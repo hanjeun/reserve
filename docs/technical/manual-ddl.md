@@ -124,8 +124,10 @@ DDL 변경의 복구에는 별도의 역방향 DDL·복원 절차가 필요하�
 |---|---|---|
 | 2026-10-04 02:30:57 KST 전후 (UTC 2026-10-03 17:30:57) | `reserve_ddl`로 다섯 컬럼의 `ft_store_search` ngram FULLTEXT 생성 | 정확한 다섯 컬럼의 FULLTEXT 인덱스 확인, 기존 3행 유지, MATCH 실행 성공(해당 조회 0행) |
 
-현재 운영 v2.8.5의 검색 동작은 유지한다. 새 앱의 후보 검색 기능은 아직 배포 전이며,
-다음 v2.8.6 배포에서 활성화할 예정이다. 인덱스 설치 성공을 새 후보 검색의 운영 검증으로 대신하지 않는다.
+2026-10-04 v2.8.6(main `3199e48fb9aa6f8c5204c946ec2382487f4c22a0`)의 blue 앱으로 후보 검색을 배포했다.
+앱 계정 `reserve_app`에서 ngram 크기 2·다섯 컬럼 FULLTEXT와 MATCH 실행을 확인했다.
+원문 LIKE·MATCH+LIKE·공개 API v1의 검색 표본은 모두 2행이었고, 새 앱의 FULLTEXT 폴백 경고는 없었다.
+앱의 `validate` 모드는 유지하며, 실행 이력은 [배포 런북](deployments.md#2-3-v286-배포-확인-2026-10-04)에 기록한다.
 
 
 ## 1-b. 가게 거리순 bounding-box 후보 인덱스
@@ -358,6 +360,81 @@ ALTER TABLE password_reset_token ADD COLUMN token_hash VARCHAR(60) NULL, ALGORIT
 10/3 검증 JAR의 SHA-256은 `f995cc530fea75dd90caae4da3558a9f0d3d97705d7f949145910563ac78152b`이며,
 같은 운영 이미지의 별도 컨테이너에서 메모리 256 MiB·접속 풀 1개로 확인했다.
 검증은 Spring·스케줄러·외부 연동을 기동하지 않았다. 기존 운영 앱의 Actuator JSON도 `status=UP`이었다.
+
+## 9. 사진 원래 이름과 신고 보존 분류 (2026-10-04 적용)
+
+적용 대상은 채팅 메시지·신고 증거·신고·접근 원장 네 테이블이에요. 먼저 테이블 정의·컬럼·인덱스와 행 수를 읽고, 승인된 DDL 계정으로 원본 덤프를 보호된 서버 경로에 보존해요. 아래는 해당 컬럼·인덱스가 없을 때만 적용하며 재실행하지 않아요.
+
+```sql
+SET SESSION lock_wait_timeout = 5;
+ALTER TABLE chat_message
+  ADD COLUMN image_original_filename VARCHAR(255) NULL;
+ALTER TABLE chat_report_evidence
+  ADD COLUMN image_original_filename VARCHAR(255) NULL;
+ALTER TABLE chat_report
+  ADD COLUMN retention_category VARCHAR(30) NOT NULL DEFAULT 'UNCLASSIFIED',
+  ADD COLUMN retention_hold BIT(1) NOT NULL DEFAULT b'0',
+  ADD COLUMN retention_basis_at DATETIME(6) NULL,
+  ADD COLUMN minimum_retention_until DATETIME(6) NULL,
+  ADD COLUMN retention_note VARCHAR(500) NULL,
+  ADD COLUMN retention_changed_by_member_id BIGINT NULL,
+  ADD COLUMN retention_changed_at DATETIME(6) NULL,
+  ADD INDEX idx_chat_report_retention
+    (retention_category,retention_hold,status,reviewed_at,id),
+  ADD INDEX idx_chat_report_contract_retention
+    (retention_category,retention_hold,status,retention_basis_at,id);
+ALTER TABLE chat_report_access_audit
+  MODIFY COLUMN action ENUM('CONTEXT','IMAGE','RETENTION_CHANGE') NOT NULL,
+  ADD INDEX idx_chat_audit_retention (accessed_at,id);
+```
+
+- 기존 신고는 `UNCLASSIFIED`로 보존해요. 파일명·기산일·처리일·고지일을 추측하여 백필하지 않아요.
+- `retention_category`는 엔티티도 명시적인 JDBC VARCHAR 매핑이에요. `retention_hold`는 Hibernate boolean과 맞는 `BIT(1)`을 써요.
+- 새 JAR는 제한된 앱 계정과 `ddl-auto: validate`로 검증해요. 타입 차이를 `update`나 root 앱 계정으로 우회하지 않아요.
+- 복구 시 새 파기 스위치를 끄고 기존 이미지를 재기동해요. 추가 컬럼·테이블과 감사 enum 확장은 남겨 기존·신규 데이터를 보존해요. 컬럼 제거로 되돌리지 않아요.
+- 새 개인정보처리방침·채팅 고지를 실제 운영에서 확인한 뒤 그 게시 시각을 `CHAT_RETENTION_NOTICE_PUBLISHED_AT`에 offset 포함 ISO-8601로 등록해요. `CHAT_RETENTION_ENABLED=true`여도 30일 전에는 파기하지 않아요. 접근 기록은 `CHAT_RETENTION_ACCESS_AUDIT_YEARS=1` 또는 법령상 `2`를 써요.
+- 이 DDL은 예약·결제·환불·광고 원장을 변경하거나 기간 파기를 활성화하지 않아요.
+
+2026-10-04 승인 후 `reserve_ddl`로 적용했어요. 네 채팅 테이블의 변경 전 덤프는
+`/var/backups/reserve-scripts/20261004-chat-retention-waiting-091203Z/chat-before.sql.gz`에
+보존해요(디렉터리 700, 파일 600·root 소유). 기존 컬럼 전체의 정렬된 조회 해시는 변경 전후 같아요.
+앱 계정·권한을 확대하거나 파기 스위치를 켜지는 않았어요. 새 후보의 스키마 검증과 실제 고지 등록은 배포 단계에서 확인해요.
+
+## 10. 직원 웨이팅 접수 (2026-10-04 적용)
+
+가게별 접수번호와 재시도 키를 DB unique로 보호해요. 가게 잠금과 실제 소유권 검사는 서비스에서 함께 적용하며 기존 Store/Member의 역방향 의존을 추가하지 않아요.
+
+```sql
+CREATE TABLE waiting_entry (
+  waiting_entry_id BIGINT NOT NULL AUTO_INCREMENT,
+  store_id BIGINT NOT NULL,
+  business_date DATE NOT NULL,
+  entry_number INT NOT NULL,
+  display_name VARCHAR(40) NULL,
+  party_size INT NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  client_request_id VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  called_at DATETIME(6) NULL,
+  finished_at DATETIME(6) NULL,
+  PRIMARY KEY (waiting_entry_id),
+  UNIQUE KEY uk_waiting_store_number (store_id,business_date,entry_number),
+  UNIQUE KEY uk_waiting_store_request (store_id,client_request_id),
+  KEY idx_waiting_board (store_id,status,business_date,entry_number),
+  KEY idx_waiting_finished (status,finished_at),
+  CONSTRAINT chk_waiting_party_size CHECK (party_size BETWEEN 1 AND 100),
+  CONSTRAINT chk_waiting_entry_number CHECK (entry_number > 0),
+  CONSTRAINT chk_waiting_status CHECK (status IN ('WAITING','CALLED','SEATED','CANCELLED'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+```
+
+- 업무 날짜는 KST, 접수·호출·종료 타임스탬프는 UTC `DATETIME(6)`이에요. 재시도 키는 소문자로 정규화해요.
+- 새 자료의 정리는 실제 고지 게시 시각을 `WAITING_RETENTION_NOTICE_PUBLISHED_AT`에 등록한 후 실행해요. `WAITING_RETENTION_ENABLED=false`면 중지해요.
+- 종료팀 표시명은 다음 KST 날짜에 제거하고 종료 기록은 7일 뒤 파기해요. 정상 가게의 진행팀은 날짜가 지나도 보존해요. 가게가 삭제되면 남은 진행팀을 취소하고 표시명을 제거해요.
+- 이전 앱으로 복구해도 이 테이블은 남겨 접수 자료를 보존해요. 일반 회원용 `/waiting` 페이지는 계속 준비 중이며 이번 구현은 사업자 패널의 직원 접수 탭이에요.
+
+2026-10-04 위 승인과 같은 DDL 계정으로 새 테이블을 만들었어요. nullable 원래 파일명·미분류 기본값·감사 enum 확장과 함께 적용했고, 기존 데이터 삭제는 실행하지 않았어요.
 현재 운영은 구버전 앱이며, 새 코드의 해시 저장은 새 앱 배포 후에 시작한다.
 재발송과 재설정은 회원 잠금 다음 토큰 ID 한 행 잠금 순서를 유지한다.
 실패 횟수는 예외가 나도 커밋하고, 성공 시 비밀번호·세션 세대 변경과 코드 소비를 함께 커밋한다.

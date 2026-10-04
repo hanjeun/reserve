@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeftOutlined, CloseOutlined, MessageOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CloseOutlined, DownOutlined, MessageOutlined } from '@ant-design/icons';
 import { Bone, Button, DataState } from '../common';
 import ConversationListSkeleton from './ConversationListSkeleton';
 import MessengerListHeading from './MessengerListHeading';
@@ -275,7 +275,10 @@ function ThreadBody({ loading, loadError, onReload, intro, emptyText, messagePro
 function OwnerReplies({ draft, sending, onInsert }) {
     return (
         <details className="reserve-messenger-replies">
-            <summary>답변 문구</summary>
+            <summary>
+                <span>답변 문구</span>
+                <DownOutlined className="reserve-messenger-replies-chevron" aria-hidden="true" />
+            </summary>
             <p>직접 만든 안내 문구입니다. 수정 후 보내기를 눌러주세요.</p>
             <div>
                 {OWNER_REPLIES.map(reply => (
@@ -338,6 +341,10 @@ export function ThreadPanel({
             </header>
 
             <div ref={threadBodyRef} className={`reserve-messenger-thread-body${isSupport ? ' reserve-messenger-thread-body--support' : ''}`}>
+                <p className="reserve-chat-retention-notice">
+                    일반 글·사진은 90일 보관합니다. 신고·분쟁 자료는 별도 보관하며,
+                    정책 고지 후 30일 유예를 거쳐 적용합니다. <a href="/privacy" target="_blank" rel="noopener noreferrer">보관 정책 보기</a>
+                </p>
                 <ThreadBody {...bodyProps} />
             </div>
 

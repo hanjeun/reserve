@@ -185,6 +185,10 @@ export const API_ENDPOINTS = {
         ADMIN_INTRO:   '/api/admin/chat/intro',
         ADMIN_INTRO_AVATAR: '/api/admin/chat/intro/avatar',
     },
+    WAITING: {
+        BOARD:  (storeId) => `/api/stores/${storeId}/waiting`,
+        STATUS: (storeId, entryId) => `/api/stores/${storeId}/waiting/${entryId}/status`,
+    },
     MAIL: {
         COMPOSE:      '/api/admin/mail/compose',
         SENT:         '/api/admin/mail/sent',

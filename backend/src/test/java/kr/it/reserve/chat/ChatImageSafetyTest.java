@@ -81,9 +81,10 @@ class ChatImageSafetyTest {
         when(rooms.findByIdForUpdate(10L)).thenReturn(Optional.of(room));
         when(messages.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         var response = chats.sendImage(owner, 10L, "", "attempt",
-                () -> new ChatImagePayload("users/1/chat/10/image.bin", "image/png", 40, 30, 100));
+                () -> new ChatImagePayload("users/1/chat/10/image.bin", "image/png", 40, 30, 100, "C:\\fakepath\\가게 사진.PNG"));
         assertThat(response.getContent()).isEmpty();
         assertThat(response.getImageWidth()).isEqualTo(40);
+        assertThat(response.getImageOriginalFilename()).isEqualTo("가게 사진.PNG");
         assertThat(room.getLastMessagePreview()).isEqualTo("사진");
         assertThat(room.getAdminUnread()).isEqualTo(1);
     }

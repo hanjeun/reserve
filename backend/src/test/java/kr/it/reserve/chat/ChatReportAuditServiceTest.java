@@ -8,7 +8,7 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import java.time.Clock;
@@ -25,8 +25,8 @@ class ChatReportAuditServiceTest {
     private final ChatReportAuditService service = new ChatReportAuditService(audits);
 
     @ParameterizedTest
-    @EnumSource(ChatReportAccessAudit.Action.class)
-    void administratorAccessRecordsThePurposeAndTarget(ChatReportAccessAudit.Action action) {
+    @CsvSource({"CONTEXT,REPORT_REVIEW", "IMAGE,REPORT_REVIEW", "RETENTION_CHANGE,REPORT_RETENTION"})
+    void administratorAccessRecordsThePurposeAndTarget(ChatReportAccessAudit.Action action, String purpose) {
         Member admin = Member.builder().id(90L).role(Role.ADMIN).build();
         LocalDateTime started = LocalDateTime.now(Clock.systemDefaultZone());
 
@@ -39,7 +39,7 @@ class ChatReportAuditServiceTest {
         assertThat(audit.getAdminMemberId()).isEqualTo(90L);
         assertThat(audit.getMessageId()).isEqualTo(20L);
         assertThat(audit.getAction()).isEqualTo(action);
-        assertThat(audit.getPurpose()).isEqualTo("REPORT_REVIEW");
+        assertThat(audit.getPurpose()).isEqualTo(purpose);
         assertThat(audit.getAccessedAt()).isBetween(started, LocalDateTime.now(Clock.systemDefaultZone()));
     }
 

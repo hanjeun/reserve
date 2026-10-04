@@ -88,7 +88,10 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                         timestamp={ownTimestamp} />}
                     <div className="reserve-chat-bubble-group" style={{ maxWidth: m.senderRole === 'ADMIN' && !isMine ? '72%' : '78%' }}>
                         {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
-                        <div style={{
+                        {m.imageUrl && <div className="reserve-chat-image-message" style={m.pending ? styles.bubblePending : undefined}>
+                            <ChatImage url={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />
+                        </div>}
+                        {(!m.imageUrl || m.content) && <div className="reserve-chat-message-bubble" style={{
                             ...styles.bubble,
                             ...(isMine ? { background: palette.background, color: palette.foreground } : styles.bubbleTheirs),
                             ...corner,
@@ -96,9 +99,8 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                             ...(m.pending ? styles.bubblePending : null),
                             ...(m.retracted || m.expired ? { background: colors.background.subtle, color: colors.text.secondary, border: `1px solid ${colors.border.default}` } : null),
                         }}>
-                            {m.imageUrl && <ChatImage url={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />}
-                            {m.content && <span style={m.imageUrl ? { display: 'block', marginTop: 8 } : undefined}>{m.content}</span>}
-                        </div>
+                            <span>{m.content}</span>
+                        </div>}
                     </div>
                     {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole}
                         timestamp={timestamp} />}

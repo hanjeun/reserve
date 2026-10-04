@@ -18,6 +18,7 @@ import { adminKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
 import { listRows } from '../../utils/listResponse';
 import ChatImage from '../chat/ChatImage';
+import ChatRetentionModal from './ChatRetentionModal';
 
 const { Text } = Typography;
 const PAGE_SIZE = 20;
@@ -54,6 +55,7 @@ const ChatReportsPanel = () => {
     const [page, setPage] = useState(1);
     const [selected, setSelected] = useState(null);
     const [contextReportId, setContextReportId] = useState(null);
+    const [retentionReportId, setRetentionReportId] = useState(null);
     const [resolutionStatus, setResolutionStatus] = useState('RESOLVED');
     const [resolutionNote, setResolutionNote] = useState('');
     const [noteError, setNoteError] = useState('');
@@ -123,6 +125,9 @@ const ChatReportsPanel = () => {
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <Button variant="ghost-sm" size="sm" onClick={() => setContextReportId(record.id)}>
                     내용 보기
+                </Button>
+                <Button variant="ghost-sm" size="sm" onClick={() => setRetentionReportId(record.id)}>
+                    보존 설정
                 </Button>
                 {record.status === 'OPEN' && (
                     <Button variant="ghost-sm-primary" size="sm" disabled={review.isPending}
@@ -220,6 +225,7 @@ const ChatReportsPanel = () => {
                 loading={query.isFetching}
             />
             {renderReports()}
+            <ChatRetentionModal reportId={retentionReportId} onClose={() => setRetentionReportId(null)} />
 
             <FormModal
                 title={`신고 #${selected?.id ?? ''} 처리`}
@@ -228,6 +234,7 @@ const ChatReportsPanel = () => {
                 onSubmit={submitResolution}
                 submitting={review.isPending}
                 submitText="처리 저장"
+                mobileSheet={false}
             >
                 <FormField label="처리 결과">
                     <FormSelect value={resolutionStatus} onChange={setResolutionStatus}
@@ -247,6 +254,7 @@ const ChatReportsPanel = () => {
                 onClose={() => setContextReportId(null)}
                 footer={null}
                 width={640}
+                mobileSize="tall"
             >
                 {renderContext()}
             </FormModal>

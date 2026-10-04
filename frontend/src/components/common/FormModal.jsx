@@ -26,7 +26,8 @@
  */
 import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { Modal, Typography } from 'antd';
+import { Typography } from 'antd';
+import ResponsiveModal from './ResponsiveModal';
 import ModalActions from './ModalActions';
 // colors 는 더 이상 쓰지 않는다 — 에러 텍스트 색은 index.css 의 .reserve-field-error 가 맡는다.
 import { fontSize } from '../../styles/tokens';
@@ -81,6 +82,8 @@ const FormModal = ({
     width = 520,
     footer,
     rootClassName,
+    mobileSize = 'form',
+    mobileSheet = true,
     scrollResetKey,
     children,
 }) => {
@@ -96,12 +99,14 @@ const FormModal = ({
     }, [open, scrollResetKey]);
 
     return (
-        <Modal
+        <ResponsiveModal
             title={<Text style={{ fontSize: fontSize.base, fontWeight: 700 }}>{title}</Text>}
             open={open}
             onCancel={onClose}
             afterClose={afterClose}
             rootClassName={rootClassName}
+            mobileSize={mobileSize}
+            mobileSheet={mobileSheet}
             /* mask.closable=false: 문의/새 광고 신청/메일 작성 — 사용자가 직접 작성하는 모달이라 바깥 클릭으로 내용이 날아가면 안 된다.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
                (상세보기/QR/예약상세)은 AntD 기본값(true)대로 아무데나 눌러도 닫힌다. */
@@ -121,7 +126,7 @@ const FormModal = ({
             <div ref={contentRef} style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
                 {children}
             </div>
-        </Modal>
+        </ResponsiveModal>
     );
 };
 
@@ -141,6 +146,8 @@ FormModal.propTypes = {
     width: PropTypes.number,
     footer: PropTypes.node,
     rootClassName: PropTypes.string,
+    mobileSize: PropTypes.oneOf(['content', 'tall', 'form']),
+    mobileSheet: PropTypes.bool,
     /** 값이 바뀌면 재사용 중인 모달 본문의 scrollTop을 0으로 되돌린다. */
     scrollResetKey: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     children: PropTypes.node,

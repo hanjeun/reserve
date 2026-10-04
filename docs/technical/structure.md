@@ -81,6 +81,7 @@ kr.it.reserve/
 ├── review/                        ← 리뷰 작성/수정/삭제
 ├── favorite/                      ← 즐겨찾기 토글/조회
 ├── business/                      ← 사업자 인증 신청/심사
+├── waiting/                       ← 직원 접수·호출·입장·취소, 소유권·접수번호·종료 자료 정리
 ├── inquiry/                       ← 1:1 문의 (회원/비회원 게스트, category enum, 관리자 답변)
 ├── mailbox/                       ← 관리자 메일 발송(Resend) — 보낸 메일함 (인바운드 없음)
 ├── notice/                        ← 공지사항 등록/조회
@@ -311,4 +312,8 @@ AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 | `PORTONE_WEBHOOK_SECRET` | 포트원 웹훅 서명 검증 키. 설정 절차는 [결제 문서](payments.md) |
 | `TOURISM_API_SERVICE_KEY` | 지역 대표 관광 사진 서버 조회 키. [지역 사진 자산](region-photo-assets.md) |
 | `CHAT_IMAGE_ENCRYPTION_KEY` | 대화 사진 암호화용 32바이트 AES 키(표준 Base64). 생성·등록은 [채팅 사진](chat-images.md) |
-| `CHAT_RETENTION_ENABLED` | 일반 채팅 원문·사진 90일 파기 worker 스위치(`chat.retention.enabled`, 기본 `false`). [채팅 계약](chat-controls.md) |
+| `CHAT_RETENTION_ENABLED` | 채팅·신고 증거·접근 기록 파기 스위치, 기본 `false`. [채팅 계약](chat-controls.md) |
+| `CHAT_RETENTION_NOTICE_PUBLISHED_AT` | 실제 운영 고지 게시 시각(offset 포함 ISO-8601). 30일 유예 후 기존 자료에도 적용 |
+| `CHAT_RETENTION_ACCESS_AUDIT_YEARS` | 관리자 접근 기록 보존 1년 또는 2년, 기본 `1` |
+| `WAITING_RETENTION_ENABLED` | 종료된 직원 접수 자료 정리 스위치, 기본 `true`; 실제 고지 시각이 없으면 실행하지 않음 |
+| `WAITING_RETENTION_NOTICE_PUBLISHED_AT` | 직원 접수 정책의 실제 운영 고지 게시 시각(offset 포함 ISO-8601) |

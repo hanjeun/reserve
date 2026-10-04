@@ -20,6 +20,7 @@ public class ChatReportEvidence {
     @Enumerated(EnumType.STRING) @Column(name = "sender_role", length = 10, nullable = false, updatable = false) private SenderRole senderRole;
     @Column(name = "content", columnDefinition = "TEXT", nullable = false, updatable = false) private String content;
     @Column(name = "image_key", length = 512, updatable = false) private String imageKey;
+    @Column(name = "image_original_filename", length = 255, updatable = false) private String imageOriginalFilename;
     @Column(name = "image_content_type", length = 40, updatable = false) private String imageContentType;
     @Column(name = "image_width", updatable = false) private Integer imageWidth;
     @Column(name = "image_height", updatable = false) private Integer imageHeight;
@@ -36,6 +37,7 @@ public class ChatReportEvidence {
         evidence.senderRole = message.getSenderRole();
         evidence.content = message.getContent();
         evidence.imageKey = message.getImageKey();
+        evidence.imageOriginalFilename = message.getImageOriginalFilename();
         evidence.imageContentType = message.getImageContentType();
         evidence.imageWidth = message.getImageWidth();
         evidence.imageHeight = message.getImageHeight();

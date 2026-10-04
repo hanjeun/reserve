@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import {
     chatListErrorMessage,
     chatListQueryPolicy,
@@ -8,6 +9,24 @@ import {
 const queryWith = error => ({ state: { error } });
 
 describe('chat list automatic refetch policy', () => {
+    it('refreshes a recently cached list on reopen despite the app-wide three-minute cache', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { staleTime: 180000 } } });
+        const key = ['chat', 'store-inbox'];
+        client.setQueryData(key, [{ roomId: 12, unread: 0 }]);
+        const load = vi.fn().mockResolvedValue([{ roomId: 12, unread: 1 }]);
+        const observer = new QueryObserver(client, {
+            queryKey: key, queryFn: load, ...chatListQueryPolicy,
+        });
+        const unsubscribe = observer.subscribe(() => {});
+        try {
+            await vi.waitFor(() => expect(observer.getCurrentResult().data).toEqual([{ roomId: 12, unread: 1 }]));
+            expect(load).toHaveBeenCalledOnce();
+        } finally {
+            unsubscribe();
+            client.clear();
+        }
+    });
+
     it('retries only one recoverable failure and never repeats permanent 4xx failures', () => {
         expect(chatListQueryPolicy.retry).toBe(shouldRetryChatList);
         expect(shouldRetryChatList(0, { status: 500 })).toBe(true);

@@ -6,6 +6,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatReportsPanel from './ChatReportsPanel';
 import { chatService } from '../../services';
+import chatRetentionService from '../../services/chatRetentionService';
+
+vi.mock('../../services/chatRetentionService', () => ({ default: { get: vi.fn(), update: vi.fn() } }));
 
 vi.mock('../../services', () => ({
     chatService: {
@@ -115,5 +118,28 @@ describe('ChatReportsPanel', () => {
 
         await waitFor(() => expect(chatService.getReportContext).toHaveBeenCalledWith(9));
         expect(await screen.findAllByText('외부 계좌로 보내세요')).toHaveLength(2);
+    });
+
+    it('requires a retention reason and writes only the selected report', async () => {
+        const user = userEvent.setup();
+        chatService.listReports.mockResolvedValue({
+            content: [{ id: 9, storeName: '가게31', reporterRole: 'OWNER', reason: 'FRAUD',
+                messageId: 90, details: '외부 결제 유도', status: 'RESOLVED', createdAt: '2026-09-12T22:00:00' }],
+            page: { number: 0, totalPages: 1, totalElements: 1 },
+        });
+        chatRetentionService.get.mockResolvedValue({ reportId: 9, category: 'GENERAL_REPORT', hold: false, note: '' });
+        chatRetentionService.update.mockResolvedValue({ reportId: 9 });
+        renderPanel();
+        await user.click(await screen.findByRole('button', { name: '보존 설정' }));
+        const dialog = await screen.findByRole('dialog');
+        await within(dialog).findByPlaceholderText('자료 분류 또는 파기 보류의 근거를 적어주세요');
+        await user.click(within(dialog).getByRole('button', { name: '보존 설정 저장' }));
+        expect(chatRetentionService.update).not.toHaveBeenCalled();
+        expect(await within(dialog).findByRole('alert')).toHaveTextContent('근거를 입력해주세요');
+        await user.type(within(dialog).getByPlaceholderText('자료 분류 또는 파기 보류의 근거를 적어주세요'), '일반 신고 처리 완료');
+        await user.click(within(dialog).getByRole('button', { name: '보존 설정 저장' }));
+        await waitFor(() => expect(chatRetentionService.update).toHaveBeenCalledWith(9, {
+            category: 'GENERAL_REPORT', hold: false, retentionBasisAt: null, note: '일반 신고 처리 완료',
+        }));
     });
 });

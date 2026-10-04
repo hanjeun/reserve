@@ -420,6 +420,10 @@
 .reserve-chat-send:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* ══ 통합 MessengerShell — 고객지원·가게 문의·사장님 받은 문의 ══════════════ */
+.reserve-messenger,
+.reserve-messenger-launcher-wrap {
+    --reserve-messenger-unread-bg: var(--c-error, #f04452);
+}
 .reserve-messenger-panel-shell {
     box-sizing: border-box;
     position: fixed;
@@ -490,6 +494,11 @@
 }
 
 .reserve-app-layout { min-height: 100vh; }
+.reserve-error-fallback {
+    width: 100%;
+    max-width: none !important;
+    background-color: var(--c-bg-paper, #fff) !important;
+}
 .reserve-messages-page {
     width: 100%;
     padding: 28px 24px;
@@ -563,6 +572,11 @@
 .reserve-chat-sender-avatar-slot { width: 28px; min-width: 28px; align-self: flex-start; padding-top: 16px; }
 .reserve-chat-sender-avatar-slot .reserve-messenger-avatar { width: 28px; height: 28px; border-radius: 11px; font-size: 14px; }
 .reserve-chat-bubble-group { min-width: 0; }
+.reserve-chat-image-message { background: transparent; border: 0; padding: 0; }
+.reserve-chat-image-message .ant-image { display: block; overflow: hidden; border-radius: 10px; background: transparent; }
+.reserve-chat-retention-notice { margin: 0 0 14px; color: var(--c-text-tertiary, #8b95a1); font-size: 12px; line-height: 1.5; }
+.reserve-chat-retention-notice a { color: var(--c-text-secondary, #4e5968); text-decoration: underline; }
+.reserve-chat-image-message + .reserve-chat-message-bubble { margin-top: 8px; }
 .reserve-chat-sender-name { display: block; margin-bottom: 4px; font-size: 11px; line-height: 1.5; color: var(--c-text-secondary, #4e5968); overflow-wrap: anywhere; }
 .reserve-messenger-home-scroll {
     flex: 1;
@@ -577,7 +591,7 @@
 .reserve-messenger-welcome-sender { display: flex; align-items: center; gap: 10px; }
 .reserve-messenger-welcome-sender strong { font-size: 14px; }
 .reserve-messenger-welcome p { margin: 14px 0 18px; font-size: 14px; line-height: 1.65; color: var(--c-text-secondary, #4e5968); }
-.reserve-messenger-primary-action { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--c-primary, #3182f6) 50%, #000); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s ease, transform 0.12s ease; }
+.reserve-messenger-primary-action { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--c-primary, #3182f6); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s ease, transform 0.12s ease; }
 .reserve-messenger-primary-action:hover { opacity: 0.88; }
 .reserve-messenger-primary-action:active { opacity: 0.78; transform: scale(0.98); }
 .reserve-messenger-primary-action:focus { outline: none; }
@@ -591,7 +605,7 @@
 .reserve-messenger-footer-tab.is-active { color: var(--c-primary, #3182f6); font-weight: 700; }
 .reserve-messenger-footer-tab:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: -2px; }
 .reserve-messenger-footer-icon { position: relative; display: inline-flex; font-size: 21px; transition: color 0.15s ease; }
-.reserve-messenger-footer-badge { position: absolute; top: 3px; left: calc(50% + 8px); min-width: 16px; padding: 2px 4px; border-radius: 20px; background: color-mix(in srgb, var(--c-error, #f04452) 50%, #000); color: #fff; font-size: 9px; }
+.reserve-messenger-footer-badge { position: absolute; top: 3px; left: calc(50% + 8px); min-width: 16px; padding: 2px 4px; border-radius: 20px; background: var(--reserve-messenger-unread-bg); color: #fff; font-size: 9px; }
 .reserve-messenger-settings { display: flex; flex-direction: column; min-height: 0; }
 .reserve-messenger-settings-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
 .reserve-messenger-settings-profile { display: flex; flex-direction: column; align-items: center; padding: 16px 0 28px; gap: 12px; text-align: center; }
@@ -800,7 +814,7 @@
     height: 20px;
     padding: 0 6px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--c-error, #f04452) 50%, #000);
+    background: var(--reserve-messenger-unread-bg);
     color: #fff;
     display: inline-flex;
     align-items: center;
@@ -1023,11 +1037,25 @@
 .reserve-messenger-replies { margin: 0 4px 10px; }
 .reserve-messenger-replies summary {
     min-height: 44px;
-    align-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    list-style: none;
     color: var(--c-text-secondary, #4e5968);
     font-size: 12px;
     cursor: pointer;
 }
+.reserve-messenger-replies summary::-webkit-details-marker { display: none; }
+.reserve-messenger-replies summary::marker { content: ''; }
+.reserve-messenger-replies-chevron {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--c-text-tertiary, #8b95a1);
+    transform: rotate(0deg);
+    transition: transform 0.2s ease;
+}
+.reserve-messenger-replies[open] .reserve-messenger-replies-chevron { transform: rotate(180deg); }
 .reserve-messenger-replies p {
     margin: 0 0 6px;
     color: var(--c-text-tertiary, #8b95a1);
@@ -1152,7 +1180,8 @@
 .reserve-chat-message-row:has(> .reserve-chat-message-meta) > .reserve-chat-bubble-group {
     min-height: 44px; align-content: center;
 }
-.reserve-chat-message-time { font-size: 10px; color: var(--c-text-tertiary, #8b95a1); white-space: nowrap; flex-shrink: 0; }
+.reserve-chat-message-time { font-size: 10px; line-height: 12px; color: var(--c-text-tertiary, #8b95a1); white-space: nowrap; flex-shrink: 0; }
+.reserve-chat-message-row > .reserve-chat-message-time { margin-bottom: 2px; }
 .reserve-chat-message-meta > .reserve-chat-message-time { position: absolute; bottom: 2px; inset-inline: 0; text-align: center; pointer-events: none; }
 .reserve-chat-message-meta > .reserve-chat-message-actions { position: absolute; inset: 0; height: 44px; }
 .reserve-chat-attachment-preview { position: relative; overflow: hidden; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; display: flex; }
@@ -1215,6 +1244,7 @@
     .reserve-messenger-primary-action,
     .reserve-messenger-row,
     .reserve-messenger-footer-icon,
+    .reserve-messenger-replies-chevron,
     .reserve-form-cal-part { transition: none; }
     .reserve-messenger-launcher-wrap:hover,
     .reserve-messenger-launcher-wrap:active,

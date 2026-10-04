@@ -1,11 +1,12 @@
 import React from 'react';
-import { Modal, Typography, Flex, Divider } from 'antd';
+import { Typography, Flex, Divider } from 'antd';
 import {
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined, MailOutlined, DollarOutlined,
     CheckCircleOutlined,
 } from '@ant-design/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import CopyableText from '../common/CopyableText';
+import ResponsiveModal from '../common/ResponsiveModal';
 import { formatTime, formatCurrency } from '../../utils';
 import { colors, fontSize } from '../../styles/tokens';
 
@@ -42,7 +43,7 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
     else if (status === 'CANCELLED' && cancelReason) reasonBlock = { label: '취소 사유', value: cancelReason };
 
     return (
-        <Modal title="예약 상세" open={open} onCancel={onClose} footer={null} centered>
+        <ResponsiveModal title="예약 상세" open={open} onCancel={onClose} footer={null} centered mobileSize="content">
             <Flex align="center" justify="space-between" style={{ marginBottom: 4 }}>
                 <Text strong style={{ fontSize: fontSize.lg }}>{storeName}</Text>
                 <ReservationStatusBadge status={status} />
@@ -112,7 +113,7 @@ const ReservationDetailModal = ({ reservation, open, onClose }) => {
                     <Text style={{ fontSize: fontSize.sm, color: colors.error.main }}>{reasonBlock.value}</Text>
                 </>
             )}
-        </Modal>
+        </ResponsiveModal>
     );
 };
 

@@ -1,11 +1,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Modal, Typography } from 'antd';
+import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import reservationService from '../../services/reservationService';
 import { reservationKeys } from '../../hooks/queryKeys';
 import { DataState, ModalLoading } from '../common';
+import ResponsiveModal from '../common/ResponsiveModal';
 import { colors, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -35,13 +36,14 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
     });
 
     return (
-        <Modal
+        <ResponsiveModal
             title="방문 체크인 QR"
             open={open}
             onCancel={onClose}
             footer={null}
             centered
             width={340}
+            mobileSize="content"
         >
             <div style={styles.wrapper}>
                 {isLoading && (
@@ -86,7 +88,7 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
                     가게에 도착하면 이 QR을 사장님께 보여주세요
                 </Text>
             </div>
-        </Modal>
+        </ResponsiveModal>
     );
 };
 

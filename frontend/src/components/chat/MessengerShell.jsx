@@ -155,7 +155,8 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                 </div>
             )}
             <div className="reserve-messenger-launcher-wrap">
-                <Badge count={!isMobile && open ? 0 : unreadCount} offset={[-4, 4]}>
+                <Badge count={!isMobile && open ? 0 : unreadCount} offset={[-4, 4]}
+                    styles={{ indicator: { background: 'var(--reserve-messenger-unread-bg)', color: '#fff' } }}>
                     <button
                         ref={launcherRef}
                         type="button"

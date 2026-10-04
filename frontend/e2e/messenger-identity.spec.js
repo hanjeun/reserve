@@ -398,7 +398,9 @@ test('photo captions stay below the image in narrow chat bubbles', async ({ page
     await expect(photo).toBeVisible();
     await expect(photo).toHaveJSProperty('naturalWidth', 512);
     const imageBox = await photo.boundingBox();
-    const captionBox = await page.getByText('릴리스 검증용', { exact: true }).boundingBox();
+    const captionSurface = page.locator('.reserve-chat-message-bubble')
+        .filter({ has: page.getByText('릴리스 검증용', { exact: true }) });
+    const captionBox = await captionSurface.boundingBox();
     expect(captionBox.y).toBeGreaterThanOrEqual(imageBox.y + imageBox.height + 7);
     expect(captionBox.width).toBeGreaterThanOrEqual(imageBox.width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

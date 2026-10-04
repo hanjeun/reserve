@@ -1,7 +1,8 @@
 import LoadingStatus from '../common/LoadingStatus';
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Modal, Skeleton } from 'antd';
+import { Skeleton } from 'antd';
+import ResponsiveModal from '../common/ResponsiveModal';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -194,7 +195,9 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
     };
 
     return (
-        <Modal
+        <ResponsiveModal
+            mobileSheet={false}
+            centered={false}
             open={open}
             onCancel={handleClose}
             footer={null}
@@ -258,7 +261,7 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
                     {formatRegionLabel(draft)} 적용
                 </Button>
             </div>
-        </Modal>
+        </ResponsiveModal>
     );
 }
 

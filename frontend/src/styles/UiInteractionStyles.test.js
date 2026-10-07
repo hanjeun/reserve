@@ -74,7 +74,13 @@ describe('scoped UI interaction styles', () => {
         expect(pressed.selectors).not.toContain('.rsv-tap-btn:active:not(:disabled)');
         const link = 'a.reserve-store-list-row-link[href]';
         const normalRule = selector => surfaces.nodes.find(node => node.type === 'rule' && node.selectors.includes(selector));
-        const card = declarations(normalRule('.reserve-store-card-shell:has(.reserve-store-card-hit:active)'));
+        const cardSelector = '.reserve-card:has(.reserve-store-card-hit)';
+        const cardPressedSelector = '.reserve-card:has(.reserve-store-card-hit:active)';
+        const card = declarations(buttons.nodes.find(node => node.type === 'rule' && node.selectors.includes(cardPressedSelector)));
+        expect(card).toMatchObject({ transform: 'scale(0.98)', opacity: '0.88' });
+        expect(findRule(surfaces, '.reserve-store-card-shell:has(.reserve-store-card-hit:active)')).toBeUndefined();
+        expect(declarations(findRule(buttons, cardSelector, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
+        expect(declarations(findRule(buttons, cardPressedSelector, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(declarations(normalRule(`${link}:active`)).opacity).toBe(card.opacity);
         expect(declarations(normalRule(`${link}:active`)).transform).toBeUndefined();
         expect(declarations(normalRule(link))).toMatchObject({ transition: 'opacity 0.12s ease', '-webkit-tap-highlight-color': 'transparent' });

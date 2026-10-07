@@ -17,19 +17,24 @@ vi.mock('../../hooks', async () => ({
 }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { success: state.success, error: state.error }, confirm: state.confirm }) }));
 vi.mock('../../services/waitingService', () => ({ default: { getBoard: vi.fn(), create: vi.fn(), updateStatus: vi.fn() } }));
-vi.mock('../common', () => ({
+vi.mock('../common', () => {
+    const Card = ({ children }) => <div>{children}</div>;
+    Card.Body = ({ children }) => <div>{children}</div>;
+    return {
+    Card,
     Button: ({ children, onClick, disabled, loading, ...props }) => <button onClick={onClick} disabled={disabled || loading} aria-label={props['aria-label']}>{children}</button>,
     DataState: ({ title, error }) => <div>{title || error?.message}</div>,
-    FilterToolbar: ({ selects, extra }) => <div>{selects.map(select => <select key={select.key} aria-label={select.ariaLabel}
-        value={select.value} onChange={event => select.onChange(event.target.value)}>{select.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>)}{extra}</div>,
+    FilterMenu: ({ options, value, onChange, ...props }) => <select aria-label={props['aria-label']}
+        value={value} onChange={event => onChange(event.target.value)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
+    FilterToolbar: ({ search }) => <input placeholder={search.placeholder} value={search.value} onChange={search.onChange} />,
     FormField: ({ children, error }) => <div>{children}{error && <span role="alert">{error}</span>}</div>,
     FormInput: ({ type = 'text', value, onChange, disabled, ...props }) => <input type={type} value={value ?? ''} disabled={disabled}
         aria-label={props['aria-label']} onChange={event => onChange(type === 'number' ? event.target.valueAsNumber : event)} />,
     FormModal: ({ open, children, onClose, onSubmit, submitting, submitDisabled, submitText }) => open && <div role="dialog">
         {children}<button disabled={submitting || submitDisabled} onClick={onSubmit}>{submitText}</button><button onClick={onClose}>닫기</button></div>,
     ReservationSummaryCardSkeleton: () => <div>불러오는 중</div>,
-    SegmentedControl: () => null,
-}));
+    };
+});
 
 const board = entries => ({ storeId: 5, businessDate: '2026-10-04', entries });
 const entry = (id, status = 'WAITING') => ({ id, storeId: 5, businessDate: '2026-10-04', entryNumber: id,
@@ -82,6 +87,8 @@ it('keeps finished entries read-only and ignores old confirmations and write res
     let finish;
     waitingService.create.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     const view = setup();
+    await screen.findByRole('listitem', { name: '1번 대기 접수' });
+    fireEvent.change(screen.getByRole('combobox', { name: '대기 접수 상태' }), { target: { value: 'ALL' } });
     expect(within(await screen.findByRole('listitem', { name: '2번 대기 접수' })).queryByRole('button')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '1번 접수 취소' }));
     const oldConfirmation = state.confirm.mock.calls[0][0];
@@ -92,11 +99,38 @@ it('keeps finished entries read-only and ignores old confirmations and write res
     await act(async () => view.updateActor());
     expect(signal.aborted).toBe(true);
     await act(async () => { await oldConfirmation.onOk(); finish({ ...entry(3), displayName: '이전 계정' }); });
-    await screen.findByText('대기 중인 팀이 없습니다.');
+    await screen.findByText('선택한 상태의 대기 접수가 없습니다.');
     expect(waitingService.updateStatus).not.toHaveBeenCalled();
     expect(state.success).not.toHaveBeenCalled();
     expect(state.error).not.toHaveBeenCalled();
     expect(view.client.getQueryData(['waiting', 2, 6]).entries).toEqual([]);
     expect(screen.queryByText('이전 계정')).toBeNull();
+    view.unmount(); view.client.clear();
+});
+
+it('filters the loaded board by name and waiting number without issuing another network request', async () => {
+    waitingService.getBoard.mockResolvedValue(board([
+        { ...entry(1), displayName: '김손님' },
+        { ...entry(2), displayName: '이손님' },
+        { ...entry(3, 'SEATED'), displayName: '종료 손님' },
+    ]));
+    const view = setup();
+    await screen.findByRole('listitem', { name: '1번 대기 접수' });
+    const search = screen.getByPlaceholderText('이름, 대기번호로 검색');
+    fireEvent.change(search, { target: { value: '김손님' } });
+    expect(screen.getByRole('listitem', { name: '1번 대기 접수' })).toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: '2번 대기 접수' })).toBeNull();
+    fireEvent.change(search, { target: { value: '2번' } });
+    expect(screen.getByRole('listitem', { name: '2번 대기 접수' })).toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: '1번 대기 접수' })).toBeNull();
+    fireEvent.change(search, { target: { value: '없는 이름' } });
+    expect(screen.getByText('검색에 맞는 대기 접수가 없습니다.')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: '' } });
+    expect(screen.queryByRole('listitem', { name: '3번 대기 접수' })).toBeNull();
+    fireEvent.change(screen.getByRole('combobox', { name: '대기 접수 상태' }), { target: { value: 'SEATED' } });
+    expect(screen.getByRole('listitem', { name: '3번 대기 접수' })).toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: '1번 대기 접수' })).toBeNull();
+    expect(screen.queryByRole('region', { name: '오늘 종료된 대기 접수' })).toBeNull();
+    expect(waitingService.getBoard).toHaveBeenCalledTimes(1);
     view.unmount(); view.client.clear();
 });

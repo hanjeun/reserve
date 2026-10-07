@@ -5,8 +5,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStoreForm } from '../useStoreForm';
+import useStoreDraftPreferences from '../useStoreDraftPreferences';
 import useAuthStore from '../../store/useAuthStore';
-import { saveStoreDraft } from '../../utils/storeDraftStorage';
+import { readStoreDraft, saveStoreDraft } from '../../utils/storeDraftStorage';
 import { storeService } from '../../services';
 
 vi.mock('../../utils/storeDraftStorage', () => ({
@@ -48,6 +49,8 @@ const wrapper = ({ children }) => {
 describe('useStoreForm draft scheduling', () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        localStorage.clear();
+        window.dispatchEvent(new StorageEvent('storage', { key: null, storageArea: localStorage }));
         useAuthStore.setState({
             user: { id: 7, role: 'BUSINESS' },
             isLoggedIn: true,
@@ -89,10 +92,75 @@ describe('useStoreForm draft scheduling', () => {
         });
         expect(saveStoreDraft).toHaveBeenCalledTimes(1);
     });
+
+    it('cancels pending automatic writes and does not flush on pagehide or unmount after disabling', async () => {
+        const preference = renderHook(() => useStoreDraftPreferences(useAuthStore(state => state.user)));
+        const draft = renderHook(() => useStoreForm({ form }), { wrapper });
+        act(() => draft.result.current.handleValuesChange());
+        act(() => preference.result.current.setAutoSaveEnabled(false));
+        await act(async () => { vi.advanceTimersByTime(5000); });
+        act(() => window.dispatchEvent(new Event('pagehide')));
+        draft.unmount();
+        await act(async () => { await Promise.resolve(); });
+        expect(saveStoreDraft).not.toHaveBeenCalled();
+    });
+
+    it('retains draft restoration and manual photo saves while automatic saving is disabled', async () => {
+        localStorage.setItem('reserve:store-draft:auto-save:member:7', 'false');
+        const { result } = renderHook(() => useStoreForm({ form }), { wrapper });
+        await act(async () => { await Promise.resolve(); });
+        expect(readStoreDraft).toHaveBeenCalledWith('member:7:store:create:new');
+        const photo = { uid: 'photo', originFileObj: new File(['photo'], '사진.png', { type: 'image/png' }) };
+        act(() => result.current.handleMainImageChange({ fileList: [photo] }));
+        act(() => result.current.handleValuesChange());
+        await act(async () => { vi.advanceTimersByTime(5000); });
+        expect(saveStoreDraft).not.toHaveBeenCalled();
+        await act(async () => { await result.current.saveDraftNow(); });
+        expect(saveStoreDraft).toHaveBeenCalledWith(expect.objectContaining({
+            key: 'member:7:store:create:new', mainImage: [photo], values: { name: '테스트 가게' },
+        }));
+        expect(result.current.draftState).toMatchObject({ status: 'saved', autoSaveEnabled: false });
+    });
+
+    it('lets an in-progress manual save finish when automatic saving is switched off', async () => {
+        let finishSave;
+        saveStoreDraft.mockImplementationOnce(() => new Promise(resolve => { finishSave = resolve; }));
+        const preference = renderHook(() => useStoreDraftPreferences(useAuthStore(state => state.user)));
+        const draft = renderHook(() => useStoreForm({ form }), { wrapper });
+        let pendingSave;
+        await act(async () => {
+            pendingSave = draft.result.current.saveDraftNow();
+            await Promise.resolve();
+        });
+        act(() => preference.result.current.setAutoSaveEnabled(false));
+        expect(draft.result.current.draftState).toMatchObject({ status: 'saving', autoSaveEnabled: false });
+        await act(async () => {
+            finishSave({ savedAt: 2 });
+            await pendingSave;
+        });
+        expect(draft.result.current.draftState).toMatchObject({ status: 'saved', savedAt: 2, autoSaveEnabled: false });
+    });
+
+    it.each([
+        ['account', { user: { id: 8, role: 'BUSINESS' } }],
+        ['session', { sessionRevision: 91 }],
+    ])('rejects old form writes after a %s transition', async (_name, nextState) => {
+        useAuthStore.setState({ sessionRevision: 90 });
+        const draft = renderHook(() => useStoreForm({ form }), { wrapper });
+        act(() => draft.result.current.handleValuesChange());
+        act(() => useAuthStore.setState(nextState));
+        await act(async () => { vi.advanceTimersByTime(5000); });
+        await act(async () => { await draft.result.current.saveDraftNow(); });
+        draft.unmount();
+        await act(async () => { await Promise.resolve(); });
+        expect(saveStoreDraft).not.toHaveBeenCalled();
+    });
 });
 
 describe('useStoreForm detail image order', () => {
     beforeEach(() => {
+        localStorage.clear();
+        window.dispatchEvent(new StorageEvent('storage', { key: null, storageArea: localStorage }));
         useAuthStore.setState({ user: { id: 7, role: 'BUSINESS' }, isLoggedIn: true });
     });
 

@@ -62,6 +62,7 @@ test('first card press does not zoom its photo on touch, while desktop hover and
     await mockUiApi(page);
     await page.goto('/stores?view=cards');
     const shell = page.locator('.reserve-store-card-shell');
+    const card = page.locator('.reserve-card').filter({ has: shell });
     const photo = shell.locator('.reserve-card-image');
     await expect(photo).toBeVisible();
     await expect(photo).toHaveJSProperty('naturalWidth', 800);
@@ -71,7 +72,9 @@ test('first card press does not zoom its photo on touch, while desktop hover and
     else await expect.poll(() => photo.evaluate(element => getComputedStyle(element).transform)).toBe('matrix(1.05, 0, 0, 1.05, 0, 0)');
     await page.mouse.down();
     try {
-        await expect.poll(() => shell.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+        await expect(card).toHaveCSS('transform', 'matrix(0.98, 0, 0, 0.98, 0, 0)');
+        await expect(card).toHaveCSS('opacity', '0.88');
+        await expect(shell).toHaveCSS('transform', 'none');
         const frames = await photo.evaluate(element => new Promise(resolve => {
             const samples = [];
             const sample = () => {

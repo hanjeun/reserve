@@ -105,8 +105,8 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
                 <Button key="noshow" variant="ghost-sm-danger" loading={isActing('noshow')} onClick={handleNoShow}>
                     <WarningOutlined /> 노쇼
                 </Button>,
-                <Button key="cancel" variant="ghost-sm" size="sm" loading={isActing('storecancel')}
-                    onClick={() => setReasonModal('cancel')} style={{ color: colors.text.tertiary }}>
+                <Button key="cancel" variant="ghost-sm-danger" loading={isActing('storecancel')}
+                    onClick={() => setReasonModal('cancel')}>
                     <StopOutlined /> 취소
                 </Button>,
             ];

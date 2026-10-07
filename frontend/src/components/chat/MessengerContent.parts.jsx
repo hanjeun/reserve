@@ -84,7 +84,7 @@ function ListRows({ query, coldError, rows, subject, emptyText, children }) {
     }
     if (query.isLoading) return <ConversationListSkeleton />;
     if (rows.length === 0) {
-        return <div className="reserve-messenger-list-state">{emptyText}</div>;
+        return <DataState state="empty" kind="message" title={emptyText} />;
     }
     return children;
 }

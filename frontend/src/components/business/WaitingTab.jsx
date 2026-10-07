@@ -2,18 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlusOutlined } from '@ant-design/icons';
-import { Button, DataState, FilterToolbar, FormField, FormInput, FormModal,
-    ReservationSummaryCardSkeleton, SegmentedControl } from '../common';
+import { Button, Card, DataState, FilterMenu, FilterToolbar, FormField, FormInput, FormModal,
+    ReservationSummaryCardSkeleton } from '../common';
+import StoreListViewToggle from '../store/StoreListViewToggle';
 import { useMyStores, useQueryParamsState } from '../../hooks';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useMessage from '../../hooks/useMessage';
 import useAuthStore from '../../store/useAuthStore';
 import waitingService from '../../services/waitingService';
 
-const QUERY_DEFAULTS = Object.freeze({ waitingStore: '' });
+const QUERY_DEFAULTS = Object.freeze({ waitingStore: '', waitingSearch: '', waitingStatus: 'ACTIVE' });
 const STATUS_LABELS = Object.freeze({ WAITING: '대기 중', CALLED: '호출됨', SEATED: '입장 완료', CANCELLED: '취소됨' });
-const VIEW_OPTIONS = Object.freeze([{ value: 'list', label: '목록' }, { value: 'cards', label: '카드' }]);
+const STATUS_OPTIONS = Object.freeze([
+    { value: 'ACTIVE', label: '진행 중' },
+    { value: 'ALL', label: '전체 상태' },
+    ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+]);
 const KST_TIME = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const isActive = entry => entry.status === 'WAITING' || entry.status === 'CALLED';
 const dateLabel = date => /^\d{4}-\d{2}-\d{2}$/.test(date || '')
@@ -23,10 +27,9 @@ const timeLabel = value => {
     return value && !Number.isNaN(date.getTime()) ? KST_TIME.format(date) : '';
 };
 
-function WaitingEntry({ entry, businessDate, busy, changing, onChange, onCancel }) {
+function WaitingEntry({ entry, businessDate, view, busy, changing, onChange, onCancel }) {
     const active = isActive(entry);
-    return <li className="reserve-waiting-entry" aria-label={`${entry.entryNumber}번 대기 접수`}>
-        <div className="reserve-waiting-entry-content">
+    const content = <div className="reserve-waiting-entry-content">
             <div className="reserve-waiting-entry-head">
                 <strong className="reserve-waiting-number">{entry.entryNumber}번</strong>
                 <span className="reserve-waiting-status" data-status={entry.status}>{STATUS_LABELS[entry.status] || '상태 확인'}</span>
@@ -38,22 +41,29 @@ function WaitingEntry({ entry, businessDate, busy, changing, onChange, onCancel 
                 {entry.calledAt && <span>호출 <time dateTime={entry.calledAt}>{timeLabel(entry.calledAt)}</time></span>}
                 {entry.finishedAt && <span>{entry.status === 'SEATED' ? '입장' : '취소'} <time dateTime={entry.finishedAt}>{timeLabel(entry.finishedAt)}</time></span>}
             </div>
-        </div>
-        {active && <div className="reserve-waiting-actions">
-            <Button variant="ghost-sm-danger" size="sm" disabled={busy}
+        </div>;
+    const actions = active && <div className="reserve-waiting-actions">
+            <Button variant="danger" size="sm" disabled={busy}
                 aria-label={`${entry.entryNumber}번 접수 취소`} onClick={() => onCancel(entry)}>취소</Button>
             <Button variant="primary" size="sm" disabled={busy} loading={changing}
                 aria-label={`${entry.entryNumber}번 ${entry.status === 'WAITING' ? '호출' : '입장 처리'}`}
                 onClick={() => onChange(entry, entry.status === 'WAITING' ? 'CALLED' : 'SEATED')}>
                 {entry.status === 'WAITING' ? '호출' : '입장'}
             </Button>
-        </div>}
+        </div>;
+    return <li className={view === 'cards' ? 'reserve-waiting-card-entry' : 'reserve-waiting-entry'}
+        aria-label={`${entry.entryNumber}번 대기 접수`}>
+        {view === 'cards' ? <Card className="reserve-waiting-card">
+            <Card.Body><div className="reserve-waiting-card-body">{content}{actions}</div></Card.Body>
+        </Card> : <>{content}{actions}</>}
     </li>;
 }
 WaitingEntry.propTypes = { entry: PropTypes.object.isRequired, businessDate: PropTypes.string,
+    view: PropTypes.oneOf(['list', 'cards']).isRequired,
     busy: PropTypes.bool, changing: PropTypes.bool, onChange: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired };
 
-function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores, onStoreChange, revision, view, onViewChange }) {
+function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores, onStoreChange,
+    revision, view, onViewChange, search, onSearchChange, status, onStatusChange }) {
     const storeId = store?.id;
     const queryClient = useQueryClient();
     const { message, confirm } = useMessage();
@@ -144,7 +154,12 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     };
     const entries = board.data?.entries || [];
     const active = entries.filter(isActive);
-    const finished = entries.filter(entry => !isActive(entry));
+    const keyword = search.trim().toLocaleLowerCase('ko-KR');
+    const matches = entry => !keyword || `${entry.entryNumber}번 ${entry.displayName || '이름 미입력'}`
+        .toLocaleLowerCase('ko-KR').includes(keyword);
+    const visibleEntries = entries.filter(entry => matches(entry)
+        && (status === 'ALL' || (status === 'ACTIVE' ? isActive(entry) : entry.status === status)));
+    const entryClass = `reserve-waiting-entries reserve-waiting-entries--${view}${view === 'cards' ? ' rsv-store-grid' : ''}`;
     const busy = pending !== null;
     let content;
     if (storesLoading || board.isLoading) content = <ReservationSummaryCardSkeleton count={3} />;
@@ -155,26 +170,31 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         {board.error && <DataState state="error" subject="대기 명단 갱신" error={board.error} onRetry={refresh} retrying={board.isFetching} compact />}
         <div className="reserve-waiting-summary">
             <div><h3>대기 명단</h3><p>{dateLabel(board.data?.businessDate)} · 대기 {active.filter(entry => entry.status === 'WAITING').length}팀 · 호출 {active.filter(entry => entry.status === 'CALLED').length}팀</p></div>
-            <Button variant="primary" size="sm" icon={<PlusOutlined />} disabled={busy} onClick={showForm}>대기 접수</Button>
+            <Button variant="primary" size="sm" disabled={busy} onClick={showForm}>대기 접수</Button>
         </div>
-        {active.length ? <ul className={`reserve-waiting-entries reserve-waiting-entries--${view}`} aria-label="진행 중인 대기 접수">
-            {active.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate}
+        {visibleEntries.length ? <ul className={entryClass} aria-label="대기 접수 목록">
+            {visibleEntries.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate} view={view}
                 busy={busy} changing={pending === entry.id} onChange={changeStatus} onCancel={cancel} />)}
-        </ul> : <DataState state="empty" title="대기 중인 팀이 없습니다." description="손님이 오면 대기 접수를 등록해주세요." compact />}
-        {finished.length > 0 && <section className="reserve-waiting-finished" aria-label="오늘 종료된 대기 접수">
-            <h3>오늘 처리한 접수 <span>{finished.length}팀</span></h3>
-            <ul className={`reserve-waiting-entries reserve-waiting-entries--${view}`}>
-                {finished.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate}
-                    busy={busy} onChange={changeStatus} onCancel={cancel} />)}
-            </ul>
-        </section>}
+        </ul> : <DataState state="empty" kind="waiting"
+            title={keyword ? '검색에 맞는 대기 접수가 없습니다.'
+                : status === 'ACTIVE' ? '대기 중인 팀이 없습니다.' : '선택한 상태의 대기 접수가 없습니다.'}
+            description={keyword ? '이름이나 대기번호를 다시 확인해주세요.'
+                : status === 'ACTIVE' ? '손님이 오면 대기 접수를 등록해주세요.' : '다른 상태를 선택해 확인해주세요.'} />}
     </>;
 
     return <div className="reserve-waiting-tab">
-        <FilterToolbar selects={[{ key: 'store', value: storeId ? String(storeId) : undefined,
-            onChange: onStoreChange, options: stores.map(item => ({ value: String(item.id), label: item.name })),
-            ariaLabel: '웨이팅을 관리할 가게', width: 200, disabled: storesLoading || Boolean(storesError), loading: storesLoading }]}
-            extra={<SegmentedControl options={VIEW_OPTIONS} value={view} onChange={onViewChange} block={false} />}
+        <div className="reserve-explore-filters reserve-waiting-filters" aria-label="웨이팅 목록 필터">
+            <FilterMenu appearance="plain" aria-label="웨이팅을 관리할 가게"
+                value={storeId ? String(storeId) : undefined} onChange={onStoreChange}
+                options={stores.map(item => ({ value: String(item.id), label: item.name }))}
+                disabled={storesLoading || Boolean(storesError)} loading={storesLoading} />
+            <FilterMenu appearance="plain" aria-label="대기 접수 상태" value={status}
+                onChange={onStatusChange} options={STATUS_OPTIONS} disabled={storesLoading || Boolean(storesError)} />
+            <div className="reserve-waiting-view-toggle">
+                <StoreListViewToggle view={view} onChange={onViewChange} disabled={storesLoading || board.isLoading} />
+            </div>
+        </div>
+        <FilterToolbar search={{ value: search, onChange: onSearchChange, placeholder: '이름, 대기번호로 검색' }}
             onReload={store ? refresh : refetchStores} loading={storesLoading || board.isFetching} />
         {content}
         <FormModal title="대기 접수" open={open} mobileSize="content" width={440}
@@ -194,16 +214,21 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
 }
 WaitingBoard.propTypes = { store: PropTypes.object, stores: PropTypes.array.isRequired, storesLoading: PropTypes.bool,
     storesError: PropTypes.object, refetchStores: PropTypes.func.isRequired, onStoreChange: PropTypes.func.isRequired,
-    revision: PropTypes.number.isRequired, view: PropTypes.string.isRequired, onViewChange: PropTypes.func.isRequired };
+    revision: PropTypes.number.isRequired, view: PropTypes.string.isRequired, onViewChange: PropTypes.func.isRequired,
+    search: PropTypes.string.isRequired, onSearchChange: PropTypes.func.isRequired,
+    status: PropTypes.string.isRequired, onStatusChange: PropTypes.func.isRequired };
 
 export default function WaitingTab() {
     const { stores, loading, error, refetch } = useMyStores();
     const revision = useAuthStore(state => state.sessionRevision);
-    const [{ waitingStore }, setParams] = useQueryParamsState(QUERY_DEFAULTS);
+    const [{ waitingStore, waitingSearch, waitingStatus }, setParams] = useQueryParamsState(QUERY_DEFAULTS);
     const [searchParams, setSearchParams] = useSearchParams();
     const [view, setView] = useViewModeParam(searchParams, setSearchParams, 'list');
     const store = stores.find(item => String(item.id) === waitingStore) ?? stores[0] ?? null;
     return <WaitingBoard key={`${revision}:${store?.id ?? 'none'}`} store={store} stores={stores}
         storesLoading={loading} storesError={error} refetchStores={refetch}
-        onStoreChange={value => setParams({ waitingStore: String(value) })} revision={revision} view={view} onViewChange={setView} />;
+        onStoreChange={value => setParams({ waitingStore: String(value) })} revision={revision} view={view} onViewChange={setView}
+        search={waitingSearch} onSearchChange={event => setParams({ waitingSearch: event.target.value })}
+        status={STATUS_OPTIONS.some(option => option.value === waitingStatus) ? waitingStatus : 'ACTIVE'}
+        onStatusChange={value => setParams({ waitingStatus: value })} />;
 }

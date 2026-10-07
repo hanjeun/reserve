@@ -181,9 +181,7 @@ const renderReservationTrend = (loading, stats, reservationGradient) => {
         );
     }
     return (
-        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Text type="secondary">해당 기간 예약이 없습니다.</Text>
-        </div>
+        <DataState state="empty" kind="reservation" title="해당 기간 예약이 없습니다." style={{ height: '100%' }} />
     );
 };
 
@@ -229,9 +227,7 @@ const renderStatusPie = (loading, statusPieData) => {
         );
     }
     return (
-        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Text type="secondary">해당 기간 예약이 없습니다.</Text>
-        </div>
+        <DataState state="empty" kind="reservation" title="해당 기간 예약이 없습니다." style={{ height: '100%' }} />
     );
 };
 
@@ -266,9 +262,7 @@ const renderRevenueTrend = (loading, stats, revenueGradient) => {
         );
     }
     return (
-        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Text type="secondary">해당 기간 순결제액이 없습니다.</Text>
-        </div>
+        <DataState state="empty" kind="payment" title="해당 기간 순결제액이 없습니다." style={{ height: '100%' }} />
     );
 };
 

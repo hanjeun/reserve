@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { storeService } from '../services';
 import useMessage from './useMessage';
 import useAuthStore from '../store/useAuthStore';
+import useStoreDraftPreferences, { getStoreDraftAutoSaveEnabled } from './useStoreDraftPreferences';
 import { buildStoreFormData } from '../utils/form';
 import { handleApiError } from '../utils/errorHandler';
 import { getDetailImageUrl } from '../utils/image';
@@ -107,7 +108,10 @@ export const useStoreForm = ({
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { message, confirm } = useMessage();
-    const userId = useAuthStore(state => state.user?.id);
+    const user = useAuthStore(state => state.user);
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
+    const userId = user?.id;
+    const { autoSaveEnabled } = useStoreDraftPreferences(user);
     const [loading, setLoading] = useState(false);
     const [mainImage, setMainImage] = useState([]);
     const [detailImages, setDetailImages] = useState([]);
@@ -119,6 +123,7 @@ export const useStoreForm = ({
     const baseFingerprintRef = useRef(null);
     const autoSaveTimerRef = useRef(null);
     const autoSaveMaxTimerRef = useRef(null);
+    const autoSaveActiveRef = useRef(false);
     const saveQueueRef = useRef(Promise.resolve());
     const saveSequenceRef = useRef(0);
     const restoredKeyRef = useRef(/** @type {string | null} */ (null));
@@ -126,8 +131,25 @@ export const useStoreForm = ({
     const restoredObjectUrlsRef = useRef(new Set());
     const hasChangesRef = useRef(false);
     const mountedRef = useRef(true);
+    const draftSessionRef = useRef({ userId, role: user?.role, sessionRevision });
     const confirmRef = useRef(confirm);
     useEffect(() => { confirmRef.current = confirm; }, [confirm]);
+
+    const isCurrentDraftSession = useCallback(() => {
+        const auth = useAuthStore.getState();
+        const started = draftSessionRef.current;
+        return started.userId != null
+            && auth.user?.id === started.userId
+            && auth.user?.role === started.role
+            && auth.sessionRevision === started.sessionRevision;
+    }, []);
+
+    const cancelAutoSave = useCallback(() => {
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+        if (autoSaveMaxTimerRef.current) clearTimeout(autoSaveMaxTimerRef.current);
+        autoSaveTimerRef.current = null;
+        autoSaveMaxTimerRef.current = null;
+    }, []);
 
     const revokeRestoredUrls = useCallback(nextFiles => {
         const retained = new Set((nextFiles ?? []).map(file => file?.draftObjectUrl).filter(Boolean));
@@ -141,12 +163,11 @@ export const useStoreForm = ({
         mountedRef.current = true;
         return () => {
             mountedRef.current = false;
-            if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-            if (autoSaveMaxTimerRef.current) clearTimeout(autoSaveMaxTimerRef.current);
+            cancelAutoSave();
             restoredObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
             restoredObjectUrlsRef.current.clear();
         };
-    }, []);
+    }, [cancelAutoSave]);
 
     // 수정 모드는 서버 기준값을 먼저 넣는다. 그 다음 effect가 로컬 초안을 비교·복원한다.
     useEffect(() => {
@@ -202,7 +223,7 @@ export const useStoreForm = ({
     }, [form, message, revokeRestoredUrls]);
 
     useEffect(() => {
-        const ready = form && formReady && draftKey && (mode === 'create' || initialData);
+        const ready = form && formReady && draftKey && isCurrentDraftSession() && (mode === 'create' || initialData);
         if (!ready || restoredKeyRef.current === draftKey) return;
         restoredKeyRef.current = draftKey;
         let cancelled = false;
@@ -212,7 +233,7 @@ export const useStoreForm = ({
             try {
                 await purgeExpiredStoreDrafts();
                 const draft = await readStoreDraft(draftKey);
-                if (cancelled) return;
+                if (cancelled || !isCurrentDraftSession()) return;
                 if (!draft) {
                     settled = true;
                     return;
@@ -232,10 +253,13 @@ export const useStoreForm = ({
                         : `${savedLabel}에 이 브라우저에 저장한 내용을 이어서 작성할까요?`,
                     okText: '이어서 작성',
                     cancelText: mode === 'create' ? '새로 작성' : '최신 정보 유지',
-                    onOk: () => applyDraft(draft),
+                    onOk: () => {
+                        if (mountedRef.current && isCurrentDraftSession()) applyDraft(draft);
+                    },
                     onCancel: async () => {
+                        if (!mountedRef.current || !isCurrentDraftSession()) return;
                         await deleteStoreDraft(draftKey).catch(() => undefined);
-                        if (mountedRef.current) {
+                        if (mountedRef.current && isCurrentDraftSession()) {
                             setDraftState({ status: 'idle', savedAt: null, error: null });
                         }
                     },
@@ -255,26 +279,23 @@ export const useStoreForm = ({
             // StrictMode의 effect 재실행 중 첫 비동기 조회가 취소됐으면 두 번째 setup이 다시 읽게 한다.
             if (!settled && restoredKeyRef.current === draftKey) restoredKeyRef.current = null;
         };
-    }, [applyDraft, draftKey, form, formReady, initialData, mode]);
+    }, [applyDraft, draftKey, form, formReady, initialData, isCurrentDraftSession, mode]);
 
-    const persistDraft = useCallback(({ announce = false } = {}) => {
-        if (!draftKey || !form) {
+    const persistDraft = useCallback(({ announce = false, automatic = false } = {}) => {
+        if (automatic && (!isCurrentDraftSession() || !getStoreDraftAutoSaveEnabled(useAuthStore.getState().user))) {
+            return Promise.resolve(undefined);
+        }
+        if (!draftKey || !form || !isCurrentDraftSession()) {
             const error = new Error('로그인 정보를 확인할 수 없어 임시저장하지 못했습니다.');
             if (announce) message.error(error.message);
             return Promise.reject(error);
         }
 
-        if (autoSaveTimerRef.current) {
-            clearTimeout(autoSaveTimerRef.current);
-            autoSaveTimerRef.current = null;
-        }
-        if (autoSaveMaxTimerRef.current) {
-            clearTimeout(autoSaveMaxTimerRef.current);
-            autoSaveMaxTimerRef.current = null;
-        }
+        cancelAutoSave();
 
         const sequence = saveSequenceRef.current + 1;
         saveSequenceRef.current = sequence;
+        autoSaveActiveRef.current = automatic;
         const snapshot = {
             key: draftKey,
             values: form.getFieldsValue(true),
@@ -288,10 +309,16 @@ export const useStoreForm = ({
 
         const queued = saveQueueRef.current
             .catch(() => undefined)
-            .then(() => saveStoreDraft(snapshot));
+            .then(() => {
+                if (!isCurrentDraftSession() || (automatic && !getStoreDraftAutoSaveEnabled(useAuthStore.getState().user))) {
+                    return undefined;
+                }
+                return saveStoreDraft(snapshot);
+            });
         saveQueueRef.current = queued;
 
         return queued.then(record => {
+            if (!record || !isCurrentDraftSession()) return undefined;
             if (mountedRef.current && saveSequenceRef.current === sequence) {
                 setDraftState({ status: 'saved', savedAt: record.savedAt, error: null });
                 hasChangesRef.current = false;
@@ -300,31 +327,37 @@ export const useStoreForm = ({
             return record;
         }).catch(error => {
             const errorMessage = draftFailureMessage(error);
-            if (mountedRef.current && saveSequenceRef.current === sequence) {
+            if (mountedRef.current && isCurrentDraftSession() && saveSequenceRef.current === sequence) {
                 setDraftState(current => ({ ...current, status: 'error', error: errorMessage }));
             }
-            if (announce) message.error(errorMessage);
+            if (announce && isCurrentDraftSession()) message.error(errorMessage);
             throw error;
         });
-    }, [draftKey, form, message]);
+    }, [cancelAutoSave, draftKey, form, isCurrentDraftSession, message]);
 
     const scheduleDraftSave = useCallback(() => {
+        if (!isCurrentDraftSession()) return;
         hasChangesRef.current = true;
         // 진행 중인 이전 저장이 완료돼도 최신 변경을 saved로 오인하지 않게 무효화한다.
         saveSequenceRef.current += 1;
+        if (!getStoreDraftAutoSaveEnabled(useAuthStore.getState().user)) {
+            cancelAutoSave();
+            setDraftState(current => ({ ...current, status: 'idle', error: null }));
+            return;
+        }
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
         setDraftState(current => ({ ...current, status: 'pending', error: null }));
         autoSaveTimerRef.current = setTimeout(() => {
             autoSaveTimerRef.current = null;
-            void persistDraft().catch(() => undefined);
+            void persistDraft({ automatic: true }).catch(() => undefined);
         }, AUTO_SAVE_IDLE_MS);
         if (!autoSaveMaxTimerRef.current) {
             autoSaveMaxTimerRef.current = setTimeout(() => {
                 autoSaveMaxTimerRef.current = null;
-                void persistDraft().catch(() => undefined);
+                void persistDraft({ automatic: true }).catch(() => undefined);
             }, AUTO_SAVE_MAX_WAIT_MS);
         }
-    }, [persistDraft]);
+    }, [cancelAutoSave, isCurrentDraftSession, persistDraft]);
 
     const handleValuesChange = useCallback(() => scheduleDraftSave(), [scheduleDraftSave]);
 
@@ -349,20 +382,32 @@ export const useStoreForm = ({
         [persistDraft],
     );
 
+    useEffect(() => {
+        if (!autoSaveEnabled || !isCurrentDraftSession()) {
+            cancelAutoSave();
+            if (autoSaveActiveRef.current || !isCurrentDraftSession()) saveSequenceRef.current += 1;
+            setDraftState(current => current.status === 'pending' || (current.status === 'saving' && autoSaveActiveRef.current)
+                ? { ...current, status: 'idle', error: null }
+                : current);
+        } else if (hasChangesRef.current) {
+            scheduleDraftSave();
+        }
+    }, [autoSaveEnabled, cancelAutoSave, isCurrentDraftSession, scheduleDraftSave, sessionRevision, userId, user?.role]);
+
     // BrowserRouter는 data-router blocker를 제공하지 않는다. 내부 링크로 즉시 이동해도 마지막
     // 자동저장 대기 중인 마지막 변경이 사라지지 않도록 언마운트 시 IndexedDB 쓰기를 시작한다.
     useEffect(() => () => {
-        if (hasChangesRef.current) void persistDraft().catch(() => undefined);
+        if (hasChangesRef.current) void persistDraft({ automatic: true }).catch(() => undefined);
     }, [persistDraft]);
 
     useEffect(() => {
         const warnBeforeUnload = event => {
-            if (!hasChangesRef.current) return;
+            if (!hasChangesRef.current || !isCurrentDraftSession()) return;
             event.preventDefault();
             event.returnValue = '';
         };
         const flushBeforeHide = () => {
-            if (hasChangesRef.current) void persistDraft().catch(() => undefined);
+            if (hasChangesRef.current) void persistDraft({ automatic: true }).catch(() => undefined);
         };
         window.addEventListener('beforeunload', warnBeforeUnload);
         window.addEventListener('pagehide', flushBeforeHide);
@@ -370,7 +415,7 @@ export const useStoreForm = ({
             window.removeEventListener('beforeunload', warnBeforeUnload);
             window.removeEventListener('pagehide', flushBeforeHide);
         };
-    }, [persistDraft]);
+    }, [isCurrentDraftSession, persistDraft]);
 
     const appendImages = formData => {
         if (mode === 'create') {
@@ -410,8 +455,7 @@ export const useStoreForm = ({
 
     const handleSubmit = async values => {
         setLoading(true);
-        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-        if (autoSaveMaxTimerRef.current) clearTimeout(autoSaveMaxTimerRef.current);
+        cancelAutoSave();
         try {
             const formData = buildStoreFormData(values);
             appendImages(formData);
@@ -433,7 +477,7 @@ export const useStoreForm = ({
             message.success(mode === 'create' ? '가게가 등록되었습니다' : '가게 정보가 수정되었습니다');
             navigate('/my-stores');
         } catch (error) {
-            void persistDraft().catch(() => undefined);
+            void persistDraft({ automatic: true }).catch(() => undefined);
             handleApiError(error, message, mode === 'create' ? '가게 등록에 실패했습니다' : '가게 수정에 실패했습니다');
         } finally {
             setLoading(false);
@@ -444,7 +488,7 @@ export const useStoreForm = ({
         loading,
         mainImage,
         detailImages,
-        draftState,
+        draftState: { ...draftState, autoSaveEnabled },
         handleSubmit,
         handleValuesChange,
         handleMainImageChange,

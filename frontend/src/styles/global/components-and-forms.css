@@ -18,6 +18,10 @@
     transition: box-shadow 0.2s ease;
 }
 .reserve-card--interactive { cursor: pointer; }
+.reserve-card:has(.reserve-store-card-hit) {
+    transition: box-shadow 0.2s ease, transform 0.12s ease, opacity 0.12s ease;
+}
+.reserve-card:has(.reserve-store-card-hit:active) { transform: scale(0.98); opacity: 0.88; }
 .reserve-card-link {
     display: block;
     color: inherit;
@@ -52,8 +56,10 @@
    타이밍에 민감한 이력이 있어 대상을 좁혀서 끈다. */
 @media (prefers-reduced-motion: reduce) {
     .reserve-card,
+    .reserve-card:has(.reserve-store-card-hit),
     .reserve-card-link { transition: none; }
     .reserve-card-link:active { transform: none; }
+    .reserve-card:has(.reserve-store-card-hit:active) { transform: none; }
     .reserve-card.ant-card-hoverable:hover .reserve-card-image { transform: none; }
 }
 /* Card actions(가게 카드 하단 수정·삭제 줄).
@@ -137,14 +143,15 @@
    장애가 화면에서 과장된다. DataState는 무채색 아이콘·본문·재시도로 통일하고,
    role=alert로 실패 의미만 보존한다. 폼 검증·파괴적 작업 실패에는 쓰지 않는다. */
 .reserve-data-state {
-    min-height: 148px;
+    width: 100%;
+    min-height: 240px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 28px 20px;
+    gap: 12px;
+    padding: 40px 20px;
     color: var(--c-text-secondary, #4e5968);
     text-align: center;
 }
@@ -153,14 +160,14 @@
     align-items: center;
     justify-content: center;
     color: var(--c-text-tertiary, #8b95a1);
-    font-size: 30px;
+    font-size: var(--data-state-icon-size, 48px);
     line-height: 1;
 }
 .reserve-data-state__copy { max-width: 560px; }
 .reserve-data-state__title,
 .reserve-data-state__description { margin: 0; color: var(--c-text-secondary, #4e5968); }
-.reserve-data-state__title { font-size: 14px; line-height: 1.55; }
-.reserve-data-state__description { margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--c-text-tertiary, #8b95a1); }
+.reserve-data-state__title { font-size: var(--data-state-title-size, 18px); font-weight: 600; line-height: 1.55; color: var(--c-text-primary, #1a1f27); word-break: keep-all; }
+.reserve-data-state__description { margin-top: 4px; font-size: var(--data-state-description-size, 15px); line-height: 1.5; color: var(--c-text-tertiary, #8b95a1); word-break: keep-all; }
 .reserve-data-state__retry { margin-top: 2px; }
 .reserve-data-state--compact {
     min-height: 0;
@@ -172,6 +179,8 @@
 }
 .reserve-data-state--compact .reserve-data-state__icon { flex: 0 0 auto; font-size: 20px; }
 .reserve-data-state--compact .reserve-data-state__copy { min-width: 0; }
+.reserve-data-state--compact .reserve-data-state__title { font-size: 14px; font-weight: 400; color: var(--c-text-secondary, #4e5968); }
+.reserve-data-state--compact .reserve-data-state__description { font-size: 13px; }
 .reserve-data-state--compact .reserve-data-state__retry { margin: 0 0 0 auto; flex: 0 0 auto; }
 @media (max-width: 479px) {
     .reserve-data-state--compact { align-items: flex-start; flex-wrap: wrap; }

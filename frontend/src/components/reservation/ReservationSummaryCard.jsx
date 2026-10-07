@@ -44,15 +44,7 @@ export default function ReservationSummaryCard({
             actions={cardActions.length > 0 ? cardActions : undefined}
         >
             <div className="reserve-tap-card reserve-reservation-summary-card-content">
-                <div className="reserve-reservation-summary-card-cover" aria-hidden="true">
-                    <img
-                        className="reserve-card-image"
-                        src={getThumbnailUrl(storeMainImageUrl)}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                    />
-                </div>
+                <Card.Cover src={getThumbnailUrl(storeMainImageUrl)} alt="" />
                 <div className="reserve-reservation-summary-card-body">
                     <div className="reserve-reservation-summary-card-heading">
                         <button

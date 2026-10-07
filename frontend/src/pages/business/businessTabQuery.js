@@ -18,7 +18,7 @@ const TAB_QUERY_KEYS = Object.freeze({
     ]),
     'qr-checkin': Object.freeze([]),
     'chat-intro': Object.freeze(['chatIntroStore']),
-    waiting: Object.freeze(['waitingStore', 'view']),
+    waiting: Object.freeze(['waitingStore', 'waitingSearch', 'waitingStatus', 'view']),
 });
 
 const ALL_SCOPED_KEYS = Object.freeze([...new Set(Object.values(TAB_QUERY_KEYS).flat())]);

@@ -330,13 +330,8 @@ const MailboxTab = () => {
 
             {showEmpty && (
                 <div style={styles.emptyPanel}>
-                    <InboxOutlined style={{ fontSize: 56, color: colors.border.default, marginBottom: 16 }} />
-                    <Text style={{ fontSize: fontSize.lg, fontWeight: fontWeight.semibold, color: colors.text.secondary, display: 'block', marginBottom: 6 }}>
-                        보낸 메일이 없습니다
-                    </Text>
-                    <Text style={{ fontSize: fontSize.sm, color: colors.text.tertiary }}>
-                        &quot;새 메일&quot; 버튼으로 메일을 보낼 수 있습니다.
-                    </Text>
+                    <DataState state="empty" kind="mail" title="보낸 메일이 없습니다"
+                        description={'"새 메일" 버튼으로 메일을 보낼 수 있습니다.'} />
                 </div>
             )}
 
@@ -359,9 +354,7 @@ const MailboxTab = () => {
                 <>
                     <div style={styles.singlePanel}>
                         {filteredSent.length === 0 ? (
-                            <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                                <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
-                            </div>
+                            <DataState state="empty" kind="mail" title="검색 결과가 없습니다." />
                         ) : filteredSent.map(m => (
                             <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent} />
                         ))}
@@ -376,9 +369,7 @@ const MailboxTab = () => {
                     <div style={styles.listPanel}>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
                             {filteredSent.length === 0 ? (
-                                <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                                    <Text style={{ color: colors.text.tertiary }}>검색 결과가 없습니다.</Text>
-                                </div>
+                                <DataState state="empty" kind="mail" title="검색 결과가 없습니다." />
                             ) : filteredSent.map(m => (
                                 <SentMailItem key={m.id} mail={m} isSelected={m.id === mail.selectedSent?.id} onClick={mail.setSelectedSent} />
                             ))}
@@ -438,7 +429,7 @@ const MailboxTab = () => {
 
 const styles = {
     singlePanel:  { border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, overflow: 'hidden', background: colors.background.paper },
-    emptyPanel:   { border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, padding: '64px 20px', textAlign: 'center', background: colors.background.paper },
+    emptyPanel:   { border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, background: colors.background.paper },
     splitPane:    { display: 'flex', height: 'calc(100vh - 280px)', minHeight: 400, maxHeight: 680, border: `1px solid ${colors.border.default}`, borderRadius: radius.lg, overflow: 'hidden', background: colors.background.paper },
     listPanel:    { width: 360, flexShrink: 0, borderRight: `1px solid ${colors.border.light}`, display: 'flex', flexDirection: 'column', background: colors.background.subtle },
     detailPanel:  { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: colors.background.paper },

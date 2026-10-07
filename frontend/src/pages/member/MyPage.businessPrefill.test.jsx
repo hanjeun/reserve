@@ -129,6 +129,22 @@ describe('MyPage business edit prefill', () => {
         expect(businessService.getMyStatus).not.toHaveBeenCalled();
     });
 
+    it.each(['USER', 'BUSINESS', 'ADMIN'])('offers browser draft preferences only to eligible %s accounts', role => {
+        useAuthStore.setState({ user: { id: 7, role, name: '회원7' } });
+        show();
+        const toggle = screen.queryByRole('switch', { name: '가게 자동 임시저장' });
+        if (role === 'USER') {
+            expect(toggle).toBeNull();
+            return;
+        }
+        expect(toggle).toBeChecked();
+        fireEvent.click(toggle);
+        expect(toggle).not.toBeChecked();
+        expect(localStorage.getItem('reserve:store-draft:auto-save:member:7')).toBe('false');
+        expect(screen.getByText(/이 계정의 이 브라우저에만 적용됩니다/)).toBeInTheDocument();
+        expect(memberService.updateMember).not.toHaveBeenCalled();
+    });
+
     it('keeps notification settings synchronized and preserves concurrent successful updates', async () => {
         useAuthStore.getState().login({ id: 7, role: 'USER', emailNotificationEnabled: true, marketingAgreed: false });
         show();

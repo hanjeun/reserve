@@ -84,7 +84,7 @@ function ListRows({ query, coldError, rows, subject, emptyText, children }) {
     }
     if (query.isLoading) return <ConversationListSkeleton />;
     if (rows.length === 0) {
-        return <div className="reserve-messenger-list-state">{emptyText}</div>;
+        return <DataState state="empty" kind="message" title={emptyText} />;
     }
     return children;
 }
@@ -279,17 +279,19 @@ function OwnerReplies({ draft, sending, onInsert }) {
                 <span>답변 문구</span>
                 <DownOutlined className="reserve-messenger-replies-chevron" aria-hidden="true" />
             </summary>
-            <p>직접 만든 안내 문구입니다. 수정 후 보내기를 눌러주세요.</p>
-            <div>
-                {OWNER_REPLIES.map(reply => (
-                    <Button
-                        key={reply.label}
-                        variant="ghost-sm"
-                        size="sm"
-                        disabled={sending || draft.length + reply.text.length + (draft ? 1 : 0) > 2000}
-                        onClick={() => onInsert(draft ? `${draft}\n${reply.text}` : reply.text)}
-                    >{reply.label}</Button>
-                ))}
+            <div className="reserve-messenger-replies-content">
+                <p>직접 만든 안내 문구입니다. 수정 후 보내기를 눌러주세요.</p>
+                <div className="reserve-messenger-replies-options">
+                    {OWNER_REPLIES.map(reply => (
+                        <Button
+                            key={reply.label}
+                            variant="ghost-sm"
+                            size="sm"
+                            disabled={sending || draft.length + reply.text.length + (draft ? 1 : 0) > 2000}
+                            onClick={() => onInsert(draft ? `${draft}\n${reply.text}` : reply.text)}
+                        >{reply.label}</Button>
+                    ))}
+                </div>
             </div>
         </details>
     );

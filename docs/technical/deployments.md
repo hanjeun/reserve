@@ -137,6 +137,26 @@ ngram 크기 2·다섯 컬럼 FULLTEXT를 확인했고, 새 앱의 FULLTEXT 폴�
 릴리스 이름은 `v2.8.6`이며 설명은 CHANGELOG와 동기화했어요.
 main과 dev의 파일이 같은 것을 확인한 뒤 `merge -s ours`로 squash 계보를 연결했어요.
 
+### 2-4. v2.8.7 배포 확인 (2026-10-04)
+
+제품 PR #307·#308·#309와 릴리스 PR #310을 거친 main
+`c1c08d8b9e197f198e5383746e5a1a389d1b81bb`의
+[CI/CD 실행](https://github.com/hanjeun/reserve/actions/runs/37192806934)이 성공했어요.
+green 앱·nginx upstream·공개 `release-id.txt`가 같은 SHA를 사용하며 health는 `UP`예요.
+제한된 `reserve_app`과 `validate`를 유지하고, 새 모델 34개의 배포 전 대조도 통과했어요.
+
+채팅 파일명·신고 보존 분류·감사 기록·웨이팅 DDL은 보호된 덤프 후 먼저 적용했고,
+기존 컬럼 해시는 전후 같아요. 상세는 [수동 DDL 9·10절](manual-ddl.md)을 따라요.
+18:44:15 KST 공개 개인정보처리방침과 배포된 고지 내용을 확인한 뒤 실제 게시 확인 시각을 등록했어요.
+같은 이미지의 환경 중 보존 설정 다섯 항목만 반영하고, 나머지 환경과 이미지가 같은지 확인했어요.
+공개 정책 API는 90일 보관·30일 유예·2026-11-03 18:44:15 KST 적용 시작을 반환했어요.
+`enabled=true`, `active=false`로 유예 중이며 채팅·신고 파기는 아직 실행되지 않아요.
+
+릴리스·main CI는 같은 입력의 성공한 단위·브라우저 검사 증거를 재사용했어요.
+필수 빌드와 CodeQL은 통과했고 Sonar는 실행하지 않았어요.
+릴리스 제목은 `v2.8.7`이며 한국어 설명은 CHANGELOG와 동기화했어요.
+main과 dev의 배포 파일이 같은 것을 확인하고 `merge -s ours`로 squash 계보를 연결해요.
+
 ## 3. 저장소 보호 & PR/브랜치 정리
 
 ### 3-1. 브랜치 보호 (main / dev)
@@ -238,7 +258,7 @@ sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
 
 ### 4-1. CSP 위반 관측
 
-`nginx/default.conf`의 CSP는 **Report-Only**로 나가요. 위반 보고는 `POST /api/csp-reports`로 들어오고, 서버는 지시문 종류와 차단된 URI의 scheme만 `CSP violation observed` 로그로 남겨요.
+`nginx/default.conf`의 CSP는 **Report-Only**로 나가요. 위반 보고는 `POST /api/csp-reports`로 들어오고, 서버는 지시문 종류·차단 URI의 scheme·코드 출처 범주·차단 대상 범주만 `CSP violation observed` 로그로 남겨요. URL 경로·쿼리·파일명·원본 호스트는 기록하지 않아요. v2.8.8부터 차단 대상 범주(`blockedCategory`)를 추가했고, 실제 사용 중인 Google 프로필 사진 호스트 `lh3.googleusercontent.com`만 이미지 허용 목록에 보완해요. 이전 이미지 보고 10건은 차단 대상 범주가 없어 전부 Google 사진 때문이라고 확정할 수 없어요.
 
 1. 배포 후 https://reserve.it.kr 에서 개발자도구 콘솔을 열고 **PC와 실제 모바일에서 주요 화면을 한 바퀴 돌며**
    `[Report Only]` 경고를 모아요.

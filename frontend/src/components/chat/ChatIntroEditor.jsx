@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Button, FormField, FormInput, FormTextArea, SegmentedControl } from '../common';
+import { Button, DataState, FormField, FormInput, FormTextArea, SegmentedControl } from '../common';
 import useFormErrors from '../../hooks/useFormErrors';
 import ChatIntroPreview from './ChatIntroPreview';
 import MessengerAvatar from './MessengerAvatar';
@@ -189,9 +189,8 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
                         <p>손님이 질문을 누르면 답변이 바로 보여요. 손님 화면에만 보이는 안내라 문의함에는 쌓이지 않아요.</p>
                     </div>
                     {items.length === 0 ? (
-                        <div className="reserve-chat-intro-empty">
-                            <p>아직 등록한 질문이 없어요.<br />주차, 영업시간처럼 자주 받는 질문을 추가해 보세요.</p>
-                        </div>
+                        <DataState state="empty" kind="message" title="아직 등록한 질문이 없어요."
+                            description="주차, 영업시간처럼 자주 받는 질문을 추가해 보세요." />
                     ) : (
                         <ol className="reserve-chat-intro-items">
                             {items.map((item, index) => (

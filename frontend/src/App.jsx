@@ -48,6 +48,7 @@ const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
 import Header, { HeaderPlaceholder } from './components/layout/Header';
 import DiscoveryNav from './components/layout/DiscoveryNav';
 import RouteLoadingSkeleton from './components/layout/RouteLoadingSkeleton';
+import { resolveRouteSkeletonLocation } from './components/layout/routeSkeletonKind';
 import { applyRouteEntryMotion, clearRouteEntryMotion, getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
 import { LoadingPresentationContext, createLoadingPresentation, useSkeletonShown } from './components/layout/loadingPresentation';
 import { DISCOVERY_NAV_ITEMS, isDiscoveryRootPath } from './constants/discovery';
@@ -226,12 +227,13 @@ function AppContent() {
     // 2026-09-29: 레이아웃 틀·로고·탐색 탭(DiscoveryNav — API·로그인 상태를 쓰지 않는다)은 AppRoutes 와 똑같이 그린다.
     // 예전엔 빈 64px 띠뿐이라 확인이 끝나는 순간 탭 44px 만큼 내용이 밀려 내려갔다.
     if (loading) {
-        const discoveryRoot = isDiscoveryRootPath(pathname, search);
+        const pending = resolveRouteSkeletonLocation(pathname, search);
+        const discoveryRoot = isDiscoveryRootPath(pending.pathname, pending.search);
         return (
             <LoadingPresentationContext.Provider value={presentation}>
-            <Layout className={appLayoutClassName(pathname) + ' reserve-boot-shell'} style={appLayoutStyle}>
-                {!isSearchPath(pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} />}
-                {discoveryRoot && <DiscoveryNav />}
+            <Layout className={appLayoutClassName(pending.pathname) + ' reserve-boot-shell'} style={appLayoutStyle}>
+                {!isSearchPath(pending.pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} />}
+                {discoveryRoot && <DiscoveryNav pendingPathname={pending.pathname} />}
                 <Content>
                     <RouteLoadingSkeleton />
                 </Content>
@@ -254,6 +256,10 @@ function AppContent() {
 function AppRoutes() {
     const isLoggedIn = useAuthStore((state) => !!state.user);
     const { pathname, search, key: locationKey, state: locationState } = useLocation();
+    const isOAuthCallback = /^\/oauth2\/callback\/?$/.test(pathname);
+    const displayLocation = resolveRouteSkeletonLocation(pathname, search);
+    const discoveryRoot = isDiscoveryRootPath(displayLocation.pathname, displayLocation.search);
+    const isSearchLayout = isSearchPath(displayLocation.pathname);
     const skeletonShown = useSkeletonShown();
     const navigationType = useNavigationType();
     const isSearchPage = isSearchPath(pathname);
@@ -302,11 +308,11 @@ function AppRoutes() {
     }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, skeletonShown]);
 
     return (
-        <Layout className={appLayoutClassName(pathname)} style={appLayoutStyle}>
+        <Layout className={appLayoutClassName(displayLocation.pathname)} style={appLayoutStyle}>
             <ScrollToTop />
             <OfflineBanner />
-            {!isSearchPage && <Header />}
-            {isDiscoveryRootPath(pathname, search) && <DiscoveryNav />}
+            {!isSearchLayout && (isOAuthCallback ? <HeaderPlaceholder discoveryRoot={discoveryRoot} /> : <Header />)}
+            {discoveryRoot && <DiscoveryNav pendingPathname={isOAuthCallback ? displayLocation.pathname : undefined} />}
             <Content ref={routeContentRef} data-skeleton-shown={skeletonShown ? 'true' : undefined}
                 onAnimationEnd={event => {
                     if (['reserve-discovery-page-from-right', 'reserve-discovery-page-from-left'].includes(event.animationName)) {
@@ -365,9 +371,9 @@ function AppRoutes() {
                 </RouteErrorBoundary>
             </Content>
 
-            {!isMessagesPath(pathname) && !isSearchPage && <AppFooter />}
+            {!isMessagesPath(displayLocation.pathname) && !isSearchLayout && <AppFooter />}
             {/* 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다. 익명 사용자는 청크도 받지 않는다. */}
-            {isLoggedIn && (
+            {isLoggedIn && !isOAuthCallback && (
                 <LoadingPresentationContext.Provider value={null}>
                 <Suspense fallback={null}>
                     <MessengerShell launcherImageSrc="/icons/R_logo.png" />

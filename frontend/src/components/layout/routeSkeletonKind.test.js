@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getRouteSkeletonKind, normalizeRouteSkeletonPath } from './routeSkeletonKind';
+import { getRouteSkeletonKind, normalizeRouteSkeletonPath, resolveRouteSkeletonLocation } from './routeSkeletonKind';
+import { clearRedirect, saveRedirect } from '../../utils/redirect';
 
 describe('route skeleton path normalization', () => {
     it.each([
@@ -26,10 +27,22 @@ describe('route skeleton path normalization', () => {
         ['/login', 'auth'], ['/signup', 'auth'], ['/forgot-password', 'auth'], ['/signup/social', 'auth'],
         ['/terms', 'legal'], ['/privacy', 'legal'], ['/operation-guide', 'legal'], ['/content-sources', 'legal'],
         ['/payment/result', 'payment-result'], ['/admin', 'admin'], ['/business', 'business'], ['/messages', 'messages'],
-        ['/oauth2/callback', 'document'], ['/unknown', 'not-found'], ['/store/12/unknown', 'not-found'],
+        ['/oauth2/callback', 'discovery'], ['/unknown', 'not-found'], ['/store/12/unknown', 'not-found'],
         ['/benefits/1/extra', 'not-found'],
     ])('preserves %s routing with and without trailing slashes', (path, kind) => {
         expect(getRouteSkeletonKind(path)).toBe(kind);
         expect(getRouteSkeletonKind(path + '///')).toBe(kind);
+    });
+
+    it('keeps the pending OAuth destination until authentication consumes it', () => {
+        clearRedirect();
+        expect(resolveRouteSkeletonLocation('/oauth2/callback')).toEqual({ pathname: '/', search: '' });
+        saveRedirect('/my-reservations?view=list');
+        try {
+            expect(resolveRouteSkeletonLocation('/oauth2/callback')).toEqual({ pathname: '/my-reservations', search: '?view=list' });
+            expect(resolveRouteSkeletonLocation('/oauth2/callback')).toEqual({ pathname: '/my-reservations', search: '?view=list' });
+            expect(resolveRouteSkeletonLocation('/oauth2/callback', '?newUser=true')).toEqual({ pathname: '/signup/social', search: '' });
+            expect(resolveRouteSkeletonLocation('/oauth2/callback', '?error=oauth2')).toEqual({ pathname: '/login', search: '' });
+        } finally { clearRedirect(); }
     });
 });

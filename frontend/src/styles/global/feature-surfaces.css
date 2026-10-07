@@ -1062,7 +1062,8 @@
     font-size: 11px;
     line-height: 1.6;
 }
-.reserve-messenger-replies > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.reserve-messenger-replies[open] .reserve-messenger-replies-content { animation: slideUpIn 0.2s ease both; }
+.reserve-messenger-replies-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .reserve-messenger-replies .reserve-btn { min-height: 44px; }
 .reserve-messenger-closed {
     display: block;
@@ -1188,7 +1189,11 @@
 .reserve-chat-attachment-preview::after { content: ''; position: absolute; inset: 0; background: var(--c-gray-500, #8b95a1); opacity: 0; transition: opacity 0.15s ease; }
 .reserve-chat-attachment-preview:hover::after { opacity: 0.2; }
 .reserve-chat-attachment-preview:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: 2px; }
+.reserve-chat-photo-image { transition: filter 0.15s ease; }
+/* 원본의 투명한 모양을 유지하며 사진 픽셀에만 hover·키보드 피드백을 준다. */
+.reserve-chat-photo:focus-visible .reserve-chat-photo-image { filter: brightness(0.9); }
 @media (hover: hover) and (pointer: fine) {
+    .reserve-chat-photo:hover .reserve-chat-photo-image { filter: brightness(0.9); }
     .reserve-chat-message-actions { opacity: 0; }
     .reserve-chat-message-row:hover .reserve-chat-message-actions,
     .reserve-chat-message-row:focus-within .reserve-chat-message-actions,
@@ -1234,6 +1239,8 @@
     .reserve-messenger.is-returning-to-list > .reserve-messenger-list,
     .reserve-messenger.is-returning-to-list > .reserve-messenger-thread { animation-duration: 0.01ms; }
     .reserve-messenger-list-refresh.is-refreshing .anticon { animation: none; }
+    .reserve-messenger-replies[open] .reserve-messenger-replies-content { animation: none; }
+    .reserve-chat-photo-image { transition: none; }
     .reserve-messenger-launcher-wrap,
     .reserve-chat-launcher,
     .reserve-chat-launcher .anticon,
@@ -1427,11 +1434,10 @@ a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 .reserve-store-list-row-meta .reserve-store-identity-text { flex: 0 1 auto; }
 .reserve-store-list-row-favorite { display: flex; flex: 0 0 44px; width: 44px; min-height: 44px; align-items: center; justify-content: center; }
 .reserve-store-list-row-favorite:empty { display: none; }
-.reserve-store-card-shell { position: relative; transition: transform 0.12s ease, opacity 0.12s ease; }
+.reserve-store-card-shell { position: relative; }
 .reserve-store-card-hit { position: absolute; inset: 0; z-index: 1; -webkit-tap-highlight-color: transparent; }
 .reserve-store-card-hit:focus { outline: none; }
 .reserve-store-card-hit:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: -2px; }
-.reserve-store-card-shell:has(.reserve-store-card-hit:active) { transform: scale(0.98); opacity: 0.88; }
 .reserve-store-card-info { display: flex; flex-direction: column; padding: 12px 16px; }
 .reserve-store-card-title-line { position: relative; display: flex; align-items: center; min-width: 0; padding-right: 44px; margin-bottom: 2px; }
 .reserve-store-card-title-line:has(> .reserve-store-card-favorite:empty) { padding-right: 0; }
@@ -1441,9 +1447,7 @@ a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 .reserve-store-card-favorite { position: absolute; z-index: 2; right: 0; top: 50%; transform: translateY(-50%); }
 .reserve-store-card-favorite:empty { display: none; }
 @media (prefers-reduced-motion: reduce) {
-    .reserve-store-card-shell { transition: none; }
     a.reserve-store-list-row-link[href] { transition: none; }
-    .reserve-store-card-shell:has(.reserve-store-card-hit:active) { transform: none; }
 }
 @media (min-width: 768px) {
     .reserve-store-list-rows { --reserve-store-list-image-size: 96px; --reserve-store-list-row-spacing: 20px; }
@@ -1843,8 +1847,6 @@ a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 .reserve-benefit-store-discovery h2 { margin: 0 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
 .reserve-benefits-heading p { margin: 0; font-size: 13px; color: var(--c-text-secondary, #4e5968); line-height: 1.6; }
 .reserve-benefits-count { color: var(--c-text-secondary, #4e5968); font-size: 12px; flex-shrink: 0; }
-.reserve-benefits-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 16px; color: var(--c-text-secondary, #4e5968); text-align: center; }
-.reserve-benefits-empty p { margin: 0; font-size: 13px; line-height: 1.6; }
 .reserve-benefit-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .reserve-benefit-row {
     --reserve-benefit-banner-min-height: 120px;
@@ -2324,8 +2326,8 @@ a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
     .reserve-discovery-shortcut:hover img { transform: translateY(-2px); }
     .reserve-explore-page .reserve-card.ant-card-hoverable { transition: box-shadow 0.2s ease, transform 0.16s ease; }
-    .reserve-explore-page .reserve-card.ant-card-hoverable:hover { transform: translateY(-2px); }
-    .reserve-explore-page .reserve-card.ant-card-hoverable:active { transform: none; }
+    .reserve-explore-page .reserve-card.ant-card-hoverable:hover:not(:has(.reserve-store-card-hit:active)) { transform: translateY(-2px); }
+    .reserve-explore-page .reserve-card.ant-card-hoverable:active:not(:has(.reserve-store-card-hit:active)) { transform: none; }
 }
 /* ── 검색 전용 화면 ──────────────────────────────────────────────────────────
    입력 진입과 가게 목록을 분리한다. 입력 변경 자체는 API/DB 요청을 만들지 않는다. */

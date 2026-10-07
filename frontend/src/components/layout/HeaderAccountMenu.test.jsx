@@ -54,7 +54,12 @@ describe('HeaderAccountMenu logout', () => {
         await user.click(screen.getByRole('button', { name: '로그아웃' }));
 
         expect(authState.setLoggingOut).toHaveBeenCalledWith(true);
-        expect(message.loading).toHaveBeenCalledWith('로그아웃하는 중입니다.', 0);
+        expect(message.loading).toHaveBeenCalledWith(expect.objectContaining({
+            content: '로그아웃하는 중입니다.', duration: 0,
+        }));
+        const progress = render(message.loading.mock.calls[0][0].icon);
+        expect(screen.getByRole('img', { name: '로딩 중' })).toBeInTheDocument();
+        progress.unmount();
         await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/auth/logout', undefined, {
             timeout: 8000,
             skipAuthRefresh: true,

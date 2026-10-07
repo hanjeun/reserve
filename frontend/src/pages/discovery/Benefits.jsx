@@ -77,12 +77,14 @@ export default function Benefits() {
         if (isPending) return <BenefitsSkeleton />;
         if (isError) {
             return (
-                <DataState className="reserve-benefits-empty" state="error" kind="news" subject="가게 소식" error={error}
+                <DataState state="error" kind="news" subject="가게 소식" error={error}
                     title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} />
             );
         }
         if (items.length === 0) {
-            return <div className="reserve-benefits-empty"><p>{total > 0 ? '이 페이지에는 소식이 없어요.' : '아직 등록된 가게 소식이 없어요.'}</p><Link to={total > 0 ? firstPageTo : '/stores'} className="reserve-benefits-text-link">{total > 0 ? '첫 페이지로' : '가게 둘러보기'} <ArrowRightOutlined aria-hidden="true" /></Link></div>;
+            return <DataState state="empty" kind="news"
+                title={total > 0 ? '이 페이지에는 소식이 없어요.' : '아직 등록된 가게 소식이 없어요.'}
+                action={<Link to={total > 0 ? firstPageTo : '/stores'} className="reserve-benefits-text-link">{total > 0 ? '첫 페이지로' : '가게 둘러보기'} <ArrowRightOutlined aria-hidden="true" /></Link>} />;
         }
         return <div className="reserve-benefit-list" aria-busy={isFetching}>{items.map(item => <BenefitRow key={item.id} item={item} />)}</div>;
     };

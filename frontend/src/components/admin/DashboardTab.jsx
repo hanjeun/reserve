@@ -172,7 +172,7 @@ const DashboardTab = () => {
                         </div>
                     )}
                     {!loading && sourceAvailable('reservations') && !stats?.reservationPieData?.length && (
-                        <DataState state="empty" kind="reservation" title="데이터가 없습니다." compact style={{ height: '100%' }} />
+                        <DataState state="empty" kind="reservation" title="데이터가 없습니다." style={{ height: '100%' }} />
                     )}
                     {!loading && sourceFailed('reservations') && (
                         <DataState state="error" kind="reservation" title="예약 집계를 불러오지 못했습니다."
@@ -206,7 +206,7 @@ const DashboardTab = () => {
                         </ResponsiveContainer>
                     )}
                     {!loading && sourceAvailable('trash') && !stats?.trashBarData?.length && (
-                        <DataState state="empty" title="휴지통이 비어있습니다." compact style={{ height: '100%' }} />
+                        <DataState state="empty" title="휴지통이 비어있습니다." style={{ height: '100%' }} />
                     )}
                     {!loading && sourceFailed('trash') && (
                         <DataState state="error" title="휴지통 데이터를 불러오지 못했습니다."

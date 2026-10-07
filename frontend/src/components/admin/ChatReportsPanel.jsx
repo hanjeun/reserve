@@ -193,7 +193,7 @@ const ChatReportsPanel = () => {
                     </div>
                 )}
                 {(contextQuery.data?.recentMessages ?? []).length === 0 ? (
-                    <Text type="secondary">저장된 메시지가 없습니다.</Text>
+                    <DataState state="empty" kind="message" title="저장된 메시지가 없습니다." />
                 ) : (contextQuery.data?.recentMessages ?? []).map((item) => (
                     <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--c-border-light, #f2f4f6)' }}>
                         <strong>{item.senderRole === 'OWNER' ? '사장님' : '회원'}</strong>

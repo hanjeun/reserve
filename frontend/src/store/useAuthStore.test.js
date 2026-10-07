@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import useAuthStore from './useAuthStore';
 import api from '../api/axios';
+import { currentSession } from '../api/sessionScope';
 vi.mock('../api/axios', () => ({ default: { get: vi.fn() } }));
 
 const a = { id: 1, name: 'A', email: 'a@example.test', role: 'USER' };
@@ -56,6 +57,17 @@ describe('auth identity transitions', () => {
         useAuthStore.getState().login(b);
         useAuthStore.getState().updateUser({ ...a, name: 'late A' });
         expect(useAuthStore.getState().user).toEqual(b);
+    });
+
+    it('ignores an expired-session event from a previous account', () => {
+        useAuthStore.getState().login(a);
+        const epoch = currentSession().epoch;
+        useAuthStore.getState().login(b);
+        window.dispatchEvent(new CustomEvent('reserve:session-expired', { detail: { epoch } }));
+        expect(useAuthStore.getState().user).toEqual(b);
+        window.dispatchEvent(new CustomEvent('reserve:session-expired', { detail: { epoch: currentSession().epoch } }));
+        expect(useAuthStore.getState().user).toBeNull();
+        expect(useAuthStore.getState().isLoggingOut).toBe(false);
     });
 
     it('retries a transient startup failure before showing an anonymous session', async () => {

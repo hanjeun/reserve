@@ -157,6 +157,32 @@ green 앱·nginx upstream·공개 `release-id.txt`가 같은 SHA를 사용하며
 릴리스 제목은 `v2.8.7`이며 한국어 설명은 CHANGELOG와 동기화했어요.
 main과 dev의 배포 파일이 같은 것을 확인하고 `merge -s ours`로 squash 계보를 연결해요.
 
+### 2-5. v2.8.8 배포 확인 (2026-10-07)
+
+제품 PR #312·#313과 릴리스 PR #319를 거친 main
+`51a3825efd33812c9482ce381ab54cae033e90b8`의
+[CI/CD 실행](https://github.com/hanjeun/reserve/actions/runs/37611763704)이 성공했어요.
+20:23 KST blue 앱·nginx upstream·공개 `release-id.txt`가 같은 SHA를 사용하며 health는 `UP`예요.
+GitHub production Deployment `6908551032`도 성공 상태예요.
+앱 DB 계정 `reserve_app`과 스키마 모드 `validate`를 유지하고, 이번 배포에 DDL·DB 보정은 없어요.
+읽기 전용 배포 verifier의 미결 결제·웹훅·파일 삭제·OAuth 해제 작업과 예약금 불변식 검사는 통과했어요.
+
+릴리스 PR은 같은 입력의 성공한 단위·브라우저 검사 증거를 재사용했어요.
+main CI는 백엔드 증거를 재사용하고 프론트 단위 133개 파일·1,172개 테스트와 PC·모바일 검사를 실행했어요.
+필수 빌드와 CodeQL은 통과했고 Sonar는 실행하지 않았어요.
+릴리스 제목은 `v2.8.8`이며 한국어 설명은 CHANGELOG와 동기화했어요.
+main과 dev의 파일이 같은 것을 확인한 뒤 `merge -s ours`로 squash 계보를 연결했어요.
+
+공개 개인정보처리방침은 200 응답이며, 보존 정책의 실제 고지 시각은 10월 4일 18:44:15 KST로 유지해요.
+정책 API는 90일 보관·30일 유예·11월 3일 18:44:15 KST 적용 시작과 `enabled=true`, `active=false`를 반환해요.
+기존 자료의 유예를 앞당기거나 초기화하지 않았어요. 유예 종료 후 첫 파기 결과는 아직 확인할 수 없어요.
+
+CSP는 Report-Only를 유지하고 Google 프로필 사진 호스트 `lh3.googleusercontent.com`을 허용했어요.
+새 앱 로그의 Loki 수집과 지도 렌더를 확인했어요. 배포 전 보고는 22건(이미지 16·카카오 스크립트 6)이었고,
+옛 로그에는 차단 대상 주소가 없어 이미지 보고 전부의 원인을 소급 확정할 수 없어요.
+새 브라우저 재현은 카카오 지도 SDK의 `t1.kakaocdn.net` 스크립트와 `eval` 사용을 확인했어요.
+이 호스트 허용·SDK의 eval 처리 방안을 정하기 전에는 CSP를 강제 모드로 바꾸지 않아요.
+
 ## 3. 저장소 보호 & PR/브랜치 정리
 
 ### 3-1. 브랜치 보호 (main / dev)

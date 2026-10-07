@@ -90,7 +90,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
 
         expectNewsOnlyStructure();
-        const empty = document.querySelector('.reserve-benefits-empty');
+        const empty = screen.getByText('아직 등록된 가게 소식이 없어요.').closest('section');
         const link = within(empty).getByRole('link', { name: '가게 둘러보기' });
         expect(link.tagName).toBe('A');
         expect(link).toHaveAttribute('href', '/stores');

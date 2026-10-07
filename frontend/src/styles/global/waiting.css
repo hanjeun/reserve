@@ -1,9 +1,10 @@
 .reserve-waiting-tab { display: flex; flex-direction: column; gap: 20px; }
 .reserve-waiting-tab > .reserve-filter-toolbar { margin-bottom: 0; }
-.reserve-waiting-filters { justify-content: flex-start; flex-wrap: nowrap; margin-bottom: 0; }
+.reserve-waiting-filters { justify-content: flex-start; flex-wrap: wrap; margin-bottom: 0; }
 .reserve-waiting-filters .reserve-filter-menu { max-width: min(240px, 65vw); }
+.reserve-waiting-view-toggle { margin-left: auto; }
 .reserve-waiting-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.reserve-waiting-summary h3, .reserve-waiting-finished h3 { margin: 0; color: var(--c-text-primary); font-size: 18px; font-weight: 700; line-height: 28px; }
+.reserve-waiting-summary h3 { margin: 0; color: var(--c-text-primary); font-size: 18px; font-weight: 700; line-height: 28px; }
 .reserve-waiting-summary p { margin: 4px 0 0; color: var(--c-text-secondary); font-size: 13px; line-height: 20px; }
 .reserve-waiting-summary > .reserve-btn { flex: 0 0 auto; }
 .reserve-waiting-entries { margin: 0; padding: 0; list-style: none; background: var(--c-bg-paper); }
@@ -25,9 +26,6 @@
 .reserve-waiting-card-entry { min-width: 0; }
 .reserve-waiting-card-body { display: flex; flex-direction: column; gap: 20px; }
 .reserve-waiting-card-body .reserve-waiting-actions { justify-content: flex-end; }
-.reserve-waiting-finished { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
-.reserve-waiting-finished h3 { font-size: 16px; }
-.reserve-waiting-finished h3 > span { margin-left: 8px; color: var(--c-text-tertiary); font-size: 13px; font-weight: 500; }
 .reserve-waiting-form-help { margin: 0; color: var(--c-text-secondary); font-size: 13px; line-height: 20px; }
 @media (max-width: 575px) {
     .reserve-waiting-summary { gap: 12px; }

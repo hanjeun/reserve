@@ -87,6 +87,8 @@ it('keeps finished entries read-only and ignores old confirmations and write res
     let finish;
     waitingService.create.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     const view = setup();
+    await screen.findByRole('listitem', { name: '1번 대기 접수' });
+    fireEvent.change(screen.getByRole('combobox', { name: '대기 접수 상태' }), { target: { value: 'ALL' } });
     expect(within(await screen.findByRole('listitem', { name: '2번 대기 접수' })).queryByRole('button')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '1번 접수 취소' }));
     const oldConfirmation = state.confirm.mock.calls[0][0];
@@ -97,7 +99,7 @@ it('keeps finished entries read-only and ignores old confirmations and write res
     await act(async () => view.updateActor());
     expect(signal.aborted).toBe(true);
     await act(async () => { await oldConfirmation.onOk(); finish({ ...entry(3), displayName: '이전 계정' }); });
-    await screen.findByText('대기 중인 팀이 없습니다.');
+    await screen.findByText('선택한 상태의 대기 접수가 없습니다.');
     expect(waitingService.updateStatus).not.toHaveBeenCalled();
     expect(state.success).not.toHaveBeenCalled();
     expect(state.error).not.toHaveBeenCalled();
@@ -122,9 +124,13 @@ it('filters the loaded board by name and waiting number without issuing another 
     expect(screen.getByRole('listitem', { name: '2번 대기 접수' })).toBeInTheDocument();
     expect(screen.queryByRole('listitem', { name: '1번 대기 접수' })).toBeNull();
     fireEvent.change(search, { target: { value: '없는 이름' } });
-    expect(screen.getByText('검색에 맞는 대기 중인 팀이 없습니다.')).toBeInTheDocument();
+    expect(screen.getByText('검색에 맞는 대기 접수가 없습니다.')).toBeInTheDocument();
     fireEvent.change(search, { target: { value: '' } });
+    expect(screen.queryByRole('listitem', { name: '3번 대기 접수' })).toBeNull();
+    fireEvent.change(screen.getByRole('combobox', { name: '대기 접수 상태' }), { target: { value: 'SEATED' } });
     expect(screen.getByRole('listitem', { name: '3번 대기 접수' })).toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: '1번 대기 접수' })).toBeNull();
+    expect(screen.queryByRole('region', { name: '오늘 종료된 대기 접수' })).toBeNull();
     expect(waitingService.getBoard).toHaveBeenCalledTimes(1);
     view.unmount(); view.client.clear();
 });

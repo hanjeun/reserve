@@ -18,6 +18,10 @@
     transition: box-shadow 0.2s ease;
 }
 .reserve-card--interactive { cursor: pointer; }
+.reserve-card:has(.reserve-store-card-hit) {
+    transition: box-shadow 0.2s ease, transform 0.12s ease, opacity 0.12s ease;
+}
+.reserve-card:has(.reserve-store-card-hit:active) { transform: scale(0.98); opacity: 0.88; }
 .reserve-card-link {
     display: block;
     color: inherit;
@@ -52,8 +56,10 @@
    타이밍에 민감한 이력이 있어 대상을 좁혀서 끈다. */
 @media (prefers-reduced-motion: reduce) {
     .reserve-card,
+    .reserve-card:has(.reserve-store-card-hit),
     .reserve-card-link { transition: none; }
     .reserve-card-link:active { transform: none; }
+    .reserve-card:has(.reserve-store-card-hit:active) { transform: none; }
     .reserve-card.ant-card-hoverable:hover .reserve-card-image { transform: none; }
 }
 /* Card actions(가게 카드 하단 수정·삭제 줄).

@@ -26,15 +26,17 @@ describe('businessTabSearch', () => {
     });
 
     it('keeps waiting selection and view only in tabs that use them', () => {
-        const waiting = new URLSearchParams(businessTabSearch('?waitingStore=5&waitingSearch=손님&view=cards&reservationPage=2', 'waiting'));
+        const waiting = new URLSearchParams(businessTabSearch('?waitingStore=5&waitingSearch=손님&waitingStatus=SEATED&view=cards&reservationPage=2', 'waiting'));
         expect(waiting.get('tab')).toBe('waiting');
         expect(waiting.get('waitingStore')).toBe('5');
         expect(waiting.get('waitingSearch')).toBe('손님');
+        expect(waiting.get('waitingStatus')).toBe('SEATED');
         expect(waiting.get('view')).toBe('cards');
         expect(waiting.has('reservationPage')).toBe(false);
         const analytics = new URLSearchParams(businessTabSearch(waiting, 'analytics'));
         expect(analytics.has('waitingStore')).toBe(false);
         expect(analytics.has('waitingSearch')).toBe(false);
+        expect(analytics.has('waitingStatus')).toBe(false);
         expect(analytics.has('view')).toBe(false);
     });
 });

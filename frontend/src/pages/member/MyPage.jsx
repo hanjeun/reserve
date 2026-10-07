@@ -16,11 +16,12 @@ import {
 } from '@ant-design/icons';
 import { PageContainer, Button, DataState, FormInput, Avatar, Bone, SegmentedControl, FormSelect } from '../../components/common';
 import useTheme, { FONT_OPTIONS, ACCENT_OPTIONS } from '../../hooks/useTheme';
+import useStoreDraftPreferences from '../../hooks/useStoreDraftPreferences';
 import AddressSearch from '../../components/store/StoreForm/AddressSearch';
 import { useMessage, useWindowWidth } from '../../hooks';
 import { memberService, businessService } from '../../services';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
-import { hasAdminAccess } from '../../constants/roles';
+import { hasAdminAccess, hasOwnerAccess } from '../../constants/roles';
 import { canWithdrawMember } from '../../utils/lifecycleReadiness';
 import { handleApiError } from '../../utils/errorHandler';
 import { VALIDATION_RULES } from '../../utils/validation';
@@ -924,6 +925,27 @@ const NotificationSection = ({ user }) => {
     );
 };
 
+const StoreDraftSection = ({ user }) => {
+    const { autoSaveEnabled, setAutoSaveEnabled } = useStoreDraftPreferences(user);
+    return (
+        <div style={styles.notificationSection}>
+            <Text strong style={styles.sectionTitle}>가게 작성 설정</Text>
+            <div style={styles.notifRow}>
+                <div>
+                    <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>자동 임시저장</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                        가게 등록·수정 내용과 새 이미지를 이 브라우저에 자동 저장합니다
+                    </Text>
+                </div>
+                <Switch size="small" aria-label="가게 자동 임시저장" checked={autoSaveEnabled} onChange={setAutoSaveEnabled} />
+            </div>
+            <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
+                이 계정의 이 브라우저에만 적용됩니다. 꺼도 임시저장·수정완료 버튼과 기존 초안은 유지됩니다.
+            </Text>
+        </div>
+    );
+};
+
 // ─── 디자인 설정 ─────────────────────────────────────────────────────────────
 /**
  * 화면 모양(시스템/라이트/다크)과 글꼴을 고르는 섹션.
@@ -1190,6 +1212,13 @@ const MyPage = () => {
 
             {/* 알림 설정 + 마케팅 수신 동의 (통합 카드) */}
             <NotificationSection user={user} />
+
+            {hasOwnerAccess(user?.role) && (
+                <>
+                    <Divider />
+                    <StoreDraftSection user={user} />
+                </>
+            )}
 
             <Divider />
 

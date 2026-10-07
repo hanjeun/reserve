@@ -1434,11 +1434,10 @@ a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 .reserve-store-list-row-meta .reserve-store-identity-text { flex: 0 1 auto; }
 .reserve-store-list-row-favorite { display: flex; flex: 0 0 44px; width: 44px; min-height: 44px; align-items: center; justify-content: center; }
 .reserve-store-list-row-favorite:empty { display: none; }
-.reserve-store-card-shell { position: relative; transition: transform 0.12s ease, opacity 0.12s ease; }
+.reserve-store-card-shell { position: relative; }
 .reserve-store-card-hit { position: absolute; inset: 0; z-index: 1; -webkit-tap-highlight-color: transparent; }
 .reserve-store-card-hit:focus { outline: none; }
 .reserve-store-card-hit:focus-visible { outline: 2px solid var(--c-text-secondary, #4e5968); outline-offset: -2px; }
-.reserve-store-card-shell:has(.reserve-store-card-hit:active) { transform: scale(0.98); opacity: 0.88; }
 .reserve-store-card-info { display: flex; flex-direction: column; padding: 12px 16px; }
 .reserve-store-card-title-line { position: relative; display: flex; align-items: center; min-width: 0; padding-right: 44px; margin-bottom: 2px; }
 .reserve-store-card-title-line:has(> .reserve-store-card-favorite:empty) { padding-right: 0; }
@@ -1448,9 +1447,7 @@ a.reserve-store-list-row-link[href]:active { opacity: 0.88; }
 .reserve-store-card-favorite { position: absolute; z-index: 2; right: 0; top: 50%; transform: translateY(-50%); }
 .reserve-store-card-favorite:empty { display: none; }
 @media (prefers-reduced-motion: reduce) {
-    .reserve-store-card-shell { transition: none; }
     a.reserve-store-list-row-link[href] { transition: none; }
-    .reserve-store-card-shell:has(.reserve-store-card-hit:active) { transform: none; }
 }
 @media (min-width: 768px) {
     .reserve-store-list-rows { --reserve-store-list-image-size: 96px; --reserve-store-list-row-spacing: 20px; }

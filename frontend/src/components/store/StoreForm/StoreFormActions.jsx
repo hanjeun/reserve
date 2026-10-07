@@ -20,6 +20,9 @@ const submitLabel = (mode, loading) => {
 };
 
 const draftLabel = draftState => {
+    if (draftState?.autoSaveEnabled === false && !['saving', 'saved', 'error'].includes(draftState?.status)) {
+        return '자동 임시저장이 꺼져 있어요. 임시저장 버튼으로 저장해주세요.';
+    }
     if (draftState?.status === 'pending') return '변경 내용을 자동 저장할게요.';
     if (draftState?.status === 'saving') return '이 브라우저에 저장 중…';
     if (draftState?.status === 'saved') {
@@ -81,6 +84,7 @@ StoreFormActions.propTypes = {
         status: PropTypes.oneOf(['idle', 'pending', 'saving', 'saved', 'error']),
         savedAt: PropTypes.number,
         error: PropTypes.string,
+        autoSaveEnabled: PropTypes.bool,
     }),
 };
 

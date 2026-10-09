@@ -67,6 +67,6 @@ public class ChatImageCipher {
     }
 
     public void requireKey() {
-        if (key == null) throw new ChatException("사진 첨부 기능을 준비 중입니다.", HttpStatus.SERVICE_UNAVAILABLE);
+        if (key == null) throw new ChatException("사진 첨부 기능을 준비 중이에요.", HttpStatus.SERVICE_UNAVAILABLE);
     }
 }

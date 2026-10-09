@@ -15,9 +15,9 @@ import ChatModerationMenu from './ChatModerationMenu';
 import { matchesSelection, viewerRoleOf } from './messengerContentModel';
 
 const OWNER_REPLIES = [
-    { label: '인사', text: '안녕하세요. 문의주셔서 감사합니다. 확인 후 안내드리겠습니다.' },
-    { label: '방문 정보 확인', text: '원하시는 방문 날짜와 시간, 인원을 알려주시면 확인 후 안내드리겠습니다.' },
-    { label: '확인 중', text: '문의하신 내용을 확인하고 있습니다. 확인이 끝나면 이 대화에서 안내드리겠습니다.' },
+    { label: '인사', text: '안녕하세요. 문의해주셔서 감사해요. 확인 후 안내해드릴게요.' },
+    { label: '방문 정보 확인', text: '원하시는 방문 날짜와 시간, 인원을 알려주시면 확인 후 안내해드릴게요.' },
+    { label: '확인 중', text: '문의하신 내용을 확인하고 있어요. 확인이 끝나면 이 대화에서 안내해드릴게요.' },
 ];
 
 // PC 패널의 X는 Shell이 제공한다. 모바일 페이지는 내부 화면과 무관하게 같은 닫기 관문을 쓴다.
@@ -79,7 +79,7 @@ function ListRows({ query, coldError, rows, subject, emptyText, children }) {
     if (coldError) {
         return (
             <DataState state="error" kind="message" subject={subject} error={query.error}
-                onRetry={query.refetch} retrying={query.isFetching} compact />
+                onRetry={query.refetch} retrying={query.isFetching} />
         );
     }
     if (query.isLoading) return <ConversationListSkeleton />;
@@ -91,11 +91,10 @@ function ListRows({ query, coldError, rows, subject, emptyText, children }) {
 
 function AdminInboxSection({ query, rows, showThread, selection, onChoose }) {
     return (
-        <section aria-labelledby="reserve-admin-support-inbox">
-            <h2 id="reserve-admin-support-inbox" className="reserve-messenger-section-label">고객지원 받은 문의</h2>
+        <section className="reserve-messenger-support-section" aria-label="고객지원 문의">
             <StaleListError query={query} rows={rows}
-                title="최신 고객 문의를 확인하지 못해 이전 목록을 보여드리고 있습니다." />
-            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="고객 문의" emptyText="아직 접수된 고객 문의가 없습니다.">
+                title="최신 고객 문의를 확인하지 못해 이전 목록을 보여드리고 있어요." />
+            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="고객 문의" emptyText="아직 접수된 고객 문의가 없어요.">
                 {rows.map((row) => (
                     <ConversationRow
                         key={`admin-${row.roomId}`}
@@ -115,9 +114,9 @@ function CustomerSection({ query, rows, customerRows, showHidden, showThread, se
         <section aria-labelledby="reserve-my-conversations">
             <h2 id="reserve-my-conversations" className={`reserve-messenger-section-label${customerRows.length === 0 ? ' reserve-messenger-sr-only' : ''}`}>내 대화</h2>
             <StaleListError query={query} rows={rows}
-                title="최신 대화를 확인하지 못해 이전 목록을 보여드리고 있습니다." />
+                title="최신 대화를 확인하지 못해 이전 목록을 보여드리고 있어요." />
             <ListRows query={query} coldError={query.isError && rows.length === 0} rows={customerRows} subject="대화 목록"
-                emptyText={showHidden ? '숨긴 대화가 없습니다.' : '아직 시작한 대화가 없습니다.'}>
+                emptyText={showHidden ? '숨긴 대화가 없어요.' : '아직 시작한 대화가 없어요.'}>
                 {customerRows.map((row) => (
                     <ConversationRow
                         key={row.type === 'SUPPORT' ? 'support' : `store-${row.storeId}`}
@@ -140,8 +139,8 @@ function OwnerInboxSection({ query, rows, showThread, selection, onChoose }) {
         <section aria-labelledby="reserve-store-inbox">
             <h2 id="reserve-store-inbox" className="reserve-messenger-section-label">가게 받은 문의</h2>
             <StaleListError query={query} rows={rows}
-                title="최신 받은 문의를 확인하지 못해 이전 목록을 보여드리고 있습니다." />
-            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="받은 문의" emptyText="아직 받은 가게 문의가 없습니다.">
+                title="최신 받은 문의를 확인하지 못해 이전 목록을 보여드리고 있어요." />
+            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="받은 문의" emptyText="아직 받은 가게 문의가 없어요.">
                 {rows.map((row) => (
                     <ConversationRow
                         key={`owner-${row.roomId}`}
@@ -249,8 +248,8 @@ function ThreadBody({ loading, loadError, onReload, intro, emptyText, messagePro
     }
     if (loadError) {
         return (
-            <DataState state="error" kind="message" title="대화를 불러오지 못했습니다."
-                onRetry={onReload} compact />
+            <DataState state="error" kind="message" title="대화를 불러오지 못했어요."
+                onRetry={onReload} />
         );
     }
     if (intro.show) {
@@ -263,10 +262,7 @@ function ThreadBody({ loading, loadError, onReload, intro, emptyText, messagePro
     }
     if (messageProps.messages.length === 0) {
         return (
-            <div className="reserve-messenger-thread-state">
-                <MessageOutlined aria-hidden="true" />
-                <span>{emptyText}</span>
-            </div>
+            <DataState state="empty" kind="message" title={emptyText} />
         );
     }
     return <ThreadMessages {...messageProps} />;
@@ -280,7 +276,7 @@ function OwnerReplies({ draft, sending, onInsert }) {
                 <DownOutlined className="reserve-messenger-replies-chevron" aria-hidden="true" />
             </summary>
             <div className="reserve-messenger-replies-content">
-                <p>직접 만든 안내 문구입니다. 수정 후 보내기를 눌러주세요.</p>
+                <p>직접 만든 안내 문구예요. 수정 후 보내기를 눌러주세요.</p>
                 <div className="reserve-messenger-replies-options">
                     {OWNER_REPLIES.map(reply => (
                         <Button
@@ -344,8 +340,8 @@ export function ThreadPanel({
 
             <div ref={threadBodyRef} className={`reserve-messenger-thread-body${isSupport ? ' reserve-messenger-thread-body--support' : ''}`}>
                 <p className="reserve-chat-retention-notice">
-                    일반 글·사진은 90일 보관합니다. 신고·분쟁 자료는 별도 보관하며,
-                    정책 고지 후 30일 유예를 거쳐 적용합니다. <a href="/privacy" target="_blank" rel="noopener noreferrer">보관 정책 보기</a>
+                    일반 글·사진은 90일 보관해요. 신고·분쟁 자료는 별도 보관하며,
+                    정책 고지 후 30일 유예를 거쳐 적용해요. <a href="/privacy" target="_blank" rel="noopener noreferrer">보관 정책 보기</a>
                 </p>
                 <ThreadBody {...bodyProps} />
             </div>

@@ -7,7 +7,8 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "email_verification")
+@Table(name = "email_verification", uniqueConstraints =
+        @UniqueConstraint(name = "uk_email_verification_email", columnNames = "email"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,6 +35,9 @@ public class EmailVerification {
     @Column(nullable = false)
     @Builder.Default
     private Boolean verified = false;
+
+    @Column(name = "verification_ticket_hash", length = 64)
+    private String verificationTicketHash;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -68,7 +72,7 @@ public class EmailVerification {
      * 인증 코드 만료 여부 확인
      */
     public boolean isExpired() {
-        return LocalDateTime.now(Clock.systemDefaultZone()).isAfter(this.expiresAt);
+        return expiresAt == null || !LocalDateTime.now(Clock.systemDefaultZone()).isBefore(expiresAt);
     }
 
     /**

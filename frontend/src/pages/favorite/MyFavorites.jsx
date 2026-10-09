@@ -1,4 +1,5 @@
-import { Typography } from 'antd';
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
+
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { DataState, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
@@ -6,13 +7,13 @@ import { StoreCard } from '../../components/store';
 import StoreListViewToggle from '../../components/store/StoreListViewToggle';
 import StoreListRow from '../../components/store/StoreListRow';
 import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
+import Bone from '../../components/common/Bone';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import { favoriteKeys } from '../../hooks/queryKeys';
 import favoriteService from '../../services/favoriteService';
-import { fontWeight, fontSize } from '../../styles/tokens';
 
-const { Title, Text } = Typography;
+
 
 // 2026-07 추가 — masonry(columns) 대신 고정 그리드로 전환.
 // 예전엔 columns:'4 240px'라 브라우저가 컨테이너 폭에 따라 3열/4열을 오가는 방식이었고
@@ -56,9 +57,9 @@ const MyFavorites = () => {
 
     // 헤더 안내 문구 — 로딩 → 실패(빈 목록) → 목록 있음 → 빈 목록 순으로 판정한다.
     const headerMessage = () => {
-        if (loading) return '즐겨찾기를 불러오는 중입니다.';
-        if (error && favorites.length === 0) return '즐겨찾기 목록을 확인하지 못했습니다.';
-        if (favorites.length > 0) return `총 ${favorites.length}개의 가게를 즐겨찾기했습니다.`;
+        if (loading) return '즐겨찾기를 불러오는 중이에요.';
+        if (error && favorites.length === 0) return '즐겨찾기 목록을 확인하지 못했어요.';
+        if (favorites.length > 0) return `총 ${favorites.length}개의 가게를 즐겨찾기했어요.`;
         return '마음에 드는 가게를 즐겨찾기에 추가해보세요.';
     };
 
@@ -91,13 +92,13 @@ const MyFavorites = () => {
             );
         }
         if (favorites.length === 0) {
-            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없습니다." style={{ marginTop: 100 }} />;
+            return <DataState state="empty" kind="favorite" title="아직 즐겨찾기한 가게가 없어요." style={{ marginTop: 100 }} />;
         }
         return (
             <>
                 {error && (
                     <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
-                        title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                        title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
                         onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />
                 )}
                 <div className={resultClassName}>
@@ -117,13 +118,14 @@ const MyFavorites = () => {
         <PageContainer size="xl" paddingTop="40px" aria-busy={isFetching}>
             {/* 헤더 */}
             <div style={styles.header}>
-                <Title level={2} style={styles.title}>즐겨찾기</Title>
-                <Text type="secondary" style={{ fontSize: fontSize.lg }}>
+                <PageTitle style={styles.title}>즐겨찾기</PageTitle>
+                <PageDescription>
                     {headerMessage()}
-                </Text>
+                </PageDescription>
             </div>
 
-            <FilterToolbar onReload={refetch} loading={loading || refetching}
+            <FilterToolbar onReload={refetch} loading={loading || refetching} initialLoading={loading}
+                extraSkeleton={<Bone width={44} height={44} borderRadius={10} />}
                 extra={<StoreListViewToggle view={view} onChange={setView} disabled={loading || refetching} />} />
 
             {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
@@ -135,7 +137,7 @@ const MyFavorites = () => {
 const styles = {
     // 아래 새로고침 툴바가 생겨 '내 예약' 화면과 같은 간격(32)으로 맞춘다.
     header: { marginBottom: 32 },
-    title:  { margin: '0 0 8px', fontWeight: fontWeight.extrabold },
+    title:  { margin: '0 0 8px', },
 };
 
 export default MyFavorites;

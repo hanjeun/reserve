@@ -37,6 +37,7 @@ export const ArcSpinner = ({
   trackOpacity = 1,
 }) => (
   <svg
+    className="reserve-arc-spinner"
     viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
     width={size}
     height={size}
@@ -67,7 +68,7 @@ export const ArcSpinner = ({
       stroke={color}
       strokeWidth={stroke}
       strokeLinecap="round"
-      style={{ animation: 'reserve-arc-dash 1.5s ease-in-out infinite' }}
+      style={{ strokeDasharray: '32 126', animation: 'reserve-arc-dash 1.5s ease-in-out infinite' }}
     />
   </svg>
 );

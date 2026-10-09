@@ -18,7 +18,7 @@ public class MemberException extends BusinessException {
      * 404 NOT_FOUND - 회원을 찾을 수 없을 때
      */
     public static MemberException notFound() {
-        return new MemberException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new MemberException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
     
     /**

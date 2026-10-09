@@ -22,7 +22,10 @@ describe('email verification restoration and expiry', () => {
             setFieldValue: vi.fn(), setFields: vi.fn(), validateFields: vi.fn().mockResolvedValue({}),
             getFieldValue: vi.fn(name => name === 'email' ? 'member@example.com' : '123456'),
         };
-        api.post.mockResolvedValue({});
+        api.post.mockImplementation(async endpoint => ({
+            expiresAt: '2026-09-30T13:35:00Z',
+            ...(endpoint === '/verify' ? { verificationTicket: 'a'.repeat(43) } : {}),
+        }));
     });
     afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
     const show = options => renderHook(() => useEmailVerification({
@@ -69,7 +72,7 @@ describe('email verification restoration and expiry', () => {
         expect(localStorage.getItem(storageKey)).toBeNull();
     });
 
-    it('starts a fresh five-minute timer on send and clears it only after verified success', async () => {
+    it('keeps the server deadline after verification and stores the signup proof only in memory', async () => {
         const onVerified = vi.fn();
         const { result } = show({ onVerified });
         await act(async () => { await result.current.sendCode(); });
@@ -79,9 +82,75 @@ describe('email verification restoration and expiry', () => {
         await act(async () => { await result.current.verifyCode(); });
         expect(api.post).toHaveBeenCalledWith('/verify', { email: 'member@example.com', code: '123456' });
         expect(result.current.isVerified).toBe(true);
-        expect(result.current.timerInfo).toBeNull();
+        expect(result.current.timerInfo.text).toBe('가입까지 남은 시간 05:00');
+        expect(result.current.getVerificationTicket()).toBe('a'.repeat(43));
         expect(onVerified).toHaveBeenCalledWith('member@example.com');
         expect(localStorage.getItem(storageKey)).toBeNull();
-        expect(clearInterval).toHaveBeenCalledWith(setInterval.mock.results.at(-1).value);
+        act(() => vi.advanceTimersByTime(300000));
+        expect(result.current.isVerified).toBe(false);
+        act(() => { expect(result.current.getVerificationTicket()).toBeNull(); });
+    });
+
+    it('uses the original server expiry instead of restarting five minutes after the response', async () => {
+        api.post.mockResolvedValue({ expiresAt: '2026-09-30T13:32:00Z' });
+        const { result } = show();
+        await act(async () => { await result.current.sendCode(); });
+        expect(result.current.timeLeft).toBe(120);
+        expect(JSON.parse(localStorage.getItem(storageKey)).endTime).toBe(Date.parse('2026-09-30T13:32:00Z'));
+    });
+
+    it('rejects a successful-looking response without a signup proof', async () => {
+        const { result } = show();
+        await act(async () => { await result.current.sendCode(); });
+        api.post.mockResolvedValue({ expiresAt: '2026-09-30T13:35:00Z' });
+        await act(async () => { await result.current.verifyCode(); });
+        expect(result.current.isVerified).toBe(false);
+        act(() => { expect(result.current.getVerificationTicket()).toBeNull(); });
+    });
+
+    it('rejects a late verification response after the email changes', async () => {
+        const { result } = show();
+        await act(async () => { await result.current.sendCode(); });
+        let finish;
+        api.post.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+        let pending;
+        act(() => { pending = result.current.verifyCode(); });
+        form.getFieldValue.mockImplementation(name => name === 'email' ? 'changed@example.com' : '123456');
+        await act(async () => {
+            finish({ expiresAt: '2026-09-30T13:35:00Z', verificationTicket: 'a'.repeat(43) });
+            await pending;
+        });
+        expect(result.current.isVerified).toBe(false);
+        act(() => { expect(result.current.getVerificationTicket()).toBeNull(); });
+    });
+
+    it('checks expiry at submission even before a delayed timer or visibility event runs', async () => {
+        const { result } = show();
+        await act(async () => { await result.current.sendCode(); await result.current.verifyCode(); });
+        vi.setSystemTime(new Date('2026-09-30T13:35:00Z'));
+        act(() => { expect(result.current.getVerificationTicket()).toBeNull(); });
+        expect(result.current.isVerified).toBe(false);
+    });
+
+    it.each(['send', 'verify'])('ignores a late %s response after leaving the signup screen', async action => {
+        const onVerified = vi.fn();
+        const { result, unmount } = show({ onVerified });
+        if (action === 'verify') await act(async () => { await result.current.sendCode(); });
+        let finish;
+        api.post.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+        let pending;
+        await act(async () => { pending = result.current[action === 'send' ? 'sendCode' : 'verifyCode'](); });
+        unmount();
+        const intervalsBeforeResponse = setInterval.mock.calls.length;
+        const feedbackBeforeResponse = feedback.message.success.mock.calls.length;
+        const storageBeforeResponse = localStorage.getItem(storageKey);
+        await act(async () => {
+            finish({ expiresAt: '2026-09-30T13:35:00Z', verificationTicket: 'a'.repeat(43) });
+            await pending;
+        });
+        expect(setInterval).toHaveBeenCalledTimes(intervalsBeforeResponse);
+        expect(feedback.message.success).toHaveBeenCalledTimes(feedbackBeforeResponse);
+        expect(localStorage.getItem(storageKey)).toBe(storageBeforeResponse);
+        expect(onVerified).not.toHaveBeenCalled();
     });
 });

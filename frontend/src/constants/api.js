@@ -188,6 +188,15 @@ export const API_ENDPOINTS = {
     WAITING: {
         BOARD:  (storeId) => `/api/stores/${storeId}/waiting`,
         STATUS: (storeId, entryId) => `/api/stores/${storeId}/waiting/${entryId}/status`,
+        STORES: '/api/waiting/stores',
+        RETENTION_POLICY: '/api/waiting/retention-policy',
+        MY: '/api/waiting/my',
+        JOIN: storeId => `/api/waiting/stores/${storeId}/entries`,
+        CANCEL: entryId => `/api/waiting/entries/${entryId}/cancel`,
+        ENTRY_QR: entryId => `/api/waiting/entries/${entryId}/qr`,
+        ONSITE_QR: storeId => `/api/waiting/stores/${storeId}/onsite-qr`,
+        CHECKIN: '/api/waiting/qr-checkin',
+        EVENTS: '/api/waiting/events',
     },
     MAIL: {
         COMPOSE:      '/api/admin/mail/compose',

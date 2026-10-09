@@ -134,7 +134,7 @@ public class AuditLogService {
             case RESERVATION_ENTITY_TYPE    -> reservationRepository.restoreById(entityId);
             case "REVIEW"         -> reviewRepository.restoreById(entityId);
             case "ADVERTISEMENT"  -> advertisementRepository.restoreById(entityId);
-            default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목입니다: " + entityType);
+            default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목이에요: " + entityType);
         }
         // 휴지통에서 제거 (SOFT_DELETE 로그 삭제)
         auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);

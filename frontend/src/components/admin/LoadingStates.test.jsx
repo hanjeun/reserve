@@ -65,7 +65,7 @@ vi.mock('../common', () => {
             </div>;
         },
         DataState: ({ state: dataState = 'empty', title, subject, onRetry }) => <section role={dataState === 'error' ? 'alert' : undefined}>
-            <span>{title ?? `${subject ?? '목록'}을 불러오지 못했습니다.`}</span>
+            <span>{title ?? `${subject ?? '목록'}을 불러오지 못했어요.`}</span>
             {onRetry && <button onClick={onRetry}>다시 불러오기</button>}
         </section>,
         FilterToolbar: ({ selects }) => <><button onClick={state.query.refetch}>새로고침</button>{selects?.[0]?.options?.[0]?.label === '전체 가게' && <button disabled={selects[0].disabled}>가게 필터</button>}</>,
@@ -138,7 +138,7 @@ describe.each(TABLE_TABS)('%s loading states', (_label, Component) => {
     it('does not present a failed request as a successful empty table', () => {
         Object.assign(state.query, { isError: true, error: new Error('offline') });
         render(<Component />);
-        expect(screen.getByRole('alert')).toHaveTextContent('불러오지 못했습니다');
+        expect(screen.getByRole('alert')).toHaveTextContent('불러오지 못했어요');
         expect(screen.queryByTestId('data-table')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '새로고침' }));
         expect(state.query.refetch).toHaveBeenCalledOnce();
@@ -169,8 +169,8 @@ describe.each(PLACEHOLDER_TABLE_TABS)('%s query transitions', (_label, Component
 it('keeps a mail lookup failure separate from the empty mailbox', () => {
     Object.assign(state.query, { isError: true, error: new Error('offline') });
     render(<MailboxTab />);
-    expect(screen.getByRole('alert')).toHaveTextContent('보낸 메일을 불러오지 못했습니다');
-    expect(screen.queryByText('보낸 메일이 없습니다')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('보낸 메일을 불러오지 못했어요');
+    expect(screen.queryByText('보낸 메일이 없어요')).not.toBeInTheDocument();
 });
 
 it('keeps the mailbox trash action in the selected detail only', () => {
@@ -196,7 +196,7 @@ it('keeps the mailbox trash action in the selected detail only', () => {
 it('keeps an ad lookup failure separate from the empty ad table', () => {
     Object.assign(state.query, { isError: true, error: new Error('offline') });
     render(<AdManageTab />);
-    expect(screen.getByRole('alert')).toHaveTextContent('광고 목록을 불러오지 못했습니다');
+    expect(screen.getByRole('alert')).toHaveTextContent('광고 목록을 불러오지 못했어요');
     expect(screen.queryByTestId('data-table')).not.toBeInTheDocument();
 });
 
@@ -206,7 +206,7 @@ it('keeps ads visible and retries the failed store filter from the result area',
     state.query.data = { ads: [], totalElements: 0 };
     render(<AdManageTab />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('가게 필터 목록을 불러오지 못했습니다');
+    expect(screen.getByRole('alert')).toHaveTextContent('가게 필터 목록을 불러오지 못했어요');
     expect(screen.getByTestId('data-table')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(refetchStores).toHaveBeenCalledOnce();
@@ -258,15 +258,15 @@ it('sends business ad filters to the server page query', async () => {
 it('keeps a store lookup failure separate from zero stores in statistics', () => {
     state.stores.error = 'offline';
     render(<StatisticsTab />);
-    expect(screen.getByRole('alert')).toHaveTextContent('가게 목록을 불러오지 못했습니다');
-    expect(screen.queryByText('등록된 가게가 없습니다.')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('가게 목록을 불러오지 못했어요');
+    expect(screen.queryByText('등록된 가게가 없어요.')).not.toBeInTheDocument();
 });
 
 it('does not fabricate zero revenue or reviews when statistics fail', () => {
     state.stores.stores = [{ id: 31, name: '가게31' }];
     Object.assign(state.query, { isError: true, error: new Error('offline') });
     render(<StatisticsTab />);
-    expect(screen.getByRole('alert')).toHaveTextContent('통계를 불러오지 못했습니다');
+    expect(screen.getByRole('alert')).toHaveTextContent('통계를 불러오지 못했어요');
     expect(screen.queryByText(/예약금 순결제액:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/리뷰 수:/)).not.toBeInTheDocument();
 });
@@ -279,10 +279,13 @@ it('labels retained statistics when a refresh fails', () => {
     expect(screen.getByText('예약금 순결제액: 2,000')).toBeInTheDocument();
 });
 
-it('disables the partner store filter until its shared lookup is ready', () => {
+it('keeps the partner filter skeleton noninteractive until its shared lookup is ready', () => {
     state.stores = { stores: [], loading: true, error: null, refetch: vi.fn() };
-    const { rerender } = render(<MemoryRouter><BusinessPanel /></MemoryRouter>);
-    expect(screen.getByRole('button', { name: '가게 필터' })).toBeDisabled();
+    const { container, rerender } = render(<MemoryRouter><BusinessPanel /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: '가게 필터' })).toBeNull();
+    const skeleton = container.querySelector('.reserve-reservation-filters[aria-hidden="true"]');
+    expect(skeleton).not.toBeNull();
+    expect(skeleton.querySelectorAll('.reserve-skeleton-block').length).toBeGreaterThan(1);
     state.stores = { stores: [], loading: false, error: null, refetch: vi.fn() };
     rerender(<MemoryRouter><BusinessPanel /></MemoryRouter>);
     expect(screen.getByRole('button', { name: '가게 필터' })).toBeEnabled();
@@ -295,7 +298,7 @@ it('offers an explicit retry when the shared partner store lookup fails', () => 
     expect(screen.getByRole('alert')).toHaveTextContent('가게별 필터');
     expect(screen.getByRole('button', { name: '가게 필터' })).toBeDisabled();
     // 가게 목록은 필터용일 뿐이다. 그게 실패해도 예약 영역(여기서는 빈 상태)은 그대로 그려져야 한다.
-    expect(screen.getByText('예약 내역이 없습니다.')).toBeInTheDocument();
+    expect(screen.getByText('예약 내역이 없어요.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(refetchStores).toHaveBeenCalledOnce();
     state.stores = { stores: [], loading: false, error: null, refetch: refetchStores };
@@ -316,7 +319,7 @@ it('keeps a failed business verification detail open and retries only that item'
     render(<BusinessVerificationTab />);
 
     fireEvent.click(screen.getByRole('button', { name: /상세보기/ }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('상세 정보를 불러오지 못했습니다.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('상세 정보를 불러오지 못했어요.');
     expect(screen.getByRole('dialog', { name: '사업자 인증 상세' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
@@ -350,5 +353,5 @@ it('retries both independent lookups when partner stores and reservations fail t
     state.manage.error = null;
     rerender(<MemoryRouter><BusinessPanel /></MemoryRouter>);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByText('예약 내역이 없습니다.')).toBeInTheDocument();
+    expect(screen.getByText('예약 내역이 없어요.')).toBeInTheDocument();
 });

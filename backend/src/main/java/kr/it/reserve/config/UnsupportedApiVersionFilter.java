@@ -27,7 +27,7 @@ final class UnsupportedApiVersionFilter extends OncePerRequestFilter {
         if (ApiPaths.isUnsupportedVersion(path)) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error("지원하지 않는 API 버전입니다.")));
+            response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error("지원하지 않는 API 버전이에요.")));
             return;
         }
         chain.doFilter(request, response);

@@ -13,10 +13,11 @@ export const normalizeRouteSkeletonPath = pathname => {
 const EXACT_SKELETON_KINDS = new Map([
     ['/', 'discovery'], ['/search', 'search'], ['/my-page', 'my-page'],
     ['/store/register', 'store-form'], ['/stores', 'store-list'], ['/benefits', 'benefits'],
-    ['/waiting', 'coming-soon'], ['/feed', 'coming-soon'],
+    ['/waiting', 'waiting'], ['/feed', 'coming-soon'],
     ['/my-stores', 'cards'], ['/my-favorites', 'cards'], ['/my-reservations', 'reservations'],
     ['/login', 'auth'], ['/signup', 'auth'], ['/forgot-password', 'auth'], ['/signup/social', 'auth'],
-    ['/terms', 'legal'], ['/privacy', 'legal'], ['/operation-guide', 'legal'], ['/content-sources', 'legal'],
+    ['/terms', 'legal'], ['/privacy', 'legal'], ['/content-sources', 'legal'],
+    ['/operation-guide', 'guide'], ['/guide/user', 'guide'], ['/guide/business', 'guide'], ['/guide/common', 'guide'],
     ['/payment/result', 'payment-result'], ['/admin', 'admin'], ['/business', 'business'], ['/messages', 'messages'],
     ['/oauth2/callback', 'discovery'],
 ]);

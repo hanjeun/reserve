@@ -88,7 +88,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         show();
         const options = await openConfirm();
         expect(options).toMatchObject({ title: '회원 탈퇴', okText: '탈퇴하기', cancelText: '취소', centered: true, okButtonProps: { danger: true } });
-        expect(options.content).toContain('거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다.');
+        expect(options.content).toContain('거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존돼요.');
         expect(memberService.getWithdrawalReadiness).not.toHaveBeenCalled();
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         act(() => { options.onCancel(); });
@@ -105,7 +105,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         });
         await act(async () => { await beginReadiness(); });
         await waitFor(() => expect(feedback.message.warning).toHaveBeenCalledWith(
-            '먼저 처리할 항목이 있습니다. 운영 중 가게 1곳, 예약 2건, 환불 3건, 결제 확인 4건, 웹훅 5건',
+            '먼저 처리할 항목이 있어요. 운영 중 가게 1곳, 예약 2건, 환불 3건, 결제 확인 4건, 웹훅 5건',
         ));
         expect(feedback.confirm).toHaveBeenCalledTimes(1);
         expect(memberService.deleteMember).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         memberService.getWithdrawalReadiness.mockResolvedValueOnce(response);
         await act(async () => { await beginReadiness(); });
         await waitFor(() => expect(feedback.message.error).toHaveBeenCalledWith(
-            '탈퇴 준비 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.',
+            '탈퇴 준비 상태를 확인하지 못했어요. 잠시 후 다시 시도해주세요.',
         ));
         expect(feedback.confirm).toHaveBeenCalledTimes(1);
         expect(memberService.deleteMember).not.toHaveBeenCalled();
@@ -134,7 +134,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         expect(feedback.confirm).toHaveBeenCalledTimes(1);
         const options = await openConfirm();
         expect(options).toMatchObject({ title: '회원 탈퇴', okText: '탈퇴하기', cancelText: '취소', centered: true, okButtonProps: { danger: true } });
-        expect(options.content).toContain('거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다.');
+        expect(options.content).toContain('거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존돼요.');
         expect(memberService.getWithdrawalReadiness).toHaveBeenCalledTimes(1);
         expect(memberService.deleteMember).not.toHaveBeenCalled();
         expectNoCompletion();
@@ -289,7 +289,7 @@ describe('MyPage withdrawal session readiness gate', () => {
         await act(async () => { await result; });
         expect(feedback.logout).toHaveBeenCalledTimes(1);
         expect(feedback.navigate).toHaveBeenCalledWith('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
-        expect(feedback.message.success).toHaveBeenCalledWith('탈퇴가 완료되었습니다');
+        expect(feedback.message.success).toHaveBeenCalledWith('탈퇴가 완료됐어요');
         await act(async () => { await options.onOk(); });
         expect(memberService.deleteMember).toHaveBeenCalledTimes(1);
     });

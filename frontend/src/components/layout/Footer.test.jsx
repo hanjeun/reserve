@@ -19,12 +19,18 @@ describe('AppFooter', () => {
         expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/content-sources');
     });
 
-    it('links the service operating guide from the service column', async () => {
+    it.each([
+        ['사용자 이용안내', '/guide/user'],
+        ['사업자 이용안내', '/guide/business'],
+        ['공통 이용안내', '/guide/common'],
+    ])('links %s from the guide column', async (name, destination) => {
         const user = userEvent.setup();
         render(<MemoryRouter initialEntries={['/']}><AppFooter /><LocationProbe /></MemoryRouter>);
 
-        await user.click(screen.getByRole('button', { name: '운영 안내' }));
+        expect(screen.getByText('이용안내')).toBeInTheDocument();
+        expect(screen.queryByText('서비스', { exact: true })).toBeNull();
+        await user.click(screen.getByRole('button', { name }));
 
-        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent('/operation-guide');
+        expect(screen.getByRole('status', { name: '현재 경로' })).toHaveTextContent(destination);
     });
 });

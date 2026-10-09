@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 
 class ChatControllerResponseContractTest {
 
-    private static final String EXPECTED_LOGIN_REQUIRED = "로그인이 필요합니다.";
+    private static final String EXPECTED_LOGIN_REQUIRED = "로그인이 필요해요.";
     private static final String EXPECTED_QUERY_SUCCESS = "조회 성공";
     private static final String EXPECTED_SEND_SUCCESS = "전송 완료";
     private static final String CONTENT = "계약 확인 메시지";
@@ -227,11 +227,11 @@ class ChatControllerResponseContractTest {
                     verify(f.rateLimiter).tryConsume(CLIENT_IP, RateLimiter.Policy.CHAT_SEND);
                 }),
                 success("ChatApi.setVisibility hidden", f -> {
-                    assertSuccess(f.chat.setVisibility(ROOM_ID, "OWNER", true), null, "내 목록에서 숨겼습니다.");
+                    assertSuccess(f.chat.setVisibility(ROOM_ID, "OWNER", true), null, "내 목록에서 숨겼어요.");
                     verify(f.moderationService).setHidden(same(f.member), eq(ROOM_ID), eq("OWNER"), eq(true));
                 }),
                 success("ChatApi.setVisibility restored", f -> {
-                    assertSuccess(f.chat.setVisibility(ROOM_ID, "MEMBER", false), null, "대화를 복원했습니다.");
+                    assertSuccess(f.chat.setVisibility(ROOM_ID, "MEMBER", false), null, "대화를 복원했어요.");
                     verify(f.moderationService).setHidden(same(f.member), eq(ROOM_ID), eq("MEMBER"), eq(false));
                 })
         );

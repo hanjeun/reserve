@@ -1,10 +1,13 @@
+import { PageTitle } from '../../components/common/PageTypography';
 import React from 'react';
 import { Typography } from 'antd';
 import { PageContainer } from '../../components/common';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import TextLink from '../../components/common/TextLink';
 import { useQuery } from '@tanstack/react-query';
 import chatRetentionService from '../../services/chatRetentionService';
+import waitingService from '../../services/waitingService';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -17,6 +20,16 @@ const RetentionDates = () => {
         timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'short',
     }).format(new Date(value));
     return <Paragraph>보존기간 변경 고지: {format(data.noticePublishedAt)} · 적용 시작: {format(data.effectiveAt)}</Paragraph>;
+};
+
+const WaitingNoticeDate = () => {
+    const { data } = useQuery({ queryKey: ['public', 'waitingRetentionPolicy'], queryFn: waitingService.getRetentionPolicy,
+        staleTime: 60_000, retry: false });
+    if (!data?.noticePublishedAt || !Number.isFinite(Date.parse(data.noticePublishedAt))) return null;
+    const publishedAt = new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'short',
+    }).format(new Date(data.noticePublishedAt));
+    return <Paragraph>고객 웨이팅 개인정보 고지 게시: {publishedAt}</Paragraph>;
 };
 
 const Section = ({ title, children }) => (
@@ -32,8 +45,8 @@ const Privacy = () => {
     return (
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
-                <Title level={2} style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary, marginBottom: 8 }}>개인정보 처리방침</Title>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 4일</Text>
+                <PageTitle>개인정보 처리방침</PageTitle>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 8일</Text>
             </div>
 
             <Section title="1. 수집하는 개인정보 항목">
@@ -43,7 +56,7 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}><strong>소셜 로그인 시:</strong> 이메일, 이름, 프로필 사진 (Google/Naver/Kakao 제공 정보)</li>
                     <li style={{ marginBottom: 6 }}><strong>예약 시:</strong> 예약 정보(날짜, 시간, 인원), 요청사항</li>
                     <li style={{ marginBottom: 6 }}><strong>채팅·신고 시:</strong> 대화 내용, 첨부 사진과 원래 파일명, 신고 내용·처리 기록 및 검토에 필요한 대화 증거</li>
-                    <li style={{ marginBottom: 6 }}><strong>직원 웨이팅 접수 시:</strong> 선택한 팀 표시명, 인원, 접수 번호와 접수·호출·입장·취소 시각. 연락처는 수집하지 않습니다.</li>
+                    <li style={{ marginBottom: 6 }}><strong>웨이팅 접수 시:</strong> 회원 식별자와 이름(고객 접수), 선택한 팀 표시명(직원 접수), 접수 방식, 인원, 접수 번호와 접수·호출·입장·취소 시각. 대기 명단에서 연락처는 수집하지 않습니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>결제 시:</strong> 결제 수단 정보 (카카오페이 처리, 카드·계좌 정보는 서버에 저장하지 않음)</li>
                     <li style={{ marginBottom: 6 }}><strong>자동 수집:</strong> 서비스 이용 기록, IP 주소, 접속 로그</li>
                 </ul>
@@ -51,7 +64,7 @@ const Privacy = () => {
 
             <Section title="2. 개인정보 수집 및 이용 목적">
                 <ul style={{ paddingLeft: 20 }}>
-                    {['회원 가입 및 서비스 이용 관리', '예약 서비스 제공 및 예약 확인 안내', '결제 처리 및 환불', '서비스 이용 관련 공지 및 고객 문의 응대', '서비스 개선을 위한 통계 분석'].map((t) => (
+                    {['회원 가입 및 서비스 이용 관리', '예약 서비스 제공 및 예약 확인 안내', '웨이팅 접수·순서 확인·호출·입장 관리', '결제 처리 및 환불', '서비스 이용 관련 공지 및 고객 문의 응대', '서비스 개선을 위한 통계 분석'].map((t) => (
                         <li key={t} style={{ marginBottom: 6 }}>{t}</li>
                     ))}
                 </ul>
@@ -67,12 +80,13 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}>소비자 불만·거래 분쟁 처리 기록: 처리 완료일로부터 3년</li>
                     <li style={{ marginBottom: 6 }}>계약·청약철회·대금결제·재화 공급 기록: 해당 거래일을 기준으로 5년. 관련 채팅 증거는 일반 채팅과 구분하여 보관합니다.</li>
                     <li style={{ marginBottom: 6 }}>관리자의 신고 원문·사진 열람 기록: 각 열람일부터 1년 이상. 법령상 2년 보관 대상이면 2년 이상 보관합니다.</li>
-                    <li style={{ marginBottom: 6 }}>웨이팅: 입장·취소가 끝난 팀의 표시명은 다음 한국 시간 날짜에 제거하고, 종료 접수 기록은 7일 후 파기합니다. 진행 중인 접수는 처리할 때까지 보관하며, 가게가 삭제되면 남은 접수를 취소하고 표시명을 제거합니다.</li>
+                    <li style={{ marginBottom: 6 }}>웨이팅: 입장·취소가 끝난 팀의 표시명과 회원 연결은 다음 한국 시간 날짜에 제거하고, 접수 방식·인원·번호·처리 시각과 고객이 동의한 고지 버전 등 종료 접수 기록은 7일 후 파기해요. 진행 중인 접수는 처리할 때까지 보관해요. 회원 탈퇴 시 해당 회원의 진행 접수를 취소하고 이름과 회원 연결을 제거하며, 가게가 삭제되면 남은 접수를 취소하고 표시명과 회원 연결을 제거해요.</li>
                     <li style={{ marginBottom: 6 }}>예약 자유 입력 요청사항 및 결제 구매자 이름·이메일·전화번호: 탈퇴 처리 시 제거 또는 비식별화</li>
                     <li style={{ marginBottom: 6 }}>법령에 따라 보존이 필요한 경우 해당 기간 동안 별도 보관</li>
                 </ul>
                 <Paragraph>미처리·미분류 신고, 진행 중인 분쟁·조사와 미결 거래 자료는 파기를 보류합니다. 법정 보존 자료는 일반 이용 자료와 분리하여 접근을 제한합니다. 채팅·신고의 보존기간 변경은 실제 서비스 고지 게시일부터 30일 유예 후 기존 자료에도 적용하며, 유예 중에는 이미 기간이 지난 자료도 자동 파기하지 않습니다.</Paragraph>
                 <RetentionDates />
+                <WaitingNoticeDate />
             </Section>
 
             <Section title="4. 개인정보 파기 절차 및 방법">
@@ -92,7 +106,8 @@ const Privacy = () => {
             </Section>
 
             <Section title="6. 개인정보의 제3자 제공">
-                <Paragraph>RESERVE는 이용자의 개인정보를 외부에 제공하지 않습니다. 단, 다음의 경우는 예외입니다.</Paragraph>
+                <Paragraph>고객 웨이팅을 접수하면 이용자가 선택한 가게의 운영자에게 회원 이름, 인원, 접수 번호·상태와 처리 시각을 제공해요. 접수·호출·입장 관리에 사용하며, 연락처와 회원 식별자는 명단에 표시하지 않아요. 진행 접수는 처리할 때까지 보관하고, 종료 팀 이름은 다음 한국 시간 날짜에 제거하며 종료 기록은 7일 후 파기해요. 접수 화면에서 제공 동의를 받으며, 동의하지 않으면 앱에서 고객 웨이팅을 접수할 수 없어요.</Paragraph>
+                <Paragraph>위 고객 웨이팅 제공과 다음 경우를 제외하고 이용자의 개인정보를 외부에 제공하지 않아요.</Paragraph>
                 <ul style={{ paddingLeft: 20 }}>
                     <li style={{ marginBottom: 6 }}>이용자가 사전에 동의한 경우</li>
                     <li style={{ marginBottom: 6 }}>법령의 규정에 의거하거나 수사 목적으로 법령에 정해진 절차에 따른 수사기관 요구 시</li>
@@ -144,15 +159,15 @@ const Privacy = () => {
                 <ul style={{ paddingLeft: 20 }}>
                     <li style={{ marginBottom: 8 }}>
                         <strong>개인정보침해신고센터</strong><br />
-                        <span style={{ color: colors.text.tertiary }}>국번없이 118 ·{' '}<a href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer" style={{ color: colors.primary.main }}>privacy.kisa.or.kr</a></span>
+                        <span style={{ color: colors.text.tertiary }}>국번없이 118 ·{' '}<TextLink href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer">privacy.kisa.or.kr</TextLink></span>
                     </li>
                     <li style={{ marginBottom: 8 }}>
                         <strong>개인정보분쟁조정위원회</strong><br />
-                        <span style={{ color: colors.text.tertiary }}>국번없이 1833-6972 ·{' '}<a href="https://www.koprc.go.kr" target="_blank" rel="noopener noreferrer" style={{ color: colors.primary.main }}>koprc.go.kr</a></span>
+                        <span style={{ color: colors.text.tertiary }}>국번없이 1833-6972 ·{' '}<TextLink href="https://www.koprc.go.kr" target="_blank" rel="noopener noreferrer">koprc.go.kr</TextLink></span>
                     </li>
                     <li style={{ marginBottom: 8 }}>
                         <strong>대검찰청 사이버범죄수사단</strong><br />
-                        <span style={{ color: colors.text.tertiary }}>02-3480-3573 ·{' '}<a href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer" style={{ color: colors.primary.main }}>spo.go.kr</a></span>
+                        <span style={{ color: colors.text.tertiary }}>02-3480-3573 ·{' '}<TextLink href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer">spo.go.kr</TextLink></span>
                     </li>
                 </ul>
             </Section>

@@ -61,8 +61,8 @@ describe('result query header source contracts', () => {
     it('keeps a 44px clickable search icon and neutral keyboard focus indicators', () => {
         expect(styleAtWidth('.reserve-search-page', 390)['--reserve-search-action-size']).toBe('44px');
         expect(styleAtWidth('.reserve-search-icon', 390).cursor).toBe('pointer');
-        expect(styleAtWidth('.reserve-search-icon:focus-visible', 390).outline).toBe('2px solid var(--c-text-secondary, #4e5968)');
-        expect(styleAtWidth('.reserve-header-query:focus-visible', 390).outline).toBe('2px solid var(--c-text-secondary, #4e5968)');
+        expect(styleAtWidth('.reserve-search-icon:focus-visible', 390).outline).toBe('var(--reserve-focus-ring)');
+        expect(styleAtWidth('.reserve-header-query:focus-visible', 390).outline).toBe('var(--reserve-focus-ring)');
     });
 
     it('keeps the search link neutral and closes only the mobile search-to-login gutter', () => {

@@ -100,7 +100,7 @@ public class FileStorageService {
         if (encrypted == null || encrypted.length == 0
                 || encrypted.length > ImageFileValidator.MAX_FILE_BYTES + 28
                 || prefixPath == null || !prefixPath.matches("users/\\d+/chat/\\d+")) {
-            throw FileException.invalid("올바른 대화 사진이 아닙니다.");
+            throw FileException.invalid("올바른 대화 사진이 아니에요.");
         }
         String key = withEnvironmentPrefix(prefixPath) + "/" + UUID.randomUUID() + ".bin";
         try {
@@ -118,23 +118,23 @@ public class FileStorageService {
     /** 객체를 읽기 전에 현재 환경·발신자·방 경계를 검증하고, 8 MiB + GCM overhead에서 중단한다. */
     public byte[] readEncryptedChatImage(String key, String prefixPath) {
         if (prefixPath == null || !prefixPath.matches("users/\\d+/chat/\\d+") || !isManagedFileUnderPrefix(key, prefixPath)) {
-            throw FileException.invalid("올바른 대화 사진이 아닙니다.");
+            throw FileException.invalid("올바른 대화 사진이 아니에요.");
         }
         int limit = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
         try (var stream = s3Client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
             if (stream.response().contentLength() != null && stream.response().contentLength() > limit) {
                 stream.abort();
-                throw FileException.invalid("사진 크기가 허용 범위를 초과했습니다.");
+                throw FileException.invalid("사진 크기가 허용 범위를 초과했어요.");
             }
             byte[] bytes = stream.readNBytes(limit + 1);
             if (bytes.length > limit) {
                 stream.abort(); // close만 호출하면 HTTP 클라이언트가 남은 대용량 본문을 drain할 수 있다.
-                throw FileException.invalid("사진 크기가 허용 범위를 초과했습니다.");
+                throw FileException.invalid("사진 크기가 허용 범위를 초과했어요.");
             }
             return bytes;
         } catch (IOException | software.amazon.awssdk.core.exception.SdkException exception) {
             log.error("Chat image read failed: errorType={}", exception.getClass().getSimpleName());
-            throw new FileException("사진을 불러오지 못했습니다.");
+            throw new FileException("사진을 불러오지 못했어요.");
         }
     }
 

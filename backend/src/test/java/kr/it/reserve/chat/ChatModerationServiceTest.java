@@ -156,7 +156,7 @@ class ChatModerationServiceTest {
         assertThat(context.getReportedMessage().getImageUrl()).isEqualTo("/api/chat/images/90");
         assertThat(original.getContent()).isEqualTo("보존된 원문");
         var participant = kr.it.reserve.chat.dto.ChatMessageResponse.from(original, customer.getId());
-        assertThat(participant.getContent()).isEqualTo("전송이 취소된 메시지입니다.");
+        assertThat(participant.getContent()).isEqualTo("전송이 취소된 메시지예요.");
         assertThat(participant.getImageUrl()).isNull();
     }
 

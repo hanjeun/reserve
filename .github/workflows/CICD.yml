@@ -250,6 +250,7 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             --label reserve.schema-compat=v270-refund-v1 \
+            --label reserve.feature-compat=waiting-signup-v1 \
             -t "$DOCKERHUB_USERNAME/reserve:latest" \
             -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
@@ -484,6 +485,11 @@ jobs:
               echo "Active backend image is not schema/refund compatible; refusing automatic deployment"
               exit 1
             fi
+            FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$ACTIVE_IMAGE")
+            if [ "$FEATURE_COMPAT" != 'waiting-signup-v1' ]; then
+              echo "Active recovery image does not support waiting settings and signup tickets; prepare an approved compatible baseline before automatic deployment"
+              exit 1
+            fi
             if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
                || { [ "$CURRENT_UPSTREAM" = "green" ] && [ "$STATUS_GREEN" != "200" ]; }; then
               echo "Nginx points to an unhealthy upstream; refusing automatic deployment"
@@ -570,12 +576,13 @@ jobs:
           CHAT_RETENTION_ACCESS_AUDIT_YEARS: ${{ vars.CHAT_RETENTION_ACCESS_AUDIT_YEARS || '1' }}
           WAITING_RETENTION_ENABLED: ${{ vars.WAITING_RETENTION_ENABLED || 'true' }}
           WAITING_RETENTION_NOTICE_PUBLISHED_AT: ${{ vars.WAITING_RETENTION_NOTICE_PUBLISHED_AT }}
+          WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT: ${{ vars.WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_APP_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY,CHAT_RETENTION_ENABLED,CHAT_RETENTION_NOTICE_PUBLISHED_AT,CHAT_RETENTION_ACCESS_AUDIT_YEARS,WAITING_RETENTION_ENABLED,WAITING_RETENTION_NOTICE_PUBLISHED_AT
+          envs: IMAGE_TAG,DOCKERHUB_USERNAME,JWT_SECRET_KEY,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,RESEND_API_KEY,PORTONE_V2_SECRET,PORTONE_STORE_ID,PORTONE_WEBHOOK_SECRET,QR_TOKEN_SECRET,DB_APP_PASSWORD,MAIL_FROM,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,CLOUDFRONT_DOMAIN,SENTRY_DSN,KAKAO_REST_API_KEY,HOLIDAY_API_KEY,TOURISM_API_SERVICE_KEY,CHAT_IMAGE_ENCRYPTION_KEY,CHAT_RETENTION_ENABLED,CHAT_RETENTION_NOTICE_PUBLISHED_AT,CHAT_RETENTION_ACCESS_AUDIT_YEARS,WAITING_RETENTION_ENABLED,WAITING_RETENTION_NOTICE_PUBLISHED_AT,WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT
           script: |
             set -e
             # 커밋 SHA로 고정된 이미지를 배포한다. :latest는 언제든 다른 커밋으로 바뀔 수 있어
@@ -644,13 +651,14 @@ jobs:
         env:
           FRONTEND_RELEASE: ${{ github.sha }}
           TARGET_UPSTREAM: ${{ env.TARGET_UPSTREAM }}
+          CURRENT_UPSTREAM: ${{ env.CURRENT_UPSTREAM }}
           DEPLOY_ATTEMPT: ${{ github.run_id }}-${{ github.run_attempt }}
         with:
           username: ubuntu
           host: ${{ secrets.RESERVE_SERVER_IP }}
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,DEPLOY_ATTEMPT
+          envs: FRONTEND_RELEASE,TARGET_UPSTREAM,CURRENT_UPSTREAM,DEPLOY_ATTEMPT
           script: |
             bash -Eeuo pipefail <<'RESERVE_CUTOVER'
 
@@ -665,6 +673,11 @@ jobs:
               blue|green) ;;
               *) echo "Invalid target upstream"; exit 1 ;;
             esac
+            case "$CURRENT_UPSTREAM" in
+              blue|green) ;;
+              *) echo "Invalid recovery upstream"; exit 1 ;;
+            esac
+            test "$CURRENT_UPSTREAM" != "$TARGET_UPSTREAM"
             [[ "$DEPLOY_ATTEMPT" =~ ^[0-9]+-[0-9]+$ ]] || {
               echo "Invalid deployment attempt id"
               exit 1
@@ -679,6 +692,22 @@ jobs:
 
             test -f "$RELEASE_DIR/index.html"
             test -f "$NGINX_TEMPLATE"
+
+            # Refuse cutover before changing routing if either image cannot retain the new contract.
+            LIVE_ROUTING=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc | tr -d '\r\n')
+            if [ "$LIVE_ROUTING" != "set \$service_url $CURRENT_UPSTREAM;" ]; then
+              echo "Live routing changed after upstream detection; refusing cutover"
+              exit 1
+            fi
+            for COMPATIBLE_UPSTREAM in "$CURRENT_UPSTREAM" "$TARGET_UPSTREAM"; do
+              COMPATIBLE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$COMPATIBLE_UPSTREAM")
+              SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$COMPATIBLE_IMAGE")
+              FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$COMPATIBLE_IMAGE")
+              if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ] || [ "$FEATURE_COMPAT" != 'waiting-signup-v1' ]; then
+                echo "Cutover requires compatible target and recovery images"
+                exit 1
+              fi
+            done
 
             rollback_cutover() {
               trap - ERR INT TERM HUP

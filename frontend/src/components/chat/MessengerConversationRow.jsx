@@ -17,7 +17,7 @@ const formatWhen = (iso) => {
 export default function MessengerConversationRow({ row, selected = false, owner = false, onSelect }) {
     const supportIdentity = useSupportIdentity();
     const title = conversationTitle(row, supportIdentity.name);
-    const preview = row.lastMessagePreview || '아직 메시지가 없습니다.';
+    const preview = row.lastMessagePreview || '아직 메시지가 없어요.';
     const unread = Number.isSafeInteger(row.unread) ? Math.max(0, row.unread) : 0;
     // 아이콘: 사람(관리자·사업자 시점) → 고객지원 → 가게 사진 → 기본 가게 아이콘.
     let icon;

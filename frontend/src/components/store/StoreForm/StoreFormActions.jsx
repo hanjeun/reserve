@@ -30,12 +30,12 @@ const draftLabel = draftState => {
         const savedSuffix = savedTime ? ' · ' + savedTime : '';
         return `이 브라우저에 저장됨${savedSuffix}`;
     }
-    if (draftState?.status === 'error') return draftState.error || '임시저장에 실패했습니다.';
+    if (draftState?.status === 'error') return draftState.error || '임시저장에 실패했어요.';
     return '입력 내용과 새 이미지는 이 브라우저에만 자동 저장돼요.';
 };
 
 /** 등록·수정 모두 같은 로컬 임시저장 관문과 제출 버튼을 사용한다. */
-const StoreFormActions = ({ mode = 'create', loading = false, onSaveDraft, draftState }) => {
+const StoreFormActions = ({ mode = 'create', loading = false, onSaveDraft, draftState, onNext, nextLabel = '다음', onConfirm }) => {
     const savingDraft = draftState?.status === 'saving';
     const draftError = draftState?.status === 'error';
     return (
@@ -64,12 +64,13 @@ const StoreFormActions = ({ mode = 'create', loading = false, onSaveDraft, draft
                 </Button>
                 <Button
                     variant="primary"
-                    htmlType="submit"
+                    htmlType={onNext || onConfirm ? 'button' : 'submit'}
+                    onClick={onNext || onConfirm}
                     loading={loading}
                     disabled={savingDraft}
                     block
                 >
-                    {submitLabel(mode, loading)}
+                    {onNext ? nextLabel : submitLabel(mode, loading)}
                 </Button>
             </Flex>
         </div>
@@ -86,6 +87,9 @@ StoreFormActions.propTypes = {
         error: PropTypes.string,
         autoSaveEnabled: PropTypes.bool,
     }),
+    onNext: PropTypes.func,
+    nextLabel: PropTypes.string,
+    onConfirm: PropTypes.func,
 };
 
 export default StoreFormActions;

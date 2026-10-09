@@ -58,6 +58,7 @@ class MemberRoleBoundaryTest {
                 {
                   "name": "가입자",
                   "email": "%s",
+                  "verificationTicket": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                   "password": "%s",
                   "passwordConfirm": "%s",
                   "role": "%s",
@@ -80,6 +81,9 @@ class MemberRoleBoundaryTest {
 
         ArgumentCaptor<Member> savedMember = ArgumentCaptor.forClass(Member.class);
         verify(memberRepository).save(savedMember.capture());
+        var signupOrder = org.mockito.Mockito.inOrder(emailVerificationService, memberRepository);
+        signupOrder.verify(emailVerificationService).consumeVerifiedEmail(EMAIL, request.getVerificationTicket());
+        signupOrder.verify(memberRepository).save(any(Member.class));
         verify(marketingConsentHistoryRepository).save(any(MarketingConsentHistory.class));
         assertThat(savedMember.getValue().getRole()).isEqualTo(Role.USER);
     }

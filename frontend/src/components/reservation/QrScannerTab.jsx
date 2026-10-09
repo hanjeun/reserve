@@ -4,12 +4,15 @@ import PropTypes from 'prop-types';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Typography } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
-import { ReloadOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import StateIllustration from '../common/StateIllustration';
+import QrTrackingGuide from './QrTrackingGuide';
+import QrScanResult from './QrScanResult';
 import { Button, Bone } from '../common';
 import reservationService from '../../services/reservationService';
+import waitingService from '../../services/waitingService';
 import { useMessage } from '../../hooks';
 import { invalidateReservationData } from '../../hooks/invalidateAfterWrite';
-import { colors, radius, shadows, fontSize, withAlpha } from '../../styles/tokens';
+import { colors, radius, shadows, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
 const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
@@ -105,9 +108,13 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     const html5QrRef = useRef(/** @type {import('html5-qrcode').Html5Qrcode | null} */ (null));
     // 같은 프레임에서 같은 QR이 연속으로 감지되어 중복 요청되는 것을 막는 락
     const processingRef = useRef(false);
+    const lastDecodedRef = useRef(null);
+    const consecutiveMissesRef = useRef(0);
 
     const [status, setStatus] = useState('idle'); // idle | starting | scanning | error
     const [errorMsg, setErrorMsg] = useState('');
+    const [scanResult, setScanResult] = useState(null);
+    const [processing, setProcessing] = useState(false);
 
     // 디코딩 루프가 실제로 도는지 확인하는 유일한 신호 (아래 startScanning 주석 참고)
     const decodeTickRef = useRef(0);
@@ -138,9 +145,6 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     //
     // CSS 만으로는 `min(가로, 세로)` 를 잡기가 번거롭다(aspect-ratio 는 max-* 로 눌러도
     // 확정된 쪽을 되돌리지 않는다). 비율 숫자를 이미 갖고 있으니 여기서 한 번에 정한다.
-    const bracketSideStyle = decodeAspect >= 1
-        ? { height: '100%', width: 'auto' }   // 가로가 긴 프레임(PC 웹캠 등) → 높이가 한계
-        : { width: '100%', height: 'auto' };  // 세로가 긴 프레임(폰 후면 카메라) → 폭이 한계
 
     // ?qrdebug=1 — 화면에 실측값을 띄운다.
     // 모바일 Safari 는 콘솔을 붙이기가 사실상 불가능해서(맥이 있어야 한다) 숫자를 볼 방법이 없었다.
@@ -204,8 +208,16 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     }, [debugOn, status]);
 
     const handleScanSuccess = useCallback(async (decodedText) => {
-        if (processingRef.current) return;
+        const scanner = html5QrRef.current;
+        if (!scanner) return;
+        consecutiveMissesRef.current = 0;
+        if (processingRef.current || lastDecodedRef.current === decodedText) return;
+        lastDecodedRef.current = decodedText;
         processingRef.current = true;
+        setProcessing(true);
+        const isWaiting = decodedText.startsWith('rw1.e.');
+        const kind = isWaiting ? 'waiting' : 'reservation';
+        setScanResult({ kind, state: 'checking' });
 
         // 스캐너를 잠시 멈춘다 (2026-08-09). 예전엔 루프가 계속 돌아서 QR이 화면에 남아 있는 동안
         // 2초마다 체크인 API를 다시 호출했다 — 성공 토스트가 무한히 다시 뜨고 요청도 계속 나갔다.
@@ -213,25 +225,39 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
 
         try {
             // 체크인은 승인 상태와 독립된 멱등 출석 기록이다.
-            const { reservation, alreadyCheckedIn } = await reservationService.checkInByQr(decodedText);
-            const who = reservation.memberName || '고객';
+            if (decodedText.startsWith('rw1.j.')) {
+                throw new Error('현장 접수용 QR이에요. 호출 후 받은 입장 QR을 비춰주세요.');
+            }
+            const result = isWaiting ? await waitingService.checkInByQr(decodedText)
+                : await reservationService.checkInByQr(decodedText);
+            if (html5QrRef.current !== scanner) return;
+            const { alreadyCheckedIn } = result;
+            setScanResult({ kind, state: alreadyCheckedIn ? 'duplicate' : 'success', data: isWaiting ? result.entry : result.reservation });
+            const who = isWaiting ? `${result.entry.entryNumber}번` : `${result.reservation.memberName || '고객'}님`;
             if (alreadyCheckedIn) {
-                message.info(`${who}님은 이미 체크인되었습니다.`);
+                message.info(`${who}은 이미 체크인됐어요.`);
             } else {
-                message.success(`${who}님 체크인이 완료되었습니다.`);
+                message.success(`${who} 체크인이 완료됐어요.`);
                 // 예약 관리 목록은 이 탭(또는 시트)으로 오면서 가려졌지만 캐시는 남아 있다.
                 // 무효화하지 않으면 돌아갔을 때 상세 모달에 체크인 시각이 빠진 목록이 보인다.
-                void invalidateReservationData(queryClient);
+                if (isWaiting) void queryClient.invalidateQueries({ queryKey: ['waiting'] });
+                else void invalidateReservationData(queryClient);
             }
         } catch (err) {
-            message.error(err?.message || 'QR 체크인에 실패했습니다.');
+            if (html5QrRef.current !== scanner || err?.isStaleSession || err?.isSessionExpired) return;
+            setScanResult({ kind, state: 'error', error: err });
+            message.error(err?.message || 'QR 체크인에 실패했어요.');
         } finally {
             // 2초 텀을 두고 다시 스캔 허용 (같은 QR 연속 인식 방지)
-            clearTimeout(resumeTimerRef.current);
-            resumeTimerRef.current = setTimeout(() => {
-                processingRef.current = false;
-                try { html5QrRef.current?.resume(); } catch { /* 이미 중지됐으면 무시 */ }
-            }, 2000);
+            if (html5QrRef.current === scanner) {
+                clearTimeout(resumeTimerRef.current);
+                resumeTimerRef.current = setTimeout(() => {
+                    if (html5QrRef.current !== scanner) return;
+                    processingRef.current = false;
+                    setProcessing(false);
+                    try { scanner.resume(); } catch { /* 이미 중지됐으면 무시 */ }
+                }, 2000);
+            }
         }
     }, [message, queryClient]);
 
@@ -288,6 +314,12 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     const startScanning = useCallback(async () => {
         setStatus('starting');
         setErrorMsg('');
+        setScanResult(null);
+        setProcessing(false);
+        processingRef.current = false;
+        clearTimeout(resumeTimerRef.current);
+        lastDecodedRef.current = null;
+        consecutiveMissesRef.current = 0;
         decodeTickRef.current = 0;
 
         // 이전 인스턴스가 남아 있으면 반드시 정리하고 시작한다 — start()가 컨테이너를
@@ -335,6 +367,9 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                     // 그 뒤 'playing' 이벤트 핸들러에서 만들어진다. 그래서 루프가 안 떠도
                     // "스캔 대기 중…"이 그대로 보이는 상태가 가능했다.
                     decodeTickRef.current += 1;
+                    // Release the local duplicate gate only after the QR has left the frame.
+                    consecutiveMissesRef.current += 1;
+                    if (consecutiveMissesRef.current >= 5) lastDecodedRef.current = null;
                 }
             );
 
@@ -362,13 +397,13 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
             setStatus('error');
             const name = err?.name || '';
             if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-                setErrorMsg('카메라 권한이 거부됐습니다. 브라우저 설정에서 허용해주세요.');
+                setErrorMsg('카메라 권한이 거부됐어요. 브라우저 설정에서 허용해주세요.');
             } else if (name === 'NotReadableError' || name === 'TrackStartError') {
-                setErrorMsg('다른 앱이 카메라를 쓰고 있습니다. 해당 앱을 닫고 다시 시도해주세요.');
+                setErrorMsg('다른 앱이 카메라를 쓰고 있어요. 해당 앱을 닫고 다시 시도해주세요.');
             } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-                setErrorMsg('사용할 수 있는 후면 카메라를 찾지 못했습니다.');
+                setErrorMsg('사용할 수 있는 후면 카메라를 찾지 못했어요.');
             } else {
-                setErrorMsg('카메라를 시작할 수 없습니다. 브라우저 카메라 권한을 확인해주세요.');
+                setErrorMsg('카메라를 시작할 수 없어요. 브라우저 카메라 권한을 확인해주세요.');
             }
         }
     }, [handleScanSuccess, attachAspectWatcher]);
@@ -391,6 +426,8 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         aspectWatcherCleanupRef.current = null;
         clearTimeout(resumeTimerRef.current);
         processingRef.current = false;
+        setProcessing(false);
+        setScanResult(result => result?.state === 'checking' ? null : result);
         const scanner = html5QrRef.current;
         html5QrRef.current = null;
         if (scanner) {
@@ -438,7 +475,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
             <div style={{ ...styles.card, ...(sheet ? styles.sheetCard : {}) }}>
                 {!sheet && <Text strong style={styles.cardTitle}>QR 체크인</Text>}
                 <Text type="secondary" style={styles.hint}>
-                    승인된 예약의 QR을 비추면 방문 시각이 기록됩니다.
+                    예약·웨이팅 QR을 비추면 입장 기록을 확인해요.
                 </Text>
 
                 {/* 스캐너 프리뷰 박스 — 항상 렌더링(display:none 금지), 오버레이만 상태별로 전환.
@@ -460,20 +497,14 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                         가로로 넓은 가이드는 사용자가 QR을 멀찍이 들게 만들어 오히려 인식이 나빠졌다.
                         가이드보다 바깥도 실제로는 스캔된다 — 안에 넣으면 확실하다는 뜻일 뿐이다. */}
                     {status === 'scanning' && (
-                        <div style={styles.bracketFrame}>
-                            <div style={{ ...styles.bracketSquare, ...bracketSideStyle }}>
-                                <span style={{ ...styles.corner, top: 0, left: 0, borderRight: 'none', borderBottom: 'none' }} />
-                                <span style={{ ...styles.corner, top: 0, right: 0, borderLeft: 'none', borderBottom: 'none' }} />
-                                <span style={{ ...styles.corner, bottom: 0, left: 0, borderRight: 'none', borderTop: 'none' }} />
-                                <span style={{ ...styles.corner, bottom: 0, right: 0, borderLeft: 'none', borderTop: 'none' }} />
-                            </div>
-                        </div>
+                        <QrTrackingGuide previewRef={previewRef} active={!processing} aspect={decodeAspect} />
                     )}
 
                     {status !== 'scanning' && (
                         <div style={styles.overlay}>
                             {status === 'idle' && (
                                 <>
+                                    <StateIllustration name="qr-ready" size="sm" />
                                     <Text strong style={styles.overlayTitle}>카메라를 켜고 스캔을 시작하세요</Text>
                                     {!sheet && (
                                         <Button variant="primary" size="sm" onClick={startScanning}>
@@ -494,14 +525,12 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                             )}
                             {status === 'error' && (
                                 <>
-                                    <div style={{ ...styles.iconBadge, background: withAlpha(colors.error.main), color: colors.error.main }}>
-                                        <ExclamationCircleOutlined style={{ fontSize: 26 }} />
-                                    </div>
+                                    <StateIllustration name="qr-invalid" size="sm" />
                                     <Text style={{ color: colors.error.main, textAlign: 'center', padding: '0 20px', fontSize: fontSize.sm }}>
                                         {errorMsg}
                                     </Text>
                                     {!sheet && (
-                                        <Button variant="secondary" size="sm" onClick={startScanning} icon={<ReloadOutlined aria-hidden="true" />}>
+                                        <Button variant="secondary" size="sm" onClick={startScanning}>
                                             다시 시도
                                         </Button>
                                     )}
@@ -515,10 +544,12 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                     <div style={styles.scanningFooter}>
                         <span className="reserve-qr-scanning-dot" style={styles.scanningDot} />
                         <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary, flex: 1 }}>
-                            스캔 대기 중…
+                            {scanResult?.state === 'checking' ? '체크인을 확인하고 있어요…' : processing ? '다음 QR을 준비해주세요.' : '스캔 대기 중…'}
                         </Text>
                     </div>
                 )}
+
+                <QrScanResult result={scanResult} />
 
                 {/* ?qrdebug=1 진단 패널. 모바일에서 콘솔을 못 붙여 매번 원인 추적이 막혔던 걸 없앤다.
                     nativeAspect ≠ canvasAspect 면 프레임이 눌린 상태이고, 그게 QR 이 안 읽히는 원인이다.
@@ -542,7 +573,6 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                             size="md"
                             onClick={status === 'scanning' ? stopScanning : startScanning}
                             loading={status === 'starting'}
-                            icon={status === 'error' ? <ReloadOutlined aria-hidden="true" /> : undefined}
                         >
                             {status === 'scanning' && '스캔 중지'}
                             {status === 'error' && '다시 시도'}
@@ -584,27 +614,6 @@ const styles = {
         top: 0,
         left: 0,
     },
-    // 정사각 가이드를 프레임 가운데에 놓는다. padding 으로 가장자리에서 살짝 띄운다.
-    // 한 변은 **프레임의 짧은 쪽**이어야 한다 — 어느 쪽이 짧은지는 렌더에서 정한다(bracketSideStyle).
-    bracketFrame: {
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 14,
-        boxSizing: 'border-box',
-        pointerEvents: 'none',
-    },
-    bracketSquare: { position: 'relative', aspectRatio: '1 / 1' },
-    corner: {
-        position: 'absolute',
-        width: 28,
-        height: 28,
-        border: '3px solid rgba(255,255,255,0.9)',
-        borderRadius: 4,
-        filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))',
-    },
     overlay: {
         position: 'absolute',
         inset: 0,
@@ -614,16 +623,6 @@ const styles = {
         justifyContent: 'center',
         gap: 14,
         backgroundColor: colors.gray[50],
-    },
-    iconBadge: {
-        width: 60,
-        height: 60,
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: withAlpha(colors.primary.main),
-        color: colors.primary.main,
     },
     overlayTitle: { fontSize: fontSize.sm, color: colors.text.primary },
     scanningFooter: {

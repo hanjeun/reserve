@@ -38,8 +38,8 @@ class MemberControllerPrincipalContractTest {
     }
 
     static Stream<Arguments> guardedProfileActions() {
-        String missingMember = "인증된 사용자 정보를 찾을 수 없습니다.";
-        String denied = "수정 권한이 없습니다.";
+        String missingMember = "인증된 사용자 정보를 찾을 수 없어요.";
+        String denied = "수정 권한이 없어요.";
         return Stream.of(
                 Arguments.of((Consumer<MemberApiController>) MemberApiController::getCurrentMember, missingMember),
                 Arguments.of((Consumer<MemberApiController>) value -> value.updateMarketingConsent(Map.of()), missingMember),

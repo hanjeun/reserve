@@ -61,7 +61,7 @@ describe('ReservationListingToolbar', () => {
         const storeFilter = screen.getByRole('button', { name: '가게 필터' });
         expect(storeFilter).toBeDisabled();
         expect(storeFilter).toHaveAttribute('aria-busy', 'true');
-        expect(storeFilter.querySelector('.anticon-loading')).not.toBeNull();
+        expect(storeFilter.querySelector('.reserve-arc-spinner')).not.toBeNull();
         expect(screen.getByRole('button', { name: '예약 상태' })).toBeEnabled();
     });
 });

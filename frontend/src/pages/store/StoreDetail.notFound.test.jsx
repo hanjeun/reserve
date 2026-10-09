@@ -31,18 +31,19 @@ describe('store detail for an address that is not a store', () => {
         renderAt('/store/abc');
 
         expect(useStoreData).toHaveBeenCalledWith(null);
-        expect(screen.getByText('요청하신 가게를 찾을 수 없습니다.')).toBeInTheDocument();
+        expect(screen.getByText('요청하신 가게를 찾을 수 없어요.')).toBeInTheDocument();
         expect(screen.queryByRole('alert')).toBeNull();
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();
     });
 
     it('treats a deleted or sanctioned store (404) as not found rather than a server feature error', () => {
-        useStoreData.mockReturnValue({ ...idle, error: Object.assign(new Error('매장을 찾을 수 없습니다.'), { status: 404 }) });
+        useStoreData.mockReturnValue({ ...idle, error: Object.assign(new Error('매장을 찾을 수 없어요.'), { status: 404 }) });
         renderAt('/store/999');
 
         expect(useStoreData).toHaveBeenCalledWith('999');
-        expect(screen.getByRole('alert')).toHaveTextContent('요청하신 가게 정보를 찾을 수 없습니다.');
-        expect(screen.getByRole('alert').querySelector('[data-icon="file-unknown"]')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('요청하신 가게 정보를 찾을 수 없어요.');
+        expect(screen.getByRole('alert').querySelector('.reserve-state-illustration img'))
+            .toHaveAttribute('src', expect.stringContaining('not-found-512.webp'));
         expect(screen.getByRole('button', { name: '가게 목록으로' })).toBeInTheDocument();
         expect(screen.queryByText(/기능을 찾지 못했습니다/)).toBeNull();
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();
@@ -52,7 +53,7 @@ describe('store detail for an address that is not a store', () => {
         useStoreData.mockReturnValue({ ...idle, error: Object.assign(new Error('서버 오류'), { status: 503 }) });
         renderAt('/store/12');
 
-        expect(screen.getByRole('alert')).toHaveTextContent('서버에서 가게 정보를 처리하지 못했습니다');
+        expect(screen.getByRole('alert')).toHaveTextContent('서버에서 가게 정보를 처리하지 못했어요');
         expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeInTheDocument();
     });
 });

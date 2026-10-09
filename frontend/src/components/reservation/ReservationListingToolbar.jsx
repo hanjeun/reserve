@@ -2,13 +2,19 @@ import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import StoreListViewToggle from '../store/StoreListViewToggle';
 import FilterMenu from '../common/FilterMenu';
+import ListingControlsSkeleton from '../common/ListingControlsSkeleton';
 
 const { Text } = Typography;
 
 /** 가게 목록과 동일한 보기·필터 메뉴를 예약 목록의 데이터와 문구에 맞춰 사용한다. */
 export default function ReservationListingToolbar({ view, onViewChange, status, onStatusChange,
     statusOptions, sort, onSortChange, sortOptions, store, onStoreChange, storeOptions,
-    count, disabled, storeDisabled = false, storeLoading = false, label = '예약 목록 필터' }) {
+    count, disabled, initialLoading = false, storeDisabled = false, storeLoading = false, label = '예약 목록 필터' }) {
+    if (initialLoading) return <ListingControlsSkeleton count={count} className="reserve-reservation-filters" filters={[
+        ...(storeOptions && onStoreChange ? [{ value: store, options: storeOptions, className: 'reserve-reservation-store-filter' }] : []),
+        { value: status, options: statusOptions, className: 'reserve-explore-domain-filter reserve-reservation-status-filter' },
+        { value: sort, options: sortOptions, className: 'reserve-explore-sort-filter reserve-reservation-sort-filter' },
+    ]} />;
     return (
         <div className="reserve-explore-filters reserve-reservation-filters" aria-label={label}>
             <StoreListViewToggle view={view} onChange={onViewChange} disabled={disabled} />
@@ -46,6 +52,7 @@ ReservationListingToolbar.propTypes = {
     storeOptions: PropTypes.array,
     count: PropTypes.number,
     disabled: PropTypes.bool.isRequired,
+    initialLoading: PropTypes.bool,
     storeDisabled: PropTypes.bool,
     storeLoading: PropTypes.bool,
     label: PropTypes.string,

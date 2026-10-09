@@ -231,7 +231,7 @@ describe('messenger home and stable support identity wiring', () => {
             type: 'SUPPORT', counterpartName: '담당자 하늘', lastMessagePreview: null, unread: 0,
         }} onSelect={vi.fn()} />);
         expect(container.querySelector('.reserve-messenger-row-subtitle')).toBeNull();
-        expect(container.querySelector('.reserve-messenger-row-preview')).toHaveTextContent('아직 메시지가 없습니다.');
+        expect(container.querySelector('.reserve-messenger-row-preview')).toHaveTextContent('아직 메시지가 없어요.');
         expect(container.querySelector('.reserve-messenger-row-preview')).not.toHaveTextContent('궁금한 점을 남겨주세요.');
     });
 
@@ -474,7 +474,7 @@ describe('messenger list heading', () => {
                 expect(rule.parent.params).toBe('(hover: hover) and (pointer: fine)');
             }
         });
-        expect(rulesFor('.reserve-messenger-list-refresh:focus-visible').outline).toBe('2px solid var(--c-text-secondary, #4e5968)');
+        expect(rulesFor('.reserve-messenger-list-refresh:focus-visible').outline).toBe('var(--reserve-focus-ring)');
         expect(rulesFor(".reserve-messenger-list-refresh[aria-pressed='true']")).toEqual({});
         expect(rulesFor('.reserve-messenger-shell-close')).toMatchObject({
             top: 'calc((var(--reserve-messenger-heading-height, 72px) - 44px) / 2)', width: '44px', height: '44px',

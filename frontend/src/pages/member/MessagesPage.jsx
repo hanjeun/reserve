@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import MessengerContent from '../../components/chat/MessengerContent';
 import { MESSENGER_ROUTE_CLOSE_EVENT } from '../../components/chat/messengerRouteTransition';
+import { useSkeletonShown } from '../../components/layout/loadingPresentation';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useGoBack from '../../hooks/useGoBack';
 import { useWindowWidth } from '../../hooks';
@@ -16,6 +17,9 @@ const MessagesPage = () => {
     const goBack = useGoBack('/');
     const width = useWindowWidth();
     const openPanel = useMessengerStore((state) => state.openPanel);
+    const openStore = useMessengerStore((state) => state.openStore);
+    const skeletonShown = useSkeletonShown();
+    const [animateEntry] = useState(() => !skeletonShown);
     const [closing, setClosing] = useState(false);
     const completedRef = useRef(false);
     // 닫기 요청이 목적지를 주면(로고 → 홈) 닫힘 애니메이션 뒤 그곳으로 간다. 없으면 이전 화면.
@@ -28,9 +32,11 @@ const MessagesPage = () => {
     useEffect(() => {
         if (!handOffToDesktopPanel || completedRef.current) return;
         completedRef.current = true;
-        openPanel();
+        const storeId = Number(params.get('storeId'));
+        if (Number.isInteger(storeId) && storeId > 0) openStore(storeId);
+        else openPanel();
         goBack();
-    }, [goBack, handOffToDesktopPanel, openPanel]);
+    }, [goBack, handOffToDesktopPanel, openPanel, openStore, params]);
 
     const finishClose = useCallback(() => {
         if (completedRef.current) return;
@@ -63,7 +69,7 @@ const MessagesPage = () => {
 
     return (
         <div
-            className={`reserve-messages-page reserve-messages-route${closing ? ' is-closing' : ' is-opening'}`}
+            className={`reserve-messages-page reserve-messages-route${closing ? ' is-closing' : animateEntry ? ' is-opening' : ''}`}
             onAnimationEnd={(event) => {
                 if (event.target === event.currentTarget && closing) finishClose();
             }}

@@ -108,7 +108,7 @@ public class ReservationElapsedScheduler {
      */
     private void cancelExpiredPending(Reservation reservation) {
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
-        reservation.setCancelReason("예약 시간이 지나도록 승인되지 않아 자동 취소되었습니다.");
+        reservation.setCancelReason("예약 시간이 지나도록 승인되지 않아 자동 취소됐어요.");
 
         if (!Boolean.TRUE.equals(reservation.getDepositPaid())) return;
 

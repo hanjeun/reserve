@@ -15,7 +15,7 @@ public class ReviewException extends BusinessException {
     // ========== 정적 팩토리 메서드 ==========
     
     public static ReviewException notFound() {
-        return new ReviewException("리뷰를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new ReviewException("리뷰를 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
     
     public static ReviewException forbidden(String message) {

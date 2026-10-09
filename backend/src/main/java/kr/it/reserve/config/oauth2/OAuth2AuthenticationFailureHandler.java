@@ -59,11 +59,11 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
         log.debug("OAuth2 errorCode: {}", errorCode);
 
         return switch (errorCode) {
-            case "access_denied"                   -> "소셜 로그인을 취소했습니다.";
-            case "authorization_request_not_found" -> "로그인 요청이 만료되었습니다. 다시 시도해주세요.";
-            case "invalid_state"                   -> "잘못된 로그인 요청입니다. 다시 시도해주세요.";
-            case "email_conflict"                  -> "이미 가입된 이메일입니다. 기존 가입 방식으로 로그인해주세요.";
-            default                                -> "소셜 로그인에 실패했습니다. 다시 시도해주세요.";
+            case "access_denied"                   -> "소셜 로그인을 취소했어요.";
+            case "authorization_request_not_found" -> "로그인 요청이 만료됐어요. 다시 시도해주세요.";
+            case "invalid_state"                   -> "잘못된 로그인 요청이에요. 다시 시도해주세요.";
+            case "email_conflict"                  -> "이미 가입된 이메일이에요. 기존 가입 방식으로 로그인해주세요.";
+            default                                -> "소셜 로그인에 실패했어요. 다시 시도해주세요.";
         };
     }
 }

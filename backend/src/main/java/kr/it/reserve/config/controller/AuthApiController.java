@@ -51,7 +51,7 @@ public class AuthApiController {
      * 로그인 실패 시 내보내는 <b>유일한</b> 문구. 미가입·소셜계정·비번불일치를 구분하지 않는다.
      * 문구를 나누면 그 자체가 계정 존재 여부를 알려주는 신호가 된다.
      */
-    private static final String LOGIN_FAILED_MESSAGE = "이메일 또는 비밀번호가 올바르지 않습니다.";
+    private static final String LOGIN_FAILED_MESSAGE = "이메일 또는 비밀번호가 올바르지 않아요.";
 
     /**
      * 계정이 없을 때도 bcrypt 를 한 번 태우기 위한 더미 해시 (타이밍 사이드채널 방어).
@@ -78,7 +78,7 @@ public class AuthApiController {
                                              HttpServletRequest request, HttpServletResponse response) {
         String ip = IpExtractor.extract(request);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.LOGIN)) {
-            throw new AuthException("로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            throw new AuthException("로그인 시도가 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
         String email = normalizeEmail(loginRequest.get("email"));
@@ -93,7 +93,7 @@ public class AuthApiController {
         if (!rateLimiter.tryConsume(email, RateLimiter.Policy.LOGIN_ACCOUNT)) {
             log.warn("Login failed: accountQuotaLeft=false");
             throw new AuthException(
-                    "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+                    "로그인 시도가 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
         // ── ★ 응답을 갈라놓지 않는다 (user enumeration 차단) ──────────────
@@ -137,8 +137,8 @@ public class AuthApiController {
                 ? member.getSuspendedUntil().toLocalDate().toString()
                 : null;
             String message = isBanned
-                ? "영구 정지된 계정입니다. 관리자에게 문의해주세요."
-                : "계정이 " + until + "까지 정지되었습니다.";
+                ? "영구 정지된 계정이에요. 관리자에게 문의해주세요."
+                : "계정이 " + until + "까지 정지됐어요.";
 
             throw new MemberSuspendedException(message, status, until, member.getSuspendReason());
         }
@@ -152,7 +152,7 @@ public class AuthApiController {
                                               HttpServletRequest request, HttpServletResponse response) {
         String ip = IpExtractor.extract(request);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.SIGNUP)) {
-            throw new AuthException("회원가입 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            throw new AuthException("회원가입 시도가 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
         Long memberId = memberService.join(signupRequest);
         Member newMember = memberService.findById(memberId);

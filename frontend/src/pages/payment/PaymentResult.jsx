@@ -1,4 +1,6 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
+import StateIllustration from '../../components/common/StateIllustration';
 import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -6,14 +8,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     CheckOutlined,
     InfoCircleOutlined,
-    LoadingOutlined,
-    ReloadOutlined,
     WarningOutlined,
 } from '@ant-design/icons';
 import { invalidateAdData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import PageContainer from '../../components/common/PageContainer';
 import Button from '../../components/common/Button';
+import { SpinIndicator } from '../../components/common/Loading';
 import CopyableText from '../../components/common/CopyableText';
 import paymentService from '../../services/paymentService';
 import useAuthStore from '../../store/useAuthStore';
@@ -36,19 +37,19 @@ const recordsPath = (isAd) => (isAd ? '/business?tab=ads' : '/my-reservations');
 const unavailableCopy = (canLookup, isError) => {
     if (!canLookup) {
         return {
-            title: '결제 정보를 확인할 수 없습니다',
-            description: '결제 정보가 충분하지 않습니다. 결제 내역에서 해당 건을 확인해주세요.',
+            title: '결제 정보를 확인할 수 없어요',
+            description: '결제 정보가 충분하지 않아요. 결제 내역에서 해당 건을 확인해주세요.',
         };
     }
     if (isError) {
         return {
-            title: '결제 상태를 불러오지 못했습니다',
-            description: '서버에서 결제 내역을 확인하지 못했습니다. 이미 금액이 결제됐다면 다시 결제하지 말고 상태를 다시 확인하세요.',
+            title: '결제 상태를 불러오지 못했어요',
+            description: '서버에서 결제 내역을 확인하지 못했어요. 이미 금액이 결제됐다면 다시 결제하지 말고 상태를 다시 확인하세요.',
         };
     }
     return {
         title: '결제 상태를 확인하고 있어요',
-        description: '아직 완료 또는 실패로 확정된 결제가 아닙니다. 상태가 확정될 때까지 같은 결제를 다시 시작하지 마세요.',
+        description: '아직 완료 또는 실패로 확정된 결제가 아니에요. 상태가 확정될 때까지 같은 결제를 다시 시작하지 마세요.',
     };
 };
 
@@ -128,13 +129,11 @@ const PaymentResult = () => {
 const PaymentVerifying = ({ isAd, onRecover }) => (
     <PaymentResultFrame busy>
         <LoadingStatus as="section" className="reserve-payment-result__content" aria-label="결제 상태를 확인하는 중">
-            <div className="reserve-payment-result__icon reserve-payment-result__icon--progress" aria-hidden="true">
-                <LoadingOutlined spin />
-            </div>
-            <h1 className="reserve-payment-result__title">결제 처리 중</h1>
-            <p className="reserve-payment-result__description">
-                결제 완료 여부를 안전하게 확인하고 있습니다. 화면을 닫거나 같은 결제를 다시 시작하지 마세요.
-            </p>
+            <StateIllustration name="payment-pending" size="lg" fallback={<SpinIndicator />} />
+            <PageTitle level={1} className="reserve-payment-result__title">결제 처리 중</PageTitle>
+            <PageDescription className="reserve-payment-result__description">
+                결제 완료 여부를 안전하게 확인하고 있어요. 화면을 닫거나 같은 결제를 다시 시작하지 마세요.
+            </PageDescription>
             <p className="reserve-payment-result__hint">
                 결제 수단 화면에서 돌아온 뒤에도 확인이 끝날 때까지 잠시 기다려주세요.
             </p>
@@ -146,18 +145,16 @@ const PaymentVerifying = ({ isAd, onRecover }) => (
 const PaymentConfirmed = ({ isAd, detail, merchantUid, onGoToRecords, onBrowseStores }) => (
     <PaymentResultFrame>
         <section className="reserve-payment-result__content">
-            <div className="reserve-payment-result__icon reserve-payment-result__icon--success" aria-hidden="true">
-                <CheckOutlined />
-            </div>
-            <h1 className="reserve-payment-result__title">결제 완료</h1>
-            <p className="reserve-payment-result__description">
-                {isAd ? '광고 등록을 확인했습니다.' : '예약금 결제를 확인했습니다.'}
-            </p>
+            <StateIllustration name="payment-success" size="lg" fallback={<CheckOutlined />} interactive />
+            <PageTitle level={1} className="reserve-payment-result__title">결제 완료</PageTitle>
+            <PageDescription className="reserve-payment-result__description">
+                {isAd ? '광고 등록을 확인했어요.' : '예약금 결제를 확인했어요.'}
+            </PageDescription>
             <PaymentSummary detail={detail} merchantUid={merchantUid} />
             <p className="reserve-payment-result__hint">
                 {isAd
-                    ? '광고 노출 상태와 상세 내역은 광고 관리에서 확인할 수 있습니다.'
-                    : '예약 확정 여부와 취소·환불 내역은 내 예약에서 확인할 수 있습니다.'}
+                    ? '광고 노출 상태와 상세 내역은 광고 관리에서 확인할 수 있어요.'
+                    : '예약 확정 여부와 취소·환불 내역은 내 예약에서 확인할 수 있어요.'}
             </p>
             <div className="reserve-payment-result__actions">
                 <Button variant="primary" size="lg" block onClick={onGoToRecords}>
@@ -176,15 +173,13 @@ const PaymentConfirmed = ({ isAd, detail, merchantUid, onGoToRecords, onBrowseSt
 const PaymentFailed = ({ isAd, detail, merchantUid, onGoToRecords }) => (
     <PaymentResultFrame>
         <section className="reserve-payment-result__content">
-            <div className="reserve-payment-result__icon reserve-payment-result__icon--neutral" aria-hidden="true">
-                <WarningOutlined />
-            </div>
-            <h1 className="reserve-payment-result__title">결제가 완료되지 않았습니다</h1>
-            <p className="reserve-payment-result__description">
+            <StateIllustration name="payment-failure" size="lg" fallback={<WarningOutlined />} interactive />
+            <PageTitle level={1} className="reserve-payment-result__title">결제가 완료되지 않았어요</PageTitle>
+            <PageDescription className="reserve-payment-result__description">
                 {isAd
-                    ? '광고 관리에서 결제 가능한 상태를 확인한 뒤 다시 진행할 수 있습니다.'
-                    : '내 예약에서 결제 가능한 예약을 확인한 뒤 다시 진행할 수 있습니다.'}
-            </p>
+                    ? '광고 관리에서 결제 가능한 상태를 확인한 뒤 다시 진행할 수 있어요.'
+                    : '내 예약에서 결제 가능한 예약을 확인한 뒤 다시 진행할 수 있어요.'}
+            </PageDescription>
             <PaymentSummary detail={detail} merchantUid={merchantUid} />
             <div className="reserve-payment-result__actions">
                 <Button variant="primary" size="lg" block onClick={onGoToRecords}>
@@ -200,11 +195,9 @@ const PaymentUnavailable = ({ isAd, canLookup, result, detail, merchantUid, onRe
     return (
         <PaymentResultFrame>
             <section className="reserve-payment-result__content" aria-live="polite">
-                <div className="reserve-payment-result__icon reserve-payment-result__icon--neutral" aria-hidden="true">
-                    <InfoCircleOutlined />
-                </div>
-                <h1 className="reserve-payment-result__title">{title}</h1>
-                <p className="reserve-payment-result__description">{description}</p>
+                <StateIllustration name={result.isError ? 'retry' : 'payment-pending'} size="lg" fallback={<InfoCircleOutlined />} interactive={result.isError} />
+                <PageTitle level={1} className="reserve-payment-result__title">{title}</PageTitle>
+                <PageDescription className="reserve-payment-result__description">{description}</PageDescription>
                 {merchantUid && <PaymentSummary detail={detail} merchantUid={merchantUid} />}
                 {canLookup && !result.isError && <PaymentRecoveryLink isAd={isAd} onRecover={onRecover} />}
                 <div className="reserve-payment-result__actions">
@@ -213,8 +206,6 @@ const PaymentUnavailable = ({ isAd, canLookup, result, detail, merchantUid, onRe
                             variant="outline"
                             size="lg"
                             block
-                            icon={<ReloadOutlined aria-hidden="true" />}
-                            loadingIcon={<ReloadOutlined spin aria-hidden="true" />}
                             loading={result.isFetching}
                             onClick={() => result.refetch?.()}
                         >

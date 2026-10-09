@@ -175,11 +175,11 @@ const ReviewList = ({
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => [created, ...old]);
             // 목록은 위에서 직접 고쳤지만, 가게 별점·리뷰 수와 '내 예약'의 리뷰 버튼은 다른 쿼리다.
             void invalidateReviewData(queryClient);
-            message.success('리뷰가 등록되었습니다');
+            message.success('리뷰가 등록됐어요');
             setWriteForm({ rating: 0, title: '', content: '' });
             setWritten(true);
         },
-        onError: () => message.error('리뷰 등록에 실패했습니다'),
+        onError: () => message.error('리뷰 등록에 실패했어요'),
     });
 
     const handleWriteSubmit = () => {
@@ -211,10 +211,10 @@ const ReviewList = ({
                 old.map(r => (r.id === reviewId ? { ...r, ...payload } : r))
             );
             void invalidateReviewData(queryClient);
-            message.success('리뷰가 수정되었습니다');
+            message.success('리뷰가 수정됐어요');
             cancelEdit();
         },
-        onError: () => message.error('리뷰 수정에 실패했습니다'),
+        onError: () => message.error('리뷰 수정에 실패했어요'),
     });
 
     const submitEdit = (reviewId) => {
@@ -234,14 +234,14 @@ const ReviewList = ({
         onSuccess: (_, reviewId) => {
             queryClient.setQueryData(reviewKeys.byStore(storeId), (old = []) => old.filter(r => r.id !== reviewId));
             void invalidateReviewData(queryClient);
-            message.success('리뷰가 삭제되었습니다');
+            message.success('리뷰가 삭제됐어요');
         },
-        onError: () => message.error('리뷰 삭제에 실패했습니다'),
+        onError: () => message.error('리뷰 삭제에 실패했어요'),
     });
 
     const handleDelete = (reviewId) => {
         confirm({
-            title: '리뷰 삭제', content: '리뷰를 삭제하시겠습니까? 삭제 후 되돌릴 수 없습니다.',
+            title: '리뷰 삭제', content: '리뷰를 삭제할까요? 삭제 후 되돌릴 수 없어요.',
             okText: '삭제하기', cancelText: '취소', okButtonProps: { danger: true }, centered: true,
             onOk: () => deleteMutation.mutateAsync(reviewId),
         });
@@ -267,7 +267,7 @@ const ReviewList = ({
                     kind="review"
                     subject="리뷰 작성 가능 예약"
                     error={completedReservationError}
-                    title="리뷰 작성 가능 예약을 확인하지 못했습니다."
+                    title="리뷰 작성 가능 예약을 확인하지 못했어요."
                     onRetry={onCompletedReservationRetry}
                     retrying={completedReservationRetrying}
                     compact
@@ -303,7 +303,7 @@ const ReviewList = ({
                 // 기준으로 진짜 중앙에 오도록 flex 중앙정렬로 감쌌다(예전엔 상태 컴포넌트 자체는 좌우 중앙이지만
                 // 그 바깥을 감싼 섹션이 좁은 폭에 고정되어 있어서 화면 전체 기준으로는 왼쪽에 쏠려 보였다).
                 <div style={styles.emptyWrap}>
-                    <DataState state="empty" kind="review" title="아직 리뷰가 없습니다. 첫 번째 리뷰를 남겨보세요!" />
+                    <DataState state="empty" kind="review" title="아직 리뷰가 없어요. 첫 번째 리뷰를 남겨보세요!" />
                 </div>
             ) : (
                 <div style={isPC ? styles.listGridPC : styles.list}>

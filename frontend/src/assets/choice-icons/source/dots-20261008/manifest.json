@@ -1,0 +1,1385 @@
+{
+  "title": "RESERVE extra icons — 13",
+  "asset_count": 13,
+  "asset_ids": [
+    "intake-reservation",
+    "intake-waiting",
+    "intake-both",
+    "booking-slot",
+    "booking-session",
+    "booking-day",
+    "waiting-onsite",
+    "waiting-remote",
+    "waiting-both",
+    "quick-top-rated",
+    "quick-favorite",
+    "quick-my-reservations",
+    "quick-messages"
+  ],
+  "subjects": {
+    "intake-reservation": "Calendar with small check",
+    "intake-waiting": "Queue ticket with small clock",
+    "intake-both": "Calendar with queue ticket",
+    "booking-slot": "Clock with regular time slots",
+    "booking-session": "Overlapping tickets with small clock",
+    "booking-day": "Calendar with one emphasized day",
+    "waiting-onsite": "Tabletop decorative QR sign",
+    "waiting-remote": "Smartphone with small location pin",
+    "waiting-both": "QR sign with smartphone",
+    "quick-top-rated": "Soft gold rounded star",
+    "quick-favorite": "Soft coral rounded heart",
+    "quick-my-reservations": "Rounded alarm clock",
+    "quick-messages": "Rounded envelope"
+  },
+  "reference": "Recent RESERVE six-category kit: camera, lights, neutral/blue material settings and normalization unchanged",
+  "production": "Blender 4.3.2 / Eevee Next / 128 samples",
+  "static_file_count": 52,
+  "rendered_independently_at": [
+    512,
+    768
+  ],
+  "transparent_film": true,
+  "no_ai_upscaling": true,
+  "encoding": {
+    "png": "RGBA8 lossless",
+    "webp": "quality 92, method 6, lossless alpha; lossy RGB"
+  },
+  "palette_srgb": {
+    "white": "#F2F5FA",
+    "pale": "#B8C9DE",
+    "blue": "#3182F6",
+    "gold": "#E9BC55",
+    "coral": "#ED7177",
+    "qr_ink": "#8191A6"
+  },
+  "color_note": "Material base colors. AgX, lighting and reflection alter final pixel colors. Blue is restricted to small details. Gold and coral are used for the star and heart.",
+  "qr": "Decorative abstract geometric pattern; no URL, data, or machine-readable payload.",
+  "motion": {
+    "type": "CSS full-image transforms",
+    "entrance_seconds": 1.4,
+    "entrance_iterations": 1,
+    "loop_seconds": 2.4,
+    "loop_iterations": "infinite",
+    "loop_optional": true,
+    "reduced_motion": "still",
+    "fixed_fps": null,
+    "true_3d_animation": false
+  },
+  "license": {
+    "original_images_and_scenes": "CC0-1.0 to extent rights exist",
+    "original_source_code": "MIT",
+    "third_party_production_tools": "Their own licenses"
+  },
+  "qa": [
+    {
+      "asset": "intake-reservation",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        112,
+        104,
+        396,
+        404
+      ],
+      "minimum_margin_px": 104,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "intake-waiting",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        110,
+        106,
+        400,
+        394
+      ],
+      "minimum_margin_px": 106,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "intake-both",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        113,
+        102,
+        399,
+        394
+      ],
+      "minimum_margin_px": 102,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "booking-slot",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        104,
+        141,
+        408,
+        356
+      ],
+      "minimum_margin_px": 104,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "booking-session",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        118,
+        113,
+        395,
+        409
+      ],
+      "minimum_margin_px": 103,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "booking-day",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        110,
+        86,
+        410,
+        419
+      ],
+      "minimum_margin_px": 86,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "waiting-onsite",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        110,
+        107,
+        403,
+        445
+      ],
+      "minimum_margin_px": 67,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "waiting-remote",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        137,
+        78,
+        374,
+        415
+      ],
+      "minimum_margin_px": 78,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "waiting-both",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        95,
+        128,
+        387,
+        410
+      ],
+      "minimum_margin_px": 95,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-top-rated",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        98,
+        104,
+        414,
+        416
+      ],
+      "minimum_margin_px": 96,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-favorite",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        96,
+        102,
+        416,
+        398
+      ],
+      "minimum_margin_px": 96,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-my-reservations",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        124,
+        95,
+        393,
+        414
+      ],
+      "minimum_margin_px": 95,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-messages",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        106,
+        129,
+        413,
+        373
+      ],
+      "minimum_margin_px": 99,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "intake-reservation",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        169,
+        156,
+        593,
+        605
+      ],
+      "minimum_margin_px": 156,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "intake-waiting",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        166,
+        160,
+        599,
+        590
+      ],
+      "minimum_margin_px": 160,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "intake-both",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        170,
+        153,
+        598,
+        591
+      ],
+      "minimum_margin_px": 153,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "booking-slot",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        156,
+        211,
+        612,
+        533
+      ],
+      "minimum_margin_px": 156,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "booking-session",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        177,
+        169,
+        591,
+        614
+      ],
+      "minimum_margin_px": 154,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "booking-day",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        165,
+        130,
+        614,
+        628
+      ],
+      "minimum_margin_px": 130,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "waiting-onsite",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        166,
+        161,
+        604,
+        667
+      ],
+      "minimum_margin_px": 101,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "waiting-remote",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        207,
+        118,
+        561,
+        622
+      ],
+      "minimum_margin_px": 118,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "waiting-both",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        143,
+        193,
+        580,
+        615
+      ],
+      "minimum_margin_px": 143,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-top-rated",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        147,
+        157,
+        621,
+        624
+      ],
+      "minimum_margin_px": 144,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-favorite",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        145,
+        153,
+        623,
+        596
+      ],
+      "minimum_margin_px": 145,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-my-reservations",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        187,
+        143,
+        589,
+        621
+      ],
+      "minimum_margin_px": 143,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "quick-messages",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        159,
+        194,
+        619,
+        559
+      ],
+      "minimum_margin_px": 149,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    }
+  ],
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 8501,
+      "sha256": "b30945a494d13818e4f3bc9b03f990b1d71146a76e3c9557d02e5ce94e92c015"
+    },
+    {
+      "file": "motion/README.md",
+      "bytes": 7934,
+      "sha256": "002afc2366542cec2b5a19c442e459c8076607283f6cb034b1f8c2fe3d7300c4"
+    },
+    {
+      "file": "motion/build_example.py",
+      "bytes": 8853,
+      "sha256": "c76de623efd13f12543bc2cdf2b32c00eb311da766461585f785fc9f7a2c2ad0"
+    },
+    {
+      "file": "motion/example.html",
+      "bytes": 53203,
+      "sha256": "a490d68bab5f6aebfa370a25e45b38c843fc6341a8382a89154cbc2a075ea67f"
+    },
+    {
+      "file": "motion/extra-icons-motion.css",
+      "bytes": 4240,
+      "sha256": "131ba3ff1f0203e5cc4783b89df577d419d6263ceb68452393875eb24f77df8b"
+    },
+    {
+      "file": "motion/motion-map.json",
+      "bytes": 2481,
+      "sha256": "c11e7018ee6c17ca65ebf1d3401c1631576775adbe16bbe2916185b5677f558e"
+    },
+    {
+      "file": "motion/validate.py",
+      "bytes": 8085,
+      "sha256": "8367e7345248c7b748825234aa195e728891b1491bcb63a22e270b8b2e0ca612"
+    },
+    {
+      "file": "motion/validation.json",
+      "bytes": 2014,
+      "sha256": "7e2a2f802fcaea31446b46610702b02f3274439e2e72baaee43d5a42b762d75b"
+    },
+    {
+      "file": "previews/dark-actual-48-64.png",
+      "bytes": 68413,
+      "sha256": "46d273861ab0f9b5fb983d65d6ea409f6bbd1600ec59d208090db0d0a716aebe"
+    },
+    {
+      "file": "previews/dark-overview.webp",
+      "bytes": 142084,
+      "sha256": "b2795dc0f09b44f68d9fac3f7e507512992349d5751bd907d208e4970ff79f7e"
+    },
+    {
+      "file": "previews/light-actual-48-64.png",
+      "bytes": 63386,
+      "sha256": "873bfe108b4dac370c986077de9276671267997ba127b4098db877f7a6f0cddd"
+    },
+    {
+      "file": "previews/light-overview.webp",
+      "bytes": 139838,
+      "sha256": "25f88c74da826a01ac0460dfb01e4f8fcfe5b8c2056ebef516cff4a4df84f8da"
+    },
+    {
+      "file": "source/LICENSE-ASSETS.txt",
+      "bytes": 921,
+      "sha256": "17ca6d87383d5d63f8096020a802a7cdc791ea456657e6e349baa028bb168032"
+    },
+    {
+      "file": "source/LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/blend-validation.json",
+      "bytes": 6581,
+      "sha256": "4c7af6e0983023a481240a2988ad47b5f571f27261058e424649e8581d699cde"
+    },
+    {
+      "file": "source/booking-day.blend",
+      "bytes": 194059,
+      "sha256": "1617ae7eb0fd96cc8fdf5483219a0e434350e55b0ac30d62a63df0f0d5fd51e6"
+    },
+    {
+      "file": "source/booking-session.blend",
+      "bytes": 271509,
+      "sha256": "c33ffbb208020a55dc24c81e7c5e58370d84c3dadc178447157626cc62ab017d"
+    },
+    {
+      "file": "source/booking-slot.blend",
+      "bytes": 199204,
+      "sha256": "db534c5c72367a765056615486d6f39394c14c7b3367528726a99c9652037ca2"
+    },
+    {
+      "file": "source/build_assets.py",
+      "bytes": 19132,
+      "sha256": "0bb378b25860d6ca2e5718260bebae1c75e77cc45557264c75081ffec2a6bc30"
+    },
+    {
+      "file": "source/compile_qa.py",
+      "bytes": 2915,
+      "sha256": "e4857b95d6cebd77e3591d8671228f1ffcc999d8230b7362f58cd3a21dde02d1"
+    },
+    {
+      "file": "source/encode_and_validate.py",
+      "bytes": 5342,
+      "sha256": "9ac075c1d6f329155c6fda4ab80e9de168812adc137b788f8b242a241bd14760"
+    },
+    {
+      "file": "source/intake-both.blend",
+      "bytes": 210499,
+      "sha256": "0f8087f535c3ed09344f0b43679fa320966d3cb783e7ba28f9895a48b0952d69"
+    },
+    {
+      "file": "source/intake-reservation.blend",
+      "bytes": 188931,
+      "sha256": "b0067cb9fa51e6072be46a32d39f1abba611b27124c23d9925e92e8d2ad175af"
+    },
+    {
+      "file": "source/intake-waiting.blend",
+      "bytes": 222995,
+      "sha256": "cb5609899b508fd3fc163ed91092c9ba12e97adc9b8828fdd945e10f826e69bb"
+    },
+    {
+      "file": "source/native-render-evidence.jsonl",
+      "bytes": 8074,
+      "sha256": "f9cf8934a3a360d705742ebbe0037bfca56458d64812d9871188dd84b74f5a8f"
+    },
+    {
+      "file": "source/package_zip.py",
+      "bytes": 1362,
+      "sha256": "29ca2903bba35ab8dbe55c146cd63aa57f68a023a232ae21242f27dc3da68074"
+    },
+    {
+      "file": "source/qa-summary.json",
+      "bytes": 3477,
+      "sha256": "5ecf8ab0d48dc4e9077113ea58683638aded2d029e519e1140c5bbeea3435237"
+    },
+    {
+      "file": "source/quick-favorite.blend",
+      "bytes": 904904,
+      "sha256": "e5d4bac53f1b8561c79e81a496c43f3ff2e8c4eafd54b5a19c08eba9d8ae12ab"
+    },
+    {
+      "file": "source/quick-messages.blend",
+      "bytes": 197007,
+      "sha256": "78366e09788a7feaac4f116ed6a6c7bf59f8973ab12168a70d8b741b161c018c"
+    },
+    {
+      "file": "source/quick-my-reservations.blend",
+      "bytes": 246184,
+      "sha256": "9fc72b81f16f282caa5d0148583d415d82639ecbd418329cc7510c06041dce86"
+    },
+    {
+      "file": "source/quick-top-rated.blend",
+      "bytes": 124633,
+      "sha256": "dd9a62055c4ccbf8a231f224de45336b5859db6c33273eacd9e83649b572493d"
+    },
+    {
+      "file": "source/refresh_manifest.py",
+      "bytes": 934,
+      "sha256": "a02be4cb7f9c3a9cf9fd9b134f3744fac87b8eeeec070f929021889db6a95cd0"
+    },
+    {
+      "file": "source/reproduction-validation.json",
+      "bytes": 1694,
+      "sha256": "1f39e49cd653385d9cc935682fabbfd5f773f6e64596f30306ce7655acc46a51"
+    },
+    {
+      "file": "source/validate_blends.py",
+      "bytes": 4177,
+      "sha256": "4a7623fdda3baffbf3c84eefa974f55eacd27a702e07be771c5b9e9da95c5692"
+    },
+    {
+      "file": "source/verify_reproduction.py",
+      "bytes": 2958,
+      "sha256": "bdc16b7a879b74abfe74072277ad7f4e7db8d6c4123b5f1596af4d8286313da6"
+    },
+    {
+      "file": "source/waiting-both.blend",
+      "bytes": 107729,
+      "sha256": "2128ca3d40cb85ad1f2fd36f93a78ee36a5b9961b328403513e2837688071c28"
+    },
+    {
+      "file": "source/waiting-onsite.blend",
+      "bytes": 101521,
+      "sha256": "ba88e59cd3b805f71873abe5d53d8fc7d04eb4152fa144a1eb52ae88310f54b9"
+    },
+    {
+      "file": "source/waiting-remote.blend",
+      "bytes": 129839,
+      "sha256": "dae0e21c0bf769442fe235567e1dad2cc016a2fa6d42f66912363fdf185a9bf6"
+    },
+    {
+      "file": "static/512/booking-day-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 133874,
+      "sha256": "74125bd9c6fbc09b77667d731e79cf5f6f9127aaadcb79765e674b768541c802",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/booking-day-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 9418,
+      "sha256": "86b84b2ed406d6272c6c99130e5d6185f9680429d8004db626b1ef3105e76011",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/booking-session-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 119053,
+      "sha256": "ba205a7ce7e0dbb1f0a3b0b07ebdd23afaabd4d5d2bf2e6cf37e4fba571e36aa",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/booking-session-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 9740,
+      "sha256": "4ac0567fe41bc6954ce153b100b4c95b053c30e61b8fccf349ecb6c06c69e712",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/booking-slot-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 112907,
+      "sha256": "724391420d027c88412724c61e0dd00f45485be4f8afc59e414c37f7aec6d32e",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/booking-slot-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 11590,
+      "sha256": "65c4fe94a062bfcd0d71cf1b6efb1de9e83226f2a62d9f5b196fae9717981fd6",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/intake-both-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 115182,
+      "sha256": "1214308bd267d6d09e746a7f5225ced7bdb6f00c18870935c4f6db0e12e43e38",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/intake-both-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 8224,
+      "sha256": "b08209f42c3ffccee949d692d046125855e824daac9760ae81ca2e199bdc5146",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/intake-reservation-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 122537,
+      "sha256": "63f5ceb72714b532ec01665fd82f91c2e98c5cfea14858afb77b952e634adae9",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/intake-reservation-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 9926,
+      "sha256": "011356696f7df94f6dae5bcf36691cc375540a250ff267b806b8f1493fe0d167",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/intake-waiting-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 116885,
+      "sha256": "80c57039d6476eba9a61f615875ab1d8b070d43a238c662bfc9eb72c43818f3f",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/intake-waiting-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 8760,
+      "sha256": "af07eef8484c4f269e6d12d5f094283575ce0dfe1e61b999cf8ee81a95eb626f",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-favorite-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 107969,
+      "sha256": "59229b5226792838dafc0e86ea9ed7cb00b4e702927e81f022f3591f2bc7a459",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-favorite-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 9550,
+      "sha256": "f7d452747b9faa5d59bf948b35357eafe7f795540fea05d40c90bed6abdbfdeb",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-messages-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 116018,
+      "sha256": "aa5689f16c420097a848e60954ae9695101738cdfc67977f6d8e64cd7534316b",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-messages-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 6772,
+      "sha256": "5e60724fc087b2aabc10902b24e1fb65e42823089b373e38db8b32d836277d15",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-my-reservations-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 131662,
+      "sha256": "c07169d7c9622dc1cb32fad066dc987891531e0e1e1cb81c4ccde71fea59672c",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-my-reservations-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 12380,
+      "sha256": "d29ee30266234ce35017e0c7e71cfafb544a829f2403b7cc441fe34b5aec58d1",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-top-rated-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 116681,
+      "sha256": "9efb4686021d41c08fcb33512ffd945f226e745b991d2093716f86fcb5a9f8e5",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/quick-top-rated-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 10238,
+      "sha256": "7cfa610461fdccb83d7f10f384bc3c159c5fa0bf4eea11b749ef5a13582ca71d",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/waiting-both-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 120686,
+      "sha256": "34a89fe1949df822aed3b3b86e1f5fefacdfa1cb289dafdc22ff1f99b1ebec0e",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/waiting-both-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 9078,
+      "sha256": "630bcc6d7ee3874e37f18acbfa242119e67bdd1cbc40b0732b95d5adb6ad7ab6",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/waiting-onsite-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 133154,
+      "sha256": "873321cf29571b91dade6f357a01e1d2bab0924d2f0b630e8b444e64f1e0154c",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/waiting-onsite-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 11068,
+      "sha256": "2f3070781a3a4b71240947a137ae95f11a79a0d247a7e5a5326ed6f215049043",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/waiting-remote-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 119267,
+      "sha256": "4fc78b2e69a941acfed0e18af27f4ea38a4811fc129b21d5e316397c6f9ac923",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/waiting-remote-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 8270,
+      "sha256": "96b58dcc8804f51a6bd9e9cc87dd459f39ffdbf27994ab4e64b7c291e4d1a8a0",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/booking-day-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 282644,
+      "sha256": "d4bca0fd06acca5f1eb9b0793c893b3c1fd46e068c5589265129e71d0c267c25",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/booking-day-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 14840,
+      "sha256": "a3a5e85c4fda8f46d132d5b26079664f100cce3b802bcc7bc0d9c2d7954d3fd3",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/booking-session-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 248509,
+      "sha256": "eb7f913b7cc98ce6b799cd37210a72c5b4ae4a46cb5406bcc1dd078439635de9",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/booking-session-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 15194,
+      "sha256": "26874d249fe5d82874a221f61fcb8b2bf15b291896c5aa3c526a158cf470220b",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/booking-slot-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 230000,
+      "sha256": "d2ca9cae13f4f0aa6bb756359d8ea50f5808b6ce93df60e62988afc58bdb76e0",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/booking-slot-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 17716,
+      "sha256": "02791bdced50a57a5298d778cde6926e452122eead4668be09677400a02ce5e4",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/intake-both-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 242480,
+      "sha256": "51eb277e284639eab30c9436612204e27039a37b3ecf531fda7fcf35d40121aa",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/intake-both-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 12690,
+      "sha256": "78379e4022892abcf212a15ce895d2e2a594a66b45d6cc5d75f319c3083da441",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/intake-reservation-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 256518,
+      "sha256": "0153eeb678de311ece3c0a713af5f02aae1cd1b8292c17503b4e481857c9b516",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/intake-reservation-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 15616,
+      "sha256": "b2166c559e449390b58b6a05ddd122aaffa7e02d011985b1551849640c0c3e26",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/intake-waiting-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 243862,
+      "sha256": "f6cebd9619795fa0b8369ddd83a1b540ff7e6bd044e8bc5beca292a2996f055d",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/intake-waiting-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 13748,
+      "sha256": "2c312436e295cd87c80339bafc68269d005e6efaf2efdadd6cf917773c0f4660",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-favorite-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 223589,
+      "sha256": "534dbc51ea1527477596c314a0cc480d175764e094864488ad4ac86d3d2bb3f2",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-favorite-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 15202,
+      "sha256": "9d3c4ce3950363af93ee88605e4bde18dbbcc785cbeecb14f6f64e6d56131fb9",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-messages-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 243334,
+      "sha256": "afd014b669df990780e66c5cd288fe0ef61d20956453e38700061e8e2b633758",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-messages-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 10812,
+      "sha256": "9da4f949903dfb7e20a6005732e6469cd9909c22fc86d3668c1766730058fa74",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-my-reservations-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 271222,
+      "sha256": "c61d3e73a13e5fa4d049d59b09fd6434e43a47b80d87bafbdb28ecc0f7ee72ef",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-my-reservations-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 19412,
+      "sha256": "c0efaac5d7aa6752edd441dc0950038e9d91ac1d185bb5d99dccfb9aafbf9624",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-top-rated-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 239887,
+      "sha256": "b87990de6672e23eadc592b70de60e543a83c78fd4d506b174352f3c36f2b7ff",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/quick-top-rated-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 15872,
+      "sha256": "5103dfb00b3f8c812467eb1e0a25afa33ac16bca7ea3f6e483084882a3a4ba54",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/waiting-both-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 254916,
+      "sha256": "978b34e66068c0820aa6e8a9380461324141578ec6e81245929dd6f704b3f8f5",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/waiting-both-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 14342,
+      "sha256": "746e90396c51427e7e6b3308b867b1d3be16dc4d3d76a2513f3b5bd6c1ee13db",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/waiting-onsite-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 279917,
+      "sha256": "980283f5c119ede068dd6cd10bfc1894bfd188388bc854d68941991344480b89",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/waiting-onsite-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 17344,
+      "sha256": "8b32afeddd52c9688cee0473014798a50af0fc0ff93110b7b5b79291c3b2f707",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/waiting-remote-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 251919,
+      "sha256": "b7aff651fc599de6631f21c3f4fde190e8c532f6df5573fd659addd25a3a2ab4",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/waiting-remote-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 12920,
+      "sha256": "8d63c275448391761fc82f5783393715bfa88ce3d1926bd36af932d8cc216cab",
+      "transparent": true,
+      "native_resolution": true
+    }
+  ]
+}

@@ -74,6 +74,6 @@ export const clearRedirect = () => {
     }
 };
 
-/** react-router의 location 객체에서 복귀에 쓸 경로 문자열을 만든다 (쿼리스트링 포함) */
+/** 현장 접수 QR의 fragment도 로그인 왕복 중 유지한다. 토큰을 쿼리·서버 접근 로그에 넣지 않는다. */
 export const pathFromLocation = (location) =>
-    `${location?.pathname || ''}${location?.search || ''}`;
+    `${location?.pathname || ''}${location?.search || ''}${location?.hash || ''}`;

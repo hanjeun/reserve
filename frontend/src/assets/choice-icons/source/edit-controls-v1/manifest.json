@@ -1,0 +1,271 @@
+{
+  "title": "RESERVE editing and status icons",
+  "version": "1",
+  "created_date": "2026-10-09",
+  "asset_ids": [
+    "edit-operation",
+    "edit-identity",
+    "intake-paused",
+    "waiting-off"
+  ],
+  "asset_count": 4,
+  "static_file_count": 16,
+  "png_count": 8,
+  "webp_count": 8,
+  "editable_blend_count": 4,
+  "subjects": {
+    "edit-operation": "Rounded clock and small neutral gear",
+    "edit-identity": "Abstract gallery card and small pencil",
+    "intake-paused": "Queue ticket and neutral temporary pause bars",
+    "waiting-off": "Queue ticket and neutral off switch with knob on the left"
+  },
+  "production": {
+    "blender": "4.3.2",
+    "engine": "BLENDER_EEVEE_NEXT",
+    "samples": 128,
+    "independent_native_render_sizes": [
+      512,
+      768
+    ],
+    "film_transparent": true,
+    "upscaled": false,
+    "static_only": true,
+    "animation": false,
+    "css": false
+  },
+  "encoding": {
+    "png": {
+      "mode": "RGBA",
+      "bit_depth": 8,
+      "lossless": true
+    },
+    "webp": {
+      "quality": 92,
+      "method": 6,
+      "rgb_lossless": false,
+      "alpha_quality": 100,
+      "alpha_pixel_identical_to_png": true
+    }
+  },
+  "webp_targets_bytes": {
+    "512": 20000,
+    "768": 32000
+  },
+  "webp_targets_all_pass": true,
+  "palette_base_srgb": {
+    "white": "#F2F5FA",
+    "pale": "#B8C9DE",
+    "blue": "#3182F6",
+    "neutral_ink": "#8191A6"
+  },
+  "shared_style": "Camera, lights, world, material parameters, color management and normalization continue the existing RESERVE pipeline unchanged. See qa/blend-validation.json.",
+  "licenses": {
+    "original_images_and_geometry": "CC0-1.0 to extent rights exist and can lawfully be waived",
+    "original_code": "MIT",
+    "third_party_tools": "Their own licenses"
+  },
+  "preservation_report": "qa/original-preservation.json",
+  "actual_size_review": "previews/*-actual-48-56-64-from512.png and *-from768.png",
+  "notes": [
+    "Material base colors differ from rendered pixels under AgX and lighting.",
+    "Preview sheets contain review-only backgrounds and labels; icon files do not.",
+    "Existing popup/intake-both/intake-reservation/waiting-both assets are reused outside this package, without alteration."
+  ],
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 3843,
+      "sha256": "7347a4c756b15970428bc6bebc1f15100275786bf8d20ff8ada574fcecac8a22"
+    },
+    {
+      "file": "previews/dark-actual-48-56-64-from512.png",
+      "bytes": 57519,
+      "sha256": "4f8a15721c83bc2afa22494d10b4803e275418a56bd4fb60b661097bd98766c8"
+    },
+    {
+      "file": "previews/dark-actual-48-56-64-from768.png",
+      "bytes": 57316,
+      "sha256": "991bf8f2998ba1cab1736c6f8cd268997afc2ae4b51a5c7ad081d63b9d81cd8a"
+    },
+    {
+      "file": "previews/dark-overview.png",
+      "bytes": 66653,
+      "sha256": "c99a6be30f04118cc777c60b4f65afb713adeaeae22be8d739023086300e5c50"
+    },
+    {
+      "file": "previews/light-actual-48-56-64-from512.png",
+      "bytes": 52964,
+      "sha256": "06afde0a8c9a10f915db62a0cf8cb2449c7ddf86f50f3d3965687e830483cf3d"
+    },
+    {
+      "file": "previews/light-actual-48-56-64-from768.png",
+      "bytes": 52626,
+      "sha256": "a6961430b2293c02eda76fcc91f5a7bb7dbf33599e22e78b24d4202f50d5739a"
+    },
+    {
+      "file": "previews/light-overview.png",
+      "bytes": 63959,
+      "sha256": "d439053fbdde658dc7ef5cde2f42c36f7a1355c1049d80eba8bcd0775aeb1433"
+    },
+    {
+      "file": "qa/blend-validation.json",
+      "bytes": 12635,
+      "sha256": "8712d3ead792e5bcf47a988e029f67b972379c002880653b7af0b5664a445ef3"
+    },
+    {
+      "file": "qa/image-validation.json",
+      "bytes": 9377,
+      "sha256": "d874269bd77d966c101d28df4fa862cbb154b599e272e0289a38b2dc5181ba74"
+    },
+    {
+      "file": "qa/independent-visual-review.json",
+      "bytes": 3941,
+      "sha256": "4d4a76ea120f99d2160abe2c80d30124e4f7f2483755c904b3dd64cfae3391b6"
+    },
+    {
+      "file": "qa/original-preservation.json",
+      "bytes": 4988,
+      "sha256": "ffa9071cd3974144dab4dee45b3b030e25f419891e705edf60e3c5f6ded42585"
+    },
+    {
+      "file": "qa/reproduction-validation.json",
+      "bytes": 2698,
+      "sha256": "e9013e2415837b9f37cff9a531ee1bcfecd26bc61be9c3b78a1c67da29fa1db8"
+    },
+    {
+      "file": "source/LICENSE-ASSETS.txt",
+      "bytes": 921,
+      "sha256": "17ca6d87383d5d63f8096020a802a7cdc791ea456657e6e349baa028bb168032"
+    },
+    {
+      "file": "source/LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/build_assets.py",
+      "bytes": 15351,
+      "sha256": "c48a2bb6db8a2e669647863926c42e6150e43f05e4b0afb56257c501f8caeb9e"
+    },
+    {
+      "file": "source/edit-identity.blend",
+      "bytes": 109742,
+      "sha256": "83e0d86de8f643b37d2f1038750127b1b79328e74d55512d7b5d96519671454e"
+    },
+    {
+      "file": "source/edit-operation.blend",
+      "bytes": 190190,
+      "sha256": "a0497e470646f42c9cfac9c68c71ca21a321739ff4c295364b826db4e9df10dc"
+    },
+    {
+      "file": "source/encode_and_validate.py",
+      "bytes": 4312,
+      "sha256": "1c36b9215f46f5cd7bf65c0493dbe79072ab41fd0a74f193e24b60f5c7f3657d"
+    },
+    {
+      "file": "source/intake-paused.blend",
+      "bytes": 184852,
+      "sha256": "f5380ba0b435e914f1a9b5b999bf207d6e78904b181836bcf1377f29009e09f6"
+    },
+    {
+      "file": "source/native-render-evidence.jsonl",
+      "bytes": 2132,
+      "sha256": "0142ccd9a732966180bf3903e20a61d110fec95bbe6cfcd95a3379daea7c4df1"
+    },
+    {
+      "file": "source/package_zip.py",
+      "bytes": 3918,
+      "sha256": "9541f796f1bb6facf04a26b08c1472a29a7f2e754b0e2eed2eb5783c71c6511f"
+    },
+    {
+      "file": "source/validate_blends.py",
+      "bytes": 3467,
+      "sha256": "f5ae701d064b4394aaee4a445ef136a088e3febeb5f643a1078b245fe84865c3"
+    },
+    {
+      "file": "source/waiting-off.blend",
+      "bytes": 199578,
+      "sha256": "38ac441f2ccce6038fbbb54c9b25f376f01349f646e3a077fa3411e0dc8530a0"
+    },
+    {
+      "file": "static/512/edit-identity-512.png",
+      "bytes": 122036,
+      "sha256": "8a3932a4c734e342eddfeae95e036b9f0f72b96b95826b5724a278819922aad8"
+    },
+    {
+      "file": "static/512/edit-identity-512.webp",
+      "bytes": 9342,
+      "sha256": "674ee3f6853ca934202e3a05bef13044a1a423c92e5e0ea74140d6ec2f809051"
+    },
+    {
+      "file": "static/512/edit-operation-512.png",
+      "bytes": 123035,
+      "sha256": "47cc318b39171224c67485b37330dc4f10070a875949d5701db3c68c14be631c"
+    },
+    {
+      "file": "static/512/edit-operation-512.webp",
+      "bytes": 11294,
+      "sha256": "094672f1e7e88d4412bb5d05c5c6def328d2db65349af917db497294206c848f"
+    },
+    {
+      "file": "static/512/intake-paused-512.png",
+      "bytes": 122044,
+      "sha256": "2e375c688e52780333958efb596d5b50a0a2b23f8c3a917d3686f6b1b4046415"
+    },
+    {
+      "file": "static/512/intake-paused-512.webp",
+      "bytes": 8638,
+      "sha256": "adc1dc90121a970b6d3822899421baed2cc22366f2ac5e01d823424fbc369d99"
+    },
+    {
+      "file": "static/512/waiting-off-512.png",
+      "bytes": 117862,
+      "sha256": "3239b8c8f5718ee19956f1326a4834ae325d972a1e6ef3d20cf3472f2cb8fe1d"
+    },
+    {
+      "file": "static/512/waiting-off-512.webp",
+      "bytes": 8124,
+      "sha256": "9c40aafe28fc2db702c201eb20cfe3cc94d7602fe2a507e95aa715c966a05cca"
+    },
+    {
+      "file": "static/768/edit-identity-768.png",
+      "bytes": 256436,
+      "sha256": "1ba6d2cae126af6218f54f282a68ba8c7c77e3979e46976ff662906be5968674"
+    },
+    {
+      "file": "static/768/edit-identity-768.webp",
+      "bytes": 14804,
+      "sha256": "d62a9ea4741efbfac19f18b421ab5e71be3bcd449db5d4415fe75302f88c93ed"
+    },
+    {
+      "file": "static/768/edit-operation-768.png",
+      "bytes": 253707,
+      "sha256": "cf1e48fb9bc8febd27f3590000648033f0e5255cf61df5e3e61bd9809e610aed"
+    },
+    {
+      "file": "static/768/edit-operation-768.webp",
+      "bytes": 17722,
+      "sha256": "23505a4b50c1cee8e646e4fd80daceb1d8e6e86cd753e423a9a551ad3761dc92"
+    },
+    {
+      "file": "static/768/intake-paused-768.png",
+      "bytes": 256013,
+      "sha256": "2a9c55f3aed65999c9bf7300b3cfb800c61573c591709354f38d82fc7772c5b1"
+    },
+    {
+      "file": "static/768/intake-paused-768.webp",
+      "bytes": 13412,
+      "sha256": "0eddeae110ab28988e99381efc00bfa353968f50df184dc212f58091d34777ab"
+    },
+    {
+      "file": "static/768/waiting-off-768.png",
+      "bytes": 246242,
+      "sha256": "542d7c5a8642eff6b7580a68e1e5c504f39baafe46eff6539a1f3f488a0ac0a9"
+    },
+    {
+      "file": "static/768/waiting-off-768.webp",
+      "bytes": 12792,
+      "sha256": "226883c87ec0da1181db9f203d7c873adc8ecf84f8e9ee011d13e1d0a478e141"
+    }
+  ]
+}

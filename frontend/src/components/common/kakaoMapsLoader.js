@@ -14,7 +14,7 @@ const waitForMaps = (resolve, reject, onSettled) => {
         });
     } catch {
         onSettled();
-        reject(new Error('카카오맵 SDK를 초기화하지 못했습니다.'));
+        reject(new Error('카카오맵 SDK를 초기화하지 못했어요.'));
     }
 };
 
@@ -24,13 +24,13 @@ export const loadKakaoMapsSdk = () => {
 
     sdkPromise = new Promise((resolve, reject) => {
         if (typeof document === 'undefined') {
-            reject(new Error('브라우저에서만 지도를 불러올 수 있습니다.'));
+            reject(new Error('브라우저에서만 지도를 불러올 수 있어요.'));
             return;
         }
 
         const appKey = import.meta.env.VITE_KAKAO_JS_KEY?.trim();
         if (!appKey) {
-            reject(new Error('카카오맵 JavaScript 키가 설정되지 않았습니다.'));
+            reject(new Error('카카오맵 JavaScript 키가 설정되지 않았어요.'));
             return;
         }
 
@@ -52,7 +52,7 @@ export const loadKakaoMapsSdk = () => {
             finish();
             script?.remove();
             sdkPromise = null;
-            reject(new Error('카카오맵 SDK를 불러오지 못했습니다.'));
+            reject(new Error('카카오맵 SDK를 불러오지 못했어요.'));
         };
         const handleLoad = () => {
             if (!sdkIsReady()) {

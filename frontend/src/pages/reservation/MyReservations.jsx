@@ -1,3 +1,4 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -6,7 +7,8 @@ import {
     CreditCardOutlined, DeleteOutlined, QrcodeOutlined,
     CloseOutlined, StarOutlined, EditOutlined,
 } from '@ant-design/icons';
-import { PageContainer, Button, DataState, FilterToolbar, MyReservationCardSkeleton, ReservationSummaryCardSkeleton, SpinIndicator } from '../../components/common';
+import { PageContainer, Button, DataState, FilterToolbar, MyReservationCardSkeleton, ReservationSummaryCardSkeleton, SpinIndicator, SegmentedControl } from '../../components/common';
+import MyWaiting from '../../components/waiting/MyWaiting';
 import ReservationRow from '../../components/reservation/ReservationRow';
 import ReservationListingToolbar from '../../components/reservation/ReservationListingToolbar';
 import ReservationSummaryCard from '../../components/reservation/ReservationSummaryCard';
@@ -21,9 +23,9 @@ import paymentService from '../../services/paymentService';
 import api from '../../api/axios';
 import { formatCurrency } from '../../utils';
 import { API_ENDPOINTS, RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
-import { colors, fontWeight, fontSize } from '../../styles/tokens';
+import { colors, fontSize } from '../../styles/tokens';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 // 상태 필터 목록은 constants/status.js 하나에서만 온다 —
 // 같은 상태를 화면마다 다르게 부르지 않기 위해서다('확정' vs '승인됨' vs '예약 확정').
@@ -154,8 +156,8 @@ const ReservationResults = ({ filtered, view, filtersActive, renderItem }) => {
         return (
             <DataState state="empty" kind="reservation" style={{ marginTop: 100 }}
                 title={filtersActive
-                    ? '조건에 맞는 예약이 없습니다.'
-                    : '예약 내역이 없습니다.'} />
+                    ? '조건에 맞는 예약이 없어요.'
+                    : '예약 내역이 없어요.'} />
         );
     }
     return (
@@ -170,7 +172,7 @@ const ReservationResults = ({ filtered, view, filtersActive, renderItem }) => {
     );
 };
 
-const MyReservations = () => {
+const ReservationHistory = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
@@ -218,15 +220,15 @@ const MyReservations = () => {
     const handleRemove = (res) => {
         confirm({
             title: '예약 삭제',
-            content: '이 예약을 목록에서 삭제합니다. 되돌릴 수 없습니다.',
+            content: '이 예약을 목록에서 삭제해요. 되돌릴 수 없어요.',
             okText: '삭제', cancelText: '취소',
             okButtonProps: { danger: true }, centered: true,
             onOk: async () => {
                 try {
                     await api.delete(API_ENDPOINTS.RESERVATION.REMOVE(res.id));
-                    message.success('목록에서 제거되었습니다.');
+                    message.success('목록에서 제거됐어요.');
                     void refetch();
-                } catch { message.error('제거에 실패했습니다.'); }
+                } catch { message.error('제거에 실패했어요.'); }
             },
         });
     };
@@ -240,7 +242,7 @@ const MyReservations = () => {
         if (!res.depositPaid) {
             confirm({
                 title: '예약 취소',
-                content: '예약을 취소하시겠습니까? 취소 후 되돌릴 수 없습니다.',
+                content: '예약을 취소할까요? 취소 후 되돌릴 수 없어요.',
                 okText: '취소하기', cancelText: '닫기',
                 okButtonProps: { danger: true }, centered: true,
                 onOk: () => cancelReservation(res.id),
@@ -277,14 +279,14 @@ const MyReservations = () => {
         paymentService.getRefundPreview(res.id)
             .then((preview) => {
                 const content = preview.refundAmount > 0
-                    ? `예약을 취소하면 ${formatCurrency(preview.refundAmount)}이 환불됩니다. (${preview.reason})`
-                    : `취소 시점 기준 환불 불가 조건입니다. (${preview.reason}) 예약을 취소하시겠습니까?`;
+                    ? `예약을 취소하면 ${formatCurrency(preview.refundAmount)}이 환불돼요. (${preview.reason})`
+                    : `취소 시점 기준 환불 불가 조건이에요. (${preview.reason}) 예약을 취소할까요?`;
                 modalHandle.update({ content, okButtonProps: { danger: true, disabled: false } });
             })
             .catch(() => {
                 // 환불 조회 실패해도 취소는 계속 가능하게 — 기본 문구로 되돌림
                 modalHandle.update({
-                    content: '예약을 취소하시겠습니까? 취소 후 되돌릴 수 없습니다.',
+                    content: '예약을 취소할까요? 취소 후 되돌릴 수 없어요.',
                     okButtonProps: { danger: true, disabled: false },
                 });
             });
@@ -339,7 +341,7 @@ const MyReservations = () => {
                 {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
                 {error && (
                     <DataState state="error" kind="reservation" subject="예약 목록" error={error}
-                        title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                        title="최신 예약을 확인하지 못해 이전 목록을 보여드리고 있어요."
                         onRetry={refetch} retrying={loading || refetching} compact style={{ marginBottom: 16 }} />
                 )}
                 <ReservationResults filtered={filtered} view={view}
@@ -350,15 +352,9 @@ const MyReservations = () => {
     }
 
     return (
-        <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page" aria-busy={loading || refetching}>
-            <div style={{ marginBottom: 32 }}>
-                <Title level={2} style={styles.title}>내 예약 확인</Title>
-                <Text type="secondary" style={{ fontSize: fontSize.lg }}>
-                    예약 현황을 확인하고 방문 후 리뷰를 남겨보세요
-                </Text>
-            </div>
-
+        <section aria-label="내 예약 목록" aria-busy={loading || refetching}>
             <ReservationListingToolbar view={view}
+                initialLoading={loading}
                 onViewChange={setView}
                 status={statusFilter} onStatusChange={nextStatus => setToolbarParam('status', nextStatus)}
                 statusOptions={STATUS_OPTIONS} sort={sort}
@@ -368,6 +364,7 @@ const MyReservations = () => {
                 search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약번호로 검색', disabled: loading || refetching }}
                 onReload={refetch}
                 loading={loading || refetching}
+                initialLoading={loading}
             />
 
             {/* 첫 조회에만 스켈레톤을 표시한다. 폴링·창 포커스·수동 새로고침은 현재 예약과
@@ -383,12 +380,33 @@ const MyReservations = () => {
                 open={detailReservation != null}
                 onClose={() => setDetailReservation(null)}
             />
-        </PageContainer>
+        </section>
     );
 };
 
+const MyReservations = () => {
+    const [params, setParams] = useSearchParams();
+    const revision = useAuthStore(state => state.sessionRevision);
+    const waiting = params.get('tab') === 'waiting';
+    useDocumentTitle('내 예약');
+    return <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page">
+        <div style={{ marginBottom: 24 }}>
+            <PageTitle style={styles.title}>내 예약 확인</PageTitle>
+            <PageDescription>예약과 웨이팅 현황을 확인해요</PageDescription>
+        </div>
+        <div style={{ marginBottom: 20 }}><SegmentedControl block={false} value={waiting ? 'waiting' : 'reservation'}
+            options={[{ value: 'reservation', label: '예약' }, { value: 'waiting', label: '웨이팅' }]}
+            onChange={value => setParams(current => {
+                const next = new URLSearchParams(current);
+                if (value === 'waiting') next.set('tab', value); else next.delete('tab');
+                return next;
+            })} /></div>
+        {waiting ? <MyWaiting key={revision} /> : <ReservationHistory key={revision} />}
+    </PageContainer>;
+};
+
 const styles = {
-    title:    { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
+    title:    { margin: '0 0 8px', },
     divider:  { height: 1, background: colors.border?.light || '#f0f0f0' },
     rejection: { fontSize: fontSize.xs, textAlign: 'right', width: '100%' },
 };

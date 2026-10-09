@@ -39,14 +39,19 @@ class SitemapServiceTest {
                 .contains("<loc>https://reserve.it.kr/terms</loc>")
                 .contains("<loc>https://reserve.it.kr/privacy</loc>")
                 .contains("<loc>https://reserve.it.kr/content-sources</loc>")
-                .contains("<loc>https://reserve.it.kr/operation-guide</loc>")
+                .contains("<loc>https://reserve.it.kr/guide/user</loc>")
+                .contains("<loc>https://reserve.it.kr/guide/business</loc>")
+                .contains("<loc>https://reserve.it.kr/guide/common</loc>")
                 .contains("<loc>https://reserve.it.kr/store/7</loc>")
                 .contains("<lastmod>2026-09-02</lastmod>")
                 .doesNotContain("/login")
-                .doesNotContain("/signup");
+                .doesNotContain("/signup")
+                .doesNotContain("/operation-guide");
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(storeRepository).findPublicSitemapEntries(pageable.capture());
-        assertThat(pageable.getValue().getPageSize()).isEqualTo(49_996);
+        int staticUrls = xml.split("<url>").length - 1 - 2;
+        assertThat(staticUrls).isEqualTo(8);
+        assertThat(pageable.getValue().getPageSize() + staticUrls).isEqualTo(50_000);
     }
 }

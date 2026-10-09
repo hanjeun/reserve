@@ -112,7 +112,7 @@ class AuthRefreshCookieContractTest {
     @Test
     void refreshWithoutCookieIs401AndNeverTouchesTheTokenStore() throws Exception {
         when(tokenService.rejectMissingCookie()).thenReturn(new RefreshRejectedException(
-                RefreshRejectedException.Reason.MISSING_COOKIE, "로그인이 만료되었습니다. 다시 로그인해주세요."));
+                RefreshRejectedException.Reason.MISSING_COOKIE, "로그인이 만료됐어요. 다시 로그인해주세요."));
 
         var result = mockMvc.perform(post("/api/auth/refresh"))
                 .andExpect(status().isUnauthorized())
@@ -126,7 +126,7 @@ class AuthRefreshCookieContractTest {
     @Test
     void rejectedRefreshSetsNoCookies() throws Exception {
         when(tokenService.refresh("stale-value")).thenThrow(new RefreshRejectedException(
-                RefreshRejectedException.Reason.REUSED_TOKEN, "로그인이 만료되었습니다. 다시 로그인해주세요."));
+                RefreshRejectedException.Reason.REUSED_TOKEN, "로그인이 만료됐어요. 다시 로그인해주세요."));
 
         var result = mockMvc.perform(post("/api/auth/refresh")
                         .cookie(new Cookie("refresh_token", "stale-value")))

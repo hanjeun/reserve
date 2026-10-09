@@ -64,13 +64,21 @@ export default defineConfig([
       'no-restricted-syntax': ['error', {
         selector:
           "CallExpression[callee.property.name=/^(warning|error)$/]" +
-          " > Literal[value=/(입력|선택|업로드|동의)\\s*해\\s*주세요|필수입니다/]",
+          " > Literal[value=/(입력|선택|업로드|동의)\\s*해\\s*주세요|필수(입니다|예요)/]",
         message:
           '폼 검증 오류는 토스트가 아니라 칸 아래 인라인으로 표시하세요. ' +
           'FormField 를 쓰는 폼은 useFormErrors + <FormField error={...}>, ' +
           'AntD Form 안의 칸은 Form.Item rules 또는 form.setFields 를 쓰세요. ' +
           '근거: FormModal.jsx 의 FormField 주석 / docs/technical/design-system.md',
       }],
+    },
+  },
+  {
+    files: ['src/**/*.{js,jsx}'],
+    ignores: ['src/**/*.{test,spec}.{js,jsx}', 'src/test/**'],
+    rules: {
+      'reserve/user-copy-tone': 'error',
+      'reserve/no-threatening-copy': 'error',
     },
   },
 ])

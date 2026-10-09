@@ -57,14 +57,14 @@ test('unknown ad result leads directly to the ad tab, including after reload', a
 test('a status lookup failure never appears as payment success', async ({ page }) => {
     await mockResult(page, 'reservation', 'PAID', true);
     await page.goto('/payment/result?success=true&merchant_uid=RESULT-TEST');
-    await expect(page.getByText('결제 상태를 불러오지 못했습니다', { exact: true })).toBeVisible();
-    await expect(page.getByText(/서버에서 결제 내역을 확인하지 못했습니다/)).toBeVisible();
+    await expect(page.getByText('결제 상태를 불러오지 못했어요', { exact: true })).toBeVisible();
+    await expect(page.getByText(/서버에서 결제 내역을 확인하지 못했어요/)).toBeVisible();
     await expect(page.getByText('결제 완료', { exact: true })).not.toBeVisible();
 });
 
 test('a success flag without an order ID cannot display success', async ({ page }) => {
     const requests = await mockResult(page, 'reservation', 'PAID');
     await page.goto('/payment/result?success=true');
-    await expect(page.getByText('결제 정보를 확인할 수 없습니다', { exact: true })).toBeVisible();
+    await expect(page.getByText('결제 정보를 확인할 수 없어요', { exact: true })).toBeVisible();
     expect(requests).toHaveLength(0);
 });

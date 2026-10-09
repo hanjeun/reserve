@@ -13,6 +13,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
+import { SpinIndicator } from './Loading';
 import { colors, radius, heights, fontWeight, fontSize, shadows, transitions } from '../../styles/tokens';
 
 const VARIANTS = {
@@ -148,7 +149,7 @@ function renderLeadingIcon({ loading, loadingIcon, icon, children }) {
     if (loading) {
         return loadingIcon
             ? <span className="reserve-btn-loading-icon" aria-hidden="true">{loadingIcon}</span>
-            : <span style={spinStyle} className="reserve-btn-spin" />;
+            : <span className="reserve-btn-spin" aria-hidden="true"><SpinIndicator /></span>;
     }
     return icon && (
         <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }} aria-hidden={children ? 'true' : undefined}>{icon}</span>
@@ -171,6 +172,7 @@ const Button = ({
     ...rest
 }) => {
     const isGhostSm = variant.startsWith('ghost-sm');
+    const iconOnly = icon != null && React.Children.count(children) === 0;
 
     const v = VARIANTS[variant] || VARIANTS.primary;
 
@@ -194,6 +196,7 @@ const Button = ({
         userSelect: 'none',
         padding: buttonPadding,
         ...v,
+        ...(iconOnly ? { height: heights.buttonMd, width: heights.buttonMd, minWidth: heights.buttonMd, flexShrink: 0, padding: 0 } : {}),
         ...style,
     };
 
@@ -210,7 +213,7 @@ const Button = ({
             disabled={disabled || loading}
             aria-busy={loading || undefined}
             onClick={handleClick}
-            className={['reserve-btn', `reserve-btn--${variant}`, className].filter(Boolean).join(' ')}
+            className={['reserve-btn', `reserve-btn--${variant}`, iconOnly && 'reserve-btn--icon-only', className].filter(Boolean).join(' ')}
             style={baseStyle}
             {...rest}
         >
@@ -228,8 +231,6 @@ const Button = ({
    예전에는 이 파일 안의 <style> 태그였는데, JSX 안의 style 은 **인스턴스마다 렌더**되어
    버튼이 많은 화면에서 동일한 태그가 수십 개 쌓였다(실측: 마이페이지에서 3개).
    전역 정책은 index.css 로 — docs/technical/design-system.md 참고. */
-
-const spinStyle = {};
 
 Button.propTypes = {
     variant: PropTypes.oneOf([

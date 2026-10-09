@@ -39,7 +39,7 @@ public class PromotionService {
     public PromotionDto.PublicPromotionDetailResponse getPublicPromotion(Long promotionId) {
         return promotionRepository.findPublicById(promotionId)
                 .map(PromotionDto.PublicPromotionDetailResponse::fromEntity)
-                .orElseThrow(() -> new PromotionException("홍보글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new PromotionException("홍보글을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     // 전체 홍보글 조회 (향상된 switch 문 적용)
@@ -59,7 +59,7 @@ public class PromotionService {
     @Transactional
     public PromotionDto.PromotionResponse getPromotion(Long promotionId) {
         if (promotionRepository.incrementViewCount(promotionId) == 0) {
-            throw new PromotionException("홍보글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new PromotionException("홍보글을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
         }
         Promotion promotion = findPromotionByIdOrThrow(promotionId);
         return PromotionDto.PromotionResponse.fromEntity(promotion);
@@ -72,7 +72,7 @@ public class PromotionService {
 
         // 권한 확인
         if (member.getRole() != Role.BUSINESS && member.getRole() != Role.ADMIN) {
-            throw new PromotionException("사업자 또는 관리자만 홍보글을 작성할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new PromotionException("사업자 또는 관리자만 홍보글을 작성할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         Store store = findOwnedOperatingStoreForUpdateOrThrow(request.getStoreId(), memberId);
@@ -139,24 +139,24 @@ public class PromotionService {
     // 공통 도우미 메서드
     private Member findActiveMemberForUpdateOrThrow(Long memberId) {
         Member member = memberRepository.findActiveByIdForUpdate(memberId)
-                .orElseThrow(() -> new PromotionException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new PromotionException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         if (member.isDeleted()) {
-            throw new PromotionException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new PromotionException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
         }
         if (member.isSuspended()) {
-            throw new PromotionException("현재 이용이 제한된 회원은 홍보글을 변경할 수 없습니다.", HttpStatus.FORBIDDEN);
+            throw new PromotionException("현재 이용이 제한된 회원은 홍보글을 변경할 수 없어요.", HttpStatus.FORBIDDEN);
         }
         return member;
     }
 
     private Store findOwnedOperatingStoreForUpdateOrThrow(Long storeId, Long memberId) {
         Store store = storeRepository.findByIdForUpdate(storeId)
-                .orElseThrow(() -> new PromotionException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new PromotionException("가게를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         if (store.isDeleted() || store.isSuspended()) {
-            throw new PromotionException("현재 운영 중인 가게의 홍보글만 작성·변경할 수 있습니다.", HttpStatus.CONFLICT);
+            throw new PromotionException("현재 운영 중인 가게의 홍보글만 작성·변경할 수 있어요.", HttpStatus.CONFLICT);
         }
         if (store.getOwner() == null || !memberId.equals(store.getOwner().getId())) {
-            throw new PromotionException("본인 소유 가게의 홍보글만 작성·변경할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new PromotionException("본인 소유 가게의 홍보글만 작성·변경할 수 있어요.", HttpStatus.FORBIDDEN);
         }
         return store;
     }
@@ -167,7 +167,7 @@ public class PromotionService {
         findActiveMemberForUpdateOrThrow(memberId);
         Promotion promotion = findPromotionByIdOrThrow(promotionId);
         if (!memberId.equals(promotion.getMember().getId())) {
-            throw new PromotionException("본인의 홍보글만 변경할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new PromotionException("본인의 홍보글만 변경할 수 있어요.", HttpStatus.FORBIDDEN);
         }
         // 요청의 storeId가 아닌 기존 연결 가게의 최신 상태·소유권을 잠금 아래 재검사한다.
         findOwnedOperatingStoreForUpdateOrThrow(promotion.getStore().getId(), memberId);
@@ -176,6 +176,6 @@ public class PromotionService {
 
     private Promotion findPromotionByIdOrThrow(Long id) {
         return promotionRepository.findById(id)
-                .orElseThrow(() -> new PromotionException("홍보글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new PromotionException("홍보글을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 }

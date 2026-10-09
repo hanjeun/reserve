@@ -24,7 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/stores")
 public class StoreApiController {
-    private static final String EDIT_LOGIN_REQUIRED_MESSAGE = "가게 수정을 위해 로그인이 필요합니다.";
+    private static final String EDIT_LOGIN_REQUIRED_MESSAGE = "가게 수정을 위해 로그인이 필요해요.";
 
 
     private final StoreService storeService;
@@ -33,11 +33,11 @@ public class StoreApiController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<StoreResponse> createStore(@ModelAttribute StoreCreateRequest request) {
-        Member member = SecurityUtil.getCurrentMember("가게 등록을 위해 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("가게 등록을 위해 로그인이 필요해요.");
         validateBusinessAuth(member);
 
         StoreResponse store = storeService.createStore(request, member);
-        return ApiResponse.success(store, "가게가 성공적으로 등록되었습니다.");
+        return ApiResponse.success(store, "가게가 성공적으로 등록됐어요.");
     }
 
     // 내 가게 목록 조회
@@ -46,7 +46,7 @@ public class StoreApiController {
     // - 가게 생성/수정은 여전히 BUSINESS 역할 필요 (validateBusinessAuth 유지)
     @GetMapping("/my")
     public ApiResponse<List<StoreResponse>> getMyStores() {
-        Member member = SecurityUtil.getCurrentMember("내 가게 조회를 위해 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("내 가게 조회를 위해 로그인이 필요해요.");
         List<StoreResponse> stores = storeService.getMyStores(member);
         return ApiResponse.success(stores, "내 가게 목록 조회 성공");
     }
@@ -109,7 +109,7 @@ public class StoreApiController {
         validateBusinessAuth(member);
 
         StoreResponse store = storeService.updateStore(id, request, member);
-        return ApiResponse.success(store, "가게 정보가 수정되었습니다.");
+        return ApiResponse.success(store, "가게 정보가 수정됐어요.");
     }
 
     // 자동 승인 토글
@@ -121,13 +121,13 @@ public class StoreApiController {
         Member member = SecurityUtil.getCurrentMember(EDIT_LOGIN_REQUIRED_MESSAGE);
         validateBusinessAuth(member);
         StoreResponse store = storeService.toggleAutoApproval(id, enabled, member);
-        return ApiResponse.success(store, "자동 승인 설정이 변경되었습니다.");
+        return ApiResponse.success(store, "자동 승인 설정이 변경됐어요.");
     }
 
     // 가게 삭제 전 활성 예약 수 조회 (모달 표시용)
     @GetMapping("/{id}/active-reservations-count")
     public ApiResponse<Integer> getActiveReservationsCount(@PathVariable Long id) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         validateBusinessAuth(member);
         int count = storeService.countActiveReservations(id, member);
         return ApiResponse.success(count, "활성 예약 수 조회 성공");
@@ -135,7 +135,7 @@ public class StoreApiController {
 
     @GetMapping("/{id}/closure-readiness")
     public ApiResponse<StoreClosureReadiness> getClosureReadiness(@PathVariable Long id) {
-        Member member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         validateBusinessAuth(member);
         return ApiResponse.success(
                 storeService.getClosureReadiness(id, member),
@@ -148,7 +148,7 @@ public class StoreApiController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "30d") String range
     ) {
-        Member member = SecurityUtil.getCurrentMember("통계 조회를 위해 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("통계 조회를 위해 로그인이 필요해요.");
         validateBusinessAuth(member);
         StoreStatisticsResponse stats = storeService.getStoreStatistics(id, member, range);
         return ApiResponse.success(stats, "가게 통계 조회 성공");
@@ -157,17 +157,17 @@ public class StoreApiController {
     // 가게 영업 종료 (거래 원장은 보존하고 공개 노출만 종료)
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteStore(@PathVariable Long id) {
-        Member member = SecurityUtil.getCurrentMember("가게 영업 종료를 위해 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("가게 영업 종료를 위해 로그인이 필요해요.");
         validateBusinessAuth(member);
 
         storeService.deleteStore(id, member);
-        return ApiResponse.success(null, "가게 영업이 종료되었습니다.");
+        return ApiResponse.success(null, "가게 영업이 종료됐어요.");
     }
 
     // [중요] 사업자 권한 검증 공통 로직
     private void validateBusinessAuth(Member member) {
         if (!member.isBusiness() && !member.isAdmin()) {
-            throw new StoreException("사업자 권한이 있는 회원만 접근 가능합니다.", HttpStatus.FORBIDDEN);
+            throw new StoreException("사업자 권한이 있는 회원만 접근할 수 있어요.", HttpStatus.FORBIDDEN);
         }
     }
 }

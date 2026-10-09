@@ -17,8 +17,8 @@ public record ChatIntroResponse(boolean configured, String notice, String greeti
 
     public static final String SUPPORT_DISPLAY_NAME = "RESERVE 고객지원";
     /** {이름} 은 화면에서 손님 이름(모르면 "회원")으로 바뀐다. 빈 줄은 문단 구분이다. */
-    public static final String DEFAULT_SUPPORT_GREETING = "안녕하세요, {이름}님 🙂\n반갑습니다.\n\n궁금한 내용을 남겨주시면\n관리자가 확인 후 답변드릴게요.";
-    public static final String DEFAULT_STORE_GREETING = "안녕하세요, {이름}님 🙂\n반갑습니다.\n\n궁금한 내용을 남겨주시면\n사장님이 확인 후 답변드릴게요.";
+    public static final String DEFAULT_SUPPORT_GREETING = "안녕하세요, {이름}님 🙂\n반가워요.\n\n궁금한 내용을 남겨주시면\n관리자가 확인 후 답변드릴게요.";
+    public static final String DEFAULT_STORE_GREETING = "안녕하세요, {이름}님 🙂\n반가워요.\n\n궁금한 내용을 남겨주시면\n사장님이 확인 후 답변드릴게요.";
 
     /**
      * 관리자가 아직 설정하지 않았을 때의 고객지원 기본 문답(2026-09-24). 관리자 화면에 그대로 채워져 고칠 수 있다.

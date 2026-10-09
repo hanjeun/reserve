@@ -5,31 +5,30 @@ import BenefitDetailSkeleton from '../common/BenefitDetailSkeleton';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
 import { STORE_LIST_PAGE_SIZE } from '../../constants/storeListPageSize';
 import MyPageSkeleton from './MyPageSkeleton';
-import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
+import { SERVICE_DOMAIN_OPTIONS, SERVICE_DOMAIN_FILTER_OPTIONS, OWNER_STORE_SORT_OPTIONS, SORT_OPTIONS,
+    RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import PropTypes from 'prop-types';
-import { Typography } from 'antd';
+import { PageTitle, PageDescription } from '../common/PageTypography';
 import Bone from '../common/Bone';
 import PageContainer from '../common/PageContainer';
-import AdminTableSkeletonTable from '../common/AdminTableSkeletonTable';
 import { ReservationCardSkeleton, ReservationSummaryCardSkeleton, StoreDetailSkeleton, MyReservationCardSkeleton } from '../common/Skeletons';
-import StoreFormSkeleton from '../store/StoreFormSkeleton';
-import { ListingHeader, ListingToolbarSkeleton, RefreshToolbarSkeleton } from './routeSkeletonParts';
+import StoreOnboardingSkeleton from '../store/StoreOnboardingSkeleton';
+import { ListingHeader, ListingToolbarSkeleton, RefreshToolbarSkeleton, SegmentedControlSkeleton } from './routeSkeletonParts';
+import { reservationSkeletonFilters } from './reservationSkeletonFilters';
+import { WaitingTabSkeleton, MyWaitingSkeleton, WaitingStoresSkeleton } from '../waiting/WaitingSkeleton';
+import AdminTabRouteSkeleton, { AdsRouteSkeleton, StatisticsRouteSkeleton, ChatIntroRouteSkeleton } from './WorkspaceRouteSkeletons';
 import { normalizeRouteSkeletonPath } from './routeSkeletonKind';
-import {
-    BUSINESS_VERIFICATION_SKELETON_COLS,
-    BUSINESS_VERIFICATION_SKELETON_HEADERS,
-    BUSINESS_VERIFICATION_SKELETON_ROWS,
-} from '../admin/businessVerificationSkeleton';
 import { discoveryComingSoonScreen } from '../../constants/discoveryComingSoon';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { resolveViewMode } from '../../utils/viewMode';
-import { breakpoints, colors, field, fontSize, fontWeight } from '../../styles/tokens';
+import { breakpoints, colors, field } from '../../styles/tokens';
+import { StateIllustrationSkeleton } from '../common/StateIllustration';
+import { GUIDE_PAGES, guidePageForPath, guideStyles } from '../../pages/legal/GuidePageMetadata';
 
 // 2026-09-29 — 청크 로딩 뼈대가 실제 페이지와 같은 틀·여백·순서로 그려지도록 페이지별 뼈대를 모았다.
 // 제목·설명·라벨처럼 서버 데이터가 아닌 고정 문구는 실제 글자로 둔다(ListingHeader 와 같은 원칙) —
 // 글자 크기·줄바꿈이 실제와 같아 로딩이 끝나도 아래 내용이 밀리지 않는다. 입력칸·버튼·목록만 뼈대다.
 
-const { Title, Text } = Typography;
 
 /** 글자 모양 뼈대 — 문구는 투명하게 두고 줄마다 막대를 그린다. 폭에 따른 줄바꿈이 실제 문구와 같다. */
 export function TextBone({ children }) {
@@ -37,10 +36,16 @@ export function TextBone({ children }) {
 }
 TextBone.propTypes = { children: PropTypes.node.isRequired };
 
+const optionValueOr = (options, value, fallback) => options.some(option => option.value === value) ? value : fallback;
+const storeSkeletonFilters = (params, sortOptions, fallbackSort) => [
+    { value: params.get('domain') || '', options: SERVICE_DOMAIN_FILTER_OPTIONS, className: 'reserve-explore-domain-filter' },
+    { value: optionValueOr(sortOptions, params.get('sort'), fallbackSort), options: sortOptions, className: 'reserve-explore-sort-filter' },
+];
+
 /* ── 로그인·회원가입·비밀번호 찾기·소셜 약관 동의 ─────────────────────────── */
 
-const authTitle = { marginBottom: 12, fontWeight: fontWeight.extrabold, letterSpacing: '-1.2px', color: colors.text.primary };
-const authSubtitle = { display: 'block', color: colors.text.tertiary, fontSize: fontSize.lg };
+const authTitle = { marginBottom: 12 };
+const authSubtitle = { display: 'block' };
 const centerRow = (height, extra) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', height, ...extra });
 const buttonBone = <Bone height={56} borderRadius={16} />;
 
@@ -73,8 +78,8 @@ AgreementRows.propTypes = { dividerFirst: PropTypes.bool, itemGap: PropTypes.num
 function LoginSkeleton() {
     return <PageContainer size="sm" paddingTop="80px" center>
         <div>
-            <Title level={2} style={authTitle}>로그인</Title>
-            <Text type="secondary" style={{ ...authSubtitle, marginBottom: 48 }}>특별한 날을 위한 완벽한 예약</Text>
+            <PageTitle style={authTitle}>로그인</PageTitle>
+            <PageDescription style={{ ...authSubtitle, marginBottom: 48 }}>특별한 날을 위한 완벽한 예약</PageDescription>
             <AuthInput /><AuthInput />
             <div style={{ ...centerRow(18, { marginTop: -8, marginBottom: 16 }), justifyContent: 'flex-end' }}><Bone width={132} height={13} /></div>
             {buttonBone}
@@ -96,8 +101,8 @@ function LoginSkeleton() {
 function SignupSkeleton() {
     return <PageContainer size="sm" paddingTop="60px" center>
         <div style={{ textAlign: 'left' }}>
-            <Title level={2} style={{ ...authTitle, textAlign: 'center' }}>회원가입</Title>
-            <Text type="secondary" style={{ ...authSubtitle, marginBottom: 40, textAlign: 'center' }}>간편한 가입으로 예약을 시작하세요</Text>
+            <PageTitle style={{ ...authTitle, textAlign: 'center' }}>회원가입</PageTitle>
+            <PageDescription style={{ ...authSubtitle, marginBottom: 40, textAlign: 'center' }}>간편한 가입으로 예약을 시작하세요</PageDescription>
             {['name', 'email', 'password', 'confirm'].map(key => <AuthInput key={key} />)}
             <div style={{ marginTop: 32 }}><AgreementRows dividerFirst itemGap={8} /></div>
             <div style={{ marginTop: 20 }}>{buttonBone}</div>
@@ -110,8 +115,8 @@ const STEP_LABEL_WIDTHS = [['email', 59], ['code', 48], ['password', 70]];
 function ForgotPasswordSkeleton() {
     return <PageContainer size="sm" paddingTop="60px" center>
         <div>
-            <Title level={2} style={authTitle}>비밀번호 찾기</Title>
-            <Text type="secondary" style={{ ...authSubtitle, marginBottom: 40 }}>가입한 이메일로 인증 후 비밀번호를 재설정합니다</Text>
+            <PageTitle style={authTitle}>비밀번호 찾기</PageTitle>
+            <PageDescription style={{ ...authSubtitle, marginBottom: 40 }}>가입한 이메일로 인증 후 비밀번호를 재설정해요</PageDescription>
             {/* 단계 표시(StepIndicator): 원 28 + 6 + 글자 17, 단계 사이 선은 글자 줄 위(아래 20)에 걸린다. */}
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 40 }}>
                 {STEP_LABEL_WIDTHS.map(([key, width], index) => (
@@ -133,8 +138,8 @@ function ForgotPasswordSkeleton() {
 function SocialAgreementSkeleton() {
     return <PageContainer size="sm" paddingTop="80px">
         <div style={{ maxWidth: 400, margin: '0 auto' }}>
-            <Title level={2} style={{ fontWeight: fontWeight.extrabold, marginBottom: 8, letterSpacing: '-1px', color: colors.text.primary }}>RESERVE 서비스 이용 동의</Title>
-            <Text type="secondary" style={{ ...authSubtitle, marginBottom: 40 }}>서비스 시작을 위해 아래 약관에 동의해주세요.</Text>
+            <PageTitle style={{ marginBottom: 8 }}>RESERVE 서비스 이용 동의</PageTitle>
+            <PageDescription style={{ ...authSubtitle, marginBottom: 40 }}>서비스 시작을 위해 아래 약관에 동의해주세요.</PageDescription>
             <div style={{ marginTop: 32 }}><AgreementRows itemGap={12} allHeight={24} /></div>
             <div style={{ marginTop: 40 }}>{buttonBone}</div>
             <div style={{ marginTop: 12 }}>{buttonBone}</div>
@@ -159,7 +164,6 @@ AuthRouteSkeleton.propTypes = { pathname: PropTypes.string };
 const LEGAL_TITLES = {
     '/terms': '서비스 이용약관',
     '/privacy': '개인정보 처리방침',
-    '/operation-guide': '운영 안내',
     '/content-sources': '콘텐츠 출처·권리 안내',
 };
 // 문단 줄(15px × 1.8 = 27px) — 실제 Section: 제목(h4 28 + 아래 12) → 본문, 섹션 아래 32.
@@ -169,7 +173,7 @@ export function LegalRouteSkeleton({ pathname = '' }) {
     return <PageContainer size="md" paddingTop="60px">
         <div style={{ marginBottom: 40 }}>
             {title
-                ? <Title level={2} style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary, marginBottom: 8 }}>{title}</Title>
+                ? <PageTitle style={{ marginBottom: 8 }}>{title}</PageTitle>
                 : <Bone width="48%" height={30} style={{ margin: '25px 0 12px' }} />}
             {/* 시행일·수정일 한 줄(13px 글자, 22px 줄) */}
             <div style={{ height: 22, display: 'flex', alignItems: 'center' }}><Bone width={170} height={13} /></div>
@@ -186,17 +190,42 @@ export function LegalRouteSkeleton({ pathname = '' }) {
 }
 LegalRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
+// 제목·설명·안내 구분·섹션 순서는 실제 공개 이용안내와 같은 작은 메타데이터에서 읽는다.
+export function GuideRouteSkeleton({ pathname = '' }) {
+    const guide = guidePageForPath(normalizeRouteSkeletonPath(pathname));
+    if (!guide) return null;
+    return <PageContainer size="md" paddingTop="60px">
+        <header style={guideStyles.header}>
+            <PageTitle level={1} style={guideStyles.title}>{guide.title}</PageTitle>
+            <PageDescription style={guideStyles.description}>{guide.description}</PageDescription>
+        </header>
+        <div style={guideStyles.navigation}>
+            {Object.entries(GUIDE_PAGES).map(([path, page]) => <span key={path} style={guideStyles.navigationItem}>
+                <TextBone>{page.title}</TextBone>
+            </span>)}
+        </div>
+        {guide.sections.map(section => <section key={section.id} style={guideStyles.section}>
+            <h2 style={guideStyles.sectionTitle}>{section.title}</h2>
+            {[100, 92, 64].map(width => <div key={width} style={{ height: 27, display: 'flex', alignItems: 'center' }}>
+                <Bone width={width + '%'} height={13} />
+            </div>)}
+            <div style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}><Bone width={130} height={14} /></div>
+        </section>)}
+    </PageContainer>;
+}
+GuideRouteSkeleton.propTypes = { pathname: PropTypes.string };
+
 /* ── 준비 중 탐색 화면(/waiting, /feed) ───────────────────────────────── */
 
 // 실제 화면과 같은 틀(.reserve-discovery-coming-soon — 최소 높이·세로 가운데 정렬)과 같은 문구 줄바꿈을 쓴다.
 export function ComingSoonRouteSkeleton({ pathname = '' }) {
     const screen = discoveryComingSoonScreen(pathname);
     return <section className="reserve-discovery-coming-soon">
-        <Bone width={48} height={48} borderRadius="50%" style={{ marginBottom: 8 }} />
+        <StateIllustrationSkeleton style={{ marginBottom: 8 }} />
         <Bone width={60} height={27} borderRadius={100} />
         {screen && <>
-            <h1><TextBone>{screen.heading}</TextBone></h1>
-            <p><TextBone>{screen.description}</TextBone></p>
+            <PageTitle level={1}><TextBone>{screen.heading}</TextBone></PageTitle>
+            <PageDescription><TextBone>{screen.description}</TextBone></PageDescription>
         </>}
         <div style={{ minHeight: 44, marginTop: 8, display: 'flex', alignItems: 'center' }}><Bone width={110} height={16} /></div>
     </section>;
@@ -209,10 +238,10 @@ export function PaymentResultRouteSkeleton() {
     return <PageContainer size="sm" paddingTop="56px" className="reserve-payment-result-page">
         <div className="reserve-payment-result">
             <div className="reserve-payment-result__content">
-                <Bone width={64} height={64} borderRadius="50%" />
-                <div className="reserve-payment-result__title" style={{ height: '1.3em', display: 'flex', alignItems: 'center' }}><Bone width={132} height="0.9em" /></div>
-                {/* 설명 두 줄(15px × 1.65) */}
-                <div className="reserve-payment-result__description" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <StateIllustrationSkeleton />
+                <div className="reserve-payment-result__title reserve-page-title ant-typography" style={{ height: '1.4em', display: 'flex', alignItems: 'center' }}><Bone width={132} height="0.9em" /></div>
+                {/* 설명 두 줄 — PageDescription과 같은 16px × 1.65. */}
+                <div className="reserve-payment-result__description reserve-page-description ant-typography" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div style={{ height: '1.65em', display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'center' }}><Bone width="92%" height={14} /></div>
                     <div style={{ height: '1.65em', display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'center' }}><Bone width="60%" height={14} /></div>
                 </div>
@@ -229,50 +258,54 @@ export function PaymentResultRouteSkeleton() {
 /* ── 관리자·파트너 패널 — 제목/설명 → 알약 탭 → (탭별) 도구줄 → 목록 ─────────── */
 
 const ADMIN_TAB_TEXT_WIDTHS = [67, 80, 62, 62, 80, 62, 94, 76, 76, 80, 80, 80, 80];
-const BUSINESS_TAB_TEXT_WIDTHS = [81, 87, 80, 89, 80];
+const ADMIN_TAB_KEYS = ['pending', 'all', 'mailbox', 'reports', 'chat-intro', 'trash', 'audit-logs', 'dashboard', 'members', 'stores-admin', 'reservations', 'payments', 'ads'];
+const BUSINESS_TAB_KEYS = ['reservations', 'waiting', 'qr-checkin', 'ads', 'analytics', 'chat-intro'];
+const BUSINESS_TAB_TEXT_WIDTHS = [81, 62, 87, 80, 89, 80];
 
 // AntD Tabs(reserve-pill-tabs) 자리 — 탭 한 칸은 위아래 8·좌우 18(≤768px 은 7·10) 여백 + 24px 글자 줄, 탭 사이 4.
-function PanelTabsSkeleton({ widths, more = false }) {
+function PanelTabsSkeleton({ widths, more = false, activeIndex = 0 }) {
     return <div className="reserve-route-panel-tabs">
         <div className="reserve-route-panel-tabs-list">
             {widths.map((width, index) => (
-                <span key={`${width}-${index}`} className={`reserve-route-panel-tab${index === 0 ? ' is-active' : ''}`}><Bone width={width} height={14} /></span>
+                <span key={`${width}-${index}`} className={`reserve-route-panel-tab${index === activeIndex ? ' is-active' : ''}`}><Bone width={width} height={14} /></span>
             ))}
         </div>
         {more && <span className="reserve-route-panel-tabs-more"><Bone width={16} height={16} /></span>}
     </div>;
 }
-PanelTabsSkeleton.propTypes = { widths: PropTypes.arrayOf(PropTypes.number).isRequired, more: PropTypes.bool };
+PanelTabsSkeleton.propTypes = { widths: PropTypes.arrayOf(PropTypes.number).isRequired, more: PropTypes.bool, activeIndex: PropTypes.number };
 
-export function AdminRouteSkeleton() {
+export function AdminRouteSkeleton({ search = '' }) {
+    const requestedTab = new URLSearchParams(search).get('tab') || 'pending';
+    const tab = requestedTab === 'chat' ? 'reports' : requestedTab;
     return <PageContainer size="xl" paddingTop="40px">
-        <ListingHeader title="관리자 패널" description="사업자 인증 신청을 검토하고, 전체 예약 현황을 모니터링하세요." marginBottom={40} descriptionSize={fontSize.base} />
-        <PanelTabsSkeleton widths={ADMIN_TAB_TEXT_WIDTHS} more />
-        {/* 기본 탭(사업자 인증 대기 중)의 검색 도구줄 + 표. 다른 탭도 같은 '도구줄 → 표' 골격이다. */}
-        <RefreshToolbarSkeleton search />
-        <AdminTableSkeletonTable
-            rows={BUSINESS_VERIFICATION_SKELETON_ROWS}
-            cols={[...BUSINESS_VERIFICATION_SKELETON_COLS]}
-            headers={[...BUSINESS_VERIFICATION_SKELETON_HEADERS]}
-            actionBtns={3}
-            stackFirstCol
-        />
+        <ListingHeader title="관리자 패널" description="사업자 인증 신청을 검토하고, 전체 예약 현황을 모니터링하세요." marginBottom={40} />
+        <PanelTabsSkeleton widths={ADMIN_TAB_TEXT_WIDTHS} activeIndex={ADMIN_TAB_KEYS.indexOf(tab)} more />
+        <AdminTabRouteSkeleton tab={tab} search={search} />
     </PageContainer>;
 }
+AdminRouteSkeleton.propTypes = { search: PropTypes.string };
 
 export function BusinessRouteSkeleton({ search = '' }) {
     const params = new URLSearchParams(search);
-    const tab = params.get('tab');
-    // 예약 관리 탭(기본)만 목록을 미리 그린다. 광고·통계·채팅 탭은 각자 모양이 달라 제목·탭까지만 둔다.
-    const isReservations = !tab || tab === 'reservations' || tab === 'qr-checkin';
+    const requestedTab = params.get('tab');
+    const tab = BUSINESS_TAB_KEYS.includes(requestedTab) ? requestedTab : 'reservations';
     const isCards = resolveViewMode('/business', params, 'list') === 'cards';
     return <PageContainer size="xl" paddingTop="40px">
-        <ListingHeader title="사업자 파트너 패널" description="예약 현황을 실시간으로 확인하고 승인·거절하세요." marginBottom={40} descriptionSize={fontSize.base} />
+        <ListingHeader title="사업자 파트너 패널" description="예약 현황을 실시간으로 확인하고 승인·거절하세요." marginBottom={40} />
         {/* 실제 Tabs 는 style={{ marginBottom: 8 }} — 탭+내용 묶음 아래 8px */}
         <div style={{ marginBottom: 8 }}>
-            <PanelTabsSkeleton widths={BUSINESS_TAB_TEXT_WIDTHS} />
-            {isReservations && <>
-                <ListingToolbarSkeleton />
+            <PanelTabsSkeleton widths={BUSINESS_TAB_TEXT_WIDTHS} activeIndex={BUSINESS_TAB_KEYS.indexOf(tab)} />
+            {tab === 'waiting' && <WaitingTabSkeleton view={isCards ? 'cards' : 'list'} />}
+            {tab === 'ads' && <AdsRouteSkeleton />}
+            {tab === 'analytics' && <StatisticsRouteSkeleton search={search} />}
+            {tab === 'chat-intro' && <ChatIntroRouteSkeleton business />}
+            {tab === 'reservations' && <>
+                <ListingToolbarSkeleton filters={reservationSkeletonFilters({
+                    store: params.get('reservationStore') || 'ALL',
+                    status: optionValueOr(RESERVATION_STATUS_FILTER_OPTIONS, params.get('reservationStatus'), 'ALL'),
+                    sort: optionValueOr(RESERVATION_SORT_OPTIONS, params.get('reservationSort'), 'recent'),
+                })} />
                 <RefreshToolbarSkeleton search />
                 {isCards ? <ReservationSummaryCardSkeleton count={5} /> : <ReservationCardSkeleton count={5} />}
             </>}
@@ -329,9 +362,9 @@ export function MessagesRouteSkeleton({ search = '' }) {
 }
 MessagesRouteSkeleton.propTypes = { search: PropTypes.string };
 
-/* ── 가게 등록·수정 — 뼈대가 실제 폼과 같은 PageContainer 를 직접 그린다(StoreFormSkeleton). ── */
+/* ── 가게 등록·수정 — 첫 질문·항목 선택과 같은 PageContainer 를 그린다. ── */
 export function StoreFormRouteSkeleton({ pathname = '' }) {
-    return <StoreFormSkeleton mode={normalizeRouteSkeletonPath(pathname).endsWith('/edit') ? 'edit' : 'create'} />;
+    return <StoreOnboardingSkeleton mode={normalizeRouteSkeletonPath(pathname).endsWith('/edit') ? 'edit' : 'create'} />;
 }
 StoreFormRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
@@ -348,7 +381,7 @@ function CardsSkeleton({ pathname = '', search = '' }) {
     const isList = resolveViewMode(pathname, new URLSearchParams(search), 'cards') === 'list';
     if (pathname.startsWith('/my-favorites')) {
         return <PageContainer size="xl" paddingTop="40px">
-            <ListingHeader title="즐겨찾기" description="즐겨찾기를 불러오는 중입니다." />
+            <ListingHeader title="즐겨찾기" description="즐겨찾기를 불러오는 중이에요." />
             <RefreshToolbarSkeleton viewControl />
             <div className={isList ? 'reserve-store-list-rows' : 'rsv-fav-grid'}>
                 {isList ? <StoreListRowSkeleton count={8} /> : <StoreCardSkeleton count={8} />}
@@ -356,8 +389,8 @@ function CardsSkeleton({ pathname = '', search = '' }) {
         </PageContainer>;
     }
     return <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page">
-        <ListingHeader title="내 가게 관리" description="등록된 가게를 수정하거나 관리할 수 있습니다." marginBottom={40} />
-        <ListingToolbarSkeleton />
+        <ListingHeader title="내 가게 관리" description="등록된 가게를 수정하거나 관리할 수 있어요." marginBottom={40} />
+        <ListingToolbarSkeleton className="" filters={storeSkeletonFilters(new URLSearchParams(search), OWNER_STORE_SORT_OPTIONS, 'recent')} />
         <div className={isList ? 'reserve-store-list-rows' : 'rsv-mystore-grid'}>
             {isList ? <StoreListRowSkeleton count={4} /> : <StoreCardSkeleton count={4} withActions />}
         </div>
@@ -366,15 +399,11 @@ function CardsSkeleton({ pathname = '', search = '' }) {
 CardsSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };
 
 function StoreListRouteSkeleton({ pathname = '/stores', search = '' }) {
-    const isList = resolveViewMode(pathname, new URLSearchParams(search), 'cards') === 'list';
+    const params = new URLSearchParams(search);
+    const isList = resolveViewMode(pathname, params, 'cards') === 'list';
     return (
         <>
-            <div className="reserve-route-store-toolbar">
-                <Bone width={44} height={44} borderRadius={10} />
-                <span className="reserve-route-store-toolbar-spacer" />
-                <Bone width={90} height={36} />
-                <Bone width={84} height={36} />
-            </div>
+            <ListingToolbarSkeleton className="" region count={null} filters={storeSkeletonFilters(params, SORT_OPTIONS, 'recommended')} />
             <div className={isList ? 'reserve-store-list-rows' : 'rsv-store-grid'}>
                 {isList
                     ? <StoreListRowSkeleton count={STORE_LIST_PAGE_SIZE} />
@@ -385,13 +414,32 @@ function StoreListRouteSkeleton({ pathname = '/stores', search = '' }) {
 }
 StoreListRouteSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };
 
+function WaitingRouteSkeleton({ pathname, search }) {
+    const isList = resolveViewMode(pathname, new URLSearchParams(search), 'cards') === 'list';
+    return <PageContainer size="xl" paddingTop="32px">
+        <div className="reserve-waiting-heading"><PageTitle level={1}>웨이팅</PageTitle><PageDescription>접수 가능한 가게를 찾고, 내 예약에서 대기 현황을 확인해요.</PageDescription></div>
+        <WaitingStoresSkeleton view={isList ? 'list' : 'cards'} />
+    </PageContainer>;
+}
+WaitingRouteSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };
+
 function ReservationsSkeleton({ pathname = '/my-reservations', search = '' }) {
-    const isCards = resolveViewMode(pathname, new URLSearchParams(search), 'list') === 'cards';
+    const params = new URLSearchParams(search);
+    const isCards = resolveViewMode(pathname, params, 'list') === 'cards';
+    const waiting = params.get('tab') === 'waiting';
     return <PageContainer size="xl" paddingTop="40px" className="reserve-myreservation-page">
-        <ListingHeader title="내 예약 확인" description="예약 현황을 확인하고 방문 후 리뷰를 남겨보세요" />
-        <ListingToolbarSkeleton />
-        <RefreshToolbarSkeleton search />
-        {isCards ? <ReservationSummaryCardSkeleton count={4} /> : <MyReservationCardSkeleton count={4} />}
+        <ListingHeader title="내 예약 확인" description="예약과 웨이팅 현황을 확인해요" marginBottom={24} />
+        <div style={{ marginBottom: 20 }}><SegmentedControlSkeleton
+            value={waiting ? 'waiting' : 'reservation'}
+            options={[{ value: 'reservation', label: '예약' }, { value: 'waiting', label: '웨이팅' }]} /></div>
+        {waiting ? <MyWaitingSkeleton view={isCards ? 'cards' : 'list'} /> : <>
+            <ListingToolbarSkeleton filters={reservationSkeletonFilters({
+                status: optionValueOr(RESERVATION_STATUS_FILTER_OPTIONS, params.get('status'), 'ALL'),
+                sort: optionValueOr(RESERVATION_SORT_OPTIONS, params.get('sort'), 'recent'),
+            })} />
+            <RefreshToolbarSkeleton search />
+            {isCards ? <ReservationSummaryCardSkeleton count={4} /> : <MyReservationCardSkeleton count={4} />}
+        </>}
     </PageContainer>;
 }
 ReservationsSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };
@@ -482,7 +530,11 @@ function SearchSkeleton() {
                     {SERVICE_DOMAIN_OPTIONS.map(domain => <Bone key={domain.value} width={68} height={44} borderRadius={100} />)}
                 </div>
             </div>
-            <Bone width={130} height={20} style={{ marginTop: 28 }} />
+            <section className="reserve-search-recent">
+                <div className="reserve-search-recent-heading"><h2>최근 검색</h2></div>
+                <p className="reserve-search-recent-note">이 브라우저에만 저장돼요.</p>
+                <div className="reserve-search-recent-empty"><Bone width={150} height={16} /></div>
+            </section>
         </div>
     </div>;
 }
@@ -496,12 +548,14 @@ const KINDS = {
     detail: DetailRouteSkeleton,
     cards: CardsSkeleton,
     'store-list': StoreListRouteSkeleton,
+    waiting: WaitingRouteSkeleton,
     reservations: ReservationsSkeleton,
     benefits: BenefitsRouteSkeleton,
     'benefit-detail': BenefitDetailRouteSkeleton,
     'coming-soon': ComingSoonRouteSkeleton,
     auth: AuthRouteSkeleton,
     legal: LegalRouteSkeleton,
+    guide: GuideRouteSkeleton,
     'payment-result': PaymentResultRouteSkeleton,
     admin: AdminRouteSkeleton,
     business: BusinessRouteSkeleton,

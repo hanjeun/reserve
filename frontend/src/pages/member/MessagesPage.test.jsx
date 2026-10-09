@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MessagesPage from './MessagesPage';
 import { requestMessengerRouteClose } from '../../components/chat/messengerRouteTransition';
 import useMessengerStore from '../../store/useMessengerStore';
+import { createLoadingPresentation, LoadingPresentationContext } from '../../components/layout/loadingPresentation';
 
 const { goBack } = vi.hoisted(() => ({ goBack: vi.fn() }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
@@ -79,5 +80,27 @@ describe('MessagesPage route motion', () => {
         await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
         expect(useMessengerStore.getState().open).toBe(true);
         expect(container.querySelector('.reserve-messages-route')).toBeNull();
+    });
+
+    it('keeps the selected store when a desktop login returns to a store message link', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1200 });
+        render(<MemoryRouter initialEntries={['/messages?storeId=42']}><MessagesPage /></MemoryRouter>);
+        await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
+        expect(useMessengerStore.getState().selection).toEqual({ kind: 'store', storeId: 42 });
+        expect(useMessengerStore.getState().activeThread).toBe(true);
+    });
+
+    it('does not restart opacity from zero after a route skeleton and still animates closing', async () => {
+        const presentation = createLoadingPresentation('messages-entry');
+        presentation.markSkeletonShown();
+        const { container } = render(<MemoryRouter initialEntries={['/messages']}>
+            <LoadingPresentationContext.Provider value={presentation}><MessagesPage /></LoadingPresentationContext.Provider>
+        </MemoryRouter>);
+        const page = container.querySelector('.reserve-messages-route');
+        expect(page).not.toHaveClass('is-opening');
+        fireEvent.click(screen.getByRole('button', { name: '메시지 닫기' }));
+        expect(page).toHaveClass('is-closing');
+        fireEvent.animationEnd(page);
+        await waitFor(() => expect(goBack).toHaveBeenCalledTimes(1));
     });
 });

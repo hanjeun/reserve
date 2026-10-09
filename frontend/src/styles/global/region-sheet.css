@@ -278,7 +278,7 @@
 .reserve-region-sheet-root button:focus-visible,
 .reserve-discovery-location-link:focus-visible,
 .reserve-explore-region-trigger:focus-visible {
-    outline: 2px solid var(--c-text-secondary);
+    outline: var(--reserve-focus-ring);
     outline-offset: 2px;
 }
 .reserve-discovery-location-link {

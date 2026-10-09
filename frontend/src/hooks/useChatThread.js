@@ -73,9 +73,9 @@ const callSend = (send, controller, roomId, text, clientMessageId, attachment) =
 // 429 는 레이트리밋이다. "실패했다"가 아니라 "너무 빠르다"라고 말해야
 // 사용자가 같은 동작을 계속 반복하지 않는다.
 const sendFailureText = (error, controller) => {
-    if (controller?.signal.aborted) return '전송 요청을 중단했습니다. 서버에 도착했을 수 있으니 대화를 확인해주세요.';
+    if (controller?.signal.aborted) return '전송 요청을 중단했어요. 서버에 도착했을 수 있으니 대화를 확인해주세요.';
     if ((error?.status ?? error?.response?.status) === 429) return '조금 천천히 보내주세요.';
-    return '전송하지 못했습니다. 잠시 후 다시 시도해주세요.';
+    return '전송하지 못했어요. 잠시 후 다시 시도해주세요.';
 };
 
 /**
@@ -163,7 +163,7 @@ export default function useChatThread({
                 active.ready = false;
                 setLoading(false);
                 setLoadError(true);
-                onError?.('대화를 불러오지 못했습니다.');
+                onError?.('대화를 불러오지 못했어요.');
             });
         return () => { cancelled = true; };
     }, [threadKey, scope, load, onLoaded, onError, reloadRevision]);

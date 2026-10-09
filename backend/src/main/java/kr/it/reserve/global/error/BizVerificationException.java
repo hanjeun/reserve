@@ -15,11 +15,11 @@ public class BizVerificationException extends BusinessException {
     // ========== 정적 팩토리 메서드 ==========
 
     public static BizVerificationException notFound() {
-        return new BizVerificationException("해당 인증 요청을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new BizVerificationException("해당 인증 요청을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 
     public static BizVerificationException memberNotFound() {
-        return new BizVerificationException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new BizVerificationException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 
     public static BizVerificationException forbidden(String message) {

@@ -106,7 +106,7 @@ const RejectModalBody = ({ target, onChange, error, onErrorClear }) => {
             {/* 미입력 경고를 토스트에서 인라인으로 옮겼다. 모달 위에 뜬 토스트는 몇 초 뒤 사라져서
                 "무엇이 잘못됐는지"가 화면에 남지 않는다 — 여기서는 칸 바로 아래에 붙는다. */}
             <FormField error={error}>
-                <FormTextArea rows={4} placeholder="예: 사업자등록증 이미지가 불명확합니다."
+                <FormTextArea rows={4} placeholder="예: 사업자등록증 이미지가 잘 보이지 않아요."
                     value={reason} onChange={(e) => { setReason(e.target.value); onErrorClear(); }}
                     maxLength={300} showCount />
             </FormField>
@@ -220,20 +220,20 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
 
     const approveMutation = useMutation({
         mutationFn: (id) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_APPROVE(id)),
-        onSuccess: () => { message.success('승인되었습니다.'); void invalidateBiz(); },
-        onError: (err) => message.error(err instanceof Error ? err.message : '승인에 실패했습니다.'),
+        onSuccess: () => { message.success('승인됐어요.'); void invalidateBiz(); },
+        onError: (err) => message.error(err instanceof Error ? err.message : '승인에 실패했어요.'),
     });
 
     const rejectMutation = useMutation({
         mutationFn: ({ id, reason }) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_REJECT(id), { reason }),
-        onSuccess: () => { message.success('거절 처리되었습니다.'); setRejectOpen(false); void invalidateBiz(); },
-        onError: (err) => message.error(err instanceof Error ? err.message : '거절 처리에 실패했습니다.'),
+        onSuccess: () => { message.success('거절 처리됐어요.'); setRejectOpen(false); void invalidateBiz(); },
+        onError: (err) => message.error(err instanceof Error ? err.message : '거절 처리에 실패했어요.'),
     });
 
     const revokeMutation = useMutation({
         mutationFn: (memberId) => api.post(API_ENDPOINTS.BUSINESS.ADMIN_REVOKE(memberId)),
-        onSuccess: () => { message.success('사업자 자격이 취소되었습니다.'); void invalidateBiz(); },
-        onError: (err) => message.error(err instanceof Error ? err.message : '처리에 실패했습니다.'),
+        onSuccess: () => { message.success('사업자 자격이 취소됐어요.'); void invalidateBiz(); },
+        onError: (err) => message.error(err instanceof Error ? err.message : '처리에 실패했어요.'),
     });
 
     const actionLoading = approveMutation.isPending || rejectMutation.isPending || revokeMutation.isPending;
@@ -241,7 +241,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const handleApprove = (record) => {
         confirm({
             title: '사업자 인증 승인',
-            content: `'${record.memberName}' 님의 사업자 인증을 승인하시겠습니까?`,
+            content: `'${record.memberName}' 님의 사업자 인증을 승인할까요?`,
             okText: '승인', cancelText: '취소', centered: true,
             onOk: () => approveMutation.mutateAsync(record.id),
         });
@@ -258,7 +258,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
     const handleRevoke = (record) => {
         confirm({
             title: '사업자 자격 취소',
-            content: `'${record.memberName}' 님의 사업자 자격을 취소하시겠습니까?`,
+            content: `'${record.memberName}' 님의 사업자 자격을 취소할까요?`,
             okText: '취소 처리', cancelText: '닫기', okButtonProps: { danger: true }, centered: true,
             onOk: () => revokeMutation.mutateAsync(record.memberId),
         });
@@ -349,14 +349,14 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
         },
     ];
 
-    const emptyText = mode === 'pending' ? '대기 중인 신청이 없습니다.' : '신청 내역이 없습니다.';
+    const emptyText = mode === 'pending' ? '대기 중인 신청이 없어요.' : '신청 내역이 없어요.';
 
     // 목록 영역 — 오류 / 첫 로딩·페이지 전환 스켈레톤 / 표
     let tableBody;
     if (error) {
         tableBody = (
             <DataState state="error" kind="member" subject="사업자 인증 신청" error={error}
-                onRetry={refetch} retrying={isFetching} compact />
+                onRetry={refetch} retrying={isFetching} />
         );
     } else if (isLoading || isPlaceholderData) {
         tableBody = (
@@ -394,10 +394,9 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 kind="member"
                 subject="사업자 인증 상세"
                 error={detailError}
-                title="상세 정보를 불러오지 못했습니다."
+                title="상세 정보를 불러오지 못했어요."
                 onRetry={detailRequestId ? () => loadDetail(detailRequestId, { retainError: true }) : undefined}
                 retrying={detailLoading}
-                compact
                 style={{ minHeight: 160, margin: 0 }}
             />
         );
@@ -450,6 +449,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 count={totalElements}
                 onReload={refetch}
                 loading={isLoading || isFetching}
+                initialLoading={isLoading}
             />
 
             {tableBody}

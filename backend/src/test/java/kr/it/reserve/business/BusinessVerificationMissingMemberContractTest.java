@@ -69,7 +69,7 @@ class BusinessVerificationMissingMemberContractTest {
         assertThatThrownBy(() -> operation.invoke(service, applicant, admin, request))
                 .isInstanceOfSatisfying(BizVerificationException.class, exception -> {
                     assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
-                    assertThat(exception).hasMessage("회원을 찾을 수 없습니다.");
+                    assertThat(exception).hasMessage("회원을 찾을 수 없어요.");
                 });
 
         verify(memberRepository).findActiveByIdForUpdate(MEMBER_ID);

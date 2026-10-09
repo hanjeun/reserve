@@ -16,7 +16,7 @@ describe('message-scoped actions', () => {
     it('places own actions before the bubble and reports a retracted opponent by stable ID', async () => {
         const view = render(<ChatBubbleList mine="MEMBER" roomId={7} reportRole="MEMBER" onRetracted={vi.fn()}
             messages={[{ id: 1, senderRole: 'MEMBER', content: '내 메시지', canRetract: true },
-                { id: 2, senderRole: 'OWNER', content: '전송이 취소된 메시지입니다.', retracted: true }]} />);
+                { id: 2, senderRole: 'OWNER', content: '전송이 취소된 메시지예요.', retracted: true }]} />);
         const first = view.container.querySelector('.reserve-chat-message-row');
         expect(first.querySelector('.reserve-chat-message-meta').nextElementSibling).toHaveClass('reserve-chat-bubble-group');
         fireEvent.click(screen.getAllByRole('button', { name: '메시지 관리' })[1]);

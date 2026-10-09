@@ -1,7 +1,9 @@
 package kr.it.reserve.email.repository;
 
 import kr.it.reserve.email.entity.EmailVerification;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +18,7 @@ public interface EmailVerificationRepository extends JpaRepository<EmailVerifica
     /**
      * 이메일로 가장 최근 인증 정보 조회
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<EmailVerification> findTopByEmailOrderByCreatedAtDesc(String email);
 
     /**

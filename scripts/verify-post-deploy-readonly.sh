@@ -4,6 +4,7 @@
 #
 #   sudo RESERVE_VERIFY_ENV=/etc/reserve-backup.env \
 #     /usr/local/bin/reserve-post-deploy-verify
+#   DDL 11/12/13 후보 적용 후에만 RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA=1을 추가한다.
 #
 # 이 스크립트는 테이블·컬럼·인덱스와 현재 큐 상태만 조회한다. PortOne 재조회,
 # 웹훅 재처리, S3 객체 삭제, READY 결제 상태 변경은 의도적으로 하지 않는다.
@@ -29,6 +30,9 @@ warn() { echo "[attention] $*" >&2; ATTENTION=1; }
 [[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]] || die "DB_NAME contains unsupported characters"
 [[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || die "DB_USER contains unsupported characters"
 [[ "$STALE_READY_DAYS" =~ ^[1-9][0-9]*$ ]] || die "STALE_READY_DAYS must be a positive integer"
+WAITING_SIGNUP_SCHEMA="${RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA:-0}"
+[[ "$WAITING_SIGNUP_SCHEMA" = "0" || "$WAITING_SIGNUP_SCHEMA" = "1" ]] \
+    || die "RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA must be 0 or 1"
 
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 \
     || die "container '$MYSQL_CONTAINER' not found"
@@ -65,6 +69,48 @@ require_index() {
     count="$(mysql_query "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '${table}' AND index_name = '${index}';")"
     [[ "$count" = "1" ]] || die "required index is missing: ${table}.${index}"
     note "index ${table}.${index}: present"
+}
+
+require_column_contract() {
+    local table="$1" column="$2" type="$3" nullable="$4" default="$5"
+    local default_condition="COLUMN_DEFAULT IS NULL"
+    if [[ "$default" != "<NULL>" ]]; then
+        default_condition="BINARY COLUMN_DEFAULT = BINARY '${default//\'/\'\'}'"
+    fi
+    local count
+    count="$(mysql_query "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '${table}' AND column_name = '${column}' AND LOWER(column_type) = '${type}' AND is_nullable = '${nullable}' AND ${default_condition} AND extra = '';")"
+    [[ "$count" = "1" ]] || die "column contract differs: ${table}.${column} (type/null/default/extra)"
+    note "column ${table}.${column}: contract matches"
+}
+
+require_index_contract() {
+    local table="$1" index="$2" non_unique="$3" expected_columns="$4"
+    local columns=()
+    IFS=',' read -r -a columns <<< "$expected_columns"
+    local matches
+    matches="$(mysql_query "SELECT IF(COUNT(*) = ${#columns[@]} AND SUM(non_unique = ${non_unique} AND sub_part IS NULL AND column_name IS NOT NULL AND expression IS NULL AND index_type = 'BTREE' AND is_visible = 'YES' AND collation = 'A') = ${#columns[@]} AND BINARY GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') = BINARY '${expected_columns}', 1, 0) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '${table}' AND index_name = '${index}';")"
+    [[ "$matches" = "1" ]] || die "index contract differs: ${table}.${index} (columns/order/unique/prefix/visibility)"
+    note "index ${table}.${index}: contract matches"
+}
+
+require_enum_check() {
+    local table="$1" constraint="$2" column="$3"
+    shift 3
+    # MySQL emits charset introducers and, on some servers, escaped literal quotes.
+    # Match only the declared IN list; additional expressions and NOT ENFORCED fail.
+    local quote="[\\\\]?'" charset="(_utf8mb4|_utf8mb3|_utf8|_latin1|_ascii|_binary)?"
+    local pattern="^[[:space:]]*[(]*[[:space:]]*\`?${column}\`?[[:space:]]+[iI][nN][[:space:]]*[(][[:space:]]*"
+    local separator="" value
+    for value in "$@"; do
+        pattern+="${separator}${charset}${quote}${value}${quote}"
+        separator="[[:space:]]*,[[:space:]]*"
+    done
+    pattern+="[[:space:]]*[)][[:space:]]*[)]*[[:space:]]*$"
+    local pattern_hex count
+    pattern_hex="$(printf '%s' "$pattern" | od -An -v -tx1 | tr -d ' \n')"
+    count="$(mysql_query "SELECT COUNT(*) FROM information_schema.table_constraints tc JOIN information_schema.check_constraints cc ON cc.constraint_schema = tc.constraint_schema AND cc.constraint_name = tc.constraint_name WHERE tc.table_schema = DATABASE() AND tc.table_name = '${table}' AND tc.constraint_name = '${constraint}' AND tc.constraint_type = 'CHECK' AND tc.enforced = 'YES' AND REGEXP_LIKE(cc.check_clause, CONVERT(0x${pattern_hex} USING utf8mb4), 'c');")"
+    [[ "$count" = "1" ]] || die "CHECK contract differs or is not enforced: ${table}.${constraint}"
+    note "CHECK ${table}.${constraint}: enforced contract matches"
 }
 
 ATTENTION=0
@@ -122,6 +168,33 @@ if [[ "${RESERVE_VERIFY_PREVIEW_SCHEMA:-0}" = "1" ]]; then
     PREVIEW_NON_INNODB="$(mysql_query "SELECT CONCAT(table_name, ':', engine) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('ad_payment_attempt','chat_room','chat_message','chat_report','chat_intro','chat_intro_item') AND engine <> 'InnoDB';")"
     [[ -z "$PREVIEW_NON_INNODB" ]] || die "preview row-lock tables must use InnoDB: $PREVIEW_NON_INNODB"
     note "preview advertising/chat tables: InnoDB"
+fi
+
+if [[ "$WAITING_SIGNUP_SCHEMA" = "1" ]]; then
+    for table in store waiting_entry email_verification member; do
+        require_table "$table"
+    done
+    WAITING_SIGNUP_INNODB="$(mysql_query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('store','waiting_entry','email_verification','member') AND table_type = 'BASE TABLE' AND engine = 'InnoDB';")"
+    [[ "$WAITING_SIGNUP_INNODB" = "4" ]] || die "waiting/signup lock tables must use InnoDB"
+
+    require_column_contract store waiting_intake_mode 'varchar(16)' NO OFF
+    require_column_contract store waiting_paused 'bit(1)' NO "b'0'"
+    require_column_contract store reservation_enabled 'bit(1)' NO "b'1'"
+    require_column_contract waiting_entry member_id bigint YES '<NULL>'
+    require_column_contract waiting_entry source 'varchar(16)' NO STAFF
+    require_column_contract waiting_entry privacy_notice_published_at 'datetime(6)' YES '<NULL>'
+    require_enum_check store chk_store_waiting_intake waiting_intake_mode OFF ONSITE REMOTE BOTH
+    require_enum_check waiting_entry chk_waiting_source source STAFF ONSITE REMOTE
+    require_index_contract waiting_entry idx_waiting_member 1 'member_id,status,created_at'
+
+    require_column_contract email_verification email 'varchar(255)' NO '<NULL>'
+    require_column_contract email_verification verification_ticket_hash 'varchar(64)' YES '<NULL>'
+    EMAIL_UNIQUE_CONSTRAINT="$(mysql_query "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'email_verification' AND constraint_name = 'uk_email_verification_email' AND constraint_type = 'UNIQUE';")"
+    [[ "$EMAIL_UNIQUE_CONSTRAINT" = "1" ]] || die "email verification UNIQUE constraint is missing"
+    require_index_contract email_verification uk_email_verification_email 0 email
+    EMAIL_DUPLICATE_GROUPS="$(mysql_query "SELECT COUNT(*) FROM (SELECT email FROM email_verification GROUP BY email HAVING COUNT(*) > 1) duplicate_emails;")"
+    [[ "$EMAIL_DUPLICATE_GROUPS" = "0" ]] || die "duplicate email verification groups require approved review"
+    note "DDL 11/12/13 waiting/signup schema: contract matches"
 fi
 
 NON_INNODB="$(mysql_query "SELECT CONCAT(table_name, ':', engine) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('payment','reservation','payment_webhook_inbox','payment_reconciliation_issue','file_deletion_task','oauth_unlink_task','marketing_consent_history','refresh_token') AND engine <> 'InnoDB';")"

@@ -18,7 +18,7 @@ describe('CopyableText', () => {
         await user.click(screen.getByRole('button', { name: '주문번호 복사' }));
 
         expect(screen.getByRole('button', { name: '주문번호 복사됨' })).toBeInTheDocument();
-        expect(screen.getByRole('status')).toHaveTextContent('주문번호를 복사했습니다.');
+        expect(screen.getByRole('status')).toHaveTextContent('주문번호를 복사했어요.');
     });
 
     it('does not render a copy control for an absent value', () => {

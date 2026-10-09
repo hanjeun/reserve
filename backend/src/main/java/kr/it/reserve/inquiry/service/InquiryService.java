@@ -41,7 +41,7 @@ public class InquiryService {
     public InquiryDto.InquiryResponse getInquiry(Long inquiryId, Long memberId) {
         Inquiry inquiry = findById(inquiryId);
         if (inquiry.getMember() == null || !inquiry.getMember().getId().equals(memberId)) {
-            throw new InquiryException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new InquiryException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
         }
         return InquiryDto.InquiryResponse.fromEntity(inquiry);
     }
@@ -56,7 +56,7 @@ public class InquiryService {
         try {
             category = Inquiry.InquiryCategory.valueOf(request.getCategory());
         } catch (IllegalArgumentException | NullPointerException e) {
-            throw new InquiryException("올바르지 않은 문의 유형입니다.", HttpStatus.BAD_REQUEST);
+            throw new InquiryException("올바르지 않은 문의 유형이에요.", HttpStatus.BAD_REQUEST);
         }
         if (request.getTitle() == null || request.getTitle().isBlank()) {
             throw new InquiryException("제목을 입력해주세요.", HttpStatus.BAD_REQUEST);
@@ -76,7 +76,7 @@ public class InquiryService {
 
         if (memberId != null) {
             Member member = memberRepository.findActiveByIdForUpdate(memberId)
-                    .orElseThrow(() -> new InquiryException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                    .orElseThrow(() -> new InquiryException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
             builder.member(member);
             notifierName = member.getName();
             notifierEmail = member.getEmail();
@@ -110,8 +110,8 @@ public class InquiryService {
         Inquiry inquiry = findById(inquiryId);
 
         // 권한 및 상태 체크 (최소한의 방어)
-        if (inquiry.getMember() == null || !inquiry.getMember().getId().equals(memberId)) throw new InquiryException("삭제 권한이 없습니다.", HttpStatus.FORBIDDEN);
-        if (inquiry.getStatus() == Inquiry.InquiryStatus.ANSWERED) throw new InquiryException("답변 완료된 문의는 삭제 불가합니다.", HttpStatus.BAD_REQUEST);
+        if (inquiry.getMember() == null || !inquiry.getMember().getId().equals(memberId)) throw new InquiryException("삭제 권한이 없어요.", HttpStatus.FORBIDDEN);
+        if (inquiry.getStatus() == Inquiry.InquiryStatus.ANSWERED) throw new InquiryException("답변 완료된 문의는 삭제할 수 없어요.", HttpStatus.BAD_REQUEST);
 
         inquiryRepository.delete(inquiry);
     }
@@ -139,6 +139,6 @@ public class InquiryService {
     // 내부 조회용
     private Inquiry findById(Long id) {
         return inquiryRepository.findById(id)
-                .orElseThrow(() -> new InquiryException("존재하지 않는 문의입니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new InquiryException("존재하지 않는 문의예요.", HttpStatus.NOT_FOUND));
     }
 }

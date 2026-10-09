@@ -22,7 +22,7 @@ import java.util.concurrent.Semaphore;
 /** 업로드 이미지의 클라이언트 메타데이터가 아니라 실제 바이트를 검사하는 단일 관문. */
 public final class ImageFileValidator {
 
-    private static final String INVALID_IMAGE_MESSAGE = "손상되었거나 디코딩할 수 없는 이미지입니다.";
+    private static final String INVALID_IMAGE_MESSAGE = "손상되었거나 디코딩할 수 없는 이미지예요.";
 
     public static final long MAX_FILE_BYTES = 8L * 1024 * 1024;
     public static final int MAX_DIMENSION = 8_192;
@@ -65,18 +65,18 @@ public final class ImageFileValidator {
 
     private static byte[] readBytes(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw FileException.invalid("비어 있는 파일은 업로드할 수 없습니다.");
+            throw FileException.invalid("비어 있는 파일은 업로드할 수 없어요.");
         }
         if (file.getSize() > MAX_FILE_BYTES) {
-            throw new FileException("파일 크기는 8MB를 초과할 수 없습니다.", HttpStatus.PAYLOAD_TOO_LARGE);
+            throw new FileException("파일 크기는 8MB를 초과할 수 없어요.", HttpStatus.PAYLOAD_TOO_LARGE);
         }
         try {
             byte[] bytes = file.getBytes();
             if (bytes.length == 0) {
-                throw FileException.invalid("비어 있는 파일은 업로드할 수 없습니다.");
+                throw FileException.invalid("비어 있는 파일은 업로드할 수 없어요.");
             }
             if (bytes.length > MAX_FILE_BYTES) {
-                throw new FileException("파일 크기는 8MB를 초과할 수 없습니다.", HttpStatus.PAYLOAD_TOO_LARGE);
+                throw new FileException("파일 크기는 8MB를 초과할 수 없어요.", HttpStatus.PAYLOAD_TOO_LARGE);
             }
             return bytes;
         } catch (IOException exception) {
@@ -89,7 +89,7 @@ public final class ImageFileValidator {
         if (startsWith(bytes, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return Format.PNG;
         if (asciiEquals(bytes, 0, "GIF87a") || asciiEquals(bytes, 0, "GIF89a")) return Format.GIF;
         if (asciiEquals(bytes, 0, "RIFF") && asciiEquals(bytes, 8, "WEBP")) return Format.WEBP;
-        throw unsupported("파일 내용이 지원하는 이미지 형식이 아닙니다. (jpg/png/webp/gif)");
+        throw unsupported("파일 내용이 지원하는 이미지 형식이 아니에요. (jpg/png/webp/gif)");
     }
 
     private static void validateDeclaredType(String declaredType, Format format) {
@@ -97,7 +97,7 @@ public final class ImageFileValidator {
         String normalized = declaredType.toLowerCase(Locale.ROOT);
         if (format == Format.JPEG && "image/jpg".equals(normalized)) return;
         if (!format.contentType.equals(normalized)) {
-            throw unsupported("파일의 실제 형식과 콘텐츠 유형이 일치하지 않습니다.");
+            throw unsupported("파일의 실제 형식과 콘텐츠 유형이 일치하지 않아요.");
         }
     }
 
@@ -105,7 +105,7 @@ public final class ImageFileValidator {
         if (filename == null || !filename.contains(".")) return;
         String extension = filename.substring(filename.lastIndexOf('.')).toLowerCase(Locale.ROOT);
         if (!EXTENSIONS.get(format).contains(extension)) {
-            throw unsupported("파일의 실제 형식과 확장자가 일치하지 않습니다.");
+            throw unsupported("파일의 실제 형식과 확장자가 일치하지 않아요.");
         }
     }
 
@@ -137,7 +137,7 @@ public final class ImageFileValidator {
     private static Dimensions readStandardDimensions(byte[] bytes) {
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
-            if (!readers.hasNext()) throw unsupported("디코딩할 수 없는 이미지입니다.");
+            if (!readers.hasNext()) throw unsupported("디코딩할 수 없는 이미지예요.");
             ImageReader reader = readers.next();
             try {
                 reader.setInput(input, true, true);
@@ -156,19 +156,19 @@ public final class ImageFileValidator {
      */
     private static Dimensions inspectWebp(byte[] bytes) {
         if (bytes.length < 20 || unsignedIntLe(bytes, 4) + 8L != bytes.length) {
-            throw unsupported("손상되었거나 디코딩할 수 없는 WebP 이미지입니다.");
+            throw unsupported("손상되었거나 디코딩할 수 없는 WebP 이미지예요.");
         }
 
         Dimensions dimensions = null;
         boolean hasImagePayload = false;
         int offset = 12;
         while (offset < bytes.length) {
-            if (offset + 8 > bytes.length) throw unsupported("손상된 WebP chunk입니다.");
+            if (offset + 8 > bytes.length) throw unsupported("손상된 WebP chunk예요.");
             String type = new String(bytes, offset, 4, StandardCharsets.US_ASCII);
             int chunkSize = readWebpChunkSize(bytes, offset + 4);
             int data = offset + 8;
             long next = (long) data + chunkSize + (chunkSize & 1);
-            if (next > bytes.length) throw unsupported("잘린 WebP chunk입니다.");
+            if (next > bytes.length) throw unsupported("잘린 WebP chunk예요.");
 
             Dimensions chunkDimensions = switch (type) {
                 case "VP8X" -> dimensionsVp8x(bytes, data, chunkSize);
@@ -186,24 +186,24 @@ public final class ImageFileValidator {
             offset = (int) next;
         }
         if (offset != bytes.length || dimensions == null || !hasImagePayload) {
-            throw unsupported("이미지 프레임이 없는 WebP 파일입니다.");
+            throw unsupported("이미지 프레임이 없는 WebP 파일이에요.");
         }
         return dimensions;
     }
 
     private static int readWebpChunkSize(byte[] bytes, int offset) {
         long chunkSizeLong = unsignedIntLe(bytes, offset);
-        if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("WebP chunk가 너무 큽니다.");
+        if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("WebP chunk가 너무 커요.");
         return (int) chunkSizeLong;
     }
 
     private static Dimensions dimensionsVp8x(byte[] bytes, int data, int size) {
-        if (size < 10) throw unsupported("손상된 VP8X 헤더입니다.");
+        if (size < 10) throw unsupported("손상된 VP8X 헤더예요.");
         return new Dimensions(1 + unsigned24Le(bytes, data + 4), 1 + unsigned24Le(bytes, data + 7));
     }
 
     private static Dimensions dimensionsVp8l(byte[] bytes, int data, int size) {
-        if (size < 5 || unsigned(bytes[data]) != 0x2f) throw unsupported("손상된 VP8L 헤더입니다.");
+        if (size < 5 || unsigned(bytes[data]) != 0x2f) throw unsupported("손상된 VP8L 헤더예요.");
         int b0 = unsigned(bytes[data + 1]);
         int b1 = unsigned(bytes[data + 2]);
         int b2 = unsigned(bytes[data + 3]);
@@ -215,7 +215,7 @@ public final class ImageFileValidator {
 
     private static Dimensions dimensionsVp8(byte[] bytes, int data, int size) {
         if (size < 10 || !startsWithAt(bytes, data + 3, 0x9d, 0x01, 0x2a)) {
-            throw unsupported("손상된 VP8 헤더입니다.");
+            throw unsupported("손상된 VP8 헤더예요.");
         }
         int width = (unsigned(bytes[data + 6]) | (unsigned(bytes[data + 7]) << 8)) & 0x3fff;
         int height = (unsigned(bytes[data + 8]) | (unsigned(bytes[data + 9]) << 8)) & 0x3fff;
@@ -223,7 +223,7 @@ public final class ImageFileValidator {
     }
 
     private static Dimensions dimensionsAnmf(byte[] bytes, int data, int size) {
-        if (size < 24) throw unsupported("손상된 ANMF 프레임입니다.");
+        if (size < 24) throw unsupported("손상된 ANMF 프레임이에요.");
         Dimensions frameDimensions = new Dimensions(
                 1 + unsigned24Le(bytes, data + 6),
                 1 + unsigned24Le(bytes, data + 9));
@@ -232,14 +232,14 @@ public final class ImageFileValidator {
         int offset = data + 16;
         int end = data + size;
         while (offset < end) {
-            if (offset + 8 > end) throw unsupported("손상된 ANMF 하위 chunk입니다.");
+            if (offset + 8 > end) throw unsupported("손상된 ANMF 하위 chunk예요.");
             String type = new String(bytes, offset, 4, StandardCharsets.US_ASCII);
             long chunkSizeLong = unsignedIntLe(bytes, offset + 4);
-            if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("ANMF 하위 chunk가 너무 큽니다.");
+            if (chunkSizeLong > Integer.MAX_VALUE) throw unsupported("ANMF 하위 chunk가 너무 커요.");
             int chunkSize = (int) chunkSizeLong;
             int payload = offset + 8;
             long next = (long) payload + chunkSize + (chunkSize & 1);
-            if (next > end) throw unsupported("잘린 ANMF 하위 chunk입니다.");
+            if (next > end) throw unsupported("잘린 ANMF 하위 chunk예요.");
 
             if ("VP8L".equals(type)) {
                 dimensionsVp8l(bytes, payload, chunkSize);
@@ -251,7 +251,7 @@ public final class ImageFileValidator {
             offset = (int) next;
         }
         if (offset != end || !hasFramePayload) {
-            throw unsupported("이미지 데이터가 없는 ANMF 프레임입니다.");
+            throw unsupported("이미지 데이터가 없는 ANMF 프레임이에요.");
         }
         return frameDimensions;
     }
@@ -260,7 +260,7 @@ public final class ImageFileValidator {
         if (dimensions.width <= 0 || dimensions.height <= 0
                 || dimensions.width > MAX_DIMENSION || dimensions.height > MAX_DIMENSION
                 || (long) dimensions.width * dimensions.height > MAX_PIXELS) {
-            throw FileException.invalid("이미지 크기는 한 변 8192px, 전체 2천만 픽셀 이하여야 합니다.");
+            throw FileException.invalid("이미지 크기는 한 변 8192px, 전체 2천만 픽셀 이하여야 해요.");
         }
     }
 
@@ -287,7 +287,7 @@ public final class ImageFileValidator {
     }
 
     private static long unsignedIntLe(byte[] bytes, int offset) {
-        if (offset < 0 || offset + 4 > bytes.length) throw unsupported("잘린 이미지 헤더입니다.");
+        if (offset < 0 || offset + 4 > bytes.length) throw unsupported("잘린 이미지 헤더예요.");
         return unsigned(bytes[offset])
                 | ((long) unsigned(bytes[offset + 1]) << 8)
                 | ((long) unsigned(bytes[offset + 2]) << 16)
@@ -295,7 +295,7 @@ public final class ImageFileValidator {
     }
 
     private static int unsigned24Le(byte[] bytes, int offset) {
-        if (offset < 0 || offset + 3 > bytes.length) throw unsupported("잘린 이미지 헤더입니다.");
+        if (offset < 0 || offset + 3 > bytes.length) throw unsupported("잘린 이미지 헤더예요.");
         return unsigned(bytes[offset]) | (unsigned(bytes[offset + 1]) << 8) | (unsigned(bytes[offset + 2]) << 16);
     }
 

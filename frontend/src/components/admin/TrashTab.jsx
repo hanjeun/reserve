@@ -100,14 +100,14 @@ const TrashTab = () => {
 
     const restoreMutation = useMutation({
         mutationFn: (record) => api.post(API_ENDPOINTS.TRASH.RESTORE(record.entityType, record.entityId)),
-        onSuccess: () => { message.success('복구되었습니다.'); void invalidateTrash(); },
-        onError: () => message.error('복구에 실패했습니다.'),
+        onSuccess: () => { message.success('복구됐어요.'); void invalidateTrash(); },
+        onError: () => message.error('복구에 실패했어요.'),
     });
 
     const handleRestore = (record) => {
         confirm({
             title: '복구',
-            content: '이 항목을 복구하시겠습니까?',
+            content: '이 항목을 복구할까요?',
             okText: '복구', cancelText: '취소', centered: true,
             onOk: () => restoreMutation.mutateAsync(record),
         });
@@ -154,7 +154,7 @@ const TrashTab = () => {
     if (itemsError) {
         trashContent = (
             <DataState state="error" subject="휴지통 목록" error={itemsError}
-                onRetry={refetch} retrying={isFetching} compact />
+                onRetry={refetch} retrying={isFetching} />
         );
     } else if (loading || isPlaceholderData) {
         trashContent = (
@@ -173,7 +173,7 @@ const TrashTab = () => {
                 dataSource={items}
                 rowKey="id"
                 pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                locale={{ emptyText: '휴지통에 항목이 없습니다.' }}
+                locale={{ emptyText: '휴지통에 항목이 없어요.' }}
             />
         );
     }
@@ -191,6 +191,7 @@ const TrashTab = () => {
                 count={totalElements}
                 onReload={refetch}
                 loading={loading || isFetching}
+                initialLoading={loading}
             />
 
             <div style={{
@@ -202,7 +203,7 @@ const TrashTab = () => {
                 fontSize: fontSize.sm,
                 color: colors.text.tertiary,
             }}>
-                소프트 삭제된 항목은 30일 후 자동으로 영구 삭제됩니다. 복구가 필요한 항목은 기간 내에 복구하세요.
+                소프트 삭제된 항목은 30일 후 자동으로 영구 삭제돼요. 복구가 필요한 항목은 기간 내에 복구하세요.
             </div>
 
             {trashContent}

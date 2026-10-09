@@ -21,7 +21,7 @@ public class UpdateChatReportRetentionRequest {
     @NotNull(message = "보류 여부를 선택해주세요.")
     private Boolean hold;
 
-    @PastOrPresent(message = "보존 기산일은 현재보다 이후일 수 없습니다.")
+    @PastOrPresent(message = "보존 기산일은 현재보다 이후일 수 없어요.")
     private OffsetDateTime retentionBasisAt;
 
     @NotBlank(message = "보존 정책 변경 근거를 입력해주세요.")

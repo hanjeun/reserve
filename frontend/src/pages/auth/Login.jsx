@@ -1,3 +1,4 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
@@ -10,9 +11,9 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS, API_BASE_URL } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { saveRedirect, consumeRedirect } from '../../utils/redirect';
-import { colors, radius, heights, fontWeight, fontSize } from '../../styles/tokens';
+import { colors, radius, heights, fontSize } from '../../styles/tokens';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const GoogleIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24">
@@ -36,7 +37,7 @@ const KakaoIcon = () => (
 );
 
 const suspensionInfo = (status, until, reason) => ({
-    title: status === 'BANNED' ? '영구 정지된 계정입니다' : '이용이 제한된 계정입니다',
+    title: status === 'BANNED' ? '영구 정지된 계정이에요' : '이용이 제한된 계정이에요',
     isBanned: status === 'BANNED', until, reason,
 });
 
@@ -52,7 +53,7 @@ const Login = () => {
     // 참고: 아래 useEffect가 안내 메시지를 띄우며 state를 비우기 때문에, 여기서 렌더 시점에
     //       미리 값을 잡아둬야 유실되지 않는다.
     const fromState = location.state?.from
-        ? `${location.state.from.pathname || ''}${location.state.from.search || ''}`
+        ? `${location.state.from.pathname || ''}${location.state.from.search || ''}${location.state.from.hash || ''}`
         : null;
     const fromRef = useRef(fromState);
     // 로그인 필요 페이지에서 넘어왔는지 — 성공 후 전환 방향을 정한다. 아래 effect 가 state 를 비우므로 렌더 시점에 잡는다.
@@ -80,14 +81,14 @@ const Login = () => {
 
         if (location.state?.signupSuccess) {
             hasHandledRef.current = true;
-            message.success('회원가입이 완료되었습니다! 로그인해주세요.');
+            message.success('회원가입이 완료됐어요! 로그인해주세요.');
             navigate('/login', { replace: true, state: {} });
             return;
         }
 
         if (location.state?.prevented) {
             hasHandledRef.current = true;
-            message.warning('로그인이 필요한 서비스입니다.');
+            message.warning('로그인이 필요한 서비스예요.');
             // 2026-07 버그 수정: 예전엔 여기서 state를 통째로 비웠다({}).
             // 그런데 그 state 안엔 PrivateRoute가 넣어준 from(원래 가려던 페이지)도 같이 들어 있어서,
             // 안내 메시지를 띄우는 순간 복귀 경로가 사라지고 로그인 성공 후 항상 '/'로 가버렸다.
@@ -125,7 +126,7 @@ const Login = () => {
             const res = await api.post(API_ENDPOINTS.AUTH.LOGIN, values, { withCredentials: true });
             if (res) {
                 login(res);
-                message.success(`${res.name}님, 로그인되었습니다!`);
+                message.success(`${res.name}님, 로그인됐어요!`);
                 // router state → sessionStorage → '/' 순으로 복귀 경로 결정
                 const target = fromRef.current || consumeRedirect() || '/';
                 // 로그인 필요로 막혔던 곳이면 가려던 길을 계속 간다(오른쪽에서). 스스로 로그인했으면 있던 곳으로 돌아간다(왼쪽에서).
@@ -159,8 +160,8 @@ const Login = () => {
     return (
         <PageContainer size="sm" paddingTop="80px" center>
             <div className="fade-in-up">
-                <Title level={2} style={styles.title}>로그인</Title>
-                <Text type="secondary" style={styles.subtitle}>특별한 날을 위한 완벽한 예약</Text>
+                <PageTitle style={styles.title}>로그인</PageTitle>
+                <PageDescription style={styles.subtitle}>특별한 날을 위한 완벽한 예약</PageDescription>
 
                 <Form onFinish={onLoginSubmit} layout="vertical" size="large" requiredMark={false}>
                     <Form.Item name="email" rules={VALIDATION_RULES.loginEmail}>
@@ -187,13 +188,13 @@ const Login = () => {
                 </Divider>
 
                 <Flex justify="center" gap={20}>
-                    <button type="button" onClick={() => handleSocialLogin('kakao')} style={{ ...styles.socialCircle, backgroundColor: '#FEE500' }}>
+                    <button type="button" className="reserve-icon-action" aria-label="카카오로 로그인" onClick={() => handleSocialLogin('kakao')} style={{ ...styles.socialCircle, backgroundColor: '#FEE500' }}>
                         <KakaoIcon />
                     </button>
-                    <button type="button" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
+                    <button type="button" className="reserve-icon-action" aria-label="네이버로 로그인" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
                         <NaverIcon />
                     </button>
-                    <button type="button" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: colors.background.default, border: `1px solid ${colors.border.light}` }}>
+                    <button type="button" className="reserve-icon-action" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: colors.background.default, border: `1px solid ${colors.border.light}` }}>
                         <GoogleIcon />
                     </button>
                 </Flex>
@@ -210,7 +211,7 @@ const Login = () => {
                         로그인 시{' '}
                         <button type="button" style={styles.linkBtn} onClick={() => navigate('/terms')}>이용약관</button>
                         {' · '}
-                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>에 동의합니다.
+                        <button type="button" style={styles.linkBtn} onClick={() => navigate('/privacy')}>개인정보처리방침</button>에 동의해요.
                     </Text>
                 </Flex>
             </div>
@@ -251,15 +252,10 @@ const Login = () => {
 const styles = {
     title: {
         marginBottom: '12px',
-        fontWeight: fontWeight.extrabold,
-        letterSpacing: '-1.2px',
-        color: colors.text.primary
     },
     subtitle: {
         display: 'block',
         marginBottom: '48px',
-        color: colors.text.tertiary,
-        fontSize: fontSize.lg
     },
     socialCircle: {
         width: heights.socialBtn,

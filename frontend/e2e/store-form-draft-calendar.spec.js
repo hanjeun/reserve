@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { Buffer } from 'node:buffer';
 
 const business = {
     id: 41,
@@ -14,6 +15,41 @@ const emptyPage = {
 };
 
 const ok = (route, data) => route.fulfill({ json: { success: true, data } });
+
+const openRegistrationOperation = async page => {
+    await page.goto('/store/register');
+    await expect(page.getByRole('heading', { name: '어떤 가게를 운영하시나요?', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: '서비스 분야', exact: true })
+        .getByRole('button', { name: '맛집 · 카페', exact: true }).click();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님을 어떻게 받고 싶으세요?', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: '손님 접수 방식', exact: true })
+        .getByRole('button', { name: '예약', exact: true }).click();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님이 무엇을 선택하면 되나요?', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: '예약 방식', exact: true })
+        .getByRole('button', { name: '시간대', exact: true }).click();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '언제, 몇 명까지 받을까요?', exact: true })).toBeVisible();
+};
+
+const continueToIdentity = async page => {
+    await page.getByLabel('영업 시간', { exact: true }).click();
+    const hours = page.getByRole('dialog', { name: '시간 범위 선택' });
+    await hours.getByRole('textbox', { name: '시작 시간 직접 입력', exact: true }).fill('09:00');
+    await hours.getByRole('textbox', { name: '종료 시간 직접 입력', exact: true }).fill('18:00');
+    await hours.getByRole('button', { name: '선택 완료', exact: true }).click();
+    await expect(page.getByLabel('영업 시간', { exact: true })).toHaveText(/09:00.*18:00/);
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님에게 가게를 소개해주세요.', exact: true })).toBeVisible();
+};
+
+const selectEditSection = async (page, label, heading) => {
+    await expect(page.getByRole('heading', { name: '무엇을 수정하시겠어요?', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: '수정할 항목', exact: true })
+        .getByRole('button', { name: label, exact: true }).click();
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+};
 
 test.beforeEach(async ({ context, page }) => {
     let editFetchCount = 0;
@@ -74,8 +110,8 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 test('store photo autoplay has a compact control matching its loading placeholder', async ({ page }) => {
-    await page.goto('/store/register');
-    await expect(page.getByRole('heading', { name: '가게 등록' })).toBeVisible();
+    await openRegistrationOperation(page);
+    await continueToIdentity(page);
     const control = page.getByRole('switch', { name: '사진 자동 넘김' });
     await expect(control).toBeChecked();
     await expect(page.locator('.reserve-store-photo-autoplay .ant-form-item-control-input')).toHaveCSS('min-height', '22px');
@@ -88,11 +124,15 @@ test('store photo autoplay has a compact control matching its loading placeholde
 test('store editing keeps a local draft and warns when the server base changed', async ({ page }) => {
     await page.goto('/store/99/edit');
 
-    await expect(page.getByRole('heading', { name: '가게 정보 수정' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '무엇을 수정하시겠어요?', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '임시저장' }))
         .toHaveClass(/reserve-btn--secondary/);
+    await page.getByRole('button', { name: '미리보기', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님에게 이렇게 보여요.', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '수정 완료' }))
         .toHaveClass(/reserve-btn--primary/);
+    await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
+    await selectEditSection(page, '소개·사진', '손님에게 가게를 소개해주세요.');
 
     const nameInput = page.getByPlaceholder('가게 이름');
     await expect(nameInput).toHaveValue('서버 원본 가게');
@@ -103,21 +143,16 @@ test('store editing keeps a local draft and warns when the server base changed',
     await page.reload();
     const conflictDialog = page.getByRole('dialog').filter({ hasText: '가게 정보가 달라졌어요' });
     await expect(conflictDialog).toBeVisible();
-    await expect(conflictDialog).toContainText('현재 가게 정보가 다릅니다');
+    await expect(conflictDialog).toContainText('초안과 현재 가게 정보가 달라요');
+    await expect(conflictDialog).toContainText('초안을 불러오면 최신 값 일부가 바뀔 수 있어요.');
     await conflictDialog.getByRole('button', { name: '이어서 작성' }).click();
     await expect(page.getByPlaceholder('가게 이름')).toHaveValue('내 수정 초안 가게');
 });
 
 test('store registration uses the shared calendar and restores a browser-local draft', async ({ page }) => {
-    await page.goto('/store/register');
-
-    await expect(page.getByRole('heading', { name: '가게 등록' })).toBeVisible();
+    await openRegistrationOperation(page);
     const draftButton = page.getByRole('button', { name: '임시저장' });
-    const submitButton = page.getByRole('button', { name: '등록 완료' });
     await expect(draftButton).toHaveClass(/reserve-btn--secondary/);
-    await expect(submitButton).toHaveClass(/reserve-btn--primary/);
-    expect(await draftButton.evaluate(element => getComputedStyle(element).backgroundColor))
-        .not.toBe(await submitButton.evaluate(element => getComputedStyle(element).backgroundColor));
 
     await page.locator('.reserve-form-date-trigger').filter({ hasText: '시작일' }).click();
     const calendar = page.getByRole('dialog', { name: '날짜 범위 선택' });
@@ -134,11 +169,26 @@ test('store registration uses the shared calendar and restores a browser-local d
     await page.keyboard.press('Escape');
     await expect(calendar).toBeHidden();
 
+    await continueToIdentity(page);
     await page.getByPlaceholder('가게 이름').fill('브라우저 임시저장 가게');
-    await page.getByPlaceholder('도로명 또는 지번 주소 입력').fill('경기 안산시 단원구');
+    await page.getByLabel('주소', { exact: true }).fill('경기 안산시 단원구');
     await page.getByRole('option').click();
     const postcode = page.locator('.reserve-store-form-address-box').filter({ hasText: /^15455$/ });
     await expect(postcode).toBeVisible();
+    await page.getByLabel('연락처', { exact: true }).fill('02-1234-5678');
+    await page.locator('.reserve-onboarding-step:not([hidden]) input[type="file"]').first().setInputFiles({
+        name: 'draft-main.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aJ1sAAAAASUVORK5CYII=', 'base64'),
+    });
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님에게 이렇게 보여요.', exact: true })).toBeVisible();
+    const submitButton = page.getByRole('button', { name: '등록 완료', exact: true });
+    await expect(submitButton).toHaveClass(/reserve-btn--primary/);
+    expect(await draftButton.evaluate(element => getComputedStyle(element).backgroundColor))
+        .not.toBe(await submitButton.evaluate(element => getComputedStyle(element).backgroundColor));
+    await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님에게 가게를 소개해주세요.', exact: true })).toBeVisible();
     await draftButton.click();
     await expect(page.getByText(/이 브라우저에 저장됨/)).toBeVisible();
 
@@ -155,26 +205,30 @@ test('store registration uses the shared calendar and restores a browser-local d
     )).toBe(true);
 });
 
-test('mobile registration and editing keep short structured fields in compact rows', async ({ page }, testInfo) => {
-    // 짧은 필드를 한 줄에 묶는 compact 행은 모바일 레이아웃 전용이라 다른 프로젝트에서는 건너뛴다.
+test('mobile registration and editing keep short operation fields in paired columns', async ({ page }, testInfo) => {
+    // 운영 질문의 짧은 필드가 모바일에서도 두 열 안에 들어가는지 확인한다.
     test.skip(!testInfo.project.name.includes('mobile'), '모바일 레이아웃 전용 검증');
 
     const verifyCompactRows = async () => {
-        const rows = page.locator('.reserve-store-form .reserve-store-form-row--compact');
-        await expect(rows.first()).toBeVisible();
-
+        const fields = page.locator('.reserve-onboarding-step:not([hidden]) .reserve-onboarding-fields');
+        await expect(fields).toBeVisible();
+        await expect(page.getByLabel('최대 예약 인원', { exact: true })).toBeVisible();
+        await expect(page.getByLabel('노쇼 예약금', { exact: true })).toBeVisible();
         const expectedPairs = [
-            ['예약 방식', '서비스 분야'],
-            ['예약 단위', '연락처'],
-            ['최대 예약 인원', '노쇼 예약금'],
+            ['전액 환불 기준', '부분 환불 기준'],
+            ['부분 환불율', '결제 마감'],
         ];
+        const items = fields.locator('.ant-form-item');
+        await expect(items).toHaveCount(expectedPairs.length * 2);
         for (let index = 0; index < expectedPairs.length; index += 1) {
-            const row = rows.nth(index);
-            for (const label of expectedPairs[index]) await expect(row).toContainText(label);
-            const boxes = await row.locator('.ant-form-item').evaluateAll(items => items.map(item => {
+            for (let column = 0; column < 2; column += 1) {
+                await expect(items.nth(index * 2 + column)).toContainText(expectedPairs[index][column]);
+            }
+            const allBoxes = await items.evaluateAll(elements => elements.map(item => {
                 const rect = item.getBoundingClientRect();
                 return { top: rect.top, width: rect.width };
             }));
+            const boxes = allBoxes.slice(index * 2, index * 2 + 2);
             expect(boxes).toHaveLength(2);
             expect(Math.abs(boxes[0].top - boxes[1].top)).toBeLessThan(2);
             expect(boxes.every(box => box.width > 100)).toBe(true);
@@ -182,16 +236,28 @@ test('mobile registration and editing keep short structured fields in compact ro
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     };
 
-    await page.goto('/store/register');
-    await expect(page.getByRole('heading', { name: '가게 등록' })).toBeVisible();
+    await openRegistrationOperation(page);
+    await page.getByLabel('노쇼 예약금', { exact: true }).fill('1000');
     await verifyCompactRows();
+    await continueToIdentity(page);
+    await expect(page.getByLabel('연락처', { exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: '예약 방식', exact: true })).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
     await page.goto('/store/99/edit');
-    await expect(page.getByRole('heading', { name: '가게 정보 수정' })).toBeVisible();
+    await selectEditSection(page, '운영 설정', '언제, 몇 명까지 받을까요?');
     await verifyCompactRows();
+    await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
+    await selectEditSection(page, '예약 방식', '손님이 무엇을 선택하면 되나요?');
+    await expect(page.getByLabel('시간 선택 간격', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('연락처', { exact: true })).toBeHidden();
+    await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
+    await selectEditSection(page, '소개·사진', '손님에게 가게를 소개해주세요.');
+    await expect(page.getByLabel('연락처', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
-test('store editing reserves the full form skeleton while the initial data is delayed', async ({ page }) => {
+test('store editing reserves its selection skeleton while the initial data is delayed', async ({ page }) => {
     let releaseEditRequest;
     const editRequestHeld = new Promise(resolve => { releaseEditRequest = resolve; });
 
@@ -217,27 +283,36 @@ test('store editing reserves the full form skeleton while the initial data is de
 
     // Measure the held data request, not the first load of the form/authentication chunks.
     await page.goto('/store/register');
-    await expect(page.getByRole('heading', { name: '가게 등록' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '어떤 가게를 운영하시나요?', exact: true })).toBeVisible();
     const skeleton = page.getByRole('status', { name: '가게 정보를 불러오는 중' });
     try {
         await page.goto('/store/99/edit', { waitUntil: 'domcontentloaded' });
         await expect(skeleton).toBeVisible();
         await expect(skeleton).toHaveAttribute('aria-busy', 'true');
-        for (const section of ['basic', 'settings', 'images', 'actions']) {
-            await expect(skeleton.locator(`[data-skeleton-section="${section}"]`)).toBeVisible();
+        await expect(skeleton.locator('..').locator('.reserve-onboarding-heading')).toHaveText('무엇을 수정하시겠어요?');
+        await expect(skeleton.locator('..').locator('.reserve-onboarding-edit-selection')).toBeVisible();
+        const choices = skeleton.locator('..').locator('.reserve-service-domain-option');
+        await expect(choices).toHaveCount(6);
+        for (let index = 0; index < 6; index += 1) {
+            const choice = choices.nth(index);
+            await expect(choice).toBeVisible();
+            const media = choice.locator('.reserve-service-domain-option__media > .reserve-skeleton-block');
+            await expect(media).toHaveCount(1);
+            await expect(media).toHaveCSS('width', '56px');
+            await expect(media).toHaveCSS('height', '56px');
+            await expect(choice.locator('.reserve-service-domain-option__label > .reserve-skeleton-block')).toHaveCSS('height', '20px');
         }
-        await expect(skeleton.locator('.reserve-store-form-skeleton-toggle')).toHaveCount(4);
-        await expect(skeleton.locator('.reserve-store-form-skeleton-control--upload')).toHaveCount(2);
-        for (const label of ['대표 이미지', '상세 이미지 (최대 5장)']) {
-            const upload = skeleton.locator(`[data-label="${label}"] .reserve-store-form-skeleton-control--upload > .reserve-skeleton-block`);
-            await expect(upload).toHaveCount(1);
-            await expect(upload).toHaveCSS('width', '102px');
-            await expect(upload).toHaveCSS('height', '102px');
+        const actions = skeleton.locator('..').locator('.reserve-store-form-skeleton > div[aria-hidden="true"] > .reserve-skeleton-block');
+        await expect(actions).toHaveCount(2);
+        for (let index = 0; index < 2; index += 1) {
+            await expect(actions.nth(index)).toBeVisible();
+            await expect(actions.nth(index)).toHaveCSS('height', page.viewportSize().width < 768 ? '44px' : '56px');
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     } finally {
         releaseEditRequest();
     }
-    await expect(page.getByRole('heading', { name: '가게 정보 수정' })).toBeVisible();
+    await expect(page.getByRole('group', { name: '수정할 항목', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '무엇을 수정하시겠어요?', exact: true })).toBeVisible();
     await expect(skeleton).toBeHidden();
 });

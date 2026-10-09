@@ -55,7 +55,7 @@ class StoreEditAuthorizationContractTest {
 
         assertThatThrownBy(() -> request(controller, operation))
                 .isInstanceOf(MemberException.class)
-                .hasMessage("가게 수정을 위해 로그인이 필요합니다.");
+                .hasMessage("가게 수정을 위해 로그인이 필요해요.");
         verifyNoInteractions(blocked);
     }
 
@@ -72,7 +72,7 @@ class StoreEditAuthorizationContractTest {
         assertThatThrownBy(() -> request(service, operation, stranger))
                 .isInstanceOfSatisfying(StoreException.class, exception ->
                         assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN))
-                .hasMessage("가게를 수정할 권한이 없습니다.");
+                .hasMessage("가게를 수정할 권한이 없어요.");
         assertThat(store.getName()).isEqualTo("원래 가게");
         assertThat(store.getAutoApprovalEnabled()).isFalse();
         if (operation == Operation.UPDATE) verify(stores).findByIdForUpdate(31L);

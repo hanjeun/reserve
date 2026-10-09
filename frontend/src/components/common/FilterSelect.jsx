@@ -31,6 +31,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Select } from 'antd';
 import ChoiceSelectInput from './ChoiceSelectInput';
+import { renderRollingChoiceLabel } from './rollingChoiceLabel';
 
 const FILTER_CLASS = 'reserve-filter-select';
 
@@ -41,6 +42,7 @@ const FilterSelect = ({ className, size, components, ...rest }) => (
         className={[FILTER_CLASS, className].filter(Boolean).join(' ')}
         size={size ?? 'large'}
         {...rest}
+        labelRender={rest.labelRender ?? (choice => renderRollingChoiceLabel(choice, { options: rest.options, children: rest.children, fieldNames: rest.fieldNames }))}
         components={{ ...components, input: ChoiceSelectInput }}
     />
 );

@@ -9,6 +9,7 @@ import {
 import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '@ant-design/icons';
 import { DataState, StatCard, ChartCard, SegmentedControl, PieLegend, FilterToolbar } from '../common';
 import { Bone } from '../common/Skeletons';
+import { SegmentedControlSkeleton } from '../layout/routeSkeletonParts';
 import { useMyStores, useQueryParamsState } from '../../hooks';
 import { storeKeys } from '../../hooks/queryKeys';
 import storeService from '../../services/storeService';
@@ -46,9 +47,9 @@ const DATE_REVENUE_COLUMNS = [
 const summarizeDaily = (rows, unit) => {
     if (!rows?.length) return undefined;
     const total = rows.reduce((sum, row) => sum + Number(row.value || 0), 0);
-    if (total === 0) return `선택한 기간의 합계는 0${unit}입니다.`;
+    if (total === 0) return `선택한 기간의 합계는 0${unit}이에요.`;
     const peak = rows.reduce((best, row) => (row.value > best.value ? row : best), rows[0]);
-    return `기간 합계 ${total.toLocaleString()}${unit}, 가장 높은 날은 ${peak.date}의 ${Number(peak.value).toLocaleString()}${unit}입니다.`;
+    return `기간 합계 ${total.toLocaleString()}${unit}, 가장 높은 날은 ${peak.date}의 ${Number(peak.value).toLocaleString()}${unit}이에요.`;
 };
 
 // 광고 성과 지표 하나를 보여주는 작은 박스 — DashboardTab의 "최근 감사 로그 요약"과 동일한 인라인 패턴(2026-07 추가)
@@ -139,13 +140,13 @@ const buildStatusPieData = (statusBreakdown) => (
 
 const statusPieSummary = (loading, stats, statusPieData) => (
     !loading && stats
-        ? `선택한 기간의 예약 ${statusPieData.reduce((sum, row) => sum + row.value, 0)}건을 상태별로 나눴습니다.`
+        ? `선택한 기간의 예약 ${statusPieData.reduce((sum, row) => sum + row.value, 0)}건을 상태별로 나눴어요.`
         : undefined
 );
 
 const revenueSummary = (loading, stats) => (
     !loading && stats?.revenueTrend?.length
-        ? `확정 환불을 차감한 결제 완료일 기준입니다. ${summarizeDaily(stats.revenueTrend, '원')}`
+        ? `확정 환불을 차감한 결제 완료일 기준이에요. ${summarizeDaily(stats.revenueTrend, '원')}`
         : undefined
 );
 
@@ -181,7 +182,7 @@ const renderReservationTrend = (loading, stats, reservationGradient) => {
         );
     }
     return (
-        <DataState state="empty" kind="reservation" title="해당 기간 예약이 없습니다." style={{ height: '100%' }} />
+        <DataState state="empty" kind="reservation" title="해당 기간 예약이 없어요." style={{ height: '100%' }} />
     );
 };
 
@@ -227,7 +228,7 @@ const renderStatusPie = (loading, statusPieData) => {
         );
     }
     return (
-        <DataState state="empty" kind="reservation" title="해당 기간 예약이 없습니다." style={{ height: '100%' }} />
+        <DataState state="empty" kind="reservation" title="해당 기간 예약이 없어요." style={{ height: '100%' }} />
     );
 };
 
@@ -262,7 +263,7 @@ const renderRevenueTrend = (loading, stats, revenueGradient) => {
         );
     }
     return (
-        <DataState state="empty" kind="payment" title="해당 기간 순결제액이 없습니다." style={{ height: '100%' }} />
+        <DataState state="empty" kind="payment" title="해당 기간 순결제액이 없어요." style={{ height: '100%' }} />
     );
 };
 
@@ -411,8 +412,10 @@ const StatisticsTab = () => {
                     disabled={toolbarLoading}
                 />
             )}
+            extraSkeleton={<SegmentedControlSkeleton options={RANGE_OPTIONS} value={range} />}
             onReload={handleReload}
             loading={toolbarLoading}
+            initialLoading={loading}
             style={{ marginBottom: 0 }}
         />
     );
@@ -428,7 +431,7 @@ const StatisticsTab = () => {
     }
 
     if (!storesLoading && myStores.length === 0) {
-        return <DataState state="empty" kind="store" title="등록된 가게가 없습니다." style={{ marginTop: 80 }} />;
+        return <DataState state="empty" kind="store" title="등록된 가게가 없어요." style={{ marginTop: 80 }} />;
     }
 
     const areaGradientId = 'stats-reservation-gradient';
@@ -444,8 +447,8 @@ const StatisticsTab = () => {
             {statsError && (
                 <DataState state="error" subject="통계" error={statsError}
                     title={stats
-                        ? '통계를 갱신하지 못했습니다. 이전 조회 결과를 표시하고 있습니다.'
-                        : '통계를 불러오지 못했습니다.'}
+                        ? '통계를 갱신하지 못했어요. 이전 조회 결과를 표시하고 있어요.'
+                        : '통계를 불러오지 못했어요.'}
                     onRetry={refetch} retrying={isFetching} compact={Boolean(stats)} />
             )}
             {(!statsError || stats) && <>

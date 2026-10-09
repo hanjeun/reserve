@@ -28,7 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminChatController {
 
-    private static final String LOGIN_REQUIRED_MESSAGE = "로그인이 필요합니다.";
+    private static final String LOGIN_REQUIRED_MESSAGE = "로그인이 필요해요.";
     private static final String QUERY_SUCCESS_MESSAGE = "조회 성공";
 
     private final ChatService chatService;

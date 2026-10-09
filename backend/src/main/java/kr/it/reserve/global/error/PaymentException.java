@@ -18,6 +18,6 @@ public class PaymentException extends BusinessException {
      * 404 NOT_FOUND - 결제 정보를 찾을 수 없을 때
      */
     public static PaymentException notFound() {
-        return new PaymentException("결제 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new PaymentException("결제 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 }

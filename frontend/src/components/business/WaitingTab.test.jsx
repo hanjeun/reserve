@@ -16,7 +16,7 @@ vi.mock('../../hooks', async () => ({
     useMyStores: () => ({ stores: state.stores, loading: false, error: null, refetch: vi.fn() }),
 }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { success: state.success, error: state.error }, confirm: state.confirm }) }));
-vi.mock('../../services/waitingService', () => ({ default: { getBoard: vi.fn(), create: vi.fn(), updateStatus: vi.fn() } }));
+vi.mock('../../services/waitingService', () => ({ default: { getBoard: vi.fn(), create: vi.fn(), updateStatus: vi.fn(), updateIntake: vi.fn() } }));
 vi.mock('../common', () => {
     const Card = ({ children }) => <div>{children}</div>;
     Card.Body = ({ children }) => <div>{children}</div>;
@@ -52,9 +52,32 @@ beforeEach(() => {
     state.stores = [{ id: 5, name: '가게 A' }];
     state.success.mockReset(); state.error.mockReset(); state.confirm.mockReset();
     waitingService.getBoard.mockReset().mockResolvedValue(board([]));
-    waitingService.create.mockReset(); waitingService.updateStatus.mockReset();
+    waitingService.create.mockReset(); waitingService.updateStatus.mockReset(); waitingService.updateIntake.mockReset();
 });
 afterEach(() => vi.restoreAllMocks());
+
+it('pauses new intake while keeping existing call actions and preserves the chosen intake mode on resume', async () => {
+    const activeBoard = { ...board([entry(1)]), waitingIntakeMode: 'BOTH', waitingPaused: false };
+    const pausedBoard = { ...activeBoard, waitingPaused: true };
+    waitingService.getBoard.mockResolvedValue(activeBoard);
+    waitingService.updateIntake.mockImplementation((_id, paused) => {
+        const saved = paused ? pausedBoard : activeBoard;
+        waitingService.getBoard.mockResolvedValue(saved);
+        return Promise.resolve(saved);
+    });
+    const view = setup();
+    fireEvent.click(await screen.findByRole('button', { name: '접수 중지' }));
+    await screen.findByRole('button', { name: '접수 시작' });
+    expect(waitingService.updateIntake).toHaveBeenLastCalledWith(5, true, expect.any(AbortSignal));
+    expect(screen.getByRole('button', { name: '대기 접수' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '1번 호출' })).not.toBeDisabled();
+    expect(view.client.getQueryData(['waiting', 1, 5]).waitingIntakeMode).toBe('BOTH');
+    fireEvent.click(screen.getByRole('button', { name: '접수 시작' }));
+    await screen.findByRole('button', { name: '접수 중지' });
+    expect(waitingService.updateIntake).toHaveBeenLastCalledWith(5, false, expect.any(AbortSignal));
+    expect(screen.getByRole('button', { name: '대기 접수' })).not.toBeDisabled();
+    view.unmount(); view.client.clear();
+});
 
 it('blocks duplicate submissions, reuses the retry ID and changes it only after an input edit', async () => {
     const uuid = vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('a4312550-4294-4af2-b069-2797f8f81b77')
@@ -99,7 +122,7 @@ it('keeps finished entries read-only and ignores old confirmations and write res
     await act(async () => view.updateActor());
     expect(signal.aborted).toBe(true);
     await act(async () => { await oldConfirmation.onOk(); finish({ ...entry(3), displayName: '이전 계정' }); });
-    await screen.findByText('선택한 상태의 대기 접수가 없습니다.');
+    await screen.findByText('선택한 상태의 대기 접수가 없어요.');
     expect(waitingService.updateStatus).not.toHaveBeenCalled();
     expect(state.success).not.toHaveBeenCalled();
     expect(state.error).not.toHaveBeenCalled();
@@ -124,7 +147,7 @@ it('filters the loaded board by name and waiting number without issuing another 
     expect(screen.getByRole('listitem', { name: '2번 대기 접수' })).toBeInTheDocument();
     expect(screen.queryByRole('listitem', { name: '1번 대기 접수' })).toBeNull();
     fireEvent.change(search, { target: { value: '없는 이름' } });
-    expect(screen.getByText('검색에 맞는 대기 접수가 없습니다.')).toBeInTheDocument();
+    expect(screen.getByText('검색에 맞는 대기 접수가 없어요.')).toBeInTheDocument();
     fireEvent.change(search, { target: { value: '' } });
     expect(screen.queryByRole('listitem', { name: '3번 대기 접수' })).toBeNull();
     fireEvent.change(screen.getByRole('combobox', { name: '대기 접수 상태' }), { target: { value: 'SEATED' } });

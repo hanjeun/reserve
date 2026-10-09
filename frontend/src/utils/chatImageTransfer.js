@@ -34,10 +34,10 @@ function downloadFilename(originalFilename, contentType, messageId) {
 
 /** Preview and download both use the authenticated participant/evidence image endpoint. */
 export async function getChatImageBlob(url, signal) {
-    if (typeof url !== 'string' || !CHAT_IMAGE_PATH.test(url)) throw new Error('사진 주소를 확인할 수 없습니다.');
+    if (typeof url !== 'string' || !CHAT_IMAGE_PATH.test(url)) throw new Error('사진 주소를 확인할 수 없어요.');
     const blob = await chatService.getImage(url, signal);
     if (!(blob instanceof Blob) || !IMAGE_EXTENSIONS[blob.type] || blob.size === 0 || blob.size > 8 * 1024 * 1024) {
-        throw new Error('사진 응답 형식이 올바르지 않습니다.');
+        throw new Error('사진 응답 형식이 올바르지 않아요.');
     }
     return blob;
 }

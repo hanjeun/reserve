@@ -28,9 +28,9 @@ public class NoticeApiController {
 
     // 관리자 권한 검증 공통 로직
     private void validateAdmin() {
-        Member member = SecurityUtil.getCurrentMember("인증 정보가 없습니다.");
+        Member member = SecurityUtil.getCurrentMember("인증 정보가 없어요.");
         if (member.getRole() != Role.ADMIN) {
-            throw new NoticeException("관리자만 접근 가능한 서비스입니다.", HttpStatus.FORBIDDEN);
+            throw new NoticeException("관리자만 접근 가능한 서비스예요.", HttpStatus.FORBIDDEN);
         }
     }
 
@@ -65,7 +65,7 @@ public class NoticeApiController {
         validateAdmin();
         Member member = SecurityUtil.getCurrentMember();
         NoticeDTO notice = noticeService.createNotice(requestDTO, member.getEmail());
-        return ApiResponse.success(notice, "공지사항이 성공적으로 등록되었습니다.");
+        return ApiResponse.success(notice, "공지사항이 성공적으로 등록됐어요.");
     }
 
     @PutMapping("/{id}")
@@ -73,7 +73,7 @@ public class NoticeApiController {
         validateAdmin();
         Member member = SecurityUtil.getCurrentMember();
         NoticeDTO notice = noticeService.updateNotice(id, requestDTO, member.getEmail());
-        return ApiResponse.success(notice, "공지사항이 수정되었습니다.");
+        return ApiResponse.success(notice, "공지사항이 수정됐어요.");
     }
 
     @DeleteMapping("/{id}")
@@ -81,6 +81,6 @@ public class NoticeApiController {
         validateAdmin();
         Member member = SecurityUtil.getCurrentMember();
         noticeService.deleteNotice(id, member.getEmail());
-        return ApiResponse.success(null, "공지사항이 삭제되었습니다.");
+        return ApiResponse.success(null, "공지사항이 삭제됐어요.");
     }
 }

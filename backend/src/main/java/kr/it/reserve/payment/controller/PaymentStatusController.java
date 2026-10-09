@@ -21,7 +21,7 @@ public class PaymentStatusController {
     @GetMapping
     public ResponseEntity<ApiResponse<PaymentStatusResponse>> getStatus(
             @RequestParam(defaultValue = "reservation") String type, @RequestParam String merchantUid) {
-        Long memberId = SecurityUtil.getCurrentMember("결제 확인을 위해 로그인이 필요합니다.").getId();
+        Long memberId = SecurityUtil.getCurrentMember("결제 확인을 위해 로그인이 필요해요.").getId();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success(
                 paymentStatusService.getStatus(type, merchantUid, memberId), "결제 상태 조회 성공"));
     }

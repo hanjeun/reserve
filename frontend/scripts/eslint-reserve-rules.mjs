@@ -1,5 +1,45 @@
 // Keep syntax policies executable; rationale and exceptions live in docs/rules/code-conventions.md.
 export const rules = {
+    'user-copy-tone': {
+        meta: {
+            type: 'suggestion',
+            schema: [],
+            messages: { tone: '일반 사용자 안내는 해요체로 쓰세요. 버튼·상태는 짧은 명사형, 약관·개인정보처리방침은 격식체를 사용합니다.' },
+        },
+        create(context) {
+            const file = context.filename.replaceAll('\\', '/');
+            if (/\/pages\/legal\/(Terms|Privacy)\.jsx$/.test(file)) return {};
+            const check = (node, text) => {
+                if (typeof text === 'string' && /[가-힣]*(?:니다|니까)(?![가-힣])/.test(text)) {
+                    context.report({ node, messageId: 'tone' });
+                }
+            };
+            return {
+                Literal: node => check(node, node.value),
+                TemplateElement: node => check(node, node.value.cooked ?? node.value.raw),
+                JSXText: node => check(node, node.value),
+            };
+        },
+    },
+    'no-threatening-copy': {
+        meta: {
+            type: 'problem',
+            schema: [],
+            messages: { threat: '고소·고발·처벌·법적 조치를 경고하는 문구 대신 필요한 이용 조건과 문의 방법을 안내하세요.' },
+        },
+        create(context) {
+            const check = (node, text) => {
+                if (typeof text === 'string' && /(?:고소|고발)(?:$|[^가-힣]|장|하|할|해|합|했|당|되|를)|처벌|법적\s*(?:조치|대응)|(?:민사|형사)\s*책임/.test(text)) {
+                    context.report({ node, messageId: 'threat' });
+                }
+            };
+            return {
+                Literal: node => check(node, node.value),
+                TemplateElement: node => check(node, node.value.cooked ?? node.value.raw),
+                JSXText: node => check(node, node.value),
+            };
+        },
+    },
     'plain-jsdoc': {
         meta: {
             type: 'suggestion',

@@ -9,10 +9,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class SendChatImageRequest {
-    @Size(max = 2000, message = "2000자까지 입력할 수 있습니다.")
+    @Size(max = 2000, message = "2000자까지 입력할 수 있어요.")
     private String content = "";
 
-    @NotBlank(message = "메시지 식별자가 필요합니다.")
+    @NotBlank(message = "메시지 식별자가 필요해요.")
     @Size(max = 64)
     @Pattern(regexp = "[A-Za-z0-9_-]+")
     private String clientMessageId;

@@ -27,9 +27,9 @@ describe('network banner transitions', () => {
     it('announces a recovery for 2.5 seconds, including an initial offline load', () => {
         online = false;
         render(<OfflineBanner />);
-        expect(screen.getByRole('status')).toHaveTextContent('인터넷 연결이 끊겼습니다');
+        expect(screen.getByRole('status')).toHaveTextContent('인터넷 연결이 끊겼어요');
         changeNetwork(true);
-        expect(screen.getByRole('status')).toHaveTextContent('인터넷에 다시 연결되었습니다');
+        expect(screen.getByRole('status')).toHaveTextContent('인터넷에 다시 연결됐어요');
         act(() => vi.advanceTimersByTime(2499));
         expect(screen.getByRole('status')).toBeInTheDocument();
         act(() => vi.advanceTimersByTime(1));
@@ -44,7 +44,7 @@ describe('network banner transitions', () => {
         changeNetwork(false);
         changeNetwork(true);
         act(() => vi.advanceTimersByTime(500));
-        expect(screen.getByRole('status')).toHaveTextContent('다시 연결되었습니다');
+        expect(screen.getByRole('status')).toHaveTextContent('다시 연결됐어요');
         act(() => vi.advanceTimersByTime(2000));
         expect(screen.queryByRole('status')).toBeNull();
     });

@@ -19,9 +19,9 @@ describe('chat intro editor', () => {
         renderEditor({ intro: { notice: '반가워요', items: [{ question: '주차', answer: '2대 가능' }] } });
         expect(screen.getByLabelText('질문 1')).toHaveValue('주차');
         expect(screen.getByLabelText('답변 1')).toHaveValue('2대 가능');
-        // 공지사항이 확성기 줄의 기본 문구("안녕하세요. 카페 리저브입니다.")를 대신한다.
+        // 공지사항이 확성기 줄의 기본 문구("안녕하세요. 카페 리저브에서 안내해드려요.")를 대신한다.
         expect(within(preview()).getByText('반가워요')).toBeInTheDocument();
-        expect(within(preview()).queryByText('안녕하세요. 카페 리저브입니다.')).toBeNull();
+        expect(within(preview()).queryByText('안녕하세요. 카페 리저브에서 안내해드려요.')).toBeNull();
         expect(within(preview()).getByText('카페 리저브')).toBeInTheDocument();
         fireEvent.click(within(preview()).getByRole('button', { name: '주차' }));
         expect(within(preview()).getByText('2대 가능')).toBeInTheDocument();
@@ -36,7 +36,7 @@ describe('chat intro editor', () => {
     it('previews exactly what customers see when nothing is set up for a store', () => {
         renderEditor();
         // 가게도 설정 전부터 기본 안내가 보인다(손님 화면과 같다).
-        expect(within(preview()).getByText('안녕하세요. 카페 리저브입니다.')).toBeInTheDocument();
+        expect(within(preview()).getByText('안녕하세요. 카페 리저브에서 안내해드려요.')).toBeInTheDocument();
         expect(within(preview()).getByLabelText('문의 시작 안내')).toBeInTheDocument();
         fireEvent.change(screen.getByLabelText('공지사항'), { target: { value: '어서 오세요' } });
         expect(within(preview()).getByText('어서 오세요')).toBeInTheDocument();

@@ -277,8 +277,16 @@ const SettingsSection = ({ bookingType = 'SLOT' }) => (
 
         <Divider />
         <SectionLabel>운영 옵션</SectionLabel>
+        <Form.Item label="고객 웨이팅 접수" name="waitingIntakeMode"
+            extra={<Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>현장 QR은 사업자 패널에서 보여줄 수 있어요. 접수를 꺼도 이미 대기 중인 팀은 유지돼요.</Text>}>
+            <FormSelect options={[
+                { value: 'OFF', label: '접수 꺼짐' }, { value: 'ONSITE', label: '현장 QR 접수' },
+                { value: 'REMOTE', label: '원격 접수' }, { value: 'BOTH', label: '현장 QR · 원격 접수' },
+            ]} />
+        </Form.Item>
         <Flex vertical gap={0} style={{ marginBottom: 16 }}>
-            <ToggleItem name="autoApprovalEnabled"       label="예약 자동 승인" desc="ON 시 예약 요청이 즉시 확정됩니다" />
+            <ToggleItem name="reservationEnabled" label="예약 접수" desc="끄면 새로운 예약을 받지 않아요. 기존 예약은 유지돼요" />
+            <ToggleItem name="autoApprovalEnabled"       label="예약 자동 승인" desc="ON 시 예약 요청이 즉시 확정돼요" />
             <ToggleItem name="allowLatePayment"          label="나중 결제 허용"  desc="예약금이 있어도 나중에 결제 가능" />
             <ToggleItem name="allowDuplicateReservation" label="중복 예약 허용"  desc="OFF 시 한 손님은 같은 날 1건만 (한 건에 여러 명은 가능)" />
             <ToggleItem name="emailNotificationEnabled"  label="예약 알림 메일"  desc="새 예약 접수 시 이메일로 알림 받기" />

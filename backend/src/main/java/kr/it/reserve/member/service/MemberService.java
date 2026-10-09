@@ -69,6 +69,7 @@ public class MemberService {
     private final OAuthUnlinkOutboxService oAuthUnlinkOutboxService;
     private final PwnedPasswordChecker pwnedPasswordChecker;
     private final MarketingConsentHistoryRepository marketingConsentHistoryRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     /**
      * 유출 비밀번호 거부 문구. 회원가입·비밀번호 변경에서 같은 문구를 쓴다.
@@ -76,7 +77,7 @@ public class MemberService {
      * 숫자만 크면 불안만 준다.
      */
     private static final String PWNED_PASSWORD_MESSAGE =
-            "다른 사이트에서 유출된 적이 있는 비밀번호입니다. 다른 비밀번호를 사용해주세요.";
+            "다른 사이트에서 유출된 적이 있는 비밀번호예요. 다른 비밀번호를 사용해주세요.";
 
     @Transactional
     public Long join(MemberSignupRequest signupRequest) {
@@ -91,11 +92,11 @@ public class MemberService {
         }
 
         if (memberRepository.findByEmail(signupRequest.getEmail()).isPresent()) {
-            throw MemberException.conflict("이미 사용 중인 이메일입니다.");
+            throw MemberException.conflict("이미 사용 중인 이메일이에요.");
         }
 
         if (!emailVerificationService.isEmailVerified(signupRequest.getEmail())) {
-            throw new MemberException("이메일 인증이 필요합니다.", HttpStatus.BAD_REQUEST);
+            throw new MemberException("이메일 인증이 필요해요.", HttpStatus.BAD_REQUEST);
         }
 
         // 유출 리스트 검사는 마지막에 둔다 — 이메일 중복·인증처럼 서버 안에서 끝나는 검증을
@@ -104,10 +105,13 @@ public class MemberService {
             throw new MemberException(PWNED_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
 
+        String encodedPassword = bCryptPasswordEncoder.encode(signupRequest.getPassword());
+        // Recheck expiry under the same DB lock as code verification, after the external password lookup.
+        emailVerificationService.consumeVerifiedEmail(signupRequest.getEmail(), signupRequest.getVerificationTicket());
         Member member = memberRepository.save(Member.builder()
                 .name(signupRequest.getName())
                 .email(signupRequest.getEmail())
-                .password(bCryptPasswordEncoder.encode(signupRequest.getPassword()))
+                .password(encodedPassword)
                 .role(Role.USER)
                 .provider(AuthProvider.LOCAL)
                 .termsAgreed(true)
@@ -174,10 +178,10 @@ public class MemberService {
     public void changePassword(Long memberId, PasswordChangeRequest request) {
         Member member = findByIdForUpdate(memberId);
         if (member.isOAuthUser() || member.getPassword() == null) {
-            throw new MemberException("소셜 로그인 사용자는 비밀번호를 변경할 수 없습니다.", HttpStatus.FORBIDDEN);
+            throw new MemberException("소셜 로그인 사용자는 비밀번호를 변경할 수 없어요.", HttpStatus.FORBIDDEN);
         }
         if (!bCryptPasswordEncoder.matches(request.getCurrentPassword(), member.getPassword())) {
-            throw new MemberException("현재 비밀번호가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new MemberException("현재 비밀번호가 일치하지 않아요.", HttpStatus.BAD_REQUEST);
         }
         requireValidPassword(request.getNewPassword());
         if (!PasswordPolicy.matches(request.getNewPassword(), request.getNewPasswordConfirm())) {
@@ -357,6 +361,7 @@ public class MemberService {
         emailVerificationRepository.deleteByEmail(originalEmail);
 
         member.withdraw("withdrawn-" + memberId + "@reserve.invalid");
+        events.publishEvent(new kr.it.reserve.member.event.MemberWithdrawn(memberId));
         log.info("Member withdrawal completed: memberId={}", memberId);
     }
 }

@@ -85,8 +85,8 @@ test('guest header separates neutral navigation hover from primary press and key
 
     await page.goto('/');
     await tabTo(page, search);
-    await expect(search).toHaveCSS('outline-color', 'rgb(78, 89, 104)');
-    await expect(search).toHaveCSS('outline-width', '2px');
+    await expect(search).toHaveCSS('outline-color', 'rgb(139, 149, 161)');
+    await expect(search).toHaveCSS('outline-width', '1px');
     expect(await search.evaluate(element => element.matches(':focus-visible'))).toBe(true);
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -177,8 +177,8 @@ test('messenger uses neutral controls, a clear composer focus, and reduced press
     await page.keyboard.press('Tab');
     const send = page.getByRole('button', { name: '보내기' });
     await expect(send).toBeFocused();
-    await expect(send).toHaveCSS('outline-color', 'rgb(78, 89, 104)');
-    await expect(send).toHaveCSS('outline-width', '2px');
+    await expect(send).toHaveCSS('outline-color', 'rgb(139, 149, 161)');
+    await expect(send).toHaveCSS('outline-width', '1px');
     expect(await send.evaluate(element => element.matches(':focus-visible'))).toBe(true);
     await pressWithoutClick(page, send, async () => {
         await expect(send).toHaveCSS('transform', 'none');

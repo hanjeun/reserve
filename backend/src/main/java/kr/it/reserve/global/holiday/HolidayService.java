@@ -86,7 +86,7 @@ public class HolidayService {
     @Scheduled(cron = "0 50 4 * * *")
     public void evictCache() {
         if (!cache.isEmpty()) {
-            log.debug("공휴일 캐시 비움 ({}개월)", cache.size());
+            log.debug("Holiday cache cleared: months={}", cache.size());
             cache.clear();
         }
     }
@@ -106,7 +106,8 @@ public class HolidayService {
             return parse(restTemplate.getForObject(uri, String.class));
         } catch (Exception e) {
             // 던지지 않는다 — 위 클래스 주석 참고. 달력은 그대로 뜨고 일요일만 빨갛게 나온다.
-            log.warn("공휴일 조회 실패 ({}). 이번 달은 일요일만 빨갛게 표시된다: {}", month, e.toString());
+            log.warn("Holiday lookup failed; only Sundays will be highlighted: month={}, errorType={}",
+                    month, e.getClass().getSimpleName());
             return Set.of();
         }
     }

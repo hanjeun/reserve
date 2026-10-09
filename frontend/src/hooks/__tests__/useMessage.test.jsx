@@ -3,8 +3,9 @@ import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing
 import { App, ConfigProvider } from 'antd';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import useMessage from '../useMessage';
+import { loadingConfig } from '../../components/common/loadingConfig';
 
-const withdrawalContent = '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 됩니다. 거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다. 정말 탈퇴하시겠습니까?';
+const withdrawalContent = '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 돼요. 거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존돼요. 정말 탈퇴할까요?';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -55,9 +56,9 @@ describe('useMessage confirmation contract', () => {
         const content = confirm.mock.calls[0][0].content;
         const { container } = render(<>{content}</>);
         expect(Array.from(container.children).map(element => element.textContent)).toEqual([
-            '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 됩니다.',
-            '거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다.',
-            '정말 탈퇴하시겠습니까?',
+            '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 돼요.',
+            '거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존돼요.',
+            '정말 탈퇴할까요?',
         ]);
     });
 
@@ -70,6 +71,27 @@ describe('useMessage confirmation contract', () => {
 });
 
 describe('real AntD confirmation structure', () => {
+    it('uses the shared spinner while a destructive confirmation is pending and prevents duplicate actions', async () => {
+        let finish;
+        const onOk = vi.fn(() => new Promise(resolve => { finish = resolve; }));
+        function Fixture() {
+            const { confirm } = useMessage();
+            return <button onClick={() => confirm({ title: '대기 접수 취소', content: '접수를 취소할까요?',
+                okText: '접수 취소', okButtonProps: { danger: true }, onOk })}>취소 안내</button>;
+        }
+        render(<ConfigProvider {...loadingConfig} theme={{ token: { motion: false } }}><App><Fixture /></App></ConfigProvider>);
+        fireEvent.click(screen.getByRole('button', { name: '취소 안내' }));
+        const dialog = await screen.findByRole('dialog', { name: '대기 접수 취소' });
+        const submit = within(dialog).getByRole('button', { name: '접수 취소' });
+        fireEvent.click(submit);
+        await waitFor(() => expect(submit.querySelector('svg.reserve-arc-spinner')).not.toBeNull());
+        expect(submit.querySelector('.anticon-loading')).toBeNull();
+        fireEvent.click(submit);
+        expect(onOk).toHaveBeenCalledOnce();
+        finish();
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
     it('renders withdrawal text and cancel/confirm controls without creating any account request', async () => {
         const onOk = vi.fn();
         const onCancel = vi.fn();
@@ -87,7 +109,7 @@ describe('real AntD confirmation structure', () => {
         expect(dialog.querySelector('.ant-modal-container')).not.toBeNull();
         expect(dialog.querySelector('.ant-modal-content')).toBeNull();
         expect(dialog.querySelector('.ant-modal-confirm-paragraph')).not.toBeNull();
-        expect(dialog.querySelector('.ant-modal-confirm-content')).toHaveTextContent('정말 탈퇴하시겠습니까?');
+        expect(dialog.querySelector('.ant-modal-confirm-content')).toHaveTextContent('정말 탈퇴할까요?');
         await waitFor(() => expect(within(dialog).getByRole('button', { name: '탈퇴하기' })).toBeVisible());
         expect(onOk).not.toHaveBeenCalled();
         fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));

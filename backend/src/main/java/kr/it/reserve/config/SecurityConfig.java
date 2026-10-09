@@ -120,6 +120,8 @@ public class SecurityConfig {
                                 ApiPaths.withV1Aliases("/api/notices", "/api/notices/highlights", "/api/notices/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/chat/retention-policy")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/waiting/stores", "/api/waiting/retention-policy")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/notices/{id:\\d+}/view")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
@@ -201,7 +203,7 @@ public class SecurityConfig {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json;charset=UTF-8");
 
-                            ApiResponse<Void> errorResponse = ApiResponse.error("인증이 필요한 서비스입니다.");
+                            ApiResponse<Void> errorResponse = ApiResponse.error("인증이 필요한 서비스예요.");
                             response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
                         }))
                 .build();

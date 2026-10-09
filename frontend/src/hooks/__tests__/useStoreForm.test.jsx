@@ -8,9 +8,11 @@ import { useStoreForm } from '../useStoreForm';
 import useStoreDraftPreferences from '../useStoreDraftPreferences';
 import useAuthStore from '../../store/useAuthStore';
 import { readStoreDraft, saveStoreDraft } from '../../utils/storeDraftStorage';
+import { readRegistrationNavigation } from '../../utils/storeRegistrationNavigation';
 import { storeService } from '../../services';
 
-vi.mock('../../utils/storeDraftStorage', () => ({
+vi.mock('../../utils/storeDraftStorage', async (importOriginal) => ({
+    ...(await importOriginal()),
     deleteStoreDraft: vi.fn().mockResolvedValue(undefined),
     fingerprintStoreDraftBase: vi.fn(() => 'base'),
     hydrateDraftImages: vi.fn(() => ({ files: [], objectUrls: [] })),
@@ -24,6 +26,10 @@ vi.mock('../../utils/storeDraftStorage', () => ({
 }));
 
 vi.mock('../../utils/form', () => ({ buildStoreFormData: vi.fn(() => new FormData()) }));
+vi.mock('../../utils/storeRegistrationNavigation', async importOriginal => ({
+    ...(await importOriginal()),
+    readRegistrationNavigation: vi.fn(),
+}));
 
 vi.mock('../../services', async (importOriginal) => ({
     ...(await importOriginal()),
@@ -45,6 +51,7 @@ const wrapper = ({ children }) => {
         </QueryClientProvider>
     );
 };
+beforeEach(() => { readRegistrationNavigation.mockReset(); });
 
 describe('useStoreForm draft scheduling', () => {
     beforeEach(() => {
@@ -154,6 +161,36 @@ describe('useStoreForm draft scheduling', () => {
         draft.unmount();
         await act(async () => { await Promise.resolve(); });
         expect(saveStoreDraft).not.toHaveBeenCalled();
+    });
+
+    it('restores tab navigation before disk lookup even when automatic saving is disabled', async () => {
+        localStorage.setItem('reserve:store-draft:auto-save:member:7', 'false');
+        readRegistrationNavigation.mockReturnValue({
+            values: { name: '돌아온 가게', _onboardingStep: 'identity' },
+            mainImage: [], detailImages: [], changed: true,
+            state: { status: 'pending', savedAt: 123, error: null },
+        });
+        const diskReads = readStoreDraft.mock.calls.length;
+        const { result } = renderHook(() => useStoreForm({ form }), { wrapper });
+        await act(async () => { await Promise.resolve(); });
+        expect(form.setFieldsValue).toHaveBeenCalledWith(expect.objectContaining({
+            name: '돌아온 가게', _onboardingStep: 'identity', mainImage: [], detailImages: [],
+        }));
+        expect(readStoreDraft.mock.calls).toHaveLength(diskReads);
+        expect(result.current.draftState).toMatchObject({ status: 'saved', savedAt: 123, autoSaveEnabled: false });
+    });
+
+    it('applies only the current StrictMode navigation restore setup', async () => {
+        readRegistrationNavigation.mockReturnValue({
+            values: { name: 'StrictMode 복귀 가게', _onboardingStep: 'waiting' },
+            mainImage: [], detailImages: [], changed: true,
+            state: { status: 'idle', savedAt: null, error: null },
+        });
+        const strictWrapper = ({ children }) => <React.StrictMode>{wrapper({ children })}</React.StrictMode>;
+        renderHook(() => useStoreForm({ form }), { wrapper: strictWrapper });
+        await act(async () => { await Promise.resolve(); });
+        const applies = form.setFieldsValue.mock.calls.filter(([values]) => values.name === 'StrictMode 복귀 가게');
+        expect(applies).toHaveLength(1);
     });
 });
 

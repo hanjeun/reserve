@@ -18,7 +18,7 @@ public class OAuth2UserInfoFactory {
             case GOOGLE -> new GoogleOAuth2UserInfo(attributes);
             case NAVER -> new NaverOAuth2UserInfo(attributes);
             case KAKAO -> new KakaoOAuth2UserInfo(attributes);
-            default -> throw new AuthException("지원하지 않는 OAuth2 제공자입니다: " + provider);
+            default -> throw new AuthException("지원하지 않는 OAuth2 제공자예요: " + provider);
         };
     }
 }

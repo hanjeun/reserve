@@ -130,7 +130,7 @@ public class ChatModerationService {
     public ChatReportContextResponse contextForImage(Member admin, Long reportId) {
         assertAdmin(admin);
         ChatReport report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new ChatException("신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("신고를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         Long roomId = report.getRoom().getId();
         List<ChatReportEvidence> evidence = evidenceRepository.findByReportIdOrderByMessageIdAsc(reportId);
         if (report.getEvidenceCapturedAt() != null) {
@@ -160,7 +160,7 @@ public class ChatModerationService {
     public ChatReportResponse reviewReport(Member admin, Long reportId, ReviewChatReportRequest request) {
         assertAdmin(admin);
         ChatReport report = reportRepository.findByIdForUpdate(reportId)
-                .orElseThrow(() -> new ChatException("신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("신고를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         ChatReport.Status status = request.getStatus();
         if (status == null) throw new ChatException("처리 상태를 선택해주세요.");
         String note = normalize(request.getResolutionNote());
@@ -174,22 +174,22 @@ public class ChatModerationService {
 
     private ChatRoom findRoomForUpdate(Long roomId) {
         return roomRepository.findByIdForUpdate(roomId)
-                .orElseThrow(() -> new ChatException("대화를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("대화를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     private SenderRole participantRole(String viewerRole) {
         if ("MEMBER".equalsIgnoreCase(viewerRole)) return SenderRole.MEMBER;
         if ("OWNER".equalsIgnoreCase(viewerRole)) return SenderRole.OWNER;
-        throw new ChatException("대화 참가자 역할이 올바르지 않습니다.");
+        throw new ChatException("대화 참가자 역할이 올바르지 않아요.");
     }
 
     private void assertStoreParticipant(ChatRoom room, Member actor, SenderRole role) {
         if (room.getType() != ChatRoom.RoomType.STORE) {
-            throw new ChatException("가게 대화에서만 사용할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("가게 대화에서만 사용할 수 있어요.", HttpStatus.FORBIDDEN);
         }
         if (role == SenderRole.MEMBER && room.getMember().getId().equals(actor.getId())) return;
         if (role == SenderRole.OWNER && ownsStore(room.getStoreId(), actor)) return;
-        throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
     }
 
     private boolean ownsStore(Long storeId, Member actor) {
@@ -200,13 +200,13 @@ public class ChatModerationService {
     }
 
     private void assertReportableMessage(ChatRoom room, Long messageId, SenderRole reporterRole) {
-        if (messageId <= 0) throw new ChatException("신고할 메시지가 올바르지 않습니다.");
+        if (messageId <= 0) throw new ChatException("신고할 메시지가 올바르지 않아요.");
         ChatMessage message = messageRepository.findByIdAndRoomId(messageId, room.getId())
-                .orElseThrow(() -> new ChatException("신고할 메시지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("신고할 메시지를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         if (message.getSenderRole() == reporterRole) {
-            throw new ChatException("상대방이 보낸 메시지만 신고할 수 있습니다.");
+            throw new ChatException("상대방이 보낸 메시지만 신고할 수 있어요.");
         }
-        if (message.isPurged()) throw new ChatException("보존 기간이 지난 메시지입니다.", HttpStatus.GONE);
+        if (message.isPurged()) throw new ChatException("보존 기간이 지난 메시지예요.", HttpStatus.GONE);
     }
 
     private List<ChatMessage> captureWindow(Long roomId, Long messageId) {
@@ -220,7 +220,7 @@ public class ChatModerationService {
 
     private void assertAdmin(Member admin) {
         if (admin == null || admin.getId() == null || admin.getRole() != Role.ADMIN)
-            throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
     }
 
     private String normalize(String value) {

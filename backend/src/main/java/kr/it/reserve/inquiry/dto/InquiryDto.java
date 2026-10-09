@@ -35,7 +35,7 @@ public class InquiryDto {
         @Size(max = 50, message = "이름은 50자 이내로 입력해주세요.")
         private String guestName;   // 비로그인일 때만 사용
 
-        @Email(message = "올바른 이메일 형식이 아닙니다.")
+        @Email(message = "올바른 이메일 형식이 아니에요.")
         @Size(max = 100, message = "이메일은 100자 이내로 입력해주세요.")
         private String guestEmail;  // 비로그인일 때만 사용
     }

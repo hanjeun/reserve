@@ -16,7 +16,7 @@ public class FileException extends BusinessException {
 
     /** 500 - 파일 업로드 실패 */
     public static FileException uploadFailed() {
-        return new FileException("파일을 저장하는 중 서버에 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+        return new FileException("파일을 저장하는 중 서버에 오류가 발생했어요.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     /** 400 - 유효하지 않은 파일 */

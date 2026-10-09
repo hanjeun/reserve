@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Button, DataState, FormTextArea, FormInput, FormModal, FormField, RefreshButton } from '../common';
 import { Bone } from '../common/Skeletons';
+import FilterToolbarSkeleton from '../common/FilterToolbarSkeleton';
 import useDebounce from '../../hooks/useDebounce';
 import { useMessage, useWindowWidth, useQueryParamsState, useFormErrors } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -102,11 +103,11 @@ const useComposeMail = ({ message }) => {
     const sendMutation = useMutation({
         mutationFn: (form) => api.post(API_ENDPOINTS.MAIL.COMPOSE, form),
         onSuccess: () => {
-            message.success('메일을 보냈습니다.');
+            message.success('메일을 보냈어요.');
             resetCompose();
             void queryClient.invalidateQueries({ queryKey: adminKeys.sentMails() });
         },
-        onError: () => message.error('메일 발송에 실패했습니다.'),
+        onError: () => message.error('메일 발송에 실패했어요.'),
     });
 
     const handleComposeSend = () => {
@@ -139,7 +140,7 @@ const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
     const mutation = useMutation({
         mutationFn: (id) => api.delete(API_ENDPOINTS.MAIL.TRASH_SENT(id)),
         onSuccess: (_data, id) => {
-            message.success('휴지통으로 옮겼습니다.');
+            message.success('휴지통으로 옮겼어요.');
             // 지운 메일을 보고 있었다면 상세를 비운다 — 안 비우면 목록에서 사라진 메일이
             // 오른쪽 패널에 계속 남아 "지워졌는데 아직 있다"처럼 보인다.
             if (selectedSent?.id === id) setSelectedSent(null);
@@ -147,12 +148,12 @@ const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
             // 휴지통 탭이 이 메일을 새로 받아야 한다.
             void queryClient.invalidateQueries({ queryKey: adminKeys.trash() });
         },
-        onError: () => message.error('휴지통으로 옮기지 못했습니다.'),
+        onError: () => message.error('휴지통으로 옮기지 못했어요.'),
     });
 
     const askAndTrash = (mail) => confirm({
         title: '휴지통으로 이동',
-        content: `"${mail.subject || '(제목 없음)'}" 메일을 휴지통으로 옮깁니다. 휴지통 탭에서 30일 안에 복구할 수 있습니다.`,
+        content: `"${mail.subject || '(제목 없음)'}" 메일을 휴지통으로 옮겨요. 휴지통 탭에서 30일 안에 복구할 수 있어요.`,
         okText: '휴지통으로',
         okButtonProps: { danger: true },
         onOk: () => mutation.mutateAsync(mail.id),
@@ -164,21 +165,21 @@ const useTrashMail = ({ message, selectedSent, setSelectedSent }) => {
 // 쿨다운·스피너 정지는 RefreshButton 이 갖는다(2026-08-25). 예전엔 여기서 3초 쿨다운을
 // 직접 구현했는데, setTimeout 을 정리하지 않아 쿨다운 도중 화면을 떠나면 사라진 컴포넌트에
 // setState 가 걸렸다. 같은 구현이 FilterToolbar·ChatTab 에도 따로 있었다.
-const SearchBar = ({ value, onChange, onReload, loading, onCompose }) => {
+const SearchBar = ({ value, onChange, onReload, loading, initialLoading = false, onCompose }) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 40 }}>
-                <Button variant="primary" size="sm" onClick={onCompose}
+                {initialLoading ? <Bone width={104} height={40} borderRadius={20} /> : <Button variant="primary" size="sm" onClick={onCompose}
                     style={{ height: 40, borderRadius: 20, paddingLeft: 20, paddingRight: 20, flexShrink: 0, gap: 6 }}>
                     <SendOutlined /> 새 메일
-                </Button>
+                </Button>}
             </div>
-            <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 12, minHeight: 40 }}>
+            {initialLoading ? <FilterToolbarSkeleton search={{ placeholder: '받는 사람, 제목 검색' }} style={{ marginBottom: 0 }} /> : <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 12, minHeight: 40 }}>
                 <Input prefix={<SearchOutlined style={{ color: colors.text.tertiary }} />}
                     placeholder="받는 사람, 제목 검색" value={value} onChange={onChange}
                     allowClear size="large" style={{ width: '100%', maxWidth: 480 }} />
                 <RefreshButton onReload={onReload} loading={loading} style={{ marginLeft: 'auto' }} />
-            </div>
+            </div>}
         </div>
     );
 };
@@ -319,19 +320,20 @@ const MailboxTab = () => {
         <div>
             <SearchBar value={search} onChange={handleSearchChange}
                 onReload={mail.loadSentMails} loading={mail.loading || mail.isFetching}
+                initialLoading={mail.loading}
                 onCompose={() => send.setComposing(true)} />
 
             {showLoading && <SentMailSkeleton />}
 
             {showError && (
                 <DataState state="error" kind="mail" subject="보낸 메일" error={mail.error}
-                    onRetry={mail.loadSentMails} retrying={mail.isFetching} compact />
+                    onRetry={mail.loadSentMails} retrying={mail.isFetching} />
             )}
 
             {showEmpty && (
                 <div style={styles.emptyPanel}>
-                    <DataState state="empty" kind="mail" title="보낸 메일이 없습니다"
-                        description={'"새 메일" 버튼으로 메일을 보낼 수 있습니다.'} />
+                    <DataState state="empty" kind="mail" title="보낸 메일이 없어요"
+                        description={'"새 메일" 버튼으로 메일을 보낼 수 있어요.'} />
                 </div>
             )}
 
@@ -354,7 +356,7 @@ const MailboxTab = () => {
                 <>
                     <div style={styles.singlePanel}>
                         {filteredSent.length === 0 ? (
-                            <DataState state="empty" kind="mail" title="검색 결과가 없습니다." />
+                            <DataState state="empty" kind="mail" title="검색 결과가 없어요." />
                         ) : filteredSent.map(m => (
                             <SentMailItem key={m.id} mail={m} isSelected={false} onClick={mail.setSelectedSent} />
                         ))}
@@ -369,7 +371,7 @@ const MailboxTab = () => {
                     <div style={styles.listPanel}>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
                             {filteredSent.length === 0 ? (
-                                <DataState state="empty" kind="mail" title="검색 결과가 없습니다." />
+                                <DataState state="empty" kind="mail" title="검색 결과가 없어요." />
                             ) : filteredSent.map(m => (
                                 <SentMailItem key={m.id} mail={m} isSelected={m.id === mail.selectedSent?.id} onClick={mail.setSelectedSent} />
                             ))}
@@ -381,7 +383,7 @@ const MailboxTab = () => {
                         {!mail.selectedSent ? (
                             <div style={styles.emptyDetail}>
                                 <InboxOutlined style={{ fontSize: 48, color: colors.border.default, marginBottom: 12 }} />
-                                <Text style={{ fontSize: fontSize.base, color: colors.text.tertiary }}>메일을 선택하면 내용이 표시됩니다.</Text>
+                                <Text style={{ fontSize: fontSize.base, color: colors.text.tertiary }}>메일을 선택하면 내용이 표시돼요.</Text>
                             </div>
                         ) : (
                             <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', display: 'flex', flexDirection: 'column' }}>
@@ -410,9 +412,9 @@ const MailboxTab = () => {
                         onChange={(e) => send.setComposeForm(f => ({ ...f, marketing: e.target.checked }))}
                     >
                         <Text style={{ fontSize: fontSize.sm }}>
-                            광고·홍보 메일입니다
+                            광고·홍보 메일이에요
                             <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block' }}>
-                                체크하면 수신 동의한 회원에게만 발송됩니다
+                                체크하면 수신 동의한 회원에게만 발송돼요
                             </Text>
                         </Text>
                     </Checkbox>

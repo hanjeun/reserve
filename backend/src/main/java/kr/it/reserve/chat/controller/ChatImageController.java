@@ -42,7 +42,7 @@ public class ChatImageController {
     public ResponseEntity<ApiResponse<ChatMessageResponse>> send(@PathVariable Long roomId,
             @RequestPart("image") MultipartFile image, @Valid @ModelAttribute SendChatImageRequest request,
             HttpServletRequest httpRequest) {
-        var member = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        var member = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         if (!limiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)
                 || !limiter.tryConsume("chat-image-member:" + member.getId(), RateLimiter.Policy.CHAT_SEND)) {
             return ResponseEntity.status(429).body(ApiResponse.error("조금 천천히 보내주세요."));
@@ -52,7 +52,7 @@ public class ChatImageController {
 
     @GetMapping("/images/{messageId:[0-9]+}")
     public ResponseEntity<byte[]> read(@PathVariable Long messageId) {
-        var image = images.read(SecurityUtil.getCurrentMember("로그인이 필요합니다."), messageId);
+        var image = images.read(SecurityUtil.getCurrentMember("로그인이 필요해요."), messageId);
         return imageResponse(image);
     }
 

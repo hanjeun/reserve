@@ -47,11 +47,11 @@ public class ReservationApiController {
             HttpServletRequest httpRequest) {
         String ip = IpExtractor.extract(httpRequest);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.RESERVATION_CREATE)) {
-            throw new ReservationException("예약 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            throw new ReservationException("예약 요청이 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
         ReservationResponse reservation = reservationService.createReservation(request, SecurityUtil.getCurrentMember());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(reservation, "예약이 신청되었습니다."));
+                .body(ApiResponse.success(reservation, "예약이 신청됐어요."));
     }
 
     @GetMapping({"/my", "/my-reservations"})
@@ -99,7 +99,7 @@ public class ReservationApiController {
         try {
             target = YearMonth.parse(month);
         } catch (DateTimeParseException e) {
-            throw new ReservationException("month 는 YYYY-MM 형식이어야 합니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("month 는 YYYY-MM 형식이어야 해요.", HttpStatus.BAD_REQUEST);
         }
         List<CalendarDayResponse> days = reservationService.getMonthCalendar(storeId, target);
         return ResponseEntity.ok(ApiResponse.success(days, "달력 조회 성공"));
@@ -117,19 +117,19 @@ public class ReservationApiController {
             @PathVariable Long id,
             @Valid @RequestBody ReservationUpdateRequest request) {
         ReservationResponse reservation = reservationService.updateReservation(id, request, SecurityUtil.getCurrentMember());
-        return ResponseEntity.ok(ApiResponse.success(reservation, "예약이 변경되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(reservation, "예약이 변경됐어요."));
     }
 
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<ApiResponse<Void>> cancelReservation(@PathVariable Long id) {
         reservationService.cancelReservation(id, SecurityUtil.getCurrentMember());
-        return ResponseEntity.ok(ApiResponse.success(null, "예약이 취소되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "예약이 취소됐어요."));
     }
 
     @DeleteMapping("/{id}/remove")
     public ResponseEntity<ApiResponse<Void>> removeReservation(@PathVariable Long id) {
         reservationService.removeReservation(id, SecurityUtil.getCurrentMember());
-        return ResponseEntity.ok(ApiResponse.success(null, "예약이 목록에서 제거되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "예약이 목록에서 제거됐어요."));
     }
 
     // --- 사업자용 API ---
@@ -164,7 +164,7 @@ public class ReservationApiController {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         reservationService.approveReservation(id, member);
-        return ResponseEntity.ok(ApiResponse.success(null, "예약이 승인되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "예약이 승인됐어요."));
     }
 
     @PatchMapping("/{id}/reject")
@@ -173,7 +173,7 @@ public class ReservationApiController {
         validateBusinessAuth(member);
         String reason = (body != null) ? body.get("rejectionReason") : null;
         reservationService.rejectReservation(id, member, reason);
-        return ResponseEntity.ok(ApiResponse.success(null, "예약이 거절되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "예약이 거절됐어요."));
     }
 
     /**
@@ -190,7 +190,7 @@ public class ReservationApiController {
         validateBusinessAuth(member);
         String reason = (body != null) ? body.get("cancelReason") : null;
         reservationService.cancelReservationByStore(id, member, reason);
-        return ResponseEntity.ok(ApiResponse.success(null, "예약이 취소되었습니다. 예약금은 전액 환불됩니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "예약이 취소됐어요. 예약금은 전액 환불돼요."));
     }
 
     /** 승인 되돌리기 — 오조작 정정용. 10분 이내만 허용되고 이용자에게 승인 취소 메일이 나간다. */
@@ -199,7 +199,7 @@ public class ReservationApiController {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         reservationService.undoApprove(id, member);
-        return ResponseEntity.ok(ApiResponse.success(null, "승인을 되돌렸습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "승인을 되돌렸어요."));
     }
 
     /** 이용완료 되돌리기 — 오조작 정정용. 10분 이내만 허용. */
@@ -208,7 +208,7 @@ public class ReservationApiController {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         reservationService.undoComplete(id, member);
-        return ResponseEntity.ok(ApiResponse.success(null, "이용완료를 되돌렸습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "이용완료를 되돌렸어요."));
     }
 
     @PatchMapping("/{id}/complete")
@@ -216,7 +216,7 @@ public class ReservationApiController {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         reservationService.completeReservation(id, member);
-        return ResponseEntity.ok(ApiResponse.success(null, "이용 완료 처리되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "이용 완료 처리됐어요."));
     }
 
     @PatchMapping("/{id}/no-show")
@@ -224,7 +224,7 @@ public class ReservationApiController {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         reservationService.markNoShow(id, member);
-        return ResponseEntity.ok(ApiResponse.success(null, "노쇼 처리되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "노쇼 처리됐어요."));
     }
 
     // QR 스캔을 통한 실제 방문 기록 — 승인 상태는 바꾸지 않고 checkedInAt만 기록
@@ -240,21 +240,21 @@ public class ReservationApiController {
         Member member = SecurityUtil.getCurrentMember();
         validateBusinessAuth(member);
         if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.QR_CHECKIN)) {
-            throw new ReservationException("QR 체크인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+            throw new ReservationException("QR 체크인 요청이 너무 많아요. 잠시 후 다시 시도해주세요.",
                     HttpStatus.TOO_MANY_REQUESTS);
         }
         String token = body.get("token");
         if (token == null || token.isBlank()) {
-            throw new ReservationException("QR 토큰이 없습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("QR 토큰이 없어요.", HttpStatus.BAD_REQUEST);
         }
         QrCheckinResponse result = reservationService.checkInByQrToken(token, member);
         return ResponseEntity.ok(ApiResponse.success(
-                result, result.isAlreadyCheckedIn() ? "이미 체크인된 예약입니다." : "체크인되었습니다."));
+                result, result.isAlreadyCheckedIn() ? "이미 체크인된 예약이에요." : "체크인됐어요."));
     }
 
     private void validateBusinessAuth(Member member) {
         if (!member.isBusiness() && !member.isAdmin()) {
-            throw ReservationException.forbidden("사업자 권한이 없습니다.");
+            throw ReservationException.forbidden("사업자 권한이 없어요.");
         }
     }
 
@@ -263,7 +263,7 @@ public class ReservationApiController {
         try {
             return Reservation.ReservationStatus.valueOf(status.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new ReservationException("올바르지 않은 예약 상태입니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("올바르지 않은 예약 상태예요.", HttpStatus.BAD_REQUEST);
         }
     }
 }

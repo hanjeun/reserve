@@ -84,7 +84,7 @@ export const VALIDATION_RULES = {
         },
     ],
     description: [
-        { max: 500, message: '최대 500자까지 입력 가능합니다' },
+        { max: 500, message: '최대 500자까지 입력할 수 있어요' },
     ],
     noShowDeposit: [
         { type: 'number', min: 0, max: 100000, message: '0~100,000원 사이로 입력해주세요' },
@@ -107,7 +107,7 @@ export const VALIDATION_RULES = {
             validator: (_rule, value) => {
                 if (!value?.[0] || !value[1]) return Promise.resolve();
                 if (toHm(value[0]) === toHm(value[1])) {
-                    return Promise.reject(new Error('오픈과 마감이 같습니다. 영업 시간을 확인해주세요'));
+                    return Promise.reject(new Error('오픈과 마감이 같아요. 영업 시간을 확인해주세요'));
                 }
                 return Promise.resolve();
             },
@@ -130,7 +130,7 @@ export const VALIDATION_RULES = {
                 const bs = toHm(value[0]);
                 const be = toHm(value[1]);
                 if (bs === be) {
-                    return Promise.reject(new Error('브레이크 시작과 종료가 같습니다'));
+                    return Promise.reject(new Error('브레이크 시작과 종료가 같아요'));
                 }
 
                 const times = getFieldValue('times');
@@ -140,7 +140,7 @@ export const VALIDATION_RULES = {
                 const close = toHm(times[1]);
                 if (bs < open || be > close) {
                     return Promise.reject(
-                        new Error(`브레이크 타임은 영업시간(${open}~${close}) 안에 있어야 합니다`));
+                        new Error(`브레이크 타임은 영업시간(${open}~${close}) 안에 있어야 해요`));
                 }
                 return Promise.resolve();
             },
@@ -159,7 +159,7 @@ export const VALIDATION_RULES = {
         { type: 'number', min: 1, max: 20, message: '1~20명 사이로 입력해주세요' },
     ],
     specialRequest: [
-        { max: 200, message: '최대 200자까지 입력 가능합니다' },
+        { max: 200, message: '최대 200자까지 입력할 수 있어요' },
     ],
 
     // ─── 회원 관련 ────────────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ export const VALIDATION_RULES = {
             validator: skipIfEmpty((v) =>
                 EMAIL_REGEX.test(v)
                     ? Promise.resolve()
-                    : Promise.reject(new Error('올바른 이메일 형식이 아닙니다'))
+                    : Promise.reject(new Error('올바른 이메일 형식이 아니에요'))
             ),
         },
     ],
@@ -186,9 +186,9 @@ export const VALIDATION_RULES = {
                 if (v.length < 8 || v.length > 64)
                     return Promise.reject(new Error('비밀번호는 8~64자로 입력해주세요'));
                 if (!/^(?=.*[a-zA-Z])(?=.*\d)/.test(v))
-                    return Promise.reject(new Error('영문과 숫자를 포함해야 합니다'));
+                    return Promise.reject(new Error('영문과 숫자를 포함해야 해요'));
                 if (new TextEncoder().encode(v).length > 72)
-                    return Promise.reject(new Error('비밀번호가 너무 깁니다. 영문 기준 72자 이내로 입력해주세요'));
+                    return Promise.reject(new Error('비밀번호가 너무 길어요. 영문 기준 72자 이내로 입력해주세요'));
                 return Promise.resolve();
             }),
         },
@@ -200,7 +200,7 @@ export const VALIDATION_RULES = {
         ({ getFieldValue }) => ({
             validator(_, value) {
                 if (!value || getFieldValue('password') === value) return Promise.resolve();
-                return Promise.reject(new Error('비밀번호가 일치하지 않습니다'));
+                return Promise.reject(new Error('비밀번호가 일치하지 않아요'));
             },
         }),
     ],

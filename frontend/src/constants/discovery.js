@@ -13,18 +13,21 @@ export const isDiscoveryRootPath = (pathname, search = '') => {
     const path = pathname.replace(/\/$/, '') || '/';
     if (path === '/stores') {
         const params = new URLSearchParams(search);
-        // 분야 사진·검색에서 진입하는 결과 목록은 탭 화면 안의 하위 화면이다.
-        if (params.get('domain')?.trim() || params.get('keyword')?.trim()) return false;
+        // 분야 필터는 탐색 탭 안에 남는다. 검색 결과만 검색 이전 페이지로 돌아가는 하위 화면이다.
+        if (params.get('keyword')?.trim()) return false;
     }
     return DISCOVERY_NAV_ITEMS.some(item => item.to === path);
 };
 
-// 홈·검색에서 같은 물체와 광학 크기를 사용한다. 배경 판이나 프레임을 덧붙이지 않는다.
+const domainFiles = import.meta.glob('../assets/service-domains/*-512.webp', { eager: true, query: '?url&no-inline', import: 'default' });
+const domainSources = Object.fromEntries(Object.entries(domainFiles).map(([path, url]) => [path.split('/').pop().replace('-512.webp', ''), url]));
+
+// 홈·검색·등록에서 같은 둥근 물체를 사용한다. 배경 판이나 프레임을 덧붙이지 않는다.
 export const SERVICE_DOMAIN_IMAGES = {
-    FOOD:          { asset: 'food', width: 57, height: 46 },
-    BEAUTY_CLINIC: { asset: 'beauty', width: 42, height: 53 },
-    SPORTS:        { asset: 'sports', width: 57, height: 45 },
-    PERFORMANCE:   { asset: 'class', width: 52, height: 50 },
-    POPUP:         { asset: 'popup', width: 42, height: 54 },
-    OTHER:         { asset: 'other', width: 53, height: 44 },
+    FOOD:          { asset: 'food', src: domainSources.food, width: 56, height: 56 },
+    BEAUTY_CLINIC: { asset: 'beauty', src: domainSources.beauty, width: 56, height: 56 },
+    SPORTS:        { asset: 'sports', src: domainSources.sports, width: 56, height: 56 },
+    PERFORMANCE:   { asset: 'class', src: domainSources.performance, width: 56, height: 56 },
+    POPUP:         { asset: 'popup', src: domainSources.popup, width: 56, height: 56 },
+    OTHER:         { asset: 'other', src: domainSources.other, width: 56, height: 56 },
 };

@@ -1,6 +1,7 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Typography, Tabs } from 'antd';
+import { Tabs } from 'antd';
 import {
     CalendarOutlined, SafetyCertificateOutlined, IdcardOutlined, MailOutlined,
     DeleteOutlined, FileTextOutlined, BarChartOutlined, TeamOutlined, ShopOutlined,
@@ -19,9 +20,8 @@ import BusinessVerificationTab from '../../components/admin/BusinessVerification
 import PaymentOperationsTab from '../../components/admin/PaymentOperationsTab';
 import { PageContainer } from '../../components/common';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
-import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
-const { Title, Text } = Typography;
+
 
 // 탭 라벨 공통 스타일
 const tabLabel = (icon, text) => (
@@ -75,10 +75,10 @@ const AdminPanel = () => {
     return (
         <PageContainer size="xl" paddingTop="40px">
             <div style={{ marginBottom: 40 }}>
-                <Title level={2} style={styles.title}>관리자 패널</Title>
-                <Text type="secondary" style={{ fontSize: fontSize.base }}>
+                <PageTitle style={styles.title}>관리자 패널</PageTitle>
+                <PageDescription>
                     사업자 인증 신청을 검토하고, 전체 예약 현황을 모니터링하세요.
-                </Text>
+                </PageDescription>
             </div>
 
             {/* NOTE: ref 및 scrollIntoView 제거 — iOS WebKit(Safari/Chrome)에서 viewport 전체를
@@ -96,7 +96,7 @@ const AdminPanel = () => {
 };
 
 const styles = {
-    title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
+    title: { margin: '0 0 8px', },
 };
 
 export default AdminPanel;

@@ -136,6 +136,8 @@ waiting:
     # 새 접수 자료에만 적용한다. 실제 게시 시각이 없으면 실행하지 않는다.
     enabled: ${WAITING_RETENTION_ENABLED:true}
     notice-published-at: ${WAITING_RETENTION_NOTICE_PUBLISHED_AT:}
+    # 직원 접수 고지 시각을 고객 접수 고지로 재사용하지 않는다. 비면 새 고객 접수·고객 정리를 중지한다.
+    customer-notice-published-at: ${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:}
 
 # Sentry 에러 모니터링
 sentry:

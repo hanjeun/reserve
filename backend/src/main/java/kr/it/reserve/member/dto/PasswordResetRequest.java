@@ -16,11 +16,11 @@ import lombok.Setter;
 public class PasswordResetRequest {
 
     @NotBlank(message = "이메일을 입력해주세요.")
-    @Email(message = "올바른 이메일 형식이 아닙니다.")
+    @Email(message = "올바른 이메일 형식이 아니에요.")
     private String email;
 
     @NotBlank(message = "인증 코드를 입력해주세요.")
-    @Pattern(regexp = "^\\d{6}$", message = "인증 코드는 6자리 숫자입니다.")
+    @Pattern(regexp = "^\\d{6}$", message = "인증 코드는 6자리 숫자예요.")
     private String code;
 
     @NotBlank(message = "새 비밀번호를 입력해주세요.")

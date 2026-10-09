@@ -184,7 +184,7 @@
 }
 .reserve-reservation-summary-card-trigger:focus { outline: none; }
 .reserve-reservation-summary-card-trigger:focus-visible::after {
-    outline: 2px solid var(--c-text-secondary, #4e5968);
+    outline: var(--reserve-focus-ring);
     outline-offset: -2px;
 }
 .reserve-reservation-summary-card-request {
@@ -303,7 +303,7 @@
     .reserve-mystore-add-row:hover { background: var(--c-gray-50, #f9fafb); }
 }
 .reserve-mystore-add-row:focus-visible,
-.reserve-mystore-list-action:focus-visible { outline: 2px solid var(--c-text-secondary); outline-offset: 2px; }
+.reserve-mystore-list-action:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 
 @media (max-width: 551px) {
     .reserve-store-list-row-actions { gap: 0; }

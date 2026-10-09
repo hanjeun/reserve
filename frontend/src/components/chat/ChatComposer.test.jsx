@@ -95,4 +95,13 @@ describe('shared chat composer', () => {
         fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
         expect(inputProps.onSend).not.toHaveBeenCalled();
     });
+    it('uses the shared spinner when a sending request cannot be interrupted', () => {
+        const inputProps = { ...props(), sending: true };
+        render(<ChatComposer {...inputProps} />);
+        const send = screen.getByRole('button', { name: '보내는 중' });
+        expect(send).toBeDisabled();
+        expect(send.querySelector('.reserve-arc-spinner')).not.toBeNull();
+        fireEvent.click(send);
+        expect(inputProps.onSend).not.toHaveBeenCalled();
+    });
 });

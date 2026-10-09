@@ -1,17 +1,34 @@
-import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import OperationGuide from './OperationGuide';
+import CommonGuide from './CommonGuide';
 
-describe('OperationGuide', () => {
-    it('keeps the public operating route focused on actual self-service paths and policy links', () => {
-        render(<MemoryRouter><OperationGuide /></MemoryRouter>);
+function RouteProbe() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    return <>
+        <output aria-label="현재 경로">{location.pathname + location.search + location.hash}</output>
+        <button type="button" onClick={() => navigate(-1)}>이전 페이지</button>
+    </>;
+}
 
-        expect(screen.getByRole('heading', { level: 2, name: '운영 안내' })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: /가게 탐색하기/ })).toHaveAttribute('href', '/stores');
-        expect(screen.getByRole('link', { name: /내 예약 확인하기/ })).toHaveAttribute('href', '/my-reservations');
-        expect(screen.getByRole('link', { name: /광고 관리 열기/ })).toHaveAttribute('href', '/business?tab=ads');
-        expect(screen.getByRole('link', { name: /콘텐츠 출처·권리 안내/ })).toHaveAttribute('href', '/content-sources');
+describe('OperationGuide legacy alias', () => {
+    it('replaces the legacy URL with the public common guide while preserving query and fragment', async () => {
+        const user = userEvent.setup();
+        render(<MemoryRouter initialEntries={['/stores', '/operation-guide?source=legacy#policy']} initialIndex={1}>
+            <Routes>
+                <Route path="/stores" element={<p>이전 가게 목록</p>} />
+                <Route path="/operation-guide" element={<OperationGuide />} />
+                <Route path="/guide/common" element={<CommonGuide />} />
+            </Routes>
+            <RouteProbe />
+        </MemoryRouter>);
+        expect(screen.getByRole('heading', { level: 1, name: '공통 이용안내' })).toBeInTheDocument();
+        expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/guide/common?source=legacy#policy');
+        await user.click(screen.getByRole('button', { name: '이전 페이지' }));
+        expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/stores');
+        expect(screen.getByText('이전 가게 목록')).toBeInTheDocument();
     });
 });

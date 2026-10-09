@@ -48,7 +48,7 @@ class ChatReportAuditServiceTest {
         Member member = Member.builder().id(7L).role(Role.USER).build();
 
         assertThatThrownBy(() -> service.recordAccess(member, 10L, 20L, ChatReportAccessAudit.Action.IMAGE))
-                .isInstanceOf(ChatException.class).hasMessage("접근 권한이 없습니다.");
+                .isInstanceOf(ChatException.class).hasMessage("접근 권한이 없어요.");
 
         verifyNoInteractions(audits);
     }

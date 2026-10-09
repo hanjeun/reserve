@@ -24,7 +24,10 @@ const isPage = value => /^[1-9]\d*$/.test(value)
 const schemas = {
     '/my-stores': { view: null, domain: domains, sort: ownerSorts },
     '/my-favorites': { view: null },
-    '/my-reservations': { view: null, status: reservationStatuses, sort: reservationSorts },
+    '/my-reservations': { view: null, status: reservationStatuses, sort: reservationSorts,
+        tab: new Set(['reservation', 'waiting']), waitingPage: value => isPage(value) && Number(value) <= 100_000,
+        waitingStatus: new Set(['ALL', 'WAITING', 'CALLED', 'SEATED', 'CANCELLED']),
+        waitingSort: new Set(['recent', 'oldest']), waitingKeyword: value => value.length <= 100 },
     '/stores': { view: null, keyword: null, domain: domains, sort: publicSorts,
         region: isRegion, page: isPage, lat: null, lng: null },
 };

@@ -165,7 +165,7 @@ const AuditLogTab = () => {
     if (error) {
         logsContent = (
             <DataState state="error" subject="시스템 로그" error={error}
-                onRetry={refetch} retrying={isFetching} compact />
+                onRetry={refetch} retrying={isFetching} />
         );
     } else if (loading || isPlaceholderData) {
         logsContent = (
@@ -193,7 +193,7 @@ const AuditLogTab = () => {
                     showSizeChanger: false,
                     onChange: (p) => setPage(p - 1),
                 }}
-                locale={{ emptyText: '시스템 로그가 없습니다.' }}
+                locale={{ emptyText: '시스템 로그가 없어요.' }}
             />
         );
     }
@@ -211,6 +211,7 @@ const AuditLogTab = () => {
                 count={totalElements}
                 onReload={refetch}
                 loading={loading || isFetching}
+                initialLoading={loading}
             />
 
             <div style={{
@@ -222,7 +223,7 @@ const AuditLogTab = () => {
                 fontSize: fontSize.sm,
                 color: colors.text.tertiary,
             }}>
-                소프트 삭제, 복구, 영구 삭제 등 관리자 행위가 기록됩니다. 로그는 90일 후 자동 삭제됩니다.
+                소프트 삭제, 복구, 영구 삭제 등 관리자 행위가 기록돼요. 로그는 90일 후 자동 삭제돼요.
             </div>
 
             {logsContent}

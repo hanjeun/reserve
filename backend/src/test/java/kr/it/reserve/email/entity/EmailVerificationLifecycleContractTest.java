@@ -24,7 +24,7 @@ class EmailVerificationLifecycleContractTest {
 
     @ParameterizedTest(name = "검증 시각: {0}, 인증 가능: {1}")
     @MethodSource("expiryBoundaryCases")
-    @DisplayName("저장 시 생성 시각을 기록하고 만료 시각을 지난 코드만 인증을 거절한다")
+    @DisplayName("저장 시 생성 시각을 기록하고 만료 시각부터 인증을 거절한다")
     void persistedCodeHonorsTheExactExpiryBoundary(LocalDateTime checkedAt, boolean accepted) {
         Clock issuedClock = Clock.fixed(Instant.parse("2026-10-03T03:00:00Z"), ZONE);
         Clock checkedClock = Clock.fixed(checkedAt.atZone(ZONE).toInstant(), ZONE);
@@ -48,7 +48,8 @@ class EmailVerificationLifecycleContractTest {
 
     private static Stream<Arguments> expiryBoundaryCases() {
         return Stream.of(
-                Arguments.of(EXPIRES_AT, true),
+                Arguments.of(EXPIRES_AT.minusNanos(1), true),
+                Arguments.of(EXPIRES_AT, false),
                 Arguments.of(EXPIRES_AT.plusNanos(1), false));
     }
 }

@@ -26,6 +26,7 @@
   /* --app-font는 useTheme가 <html>에 직접 세팅한다(글꼴 옵션).
      아직 세팅되기 전이거나 localStorage를 못 읽는 환경에서는 기존 값으로 폴백한다. */
   --app-font: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+  --reserve-focus-ring: 1px solid var(--c-gray-500, #8b95a1);
   font-family: var(--app-font);
 }
 
@@ -69,9 +70,36 @@ a {
   color: inherit;
 }
 
+/* Plain text links share one neutral color through navigation and pointer states. */
+a.reserve-text-link,
+a.reserve-text-link:visited,
+a.reserve-text-link:hover,
+a.reserve-text-link:focus,
+a.reserve-text-link:active {
+    color: var(--c-text-secondary, #4e5968);
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s ease;
+}
+a.reserve-text-link:is(:hover, :focus-visible, :active, [aria-current="page"]) {
+    text-decoration-color: currentColor;
+}
+
 /* button/input은 브라우저 기본값이 폰트 상속을 안 받아서(웹 표준 동작) 전역으로 맞춰줌 */
 button, input, textarea, select {
   font-family: inherit;
+}
+
+/* 기본 컨트롤도 키보드 이동에서만 같은 얇은 중립 포커스를 표시한다. */
+:where(button, a[href], [role="button"], [role="tab"], [role="menuitem"], [tabindex]):focus:not(:focus-visible) {
+    outline: none;
+}
+:where(button, a[href], [role="button"], [role="tab"], [role="menuitem"], [tabindex]):focus-visible,
+.ant-btn.ant-btn:not(:disabled):focus-visible {
+    outline: var(--reserve-focus-ring);
+    outline-offset: 2px;
 }
 
 /* ── 드롭다운(Select/FormSelect 등 "롤러") 옵션 목록 — hover/선택 항목 사이 여백 ──

@@ -39,6 +39,9 @@ export const shadows = {
   buttonActive: '0 15px 30px rgba(49, 130, 246, 0.3)',
 };
 
+export const stateIllustrationSize = Object.freeze({ sm: 64, md: 80, lg: 96 });
+export const stateIllustrationDesktopSize = Object.freeze({ sm: 72, md: 96, lg: 112 });
+
 export const heights = {
   header: '64px',
   buttonSm: '36px',

@@ -28,7 +28,7 @@ const editable = {
     reservationDate: '2026-10-01', reservationTime: '10:00:00', guestCount: 2, specialRequest: '',
 };
 
-const httpError = (status) => Object.assign(new Error('요청에 실패했습니다.'), { status });
+const httpError = (status) => Object.assign(new Error('요청에 실패했어요.'), { status });
 
 function renderEditHook(message) {
     const form = { setFieldsValue: vi.fn() };
@@ -76,7 +76,7 @@ describe('useStoreDetailActions edit lookup', () => {
         }); });
         expect(reservationService.updateReservation).not.toHaveBeenCalled();
         expect(reservationService.createReservation).not.toHaveBeenCalled();
-        expect(message.info).toHaveBeenCalledWith('예약 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+        expect(message.info).toHaveBeenCalledWith('예약 정보를 불러오는 중이에요. 잠시 후 다시 시도해주세요.');
     });
 
     it('keeps the customer on the page and retries after a network failure', async () => {
@@ -101,8 +101,8 @@ describe('useStoreDetailActions edit lookup', () => {
     });
 
     it.each([
-        [404, '예약을 찾을 수 없습니다.'],
-        [403, '변경할 수 없는 예약입니다.'],
+        [404, '예약을 찾을 수 없어요.'],
+        [403, '변경할 수 없는 예약이에요.'],
     ])('sends the customer back to their reservations for a %i that a retry cannot fix', async (status, text) => {
         reservationService.getReservation.mockRejectedValueOnce(httpError(status));
 

@@ -17,18 +17,18 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class ReservationCreateRequest {
     
-    @NotNull(message = "가게 ID는 필수입니다.")
+    @NotNull(message = "가게 ID는 필수예요.")
     private Long storeId;
     
-    @NotNull(message = "예약 날짜는 필수입니다.")
-    @FutureOrPresent(message = "예약 날짜는 현재 이후여야 합니다.")
+    @NotNull(message = "예약 날짜는 필수예요.")
+    @FutureOrPresent(message = "예약 날짜는 현재 이후여야 해요.")
     private LocalDate reservationDate;
     
-    @NotNull(message = "예약 시간은 필수입니다.")
+    @NotNull(message = "예약 시간은 필수예요.")
     private LocalTime reservationTime;
     
-    @NotNull(message = "예약 인원은 필수입니다.")
-    @Min(value = 1, message = "예약 인원은 최소 1명 이상이어야 합니다.")
+    @NotNull(message = "예약 인원은 필수예요.")
+    @Min(value = 1, message = "예약 인원은 최소 1명 이상이어야 해요.")
     private Integer guestCount;
     
     private String specialRequest;

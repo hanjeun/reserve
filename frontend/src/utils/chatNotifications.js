@@ -2,7 +2,7 @@ const THROTTLE_MS = 60000;
 const MAX_ROOMS = 50;
 const ROLES = new Set(['MEMBER', 'OWNER', 'ADMIN']);
 const TITLE = 'RESERVE 새 메시지';
-const BODY = '새 메시지가 도착했습니다. RESERVE에서 확인해주세요.';
+const BODY = '새 메시지가 도착했어요. RESERVE에서 확인해주세요.';
 const TAG = 'reserve-chat';
 
 const positiveId = (value) => (

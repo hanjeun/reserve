@@ -73,7 +73,7 @@ export default function HeroSection({ isMobile, prefersReducedMotion }) {
                 <div className="slide-up" style={{ animationDelay: '0.28s', textAlign: 'center' }}>
                     <Text style={styles.subTitle}>
                         기다림 없는 완벽한 하루를 위해,<br />
-                        원하는 예약을 가장 빠르게 도와드립니다.
+                        원하는 예약을 가장 빠르게 도와드려요.
                     </Text>
                 </div>
                 <div className="slide-up" style={{ animationDelay: '0.36s', marginTop: 32 }}>

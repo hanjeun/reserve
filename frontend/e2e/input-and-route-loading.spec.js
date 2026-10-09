@@ -15,6 +15,39 @@ test.beforeEach(async ({ page }) => {
     });
 });
 
+test('home messages opens the desktop panel in place and keeps the mobile route', async ({ page, isMobile }) => {
+    await page.goto('/');
+    const home = page.locator('.reserve-discovery-home');
+    await expect(home).toBeVisible();
+    await page.getByRole('link', { name: '메시지', exact: true }).click();
+    if (isMobile) {
+        await expect(page).toHaveURL(/\/messages$/);
+        await expect(page.locator('.reserve-messages-page')).toBeVisible();
+        await expect(page.locator('.reserve-messenger-launcher-wrap')).toHaveCount(0);
+    } else {
+        await expect(page).toHaveURL(/\/$/);
+        await expect(home).toBeVisible();
+        await expect(page.getByRole('dialog', { name: '메시지', exact: true })).toBeVisible();
+    }
+});
+
+test('guide selection and hover retain text color while the current guide is underlined', async ({ page }) => {
+    await page.goto('/guide/user');
+    const nav = page.getByRole('navigation', { name: '이용안내' });
+    const current = nav.getByRole('link', { name: '사용자 이용안내' });
+    const next = nav.getByRole('link', { name: '사업자 이용안내' });
+    const color = await current.evaluate(link => getComputedStyle(link).color);
+    await expect(next).toHaveCSS('color', color);
+    await next.hover();
+    await expect(next).toHaveCSS('color', color);
+    await expect(current).toHaveCSS('text-decoration-color', color);
+    await next.click();
+    const selected = nav.getByRole('link', { name: '사업자 이용안내' });
+    await expect(selected).toHaveAttribute('aria-current', 'page');
+    await expect(selected).toHaveCSS('color', color);
+    await expect(selected).toHaveCSS('text-decoration-color', color);
+});
+
 test('choice-only chat and profile settings retain focus without editable keyboard inputs', async ({ page }, testInfo) => {
     await page.goto('/messages');
     await page.getByRole('button', { name: '설정', exact: true }).click();
@@ -31,7 +64,7 @@ test('choice-only chat and profile settings retain focus without editable keyboa
     await color.press('Enter');
     await expect(page.locator('.reserve-chat-preferences .reserve-chat-color-option')).toHaveText('로즈');
     await expect(color).toBeFocused();
-    await expect(page.locator('.reserve-chat-preferences')).toContainText('앱의 포인트 색은 바뀌지 않습니다');
+    await expect(page.locator('.reserve-chat-preferences')).toContainText('앱의 포인트 색은 바뀌지 않아요.');
     await color.click();
     await expect(color).toHaveAttribute('aria-expanded', 'true');
     await page.screenshot({ path: testInfo.outputPath('chat-choice-only.png') });

@@ -45,8 +45,8 @@ public class ChatIntroController {
     public ResponseEntity<ApiResponse<ChatIntroResponse>> updateStore(
             @PathVariable Long storeId,
             @Valid @RequestBody ChatIntroRequest request) {
-        Member me = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member me = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         return ResponseEntity.ok(ApiResponse.success(
-                introService.updateStoreIntro(me, storeId, request), "자동 응답을 저장했습니다."));
+                introService.updateStoreIntro(me, storeId, request), "자동 응답을 저장했어요."));
     }
 }

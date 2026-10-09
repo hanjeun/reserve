@@ -46,11 +46,11 @@ export default function ChatRetentionModal({ reportId, onClose }) {
         mutationFn: ({ id, body }) => chatRetentionService.update(id, body),
         onSuccess: async () => {
             await client.invalidateQueries({ queryKey: ['admin', 'chatRetention'] });
-            message.success('자료 분류와 보존 설정을 저장했습니다.');
+            message.success('자료 분류와 보존 설정을 저장했어요.');
             setDraft(null);
             onClose();
         },
-        onError: (failure) => message.error(failure?.message || '보존 설정을 저장하지 못했습니다.'),
+        onError: (failure) => message.error(failure?.message || '보존 설정을 저장하지 못했어요.'),
     });
     const submit = () => {
         if (reportId == null || query.isPending || query.isError || save.isPending) return;
@@ -75,7 +75,7 @@ export default function ChatRetentionModal({ reportId, onClose }) {
             submitDisabled={query.isPending || query.isError}>
             {query.isPending ? <ModalLoading minHeight="160px" /> : query.isError ? (
                 <DataState state="error" kind="message" subject="보존 설정" error={query.error}
-                    onRetry={query.refetch} retrying={query.isFetching} compact />
+                    onRetry={query.refetch} retrying={query.isFetching} />
             ) : (
                 <>
                     <FormField label="자료 분류">
@@ -88,11 +88,11 @@ export default function ChatRetentionModal({ reportId, onClose }) {
                     </FormField>}
                     <FormField label="파기 보류">
                         <Checkbox checked={values.hold} onChange={(event) => update({ hold: event.target.checked })}>
-                            진행 중인 분쟁·조사로 파기를 보류합니다
+                            진행 중인 분쟁·조사로 파기를 보류해요
                         </Checkbox>
                     </FormField>
                     <Typography.Paragraph type="secondary">
-                        미처리·미분류 신고는 자동 파기하지 않습니다. 이미 확정한 법정 최소 보존기간은 분류를 바꿔도 줄어들지 않습니다.
+                        미처리·미분류 신고는 자동 파기하지 않아요. 이미 확정한 법정 최소 보존기간은 분류를 바꿔도 줄어들지 않아요.
                     </Typography.Paragraph>
                     <FormField label="변경 근거" error={error}>
                         <FormTextArea value={values.note} onChange={(event) => update({ note: event.target.value })}

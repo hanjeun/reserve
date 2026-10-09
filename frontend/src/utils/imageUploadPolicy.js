@@ -14,10 +14,10 @@ export const imageFileError = (file, maxBytes = MAX_IMAGE_REQUEST_BYTES) => {
     if ((!hasAllowedType && !hasAllowedExtension)
         || (hasDeclaredType && !hasAllowedType)
         || (hasExtension && !hasAllowedExtension)) {
-        return 'JPG · PNG · WEBP · GIF 이미지만 업로드할 수 있습니다.';
+        return 'JPG · PNG · WEBP · GIF 이미지만 업로드할 수 있어요.';
     }
     if (file.size > maxBytes) {
-        return `파일 크기는 ${Math.floor(maxBytes / 1024 / 1024)}MB 이하여야 합니다.`;
+        return `파일 크기는 ${Math.floor(maxBytes / 1024 / 1024)}MB 이하여야 해요.`;
     }
     return null;
 };

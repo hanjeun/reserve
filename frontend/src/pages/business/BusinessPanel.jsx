@@ -1,6 +1,7 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Pagination, Typography, Tabs } from 'antd';
+import { Pagination, Tabs } from 'antd';
 import {
     CalendarOutlined,
     PartitionOutlined,
@@ -22,14 +23,15 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDebounce from '../../hooks/useDebounce';
 import useMessage from '../../hooks/useMessage';
 import useViewModeParam from '../../hooks/useViewModeParam';
+import { resolveViewMode } from '../../utils/viewMode';
+import { WaitingTabSkeleton } from '../../components/waiting/WaitingSkeleton';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 import reservationService from '../../services/reservationService';
-import { colors, fontSize, fontWeight } from '../../styles/tokens';
+import { colors } from '../../styles/tokens';
 import businessTabSearch from './businessTabQuery';
 
-const { Title, Text } = Typography;
 const WaitingTab = lazy(() => import('../../components/business/WaitingTab'));
 
 // 상태 필터 목록은 constants/status.js 하나에서만 온다 —
@@ -76,8 +78,8 @@ const renderListBody = ({ loading, view, reservations, statusFilter, debouncedKe
         return (
             <DataState state="empty" kind="reservation" style={{ marginTop: 80 }}
                 title={statusFilter === 'ALL' && !debouncedKeyword.trim()
-                    ? '예약 내역이 없습니다.'
-                    : '조건에 맞는 예약이 없습니다.'} />
+                    ? '예약 내역이 없어요.'
+                    : '조건에 맞는 예약이 없어요.'} />
         );
     }
     return (
@@ -101,7 +103,7 @@ const renderMainContent = ({ error, myStoresError, myStoresLoading, busy, retryA
     if (error && myStoresError) {
         return (
             <DataState state="error" kind="reservation" subject="예약 관리 데이터"
-                title="예약 관리 데이터를 불러오지 못했습니다." error={error}
+                title="예약 관리 데이터를 불러오지 못했어요." error={error}
                 onRetry={retryAll} retrying={busy} />
         );
     }
@@ -158,15 +160,15 @@ const ReservationTab = () => {
     const handleRemove = (id) => {
         confirm({
             title: '예약 삭제',
-            content: '이 예약을 목록에서 삭제합니다. 되돌릴 수 없습니다.',
+            content: '이 예약을 목록에서 삭제해요. 되돌릴 수 없어요.',
             okText: '삭제', cancelText: '취소',
             okButtonProps: { danger: true }, centered: true,
             onOk: async () => {
                 try {
                     await reservationService.removeReservation(id);
-                    message.success('목록에서 제거되었습니다.');
+                    message.success('목록에서 제거됐어요.');
                     void refetch();
-                } catch { message.error('제거에 실패했습니다.'); }
+                } catch { message.error('제거에 실패했어요.'); }
             },
         });
     };
@@ -210,12 +212,14 @@ const ReservationTab = () => {
                 sortOptions={SORT_OPTIONS}
                 count={total}
                 disabled={loading || refetching}
+                initialLoading={loading || myStoresLoading}
                 label="사업자 예약 목록 필터"
             />
             <FilterToolbar
                 search={{ value: keyword, onChange: e => changeFilter({ reservationSearch: e.target.value }), placeholder: '가게명, 예약자로 검색' }}
                 onReload={refetch}
                 loading={loading || refetching}
+                initialLoading={loading}
             />
 
             {/* 가게 필터 목록과 예약 목록은 서로 독립 요청이다. 예약은 가게 목록 없이도 '전체 가게'로
@@ -280,7 +284,7 @@ const BusinessPanel = () => {
                     <ClockCircleOutlined />웨이팅
                 </span>
             ),
-            children: <Suspense fallback={<ReservationSummaryCardSkeleton count={3} />}><WaitingTab /></Suspense>,
+            children: <Suspense fallback={<WaitingTabSkeleton view={resolveViewMode('/business', new URLSearchParams(location.search), 'list')} />}><WaitingTab /></Suspense>,
         },
         {
             key: 'qr-checkin',
@@ -323,10 +327,10 @@ const BusinessPanel = () => {
     return (
         <PageContainer size="xl" paddingTop="40px">
             <div style={{ marginBottom: 40 }}>
-                <Title level={2} style={styles.title}>사업자 파트너 패널</Title>
-                <Text type="secondary" style={{ fontSize: fontSize.base }}>
+                <PageTitle style={styles.title}>사업자 파트너 패널</PageTitle>
+                <PageDescription>
                     예약 현황을 실시간으로 확인하고 승인·거절하세요.
-                </Text>
+                </PageDescription>
             </div>
             <Tabs
                 activeKey={activeTab}
@@ -357,7 +361,7 @@ const BusinessPanel = () => {
 };
 
 const styles = {
-    title: { fontWeight: fontWeight.extrabold, margin: '0 0 8px', color: colors.text.primary },
+    title: { margin: '0 0 8px', },
     list:    { display: 'flex', flexDirection: 'column', paddingBottom: 40 },
     divider: { height: 1, background: colors.border.light },
 };

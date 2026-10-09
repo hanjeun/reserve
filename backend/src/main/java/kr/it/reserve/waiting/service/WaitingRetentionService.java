@@ -25,21 +25,33 @@ public class WaitingRetentionService {
     private final WaitingEntryRepository entries;
     private final boolean enabled;
     private final Instant noticePublishedAt;
+    private final Instant customerNoticePublishedAt;
     private final Clock clock;
 
     @Autowired
     public WaitingRetentionService(WaitingEntryRepository entries,
                                    @Value("${waiting.retention.enabled:true}") boolean enabled,
-                                   @Value("${waiting.retention.notice-published-at:}") String notice) {
-        this(entries, enabled, notice, Clock.systemUTC());
+                                   @Value("${waiting.retention.notice-published-at:}") String notice,
+                                   @Value("${waiting.retention.customer-notice-published-at:}") String customerNotice) {
+        this(entries, enabled, notice, customerNotice, Clock.systemUTC());
     }
 
-    WaitingRetentionService(WaitingEntryRepository entries, boolean enabled, String notice, Clock clock) {
+    WaitingRetentionService(WaitingEntryRepository entries, boolean enabled, String notice, String customerNotice, Clock clock) {
         this.entries = entries;
         this.enabled = enabled;
         this.clock = clock;
         this.noticePublishedAt = parseNotice(notice, clock.instant());
+        this.customerNoticePublishedAt = parseNotice(customerNotice, clock.instant());
     }
+
+    public CustomerPolicy customerPolicy() {
+        Instant now = clock.instant();
+        boolean ready = enabled && noticePublishedAt != null && customerNoticePublishedAt != null
+                && !now.isBefore(noticePublishedAt) && !now.isBefore(customerNoticePublishedAt);
+        return new CustomerPolicy(customerNoticePublishedAt, ready, 7);
+    }
+
+    public record CustomerPolicy(Instant noticePublishedAt, boolean intakeReady, int finishedRecordRetentionDays) {}
 
     @Scheduled(fixedDelayString = "${waiting.retention.fixed-delay-ms:300000}", initialDelay = 30_000)
     @Transactional
@@ -48,11 +60,12 @@ public class WaitingRetentionService {
         if (!enabled || noticePublishedAt == null || now.isBefore(noticePublishedAt)) return;
         LocalDateTime dayStart = WaitingService.dayStartUtc(now.atZone(ServiceTime.ZONE).toLocalDate());
         LocalDateTime nowUtc = LocalDateTime.ofInstant(now, ZoneOffset.UTC);
+        boolean includeCustomers = customerPolicy().intakeReady();
         int closed = entries.cancelForDeletedStores(WaitingStatus.ACTIVE.stream().map(WaitingStatus::name).collect(Collectors.toSet()),
-                WaitingStatus.CANCELLED.name(), nowUtc);
+                WaitingStatus.CANCELLED.name(), nowUtc, includeCustomers);
         LocalDateTime cutoff = nowUtc.minusDays(7);
-        int minimized = entries.clearFinishedNames(WaitingStatus.TERMINAL, dayStart);
-        int deleted = entries.deleteFinishedBefore(WaitingStatus.TERMINAL, cutoff);
+        int minimized = entries.clearFinishedNames(WaitingStatus.TERMINAL, dayStart, includeCustomers);
+        int deleted = entries.deleteFinishedBefore(WaitingStatus.TERMINAL, cutoff, includeCustomers);
         if (closed > 0 || minimized > 0 || deleted > 0) {
             log.info("Waiting retention completed: closed={}, minimized={}, deleted={}", closed, minimized, deleted);
         }

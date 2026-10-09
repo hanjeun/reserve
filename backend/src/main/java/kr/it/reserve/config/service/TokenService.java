@@ -43,7 +43,7 @@ public class TokenService {
     /** 직전 토큰을 현재 토큰으로 인정해 주는 시간. 동시 요청·재시도만 흡수하면 되므로 짧게 둔다. */
     static final Duration PREVIOUS_TOKEN_GRACE = Duration.ofSeconds(60);
 
-    private static final String RELOGIN_MESSAGE = "로그인이 만료되었습니다. 다시 로그인해주세요.";
+    private static final String RELOGIN_MESSAGE = "로그인이 만료됐어요. 다시 로그인해주세요.";
 
     private final TokenProvider tokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;

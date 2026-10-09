@@ -180,10 +180,10 @@ test('both HTML CSP policies allow verified Kakao scripts without enabling eval 
     assert.equal(policies.length, 2);
     assert.equal(policies[0], policies[1]);
     const scripts = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('script-src ')).split(/\s+/);
-    assert.ok(scripts.includes('https://dapi.kakao.com'));
-    assert.ok(scripts.includes('https://t1.kakaocdn.net'));
-    assert.ok(!scripts.includes("'unsafe-eval'"));
-    assert.ok(!scripts.includes('https://*.kakaocdn.net'));
+    assert.deepEqual(scripts, [
+        'script-src', "'self'", 'https://cdn.portone.io', 'https://dapi.kakao.com',
+        'https://t1.kakaocdn.net', 'https://*.daumcdn.net',
+    ]);
     assert.doesNotMatch(nginx, /add_header\s+Content-Security-Policy\s/);
 });
 

@@ -30,7 +30,7 @@ const openRegistrationOperation = async page => {
     await page.getByRole('group', { name: '예약 방식', exact: true })
         .getByRole('button', { name: '시간대', exact: true }).click();
     await page.getByRole('button', { name: '다음', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '언제, 몇 명까지 받을까요?', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '언제 가게를 운영하시나요?', exact: true })).toBeVisible();
 };
 
 const continueToIdentity = async page => {
@@ -40,6 +40,11 @@ const continueToIdentity = async page => {
     await hours.getByRole('textbox', { name: '종료 시간 직접 입력', exact: true }).fill('18:00');
     await hours.getByRole('button', { name: '선택 완료', exact: true }).click();
     await expect(page.getByLabel('영업 시간', { exact: true })).toHaveText(/09:00.*18:00/);
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '예약을 어떤 규칙으로 받을까요?', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '노쇼 예약금을 설정하실 건가요?', exact: true })).toBeVisible();
+    await page.getByRole('radio', { name: '예약금 없이 받기', exact: true }).click();
     await page.getByRole('button', { name: '다음', exact: true }).click();
     await expect(page.getByRole('heading', { name: '손님에게 가게를 소개해주세요.', exact: true })).toBeVisible();
 };
@@ -205,48 +210,61 @@ test('store registration uses the shared calendar and restores a browser-local d
     )).toBe(true);
 });
 
-test('mobile registration and editing keep short operation fields in paired columns', async ({ page }, testInfo) => {
-    // 운영 질문의 짧은 필드가 모바일에서도 두 열 안에 들어가는지 확인한다.
+test('mobile registration and editing keep booking, payment and refund fields in their own questions', async ({ page }, testInfo) => {
     test.skip(!testInfo.project.name.includes('mobile'), '모바일 레이아웃 전용 검증');
 
-    const verifyCompactRows = async () => {
-        const fields = page.locator('.reserve-onboarding-step:not([hidden]) .reserve-onboarding-fields');
-        await expect(fields).toBeVisible();
-        await expect(page.getByLabel('최대 예약 인원', { exact: true })).toBeVisible();
-        await expect(page.getByLabel('노쇼 예약금', { exact: true })).toBeVisible();
-        const expectedPairs = [
-            ['전액 환불 기준', '부분 환불 기준'],
-            ['부분 환불율', '결제 마감'],
-        ];
-        const items = fields.locator('.ant-form-item');
-        await expect(items).toHaveCount(expectedPairs.length * 2);
-        for (let index = 0; index < expectedPairs.length; index += 1) {
-            for (let column = 0; column < 2; column += 1) {
-                await expect(items.nth(index * 2 + column)).toContainText(expectedPairs[index][column]);
-            }
-            const allBoxes = await items.evaluateAll(elements => elements.map(item => {
-                const rect = item.getBoundingClientRect();
-                return { top: rect.top, width: rect.width };
-            }));
-            const boxes = allBoxes.slice(index * 2, index * 2 + 2);
-            expect(boxes).toHaveLength(2);
-            expect(Math.abs(boxes[0].top - boxes[1].top)).toBeLessThan(2);
-            expect(boxes.every(box => box.width > 100)).toBe(true);
+    const verifyFields = async labels => {
+        for (const label of labels) {
+            const control = page.getByLabel(label, { exact: true });
+            await expect(control).toBeVisible();
+            const box = await control.boundingBox();
+            expect(box.width).toBeGreaterThan(100);
+            expect(box.x).toBeGreaterThanOrEqual(0);
+            expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize().width + 1);
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     };
 
     await openRegistrationOperation(page);
+    await verifyFields(['영업 시간', '운영 기간']);
+    await expect(page.getByLabel('최대 예약 인원', { exact: true })).toBeHidden();
+    await page.getByLabel('영업 시간', { exact: true }).click();
+    const hours = page.getByRole('dialog', { name: '시간 범위 선택' });
+    await hours.getByRole('textbox', { name: '시작 시간 직접 입력', exact: true }).fill('09:00');
+    await hours.getByRole('textbox', { name: '종료 시간 직접 입력', exact: true }).fill('18:00');
+    await hours.getByRole('button', { name: '선택 완료', exact: true }).click();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '예약을 어떤 규칙으로 받을까요?', exact: true })).toBeVisible();
+    await verifyFields(['최대 예약 인원', '예약 가능 기간', '예약 마감']);
+    await expect(page.getByLabel('노쇼 예약금', { exact: true })).toBeHidden();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await page.getByRole('radio', { name: '예약금 설정하기', exact: true }).click();
     await page.getByLabel('노쇼 예약금', { exact: true }).fill('1000');
-    await verifyCompactRows();
-    await continueToIdentity(page);
+    await page.getByRole('radio', { name: '나중 결제도 허용', exact: true }).click();
+    await verifyFields(['노쇼 예약금', '결제 마감']);
+    await expect(page.getByLabel('전액 환불 기준', { exact: true })).toBeHidden();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '예약금을 언제까지 돌려드릴까요?', exact: true })).toBeVisible();
+    await verifyFields(['전액 환불 기준', '부분 환불 기준', '부분 환불율']);
+    await expect(page.getByLabel('결제 마감', { exact: true })).toBeHidden();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
     await expect(page.getByLabel('연락처', { exact: true })).toBeVisible();
     await expect(page.getByRole('group', { name: '예약 방식', exact: true })).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
     await page.goto('/store/99/edit');
-    await selectEditSection(page, '운영 설정', '언제, 몇 명까지 받을까요?');
-    await verifyCompactRows();
+    await selectEditSection(page, '예약 접수 규칙', '예약을 어떤 규칙으로 받을까요?');
+    await verifyFields(['최대 예약 인원', '예약 가능 기간', '예약 마감']);
+    await expect(page.getByLabel('노쇼 예약금', { exact: true })).toBeHidden();
+    await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
+    await selectEditSection(page, '노쇼 예약금·결제', '노쇼 예약금을 설정하실 건가요?');
+    await page.getByRole('radio', { name: '예약금 설정하기', exact: true }).click();
+    await page.getByLabel('노쇼 예약금', { exact: true }).fill('1000');
+    await page.getByRole('radio', { name: '나중 결제도 허용', exact: true }).click();
+    await verifyFields(['노쇼 예약금', '결제 마감']);
+    await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
+    await selectEditSection(page, '취소·환불 정책', '예약금을 언제까지 돌려드릴까요?');
+    await verifyFields(['전액 환불 기준', '부분 환불 기준', '부분 환불율']);
     await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
     await selectEditSection(page, '예약 방식', '손님이 무엇을 선택하면 되나요?');
     await expect(page.getByLabel('시간 선택 간격', { exact: true })).toBeVisible();
@@ -292,8 +310,8 @@ test('store editing reserves its selection skeleton while the initial data is de
         await expect(skeleton.locator('..').locator('.reserve-onboarding-heading')).toHaveText('무엇을 수정하시겠어요?');
         await expect(skeleton.locator('..').locator('.reserve-onboarding-edit-selection')).toBeVisible();
         const choices = skeleton.locator('..').locator('.reserve-service-domain-option');
-        await expect(choices).toHaveCount(6);
-        for (let index = 0; index < 6; index += 1) {
+        await expect(choices).toHaveCount(9);
+        for (let index = 0; index < 9; index += 1) {
             const choice = choices.nth(index);
             await expect(choice).toBeVisible();
             const media = choice.locator('.reserve-service-domain-option__media > .reserve-skeleton-block');

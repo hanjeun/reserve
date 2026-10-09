@@ -48,15 +48,15 @@ const openRegistrationOperation = async page => {
     await page.getByRole('group', { name: '예약 방식', exact: true })
         .getByRole('button', { name: '시간대', exact: true }).click();
     await page.getByRole('button', { name: '다음', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '언제, 몇 명까지 받을까요?', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '언제 가게를 운영하시나요?', exact: true })).toBeVisible();
 };
 
 const openEditOperation = async page => {
     await page.goto('/store/99/edit');
     await expect(page.getByRole('heading', { name: '무엇을 수정하시겠어요?', exact: true })).toBeVisible();
     await page.getByRole('group', { name: '수정할 항목', exact: true })
-        .getByRole('button', { name: '운영 설정', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '언제, 몇 명까지 받을까요?', exact: true })).toBeVisible();
+        .getByRole('button', { name: '영업 일정', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '언제 가게를 운영하시나요?', exact: true })).toBeVisible();
 };
 
 const openHours = async page => {
@@ -125,8 +125,12 @@ test('an empty range requires both times and keeps calendar styling within the v
     })).toBe(true);
     await dialog.getByRole('button', { name: '다음', exact: true }).click();
     await expect(trigger).toContainText('시작 시간');
-    await dialog.getByRole('listbox', { name: '오전·오후' }).press('ArrowDown');
-    await dialog.getByRole('listbox', { name: '시', exact: true }).press('ArrowUp');
+    await expect(dialog.getByRole('listbox', { name: '오전·오후' })).toHaveCount(0);
+    const hours = dialog.getByRole('listbox', { name: '시', exact: true });
+    await expect(hours.getByRole('option')).toHaveCount(24);
+    await hours.press('End');
+    await hours.press('ArrowUp');
+    await hours.press('ArrowUp');
     await dialog.getByRole('listbox', { name: '분', exact: true }).press('PageDown');
     await dialog.getByRole('button', { name: '선택 완료' }).click();
     await expect(trigger).toContainText('09:00');
@@ -235,10 +239,9 @@ test('break-time bounds remain enforced by the existing form validation', async 
     const trigger = page.getByLabel('브레이크 타임', { exact: true });
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: '시간 범위 선택' });
-    await dialog.getByRole('listbox', { name: '오전·오후' }).press('Home');
     await dialog.getByRole('listbox', { name: '시', exact: true }).press('Home');
     await dialog.getByRole('button', { name: '선택 완료' }).click();
-    await expect(trigger).toHaveText(/01:00.*13:00/);
+    await expect(trigger).toHaveText(/00:00.*13:00/);
     await expect(page.getByText(/브레이크 타임은 영업시간/)).toBeVisible();
     await expect(trigger).not.toHaveAttribute('aria-invalid', /.*/);
     await expect(trigger).toHaveAttribute('aria-describedby', /breakTimes_help/);
@@ -298,7 +301,7 @@ test('a new key or range tab supersedes an unfinished animation without a late s
     await observeScroll(minutes);
     await expect(selectedMinute(dialog)).toHaveText('00');
     await centeredMinute(dialog);
-    await expect(dialog.getByRole('listbox', { name: '시', exact: true }).getByRole('option', { selected: true })).toHaveText('06');
+    await expect(dialog.getByRole('listbox', { name: '시', exact: true }).getByRole('option', { selected: true })).toHaveText('18');
 });
 
 const equalActions = async (dialog, confirmText) => {

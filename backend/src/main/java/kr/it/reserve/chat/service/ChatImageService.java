@@ -54,7 +54,9 @@ public class ChatImageService {
         var message = messages.findById(messageId)
                 .orElseThrow(() -> new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         chatService.assertImageReader(message.getRoom().getId(), member);
-        if (message.isRetracted()) throw new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
+        if (message.isRetracted() || chatService.isMessageHidden(member.getId(), messageId)) {
+            throw new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
+        }
         return readContent(message);
     }
 

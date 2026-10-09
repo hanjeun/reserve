@@ -31,6 +31,7 @@ class ChatConcurrencyGuardTest {
     @Mock private ChatMessageRepository messageRepository;
     @Mock private MemberRepository memberRepository;
 
+    @Mock private kr.it.reserve.chat.repository.ChatMessageHiddenRepository hiddenRepository;
     @InjectMocks
     private ChatService chatService;
 

@@ -43,9 +43,26 @@ const applyChanges = (previous, incoming) => {
     let changed = false;
     const next = previous.map(message => {
         const update = changes.get(message.id);
-        if (!update || (message.retracted && update.retracted && message.expired === update.expired)) return message;
+        if (!update || message.hidden || (message.retracted && update.retracted
+            && message.expired === update.expired && !update.hidden)) return message;
         changed = true;
-        return { ...message, ...update };
+        return update.hidden ? withoutHiddenContent({ ...message, ...update }) : { ...message, ...update };
+    });
+    return changed ? next : previous;
+};
+
+const withoutHiddenContent = message => ({ ...message, hidden: true, content: null, imageUrl: null,
+    imageOriginalFilename: null, imageWidth: null, imageHeight: null, canRetract: false });
+
+// 개인 삭제도 읽음·페이지 커서의 ID는 보존한다. 이미 삭제한 내용을 낡은 응답으로 복구하지 않는다.
+const applyHidden = (previous, ids) => {
+    if (!ids?.length) return previous;
+    const hidden = new Set(ids);
+    let changed = false;
+    const next = previous.map(message => {
+        if (message.hidden || !hidden.has(message.id)) return message;
+        changed = true;
+        return withoutHiddenContent(message);
     });
     return changed ? next : previous;
 };
@@ -128,7 +145,8 @@ export default function useChatThread({
     // 같은 식별자를 보내 서버가 기존 한 줄을 돌려주게 한다.
     const retryRef = useRef(null);
     useLayoutEffect(() => {
-        const active = { scope, sending: false, ready: false, invalidated: false, pollAfterId: 0, changeRevision: 0, catchingUp: false, pendingPolled: false };
+        const active = { scope, sending: false, ready: false, invalidated: false, pollAfterId: 0, changeRevision: 0,
+            hiddenCursor: 0, catchingUp: false, pendingPolled: false };
         activeRef.current = active;
         return () => {
             active.requestController?.abort();
@@ -203,11 +221,12 @@ export default function useChatThread({
                     if (!pollChanges || active.pollingChanges || document.visibilityState === 'hidden'
                         || !alive || activeRef.current !== active || active.invalidated || !active.ready) return;
                     active.pollingChanges = true;
-                    return pollChanges(roomId, active.changeRevision).then(changes => {
+                    return pollChanges(roomId, active.changeRevision, active.hiddenCursor).then(changes => {
                         if (!alive || activeRef.current !== active || active.invalidated) return;
-                        setMessages(previous => applyChanges(previous, changes?.messages));
+                        setMessages(previous => applyHidden(applyChanges(previous, changes?.messages), changes?.hiddenMessageIds));
                         active.changeRevision = changes?.nextRevision ?? active.changeRevision;
-                        if (changes?.messages?.length) onChanged?.();
+                        active.hiddenCursor = changes?.nextHiddenId ?? active.hiddenCursor;
+                        if (changes?.messages?.length || changes?.hiddenMessageIds?.length) onChanged?.();
                     }).catch(() => { /* 커서는 성공했을 때만 진행한다. 다음 폴링에서 재조회한다. */ })
                         .finally(() => { active.pollingChanges = false; });
                 })
@@ -308,7 +327,7 @@ export default function useChatThread({
     const captureHistory = useCallback(() => {
         const active = activeRef.current;
         if (!active || active.scope !== scope || !active.ready || active.invalidated) return null;
-        return { active, changeRevision: active.changeRevision };
+        return { active, changeRevision: active.changeRevision, hiddenCursor: active.hiddenCursor };
     }, [scope]);
 
     const prepend = useCallback((olderMessages, snapshot) => {
@@ -316,7 +335,7 @@ export default function useChatThread({
         if (!active || active.scope !== scope || !active.ready || active.invalidated) return false;
         // 조회 사이 취소 커서가 진행했다면 오래된 원문을 붙이지 않고 호출부가 재조회한다.
         if (snapshot !== undefined && (!snapshot || snapshot.active !== active
-            || snapshot.changeRevision !== active.changeRevision)) return false;
+            || snapshot.changeRevision !== active.changeRevision || snapshot.hiddenCursor !== active.hiddenCursor)) return false;
         setMessages((prev) => prependById(prev, olderMessages));
         return true;
     }, [scope]);

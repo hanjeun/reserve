@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /** MessengerShell 한 줄. 보는 위치에 따라 상대 이름과 안 읽음 수를 명시적으로 만든다. */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class ConversationSummaryResponse {
     public static final String SUPPORT_NAME = "RESERVE 고객지원";
 

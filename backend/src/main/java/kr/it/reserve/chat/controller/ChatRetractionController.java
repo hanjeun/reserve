@@ -29,8 +29,9 @@ public class ChatRetractionController {
 
     @GetMapping("/retractions")
     public ResponseEntity<ApiResponse<ChatRetractionService.Retractions>> changes(
-            @PathVariable Long roomId, @RequestParam(defaultValue = "0") long afterRevision) {
+            @PathVariable Long roomId, @RequestParam(defaultValue = "0") long afterRevision,
+            @RequestParam(defaultValue = "0") long afterHiddenId) {
         var actor = SecurityUtil.getCurrentMember("로그인이 필요해요.");
-        return ResponseEntity.ok(ApiResponse.success(retractions.changes(actor, roomId, afterRevision), "조회 성공"));
+        return ResponseEntity.ok(ApiResponse.success(retractions.changes(actor, roomId, afterRevision, afterHiddenId), "조회 성공"));
     }
 }

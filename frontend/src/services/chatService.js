@@ -25,8 +25,12 @@ const chatService = {
         API_ENDPOINTS.CHAT.ADMIN_POLL(roomId), { params: { afterId } }),
     sendAdminSupportRoom: (roomId, content, clientMessageId, config) => api.post(
         API_ENDPOINTS.CHAT.ADMIN_REPLY(roomId), messageBody(content, clientMessageId), config),
-    retract: (roomId, messageId) => api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`),
-    pollRetractions: (roomId, afterRevision = 0) => api.get(`/api/chat/rooms/${roomId}/retractions`, { params: { afterRevision } }),
+    retract: (roomId, messageId, config) => config
+        ? api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`, undefined, config)
+        : api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/retract`),
+    hideMessage: (roomId, messageId, config) => api.post(`/api/chat/rooms/${roomId}/messages/${messageId}/hide`, undefined, config),
+    pollRetractions: (roomId, afterRevision = 0, afterHiddenId = 0) => api.get(`/api/chat/rooms/${roomId}/retractions`,
+        { params: { afterRevision, ...(afterHiddenId ? { afterHiddenId } : {}) } }),
     markAdminSupportRead: (roomId, readThroughId) => readThroughId == null
         ? api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId))
         : api.post(API_ENDPOINTS.CHAT.ADMIN_READ(roomId), undefined, { params: { readThroughId } }),

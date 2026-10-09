@@ -16,19 +16,36 @@ RESERVE MySQL의 백업 구성과 복원 절차예요.
 
 2026-10-09 02:14~02:18 KST 읽기 전용 재조회에서 root cron의 `10 18 * * * reserve-backup`과 두 설정 파일의 `600 root`를 확인했어요. 최신 로컬 파일은 `/var/backups/reserve/reserve-20261007-181001.sql.gz`(14,687바이트, `600 root`)예요. 로그에는 35테이블 검증과 같은 이름의 S3 `mysql/` 객체 업로드·정상 종료가 기록돼 있어요. 이번 조회에서 S3를 별도 다운로드하거나 이 최신 파일을 격리 복원하지는 않았어요. 아래 10/2·10/3의 **34테이블** 독립 복원 근거를 새 35테이블 백업의 복원 성공으로 재사용하지 않아요. Codex의 확인 예약과 이 실제 서버 cron은 다른 작업이에요.
 
-같은 조회에서 정기 덤프 디렉터리 `/var/backups/reserve`는 `755 ubuntu`로, 아래의 `700 root` 보관 기준과 달랐어요. `/var/backups/reserve-scripts`는 `700 root`였어요. 새 사전 백업 전에 경로·소유권·cron의 접근을 확인하고 승인된 운영 준비에서 정기 보관 경로도 기준에 맞춰야 해요. 이번에는 권한·소유권을 변경하지 않았어요.
+같은 조회에서 정기 덤프 디렉터리 `/var/backups/reserve`는 `755 ubuntu`로, 아래의 `700 root` 보관 기준과 달랐어요. `/var/backups/reserve-scripts`는 `700 root`였어요. 승인된 10/9 첫 전환 준비에서 정기 보관 디렉터리를 **`700 root`**로 보완했어요. root cron의 접근을 유지하고 기존 덤프 9개의 해시가 모두 같음을 확인했어요.
 
 2026-10-09 **11:29~11:30 KST** 재조회에서는 새 정기 파일 `/var/backups/reserve/reserve-20261008-181001.sql.gz`(14,689바이트, `600 root`)과 같은 실행의 35테이블·S3 업로드 완료 기록을 확인했어요. cron·설정 파일 권한과 위 디렉터리 소유권 차이는 그대로예요. 업로드 전용 자격의 S3 `HeadObject` 403은 조회 권한의 한계이며 객체 부재를 뜻하지 않아요.
 
 이후 사용자가 로그인한 **별도 CloudShell 읽기 접근**으로 같은 객체의 14,689바이트·수정 시각 `2026-10-08T18:10:05Z`·`AES256` 암호화와 VersionId `.HAxBE2YxQsiGPC_.IAuWMKqfm6x5KpN`을 확인하고, `/home/cloudshell-user/reserve-backups/20261009/reserve-20261008-181001.sql.gz`에 받았어요. CloudShell 디렉터리는 `700`, 파일은 `600`이며 원문을 출력하지 않았어요. 서버 원본과 다운로드본의 SHA-256은 모두 `633ecf9a0f93b9c29212823b40ce804eae1495985afd6fd39d638e2a894eaaa4`예요.
 
-같은 날 이 파일을 PC의 USER·SYSTEM 전용 보호 경로 `C:/Users/USER/AppData/Local/RESERVE/release-prep/20261009/backups/`로 전송해 같은 크기·해시와 gzip 무결성을 확인했어요. 새 전용 볼륨을 사용하는 로컬 Docker MySQL **8.0.45**의 격리 복원 DB에서 **35테이블·61행**을 복원했고, DDL 11→12→13 적용 전후 모든 기존 컬럼의 행·값 digest가 같았어요. 기존 제약 86개·인덱스 구성 요소 173개·CHECK 3개·FK 연결 27개를 보존했으며 새 컬럼 7개·강제 CHECK 2개·고객 조회 인덱스와 이메일 unique/중복 0을 대조했어요. 기존 CHECK 문자열의 문자셋 표기 정규화는 허용 상태 값·강제 여부와 구분해 확인했어요. 운영 DB 복원·운영 DDL·새 운영 사전 백업은 실행하지 않았고, 적용 직전의 새 백업과 독립 읽기·복원 관문은 그대로 남아요.
+같은 날 이 정기 파일을 PC의 USER·SYSTEM 전용 보호 경로 `C:/Users/USER/AppData/Local/RESERVE/release-prep/20261009/backups/`로 전송해 같은 크기·해시와 gzip 무결성을 확인했어요. 새 전용 볼륨을 사용하는 로컬 Docker MySQL **8.0.45**의 격리 복원 DB에서 **35테이블·61행**을 복원했고, DDL 11→12→13 적용 전후 모든 기존 컬럼의 행·값 digest가 같았어요. 기존 제약 86개·인덱스 구성 요소 173개·CHECK 3개·FK 연결 27개를 보존했으며 새 컬럼 7개·강제 CHECK 2개·고객 조회 인덱스와 이메일 unique/중복 0을 대조했어요. 기존 CHECK 문자열의 문자셋 표기 정규화는 허용 상태 값·강제 여부와 구분해 확인했어요. 이 준비 검사는 아래의 새 직전 백업과 실제 운영 JAR 검증을 대신하지 않아요.
 
 같은 격리 DB에서 후보 `verify-post-deploy-readonly.sh`의 실제 SQL·판별식은 정상 정의를 통과시키고, `waiting_intake_mode`의 잘못된 기본값·강제하지 않는 CHECK·잘못된 고객 목록 인덱스 순서를 각각 거부했어요. 각 합성 변경은 전용 DDL 계정으로 즉시 복구했고 마지막 정상 실행도 통과했어요. 전후 35테이블·61행의 기존/신규 컬럼 값·행 수와 전체 컬럼/제약/인덱스/FK 메타데이터가 동일해요. 제한된 앱 계정과 검사 관문을 완화하지 않았으며 운영에서 실행한 결과는 아니에요.
 
 실제 `reserve-2.9.0.jar`(87,331,568바이트·SHA-256 `c557f774f35177e3aae247d11b37cf23a0144d7524a2e28253be30a5c51b741b`)로 Java 21의 독립 `VerifyDatabaseSchema`를 실행해 **제한된 `reserve_app`·34개 엔티티 모델·`validate` 통과**를 확인했어요. Spring·스케줄러·외부 연동을 시작하지 않았고 검증 전후 전체 데이터/메타데이터가 동일해요. Windows의 긴 경로 때문에 클래스는 원본 547개 바이트가 같은 class-JAR로, 라이브러리는 원본 136개 JAR로 로드했으며 검증 대상은 원래 실행 JAR이에요. 격리 가입 합성 DB는 검사 종료 뒤 0테이블이에요.
 
-같은 JAR로 로컬 복구 이미지 `reserve-local:v2.9.0-c557f774f351`을 새로 만들고 내부 `/app.jar` 해시·비루트 UID 100·Java 21·두 호환 라벨을 확인했어요. 보호된 `release-prep/20261009/recovery/reserve-v2.9.0-c557f774f351.tar`는 244,337,152바이트·SHA-256 `2594d1654871c6b1b6ca32b93c9ca49840dfef397577f93f4b523d28db3ec5773`예요. 구 운영 이미지를 다시 표기한 것이 아니며 레지스트리 push·서버 설치·실제 앱 health 확인은 하지 않았어요. 미커밋 후보 산출물이고, 첫 운영 호환 기본 릴리스의 승인·전환과 현재 설정 보존은 여전히 [배포 런북](deployments.md)의 별도 절차예요.
+같은 로컬 후보 JAR로 복구 이미지 `reserve-local:v2.9.0-c557f774f351`을 새로 만들고 내부 `/app.jar` 해시·비루트 UID 100·Java 21·두 호환 라벨을 확인했어요. 보호된 `release-prep/20261009/recovery/reserve-v2.9.0-c557f774f351.tar`는 244,337,152바이트·SHA-256 `2594d1654871c6b1b6ca32b93c9ca49840dfe397577f93f4b523d28db3ec5773`예요. 구 운영 이미지를 다시 표기한 것이 아니며 **이 로컬 후보 이미지**는 레지스트리 push·서버 설치·실제 앱 health 확인에 사용하지 않았어요. 이후 최종 main의 원격 빌드 이미지로 진행한 운영 호환 전환·현재 설정 보존은 [배포 런북](deployments.md)과 아래 실제 보관 이력을 따라요.
+
+### 2026-10-09 첫 전환의 새 직전 백업
+
+승인된 첫 전환에서 공개 503을 연속 확인하고 구 blue 앱을 멈춰 Java writer 0을 확인한 뒤 새 백업을 만들었어요. 사전 보관 경로는 `/var/backups/reserve-scripts/20261009T062420Z-before-customer-waiting-signup/`이며 디렉터리 `700 root`·설정/백업 파일 `600 root`예요. 구 이미지 244,276,736바이트와 구 프론트 7,084,834바이트도 별도 보호 export로 보존했어요.
+
+새 파일 `database/reserve-20261009-063011.sql.gz`는 **14,688바이트**, SHA-256 **`41a76b0b1539ad6d4c1f864ed30202983f12eeefbe7110312ae1094199bb8f65`**예요. gzip CRC·덤프 종료 표식·35테이블/61행·S3 업로드를 확인했어요. 독립 CloudShell 접근에서 `s3://reserve-it-kr-backup/mysql/reserve-20261009-063011.sql.gz`의 같은 크기, `AES256`, VersionId `z95pnpYuPFM.eLj2bkecTPad4VdPdsdD`, 수정 시각 `2026-10-09T06:30:15Z`를 확인하고 실제 다운로드했어요. `/home/cloudshell-user/reserve-backup-verification/20261009/`는 700·파일은 600이며 gzip 검사와 서버 원본의 해시 일치도 통과했어요. 원문 덤프·키·자격은 출력하지 않았어요.
+
+보호된 PC 복사도 USER·SYSTEM 전용 ACL과 같은 크기·해시를 확인했어요. 새 로컬 격리 DB `reserve_restore_main_20261009_062420`의 MySQL 8.0.45에 **이 직전 백업을 실제 복원**해 35테이블·61행과 서버 사전 스냅샷의 원래 컬럼 row digest가 같음을 확인했어요. 격리 `reserve_ddl`로 11→12→13을 적용하고 기존 값·메타데이터 의미, 새 7컬럼·강제 CHECK 2개와 세 가게의 `OFF`·일시 중지 false·예약 true를 대조했어요. 최종 원격 JAR **87,331,569바이트·SHA-256 `7d569faca35745721ab2b0be6ae16238d0456d1f76dddab5ec5e266115d454d1`**로 15:36:35 KST에 격리 제한 계정 `validate` 34모델, 15:38:51 KST에 SQL verifier를 통과했어요. 라이브러리 136개·클래스 547개도 원본 바이트를 유지했어요. 이 검사 뒤 실제 운영 DDL과 제한된 `reserve_app` 검증까지 통과한 시각은 [DDL 이력](manual-ddl.md#11-고객-웨이팅-확장-2026-10-09-운영-ddl-적용)을 따라요.
+
+### 2026-10-09 적용 후 설정과 호환 복구 보관
+
+공개 재개와 실제 고객 고지 반영 뒤 **16:04:16 KST**의 `/var/backups/reserve-scripts/20261009T070416Z-after-customer-waiting-signup/`에 사후 설정·green/Nginx/MySQL 정의·구 blue 자료를 함께 보관했어요. 디렉터리 `700 root`·파일 `600 root`이고 기존 키·직원/채팅 고지와 새 고객 고지 **`2026-10-09T06:54:37Z`**를 유지해요. **16:06:27 KST**의 제한 계정 조회에서 원래 35테이블·61행 값 digest와 DDL 직후 메타데이터가 모두 같았으며 기존 정기 덤프 9개도 변경하지 않았어요.
+
+- 직후 `reserve-20261009-070416.sql.gz`는 **14,867바이트·SHA-256 `f597dd25f51368155b5bdd47e1a956dd7813a04927ce1317dfe2bfe116c638a3`**예요. 서버 gzip·35테이블·S3 업로드를 확인했어요. 독립 CloudShell 읽기 접근에서도 같은 객체의 `AES256`·VersionId `zMvnsQ.0x5ftMTAt8l3ab6Sn6Hi_bCLY`·수정 시각 `2026-10-09T07:04:19Z`를 확인하고 실제 다운로드했어요. **16:09:42 KST**에 `/home/cloudshell-user/reserve-backup-verification/20261009/reserve-20261009-070416.sql.gz`의 `600`·gzip 무결성·서버 해시 일치를 확인했어요. 이 다운로드 검증과 직전 덤프의 실제 격리 복원은 서로 다른 근거예요.
+- 같은 사후 경로의 `compatible-backend.tar`는 **244,330,496바이트·SHA-256 `3f43e022910882629c22c079be98e9f3b7aaf47bf7214e3c8cc6a44ce04df438`**예요. 최종 image digest `sha256:7c13f58c62a9de5b0c7673b6347f859edde8c702254b87d6b5cce5f2a3f9b3c2`의 실제 index → manifest → config와 모든 layer의 descriptor·크기·blob 해시, 두 호환 라벨을 대조했어요. Docker 29의 manifest image ID와 config ID는 서로 다른 객체이며 이를 같다고 가정하지 않아요.
+- `compatible-frontend.tar.gz`는 **8,731,011바이트·SHA-256 `6324b0fb55af8d6c9854e315d4ae9483979bf8bbf4c04dc5db30f52d3fba8549`**예요. 실제 프론트와 JAR store-shell의 HTML, release 식별자가 최종 main `b32c08943c5215ebaf589b1311efefc01f6c4024`와 일치해요. 이 이미지·프론트·사후 설정은 새 고객 명단·QR·접수/예약 차단·가입 증명을 이해하는 실제 복구 입력이에요. 구 이미지 export는 원래 자료 보존용이며 새 기능이 사용된 뒤 단독 앱 롤백 대상으로 쓰지 않아요.
+- 같은 POST의 `compatible-recovery.tar.gz`는 **251,929,721바이트·SHA-256 `4e71835e0e90f035e3c14ee5549a85e879cabb2fc0d99be77fd6fc60f5478f2f`**예요. 새 이미지·프론트·현재 환경/역할·직후 DB·현재 메타데이터를 묶고 필수 복구물 7개·tar entry 28개를 확인했어요. **16:13:11 KST**에 이 묶음과 직후 덤프를 PC의 `C:/Users/USER/AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local/RESERVE/release-prep/20261009/production/20261009T070416Z/`로 binary 복사해 USER·SYSTEM 전용 ACL·크기·해시를 대조했어요. 이 파일에는 보호 환경값이 있으므로 Git·일반 Downloads·공개 첨부에 올리지 않아요. **16:15:20 KST**의 마지막 읽기 전용 consistent snapshot과 health 조회도 기존 데이터/메타데이터·세 가게 설정·최종 SHA·고객 정책의 일치를 확인했어요. 운영 DB를 덮어쓰는 전체 복원이나 실제 운영 rollback 훈련은 실행하지 않았어요.
 
 > **2026-10-02 검증:** 별도 읽기 접근으로 받은 S3 객체 `mysql/reserve-20260930-181001.sql.gz`는
 > 13,883바이트이며 SHA-256은 `8c886711714827452cbb9e813c49520b58ddbed784791e830e0428c06064f1d6`이다.
@@ -49,7 +66,7 @@ RESERVE MySQL의 백업 구성과 복원 절차예요.
 
 ### 고객 웨이팅·새 접수 설정 출시 전 백업과 복구 준비
 
-최종 기능 범위가 정해지면 [수동 DDL](manual-ddl.md) 11·12절의 `store`·`waiting_entry`를, 가입 인증 보완까지 포함하면 13절의 `email_verification`·`member`도 대상으로 삼아요. 사전 전체 덤프는 기존 백업 스크립트로 만들고, 실제 시각의 `/var/backups/reserve-scripts/<UTC시각>-before-customer-waiting-signup/`에 대상 정의·행 수·기존 값과 함께 보호해요. 원본 디렉터리 700·파일 600·root 소유를 유지하고 일반 다운로드·채팅·로그로 개인정보나 키를 옮기지 않아요. 이 경로와 새 백업 생성은 승인된 운영 작업 때 확정하며 아직 실행하지 않았어요.
+최종 기능 범위가 정해지면 [수동 DDL](manual-ddl.md) 11·12절의 `store`·`waiting_entry`를, 가입 인증 보완까지 포함하면 13절의 `email_verification`·`member`도 대상으로 삼아요. 사전 전체 덤프는 기존 백업 스크립트로 만들고, 실제 시각의 `/var/backups/reserve-scripts/<UTC시각>-before-customer-waiting-signup/`에 대상 정의·행 수·기존 값과 함께 보호해요. 원본 디렉터리 700·파일 600·root 소유를 유지하고 일반 다운로드·채팅·로그로 개인정보나 키를 옮기지 않아요. 첫 전환의 실제 보관 경로와 생성·독립 복원은 위 이력을 따르며 이후 운영 변경도 해당 시각의 새 백업과 승인을 확인해요.
 
 출시 관문에서는 별도 읽기 접근으로 받은 실제 백업의 해시·종료 표식을 대조하고, 운영과 같은 MySQL 8.0.45의 **격리 대상**에 복원해요. 새 스키마 추가 뒤 후보 앱의 제한된 계정 `validate`와 unique·CHECK·인덱스를 대조해요. 서버의 `reserve-restore --target reserve_restore_<이름>`는 같은 운영 MySQL에 새 DB를 만드는 쓰기 작업이므로 별도 승인 없이는 쓰지 않아요. 현재 단계에는 실제 운영 롤백 훈련·스트레스·다중 인스턴스 시험을 추가하지 않아요.
 
@@ -61,7 +78,7 @@ RESERVE MySQL의 백업 구성과 복원 절차예요.
 
 고객 고지의 실제 게시 시각·이미지 SHA·신규 설정 값을 복구 입력으로 보관해요. 키는 기존 보호 보관본을 유지하고, 복구 시각을 새 게시 시각으로 입력하지 않아요. 채팅의 30일 유예나 고지 시각도 앞당기지 않아요. 기존 ZIP·Blender/PNG·QR 캡처·동결 라이선스·고유 운영 근거·복구용 Promtail/positions를 백업 정리 대상에 넣지 않아요.
 
-자동 cutover는 이전·새 이미지의 `reserve.feature-compat=waiting-signup-v1`과 기존 스키마/환불 표식을 요구해요. 현재 운영 이미지는 새 기능 복구 대상이 아니므로, 승인된 첫 전환에서 호환 기본 릴리스를 준비해야 해요. 라벨만 복사해서 호환성을 만들지 않아요. 최종 후보와 복구 후보의 실제 QR·접수 설정·예약 차단·가입 증명 동작과 제한된 앱 계정의 `validate`를 확인해요. 이 문서 작성 시점에는 해당 복구 이미지 빌드나 운영 전환을 실행하지 않았어요.
+자동 cutover는 이전·새 이미지의 `reserve.feature-compat=waiting-signup-v1`과 기존 스키마/환불 표식을 요구해요. 전환 전 blue는 새 기능 복구 대상이 아니므로 승인된 첫 전환에서 최종 main의 호환 기본 릴리스를 별도로 설치했어요. 라벨만 복사해서 호환성을 만들지 않아요. 이후에도 복구 후보의 실제 QR·접수 설정·예약 차단·가입 증명 코드와 제한된 앱 계정의 `validate`를 확인해요. 새 설정과 고지 시각을 보관한 실제 사후 경로는 위 이력을 따라요.
 
 ## 1. 설치 (서버에서 1회)
 

@@ -190,3 +190,46 @@ it('keeps final edit validation and returns to the preview after correcting a fi
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     expect(submit.mock.calls[0][0].phone).toBe('02-5555-5555');
 });
+
+it('saves a free reservation edit with no cutoff or inactive payment and refund inputs', async () => {
+    render(<Harness mode="edit" initialValues={{ ...complete, _onboardingStep: 'review', bookingDeadlineHours: null,
+        noShowDeposit: 0, allowLatePayment: true, paymentTimeoutMinutes: undefined, fullRefundDays: undefined,
+        partialRefundDays: undefined, partialRefundRate: undefined }} />);
+    await screen.findByRole('region', { name: '가게 상세 미리보기' });
+    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0][0]).toMatchObject({ noShowDeposit: 0, allowLatePayment: false, bookingDeadlineHours: 0 });
+});
+
+it('moves payment timing into its own question and keeps the stored timeout when the branch is hidden', async () => {
+    render(<Harness mode="edit" initialValues={{ ...complete, noShowDeposit: 3000, allowLatePayment: false, paymentTimeoutMinutes: 60 }} />);
+    await screen.findByRole('button', { name: '노쇼 예약금·결제' });
+    fireEvent.click(screen.getByRole('button', { name: '노쇼 예약금·결제' }));
+    await screen.findByRole('heading', { name: '노쇼 예약금을 설정하실 건가요?' });
+    expect(screen.getByLabelText('결제 마감')).not.toBeVisible();
+    fireEvent.click(screen.getByRole('radio', { name: '나중 결제도 허용' }));
+    expect(await screen.findByLabelText('결제 마감')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: '신청할 때 결제' }));
+    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    const preview = await screen.findByRole('region', { name: '가게 상세 미리보기' });
+    expect(within(preview).getByText('신청할 때 결제')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect(submit.mock.calls[0][0]).toMatchObject({ noShowDeposit: 3000, allowLatePayment: false, paymentTimeoutMinutes: 60 });
+});
+
+it('routes a cutoff preview edit to booking rules and returns without losing a holiday or period', async () => {
+    const period = [dayjs('2026-10-01'), dayjs('2026-12-31')];
+    const holidays = [dayjs('2026-11-01')];
+    render(<Harness mode="edit" initialValues={{ ...complete, _onboardingStep: 'review', operatingPeriod: period, closedDates: holidays }} />);
+    const preview = await screen.findByRole('region', { name: '가게 상세 미리보기' });
+    fireEvent.click(within(preview).getByRole('button', { name: '예약 마감 수정' }));
+    await screen.findByRole('heading', { name: '예약을 어떤 규칙으로 받을까요?' });
+    act(() => { expect(requestRegistrationStepBack()).toBe(true); });
+    await screen.findByRole('region', { name: '가게 상세 미리보기' });
+    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    const data = buildStoreFormData(submit.mock.calls[0][0]);
+    expect(data.get('closeDate')).toBe('2026-12-31');
+    expect(data.getAll('closedDates')).toEqual(['2026-11-01']);
+});

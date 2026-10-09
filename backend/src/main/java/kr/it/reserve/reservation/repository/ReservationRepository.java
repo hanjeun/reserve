@@ -19,6 +19,17 @@ import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
+    /** 가게 행 잠금 아래에서 검사한다. 이미 약속한 유료 예약의 환불 기준을 변경하지 않는다. */
+    @Query("""
+            SELECT COUNT(r) > 0 FROM Reservation r
+             WHERE r.store.id = :storeId
+               AND ((COALESCE(r.depositAmount, 0) > 0 AND r.status IN :activeStatuses)
+                 OR (r.reservationDate >= :today AND EXISTS (
+                      SELECT p.id FROM Payment p WHERE p.reservation = r AND p.status = 'PAID' AND p.amount > 0)))
+            """)
+    boolean existsRefundPolicyObligation(@Param("storeId") Long storeId,
+            @Param("activeStatuses") List<Reservation.ReservationStatus> activeStatuses, @Param("today") LocalDate today);
+
     /** QR 중복 스캔과 운영 상태 변경이 같은 예약을 동시에 덮어쓰지 않도록 잠근다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH s.owner JOIN FETCH r.member WHERE r.id = :id")

@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { AppstoreOutlined, CalendarOutlined, ClockCircleOutlined, PictureOutlined, QrcodeOutlined, ShopOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CalendarOutlined, ClockCircleOutlined, PictureOutlined, QrcodeOutlined, ShopOutlined, ProfileOutlined, WalletOutlined, RollbackOutlined } from '@ant-design/icons';
 import IconChoicePicker from '../common/IconChoicePicker';
 import { STORE_EDIT_SECTIONS, STORE_EDIT_SELECTION_HELP } from '../../utils/storeOnboarding';
 
@@ -10,18 +10,13 @@ const SECTION_ICONS = {
     waiting: QrcodeOutlined,
     operation: ClockCircleOutlined,
     identity: PictureOutlined,
-};
-const SECTION_ASSETS = {
-    industry: 'edit-industry',
-    service: 'intake-both',
-    booking: 'intake-reservation',
-    waiting: 'waiting-both',
-    operation: 'edit-operation',
-    identity: 'edit-identity',
+    'booking-policy': ProfileOutlined,
+    deposit: WalletOutlined,
+    refund: RollbackOutlined,
 };
 const SECTION_OPTIONS = STORE_EDIT_SECTIONS.map(section => {
     const Icon = SECTION_ICONS[section.value];
-    return { ...section, asset: SECTION_ASSETS[section.value], icon: <Icon /> };
+    return { ...section, icon: <Icon /> };
 });
 
 export default function StoreEditSelection({ onSelectStep, disabled = false }) {

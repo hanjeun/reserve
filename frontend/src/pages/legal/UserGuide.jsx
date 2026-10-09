@@ -9,6 +9,7 @@ export default function UserGuide() {
         reservation: <>
             <GuideParagraph>로그인한 뒤 예약을 받는 가게에서 가능한 날짜와 시간을 선택해 예약을 신청해요. 날짜만 고르는 가게와 정해진 회차를 고르는 가게도 있으므로 화면에 표시되는 방식을 따라주세요.</GuideParagraph>
             <GuideParagraph>신청 결과와 예약 상태는 내 예약에서 확인해요. 예약금이 있는 경우 결제 안내와 마감, 변경·취소 조건을 확인해주세요. 신청 후에는 내 예약의 현재 상태에서 예약 확정과 결제 여부를 확인해요.</GuideParagraph>
+            <GuideParagraph>예약금이 없는 가게에서는 결제하지 않아요. 예약금을 받는 가게는 신청할 때 결제하거나, 나중 결제를 허용한 경우 내 예약에서 결제할 수 있어요. 나중 결제에 마감이 설정되어 있으면 시간 안에 결제해주세요.</GuideParagraph>
             <GuideLinks links={[{ to: '/my-reservations', label: '내 예약 확인하기' }]} />
         </>,
         waiting: <>

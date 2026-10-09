@@ -46,9 +46,9 @@ const appendHours = (fd, values) => {
         fd.append('openTime',  values.times[0].format('HH:mm'));
         fd.append('closeTime', values.times[1].format('HH:mm'));
     }
-    if (values.breakTimes?.[0] && values.breakTimes?.[1]) {
-        fd.append('breakStartTime', values.breakTimes[0].format('HH:mm'));
-        fd.append('breakEndTime',   values.breakTimes[1].format('HH:mm'));
+    if (Object.hasOwn(values, 'breakTimes')) {
+        fd.append('breakStartTime', formatValue(values.breakTimes?.[0], 'HH:mm') || '');
+        fd.append('breakEndTime', formatValue(values.breakTimes?.[1], 'HH:mm') || '');
     }
 };
 
@@ -81,7 +81,7 @@ export const buildStoreFormData = (values) => {
     fd.append('partialRefundRate', values.partialRefundRate ?? 50);
 
     // 예약 슬롯 정책
-    fd.append('maxCapacityPerSlot', optionalString(values.maxCapacityPerSlot));
+    if (Object.hasOwn(values, 'maxCapacityPerSlot')) fd.append('maxCapacityPerSlot', optionalString(values.maxCapacityPerSlot));
     fd.append('autoApprovalEnabled',      boolString(values.autoApprovalEnabled));
     fd.append('allowLatePayment',          boolString(values.allowLatePayment));
     fd.append('allowDuplicateReservation', boolString(values.allowDuplicateReservation));
@@ -92,45 +92,43 @@ export const buildStoreFormData = (values) => {
         fd.append('imageAutoplayEnabled', boolString(values.imageAutoplayEnabled));
     }
 
-    // 예약 마감 시간 (없으면 미전송 → 백엔드 null = 제한 없음)
-    appendOptional(fd, 'bookingDeadlineHours', values.bookingDeadlineHours);
+    // 누락 = 유지, 명시적인 0/빈 값 = 제한 없음.
+    if (Object.hasOwn(values, 'bookingDeadlineHours')) fd.append('bookingDeadlineHours', optionalString(values.bookingDeadlineHours));
 
     // ── 휴무 (2026-08-11) ────────────────────────────────────────────────────
     // ⚠️ multipart 에서 배열은 **같은 키를 여러 번 append** 해야 스프링이 List 로 바인딩한다.
     //    JSON.stringify 로 보내면 List<Integer> 에 못 꽂히고 400 이 난다.
     //
-    // ⚠️ 값이 없어도 키를 하나는 보내야 한다. 아무것도 안 보내면 스프링이 필드를 null 로 두는데,
-    //    서비스는 "항상 덮어쓰기"라 null → 빈 목록이 되어 결과적으로는 같다. 다만 그건 우연히
-    //    맞는 것이라, 빈 문자열을 명시적으로 보내 "비우겠다"는 의도를 드러낸다.
-    //    (백엔드 normalizeClosedDays/Dates 가 빈 값·형식 오류를 걸러낸다.)
-    appendList(fd, 'closedDays', (values.closedDays ?? []).map(String));
+    // 누락은 기존 값 유지, 빈 문자열은 명시적 해제다.
+    if (Object.hasOwn(values, 'closedDays')) appendList(fd, 'closedDays', (values.closedDays ?? []).map(String));
 
     const closedDates = (values.closedDates ?? [])
         .map(d => formatValue(d, 'YYYY-MM-DD'))
         .filter(Boolean);
-    appendList(fd, 'closedDates', closedDates);
+    if (Object.hasOwn(values, 'closedDates')) appendList(fd, 'closedDates', closedDates);
 
     // 예약 방식 (2026-08-24). 값이 없으면 서버가 SLOT 으로 흡수하지만,
     // 명시적으로 보내는 편이 "무엇을 의도했는지"가 드러난다.
-    fd.append('bookingType', values.bookingType || 'SLOT');
+    if (Object.hasOwn(values, 'bookingType')) fd.append('bookingType', values.bookingType || 'SLOT');
 
-    // 회차 목록 — 휴무와 같은 이유로 빈 값이라도 키를 하나 보낸다(서버가 항상 덮어쓴다).
+    // 회차 목록 — 명시적으로 비운 경우에만 빈 문자열을 보낸다.
     // ★ SESSION 이 아닐 때도 보낸다. 서버가 방식에 따라 버릴지 말지 정한다 —
     //   프론트가 미리 거르면 두 곳이 같은 규칙을 알고 있어야 해서 언젠가 어긋난다.
     const sessionTimes = (values.sessionTimes ?? [])
         .map(t => formatValue(t, 'HH:mm'))
         .filter(Boolean);
-    appendList(fd, 'sessionTimes', sessionTimes);
+    if (Object.hasOwn(values, 'sessionTimes')) appendList(fd, 'sessionTimes', sessionTimes);
 
-    // 운영 기간 (2026-08-24). 휴무와 같은 이유로 **빈 값이라도 키를 보낸다** —
-    // 서버가 항상 덮어쓰기라, 안 보내면 기간을 지우려는 조작이 조용히 무시된다.
+    // 운영 기간: 누락은 유지, 입력 필드를 비우면 두 경계를 명시적으로 해제한다.
     const period = values.operatingPeriod ?? [];
     const toIso = (d) => formatValue(d, 'YYYY-MM-DD') || '';
-    fd.append('openDate',  toIso(period[0]));
-    fd.append('closeDate', toIso(period[1]));
+    if (Object.hasOwn(values, 'operatingPeriod')) {
+        fd.append('openDate', toIso(period[0]));
+        fd.append('closeDate', toIso(period[1]));
+    }
 
     // 빈 값 = 제한 없음
-    fd.append('maxAdvanceBookingDays', optionalString(values.maxAdvanceBookingDays));
+    if (Object.hasOwn(values, 'maxAdvanceBookingDays')) fd.append('maxAdvanceBookingDays', optionalString(values.maxAdvanceBookingDays));
 
     fd.append('paymentTimeoutMinutes',  values.paymentTimeoutMinutes  ?? 30);
     fd.append('reservationSlotMinutes', values.reservationSlotMinutes ?? 30);

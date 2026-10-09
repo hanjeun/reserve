@@ -78,7 +78,7 @@ RESERVE MySQL의 백업 구성과 복원 절차예요.
 
 고객 고지의 실제 게시 시각·이미지 SHA·신규 설정 값을 복구 입력으로 보관해요. 키는 기존 보호 보관본을 유지하고, 복구 시각을 새 게시 시각으로 입력하지 않아요. 채팅의 30일 유예나 고지 시각도 앞당기지 않아요. 기존 ZIP·Blender/PNG·QR 캡처·동결 라이선스·고유 운영 근거·복구용 Promtail/positions를 백업 정리 대상에 넣지 않아요.
 
-자동 cutover는 이전·새 이미지의 `reserve.feature-compat=waiting-signup-v1`과 기존 스키마/환불 표식을 요구해요. 전환 전 blue는 새 기능 복구 대상이 아니므로 승인된 첫 전환에서 최종 main의 호환 기본 릴리스를 별도로 설치했어요. 라벨만 복사해서 호환성을 만들지 않아요. 이후에도 복구 후보의 실제 QR·접수 설정·예약 차단·가입 증명 코드와 제한된 앱 계정의 `validate`를 확인해요. 새 설정과 고지 시각을 보관한 실제 사후 경로는 위 이력을 따라요.
+v2.9.0의 자동 cutover는 이전·새 이미지의 `reserve.feature-compat=waiting-signup-v1`과 기존 스키마/환불 표식을 요구했어요. v2.10.0 이후에는 이 문서의 개인 삭제 복구 절에 명시한 `waiting-signup-hidden-v2`를 사용해요. 전환 전 blue는 새 기능 복구 대상이 아니므로 승인된 첫 전환에서 최종 main의 호환 기본 릴리스를 별도로 설치했어요. 라벨만 복사해서 호환성을 만들지 않아요. 이후에도 복구 후보의 실제 QR·접수 설정·예약 차단·가입 증명 코드와 제한된 앱 계정의 `validate`를 확인해요. 새 설정과 고지 시각을 보관한 실제 사후 경로는 위 이력을 따라요.
 
 ## 1. 설치 (서버에서 1회)
 
@@ -479,8 +479,26 @@ HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없�
 | 2026-10-02 | 최소 권한 합성 fixture | 현재 백업 스크립트로 12테이블·뷰·프로시저·트리거·이벤트 복원 성공; `SHOW_ROUTINE` 누락 시 성공 코드의 프로시저 생략 재현; S3 업로드 stub, 운영 계정 불변 |
 | 2026-10-03 | S3 `reserve-20261002-181001.sql.gz`, 34 tables·13,943 bytes | CloudShell·PC 독립 다운로드와 서버 SHA-256 일치; 격리 MySQL 8.0.45 복원 34테이블·62행 및 `CHECK TABLE` 34건 성공; `token_hash` INSTANT DDL 확인; 운영 DB 복원 아님 |
 
-## 개인 메시지 삭제의 후속 복구 준비 (운영 미적용)
+## v2.10.0 개인 메시지 삭제의 복구 보관
 
 `manual-ddl.md` 14절의 개인 삭제는 `chat_message_hidden`과 본인 메시지 조회·사진·폴링 관문을 함께 사용해요. 개인 삭제가 사용된 뒤 v2.9.0 앱만 복원하면 본인에게 숨겼던 내용이 다시 보일 수 있어요. 신규 테이블·표시 설정·원문·신고 증거를 유지하는 새 백엔드, 같은 기능의 프론트, 현재 환경값과 직전 백업을 복구 묶음으로 확보해요. 테이블을 제거하거나 v2.9.0 이미지를 다시 표시해서 이 복구 조건을 대신하지 않아요.
 
 후속 자동 배포는 `reserve.feature-compat=waiting-signup-hidden-v2`를 기존·대상 이미지 양쪽에 요구해요. 기존 예약·웨이팅·가입 설정 복구 조건도 포함하며, 실제 JAR의 개인 삭제 코드를 검사한 새 이미지에만 표식을 붙여요. 최초 전환은 새 승인과 새 백업·격리 복원·제한된 앱 계정의 전체 새 JAR `validate`·호환 이미지 확인 후 진행해요. 10/9의 개인 삭제 MySQL 3개는 데이터 없는 별도 합성 DB 검사이고, 운영/사후 백업의 전체 복원 훈련이나 새 복구 이미지의 완성 근거로 재사용하지 않아요.
+
+### 실제 사전 백업과 새 JAR의 복원 검증
+
+사전 경로는 `/var/backups/reserve-scripts/20261009T091240Z-before-private-messages/`예요. 공개 503·구 green 중지·앱 writer 0 뒤 만든 `database/reserve-20261009-092520.sql.gz`는 **14,863바이트·SHA-256 `bffd97a53524f2fca1ba83f84db2c963507a0f8ad778f85c38f1a92b75a573c7`**예요. 독립 CloudShell에서 S3 VersionId `a84Brbf1gc2jFzeCSBp3V6bfQYIDJd_k`를 실제 다운로드하고 gzip·크기·해시를 확인했어요.
+
+로컬 MySQL 8.0.45의 `reserve_restore_v210_20261009_092520`에 복원해 기존 35테이블·61행과 전체 값/메타데이터가 같음을 확인한 뒤 DDL 14절을 적용했어요. 36테이블 CHECK, 기존 데이터/메타데이터 보존, 새 unique·FK·개인 커서 인덱스, 실제 새 JAR의 제한된 `reserve_app` `validate` 35모델을 통과했어요. 운영에서도 같은 SQL과 전체 JAR 검증을 완료했으며 상세 시각은 [DDL 14절](manual-ddl.md#14-메시지-나에게만-삭제-v2100-운영-적용)을 따라요.
+
+새 main SHA는 `6fdaafa36dc0a1340a75adea2243c9ef5c1829e4`, 실제 image digest는 **`sha256:5d9f3dcfae6175a9ca4a694a00f88f4ba3b617233889be0f3bdec83986c947ab`**예요. Docker export의 실제 JAR과 비루트 `appuser`·개인 삭제 호환 표식을 확인했어요. 전환 전의 `compatible-recovery.tar.gz` **252,047,375바이트·SHA-256 `bb5a5b3deb1ec1bec158e7c378f4e7af6e7bd1774a59b51ebe531c5f37066e12`**에는 실제 새 백엔드·같은 프론트·현재 설정·사전 덤프·14절 SQL·검증 결과가 있어요. USER·SYSTEM 전용 PC 사본도 동일한 해시로 확보한 뒤 공개 전환했어요.
+
+### 적용 후 상태와 개인 삭제 호환 복구 보관
+
+사후 경로는 `/var/backups/reserve-scripts/20261009T094216Z-after-private-messages/`예요. `database/reserve-20261009-094216.sql.gz`는 **14,987바이트·SHA-256 `ac51a5f1f8b6ed1f2fc974907783f0fa2e85a21c59e9633cb8982b33113a3918`**이고 독립 S3 다운로드의 VersionId는 `8eMEp_kvT8_vflT7nTEBnevHQ81R1Yc2`예요. 새 개인 표시 테이블을 포함한 36테이블·61행과 기존 전체 값/메타데이터를 보존했어요. 같은 파일을 다른 로컬 DB `reserve_restore_v210_post_20261009_094216`에 실제 복원해 **18:46:42 KST**에 전체 값/메타데이터 일치와 36테이블 CHECK를 확인했어요.
+
+실제 `backend-image.tar`는 **244,341,760바이트·SHA-256 `fcbd1479d8ba94980c7c4ca1d7f015077c352be131eb126b44da2d44aa757e34`**, `frontend.tar.gz`는 **8,774,605바이트·SHA-256 `c1aa2981dfdb5bf7ada6e5b61a5156da8783e2e00d1045d9fc338c6ef3481a0c`**예요. 사후 `compatible-recovery.tar.gz`는 **252,026,307바이트·SHA-256 `0e29f40006f876b9d8ee9a9b4fe2988e685b8b75acb62614a6041e71a630ae55`**이며 25개 항목에 새 DB 덤프·같은 image/front·현재 blue/MySQL 정의·키와 역할 설정·Nginx root/upstream·현재 Compose 입력을 포함해요.
+
+서버 디렉터리 700 root·설정/덤프/export 600 root를 유지해요. PC의 보호된 `release-prep/20261009/production/20261009T094216Z/`에도 USER·SYSTEM 전용 ACL로 사후 덤프와 복구 묶음을 복사해 해시를 대조했어요. 원문 덤프·키·자격은 Git·일반 Downloads·채팅에 노출하지 않았어요. 구 green과 `blue-before-v210-20261009t091240z` 및 v2.9.0의 원본 보관본은 보존하지만 개인 삭제 복구 후보로 사용하지 않아요.
+
+복구는 최신 DB와 표시 설정을 유지한 채 이 digest의 호환 앱·같은 프론트·현재 보호된 환경값으로 준비해요. 전체 DB 덮어쓰기와 실제 운영 롤백 훈련은 실행하지 않았고, 실행하려면 별도 승인과 그 직전 백업이 필요해요. 기존 고객 고지 시각·접수/예약 설정·가입 증명·원문/신고 증거와 90일/30일 유예 정책을 유지하며 구 이미지에 표식만 붙이지 않아요.

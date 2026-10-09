@@ -444,7 +444,7 @@ Contact point의 **Test**로 수신을 확인한 뒤 [모니터링](monitoring.m
 nginx `root`가 SHA 절대 경로에 고정되므로 두 nginx 파일을 함께 복구해요.
 
 1. 대상 SHA·현재 upstream·해당 실행의 rollback 디렉터리를 읽기 전용으로 확인해요. 복구할 프론트 자산, 백엔드 SHA 이미지, 현재 보호된 설정과 [DB·설정 복구 경로](backup.md)를 함께 제시하고 별도 운영 승인을 받아요.
-2. 성공한 배포는 이전 백엔드 컨테이너를 제거하므로 nginx 파일만 되돌리면 종료된 upstream으로 연결될 수 있어요. 복구 이미지가 `reserve.schema-compat=v270-refund-v1`과 `reserve.feature-compat=waiting-signup-v1`을 갖고 실제로 예약 사용·웨이팅 중지·접수 방식·가입 증명을 유지하는지 확인해요. 현재 live를 덮어쓰지 않는 반대편 Blue/Green을 같은 SHA 이미지·해당 compose와 **현재 보호된 환경값**으로 준비해요. 제한된 앱 계정의 `validate`와 loopback health가 실패하면 라우팅을 바꾸지 않아요.
+2. 성공한 배포는 이전 백엔드 컨테이너를 제거하므로 nginx 파일만 되돌리면 종료된 upstream으로 연결될 수 있어요. 복구 이미지가 `reserve.schema-compat=v270-refund-v1`과 `reserve.feature-compat=waiting-signup-hidden-v2`를 갖고 실제로 예약 사용·웨이팅 중지·접수 방식·가입 증명·개인 메시지 표시 설정을 유지하는지 확인해요. 현재 live를 덮어쓰지 않는 반대편 Blue/Green을 같은 SHA 이미지·해당 compose와 **현재 보호된 환경값**으로 준비해요. 제한된 앱 계정의 `validate`와 loopback health가 실패하면 라우팅을 바꾸지 않아요.
 3. 최신 DB·가게 설정·고객 고지 시각을 유지해요. 과거 `.env`나 전체 DB 덤프를 함께 되돌리지 않아요. 새 명단·QR 처리와 예약 차단을 유지할 호환 이미지가 없으면 트래픽·신규 쓰기를 닫는 승인된 복구 경로를 사용해요. 구 이미지에 표식만 추가하거나 `ddl-auto=update`로 우회하지 않아요.
 4. 백엔드와 프론트가 동일한 인증·웨이팅 계약을 지원하는 상태에서 rollback 디렉터리의 `default.conf`와 `service-env.inc`를 함께 복구해요. 해당 파일에 지정된 upstream이 준비한 백엔드인지, 프론트 SHA 경로와 자산이 존재하는지 대조해요. `current` 포인터도 해당 프론트 SHA로 맞춰요.
 5. `nginx -t` 뒤 한 번 reload하고 nginx를 거치는 HTML·자산·API와 새 설정의 유지 상태를 확인해요. 성공이 확인되기 전에는 기존 live 컨테이너와 복구 자료를 정리하지 않아요.
@@ -464,10 +464,22 @@ nginx `root`가 SHA 절대 경로에 고정되므로 두 nginx 파일을 함께 
 HTML 이스케이프, 공개 썸네일 경로 검사를 거친 이름·설명·사진을 넣고 기존 SPA 자산은 보존해요.
 삭제·정지 가게는 404·noindex로 응답해요. 이 변경의 운영 적용은 해당 릴리스 배포에 포함돼요.
 
-## 개인 메시지 삭제의 후속 출시 준비 (운영 미적용)
+## v2.10.0 개인 메시지 삭제 운영 적용
 
-개인 메시지 삭제와 관련 화면 보완은 v2.9.0 배포 이후 프리뷰 변경이에요. 이를 출시하려면 새 Git·릴리스·운영 DDL 14절·배포 승인 범위를 확정하고, 현재 dev에 요청 변경만 옮겨 최종 SHA를 검사해요. 이미 배포한 프리뷰 전체를 다시 스테이징하지 않아요.
+개인 메시지 삭제와 관련 화면 보완은 별도 승인된 v2.10.0으로 운영에 적용했어요. 현재 dev에 요청 변경만 옮겨 최종 SHA를 검사했으며 이미 배포한 혼합 프리뷰 전체를 다시 스테이징하지 않았어요.
 
-이 후보의 이미지 계약은 `reserve.feature-compat=waiting-signup-hidden-v2`예요. Docker 빌드가 실제 JAR의 개인 삭제 entity·repository·service를 요구하고, live 판별과 cutover 직전에는 기존·대상 이미지 양쪽의 계약을 확인해요. v2.9.0의 `waiting-signup-v1` 이미지는 개인 삭제 복구 대상으로 인정하지 않아요. 따라서 최초 전환은 자동 관문을 우회하거나 구 이미지 라벨을 바꾸지 않고, 승인된 새 백업·14절 DDL·전체 새 JAR `validate`·현재 환경값·새 호환 이미지·같은 프론트의 준비 후 진행해야 해요. 다음 자동 배포부터 새 계약을 사용해요.
+v2.10.0 이미지의 계약은 `reserve.feature-compat=waiting-signup-hidden-v2`예요. Docker 빌드가 실제 JAR의 개인 삭제 entity·repository·service를 요구하고, live 판별과 cutover 직전에는 기존·대상 이미지 양쪽의 계약을 확인해요. v2.9.0의 `waiting-signup-v1` 이미지는 개인 삭제 복구 대상으로 인정하지 않아요. 따라서 최초 전환은 자동 관문을 우회하거나 구 이미지 라벨을 바꾸지 않고, 승인된 새 백업·14절 DDL·전체 새 JAR `validate`·현재 환경값·새 호환 이미지·같은 프론트의 준비 후 진행해야 해요. 다음 자동 배포부터 새 계약을 사용해요.
 
-복구할 때도 개인 표시 설정과 기존 고객 웨이팅·예약 차단·가입 증명·실제 고지 시각을 유지해요. 실패 시 이 상태를 이해하는 호환 수정 이미지로 복구하고, 준비된 이미지가 없으면 신규 쓰기를 제한한 채 복구해요. 자세한 경로는 [백업 런북](backup.md)과 [DDL 14절](manual-ddl.md#14-메시지-나에게만-삭제-프리뷰-준비-운영-미적용)을 사용해요. 영상통화는 후속 설계이며 이 후보의 코드·스키마·운영 범위에 포함하지 않아요.
+복구할 때도 개인 표시 설정과 기존 고객 웨이팅·예약 차단·가입 증명·실제 고지 시각을 유지해요. 실패 시 이 상태를 이해하는 호환 수정 이미지로 복구하고, 준비된 이미지가 없으면 신규 쓰기를 제한한 채 복구해요. 자세한 경로는 [백업 런북](backup.md)과 [DDL 14절](manual-ddl.md#14-메시지-나에게만-삭제-v2100-운영-적용)을 사용해요. 영상통화는 후속 설계이며 이 후보의 코드·스키마·운영 범위에 포함하지 않아요.
+
+### 실제 첫 호환 전환과 검사 근거
+
+최종 main은 `6fdaafa36dc0a1340a75adea2243c9ef5c1829e4`이고 기능 PR [#327](https://github.com/hanjeun/reserve/pull/327)·릴리스 PR [#328](https://github.com/hanjeun/reserve/pull/328)을 거쳤어요. 최종 기능 입력의 [CI 37907566249](https://github.com/hanjeun/reserve/actions/runs/37907566249)는 프론트 unit 1,314개·PC 109개(기기 조건 4개 스킵)·모바일 113개와 필수 빌드/정책 검사를 통과했고 CodeQL도 통과했어요. 후속 동일 입력은 기존 증거 해시 관문으로 재사용했으며 필수 빌드·보안 관문을 유지했어요.
+
+[main CI 37909670737](https://github.com/hanjeun/reserve/actions/runs/37909670737)의 테스트 증거·양쪽 빌드·stage는 성공했고, 자동 배포는 기존 v2.9.0의 개인 삭제 미지원 복구 이미지 때문에 live 판별에서 거부됐어요. 자동 실행 전체를 성공으로 바꾸거나 관문을 완화하지 않았어요. 별도 승인된 첫 전환에서 공개 트래픽과 구 앱을 닫고, 새 백업의 독립 S3 읽기·격리 복원·DDL 14절·전체 새 JAR의 제한된 계정 validate·새 호환 복구 묶음을 확인한 뒤 진행했어요.
+
+공개 전환 확인은 **2026-10-09 18:40:44 KST**예요. 새 **blue / loopback 8080 / 비루트 appuser / reserve_app / validate**와 같은 SHA 프론트 root `/usr/share/nginx/html/releases/6fdaafa36dc0a1340a75adea2243c9ef5c1829e4`를 함께 전환했어요. 기존 앱 환경값·키·고지 시각은 유지하고 profile/server env만 blue로 맞췄어요. Nginx는 새 blue를 Docker 내부 주소로 연결하며, 중지된 구 green의 DNS 재해석에 의존하지 않도록 보관된 내부 주소를 사용해요. 구 green으로 복구하지 않아요.
+
+Nginx를 거치는 실제 release-id·HTML·자산·가게 API와 익명 개인 삭제 401 거부를 확인했어요. 고객 고지는 `2026-10-09T06:54:37Z`·intakeReady true·7일 파기를 유지하고 채팅은 90일·30일 유예·`2026-11-03T09:44:15Z`부터 활성화돼요. 기존 61행·가게 설정·원문/신고 증거를 보존했어요. 전환 후 읽기 전용 verifier에서 예약금/원장 위반과 결제·파일 삭제·OAuth 확인 필요 항목이 모두 0이고 새 앱 시작 ERROR/FATAL은 0이었어요.
+
+서버 기본 읽기 verifier도 최종 main의 소스로 배치했으며 이전 설치본은 사전 보호 경로의 `runtime/previous-post-deploy-verify.sh`에 보존했어요. 새 역할/권한을 부여하지 않았고 실제 결제·환불·고객 메시지 삭제·IAM 확대를 실행하지 않았어요. 사전/사후 백업과 새 호환 복구 image/front 및 사후 별도 격리 복원은 [백업 런북](backup.md)을 따라요. 실제 휴대폰 QR·미지원 브라우저·일반 터치 확인은 사용자 확인으로 남기며 CSP는 Report-Only, Kakao eval 판단과 유예 종료 후 첫 채팅 파기는 아직 완료로 처리하지 않아요.

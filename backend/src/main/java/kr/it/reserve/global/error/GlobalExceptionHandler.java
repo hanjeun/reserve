@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,6 +22,12 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /** 끊기거나 완료된 스트림에는 JSON 본문을 다시 쓰지 않는다. 실제 서버 예외는 아래 관문에 남긴다. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    protected void handleClosedAsyncResponse(AsyncRequestNotUsableException ignored) {
+        log.debug("Async response is no longer writable");
+    }
 
     /** 요청 바인딩 오류는 서버 장애가 아니다. 거부한 원문 값·JSON을 로그나 응답에 복사하지 않는다. */
     @ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class,

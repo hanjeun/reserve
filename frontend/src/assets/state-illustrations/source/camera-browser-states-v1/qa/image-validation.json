@@ -1,0 +1,212 @@
+[
+  {
+    "asset": "camera-denied",
+    "resolution": [
+      512,
+      512
+    ],
+    "png_bytes": 127625,
+    "webp_bytes": 11936,
+    "webp_quality": 94,
+    "webp_limit_bytes": 20000,
+    "alpha_bbox": [
+      114,
+      111,
+      405,
+      407
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 1.0278864307246196,
+        "edge_mean_absolute_rgb_error": 0.5417013022998061
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 1.0280481063095201,
+        "edge_mean_absolute_rgb_error": 0.5459961208090884
+      }
+    }
+  },
+  {
+    "asset": "camera-unavailable",
+    "resolution": [
+      512,
+      512
+    ],
+    "png_bytes": 141044,
+    "webp_bytes": 13056,
+    "webp_quality": 94,
+    "webp_limit_bytes": 20000,
+    "alpha_bbox": [
+      103,
+      99,
+      427,
+      415
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 1.0634270862341038,
+        "edge_mean_absolute_rgb_error": 0.658742736397253
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 1.063385315139701,
+        "edge_mean_absolute_rgb_error": 0.657554146856841
+      }
+    }
+  },
+  {
+    "asset": "browser-unsupported",
+    "resolution": [
+      512,
+      512
+    ],
+    "png_bytes": 127416,
+    "webp_bytes": 10888,
+    "webp_quality": 94,
+    "webp_limit_bytes": 20000,
+    "alpha_bbox": [
+      113,
+      99,
+      421,
+      405
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.9465329550702646,
+        "edge_mean_absolute_rgb_error": 0.5524861878453039
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.9465857359635812,
+        "edge_mean_absolute_rgb_error": 0.5540647198105761
+      }
+    }
+  },
+  {
+    "asset": "camera-denied",
+    "resolution": [
+      768,
+      768
+    ],
+    "png_bytes": 264258,
+    "webp_bytes": 19398,
+    "webp_quality": 94,
+    "webp_limit_bytes": 32000,
+    "alpha_bbox": [
+      171,
+      167,
+      606,
+      610
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.9310202395704255,
+        "edge_mean_absolute_rgb_error": 0.5573993471164309
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.9312862733567163,
+        "edge_mean_absolute_rgb_error": 0.5677366702937976
+      }
+    }
+  },
+  {
+    "asset": "camera-unavailable",
+    "resolution": [
+      768,
+      768
+    ],
+    "png_bytes": 288572,
+    "webp_bytes": 20580,
+    "webp_quality": 94,
+    "webp_limit_bytes": 32000,
+    "alpha_bbox": [
+      155,
+      149,
+      640,
+      622
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.9486249753812026,
+        "edge_mean_absolute_rgb_error": 0.6029745399546257
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.948942169149278,
+        "edge_mean_absolute_rgb_error": 0.6158306024703807
+      }
+    }
+  },
+  {
+    "asset": "browser-unsupported",
+    "resolution": [
+      768,
+      768
+    ],
+    "png_bytes": 266819,
+    "webp_bytes": 18292,
+    "webp_quality": 94,
+    "webp_limit_bytes": 32000,
+    "alpha_bbox": [
+      170,
+      150,
+      630,
+      607
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.8676145414306332,
+        "edge_mean_absolute_rgb_error": 0.5631855030996662
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.86778584409882,
+        "edge_mean_absolute_rgb_error": 0.5714830710538865
+      }
+    }
+  }
+]

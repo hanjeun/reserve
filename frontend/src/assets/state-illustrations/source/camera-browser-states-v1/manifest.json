@@ -1,0 +1,497 @@
+{
+  "title": "RESERVE camera and browser states v1",
+  "version": 1,
+  "asset_count": 3,
+  "asset_ids": [
+    "camera-denied",
+    "camera-unavailable",
+    "browser-unsupported"
+  ],
+  "production_static_files": 12,
+  "editable_blends": 3,
+  "rendered_independently_at": [
+    512,
+    768
+  ],
+  "production": "Blender 4.3.2 / Eevee Next / 128 samples",
+  "palette_srgb": [
+    "#F2F5FA",
+    "#B8C9DE",
+    "#3182F6",
+    "#8191A6"
+  ],
+  "alpha": "RGBA8 PNG; static lossy-RGB WebP with pixel-identical lossless alpha",
+  "webp_quality": 94,
+  "webp_byte_limits": {
+    "512": 20000,
+    "768": 32000
+  },
+  "model_and_image_license": "CC0-1.0",
+  "original_code_license": "MIT",
+  "source_pipelines": [
+    "RESERVE original-style first 28",
+    "original-style empty-news",
+    "RESERVE six categories",
+    "RESERVE extra 13"
+  ],
+  "latest_four_current_source_verified": false,
+  "image_checks": [
+    {
+      "asset": "camera-denied",
+      "resolution": [
+        512,
+        512
+      ],
+      "png_bytes": 127625,
+      "webp_bytes": 11936,
+      "webp_quality": 94,
+      "webp_limit_bytes": 20000,
+      "alpha_bbox": [
+        114,
+        111,
+        405,
+        407
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 1.0278864307246196,
+          "edge_mean_absolute_rgb_error": 0.5417013022998061
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 1.0280481063095201,
+          "edge_mean_absolute_rgb_error": 0.5459961208090884
+        }
+      }
+    },
+    {
+      "asset": "camera-unavailable",
+      "resolution": [
+        512,
+        512
+      ],
+      "png_bytes": 141044,
+      "webp_bytes": 13056,
+      "webp_quality": 94,
+      "webp_limit_bytes": 20000,
+      "alpha_bbox": [
+        103,
+        99,
+        427,
+        415
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 1.0634270862341038,
+          "edge_mean_absolute_rgb_error": 0.658742736397253
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 1.063385315139701,
+          "edge_mean_absolute_rgb_error": 0.657554146856841
+        }
+      }
+    },
+    {
+      "asset": "browser-unsupported",
+      "resolution": [
+        512,
+        512
+      ],
+      "png_bytes": 127416,
+      "webp_bytes": 10888,
+      "webp_quality": 94,
+      "webp_limit_bytes": 20000,
+      "alpha_bbox": [
+        113,
+        99,
+        421,
+        405
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.9465329550702646,
+          "edge_mean_absolute_rgb_error": 0.5524861878453039
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.9465857359635812,
+          "edge_mean_absolute_rgb_error": 0.5540647198105761
+        }
+      }
+    },
+    {
+      "asset": "camera-denied",
+      "resolution": [
+        768,
+        768
+      ],
+      "png_bytes": 264258,
+      "webp_bytes": 19398,
+      "webp_quality": 94,
+      "webp_limit_bytes": 32000,
+      "alpha_bbox": [
+        171,
+        167,
+        606,
+        610
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.9310202395704255,
+          "edge_mean_absolute_rgb_error": 0.5573993471164309
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.9312862733567163,
+          "edge_mean_absolute_rgb_error": 0.5677366702937976
+        }
+      }
+    },
+    {
+      "asset": "camera-unavailable",
+      "resolution": [
+        768,
+        768
+      ],
+      "png_bytes": 288572,
+      "webp_bytes": 20580,
+      "webp_quality": 94,
+      "webp_limit_bytes": 32000,
+      "alpha_bbox": [
+        155,
+        149,
+        640,
+        622
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.9486249753812026,
+          "edge_mean_absolute_rgb_error": 0.6029745399546257
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.948942169149278,
+          "edge_mean_absolute_rgb_error": 0.6158306024703807
+        }
+      }
+    },
+    {
+      "asset": "browser-unsupported",
+      "resolution": [
+        768,
+        768
+      ],
+      "png_bytes": 266819,
+      "webp_bytes": 18292,
+      "webp_quality": 94,
+      "webp_limit_bytes": 32000,
+      "alpha_bbox": [
+        170,
+        150,
+        630,
+        607
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.8676145414306332,
+          "edge_mean_absolute_rgb_error": 0.5631855030996662
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.86778584409882,
+          "edge_mean_absolute_rgb_error": 0.5714830710538865
+        }
+      }
+    }
+  ],
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 4787,
+      "sha256": "5d7a371516b6e874eba8aef18d93abbc3b530684e9b54d6f25075450a18a3861"
+    },
+    {
+      "file": "previews/dark-actual-48-56-64-from512.png",
+      "bytes": 38748,
+      "sha256": "ae73d237636b09e02ecd38a379c85f9bc5d522642d069660755cab8e46c1d55b"
+    },
+    {
+      "file": "previews/dark-actual-48-56-64-from768.png",
+      "bytes": 38684,
+      "sha256": "d5189b0f7824279363a372f812fb55fab5ffdd5125515222a6667ddd2a00523b"
+    },
+    {
+      "file": "previews/dark-overview.png",
+      "bytes": 95412,
+      "sha256": "5ea590fb827aa3718b5883800c0efe16d4f13480cf1a3677d57e7b8657c9dd55"
+    },
+    {
+      "file": "previews/light-actual-48-56-64-from512.png",
+      "bytes": 37464,
+      "sha256": "13a9f2f68cf3c833f53c96c199af537ee0475c4ffea1f8f8d8dfc7bd311a526e"
+    },
+    {
+      "file": "previews/light-actual-48-56-64-from768.png",
+      "bytes": 37397,
+      "sha256": "89dad47930c3fe58bae4f4561195518295564afb7ac67140b36e0fba3d6248c3"
+    },
+    {
+      "file": "previews/light-overview.png",
+      "bytes": 94163,
+      "sha256": "380cffb01bc0e743ddf17a646d9d65a0d2ccb037b6c0bd32a7eaa8a3389308da"
+    },
+    {
+      "file": "qa/blend-reopen-render.log",
+      "bytes": 2982,
+      "sha256": "fa5a4ed5d9bf3790f047fa827728dc35a3353c6898ab55d31d8e6a00c6852551"
+    },
+    {
+      "file": "qa/blend-validation.json",
+      "bytes": 11873,
+      "sha256": "f1e23d2698280a82df77dd8d88870dfcc7f38594255cdcb62266617f0df11c0f"
+    },
+    {
+      "file": "qa/execution-report.json",
+      "bytes": 2247,
+      "sha256": "daf3e4aa2b9f4de4d44609b4b66c18889dab7a8bdb9022bd1e02aaad4be17d2c"
+    },
+    {
+      "file": "qa/image-validation.json",
+      "bytes": 4733,
+      "sha256": "0e0e54e17b0b748d38f46f537a83c25b2efe4b28cb5bfe53e2b32c56fb2bea37"
+    },
+    {
+      "file": "qa/independent-visual-review.json",
+      "bytes": 9749,
+      "sha256": "c2cbf7f126aca0f9ca276192fb8fef52e7e01251c32308d8cb45e2296e21356a"
+    },
+    {
+      "file": "qa/native-render.log",
+      "bytes": 4776,
+      "sha256": "241ee3de882d8ed71a23aada814c38f8d95fc6ff3f73428ec4ae752eb996782a"
+    },
+    {
+      "file": "qa/preservation-before-sha256.json",
+      "bytes": 369654,
+      "sha256": "7703056a30607f8fdbad416a11f4cb709d4038ebc4fdccef3fdad5a6f6931d85"
+    },
+    {
+      "file": "qa/preservation-report.json",
+      "bytes": 2077,
+      "sha256": "a651b3b4b215402582901967e08e6b48dc9d3ee3133624941334acad3b8ec1b9"
+    },
+    {
+      "file": "qa/roundtrip-validation.json",
+      "bytes": 860,
+      "sha256": "9691fa883e3ebc2c885d73f1ca9c5b01ba79fd91d789e7bb53ead01a38f228c2"
+    },
+    {
+      "file": "source/CC0-1.0-FULL.txt",
+      "bytes": 7048,
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "file": "source/LICENSE-ASSETS.txt",
+      "bytes": 1087,
+      "sha256": "32958743d5a8643b2ce9c3b343a6601551874cb144f3705298fd3c37ad0400a6"
+    },
+    {
+      "file": "source/LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/browser-unsupported.blend",
+      "bytes": 194706,
+      "sha256": "1cfd1fbbd89311d25b0177c622fef37a74b4c923932761730cf3f027d76cd740"
+    },
+    {
+      "file": "source/build_assets.py",
+      "bytes": 13337,
+      "sha256": "af3f546fee6464712fa05ff73b6feaaf3e6d8c06cc14f4e07df33474d665510c"
+    },
+    {
+      "file": "source/camera-denied.blend",
+      "bytes": 166842,
+      "sha256": "331892c3f8a5f3840090bbc5b6076bdfa8586059c2557d14d43e995841748d1d"
+    },
+    {
+      "file": "source/camera-unavailable.blend",
+      "bytes": 190493,
+      "sha256": "3be285059e394afad4b3f4bc14a951b4e352dd5fb54d1b861faa7e4966db294f"
+    },
+    {
+      "file": "source/encode_and_validate.py",
+      "bytes": 4080,
+      "sha256": "a1e856154e9bcab84fe81bd15f881991cbc16f209b128cede0723f2f509b9e01"
+    },
+    {
+      "file": "source/native-render-evidence.jsonl",
+      "bytes": 1646,
+      "sha256": "3981d3f279c5670243858f996fac4928a465ec81c3604099a48824915c1a758c"
+    },
+    {
+      "file": "source/package_and_verify.py",
+      "bytes": 8631,
+      "sha256": "6368908b2216a17fe3e4abad9820776093b0205e0bb8268b1b4a061a6237f017"
+    },
+    {
+      "file": "source/prior-notices/empty-news-LICENSE-ASSETS.txt",
+      "bytes": 451,
+      "sha256": "606131658eed432e4d008a507abb2aa8e6ee7ad4beb2f0c5cfcf34b486be24e6"
+    },
+    {
+      "file": "source/prior-notices/empty-news-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-category-kit-LICENSE-ASSETS.txt",
+      "bytes": 811,
+      "sha256": "f6abe52f31d97f04f41c2b86c70898767ecf5e44ad3d721760e810c4d7f00d0e"
+    },
+    {
+      "file": "source/prior-notices/reserve-category-kit-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-extra-icons-13-LICENSE-ASSETS.txt",
+      "bytes": 921,
+      "sha256": "17ca6d87383d5d63f8096020a802a7cdc791ea456657e6e349baa028bb168032"
+    },
+    {
+      "file": "source/prior-notices/reserve-extra-icons-13-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-ASSETS.txt",
+      "bytes": 451,
+      "sha256": "606131658eed432e4d008a507abb2aa8e6ee7ad4beb2f0c5cfcf34b486be24e6"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-assets.txt",
+      "bytes": 482,
+      "sha256": "696a650929791ac7a22b8f3801b6676c411a57bbef84e12d85c4f6728601dd76"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-source.txt",
+      "bytes": 1090,
+      "sha256": "a80c238fad191ae41ccefa22718d0312893c5f47a620feb4044e086701b96f0e"
+    },
+    {
+      "file": "source/validate_blends.py",
+      "bytes": 4369,
+      "sha256": "1523b7ab15052b37777a1d8358a7e07fb403397b88f1a8bf9dc8aa41a8a11b00"
+    },
+    {
+      "file": "static/512/browser-unsupported-512.png",
+      "bytes": 127416,
+      "sha256": "4e8c118d988dbc3d770c648cdaa542062d75a210f01aefc4a60e38b44c396e9b"
+    },
+    {
+      "file": "static/512/browser-unsupported-512.webp",
+      "bytes": 10888,
+      "sha256": "ec642a1e54201132a4f040ab84a3118a95eff3f61e5409f0a40939ad9a4ce040"
+    },
+    {
+      "file": "static/512/camera-denied-512.png",
+      "bytes": 127625,
+      "sha256": "78e4f0f217b800dce255c507edc8928d095b174545a907c7630ec02101462838"
+    },
+    {
+      "file": "static/512/camera-denied-512.webp",
+      "bytes": 11936,
+      "sha256": "d26df8088bedefc258499053467f7db2e251206bf313fbc19473ce16e7f3d247"
+    },
+    {
+      "file": "static/512/camera-unavailable-512.png",
+      "bytes": 141044,
+      "sha256": "7bfb85538e6233ca462d4c1837a0c035e411744c2160e280c647dca0e03bc597"
+    },
+    {
+      "file": "static/512/camera-unavailable-512.webp",
+      "bytes": 13056,
+      "sha256": "e45426f892b8483dd5a7a2a24d6670129d1a10f6c28fce203f7e969dcb239dd5"
+    },
+    {
+      "file": "static/768/browser-unsupported-768.png",
+      "bytes": 266819,
+      "sha256": "ab1b67f6faa3832dd166b237da6f14cf2c451920e5bf6628c8f29f9cf244db04"
+    },
+    {
+      "file": "static/768/browser-unsupported-768.webp",
+      "bytes": 18292,
+      "sha256": "e13a758316df49f6c3d47c358f03791f14d5f34079758d74225a66133aeb8005"
+    },
+    {
+      "file": "static/768/camera-denied-768.png",
+      "bytes": 264258,
+      "sha256": "afd3412673cb84bfe8cb7eab2dc00d090c197e42ee05e407260a0f459295e729"
+    },
+    {
+      "file": "static/768/camera-denied-768.webp",
+      "bytes": 19398,
+      "sha256": "7fec0584817eccc3cb3b2fcf20fbcf937f653e0e0d236b92b1fd342d4a59d8ec"
+    },
+    {
+      "file": "static/768/camera-unavailable-768.png",
+      "bytes": 288572,
+      "sha256": "28e7fa98356fcef1cc7f5176b28c9d3e729d05893acfeb53f3a3ae05ee8ecefb"
+    },
+    {
+      "file": "static/768/camera-unavailable-768.webp",
+      "bytes": 20580,
+      "sha256": "73cb22d60d6863405fee115ecb02ef7db678019a210e9456f7d677935e58ea03"
+    }
+  ]
+}

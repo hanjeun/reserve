@@ -69,6 +69,12 @@ export function bundleNotices() {
                 '--- SUITE font license ---\n'
                 + readFileSync(resolve('public/fonts/SUITE-LICENSE.txt'), 'utf8'));
             const missing = [];
+            for (const kit of ['state-illustrations/source/camera-browser-states-v1', 'choice-icons/source/policy-menu-icons-v1']) {
+                const directory = resolve('src/assets', kit, 'source');
+                for (const name of ['LICENSE-ASSETS.txt', 'CC0-1.0-FULL.txt', 'LICENSE-CODE.txt']) {
+                    sections.push(`--- RESERVE ${kit} / ${name} ---\n${readFileSync(join(directory, name), 'utf8')}`);
+                }
+            }
             for (const [identity, { directory, pkg }] of [...packages].sort(([a], [b]) => a.localeCompare(b))) {
                 const notices = readdirSync(directory).filter(name =>
                     /^(licen[cs]e|notice|copying)(?:[._-].*)?$/i.test(name)

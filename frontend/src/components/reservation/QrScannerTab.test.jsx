@@ -2,9 +2,10 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App as AntApp } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import QrScannerTab from './QrScannerTab';
 import reservationService from '../../services/reservationService';
+import { cameraFailurePresentation } from './qrCameraPresentation';
 
 const scannerState = vi.hoisted(() => ({
     onSuccess: null,
@@ -42,6 +43,9 @@ vi.mock('../../services/reservationService', () => ({
 
 describe('QrScannerTab sheet surface', () => {
     beforeEach(() => {
+        const original = navigator;
+        vi.stubGlobal('navigator', new Proxy(original, { get: (target, property) => property === 'mediaDevices'
+            ? { getUserMedia: vi.fn() } : Reflect.get(target, property, target) }));
         vi.clearAllMocks();
         scannerState.start.mockReset();
         scannerState.onSuccess = null;
@@ -49,6 +53,44 @@ describe('QrScannerTab sheet surface', () => {
             reservation: { memberName: '한재은' },
             alreadyCheckedIn: false,
         });
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    it.each([
+        [{ name: 'NotAllowedError' }, 'camera-denied'],
+        ['Error getting userMedia, error = NotAllowedError: Permission denied', 'camera-denied'],
+        [{ name: 'NotFoundError' }, 'camera-unavailable'],
+        [{ name: 'NotReadableError' }, 'camera-unavailable'],
+    ])('distinguishes a camera failure from a bad QR payload', (error, icon) => {
+        expect(cameraFailurePresentation(error).icon).toBe(icon);
+    });
+
+    it('shows the unsupported browser state without attempting camera startup', async () => {
+        vi.stubGlobal('navigator', new Proxy(navigator, { get: (target, property) => property === 'mediaDevices'
+            ? undefined : Reflect.get(target, property, target) }));
+        const client = new QueryClient();
+        const { container, unmount } = render(<QueryClientProvider client={client}><AntApp><QrScannerTab sheet /></AntApp></QueryClientProvider>);
+        fireEvent.click(await screen.findByRole('button', { name: 'QR 스캔 시작' }));
+        await screen.findByText(/이 브라우저에서는 카메라 스캔을 사용할 수 없어요/);
+        expect(scannerState.start).not.toHaveBeenCalled();
+        expect(container.querySelector('img[src*="browser-unsupported"]')).toBeInTheDocument();
+        unmount(); client.clear();
+    });
+
+    it('recovers from permission denial and stops the restarted camera when leaving the screen', async () => {
+        scannerState.start.mockRejectedValueOnce('Error getting userMedia, error = NotAllowedError: Permission denied');
+        const client = new QueryClient();
+        const { container, unmount } = render(<QueryClientProvider client={client}><AntApp><QrScannerTab sheet /></AntApp></QueryClientProvider>);
+        fireEvent.click(await screen.findByRole('button', { name: 'QR 스캔 시작' }));
+        await screen.findByText(/카메라 권한이 거부됐어요/);
+        expect(container.querySelector('img[src*="camera-denied"]')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+        await screen.findByRole('button', { name: '스캔 중지' });
+        expect(scannerState.start).toHaveBeenCalledTimes(2);
+        unmount();
+        await waitFor(() => expect(scannerState.stop).toHaveBeenCalled());
+        expect(reservationService.checkInByQr).not.toHaveBeenCalled();
+        client.clear();
     });
 
     it('uses the same default button spinner as submit buttons while mock camera startup is pending', async () => {

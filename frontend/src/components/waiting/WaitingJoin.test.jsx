@@ -4,10 +4,11 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import WaitingJoin from './WaitingJoin';
 import waitingService from '../../services/waitingService';
+import { clearRedirect, peekRedirect } from '../../utils/redirect';
 
-const state = vi.hoisted(() => ({ revision: 1, loggedIn: true, success: vi.fn() }));
+const state = vi.hoisted(() => ({ revision: 1, loggedIn: true, termsAgreed: true, success: vi.fn() }));
 vi.mock('../../store/useAuthStore', () => {
-    const read = () => ({ sessionRevision: state.revision, isLoggedIn: state.loggedIn });
+    const read = () => ({ sessionRevision: state.revision, isLoggedIn: state.loggedIn, user: { termsAgreed: state.termsAgreed } });
     const hook = selector => selector(read()); hook.getState = read; return { default: hook };
 });
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { success: state.success } }) }));
@@ -18,7 +19,7 @@ vi.mock('../common', () => ({
     FormInput: ({ value, onChange, disabled }) => <input aria-label="웨이팅 인원" type="number" value={value} disabled={disabled} onChange={e => onChange(e.target.valueAsNumber)} />,
     FormModal: ({ open, children, onSubmit, submitting, submitDisabled }) => open && <div role="dialog">{children}<button onClick={onSubmit} disabled={submitting || submitDisabled}>접수하기</button></div>,
 }));
-function Location() { const location = useLocation(); return <output>{location.pathname}{location.search}{location.state?.from?.hash}</output>; }
+function Location() { const location = useLocation(); return <output aria-label="현재 접수 경로">{location.pathname}{location.search}{location.state?.from?.hash}</output>; }
 function setup(mode = 'REMOTE', hash = '', storeValues = {}) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const tree = () => <QueryClientProvider client={client}><MemoryRouter initialEntries={[`/store/31${hash}`]}>
@@ -26,7 +27,8 @@ function setup(mode = 'REMOTE', hash = '', storeValues = {}) {
     const result = render(tree()); return { ...result, client, update: () => result.rerender(tree()) };
 }
 beforeEach(() => {
-    state.revision = 1; state.loggedIn = true; state.success.mockReset(); waitingService.join.mockReset();
+    state.revision = 1; state.loggedIn = true; state.termsAgreed = true; state.success.mockReset(); waitingService.join.mockReset();
+    clearRedirect();
     waitingService.getRetentionPolicy.mockReset().mockResolvedValue({ intakeReady: true, noticePublishedAt: '2026-10-07T09:00:00Z', finishedRecordRetentionDays: 7 });
 });
 async function agreeToIntake() {
@@ -61,6 +63,24 @@ it('onsite-only stores require a QR and preserve its fragment through the login 
     state.loggedIn = false; setup('ONSITE', '#waiting-token=rw1.j.test');
     fireEvent.click(screen.getByRole('button', { name: '로그인하고 접수' }));
     expect(screen.getByRole('status')).toHaveTextContent('/login#waiting-token=rw1.j.test');
+    expect(peekRedirect()).toBe('/store/31#waiting-token=rw1.j.test');
+    expect(waitingService.join).not.toHaveBeenCalled();
+});
+
+it('opens authenticated onsite intake directly and requires an explicit consent and submit', () => {
+    setup('ONSITE', '#waiting-token=rw1.j.test');
+    fireEvent.click(screen.getByRole('button', { name: '웨이팅 접수' }));
+    expect(screen.getByRole('status', { name: '현재 접수 경로' })).toHaveTextContent('/store/31');
+    expect(screen.getByRole('checkbox', { name: '가게에 개인정보 제공 동의' })).not.toBeChecked();
+    expect(waitingService.join).not.toHaveBeenCalled();
+});
+
+it('keeps the onsite destination when an authenticated member still needs service agreement', () => {
+    state.termsAgreed = false;
+    setup('ONSITE', '#waiting-token=rw1.j.test');
+    fireEvent.click(screen.getByRole('button', { name: '이용 동의하고 접수' }));
+    expect(screen.getByRole('status')).toHaveTextContent('/signup/social');
+    expect(peekRedirect()).toBe('/store/31#waiting-token=rw1.j.test');
     expect(waitingService.join).not.toHaveBeenCalled();
 });
 

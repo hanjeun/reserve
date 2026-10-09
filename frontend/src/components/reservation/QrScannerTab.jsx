@@ -5,6 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { Typography } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import StateIllustration from '../common/StateIllustration';
+import { cameraFailurePresentation, unsupportedCameraPresentation } from './qrCameraPresentation';
 import QrTrackingGuide from './QrTrackingGuide';
 import QrScanResult from './QrScanResult';
 import { Button, Bone } from '../common';
@@ -113,6 +114,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
 
     const [status, setStatus] = useState('idle'); // idle | starting | scanning | error
     const [errorMsg, setErrorMsg] = useState('');
+    const [errorIcon, setErrorIcon] = useState('camera-unavailable');
     const [scanResult, setScanResult] = useState(null);
     const [processing, setProcessing] = useState(false);
 
@@ -312,6 +314,13 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     }, []);
 
     const startScanning = useCallback(async () => {
+        if (window.isSecureContext === false || typeof navigator.mediaDevices?.getUserMedia !== 'function') {
+            const presentation = unsupportedCameraPresentation();
+            setErrorIcon(presentation.icon);
+            setErrorMsg(presentation.message);
+            setStatus('error');
+            return;
+        }
         setStatus('starting');
         setErrorMsg('');
         setScanResult(null);
@@ -393,18 +402,11 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                 }
             }, 1500);
         } catch (err) {
-            console.error('[QR] camera start failed', err);
+            console.warn('[QR] camera start unavailable');
             setStatus('error');
-            const name = err?.name || '';
-            if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-                setErrorMsg('카메라 권한이 거부됐어요. 브라우저 설정에서 허용해주세요.');
-            } else if (name === 'NotReadableError' || name === 'TrackStartError') {
-                setErrorMsg('다른 앱이 카메라를 쓰고 있어요. 해당 앱을 닫고 다시 시도해주세요.');
-            } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-                setErrorMsg('사용할 수 있는 후면 카메라를 찾지 못했어요.');
-            } else {
-                setErrorMsg('카메라를 시작할 수 없어요. 브라우저 카메라 권한을 확인해주세요.');
-            }
+            const presentation = cameraFailurePresentation(err);
+            setErrorIcon(presentation.icon);
+            setErrorMsg(presentation.message);
         }
     }, [handleScanSuccess, attachAspectWatcher]);
 
@@ -525,7 +527,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                             )}
                             {status === 'error' && (
                                 <>
-                                    <StateIllustration name="qr-invalid" size="sm" />
+                                    <StateIllustration name={errorIcon} size="sm" />
                                     <Text style={{ color: colors.error.main, textAlign: 'center', padding: '0 20px', fontSize: fontSize.sm }}>
                                         {errorMsg}
                                     </Text>

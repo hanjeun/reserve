@@ -11,6 +11,7 @@ import useAuthStore from '../../store/useAuthStore';
 import waitingService from '../../services/waitingService';
 import useWaitingEvents from '../../hooks/useWaitingEvents';
 import WaitingQrModal from '../waiting/WaitingQrModal';
+import WaitingDetailModal from '../waiting/WaitingDetailModal';
 import { WaitingTabSkeleton } from '../waiting/WaitingSkeleton';
 
 const QUERY_DEFAULTS = Object.freeze({ waitingStore: '', waitingSearch: '', waitingStatus: 'ACTIVE' });
@@ -29,11 +30,12 @@ const timeLabel = value => {
     return value && !Number.isNaN(date.getTime()) ? KST_TIME.format(date) : '';
 };
 
-function WaitingEntry({ entry, businessDate, view, busy, changing, onChange, onCancel }) {
+function WaitingEntry({ entry, businessDate, view, busy, changing, onChange, onCancel, onOpenDetail }) {
     const active = isActive(entry);
     const content = <div className="reserve-waiting-entry-content">
             <div className="reserve-waiting-entry-head">
-                <strong className="reserve-waiting-number">{entry.entryNumber}번</strong>
+                <button type="button" className="reserve-waiting-number reserve-waiting-detail-trigger reserve-tap-card__trigger"
+                    aria-label={`${entry.entryNumber}번 웨이팅 상세 보기`} onClick={() => onOpenDetail(entry.id)}>{entry.entryNumber}번</button>
                 <span className="reserve-waiting-status" data-status={entry.status}>{STATUS_LABELS[entry.status] || '상태 확인'}</span>
             </div>
             <div className="reserve-waiting-name">{entry.displayName || '이름 미입력'}<span>{entry.partySize}명</span></div>
@@ -53,16 +55,17 @@ function WaitingEntry({ entry, businessDate, view, busy, changing, onChange, onC
                 {entry.status === 'WAITING' ? '호출' : '입장'}
             </Button>
         </div>;
-    return <li className={view === 'cards' ? 'reserve-waiting-card-entry' : 'reserve-waiting-entry'}
+    return <li className={view === 'cards' ? 'reserve-waiting-card-entry' : 'reserve-waiting-entry reserve-tap-card'}
         aria-label={`${entry.entryNumber}번 대기 접수`}>
-        {view === 'cards' ? <Card className="reserve-waiting-card">
+        {view === 'cards' ? <Card className="reserve-waiting-card reserve-tap-card">
             <Card.Body><div className="reserve-waiting-card-body">{content}{actions}</div></Card.Body>
         </Card> : <>{content}{actions}</>}
     </li>;
 }
 WaitingEntry.propTypes = { entry: PropTypes.object.isRequired, businessDate: PropTypes.string,
     view: PropTypes.oneOf(['list', 'cards']).isRequired,
-    busy: PropTypes.bool, changing: PropTypes.bool, onChange: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired };
+    busy: PropTypes.bool, changing: PropTypes.bool, onChange: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired,
+    onOpenDetail: PropTypes.func.isRequired };
 
 function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores, onStoreChange,
     revision, view, onViewChange, search, onSearchChange, status, onStatusChange }) {
@@ -75,6 +78,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     const [pending, setPending] = useState(null);
     const [open, setOpen] = useState(false);
     const [qrOpen, setQrOpen] = useState(false);
+    const [detailId, setDetailId] = useState(null);
     useWaitingEvents(Boolean(storeId) && !storesError);
     const [draft, setDraft] = useState({ displayName: '', partySize: 1 });
     const [fieldErrors, setFieldErrors] = useState({});
@@ -161,6 +165,8 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         setOpen(true);
     };
     const entries = board.data?.entries || [];
+    const detailEntry = entries.find(entry => entry.id === detailId);
+    const detail = detailEntry ? { entry: detailEntry, storeName: store?.name } : null;
     const active = entries.filter(isActive);
     const keyword = search.trim().toLocaleLowerCase('ko-KR');
     const matches = entry => !keyword || `${entry.entryNumber}번 ${entry.displayName || '이름 미입력'}`
@@ -196,7 +202,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
             error={board.error} onRetry={refresh} retrying={board.isFetching} />
             : visibleEntries.length ? <ul className={entryClass} aria-label="대기 접수 목록">
             {visibleEntries.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate} view={view}
-                busy={busy} changing={pending === entry.id} onChange={changeStatus} onCancel={cancel} />)}
+                busy={busy} changing={pending === entry.id} onChange={changeStatus} onCancel={cancel} onOpenDetail={setDetailId} />)}
         </ul> : <DataState state="empty" kind="waiting"
             title={keyword ? '검색에 맞는 대기 접수가 없어요.'
                 : status === 'ACTIVE' ? '대기 중인 팀이 없어요.' : '선택한 상태의 대기 접수가 없어요.'}
@@ -222,6 +228,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
             onReload={store ? refresh : refetchStores} loading={storesLoading || board.isFetching} />
         {content}
         <WaitingQrModal open={qrOpen} storeId={storeId} onClose={() => setQrOpen(false)} />
+        <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />
         <FormModal title="대기 접수" open={open} mobileSize="content" width={440}
             onClose={() => { if (operation.current === null) setOpen(false); }} onSubmit={submit}
             submitting={pending === 'create'} submitText="접수하기" submitDisabled={busy}>

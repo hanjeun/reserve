@@ -502,3 +502,11 @@ HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없�
 서버 디렉터리 700 root·설정/덤프/export 600 root를 유지해요. PC의 보호된 `release-prep/20261009/production/20261009T094216Z/`에도 USER·SYSTEM 전용 ACL로 사후 덤프와 복구 묶음을 복사해 해시를 대조했어요. 원문 덤프·키·자격은 Git·일반 Downloads·채팅에 노출하지 않았어요. 구 green과 `blue-before-v210-20261009t091240z` 및 v2.9.0의 원본 보관본은 보존하지만 개인 삭제 복구 후보로 사용하지 않아요.
 
 복구는 최신 DB와 표시 설정을 유지한 채 이 digest의 호환 앱·같은 프론트·현재 보호된 환경값으로 준비해요. 전체 DB 덮어쓰기와 실제 운영 롤백 훈련은 실행하지 않았고, 실행하려면 별도 승인과 그 직전 백업이 필요해요. 기존 고객 고지 시각·접수/예약 설정·가입 증명·원문/신고 증거와 90일/30일 유예 정책을 유지하며 구 이미지에 표식만 붙이지 않아요.
+
+## v2.11.0 배포 전 백업·복원 확인
+
+2026-10-10 **01:31:04 KST**에 `/var/backups/reserve-scripts/20261009T163104Z-before-v211/`의 별도 보호 경로에 새 백업을 만들었어요. 서버 디렉터리는 700 root, 설정·덤프는 600 root예요. `database/reserve-20261009-163104.sql.gz`는 **15,699바이트**, SHA-256 **`59c6af7701cd8433dcbda6ef785c2c3ba5cf9c086d8c71d04beec0de46e6f41f`**이며 gzip·완료 표식과 S3 업로드를 확인했어요.
+
+사용자가 로그인한 독립 CloudShell에서 같은 S3 객체를 실제 다운로드했어요. 객체 수정 시각은 `2026-10-09T16:31:08Z`, 암호화는 AES256, VersionId는 `Ku8juHopxNtjRAAthGXQoNMlkjHaZI07`이며 크기·SHA-256이 서버 원본과 같아요. CloudShell 보호 디렉터리는 700, 파일은 600이에요.
+
+USER·SYSTEM 전용 PC 경로 `C:/Users/USER/AppData/Local/RESERVE/release-prep/20261010/production/20261009T163104Z/`로 전송한 같은 백업을 로컬 Docker MySQL 8.0.45의 새 격리 DB `reserve_restore_v211_20261009_163104`에 복원했어요. **36테이블·68행, CHECK TABLE 36건**을 통과했고 새 로컬 `reserve-2.11.0.jar`의 제한된 `reserve_app`·35모델 `validate`도 통과했어요. 검사 전후 덤프 해시로 복원 DB의 데이터·스키마 불변을 확인했어요. 운영 DB에 복원하거나 새 DDL을 실행하지 않았어요. 이 로컬 JAR 검증은 최종 CI 이미지의 운영 기동·사후 확인과 구분해요.

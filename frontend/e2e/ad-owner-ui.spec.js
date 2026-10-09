@@ -76,8 +76,12 @@ test('past unpaid ads cannot be paid and both ad previews keep the shared modal 
     await dialog.locator('.reserve-form-date-trigger').click();
     const dateDialog = page.locator('.reserve-form-cal-modal');
     const activeDatePart = dateDialog.locator('.reserve-form-cal-part.is-active');
-    // 편집 중인 시작/종료 칸은 얇은 회색 테두리(gray-400)다 — 진한 테두리를 쓰지 않는다(2026-09-23).
-    await expect(activeDatePart).toHaveCSS('border-top-color', 'rgb(181, 184, 189)');
+    // 날짜 입력의 포커스는 직접 입력 칸이 아니라 필드 전체에 중립 테두리로 표시한다.
+    const focusBorder = 'rgb(26, 31, 39)';
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+        await expect(activeDatePart).toHaveCSS(`border-${side}-color`, focusBorder);
+        await expect(activeDatePart).toHaveCSS(`border-${side}-width`, '1px');
+    }
     await dateDialog.getByRole('button', { name: '다음 달' }).click();
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1, 1);

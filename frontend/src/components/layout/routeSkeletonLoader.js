@@ -1,25 +1,42 @@
 import { useEffect, useState } from 'react';
+import { getRouteSkeletonKind, resolveRouteSkeletonLocation } from './routeSkeletonKind';
 
-// 페이지별 큰 뼈대(로그인류·문서·결제 결과·관리자·파트너·메시지·가게 폼)는 별도 청크다.
-// 앱 셸 청크가 번들 예산(600KiB)에 닿아 있어 여기 다 넣을 수 없다(2026-09-29 실측: +21kB 로 초과).
-// 앱 셸이 실행되는 즉시 받기 시작하므로 로그인 확인(/api/member/me)이 끝나기 전에 대개 도착한다.
-// 도착 전에는 같은 최소 높이의 빈 자리를 두어 푸터가 위로 올라왔다 내려가지 않게 한다.
-let pageSkeletonModule = null;
-const pageSkeletonRequest = import('./RouteSkeletonPages')
-    .then(module => { pageSkeletonModule = module; return module; })
-    .catch(() => null); // 청크를 못 받으면(오프라인 등) 빈 자리로 남는다 — 실제 페이지 청크도 같은 이유로 실패한다.
-/** 테스트·미리 받기용 — 페이지별 뼈대 청크가 준비되면 끝나는 약속. */
-export const preloadRouteSkeletons = () => pageSkeletonRequest;
+// 첫 주소의 골격만 미리 받는다. 홈 때문에 메신저·관리자 골격과 그 UI까지 로딩하지 않는다.
+const modules = new Map();
+const requests = new Map();
+const moduleKey = kind => kind === 'discovery' ? 'discovery' : 'pages';
+// import 두 개를 같은 삼항식에 넣으면 Vite가 두 분기의 modulepreload를 합친다.
+const loaders = {
+    discovery: () => import('./DiscoveryRouteSkeleton'),
+    pages: () => import('./RouteSkeletonPages'),
+};
 
-export function usePageSkeletonModule() {
-    const [module, setModule] = useState(pageSkeletonModule);
+export function preloadRouteSkeletons(kind) {
+    const key = moduleKey(kind);
+    if (!requests.has(key)) {
+        const request = loaders[key]();
+        requests.set(key, request
+            .then(module => { modules.set(key, module); return module; })
+            .catch(() => null));
+    }
+    return requests.get(key);
+}
+
+if (typeof window !== 'undefined') {
+    const location = resolveRouteSkeletonLocation(window.location.pathname, window.location.search);
+    void preloadRouteSkeletons(getRouteSkeletonKind(location.pathname));
+}
+
+export function usePageSkeletonModule(kind) {
+    const key = moduleKey(kind);
+    const [loaded, setLoaded] = useState(() => ({ key, module: modules.get(key) }));
+    const module = modules.get(key) ?? (loaded.key === key ? loaded.module : null);
     useEffect(() => {
         if (module) return undefined;
         let alive = true;
-        // Import failure is already normalized to null; this subscription does not outlive the effect.
-        void pageSkeletonRequest.then(loaded => { if (alive && loaded) setModule(loaded); });
+        void preloadRouteSkeletons(kind).then(next => { if (alive && next) setLoaded({ key, module: next }); });
         return () => { alive = false; };
-    }, [module]);
+    }, [kind, key, module]);
     return module;
 }
 

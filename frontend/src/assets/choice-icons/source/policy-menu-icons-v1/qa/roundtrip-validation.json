@@ -1,0 +1,38 @@
+[
+  {
+    "asset": "edit-booking-policy",
+    "resolution": [
+      512,
+      512
+    ],
+    "saved_scene_reopened_and_rerendered": true,
+    "rgba_pixel_identical": true,
+    "max_channel_difference": 0,
+    "mean_absolute_channel_difference": 0.0,
+    "alpha_pixel_identical": true
+  },
+  {
+    "asset": "edit-deposit",
+    "resolution": [
+      512,
+      512
+    ],
+    "saved_scene_reopened_and_rerendered": true,
+    "rgba_pixel_identical": true,
+    "max_channel_difference": 0,
+    "mean_absolute_channel_difference": 0.0,
+    "alpha_pixel_identical": true
+  },
+  {
+    "asset": "edit-refund",
+    "resolution": [
+      512,
+      512
+    ],
+    "saved_scene_reopened_and_rerendered": true,
+    "rgba_pixel_identical": true,
+    "max_channel_difference": 0,
+    "mean_absolute_channel_difference": 0.0,
+    "alpha_pixel_identical": true
+  }
+]

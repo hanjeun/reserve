@@ -1,0 +1,56 @@
+{
+  "snapshotted_files": 2247,
+  "unchanged_files": 2247,
+  "changed_files": [],
+  "missing_files": [],
+  "original_48_production_image_files_verified": 192,
+  "eight_refinement_app_webps_verified": 16,
+  "eight_refinement_native_pngs_verified": 16,
+  "eight_refinement_blends_verified": 8,
+  "three_camera_browser_production_image_files_verified": 12,
+  "three_camera_browser_blends_verified": 3,
+  "prior_zip_count_verified": 8,
+  "prior_zips": {
+    "RESERVE-camera-browser-states-v1.zip": {
+      "bytes": 2322510,
+      "sha256": "ee707d43c08a19fd9a4ba2088d49a1f024ce749261b4414e51f22e7bd06f6601"
+    },
+    "RESERVE-category-icons-6.zip": {
+      "bytes": 3420591,
+      "sha256": "4c034643151479a5c880edccde3e352dc6cda6bc5a17bdfcf65be2cb34868d23"
+    },
+    "RESERVE-empty-news-two-styles.zip": {
+      "bytes": 2120601,
+      "sha256": "6144befc09e138f5a538556aec6c3adc368ca8c3000751f90f9bb288f5e5aa21"
+    },
+    "RESERVE-extra-icons-13.zip": {
+      "bytes": 8491968,
+      "sha256": "1a5211b0dc66fe94a13e4e715509f71b50481d15efab706be3eb34a094f07d00"
+    },
+    "RESERVE-original-style-28.zip": {
+      "bytes": 18879760,
+      "sha256": "7ec8f4b83b0dabdb65b6d0020132e9b7f5a0871375fb2814b6c4566b833593ff"
+    },
+    "RESERVE-small-size-refinements-v1.zip": {
+      "bytes": 213179,
+      "sha256": "79b58b7db84a68d87e5e6a7ab51f2c248843a207e643b300b974422a96fd003f"
+    },
+    "RESERVE-state-illustrations-delivery.zip": {
+      "bytes": 16209274,
+      "sha256": "91bf399949837b68063d2d3af62cea0cc61c487229ac49f649ae0be63b11d3ff"
+    },
+    "RESERVE-state-illustrations.zip": {
+      "bytes": 31590026,
+      "sha256": "c227983dcf85733ccd110285664c64c37693425c7f96f8c370359c79cb0b8587"
+    }
+  },
+  "also_verified": "Locally available earlier source, review, motion, site, retired-page and archive files; none modified",
+  "unavailable_latest_four": {
+    "name": "RESERVE-edit-controls-v1.zip",
+    "library_file_id": "libfile_66105d91013c819196b377009243c467",
+    "historical_recorded_bytes": 2614668,
+    "historical_recorded_sha256": "5420c7b3b05a6895fdc1ffcd0902cb903f41d84b1ef738814aedbc80e8916931",
+    "current_bytes_verified": false,
+    "reason": "Local folder/archive still absent in this run. The preceding authorized Library helper download returned HTTP 403; no new download or access restriction bypass was attempted. Historical hash is not current verification."
+  }
+}

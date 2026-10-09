@@ -81,6 +81,7 @@ export const serializeStoreFormValues = (values = {}) => {
     delete serialized.detailImages;
 
     Object.entries(DATE_LIST_FIELDS).forEach(([fieldName, format]) => {
+        if (!Object.hasOwn(values, fieldName)) return;
         const fieldValue = values[fieldName];
         if (fieldValue == null) {
             serialized[fieldName] = fieldValue;
@@ -100,6 +101,7 @@ export const serializeStoreFormValues = (values = {}) => {
 export const hydrateStoreFormValues = (values = {}) => {
     const hydrated = { ...values };
     Object.entries(DATE_LIST_FIELDS).forEach(([fieldName, format]) => {
+        if (!Object.hasOwn(values, fieldName)) return;
         const fieldValue = values[fieldName];
         if (fieldValue == null) {
             hydrated[fieldName] = fieldValue;

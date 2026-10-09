@@ -14,7 +14,7 @@ export const MY_WAITING_HELP = '열려 있는 동안 대기 현황이 자동으�
 export function WaitingListSkeleton({ view = 'list', count = 3, personal = false }) {
     const cards = view === 'cards';
     const content = <>
-        <div className="reserve-waiting-entry-content" style={{ flex: 1 }}>
+        <div className="reserve-waiting-entry-content">
             <div className="reserve-waiting-entry-head" style={{ minHeight: cards ? 28 : 24 }}>
                 <Bone width={44} height={cards ? 20 : 16} />
                 <Bone width={62} height={24} borderRadius={6} />

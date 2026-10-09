@@ -1,0 +1,15 @@
+Original illustration images and original Blender scene geometry created for
+this category kit are offered under CC0 1.0 Universal, to the extent copyright
+or related rights exist and can lawfully be waived.
+
+CC0 1.0 legal text:
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+Commercial use, copying and modification are permitted under that dedication.
+No representation is made that AI-assisted output is copyrightable or exclusive.
+This dedication does not cover trademarks, patents, third-party rights, or
+third-party software used to produce the kit. No warranty is provided.
+
+The geometry was built procedurally in Blender. No third-party stock models,
+images, textures or fonts were incorporated. The shared scene/style pipeline
+continues the user's previously delivered RESERVE asset kit.

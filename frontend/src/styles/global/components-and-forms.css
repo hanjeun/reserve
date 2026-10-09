@@ -210,9 +210,10 @@
 .reserve-payment-result__content > .reserve-state-illustration { margin-inline: auto; }
 .reserve-data-state--compact {
     min-height: 0;
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, auto) auto;
+    justify-content: start;
+    gap: 8px 12px;
     padding: 18px 16px;
     text-align: left;
 }
@@ -220,10 +221,10 @@
 .reserve-data-state--compact .reserve-data-state__copy { min-width: 0; }
 .reserve-data-state--compact .reserve-data-state__title { font-size: 14px; font-weight: 400; color: var(--c-text-secondary, #4e5968); }
 .reserve-data-state--compact .reserve-data-state__description { font-size: 13px; }
-.reserve-data-state--compact .reserve-data-state__retry { margin: 0 0 0 auto; flex: 0 0 auto; }
+.reserve-data-state--compact .reserve-data-state__retry { margin: 0; justify-self: start; }
 @media (max-width: 479px) {
-    .reserve-data-state--compact { align-items: flex-start; flex-wrap: wrap; }
-    .reserve-data-state--compact .reserve-data-state__retry { margin-left: 28px; }
+    .reserve-data-state--compact { grid-template-columns: 20px minmax(0, 1fr); }
+    .reserve-data-state--compact .reserve-data-state__retry { grid-column: 2; padding-inline: 0; }
 }
 
 /* ── 페이지 자체가 없거나 그리다 실패한 화면 (PageStatus) ───────────────────

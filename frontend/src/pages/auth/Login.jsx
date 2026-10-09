@@ -10,7 +10,7 @@ import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS, API_BASE_URL } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
-import { saveRedirect, consumeRedirect } from '../../utils/redirect';
+import { saveRedirect, safeRedirectPath, consumeLoginRedirect } from '../../utils/redirect';
 import { colors, radius, heights, fontSize } from '../../styles/tokens';
 
 const { Text } = Typography;
@@ -53,7 +53,7 @@ const Login = () => {
     // 참고: 아래 useEffect가 안내 메시지를 띄우며 state를 비우기 때문에, 여기서 렌더 시점에
     //       미리 값을 잡아둬야 유실되지 않는다.
     const fromState = location.state?.from
-        ? `${location.state.from.pathname || ''}${location.state.from.search || ''}${location.state.from.hash || ''}`
+        ? safeRedirectPath(`${location.state.from.pathname || ''}${location.state.from.search || ''}${location.state.from.hash || ''}`)
         : null;
     const fromRef = useRef(fromState);
     // 로그인 필요 페이지에서 넘어왔는지 — 성공 후 전환 방향을 정한다. 아래 effect 가 state 를 비우므로 렌더 시점에 잡는다.
@@ -77,7 +77,7 @@ const Login = () => {
     useEffect(() => {
         if (hasHandledRef.current) return;
         // 계정 경계에서 재마운트돼도 원래 요청한 경로로 돌아간다.
-        if (isLoggedIn) { navigate(fromRef.current || consumeRedirect() || '/', { replace: true }); return; }
+        if (isLoggedIn) { navigate(consumeLoginRedirect(fromRef.current), { replace: true }); return; }
 
         if (location.state?.signupSuccess) {
             hasHandledRef.current = true;
@@ -128,7 +128,7 @@ const Login = () => {
                 login(res);
                 message.success(`${res.name}님, 로그인됐어요!`);
                 // router state → sessionStorage → '/' 순으로 복귀 경로 결정
-                const target = fromRef.current || consumeRedirect() || '/';
+                const target = consumeLoginRedirect(fromRef.current);
                 // 로그인 필요로 막혔던 곳이면 가려던 길을 계속 간다(오른쪽에서). 스스로 로그인했으면 있던 곳으로 돌아간다(왼쪽에서).
                 const direction = preventedRef.current && target !== '/' ? 'from-right' : 'from-left';
                 navigate(target, { replace: true, state: { reserveRouteMotion: direction } });
@@ -194,7 +194,7 @@ const Login = () => {
                     <button type="button" className="reserve-icon-action" aria-label="네이버로 로그인" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
                         <NaverIcon />
                     </button>
-                    <button type="button" className="reserve-icon-action" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: colors.background.default, border: `1px solid ${colors.border.light}` }}>
+                    <button type="button" className="reserve-icon-action" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: '#fff', border: '1px solid #dadce0' }}>
                         <GoogleIcon />
                     </button>
                 </Flex>

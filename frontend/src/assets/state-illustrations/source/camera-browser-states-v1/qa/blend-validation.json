@@ -1,0 +1,435 @@
+{
+  "blender_version": "4.3.2",
+  "reference_path_at_validation": "/workspace/shared/reserve-extra-icons-13/source/waiting-onsite.blend",
+  "files": [
+    {
+      "asset": "camera-denied",
+      "sha256": "331892c3f8a5f3840090bbc5b6076bdfa8586059c2557d14d43e995841748d1d",
+      "blend_reopened": true,
+      "editable_mesh_count": 12,
+      "editable_curve_count": 1,
+      "external_libraries": 0,
+      "external_images": 0,
+      "font_objects": 0,
+      "animated_objects": 0,
+      "actions": 0,
+      "settings_exact_match_to_available_extra13_reference": true,
+      "settings": {
+        "engine": "BLENDER_EEVEE_NEXT",
+        "samples": 128,
+        "transparent": true,
+        "color_mode": "RGBA",
+        "color_depth": "8",
+        "view_transform": "AgX",
+        "look": "AgX - Medium High Contrast",
+        "exposure": 0.3499999940395355,
+        "gamma": 1.0,
+        "display": "sRGB",
+        "view_settings_view": "AgX",
+        "world_color": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ],
+        "world_use_nodes": true,
+        "camera": {
+          "location": [
+            3.200000047683716,
+            -9.0,
+            4.800000190734863
+          ],
+          "rotation": [
+            1.1957879066467285,
+            1.289480433541712e-08,
+            0.3416154980659485
+          ],
+          "type": "ORTHO",
+          "ortho_scale": 3.75
+        },
+        "lights": {
+          "Large soft key": {
+            "location": [
+              -3.0,
+              -4.0,
+              7.0
+            ],
+            "rotation": [
+              0.6980299949645996,
+              2.1354791712724364e-08,
+              -0.643501341342926
+            ],
+            "energy": 550.0,
+            "shape": "DISK",
+            "size": 4.5,
+            "type": "AREA"
+          },
+          "Soft fill": {
+            "location": [
+              4.0,
+              -2.0,
+              4.0
+            ],
+            "rotation": [
+              0.9861174821853638,
+              -2.8577392896522724e-08,
+              1.1071487665176392
+            ],
+            "energy": 350.0,
+            "shape": "DISK",
+            "size": 4.0,
+            "type": "AREA"
+          },
+          "Edge separation": {
+            "location": [
+              1.0,
+              4.0,
+              5.0
+            ],
+            "rotation": [
+              0.8055741190910339,
+              -5.3024400870071986e-08,
+              2.8966140747070312
+            ],
+            "energy": 650.0,
+            "shape": "DISK",
+            "size": 3.0,
+            "type": "AREA"
+          }
+        },
+        "materials": {
+          "#3182F6": {
+            "source_srgb": "#3182F6",
+            "base_color": [
+              0.03071344457566738,
+              0.22322796285152435,
+              0.9215818643569946,
+              1.0
+            ],
+            "metallic": 0.11999999731779099,
+            "roughness": 0.25
+          },
+          "#8191A6": {
+            "source_srgb": "#8191A6",
+            "base_color": [
+              0.21952620148658752,
+              0.28314873576164246,
+              0.38132601976394653,
+              1.0
+            ],
+            "metallic": 0.03999999910593033,
+            "roughness": 0.36000001430511475
+          },
+          "#B8C9DE": {
+            "source_srgb": "#B8C9DE",
+            "base_color": [
+              0.4793201684951782,
+              0.5840784311294556,
+              0.7304607629776001,
+              1.0
+            ],
+            "metallic": 0.07999999821186066,
+            "roughness": 0.30000001192092896
+          },
+          "#F2F5FA": {
+            "source_srgb": "#F2F5FA",
+            "base_color": [
+              0.8879231214523315,
+              0.9130986332893372,
+              0.9559733271598816,
+              1.0
+            ],
+            "metallic": 0.05000000074505806,
+            "roughness": 0.2800000011920929
+          }
+        }
+      },
+      "rerendered_saved_scene_at_512": true
+    },
+    {
+      "asset": "camera-unavailable",
+      "sha256": "3be285059e394afad4b3f4bc14a951b4e352dd5fb54d1b861faa7e4966db294f",
+      "blend_reopened": true,
+      "editable_mesh_count": 11,
+      "editable_curve_count": 2,
+      "external_libraries": 0,
+      "external_images": 0,
+      "font_objects": 0,
+      "animated_objects": 0,
+      "actions": 0,
+      "settings_exact_match_to_available_extra13_reference": true,
+      "settings": {
+        "engine": "BLENDER_EEVEE_NEXT",
+        "samples": 128,
+        "transparent": true,
+        "color_mode": "RGBA",
+        "color_depth": "8",
+        "view_transform": "AgX",
+        "look": "AgX - Medium High Contrast",
+        "exposure": 0.3499999940395355,
+        "gamma": 1.0,
+        "display": "sRGB",
+        "view_settings_view": "AgX",
+        "world_color": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ],
+        "world_use_nodes": true,
+        "camera": {
+          "location": [
+            3.200000047683716,
+            -9.0,
+            4.800000190734863
+          ],
+          "rotation": [
+            1.1957879066467285,
+            1.289480433541712e-08,
+            0.3416154980659485
+          ],
+          "type": "ORTHO",
+          "ortho_scale": 3.75
+        },
+        "lights": {
+          "Large soft key": {
+            "location": [
+              -3.0,
+              -4.0,
+              7.0
+            ],
+            "rotation": [
+              0.6980299949645996,
+              2.1354791712724364e-08,
+              -0.643501341342926
+            ],
+            "energy": 550.0,
+            "shape": "DISK",
+            "size": 4.5,
+            "type": "AREA"
+          },
+          "Soft fill": {
+            "location": [
+              4.0,
+              -2.0,
+              4.0
+            ],
+            "rotation": [
+              0.9861174821853638,
+              -2.8577392896522724e-08,
+              1.1071487665176392
+            ],
+            "energy": 350.0,
+            "shape": "DISK",
+            "size": 4.0,
+            "type": "AREA"
+          },
+          "Edge separation": {
+            "location": [
+              1.0,
+              4.0,
+              5.0
+            ],
+            "rotation": [
+              0.8055741190910339,
+              -5.3024400870071986e-08,
+              2.8966140747070312
+            ],
+            "energy": 650.0,
+            "shape": "DISK",
+            "size": 3.0,
+            "type": "AREA"
+          }
+        },
+        "materials": {
+          "#3182F6": {
+            "source_srgb": "#3182F6",
+            "base_color": [
+              0.03071344457566738,
+              0.22322796285152435,
+              0.9215818643569946,
+              1.0
+            ],
+            "metallic": 0.11999999731779099,
+            "roughness": 0.25
+          },
+          "#8191A6": {
+            "source_srgb": "#8191A6",
+            "base_color": [
+              0.21952620148658752,
+              0.28314873576164246,
+              0.38132601976394653,
+              1.0
+            ],
+            "metallic": 0.03999999910593033,
+            "roughness": 0.36000001430511475
+          },
+          "#B8C9DE": {
+            "source_srgb": "#B8C9DE",
+            "base_color": [
+              0.4793201684951782,
+              0.5840784311294556,
+              0.7304607629776001,
+              1.0
+            ],
+            "metallic": 0.07999999821186066,
+            "roughness": 0.30000001192092896
+          },
+          "#F2F5FA": {
+            "source_srgb": "#F2F5FA",
+            "base_color": [
+              0.8879231214523315,
+              0.9130986332893372,
+              0.9559733271598816,
+              1.0
+            ],
+            "metallic": 0.05000000074505806,
+            "roughness": 0.2800000011920929
+          }
+        }
+      },
+      "rerendered_saved_scene_at_512": true
+    },
+    {
+      "asset": "browser-unsupported",
+      "sha256": "1cfd1fbbd89311d25b0177c622fef37a74b4c923932761730cf3f027d76cd740",
+      "blend_reopened": true,
+      "editable_mesh_count": 10,
+      "editable_curve_count": 2,
+      "external_libraries": 0,
+      "external_images": 0,
+      "font_objects": 0,
+      "animated_objects": 0,
+      "actions": 0,
+      "settings_exact_match_to_available_extra13_reference": true,
+      "settings": {
+        "engine": "BLENDER_EEVEE_NEXT",
+        "samples": 128,
+        "transparent": true,
+        "color_mode": "RGBA",
+        "color_depth": "8",
+        "view_transform": "AgX",
+        "look": "AgX - Medium High Contrast",
+        "exposure": 0.3499999940395355,
+        "gamma": 1.0,
+        "display": "sRGB",
+        "view_settings_view": "AgX",
+        "world_color": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ],
+        "world_use_nodes": true,
+        "camera": {
+          "location": [
+            3.200000047683716,
+            -9.0,
+            4.800000190734863
+          ],
+          "rotation": [
+            1.1957879066467285,
+            1.289480433541712e-08,
+            0.3416154980659485
+          ],
+          "type": "ORTHO",
+          "ortho_scale": 3.75
+        },
+        "lights": {
+          "Large soft key": {
+            "location": [
+              -3.0,
+              -4.0,
+              7.0
+            ],
+            "rotation": [
+              0.6980299949645996,
+              2.1354791712724364e-08,
+              -0.643501341342926
+            ],
+            "energy": 550.0,
+            "shape": "DISK",
+            "size": 4.5,
+            "type": "AREA"
+          },
+          "Soft fill": {
+            "location": [
+              4.0,
+              -2.0,
+              4.0
+            ],
+            "rotation": [
+              0.9861174821853638,
+              -2.8577392896522724e-08,
+              1.1071487665176392
+            ],
+            "energy": 350.0,
+            "shape": "DISK",
+            "size": 4.0,
+            "type": "AREA"
+          },
+          "Edge separation": {
+            "location": [
+              1.0,
+              4.0,
+              5.0
+            ],
+            "rotation": [
+              0.8055741190910339,
+              -5.3024400870071986e-08,
+              2.8966140747070312
+            ],
+            "energy": 650.0,
+            "shape": "DISK",
+            "size": 3.0,
+            "type": "AREA"
+          }
+        },
+        "materials": {
+          "#3182F6": {
+            "source_srgb": "#3182F6",
+            "base_color": [
+              0.03071344457566738,
+              0.22322796285152435,
+              0.9215818643569946,
+              1.0
+            ],
+            "metallic": 0.11999999731779099,
+            "roughness": 0.25
+          },
+          "#8191A6": {
+            "source_srgb": "#8191A6",
+            "base_color": [
+              0.21952620148658752,
+              0.28314873576164246,
+              0.38132601976394653,
+              1.0
+            ],
+            "metallic": 0.03999999910593033,
+            "roughness": 0.36000001430511475
+          },
+          "#B8C9DE": {
+            "source_srgb": "#B8C9DE",
+            "base_color": [
+              0.4793201684951782,
+              0.5840784311294556,
+              0.7304607629776001,
+              1.0
+            ],
+            "metallic": 0.07999999821186066,
+            "roughness": 0.30000001192092896
+          },
+          "#F2F5FA": {
+            "source_srgb": "#F2F5FA",
+            "base_color": [
+              0.8879231214523315,
+              0.9130986332893372,
+              0.9559733271598816,
+              1.0
+            ],
+            "metallic": 0.05000000074505806,
+            "roughness": 0.2800000011920929
+          }
+        }
+      },
+      "rerendered_saved_scene_at_512": true
+    }
+  ]
+}

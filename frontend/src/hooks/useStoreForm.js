@@ -7,6 +7,7 @@ import useMessage from './useMessage';
 import useAuthStore from '../store/useAuthStore';
 import useStoreDraftPreferences, { getStoreDraftAutoSaveEnabled } from './useStoreDraftPreferences';
 import { buildStoreFormData } from '../utils/form';
+import { migrateOnboardingDraft, normalizeOnboardingSubmission } from '../utils/storeOnboarding';
 import { handleApiError } from '../utils/errorHandler';
 import { getDetailImageUrl } from '../utils/image';
 import {
@@ -53,7 +54,7 @@ const initialValuesFromStore = initialData => {
         fullRefundDays: initialData.fullRefundDays ?? 3,
         partialRefundDays: initialData.partialRefundDays ?? 1,
         partialRefundRate: initialData.partialRefundRate ?? 50,
-        bookingDeadlineHours: initialData.bookingDeadlineHours ?? undefined,
+        bookingDeadlineHours: initialData.bookingDeadlineHours ?? 0,
         paymentTimeoutMinutes: initialData.paymentTimeoutMinutes ?? 30,
         reservationSlotMinutes: initialData.reservationSlotMinutes ?? 30,
         nearbyRadiusKm: initialData.nearbyRadiusKm ?? 3,
@@ -130,6 +131,7 @@ export const useStoreForm = ({
     const mainImageRef = useRef([]);
     const detailImagesRef = useRef([]);
     const baseFingerprintRef = useRef(null);
+    const editBaseValuesRef = useRef({});
     const autoSaveTimerRef = useRef(null);
     const autoSaveMaxTimerRef = useRef(null);
     const autoSaveActiveRef = useRef(false);
@@ -205,6 +207,7 @@ export const useStoreForm = ({
         if (initializedEditKeyRef.current === editKey) return;
         initializedEditKeyRef.current = editKey;
         const values = initialValuesFromStore(initialData);
+        editBaseValuesRef.current = values;
         const images = existingImagesFromStore(initialData);
         form.setFieldsValue(values);
         setMainImage(images.mainImage);
@@ -226,7 +229,7 @@ export const useStoreForm = ({
     const applyDraft = useCallback((draft, navigation = false) => {
         const restoredMain = hydrateDraftImages(draft.mainImage);
         const restoredDetail = hydrateDraftImages(draft.detailImages);
-        const restoredValues = hydrateStoreFormValues(draft.values);
+        const restoredValues = migrateOnboardingDraft(hydrateStoreFormValues(draft.values), mode);
         const nextFiles = [...restoredMain.files, ...restoredDetail.files];
 
         revokeRestoredUrls(nextFiles);
@@ -248,7 +251,7 @@ export const useStoreForm = ({
             : { status: 'saved', savedAt: draft.savedAt, error: null });
         hasChangesRef.current = navigation ? draft.changed : false;
         if (!navigation) message.info('이 브라우저에 임시저장한 내용을 불러왔어요.');
-    }, [form, message, revokeRestoredUrls]);
+    }, [form, message, mode, revokeRestoredUrls]);
 
     useEffect(() => {
         const ready = form && formReady && draftKey && isCurrentDraftSession() && (mode === 'create' || initialData);
@@ -496,7 +499,9 @@ export const useStoreForm = ({
         setLoading(true);
         cancelAutoSave();
         try {
-            const formData = buildStoreFormData(values);
+            const submitted = normalizeOnboardingSubmission({ ...(mode === 'edit' ? editBaseValuesRef.current : {}),
+                ...form.getFieldsValue(true), ...values }, mode);
+            const formData = buildStoreFormData(submitted);
             appendImages(formData);
 
             if (mode === 'create') await storeService.createStore(formData);

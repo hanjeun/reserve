@@ -5,10 +5,12 @@ export default function BusinessGuide() {
         register: <>
             <GuideParagraph>가게 등록과 파트너 패널은 사업자 권한으로 이용해요. 아직 사업자 계정이 아니라면 마이페이지에서 사업자 인증을 신청하고 승인 상태를 확인해주세요.</GuideParagraph>
             <GuideParagraph>내 가게에서 가게 등록을 시작해 서비스 분야, 이름, 위치와 운영 정보를 입력해요. 예약·웨이팅 중 사용할 방식을 선택하고 화면의 안내에 따라 필요한 항목을 입력한 뒤 미리보기와 최종 내용을 확인해 등록해주세요.</GuideParagraph>
+            <GuideParagraph>업종, 접수 방식, 예약 방식, 웨이팅, 영업 일정, 예약 접수 규칙, 노쇼 예약금·결제, 취소·환불 정책, 소개·사진의 9개 영역으로 나누어 설정해요. 선택한 접수 방식에 필요한 질문만 이어져요. 예약금을 받지 않으면 결제·환불 항목을 입력하지 않아도 돼요.</GuideParagraph>
             <GuideLinks links={[{ to: '/my-page', label: '사업자 인증 확인하기' }, { to: '/store/register', label: '가게 등록하기' }, { to: '/my-stores', label: '내 가게 관리하기' }]} />
         </>,
         edit: <>
-            <GuideParagraph>내 가게에서 수정할 가게를 선택해 수정할 항목을 고르세요. 내용을 입력한 뒤 수정 완료를 눌러 저장해요. 예약 방식과 웨이팅의 현장 QR·원격 접수 설정도 가게 수정에서 확인할 수 있어요.</GuideParagraph>
+            <GuideParagraph>내 가게에서 수정할 가게를 선택해 9개 영역 중 바꿀 항목을 고르세요. 해당 질문을 수정한 뒤 미리보기에서 확인하고 수정 완료로 저장해요. 미리보기의 수정 버튼은 그 항목의 질문으로 이동해요. 예약 방식과 웨이팅의 현장 QR·원격 접수 설정도 여기에서 확인할 수 있어요.</GuideParagraph>
+            <GuideParagraph>예약 마감의 제한 없음은 등록·수정 모두 사용할 수 있어요. 날짜는 직접 입력하거나 달력에서 고르고, 시간은 00시부터 23시까지의 24시간제로 선택해요. 예약금이 있을 때만 결제 시점을 고르며 나중 결제를 허용할 때 결제 마감을 설정해요.</GuideParagraph>
             <GuideParagraph>가게의 접수 중지 선택은 새 예약과 웨이팅 접수를 끄는 설정이에요. 기존 예약과 대기 내역은 관리 화면에서 계속 확인하고 처리해주세요.</GuideParagraph>
             <GuideLinks links={[{ to: '/my-stores', label: '가게 수정 열기' }]} />
         </>,

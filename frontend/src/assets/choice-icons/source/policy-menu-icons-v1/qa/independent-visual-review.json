@@ -1,0 +1,711 @@
+{
+  "review": "Independent visual review of RESERVE policy menu icons",
+  "overall_result": "PASS",
+  "result_scope": "Static visual and encoded-file review of the final revised production files",
+  "blocking_issues": [],
+  "scope": {
+    "icons": [
+      "edit-booking-policy",
+      "edit-deposit",
+      "edit-refund"
+    ],
+    "production_sizes": [
+      512,
+      768
+    ],
+    "actual_display_sizes": [
+      48,
+      56,
+      64
+    ],
+    "backgrounds": [
+      "#FFFFFF",
+      "#161C27"
+    ],
+    "formats": [
+      "PNG",
+      "WebP"
+    ]
+  },
+  "executed_method": [
+    "Confirmed six preview files and twelve production images existed before reviewing them.",
+    "Opened both overview sheets and all four actual-size sheets with the image viewer. Reviewed the true 48, 56, and 64 pixel canvases at their supplied size, including the unlabelled repeated comparison row.",
+    "Opened all three native 768-pixel PNGs and the revised 512-pixel refund PNG directly to inspect final object geometry and the arrow join. The initial 512-pixel refund WebP was also inspected before the polish revision.",
+    "Opened six available reference previews across the camera/browser, category, and extra-icon families for visual comparison.",
+    "Decoded all twelve production files independently with Pillow and NumPy. Checked dimensions, RGBA mode, single-frame state, transparent canvas borders, alpha range, full/RGB/alpha equality, encoded size targets, and composited RGB error on both backgrounds.",
+    "Independently regenerated and compared all 36 labelled small-size preview crops against the corresponding production WebP derivatives; every crop was pixel-identical.",
+    "After refund geometry was polished, re-opened both refreshed overview sheets, all four refreshed actual-size sheets, and both revised native refund PNGs. Repeated all production pixel checks, all preview hashes, and all 36 small-size crop comparisons. Verified the clipboard and deposit PNG/WebP hashes stayed unchanged from the first review."
+  ],
+  "preview_files_reviewed": [
+    "previews/dark-actual-48-56-64-from512.png",
+    "previews/dark-actual-48-56-64-from768.png",
+    "previews/dark-overview.png",
+    "previews/light-actual-48-56-64-from512.png",
+    "previews/light-actual-48-56-64-from768.png",
+    "previews/light-overview.png"
+  ],
+  "native_files_directly_viewed": [
+    "static/768/edit-booking-policy-768.png",
+    "static/768/edit-deposit-768.png",
+    "static/512/edit-refund-512.png",
+    "static/768/edit-refund-768.png"
+  ],
+  "available_references_reviewed": [
+    "/workspace/shared/reserve-camera-browser-v1/previews/light-overview.png",
+    "/workspace/shared/reserve-camera-browser-v1/previews/dark-overview.png",
+    "/workspace/shared/reserve-category-kit/previews/light-overview.webp",
+    "/workspace/shared/reserve-category-kit/previews/dark-actual-48-64.png",
+    "/workspace/shared/reserve-extra-icons-13/previews/light-overview.webp",
+    "/workspace/shared/reserve-extra-icons-13/previews/dark-actual-48-64.png"
+  ],
+  "reference_comparison": "The new icons visually retain the available family's pale white-gray rounded solid forms, restrained blue accents, shallow three-quarter perspective, broad upper-left highlights, soft modeled shading, and transparent empty canvas. This is a visual-family comparison against available assets, not an independent numeric audit of the camera, lights, material settings, or source scene.",
+  "per_icon": {
+    "edit-booking-policy": {
+      "result": "PASS",
+      "findings": "A vertical rounded clipboard with exactly three visible blue check rows and corresponding pale row strokes. The top clip and portrait silhouette stay recognizable at all three actual display sizes. No calendar grid or clock is visible."
+    },
+    "edit-deposit": {
+      "result": "PASS",
+      "findings": "A horizontal rounded pale wallet with one partly inserted coin and one small blue clasp. The coin's lower portion is occluded by the wallet front. The coin, wallet outline and clasp remain separate cues at 48/56/64 px. No additional coin, currency sign, letters, numbers, or logo is visible."
+    },
+    "edit-refund": {
+      "result": "PASS",
+      "findings": "One plain rimmed coin sits above an open, leftward bent return arrow. The arrow has a pale rounded shaft and blue left-pointing head; its open form does not resemble a circular refresh symbol. The coin/arrow arrangement stays distinct from the wallet at every tested menu size. No currency sign, letters, numbers, or logo is visible. The revised head-to-shaft intersection and integrated vertical cap are visually clean."
+    }
+  },
+  "shared_checks": {
+    "semantic_separation": "PASS; clipboard, wallet-with-inserted-coin, and coin-above-return-arrow remain distinguishable in labelled and unlabelled small-size comparisons.",
+    "small_size_readability": "PASS at 48/56/64 px on both tested backgrounds from both source resolutions.",
+    "alpha_and_edges": "PASS; all production borders are fully transparent and no clipping, rectangular backdrop, or distracting edge fringe was visible on the review backgrounds.",
+    "source_size_consistency": "PASS; no material small-size readability difference was apparent between the independently rendered 512 and 768 source derivatives.",
+    "encoding": "PASS; all files decode as static RGBA. All six WebPs meet their stated byte targets. Alpha is exactly equal within every PNG/WebP pair, while RGB and full RGBA are not pixel-identical."
+  },
+  "advisories": [
+    {
+      "severity": "semantic context",
+      "observation": "Use normal menu text alongside the icons. A generic clipboard expresses policy/checklist, a wallet expresses money/deposit, and a coin-plus-return arrow expresses money return; the artwork alone does not spell out the exact menu action."
+    }
+  ],
+  "limitations": [
+    "The latest four edit-control assets were absent from the available workspace. Their earlier Library download was reported HTTP 403 by the parent; this reviewer did not retry or attempt a bypass. Exact visual matching to those unavailable files is unverified.",
+    "This reviewer did not reopen Blender scenes, rerender them, audit source reproducibility, or independently prove exact numeric camera/light/material equality. Those checks are outside this visual report.",
+    "No deployed-app, real-device, user-study, or accessibility comprehension test was performed.",
+    "The PASS applies to the reviewed static files identified by the hashes below. Subsequent changes require corresponding re-review."
+  ],
+  "production_file_count": 12,
+  "pixel_checks": [
+    {
+      "asset": "static/512/edit-booking-policy-512.png",
+      "png_mode": "RGBA",
+      "webp_mode": "RGBA",
+      "png_size": [
+        512,
+        512
+      ],
+      "webp_size": [
+        512,
+        512
+      ],
+      "png_bytes": 123055,
+      "webp_bytes": 8640,
+      "webp_target_bytes": 20000,
+      "webp_under_target": true,
+      "png_frames": 1,
+      "webp_frames": 1,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bounds_xy_exclusive": [
+        152,
+        101,
+        369,
+        413
+      ],
+      "transparent_border": true,
+      "rgba_equal": false,
+      "rgb_equal": false,
+      "alpha_equal": true,
+      "comparison": [
+        {
+          "background_rgb": [
+            255,
+            255,
+            255
+          ],
+          "visible_rgb_mae": 1.1160664603603925,
+          "visible_rgb_max_error": 31.0
+        },
+        {
+          "background_rgb": [
+            22,
+            28,
+            39
+          ],
+          "visible_rgb_mae": 1.1160664603603925,
+          "visible_rgb_max_error": 31.0
+        }
+      ],
+      "png_sha256": "1d749ee755b8716ed664db0ddec348e7010954e31859ca3cc5e7d0037df61562",
+      "webp_sha256": "aa87a82b1b52ddda8d2f67fc560adf1e47cd16d633c4498b1f4d42a2c3129ccb"
+    },
+    {
+      "asset": "static/512/edit-deposit-512.png",
+      "png_mode": "RGBA",
+      "webp_mode": "RGBA",
+      "png_size": [
+        512,
+        512
+      ],
+      "webp_size": [
+        512,
+        512
+      ],
+      "png_bytes": 118688,
+      "webp_bytes": 8414,
+      "webp_target_bytes": 20000,
+      "webp_under_target": true,
+      "png_frames": 1,
+      "webp_frames": 1,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bounds_xy_exclusive": [
+        98,
+        112,
+        415,
+        406
+      ],
+      "transparent_border": true,
+      "rgba_equal": false,
+      "rgb_equal": false,
+      "alpha_equal": true,
+      "comparison": [
+        {
+          "background_rgb": [
+            255,
+            255,
+            255
+          ],
+          "visible_rgb_mae": 0.8858452640873131,
+          "visible_rgb_max_error": 33.0
+        },
+        {
+          "background_rgb": [
+            22,
+            28,
+            39
+          ],
+          "visible_rgb_mae": 0.8858452640873131,
+          "visible_rgb_max_error": 33.0
+        }
+      ],
+      "png_sha256": "1ef61437658f7774229c38ae4f87f3d58676466cd9e100d213356c008855595d",
+      "webp_sha256": "d887771f4b01195c577aa6f0d48a46014501ed008a67f0d13985f60686d38c31"
+    },
+    {
+      "asset": "static/512/edit-refund-512.png",
+      "png_mode": "RGBA",
+      "webp_mode": "RGBA",
+      "png_size": [
+        512,
+        512
+      ],
+      "webp_size": [
+        512,
+        512
+      ],
+      "png_bytes": 105369,
+      "webp_bytes": 9686,
+      "webp_target_bytes": 20000,
+      "webp_under_target": true,
+      "png_frames": 1,
+      "webp_frames": 1,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bounds_xy_exclusive": [
+        122,
+        99,
+        386,
+        402
+      ],
+      "transparent_border": true,
+      "rgba_equal": false,
+      "rgb_equal": false,
+      "alpha_equal": true,
+      "comparison": [
+        {
+          "background_rgb": [
+            255,
+            255,
+            255
+          ],
+          "visible_rgb_mae": 1.0800772278905613,
+          "visible_rgb_max_error": 26.0
+        },
+        {
+          "background_rgb": [
+            22,
+            28,
+            39
+          ],
+          "visible_rgb_mae": 1.0800772278905613,
+          "visible_rgb_max_error": 26.0
+        }
+      ],
+      "png_sha256": "0156e625c937d990d518c07e616451e30cbe2ded5c33316b6d5ff8424e7db423",
+      "webp_sha256": "a1b2d90613342fc397c879645719f2480be396a5b93c7c0210c85250974b3929"
+    },
+    {
+      "asset": "static/768/edit-booking-policy-768.png",
+      "png_mode": "RGBA",
+      "webp_mode": "RGBA",
+      "png_size": [
+        768,
+        768
+      ],
+      "webp_size": [
+        768,
+        768
+      ],
+      "png_bytes": 259574,
+      "webp_bytes": 13320,
+      "webp_target_bytes": 32000,
+      "webp_under_target": true,
+      "png_frames": 1,
+      "webp_frames": 1,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bounds_xy_exclusive": [
+        228,
+        153,
+        553,
+        620
+      ],
+      "transparent_border": true,
+      "rgba_equal": false,
+      "rgb_equal": false,
+      "alpha_equal": true,
+      "comparison": [
+        {
+          "background_rgb": [
+            255,
+            255,
+            255
+          ],
+          "visible_rgb_mae": 0.9845195528303421,
+          "visible_rgb_max_error": 32.0
+        },
+        {
+          "background_rgb": [
+            22,
+            28,
+            39
+          ],
+          "visible_rgb_mae": 0.9845195528303421,
+          "visible_rgb_max_error": 32.0
+        }
+      ],
+      "png_sha256": "7799e66c03ed4a75086b44a6519c43a526bbc4ab63bf89658cfc54b761229fee",
+      "webp_sha256": "39c9303b3b6882dde972dea2ad2cb8c121f0affe01271a0c496a0428f3b72e70"
+    },
+    {
+      "asset": "static/768/edit-deposit-768.png",
+      "png_mode": "RGBA",
+      "webp_mode": "RGBA",
+      "png_size": [
+        768,
+        768
+      ],
+      "webp_size": [
+        768,
+        768
+      ],
+      "png_bytes": 248080,
+      "webp_bytes": 12676,
+      "webp_target_bytes": 32000,
+      "webp_under_target": true,
+      "png_frames": 1,
+      "webp_frames": 1,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bounds_xy_exclusive": [
+        148,
+        168,
+        622,
+        608
+      ],
+      "transparent_border": true,
+      "rgba_equal": false,
+      "rgb_equal": false,
+      "alpha_equal": true,
+      "comparison": [
+        {
+          "background_rgb": [
+            255,
+            255,
+            255
+          ],
+          "visible_rgb_mae": 0.8260730508394151,
+          "visible_rgb_max_error": 32.0
+        },
+        {
+          "background_rgb": [
+            22,
+            28,
+            39
+          ],
+          "visible_rgb_mae": 0.8260730508394151,
+          "visible_rgb_max_error": 32.0
+        }
+      ],
+      "png_sha256": "9b2ada549302fa32b03361a474b23990af7ff1b94ada37496989ca746231f85c",
+      "webp_sha256": "2563185df2b034c06a258ee9afaf4d513b1d2230e6134ef314dafb16aab71bea"
+    },
+    {
+      "asset": "static/768/edit-refund-768.png",
+      "png_mode": "RGBA",
+      "webp_mode": "RGBA",
+      "png_size": [
+        768,
+        768
+      ],
+      "webp_size": [
+        768,
+        768
+      ],
+      "png_bytes": 216667,
+      "webp_bytes": 14820,
+      "webp_target_bytes": 32000,
+      "webp_under_target": true,
+      "png_frames": 1,
+      "webp_frames": 1,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bounds_xy_exclusive": [
+        183,
+        149,
+        579,
+        603
+      ],
+      "transparent_border": true,
+      "rgba_equal": false,
+      "rgb_equal": false,
+      "alpha_equal": true,
+      "comparison": [
+        {
+          "background_rgb": [
+            255,
+            255,
+            255
+          ],
+          "visible_rgb_mae": 0.9744226171043743,
+          "visible_rgb_max_error": 30.0
+        },
+        {
+          "background_rgb": [
+            22,
+            28,
+            39
+          ],
+          "visible_rgb_mae": 0.9744226171043742,
+          "visible_rgb_max_error": 30.0
+        }
+      ],
+      "png_sha256": "d0b5602f45ca22eff52448002f045846769c76e2f0cb4e9c274a7cc3341f4a90",
+      "webp_sha256": "e0e95798a2b1e210428fff2e0e68334631903a883091c94087961393e5a01c00"
+    }
+  ],
+  "preview_checks": [
+    {
+      "path": "previews/dark-actual-48-56-64-from512.png",
+      "dimensions": [
+        960,
+        430
+      ],
+      "mode": "RGB",
+      "sha256": "e30e2adef254d500ed4bb6e77c649f6ebbe086ae897c3d8c7272d6e1dc067531"
+    },
+    {
+      "path": "previews/dark-actual-48-56-64-from768.png",
+      "dimensions": [
+        960,
+        430
+      ],
+      "mode": "RGB",
+      "sha256": "c5c9ae08863b4e5b2168354066429178e7fae244dff57aef9804f890e3870ffb"
+    },
+    {
+      "path": "previews/dark-overview.png",
+      "dimensions": [
+        960,
+        355
+      ],
+      "mode": "RGB",
+      "sha256": "42b6c19f926140b8f524d4dcbca1a28fb9a84657c9e58ea56b26c181bfc68812"
+    },
+    {
+      "path": "previews/light-actual-48-56-64-from512.png",
+      "dimensions": [
+        960,
+        430
+      ],
+      "mode": "RGB",
+      "sha256": "8fdf82eecbefaacd715e2881bcf80f1a7b4c87edae051f55dde72062e79a9743"
+    },
+    {
+      "path": "previews/light-actual-48-56-64-from768.png",
+      "dimensions": [
+        960,
+        430
+      ],
+      "mode": "RGB",
+      "sha256": "100edf6d5668d969cc62cd3ce650482c0e6b88b3f6b414675aa9c7af7bb44323"
+    },
+    {
+      "path": "previews/light-overview.png",
+      "dimensions": [
+        960,
+        355
+      ],
+      "mode": "RGB",
+      "sha256": "588290edbc0b0e7c8e22edc34a8faa09c2e18100963fc371d3ce6891e4e6bb0c"
+    }
+  ],
+  "sheet_derivative_checks": [
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from512.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/light-actual-48-56-64-from768.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from512.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-booking-policy",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-deposit",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 48,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 56,
+      "pixel_identical_to_independent_derivative": true
+    },
+    {
+      "sheet": "previews/dark-actual-48-56-64-from768.png",
+      "icon": "edit-refund",
+      "canvas_size_px": 64,
+      "pixel_identical_to_independent_derivative": true
+    }
+  ],
+  "reviewed_at_utc": "2026-10-09T14:01:51.023343+00:00",
+  "status": "FINAL: revised refund and all regenerated previews re-reviewed.",
+  "resolved_issues": [
+    {
+      "asset": "edit-refund",
+      "initial_observation": "The pale shaft endpoint projected as a small rounded peg across the blue arrowhead face, and the upper-right shaft cap had a faint scalloped seam. These were cosmetic rather than small-size semantic blockers.",
+      "final_verification": "The revised 512 and 768 PNGs show the blue head covering the shaft join and a smooth integrated vertical cap. Both cosmetic defects are resolved. Refreshed overviews and small-size sheets preserve the leftward open-return cue."
+    }
+  ]
+}

@@ -167,7 +167,7 @@ const cellPresentation = ({ cell, mode, disabledDate, selectedKeys, draftRange, 
     if (isInsideRange) classNames.push('is-range');
     if (isToday && !isDisabled) classNames.push('is-today');
     const isPublicHoliday = holidays.has(cell.key);
-    if ((date.day() === 0 || isPublicHoliday) && !isDisabled && !isSelected) classNames.push('is-holiday');
+    if (date.day() === 0 || isPublicHoliday) classNames.push('is-holiday');
 
     let stateLabel = isPublicHoliday ? ' 공휴일' : '';
     if (isDisabled) stateLabel += ' 선택 불가';

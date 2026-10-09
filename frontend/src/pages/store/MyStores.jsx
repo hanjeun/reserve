@@ -238,7 +238,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
             title={stores.length > 0 ? '조건에 맞는 내 가게가 없어요.' : '등록된 가게가 없어요.'}
             action={stores.length > 0
                 ? <Button variant="secondary" size="sm" onClick={onResetFilters}>필터 초기화</Button>
-                : <Button variant="secondary" size="sm" onClick={onRegister}>새 가게 등록하기</Button>} />
+                : <Button variant="primary" size="md" onClick={onRegister}><PlusOutlined aria-hidden="true" /> 새 가게 등록하기</Button>} />
     );
 };
 

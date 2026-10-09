@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Pagination } from 'antd';
 import { Button, Card, DataState, FilterToolbar } from '../common';
 import ReservationListingToolbar from '../reservation/ReservationListingToolbar';
 import WaitingQrModal from './WaitingQrModal';
+import WaitingDetailModal from './WaitingDetailModal';
 import { MY_WAITING_HELP, MyWaitingSkeleton, WaitingListSkeleton } from './WaitingSkeleton';
 import useWaitingEvents from '../../hooks/useWaitingEvents';
 import useMessage from '../../hooks/useMessage';
@@ -37,6 +38,7 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
     const debouncedKeyword = useDebounce(keyword, 300);
     const searchPending = keyword !== debouncedKeyword;
     const [qrId, setQrId] = useState(null);
+    const [detailId, setDetailId] = useState(null);
     const [pending, setPending] = useState(null);
     const [manualRefresh, setManualRefresh] = useState(null);
     const operation = useRef(null);
@@ -111,14 +113,17 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
         }, { replace: true });
     }, [loggedIn, total, page, mine.isSuccess, mine.isPlaceholderData, searchPending, setParams]);
     const qrActive = rows.some(item => item.entry.id === qrId && item.entry.status === 'CALLED');
+    const detail = rows.find(item => item.entry.id === detailId) ?? null;
     const render = item => {
         const { entry } = item;
         const active = entry.status === 'WAITING' || entry.status === 'CALLED';
         const content = <>
             <div className="reserve-waiting-entry-content">
-                <div className="reserve-waiting-entry-head"><strong className="reserve-waiting-number">{entry.entryNumber}번</strong>
+                <div className="reserve-waiting-entry-head"><button type="button"
+                    className="reserve-waiting-number reserve-waiting-detail-trigger reserve-tap-card__trigger"
+                    aria-label={`${item.storeName} ${entry.entryNumber}번 웨이팅 상세 보기`} onClick={() => setDetailId(entry.id)}>{entry.entryNumber}번</button>
                     <span className="reserve-waiting-status" data-status={entry.status}>{LABELS[entry.status]}</span></div>
-                <div className="reserve-waiting-name"><Link to={`/store/${entry.storeId}`}>{item.storeName}</Link><span>{entry.partySize}명</span></div>
+                <div className="reserve-waiting-name">{item.storeName}<span>{entry.partySize}명</span></div>
                 <p className="reserve-waiting-form-help">{entry.status === 'WAITING' ? `내 앞에 ${item.teamsAhead}팀이 있어요.`
                     : entry.status === 'CALLED' ? '가게로 와서 직원에게 입장 QR을 보여주세요.'
                         : entry.status === 'SEATED' ? '입장이 완료됐어요.' : '취소한 접수예요.'}</p>
@@ -128,8 +133,8 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
                 {entry.status === 'CALLED' && <Button variant="primary" size="sm" disabled={pending != null} onClick={() => setQrId(entry.id)}>입장 QR</Button>}
             </div>}
         </>;
-        return <li key={entry.id} className={view === 'cards' ? 'reserve-waiting-card-entry' : 'reserve-waiting-entry'}>
-            {view === 'cards' ? <Card><Card.Body><div className="reserve-waiting-card-body">{content}</div></Card.Body></Card> : content}
+        return <li key={entry.id} className={view === 'cards' ? 'reserve-waiting-card-entry' : 'reserve-waiting-entry reserve-tap-card'}>
+            {view === 'cards' ? <Card className="reserve-waiting-card reserve-tap-card"><Card.Body><div className="reserve-waiting-card-body">{content}</div></Card.Body></Card> : content}
         </li>;
     };
     const initialLoading = mine.isPending && !toolbarReady;
@@ -161,6 +166,7 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
                 }} />
         </nav>}
         <WaitingQrModal open={qrActive} entryId={qrId} onClose={() => setQrId(null)} />
+        <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />
     </div>;
 }
 MyWaitingSession.propTypes = {

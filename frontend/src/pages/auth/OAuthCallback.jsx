@@ -34,8 +34,9 @@ const OAuthCallback = () => {
         const params = new URLSearchParams(window.location.search);
         const oauthError = params.get('error');
         const oauthMessage = params.get('message');
-        if (oauthError === 'oauth2' && oauthMessage) {
-            message.error(decodeURIComponent(oauthMessage));
+        if (oauthError === 'oauth2') {
+            // URLSearchParams가 이미 디코딩했다. '%'가 포함된 안내를 다시 디코딩하면 콜백이 중단된다.
+            message.error(oauthMessage || '소셜 로그인하지 못했어요. 다시 시도해주세요.');
             navigate('/login', { replace: true });
             return cleanup;
         }
@@ -45,15 +46,16 @@ const OAuthCallback = () => {
                 const user = await checkAuth(true);
                 if (!mounted.current) return;
                 if (user?.email) {
-                    const isNewUser = params.get('newUser') === 'true';
+                    const isNewUser = user.termsAgreed === false || params.get('newUser') === 'true';
                     if (isNewUser) {
                         // 약관 동의가 먼저 — 복귀 경로는 소비하지 않고 남겨둔다(SocialAgreement가 소비)
-                        navigate('/signup/social', { replace: true });
+                        window.location.replace('/signup/social');
                     } else {
                         const greeting = user.name ? `${user.name}님, 반가워요!` : '로그인됐어요.';
                         message.success(greeting);
-                        // 원래 보던 페이지로 복귀 (없으면 홈)
-                        navigate(consumeRedirect() || '/', { replace: true });
+                        // OAuth 문서를 교체해 모바일 주소창과 접수 화면의 주소를 함께 갱신한다.
+                        // 검증된 내부 경로만 사용하고 QR의 fragment를 그대로 보존한다.
+                        window.location.replace(consumeRedirect() || '/');
                     }
                 } else {
                     throw new Error('사용자 정보가 올바르지 않아요.');

@@ -41,27 +41,27 @@ describe('FormTimePicker', () => {
         expect(onChange.mock.calls[0][1]).toBe('09:15');
     });
 
-    it.each([['00:07', '오전'], ['12:07', '오후']])('preserves midnight/noon for %s', async (value, period) => {
+    it.each(['00:07', '12:07', '23:07'])('uses the same 24-hour time on the wheel and final value for %s', async value => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         render(<FormTimePicker value={time(value)} onChange={onChange} />);
         await user.click(screen.getByRole('button', { name: value }));
-        expect(selected('오전·오후')).toHaveTextContent(period);
-        expect(selected('시')).toHaveTextContent('12');
+        expect(screen.queryByRole('listbox', { name: '오전·오후' })).not.toBeInTheDocument();
+        expect(selected('시')).toHaveTextContent(value.slice(0, 2));
         await user.click(screen.getByRole('button', { name: '선택 완료' }));
         expect(onChange.mock.calls[0][0].format('HH:mm')).toBe(value);
     });
 
-    it('switches the period without changing the minute or the hour shown on the wheel', async () => {
+    it('selects an afternoon hour directly without changing the minute', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         render(<FormTimePicker value={time('00:07')} onChange={onChange} />);
         await user.click(screen.getByRole('button', { name: '00:07' }));
-        await user.click(within(screen.getByRole('listbox', { name: '오전·오후' })).getByRole('option', { name: '오후' }));
-        expect(selected('시')).toHaveTextContent('12');
+        await user.click(within(screen.getByRole('listbox', { name: '시' })).getByRole('option', { name: '18' }));
+        expect(selected('시')).toHaveTextContent('18');
         expect(selected('분')).toHaveTextContent('07');
         await user.click(screen.getByRole('button', { name: '선택 완료' }));
-        expect(onChange.mock.calls[0][1]).toBe('12:07');
+        expect(onChange.mock.calls[0][1]).toBe('18:07');
     });
 
     it('requires both ends of an empty range to be confirmed before updating the form', async () => {
@@ -76,20 +76,38 @@ describe('FormTimePicker', () => {
         expect(onChange.mock.calls[0][0].map(item => item.format('HH:mm'))).toEqual(['09:00', '10:00']);
     });
 
-    it('sorts a reversed range by HH:mm even when its Dayjs dates differ', async () => {
+    it('does not commit a zero-length range when the initial end cursor cannot advance past 23', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<FormTimePicker.RangePicker onChange={onChange} />);
+        await user.click(screen.getByRole('button', { name: /시작 시간.*종료 시간/ }));
+        await user.click(within(screen.getByRole('listbox', { name: '시' })).getByRole('option', { name: '23' }));
+        await user.click(screen.getByRole('button', { name: '다음' }));
+        await user.click(screen.getByRole('button', { name: '선택 완료' }));
+        expect(onChange).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: '선택 완료' })).toBeDisabled();
+        await user.click(within(screen.getByRole('listbox', { name: '분' })).getByRole('option', { name: '01' }));
+        await user.click(screen.getByRole('button', { name: '선택 완료' }));
+        expect(onChange.mock.calls[0][1]).toEqual(['23:00', '23:01']);
+    });
+
+    it('rejects a reversed range instead of silently swapping the business opening and closing times', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
         render(<FormTimePicker.RangePicker value={[time('13:20', '2026-10-02'), time('18:20', '2026-09-01')]} onChange={onChange} />);
         await user.click(screen.getByRole('button', { name: /13:20.*18:20/ }));
         await user.click(screen.getByRole('button', { name: /종료 시간.*18:20/ }));
-        await user.click(within(screen.getByRole('listbox', { name: '오전·오후' })).getByRole('option', { name: '오전' }));
         await user.click(within(screen.getByRole('listbox', { name: '시' })).getByRole('option', { name: '09' }));
+        expect(screen.getByRole('button', { name: '선택 완료' })).toBeDisabled();
+        expect(screen.getByText(/종료 시간은 시작 시간보다 뒤여야/)).toBeInTheDocument();
+        expect(onChange).not.toHaveBeenCalled();
+        await user.click(within(screen.getByRole('listbox', { name: '시' })).getByRole('option', { name: '19' }));
         await user.click(screen.getByRole('button', { name: '선택 완료' }));
-        expect(onChange.mock.calls[0][0].map(item => item.format('HH:mm'))).toEqual(['09:20', '13:20']);
-        expect(onChange.mock.calls[0][1]).toEqual(['09:20', '13:20']);
+        expect(onChange.mock.calls[0][0].map(item => item.format('HH:mm'))).toEqual(['13:20', '19:20']);
+        expect(onChange.mock.calls[0][1]).toEqual(['13:20', '19:20']);
         const payload = buildStoreFormData({ times: onChange.mock.calls[0][0] });
-        expect(payload.get('openTime')).toBe('09:20');
-        expect(payload.get('closeTime')).toBe('13:20');
+        expect(payload.get('openTime')).toBe('13:20');
+        expect(payload.get('closeTime')).toBe('19:20');
     });
 
     it('synchronizes typed range times with the wheels, rejects invalid input and keeps cancel reversible', async () => {
@@ -100,8 +118,7 @@ describe('FormTimePicker', () => {
         const start = screen.getByRole('textbox', { name: '시작 시간 직접 입력' });
         await user.clear(start);
         await user.type(start, '2359');
-        expect(selected('오전·오후')).toHaveTextContent('오후');
-        expect(selected('시')).toHaveTextContent('11');
+        expect(selected('시')).toHaveTextContent('23');
         expect(selected('분')).toHaveTextContent('59');
         const end = screen.getByRole('textbox', { name: '종료 시간 직접 입력' });
         await user.clear(end);
@@ -111,8 +128,7 @@ describe('FormTimePicker', () => {
         expect(onChange).not.toHaveBeenCalled();
         await user.clear(end);
         await user.type(end, '00:07');
-        expect(selected('오전·오후')).toHaveTextContent('오전');
-        expect(selected('시')).toHaveTextContent('12');
+        expect(selected('시')).toHaveTextContent('00');
         expect(selected('분')).toHaveTextContent('07');
         await user.click(screen.getByRole('button', { name: '취소' }));
         expect(onChange).not.toHaveBeenCalled();
@@ -128,14 +144,14 @@ describe('FormTimePicker', () => {
         await user.click(screen.getByRole('button', { name: '13:00' }));
         await user.click(screen.getByRole('listbox', { name: '시' }));
         await user.keyboard('{End}');
-        await user.click(screen.getByRole('button', { name: '12:00 회차 추가' }));
-        await user.click(screen.getByRole('button', { name: '12:00 회차 추가' }));
-        expect(screen.getAllByRole('button', { name: '12:00 회차 삭제' })).toHaveLength(1);
+        await user.click(screen.getByRole('button', { name: '23:00 회차 추가' }));
+        await user.click(screen.getByRole('button', { name: '23:00 회차 추가' }));
+        expect(screen.getAllByRole('button', { name: '23:00 회차 삭제' })).toHaveLength(1);
         await user.click(screen.getByRole('button', { name: '13:00 회차 삭제' }));
         expect(onChange).not.toHaveBeenCalled();
         await user.click(screen.getByRole('button', { name: '선택 완료' }));
-        expect(onChange.mock.calls[0][1]).toEqual(['12:00']);
-        expect(buildStoreFormData({ sessionTimes: onChange.mock.calls[0][0] }).getAll('sessionTimes')).toEqual(['12:00']);
+        expect(onChange.mock.calls[0][1]).toEqual(['23:00']);
+        expect(buildStoreFormData({ sessionTimes: onChange.mock.calls[0][0] }).getAll('sessionTimes')).toEqual(['23:00']);
     });
 
     it('takes a native scroll selection and supports keyboard boundaries without losing focus', async () => {

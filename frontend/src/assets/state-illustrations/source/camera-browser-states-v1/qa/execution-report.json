@@ -1,0 +1,23 @@
+{
+  "executed": [
+    "Six independent native PNG renders: three states \u00d7 512 and 768, Blender 4.3.2 / Eevee Next / 128 samples",
+    "PNG lossless optimization with RGBA equality check",
+    "Six static WebP encodes, quality 94, method 6, lossless alpha; sizes checked against 20000/32000-byte ceilings",
+    "Canvas dimensions, alpha extrema, transparent borders, margins and exact WebP alpha checked",
+    "PNG/WebP light and dark composites numerically compared, including partial-alpha edges",
+    "All three delivered blends reopened, editable objects and no external images/libraries/fonts/actions checked",
+    "Exact shared scene settings and four material definitions compared to locally available waiting-onsite.blend",
+    "All three saved scenes rerendered at 512 with RGBA pixel-identical comparison",
+    "Independent visual review of actual 48/56/64 px on light/dark from both production resolutions, plus original QR state comparison",
+    "SHA-256 preservation check against pre-work snapshot",
+    "ZIP integrity, safe paths, payload allowlist, 12 production images, 3 blends and per-file hashes verified"
+  ],
+  "not_executed": [
+    "Current-byte/source inspection or SHA verification of unavailable latest-four edit-controls ZIP; historical reference only",
+    "Rerender round-trip comparison at 768 from saved blends (independent native 768 renders were executed)",
+    "User-study, accessibility usability test, real-browser/app integration or physical-device display test",
+    "Animation, Lottie, video, site/app code, Git, deployment or operational work"
+  ],
+  "renderer_messages": "Initial EGL context and read-only cache warnings appeared; software rendering completed successfully at requested engine, settings and resolution. No warning was treated as render completion.",
+  "qa_script_repairs": "Before successful validation, Three audit-script issues were corrected: exclude an unused default material, use waiting-onsite reference because it contains the shared ink material, and compare materials by source color rather than Blender-generated numeric name suffixes. One diagnostic 512px rerender occurred before the final full validation pass. The artwork and delivered render settings did not change."
+}

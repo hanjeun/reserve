@@ -1,0 +1,228 @@
+{
+  "review": "Independent visual review of RESERVE camera and browser state icons",
+  "reviewed_at_utc": "2026-10-09T13:31:00Z",
+  "overall_result": "PASS",
+  "blocking_issues": [],
+  "scope": {
+    "icons": [
+      "camera-denied",
+      "camera-unavailable",
+      "browser-unsupported"
+    ],
+    "production_sizes": [
+      512,
+      768
+    ],
+    "actual_display_sizes": [
+      48,
+      56,
+      64
+    ],
+    "backgrounds": [
+      "light",
+      "dark"
+    ],
+    "formats": [
+      "PNG",
+      "WebP"
+    ]
+  },
+  "method": "Direct image inspection of both overview images and all four actual-size review sheets. Small icons were reviewed on their actual 48/56/64-pixel canvases rather than judged solely from enlarged overviews. Production PNG/WebP channel equality was checked with NumPy array_equal separately for full RGBA, RGB and alpha. Current original QR state files were opened directly to verify their current badge appearance, rather than relying on older composite review sheets.",
+  "preview_files_reviewed": [
+    "previews/light-overview.png",
+    "previews/dark-overview.png",
+    "previews/light-actual-48-56-64-from512.png",
+    "previews/dark-actual-48-56-64-from512.png",
+    "previews/light-actual-48-56-64-from768.png",
+    "previews/dark-actual-48-56-64-from768.png"
+  ],
+  "available_references_reviewed": [
+    "/workspace/shared/reserve-extra-icons-13/previews/light-actual-48-64.png",
+    "/workspace/shared/reserve-extra-icons-13/previews/dark-actual-48-64.png",
+    "/workspace/shared/reserve-small-refinement-v1/qa/after-light-48-64.png",
+    "/workspace/shared/reserve-original-style-kit/static/512/qr-invalid.png",
+    "/workspace/shared/reserve-original-style-kit/static/512/qr-success.png",
+    "/workspace/shared/reserve-original-style-kit/static/512/qr-ready.png",
+    "/workspace/shared/reserve-original-style-kit/static/512/qr-expired.png"
+  ],
+  "reference_comparison": "The current original QR files were directly inspected: qr-invalid uses a neutral dark-blue circular exclamation badge; qr-success uses a bright green circular badge with a pale check; qr-ready uses a blue open-circle mark; qr-expired uses a blue clock badge. The previously viewed refinement composite showed a different invalid-state treatment and is not authoritative for these current original files. New icons retain the available family's pale rounded gray forms, restrained blue accents, soft upper-left highlights and shallow 3D perspective. Their camera or browser silhouettes and neutral restriction geometry are distinguishable from those QR symbols. This is a broad visual-family comparison, not verification against the unavailable four most-recent controls.",
+  "per_icon": {
+    "camera-denied": {
+      "result": "PASS",
+      "findings": "Camera body and lens remain recognizable at all three sizes. Lower-right padlock creates a distinct silhouette and reads as permission restriction. At 48 px the blue keyhole is tertiary detail; lock body and shackle carry the cue."
+    },
+    "camera-unavailable": {
+      "result": "PASS",
+      "findings": "The strong diagonal off bar remains clear at 48 px and is unmistakably different from the denied-state lower-right padlock. Lens and camera outline remain visible. Its neutral gray keeps the restriction cue visually restrained."
+    },
+    "browser-unsupported": {
+      "result": "PASS",
+      "findings": "Broad browser-window silhouette, top chrome and lower-right restriction symbol remain distinct from the two cameras. Restriction circle and diagonal remain legible at 48 px. Toolbar dots are secondary details and do not carry the state meaning."
+    }
+  },
+  "shared_checks": {
+    "semantic_separation": "PASS across the three new icons at 48/56/64 px on light and dark",
+    "silhouette": "PASS; main camera and browser objects retain recognizable outer contours",
+    "palette_and_material": "PASS against available original/earlier control references",
+    "alpha_and_edges": "PASS; no visible rectangular background, clipped silhouette, distracting fringe or dirty transparent edge on either tested background",
+    "shading_and_shadow": "PASS; soft modeled shadows stay attached to the forms without visible detached shadow artifacts",
+    "source_size_consistency": "PASS; no material small-size readability difference between the 512 and 768 source review sheets"
+  },
+  "advisories": [
+    "Use normal UI state text with the icons. Camera-off imagery does not independently encode whether the technical cause is missing hardware, hardware busy, or another unavailable condition; browser restriction imagery similarly benefits from the unsupported-browser label. This is a semantic limit of the symbol, not a rendering defect.",
+    "Do not depend on the tiny blue keyhole or toolbar dots as the only distinguishing cue at 48 px."
+  ],
+  "limitations": [
+    "The latest four requested recent-reference ZIP/source assets were not available in this workspace and their Library download was reported HTTP 403 by the parent. Exact direct matching against those four references is unverified in this review. Available original QR states and earlier control previews were reviewed.",
+    "This is a visual/static-file review, not a Blender source or rerender reproducibility audit."
+  ],
+  "pixel_checks": [
+    {
+      "asset": "static/512/browser-unsupported-512.png",
+      "rgba": true,
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_border": true,
+      "transparent_corners": true,
+      "png_webp_pixel_equivalent": false,
+      "alpha_bounds": [
+        113,
+        99,
+        421,
+        405
+      ],
+      "png_webp_rgba_equal": false,
+      "png_webp_rgb_equal": false,
+      "png_webp_alpha_equal": true
+    },
+    {
+      "asset": "static/512/camera-denied-512.png",
+      "rgba": true,
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_border": true,
+      "transparent_corners": true,
+      "png_webp_pixel_equivalent": false,
+      "alpha_bounds": [
+        114,
+        111,
+        405,
+        407
+      ],
+      "png_webp_rgba_equal": false,
+      "png_webp_rgb_equal": false,
+      "png_webp_alpha_equal": true
+    },
+    {
+      "asset": "static/512/camera-unavailable-512.png",
+      "rgba": true,
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_border": true,
+      "transparent_corners": true,
+      "png_webp_pixel_equivalent": false,
+      "alpha_bounds": [
+        103,
+        99,
+        427,
+        415
+      ],
+      "png_webp_rgba_equal": false,
+      "png_webp_rgb_equal": false,
+      "png_webp_alpha_equal": true
+    },
+    {
+      "asset": "static/768/browser-unsupported-768.png",
+      "rgba": true,
+      "dimensions": [
+        768,
+        768
+      ],
+      "transparent_border": true,
+      "transparent_corners": true,
+      "png_webp_pixel_equivalent": false,
+      "alpha_bounds": [
+        170,
+        150,
+        630,
+        607
+      ],
+      "png_webp_rgba_equal": false,
+      "png_webp_rgb_equal": false,
+      "png_webp_alpha_equal": true
+    },
+    {
+      "asset": "static/768/camera-denied-768.png",
+      "rgba": true,
+      "dimensions": [
+        768,
+        768
+      ],
+      "transparent_border": true,
+      "transparent_corners": true,
+      "png_webp_pixel_equivalent": false,
+      "alpha_bounds": [
+        171,
+        167,
+        606,
+        610
+      ],
+      "png_webp_rgba_equal": false,
+      "png_webp_rgb_equal": false,
+      "png_webp_alpha_equal": true
+    },
+    {
+      "asset": "static/768/camera-unavailable-768.png",
+      "rgba": true,
+      "dimensions": [
+        768,
+        768
+      ],
+      "transparent_border": true,
+      "transparent_corners": true,
+      "png_webp_pixel_equivalent": false,
+      "alpha_bounds": [
+        155,
+        149,
+        640,
+        622
+      ],
+      "png_webp_rgba_equal": false,
+      "png_webp_rgb_equal": false,
+      "png_webp_alpha_equal": true
+    }
+  ],
+  "direct_reference_observations": [
+    {
+      "path": "/workspace/shared/reserve-original-style-kit/static/512/qr-invalid.png",
+      "sha256": "70c7f75b9f22345c2e7c38cb2789a3fa3683aecfbb2a913efdfcf9c2c1fc30d6",
+      "badge_observed": "Neutral dark-blue circular badge with pale exclamation"
+    },
+    {
+      "path": "/workspace/shared/reserve-original-style-kit/static/512/qr-success.png",
+      "sha256": "dfc1884e30d4d96fa9b82645c830dd8ad45d8cdd942b92cab7fd371470c5589b",
+      "badge_observed": "Bright green circular badge with pale check"
+    },
+    {
+      "path": "/workspace/shared/reserve-original-style-kit/static/512/qr-ready.png",
+      "sha256": "f30914dddc41458a655c2efa9cd0f800707edc0123d9899bee96232d75fb77ed",
+      "badge_observed": "Blue open circle"
+    },
+    {
+      "path": "/workspace/shared/reserve-original-style-kit/static/512/qr-expired.png",
+      "sha256": "dce5d85fee1b41789d64d67e9092a2af618bde6de95f63af511a3ac3d15f2470",
+      "badge_observed": "Blue clock"
+    }
+  ],
+  "encoding_observation": "All six PNG/WebP pairs have exactly matching alpha channels but differ in RGB and full RGBA values. This is consistent with the reported WebP lossy RGB quality-94 encoding and exact alpha. Pixel identity is not claimed. The visual readability pass is independent of that equality test.",
+  "corrections": [
+    "Replaced the earlier false PNG/WebP pixel-equivalence result. Pillow RGBA difference.getbbox could overlook RGB changes when alpha difference was zero; NumPy array_equal now reports full RGBA and RGB unequal, alpha equal.",
+    "Replaced badge-color assertions inferred from an older composite with direct observations of the current original QR files. The current qr-success PNG was visually green when reviewed."
+  ]
+}

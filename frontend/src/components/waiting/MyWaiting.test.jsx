@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -121,7 +121,7 @@ it('keeps the same focused search field and prior own data while a debounced ser
     expect(currentParams().get('status')).toBe('CONFIRMED');
     expect(currentParams().get('sort')).toBe('oldest');
     await act(async () => request.resolve(pageWith('새 가게', 1)));
-    await screen.findByRole('link', { name: '새 가게' });
+    await screen.findByRole('button', { name: '새 가게 4번 웨이팅 상세 보기' });
     expect(screen.queryByText('이전 내 웨이팅')).toBeNull();
 });
 
@@ -199,4 +199,40 @@ it('normalizes waiting keys independently while preserving the existing reservat
     expect(invalid.get('status')).toBe('CONFIRMED'); expect(invalid.get('sort')).toBe('visit');
     expect(invalid.get('tab')).toBe('waiting');
     expect(normalizeListQueryParams('/my-favorites', input).has('waitingStatus')).toBe(false);
+});
+
+it('opens a waiting detail, updates its status from the own list and removes it across an account boundary', async () => {
+    const own = pageWith('내 접수 가게');
+    Object.assign(own.content[0].entry, {
+        businessDate: '2026-10-10', createdAt: '2026-10-10T01:30:00Z', displayName: '내 이름',
+    });
+    waitingService.getMine.mockResolvedValue(own);
+    const view = showMine();
+    fireEvent.click(await screen.findByRole('button', { name: '내 접수 가게 4번 웨이팅 상세 보기' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('내 이름')).toBeInTheDocument();
+    expect(within(dialog).getByText('내 앞에 3팀이 있어요.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: '가게 상세 보기' })).toHaveAttribute('href', '/store/31');
+    expect(dialog).toHaveTextContent('2026-10-10');
+    expect(dialog).toHaveTextContent('10:30');
+    await act(async () => view.client.setQueriesData({ queryKey: ['waiting', 1, 'my', 7] }, {
+        ...own, content: [{ ...own.content[0], entry: { ...own.content[0].entry, status: 'SEATED', finishedAt: '2026-10-10T02:00:00Z' } }],
+    }));
+    await within(dialog).findByText('입장 완료');
+    expect(dialog).toHaveTextContent('입장 시각');
+    Object.assign(auth, { sessionRevision: 2, user: { id: 8 } });
+    waitingService.getMine.mockResolvedValue(pageWith('다른 계정 가게'));
+    view.rerenderAuth();
+    await screen.findByText('다른 계정 가게');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('내 이름')).toBeNull();
+});
+
+it('opens entry QR without also opening waiting details', async () => {
+    waitingService.getMine.mockResolvedValue(pageWith('호출 가게', 1, 'CALLED'));
+    showMine();
+    fireEvent.click(await screen.findByRole('button', { name: '입장 QR' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('입장 QR 12');
+    expect(screen.queryByText('웨이팅 상세')).toBeNull();
 });

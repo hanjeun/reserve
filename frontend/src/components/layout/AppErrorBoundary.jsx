@@ -23,12 +23,12 @@ import { isChunkLoadError } from '../../utils/chunkReload';
  * 폴백은 컴포넌트 하나로 가볍게 두고, 파일 안에서만 쓰는 폴백에는 propTypes 를 달지 않는다
  * (Sentry.ErrorBoundary 가 항상 같은 모양의 props 를 넘긴다).
  */
-function ErrorFallback({ error, resetError, goHome }) {
+function ErrorFallback({ error, resetError, goHome, fullPage = false }) {
     const chunkError = isChunkLoadError(error);
     return (
         <PageStatus
             role="alert"
-            className="reserve-error-fallback"
+            className={`reserve-error-fallback${fullPage ? ' reserve-error-fallback--app' : ''}`}
             icon={<ExclamationCircleFilled />}
             illustration={chunkError ? 'retry' : 'unknown-error'}
             title={chunkError ? '화면을 불러오지 못했어요' : '문제가 생겼어요'}
@@ -65,7 +65,7 @@ function RouteErrorFallback({ error, resetError }) {
 
 // 셸이 무너진 상태라 라우터·스토어에 기대지 않는다. 홈으로는 문서를 새로 불러온다.
 const AppErrorFallback = ({ error, resetError }) => (
-    <ErrorFallback error={error} resetError={resetError} goHome={() => window.location.assign('/')} />
+    <ErrorFallback error={error} resetError={resetError} goHome={() => window.location.assign('/')} fullPage />
 );
 
 const tagBoundary = (name) => (scope) => { scope.setTag('error_boundary', name); };

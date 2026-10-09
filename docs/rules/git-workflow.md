@@ -251,5 +251,5 @@ gh run view <run-id> --log-failed -R hanjeun/reserve
 
 - 점검 스크립트는 읽기 전용이에요. 필수 `build-backend`/`build-frontend`가 없거나 skipped/neutral이면 준비 완료로 보지 않아요.
 - 체크 성공은 머지 승인이 아니에요. 의존성 PR은 최신 base에서 다시 검증해요.
-- 의존성 업데이트 때 확인할 것: AntD/rc-tabs는 patch-package와 모바일 탭, ESLint는 core·설정·플러그인 peer 호환성, 모션 메이저는 일반 모션.
+- 의존성 업데이트 때 확인할 것: AntD/rc-tabs·rc-util은 버전 고정 postinstall 패치와 모바일 탭·닫힘 동작, ESLint는 core·설정·플러그인 peer 호환성, 모션 메이저는 일반 모션.
 - `--force`, `--legacy-peer-deps`, `--ignore-scripts`로 실패를 숨기지 않아요.

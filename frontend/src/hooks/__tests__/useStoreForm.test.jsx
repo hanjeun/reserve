@@ -208,6 +208,19 @@ describe('useStoreForm detail image order', () => {
         expect(form.setFieldsValue).toHaveBeenCalledWith(expect.objectContaining({ imageAutoplayEnabled: false }));
     });
 
+    it('merges an identity edit with the original period, holidays and capacity while preserving explicit clears', async () => {
+        const { buildStoreFormData } = await import('../../utils/form');
+        const initialData = { id: 3, name: '가게', noShowDeposit: 0, bookingDeadlineHours: null,
+            openDate: '2026-10-01', closeDate: '2026-12-31', closedDates: ['2026-11-01'], maxCapacityPerSlot: 4 };
+        const { result } = renderHook(() => useStoreForm({ mode: 'edit', initialData, storeId: 3, form }), { wrapper });
+        await act(async () => { await result.current.handleSubmit({ name: '소개 수정', closedDates: [] }); });
+        const values = buildStoreFormData.mock.calls.at(-1)[0];
+        expect(values.maxCapacityPerSlot).toBe(4);
+        expect(values.operatingPeriod.map(date => date.format('YYYY-MM-DD'))).toEqual(['2026-10-01', '2026-12-31']);
+        expect(values.closedDates).toEqual([]);
+        expect(values.bookingDeadlineHours).toBe(0);
+    });
+
     it('sends the on-screen order even when a new photo is dragged before existing ones', async () => {
         const initialData = { id: 3, name: '가게', detailImageUrls: ['https://cdn.example.test/a.png', 'https://cdn.example.test/b.png'] };
         const { result } = renderHook(

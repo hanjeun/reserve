@@ -1,0 +1,18 @@
+Original illustration images and original editable Blender geometry in this new
+policy/deposit/refund icon kit are dedicated under CC0 1.0 Universal, to the extent
+copyright or related rights exist and may lawfully be waived.
+
+Full terms are included in CC0-1.0-FULL.txt. Official text:
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+Commercial use, copying and modification are permitted. No representation is
+made that AI-assisted output is copyrightable or exclusive. This dedication
+does not waive trademarks, patents, or third-party rights and provides no
+warranty. Third-party production software retains its own licenses.
+
+All new geometry is original, procedural Blender modeling. No stock models,
+images, textures, outside model assets, fonts, logos or actual QR payloads are
+incorporated. The shared procedural helpers and style continue the user's
+existing RESERVE assets. Full original source/license notices are preserved
+verbatim in prior-notices; the code is under LICENSE-CODE.txt (MIT).
+Review labels are added only on QA sheets; asset canvases contain no text.

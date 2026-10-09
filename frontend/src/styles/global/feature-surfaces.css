@@ -126,6 +126,9 @@
     color: var(--c-text-disabled, #b5b8bd);
     cursor: not-allowed;
 }
+/* 폼에서 지난 공휴일을 선택하지 못해도 빨간날 표시는 유지한다. 회색 선택면도 그대로 둔다. */
+.reserve-form-cal-cell.is-holiday { color: var(--c-error, #f04452); }
+.reserve-form-cal-cell.is-holiday:disabled { color: var(--c-error, #f04452); opacity: 0.5; }
 /* 날짜 필드 — 다른 입력칸을 눌렀을 때와 같은 정도로만 반응한다. */
 .reserve-cal-trigger:hover { background-color: var(--c-gray-100, #f2f4f6); }
 .reserve-form-date-trigger:disabled { cursor: not-allowed; }
@@ -147,15 +150,12 @@
     background: var(--c-gray-100, #f2f4f6);
 }
 .reserve-form-cal-part.is-active {
-    border-color: var(--c-gray-400, #b5b8bd);
+    border-color: var(--c-text-primary, #191f28);
     background: var(--c-bg-paper, #fff);
     box-shadow: none;
 }
 .reserve-form-cal-part:focus { outline: none; }
-.reserve-form-cal-part:focus-visible {
-    outline: var(--reserve-focus-ring);
-    outline-offset: 2px;
-}
+.reserve-form-cal-part:focus-within { border-color: var(--c-text-primary, #191f28); }
 
 /* 날짜 원문은 입력칸에 두고 유효한 완성 날짜만 달력의 회색 선택면으로 표시한다. */
 .reserve-date-part-label { display: block; margin-bottom: 3px; font-size: 12px; color: var(--c-text-tertiary, #8b95a1); }
@@ -164,7 +164,7 @@ button.reserve-date-part-label { width: 100%; padding: 0; border: 0; background:
 .reserve-date-part-value::placeholder { color: var(--c-text-tertiary, #8b95a1); }
 .reserve-date-part-value:focus { outline: none; }
 .reserve-date-part-value:focus-visible,
-button.reserve-date-part-label:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; border-radius: 4px; }
+button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-date-input-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--c-text-tertiary, #8b95a1); }
 
 /* 달 넘기기 — 버튼이 작아서 항상 판을 깔면 답답하다. hover 에만 둥근 회색 판을 준다. */
@@ -200,9 +200,10 @@ button.reserve-date-part-label:focus-visible { outline: var(--reserve-focus-ring
 .reserve-time-parts button.reserve-time-part-label { width: 100%; padding: 0; border: 0; background: transparent; text-align: left; font-family: inherit; cursor: pointer; }
 .reserve-time-parts input.reserve-time-part-value { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; font-family: inherit; font-size: 16px; line-height: 1.5; }
 .reserve-time-parts input.reserve-time-part-value:focus { outline: none; }
-.reserve-time-parts button.reserve-time-part-label:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; border-radius: 4px; }
+.reserve-time-parts input.reserve-time-part-value:focus-visible,
+.reserve-time-parts button.reserve-time-part-label:focus-visible { outline: none; }
 .reserve-time-heading { margin-bottom: 14px; text-align: center; font-size: 18px; font-weight: 600; color: var(--c-text-primary, #191f28); }
-.reserve-time-wheels { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.reserve-time-wheels { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .reserve-time-wheels::before {
     content: '';
     position: absolute;
@@ -509,6 +510,7 @@ button.reserve-date-part-label:focus-visible { outline: var(--reserve-focus-ring
     max-width: none !important;
     background-color: var(--c-bg-paper, #fff) !important;
 }
+.reserve-error-fallback--app { min-height: 100svh !important; }
 .reserve-messages-page {
     width: 100%;
     padding: 28px 24px;

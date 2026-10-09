@@ -456,54 +456,17 @@ jobs:
       #  두 번 붙었다. 아래에서는 명령 치환 밖에서 폴백을 주어 값이 겹치지 않게 한다.)
       - name: Detect active upstream (inside server)
         id: detect
-        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
-        with:
-          username: ubuntu
-          host: ${{ secrets.RESERVE_SERVER_IP }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          capture_stdout: true
-          script: |
-            set -eu
-            SERVICE_ENV_LINE=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc \
-              | tr -d '\r\n')
-            case "$SERVICE_ENV_LINE" in
-              'set $service_url blue;') CURRENT_UPSTREAM=blue ;;
-              'set $service_url green;') CURRENT_UPSTREAM=green ;;
-              *)
-                echo "Invalid nginx service-env.inc; refusing to guess the live upstream"
-                exit 1
-                ;;
-            esac
-
-            STATUS_BLUE=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-time 10 http://localhost:8080/actuator/health) || STATUS_BLUE="000"
-            STATUS_GREEN=$(curl -o /dev/null -w "%{http_code}" -s --connect-timeout 5 --max-time 10 http://localhost:8081/actuator/health) || STATUS_GREEN="000"
-            echo "routed=$CURRENT_UPSTREAM blue=$STATUS_BLUE green=$STATUS_GREEN"
-            ACTIVE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$CURRENT_UPSTREAM")
-            SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$ACTIVE_IMAGE")
-            if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ]; then
-              echo "Active backend image is not schema/refund compatible; refusing automatic deployment"
-              exit 1
-            fi
-            FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$ACTIVE_IMAGE")
-            if [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-v2' ]; then
-              echo "Active recovery image does not support waiting settings, signup tickets and private message deletion; prepare an approved compatible baseline before automatic deployment"
-              exit 1
-            fi
-            if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
-               || { [ "$CURRENT_UPSTREAM" = "green" ] && [ "$STATUS_GREEN" != "200" ]; }; then
-              echo "Nginx points to an unhealthy upstream; refusing automatic deployment"
-              exit 1
-            fi
-            echo "DETECTED_UPSTREAM=$CURRENT_UPSTREAM"
+        env:
+          RESERVE_SERVER_IP: ${{ secrets.RESERVE_SERVER_IP }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          RESERVE_SSH_FINGERPRINT: ${{ env.RESERVE_SSH_FINGERPRINT }}
+        run: bash scripts/detect-active-upstream.sh
 
       - name: Set target IP
         env:
-          # capture_stdout 결과에는 drone-ssh의 래퍼 출력이 섞이므로 마지막 표식 줄만 골라 쓴다.
-          DETECT_STDOUT: ${{ steps.detect.outputs.stdout }}
+          DETECTED_UPSTREAM: ${{ steps.detect.outputs.current_upstream }}
         run: |
-          CURRENT_UPSTREAM=$(printf '%s\n' "$DETECT_STDOUT" \
-            | grep -o 'DETECTED_UPSTREAM=[a-z]*' | tail -n 1 | cut -d= -f2)
+          CURRENT_UPSTREAM="$DETECTED_UPSTREAM"
 
           # 판별 자체가 실패했으면(출력 파싱 불가) 배포를 멈춘다.
           # 여기서 조용히 none으로 넘어가면 예전과 똑같이 매번 blue를 덮어쓰게 된다.

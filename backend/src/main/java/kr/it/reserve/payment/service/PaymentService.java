@@ -91,7 +91,7 @@ public class PaymentService {
         Payment existingReady = readyPayments.isEmpty() ? null : readyPayments.getFirst();
 
         if (existingReady != null) {
-            // 재사용 시에도 금액을 현재 정책 값으로 다시 맞춘다 — 예전 READY 행에는
+            // 재사용 시에도 금액을 예약 당시 확정된 값으로 다시 맞춘다 — 예전 READY 행에는
             // 클라이언트가 보냈던 금액이 그대로 남아 있을 수 있다.
             if (!Integer.valueOf(amount).equals(existingReady.getAmount())) {
                 log.info("Resyncing READY payment amount: paymentId={}, {} -> {}",
@@ -152,8 +152,9 @@ public class PaymentService {
      */
     private int resolveDepositAmount(Reservation reservation) {
         Integer fromReservation = reservation.getDepositAmount();
-        if (fromReservation != null && fromReservation > 0) {
-            return fromReservation;
+        if (fromReservation != null) {
+            // 0원도 예약 당시 확정된 금액이다. 가게의 이후 가격을 가져와 유료 예약으로 바꾸지 않는다.
+            return Math.max(0, fromReservation);
         }
         Store store = reservation.getStore();
         Integer fromStore = (store != null) ? store.getNoShowDeposit() : null;

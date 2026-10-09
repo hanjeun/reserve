@@ -76,6 +76,12 @@ Upstream: [Pretendard](https://github.com/orioncactus/pretendard), [SUITE](https
 
 Retain upstream licenses and notices for Spring Boot, Jackson, JJWT, AWS SDK and other dependencies. Do not assume the entire backend is MIT/Apache-2.0 licensed.
 
+## RESERVE camera/browser states and policy menu illustrations
+
+The six Dots illustrations `camera-denied`, `camera-unavailable`, `browser-unsupported`, `edit-booking-policy`, `edit-deposit`, and `edit-refund` retain the delivered CC0 1.0 image/model notices and MIT production-code notice. Original Blender files, code, PNG/WebP, manifests and checksum lists are preserved under `frontend/src/assets/state-illustrations/source/camera-browser-states-v1` and `frontend/src/assets/choice-icons/source/policy-menu-icons-v1`. Builds bundle each kit's asset notice, full CC0 text and MIT text in `THIRD_PARTY_NOTICES.txt`.
+
+Both archives contain prior notices whose names differ only by `LICENSE-ASSETS.txt` versus `LICENSE-assets.txt`. Windows cannot keep those names together, so the lowercase copy is stored as `LICENSE-assets-lowercase.txt`; its bytes and the delivered checksum list remain unchanged. All 50 and 52 declared source hashes were verified against the original archives before import; existing project assets and downloaded ZIPs are preserved.
+
 For the Sentry Java `8.59.0` candidate in [PR #318](https://github.com/hanjeun/reserve/pull/318), the tag's [original LICENSE](https://github.com/getsentry/sentry-java/blob/8.59.0/LICENSE) is retained in `backend/licenses/upstream/sentry-8.59.0.txt`, with hashes for all five Maven Central JARs pinned in the supplemental manifest. The `8.58.0` notices remain available. The local release candidate's build and lockfile select `8.59.0`; production application and original-notice verification in the final executable JAR remain separate steps.
 
 The same PR's 30 AWS SDK `2.55.11` JARs supply `META-INF/LICENSE.txt` and `NOTICE.txt`; the additional LICENSE/NOTICE entries in `third-party-jackson-core` also match the existing collection rule. The BOM and Gradle wrapper are separate from the production runtime JAR inventory. Compare the chosen versions and packaged notices at release time.

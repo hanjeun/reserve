@@ -1,0 +1,236 @@
+[
+  {
+    "asset": "edit-booking-policy",
+    "resolution": [
+      512,
+      512
+    ],
+    "png_bytes": 123055,
+    "webp_bytes": 8640,
+    "webp_quality": 92,
+    "webp_limit_bytes": 20000,
+    "alpha_bbox": [
+      152,
+      101,
+      369,
+      413
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "png_bit_depth": 8,
+    "png_color_type": 6,
+    "webp_method": 6,
+    "webp_exact": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 1.1161350625073023,
+        "edge_mean_absolute_rgb_error": 0.6689221846302562
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 1.1161934805467928,
+        "edge_mean_absolute_rgb_error": 0.6706943773159336
+      }
+    }
+  },
+  {
+    "asset": "edit-deposit",
+    "resolution": [
+      512,
+      512
+    ],
+    "png_bytes": 118688,
+    "webp_bytes": 8414,
+    "webp_quality": 92,
+    "webp_limit_bytes": 20000,
+    "alpha_bbox": [
+      98,
+      112,
+      415,
+      406
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "png_bit_depth": 8,
+    "png_color_type": 6,
+    "webp_method": 6,
+    "webp_exact": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.8857587965153231,
+        "edge_mean_absolute_rgb_error": 0.6467422920302501
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.8859977348644503,
+        "edge_mean_absolute_rgb_error": 0.6540139616055847
+      }
+    }
+  },
+  {
+    "asset": "edit-refund",
+    "resolution": [
+      512,
+      512
+    ],
+    "png_bytes": 105369,
+    "webp_bytes": 9686,
+    "webp_quality": 92,
+    "webp_limit_bytes": 20000,
+    "alpha_bbox": [
+      122,
+      99,
+      386,
+      402
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "png_bit_depth": 8,
+    "png_color_type": 6,
+    "webp_method": 6,
+    "webp_exact": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 1.0794923570669086,
+        "edge_mean_absolute_rgb_error": 0.9171462829736211
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 1.0809263215397071,
+        "edge_mean_absolute_rgb_error": 0.9347721822541967
+      }
+    }
+  },
+  {
+    "asset": "edit-booking-policy",
+    "resolution": [
+      768,
+      768
+    ],
+    "png_bytes": 259574,
+    "webp_bytes": 13320,
+    "webp_quality": 92,
+    "webp_limit_bytes": 32000,
+    "alpha_bbox": [
+      228,
+      153,
+      553,
+      620
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "png_bit_depth": 8,
+    "png_color_type": 6,
+    "webp_method": 6,
+    "webp_exact": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.9844296358459748,
+        "edge_mean_absolute_rgb_error": 0.5335048783102819
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.9846335108942765,
+        "edge_mean_absolute_rgb_error": 0.5427254208212716
+      }
+    }
+  },
+  {
+    "asset": "edit-deposit",
+    "resolution": [
+      768,
+      768
+    ],
+    "png_bytes": 248080,
+    "webp_bytes": 12676,
+    "webp_quality": 92,
+    "webp_limit_bytes": 32000,
+    "alpha_bbox": [
+      148,
+      168,
+      622,
+      608
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "png_bit_depth": 8,
+    "png_color_type": 6,
+    "webp_method": 6,
+    "webp_exact": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.8260242169261948,
+        "edge_mean_absolute_rgb_error": 0.7140366172624237
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.8261439333692483,
+        "edge_mean_absolute_rgb_error": 0.7194613968807517
+      }
+    }
+  },
+  {
+    "asset": "edit-refund",
+    "resolution": [
+      768,
+      768
+    ],
+    "png_bytes": 216667,
+    "webp_bytes": 14820,
+    "webp_quality": 92,
+    "webp_limit_bytes": 32000,
+    "alpha_bbox": [
+      183,
+      149,
+      579,
+      603
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "canvas_edges_fully_transparent": true,
+    "webp_alpha_exact": true,
+    "png_recompression_pixel_identical": true,
+    "static": true,
+    "png_bit_depth": 8,
+    "png_color_type": 6,
+    "webp_method": 6,
+    "webp_exact": true,
+    "composite_comparison": {
+      "light": {
+        "foreground_mean_absolute_rgb_error": 0.9740989652789698,
+        "edge_mean_absolute_rgb_error": 0.9167470266795242
+      },
+      "dark": {
+        "foreground_mean_absolute_rgb_error": 0.9741605820140751,
+        "edge_mean_absolute_rgb_error": 0.9178720668595307
+      }
+    }
+  }
+]

@@ -1,0 +1,3 @@
+New procedural rendered assets in this set are offered under CC0-1.0.
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+To the extent possible under law, all copyright and related or neighboring rights in these newly generated assets are waived. Commercial use and modification are permitted. No trademark exclusivity or third-party rights warranty is provided. This statement does not change the licenses of Blender, Python, image encoders, or other production software.

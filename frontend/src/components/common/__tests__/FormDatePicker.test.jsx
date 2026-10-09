@@ -7,7 +7,7 @@ import FormDatePicker from '../FormDatePicker';
 import holidayService from '../../../services/holidayService';
 
 vi.mock('../../../services/holidayService', () => ({
-    default: { getMonth: vi.fn(() => Promise.resolve(['2026-12-25'])) },
+    default: { getMonth: vi.fn(month => Promise.resolve([`${month}-25`])) },
 }));
 
 vi.mock('antd', async () => {
@@ -25,6 +25,17 @@ vi.mock('antd', async () => {
 });
 
 describe('FormDatePicker', () => {
+    it('keeps public holidays marked when selected or disabled instead of turning them into ordinary gray dates', async () => {
+        const user = userEvent.setup();
+        const { rerender } = render(<FormDatePicker value={dayjs('2027-12-25')} highlightHolidays />);
+        await user.click(screen.getByRole('button', { name: '2027-12-25' }));
+        const selectedHoliday = await screen.findByRole('button', { name: '12월 25일 공휴일 선택됨' });
+        expect(selectedHoliday).toHaveClass('is-holiday');
+        rerender(<FormDatePicker value={dayjs('2027-12-25')} highlightHolidays disabledDate={date => date.date() === 25} />);
+        const disabledHoliday = screen.getByRole('button', { name: /12월 25일.*선택 불가/ });
+        expect(disabledHoliday).toBeDisabled();
+        expect(disabledHoliday).toHaveClass('is-holiday');
+    });
     it('paints public holidays red only when the caller opts in', async () => {
         const user = userEvent.setup();
         const { unmount } = render(<FormDatePicker value={dayjs('2026-12-01')} />);

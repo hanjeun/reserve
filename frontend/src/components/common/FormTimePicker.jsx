@@ -10,8 +10,7 @@ import RollingFieldValue from './RollingFieldValue';
 import TimeWheelColumn, { TIME_WHEEL_ROW_HEIGHT } from './TimeWheelColumn';
 import { colors, field, fontSize, fontWeight } from '../../styles/tokens';
 
-const PERIODS = [{ value: 0, label: '오전' }, { value: 1, label: '오후' }];
-const HOURS = Array.from({ length: 12 }, (_, index) => ({ value: index + 1, label: String(index + 1).padStart(2, '0') }));
+const HOURS = Array.from({ length: 24 }, (_, index) => ({ value: index, label: String(index).padStart(2, '0') }));
 const MINUTES = Array.from({ length: 60 }, (_, index) => ({ value: index, label: String(index).padStart(2, '0') }));
 const validTime = value => (dayjs.isDayjs(value) && value.isValid() ? value : null);
 const timeKey = value => validTime(value)?.format('HH:mm') ?? '';
@@ -34,8 +33,10 @@ const pickerDialogLabel = mode => {
     else if (mode === 'multiple') dialogLabel = '회차 시각 선택';
     return dialogLabel;
 };
+const rangeOrderError = (mode, draftRange) => mode === 'range' && draftRange[0] && draftRange[1]
+    && minuteValue(draftRange[1]) <= minuteValue(draftRange[0]);
 const pickerInputErrors = (mode, typedRange, draftRange) => mode === 'range'
-    ? typedRange.map((text, part) => Boolean(text || draftRange[part]) && !parseTypedTime(text)) : [];
+    ? typedRange.map((text, part) => Boolean(text || draftRange[part]) && (!parseTypedTime(text) || part === 1 && rangeOrderError(mode, draftRange))) : [];
 const pickerHasValue = (mode, currentValue) => mode === 'single'
     ? Boolean(validTime(currentValue)) : Array.isArray(currentValue) && currentValue.some(validTime);
 const pickerIconColor = (disabled, isError, hasValue) => {
@@ -57,9 +58,10 @@ const pickerValueLabel = (mode, currentValue, format, placeholder) => {
     }
     return label;
 };
-const pickerHintText = (hasInputError, mode) => {
+const pickerHintText = (hasInputError, mode, hasOrderError) => {
     let hintText = '위아래로 밀거나 스크롤해서 선택해주세요.';
-    if (hasInputError) hintText = '00:00부터 23:59까지 입력해주세요. 예: 1052 또는 10:52';
+    if (hasOrderError) hintText = '종료 시간은 시작 시간보다 뒤여야 해요. 자정을 넘는 시간 범위는 아직 지원하지 않아요.';
+    else if (hasInputError) hintText = '00:00부터 23:59까지 입력해주세요. 예: 1052 또는 10:52';
     else if (mode === 'range') hintText = '숫자를 눌러 입력하거나 위아래로 밀어 선택해주세요.';
     return hintText;
 };
@@ -122,8 +124,7 @@ const FormTimePickerBase = ({
         }
     };
 
-    const changeHour = hour => changeTime(cursor.hour((hour % 12) + (cursor.hour() >= 12 ? 12 : 0)).second(0));
-    const changePeriod = period => changeTime(cursor.hour((cursor.hour() % 12) + period * 12).second(0));
+    const changeHour = hour => changeTime(cursor.hour(hour).second(0));
     const changeMinute = minute => changeTime(cursor.minute(minute).second(0));
 
     const selectRangePart = part => {
@@ -162,7 +163,12 @@ const FormTimePickerBase = ({
                 return;
             }
             // Compare the time of day, not the date attached to a Dayjs value.
-            commitValue(sortTimes(next));
+            if (rangeOrderError(mode, next)) {
+                setDraftRange(next);
+                setTypedRange(next.map(timeKey));
+                return;
+            }
+            commitValue(next);
         } else {
             commitValue(cursor);
         }
@@ -174,7 +180,7 @@ const FormTimePickerBase = ({
     const fieldInvalid = ariaInvalid ?? (isError || undefined);
     const iconColor = pickerIconColor(disabled, isError, hasValue);
     const label = pickerValueLabel(mode, currentValue, format, placeholder);
-    const hintText = pickerHintText(hasInputError, mode);
+    const hintText = pickerHintText(hasInputError, mode, rangeOrderError(mode, draftRange));
 
     return (
         <>
@@ -246,8 +252,7 @@ const FormTimePickerBase = ({
                 ) : <div className="reserve-time-heading">{dialogLabel}</div>}
 
                 <div className="reserve-time-wheels" style={{ '--reserve-time-row-height': `${TIME_WHEEL_ROW_HEIGHT}px` }}>
-                    <TimeWheelColumn label="오전·오후" options={PERIODS} value={cursor.hour() >= 12 ? 1 : 0} onChange={changePeriod} />
-                    <TimeWheelColumn label="시" options={HOURS} value={cursor.hour() % 12 || 12} onChange={changeHour} />
+                    <TimeWheelColumn label="시" options={HOURS} value={cursor.hour()} onChange={changeHour} />
                     <TimeWheelColumn label="분" options={MINUTES} value={cursor.minute()} onChange={changeMinute} />
                 </div>
                 <p id={hintId} className="reserve-time-hint" style={hasInputError ? { color: colors.error.main } : undefined}>

@@ -1,0 +1,24 @@
+{
+  "executed": [
+    "Six independent native PNG renders: three icons \u00d7 512 and 768, Blender 4.3.2 / Eevee Next / 128 samples",
+    "PNG lossless optimization with RGBA equality check",
+    "Six static WebP encodes, quality 92, method 6, lossless alpha; sizes checked against 20000/32000-byte ceilings",
+    "Canvas dimensions, alpha extrema, transparent borders, margins and exact WebP alpha checked",
+    "PNG/WebP light and dark composites numerically compared, including partial-alpha edges",
+    "All three delivered blends reopened, editable objects and no external images/libraries/fonts/actions checked",
+    "Exact shared scene settings and all three used material definitions compared to locally available waiting-onsite.blend; the fourth neutral material remains available in rebuild code but is unused by these new icons",
+    "All three saved scenes rerendered at 512 with RGBA pixel-identical comparison",
+    "Independent visual review of actual 48/56/64 px on light/dark from both production resolutions, plus same-pipeline camera/browser and extra-icon style comparison",
+    "SHA-256 preservation check against pre-work snapshot",
+    "ZIP integrity, safe paths, payload allowlist, 12 production images, 3 blends and per-file hashes verified"
+  ],
+  "not_executed": [
+    "Current-byte/source inspection or SHA verification of unavailable latest-four edit-controls ZIP; historical reference only",
+    "Rerender round-trip comparison at 768 from saved blends (independent native 768 renders were executed)",
+    "User-study, accessibility usability test, real-browser/app integration or physical-device display test",
+    "Animation, Lottie, video, site/app code, Git, deployment or operational work"
+  ],
+  "renderer_messages": "Initial EGL context and read-only cache warnings appeared; software rendering completed successfully at requested engine, settings and resolution. No warning was treated as render completion.",
+  "geometry_polish": "Independent visual QA found a non-blocking visible shaft overlap on the refund arrowhead and a faint endpoint seam at native size. The shaft was replaced with one continuous rounded mesh and its join was concealed behind the blue head; refund was independently rerendered at both production resolutions, then image/scene/visual checks were repeated.",
+  "qa_script_repairs": "Inherited validation logic compares shared materials by source color, ignoring unused default materials and generated numeric suffixes. Audit results describe the checks actually executed in this new run."
+}

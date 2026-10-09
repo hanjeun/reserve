@@ -3,6 +3,7 @@ import { PageStatusSkeleton } from '../common/PageStatus';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
 import BenefitDetailSkeleton from '../common/BenefitDetailSkeleton';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
+import DiscoveryRouteSkeleton from './DiscoveryRouteSkeleton';
 import { STORE_LIST_PAGE_SIZE } from '../../constants/storeListPageSize';
 import MyPageSkeleton from './MyPageSkeleton';
 import { SERVICE_DOMAIN_OPTIONS, SERVICE_DOMAIN_FILTER_OPTIONS, OWNER_STORE_SORT_OPTIONS, SORT_OPTIONS,
@@ -370,11 +371,6 @@ StoreFormRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
 // StoreDetail.jsx 의 BREAKPOINT 와 같은 값 — PC 두 칸 배치가 시작되는 폭.
 const STORE_DETAIL_BREAKPOINT = 900;
-// 홈 바로가기 두 묶음 — 서비스 분야별(분야 수만큼) + 빠른 메뉴 4칸(평점순·관심 가게·내 예약·메시지). pages/Home 의 SHORTCUT_GROUPS 와 같은 개수.
-const HOME_SHORTCUT_GROUPS = [
-    { key: 'services', count: SERVICE_DOMAIN_OPTIONS.length },
-    { key: 'quick', count: 4 },
-];
 
 // 페이지가 데이터 로딩 때 그리는 것과 같은 컴포넌트·개수·보기 방식 — 코드 로딩 → 데이터 로딩으로 넘어갈 때 모양이 안 바뀐다(2026-09-24).
 function CardsSkeleton({ pathname = '', search = '' }) {
@@ -463,54 +459,6 @@ function DetailRouteSkeleton() {
 }
 
 
-// 실제 홈(pages/Home)의 틀 클래스를 그대로 써서 위치·여백·반응형 경계를 홈 CSS 한 곳에서 따라가게 한다(2026-09-29).
-// 예전엔 전용 클래스로 따로 그려 홈에 없는 공지 줄, 한 줄 10칸 바로가기, 89px 제목 줄이 있어 로딩 뒤 모양이 바뀌었다.
-function DiscoverySkeleton() {
-    return (
-        <div className="reserve-discovery-home">
-            <div className="reserve-discovery-location">
-                <Bone width={112} height={20} />
-                <Bone width={72} height={20} />
-            </div>
-            <div className="reserve-discovery-featured">
-                <div className="reserve-discovery-banner-track">
-                    <Bone height="auto" borderRadius="var(--reserve-home-banner-radius)" style={{ aspectRatio: 'var(--reserve-home-banner-ratio)' }} />
-                </div>
-            </div>
-            <div className="reserve-discovery-shortcuts">
-                <div className="reserve-discovery-shortcut-grid">
-                    {HOME_SHORTCUT_GROUPS.map(group => (
-                        <div key={group.key} className={'reserve-discovery-shortcut-group reserve-discovery-shortcut-group--' + group.key}>
-                            {/* 그룹 제목은 PC 에서만 보인다(모바일은 홈 CSS 가 숨긴다). 20px 줄 높이에 맞춘다 —
-                                뼈대의 margin 은 부모 밖으로 겹쳐 사라지므로 부모의 padding 으로 높이를 채운다. */}
-                            <div className="reserve-discovery-shortcut-group-title" style={{ paddingBlock: 3 }}><Bone width={96} height={14} /></div>
-                            <div className="reserve-discovery-shortcut-items">
-                                {Array.from({ length: group.count }, (_, index) => (
-                                    <div className="reserve-discovery-shortcut" key={`${group.key}-${index}`}>
-                                        <span className="reserve-discovery-shortcut-media"><Bone width={48} height={48} borderRadius="50%" /></span>
-                                        <span className="reserve-route-discovery-shortcut-label"><Bone width={42} height={12} /></span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-            <div className="reserve-discovery-recommended">
-                <div className="reserve-discovery-section-heading">
-                    <div className="reserve-discovery-section-copy"><Bone width={150} height={22} style={{ marginBlock: 3 }} /></div>
-                    {/* '전체 보기' 링크의 44px 터치 높이 */}
-                    <div style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}><Bone width={58} height={16} /></div>
-                </div>
-                {/* 홈 추천은 가게 목록 행(StoreListRow)을 재사용하므로 스켈레톤도 같은 목록 행 스켈레톤이다. */}
-                <div className="reserve-discovery-store-list reserve-store-list-rows">
-                    <StoreListRowSkeleton count={4} />
-                </div>
-            </div>
-        </div>
-    );
-}
-
 function SearchSkeleton() {
     return <div className="reserve-search-page">
         <div className="reserve-search-header">
@@ -542,7 +490,7 @@ function SearchSkeleton() {
 const KINDS = {
     search: SearchSkeleton,
     'my-page': MyPageSkeleton,
-    discovery: DiscoverySkeleton,
+    discovery: DiscoveryRouteSkeleton,
     'store-form': StoreFormRouteSkeleton,
     // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 틀·스켈레톤
     detail: DetailRouteSkeleton,

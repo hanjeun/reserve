@@ -6,6 +6,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import jakarta.servlet.http.HttpServletResponse;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -47,6 +49,13 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().string(not(containsString("private-error"))));
     }
 
+    @Test
+    void closedEventStreamDoesNotTryToWriteAJsonErrorIntoTheEventResponse() throws Exception {
+        mvc.perform(get("/error-probe/closed-stream"))
+                .andExpect(content().contentType(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(content().string(""));
+    }
+
     @RestController
     static class Probe {
         @GetMapping("/error-probe")
@@ -57,6 +66,12 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/error-probe/failure")
         void fail() { throw new IllegalStateException("private-error"); }
+
+        @GetMapping("/error-probe/closed-stream")
+        void closedStream(HttpServletResponse response) throws AsyncRequestNotUsableException {
+            response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
+            throw new AsyncRequestNotUsableException("Response is no longer usable");
+        }
     }
 
     record Body(int value) { }

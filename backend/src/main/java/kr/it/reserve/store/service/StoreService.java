@@ -229,6 +229,7 @@ public class StoreService {
         // ★ 저장 직전에 "최종 값"으로 검증한다 — 요청 본문이 아니라 엔티티를 본다.
         //   요청만 보면 생성/수정 경로가 서로 다른 판정을 하게 된다(수정은 일부 필드만 올 수 있다).
         validateBusinessHours(store);
+        normalizeDepositPaymentPolicy(store);
 
         Store savedStore = storeRepository.save(store);
         Long storeId = savedStore.getId();
@@ -329,17 +330,20 @@ public class StoreService {
         try {
             applyStoreDetails(store, request);
             applyRefundPolicy(store, request);
-            // maxCapacityPerSlot: 항상 업데이트 (null = 무제한, 프론트가 명시적으로 보냄)
-            store.setMaxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()));
-            // autoApprovalEnabled: 항상 업데이트 (null-safe, 기본 false)
-            store.setAutoApprovalEnabled(Boolean.TRUE.equals(request.getAutoApprovalEnabled()));
-            store.setBookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()));
+            if (request.getMaxCapacityPerSlotRaw() != null) {
+                String raw = request.getMaxCapacityPerSlotRaw().trim();
+                if (!raw.isEmpty() && request.getMaxCapacityPerSlot() == null) {
+                    throw new StoreException("예약 인원을 올바른 숫자로 입력해주세요.", HttpStatus.BAD_REQUEST);
+                }
+                store.setMaxCapacityPerSlot(normalizeCapacity(request.getMaxCapacityPerSlot()));
+            }
+            if (request.getAutoApprovalEnabled() != null) store.setAutoApprovalEnabled(request.getAutoApprovalEnabled());
+            if (request.hasField("bookingDeadlineHours")) store.setBookingDeadlineHours(clampBookingDeadlineHours(request.getBookingDeadlineHours()));
             if (request.getPaymentTimeoutMinutes() != null) store.setPaymentTimeoutMinutes(clampPaymentTimeout(request.getPaymentTimeoutMinutes()));
             if (request.getReservationSlotMinutes() != null) store.setReservationSlotMinutes(clampSlotMinutes(request.getReservationSlotMinutes()));
             if (request.getNearbyRadiusKm() != null) store.setNearbyRadiusKm(clampNearbyRadiusKm(request.getNearbyRadiusKm()));
             if (request.getAllowLatePayment() != null) store.setAllowLatePayment(request.getAllowLatePayment());
-            // allowDuplicateReservation: 항상 업데이트 (null-safe, 기본 false)
-            store.setAllowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()));
+            if (request.getAllowDuplicateReservation() != null) store.setAllowDuplicateReservation(request.getAllowDuplicateReservation());
             // emailNotificationEnabled: null이면 변경 안 함
             if (request.getEmailNotificationEnabled() != null) store.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
             if (request.getImageAutoplayEnabled() != null) store.setImageAutoplayEnabled(request.getImageAutoplayEnabled());
@@ -347,24 +351,28 @@ public class StoreService {
             if (request.getWaitingIntakeMode() != null) {
                 store.setWaitingIntakeMode(kr.it.reserve.store.entity.WaitingIntakeMode.parse(request.getWaitingIntakeMode()));
             }
-            // 휴무는 "항상 덮어쓴다" — 요일·날짜를 **빼는** 것도 정상적인 수정이라
-            // null 가드를 두면 마지막 휴무를 지울 방법이 없어진다.
-            store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
-            store.setClosedDateList(normalizeClosedDates(request.getClosedDates()));
-            // 휴무와 같은 이유로 항상 덮어쓴다 — 운영 기간을 **없애는** 것도 정상적인 수정이라
-            // null 가드를 두면 한 번 넣은 기간을 지울 방법이 사라진다.
-            applyOperatingPeriod(store, request.getOpenDate(), request.getCloseDate());
-            applyBookingType(store, request.getBookingType(), request.getSessionTimes());
-            store.setMaxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()));
+            // 누락 = 유지, 빈 목록/빈 값 = 해제. 영역별 수정에서도 다른 영역을 지우지 않는다.
+            if (request.hasField("closedDays")) store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
+            if (request.hasField("closedDates")) store.setClosedDateList(normalizeClosedDates(request.getClosedDates()));
+            if (request.hasField("openDate") || request.hasField("closeDate")) {
+                applyOperatingPeriod(store,
+                        request.hasField("openDate") ? request.getOpenDate() : store.getOpenDate() == null ? null : store.getOpenDate().toString(),
+                        request.hasField("closeDate") ? request.getCloseDate() : store.getCloseDate() == null ? null : store.getCloseDate().toString());
+            }
+            if (request.hasField("bookingType") || request.hasField("sessionTimes")) {
+                applyBookingType(store, request.hasField("bookingType") ? request.getBookingType() : store.resolveBookingType().name(),
+                        request.hasField("sessionTimes") ? request.getSessionTimes() : store.getSessionTimeList().stream().map(LocalTime::toString).toList());
+            }
+            if (request.hasField("maxAdvanceBookingDays")) store.setMaxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()));
             if (request.getOpenTime() != null) store.setOpenTime(request.getOpenTime());
             if (request.getCloseTime() != null) store.setCloseTime(request.getCloseTime());
-            // 브레이크 타임: null 전송 시 삭제, 값 있으면 업데이트
-            store.setBreakStartTime(request.getBreakStartTime());
-            store.setBreakEndTime(request.getBreakEndTime());
+            if (request.hasField("breakStartTime")) store.setBreakStartTime(request.getBreakStartTime());
+            if (request.hasField("breakEndTime")) store.setBreakEndTime(request.getBreakEndTime());
             // (2026-08-09) 여기 있던 setCloseTime 중복 호출을 제거했다 — 위에서 이미 같은 값을 넣는다.
             // ★ 병합이 끝난 뒤 검증한다. 요청에 openTime 만 왔다면 기존 closeTime 과 비교돼야 한다 —
             //   요청 본문끼리만 비교하면 "12시 오픈만 보냈는데 마감이 10시인 가게"를 통과시킨다.
             validateBusinessHours(store);
+            normalizeDepositPaymentPolicy(store);
 
             if (request.getKeywords() != null) {
                 store.setKeywordList(request.getKeywords());
@@ -402,6 +410,18 @@ public class StoreService {
     }
 
     private void applyRefundPolicy(Store store, StoreUpdateRequest request) {
+        int nextFullDays = request.getFullRefundDays() == null ? refundPolicy(store).fullDays() : clampFullRefundDays(request.getFullRefundDays());
+        int nextPartialDays = request.getPartialRefundDays() == null ? (store.getPartialRefundDays() == null ? 1 : store.getPartialRefundDays())
+                : clampPartialRefundDays(request.getPartialRefundDays(), nextFullDays);
+        int nextRate = request.getPartialRefundRate() == null ? (store.getPartialRefundRate() == null ? 50 : store.getPartialRefundRate())
+                : clampPartialRefundRate(request.getPartialRefundRate());
+        if (!refundPolicy(store).equals(effectiveRefundPolicy(nextFullDays, nextPartialDays, nextRate))
+                && reservationRepository.existsRefundPolicyObligation(store.getId(), List.of(
+                        kr.it.reserve.reservation.entity.Reservation.ReservationStatus.PENDING,
+                        kr.it.reserve.reservation.entity.Reservation.ReservationStatus.CONFIRMED,
+                        kr.it.reserve.reservation.entity.Reservation.ReservationStatus.UNCONFIRMED), ServiceTime.today())) {
+            throw new StoreException("남아 있는 유료 예약이 있어 환불 기준을 바꿀 수 없어요. 기존 예약을 처리한 뒤 다시 수정해주세요.", HttpStatus.CONFLICT);
+        }
         // 옵션 값은 전부 clamp/normalize 를 거친다(생성 경로와 동일) — "가게 옵션 정규화" 절 참고.
         if (request.getNoShowDeposit() != null) store.setNoShowDeposit(clampDeposit(request.getNoShowDeposit()));
         if (request.getFullRefundDays() != null) store.setFullRefundDays(clampFullRefundDays(request.getFullRefundDays()));
@@ -412,6 +432,20 @@ public class StoreService {
                     request.getPartialRefundDays(), store.getFullRefundDays()));
         }
         if (request.getPartialRefundRate() != null) store.setPartialRefundRate(clampPartialRefundRate(request.getPartialRefundRate()));
+    }
+
+    private record RefundPolicy(int fullDays, int partialDays, int partialRate) { }
+
+    private RefundPolicy refundPolicy(Store store) {
+        return effectiveRefundPolicy(store.getFullRefundDays() == null ? 3 : store.getFullRefundDays(),
+                store.getPartialRefundDays() == null ? 1 : store.getPartialRefundDays(),
+                store.getPartialRefundRate() == null ? 50 : store.getPartialRefundRate());
+    }
+
+    private RefundPolicy effectiveRefundPolicy(int fullDays, int partialDays, int partialRate) {
+        if (fullDays <= 0) return new RefundPolicy(0, 0, 0);
+        if (partialDays <= 0 || partialDays >= fullDays || partialRate <= 0) return new RefundPolicy(fullDays, 0, 0);
+        return new RefundPolicy(fullDays, partialDays, partialRate);
     }
 
     /**
@@ -925,6 +959,11 @@ public class StoreService {
      * 한쪽만 남겨두면 "설정한 것 같은데 적용은 안 되는" 상태가 된다. 그건 데이터를 지우는 쪽이
      * 오해가 적다(사장님 입력이 불완전했던 것이지 모순은 아니다).
      */
+    private void normalizeDepositPaymentPolicy(Store store) {
+        // 결제액이 없는 가게는 나중 결제를 사용할 수 없다. 기존 예약의 금액·환불 스냅샷은 수정하지 않는다.
+        if (store.getNoShowDeposit() == null || store.getNoShowDeposit() <= 0) store.setAllowLatePayment(false);
+    }
+
     private void validateBusinessHours(Store store) {
         LocalTime open  = store.getOpenTime();
         LocalTime close = store.getCloseTime();

@@ -26,7 +26,7 @@ const buildAddressRow = (store) => {
 const buildHoursRow = (store) => {
     if (!store.openTime || !store.closeTime) return null;
     const base = `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}`;
-    const value = (store.breakStartTime && store.breakEndTime)
+    const value = (store.reservationEnabled !== false && (store.bookingType ?? 'SLOT') === 'SLOT' && store.breakStartTime && store.breakEndTime)
         ? `${base}  (브레이크 ${store.breakStartTime.substring(0, 5)} ~ ${store.breakEndTime.substring(0, 5)})`
         : base;
     return { Icon: ClockCircleOutlined, label: '영업 시간', value };
@@ -34,7 +34,7 @@ const buildHoursRow = (store) => {
 
 const buildDepositRow = (store) => {
     if (!hasPositiveNumber(store.noShowDeposit)) return null;
-    return { Icon: CreditCardOutlined, label: '노쇼 예약금', value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}원 (예약 후 결제)`, highlight: true };
+    return { Icon: CreditCardOutlined, label: '노쇼 예약금', value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}원 (${store.allowLatePayment ? '예약 후 결제 가능' : '신청할 때 결제'})`, highlight: true };
 };
 
 const buildOperatingPeriodRow = (store) => {
@@ -60,11 +60,10 @@ const buildAdvanceBookingRow = (store) => {
 };
 
 const buildRefundRow = (store) => {
-    const hasRefund = hasPositiveNumber(store.fullRefundDays) || hasPositiveNumber(store.partialRefundDays);
-    if (!hasPositiveNumber(store.noShowDeposit) || !hasRefund) return null;
+    if (!hasPositiveNumber(store.noShowDeposit) || !hasPositiveNumber(store.fullRefundDays)) return null;
     const parts = [];
     if (hasPositiveNumber(store.fullRefundDays)) parts.push(`방문 ${store.fullRefundDays}일 전까지 전액 환불`);
-    if (hasPositiveNumber(store.partialRefundDays) && hasPositiveNumber(store.partialRefundRate)) parts.push(`방문 ${store.partialRefundDays}일 전까지 ${store.partialRefundRate}% 환불`);
+    if (hasPositiveNumber(store.partialRefundDays) && Number(store.partialRefundDays) < Number(store.fullRefundDays) && hasPositiveNumber(store.partialRefundRate)) parts.push(`방문 ${store.partialRefundDays}일 전까지 ${store.partialRefundRate}% 환불`);
     parts.push('이후 환불 불가');
     return { Icon: RollbackOutlined, label: '환불 정책', value: parts, isMultiLine: true };
 };
@@ -75,7 +74,7 @@ const buildDeadlineRow = (store) => {
 };
 
 const buildPaymentTimeoutRow = (store) => {
-    if (!hasPositiveNumber(store.noShowDeposit) || !hasPositiveNumber(store.paymentTimeoutMinutes)) return null;
+    if (!hasPositiveNumber(store.noShowDeposit) || !store.allowLatePayment || !hasPositiveNumber(store.paymentTimeoutMinutes)) return null;
     return { Icon: ThunderboltOutlined, label: '결제 마감', value: `예약 후 ${formatMinLabel(store.paymentTimeoutMinutes)} 이내 미결제 시 자동 취소` };
 };
 

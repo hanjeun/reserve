@@ -1,6 +1,7 @@
 package kr.it.reserve.store.dto;
 
 import lombok.Getter;
+import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -8,11 +9,20 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 @Setter
 @NoArgsConstructor
 public class StoreUpdateRequest {
+
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private final Set<String> providedFields = new HashSet<>();
+
+    /** multipart의 누락과 명시적인 빈 값은 다르다. 날짜·인원·휴무 해제에도 같은 경계를 쓴다. */
+    public boolean hasField(String name) { return providedFields.contains(name); }
     
     private String name;
     private Boolean reservationEnabled;
@@ -100,7 +110,7 @@ public class StoreUpdateRequest {
     private String waitingIntakeMode;
 
     /**
-     * 정기 휴무 요일 — ISO 요일 번호 목록 (월=1 … 일=7). 빈 목록·null = 연중무휴.
+     * 정기 휴무 요일 — ISO 요일 번호 목록 (월=1 … 일=7). 누락은 유지, 명시적 빈 값은 연중무휴.
      * 폼이 multipart 라 문자열 CSV 로도 올 수 있어 서비스에서 정규화한다.
      */
     private List<Integer> closedDays;
@@ -113,7 +123,7 @@ public class StoreUpdateRequest {
      *
      * <p>enum 이 아니라 String 인 이유는 {@code openDate} 와 같다(multipart 바인딩).
      * 모르는 값을 400 으로 거절하지 않고 SLOT 으로 흡수하는 것도 의도다 —
-     * 옛 클라이언트가 이 필드를 안 보내거나 엉뚱한 값을 보내도 가게가 잠기면 안 된다.
+     * 옛 클라이언트가 이 필드를 안 보내면 유지한다. 명시적인 빈 값·모르는 값은 SLOT으로 흡수한다.
      */
     private String bookingType;
 
@@ -146,4 +156,15 @@ public class StoreUpdateRequest {
     public void setMaxCapacityPerSlot(String value) {
         this.maxCapacityPerSlotRaw = value;
     }
+
+    public void setClosedDays(List<Integer> value) { closedDays = value; providedFields.add("closedDays"); }
+    public void setClosedDates(List<String> value) { closedDates = value; providedFields.add("closedDates"); }
+    public void setOpenDate(String value) { openDate = value; providedFields.add("openDate"); }
+    public void setCloseDate(String value) { closeDate = value; providedFields.add("closeDate"); }
+    public void setBookingType(String value) { bookingType = value; providedFields.add("bookingType"); }
+    public void setSessionTimes(List<String> value) { sessionTimes = value; providedFields.add("sessionTimes"); }
+    public void setMaxAdvanceBookingDays(Integer value) { maxAdvanceBookingDays = value; providedFields.add("maxAdvanceBookingDays"); }
+    public void setBookingDeadlineHours(Integer value) { bookingDeadlineHours = value; providedFields.add("bookingDeadlineHours"); }
+    public void setBreakStartTime(LocalTime value) { breakStartTime = value; providedFields.add("breakStartTime"); }
+    public void setBreakEndTime(LocalTime value) { breakEndTime = value; providedFields.add("breakEndTime"); }
 }

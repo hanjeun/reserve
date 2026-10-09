@@ -98,16 +98,15 @@ export const VALIDATION_RULES = {
     maxAdvanceBookingDays: [
         { type: 'number', min: 1, max: 365, message: '1~365일 사이로 입력해주세요' },
     ],
-    // 영업시간 — AntD RangePicker 는 두 값의 순서를 알아서 맞춰주므로 "마감이 오픈보다 앞"은
-    // 사실상 안 나온다. 그런데 **같은 시각**은 통과한다. 길이가 0인 영업시간은 슬롯이 하나도
-    // 안 나와서, 저장은 성공하는데 손님 쪽 예약 가능 시간이 0개가 된다(백엔드도 같은 이유로 거절).
+    // 직접 입력도 받는다. 서버와 같이 같은 시각·역순·자정을 넘는 범위를 거절한다.
     businessHours: [
         { required: true, message: '영업 시간을 선택해주세요' },
         {
             validator: (_rule, value) => {
-                if (!value?.[0] || !value[1]) return Promise.resolve();
-                if (toHm(value[0]) === toHm(value[1])) {
-                    return Promise.reject(new Error('오픈과 마감이 같아요. 영업 시간을 확인해주세요'));
+                if (value && (!value[0] || !value[1])) return Promise.reject(new Error('오픈 시간과 마감 시간을 모두 선택해주세요'));
+                if (!value) return Promise.resolve();
+                if (toHm(value[0]) >= toHm(value[1])) {
+                    return Promise.reject(new Error('마감 시간은 오픈 시간보다 뒤여야 해요. 영업 시간을 확인해주세요'));
                 }
                 return Promise.resolve();
             },
@@ -129,8 +128,8 @@ export const VALIDATION_RULES = {
 
                 const bs = toHm(value[0]);
                 const be = toHm(value[1]);
-                if (bs === be) {
-                    return Promise.reject(new Error('브레이크 시작과 종료가 같아요'));
+                if (bs >= be) {
+                    return Promise.reject(new Error('브레이크 종료는 시작보다 뒤여야 해요'));
                 }
 
                 const times = getFieldValue('times');

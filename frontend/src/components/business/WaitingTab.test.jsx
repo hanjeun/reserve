@@ -54,6 +54,25 @@ beforeEach(() => {
     waitingService.getBoard.mockReset().mockResolvedValue(board([]));
     waitingService.create.mockReset(); waitingService.updateStatus.mockReset(); waitingService.updateIntake.mockReset();
 });
+
+it('opens read-only details from the managed board without changing call or cancellation actions', async () => {
+    waitingService.getBoard.mockResolvedValue(board([{ ...entry(9), displayName: '대기 손님', partySize: 3 }]));
+    const view = setup();
+    const trigger = await screen.findByRole('button', { name: '9번 웨이팅 상세 보기' });
+    expect(screen.getByRole('button', { name: '9번 호출' })).toBeInTheDocument();
+    fireEvent.click(trigger);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('대기 손님')).toBeInTheDocument();
+    expect(within(dialog).getByText('3명')).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('접수 시각');
+    expect(dialog).toHaveTextContent('17:00');
+    expect(waitingService.updateStatus).not.toHaveBeenCalled();
+    state.revision = 2;
+    waitingService.getBoard.mockResolvedValue(board([]));
+    view.updateActor();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    view.unmount(); view.client.clear();
+});
 afterEach(() => vi.restoreAllMocks());
 
 it('places a failed cached refresh in the list body with a full illustration state instead of a false empty result', async () => {
@@ -138,7 +157,10 @@ it('keeps finished entries read-only and ignores old confirmations and write res
     const view = setup();
     await screen.findByRole('listitem', { name: '1번 대기 접수' });
     fireEvent.change(screen.getByRole('combobox', { name: '대기 접수 상태' }), { target: { value: 'ALL' } });
-    expect(within(await screen.findByRole('listitem', { name: '2번 대기 접수' })).queryByRole('button')).toBeNull();
+    const finished = within(await screen.findByRole('listitem', { name: '2번 대기 접수' }));
+    expect(finished.getAllByRole('button')).toHaveLength(1);
+    expect(finished.getByRole('button', { name: '2번 웨이팅 상세 보기' })).toBeInTheDocument();
+    expect(finished.queryByRole('button', { name: /호출|입장|취소/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '1번 접수 취소' }));
     const oldConfirmation = state.confirm.mock.calls[0][0];
     fireEvent.click(screen.getByRole('button', { name: '대기 접수' }));

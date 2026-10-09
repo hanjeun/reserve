@@ -6,10 +6,10 @@ import { usePageSkeletonModule } from './routeSkeletonLoader';
 import { useMarkSkeletonShown } from './loadingPresentation';
 
 export function RouteSkeletonPreview({ pathname, search = '' }) {
-    const module = usePageSkeletonModule();
     const location = resolveRouteSkeletonLocation(pathname, search);
     const normalizedPath = location.pathname;
     const kind = getRouteSkeletonKind(normalizedPath);
+    const module = usePageSkeletonModule(kind);
     const Skeleton = module?.default;
     useMarkSkeletonShown(undefined, Boolean(Skeleton));
     return (

@@ -9,6 +9,7 @@ import TextLink from '../common/TextLink';
 import useMessage from '../../hooks/useMessage';
 import useAuthStore from '../../store/useAuthStore';
 import waitingService from '../../services/waitingService';
+import { pathFromLocation, saveRedirect } from '../../utils/redirect';
 
 function WaitingJoinForm({ store, preview, isPC }) {
     const location = useLocation();
@@ -17,6 +18,7 @@ function WaitingJoinForm({ store, preview, isPC }) {
     const { message } = useMessage();
     const revision = useAuthStore(state => state.sessionRevision);
     const loggedIn = useAuthStore(state => state.isLoggedIn);
+    const termsNotAgreed = useAuthStore(state => state.user?.termsAgreed) === false;
     const [open, setOpen] = useState(false);
     const [partySize, setPartySize] = useState(1);
     const [pending, setPending] = useState(false);
@@ -45,15 +47,23 @@ function WaitingJoinForm({ store, preview, isPC }) {
     const allowed = !paused && (remote || onsiteEntry);
     if (mode === 'OFF') return null;
     const goToLogin = () => {
-        if (!preview && !operation.current) navigate('/login', { state: { from: location } });
+        if (!preview && !operation.current) {
+            saveRedirect(pathFromLocation(location));
+            navigate('/login', { state: { from: location } });
+        }
     };
     const start = () => {
         if (preview || !allowed || operation.current) return;
         if (!loggedIn) { goToLogin(); return; }
+        if (termsNotAgreed) {
+            saveRedirect(pathFromLocation(location));
+            navigate('/signup/social', { replace: true });
+            return;
+        }
         setError(''); setPrivacyError(''); setAgreedNotice(null); setOpen(true);
     };
     const submit = async () => {
-        if (preview || operation.current || !loggedIn) return;
+        if (preview || operation.current || !loggedIn || termsNotAgreed) return;
         if (!Number.isInteger(partySize) || partySize < 1 || partySize > 100) { setError('인원은 1명부터 100명까지 입력해주세요.'); return; }
         if (!privacyAgreed) { setPrivacyError('접수 안내를 확인하고 개인정보 제공에 동의해주세요.'); return; }
         const controller = new AbortController();
@@ -108,7 +118,7 @@ function WaitingJoinForm({ store, preview, isPC }) {
             </ol>
             <div className="reserve-waiting-join-actions">
                 {allowed && <Button variant="primary" block onClick={start} disabled={preview || pending}>
-                    {loggedIn ? '웨이팅 접수' : '로그인하고 접수'}
+                    {loggedIn ? termsNotAgreed ? '이용 동의하고 접수' : '웨이팅 접수' : '로그인하고 접수'}
                 </Button>}
                 {!paused && !allowed && !loggedIn && <Button variant="primary" block onClick={goToLogin} disabled={preview}>로그인하기</Button>}
                 {loggedIn && !preview && <TextLink to="/my-reservations?tab=waiting" className="reserve-waiting-my-link">내 웨이팅 확인</TextLink>}

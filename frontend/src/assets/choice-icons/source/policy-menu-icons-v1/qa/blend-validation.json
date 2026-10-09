@@ -1,0 +1,402 @@
+{
+  "blender_version": "4.3.2",
+  "reference_path_at_validation": "/workspace/shared/reserve-extra-icons-13/source/waiting-onsite.blend",
+  "files": [
+    {
+      "asset": "edit-booking-policy",
+      "sha256": "6cadfe5ead508d719c22318e366b734ed4eaf643371d769219f5612cd661a7dd",
+      "blend_reopened": true,
+      "editable_mesh_count": 13,
+      "editable_curve_count": 3,
+      "external_libraries": 0,
+      "external_images": 0,
+      "font_objects": 0,
+      "animated_objects": 0,
+      "actions": 0,
+      "settings_exact_match_to_available_extra13_reference": true,
+      "settings": {
+        "engine": "BLENDER_EEVEE_NEXT",
+        "samples": 128,
+        "transparent": true,
+        "color_mode": "RGBA",
+        "color_depth": "8",
+        "view_transform": "AgX",
+        "look": "AgX - Medium High Contrast",
+        "exposure": 0.3499999940395355,
+        "gamma": 1.0,
+        "display": "sRGB",
+        "view_settings_view": "AgX",
+        "world_color": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ],
+        "world_use_nodes": true,
+        "camera": {
+          "location": [
+            3.200000047683716,
+            -9.0,
+            4.800000190734863
+          ],
+          "rotation": [
+            1.1957879066467285,
+            1.289480433541712e-08,
+            0.3416154980659485
+          ],
+          "type": "ORTHO",
+          "ortho_scale": 3.75
+        },
+        "lights": {
+          "Large soft key": {
+            "location": [
+              -3.0,
+              -4.0,
+              7.0
+            ],
+            "rotation": [
+              0.6980299949645996,
+              2.1354791712724364e-08,
+              -0.643501341342926
+            ],
+            "energy": 550.0,
+            "shape": "DISK",
+            "size": 4.5,
+            "type": "AREA"
+          },
+          "Soft fill": {
+            "location": [
+              4.0,
+              -2.0,
+              4.0
+            ],
+            "rotation": [
+              0.9861174821853638,
+              -2.8577392896522724e-08,
+              1.1071487665176392
+            ],
+            "energy": 350.0,
+            "shape": "DISK",
+            "size": 4.0,
+            "type": "AREA"
+          },
+          "Edge separation": {
+            "location": [
+              1.0,
+              4.0,
+              5.0
+            ],
+            "rotation": [
+              0.8055741190910339,
+              -5.3024400870071986e-08,
+              2.8966140747070312
+            ],
+            "energy": 650.0,
+            "shape": "DISK",
+            "size": 3.0,
+            "type": "AREA"
+          }
+        },
+        "materials": {
+          "#3182F6": {
+            "source_srgb": "#3182F6",
+            "base_color": [
+              0.03071344457566738,
+              0.22322796285152435,
+              0.9215818643569946,
+              1.0
+            ],
+            "metallic": 0.11999999731779099,
+            "roughness": 0.25
+          },
+          "#B8C9DE": {
+            "source_srgb": "#B8C9DE",
+            "base_color": [
+              0.4793201684951782,
+              0.5840784311294556,
+              0.7304607629776001,
+              1.0
+            ],
+            "metallic": 0.07999999821186066,
+            "roughness": 0.30000001192092896
+          },
+          "#F2F5FA": {
+            "source_srgb": "#F2F5FA",
+            "base_color": [
+              0.8879231214523315,
+              0.9130986332893372,
+              0.9559733271598816,
+              1.0
+            ],
+            "metallic": 0.05000000074505806,
+            "roughness": 0.2800000011920929
+          }
+        }
+      },
+      "rerendered_saved_scene_at_512": true
+    },
+    {
+      "asset": "edit-deposit",
+      "sha256": "16fd9755f399185ab4f29f53dde93419f490cc170d65b4781d0f6a628c0a1958",
+      "blend_reopened": true,
+      "editable_mesh_count": 6,
+      "editable_curve_count": 0,
+      "external_libraries": 0,
+      "external_images": 0,
+      "font_objects": 0,
+      "animated_objects": 0,
+      "actions": 0,
+      "settings_exact_match_to_available_extra13_reference": true,
+      "settings": {
+        "engine": "BLENDER_EEVEE_NEXT",
+        "samples": 128,
+        "transparent": true,
+        "color_mode": "RGBA",
+        "color_depth": "8",
+        "view_transform": "AgX",
+        "look": "AgX - Medium High Contrast",
+        "exposure": 0.3499999940395355,
+        "gamma": 1.0,
+        "display": "sRGB",
+        "view_settings_view": "AgX",
+        "world_color": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ],
+        "world_use_nodes": true,
+        "camera": {
+          "location": [
+            3.200000047683716,
+            -9.0,
+            4.800000190734863
+          ],
+          "rotation": [
+            1.1957879066467285,
+            1.289480433541712e-08,
+            0.3416154980659485
+          ],
+          "type": "ORTHO",
+          "ortho_scale": 3.75
+        },
+        "lights": {
+          "Large soft key": {
+            "location": [
+              -3.0,
+              -4.0,
+              7.0
+            ],
+            "rotation": [
+              0.6980299949645996,
+              2.1354791712724364e-08,
+              -0.643501341342926
+            ],
+            "energy": 550.0,
+            "shape": "DISK",
+            "size": 4.5,
+            "type": "AREA"
+          },
+          "Soft fill": {
+            "location": [
+              4.0,
+              -2.0,
+              4.0
+            ],
+            "rotation": [
+              0.9861174821853638,
+              -2.8577392896522724e-08,
+              1.1071487665176392
+            ],
+            "energy": 350.0,
+            "shape": "DISK",
+            "size": 4.0,
+            "type": "AREA"
+          },
+          "Edge separation": {
+            "location": [
+              1.0,
+              4.0,
+              5.0
+            ],
+            "rotation": [
+              0.8055741190910339,
+              -5.3024400870071986e-08,
+              2.8966140747070312
+            ],
+            "energy": 650.0,
+            "shape": "DISK",
+            "size": 3.0,
+            "type": "AREA"
+          }
+        },
+        "materials": {
+          "#3182F6": {
+            "source_srgb": "#3182F6",
+            "base_color": [
+              0.03071344457566738,
+              0.22322796285152435,
+              0.9215818643569946,
+              1.0
+            ],
+            "metallic": 0.11999999731779099,
+            "roughness": 0.25
+          },
+          "#B8C9DE": {
+            "source_srgb": "#B8C9DE",
+            "base_color": [
+              0.4793201684951782,
+              0.5840784311294556,
+              0.7304607629776001,
+              1.0
+            ],
+            "metallic": 0.07999999821186066,
+            "roughness": 0.30000001192092896
+          },
+          "#F2F5FA": {
+            "source_srgb": "#F2F5FA",
+            "base_color": [
+              0.8879231214523315,
+              0.9130986332893372,
+              0.9559733271598816,
+              1.0
+            ],
+            "metallic": 0.05000000074505806,
+            "roughness": 0.2800000011920929
+          }
+        }
+      },
+      "rerendered_saved_scene_at_512": true
+    },
+    {
+      "asset": "edit-refund",
+      "sha256": "ff1c56950e15751072c8b49a8cb9402a8ad889cf4f580a0d9e5d21e37e77572e",
+      "blend_reopened": true,
+      "editable_mesh_count": 4,
+      "editable_curve_count": 0,
+      "external_libraries": 0,
+      "external_images": 0,
+      "font_objects": 0,
+      "animated_objects": 0,
+      "actions": 0,
+      "settings_exact_match_to_available_extra13_reference": true,
+      "settings": {
+        "engine": "BLENDER_EEVEE_NEXT",
+        "samples": 128,
+        "transparent": true,
+        "color_mode": "RGBA",
+        "color_depth": "8",
+        "view_transform": "AgX",
+        "look": "AgX - Medium High Contrast",
+        "exposure": 0.3499999940395355,
+        "gamma": 1.0,
+        "display": "sRGB",
+        "view_settings_view": "AgX",
+        "world_color": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ],
+        "world_use_nodes": true,
+        "camera": {
+          "location": [
+            3.200000047683716,
+            -9.0,
+            4.800000190734863
+          ],
+          "rotation": [
+            1.1957879066467285,
+            1.289480433541712e-08,
+            0.3416154980659485
+          ],
+          "type": "ORTHO",
+          "ortho_scale": 3.75
+        },
+        "lights": {
+          "Large soft key": {
+            "location": [
+              -3.0,
+              -4.0,
+              7.0
+            ],
+            "rotation": [
+              0.6980299949645996,
+              2.1354791712724364e-08,
+              -0.643501341342926
+            ],
+            "energy": 550.0,
+            "shape": "DISK",
+            "size": 4.5,
+            "type": "AREA"
+          },
+          "Soft fill": {
+            "location": [
+              4.0,
+              -2.0,
+              4.0
+            ],
+            "rotation": [
+              0.9861174821853638,
+              -2.8577392896522724e-08,
+              1.1071487665176392
+            ],
+            "energy": 350.0,
+            "shape": "DISK",
+            "size": 4.0,
+            "type": "AREA"
+          },
+          "Edge separation": {
+            "location": [
+              1.0,
+              4.0,
+              5.0
+            ],
+            "rotation": [
+              0.8055741190910339,
+              -5.3024400870071986e-08,
+              2.8966140747070312
+            ],
+            "energy": 650.0,
+            "shape": "DISK",
+            "size": 3.0,
+            "type": "AREA"
+          }
+        },
+        "materials": {
+          "#3182F6": {
+            "source_srgb": "#3182F6",
+            "base_color": [
+              0.03071344457566738,
+              0.22322796285152435,
+              0.9215818643569946,
+              1.0
+            ],
+            "metallic": 0.11999999731779099,
+            "roughness": 0.25
+          },
+          "#B8C9DE": {
+            "source_srgb": "#B8C9DE",
+            "base_color": [
+              0.4793201684951782,
+              0.5840784311294556,
+              0.7304607629776001,
+              1.0
+            ],
+            "metallic": 0.07999999821186066,
+            "roughness": 0.30000001192092896
+          },
+          "#F2F5FA": {
+            "source_srgb": "#F2F5FA",
+            "base_color": [
+              0.8879231214523315,
+              0.9130986332893372,
+              0.9559733271598816,
+              1.0
+            ],
+            "metallic": 0.05000000074505806,
+            "roughness": 0.2800000011920929
+          }
+        }
+      },
+      "rerendered_saved_scene_at_512": true
+    }
+  ]
+}

@@ -4,22 +4,26 @@ import { PageContainer, PageTitle } from '../common';
 import Bone from '../common/Bone';
 import StoreFormActions from './StoreForm/StoreFormActions';
 import StoreEditSelection from './StoreEditSelection';
-import { IndustryQuestion, ServiceQuestion, BookingQuestion, WaitingQuestion, OperationQuestion, IdentityQuestion, RegistrationSummary } from './StoreOnboardingFields';
+import { IndustryQuestion, ServiceQuestion, BookingQuestion, WaitingQuestion, OperationQuestion, BookingPolicyQuestion, DepositQuestion, RefundQuestion, IdentityQuestion, RegistrationSummary } from './StoreOnboardingFields';
 import { STORE_FORM_DENSITY_VARS, storeFormFrame } from './storeFormFrame';
 import { useWindowWidth } from '../../hooks';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { useSkeletonShown } from '../layout/loadingPresentation';
-import { STORE_ONBOARDING_DEFAULTS, onboardingSteps, onboardingPreviewStore } from '../../utils/storeOnboarding';
+import { STORE_ONBOARDING_DEFAULTS, STORE_ONBOARDING_DOMAINS, onboardingSteps, onboardingPreviewStore, onboardingFieldDomain, normalizeOnboardingSubmission } from '../../utils/storeOnboarding';
 import { REGISTRATION_BACK_EVENT } from '../../utils/storeRegistrationNavigation';
 
 const StoreDetailPreview = lazy(() => import('./StoreDetailPreview'));
 const EMPTY_IMAGES = [];
+const QUESTIONS = { industry: IndustryQuestion, service: ServiceQuestion, booking: BookingQuestion, waiting: WaitingQuestion,
+    operation: OperationQuestion, 'booking-policy': BookingPolicyQuestion, deposit: DepositQuestion, refund: RefundQuestion, identity: IdentityQuestion };
 const navigationValues = values => ({
     _onboardingStep: values._onboardingStep,
     _onboardingHistory: values._onboardingHistory,
     _onboardingPreviewDevice: values._onboardingPreviewDevice,
     reservationEnabled: values.reservationEnabled,
     waitingIntakeMode: values.waitingIntakeMode,
+    noShowDeposit: values.noShowDeposit,
+    _depositEnabled: values._depositEnabled,
 });
 
 function usePreviewImages(mainImage, detailImages) {
@@ -82,9 +86,6 @@ export default function StoreOnboarding({ mode = 'create', form, formRef, initia
     const editStep = useCallback(step => {
         if (loading || advancing.current) return;
         goTo(step, mode === 'edit' ? [form.getFieldValue('_onboardingStep') === 'review' ? 'review' : 'selection'] : undefined);
-        if (step === 'operation') requestAnimationFrame(() => {
-            document.querySelector('[data-onboarding-step="operation"] .reserve-onboarding-advanced')?.setAttribute('open', '');
-        });
     }, [form, goTo, loading, mode]);
     useEffect(() => {
         const previousStep = event => {
@@ -143,7 +144,7 @@ export default function StoreOnboarding({ mode = 'create', form, formRef, initia
     };
     const validationFailed = ({ errorFields }) => {
         const name = errorFields[0]?.name?.[0];
-        const step = steps.find(item => item.fields.includes(name));
+        const step = steps.find(item => item.key === onboardingFieldDomain(name));
         if (step) goTo(step.key, mode === 'edit' ? ['review'] : undefined);
         revealError(errorFields);
     };
@@ -151,12 +152,10 @@ export default function StoreOnboarding({ mode = 'create', form, formRef, initia
         if (advancing.current || loading || !last || form.getFieldValue('_onboardingStep') !== 'review') return;
         advancing.current = true;
         try {
-            const submitted = await form.validateFields();
+            const submitted = await form.validateFields(onboardingSteps({ ...STORE_ONBOARDING_DEFAULTS, ...form.getFieldsValue(true) }, mode).flatMap(step => step.fields));
             if (form.getFieldValue('_onboardingStep') !== 'review') return;
             const allValues = { ...STORE_ONBOARDING_DEFAULTS, ...form.getFieldsValue(true), ...submitted };
-            // Booking fields remain in the draft when switching modes, but a waiting-only store takes no deposit.
-            if (mode === 'create' && allValues.reservationEnabled === false) allValues.noShowDeposit = 0;
-            await onSubmit(allValues);
+            await onSubmit(normalizeOnboardingSubmission(allValues, mode));
         } catch (failure) {
             if (failure.errorFields) validationFailed(failure);
         } finally { advancing.current = false; }
@@ -169,7 +168,7 @@ export default function StoreOnboarding({ mode = 'create', form, formRef, initia
             <PageTitle key={current.key} level={1} ref={heading} tabIndex={-1} className="reserve-onboarding-heading">{current.title}</PageTitle>
             <Form form={form} ref={formRef} layout="vertical" requiredMark={false} validateTrigger="onBlur" size="large"
                 className="reserve-store-form" initialValues={{ ...STORE_ONBOARDING_DEFAULTS, _onboardingStep: firstStep,
-                    _onboardingHistory: [], _onboardingPreviewDevice: 'mobile', ...initialValues }}
+                    _onboardingHistory: [], _onboardingPreviewDevice: 'mobile', _onboardingVersion: 2, ...initialValues }}
                 onValuesChange={onValuesChange}
                 onSubmitCapture={event => event.preventDefault()}
                 onKeyDown={event => {
@@ -179,24 +178,13 @@ export default function StoreOnboarding({ mode = 'create', form, formRef, initia
                 {mode === 'edit' && <fieldset disabled={loading} className="reserve-onboarding-step" hidden={current.key !== 'selection'}>
                     <StoreEditSelection onSelectStep={editStep} disabled={loading} />
                 </fieldset>}
-                <fieldset disabled={loading} className="reserve-onboarding-step" hidden={current.key !== 'industry'}>
-                    <IndustryQuestion change={change} />
-                </fieldset>
-                <fieldset disabled={loading} className="reserve-onboarding-step" hidden={current.key !== 'service'}>
-                    <ServiceQuestion values={values} change={change} disabled={loading} mode={mode} />
-                </fieldset>
-                <fieldset disabled={loading} className="reserve-onboarding-step" hidden={current.key !== 'booking'}>
-                    <BookingQuestion mode={mode} />
-                </fieldset>
-                <fieldset disabled={loading} className="reserve-onboarding-step" hidden={current.key !== 'waiting'}>
-                    <WaitingQuestion mode={mode} />
-                </fieldset>
-                <fieldset disabled={loading} className="reserve-onboarding-step" hidden={current.key !== 'operation'}>
-                    <OperationQuestion mode={mode} />
-                </fieldset>
-                <fieldset disabled={loading} className="reserve-onboarding-step" hidden={current.key !== 'identity'}>
-                    <IdentityQuestion change={change} mode={mode} mainImage={mainImage} detailImages={detailImages} {...images} />
-                </fieldset>
+                {STORE_ONBOARDING_DOMAINS.map(domain => {
+                    const Question = QUESTIONS[domain.key];
+                    return <fieldset key={domain.key} disabled={loading} className="reserve-onboarding-step" hidden={current.key !== domain.key}>
+                        <Question values={values} change={change} disabled={loading} mode={mode} onEdit={editStep}
+                            {...(domain.key === 'identity' ? { mainImage, detailImages, ...images } : {})} />
+                    </fieldset>;
+                })}
                 {last && <div className="reserve-onboarding-review">
                     <Suspense fallback={<Bone width="100%" height={380} />}>
                         <StoreDetailPreview store={onboardingPreviewStore(reviewValues, imageUrls, originalStore)}

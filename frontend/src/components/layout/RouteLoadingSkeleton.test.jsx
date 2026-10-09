@@ -1,11 +1,12 @@
 import { Suspense, lazy } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import RouteLoadingSkeleton, { RouteSkeletonPreview } from './RouteLoadingSkeleton';
 import { getRouteSkeletonKind } from './routeSkeletonKind';
 import { preloadRouteSkeletons } from './routeSkeletonLoader';
 import RouteSkeletonPages from './RouteSkeletonPages';
+import DiscoveryRouteSkeleton from './DiscoveryRouteSkeleton';
 
 const routes = {
     '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'benefit-detail', '/waiting': 'waiting', '/feed': 'coming-soon',
@@ -26,6 +27,7 @@ describe('route chunk loading patterns', () => {
     // 페이지별 뼈대는 별도 청크다. 앱처럼 먼저 받아 두면 이후 렌더는 동기적으로 그 모양을 그린다.
     beforeAll(async () => {
         expect((await preloadRouteSkeletons())?.default).toBe(RouteSkeletonPages);
+        expect((await preloadRouteSkeletons('discovery'))?.default).toBe(DiscoveryRouteSkeleton);
     });
     afterEach(() => setWidth(originalWidth));
 
@@ -94,6 +96,17 @@ describe('route chunk loading patterns', () => {
         // The shared toolbar is sized by its actual 44px view slot, including while it is a bone.
         expect(container.querySelector('.reserve-explore-filters').firstElementChild)
             .toHaveStyle({ width: '44px', height: '44px', flexShrink: '0' });
+    });
+
+    it('switches between the cached home and login skeletons without keeping the previous page', () => {
+        const { container, rerender } = render(<RouteSkeletonPreview pathname="/" />);
+        expect(container.querySelector('.reserve-discovery-home')).toBeInTheDocument();
+        rerender(<RouteSkeletonPreview pathname="/login" />);
+        expect(container.querySelector('.reserve-discovery-home')).toBeNull();
+        expect(container.querySelector('.reserve-page-title')).toHaveTextContent('로그인');
+        rerender(<RouteSkeletonPreview pathname="/" />);
+        expect(container.querySelector('.reserve-discovery-home')).toBeInTheDocument();
+        expect(container.querySelector('.reserve-page-title')).toBeNull();
     });
 
     it('keeps reservations at the real page width, heading and selected card layout', () => {
@@ -218,10 +231,10 @@ describe('route chunk loading patterns', () => {
             expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth, padding });
         });
 
-    it('renders the editing question and six choice slots on the edit route', () => {
+    it('renders the editing question and nine choice slots on the edit route', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/store/12/edit" />);
         expect(container.querySelector('.reserve-onboarding-heading')).toHaveTextContent('무엇을 수정하시겠어요?');
-        expect(container.querySelectorAll('.reserve-onboarding-edit-selection .reserve-service-domain-option')).toHaveLength(6);
+        expect(container.querySelectorAll('.reserve-onboarding-edit-selection .reserve-service-domain-option')).toHaveLength(9);
         expect(container.querySelector('button,input,select,a,textarea')).toBeNull();
     });
 
@@ -234,6 +247,7 @@ describe('route chunk loading patterns', () => {
             const { container } = render(<FreshPreview pathname="/login" />);
             expect(container.querySelector('[aria-hidden="true"] > div')).toHaveStyle({ minHeight: 'calc(100svh - 64px)' });
             expect(container.querySelector('h2')).toBeNull();
+            await waitFor(() => expect(release).toBeTypeOf('function'));
             await act(async () => release({ default: () => <h2>로그인</h2> }));
             expect(container.querySelector('h2')).toHaveTextContent('로그인');
         } finally {

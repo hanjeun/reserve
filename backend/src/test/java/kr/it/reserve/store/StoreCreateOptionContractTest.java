@@ -35,6 +35,7 @@ class StoreCreateOptionContractTest {
         request.setName("  옵션 검증 가게  ");
         request.setCategory("카페");
         request.setAddress("서울 검증 주소");
+        request.setNoShowDeposit(3000);
         request.setAutoApprovalEnabled(requested);
         request.setAllowLatePayment(requested);
         request.setAllowDuplicateReservation(requested);

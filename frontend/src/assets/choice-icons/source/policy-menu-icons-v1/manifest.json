@@ -1,0 +1,535 @@
+{
+  "title": "RESERVE policy menu icons v1",
+  "version": 1,
+  "asset_count": 3,
+  "asset_ids": [
+    "edit-booking-policy",
+    "edit-deposit",
+    "edit-refund"
+  ],
+  "production_static_files": 12,
+  "editable_blends": 3,
+  "rendered_independently_at": [
+    512,
+    768
+  ],
+  "production": "Blender 4.3.2 / Eevee Next / 128 samples",
+  "palette_srgb": [
+    "#F2F5FA",
+    "#B8C9DE",
+    "#3182F6",
+    "#8191A6"
+  ],
+  "alpha": "RGBA8 PNG; static lossy-RGB WebP with pixel-identical lossless alpha",
+  "webp_quality": 92,
+  "webp_method": 6,
+  "webp_exact": true,
+  "webp_alpha_quality": 100,
+  "webp_byte_limits": {
+    "512": 20000,
+    "768": 32000
+  },
+  "model_and_image_license": "CC0-1.0",
+  "original_code_license": "MIT",
+  "source_pipelines": [
+    "RESERVE original-style first 28",
+    "original-style empty-news",
+    "RESERVE six categories",
+    "RESERVE extra 13",
+    "RESERVE camera and browser states v1"
+  ],
+  "latest_four_current_source_verified": false,
+  "image_checks": [
+    {
+      "asset": "edit-booking-policy",
+      "resolution": [
+        512,
+        512
+      ],
+      "png_bytes": 123055,
+      "webp_bytes": 8640,
+      "webp_quality": 92,
+      "webp_limit_bytes": 20000,
+      "alpha_bbox": [
+        152,
+        101,
+        369,
+        413
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "png_bit_depth": 8,
+      "png_color_type": 6,
+      "webp_method": 6,
+      "webp_exact": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 1.1161350625073023,
+          "edge_mean_absolute_rgb_error": 0.6689221846302562
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 1.1161934805467928,
+          "edge_mean_absolute_rgb_error": 0.6706943773159336
+        }
+      }
+    },
+    {
+      "asset": "edit-deposit",
+      "resolution": [
+        512,
+        512
+      ],
+      "png_bytes": 118688,
+      "webp_bytes": 8414,
+      "webp_quality": 92,
+      "webp_limit_bytes": 20000,
+      "alpha_bbox": [
+        98,
+        112,
+        415,
+        406
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "png_bit_depth": 8,
+      "png_color_type": 6,
+      "webp_method": 6,
+      "webp_exact": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.8857587965153231,
+          "edge_mean_absolute_rgb_error": 0.6467422920302501
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.8859977348644503,
+          "edge_mean_absolute_rgb_error": 0.6540139616055847
+        }
+      }
+    },
+    {
+      "asset": "edit-refund",
+      "resolution": [
+        512,
+        512
+      ],
+      "png_bytes": 105369,
+      "webp_bytes": 9686,
+      "webp_quality": 92,
+      "webp_limit_bytes": 20000,
+      "alpha_bbox": [
+        122,
+        99,
+        386,
+        402
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "png_bit_depth": 8,
+      "png_color_type": 6,
+      "webp_method": 6,
+      "webp_exact": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 1.0794923570669086,
+          "edge_mean_absolute_rgb_error": 0.9171462829736211
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 1.0809263215397071,
+          "edge_mean_absolute_rgb_error": 0.9347721822541967
+        }
+      }
+    },
+    {
+      "asset": "edit-booking-policy",
+      "resolution": [
+        768,
+        768
+      ],
+      "png_bytes": 259574,
+      "webp_bytes": 13320,
+      "webp_quality": 92,
+      "webp_limit_bytes": 32000,
+      "alpha_bbox": [
+        228,
+        153,
+        553,
+        620
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "png_bit_depth": 8,
+      "png_color_type": 6,
+      "webp_method": 6,
+      "webp_exact": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.9844296358459748,
+          "edge_mean_absolute_rgb_error": 0.5335048783102819
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.9846335108942765,
+          "edge_mean_absolute_rgb_error": 0.5427254208212716
+        }
+      }
+    },
+    {
+      "asset": "edit-deposit",
+      "resolution": [
+        768,
+        768
+      ],
+      "png_bytes": 248080,
+      "webp_bytes": 12676,
+      "webp_quality": 92,
+      "webp_limit_bytes": 32000,
+      "alpha_bbox": [
+        148,
+        168,
+        622,
+        608
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "png_bit_depth": 8,
+      "png_color_type": 6,
+      "webp_method": 6,
+      "webp_exact": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.8260242169261948,
+          "edge_mean_absolute_rgb_error": 0.7140366172624237
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.8261439333692483,
+          "edge_mean_absolute_rgb_error": 0.7194613968807517
+        }
+      }
+    },
+    {
+      "asset": "edit-refund",
+      "resolution": [
+        768,
+        768
+      ],
+      "png_bytes": 216667,
+      "webp_bytes": 14820,
+      "webp_quality": 92,
+      "webp_limit_bytes": 32000,
+      "alpha_bbox": [
+        183,
+        149,
+        579,
+        603
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "canvas_edges_fully_transparent": true,
+      "webp_alpha_exact": true,
+      "png_recompression_pixel_identical": true,
+      "static": true,
+      "png_bit_depth": 8,
+      "png_color_type": 6,
+      "webp_method": 6,
+      "webp_exact": true,
+      "composite_comparison": {
+        "light": {
+          "foreground_mean_absolute_rgb_error": 0.9740989652789698,
+          "edge_mean_absolute_rgb_error": 0.9167470266795242
+        },
+        "dark": {
+          "foreground_mean_absolute_rgb_error": 0.9741605820140751,
+          "edge_mean_absolute_rgb_error": 0.9178720668595307
+        }
+      }
+    }
+  ],
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 5416,
+      "sha256": "165684588f9f7c76f4b818789124ff618fa79fa7322044083e04f68569ce7cb7"
+    },
+    {
+      "file": "previews/dark-actual-48-56-64-from512.png",
+      "bytes": 33861,
+      "sha256": "e30e2adef254d500ed4bb6e77c649f6ebbe086ae897c3d8c7272d6e1dc067531"
+    },
+    {
+      "file": "previews/dark-actual-48-56-64-from768.png",
+      "bytes": 33694,
+      "sha256": "c5c9ae08863b4e5b2168354066429178e7fae244dff57aef9804f890e3870ffb"
+    },
+    {
+      "file": "previews/dark-overview.png",
+      "bytes": 70574,
+      "sha256": "42b6c19f926140b8f524d4dcbca1a28fb9a84657c9e58ea56b26c181bfc68812"
+    },
+    {
+      "file": "previews/light-actual-48-56-64-from512.png",
+      "bytes": 32131,
+      "sha256": "8fdf82eecbefaacd715e2881bcf80f1a7b4c87edae051f55dde72062e79a9743"
+    },
+    {
+      "file": "previews/light-actual-48-56-64-from768.png",
+      "bytes": 31920,
+      "sha256": "100edf6d5668d969cc62cd3ce650482c0e6b88b3f6b414675aa9c7af7bb44323"
+    },
+    {
+      "file": "previews/light-overview.png",
+      "bytes": 69520,
+      "sha256": "588290edbc0b0e7c8e22edc34a8faa09c2e18100963fc371d3ce6891e4e6bb0c"
+    },
+    {
+      "file": "qa/blend-reopen-render.log",
+      "bytes": 2954,
+      "sha256": "250e7fadd1009803fd0ca27ea4cee66f097aa54ddb433a1c652410014cfbd34d"
+    },
+    {
+      "file": "qa/blend-validation.json",
+      "bytes": 10873,
+      "sha256": "820cd4ae92878459d2ec06ceb9ece7bc76fc351149e65e3b19acf65ae4e59910"
+    },
+    {
+      "file": "qa/execution-report.json",
+      "bytes": 2554,
+      "sha256": "abf42a78f7aac6077de789191c0a7ef98e4cbc5b4b22f73843c02e421558c19e"
+    },
+    {
+      "file": "qa/image-validation.json",
+      "bytes": 5290,
+      "sha256": "26e8c1d9bd8b72a2fded0de75abb5dedaf716749eedbdaa64bd1ecd24be12c14"
+    },
+    {
+      "file": "qa/independent-visual-review.json",
+      "bytes": 23214,
+      "sha256": "0ff6d4ea868359c525ee67e8a102a82094bc868db614c731692fb33fe4b6f115"
+    },
+    {
+      "file": "qa/native-render.log",
+      "bytes": 6714,
+      "sha256": "cd77eb25bb2b758f37e5c747bc4676de0880f4ddb127ca4c745c6301f1fd499d"
+    },
+    {
+      "file": "qa/preservation-before-sha256.json",
+      "bytes": 408338,
+      "sha256": "3c2954d076e569ff5552c17bac5a14faf9e29e78cf5cbeea8ad5508d44a519e9"
+    },
+    {
+      "file": "qa/preservation-report.json",
+      "bytes": 2396,
+      "sha256": "4a3465ef110345ccd886bd357027492ee798f8a91ffdc0c2b2a01bc886b7c09d"
+    },
+    {
+      "file": "qa/roundtrip-validation.json",
+      "bytes": 852,
+      "sha256": "37bd8c1c5f2a497708b68dcebe29c9f844b52351426bc890c83e57e1668ef0b9"
+    },
+    {
+      "file": "source/CC0-1.0-FULL.txt",
+      "bytes": 7048,
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "file": "source/LICENSE-ASSETS.txt",
+      "bytes": 1093,
+      "sha256": "336e5b005c1dff103a9a691a6507e1ec52e6ac476e7b404385086ab7210a9d6f"
+    },
+    {
+      "file": "source/LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/build_assets.py",
+      "bytes": 14288,
+      "sha256": "f322e91991ff010cc2d5cc6a064ae2c455a96a3575e2a7ad31a9e4c18e047345"
+    },
+    {
+      "file": "source/edit-booking-policy.blend",
+      "bytes": 193957,
+      "sha256": "6cadfe5ead508d719c22318e366b734ed4eaf643371d769219f5612cd661a7dd"
+    },
+    {
+      "file": "source/edit-deposit.blend",
+      "bytes": 108088,
+      "sha256": "16fd9755f399185ab4f29f53dde93419f490cc170d65b4781d0f6a628c0a1958"
+    },
+    {
+      "file": "source/edit-refund.blend",
+      "bytes": 171191,
+      "sha256": "ff1c56950e15751072c8b49a8cb9402a8ad889cf4f580a0d9e5d21e37e77572e"
+    },
+    {
+      "file": "source/encode_and_validate.py",
+      "bytes": 4258,
+      "sha256": "48406ece930a5a8cfd173c40b07d87cfcae616d0c38b0556fc88dc631518bb55"
+    },
+    {
+      "file": "source/native-render-evidence.jsonl",
+      "bytes": 1614,
+      "sha256": "f956b2136572bde71f48b22aed19c1393d42a255973208d144f9fdd18337b7f6"
+    },
+    {
+      "file": "source/package_and_verify.py",
+      "bytes": 10231,
+      "sha256": "4578f5bbf9a76ea7baee7f50cfc36cf3cd71b93934b4edd9f61098da14eaa323"
+    },
+    {
+      "file": "source/prior-notices/camera-browser-LICENSE-ASSETS.txt",
+      "bytes": 1087,
+      "sha256": "32958743d5a8643b2ce9c3b343a6601551874cb144f3705298fd3c37ad0400a6"
+    },
+    {
+      "file": "source/prior-notices/camera-browser-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/empty-news-LICENSE-ASSETS.txt",
+      "bytes": 451,
+      "sha256": "606131658eed432e4d008a507abb2aa8e6ee7ad4beb2f0c5cfcf34b486be24e6"
+    },
+    {
+      "file": "source/prior-notices/empty-news-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-category-kit-LICENSE-ASSETS.txt",
+      "bytes": 811,
+      "sha256": "f6abe52f31d97f04f41c2b86c70898767ecf5e44ad3d721760e810c4d7f00d0e"
+    },
+    {
+      "file": "source/prior-notices/reserve-category-kit-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-extra-icons-13-LICENSE-ASSETS.txt",
+      "bytes": 921,
+      "sha256": "17ca6d87383d5d63f8096020a802a7cdc791ea456657e6e349baa028bb168032"
+    },
+    {
+      "file": "source/prior-notices/reserve-extra-icons-13-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-ASSETS.txt",
+      "bytes": 451,
+      "sha256": "606131658eed432e4d008a507abb2aa8e6ee7ad4beb2f0c5cfcf34b486be24e6"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-assets.txt",
+      "bytes": 482,
+      "sha256": "696a650929791ac7a22b8f3801b6676c411a57bbef84e12d85c4f6728601dd76"
+    },
+    {
+      "file": "source/prior-notices/reserve-original-style-kit-LICENSE-source.txt",
+      "bytes": 1090,
+      "sha256": "a80c238fad191ae41ccefa22718d0312893c5f47a620feb4044e086701b96f0e"
+    },
+    {
+      "file": "source/validate_blends.py",
+      "bytes": 4361,
+      "sha256": "247b935aeda642b06a08af24ec7223ecd86a1d3e0252896d21129db21c993f69"
+    },
+    {
+      "file": "static/512/edit-booking-policy-512.png",
+      "bytes": 123055,
+      "sha256": "1d749ee755b8716ed664db0ddec348e7010954e31859ca3cc5e7d0037df61562"
+    },
+    {
+      "file": "static/512/edit-booking-policy-512.webp",
+      "bytes": 8640,
+      "sha256": "aa87a82b1b52ddda8d2f67fc560adf1e47cd16d633c4498b1f4d42a2c3129ccb"
+    },
+    {
+      "file": "static/512/edit-deposit-512.png",
+      "bytes": 118688,
+      "sha256": "1ef61437658f7774229c38ae4f87f3d58676466cd9e100d213356c008855595d"
+    },
+    {
+      "file": "static/512/edit-deposit-512.webp",
+      "bytes": 8414,
+      "sha256": "d887771f4b01195c577aa6f0d48a46014501ed008a67f0d13985f60686d38c31"
+    },
+    {
+      "file": "static/512/edit-refund-512.png",
+      "bytes": 105369,
+      "sha256": "0156e625c937d990d518c07e616451e30cbe2ded5c33316b6d5ff8424e7db423"
+    },
+    {
+      "file": "static/512/edit-refund-512.webp",
+      "bytes": 9686,
+      "sha256": "a1b2d90613342fc397c879645719f2480be396a5b93c7c0210c85250974b3929"
+    },
+    {
+      "file": "static/768/edit-booking-policy-768.png",
+      "bytes": 259574,
+      "sha256": "7799e66c03ed4a75086b44a6519c43a526bbc4ab63bf89658cfc54b761229fee"
+    },
+    {
+      "file": "static/768/edit-booking-policy-768.webp",
+      "bytes": 13320,
+      "sha256": "39c9303b3b6882dde972dea2ad2cb8c121f0affe01271a0c496a0428f3b72e70"
+    },
+    {
+      "file": "static/768/edit-deposit-768.png",
+      "bytes": 248080,
+      "sha256": "9b2ada549302fa32b03361a474b23990af7ff1b94ada37496989ca746231f85c"
+    },
+    {
+      "file": "static/768/edit-deposit-768.webp",
+      "bytes": 12676,
+      "sha256": "2563185df2b034c06a258ee9afaf4d513b1d2230e6134ef314dafb16aab71bea"
+    },
+    {
+      "file": "static/768/edit-refund-768.png",
+      "bytes": 216667,
+      "sha256": "d0b5602f45ca22eff52448002f045846769c76e2f0cb4e9c274a7cc3341f4a90"
+    },
+    {
+      "file": "static/768/edit-refund-768.webp",
+      "bytes": 14820,
+      "sha256": "e0e95798a2b1e210428fff2e0e68334631903a883091c94087961393e5a01c00"
+    }
+  ]
+}

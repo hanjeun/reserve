@@ -28,13 +28,18 @@ const advanceRegistrationToIdentity = async page => {
     await page.getByRole('group', { name: '예약 방식', exact: true })
         .getByRole('button', { name: '시간대', exact: true }).click();
     await page.getByRole('button', { name: '다음', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '언제, 몇 명까지 받을까요?', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '언제 가게를 운영하시나요?', exact: true })).toBeVisible();
     await page.getByLabel('영업 시간', { exact: true }).click();
     const hours = page.getByRole('dialog', { name: '시간 범위 선택' });
     await hours.getByRole('textbox', { name: '시작 시간 직접 입력', exact: true }).fill('09:00');
     await hours.getByRole('textbox', { name: '종료 시간 직접 입력', exact: true }).fill('18:00');
     await hours.getByRole('button', { name: '선택 완료', exact: true }).click();
     await expect(page.getByLabel('영업 시간', { exact: true })).toHaveText(/09:00.*18:00/);
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '예약을 어떤 규칙으로 받을까요?', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '노쇼 예약금을 설정하실 건가요?', exact: true })).toBeVisible();
+    await page.getByRole('radio', { name: '예약금 없이 받기', exact: true }).click();
     await page.getByRole('button', { name: '다음', exact: true }).click();
     await expect(page.getByRole('heading', { name: '손님에게 가게를 소개해주세요.', exact: true })).toBeVisible();
 };

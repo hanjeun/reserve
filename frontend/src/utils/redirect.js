@@ -22,21 +22,34 @@ const EXCLUDED_PREFIXES = [
     '/oauth2/callback',
     '/forgot-password',
 ];
+const hasUnsafeCharacters = value => Array.from(value).some(character =>
+    character === '\\' || character.charCodeAt(0) <= 0x20 || character.charCodeAt(0) === 0x7f);
 
 /**
  * 내부 경로인지 검증 (오픈 리다이렉트 방지).
  * '/'로 시작해야 하고, '//evil.com'(프로토콜 상대 URL)이나 '/\evil.com'은 거부한다.
  */
-const isSafeInternalPath = (path) => {
-    if (typeof path !== 'string' || path.length === 0) return false;
-    if (!path.startsWith('/')) return false;
-    if (path.startsWith('//') || path.startsWith('/\\')) return false;
-    return !EXCLUDED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`) || path.startsWith(`${p}?`));
+export const safeRedirectPath = (path) => {
+    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')
+        || hasUnsafeCharacters(path)) return null;
+    try {
+        // 해시·쿼리와 무관하게 실제 목적지 경로를 확인한다. 콜백 자체로 복귀하면 처리가 반복되거나 멈춘다.
+        const url = new URL(path, 'https://reserve.invalid');
+        if (url.origin !== 'https://reserve.invalid') return null;
+        const decoded = decodeURIComponent(url.pathname);
+        if (hasUnsafeCharacters(decoded)) return null;
+        const normalized = new URL(decoded, 'https://reserve.invalid');
+        if (normalized.origin !== 'https://reserve.invalid') return null;
+        const pathname = normalized.pathname.toLowerCase();
+        return EXCLUDED_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`)) ? null : path;
+    } catch {
+        return null;
+    }
 };
 
 /** 로그인 유도 직전에 현재 경로를 저장 (PrivateRoute, 로그인 유도 버튼 등에서 호출) */
 export const saveRedirect = (path) => {
-    if (!isSafeInternalPath(path)) return;
+    if (!safeRedirectPath(path)) return;
     try {
         sessionStorage.setItem(KEY, path);
     } catch {
@@ -48,7 +61,7 @@ export const saveRedirect = (path) => {
 export const peekRedirect = () => {
     try {
         const path = sessionStorage.getItem(KEY);
-        return isSafeInternalPath(path) ? path : null;
+        return safeRedirectPath(path);
     } catch {
         return null;
     }
@@ -63,6 +76,12 @@ export const consumeRedirect = () => {
     } catch {
         return null;
     }
+};
+
+/** router state가 우선이어도 저장값을 함께 소비해 다음 로그인에 이전 목적지가 남지 않게 한다. */
+export const consumeLoginRedirect = (preferredPath) => {
+    const saved = consumeRedirect();
+    return safeRedirectPath(preferredPath) || saved || '/';
 };
 
 /** 저장만 지우고 값은 안 쓸 때 (예: 로그아웃) */

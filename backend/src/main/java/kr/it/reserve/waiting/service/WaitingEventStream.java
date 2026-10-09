@@ -48,7 +48,7 @@ public class WaitingEventStream {
             emitter.send(SseEmitter.event().name(name).data(data));
         } catch (java.io.IOException | IllegalStateException disconnected) {
             subscribers.remove(emitter);
-            emitter.complete();
+            // 쓰기 실패의 최종 async dispatch는 Servlet/Spring이 처리한다. complete를 다시 호출하지 않는다.
         }
     }
 }

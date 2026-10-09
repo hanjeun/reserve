@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 const read = path => fs.readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const require = createRequire(new URL('../../frontend/package.json', import.meta.url));
@@ -12,7 +16,81 @@ const deployment = workflow.jobs['deploy-backend'];
 const backendTests = workflow.jobs['test-backend'];
 const frontendTests = workflow.jobs['test-frontend'];
 const staging = workflow.jobs['stage-release'];
+const detectionScript = read('scripts/detect-active-upstream.sh');
 const step = (job, id) => job.steps.find(entry => entry.id === id);
+
+const bashPath = value => process.platform === 'win32'
+    ? value.replaceAll('\\', '/').replace(/^([a-z]):/i, (_match, drive) => `/${drive.toLowerCase()}`) : value;
+const runDetection = overrides => {
+    const parent = os.tmpdir();
+    const fixture = fs.mkdtempSync(path.join(parent, 'reserve-upstream-test-'));
+    const bin = path.join(fixture, 'bin');
+    fs.mkdirSync(bin);
+    const mocks = {
+        'ssh-keyscan': 'printf "reserve.test ssh-ed25519 test-key\\n"',
+        'ssh-keygen': 'printf "256 SHA256:fixture fixture (ED25519)\\n"',
+        ssh: `printf 'called' > "$TASK_SSH_CALLED"
+if [[ "$MOCK_REMOTE_FAILURE" != 0 ]]; then echo 'recovery guard rejected'; exit "$MOCK_REMOTE_FAILURE"; fi
+if [[ "$MOCK_AMBIGUOUS" == true ]]; then printf 'DETECTED_UPSTREAM=blue\\nDETECTED_UPSTREAM=green\\n'; exit 0; fi
+exec bash -se`,
+        curl: `if [[ "$*" == *8080* ]]; then printf '%s' "$MOCK_BLUE"; else printf '%s' "$MOCK_GREEN"; fi`,
+        sudo: `case "$*" in
+  'docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc') printf 'set $service_url blue;\\n' ;;
+  'docker inspect --format '* ) printf 'fixture-image\\n' ;;
+  *reserve.schema-compat*) printf '%s\\n' "$MOCK_SCHEMA" ;;
+  *reserve.feature-compat*) printf '%s\\n' "$MOCK_FEATURE" ;;
+  *) exit 91 ;;
+esac`,
+    };
+    for (const [name, body] of Object.entries(mocks)) fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+    const output = path.join(fixture, 'github-output');
+    const called = path.join(fixture, 'ssh-called');
+    fs.writeFileSync(output, '');
+    try {
+        const result = spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+            ['-c', 'export PATH="$TASK_MOCK_BIN:$PATH"; exec bash "$TASK_DETECTION_SCRIPT"'], {
+                encoding: 'utf8', timeout: 15000,
+                env: { ...process.env, TASK_MOCK_BIN: bashPath(bin),
+                    TASK_DETECTION_SCRIPT: bashPath(fileURLToPath(new URL('../detect-active-upstream.sh', import.meta.url))),
+                    GITHUB_OUTPUT: bashPath(output), TASK_SSH_CALLED: bashPath(called),
+                    RESERVE_SERVER_IP: 'reserve.test', EC2_SSH_KEY: 'fixture-key', RESERVE_SSH_FINGERPRINT: 'SHA256:fixture',
+                    MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v270-refund-v1', MOCK_FEATURE: 'waiting-signup-hidden-v2',
+                    MOCK_REMOTE_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
+            });
+        assert.ifError(result.error);
+        return { ...result, output: fs.readFileSync(output, 'utf8'), sshCalled: fs.existsSync(called) };
+    } finally {
+        assert.equal(path.dirname(path.resolve(fixture)), path.resolve(parent));
+        assert.ok(path.basename(fixture).startsWith('reserve-upstream-test-'));
+        fs.rmSync(fixture, { recursive: true, force: true });
+    }
+};
+
+test('upstream detection publishes a single GitHub output only after the real shell guards succeed', () => {
+    const result = runDetection({});
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.equal(result.output, 'current_upstream=blue\n');
+    assert.ok(result.sshCalled);
+});
+
+test('SSH failure propagates its exit code without leaving a partial EOF output', () => {
+    const result = runDetection({ MOCK_REMOTE_FAILURE: '41' });
+    assert.equal(result.status, 41);
+    assert.equal(result.output, '');
+});
+
+for (const [description, overrides] of [
+    ['wrong host fingerprint', { RESERVE_SSH_FINGERPRINT: 'SHA256:wrong' }],
+    ['unsupported recovery features', { MOCK_FEATURE: 'waiting-signup-v1' }],
+    ['unsupported refund schema', { MOCK_SCHEMA: 'old' }],
+    ['unhealthy live upstream', { MOCK_BLUE: '503' }],
+    ['ambiguous upstream marker', { MOCK_AMBIGUOUS: 'true' }],
+]) test(`upstream detection refuses ${description} without publishing deployment output`, () => {
+    const result = runDetection(overrides);
+    assert.notEqual(result.status, 0);
+    assert.equal(result.output, '');
+    if (description === 'wrong host fingerprint') assert.equal(result.sshCalled, false);
+});
 
 test('production deployment requires the restricted app account and cannot fall back to root or DDL update', () => {
     for (const color of ['blue', 'green']) {
@@ -94,6 +172,19 @@ test('snapshot verification installs a scoped Git byte guard without changing th
     assert.match(read('scripts/design-system-snapshot.ps1'), /rev-parse --git-path info\/attributes/);
     assert.match(read('scripts/design-system-snapshot.ps1'), /Get-Item -LiteralPath \$saved -Force/);
     assert.match(read('scripts/design-system-snapshot.ps1'), /Get-ChildItem -LiteralPath \$snapshotRoot -Recurse -File -Force/);
+});
+
+test('both HTML CSP policies allow verified Kakao scripts without enabling eval or enforcement', () => {
+    const nginx = read('nginx/default.conf');
+    const policies = [...nginx.matchAll(/add_header Content-Security-Policy-Report-Only "([^"]+)" always;/g)].map(match => match[1]);
+    assert.equal(policies.length, 2);
+    assert.equal(policies[0], policies[1]);
+    const scripts = policies[0].split(';').map(value => value.trim()).find(value => value.startsWith('script-src ')).split(/\s+/);
+    assert.deepEqual(scripts, [
+        'script-src', "'self'", 'https://cdn.portone.io', 'https://dapi.kakao.com',
+        'https://t1.kakaocdn.net', 'https://*.daumcdn.net',
+    ]);
+    assert.doesNotMatch(nginx, /add_header\s+Content-Security-Policy\s/);
 });
 
 test('PC and mobile browser checks use separate projects and failure evidence', () => {
@@ -179,8 +270,9 @@ test('public pages ship an indexable robots meta in the raw HTML', () => {
 test('the live backend must be schema and refund compatible before deployment', () => {
     assert.match(backend.steps.find(entry => entry.name === 'Build Docker image').run, /--label reserve\.schema-compat=v270-refund-v1/);
     const detect = step(deployment, 'detect');
-    assert.match(detect.with.script, /SCHEMA_COMPAT.*reserve\.schema-compat/);
-    assert.match(detect.with.script, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
+    assert.equal(detect.run, 'bash scripts/detect-active-upstream.sh');
+    assert.match(detectionScript, /SCHEMA_COMPAT.*reserve\.schema-compat/);
+    assert.match(detectionScript, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
 });
 
 test('automatic cutover requires recovery support for waiting settings, signup tickets and private message deletion', () => {
@@ -188,8 +280,8 @@ test('automatic cutover requires recovery support for waiting settings, signup t
     const detect = step(deployment, 'detect');
     const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
     assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-v2/);
-    assert.match(detect.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-v2'/);
-    assert.ok(detect.with.script.indexOf('"$FEATURE_COMPAT" !=') < detect.with.script.indexOf('DETECTED_UPSTREAM='));
+    assert.match(detectionScript, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-v2'/);
+    assert.ok(detectionScript.indexOf('"$FEATURE_COMPAT" !=') < detectionScript.indexOf('DETECTED_UPSTREAM='));
     assert.equal(cutover.env.CURRENT_UPSTREAM, '${{ env.CURRENT_UPSTREAM }}');
     assert.ok(cutover.with.envs.split(',').includes('CURRENT_UPSTREAM'));
     assert.match(cutover.with.script, /"\$LIVE_ROUTING" != "set \\\$service_url \$CURRENT_UPSTREAM;"/);

@@ -175,24 +175,26 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     let content;
     if (storesError) content = <DataState state="error" kind="store" subject="가게 목록" error={storesError} onRetry={refetchStores} />;
     else if (!store) content = <DataState state="empty" kind="store" title="등록된 가게가 없어요." />;
-    else if (board.error && !board.data) content = <DataState state="error" subject="대기 명단" error={board.error} onRetry={refresh} retrying={board.isFetching} />;
     else content = <>
-        {board.error && <DataState state="error" subject="대기 명단 갱신" error={board.error} onRetry={refresh} retrying={board.isFetching} compact />}
         <div className="reserve-waiting-summary">
-            <div><h3>대기 명단</h3><p>{dateLabel(board.data?.businessDate)} · 대기 {active.filter(entry => entry.status === 'WAITING').length}팀 · 호출 {active.filter(entry => entry.status === 'CALLED').length}팀</p></div>
+            <div><h3>대기 명단</h3><p>{board.data
+                ? `${dateLabel(board.data.businessDate)} · 대기 ${active.filter(entry => entry.status === 'WAITING').length}팀 · 호출 ${active.filter(entry => entry.status === 'CALLED').length}팀`
+                : '대기 현황을 확인하지 못했어요.'}</p></div>
             <div className="reserve-waiting-actions">
-                <Button variant={paused ? 'primary' : 'outline'} size="sm" disabled={busy} loading={pending === 'intake'}
+                <Button variant={paused ? 'primary' : 'outline'} size="sm" disabled={busy || !board.data} loading={pending === 'intake'}
                     onClick={() => write('intake', signal => waitingService.updateIntake(storeId, !paused, signal),
                         paused ? '웨이팅 접수를 시작했어요.' : '신규 접수를 중지했어요. 기존 대기는 유지돼요.')}>
                     {paused ? '접수 시작' : '접수 중지'}
                 </Button>
-                {['ONSITE', 'BOTH'].includes(intakeMode) && <Button variant="outline" size="sm" disabled={paused || busy} onClick={() => setQrOpen(true)}>현장 접수 QR</Button>}
-                <Button variant="primary" size="sm" disabled={busy || paused} onClick={showForm}>대기 접수</Button>
+                {['ONSITE', 'BOTH'].includes(intakeMode) && <Button variant="outline" size="sm" disabled={paused || busy || !board.data} onClick={() => setQrOpen(true)}>현장 접수 QR</Button>}
+                <Button variant="primary" size="sm" disabled={busy || paused || !board.data} onClick={showForm}>대기 접수</Button>
             </div>
         </div>
-        <p className="reserve-waiting-form-help" role="status">{paused ? '신규 접수를 잠시 중지했어요. 기존 대기는 호출·입장 처리할 수 있어요.'
-            : intakeMode === 'OFF' ? '직원 접수를 받고 있어요. 고객 접수 방식은 가게 수정에서 설정할 수 있어요.' : '웨이팅 접수를 받고 있어요.'}</p>
-        {visibleEntries.length ? <ul className={entryClass} aria-label="대기 접수 목록">
+        {board.data && <p className="reserve-waiting-form-help" role="status">{paused ? '신규 접수를 잠시 중지했어요. 기존 대기는 호출·입장 처리할 수 있어요.'
+            : intakeMode === 'OFF' ? '직원 접수를 받고 있어요. 고객 접수 방식은 가게 수정에서 설정할 수 있어요.' : '웨이팅 접수를 받고 있어요.'}</p>}
+        {board.error ? <DataState state="error" kind="waiting" subject="대기 명단 갱신"
+            error={board.error} onRetry={refresh} retrying={board.isFetching} />
+            : visibleEntries.length ? <ul className={entryClass} aria-label="대기 접수 목록">
             {visibleEntries.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate} view={view}
                 busy={busy} changing={pending === entry.id} onChange={changeStatus} onCancel={cancel} />)}
         </ul> : <DataState state="empty" kind="waiting"

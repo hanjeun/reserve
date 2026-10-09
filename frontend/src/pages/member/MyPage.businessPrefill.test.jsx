@@ -62,7 +62,7 @@ const openBusiness = async () => {
     return rendered;
 };
 const startEdit = () => fireEvent.click(screen.getByRole('button', { name: '수정하기' }));
-const editError = () => screen.queryByText('사업자 신청 내용을 불러오지 못했습니다.');
+const editError = () => screen.queryByText('사업자 신청 내용을 불러오지 못했어요.');
 const settle = (request, value, fails = false) => act(async () => {
     if (fails) request.reject(value); else request.resolve(value);
     await request.promise.catch(() => {});
@@ -88,7 +88,7 @@ describe('MyPage business edit prefill', () => {
         await openBusiness();
         businessService.getMyStatus.mockRejectedValueOnce(new Error('offline'));
         startEdit();
-        await screen.findByText('사업자 신청 내용을 불러오지 못했습니다.');
+        await screen.findByText('사업자 신청 내용을 불러오지 못했어요.');
         expect(screen.getByText('심사 중이에요')).toBeInTheDocument();
         expect(screen.queryByPlaceholderText('상호명 *')).toBeNull();
         expect(screen.queryByText('신청 내용 수정')).toBeNull();
@@ -141,7 +141,7 @@ describe('MyPage business edit prefill', () => {
         fireEvent.click(toggle);
         expect(toggle).not.toBeChecked();
         expect(localStorage.getItem('reserve:store-draft:auto-save:member:7')).toBe('false');
-        expect(screen.getByText(/이 계정의 이 브라우저에만 적용됩니다/)).toBeInTheDocument();
+        expect(screen.getByText(/이 계정의 이 브라우저에만 적용돼요/)).toBeInTheDocument();
         expect(memberService.updateMember).not.toHaveBeenCalled();
     });
 
@@ -181,7 +181,7 @@ describe('MyPage business edit prefill', () => {
         businessService.getMyStatus.mockRejectedValueOnce(new Error('offline'));
         show();
         fireEvent.click(screen.getByRole('tab', { name: /사업자/ }));
-        await screen.findByText('사업자 인증 상태를 불러오지 못했습니다.');
+        await screen.findByText('사업자 인증 상태를 불러오지 못했어요.');
         const request = deferred();
         businessService.getMyStatus.mockReturnValueOnce(request.promise);
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
@@ -196,7 +196,7 @@ describe('MyPage business edit prefill', () => {
             await openBusiness();
             businessService.getMyStatus.mockResolvedValueOnce(current);
             startEdit();
-            await screen.findByText('사업자 신청 내용을 불러오지 못했습니다.');
+            await screen.findByText('사업자 신청 내용을 불러오지 못했어요.');
             expect(screen.queryByPlaceholderText('상호명 *')).toBeNull();
             expect(screen.getByRole('button', { name: '수정하기' })).toBeEnabled();
             expect(businessService.update).not.toHaveBeenCalled();
@@ -223,7 +223,7 @@ describe('MyPage business edit prefill', () => {
         await openBusiness();
         businessService.getMyStatus.mockRejectedValueOnce(new Error('offline'));
         startEdit();
-        await screen.findByText('사업자 신청 내용을 불러오지 못했습니다.');
+        await screen.findByText('사업자 신청 내용을 불러오지 못했어요.');
         const cancellation = deferred();
         businessService.cancel.mockReturnValueOnce(cancellation.promise);
         fireEvent.click(screen.getByRole('button', { name: '신청 취소' }));

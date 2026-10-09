@@ -112,7 +112,7 @@ class AuthApiControllerRateLimitTest {
                 new MockHttpServletResponse()))
                 .isInstanceOfSatisfying(AuthException.class, exception -> {
                     assertThat(exception.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
-                    assertThat(exception.getMessage()).isEqualTo("이메일 또는 비밀번호가 올바르지 않습니다.");
+                    assertThat(exception.getMessage()).isEqualTo("이메일 또는 비밀번호가 올바르지 않아요.");
                 });
         verify(tokenProvider, never()).generateAccessToken(org.mockito.ArgumentMatchers.any());
     }

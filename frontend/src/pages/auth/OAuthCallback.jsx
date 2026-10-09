@@ -50,18 +50,18 @@ const OAuthCallback = () => {
                         // 약관 동의가 먼저 — 복귀 경로는 소비하지 않고 남겨둔다(SocialAgreement가 소비)
                         navigate('/signup/social', { replace: true });
                     } else {
-                        const greeting = user.name ? `${user.name}님, 반갑습니다!` : '로그인되었습니다.';
+                        const greeting = user.name ? `${user.name}님, 반가워요!` : '로그인됐어요.';
                         message.success(greeting);
                         // 원래 보던 페이지로 복귀 (없으면 홈)
                         navigate(consumeRedirect() || '/', { replace: true });
                     }
                 } else {
-                    throw new Error('유저 정보가 올바르지 않습니다.');
+                    throw new Error('사용자 정보가 올바르지 않아요.');
                 }
             } catch (err) {
                 if (!mounted.current) return;
                 console.error('OAuth 인증 실패:', err);
-                message.error('로그인 정보를 가져오는데 실패했습니다.');
+                message.error('로그인 정보를 가져오지 못했어요.');
                 navigate('/login', { replace: true });
             }
         };

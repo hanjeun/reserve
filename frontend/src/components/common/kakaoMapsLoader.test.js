@@ -44,7 +44,7 @@ describe('Kakao Maps SDK loader', () => {
         vi.stubEnv('VITE_KAKAO_JS_KEY', '');
         const { loadKakaoMapsSdk } = await loadFreshModule();
 
-        await expect(loadKakaoMapsSdk()).rejects.toThrow('JavaScript 키가 설정되지 않았습니다');
+        await expect(loadKakaoMapsSdk()).rejects.toThrow('JavaScript 키가 설정되지 않았어요');
         expect(document.getElementById('reserve-kakao-maps-sdk')).toBeNull();
     });
 
@@ -53,7 +53,7 @@ describe('Kakao Maps SDK loader', () => {
         const first = loadKakaoMapsSdk();
         const failedScript = document.getElementById('reserve-kakao-maps-sdk');
         failedScript.dispatchEvent(new Event('error'));
-        await expect(first).rejects.toThrow('SDK를 불러오지 못했습니다');
+        await expect(first).rejects.toThrow('SDK를 불러오지 못했어요');
 
         const second = loadKakaoMapsSdk();
         const retryScript = document.getElementById('reserve-kakao-maps-sdk');

@@ -188,7 +188,7 @@ class PaymentServiceRefundSafetyTest {
         assertThatThrownBy(
                         () -> paymentService.refundPayment(request()))
                 .isInstanceOf(kr.it.reserve.global.error.PaymentException.class)
-                .hasMessageContaining("안전하게 기록하지 못했습니다");
+                .hasMessageContaining("안전하게 기록하지 못했어요");
 
         verify(portoneService, never()).cancelPayment(
                 anyString(),
@@ -338,7 +338,7 @@ class PaymentServiceRefundSafetyTest {
 
         assertThatThrownBy(() -> paymentService.refundByMemberRequest(100L, null, requester))
                 .isInstanceOf(PaymentException.class)
-                .hasMessageContaining("다시 시도할 환불 요청이 없습니다");
+                .hasMessageContaining("다시 시도할 환불 요청이 없어요");
 
         verify(paymentRepository, never()).findPaidByReservationIdForUpdate(100L);
         verify(portoneService, never()).cancelPayment(
@@ -407,7 +407,7 @@ class PaymentServiceRefundSafetyTest {
         assertThat(paymentService.calculateRefundAmountForMember(100L, customer).getRefundAmount()).isEqualTo(10_000);
         var stranger = Member.builder().id(8L).role(Role.USER).build();
         assertThatThrownBy(() -> paymentService.calculateRefundAmountForMember(100L, stranger))
-                .isInstanceOf(PaymentException.class).hasMessage("본인의 예약만 조회할 수 있습니다.");
+                .isInstanceOf(PaymentException.class).hasMessage("본인의 예약만 조회할 수 있어요.");
         verifyNoInteractions(portoneService, refundLedgerService);
     }
 

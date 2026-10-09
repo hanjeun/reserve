@@ -102,30 +102,30 @@ const StoresAdminTab = () => {
     const suspendMutation = useMutation({
         mutationFn: ({ id, days, reason }) => api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_SUSPEND(id), { days: String(days), reason: reason || '' }),
         onSuccess: (_, { days }) => {
-            message.success(`${days}일간 영업정지 처리되었습니다.`);
+            message.success(`${days}일간 영업정지 처리됐어요.`);
             setStoreSuspendOpen(false);
             void invalidateStores();
         },
-        onError: () => message.error('영업정지 처리에 실패했습니다.'),
+        onError: () => message.error('영업정지 처리에 실패했어요.'),
     });
 
     const banMutation = useMutation({
         mutationFn: ({ id, reason }) => api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_BAN(id), { reason: reason || '' }),
         onSuccess: () => {
-            message.success('영구 폐업 처리되었습니다.');
+            message.success('영구 폐업 처리됐어요.');
             setStoreBanOpen(false);
             void invalidateStores();
         },
-        onError: () => message.error('영구 폐업 처리에 실패했습니다.'),
+        onError: () => message.error('영구 폐업 처리에 실패했어요.'),
     });
 
     const unbanMutation = useMutation({
         mutationFn: (id) => api.post(API_ENDPOINTS.ADMIN_MANAGE.STORE_UNBAN(id)),
         onSuccess: () => {
-            message.success('영업정지가 해제되었습니다.');
+            message.success('영업정지가 해제됐어요.');
             void invalidateStores();
         },
-        onError: () => message.error('해제에 실패했습니다.'),
+        onError: () => message.error('해제에 실패했어요.'),
     });
 
     const handleStoreSuspend = ({ days, reason }) => {
@@ -142,7 +142,7 @@ const StoresAdminTab = () => {
     const handleStoreUnban = (r) => {
         confirm({
             title: '영업정지 해제',
-            content: `'${r.name}' 가게의 정지를 해제하시겠습니까?`,
+            content: `'${r.name}' 가게의 정지를 해제할까요?`,
             okText: '해제', cancelText: '취소', centered: true,
             onOk: () => unbanMutation.mutateAsync(r.id),
         });
@@ -183,7 +183,7 @@ const StoresAdminTab = () => {
         if (storesError) {
             return (
                 <DataState state="error" kind="store" subject="가게 목록" error={storesError}
-                    onRetry={refetch} retrying={isFetching} compact />
+                    onRetry={refetch} retrying={isFetching} />
             );
         }
         if (storeLoading || isPlaceholderData) {
@@ -203,7 +203,7 @@ const StoresAdminTab = () => {
                 dataSource={stores}
                 rowKey="id"
                 pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                locale={{ emptyText: '가게가 없습니다.' }}
+                locale={{ emptyText: '가게가 없어요.' }}
             />
         );
     };
@@ -215,6 +215,7 @@ const StoresAdminTab = () => {
                 search={{ value: storeSearch, onChange: handleSearchChange, placeholder: '가게명, 주소로 검색' }}
                 onReload={refetch}
                 loading={storeLoading || isFetching}
+                initialLoading={storeLoading}
             />
             {renderStoreList()}
 

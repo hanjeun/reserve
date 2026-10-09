@@ -6,7 +6,8 @@ import ResponsiveModal from '../common/ResponsiveModal';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Button, DataState } from '../common';
+import Button from '../common/Button';
+import DataState from '../common/DataState';
 import { storeService, tourismService } from '../../services';
 import { REGION_OPTIONS, formatRegionLabel } from '../../constants/regions';
 import { storeKeys, tourismKeys } from '../../hooks/queryKeys';
@@ -16,9 +17,9 @@ const EMPTY_GROUPS = [];
 const selectionFor = value => ({ base: value, draft: value, activeGroup: value.split(' ')[0] });
 // 세부 시군구가 없을 때 안내 문구.
 const emptyAreaMessage = (groupCount, ownerRegions) => {
-    if (groupCount > 0) return '세부 시군구가 없습니다. 시도 전체를 적용할 수 있어요.';
-    if (ownerRegions) return '이 시도에 등록한 내 가게가 없습니다.';
-    return '현재 등록된 가게가 없습니다. 이 지역으로 검색하면 빈 결과가 표시됩니다.';
+    if (groupCount > 0) return '세부 시군구가 없어요. 시도 전체를 적용할 수 있어요.';
+    if (ownerRegions) return '이 시도에 등록한 내 가게가 없어요.';
+    return '현재 등록된 가게가 없어요. 이 지역으로 검색하면 빈 결과가 표시돼요.';
 };
 
 const buildRegionGroups = actualGroups => REGION_OPTIONS.map(option => {
@@ -86,7 +87,7 @@ const PopularAreaList = ({ isLoading, hasAreas, areas, draft, ownerRegions, onPi
             </div>
         );
     }
-    return <p className="reserve-region-sheet-popular-empty">{ownerRegions ? '아직 등록한 가게가 없습니다.' : '아직 많이 찾는 지역이 없습니다.'}</p>;
+    return <p className="reserve-region-sheet-popular-empty">{ownerRegions ? '아직 등록한 가게가 없어요.' : '아직 많이 찾는 지역이 없어요.'}</p>;
 };
 
 // 선택한 시도의 "전체" + 시군구 목록.
@@ -214,7 +215,7 @@ export default function RegionSheet({ open, value = '', onClose, onApply, availa
             <p className="reserve-region-sheet-intro">{ownerRegions ? '내 가게가 있는 시도와 시군구를 고르세요.' : '시도를 고르고, 가게가 있는 시군구를 좁혀 보세요.'}</p>
             {!availableGroups && isError && (
                 <DataState className="reserve-region-sheet-feedback" state="error" kind="store" error={error}
-                    title="세부 지역을 불러오지 못했어요. 시도 선택은 계속 사용할 수 있습니다."
+                    title="세부 지역을 불러오지 못했어요. 시도 선택은 계속 사용할 수 있어요."
                     onRetry={refetch} retrying={isFetching} compact />
             )}
             <>

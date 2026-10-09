@@ -54,7 +54,7 @@ public class AdPaymentLedgerService {
     public void requireResolvedForRemoval(Long adId) {
         if (!attempts.existsByAdId(adId) || attempts.findByAdIdOrderByIdAsc(adId).stream()
                 .anyMatch(value -> AdPaymentAttempt.UNRESOLVED.contains(value.getState()))) {
-            throw conflict("결제 확인이 끝난 뒤 광고를 숨길 수 있습니다.");
+            throw conflict("결제 확인이 끝난 뒤 광고를 숨길 수 있어요.");
         }
     }
 
@@ -107,13 +107,13 @@ public class AdPaymentLedgerService {
         boolean reusable = !attempt.isEverPaid() && ("READY".equals(attempt.getPgStatus())
                 || "NOT_FOUND".equals(attempt.getPgStatus()));
         if (!reusable && attempt.getState() != State.FAILED) {
-            throw conflict("기존 결제 결과가 확실하지 않습니다. 재결제하지 말고 내역을 확인해주세요.");
+            throw conflict("기존 결제 결과가 확실하지 않아요. 재결제하지 말고 내역을 확인해주세요.");
         }
         if (attempt.getState() == State.FAILED && "FAILED".equals(attempt.getPgStatus())) {
             boolean otherUnresolved = attempts.findByAdIdOrderByIdAsc(adId).stream()
                     .anyMatch(value -> !value.getId().equals(attempt.getId())
                             && (AdPaymentAttempt.UNRESOLVED.contains(value.getState()) || value.getState() == State.PAID));
-            if (otherUnresolved) throw conflict("이전 결제 시도의 확인이 필요합니다.");
+            if (otherUnresolved) throw conflict("이전 결제 시도의 확인이 필요해요.");
             ad.setMerchantUid("AD-" + UUID.randomUUID());
             attempts.save(AdPaymentAttempt.create(ad, false));
         }
@@ -130,9 +130,9 @@ public class AdPaymentLedgerService {
                 || ad.getStartDate().isBefore(ServiceTime.today())
                 || attempt.isCancelRequested()
                 || (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED)) {
-            throw conflict("이 광고는 다시 결제할 수 없습니다. 광고 내역을 확인해주세요.");
+            throw conflict("이 광고는 다시 결제할 수 없어요. 광고 내역을 확인해주세요.");
         }
-        if (attempt.getLeaseToken() != null) throw conflict("결제 상태를 확인 중입니다. 잠시 후 다시 확인해주세요.");
+        if (attempt.getLeaseToken() != null) throw conflict("결제 상태를 확인 중이에요. 잠시 후 다시 확인해주세요.");
     }
 
     public List<String> requestOwnerCancellation(Long adId, Long ownerId) {
@@ -140,7 +140,7 @@ public class AdPaymentLedgerService {
         requireOwner(ad, ownerId);
         if (!List.of(AdStatus.PENDING_PAYMENT, AdStatus.PAYMENT_FAILED, AdStatus.ACTIVE,
                 AdStatus.CANCELLED, AdStatus.REFUND_PENDING, AdStatus.REFUNDED, AdStatus.REVIEW_REQUIRED).contains(ad.getStatus())) {
-            throw conflict("취소할 수 없는 광고 상태입니다.");
+            throw conflict("취소할 수 없는 광고 상태예요.");
         }
         current(ad);
         List<AdPaymentAttempt> all = attempts.findByAdIdOrderByIdAsc(adId);
@@ -286,7 +286,7 @@ public class AdPaymentLedgerService {
         requireOwner(ad, ownerId);
         if (attempt.getState() != State.PAID || !uid.equals(ad.getMerchantUid())
                 || (ad.getStatus() != AdStatus.ACTIVE && ad.getStatus() != AdStatus.EXPIRED)) {
-            throw conflict("결제 결과 확인이 필요합니다. 이미 결제했다면 다시 결제하지 말고 광고 내역을 확인해주세요.");
+            throw conflict("결제 결과 확인이 필요해요. 이미 결제했다면 다시 결제하지 말고 광고 내역을 확인해주세요.");
         }
         return AdvertisementResponse.fromEntity(ad);
     }

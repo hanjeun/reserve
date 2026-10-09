@@ -20,6 +20,7 @@ test('production deployment requires the restricted app account and cannot fall 
         const environment = compose.services[color].environment;
         assert.ok(environment.includes('DB_USERNAME=reserve_app'));
         assert.ok(environment.includes('SPRING_JPA_HIBERNATE_DDL_AUTO=validate'));
+        assert.ok(environment.includes('WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT=${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:-}'));
         assert.ok(environment.includes('DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required for deployment}'));
         assert.ok(!environment.some(value => /DB_USERNAME=.*root|DDL_AUTO=.*update|DB_PASSWORD.*\$\{DB_PASSWORD/.test(value)));
     }
@@ -180,6 +181,25 @@ test('the live backend must be schema and refund compatible before deployment', 
     const detect = step(deployment, 'detect');
     assert.match(detect.with.script, /SCHEMA_COMPAT.*reserve\.schema-compat/);
     assert.match(detect.with.script, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
+});
+
+test('automatic cutover requires recovery support for waiting settings and signup tickets', () => {
+    const build = backend.steps.find(entry => entry.name === 'Build Docker image');
+    const detect = step(deployment, 'detect');
+    const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
+    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-v1/);
+    assert.match(detect.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-v1'/);
+    assert.ok(detect.with.script.indexOf('"$FEATURE_COMPAT" !=') < detect.with.script.indexOf('DETECTED_UPSTREAM='));
+    assert.equal(cutover.env.CURRENT_UPSTREAM, '${{ env.CURRENT_UPSTREAM }}');
+    assert.ok(cutover.with.envs.split(',').includes('CURRENT_UPSTREAM'));
+    assert.match(cutover.with.script, /"\$LIVE_ROUTING" != "set \\\$service_url \$CURRENT_UPSTREAM;"/);
+    assert.match(cutover.with.script, /for COMPATIBLE_UPSTREAM in "\$CURRENT_UPSTREAM" "\$TARGET_UPSTREAM"/);
+    const compatibilityGuard = cutover.with.script.indexOf('"$FEATURE_COMPAT" !=');
+    assert.ok(compatibilityGuard > 0);
+    assert.ok(compatibilityGuard < cutover.with.script.indexOf('trap rollback_cutover'));
+    assert.ok(compatibilityGuard < cutover.with.script.indexOf('sudo touch "$ROLLBACK_DIR/cutover-started"'));
+    assert.ok(deployment.steps.indexOf(detect) < deployment.steps.indexOf(cutover));
+    for (const entry of [detect, cutover]) assert.equal(entry['continue-on-error'], undefined);
 });
 
 test('test failures retain reports without uploading frontend secret files', () => {

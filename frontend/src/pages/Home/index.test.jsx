@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Home from './index';
 import { storeService, tourismService } from '../../services';
+import { saveDiscoveryRegion } from '../../utils/discoveryRegion';
 
 const { navigate, locationRequest, setLiveLocation, messageInfo, locationState } = vi.hoisted(() => ({
     navigate: vi.fn(),
@@ -33,7 +34,10 @@ vi.mock('../../hooks/useMessage', () => ({
 }));
 
 vi.mock('../../store/useAuthStore', () => ({
-    default: selector => selector({ user: locationState.user }),
+    default: Object.assign(selector => selector({ user: locationState.user, isLoggedIn: Boolean(locationState.user) }), {
+        getState: () => ({ user: locationState.user, sessionRevision: 0 }),
+        subscribe: () => () => {},
+    }),
 }));
 
 vi.mock('../../store/useLocationStore', () => ({
@@ -82,6 +86,7 @@ const prepareBannerScroll = () => {
 
 describe('app discovery home', () => {
     beforeEach(() => {
+        saveDiscoveryRegion('');
         navigate.mockClear();
         locationRequest.mockReset();
         locationRequest.mockResolvedValue(null);
@@ -106,13 +111,13 @@ describe('app discovery home', () => {
     it('shows the operation-guide photo as the first home banner, service domains, and recommended stores', async () => {
         renderHome();
 
-        const guide = screen.getByRole('link', { name: 'RESERVE 운영 안내 보기' });
-        expect(guide).toHaveAttribute('href', '/operation-guide');
+        const guide = screen.getByRole('link', { name: 'RESERVE 이용안내 보기' });
+        expect(guide).toHaveAttribute('href', '/guide/common');
         expect(guide).toHaveClass('reserve-discovery-banner', 'reserve-discovery-banner--current');
         expect(guide.querySelector('img')).toHaveAttribute('src', '/images/discovery-v3/operation-guide-cover-v1.webp');
         expect(within(guide).getByText('RESERVE 이용 안내')).toBeInTheDocument();
         expect(guide).toHaveTextContent(/예약 전에 확인하면,\s*더 편리해요/);
-        expect(within(guide).getByText('예약·결제·취소 기준을 한눈에 확인하세요')).toBeInTheDocument();
+        expect(within(guide).getByText('예약·웨이팅부터 가게 운영까지 확인하세요')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: '운동 · 웰니스 가게 둘러보기' }))
             .toHaveAttribute('href', '/stores?domain=SPORTS');
         expect(await screen.findByText('모던 필라테스')).toBeInTheDocument();
@@ -122,7 +127,7 @@ describe('app discovery home', () => {
     it('keeps the guide copy inside the hero link rather than a separately loaded notice block', async () => {
         renderHome();
 
-        expect(screen.getAllByRole('link', { name: 'RESERVE 운영 안내 보기' })).toHaveLength(1);
+        expect(screen.getAllByRole('link', { name: 'RESERVE 이용안내 보기' })).toHaveLength(1);
         expect(screen.queryByText('예약 확인부터 가게 운영과 광고 관리까지 필요한 흐름을 안내합니다.')).toBeNull();
     });
 
@@ -131,7 +136,7 @@ describe('app discovery home', () => {
         renderHome();
         const banners = screen.getAllByRole('link', { name: /둘러보기$/ }).filter(link => link.classList.contains('reserve-discovery-banner'));
         expect(banners).toHaveLength(3);
-        expect(screen.getByRole('link', { name: 'RESERVE 운영 안내 보기' })).toHaveClass('reserve-discovery-banner--current');
+        expect(screen.getByRole('link', { name: 'RESERVE 이용안내 보기' })).toHaveClass('reserve-discovery-banner--current');
         expect(banners[0]).not.toHaveClass('reserve-discovery-banner--current');
         expect(banners[1]).not.toHaveClass('reserve-discovery-banner--current');
         await user.click(banners[0]);
@@ -299,7 +304,7 @@ describe('app discovery home', () => {
     it('keeps successful no-store results separate from recommendation failures', async () => {
         storeService.getStores.mockResolvedValue({ content: [] });
         renderHome();
-        expect(await screen.findByText('아직 추천할 가게가 없습니다.')).toBeInTheDocument();
+        expect(await screen.findByText('아직 추천할 가게가 없어요.')).toBeInTheDocument();
         expect(screen.queryByText('추천 가게를 불러오지 못했어요.')).toBeNull();
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();
         expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/stores?sort=rating');
@@ -311,7 +316,7 @@ describe('app discovery home', () => {
             .mockResolvedValue({ content: [{ id: 3, name: '모던 필라테스', rating: 4.9, reviewCount: 10 }] });
         renderHome();
         expect(await screen.findByText('추천 가게를 불러오지 못했어요.')).toBeInTheDocument();
-        expect(screen.queryByText('아직 추천할 가게가 없습니다.')).toBeNull();
+        expect(screen.queryByText('아직 추천할 가게가 없어요.')).toBeNull();
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
         expect(await screen.findByRole('link', { name: '모던 필라테스 상세 보기' })).toBeInTheDocument();
         expect(storeService.getStores).toHaveBeenCalledTimes(2);
@@ -337,6 +342,30 @@ describe('app discovery home', () => {
         expect(screen.getByRole('button', { name: '현재 위치로' })).toBeEnabled();
         expect(screen.getByRole('button', { name: '전체 지역' })).toHaveAttribute('aria-haspopup', 'dialog');
         expect(locationRequest).not.toHaveBeenCalled();
+    });
+
+    it('restores the tab region when returning to a home URL without region filters', async () => {
+        saveDiscoveryRegion('경기 안산시');
+        renderHome();
+        expect(screen.getByRole('button', { name: '경기도 안산시' })).toBeInTheDocument();
+        await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({
+            page: 0, size: 4, sort: 'rating', region: '경기 안산시',
+        }));
+        expect(screen.getByRole('link', { name: '전체 보기' }))
+            .toHaveAttribute('href', '/stores?sort=rating&region=%EA%B2%BD%EA%B8%B0+%EC%95%88%EC%82%B0%EC%8B%9C');
+    });
+
+    it('prioritizes a valid URL region and an explicit whole-region selection over saved choices', async () => {
+        saveDiscoveryRegion('경기 안산시');
+        const first = renderHome(['/?region=서울 종로구']);
+        await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({
+            page: 0, size: 4, sort: 'rating', region: '서울 종로구',
+        }));
+        first.unmount();
+        storeService.getStores.mockClear();
+        renderHome(['/?region=']);
+        expect(screen.getByRole('button', { name: '전체 지역' })).toBeInTheDocument();
+        await waitFor(() => expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating' }));
     });
 
     it('opens the shared region sheet and applies a real district to recommendations and links', async () => {
@@ -371,9 +400,9 @@ describe('app discovery home', () => {
         await user.click(screen.getByRole('button', { name: '전체 지역' }));
         let dialog = await screen.findByRole('dialog');
         await user.click(within(dialog.querySelector('.reserve-region-sheet-groups')).getByRole('button', { name: /제주특별자치도/ }));
-        expect(within(dialog).getByText(/현재 등록된 가게가 없습니다/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/현재 등록된 가게가 없어요/)).toBeInTheDocument();
         await user.click(within(dialog).getByRole('button', { name: '제주특별자치도 적용' }));
-        expect(await screen.findByText('이 지역에 등록된 가게가 없습니다.')).toBeInTheDocument();
+        expect(await screen.findByText('이 지역에 등록된 가게가 없어요.')).toBeInTheDocument();
         expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating', region: '제주' });
 
         await user.click(screen.getByRole('button', { name: '제주특별자치도' }));

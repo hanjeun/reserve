@@ -1,7 +1,9 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import { ClockCircleOutlined, ReadOutlined, RightOutlined } from '@ant-design/icons';
 import { Link, useLocation } from 'react-router-dom';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { discoveryComingSoonScreen } from '../../constants/discoveryComingSoon';
+import StateIllustration from '../../components/common/StateIllustration';
 
 // 디자인 단계의 진입 화면이다. 할인·대기 접수·게시글을 가짜 데이터로 채우지 않는다.
 // 문구는 청크 로딩 뼈대와 공유한다(constants/discoveryComingSoon). 아이콘만 여기서 붙인다.
@@ -16,10 +18,10 @@ export default function ComingSoon() {
 
     return (
         <section className="reserve-discovery-coming-soon" aria-labelledby="discovery-coming-soon-title">
-            <Icon className="reserve-discovery-coming-soon-icon" aria-hidden="true" />
+            <StateIllustration name="preparing" size="lg" fallback={<Icon />} interactive />
             <span className="reserve-discovery-coming-soon-status">준비 중</span>
-            <h1 id="discovery-coming-soon-title">{screen.heading}</h1>
-            <p>{screen.description}</p>
+            <PageTitle level={1} id="discovery-coming-soon-title">{screen.heading}</PageTitle>
+            <PageDescription>{screen.description}</PageDescription>
             <Link to="/stores" className="reserve-discovery-coming-soon-link">
                 가게 둘러보기 <RightOutlined aria-hidden="true" />
             </Link>

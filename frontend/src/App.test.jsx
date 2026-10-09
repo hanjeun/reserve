@@ -10,7 +10,10 @@ const { authState, pageState } = vi.hoisted(() => ({
     pageState: { termsThrows: false },
 }));
 vi.mock('./store/useAuthStore', () => ({
-    default: (selector) => (selector ? selector(authState) : authState),
+    default: Object.assign((selector) => (selector ? selector(authState) : authState), {
+        getState: () => authState,
+        subscribe: () => () => {},
+    }),
 }));
 vi.mock('./components/layout/Header', () => ({
     default: () => <header><Link to="/somewhere-else">다른 곳으로</Link></header>,
@@ -33,7 +36,10 @@ const renderAt = (path) => {
 
 describe('app route table fallbacks', () => {
     // Test the route table with the real page, not the first Vite transform of its lazy module.
-    beforeAll(() => import('./pages/NotFound'));
+    beforeAll(() => Promise.all([
+        import('./pages/NotFound'), import('./pages/legal/UserGuide'), import('./pages/legal/BusinessGuide'),
+        import('./pages/legal/CommonGuide'), import('./pages/legal/OperationGuide'),
+    ]));
     beforeEach(() => {
         document.head.innerHTML = `
             <title>RESERVE | 예약이 필요한 순간</title>
@@ -59,6 +65,27 @@ describe('app route table fallbacks', () => {
         expect(screen.getByText('푸터')).toBeInTheDocument();
         expect(document.querySelector('meta[name="robots"]').getAttribute('content')).toMatch(/^noindex/);
         expect(document.title).toBe('페이지를 찾을 수 없어요 | RESERVE');
+    });
+
+    it.each([
+        ['/guide/user', '사용자 이용안내'],
+        ['/guide/business', '사업자 이용안내'],
+        ['/guide/common', '공통 이용안내'],
+    ])('opens %s publicly with its own title and canonical', async (path, title) => {
+        renderAt(path);
+        expect(await screen.findByRole('navigation', { name: '이용안내' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument();
+        expect(document.title).toBe(title + ' | RESERVE');
+        expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://reserve.it.kr' + path);
+    });
+
+    it('keeps the legacy guide public and preserves its query and fragment on redirect', async () => {
+        renderAt('/operation-guide?source=legacy#policy');
+        expect(await screen.findByRole('navigation', { name: '이용안내' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: '공통 이용안내' })).toBeInTheDocument();
+        expect(window.location.pathname + window.location.search + window.location.hash).toBe('/guide/common?source=legacy#policy');
+        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://reserve.it.kr/guide/common');
     });
 
     it('keeps the header when a routed page throws, then recovers on the next address', async () => {

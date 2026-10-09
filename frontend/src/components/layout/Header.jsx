@@ -9,6 +9,7 @@ import { isDiscoveryRootPath } from '../../constants/discovery';
 import useAuthStore from '../../store/useAuthStore';
 import Button from '../common/Button';
 import { requestMessengerRouteClose } from '../chat/messengerRouteTransition';
+import { requestRegistrationStepBack } from '../../utils/storeRegistrationNavigation';
 import { useSkeletonShown } from './loadingPresentation';
 import { colors, heights, fontWeight, radius } from '../../styles/tokens';
 
@@ -70,6 +71,8 @@ const Header = () => {
     }, [reducedMotion, location.key]);
 
     const handleBack = () => {
+        const storeQuestions = currentPath === '/store/register' || /^\/store\/\d+\/edit$/.test(currentPath);
+        if (storeQuestions && requestRegistrationStepBack()) return;
         if (currentPath === '/messages' && requestMessengerRouteClose()) return;
         runHeaderNavigation('back', goBack);
     };

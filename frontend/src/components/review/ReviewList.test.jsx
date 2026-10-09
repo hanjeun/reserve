@@ -9,7 +9,13 @@ vi.mock('../../hooks', async (importOriginal) => ({
     useMessage: () => ({ message: { success: vi.fn(), error: vi.fn() }, confirm: vi.fn() }),
 }));
 vi.mock('../../services/reviewService', () => ({ default: { getReviewsByStore: vi.fn(), createReview: vi.fn(), updateReview: vi.fn(), deleteReview: vi.fn() } }));
-vi.mock('../../store/useAuthStore', () => ({ default: () => ({ user: null }) }));
+vi.mock('../../store/useAuthStore', () => {
+    const state = { user: null, isLoggedIn: false, sessionRevision: 0 };
+    return { default: Object.assign(selector => selector ? selector(state) : state, {
+        getState: () => state,
+        subscribe: () => () => {},
+    }) };
+});
 const renderReviews = (props = {}) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ReviewList storeId={12} {...props} /></QueryClientProvider>);
 
 describe('review read states', () => {
@@ -34,15 +40,15 @@ describe('review read states', () => {
         reviewService.getReviewsByStore.mockImplementation(() => new Promise(() => {}));
         renderReviews();
         expect(screen.getByRole('status', { name: '리뷰를 불러오는 중' })).toHaveAttribute('aria-busy', 'true');
-        expect(screen.queryByText(/아직 리뷰가 없습니다/)).toBeNull();
+        expect(screen.queryByText(/아직 리뷰가 없어요/)).toBeNull();
     });
     it('separates an API failure from an empty list and retries', async () => {
         reviewService.getReviewsByStore.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
         renderReviews();
-        expect(await screen.findByRole('alert')).toHaveTextContent('리뷰를 불러오지 못했습니다.');
-        expect(screen.queryByText(/아직 리뷰가 없습니다/)).toBeNull();
+        expect(await screen.findByRole('alert')).toHaveTextContent('리뷰를 불러오지 못했어요.');
+        expect(screen.queryByText(/아직 리뷰가 없어요/)).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
-        expect(await screen.findByText(/아직 리뷰가 없습니다/)).toBeInTheDocument();
+        expect(await screen.findByText(/아직 리뷰가 없어요/)).toBeInTheDocument();
     });
 
     it('keeps a failed review-eligibility check visible instead of treating it as no completed reservation', async () => {
@@ -53,7 +59,7 @@ describe('review read states', () => {
             onCompletedReservationRetry: retryEligibility,
         });
 
-        expect(await screen.findByRole('alert')).toHaveTextContent('리뷰 작성 가능 예약을 확인하지 못했습니다.');
+        expect(await screen.findByRole('alert')).toHaveTextContent('리뷰 작성 가능 예약을 확인하지 못했어요.');
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
         expect(retryEligibility).toHaveBeenCalledOnce();
     });

@@ -1,5 +1,7 @@
+import { PageTitle, PageDescription } from './PageTypography';
 import { useId } from 'react';
 import PropTypes from 'prop-types';
+import StateIllustration, { StateIllustrationSkeleton } from './StateIllustration';
 import PageContainer from './PageContainer';
 import Bone from './Bone';
 
@@ -13,14 +15,15 @@ import Bone from './Bone';
  */
 const PAGE_STATUS_PADDING_TOP = 'clamp(56px, 14vh, 128px)';
 
-export default function PageStatus({ icon, title, description, actions, role, className }) {
+export default function PageStatus({ icon, illustration, title, description, actions, role, className }) {
     const titleId = useId();
     return (
         <PageContainer size="sm" center paddingTop={PAGE_STATUS_PADDING_TOP} className={['reserve-page-status-page', className].filter(Boolean).join(' ')}>
             <section className="reserve-page-status" role={role} aria-labelledby={titleId}>
-                {icon && <span className="reserve-page-status__icon" aria-hidden="true">{icon}</span>}
-                <h1 id={titleId} className="reserve-page-status__title">{title}</h1>
-                {description && <p className="reserve-page-status__description">{description}</p>}
+                {illustration ? <span className="reserve-page-status__illustration"><StateIllustration name={illustration} size="lg" fallback={icon} interactive /></span>
+                    : icon && <span className="reserve-page-status__icon" aria-hidden="true">{icon}</span>}
+                <PageTitle level={1} id={titleId} className="reserve-page-status__title">{title}</PageTitle>
+                {description && <PageDescription className="reserve-page-status__description">{description}</PageDescription>}
                 {actions && <div className="reserve-page-status__actions">{actions}</div>}
             </section>
         </PageContainer>
@@ -29,6 +32,7 @@ export default function PageStatus({ icon, title, description, actions, role, cl
 
 PageStatus.propTypes = {
     icon: PropTypes.node,
+    illustration: PropTypes.string,
     title: PropTypes.string.isRequired,
     description: PropTypes.string,
     actions: PropTypes.node,
@@ -41,9 +45,9 @@ export function PageStatusSkeleton() {
     return (
         <PageContainer size="sm" center paddingTop={PAGE_STATUS_PADDING_TOP} className="reserve-page-status-page">
             <div className="reserve-page-status">
-                <Bone width={44} height={44} borderRadius="50%" />
-                <Bone width="62%" height={30} style={{ marginTop: 4 }} />
-                <Bone width="84%" height={22} />
+                <StateIllustrationSkeleton />
+                <div className="reserve-page-title ant-typography" style={{ width: '62%', margin: '4px 0 0' }} aria-hidden="true"><Bone width="100%" height="1.4em" /></div>
+                <div className="reserve-page-description ant-typography" style={{ width: '84%' }} aria-hidden="true"><Bone width="100%" height="1.65em" /></div>
                 <div className="reserve-page-status__actions">
                     <Bone width={112} height={44} borderRadius={16} />
                     <Bone width={112} height={44} borderRadius={16} />

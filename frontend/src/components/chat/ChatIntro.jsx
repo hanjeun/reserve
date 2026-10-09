@@ -49,7 +49,7 @@ export default function ChatIntro({
     return (
         <section className="reserve-messenger-support-intro" aria-label="문의 시작 안내">
             <p className="reserve-messenger-support-announcement">
-                <NotificationOutlined aria-hidden="true" /> <span className="reserve-chat-intro-notice">{notice || `안녕하세요. ${name}입니다.`}</span>
+                <NotificationOutlined aria-hidden="true" /> <span className="reserve-chat-intro-notice">{notice || `안녕하세요. ${name}에서 안내해드려요.`}</span>
             </p>
             <div className="reserve-messenger-support-greeting">
                 {paragraphs.map(paragraph => (

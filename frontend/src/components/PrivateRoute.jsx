@@ -26,7 +26,7 @@ const PrivateRoute = ({ allowedRoles }) => {
     useEffect(() => {
         if (roleBlocked && !notifiedRef.current) {
             notifiedRef.current = true;
-            message.error('접근 권한이 없습니다.');
+            message.error('접근 권한이 없어요.');
         }
     }, [roleBlocked, message]);
 

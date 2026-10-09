@@ -97,14 +97,18 @@ test('region selector uses viewport-appropriate reversible motion above the mess
     await close.focus();
     const focus = await close.evaluate(element => {
         const probe = document.createElement('span');
-        probe.style.color = 'var(--c-text-secondary)';
+        probe.style.color = 'var(--c-gray-500, #8b95a1)';
         document.body.append(probe);
         const neutralColor = getComputedStyle(probe).color;
         probe.remove();
-        return { visible: element.matches(':focus-visible'), outlineColor: getComputedStyle(element).outlineColor, neutralColor };
+        const style = getComputedStyle(element);
+        return { visible: element.matches(':focus-visible'), outlineColor: style.outlineColor,
+            outlineWidth: style.outlineWidth, outlineStyle: style.outlineStyle, neutralColor };
     });
     expect(focus.visible).toBe(true);
     expect(focus.outlineColor).toBe(focus.neutralColor);
+    expect(focus.outlineWidth).toBe('1px');
+    expect(focus.outlineStyle).toBe('solid');
 
     await page.locator('.reserve-region-sheet-groups').getByRole('button', { name: /서울특별시/ }).click();
     await close.click();

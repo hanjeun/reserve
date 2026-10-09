@@ -22,7 +22,11 @@ vi.mock('antd', () => {
     }}>{children}</form>;
     Form.Item = ({ children }) => <div>{children}</div>;
     return {
-        Form, Typography: { Title: ({ children }) => <h2>{children}</h2>, Text: ({ children }) => <span>{children}</span> },
+        Form, Typography: {
+            Title: ({ children }) => <h2>{children}</h2>,
+            Paragraph: ({ children }) => <p>{children}</p>,
+            Text: ({ children }) => <span>{children}</span>,
+        },
         Divider: ({ children }) => <div>{children}</div>, Flex: ({ children }) => <div>{children}</div>,
         Modal: ({ title, open, children, onOk }) => open ? <section role="dialog">{title}{children}
             <button type="button" onClick={onOk}>확인</button></section> : null,
@@ -38,8 +42,8 @@ describe('social and email suspension notices', () => {
     };
 
     it.each([
-        ['SUSPENDED', '이용이 제한된 계정입니다'],
-        ['BANNED', '영구 정지된 계정입니다'],
+        ['SUSPENDED', '이용이 제한된 계정이에요'],
+        ['BANNED', '영구 정지된 계정이에요'],
     ])('keeps the %s notice visible after the social redirect query is cleared', (status, title) => {
         const rendered = show(`/login?suspended=true&status=${status}&until=2026-10-02`);
         expect(screen.getByRole('dialog')).toHaveTextContent(title);

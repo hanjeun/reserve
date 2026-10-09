@@ -27,6 +27,7 @@ describe('Button', () => {
         const button = screen.getByRole('button', { name: '등록 중…' });
         expect(button).toBeDisabled();
         expect(button).toHaveAttribute('aria-busy', 'true');
+        expect(button.querySelector('svg.reserve-arc-spinner')).toHaveAttribute('viewBox', '0 0 50 50');
         await user.click(button);
         expect(onClick).not.toHaveBeenCalled();
     });

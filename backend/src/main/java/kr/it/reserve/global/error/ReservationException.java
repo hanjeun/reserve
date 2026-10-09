@@ -18,7 +18,7 @@ public class ReservationException extends BusinessException {
      * 404 NOT_FOUND - 예약을 찾을 수 없을 때
      */
     public static ReservationException notFound() {
-        return new ReservationException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new ReservationException("예약을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
     
     /**

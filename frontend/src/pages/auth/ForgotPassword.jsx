@@ -1,3 +1,4 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Typography, Flex } from 'antd';
@@ -7,9 +8,9 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
-import { colors, fontWeight, fontSize, animation } from '../../styles/tokens';
+import { colors, fontSize, animation } from '../../styles/tokens';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const TIMER_SEC = 5 * 60;
 
@@ -99,7 +100,7 @@ const ForgotPassword = () => {
             //   서버도 이제 그 값을 주지 않는다 — 노출을 막는 지점은 프론트가 아니라 API 여야 한다.
             //   미가입 이메일이면 아래 코드 입력 화면으로 넘어가고 메일이 오지 않을 뿐이다
             //   (GitHub·Google 등이 쓰는 방식). 그 상황은 안내 문구가 설명한다.
-            message.success('입력하신 이메일로 인증 코드를 보냈습니다.');
+            message.success('입력하신 이메일로 인증 코드를 보냈어요.');
             setEmail(emailVal);
             setIsCodeSent(true);
             setIsVerified(false);
@@ -107,7 +108,7 @@ const ForgotPassword = () => {
         } catch (err) {
             if (!err?.errorFields) {
                 const msg = typeof err === 'string' ? err : err?.message;
-                message.error(msg || '발송에 실패했습니다.');
+                message.error(msg || '발송에 실패했어요.');
             }
         } finally {
             setSendLoading(false);
@@ -119,11 +120,11 @@ const ForgotPassword = () => {
             setSendLoading(true);
             // 재발송도 같은 이유로 가입 여부를 구분하지 않는다(위 handleSendCode 주석 참고).
             await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email });
-            message.success('인증 코드를 재발송했습니다.');
+            message.success('인증 코드를 재발송했어요.');
             startTimer();
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
-            message.error(msg || '재발송에 실패했습니다.');
+            message.error(msg || '재발송에 실패했어요.');
         } finally {
             setSendLoading(false);
         }
@@ -133,18 +134,18 @@ const ForgotPassword = () => {
         // AntD Form 화면이므로 인라인 에러는 setFields 로 붙인다(useEmailVerification 과 같은 규약).
         const setCodeError = (msg) => form.setFields([{ name: 'verificationCode', errors: [msg] }]);
 
-        if (timeLeft === 0) return setCodeError('인증 시간이 만료되었습니다. 재발송해주세요.');
+        if (timeLeft === 0) return setCodeError('인증 시간이 만료됐어요. 재발송해주세요.');
         const code = form.getFieldValue('verificationCode')?.trim();
         if (!code) return setCodeError('인증번호를 입력해주세요.');
         setVerifyLoading(true);
         try {
             await api.post(API_ENDPOINTS.PASSWORD_RESET.VERIFY_CODE, { email, code });
-            message.success('인증되었습니다.');
+            message.success('인증됐어요.');
             setIsVerified(true);
             clearInterval(timerRef.current);
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
-            setCodeError(msg || '인증번호가 올바르지 않습니다.');
+            setCodeError(msg || '인증번호가 올바르지 않아요.');
         } finally {
             setVerifyLoading(false);
         }
@@ -160,11 +161,11 @@ const ForgotPassword = () => {
                 newPassword: values.newPassword,
                 newPasswordConfirm: values.confirmNewPassword,
             });
-            message.success('비밀번호가 변경되었습니다.');
+            message.success('비밀번호가 변경됐어요.');
             returnToLogin();
         } catch (err) {
             const msg = typeof err === 'string' ? err : err?.message;
-            message.error(msg || '변경에 실패했습니다.');
+            message.error(msg || '변경에 실패했어요.');
         } finally {
             setSubmitLoading(false);
         }
@@ -189,10 +190,10 @@ const ForgotPassword = () => {
     return (
         <PageContainer size="sm" paddingTop="60px" center>
             <div className="fade-in-up">
-                <Title level={2} style={styles.title}>비밀번호 찾기</Title>
-                <Text type="secondary" style={styles.subtitle}>
-                    가입한 이메일로 인증 후 비밀번호를 재설정합니다
-                </Text>
+                <PageTitle style={styles.title}>비밀번호 찾기</PageTitle>
+                <PageDescription style={styles.subtitle}>
+                    가입한 이메일로 인증 후 비밀번호를 재설정해요
+                </PageDescription>
 
                 <StepIndicator current={indicatorStep} />
 
@@ -255,7 +256,7 @@ const ForgotPassword = () => {
                                     ({ getFieldValue }) => ({
                                         validator(_, value) {
                                             if (!value || getFieldValue('newPassword') === value) return Promise.resolve();
-                                            return Promise.reject(new Error('비밀번호가 일치하지 않습니다'));
+                                            return Promise.reject(new Error('비밀번호가 일치하지 않아요'));
                                         },
                                     }),
                                 ]}
@@ -294,15 +295,10 @@ const ForgotPassword = () => {
 const styles = {
     title: {
         marginBottom: '12px',
-        fontWeight: fontWeight.extrabold,
-        letterSpacing: '-1.2px',
-        color: colors.text?.primary,
     },
     subtitle: {
         display: 'block',
         marginBottom: '40px',
-        color: colors.text?.tertiary,
-        fontSize: fontSize.lg,
     },
 };
 

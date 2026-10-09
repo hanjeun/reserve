@@ -92,18 +92,18 @@ public class AdvertisementService {
             throw StoreException.notFound();
         }
         if (store.isSuspended()) {
-            throw StoreException.forbidden("운영이 중단된 가게에는 광고를 등록할 수 없습니다.");
+            throw StoreException.forbidden("운영이 중단된 가게에는 광고를 등록할 수 없어요.");
         }
 
         if (store.getOwner() == null || !store.getOwner().getId().equals(owner.getId())) {
-            throw StoreException.forbidden("본인 가게에만 광고를 등록할 수 있습니다.");
+            throw StoreException.forbidden("본인 가게에만 광고를 등록할 수 있어요.");
         }
 
         AdType adType;
         try {
             adType = AdType.valueOf(request.getAdType());
         } catch (Exception e) {
-            throw new AdvertisementException("광고 유형이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("광고 유형이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
 
         // 중복 신청 방지(2026-07 추가): 카카오페이 결제창이 닫히지 않은 채로 남아있거나 사용자가 결제를
@@ -117,7 +117,7 @@ public class AdvertisementService {
                 .ifPresent(existing -> {
                     throw new AdvertisementException(
                             "이미 결제 대기 중인 " + (adType == AdType.BADGE ? "노출형" : "배너형") +
-                            " 신청이 있습니다. 기존 신청을 결제하거나 취소한 후 다시 시도해주세요.",
+                            " 신청이 있어요. 기존 신청을 결제하거나 취소한 후 다시 시도해주세요.",
                             HttpStatus.CONFLICT);
                 });
 
@@ -172,10 +172,10 @@ public class AdvertisementService {
             throw new AdvertisementException("노출 시작일과 종료일을 입력해주세요.", HttpStatus.BAD_REQUEST);
         }
         if (startDate.isBefore(ServiceTime.today())) {
-            throw new AdvertisementException("시작일은 오늘 이후여야 합니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("시작일은 오늘 이후여야 해요.", HttpStatus.BAD_REQUEST);
         }
         if (endDate.isBefore(startDate)) {
-            throw new AdvertisementException("종료일은 시작일 이후여야 합니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("종료일은 시작일 이후여야 해요.", HttpStatus.BAD_REQUEST);
         }
 
     }
@@ -186,10 +186,10 @@ public class AdvertisementService {
         if (adType == AdType.BANNER) {
             List<MultipartFile> images = request.getImages();
             if (images == null || images.isEmpty() || images.stream().allMatch(MultipartFile::isEmpty)) {
-                throw new AdvertisementException("배너 광고는 이미지가 최소 1장 필요합니다.", HttpStatus.BAD_REQUEST);
+                throw new AdvertisementException("배너 광고는 이미지가 최소 1장 필요해요.", HttpStatus.BAD_REQUEST);
             }
             if (images.size() > MAX_BANNER_IMAGES) {
-                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
+                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있어요.", HttpStatus.BAD_REQUEST);
             }
             for (MultipartFile image : images) {
                 if (image.isEmpty()) continue;
@@ -206,7 +206,7 @@ public class AdvertisementService {
         int pricePerDay = adType == AdType.BADGE ? BADGE_PRICE_PER_DAY : BANNER_PRICE_PER_DAY;
         // int로 잘라 음수·다른 금액을 만들지 않는다. 파일 업로드나 PG 호출 전에 거부한다.
         if (days <= 0 || days > Integer.MAX_VALUE / pricePerDay) {
-            throw new AdvertisementException("광고 기간이 결제 가능한 범위를 벗어났습니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("광고 기간이 결제 가능한 범위를 벗어났어요.", HttpStatus.BAD_REQUEST);
         }
         return Math.toIntExact(pricePerDay * days);
     }
@@ -216,7 +216,7 @@ public class AdvertisementService {
         try {
             return BannerCopyPreset.valueOf(key.trim());
         } catch (IllegalArgumentException exception) {
-            throw new AdvertisementException("배너 문구 선택이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("배너 문구 선택이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -260,7 +260,7 @@ public class AdvertisementService {
         try {
             return BannerMotionPreset.valueOf(key.trim());
         } catch (IllegalArgumentException exception) {
-            throw new AdvertisementException("배너 모션 선택이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("배너 모션 선택이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -383,14 +383,14 @@ public class AdvertisementService {
         Advertisement ad = adPaymentLedgerService.lockAdvertisement(adId);
 
         if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
-            throw AdvertisementException.forbidden("본인 광고만 수정할 수 있습니다.");
+            throw AdvertisementException.forbidden("본인 광고만 수정할 수 있어요.");
         }
         if (ad.getAdType() != AdType.BANNER) {
-            throw new AdvertisementException("노출형 광고는 수정할 내용이 없습니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("노출형 광고는 수정할 내용이 없어요.", HttpStatus.BAD_REQUEST);
         }
         if (ad.getStatus() != AdStatus.PENDING_PAYMENT && ad.getStatus() != AdStatus.PAYMENT_FAILED
                 && ad.getStatus() != AdStatus.ACTIVE) {
-            throw new AdvertisementException("수정할 수 없는 상태입니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("수정할 수 없는 상태예요.", HttpStatus.BAD_REQUEST);
         }
 
         if (request.getBannerCopyKey() != null || request.getTitle() != null || request.getDescription() != null) {
@@ -414,7 +414,7 @@ public class AdvertisementService {
     private void replaceBannerImages(Advertisement ad, List<MultipartFile> images, Long ownerId) {
         if (images != null && !images.isEmpty() && images.stream().anyMatch(f -> !f.isEmpty())) {
             if (images.size() > MAX_BANNER_IMAGES) {
-                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있습니다.", HttpStatus.BAD_REQUEST);
+                throw new AdvertisementException("배너 이미지는 최대 " + MAX_BANNER_IMAGES + "장까지 등록할 수 있어요.", HttpStatus.BAD_REQUEST);
             }
             List<String> newImageUrls = new java.util.ArrayList<>();
             for (MultipartFile image : images) {
@@ -465,7 +465,7 @@ public class AdvertisementService {
         Advertisement ad = adPaymentLedgerService.lockAdvertisement(adId);
 
         if (ad.getStore().getOwner() == null || !ad.getStore().getOwner().getId().equals(owner.getId())) {
-            throw AdvertisementException.forbidden("본인 광고만 삭제할 수 있습니다.");
+            throw AdvertisementException.forbidden("본인 광고만 삭제할 수 있어요.");
         }
 
         boolean isDeletable = ad.getStatus() == AdStatus.EXPIRED
@@ -474,7 +474,7 @@ public class AdvertisementService {
                 || ad.getStatus() == AdStatus.SUSPENDED;
 
         if (!isDeletable) {
-            throw new AdvertisementException("만료·취소·환불·중단 상태의 광고만 삭제할 수 있습니다.", HttpStatus.BAD_REQUEST);
+            throw new AdvertisementException("만료·취소·환불·중단 상태의 광고만 삭제할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
 
         adPaymentLedgerService.requireResolvedForRemoval(adId);
@@ -545,7 +545,7 @@ public class AdvertisementService {
                 || ad.getAdType() != AdType.BANNER
                 || ad.getStatus() != AdStatus.ACTIVE
                 || !ad.isWithinDateRange()) {
-            throw new AdvertisementException("현재 노출 중인 배너 광고만 전환으로 기록할 수 있습니다.",
+            throw new AdvertisementException("현재 노출 중인 배너 광고만 전환으로 기록할 수 있어요.",
                     HttpStatus.BAD_REQUEST);
         }
 

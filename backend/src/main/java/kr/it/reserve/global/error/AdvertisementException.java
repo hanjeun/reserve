@@ -13,7 +13,7 @@ public class AdvertisementException extends BusinessException {
     }
 
     public static AdvertisementException notFound() {
-        return new AdvertisementException("광고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new AdvertisementException("광고를 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 
     public static AdvertisementException forbidden(String message) {

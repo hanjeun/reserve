@@ -86,6 +86,8 @@ export const buildStoreFormData = (values) => {
     fd.append('allowLatePayment',          boolString(values.allowLatePayment));
     fd.append('allowDuplicateReservation', boolString(values.allowDuplicateReservation));
     fd.append('emailNotificationEnabled',  boolString(values.emailNotificationEnabled));
+    appendOptional(fd, 'waitingIntakeMode', values.waitingIntakeMode);
+    if (values.reservationEnabled != null) fd.append('reservationEnabled', boolString(values.reservationEnabled));
     if (values.imageAutoplayEnabled != null) {
         fd.append('imageAutoplayEnabled', boolString(values.imageAutoplayEnabled));
     }

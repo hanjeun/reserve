@@ -62,7 +62,7 @@ describe('public store news and benefit guidance', () => {
         expect(screen.getByRole('link', { name: '가게 보기 →' })).toHaveAttribute('href', '/store/12');
         expect(document.querySelector('.reserve-benefit-detail-content').textContent).toBe(item.content);
         expect(document.querySelector('.reserve-benefit-detail-content script, .reserve-benefit-detail-content img')).toBeNull();
-        expect(screen.getByRole('img', { name: '가게 사진이 등록되지 않았습니다' })).toHaveAttribute('src', BENEFIT_IMAGE_FALLBACK);
+        expect(screen.getByRole('img', { name: '가게 사진이 등록되지 않았어요' })).toHaveAttribute('src', BENEFIT_IMAGE_FALLBACK);
     });
     it('reads the requested page and Spring Boot nested page total', async () => {
         benefitService.getList.mockResolvedValue({ content: [item], page: { totalElements: 25 } });

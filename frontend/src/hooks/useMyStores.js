@@ -26,10 +26,10 @@ const useMyStores = () => {
             );
             return { prev };
         },
-        onSuccess: () => message.success('가게 영업이 종료되었습니다.'),
+        onSuccess: () => message.success('가게 영업이 종료됐어요.'),
         onError: (err, _, ctx) => {
             if (ctx?.prev) queryClient.setQueryData(storeKeys.my(), ctx.prev);
-            message.error(err?.message || '영업 종료에 실패했습니다.');
+            message.error(err?.message || '영업 종료에 실패했어요.');
         },
         // 내 가게 목록만 낙관 갱신하면 공개 목록·상세와 즐겨찾기에 닫은 가게가 남고,
         // 서버가 함께 정리한 광고 상태도 늦게 보인다.

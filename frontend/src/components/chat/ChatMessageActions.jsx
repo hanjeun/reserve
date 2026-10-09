@@ -31,7 +31,7 @@ export default function ChatMessageActions({ message: item, roomId, onRetracted,
     const retract = () => {
         const revision = useAuthStore.getState().sessionRevision;
         confirm({ title: '메시지 전송을 취소할까요?',
-            content: '양쪽 대화에 취소된 메시지로 표시됩니다. 이미 읽거나 내려받은 내용은 회수할 수 없으며, 신고·분쟁 검토 원본은 보존됩니다.',
+            content: '양쪽 대화에 취소된 메시지로 표시돼요. 이미 읽거나 내려받은 내용은 회수할 수 없으며, 신고·분쟁 검토 원본은 보존돼요.',
             okText: '전송 취소', cancelText: '돌아가기',
             onOk: async () => {
                 if (revision !== useAuthStore.getState().sessionRevision) return;
@@ -40,9 +40,9 @@ export default function ChatMessageActions({ message: item, roomId, onRetracted,
                     const result = await chatService.retract(roomId, item.id);
                     if (revision !== useAuthStore.getState().sessionRevision) return;
                     onRetracted(result);
-                    message.success('전송을 취소했습니다.');
+                    message.success('전송을 취소했어요.');
                 } catch (error) {
-                    if (revision === useAuthStore.getState().sessionRevision) message.error(error.message || '전송을 취소하지 못했습니다.');
+                    if (revision === useAuthStore.getState().sessionRevision) message.error(error.message || '전송을 취소하지 못했어요.');
                 } finally { setBusyScope(current => current === scope ? null : current); }
             },
         });
@@ -62,7 +62,7 @@ export default function ChatMessageActions({ message: item, roomId, onRetracted,
         try {
             await downloadChatImage(item.imageUrl, controller.signal, isCurrent, item.imageOriginalFilename);
         } catch (error) {
-            if (!controller.signal.aborted && isCurrent()) message.error(error.message || '사진을 내려받지 못했습니다.');
+            if (!controller.signal.aborted && isCurrent()) message.error(error.message || '사진을 내려받지 못했어요.');
         } finally {
             if (downloadController.current === controller) {
                 downloadController.current = null;

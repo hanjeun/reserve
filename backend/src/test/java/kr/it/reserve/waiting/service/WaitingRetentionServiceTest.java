@@ -17,6 +17,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class WaitingRetentionServiceTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-04T15:05:00Z"), ZoneOffset.UTC);
@@ -24,18 +25,18 @@ class WaitingRetentionServiceTest {
 
     @Test
     void onlyTerminalRowsAreMinimizedAfterKoreanMidnightAndExpiredAfterSevenDays() {
-        var retention = new WaitingRetentionService(entries, true, "2026-10-04T09:00:00+09:00", CLOCK);
+        var retention = new WaitingRetentionService(entries, true, "2026-10-04T09:00:00+09:00", "2026-10-04T10:00:00+09:00", CLOCK);
         retention.cleanFinishedEntries();
-        verify(entries).cancelForDeletedStores(Set.of("WAITING", "CALLED"), "CANCELLED", LocalDateTime.parse("2026-10-04T15:05:00"));
-        verify(entries).clearFinishedNames(WaitingStatus.TERMINAL, LocalDateTime.parse("2026-10-04T15:00:00"));
-        verify(entries).deleteFinishedBefore(WaitingStatus.TERMINAL, LocalDateTime.parse("2026-09-27T15:05:00"));
+        verify(entries).cancelForDeletedStores(Set.of("WAITING", "CALLED"), "CANCELLED", LocalDateTime.parse("2026-10-04T15:05:00"), true);
+        verify(entries).clearFinishedNames(WaitingStatus.TERMINAL, LocalDateTime.parse("2026-10-04T15:00:00"), true);
+        verify(entries).deleteFinishedBefore(WaitingStatus.TERMINAL, LocalDateTime.parse("2026-09-27T15:05:00"), true);
     }
 
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = {"invalid", "2026-10-05T09:00:00+09:00"})
     void missingInvalidOrFuturePublicationDoesNotDelete(String notice) {
-        new WaitingRetentionService(entries, true, notice, CLOCK).cleanFinishedEntries();
+        new WaitingRetentionService(entries, true, notice, "2026-10-04T10:00:00+09:00", CLOCK).cleanFinishedEntries();
         verifyNoInteractions(entries);
     }
 
@@ -43,14 +44,26 @@ class WaitingRetentionServiceTest {
     void futurePublicationNeverBecomesActiveJustBecauseTheClockReachesIt() {
         Clock advancing = mock(Clock.class);
         when(advancing.instant()).thenReturn(CLOCK.instant(), CLOCK.instant().plusSeconds(2 * 24 * 60 * 60));
-        var retention = new WaitingRetentionService(entries, true, "2026-10-05T09:00:00+09:00", advancing);
+        var retention = new WaitingRetentionService(entries, true, "2026-10-05T09:00:00+09:00", "", advancing);
         retention.cleanFinishedEntries();
         verifyNoInteractions(entries);
     }
 
     @Test
     void operatorCanDisableTheSweep() {
-        new WaitingRetentionService(entries, false, "2026-10-04T09:00:00+09:00", CLOCK).cleanFinishedEntries();
+        new WaitingRetentionService(entries, false, "2026-10-04T09:00:00+09:00", "2026-10-04T10:00:00+09:00", CLOCK).cleanFinishedEntries();
         verifyNoInteractions(entries);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"invalid", "2026-10-05T09:00:00+09:00"})
+    void staffPublicationNeverSubstitutesForMissingInvalidOrFutureCustomerPublication(String customerNotice) {
+        var retention = new WaitingRetentionService(entries, true, "2026-10-04T09:00:00+09:00", customerNotice, CLOCK);
+        assertThat(retention.customerPolicy().intakeReady()).isFalse();
+        assertThat(retention.customerPolicy().noticePublishedAt()).isNull();
+        retention.cleanFinishedEntries();
+        verify(entries).clearFinishedNames(WaitingStatus.TERMINAL, LocalDateTime.parse("2026-10-04T15:00:00"), false);
+        verify(entries).deleteFinishedBefore(WaitingStatus.TERMINAL, LocalDateTime.parse("2026-09-27T15:05:00"), false);
     }
 }

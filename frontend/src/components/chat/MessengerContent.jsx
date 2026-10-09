@@ -295,7 +295,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         } catch {
             if (historyScopeRef.current !== scope) return;
             historyScrollRef.current = null;
-            message.error('이전 메시지를 불러오지 못했습니다.');
+            message.error('이전 메시지를 불러오지 못했어요.');
         } finally {
             if (historyScopeRef.current === scope) {
                 setHistory((state) => state.loading ? { ...state, loading: false } : state);

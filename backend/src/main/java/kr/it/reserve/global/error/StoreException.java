@@ -18,7 +18,7 @@ public class StoreException extends BusinessException {
      * 404 NOT_FOUND - 매장을 찾을 수 없을 때
      */
     public static StoreException notFound() {
-        return new StoreException("매장을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new StoreException("매장을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
     
     /**

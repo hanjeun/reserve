@@ -61,6 +61,6 @@ test('business reservations: a failed request is not displayed as an empty list'
     await page.route('**/api/reservations/store?**', route => route.fulfill({ status: 500,
         json: { success: false, message: '검토용 조회 실패' } }));
     await page.goto('/business');
-    await expect(page.getByText('서버에서 예약 목록을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.')).toBeVisible();
-    await expect(page.getByText('예약 내역이 없습니다.', { exact: true })).not.toBeVisible();
+    await expect(page.getByText('서버에서 예약 목록을 처리하지 못했어요. 잠시 후 다시 시도해주세요.')).toBeVisible();
+    await expect(page.getByText('예약 내역이 없어요.', { exact: true })).not.toBeVisible();
 });

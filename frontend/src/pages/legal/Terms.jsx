@@ -1,3 +1,4 @@
+import { PageTitle } from '../../components/common/PageTypography';
 import React from 'react';
 import { Typography } from 'antd';
 import { PageContainer } from '../../components/common';
@@ -20,8 +21,8 @@ const Terms = () => {
     return (
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
-                <Title level={2} style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary, marginBottom: 8 }}>서비스 이용약관</Title>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 9월 1일</Text>
+                <PageTitle>서비스 이용약관</PageTitle>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 1월 1일 · 최종 수정: 2026년 10월 7일</Text>
             </div>
 
             <Section title="제1조 (목적)">
@@ -73,9 +74,8 @@ const Terms = () => {
                 <Paragraph>일반 채팅의 글·사진은 전송일부터 90일 보관합니다. 처리된 일반 신고는 1년, 소비자 불만·거래 분쟁은 3년, 계약·청약철회·결제·공급 증거는 해당 거래일 기준 5년 보관하며 미처리 신고와 진행 중인 분쟁은 파기를 보류합니다. 변경된 채팅 보존기간은 실제 고지 후 30일 유예를 거쳐 기존 자료에도 적용합니다. 자세한 파기 절차와 관리자 열람 기록·웨이팅 접수의 보존기간은 개인정보 처리방침에서 확인할 수 있습니다.</Paragraph>
             </Section>
 
-            <Section title="제7조 (면책조항)">
-                <Paragraph>서비스는 이용자와 가게 사업자 간의 예약을 중개하는 플랫폼으로, 실제 서비스 품질에 대한 책임은 가게 사업자에게 있습니다. 서비스는 천재지변, 통신 장애 등 불가항력으로 인한 서비스 중단에 대해 책임을 지지 않습니다.</Paragraph>
-                <Paragraph>본 서비스는 포트폴리오 목적으로 운영되며, 실제 금전적 손해에 대한 보상은 제공되지 않습니다.</Paragraph>
+            <Section title="제7조 (서비스 역할)">
+                <Paragraph>서비스는 이용자와 가게 사업자 간의 예약을 중개하는 플랫폼입니다. 방문 시 제공되는 서비스는 각 가게 사업자가 직접 운영합니다.</Paragraph>
             </Section>
 
             <Section title="제8조 (권리 귀속)">

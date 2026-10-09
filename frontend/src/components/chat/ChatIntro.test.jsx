@@ -52,7 +52,7 @@ describe('chat intro component', () => {
     it('shows a greeting and four question buttons without a sender avatar, synthetic messages or time', () => {
         const { container } = render(<ChatIntro userName=" 이용자 " items={DEFAULT_ITEMS} onAsk={vi.fn()} />);
         expect(screen.getByText(/안녕하세요, 이용자님/)).toBeInTheDocument();
-        expect(screen.getByText('안녕하세요. RESERVE입니다.')).toBeInTheDocument();
+        expect(screen.getByText('안녕하세요. RESERVE에서 안내해드려요.')).toBeInTheDocument();
         expect(screen.getByRole('group', { name: '자주 묻는 질문' }).querySelectorAll('button')).toHaveLength(4);
         // 보낸 사람 표시(아바타 + 이름)는 대화창 헤더와 겹쳐서 두지 않는다(2026-09-24).
         expect(container.querySelector('img')).toBeNull();
@@ -103,12 +103,12 @@ describe('chat intro component', () => {
         const line = container.querySelector('.reserve-messenger-support-announcement');
         expect(line).toHaveTextContent('9월 30일은 임시 휴무예요');
         expect(line.querySelector('[aria-label="notification"], .anticon')).toBeTruthy();
-        expect(screen.queryByText('안녕하세요. 카페 리저브입니다.')).toBeNull();
+        expect(screen.queryByText('안녕하세요. 카페 리저브에서 안내해드려요.')).toBeNull();
     });
 
     it('introduces a store with its own name and a default owner greeting', () => {
         render(<ChatIntro variant="store" displayName="카페 리저브" items={[{ question: '영업시간', answer: '10시~22시' }]} />);
-        expect(screen.getByText('안녕하세요. 카페 리저브입니다.')).toBeInTheDocument();
+        expect(screen.getByText('안녕하세요. 카페 리저브에서 안내해드려요.')).toBeInTheDocument();
         expect(screen.getByText(/사장님이 확인 후 답변드릴게요/)).toBeInTheDocument();
         expect(screen.queryByText(/관리자가 확인/)).toBeNull();
     });
@@ -167,7 +167,7 @@ describe('first support inquiry', () => {
         expect(screen.queryByLabelText('문의 시작 안내')).not.toBeInTheDocument();
         await act(async () => reject(new Error('offline')));
         const thread = within(screen.getByRole('region', { name: 'RESERVE 고객지원' }));
-        expect(thread.getByRole('alert')).toHaveTextContent('대화를 불러오지 못했습니다.');
+        expect(thread.getByRole('alert')).toHaveTextContent('대화를 불러오지 못했어요.');
         expect(screen.getByRole('textbox')).toBeDisabled();
         expect(screen.queryByLabelText('문의 시작 안내')).not.toBeInTheDocument();
         await userEvent.setup().click(thread.getByRole('button', { name: '다시 불러오기' }));
@@ -242,7 +242,7 @@ describe('first store inquiry', () => {
     it('shows the default store intro even before the owner sets anything up', async () => {
         mountContent();
         expect(await screen.findByLabelText('문의 시작 안내')).toBeInTheDocument();
-        expect(screen.getByText('안녕하세요. 카페 리저브입니다.')).toBeInTheDocument();
+        expect(screen.getByText('안녕하세요. 카페 리저브에서 안내해드려요.')).toBeInTheDocument();
         expect(screen.getByText(/사장님이 확인 후 답변드릴게요/)).toBeInTheDocument();
     });
 

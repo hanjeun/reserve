@@ -39,7 +39,7 @@ class ChatRetractionServiceTest {
         var result = service.retract(actor, 21L, 90L);
 
         assertThat(result.isRetracted()).isTrue();
-        assertThat(result.getContent()).isEqualTo("전송이 취소된 메시지입니다.");
+        assertThat(result.getContent()).isEqualTo("전송이 취소된 메시지예요.");
         assertThat(result.getImageUrl()).isNull();
         assertThat(message.getContent()).isEqualTo("원문 보존");
         assertThat(message.getImageKey()).isEqualTo("users/7/chat/21/photo.bin");
@@ -78,7 +78,7 @@ class ChatRetractionServiceTest {
 
     @Test void participantCheckAndRoomMessagePairAreRequiredBeforeAnyMutation() {
         when(rooms.findByIdForUpdate(21L)).thenReturn(Optional.of(room));
-        doThrow(new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN)).when(chats).assertImageReader(21L, actor);
+        doThrow(new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN)).when(chats).assertImageReader(21L, actor);
         assertThatThrownBy(() -> service.retract(actor, 21L, 90L)).isInstanceOf(ChatException.class);
         verifyNoInteractions(messages);
         assertThat(room.getRetractionRevision()).isZero();

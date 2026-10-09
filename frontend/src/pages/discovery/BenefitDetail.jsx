@@ -1,3 +1,4 @@
+import { PageTitle } from '../../components/common/PageTypography';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { DataState } from '../../components/common';
@@ -31,11 +32,11 @@ export default function BenefitDetail() {
         title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} /></section>;
     return (
         <article className="reserve-benefits-page reserve-benefit-detail" aria-labelledby="benefit-detail-title">
-            <header className="reserve-benefits-heading"><div><span className="reserve-benefits-eyebrow">가게 소식 · 안내</span><h1 id="benefit-detail-title">{item.title}</h1><Link to={`/store/${item.storeId}`} className="reserve-benefits-text-link">{item.storeName}</Link><time dateTime={item.createdAt || undefined}>{formatBenefitDate(item.createdAt)}</time></div></header>
-            <img className={`reserve-benefit-detail-image${getBenefitImageUrl(item.mainImageUrl) === BENEFIT_IMAGE_FALLBACK ? ' reserve-benefit-detail-image--placeholder' : ''}`} src={getBenefitImageUrl(item.mainImageUrl)} alt={getBenefitImageUrl(item.mainImageUrl) === BENEFIT_IMAGE_FALLBACK ? '가게 사진이 등록되지 않았습니다' : `${item.storeName} 가게 사진`} onError={event => { if (!event.currentTarget.src.endsWith(BENEFIT_IMAGE_FALLBACK)) { event.currentTarget.src = BENEFIT_IMAGE_FALLBACK; event.currentTarget.alt = '가게 사진을 불러오지 못했습니다'; event.currentTarget.classList.add('reserve-benefit-detail-image--placeholder'); } }} />
+            <header className="reserve-benefits-heading"><div><span className="reserve-benefits-eyebrow">가게 소식 · 안내</span><PageTitle level={1} id="benefit-detail-title">{item.title}</PageTitle><Link to={`/store/${item.storeId}`} className="reserve-benefits-text-link">{item.storeName}</Link><time dateTime={item.createdAt || undefined}>{formatBenefitDate(item.createdAt)}</time></div></header>
+            <img className={`reserve-benefit-detail-image${getBenefitImageUrl(item.mainImageUrl) === BENEFIT_IMAGE_FALLBACK ? ' reserve-benefit-detail-image--placeholder' : ''}`} src={getBenefitImageUrl(item.mainImageUrl)} alt={getBenefitImageUrl(item.mainImageUrl) === BENEFIT_IMAGE_FALLBACK ? '가게 사진이 등록되지 않았어요' : `${item.storeName} 가게 사진`} onError={event => { if (!event.currentTarget.src.endsWith(BENEFIT_IMAGE_FALLBACK)) { event.currentTarget.src = BENEFIT_IMAGE_FALLBACK; event.currentTarget.alt = '가게 사진을 불러오지 못했어요'; event.currentTarget.classList.add('reserve-benefit-detail-image--placeholder'); } }} />
             {/* 본문은 원문 텍스트로만 출력한다. HTML/Markdown으로 해석하지 않는다. */}
             <div className="reserve-benefit-detail-content">{item.content}</div>
-            <p className="reserve-benefits-disclaimer">적용 조건과 제공 여부는 가게의 안내를 확인해 주세요. 쿠폰 발급·사용 기능은 제공하지 않습니다.</p>
+            <p className="reserve-benefits-disclaimer">적용 조건과 제공 여부는 가게의 안내를 확인해 주세요. 쿠폰 발급·사용 기능은 제공하지 않아요.</p>
             <footer className="reserve-benefit-detail-links"><Link className="reserve-benefits-text-link" to="/benefits">소식 목록</Link><Link className="reserve-benefits-text-link" to={`/store/${item.storeId}`}>가게 보기 →</Link></footer>
         </article>
     );

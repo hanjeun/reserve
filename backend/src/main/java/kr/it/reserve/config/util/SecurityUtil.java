@@ -12,7 +12,7 @@ public class SecurityUtil {
 
     // 인증된 사용자 정보 가져오기
     public static Member getCurrentMember() {
-        return getCurrentMember("인증되지 않은 사용자입니다.");
+        return getCurrentMember("인증되지 않은 사용자예요.");
     }
 
     // 커스텀 메시지로 인증된 사용자 가져오기

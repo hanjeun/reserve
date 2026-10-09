@@ -20,17 +20,17 @@ public class ChatRetractionController {
 
     @PostMapping("/messages/{messageId}/retract")
     public ResponseEntity<ApiResponse<ChatMessageResponse>> retract(@PathVariable Long roomId, @PathVariable Long messageId) {
-        var actor = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        var actor = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         if (!limiter.tryConsume("member-" + actor.getId(), RateLimiter.Policy.CHAT_SEND)) {
             return ResponseEntity.status(429).body(ApiResponse.error("잠시 후 다시 시도해주세요."));
         }
-        return ResponseEntity.ok(ApiResponse.success(retractions.retract(actor, roomId, messageId), "전송을 취소했습니다."));
+        return ResponseEntity.ok(ApiResponse.success(retractions.retract(actor, roomId, messageId), "전송을 취소했어요."));
     }
 
     @GetMapping("/retractions")
     public ResponseEntity<ApiResponse<ChatRetractionService.Retractions>> changes(
             @PathVariable Long roomId, @RequestParam(defaultValue = "0") long afterRevision) {
-        var actor = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        var actor = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         return ResponseEntity.ok(ApiResponse.success(retractions.changes(actor, roomId, afterRevision), "조회 성공"));
     }
 }

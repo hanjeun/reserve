@@ -75,7 +75,7 @@ class PaymentDepositDiagnosticsControllerTest {
     void excessivePageOffsetIsRejectedBeforeAnyRepositoryOrWriterCall() {
         assertThatThrownBy(() -> controller.depositInvariants(Integer.MAX_VALUE, 100))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("조회 가능한 페이지 범위를 초과했습니다.");
+                .hasMessage("조회 가능한 페이지 범위를 초과했어요.");
         verifyNoInteractions(payments, issues, inbox, processor, service);
     }
 

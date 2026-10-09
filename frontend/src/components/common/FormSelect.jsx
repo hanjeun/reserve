@@ -19,6 +19,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Select } from 'antd';
 import ChoiceSelectInput from './ChoiceSelectInput';
+import { renderRollingChoiceLabel } from './rollingChoiceLabel';
 
 /** index.css 의 `.ant-select.reserve-form-select` 규칙과 짝이다. 한쪽만 고치지 말 것. */
 const FORM_CLASS = 'reserve-form-select';
@@ -33,6 +34,7 @@ const FormSelect = ({ placeholder, disabled = false, options, children, style, c
         // 호출측 className 을 버리지 않고 이어 붙인다(폭·정렬용 유틸 클래스와 함께 쓰는 경우가 있다).
         className={className ? `${FORM_CLASS} ${className}` : FORM_CLASS}
         {...rest}
+        labelRender={rest.labelRender ?? (choice => renderRollingChoiceLabel(choice, { options, children, fieldNames: rest.fieldNames }))}
         components={{ ...components, input: ChoiceSelectInput }}
     >
         {children}

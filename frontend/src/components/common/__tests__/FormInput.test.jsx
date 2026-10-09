@@ -47,5 +47,6 @@ describe('FormInput.WithButton', () => {
         const button = screen.getByRole('button', { name: '인증번호 발송 처리 중' });
         expect(button).toBeDisabled();
         expect(button).toHaveAttribute('aria-busy', 'true');
+        expect(button.querySelector('.reserve-arc-spinner')).not.toBeNull();
     });
 });

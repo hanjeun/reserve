@@ -30,6 +30,7 @@ function ErrorFallback({ error, resetError, goHome }) {
             role="alert"
             className="reserve-error-fallback"
             icon={<ExclamationCircleFilled />}
+            illustration={chunkError ? 'retry' : 'unknown-error'}
             title={chunkError ? '화면을 불러오지 못했어요' : '문제가 생겼어요'}
             description={chunkError
                 ? '새 버전이 배포됐거나 연결이 잠시 불안정했어요. 새로고침하면 대부분 해결돼요.'

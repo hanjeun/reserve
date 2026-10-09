@@ -24,11 +24,11 @@ public class    JwtProperties {
     @PostConstruct
     public void validate() {
         if (secretKey == null || secretKey.trim().isEmpty()) {
-            throw new IllegalStateException("JWT Secret Key가 설정되지 않았습니다.");
+            throw new IllegalStateException("JWT secret key is not configured");
         }
 
         if (secretKey.length() < 64) {
-            throw new IllegalStateException("JWT Secret Key는 최소 64자 이상이어야 합니다.");
+            throw new IllegalStateException("JWT secret key must contain at least 64 characters");
         }
 
         log.info("JWT config loaded: issuer={}, accessTokenExpiry={}m, refreshTokenExpiry={}d",
@@ -44,7 +44,7 @@ public class    JwtProperties {
         public Duration getExpirationDuration() {
             if (expirationMinutes != null) return Duration.ofMinutes(expirationMinutes);
             if (expirationDays != null) return Duration.ofDays(expirationDays);
-            throw new IllegalStateException("토큰 만료 시간이 설정되지 않았습니다.");
+            throw new IllegalStateException("Token expiration is not configured");
         }
     }
 

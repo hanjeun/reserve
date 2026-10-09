@@ -452,3 +452,117 @@ CREATE TABLE waiting_entry (
 - 이전 앱으로 복구해도 이 테이블은 남겨 접수 자료를 보존해요. 일반 회원용 `/waiting` 페이지는 계속 준비 중이며 이번 구현은 사업자 패널의 직원 접수 탭이에요.
 
 2026-10-04 위 승인과 같은 DDL 계정으로 새 테이블을 만들었어요. nullable 원래 파일명·미분류 기본값·감사 enum 확장과 함께 적용했고, 기존 데이터 삭제는 실행하지 않았어요.
+
+## 11. 고객 웨이팅 확장 (로컬 구현, 운영 미적용)
+
+직원 명단과 고객 접수는 같은 `waiting_entry`를 사용해요. 가게의 고객 접수는 기존 가게까지 `OFF`로 시작하고, 직원 접수는 계속 가능해요. 운영 적용 전 제한된 백업 경로에 `store`·`waiting_entry`를 백업하고 복원 가능 여부를 확인한 뒤 별도 DDL 계정으로 실행해요. 실제 고지 게시와 릴리스 적용 승인을 확인해야 해요.
+
+2026-10-08 20:50:30 KST 읽기 전용 조회의 실제 대상은 Lightsail의 `mysql` 컨테이너, DB `reserve`, MySQL **8.0.45**예요. `store.waiting_intake_mode`·`waiting_paused`·`reservation_enabled`와 `waiting_entry.member_id`·`source`가 없고, 당시 대기 접수는 0행이었어요. 21:14:52 KST 추가 조회에서 `waiting_entry.privacy_notice_published_at`도 없고, 직원 접수의 기존 unique 2개와 CHECK 3개만 확인했어요. 이 조회는 DDL 적용·복원·새 앱 검증 결과가 아니며 적용 직전에 다시 읽어야 해요.
+
+2026-10-09 02:14~02:18 KST 재조회에서도 같은 `reserve`/MySQL 8.0.45의 35테이블에 11·12·13절 추가 정의는 없었어요. 대상 행 수는 `store` 3·`waiting_entry` 0·`email_verification` 1·`member` 3이며 이메일 중복 그룹은 0이었어요. 고객 고지 변수도 아직 없어요. 이 집계는 개인정보 원문을 출력하지 않는 준비 조회이며 DDL·고지 게시·복원·새 앱 검증을 실행한 결과가 아니에요.
+
+2026-10-09 **11:29 KST**의 운영 준비 조회에서도 MySQL 8.0.45·35테이블과 11·12·13절의 신규 컬럼·CHECK·인덱스 미적용을 확인했어요. 이메일 중복 그룹·웨이팅 행은 각각 0이고 고객 고지 변수는 미설정이에요. 실제 적용 직전에 이 상태와 남은 SQL을 다시 확정해요.
+
+이후 같은 날 최신 정기 백업 `reserve-20261008-181001.sql.gz`를 보호된 PC 경로로 받아 **격리 MySQL 8.0.45 / 35테이블·61행**에 복원하고 별도 DDL 계정으로 11절 → 12절 → 13절을 실제 적용했어요. 원래 컬럼의 모든 값·행 digest와 기존 제약·인덱스·CHECK·FK를 보존했으며, 새 컬럼 7개·CHECK 2개·고객 목록 인덱스·이메일 unique와 중복 0을 대조했어요. 기존 `chk_waiting_status`의 문자셋 표기 변경은 허용 상태 값·강제 여부가 동일함을 확인했어요. 가입 인증의 opt-in MySQL 검사 5개도 실패·skip 없이 통과했어요. 실제 v2.9.0 JAR로 제한된 `reserve_app`의 독립 `validate`도 34모델을 통과했으며 전후 모든 데이터/메타데이터를 보존했어요. 잘못된 기본값·강제하지 않는 CHECK·틀린 인덱스의 verifier 거부 3개와 즉시 원복도 확인했어요. 정확한 JAR/백업 해시·보호 경로와 합성 DB 분리 근거는 [백업 런북](backup.md)을 따라요. **운영 DDL·고지 게시·운영 변수 쓰기는 실행하지 않았으며**, 운영 적용 직전의 새 백업·실제 대상 재조회·해당 운영 JAR의 `validate` 관문을 유지해요.
+
+다음 조회는 승인된 DDL의 대상을 확정하기 위한 읽기 전용 입력이에요. 존재하는 컬럼·제약·인덱스는 새 명령에서 제외해요. CHECK의 실제 정의와 기존 자료도 `SHOW CREATE TABLE store`·`waiting_entry`로 확인해요.
+
+```sql
+SELECT DATABASE(), @@version, @@hostname;
+SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND ((TABLE_NAME = 'store' AND COLUMN_NAME IN ('waiting_intake_mode','waiting_paused','reservation_enabled'))
+    OR (TABLE_NAME = 'waiting_entry' AND COLUMN_NAME IN ('member_id','source','privacy_notice_published_at')));
+SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('store','waiting_entry','email_verification')
+ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX;
+SELECT TABLE_NAME, CONSTRAINT_NAME, CONSTRAINT_TYPE
+FROM information_schema.TABLE_CONSTRAINTS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('store','waiting_entry','email_verification');
+```
+
+```sql
+SET SESSION lock_wait_timeout = 5;
+ALTER TABLE store
+  ADD COLUMN waiting_intake_mode VARCHAR(16) NOT NULL DEFAULT 'OFF',
+  ADD CONSTRAINT chk_store_waiting_intake CHECK (waiting_intake_mode IN ('OFF','ONSITE','REMOTE','BOTH'));
+
+ALTER TABLE waiting_entry
+  ADD COLUMN member_id BIGINT NULL,
+  ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'STAFF',
+  ADD COLUMN privacy_notice_published_at DATETIME(6) NULL,
+  ADD KEY idx_waiting_member (member_id,status,created_at),
+  ADD CONSTRAINT chk_waiting_source CHECK (source IN ('STAFF','ONSITE','REMOTE'));
+```
+
+- 적용 전 `information_schema.COLUMNS`·`STATISTICS`에서 대상 컬럼·인덱스 유무를 확인해요. 부분 성공 뒤에는 위 두 문장을 통째로 재실행하지 않아요.
+- 적용 후 새 JAR의 `validate` 성공, 공개 가게 목록·개인 목록의 권한, 접수·호출·입장·취소와 스키마를 확인해요. `ddl-auto=update`나 root 앱 계정으로 검증 실패를 우회하지 않아요.
+- 회원 연결은 FK 없이 유지하며 회원 탈퇴 이벤트의 동일 트랜잭션에서 취소·최소화해요. 새 모듈 때문에 `MemberService`가 웨이팅 저장소를 직접 주입받지 않아요.
+- 고객은 접수 화면에서 해당 가게에 개인정보 제공에 동의해요. 서버가 현재 고지 버전을 대조하고, `privacy_notice_published_at`에 그 시각을 UTC로 저장해요. 회원 식별자·고지 시각을 공개 명단 응답에 추가하지 않아요.
+- 실제 고객 고지 게시 시각은 **별도** `WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT`에 offset 포함 ISO-8601로 등록해요. 기존 `WAITING_RETENTION_NOTICE_PUBLISHED_AT`는 직원 접수 고지예요. 고객 값이 없거나 잘못됐거나 미래면 새 고객 접수와 고객 기간 정리를 중지해요. 직원 접수 정리는 기존 스위치·고지를 따라요.
+- 고객의 종료 기록은 당일까지만 내 예약에서 확인할 수 있어요. 종료팀 이름과 회원 연결은 다음 KST 날짜에 제거하고 종료 기록은 7일 뒤 파기해요. 고객 동의 버전이 없는 기존 고객 자료에는 기간 정리를 소급 적용하지 않으며 별도 확인 대상으로 남겨요. 탈퇴 요청의 동일 트랜잭션 정리는 이 기간 정리 스위치와 별개예요.
+- 앱 복구 시 새 컬럼은 남겨요. 이전 앱은 직원 접수만 지원하므로 고객 접수가 사용된 뒤에는 구버전을 단순 재가동하지 않고 고객 접수를 닫고 활성 고객 접수·QR·보존 작업의 영향부터 확인해야 해요. DB 복원은 승인·검증된 복구 절차로 진행해요.
+- 이 DDL과 새 개인정보 고지의 운영 게시 시각은 아직 기록하지 않았어요. 기존 채팅 고지·30일 유예 시각은 바꾸지 않아요.
+
+### 11·12절 적용 순서와 복구 경로
+
+1. 최종 출시 범위·이미지 SHA와 대상 테이블을 확정해요. 2026-10-08 프리뷰 전체가 운영에 반영됐다고 가정하지 않아요. 이메일 인증 보완까지 포함하면 13절도 대상이에요.
+2. [백업 런북](backup.md)의 보호된 사전 백업 절차로 현재 전체 DB와 대상 테이블 정의·원래 값·행 수를 보존해요. 디렉터리 700·파일 600·root 소유를 유지해요. 사전 경로는 `/var/backups/reserve-scripts/<실제-UTC시각>-before-customer-waiting-signup/`로 준비하며, 이 문서 작성만으로 파일이 생성된 것은 아니에요. 별도 접근으로 받은 백업을 격리 MySQL 8.0.45에 복원할 수 있어야 해요. 최신 정기 파일의 존재·업로드 로그만으로 이 단계를 통과시키지 않아요.
+3. 실제 `SHOW CREATE TABLE`·중복 집계·인덱스 결과와 실행할 SQL, 보호된 백업 위치, 복구 이미지·설정을 함께 제시하고 **새 운영 DDL 승인**을 받아요. `reserve_ddl`로 11절 → 12절 → 포함된 경우 13절 순서로 적용해요. 각 단계의 결과를 읽고 다음 단계로 진행하며 부분 성공은 남은 항목만 작성해요. 알고리즘·메타데이터 잠금 영향은 최종 격리 DB 입력으로 확인해요.
+4. 기존 컬럼의 값·행 수를 보존했는지 대조하고, 최종 릴리스 JAR을 제한된 `reserve_app`과 `ddl-auto=validate`로 확인해요. unique·CHECK·인덱스는 Hibernate 검증만 믿지 않고 실제 메타데이터를 대조해요. 외부 연동·스케줄러가 실행되지 않는 `VerifyDatabaseSchema.java` 경로를 써요. `scripts/verify-post-deploy-readonly.sh`의 `RESERVE_VERIFY_WAITING_SIGNUP_SCHEMA=1`은 11·12·13절의 컬럼·기본값·NULL, 실제 CHECK 정의와 강제 여부, 인덱스 구성과 이메일 unique·중복을 함께 확인해요. 최종 격리 MySQL에서 정상 정의와 어긋난 정의의 거부를 확인한 뒤 최신 스크립트를 설치해 사용해요. 기존 구 운영 앱에는 이 새 후보 옵션을 적용하지 않아요.
+5. 고객 고지가 없는 상태에서도 새 앱은 새 고객 접수를 거부해요. 별도 게시·배포 승인 후 실제 운영 처리방침과 접수 안내를 확인하고, 새 게시 시각을 고객 변수에 등록해요. 실제 게시 전 시각을 예약 입력하거나 직원·채팅 시각을 재사용하지 않아요. `/api/waiting/retention-policy`와 실제 컨테이너 설정을 대조한 뒤 대상 가게 접수를 열어요.
+6. 첫 기능 릴리스에는 이전 운영 이미지가 새 설정을 이해하지 못해 안전한 단순 롤백 대상이 없어요. 자동 배포는 새 `reserve.feature-compat=waiting-signup-v1`이 있는 복구 이미지부터 요구해요. 첫 기본 릴리스는 최종 검사와 별도 운영 승인 후 신규 쓰기를 차단한 전환 절차로 준비해요. 고객 접수를 닫은 **새 설정 호환 이미지**나 승인된 수정 이미지가 우선이며, 구 이미지에 라벨만 추가하지 않아요. 활성 고객 명단·QR 처리와 예약 차단을 유지할 수 없으면 트래픽·신규 쓰기를 닫고 복구해요. 추가 스키마와 최신 설정을 남겨요. 오래된 전체 덤프로 새 설정·접수를 덮는 복원은 별도 승인과 복원 직전 백업이 필요해요.
+
+사용자는 10/9에 첫 전환의 신규 쓰기 제한 시간에 별도 제약이 없다고 답했어요. 전환 창을 기다릴 필요는 없지만, 최종 입력·독립 복원·실제 호환 이미지와 작업별 승인을 생략하는 답변은 아니에요. 실행할 11→12→13 SQL, 보호된 사전 백업 위치, 동일 릴리스의 프론트·백엔드/복구 이미지와 신규 쓰기 차단·복귀 방법을 한 번에 검토한 뒤 운영 작업에 대한 별도 승인을 받아요.
+
+## 12. 웨이팅 일시 중지와 예약 접수 선택 (로컬 구현, 운영 미적용)
+
+11절의 고객 웨이팅 확장과 함께 사용하는 가게 설정이에요. `waiting_paused`는 고객 접수 방식과 별도로 새 직원·고객 접수만 중지하고 기존 명단은 보존해요. `reservation_enabled=false`인 가게는 상세의 예약 폼·가능 슬롯·직접 API 예약을 막아요. 기존 가게는 예약 켜짐·웨이팅 중지 아님으로 유지해요.
+
+```sql
+SET SESSION lock_wait_timeout = 5;
+ALTER TABLE store
+  ADD COLUMN waiting_paused BIT(1) NOT NULL DEFAULT b'0',
+  ADD COLUMN reservation_enabled BIT(1) NOT NULL DEFAULT b'1';
+```
+
+- 승인된 운영 변경 전 `information_schema.COLUMNS`에서 이름·타입·기존 값과 11절 적용 여부를 확인하고 보호된 경로에 `store`를 백업해요. 부분 적용 뒤 위 문장을 통째로 재실행하지 않아요.
+- 새 JAR은 제한된 앱 계정과 `ddl-auto=validate`로 확인해요. 운영에서 `update`로 우회하거나 이 문서만으로 운영 적용 완료를 기록하지 않아요.
+- 복구 시 추가 컬럼을 삭제하지 않아요. 이전 앱은 새 예약 차단·일시 중지 설정을 알지 못하므로 이를 사용한 가게가 있으면 구버전을 바로 재가동하지 않고 신규 접수·예약 차단을 유지할 복구 경로를 먼저 확인해요.
+- 질문형 등록·미리보기는 기존 최종 등록 API와 로컬 초안 저장을 사용해요. 단계 이동만으로 DB 가게·예약·결제를 만들지 않아요.
+
+## 13. 가입 이메일 인증 증명·unique (로컬 구현, 운영 미적용)
+
+2026-10-08 20:50:30 KST 운영 조회에서 `email_verification`은 기존 `id`·이메일·6자리 코드·발급/만료 시각·인증 여부·실패 횟수만 있고, 이메일 unique와 가입 증명 해시 컬럼이 없었어요. 이메일 중복 그룹 집계는 0이었어요. 이 집계를 적용 직전에 다시 확인하고 이메일 원문을 채팅·로그로 출력하지 않아요.
+
+```sql
+SELECT COUNT(*) AS duplicate_email_groups
+FROM (SELECT email FROM email_verification GROUP BY email HAVING COUNT(*) > 1) duplicates;
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'email_verification'
+  AND COLUMN_NAME IN ('email','verification_ticket_hash');
+
+-- 중복이 없고 해당 컬럼·unique가 없을 때만 새 승인으로 실행해요.
+SET SESSION lock_wait_timeout = 5;
+ALTER TABLE email_verification
+  ADD COLUMN verification_ticket_hash VARCHAR(64) NULL,
+  ADD CONSTRAINT uk_email_verification_email UNIQUE (email);
+```
+
+- 중복이 있으면 자동 삭제나 임의 최신 행 선택으로 제약을 맞추지 않아요. 활성 인증을 보호할 정리 범위를 먼저 확정해요.
+- 최종 백업에는 `email_verification`·`member`도 포함해요. 기존 인증 행의 새 해시는 NULL로 남기며 이메일만으로 가입을 허용하는 우회를 두지 않아요. 사용자는 새 화면에서 코드를 다시 발송·인증해야 해요.
+- 새 프론트·백엔드는 같은 릴리스로 전환해요. 서버가 반환한 원래 5분 만료 시각을 유지하고, 가입 증명은 프론트 메모리에만 둬요. 가입 성공의 같은 트랜잭션에서 인증을 삭제하며, 회원 저장 실패 시 삭제도 롤백돼요.
+- 새 설정 호환 복구 이미지에 이 인증 관문도 유지해요. 컬럼을 남긴 채 이전의 무기한·미소비 인증 동작으로 복구하지 않아요. 앱·DDL 계정 권한과 `validate`를 유지해요.
+
+가입 인증의 H2 트랜잭션 검사와 별도로 `EmailVerificationMySqlReleaseTest` 소스를 준비했어요. 두 최초 발송의 gap lock 경합·실패 횟수 누적·동시 한 번 소비·가입 실패 롤백/원래 만료·만료되거나 잘못된 증명의 미소비를 실제 서비스와 MySQL 8.0.45에서 확인해요. `RESERVE_MYSQL_SIGNUP_TEST_ISOLATED=1`이 없으면 실행하지 않으며, URL은 `127.0.0.1:<포트>/reserve_release_signup_<구분명>`과 전용 `reserve_signup_test*` 계정만 허용해요. 이 검사는 합성 인증 테이블을 create-drop 하므로 새 빈 검사 DB에만 사용하고 실제 백업 복원 DB·개발/운영 DB에 연결하지 않아요. 검사 소스 작성은 실행 성공 근거가 아니며 최종 입력 단계에서 명시적으로 실행해요.
+
+최종 입력으로 검사를 시작할 때 전용 계정은 위 빈 DB에만 권한을 주고, URL·계정·비밀번호는 `RESERVE_MYSQL_SIGNUP_TEST_URL`·`RESERVE_MYSQL_SIGNUP_TEST_USER`·`RESERVE_MYSQL_SIGNUP_TEST_PASSWORD`로 현재 검사 프로세스에만 전달해요. 비밀번호를 명령 인수·채팅·Git 파일에 넣지 않아요. 네 환경값을 준비한 뒤 **선별한 후보의 backend 디렉터리**에서 아래 필터만 실행해요.
+
+```powershell
+./gradlew.bat test --tests 'kr.it.reserve.email.EmailVerificationMySqlReleaseTest' --rerun-tasks
+```
+
+여기서 `--rerun-tasks`는 일반 CI에서 환경값 없이 스킵했던 결과나 이전 task 상태를 실제 MySQL 검사로 재사용하지 않기 위한 옵션이에요. 대상은 위 클래스의 5개 검사이며, **실행 5·실패 0·스킵 0**과 MySQL 8.0.45 연결을 실제 결과로 확인해야 해요. 일반 CI·H2의 성공이나 환경값을 빠뜨린 스킵을 이 근거로 대신하지 않아요. 성공한 같은 입력의 MySQL 검사는 반복하지 않고, 실패 수정 후에는 바뀐 입력이 영향을 주는 실패 항목만 다시 확인해요. 종료 시 검사 프로세스의 전용 자격 환경값도 비워요.

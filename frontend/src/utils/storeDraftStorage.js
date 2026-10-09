@@ -18,7 +18,7 @@ let databasePromise;
 
 const openDatabase = () => {
     if (typeof indexedDB === 'undefined') {
-        return Promise.reject(new Error('이 브라우저에서는 로컬 임시저장을 지원하지 않습니다.'));
+        return Promise.reject(new Error('이 브라우저에서는 로컬 임시저장을 지원하지 않아요.'));
     }
     if (databasePromise) return databasePromise;
 
@@ -40,11 +40,11 @@ const openDatabase = () => {
         };
         request.onerror = () => {
             databasePromise = undefined;
-            reject(request.error ?? new Error('로컬 임시저장소를 열지 못했습니다.'));
+            reject(request.error ?? new Error('로컬 임시저장소를 열지 못했어요.'));
         };
         request.onblocked = () => {
             databasePromise = undefined;
-            reject(new Error('다른 탭에서 임시저장소를 사용 중입니다. 열려 있는 RESERVE 탭을 확인해주세요.'));
+            reject(new Error('다른 탭에서 임시저장소를 사용 중이에요. 열려 있는 RESERVE 탭을 확인해주세요.'));
         };
     });
 
@@ -59,8 +59,8 @@ const runTransaction = async (mode, operation) => {
         let result;
 
         transaction.oncomplete = () => resolve(result);
-        transaction.onerror = () => reject(transaction.error ?? new Error('로컬 임시저장 처리에 실패했습니다.'));
-        transaction.onabort = () => reject(transaction.error ?? new Error('로컬 임시저장이 중단되었습니다.'));
+        transaction.onerror = () => reject(transaction.error ?? new Error('로컬 임시저장 처리에 실패했어요.'));
+        transaction.onabort = () => reject(transaction.error ?? new Error('로컬 임시저장이 중단됐어요.'));
 
         result = operation(store, transaction);
     });
@@ -196,7 +196,7 @@ export const fingerprintStoreDraftBase = ({ values, mainImage = [], detailImages
 }));
 
 export const saveStoreDraft = async ({ key, values, mainImage, detailImages, baseFingerprint }) => {
-    if (!key) throw new Error('로그인 정보를 확인할 수 없어 임시저장하지 못했습니다.');
+    if (!key) throw new Error('로그인 정보를 확인할 수 없어 임시저장하지 못했어요.');
     const savedAt = Date.now();
     const record = {
         key,

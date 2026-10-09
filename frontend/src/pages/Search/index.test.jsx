@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import SearchPage from './index';
 import Header from '../../components/layout/Header';
+import useAuthStore from '../../store/useAuthStore';
+import { addRecentSearch, clearRecentSearches, readRecentSearches, recentSearchOwner } from '../../utils/recentSearches';
 
 const reducedMotionMock = vi.hoisted(() => ({ value: true }));
 
@@ -37,6 +39,7 @@ describe('dedicated search submission and result editing', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         reducedMotionMock.value = true;
+        clearRecentSearches();
     });
 
     it('loads the search term and submits it with Enter', async () => {
@@ -192,7 +195,7 @@ describe('dedicated search submission and result editing', () => {
 
     it.each([
         ['맛집·카페', '/stores?domain=FOOD'],
-        ['가게 전체 보기', '/stores'],
+        ['운동·웰니스', '/stores?domain=SPORTS'],
     ])('closes search with the same motion before following %s', (name, destination) => {
         vi.useFakeTimers();
         try {
@@ -211,7 +214,7 @@ describe('dedicated search submission and result editing', () => {
     it('keeps the current search screen open when a link is opened in a new tab', () => {
         reducedMotionMock.value = false;
         const { container } = renderSearch();
-        expect(fireEvent.click(screen.getByRole('link', { name: '가게 전체 보기' }), { ctrlKey: true })).toBe(true);
+        expect(fireEvent.click(screen.getByRole('link', { name: '맛집·카페' }), { ctrlKey: true })).toBe(true);
         expect(path()).toBe('/search');
         expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--leaving');
     });
@@ -225,5 +228,42 @@ describe('dedicated search submission and result editing', () => {
         renderSearch();
         await user.click(screen.getByRole('link', { name: '맛집·카페' }));
         expect(path()).toBe('/stores?domain=FOOD');
+    });
+
+    it('restores a completed search and runs it through the same search action', async () => {
+        const user = userEvent.setup();
+        const { unmount } = renderSearch();
+        await user.type(field(), '  안산 공방  ');
+        await user.keyboard('{Enter}');
+        unmount();
+        renderSearch();
+        expect(screen.queryByRole('link', { name: '가게 전체 보기' })).toBeNull();
+        await user.click(screen.getByRole('button', { name: '최근 검색: 안산 공방', exact: true }));
+        expect(path()).toBe('/stores?keyword=' + encodeURIComponent('안산 공방'));
+        expect(readRecentSearches(recentSearchOwner(useAuthStore.getState().user))).toEqual(['안산 공방']);
+    });
+
+    it('keeps typed input and cancelled editing out of recent searches', async () => {
+        const user = userEvent.setup();
+        renderSearch(['/search?keyword=' + encodeURIComponent('입력 중')]);
+        expect(screen.getByText('최근 검색한 내용이 없어요.')).toBeInTheDocument();
+        fireEvent.keyDown(field(), { key: 'Enter', isComposing: true });
+        await user.click(screen.getByRole('button', { name: '취소' }));
+        expect(readRecentSearches(recentSearchOwner(useAuthStore.getState().user))).toEqual([]);
+    });
+
+    it('deletes one recent search without searching and clears the remaining history', async () => {
+        const user = userEvent.setup();
+        const owner = recentSearchOwner(useAuthStore.getState().user);
+        addRecentSearch(owner, '안산 공방');
+        addRecentSearch(owner, '서울 스튜디오');
+        renderSearch();
+        await user.click(screen.getByRole('button', { name: '최근 검색 삭제: 안산 공방', exact: true }));
+        expect(path()).toBe('/search');
+        expect(screen.queryByRole('button', { name: '최근 검색: 안산 공방', exact: true })).toBeNull();
+        expect(screen.getByRole('button', { name: '최근 검색: 서울 스튜디오', exact: true })).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: '전체 삭제', exact: true }));
+        expect(screen.getByText('최근 검색한 내용이 없어요.')).toBeInTheDocument();
+        expect(readRecentSearches(owner)).toEqual([]);
     });
 });

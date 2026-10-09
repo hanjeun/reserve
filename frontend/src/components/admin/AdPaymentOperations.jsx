@@ -31,7 +31,7 @@ const AdPaymentOperations = () => {
     const action = useMutation({
         mutationFn: ({ id, operation }) => api.post(`/api/admin/ad-payments/${id}/${operation}`),
         onSuccess: result => message.info(`현재 상태: ${LABELS[result.state] ?? '확인 필요'}`),
-        onError: err => message.error(err instanceof Error ? err.message : '처리 결과를 확인하지 못했습니다.'),
+        onError: err => message.error(err instanceof Error ? err.message : '처리 결과를 확인하지 못했어요.'),
         // 대사·환불은 광고 상태(노출 중 → 환불 등)도 바꾼다 — 광고 목록·공개 배너도 함께 무효화한다.
         onSettled: () => Promise.all([
             client.invalidateQueries({ queryKey: adminKeys.paymentOperations() }),
@@ -41,8 +41,8 @@ const AdPaymentOperations = () => {
     const run = (record, operation) => confirm({
         title: operation === 'refund' ? '광고 결제 전액 환불 요청' : '광고 결제 대사·미결 처리',
         content: operation === 'refund'
-            ? `광고 #${record.adId}, 주문 ${record.merchantUid}, ${formatCurrency(record.amount)} 전액 환불을 요청합니다. PG를 재확인하고, 결과가 불확실한 이전 발신은 중복 실행하지 않습니다.`
-            : `주문 ${record.merchantUid}를 PG에서 재확인합니다. 이미 저장된 취소 요청이 있으면 최초 환불 요청도 실행될 수 있습니다.`,
+            ? `광고 #${record.adId}, 주문 ${record.merchantUid}, ${formatCurrency(record.amount)} 전액 환불을 요청해요. PG를 재확인하고, 결과가 불확실한 이전 발신은 중복 실행하지 않아요.`
+            : `주문 ${record.merchantUid}를 PG에서 재확인해요. 이미 저장된 취소 요청이 있으면 최초 환불 요청도 실행될 수 있어요.`,
         okText: operation === 'refund' ? '환불 요청' : '대사·처리',
         cancelText: '취소',
         onOk: () => action.mutateAsync({ id: record.id, operation }),
@@ -71,23 +71,23 @@ const AdPaymentOperations = () => {
     let ledgerContent;
     if (query.isError) {
         ledgerContent = <DataState state="error" kind="payment" subject="광고 결제 원장" error={query.error}
-            onRetry={query.refetch} retrying={query.isFetching} compact />;
+            onRetry={query.refetch} retrying={query.isFetching} />;
     } else if (query.isPending) {
         ledgerContent = <AdminTableSkeleton rows={6} headers={columns.map(column => column.title)}
             cols={columns.map(column => column.width)} actionBtns={2} />;
     } else {
         ledgerContent = <DataTable columns={columns} dataSource={query.data?.content ?? []} rowKey="id"
-            locale={{ emptyText: '표시할 광고 결제 시도가 없습니다.' }}
+            locale={{ emptyText: '표시할 광고 결제 시도가 없어요.' }}
             pagination={{ current: page, pageSize: PAGE_SIZE,
                 total: query.data?.page?.totalElements ?? query.data?.totalElements ?? 0, onChange: setPage }} />;
     }
 
     return (
         <div>
-            <p>결제 시도별 기록입니다. 취소 요청과 환불 완료는 다릅니다. 과거에 덮어쓴 주문번호는 별도 PG 이력 대사가 필요합니다.</p>
+            <p>결제 시도별 기록이에요. 취소 요청과 환불 완료는 달라요. 과거에 덮어쓴 주문번호는 별도 PG 이력 대사가 필요해요.</p>
             <SegmentedControl options={FILTERS} value={openOnly ? 'open' : 'all'} onChange={value => { setOpenOnly(value === 'open'); setPage(1); }} />
             <FilterToolbar count={query.data?.page?.totalElements ?? query.data?.totalElements ?? 0}
-                onReload={query.refetch} loading={query.isFetching} />
+                onReload={query.refetch} loading={query.isFetching} initialLoading={query.isLoading} />
             {ledgerContent}
         </div>
     );

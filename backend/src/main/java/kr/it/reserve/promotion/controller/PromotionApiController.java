@@ -55,7 +55,7 @@ public class PromotionApiController {
     // 홍보글 작성
     @PostMapping
     public ApiResponse<PromotionDto.PromotionResponse> createPromotion(@RequestBody PromotionDto.PromotionRequest request) {
-        return ApiResponse.success(promotionService.createPromotion(SecurityUtil.getCurrentMemberId(), request), "홍보글이 등록되었습니다.");
+        return ApiResponse.success(promotionService.createPromotion(SecurityUtil.getCurrentMemberId(), request), "홍보글이 등록됐어요.");
     }
 
     // 홍보글 수정
@@ -64,14 +64,14 @@ public class PromotionApiController {
             @PathVariable Long promotionId,
             @RequestBody PromotionDto.PromotionRequest request
     ) {
-        return ApiResponse.success(promotionService.updatePromotion(promotionId, SecurityUtil.getCurrentMemberId(), request), "홍보글이 수정되었습니다.");
+        return ApiResponse.success(promotionService.updatePromotion(promotionId, SecurityUtil.getCurrentMemberId(), request), "홍보글이 수정됐어요.");
     }
 
     // 홍보글 삭제
     @DeleteMapping("/{promotionId}")
     public ApiResponse<Void> deletePromotion(@PathVariable Long promotionId) {
         promotionService.deletePromotion(promotionId, SecurityUtil.getCurrentMemberId());
-        return ApiResponse.success(null, "홍보글이 삭제되었습니다.");
+        return ApiResponse.success(null, "홍보글이 삭제됐어요.");
     }
 
     // 내가 작성한 홍보글 목록 조회

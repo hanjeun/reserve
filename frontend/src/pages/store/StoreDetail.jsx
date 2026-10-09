@@ -1,17 +1,20 @@
+import { PageTitle } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
+import WaitingJoin from '../../components/waiting/WaitingJoin';
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { Image, Typography, Form, Carousel, Divider } from 'antd';
 import {
     PlusOutlined, MinusOutlined,
-    ClockCircleOutlined, CreditCardOutlined, FieldTimeOutlined,
-    ThunderboltOutlined, RollbackOutlined, HourglassOutlined, TeamOutlined,
-    StarFilled, EnvironmentOutlined, MessageOutlined, PhoneOutlined,
+    ClockCircleOutlined,
+    StarFilled, MessageOutlined, PhoneOutlined,
 } from '@ant-design/icons';
 import { PageContainer, Button, DataState, FormTextArea, FavoriteButton, Badge, KakaoMap, StoreDetailSkeleton, Bone } from '../../components/common';
 import { BookingCalendar } from '../../components/store';
 import StoreIdentityText from '../../components/store/StoreIdentityText';
+import StoreInfoSection from '../../components/store/StoreInfoSection';
+import StoreActionPanel from '../../components/store/StoreActionPanel';
 import { ReviewList } from '../../components/review';
 import { useStoreData, useMessage, usePayment, useWindowWidth, useStoreDetailActions, useStoreImageHint } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -33,17 +36,17 @@ const { Title, Text } = Typography;
 const BREAKPOINT = 900;
 
 // 인원 수 입력 스텝퍼
-const GuestCountInput = ({ value = 1, onChange }) => {
+const GuestCountInput = ({ value = 1, onChange, disabled = false }) => {
     const dec = () => { if (value > 1) onChange?.(value - 1); };
     const inc = () => { if (value < 99) onChange?.(value + 1); };
     return (
         <div style={inputStyles.wrapper}>
             <span style={inputStyles.count}><RollingFieldValue value={value}>{`${value}명`}</RollingFieldValue></span>
             <div style={inputStyles.btnGroup}>
-                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={dec} disabled={value <= 1} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : undefined }}>
+                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={dec} disabled={disabled || value <= 1} style={{ ...inputStyles.btn, opacity: value <= 1 ? 0.35 : undefined }}>
                     <MinusOutlined style={{ fontSize: 12 }} />
                 </button>
-                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={inc} disabled={value >= 99} style={{ ...inputStyles.btn, opacity: value >= 99 ? 0.35 : undefined }}>
+                <button type="button" className="rsv-tap-btn reserve-guest-count-step" onClick={inc} disabled={disabled || value >= 99} style={{ ...inputStyles.btn, opacity: value >= 99 ? 0.35 : undefined }}>
                     <PlusOutlined style={{ fontSize: 12 }} />
                 </button>
             </div>
@@ -67,153 +70,7 @@ const inputStyles = {
     },
 };
 
-// ─── StoreInfoSection 행 빌더 헬퍼 (모듈 레벨 — 복잡도 분산) ───
-
-/** 분 단위 숫자를 "N분 / N시간 / N시간 N분" 문자열로 변환 */
-const formatMinLabel = (min) => {
-    if (min < 60)          return `${min}분`;
-    if (min % 60 === 0)    return `${min / 60}시간`;
-    return `${Math.floor(min / 60)}시간 ${min % 60}분`;
-};
-
-const buildAddressRow = (store) => {
-    if (!store.address) return null;
-    const full = store.addressDetail ? `${store.address} ${store.addressDetail}` : store.address;
-    return { Icon: EnvironmentOutlined, label: '주소', value: full, link: `https://map.kakao.com/link/search/${encodeURIComponent(full)}` };
-};
-
-const buildHoursRow = (store) => {
-    if (!store.openTime || !store.closeTime) return null;
-    const base = `${store.openTime.substring(0, 5)} ~ ${store.closeTime.substring(0, 5)}`;
-    const value = (store.breakStartTime && store.breakEndTime)
-        ? `${base}  (브레이크 ${store.breakStartTime.substring(0, 5)} ~ ${store.breakEndTime.substring(0, 5)})`
-        : base;
-    return { Icon: ClockCircleOutlined, label: '영업 시간', value };
-};
-
-const buildDepositRow = (store) => {
-    if (store.noShowDeposit <= 0) return null;
-    return { Icon: CreditCardOutlined, label: '노쇼 예약금', value: `${Number(store.noShowDeposit).toLocaleString('ko-KR')}원 (예약 후 결제)`, highlight: true };
-};
-
-const buildOperatingPeriodRow = (store) => {
-    if (!store.openDate && !store.closeDate) return null;
-    let value;
-    if (store.openDate && store.closeDate) value = `${store.openDate} ~ ${store.closeDate}`;
-    else if (store.openDate) value = `${store.openDate}부터 운영`;
-    else value = `${store.closeDate}까지 운영`;
-    return { Icon: FieldTimeOutlined, label: '운영 기간', value };
-};
-
-const buildClosedDaysRow = (store) => {
-    if (!store.closedDays?.length) return null;
-    const labels = ['', '월', '화', '수', '목', '금', '토', '일'];
-    return { Icon: ClockCircleOutlined, label: '정기 휴무', value: `매주 ${store.closedDays.map(day => labels[day]).join('·')} 휴무` };
-};
-
-const buildAdvanceBookingRow = (store) => {
-    if (store.maxAdvanceBookingDays > 0) {
-        return { Icon: FieldTimeOutlined, label: '예약 범위', value: `${store.maxAdvanceBookingDays}일 이내만 예약 가능` };
-    }
-    return null;
-};
-
-const buildRefundRow = (store) => {
-    const hasRefund = store.fullRefundDays > 0 || store.partialRefundDays > 0;
-    if (store.noShowDeposit <= 0 || !hasRefund) return null;
-    const parts = [];
-    if (store.fullRefundDays > 0)                                         parts.push(`방문 ${store.fullRefundDays}일 전까지 전액 환불`);
-    if (store.partialRefundDays > 0 && store.partialRefundRate > 0)       parts.push(`방문 ${store.partialRefundDays}일 전까지 ${store.partialRefundRate}% 환불`);
-    parts.push('이후 환불 불가');
-    return { Icon: RollbackOutlined, label: '환불 정책', value: parts, isMultiLine: true };
-};
-
-const buildDeadlineRow = (store) => {
-    if (store.bookingDeadlineHours <= 0) return null;
-    return { Icon: FieldTimeOutlined, label: '예약 마감', value: `방문 ${store.bookingDeadlineHours}시간 전까지 예약 가능` };
-};
-
-const buildPaymentTimeoutRow = (store) => {
-    if (store.noShowDeposit <= 0 || store.paymentTimeoutMinutes <= 0) return null;
-    return { Icon: ThunderboltOutlined, label: '결제 마감', value: `예약 후 ${formatMinLabel(store.paymentTimeoutMinutes)} 이내 미결제 시 자동 취소` };
-};
-
-const buildSlotRow = (store) => ({
-    Icon: HourglassOutlined,
-    label: '예약 단위',
-    value: `${formatMinLabel(store.reservationSlotMinutes ?? 30)} 단위로 예약 가능`,
-});
-
-const buildCapacityRow = (store) => {
-    if (store.maxCapacityPerSlot <= 0) return null;
-    return { Icon: TeamOutlined, label: '최대 인원', value: `${store.maxCapacityPerSlot}명` };
-};
-
-/** 행 값 렌더러 — IIFE를 컴포넌트로 대체해 StoreInfoSection 복잡도 감소 */
-const RowValue = ({ row }) => {
-    if (row.isMultiLine) {
-        const last = row.value[row.value.length - 1];
-        return row.value.map(v => (
-            <div key={v} style={v === last ? { color: colors.error?.main || '#ff4d4f' } : {}}>{v}</div>
-        ));
-    }
-    if (row.link) {
-        return (
-            <a href={row.link} target="_blank" rel="noopener noreferrer"
-                className="reserve-store-info-link"
-                style={{ color: colors.text.secondary, textDecoration: 'none', borderBottom: `1px solid ${colors.border.light}` }}>
-                {row.value}
-            </a>
-        );
-    }
-    return row.value;
-};
-
-// 가게 상세 정보 섹션 — Cognitive Complexity: 30 → ~5
-export const StoreInfoSection = ({ store }) => {
-    const rows = [
-        buildAddressRow(store),
-        buildHoursRow(store),
-        buildOperatingPeriodRow(store),
-        buildClosedDaysRow(store),
-        buildAdvanceBookingRow(store),
-        buildDepositRow(store),
-        buildRefundRow(store),
-        buildDeadlineRow(store),
-        buildPaymentTimeoutRow(store),
-        buildSlotRow(store),
-        buildCapacityRow(store),
-    ].filter(Boolean);
-
-    if (rows.length === 0) return null;
-
-    return (
-        <div style={infoStyles.card}>
-            {rows.map((row, i) => (
-                <React.Fragment key={row.label}>
-                    <div style={infoStyles.row}>
-                        <row.Icon style={infoStyles.icon} />
-                        <span style={infoStyles.label}>{row.label}</span>
-                        <div style={{ ...infoStyles.value, ...(row.highlight ? infoStyles.highlight : {}) }}>
-                            <RowValue row={row} />
-                        </div>
-                    </div>
-                    {i < rows.length - 1 && <div style={infoStyles.divider} />}
-                </React.Fragment>
-            ))}
-        </div>
-    );
-};
-
-const infoStyles = {
-    card: { padding: '4px 0' },
-    row:  { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 0' },
-    icon: { fontSize: 14, color: colors.text.tertiary, flexShrink: 0, marginTop: 3 },
-    label: { fontSize: fontSize.sm, color: colors.text.tertiary, flexShrink: 0, width: 'var(--reserve-store-info-label-width, 80px)', lineHeight: '22px' },
-    value: { fontSize: fontSize.sm, color: colors.text.secondary, flex: 1, lineHeight: '22px' },
-    highlight: { color: colors.primary.main, fontWeight: fontWeight.medium },
-    divider: { height: 1, background: colors.border.light },
-};
+export { StoreInfoSection };
 
 const storePreviewClassNames = { popup: { root: 'reserve-image-preview reserve-store-detail-preview' } };
 
@@ -226,15 +83,15 @@ const rememberStorePreviewOrigin = event => {
 };
 
 // PC·모바일의 가게명/평점/소개/빠른 연락은 같은 구조를 사용한다.
-export const StoreIdentity = ({ store, nearby, canContact, onContact }) => {
+export const StoreIdentity = ({ store, nearby, canContact, onContact, preview = false }) => {
     const { rating, reviewCount } = normalizeStoreRating(store.rating, store.reviewCount);
     const dialNumber = String(store.phone ?? '').replace(/[^+\d]/g, '');
     return (
         <div className="reserve-store-identity">
             <div className="reserve-store-identity-title-row">
-                <Title level={1}>{store.name}</Title>
+                <PageTitle level={1}>{store.name}</PageTitle>
                 <fieldset className="reserve-store-identity-actions" aria-label="가게 빠른 작업" style={{ border: 0, padding: 0, minWidth: 0, marginInline: 0 }}>
-                    <FavoriteButton storeId={store.id} size="md" appearance="plain" />
+                    {!preview && <FavoriteButton storeId={store.id} size="md" appearance="plain" />}
                     {canContact && onContact && (
                         <button type="button" className="reserve-store-contact-action"
                             onClick={onContact} aria-label="가게에 채팅 문의하기" title="채팅 문의">
@@ -543,9 +400,10 @@ const timeSlotStyles = {
 
 export const ReservationPanel = ({
     store, form, onFinish, paying, isPC, isEditMode, editingReservation,
-    editLoadError = null, editRetrying = false, onRetryEditLoad,
+    editLoadError = null, editRetrying = false, onRetryEditLoad, preview = false,
 }) => {
     const dateValue = Form.useWatch('reservationDate', form);
+    const reservationStore = React.useMemo(() => preview ? { ...store, id: undefined } : store, [preview, store]);
     const timeAvailabilityRef = React.useRef({ key: /** @type {string | null} */ (null), status: 'idle', slots: [] });
     // DAY auto-fill runs in the same effect batch as lookup completion. Validation must see that
     // completion immediately, rather than the previous render's pending state.
@@ -553,18 +411,15 @@ export const ReservationPanel = ({
     let submitLabel = isEditMode ? '예약 변경하기' : '예약 신청하기';
     if (paying) submitLabel = '처리 중...';
     return (
-    <div style={isPC ? pcFormStyles.panel : {}}>
-        <Title level={3} style={{ marginTop: 0, marginBottom: 20, fontWeight: fontWeight.bold }}>
-            {isEditMode ? '예약 변경하기' : '예약하기'}
-        </Title>
-        <Form form={form} layout="vertical" onFinish={onFinish}
+    <StoreActionPanel title={isEditMode ? '예약 변경하기' : '예약하기'} isPC={isPC}>
+        <Form form={form} component={preview ? false : 'form'} layout="vertical" onFinish={preview ? undefined : onFinish}
             initialValues={{ guestCount: 1 }} requiredMark={false}
             style={{ fontWeight: fontWeight.medium }}>
             {/* 수정할 예약을 못 불러왔으면 빈 폼을 보여 주지 않는다. 채워지지 않은 폼에서 "변경하기"를
                 누르면 새 예약을 만드는 것처럼 보인다. 재시도 뒤 prefill 이 붙도록 Form 요소는 남긴다. */}
             {isEditMode && editLoadError ? (
                 <DataState state="error" kind="reservation" subject="변경할 예약 정보" error={editLoadError}
-                    title="변경할 예약 정보를 불러오지 못했습니다." onRetry={onRetryEditLoad} retrying={editRetrying} />
+                    title="변경할 예약 정보를 불러오지 못했어요." onRetry={onRetryEditLoad} retrying={editRetrying} />
             ) : (
                 <>
                     <Form.Item label="예약 날짜" name="reservationDate"
@@ -575,7 +430,7 @@ export const ReservationPanel = ({
                             "왜 안 눌리지"를 알 방법이 없었다. 게다가 그 다섯 판정이 서버(isBookableOn)와
                             **프론트에도 따로**(makeDisabledDate) 있어서 언젠가 어긋날 자리였다.
                             이제 사유는 서버가 내려주고 달력은 그리기만 한다. */}
-                        <BookingCalendar storeId={store?.id} />
+                        <BookingCalendar storeId={reservationStore?.id} disabled={preview} />
                     </Form.Item>
                     {/* 라벨·에러 문구가 예약 방식을 따라간다. DAY 는 시간을 고르는 게 아니라
                         "이 날 예약이 되는지"를 보는 칸이라, "시간을 선택해주세요"가 말이 안 된다. */}
@@ -614,34 +469,24 @@ export const ReservationPanel = ({
                                 return Promise.resolve();
                             },
                         })]}>
-                        <TimeSlotPicker store={store} dateValue={dateValue} form={form} onAvailabilityChange={handleAvailabilityChange} editingReservation={editingReservation} />
+                        <TimeSlotPicker store={reservationStore} dateValue={dateValue} form={form} onAvailabilityChange={handleAvailabilityChange} editingReservation={editingReservation} />
                     </Form.Item>
                     <Form.Item label="인원 수" name="guestCount" rules={VALIDATION_RULES.guestCount}>
-                        <GuestCountInput />
+                        <GuestCountInput disabled={preview} />
                     </Form.Item>
                     <Form.Item label="요청 사항" name="specialRequest">
-                        <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." />
+                        <FormTextArea rows={3} placeholder="요청 사항을 입력하세요." disabled={preview} />
                     </Form.Item>
                     <div style={{ marginTop: 24 }}>
-                        <Button variant="primary" htmlType="submit" block loading={paying}>
+                        <Button variant="primary" htmlType={preview ? 'button' : 'submit'} block loading={paying} disabled={preview}>
                             {submitLabel}
                         </Button>
                     </div>
                 </>
             )}
         </Form>
-    </div>
+    </StoreActionPanel>
     );
-};
-
-const pcFormStyles = {
-    panel: {
-        background: colors.background.paper,
-        borderRadius: radius.xl,
-        border: `1px solid ${colors.border.light}`,
-        padding: '28px 24px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-    },
 };
 
 // "우리동네" 기준 위치 — 저장된 위치가 있으면 그것, 없으면 이 세션의 라이브 위치.
@@ -663,7 +508,7 @@ const StoreNotFound = ({ error, onRetry, onGoToList }) => (
         kind="store"
         subject="가게 정보"
         error={error}
-        title={error ? undefined : '요청하신 가게를 찾을 수 없습니다.'}
+        title={error ? undefined : '요청하신 가게를 찾을 수 없어요.'}
         onRetry={error ? onRetry : undefined}
         missingAction={<Button variant="ghost" size="sm" onClick={onGoToList}>가게 목록으로</Button>}
         style={{ marginTop: 100 }}
@@ -671,10 +516,11 @@ const StoreNotFound = ({ error, onRetry, onGoToList }) => (
 );
 
 // 상세 이미지 캐러셀 — PC·모바일이 래퍼/이미지 스타일만 다르고 구조는 같다.
-const StoreImageCarousel = ({ storeName, sliderImages, autoplay, wrapperStyle, imageStyle }) => (
+const storeDetailImageUrl = (url, preview) => preview && url?.startsWith('blob:') ? url : getDetailImageUrl(url);
+const StoreImageCarousel = ({ storeName, sliderImages, autoplay, wrapperStyle, imageStyle, preview = false }) => (
     <div style={{ position: 'relative' }}>
         <div className="reserve-store-gallery" style={wrapperStyle} onClickCapture={rememberStorePreviewOrigin}>
-            <Image.PreviewGroup items={sliderImages.map(getDetailImageUrl)} classNames={storePreviewClassNames}><Carousel className="reserve-carousel" infinite
+            <Image.PreviewGroup items={sliderImages.map(url => storeDetailImageUrl(url, preview))} classNames={storePreviewClassNames}><Carousel className="reserve-carousel" infinite
                 /* 터치 스와이프를 명시적으로 켠다. react-slick 은 기본값이 켜져 있지만,
                    swipeToSlide 가 없으면 "슬라이드 폭의 일정 비율" 을 넘겨야만 넘어가서
                    짧게 쓸면 제자리로 돌아온다 — 모바일에서 "안 넘어간다" 의 원인.
@@ -686,9 +532,9 @@ const StoreImageCarousel = ({ storeName, sliderImages, autoplay, wrapperStyle, i
                         {/* draggable={false} — PC 마우스 드래그 스와이프용.
                             브라우저 기본 이미지 드래그가 slick 의 mousemove 를 가로채기 때문이다.
                             CSS 쪽(-webkit-user-drag)은 index.css 에 있고, 이 속성은 Firefox 용이다. */}
-                        <Image src={getDetailImageUrl(img)} alt={`${storeName}-${sliderIdx}`}
+                        <Image src={storeDetailImageUrl(img, preview)} alt={`${storeName}-${sliderIdx}`}
                             width="100%" style={imageStyle} draggable={false}
-                            preview={{ mask: '크게 보기' }} />
+                            preview={preview ? false : { mask: '크게 보기' }} />
                     </div>
                 ))}
             </Carousel></Image.PreviewGroup>
@@ -703,62 +549,66 @@ const StoreReviewSection = ({ sectionRef, isPC, ...reviewListProps }) => (
     </section>
 );
 
-const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, reviewProps }) => {
+export const StoreDetailPCLayout = ({ sliderImages, identityProps, panelProps, reviewProps, preview = false, infoContent }) => {
     const { store } = identityProps;
+    const showPanel = !preview || store.reservationEnabled !== false;
     return (
         <>
-            <div style={styles.pcGrid}>
-                <div style={styles.pcLeft}>
+            <div style={showPanel ? styles.pcGrid : { ...styles.pcGrid, justifyContent: 'center' }}>
+                <div style={showPanel ? styles.pcLeft : { ...styles.pcLeft, flex: 1, maxWidth: 640 }}>
                     <StoreImageCarousel storeName={store.name} sliderImages={sliderImages}
-                        autoplay={store.imageAutoplayEnabled !== false}
+                        autoplay={!preview && store.imageAutoplayEnabled !== false} preview={preview}
                         wrapperStyle={styles.pcImageWrapper} imageStyle={styles.pcMainImg} />
-                    <StoreIdentity {...identityProps} />
-                    <StoreInfoSection store={store} />
-                    <div style={{ marginTop: 20, marginBottom: 8 }}>
+                    <StoreIdentity {...identityProps} preview={preview} />
+                    {infoContent ?? <StoreInfoSection store={store} />}
+                    {!preview && <div style={{ marginTop: 20, marginBottom: 8 }}>
                         <KakaoMap latitude={store.latitude} longitude={store.longitude}
                             address={store.address} storeName={store.name} height={220} />
-                    </div>
+                    </div>}
                 </div>
-                <div style={styles.pcRight}>
-                    <ReservationPanel {...panelProps} isPC={true} />
-                </div>
+                {showPanel && <div style={styles.pcRight}>
+                    {store.reservationEnabled !== false && <ReservationPanel {...panelProps} isPC={true} preview={preview} />}
+                    {!preview && <WaitingJoin key={store.id} store={store} isPC />}
+                </div>}
             </div>
             {/* 리뷰 섹션을 2단 레이아웃(pcGrid) 밖으로 분리(2026-07) — 예전엔 pcLeft 안에 있어서
                 예약 폼의 sticky 범위(부모 행 pcGrid가 다 스크롤될 때까지 폼이 화면에 붙어있음)가
                 리뷰 개수만큼 계속 늘어나, 리뷰가 많은 가게일수록 폼이 오래 "고정"된 채로 남아있었다.
                 풀와이드 섹션으로 빼서 sticky 범위를 갤러리+정보+지도까지로 줄이고, 리뷰는 더 넓은
                 폭(540→720)으로 보여준다. 폭은 취향껏 다시 조정 가능. */}
-            <Divider style={styles.divider} />
-            <StoreReviewSection {...reviewProps} isPC />
+            {!preview && <><Divider style={styles.divider} /><StoreReviewSection {...reviewProps} isPC /></>}
         </>
     );
 };
 
-const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProps, reviewProps }) => {
+export const StoreDetailMobileLayout = ({ sliderImages, identityProps, panelProps, reviewProps, preview = false, infoContent }) => {
     const { store } = identityProps;
+    const showPanel = !preview || store.reservationEnabled !== false;
     return (
         <>
             <section style={{ padding: 0 }}>
                 <StoreImageCarousel storeName={store.name} sliderImages={sliderImages}
-                    autoplay={store.imageAutoplayEnabled !== false}
+                    autoplay={!preview && store.imageAutoplayEnabled !== false} preview={preview}
                     wrapperStyle={styles.mobileImageWrapper} imageStyle={styles.mainImg} />
                 <div>
-                    <StoreIdentity {...identityProps} />
+                    <StoreIdentity {...identityProps} preview={preview} />
                 </div>
             </section>
             <div>
-                <StoreInfoSection store={store} />
-                <div style={{ marginTop: 16, marginBottom: 8 }}>
+                {infoContent ?? <StoreInfoSection store={store} />}
+                {!preview && <div style={{ marginTop: 16, marginBottom: 8 }}>
                     <KakaoMap latitude={store.latitude} longitude={store.longitude}
                         address={store.address} storeName={store.name} height={200} />
-                </div>
+                </div>}
             </div>
-            <Divider style={styles.divider} />
-            <section>
-                <ReservationPanel {...panelProps} isPC={false} />
-            </section>
-            <Divider style={styles.divider} />
-            <StoreReviewSection {...reviewProps} isPC={false} />
+            {showPanel && <>
+                <Divider style={styles.divider} />
+                <section>
+                    {store.reservationEnabled !== false && <ReservationPanel {...panelProps} isPC={false} preview={preview} />}
+                    {!preview && <WaitingJoin key={store.id} store={store} isPC={false} />}
+                </section>
+            </>}
+            {!preview && <><Divider style={styles.divider} /><StoreReviewSection {...reviewProps} isPC={false} /></>}
         </>
     );
 };
@@ -790,7 +640,8 @@ const StoreDetail = () => {
         const target = `/messages?storeId=${id}`;
         // 모바일은 브라우저 뒤로가기가 자연스러운 전체 페이지, 태블릿 이상은 현재 맥락을
         // 유지하는 오른쪽 패널을 쓴다. 비로그인은 PrivateRoute를 거쳐 로그인 뒤 돌아온다.
-        if (!isLoggedIn || windowWidth < breakpoints.tablet) navigate(target);
+        if (!isLoggedIn || user?.termsAgreed === false || useAuthStore.getState().isLoggingOut
+            || window.innerWidth < breakpoints.tablet) navigate(target);
         else openStoreMessenger(Number(id));
     };
 

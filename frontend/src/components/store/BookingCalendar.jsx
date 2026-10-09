@@ -68,7 +68,7 @@ const BLOCKED_LABEL = {
     FULL: '마감',
 };
 
-const BookingCalendar = ({ storeId, value, onChange, style }) => {
+const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) => {
     const { status } = Form.Item.useStatus();
     const isError = status === 'error';
 
@@ -168,7 +168,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
         const isRedDay = date.day() === 0 || info?.holiday === true;
 
         const blockedLabel = BLOCKED_LABEL[dayStatus];
-        const blockedReason = blockedLabel ?? (dayStatus === 'OUT_OF_PERIOD' ? '예약 가능한 기간이 아닙니다' : null);
+        const blockedReason = blockedLabel ?? (dayStatus === 'OUT_OF_PERIOD' ? '예약 가능한 기간이 아니에요' : null);
         const dayLabel = date.format('M월 D일');
         const cls = ['rsv-tap-btn', 'reserve-cal-cell'];
 
@@ -234,6 +234,7 @@ const BookingCalendar = ({ storeId, value, onChange, style }) => {
             <button
                 type="button"
                 className="rsv-tap-btn reserve-cal-trigger"
+                disabled={disabled}
                 onClick={openCalendar}
                 style={{ ...styles.trigger, ...(isError ? styles.triggerError : null), ...style }}
             >
@@ -384,6 +385,7 @@ BookingCalendar.propTypes = {
     value: PropTypes.object,
     onChange: PropTypes.func,
     style: PropTypes.object,
+    disabled: PropTypes.bool,
 };
 
 export default BookingCalendar;

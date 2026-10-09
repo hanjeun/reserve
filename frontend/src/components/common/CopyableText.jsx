@@ -61,7 +61,7 @@ const CopyableText = ({ value, label = '내용', fallback = '-', className = '',
                 </button>
             )}
             <output className="reserve-copyable-text__status">
-                {copied ? `${label}를 복사했습니다.` : ''}
+                {copied ? `${label}를 복사했어요.` : ''}
             </output>
         </span>
     );

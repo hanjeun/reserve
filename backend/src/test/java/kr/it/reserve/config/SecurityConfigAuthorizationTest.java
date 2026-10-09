@@ -60,6 +60,19 @@ class SecurityConfigAuthorizationTest {
     }
 
     @Test
+    void onlyTheWaitingDirectoryAndPrivacyPolicyArePublicIncludingVersionedAliases() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            mockMvc.perform(get(prefix + "/waiting/stores")).andExpect(status().isOk());
+            mockMvc.perform(get(prefix + "/waiting/retention-policy")).andExpect(status().isOk());
+            for (String path : new String[]{"/waiting/my", "/waiting/events", "/waiting/entries/1/qr", "/waiting/stores/1/onsite-qr"}) {
+                mockMvc.perform(get(prefix + path)).andExpect(status().isUnauthorized());
+            }
+            mockMvc.perform(post(prefix + "/waiting/stores/1/entries")).andExpect(status().isUnauthorized());
+            mockMvc.perform(post(prefix + "/waiting/entries/1/cancel")).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
     void invalidPublicAdvertisementTypeIsBadRequestRatherThanServerError() throws Exception {
         mockMvc.perform(get("/api/advertisements/active").param("type", "invalid"))
                 .andExpect(status().isBadRequest());

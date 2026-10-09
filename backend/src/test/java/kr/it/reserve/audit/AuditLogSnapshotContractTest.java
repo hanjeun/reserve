@@ -216,7 +216,7 @@ class AuditLogSnapshotContractTest {
         assertThatThrownBy(() -> service.restore(entityType, 61L))
                 .isInstanceOfSatisfying(AuditException.class, exception -> {
                     assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-                    assertThat(exception).hasMessage("휴지통 복구가 지원되지 않는 항목입니다: " + entityType);
+                    assertThat(exception).hasMessage("휴지통 복구가 지원되지 않는 항목이에요: " + entityType);
                 });
 
         verifyNoInteractions(auditLogRepository, adminSentMailRepository, reservationRepository,

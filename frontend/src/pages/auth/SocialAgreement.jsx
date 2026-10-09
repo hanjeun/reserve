@@ -1,3 +1,4 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Typography, Checkbox } from 'antd';
@@ -8,9 +9,9 @@ import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import { consumeRedirect, clearRedirect } from '../../utils/redirect';
 import { API_ENDPOINTS } from '../../constants';
-import { colors, fontSize, fontWeight, agreement as A } from '../../styles/tokens';
+import { agreement as A } from '../../styles/tokens';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const SocialAgreement = () => {
     const navigate = useNavigate();
@@ -38,14 +39,14 @@ const SocialAgreement = () => {
             });
             // 로컬 스토어도 동기화 (termsAgreed + marketingAgreed 반영)
             updateUser({ ...user, termsAgreed: true, marketingAgreed: agreements.marketing });
-            message.success('환영합니다! RESERVE를 시작해보세요.');
+            message.success('환영해요! RESERVE를 시작해보세요.');
             // 2026-07: 신규 소셜 가입자도 약관 동의까지 마치면 원래 가려던 페이지로 보낸다.
             // (OAuthCallback은 신규 가입자의 복귀 경로를 일부러 소비하지 않고 남겨둔다)
             const target = consumeRedirect();
             // 가려던 곳이 있으면 이어서(오른쪽에서), 없으면 홈으로(왼쪽에서).
             navigate(target || '/', { replace: true, state: { reserveRouteMotion: target ? 'from-right' : 'from-left' } });
         } catch {
-            message.error('오류가 발생했습니다. 다시 시도해주세요.');
+            message.error('오류가 발생했어요. 다시 시도해주세요.');
         } finally {
             setLoading(false);
         }
@@ -61,16 +62,16 @@ const SocialAgreement = () => {
     return (
         <PageContainer size="sm" paddingTop="80px">
             <div style={{ maxWidth: 400, margin: '0 auto' }}>
-                <Title level={2} style={styles.title}>RESERVE 서비스 이용 동의</Title>
-                <Text type="secondary" style={styles.subtitle}>
+                <PageTitle style={styles.title}>RESERVE 서비스 이용 동의</PageTitle>
+                <PageDescription style={styles.subtitle}>
                     서비스 시작을 위해 아래 약관에 동의해주세요.
-                </Text>
+                </PageDescription>
 
                 <div style={A.section}>
                     <button type="button" style={{ ...A.allRow, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', width: '100%' }}
                         onClick={() => handleAll(!allChecked)}>
                         <Checkbox style={{ flexShrink: 0 }} checked={allChecked} onChange={e => handleAll(e.target.checked)} />
-                        <Text style={A.allText}>RESERVE 서비스 이용에 모두 동의합니다</Text>
+                        <Text style={A.allText}>RESERVE 서비스 이용에 모두 동의해요</Text>
                     </button>
                     <div style={A.divider} />
 
@@ -124,8 +125,8 @@ const SocialAgreement = () => {
 };
 
 const styles = {
-    title:    { fontWeight: fontWeight.extrabold, marginBottom: 8, letterSpacing: '-1px', color: colors.text.primary },
-    subtitle: { display: 'block', marginBottom: 40, color: colors.text.tertiary, fontSize: fontSize.lg },
+    title:    { marginBottom: 8, },
+    subtitle: { display: 'block', marginBottom: 40, },
 };
 
 export default SocialAgreement;

@@ -22,8 +22,9 @@ vi.mock('../../components/reservation/ReservationRow', () => ({ default: ({ rese
 vi.mock('../../components/reservation/ReservationListingToolbar', () => ({ default: () => <div /> }));
 vi.mock('../../components/reservation/ReservationDetailModal', () => ({ default: () => null }));
 vi.mock('../../components/reservation/QrCodeModal', () => ({ default: () => null }));
+vi.mock('../../components/common/FilterMenu', () => ({ default: ({ 'aria-label': label, disabled }) => <button type="button" aria-label={label} disabled={disabled} /> }));
 vi.mock('antd', () => ({
-    Typography: { Title: ({ children }) => <h2>{children}</h2>, Text: ({ children, role }) => <span role={role}>{children}</span> },
+    Typography: { Title: ({ children }) => <h2>{children}</h2>, Text: ({ children, role }) => <span role={role}>{children}</span>, Paragraph: ({ children }) => <p>{children}</p> },
     Empty: ({ description }) => <div>{description}</div>,
     Alert: ({ title, action }) => <div role="alert">{title}{action}</div>,
     Modal: ({ open, children }) => open ? <div>{children}</div> : null,
@@ -44,6 +45,8 @@ vi.mock('../../components/common', () => {
         ModalLoading: () => <span>불러오는 중</span>,
         SpinIndicator: () => <span />,
         FilterToolbar: () => <div />,
+        SegmentedControl: ({ options, value, onChange }) => <div role="group">{options.map(option => <button type="button" key={option.value}
+            aria-pressed={value === option.value} onClick={() => onChange(option.value)}>{option.label}</button>)}</div>,
         FilterMenu: ({ 'aria-label': label }) => <button type="button" aria-label={label} />,
         DataState: ({ state: dataState = 'empty', title, subject, onRetry, action }) => (
             <section role={dataState === 'error' ? 'alert' : undefined}>
@@ -85,14 +88,14 @@ describe('personal page loading presentation', () => {
         state.query.isFetching = true;
         show(<MyFavorites />);
         expect(screen.getByRole('status', { name: '즐겨찾기를 불러오는 중' })).toBeInTheDocument();
-        expect(screen.queryByText('아직 즐겨찾기한 가게가 없습니다.')).toBeNull();
+        expect(screen.queryByText('아직 즐겨찾기한 가게가 없어요.')).toBeNull();
     });
 
     it('distinguishes a failed favorites query and retries the existing query', () => {
         state.query.error = new Error('offline');
         show(<MyFavorites />);
         expect(screen.getByRole('alert')).toHaveTextContent('즐겨찾기 목록을 불러오지 못했습니다.');
-        expect(screen.queryByText('아직 즐겨찾기한 가게가 없습니다.')).toBeNull();
+        expect(screen.queryByText('아직 즐겨찾기한 가게가 없어요.')).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
         expect(state.refetch).toHaveBeenCalledTimes(1);
     });
@@ -110,14 +113,14 @@ describe('personal page loading presentation', () => {
 
     it('shows a genuinely empty favorites list only after a successful query', () => {
         show(<MyFavorites />);
-        expect(screen.getByText('아직 즐겨찾기한 가게가 없습니다.')).toBeInTheDocument();
+        expect(screen.getByText('아직 즐겨찾기한 가게가 없어요.')).toBeInTheDocument();
     });
 
     it('does not present a failed store query as no registered stores', () => {
         state.stores.error = 'offline';
         show(<MyStores />);
         expect(screen.getByRole('alert')).toHaveTextContent('가게 목록을 불러오지 못했습니다.');
-        expect(screen.queryByText(/등록된 가게가 없습니다/)).toBeNull();
+        expect(screen.queryByText(/등록된 가게가 없어요/)).toBeNull();
     });
 
     it('shows a labeled initial store skeleton', () => {
@@ -130,7 +133,7 @@ describe('personal page loading presentation', () => {
         state.reservations.error = new Error('offline');
         show(<MyReservations />);
         expect(screen.getByRole('alert')).toHaveTextContent('예약 목록을 불러오지 못했습니다.');
-        expect(screen.queryByText('예약 내역이 없습니다.')).toBeNull();
+        expect(screen.queryByText('예약 내역이 없어요.')).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
         expect(state.refetch).toHaveBeenCalledTimes(1);
     });
@@ -175,7 +178,7 @@ describe('personal page loading presentation', () => {
             isError: false,
         };
         show(<PaymentResult />, '/payment/result?type=reservation&merchant_uid=order-1');
-        expect(screen.getByText('결제가 완료되지 않았습니다')).toBeInTheDocument();
+        expect(screen.getByText('결제가 완료되지 않았어요')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '내 예약에서 다시 결제' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '상태 다시 확인' })).toBeNull();
     });

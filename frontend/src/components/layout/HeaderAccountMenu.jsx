@@ -31,7 +31,7 @@ const HeaderAccountMenu = () => {
     const handleLogout = async () => {
         if (isLoggingOut) return;
         setLoggingOut(true);
-        const dismissProgress = message.loading({ content: '로그아웃하는 중입니다.', duration: 0, icon: <SpinIndicator /> });
+        const dismissProgress = message.loading({ content: '로그아웃하는 중이에요.', duration: 0, icon: <SpinIndicator /> });
         let serverLogoutFailed = false;
         try {
             // 로그아웃은 더 이상 토큰이 필요 없는 단방향 요청이다. 401 refresh를 시도하거나
@@ -46,9 +46,9 @@ const HeaderAccountMenu = () => {
             // 로그아웃 → 홈. 로고로 홈에 갈 때와 같은 방향(왼쪽에서)으로 돌아간다.
             navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
             if (serverLogoutFailed) {
-                message.warning('이 기기에서 로그아웃했습니다. 서버 연결은 확인하지 못했습니다.');
+                message.warning('이 기기에서 로그아웃했어요. 서버 연결은 확인하지 못했어요.');
             } else {
-                message.success('성공적으로 로그아웃되었습니다.');
+                message.success('로그아웃했어요.');
             }
         }
     };

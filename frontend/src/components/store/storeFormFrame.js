@@ -16,7 +16,7 @@ export const STORE_FORM_DENSITY_VARS = Object.freeze({
 
 export const STORE_FORM_COPY = Object.freeze({
     create: { title: '가게 등록', subtitle: '가게 정보를 입력하고 예약을 받아보세요.' },
-    edit: { title: '가게 정보 수정', subtitle: '등록된 가게 정보를 수정합니다.' },
+    edit: { title: '가게 정보 수정', subtitle: '등록된 가게 정보를 수정해요.' },
 });
 
 /** 창 폭에 따른 폼 틀. isMobile(<768)은 한 줄 쌓기·작은 입력, isSingleColumn(<900)은 두 컬럼을 한 컬럼으로 합친다. */

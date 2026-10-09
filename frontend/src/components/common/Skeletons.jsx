@@ -347,7 +347,7 @@ const StoreDetailSkeleton = ({ imageHint, isPC: isPCProp }) => {
         <div style={{ flex: '0 0 50%', minWidth: 0, maxWidth: 560 }}>
           {/* 커버 이미지 — 실제 pcImageWrapper의 borderRadius: radius.xl(16px) */}
           <Bone height="auto" borderRadius={16} style={{ marginBottom: 20, ...coverStyle }} />
-          <Bone width="50%" height={28} style={{ marginBottom: 20 }} />
+          <div className="reserve-page-title ant-typography" style={{ width: '50%', margin: '0 0 20px' }}><Bone width="100%" height="1.4em" /></div>
           <InfoRowsSkeleton mapHeight={220} />
         </div>
         {/* 오른쪽: 예약폼 — StoreDetail.jsx의 pcRight + formCard와 동일한 폭/모서리 */}
@@ -377,7 +377,7 @@ const StoreDetailSkeleton = ({ imageHint, isPC: isPCProp }) => {
   return (
     <div>
       <Bone height="auto" borderRadius={16} style={{ width: '100%', ...coverStyle }} />
-      <Bone width="55%" height={28} style={{ marginTop: 20, marginBottom: 16 }} />
+      <div className="reserve-page-title ant-typography" style={{ width: '55%', margin: '20px 0 16px' }}><Bone width="100%" height="1.4em" /></div>
       <InfoRowsSkeleton mapHeight={200} />
       <Bone height={1} borderRadius={0} style={{ margin: '20px 0' }} />
       <div style={{ fontSize: 22, fontWeight: 800, color: colors.text.primary, marginBottom: 20 }}>

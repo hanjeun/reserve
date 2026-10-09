@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { Buffer } from 'node:buffer';
 
 test.beforeEach(async ({ context, page }) => {
     await context.clearCookies();
@@ -150,7 +151,7 @@ test('reservation: authenticated user can open the empty reservation list', asyn
     await page.goto('/my-reservations');
 
     await expect(page.getByRole('heading', { name: '내 예약 확인' })).toBeVisible();
-    await expect(page.getByText('예약 내역이 없습니다.')).toBeVisible();
+    await expect(page.getByText('예약 내역이 없어요.')).toBeVisible();
 });
 
 test('payment: server record confirms a reservation payment', async ({ page }) => {
@@ -161,7 +162,7 @@ test('payment: server record confirms a reservation payment', async ({ page }) =
     await page.goto('/payment/result?success=true&merchant_uid=smoke-payment');
 
     await expect(page.getByText('결제 완료', { exact: true })).toBeVisible();
-    await expect(page.getByText('예약금 결제를 확인했습니다.')).toBeVisible();
+    await expect(page.getByText('예약금 결제를 확인했어요.')).toBeVisible();
     await expect(page.getByText('smoke-payment')).toBeVisible();
 });
 
@@ -182,7 +183,7 @@ test('admin: admin role can open server-paginated verification and payment opera
         await expect(paymentTab).toHaveAttribute('aria-selected', 'true');
     }
     await expect(page.getByRole('radio', { name: '오래된 READY' })).toHaveAttribute('aria-checked', 'true');
-    await expect(page.getByText('처리할 항목이 없습니다.')).toBeVisible();
+    await expect(page.getByText('처리할 항목이 없어요.')).toBeVisible();
 });
 
 test('QR: business user sees attendance semantics before enabling the camera', async ({ page }, testInfo) => {
@@ -198,7 +199,7 @@ test('QR: business user sees attendance semantics before enabling the camera', a
         testInfo.project.name.includes('mobile') ? '24px 24px 0px 0px' : '24px',
     );
     await expect(page.getByRole('status', { name: 'QR 스캐너를 준비하는 중' })).toBeVisible();
-    await expect(page.getByText('승인된 예약의 QR을 비추면 방문 시각이 기록됩니다.')).toBeVisible();
+    await expect(page.getByText('예약·웨이팅 QR을 비추면 입장 기록을 확인해요.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'QR 스캔 시작' })).toBeVisible();
 });
 
@@ -261,14 +262,19 @@ test('business analytics: refresh stays in place while the first store list load
 
     const navigation = page.goto('/business?tab=analytics');
     const refresh = page.getByRole('button', { name: '새로고침' });
+    const refreshSlot = page.locator('.reserve-statistics-tab .reserve-filter-toolbar-refresh');
 
-    await expect(refresh).toBeVisible();
-    await expect(refresh).toBeDisabled();
+    await expect(refreshSlot.locator('.reserve-skeleton-block')).toBeVisible();
+    await expect(refresh).toHaveCount(0);
+    const before = await refreshSlot.boundingBox();
 
     releaseStores();
     await navigation;
     await expect(page.getByRole('button', { name: '통계 가게 필터' })).toBeEnabled();
     await expect(refresh).toBeEnabled();
+    const after = await refreshSlot.boundingBox();
+    expect(Math.abs((after.x + after.width) - (before.x + before.width))).toBeLessThanOrEqual(1);
+    expect(Math.abs((after.y + after.height / 2) - (before.y + before.height / 2))).toBeLessThanOrEqual(1);
 });
 
 test('analytics: opening a source-data table does not stretch its neighboring chart card', async ({ page }) => {

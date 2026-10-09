@@ -10,12 +10,17 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.store.entity.ServiceDomain;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.service.StoreService;
+import kr.it.reserve.waiting.error.WaitingException;
+import kr.it.reserve.waiting.service.CustomerWaitingService;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -23,6 +28,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
@@ -30,6 +36,7 @@ class StoreSearchOrderingTest {
     @Autowired EntityManager em;
     @Autowired StoreService service;
     @Autowired StoreRepository repository;
+    @Autowired CustomerWaitingService waiting;
 
     @Test void rankingAndPublicFilterRunBeforePagingAndCountsMatch() {
         Member owner = Member.builder().name("검증").email("search-order@example.test").role(Role.BUSINESS).build();
@@ -196,5 +203,135 @@ class StoreSearchOrderingTest {
                 new StoreService.SearchScope(null, "서울"),
                 null, "rating", 0, 12, null, null)
                 .getContent()).extracting(StoreResponse::getId).contains(seoul.getId()).doesNotContain(gyeonggi.getId());
+    }
+
+    @Test void waitingDirectoryFiltersRegionAndIntakeBeforePagingAndCountsMatch() {
+        String keyword = "웨이팅지역검증-" + UUID.randomUUID();
+        Member owner = waitingDirectoryOwner("region");
+        Store onsite = waitingDirectoryStore(owner, keyword + " 현장", "경기 안산시 단원구",
+                WaitingIntakeMode.ONSITE, false, 4.0, 12);
+        Store remotePaused = waitingDirectoryStore(owner, keyword + " 원격 중지", "경기도 안산시 상록구",
+                WaitingIntakeMode.REMOTE, true, 4.9, 3);
+        Store both = waitingDirectoryStore(owner, keyword + " 모두", "경기 안산시 단원구",
+                WaitingIntakeMode.BOTH, false, 4.7, 9);
+        Store seoul = waitingDirectoryStore(owner, keyword + " 서울", "서울특별시 종로구",
+                WaitingIntakeMode.BOTH, false, 5.0, 100);
+        waitingDirectoryStore(owner, keyword + " 접수 꺼짐", "경기 안산시 단원구",
+                WaitingIntakeMode.OFF, false, 5.0, 1000);
+        Store banned = waitingDirectoryStore(owner, keyword + " 제재", "경기 안산시 단원구",
+                WaitingIntakeMode.BOTH, false, 5.0, 1000);
+        banned.setStatus(StoreStatus.BANNED);
+        Store deleted = waitingDirectoryStore(owner, keyword + " 삭제", "경기 안산시 단원구",
+                WaitingIntakeMode.REMOTE, false, 5.0, 1000);
+        deleted.setDeletedAt(LocalDateTime.now());
+        em.flush();
+        em.clear();
+
+        assertWaitingDirectoryPages(keyword, new CustomerWaitingService.DirectoryFilters("경기 안산시", "ALL", "rating"),
+                List.of(remotePaused.getId(), both.getId(), onsite.getId()));
+        assertWaitingDirectoryPages(keyword, new CustomerWaitingService.DirectoryFilters("경기 안산시", "OPEN", "rating"),
+                List.of(both.getId(), onsite.getId()));
+        assertWaitingDirectoryPages(keyword, new CustomerWaitingService.DirectoryFilters("경기 안산시", "PAUSED", "rating"),
+                List.of(remotePaused.getId()));
+        assertWaitingDirectoryPages(keyword, new CustomerWaitingService.DirectoryFilters("", "ALL", "rating"),
+                List.of(seoul.getId(), remotePaused.getId(), both.getId(), onsite.getId()));
+        assertWaitingDirectoryPages(keyword, new CustomerWaitingService.DirectoryFilters("서울", "OPEN", "rating"),
+                List.of(seoul.getId()));
+        assertWaitingDirectoryPages(keyword, new CustomerWaitingService.DirectoryFilters("서울", "PAUSED", "rating"), List.of());
+    }
+
+    @Test void waitingDirectoryRankingAndLiteralSearchRunBeforePaging() {
+        String keyword = "웨이팅정렬검증-" + UUID.randomUUID();
+        String literal = keyword + "100%_";
+        Member owner = waitingDirectoryOwner("ranking");
+        Store promoted = waitingDirectoryStore(owner, literal + " 배지", "경기 안산시 단원구",
+                WaitingIntakeMode.BOTH, false, 1.0, 1);
+        Store highestRated = waitingDirectoryStore(owner, literal + " 별점", "경기 안산시 단원구",
+                WaitingIntakeMode.ONSITE, false, 5.0, 10);
+        Store mostReviewed = waitingDirectoryStore(owner, literal + " 리뷰", "경기 안산시 단원구",
+                WaitingIntakeMode.REMOTE, false, 4.0, 100);
+        Store ratingTie = waitingDirectoryStore(owner, literal + " 동점", "서울특별시 종로구",
+                WaitingIntakeMode.REMOTE, false, 5.0, 2);
+        Store categoryMatch = waitingDirectoryStore(owner, keyword + " 카테고리", "경기 안산시 단원구",
+                WaitingIntakeMode.BOTH, false, 3.0, 5);
+        categoryMatch.setCategory(literal);
+        waitingDirectoryStore(owner, keyword + "100X_ 밑줄만", "경기 안산시 단원구",
+                WaitingIntakeMode.BOTH, false, 5.0, 1000);
+        waitingDirectoryStore(owner, keyword + "100%X 퍼센트만", "경기 안산시 단원구",
+                WaitingIntakeMode.BOTH, false, 5.0, 1000);
+        Store descriptionOnly = waitingDirectoryStore(owner, keyword + " 설명만", "경기 안산시 단원구",
+                WaitingIntakeMode.BOTH, false, 5.0, 1000);
+        descriptionOnly.setDescription(literal);
+        em.persist(Advertisement.builder().store(promoted).adType(AdType.BADGE).status(AdStatus.ACTIVE)
+                .startDate(ServiceTime.today()).endDate(ServiceTime.today().plusDays(1))
+                .amount(1000).merchantUid("AD-" + UUID.randomUUID()).build());
+        em.flush();
+        em.createQuery("UPDATE Store s SET s.createdAt = :at WHERE s.owner = :owner")
+                .setParameter("at", LocalDateTime.of(2026, 1, 1, 0, 0)).setParameter("owner", owner).executeUpdate();
+        em.clear();
+
+        assertWaitingDirectoryPages(literal, new CustomerWaitingService.DirectoryFilters("", "ALL", "recommended"),
+                List.of(promoted.getId(), highestRated.getId(), ratingTie.getId(), mostReviewed.getId(), categoryMatch.getId()));
+        assertWaitingDirectoryPages(literal, new CustomerWaitingService.DirectoryFilters("", "ALL", "rating"),
+                List.of(promoted.getId(), ratingTie.getId(), highestRated.getId(), mostReviewed.getId(), categoryMatch.getId()));
+        assertWaitingDirectoryPages(literal, new CustomerWaitingService.DirectoryFilters("", "ALL", "reviewCount"),
+                List.of(promoted.getId(), mostReviewed.getId(), highestRated.getId(), categoryMatch.getId(), ratingTie.getId()));
+        assertThat(waiting.directory(literal, 1, 1).getContent()).extracting(StoreResponse::getId)
+                .containsExactly(categoryMatch.getId());
+        assertThat(waiting.directory(literal, 1, 1, new CustomerWaitingService.DirectoryFilters(null, null, null)).getContent())
+                .extracting(StoreResponse::getId).containsExactly(highestRated.getId());
+    }
+
+    @Test void waitingDirectoryRejectsInvalidFiltersBeforeDatabaseAccess() {
+        var statistics = em.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        boolean wasEnabled = statistics.isStatisticsEnabled();
+        statistics.setStatisticsEnabled(true);
+        try {
+            long statementsBefore = statistics.getPrepareStatementCount();
+            for (var filters : List.of(
+                    new CustomerWaitingService.DirectoryFilters("가".repeat(101), "ALL", "recommended"),
+                    new CustomerWaitingService.DirectoryFilters("", "WAITING", "recommended"),
+                    new CustomerWaitingService.DirectoryFilters("", "ALL", "rating desc; drop table store"))) {
+                assertThatThrownBy(() -> waiting.directory("", 0, 1, filters))
+                        .isInstanceOfSatisfying(WaitingException.class,
+                                error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+            }
+            assertThatThrownBy(() -> waiting.directory("가".repeat(101), 0, 1,
+                    new CustomerWaitingService.DirectoryFilters("", "ALL", "recommended")))
+                    .isInstanceOfSatisfying(WaitingException.class,
+                            error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+            assertThat(statistics.getPrepareStatementCount()).isEqualTo(statementsBefore);
+        } finally {
+            statistics.setStatisticsEnabled(wasEnabled);
+        }
+    }
+
+    private Member waitingDirectoryOwner(String suffix) {
+        Member owner = Member.builder().name("웨이팅 탐색 검증")
+                .email("waiting-directory-" + suffix + "-" + UUID.randomUUID() + "@example.test")
+                .role(Role.BUSINESS).build();
+        em.persist(owner);
+        return owner;
+    }
+
+    private Store waitingDirectoryStore(Member owner, String name, String address, WaitingIntakeMode mode,
+                                        boolean paused, double rating, int reviews) {
+        Store store = Store.builder().owner(owner).name(name).address(address).waitingIntakeMode(mode)
+                .waitingPaused(paused).rating(rating).reviewCount(reviews).build();
+        em.persist(store);
+        return store;
+    }
+
+    private void assertWaitingDirectoryPages(String keyword, CustomerWaitingService.DirectoryFilters filters,
+                                             List<Long> expectedIds) {
+        for (int page = 0; page < expectedIds.size(); page++) {
+            var result = waiting.directory(keyword, page, 1, filters);
+            assertThat(result.getTotalElements()).as(filters + " page " + page).isEqualTo(expectedIds.size());
+            assertThat(result.getContent()).as(filters + " page " + page)
+                    .extracting(StoreResponse::getId).containsExactly(expectedIds.get(page));
+        }
+        var afterLastPage = waiting.directory(keyword, expectedIds.size(), 1, filters);
+        assertThat(afterLastPage.getTotalElements()).isEqualTo(expectedIds.size());
+        assertThat(afterLastPage.getContent()).isEmpty();
     }
 }

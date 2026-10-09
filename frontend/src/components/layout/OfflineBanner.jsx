@@ -43,8 +43,8 @@ const OfflineBanner = () => {
             <WifiOutlined style={{ fontSize: 14 }} />
             <span>
                 {reconnected
-                    ? '인터넷에 다시 연결되었습니다.'
-                    : '인터넷 연결이 끊겼습니다. 네트워크 상태를 확인해주세요.'}
+                    ? '인터넷에 다시 연결됐어요.'
+                    : '인터넷 연결이 끊겼어요. 네트워크 상태를 확인해주세요.'}
             </span>
         </div>
     );

@@ -70,7 +70,7 @@ public class AuditCleanupWorker {
             case "RESERVATION" -> reservationRepository.deleteById(entityId);
             case "REVIEW" -> reviewRepository.deleteById(entityId);
             case "ADVERTISEMENT" -> advertisementRepository.deleteById(entityId);
-            default -> throw new AuditException("휴지통 영구삭제가 지원되지 않는 항목입니다: " + entityType);
+            default -> throw new AuditException("휴지통 영구삭제가 지원되지 않는 항목이에요: " + entityType);
         }
     }
 

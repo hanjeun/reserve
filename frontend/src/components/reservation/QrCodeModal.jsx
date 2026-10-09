@@ -75,14 +75,14 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
                         kind="reservation"
                         subject="QR 코드"
                         error={error}
-                        title="QR 코드를 불러오지 못했습니다."
+                        title="QR 코드를 불러오지 못했어요."
                         onRetry={refetch}
                         retrying={isFetching}
                         compact
                         style={styles.errorState}
                     />
                 ) : (
-                    <Text type="secondary">QR 코드를 불러올 수 없습니다.</Text>
+                    <Text type="secondary">QR 코드를 불러올 수 없어요.</Text>
                 ))}
                 <Text style={styles.hint}>
                     가게에 도착하면 이 QR을 사장님께 보여주세요

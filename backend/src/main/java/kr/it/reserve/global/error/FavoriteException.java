@@ -15,6 +15,6 @@ public class FavoriteException extends BusinessException {
     // ========== 정적 팩토리 메서드 ==========
     
     public static FavoriteException notFound() {
-        return new FavoriteException("매장을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new FavoriteException("매장을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 }

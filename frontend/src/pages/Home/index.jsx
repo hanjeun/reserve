@@ -8,15 +8,19 @@ import {
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { DataState } from '../../components/common';
+import DataState from '../../components/common/DataState';
+import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
+import ChoiceIllustration from '../../components/common/ChoiceIllustration';
 import RegionSheet from '../../components/discovery/RegionSheet';
 import StoreListRow from '../../components/store/StoreListRow';
 import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 import { DISCOVERY_ASSET_ROOT as ASSET_ROOT, SERVICE_DOMAIN_IMAGES } from '../../constants/discovery';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useDiscoveryRegion from '../../hooks/useDiscoveryRegion';
 import useGeolocation from '../../hooks/useGeolocation';
 import useMessage from '../../hooks/useMessage';
+import useMessagesEntry from '../../hooks/useMessagesEntry';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useAuthStore from '../../store/useAuthStore';
 import useLocationStore from '../../store/useLocationStore';
@@ -40,10 +44,10 @@ const SHORTCUTS = [
         to: '/stores?domain=' + encodeURIComponent(domain.value),
         ...SERVICE_DOMAIN_IMAGES[domain.value],
     })),
-    { key: 'rating', label: '평점순', to: '/stores?sort=rating', asset: 'rating', width: 45, height: 45 },
-    { key: 'favorites', label: '관심 가게', to: '/my-favorites', asset: 'favorites', width: 45, height: 51 },
-    { key: 'reservations', label: '내 예약', to: '/my-reservations', asset: 'reservations', width: 43, height: 53 },
-    { key: 'messages', label: '메시지', to: '/messages', asset: 'messages', width: 49, height: 49 },
+    { key: 'rating', label: '평점순', to: '/stores?sort=rating', asset: 'quick-top-rated' },
+    { key: 'favorites', label: '관심 가게', to: '/my-favorites', asset: 'quick-favorite' },
+    { key: 'reservations', label: '내 예약', to: '/my-reservations', asset: 'quick-my-reservations' },
+    { key: 'messages', label: '메시지', to: '/messages', asset: 'quick-messages' },
 ];
 
 const SHORTCUT_GROUPS = [
@@ -56,11 +60,11 @@ const FEATURED_SLIDES = [
         key: 'operation-guide',
         asset: 'operation-guide-cover-v1',
         desktopAsset: 'operation-guide-cover-desktop-v1',
-        to: '/operation-guide',
-        accessibleLabel: 'RESERVE 운영 안내 보기',
+        to: '/guide/common',
+        accessibleLabel: 'RESERVE 이용안내 보기',
         kicker: 'RESERVE 이용 안내',
         title: ['예약 전에 확인하면,', '더 편리해요'],
-        description: '예약·결제·취소 기준을 한눈에 확인하세요',
+        description: '예약·웨이팅부터 가게 운영까지 확인하세요',
     },
     {
         key: 'dining',
@@ -281,6 +285,7 @@ function FeaturedCarousel({ region = '' }) {
 FeaturedCarousel.propTypes = { region: PropTypes.string };
 
 function DiscoveryShortcuts({ region = '' }) {
+    const { onMessagesLinkClick } = useMessagesEntry();
     return (
         <section id="home-services" className="reserve-discovery-shortcuts" aria-labelledby="home-services-title">
             <h2 id="home-services-title" className="reserve-discovery-visually-hidden">서비스 둘러보기</h2>
@@ -293,17 +298,13 @@ function DiscoveryShortcuts({ region = '' }) {
                                 <Link
                                     key={shortcut.key}
                                     to={withRegion(shortcut.to, region)}
+                                    onClick={shortcut.to === '/messages' ? onMessagesLinkClick : undefined}
                                     className="reserve-discovery-shortcut"
                                     aria-label={shortcut.accessibleLabel || shortcut.label}
                                 >
                                     <span className="reserve-discovery-shortcut-media" aria-hidden="true">
-                                        <img
-                                            src={ASSET_ROOT + shortcut.asset + '.webp'}
-                                            alt=""
-                                            width={shortcut.width}
-                                            height={shortcut.height}
-                                            draggable={false}
-                                        />
+                                        {SERVICE_DOMAIN_IMAGES[shortcut.key] ? <ServiceDomainIcon domain={shortcut.key} />
+                                            : <ChoiceIllustration name={shortcut.asset} />}
                                     </span>
                                     <span>{shortcut.label}</span>
                                 </Link>
@@ -345,7 +346,7 @@ function RecommendedStores({ region = '' }) {
         if (stores.length === 0) {
             return (
                 <div className="reserve-discovery-empty">
-                    <DataState state="empty" kind="store" title={region ? '이 지역에 등록된 가게가 없습니다.' : '아직 추천할 가게가 없습니다.'} />
+                    <DataState state="empty" kind="store" title={region ? '이 지역에 등록된 가게가 없어요.' : '아직 추천할 가게가 없어요.'} />
                 </div>
             );
         }
@@ -379,7 +380,7 @@ export default function Home() {
     const user = useAuthStore(state => state.user);
     const setLiveLocation = useLocationStore(state => state.setLiveLocation);
     const [homeParams, setHomeParams] = useSearchParams();
-    const region = homeParams.get('region') || '';
+    const [region, rememberRegion] = useDiscoveryRegion(homeParams);
     const [regionOpen, setRegionOpen] = useState(false);
 
     const openRegion = () => {
@@ -387,6 +388,7 @@ export default function Home() {
     };
 
     const applyRegion = nextRegion => {
+        if (!rememberRegion(nextRegion)) return;
         setHomeParams(prev => {
             const next = new URLSearchParams(prev);
             if (nextRegion) next.set('region', nextRegion);

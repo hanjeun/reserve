@@ -24,9 +24,9 @@ public class FavoriteApiController {
      */
     @PostMapping("/toggle/{storeId}")
     public ApiResponse<FavoriteDto.ToggleResponse> toggleFavorite(@PathVariable Long storeId) {
-        Member member = SecurityUtil.getCurrentMember("찜 기능을 이용하려면 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("찜 기능을 이용하려면 로그인이 필요해요.");
         FavoriteDto.ToggleResponse response = favoriteService.toggleFavorite(storeId, member);
-        String message = response.isFavorite() ? "찜 목록에 추가되었습니다." : "찜 목록에서 삭제되었습니다.";
+        String message = response.isFavorite() ? "찜 목록에 추가됐어요." : "찜 목록에서 삭제됐어요.";
         return ApiResponse.success(response, message);
     }
 
@@ -52,7 +52,7 @@ public class FavoriteApiController {
      */
     @GetMapping("/my")
     public ApiResponse<List<FavoriteDto.Response>> getMyFavorites() {
-        Member member = SecurityUtil.getCurrentMember("찜 목록을 조회하려면 로그인이 필요합니다.");
+        Member member = SecurityUtil.getCurrentMember("찜 목록을 조회하려면 로그인이 필요해요.");
         List<FavoriteDto.Response> favorites = favoriteService.getMyFavorites(member);
         return ApiResponse.success(favorites, "내 찜 목록 조회 성공");
     }

@@ -19,6 +19,7 @@ import {
     WifiOutlined,
 } from '@ant-design/icons';
 import Button from './Button';
+import StateIllustration from './StateIllustration';
 import { fontSize, spacing } from '../../styles/tokens';
 import { isMissingRequestError, listRequestErrorKind, listRequestErrorMessage } from '../../utils/listErrorMessage';
 
@@ -80,7 +81,10 @@ const DataState = ({
     const Icon = isError
         ? (ERROR_ICON_BY_KIND[errorKind] ?? ERROR_ICON_BY_KIND.unknown)
         : (EMPTY_ICON_BY_KIND[kind] ?? InboxOutlined);
-    const message = title ?? (isError ? listRequestErrorMessage(error, subject ?? '목록', requestType) : '표시할 항목이 없습니다.');
+    const message = title ?? (isError ? listRequestErrorMessage(error, subject ?? '목록', requestType) : '표시할 항목이 없어요.');
+    const errorImages = { forbidden: 'access-restricted', missing: 'not-found', offline: 'network-offline',
+        rateLimited: 'rate-limited', retry: 'retry', unavailable: 'server-unavailable', unknown: 'unknown-error' };
+    const illustration = isMissingDetail ? 'not-found' : isError ? errorImages[errorKind] ?? 'unknown-error' : `empty-${kind}`;
 
     return (
         <section
@@ -95,7 +99,8 @@ const DataState = ({
             aria-live={isError ? 'assertive' : undefined}
             {...rest}
         >
-            <span className="reserve-data-state__icon" aria-hidden="true"><Icon /></span>
+            {compact ? <span className="reserve-data-state__icon" aria-hidden="true"><Icon /></span>
+                : <StateIllustration name={illustration} fallback={<Icon />} interactive={!retrying} />}
             <div className="reserve-data-state__copy">
                 <p className="reserve-data-state__title">{message}</p>
                 {description && <p className="reserve-data-state__description">{description}</p>}
@@ -104,9 +109,9 @@ const DataState = ({
                 <Button
                     variant="ghost"
                     size="sm"
-                    icon={<SyncOutlined aria-hidden="true" />}
-                    loadingIcon={<SyncOutlined spin aria-hidden="true" />}
                     loading={retrying}
+                    icon={<SyncOutlined />}
+                    loadingIcon={<SyncOutlined spin />}
                     onClick={onRetry}
                     className="reserve-data-state__retry"
                 >

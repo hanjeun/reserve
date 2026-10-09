@@ -1,38 +1,55 @@
-import React, { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Badge } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { chatService } from '../../services';
 import { chatKeys } from '../../hooks/queryKeys';
 import { useWindowWidth } from '../../hooks';
+import useMessagesEntry from '../../hooks/useMessagesEntry';
 import useAuthStore from '../../store/useAuthStore';
 import useMessengerStore, { messengerIdentityOf } from '../../store/useMessengerStore';
 import { breakpoints } from '../../styles/tokens';
 import MessengerLauncherVisual from './MessengerLauncherVisual';
 import { chatListQueryPolicy, shouldAutoRefreshChatMetadata } from './chatListQueryPolicy';
+import ConversationListSkeleton from './ConversationListSkeleton';
+import { LoadingPresentationContext, createLoadingPresentation } from '../layout/loadingPresentation';
 
 const MessengerContent = lazy(() => import('./MessengerContent'));
 const BADGE_POLL_MS = 60000;
 
+// 패널을 실제로 연 한 번의 이동만 기록한다. 뒤쪽 페이지와 골격 표시 기록을 공유하지 않는다.
+function MessengerPanelBody({ coverImageSrc }) {
+    const identity = useMessengerStore(state => state.sessionIdentity);
+    const view = useMessengerStore(state => state.view);
+    const activeThread = useMessengerStore(state => state.activeThread);
+    const selection = useMessengerStore(state => state.selection);
+    const navigationKey = `${identity}:${view}:${activeThread}:${selection.kind}:${selection.storeId ?? selection.roomId ?? ''}`;
+    const presentation = useMemo(() => createLoadingPresentation(navigationKey), [navigationKey]);
+    return <LoadingPresentationContext.Provider value={presentation}>
+        <Suspense fallback={<div className="reserve-messenger-shell-loading"><div style={{ width: '100%', padding: 24 }}><ConversationListSkeleton /></div></div>}>
+            <MessengerContent surface="panel" coverImageSrc={coverImageSrc} />
+        </Suspense>
+    </LoadingPresentationContext.Provider>;
+}
+MessengerPanelBody.propTypes = { coverImageSrc: PropTypes.string };
+
 /** 로그인 영역 전체의 단일 런처. PC는 패널, 모바일은 /messages 화면으로 진입한다. */
 const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const { pathname } = useLocation();
-    const navigate = useNavigate();
+    const { openMessages } = useMessagesEntry();
     const width = useWindowWidth();
     const user = useAuthStore((state) => state.user);
     const sessionRevision = useAuthStore((state) => state.sessionRevision);
     const open = useMessengerStore((state) => state.open);
     const storeOpenRevision = useMessengerStore((state) => state.storeOpenRevision);
-    const togglePanel = useMessengerStore((state) => state.togglePanel);
     const closePanel = useMessengerStore((state) => state.closePanel);
     const syncIdentity = useMessengerStore((state) => state.syncIdentity);
     const view = useMessengerStore((state) => state.view);
-    const showHome = useMessengerStore((state) => state.showHome);
     const identity = messengerIdentityOf({ user, sessionRevision });
     const isMobile = width < breakpoints.tablet;
-    const isMessagesPage = pathname === '/messages';
+    const isMessagesPage = /^\/messages\/?$/.test(pathname);
     const panelRef = useRef(null);
     const launcherRef = useRef(null);
     const returnFocusRef = useRef(null);
@@ -125,7 +142,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
         }
     };
 
-    if (!user || pathname === '/search') return null;
+    if (!user || /^\/search\/?$/.test(pathname)) return null;
 
     if (isMessagesPage) return null;
 
@@ -149,9 +166,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                     >
                         <CloseOutlined />
                     </button>
-                    <Suspense fallback={<div className="reserve-messenger-shell-loading">메시지를 불러오는 중입니다.</div>}>
-                        <MessengerContent surface="panel" coverImageSrc={coverImageSrc} />
-                    </Suspense>
+                    <MessengerPanelBody coverImageSrc={coverImageSrc} />
                 </div>
             )}
             <div className="reserve-messenger-launcher-wrap">
@@ -161,17 +176,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                         ref={launcherRef}
                         type="button"
                         className={`reserve-chat-launcher reserve-messenger-launcher${!isMobile && open ? ' is-open' : ''}`}
-                        onClick={() => {
-                            // useWindowWidth는 resize를 150ms 디바운스한다. 개발자 도구·회전·창 복원 직후
-                            // 훅 값이 잠깐 이전 폭인 동안 누르면 PC에서도 /messages로 이동할 수 있으므로,
-                            // 사용자 동작 시점의 실제 폭으로 분기한다.
-                            const mobileAtClick = window.innerWidth < breakpoints.tablet;
-                            if (mobileAtClick) {
-                                showHome();
-                                navigate('/messages', { state: { messengerEntry: true } });
-                            }
-                            else togglePanel();
-                        }}
+                        onClick={() => openMessages({ toggle: true })}
                         aria-label={!isMobile && open ? '메시지 창 닫기' : `${messagesLabel} 열기`}
                         aria-expanded={!isMobile && open}
                     >

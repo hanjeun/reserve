@@ -35,7 +35,7 @@ public class BusinessVerificationApiController {
     public ApiResponse<BusinessVerificationResponse> submitVerification(@ModelAttribute BusinessVerificationRequest request) {
         Member member = SecurityUtil.getCurrentMember();
         BusinessVerificationResponse response = verificationService.submitVerification(member, request);
-        return ApiResponse.success(response, "사업자 인증 신청이 완료되었습니다. 관리자 승인 후 이용 가능합니다.");
+        return ApiResponse.success(response, "사업자 인증 신청이 완료됐어요. 관리자 승인 후 이용할 수 있어요.");
     }
 
     /**
@@ -96,7 +96,7 @@ public class BusinessVerificationApiController {
     @PostMapping("/admin/{id}/approve")
     public ApiResponse<BusinessVerificationResponse> approve(@PathVariable Long id) {
         Member admin = SecurityUtil.getCurrentMember();
-        return ApiResponse.success(verificationService.approveVerification(id, admin), "사업자 인증이 승인되었습니다.");
+        return ApiResponse.success(verificationService.approveVerification(id, admin), "사업자 인증이 승인됐어요.");
     }
 
     /**
@@ -109,7 +109,7 @@ public class BusinessVerificationApiController {
             @RequestBody Map<String, String> body) {
         Member admin = SecurityUtil.getCurrentMember();
         String reason = body.get("reason");
-        return ApiResponse.success(verificationService.rejectVerification(id, admin, reason), "사업자 인증이 거절되었습니다.");
+        return ApiResponse.success(verificationService.rejectVerification(id, admin, reason), "사업자 인증이 거절됐어요.");
     }
 
     /**
@@ -127,7 +127,7 @@ public class BusinessVerificationApiController {
     @PatchMapping("/update")
     public ApiResponse<BusinessVerificationResponse> updateVerification(@ModelAttribute BusinessVerificationRequest request) {
         Member member = SecurityUtil.getCurrentMember();
-        return ApiResponse.success(verificationService.updateVerification(member, request), "수정되었습니다.");
+        return ApiResponse.success(verificationService.updateVerification(member, request), "수정됐어요.");
     }
 
     /**
@@ -136,7 +136,7 @@ public class BusinessVerificationApiController {
     @DeleteMapping("/cancel")
     public ApiResponse<Void> cancelVerification() {
         verificationService.cancelVerification(SecurityUtil.getCurrentMember());
-        return ApiResponse.success(null, "사업자 인증 신청이 취소되었습니다.");
+        return ApiResponse.success(null, "사업자 인증 신청이 취소됐어요.");
     }
 
     /**
@@ -147,7 +147,7 @@ public class BusinessVerificationApiController {
     @PostMapping("/resign")
     public ApiResponse<Void> resignBusinessRole() {
         verificationService.resignBusinessRole(SecurityUtil.getCurrentMember());
-        return ApiResponse.success(null, "사업자 자격이 포기되었습니다.");
+        return ApiResponse.success(null, "사업자 자격이 포기됐어요.");
     }
 
     /**
@@ -157,7 +157,7 @@ public class BusinessVerificationApiController {
     @PostMapping("/admin/{memberId}/revoke")
     public ApiResponse<Void> revokeBusinessRole(@PathVariable Long memberId) {
         verificationService.revokeBusinessRole(memberId, SecurityUtil.getCurrentMember());
-        return ApiResponse.success(null, "사업자 자격이 취소되었습니다.");
+        return ApiResponse.success(null, "사업자 자격이 취소됐어요.");
     }
 
     private Pageable boundedPage(int page, int size) {
@@ -172,7 +172,7 @@ public class BusinessVerificationApiController {
             return VerificationStatus.valueOf(status.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new BizVerificationException(
-                    "올바르지 않은 인증 상태입니다.",
+                    "올바르지 않은 인증 상태예요.",
                     org.springframework.http.HttpStatus.BAD_REQUEST);
         }
     }

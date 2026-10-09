@@ -4,7 +4,7 @@
  * AntD DatePicker의 필드 API(value/onChange)는 유지하되 달력 표면은 RESERVE가 직접 그린다.
  * 가게 설정·광고 신청·예약 화면이 서로 다른 달력 언어를 쓰지 않게 하는 공통 관문이다.
  */
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useId, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Form, Modal } from 'antd';
 import {
@@ -27,6 +27,40 @@ const SWIPE_MIN_PX = 45;
 const validDay = value => (value && dayjs.isDayjs(value) && value.isValid() ? value : null);
 const dayKey = value => validDay(value)?.format('YYYY-MM-DD') ?? null;
 const sameDay = (left, right) => Boolean(left && right && left.isSame(right, 'day'));
+
+const dateText = value => dayKey(value) ?? '';
+const parseTypedDate = text => {
+    const trimmed = text.trim();
+    const separated = /^(\d{4})([-./])(\d{2})\2(\d{2})$/.exec(trimmed);
+    const compact = /^(\d{4})(\d{2})(\d{2})$/.exec(trimmed);
+    // Also accept the previous calendar label's complete dotted form, including its final dot.
+    const dottedLabel = /^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.$/.exec(trimmed);
+    const parts = separated ? [separated[1], separated[3], separated[4]] : (compact ?? dottedLabel)?.slice(1);
+    if (!parts) return null;
+    const [year, month, date] = parts.map(Number);
+    if (year < 1 || year > 9999 || month < 1 || month > 12 || date < 1 || date > 31) return null;
+    const parsed = dayjs('2000-01-01').year(year).month(month - 1).date(date).startOf('day');
+    return parsed.isValid() && parsed.year() === year && parsed.month() === month - 1 && parsed.date() === date ? parsed : null;
+};
+
+const typedDateState = (mode, texts, composing, disabledDate) => {
+    const dates = texts.map((text, part) => composing.has(part) ? null : parseTypedDate(text));
+    const errors = texts.map((text, part) => {
+        if (!text.trim() || composing.has(part)) return null;
+        if (!dates[part]) return '올바른 날짜를 끝까지 입력해주세요. 예: 2026-10-08 또는 20261008';
+        if (disabledDate?.(dates[part])) return '선택할 수 없는 날짜예요.';
+        return null;
+    });
+    const accepted = dates.map((date, part) => errors[part] ? null : date);
+    if (mode === 'range' && accepted[0] && accepted[1]?.isBefore(accepted[0], 'day')) {
+        errors[1] = '종료일은 시작일과 같거나 늦어야 해요.';
+        accepted[1] = null;
+    }
+    return { dates: accepted, errors };
+};
+
+const pickerInputTexts = (mode, value) => mode === 'range'
+    ? [dateText(value?.[0]), dateText(value?.[1])] : [mode === 'single' ? dateText(value) : ''];
 
 const initialMonthFor = (mode, value) => {
     if (mode === 'range') return validDay(value?.[0]) ?? validDay(value?.[1]) ?? dayjs();
@@ -95,6 +129,9 @@ const toggleDate = (current, date) => {
     if (exists) return current.filter(item => !sameDay(item, date));
     return [...current, date].sort((a, b) => a.valueOf() - b.valueOf());
 };
+
+const addDate = (current, date) => !date || current.some(item => sameDay(item, date))
+    ? current : [...current, date].sort((a, b) => a.valueOf() - b.valueOf());
 
 const pickRangeDate = (current, date, rangePart, setRangePart) => {
     const next = [...current];
@@ -177,34 +214,42 @@ TriggerLabel.propTypes = {
     modalOpen: PropTypes.bool,
 };
 
-function RangePartChoice({ draftRange, rangePart, setRangePart }) {
+function DateTextInput({ label, text, date, active, onSelect, onType, onNormalize,
+    onCompositionStart, onCompositionEnd, onEnter, composing, error, fieldInvalid, describedBy, disabled }) {
+    const inputId = useId();
     return (
-        <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0, ...styles.rangeChoice }} aria-label="선택할 날짜 종류">
-            {[0, 1].map(part => {
-                const date = draftRange[part];
-                return (
-                    <button
-                        key={part}
-                        type="button"
-                        className={`reserve-form-cal-part${rangePart === part ? ' is-active' : ''}`}
-                        aria-pressed={rangePart === part}
-                        onClick={() => setRangePart(part)}
-                    >
-                        <span style={styles.partLabel}>{part === 0 ? '시작일' : '종료일'}</span>
-                        <span style={date ? styles.partValue : styles.partPlaceholder}>
-                            {date ? date.format('YYYY. M. D.') : '선택 안 함'}
-                        </span>
-                    </button>
-                );
-            })}
-        </fieldset>
+        <div className={`reserve-form-cal-part reserve-date-input${active ? ' is-active' : ''}`}
+            style={error ? styles.triggerError : undefined}>
+            {onSelect ? <button type="button" className="reserve-date-part-label" disabled={disabled}
+                aria-label={`${label} ${date ? date.format('YYYY. M. D.') : '선택 안 함'}`}
+                aria-pressed={active} onClick={onSelect}>{label}</button>
+                : <label className="reserve-date-part-label" htmlFor={inputId}>{label}</label>}
+            <input id={inputId} type="text" inputMode="numeric" autoComplete="off" spellCheck={false}
+                className="reserve-date-part-value" aria-label={`${label} 직접 입력`} disabled={disabled}
+                aria-invalid={error ? true : fieldInvalid} aria-describedby={describedBy}
+                placeholder="YYYY-MM-DD" value={text}
+                onFocus={event => { onSelect?.(); event.currentTarget.select(); }}
+                onChange={onType} onBlur={onNormalize}
+                onCompositionStart={onCompositionStart} onCompositionEnd={onCompositionEnd}
+                onKeyDown={event => {
+                    if (event.key !== 'Enter') return;
+                    event.stopPropagation();
+                    if (composing || event.nativeEvent.isComposing || event.keyCode === 229) return;
+                    event.preventDefault();
+                    onEnter();
+                }} />
+        </div>
     );
 }
 
-RangePartChoice.propTypes = {
-    draftRange: PropTypes.array.isRequired,
-    rangePart: PropTypes.number.isRequired,
-    setRangePart: PropTypes.func.isRequired,
+DateTextInput.propTypes = {
+    label: PropTypes.string.isRequired, text: PropTypes.string.isRequired,
+    date: PropTypes.object, active: PropTypes.bool, onSelect: PropTypes.func,
+    onType: PropTypes.func.isRequired, onNormalize: PropTypes.func.isRequired,
+    onCompositionStart: PropTypes.func.isRequired, onCompositionEnd: PropTypes.func.isRequired,
+    onEnter: PropTypes.func.isRequired, composing: PropTypes.bool,
+    error: PropTypes.string, fieldInvalid: PropTypes.oneOfType([PropTypes.bool, PropTypes.string]),
+    describedBy: PropTypes.string, disabled: PropTypes.bool,
 };
 
 const FormDatePickerBase = ({
@@ -212,6 +257,7 @@ const FormDatePickerBase = ({
     value,
     onChange,
     onBlur,
+    onFocus,
     placeholder,
     disabled = false,
     disabledDate,
@@ -221,6 +267,8 @@ const FormDatePickerBase = ({
     className = '',
     allowEmpty = [false, false],
     highlightHolidays = false,
+    'aria-describedby': describedBy,
+    'aria-invalid': ariaInvalid,
 }) => {
     const { status } = Form.Item.useStatus();
     const [open, setOpen] = useState(false);
@@ -230,25 +278,80 @@ const FormDatePickerBase = ({
     const holidays = useHolidayDates(month.format('YYYY-MM'), open && highlightHolidays);
     const [draftSingle, setDraftSingle] = useState(() => validDay(value));
     const [draftMultiple, setDraftMultiple] = useState(() => validDays(value));
+    const draftMultipleRef = useRef(draftMultiple);
     const [draftRange, setDraftRange] = useState(() => [validDay(value?.[0]), validDay(value?.[1])]);
     const [rangePart, setRangePart] = useState(0);
+    const [typedDates, setTypedDates] = useState(() => pickerInputTexts(mode, value));
+    const typedDatesRef = useRef(typedDates);
+    const composingRef = useRef(new Set());
+    const [composingParts, setComposingParts] = useState([false, false]);
+    const hintId = useId();
     const touchRef = useRef(null);
+    const inputState = typedDateState(mode, typedDates, new Set([0, 1].filter(part => composingParts[part])), disabledDate);
+    const hasInputError = inputState.errors.some(Boolean) || composingParts.some(Boolean);
+    const rangeLabels = Array.isArray(placeholder) ? placeholder : ['시작일', '종료일'];
 
     const selectedKeys = useMemo(() => {
         if (mode === 'range') return new Set(draftRange.map(dayKey).filter(Boolean));
-        if (mode === 'multiple') return new Set(draftMultiple.map(dayKey).filter(Boolean));
+        if (mode === 'multiple') return new Set([...draftMultiple, draftSingle].map(dayKey).filter(Boolean));
         return new Set([dayKey(draftSingle)].filter(Boolean));
     }, [draftMultiple, draftRange, draftSingle, mode]);
 
+    const setInputTexts = texts => {
+        typedDatesRef.current = texts;
+        setTypedDates(texts);
+    };
+    const setMultipleDates = dates => {
+        draftMultipleRef.current = dates;
+        setDraftMultiple(dates);
+    };
+    const updateTypedDraft = (texts, part) => {
+        const next = typedDateState(mode, texts, composingRef.current, disabledDate);
+        if (mode === 'range') setDraftRange(next.dates);
+        else setDraftSingle(next.dates[0]);
+        if (next.dates[part]) setMonth(next.dates[part].startOf('month'));
+    };
+    const typeDate = (part, text) => {
+        if (disabled) return;
+        const next = [...typedDatesRef.current];
+        next[part] = text;
+        setInputTexts(next);
+        updateTypedDraft(next, part);
+    };
+    const startComposition = part => {
+        composingRef.current.add(part);
+        setComposingParts([0, 1].map(index => composingRef.current.has(index)));
+        updateTypedDraft(typedDatesRef.current, part);
+    };
+    const finishComposition = (part, text) => {
+        composingRef.current.delete(part);
+        setComposingParts([0, 1].map(index => composingRef.current.has(index)));
+        typeDate(part, text);
+    };
+    const normalizeDateText = part => {
+        const next = typedDateState(mode, typedDatesRef.current, composingRef.current, disabledDate);
+        if (!next.dates[part]) return;
+        setInputTexts(typedDatesRef.current.map((text, index) => index === part ? dateText(next.dates[part]) : text));
+    };
+    const selectRangePart = part => {
+        setRangePart(part);
+        const date = draftRange[part] ?? draftRange[1 - part];
+        if (date) setMonth(date.startOf('month'));
+    };
+
     const openPicker = () => {
         if (disabled) return;
+        setInputTexts(pickerInputTexts(mode, value));
+        composingRef.current.clear();
+        setComposingParts([false, false]);
         setMonth(initialMonthFor(mode, value).startOf('month'));
         if (mode === 'range') {
             const next = [validDay(value?.[0]), validDay(value?.[1])];
             setDraftRange(next);
             setRangePart(next[0] && !next[1] ? 1 : 0);
         } else if (mode === 'multiple') {
-            setDraftMultiple(validDays(value));
+            setMultipleDates(validDays(value));
+            setDraftSingle(null);
         } else {
             setDraftSingle(validDay(value));
         }
@@ -256,6 +359,8 @@ const FormDatePickerBase = ({
     };
 
     const closePicker = () => {
+        composingRef.current.clear();
+        setComposingParts([false, false]);
         setOpen(false);
         onBlur?.();
     };
@@ -266,7 +371,7 @@ const FormDatePickerBase = ({
     );
 
     const pickDate = date => {
-        if (isDateDisabled(date)) return;
+        if (disabled || isDateDisabled(date)) return;
         if (mode === 'single') {
             setDraftSingle(date);
             onChange?.(date);
@@ -275,14 +380,23 @@ const FormDatePickerBase = ({
         }
 
         if (mode === 'multiple') {
-            setDraftMultiple(current => toggleDate(current, date));
+            const candidate = typedDateState(mode, typedDatesRef.current, composingRef.current, disabledDate).dates[0];
+            setMultipleDates(toggleDate(addDate(draftMultipleRef.current, candidate), date));
+            setDraftSingle(null);
+            setInputTexts(['']);
             return;
         }
 
-        setDraftRange(current => pickRangeDate(current, date, rangePart, setRangePart));
+        const next = pickRangeDate(draftRange, date, rangePart, setRangePart);
+        const texts = [...typedDatesRef.current];
+        texts[rangePart] = dateText(next[rangePart]);
+        if (rangePart === 0 && parseTypedDate(texts[1])?.isBefore(date, 'day')) texts[1] = '';
+        setInputTexts(texts);
+        updateTypedDraft(texts, rangePart);
     };
 
     const clearValue = () => {
+        if (disabled) return;
         if (mode === 'range') onChange?.(null);
         else if (mode === 'multiple') onChange?.([]);
         else onChange?.(null);
@@ -290,10 +404,27 @@ const FormDatePickerBase = ({
     };
 
     const commitDraft = () => {
-        if (mode === 'range') onChange?.(draftRange.some(Boolean) ? draftRange : null);
-        else if (mode === 'multiple') onChange?.(draftMultiple);
-        else onChange?.(draftSingle);
+        if (disabled || !open || composingRef.current.size) return;
+        const next = typedDateState(mode, typedDatesRef.current, composingRef.current, disabledDate);
+        if (next.errors.some(Boolean)) return;
+        if (mode === 'range') {
+            if (!canCommitRange(next.dates, allowEmpty)) return;
+            onChange?.(next.dates);
+        } else if (mode === 'multiple') onChange?.(addDate(draftMultipleRef.current, next.dates[0]));
+        else {
+            if (!next.dates[0]) return;
+            onChange?.(next.dates[0]);
+        }
         closePicker();
+    };
+
+    const addTypedDate = () => {
+        if (disabled || composingRef.current.size) return;
+        const next = typedDateState(mode, typedDatesRef.current, composingRef.current, disabledDate);
+        if (next.errors[0] || !next.dates[0]) return;
+        setMultipleDates(addDate(draftMultipleRef.current, next.dates[0]));
+        setDraftSingle(null);
+        setInputTexts(['']);
     };
 
     const rangeCanCommit = mode !== 'range' || canCommitRange(draftRange, allowEmpty);
@@ -348,7 +479,21 @@ const FormDatePickerBase = ({
     const label = triggerLabel(mode, value, placeholder, format);
     const dialogLabel = mode === 'range' ? '날짜 범위 선택' : '날짜 선택';
     const isError = status === 'error';
+    const fieldInvalid = ariaInvalid ?? (isError || undefined);
     const iconColor = resolveIconColor(disabled, isError, hasValue);
+    const inputDescribedBy = [describedBy, hintId].filter(Boolean).join(' ');
+    const renderDateInput = (part, label, onSelect) => <DateTextInput key={part}
+        label={label} text={typedDates[part]} date={mode === 'range' ? draftRange[part] : draftSingle}
+        active={mode === 'range' && rangePart === part} onSelect={onSelect} disabled={disabled}
+        onType={event => {
+            if (event.nativeEvent.isComposing && !composingRef.current.has(part)) startComposition(part);
+            typeDate(part, event.target.value);
+        }}
+        onNormalize={() => normalizeDateText(part)}
+        onCompositionStart={() => startComposition(part)}
+        onCompositionEnd={event => finishComposition(part, event.currentTarget.value)}
+        onEnter={mode === 'multiple' ? addTypedDate : commitDraft} composing={composingParts[part]}
+        error={inputState.errors[part]} fieldInvalid={fieldInvalid} describedBy={inputDescribedBy} />;
 
     return (
         <>
@@ -358,8 +503,11 @@ const FormDatePickerBase = ({
                 disabled={disabled}
                 aria-haspopup="dialog"
                 aria-expanded={open}
+                aria-describedby={describedBy}
                 className={`rsv-tap-btn reserve-cal-trigger reserve-form-date-trigger ${className}`.trim()}
                 onClick={openPicker}
+                onFocus={onFocus}
+                onBlur={() => { if (!open) onBlur?.(); }}
                 style={{
                     ...styles.trigger,
                     ...(disabled ? styles.triggerDisabled : null),
@@ -387,9 +535,12 @@ const FormDatePickerBase = ({
                 closable={false}
                 rootClassName="reserve-cal-modal reserve-form-cal-modal"
             >
-                {mode === 'range' && (
-                    <RangePartChoice draftRange={draftRange} rangePart={rangePart} setRangePart={setRangePart} />
-                )}
+                {mode === 'range' ? <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0, ...styles.rangeChoice }}
+                    aria-label="선택할 날짜 종류">
+                    {[0, 1].map(part => renderDateInput(part, rangeLabels[part], () => selectRangePart(part)))}
+                </fieldset> : <div style={{ marginBottom: 14 }}>
+                    {renderDateInput(0, mode === 'multiple' ? '추가할 날짜' : '날짜')}
+                </div>}
 
                 <div style={styles.header}>
                     <div style={styles.navGroup}>
@@ -422,12 +573,14 @@ const FormDatePickerBase = ({
                     {cells.map((cell, index) => renderCell(cell, index))}
                 </div>
 
-                {mode !== 'single' && (
-                    <div style={styles.footer}>
-                        <Button variant="ghost-sm" size="sm" onClick={clearValue}>전체 해제</Button>
-                        <ModalActions onCancel={closePicker} onConfirm={commitDraft} disabled={!rangeCanCommit} confirmText="선택 완료" />
-                    </div>
-                )}
+                <p id={hintId} className="reserve-date-input-hint" style={inputState.errors.some(Boolean) ? { color: colors.error.main } : undefined}>
+                    {inputState.errors.find(Boolean) || '2026-10-08 또는 20261008처럼 입력하거나 달력에서 골라주세요.'}
+                </p>
+                <div style={{ ...styles.footer, ...(mode === 'single' ? { justifyContent: 'flex-end' } : null) }}>
+                    {mode !== 'single' && <Button variant="ghost-sm" size="sm" onClick={clearValue} disabled={disabled}>전체 해제</Button>}
+                    <ModalActions onCancel={closePicker} onConfirm={commitDraft}
+                        disabled={disabled || hasInputError || !rangeCanCommit || (mode === 'single' && !draftSingle)} confirmText="선택 완료" />
+                </div>
             </Modal>
         </>
     );
@@ -442,6 +595,7 @@ const sharedPropTypes = {
     value: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
     onChange: PropTypes.func,
     onBlur: PropTypes.func,
+    onFocus: PropTypes.func,
     placeholder: PropTypes.oneOfType([PropTypes.string, PropTypes.arrayOf(PropTypes.string)]),
     disabled: PropTypes.bool,
     disabledDate: PropTypes.func,
@@ -451,6 +605,8 @@ const sharedPropTypes = {
     className: PropTypes.string,
     multiple: PropTypes.bool,
     highlightHolidays: PropTypes.bool,
+    'aria-describedby': PropTypes.string,
+    'aria-invalid': PropTypes.oneOfType([PropTypes.bool, PropTypes.string]),
 };
 
 FormDatePicker.propTypes = sharedPropTypes;
@@ -478,9 +634,6 @@ const styles = {
     placeholder: { minWidth: 0, color: field.placeholderColor, fontSize: fontSize.lg, fontWeight: fontWeight.regular },
     arrow: { color: colors.text.placeholder, textAlign: 'center' },
     rangeChoice: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 },
-    partLabel: { display: 'block', marginBottom: 3, fontSize: fontSize.xs, color: colors.text.tertiary },
-    partValue: { display: 'block', fontSize: fontSize.sm, color: colors.text.primary, fontVariantNumeric: 'tabular-nums' },
-    partPlaceholder: { display: 'block', fontSize: fontSize.sm, color: field.placeholderColor },
     header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
     navGroup: { display: 'flex', gap: 2 },
     monthLabel: { fontSize: fontSize.md, fontWeight: fontWeight.semibold, color: colors.text.primary },

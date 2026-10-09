@@ -22,6 +22,7 @@ export default function NotFound() {
     return (
         <PageStatus
             icon={<FileUnknownOutlined />}
+            illustration="not-found"
             title="페이지를 찾을 수 없어요"
             description="주소가 잘못 입력됐거나 더 이상 제공하지 않는 페이지예요."
             actions={<>

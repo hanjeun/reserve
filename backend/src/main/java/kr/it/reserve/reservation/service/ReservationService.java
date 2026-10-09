@@ -49,8 +49,8 @@ import java.util.stream.Collectors;
 @Service
 public class ReservationService {
 
-    private static final String STORE_NOT_FOUND_MESSAGE = "가게를 찾을 수 없습니다.";
-    private static final String RESERVATION_NOT_FOUND_MESSAGE = "예약을 찾을 수 없습니다.";
+    private static final String STORE_NOT_FOUND_MESSAGE = "가게를 찾을 수 없어요.";
+    private static final String RESERVATION_NOT_FOUND_MESSAGE = "예약을 찾을 수 없어요.";
 
     private final ReservationRepository reservationRepository;
     private final StoreRepository storeRepository;
@@ -93,12 +93,12 @@ public class ReservationService {
 
         // 정지 체크 — JWT 크레임에는 status가 없으므로 DB에서 fresh 조회
         Member freshMember = memberRepository.findActiveByIdForUpdate(member.getId())
-                .orElseThrow(() -> new ReservationException("회원 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReservationException("회원 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         if (freshMember.isSuspended()) {
-            throw new ReservationException("계정이 정지된 상태입니다. 예약을 진행할 수 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ReservationException("계정이 정지된 상태예요. 예약을 진행할 수 없어요.", HttpStatus.FORBIDDEN);
         }
         if (!freshMember.isTermsAgreed()) {
-            throw new ReservationException("서비스 이용 약관에 동의해야 예약할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ReservationException("서비스 이용 약관에 동의해야 예약할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         // 비관적 락으로 조회 — 이 store row에 대한 동시 예약 요청을 트랜잭션 종료까지 순차화해서
@@ -110,12 +110,12 @@ public class ReservationService {
             throw new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
         }
         if (store.isSuspended()) {
-            throw new ReservationException("현재 운영이 중단된 가게입니다. 신규 예약을 받지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("현재 운영이 중단된 가게예요. 신규 예약을 받지 않아요.", HttpStatus.BAD_REQUEST);
         }
 
         // 가게 주인이 정지된 경우 신규 예약 차단
         if (store.getOwner() != null && store.getOwner().isSuspended()) {
-            throw new ReservationException("현재 운영이 중단된 가게입니다. 신규 예약을 받지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("현재 운영이 중단된 가게예요. 신규 예약을 받지 않아요.", HttpStatus.BAD_REQUEST);
         }
 
         // 나중 결제 허용 검증: allowLatePayment=false + 예약금 있으면 즉시 결제 필수
@@ -124,7 +124,7 @@ public class ReservationService {
                 && Boolean.TRUE.equals(request.getSkipPayment())) {
             // request에 skipPayment 플래그가 있으면(=나중 결제 시도) 거부
             throw new ReservationException(
-                    "이 가게는 나중 결제를 허용하지 않습니다. 예약금을 즉시 결제해주세요.",
+                    "이 가게는 나중 결제를 허용하지 않아요. 예약금을 즉시 결제해주세요.",
                     HttpStatus.BAD_REQUEST
             );
         }
@@ -181,7 +181,7 @@ public class ReservationService {
                         e.getClass().getSimpleName());
             }
         } else {
-            log.debug("사장님 이메일 알림 비활성화 상태 — 발송 건너뜀");
+            log.debug("Owner reservation notification skipped: email notifications disabled");
         }
 
     }
@@ -197,6 +197,9 @@ public class ReservationService {
     private void validateReservationSlot(Store store, Member member,
                                          LocalDate date, LocalTime time, Integer guestCount,
                                          Long excludeReservationId) {
+        if (!store.isReservationEnabled()) {
+            throw new ReservationException("현재 이 가게는 예약 접수를 받지 않아요.", HttpStatus.CONFLICT);
+        }
         LocalDateTime reservationDateTime = LocalDateTime.of(date, time);
         // ★ 반드시 KST 기준 "지금"이어야 한다. date·time 은 사용자가 고른 한국 시각이고,
         //   컨테이너는 UTC 라 인자 없는 now() 는 9시간 뒤처진다.
@@ -205,7 +208,7 @@ public class ReservationService {
         LocalDateTime now = ServiceTime.now();
 
         if (reservationDateTime.isBefore(now)) {
-            throw new ReservationException("예약 날짜/시간은 현재 이후여야 합니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("예약 날짜/시간은 현재 이후여야 해요.", HttpStatus.BAD_REQUEST);
         }
 
         // ★ 휴무 검증 (2026-08-11 신설).
@@ -220,8 +223,8 @@ public class ReservationService {
         if (!store.isBookableOn(date)) {
             throw new ReservationException(
                     store.isClosedOn(date)
-                            ? "휴무일에는 예약할 수 없습니다. 다른 날짜를 선택해주세요."
-                            : "예약을 받는 기간이 아닙니다. 다른 날짜를 선택해주세요.",
+                            ? "휴무일에는 예약할 수 없어요. 다른 날짜를 선택해주세요."
+                            : "예약을 받는 기간이 아니에요. 다른 날짜를 선택해주세요.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -239,7 +242,7 @@ public class ReservationService {
             String breakStr = store.getBreakStartTime().toString().substring(0, 5)
                 + " ~ " + store.getBreakEndTime().toString().substring(0, 5);
             throw new ReservationException(
-                "브레이크 타임(" + breakStr + ") 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.",
+                "브레이크 타임(" + breakStr + ") 중에는 예약할 수 없어요. 다른 시간대를 선택해주세요.",
                 HttpStatus.BAD_REQUEST
             );
         }
@@ -257,7 +260,7 @@ public class ReservationService {
         if (!bookable.contains(time)) {
             throw new ReservationException(
                 bookable.isEmpty()
-                    ? "이 날짜에는 예약을 받지 않습니다. 다른 날짜를 선택해주세요."
+                    ? "이 날짜에는 예약을 받지 않아요. 다른 날짜를 선택해주세요."
                     : "예약 가능한 시간대를 선택해주세요.",
                 HttpStatus.BAD_REQUEST
             );
@@ -272,7 +275,7 @@ public class ReservationService {
                             member.getId(), store.getId(), date, excludeReservationId);
             if (isDuplicate) {
                 throw new ReservationException(
-                        "이미 해당 날짜에 예약이 존재합니다. 같은 날 중복 예약은 불가합니다.",
+                        "이미 해당 날짜에 예약이 존재해요. 같은 날 중복 예약할 수 없어요.",
                         HttpStatus.CONFLICT
                 );
             }
@@ -293,7 +296,7 @@ public class ReservationService {
             LocalDate lastBookable = ServiceTime.today().plusDays(maxAdvance);
             if (date.isAfter(lastBookable)) {
                 throw new ReservationException(
-                        "이 가게는 " + maxAdvance + "일 이내의 날짜만 예약할 수 있습니다.", HttpStatus.BAD_REQUEST);
+                        "이 가게는 " + maxAdvance + "일 이내의 날짜만 예약할 수 있어요.", HttpStatus.BAD_REQUEST);
             }
         }
 
@@ -302,7 +305,7 @@ public class ReservationService {
             LocalDateTime deadline = reservationDateTime.minusHours(store.getBookingDeadlineHours());
             if (now.isAfter(deadline)) {
                 throw new ReservationException(
-                    "예약 마감 시간이 지났습니다. 예약 시간 " + store.getBookingDeadlineHours() + "시간 전까지만 예약 가능합니다.",
+                    "예약 마감 시간이 지났어요. 예약 시간 " + store.getBookingDeadlineHours() + "시간 전까지만 예약할 수 있어요.",
                     HttpStatus.BAD_REQUEST
                 );
             }
@@ -325,13 +328,13 @@ public class ReservationService {
             int remaining = store.getMaxCapacityPerSlot() - currentGuests;
             if (remaining <= 0) {
                 throw new ReservationException(
-                        "해당 시간대 예약이 마감되었습니다. (" + currentGuests + "/" + store.getMaxCapacityPerSlot() + "명 마감) 다른 시간대를 선택해주세요.",
+                        "해당 시간대 예약이 마감됐어요. (" + currentGuests + "/" + store.getMaxCapacityPerSlot() + "명 마감) 다른 시간대를 선택해주세요.",
                         HttpStatus.CONFLICT
                 );
             }
             if (guestCount > remaining) {
                 throw new ReservationException(
-                        "선택하신 인원(" + guestCount + "명)이 남은 자리(" + remaining + "명)를 초과합니다.",
+                        "선택하신 인원(" + guestCount + "명)이 남은 자리(" + remaining + "명)를 초과해요.",
                         HttpStatus.CONFLICT
                 );
             }
@@ -576,13 +579,13 @@ public class ReservationService {
         boolean editableStatus = current == Reservation.ReservationStatus.PENDING
                 || current == Reservation.ReservationStatus.CONFIRMED;
         if (!editableStatus) {
-            throw new ReservationException("완료·취소·거절·노쇼된 예약은 변경할 수 없습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("완료·취소·거절·노쇼된 예약은 변경할 수 없어요.", HttpStatus.BAD_REQUEST);
         }
 
         // 결제된 예약은 수정 불가 — 취소 후 재예약으로 유도(부분 환불/재결제 정합성 보호)
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
             throw new ReservationException(
-                    "이미 결제된 예약은 변경할 수 없습니다. 취소 후 다시 예약해주세요.", HttpStatus.BAD_REQUEST);
+                    "이미 결제된 예약은 변경할 수 없어요. 취소 후 다시 예약해주세요.", HttpStatus.BAD_REQUEST);
         }
 
         // 슬롯 재검증을 위해 가게를 비관적 락으로 조회 (생성과 동일하게 오버부킹 레이스 차단)
@@ -591,7 +594,7 @@ public class ReservationService {
 
         // 운영 중단된 가게로는 예약을 옮길 수 없음
         if (store.getOwner() != null && store.getOwner().isSuspended()) {
-            throw new ReservationException("현재 운영이 중단된 가게입니다. 예약을 변경할 수 없습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("현재 운영이 중단된 가게예요. 예약을 변경할 수 없어요.", HttpStatus.BAD_REQUEST);
         }
 
         // 요청에 담긴 값만 반영, 나머지는 기존값 유지 (status는 무시)
@@ -632,7 +635,7 @@ public class ReservationService {
         validateOwnership(reservation, member);
 
         if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
-            throw new ReservationException("이미 취소된 예약입니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("이미 취소된 예약이에요.", HttpStatus.BAD_REQUEST);
         }
 
         // ★ 환불 실패가 취소를 막지 않는다 (2026-08-09).
@@ -667,7 +670,7 @@ public class ReservationService {
         Reservation reservation = findByIdOrThrow(reservationId);
         validateOwnership(reservation, member);
         if (!isApprovedForCheckIn(reservation)) {
-            throw new ReservationException("승인된 예약만 QR 체크인을 사용할 수 있습니다.",
+            throw new ReservationException("승인된 예약만 QR 체크인을 사용할 수 있어요.",
                     HttpStatus.BAD_REQUEST);
         }
         return qrCheckinTokenProvider.generateToken(reservationId, reservation.getReservationDate());
@@ -701,7 +704,7 @@ public class ReservationService {
                     reservation.getId(), reservation.getStore().getId(), owner.getId(),
                     reservation.getReservationDate(), today);
             throw new ReservationException(
-                    "방문 당일에만 QR 체크인이 가능합니다. (예약일: " + reservation.getReservationDate() + ")",
+                    "방문 당일에만 QR 체크인을 할 수 있어요. (예약일: " + reservation.getReservationDate() + ")",
                     HttpStatus.BAD_REQUEST
             );
         }
@@ -718,7 +721,7 @@ public class ReservationService {
             log.warn("QR check-in rejected (bad status): reservationId={}, storeId={}, ownerId={}, status={}",
                     reservation.getId(), reservation.getStore().getId(), owner.getId(), reservation.getStatus());
             throw new ReservationException(
-                    "승인된 예약만 QR 체크인이 가능합니다. (현재 상태: " + reservation.getStatus() + ")",
+                    "승인된 예약만 QR 체크인을 할 수 있어요. (현재 상태: " + reservation.getStatus() + ")",
                     HttpStatus.BAD_REQUEST
             );
         }
@@ -749,7 +752,7 @@ public class ReservationService {
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
-            throw new ReservationException("대기 중인 예약만 승인 가능합니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("대기 중인 예약만 승인할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
@@ -782,7 +785,7 @@ public class ReservationService {
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
-            throw new ReservationException("대기 중인 예약만 거절 가능합니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("대기 중인 예약만 거절할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
 
         reservation.setStatus(Reservation.ReservationStatus.REJECTED);
@@ -844,7 +847,7 @@ public class ReservationService {
 
         if (!isClosable(reservation)) {
             throw new ReservationException(
-                    "승인된 예약만 취소할 수 있습니다. 대기 중인 예약은 '거절'을 사용해주세요.",
+                    "승인된 예약만 취소할 수 있어요. 대기 중인 예약은 '거절'을 사용해주세요.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -938,7 +941,7 @@ public class ReservationService {
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED) {
-            throw new ReservationException("승인된 예약만 되돌릴 수 있습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("승인된 예약만 되돌릴 수 있어요.", HttpStatus.BAD_REQUEST);
         }
         requireWithinUndoWindow(reservation);
 
@@ -974,7 +977,7 @@ public class ReservationService {
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
-            throw new ReservationException("이용완료된 예약만 되돌릴 수 있습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("이용완료된 예약만 되돌릴 수 있어요.", HttpStatus.BAD_REQUEST);
         }
         requireWithinUndoWindow(reservation);
 
@@ -996,7 +999,7 @@ public class ReservationService {
         LocalDateTime changedAt = reservation.getUpdatedAt();
         if (changedAt == null || changedAt.isBefore(LocalDateTime.now(Clock.systemDefaultZone()).minusMinutes(UNDO_WINDOW_MINUTES))) {
             throw new ReservationException(
-                    "되돌릴 수 있는 시간이 지났습니다. 취소 또는 거절을 사용해주세요.", HttpStatus.BAD_REQUEST);
+                    "되돌릴 수 있는 시간이 지났어요. 취소 또는 거절을 사용해주세요.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -1011,7 +1014,7 @@ public class ReservationService {
         // UNCONFIRMED 도 받는다 (2026-08-11) — 그건 "승인됐는데 시간이 지나도록 사장님이
         // 처리를 안 한" 상태다. 처리를 안 했다는 이유로 처리 수단을 막으면 영영 못 닫는다.
         if (!isClosable(reservation)) {
-            throw new ReservationException("승인된 예약만 이용완료 처리가 가능합니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("승인된 예약만 이용완료 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
 
         reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
@@ -1026,10 +1029,10 @@ public class ReservationService {
         validateStoreOwner(reservation, owner);
 
         if (!isClosable(reservation)) {
-            throw new ReservationException("승인된 예약만 노쇼 처리가 가능합니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("승인된 예약만 노쇼 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
         if (reservation.getCheckedInAt() != null) {
-            throw new ReservationException("체크인된 예약은 노쇼로 처리할 수 없습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("체크인된 예약은 노쇼로 처리할 수 없어요.", HttpStatus.BAD_REQUEST);
         }
 
         reservation.setStatus(Reservation.ReservationStatus.NO_SHOW);
@@ -1044,7 +1047,7 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (!store.getOwner().getId().equals(owner.getId())) {
-            throw new ReservationException("본인 가게의 예약만 조회 가능합니다.", HttpStatus.FORBIDDEN);
+            throw new ReservationException("본인 가게의 예약만 조회할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         Pageable pageable = PageRequest.of(searchDto.getPage(), searchDto.getSize());
@@ -1146,7 +1149,7 @@ public class ReservationService {
         boolean isOwner = reservation.getMember().getId().equals(member.getId());
         boolean isStoreOwner = reservation.getStore().getOwner().getId().equals(member.getId());
         if (!isOwner && !isStoreOwner && !member.isAdmin()) {
-            throw new ReservationException("해당 예약에 대한 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ReservationException("해당 예약에 대한 권한이 없어요.", HttpStatus.FORBIDDEN);
         }
 
         // 진행 중인 예약은 삭제 불가
@@ -1157,7 +1160,7 @@ public class ReservationService {
                 || status == Reservation.ReservationStatus.NO_SHOW;
 
         if (!isDeletable) {
-            throw new ReservationException("완료·취소·거절·노쇼 상태의 예약만 삭제할 수 있습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReservationException("완료·취소·거절·노쇼 상태의 예약만 삭제할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
 
         reservation.softDelete();
@@ -1195,7 +1198,7 @@ public class ReservationService {
 
     private void validateOwnership(Reservation reservation, Member member) {
         if (!reservation.getMember().getId().equals(member.getId())) {
-            throw new ReservationException("해당 예약에 대한 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ReservationException("해당 예약에 대한 권한이 없어요.", HttpStatus.FORBIDDEN);
         }
     }
 
@@ -1219,7 +1222,7 @@ public class ReservationService {
     private void validateStoreOwner(Reservation reservation, Member owner) {
         if (owner.isAdmin()) return; // 관리자는 모든 예약 접근 가능
         if (!reservation.getStore().getOwner().getId().equals(owner.getId())) {
-            throw new ReservationException("가게 소유자만 접근 가능합니다.", HttpStatus.FORBIDDEN);
+            throw new ReservationException("가게 소유자만 접근할 수 있어요.", HttpStatus.FORBIDDEN);
         }
     }
 }

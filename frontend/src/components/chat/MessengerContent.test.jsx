@@ -168,9 +168,9 @@ describe('MessengerContent', () => {
         await waitFor(() => expect(chatService.listConversations).toHaveBeenCalled());
         expect(screen.getByRole('button', { name: '고객지원에 문의' })).toBeEnabled();
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-        expect(screen.queryByText('아직 시작한 대화가 없습니다.')).not.toBeInTheDocument();
+        expect(screen.queryByText('아직 시작한 대화가 없어요.')).not.toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '대화', exact: true }));
-        expect(await screen.findByRole('alert')).toHaveTextContent('대화 목록을 불러오지 못했습니다.');
+        expect(await screen.findByRole('alert')).toHaveTextContent('대화 목록을 불러오지 못했어요.');
         expect(screen.queryByRole('button', { name: '고객지원에 문의' })).not.toBeInTheDocument();
         expect(screen.getByLabelText('대화 선택 안내')).toBeInTheDocument();
         expect(chatService.getSupport).not.toHaveBeenCalled();
@@ -200,7 +200,7 @@ describe('MessengerContent', () => {
             counterpartName: '새로고침 검증 가게',
             unread: 0,
         };
-        const missingRoute = Object.assign(new Error('요청하신 경로를 찾을 수 없습니다.'), { status: 404 });
+        const missingRoute = Object.assign(new Error('요청하신 경로를 찾을 수 없어요.'), { status: 404 });
         chatService.listConversations.mockResolvedValueOnce(page([row])).mockRejectedValueOnce(missingRoute);
         useMessengerStore.getState().showConversations();
         renderMessenger({ surface: 'panel' });
@@ -208,10 +208,10 @@ describe('MessengerContent', () => {
         expect(await screen.findByRole('button', { name: /새로고침 검증 가게/ })).toBeVisible();
         await user.click(screen.getByRole('button', { name: '대화 목록 새로고침' }));
 
-        expect(await screen.findByText('최신 대화를 확인하지 못해 이전 목록을 보여드리고 있습니다.'))
+        expect(await screen.findByText('최신 대화를 확인하지 못해 이전 목록을 보여드리고 있어요.'))
             .toBeVisible();
         expect(screen.getByRole('button', { name: /새로고침 검증 가게/ })).toBeVisible();
-        expect(screen.getByRole('alert')).toHaveTextContent('최신 대화를 확인하지 못해 이전 목록을 보여드리고 있습니다.');
+        expect(screen.getByRole('alert')).toHaveTextContent('최신 대화를 확인하지 못해 이전 목록을 보여드리고 있어요.');
     });
 
     it.each(['BUSINESS', 'ADMIN'])('refreshes both available lists for %s without opening a room', async role => {
@@ -258,7 +258,7 @@ describe('MessengerContent', () => {
         renderMessenger({ surface: 'panel' });
 
         await user.click(await screen.findByRole('button', { name: '고객 문의 확인' }));
-        expect(await screen.findByText('고객지원 받은 문의')).toBeInTheDocument();
+        expect(await screen.findByRole('region', { name: '고객지원 문의' })).toBeInTheDocument();
         const row = await screen.findByRole('button', { name: /고객 김/ });
         expect(row).toHaveTextContent('예약 변경 문의입니다');
         await user.click(row);
@@ -294,7 +294,7 @@ describe('MessengerContent', () => {
         useMessengerStore.getState().showConversations();
         renderMessenger({ surface: 'panel' });
 
-        const adminInbox = await screen.findByRole('region', { name: '고객지원 받은 문의' });
+        const adminInbox = await screen.findByRole('region', { name: '고객지원 문의' });
         const adminRow = await screen.findByRole('button', { name: /한재은/ });
         expect(within(adminInbox).getAllByRole('button')).toEqual([adminRow]);
         const myConversations = screen.getByRole('region', { name: '내 대화' });
@@ -303,16 +303,16 @@ describe('MessengerContent', () => {
 
     it('keeps a real 404 failure visible and permits an explicit retry to recover', async () => {
         const user = userEvent.setup();
-        const missingRoute = Object.assign(new Error('요청하신 경로를 찾을 수 없습니다.'), { status: 404 });
+        const missingRoute = Object.assign(new Error('요청하신 경로를 찾을 수 없어요.'), { status: 404 });
         chatService.listConversations.mockRejectedValueOnce(missingRoute).mockResolvedValue(page());
         useMessengerStore.getState().showConversations();
         renderMessenger({ surface: 'panel' });
         expect(await screen.findByRole('alert')).toHaveTextContent(
-            '요청한 대화 목록을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.',
+            '요청한 대화 목록을 불러올 수 없어요. 잠시 후 다시 시도해주세요.',
         );
         expect(chatService.listConversations).toHaveBeenCalledTimes(1);
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
-        await screen.findByText('아직 시작한 대화가 없습니다.');
+        await screen.findByText('아직 시작한 대화가 없어요.');
         expect(chatService.listConversations).toHaveBeenCalledTimes(2);
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         expect(chatService.getSupport).not.toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe('MessengerContent', () => {
         useMessengerStore.getState().syncIdentity(messengerIdentityOf(useAuthStore.getState()));
         useMessengerStore.setState({ activeThread: false });
         useMessengerStore.getState().showConversations();
-        const missingRoute = Object.assign(new Error('요청하신 경로를 찾을 수 없습니다.'), { status: 404 });
+        const missingRoute = Object.assign(new Error('요청하신 경로를 찾을 수 없어요.'), { status: 404 });
         chatService.listConversations.mockRejectedValue(missingRoute);
         chatService.listStoreInbox.mockRejectedValue(missingRoute);
         chatService.listAdminSupportInbox.mockRejectedValue(missingRoute);
@@ -392,7 +392,7 @@ describe('MessengerContent', () => {
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
         useMessengerStore.getState().showConversations();
         renderMessenger({ surface: 'panel' });
-        await screen.findByText('아직 시작한 대화가 없습니다.');
+        await screen.findByText('아직 시작한 대화가 없어요.');
         expect(screen.queryByRole('button', { name: '고객지원에 문의' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: '홈', exact: true })).toBeEnabled();
         expect(chatService.getSupport).not.toHaveBeenCalled();
@@ -434,7 +434,7 @@ describe('MessengerContent', () => {
         await user.type(screen.getByRole('textbox'), '제가 쓴 문장');
         await user.click(screen.getByText('답변 문구'));
         await user.click(screen.getByRole('button', { name: '인사' }));
-        expect(screen.getByRole('textbox')).toHaveValue('제가 쓴 문장\n안녕하세요. 문의주셔서 감사합니다. 확인 후 안내드리겠습니다.');
+        expect(screen.getByRole('textbox')).toHaveValue('제가 쓴 문장\n안녕하세요. 문의해주셔서 감사해요. 확인 후 안내해드릴게요.');
         expect(chatService.sendStoreInbox).not.toHaveBeenCalled();
     });
 
@@ -472,7 +472,7 @@ describe('MessengerContent', () => {
         fireEvent.focus(window);
         await waitFor(() => expect(NotificationApi).toHaveBeenCalledTimes(1));
         expect(NotificationApi).toHaveBeenCalledWith('RESERVE 새 메시지', {
-            body: '새 메시지가 도착했습니다. RESERVE에서 확인해주세요.', tag: 'reserve-chat',
+            body: '새 메시지가 도착했어요. RESERVE에서 확인해주세요.', tag: 'reserve-chat',
         });
         view.unmount();
         expect(notifications[0].close).toHaveBeenCalled();
@@ -664,7 +664,7 @@ describe('MessengerContent', () => {
         const firstRequest = new Promise(resolve => { resolveFirst = resolve; });
         const retryRequest = new Promise(resolve => { resolveRetry = resolve; });
         const cancelled = {
-            id: 1, senderRole: 'ADMIN', content: '전송이 취소된 메시지입니다.',
+            id: 1, senderRole: 'ADMIN', content: '전송이 취소된 메시지예요.',
             retracted: true, retractionRevision: 1, createdAt: '2026-09-01T09:00:00',
         };
         chatService.getSupport.mockResolvedValue({
@@ -701,11 +701,11 @@ describe('MessengerContent', () => {
         await act(async () => resolveRetry({ hasMore: false, nextBeforeId: 1, messages: [cancelled] }));
         expect(chatService.getHistory).toHaveBeenCalledTimes(2);
         expect(screen.getByRole('button', { name: '이전 메시지 보기' })).toBeEnabled();
-        expect(screen.queryByText('전송이 취소된 메시지입니다.')).not.toBeInTheDocument();
+        expect(screen.queryByText('전송이 취소된 메시지예요.')).not.toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: '이전 메시지 보기' }));
         expect(chatService.getHistory).toHaveBeenNthCalledWith(3, 1, 51, 50);
-        expect(await screen.findByText('전송이 취소된 메시지입니다.')).toBeInTheDocument();
+        expect(await screen.findByText('전송이 취소된 메시지예요.')).toBeInTheDocument();
         expect(screen.queryByText('폐기할 과거 원문')).not.toBeInTheDocument();
         expect(screen.getByText('최근 메시지')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '이전 메시지 보기' })).not.toBeInTheDocument();
@@ -751,7 +751,7 @@ describe('MessengerContent', () => {
         });
 
         expect(screen.queryByText('무시할 A 과거 메시지')).not.toBeInTheDocument();
-        expect(screen.queryByText('이전 메시지를 불러오지 못했습니다.')).not.toBeInTheDocument();
+        expect(screen.queryByText('이전 메시지를 불러오지 못했어요.')).not.toBeInTheDocument();
         expect(screen.getByText('B 최근 메시지')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '이전 메시지 보기' })).toBeDisabled();
         await act(async () => resolveCurrent({
@@ -796,7 +796,7 @@ describe('MessengerContent', () => {
         });
 
         expect(screen.queryByText('무시할 A 과거 메시지')).not.toBeInTheDocument();
-        expect(screen.queryByText('이전 메시지를 불러오지 못했습니다.')).not.toBeInTheDocument();
+        expect(screen.queryByText('이전 메시지를 불러오지 못했어요.')).not.toBeInTheDocument();
         expect(screen.getByText('A 최근 메시지')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '이전 메시지 보기' })).not.toBeDisabled();
     });

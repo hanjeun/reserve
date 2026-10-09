@@ -43,7 +43,7 @@ public class HolidayApiController {
         try {
             target = YearMonth.parse(month);
         } catch (DateTimeParseException e) {
-            throw new BusinessException("month 는 YYYY-MM 형식이어야 합니다.", HttpStatus.BAD_REQUEST);
+            throw new BusinessException("month 는 YYYY-MM 형식이어야 해요.", HttpStatus.BAD_REQUEST);
         }
 
         YearMonth current = YearMonth.from(ServiceTime.today());

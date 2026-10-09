@@ -78,7 +78,7 @@ describe('owner region sheet source', () => {
     it('keeps the sheet usable after a region path failure and recovers with the retry action', async () => {
         const user = userEvent.setup();
         storeService.getRegions
-            .mockRejectedValueOnce(new Error('정보를 찾을 수 없습니다.'))
+            .mockRejectedValueOnce(new Error('정보를 찾을 수 없어요.'))
             .mockResolvedValueOnce([{ name: '경기', count: 1, areas: [{ name: '안산시', count: 1 }] }]);
 
         render(<MemoryRouter><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

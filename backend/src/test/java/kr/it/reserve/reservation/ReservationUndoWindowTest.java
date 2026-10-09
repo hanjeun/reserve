@@ -59,7 +59,7 @@ class ReservationUndoWindowTest {
         }
 
         assertThatThrownBy(() -> service.undoComplete(20L, owner))
-                .isInstanceOf(ReservationException.class).hasMessageContaining("되돌릴 수 있는 시간이 지났습니다");
+                .isInstanceOf(ReservationException.class).hasMessageContaining("되돌릴 수 있는 시간이 지났어요");
 
         assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.COMPLETED);
         assertDepositIsUntouched();

@@ -64,7 +64,7 @@ test('keeps the data skeleton still and moves schedule copy into store informati
         const dateField = page.locator('.ant-form-item').filter({ has: page.getByRole('button', { name: '날짜 선택', exact: true }) });
         await expect(dateField.locator('.ant-form-item-extra')).toHaveCount(0);
         await expect(page.getByText('날짜를 먼저 선택해주세요', { exact: true })).toBeVisible();
-        await expect(page.getByText('아직 리뷰가 없습니다. 첫 번째 리뷰를 남겨보세요!', { exact: true })).toBeVisible();
+        await expect(page.getByText('아직 리뷰가 없어요. 첫 번째 리뷰를 남겨보세요!', { exact: true })).toBeVisible();
         await expect(page.locator('body')).not.toContainText('NaN');
         await expect(page.locator('body')).not.toContainText('undefined');
         await page.screenshot({ path: test.info().outputPath('store-schedule-information.png'), fullPage: true });

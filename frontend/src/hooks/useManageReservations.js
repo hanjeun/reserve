@@ -37,7 +37,7 @@ const useManageReservations = (params) => {
             ? reservationService.undoApprove(id)
             : reservationService.undoComplete(id)),
         onSuccess:  (_d, { kind }) => message.success(
-            kind === 'approve' ? '승인을 되돌렸습니다' : '이용완료를 되돌렸습니다'),
+            kind === 'approve' ? '승인을 되돌렸어요' : '이용완료를 되돌렸어요'),
         onError,
         onSettled,
     });
@@ -69,14 +69,14 @@ const useManageReservations = (params) => {
 
     const approveMutation = useMutation({
         mutationFn: (id) => reservationService.approveReservation(id),
-        onSuccess:  (_d, id) => successWithUndo('예약을 승인했습니다', id, 'approve'),
+        onSuccess:  (_d, id) => successWithUndo('예약을 승인했어요', id, 'approve'),
         onError,
         onSettled,
     });
 
     const rejectMutation = useMutation({
         mutationFn: ({ id, reason }) => reservationService.rejectReservation(id, reason),
-        onSuccess:  () => message.success('예약을 거절했습니다'),
+        onSuccess:  () => message.success('예약을 거절했어요'),
         onError,
         onSettled,
     });
@@ -86,21 +86,21 @@ const useManageReservations = (params) => {
     // "취소했습니다"만 뜨면 환불이 됐는지 따로 확인하러 가야 한다.
     const storeCancelMutation = useMutation({
         mutationFn: ({ id, reason }) => reservationService.storeCancelReservation(id, reason),
-        onSuccess:  () => message.success('예약을 취소했습니다. 예약금은 전액 환불됩니다'),
+        onSuccess:  () => message.success('예약을 취소했어요. 예약금은 전액 환불돼요'),
         onError,
         onSettled,
     });
 
     const completeMutation = useMutation({
         mutationFn: (id) => reservationService.completeReservation(id),
-        onSuccess:  (_d, id) => successWithUndo('방문 완료로 처리했습니다', id, 'complete'),
+        onSuccess:  (_d, id) => successWithUndo('방문 완료로 처리했어요', id, 'complete'),
         onError,
         onSettled,
     });
 
     const noShowMutation = useMutation({
         mutationFn: (id) => reservationService.noShowReservation(id),
-        onSuccess:  () => message.success('노쇼로 처리했습니다'),
+        onSuccess:  () => message.success('노쇼로 처리했어요'),
         onError,
         onSettled,
     });

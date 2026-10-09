@@ -15,11 +15,11 @@ public class SendMessageRequest {
      * 공백만 있는 메시지는 거절한다({@code @NotBlank}) — 화면에서도 막지만 API 는 직접 호출될 수 있다.
      */
     @NotBlank(message = "내용을 입력해주세요.")
-    @Size(max = 2000, message = "2000자까지 입력할 수 있습니다.")
+    @Size(max = 2000, message = "2000자까지 입력할 수 있어요.")
     private String content;
 
     /** 재시도 멱등 키. 구버전 클라이언트 호환을 위해 생략은 허용한다. */
-    @Size(max = 64, message = "메시지 식별자가 너무 깁니다.")
-    @Pattern(regexp = "[A-Za-z0-9_-]+", message = "올바른 메시지 식별자가 아닙니다.")
+    @Size(max = 64, message = "메시지 식별자가 너무 길어요.")
+    @Pattern(regexp = "[A-Za-z0-9_-]+", message = "올바른 메시지 식별자가 아니에요.")
     private String clientMessageId;
 }

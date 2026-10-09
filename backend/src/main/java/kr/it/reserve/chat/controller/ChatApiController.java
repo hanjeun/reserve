@@ -38,7 +38,7 @@ import org.springframework.data.domain.Page;
 @RequiredArgsConstructor
 public class ChatApiController {
 
-    private static final String LOGIN_REQUIRED_MESSAGE = "로그인이 필요합니다.";
+    private static final String LOGIN_REQUIRED_MESSAGE = "로그인이 필요해요.";
     private static final String QUERY_SUCCESS_MESSAGE = "조회 성공";
     private static final String SEND_SUCCESS_MESSAGE = "전송 완료";
 
@@ -194,7 +194,7 @@ public class ChatApiController {
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         return ResponseEntity.ok(ApiResponse.success(
                 moderationService.setBlocked(me, roomId, viewerRole, blocked),
-                blocked ? "대화를 차단했습니다." : "대화 차단을 해제했습니다."));
+                blocked ? "대화를 차단했어요." : "대화 차단을 해제했어요."));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -202,7 +202,7 @@ public class ChatApiController {
     public ResponseEntity<ApiResponse<Void>> setVisibility(@PathVariable Long roomId,
             @RequestParam String viewerRole, @RequestParam boolean hidden) {
         moderationService.setHidden(SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE), roomId, viewerRole, hidden);
-        return ResponseEntity.ok(ApiResponse.success(null, hidden ? "내 목록에서 숨겼습니다." : "대화를 복원했습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, hidden ? "내 목록에서 숨겼어요." : "대화를 복원했어요."));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -214,10 +214,10 @@ public class ChatApiController {
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         if (!rateLimiter.tryConsume("member-" + me.getId(), RateLimiter.Policy.CHAT_REPORT)) {
             return ResponseEntity.status(429)
-                    .body(ApiResponse.error("신고 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                    .body(ApiResponse.error("신고 요청이 너무 많아요. 잠시 후 다시 시도해주세요."));
         }
         return ResponseEntity.ok(ApiResponse.success(
-                moderationService.createReport(me, roomId, viewerRole, request), "신고를 접수했습니다."));
+                moderationService.createReport(me, roomId, viewerRole, request), "신고를 접수했어요."));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -253,7 +253,7 @@ public class ChatApiController {
         Member me = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
         if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.CHAT_SEND)) {
             return ResponseEntity.status(429)
-                    .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해주세요."));
+                    .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있어요. 잠시 후 다시 시도해주세요."));
         }
         return ResponseEntity.ok(ApiResponse.success(
                 chatService.sendAsMember(me, request.getContent(), request.getClientMessageId()), SEND_SUCCESS_MESSAGE));
@@ -288,6 +288,6 @@ public class ChatApiController {
 
     private ResponseEntity<ApiResponse<ChatMessageResponse>> tooManyRequests() {
         return ResponseEntity.status(429)
-                .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해주세요."));
+                .body(ApiResponse.error("메시지를 너무 빠르게 보내고 있어요. 잠시 후 다시 시도해주세요."));
     }
 }

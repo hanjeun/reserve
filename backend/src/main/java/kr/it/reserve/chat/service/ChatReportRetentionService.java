@@ -57,7 +57,7 @@ public class ChatReportRetentionService {
         }
         if (request.getRetentionBasisAt() != null && request.getRetentionBasisAt()
                 .withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime().isAfter(now)) {
-            throw new ChatException("보존 기산일은 현재보다 이후일 수 없습니다.", HttpStatus.BAD_REQUEST);
+            throw new ChatException("보존 기산일은 현재보다 이후일 수 없어요.", HttpStatus.BAD_REQUEST);
         }
         if (!request.getHold() && (request.getCategory() == ChatReport.RetentionCategory.UNCLASSIFIED
                 || (request.getCategory() == ChatReport.RetentionCategory.CONTRACT_PAYMENT
@@ -68,10 +68,10 @@ public class ChatReportRetentionService {
 
     private void assertAdmin(Member member) {
         if (member == null || member.getId() == null || member.getRole() != Role.ADMIN)
-            throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
     }
 
     private ChatException notFound() {
-        return new ChatException("채팅 신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new ChatException("채팅 신고를 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 }

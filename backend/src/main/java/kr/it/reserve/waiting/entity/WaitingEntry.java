@@ -27,7 +27,8 @@ import java.time.LocalDateTime;
         @UniqueConstraint(name = "uk_waiting_store_request", columnNames = {"store_id", "client_request_id"})
 }, indexes = {
         @Index(name = "idx_waiting_board", columnList = "store_id, status, business_date, entry_number"),
-        @Index(name = "idx_waiting_finished", columnList = "status, finished_at")
+        @Index(name = "idx_waiting_finished", columnList = "status, finished_at"),
+        @Index(name = "idx_waiting_member", columnList = "member_id, status, created_at")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -41,6 +42,19 @@ public class WaitingEntry {
     // 폐업·회원 파기 경로와 역방향 연관을 만들지 않는다. 접수·수정은 반드시 Store 잠금과 소유 검사를 거친다.
     @Column(name = "store_id", nullable = false)
     private Long storeId;
+
+    @Column(name = "member_id")
+    private Long memberId;
+
+    // 고객이 접수 때 확인·동의한 고지 버전. 원문·회원 식별자를 중복 보관하지 않는다.
+    @Column(name = "privacy_notice_published_at")
+    private LocalDateTime privacyNoticePublishedAt;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @org.hibernate.annotations.ColumnDefault("'STAFF'")
+    @Column(name = "source", nullable = false, length = 16)
+    private WaitingSource source = WaitingSource.STAFF;
 
     @Column(name = "business_date", nullable = false)
     private LocalDate businessDate;
@@ -91,6 +105,16 @@ public class WaitingEntry {
         return entry;
     }
 
+    public static WaitingEntry createForCustomer(Long storeId, LocalDate date, int number, String displayName,
+                                                 int partySize, String requestId, LocalDateTime nowUtc,
+                                                 Long memberId, WaitingSource source, LocalDateTime privacyNoticePublishedAt) {
+        WaitingEntry entry = create(storeId, date, number, displayName, partySize, requestId, nowUtc);
+        entry.memberId = memberId;
+        entry.source = source;
+        entry.privacyNoticePublishedAt = privacyNoticePublishedAt;
+        return entry;
+    }
+
     public void changeStatus(WaitingStatus next, LocalDateTime nowUtc) {
         if (next == null || next == WaitingStatus.WAITING) {
             throw new WaitingException("변경할 대기 상태를 확인해주세요.", HttpStatus.BAD_REQUEST);
@@ -99,7 +123,7 @@ public class WaitingEntry {
         boolean allowed = (status == WaitingStatus.WAITING && (next == WaitingStatus.CALLED || next == WaitingStatus.CANCELLED))
                 || (status == WaitingStatus.CALLED && next.isTerminal());
         if (!allowed) {
-            throw new WaitingException("이미 처리된 접수이거나 변경할 수 없는 상태입니다. 목록을 새로고침해주세요.", HttpStatus.CONFLICT);
+            throw new WaitingException("이미 처리된 접수이거나 변경할 수 없는 상태예요. 목록을 새로고침해주세요.", HttpStatus.CONFLICT);
         }
         status = next;
         updatedAt = nowUtc;

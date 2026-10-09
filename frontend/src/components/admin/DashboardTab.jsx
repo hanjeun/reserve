@@ -39,10 +39,10 @@ const DashboardTab = () => {
     const sourceAvailable = (name) => stats?.sources?.[name] === true;
     const sourceFailed = (name) => Boolean(error || stats?.sources?.[name] === false);
     const reservationSummary = sourceAvailable('reservations')
-        ? `전체 ${stats.totalRes}건의 상태 분포입니다.`
+        ? `전체 ${stats.totalRes}건의 상태 분포예요.`
         : undefined;
     const trashSummary = sourceAvailable('trash')
-        ? `전체 ${stats.trashCount}개 중 최근 50개를 유형별로 집계했습니다.`
+        ? `전체 ${stats.trashCount}개 중 최근 50개를 유형별로 집계했어요.`
         : undefined;
 
     // 감사 로그 요약 카드 본문: 로딩 → 실패 → 집계 순으로 하나만 그린다.
@@ -57,7 +57,7 @@ const DashboardTab = () => {
         }
         if (sourceFailed('audit')) {
             return (
-                <DataState state="error" title="감사 로그를 불러오지 못했습니다."
+                <DataState state="error" title="감사 로그를 불러오지 못했어요."
                     onRetry={refetch} retrying={isFetching} compact />
             );
         }
@@ -77,15 +77,15 @@ const DashboardTab = () => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* 툴바 — 다른 탭과 동일한 FilterToolbar */}
-            <FilterToolbar onReload={refetch} loading={isFetching} />
+            <FilterToolbar onReload={refetch} loading={isFetching} initialLoading={loading} />
 
             {error && (
                 <DataState state="error" subject="대시보드 데이터" error={error}
-                    title="대시보드 데이터를 모두 불러오지 못했습니다." onRetry={refetch} retrying={isFetching} compact />
+                    title="대시보드 데이터를 모두 불러오지 못했어요." onRetry={refetch} retrying={isFetching} compact={Boolean(stats)} />
             )}
             {!error && stats?.failedSources?.length > 0 && (
                 <DataState state="error"
-                    title={`${stats.failedSources.join(' · ')} 데이터만 불러오지 못했습니다. 나머지 결과는 정상 표시 중입니다.`}
+                    title={`${stats.failedSources.join(' · ')} 데이터만 불러오지 못했어요. 나머지 결과는 정상 표시 중이에요.`}
                     onRetry={refetch} retrying={isFetching} compact />
             )}
 
@@ -172,10 +172,10 @@ const DashboardTab = () => {
                         </div>
                     )}
                     {!loading && sourceAvailable('reservations') && !stats?.reservationPieData?.length && (
-                        <DataState state="empty" kind="reservation" title="데이터가 없습니다." style={{ height: '100%' }} />
+                        <DataState state="empty" kind="reservation" title="데이터가 없어요." style={{ height: '100%' }} />
                     )}
                     {!loading && sourceFailed('reservations') && (
-                        <DataState state="error" kind="reservation" title="예약 집계를 불러오지 못했습니다."
+                        <DataState state="error" kind="reservation" title="예약 집계를 불러오지 못했어요."
                             onRetry={refetch} retrying={isFetching} compact style={{ height: '100%' }} />
                     )}
                 </ChartCard>
@@ -206,10 +206,10 @@ const DashboardTab = () => {
                         </ResponsiveContainer>
                     )}
                     {!loading && sourceAvailable('trash') && !stats?.trashBarData?.length && (
-                        <DataState state="empty" title="휴지통이 비어있습니다." style={{ height: '100%' }} />
+                        <DataState state="empty" title="휴지통이 비어있어요." style={{ height: '100%' }} />
                     )}
                     {!loading && sourceFailed('trash') && (
-                        <DataState state="error" title="휴지통 데이터를 불러오지 못했습니다."
+                        <DataState state="error" title="휴지통 데이터를 불러오지 못했어요."
                             onRetry={refetch} retrying={isFetching} compact style={{ height: '100%' }} />
                     )}
                 </ChartCard>

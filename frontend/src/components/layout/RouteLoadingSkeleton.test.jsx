@@ -5,11 +5,13 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import RouteLoadingSkeleton, { RouteSkeletonPreview } from './RouteLoadingSkeleton';
 import { getRouteSkeletonKind } from './routeSkeletonKind';
 import { preloadRouteSkeletons } from './routeSkeletonLoader';
+import RouteSkeletonPages from './RouteSkeletonPages';
 
 const routes = {
-    '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'benefit-detail', '/waiting': 'coming-soon', '/feed': 'coming-soon',
+    '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'benefit-detail', '/waiting': 'waiting', '/feed': 'coming-soon',
     '/login': 'auth', '/signup': 'auth', '/forgot-password': 'auth', '/oauth2/callback': 'discovery', '/signup/social': 'auth',
-    '/stores': 'store-list', '/store/12': 'detail', '/terms': 'legal', '/privacy': 'legal', '/operation-guide': 'legal', '/content-sources': 'legal',
+    '/stores': 'store-list', '/store/12': 'detail', '/terms': 'legal', '/privacy': 'legal', '/content-sources': 'legal',
+    '/operation-guide': 'guide', '/guide/user': 'guide', '/guide/business': 'guide', '/guide/common': 'guide',
     '/my-stores': 'cards', '/store/register': 'store-form', '/store/12/edit': 'store-form', '/business': 'business', '/admin': 'admin',
     '/my-reservations': 'reservations', '/my-favorites': 'cards', '/payment/result': 'payment-result', '/my-page': 'my-page', '/messages': 'messages',
     '/benefits/abc': 'benefit-detail',
@@ -22,7 +24,9 @@ const setWidth = width => Object.defineProperty(window, 'innerWidth', { configur
 
 describe('route chunk loading patterns', () => {
     // 페이지별 뼈대는 별도 청크다. 앱처럼 먼저 받아 두면 이후 렌더는 동기적으로 그 모양을 그린다.
-    beforeAll(() => preloadRouteSkeletons());
+    beforeAll(async () => {
+        expect((await preloadRouteSkeletons())?.default).toBe(RouteSkeletonPages);
+    });
     afterEach(() => setWidth(originalWidth));
 
     it('mirrors the search header, six domains and quick choices without a text input', () => {
@@ -53,7 +57,7 @@ describe('route chunk loading patterns', () => {
         ['?view=list', '.reserve-store-list-row-skeleton'],
     ])('keeps the /stores chunk and data loading at 12 placeholders for %s', (search, selector) => {
         const { container } = render(<RouteSkeletonPreview pathname="/stores" search={search} />);
-        expect(container.querySelector('.reserve-route-store-toolbar')).toBeInTheDocument();
+        expect(container.querySelector('.reserve-explore-filters')).toBeInTheDocument();
         expect(container.querySelectorAll(selector)).toHaveLength(12);
         expect(container.querySelector('button, a, img')).toBeNull();
         if (search !== '?view=list') {
@@ -87,7 +91,9 @@ describe('route chunk loading patterns', () => {
         const row = container.querySelector('.reserve-filter-toolbar-secondary');
         expect(row.firstElementChild).toHaveStyle({ flexShrink: '1', minWidth: '0px', maxWidth: '480px' });
         expect(row.querySelector('.reserve-filter-toolbar-refresh > .reserve-skeleton-block')).toHaveStyle({ width: '70px', height: '16px' });
-        expect(container.querySelector('.reserve-explore-filters')).toHaveStyle({ minHeight: '44px' });
+        // The shared toolbar is sized by its actual 44px view slot, including while it is a bone.
+        expect(container.querySelector('.reserve-explore-filters').firstElementChild)
+            .toHaveStyle({ width: '44px', height: '44px', flexShrink: '0' });
     });
 
     it('keeps reservations at the real page width, heading and selected card layout', () => {
@@ -128,21 +134,35 @@ describe('route chunk loading patterns', () => {
         expect(Array.from(container.querySelectorAll('.reserve-skeleton-block')).filter(bone => bone.style.width === '52px' && bone.style.borderRadius === '50%')).toHaveLength(3);
     });
 
-    it.each([['/terms', '서비스 이용약관'], ['/privacy', '개인정보 처리방침'], ['/operation-guide', '운영 안내'], ['/content-sources', '콘텐츠 출처·권리 안내']])(
+    it.each([['/terms', '서비스 이용약관'], ['/privacy', '개인정보 처리방침'], ['/content-sources', '콘텐츠 출처·권리 안내']])(
         'uses the md document frame for %s', (path, title) => {
             const { container } = render(<RouteSkeletonPreview pathname={path} />);
             expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth: '700px', padding: '60px 24px 80px' });
             expect(container.querySelector('h2')).toHaveTextContent(title);
         });
 
-    it('reuses the benefit detail data skeleton and the coming-soon frame', () => {
+    it.each([
+        ['/guide/user', '사용자 이용안내', 5],
+        ['/guide/business', '사업자 이용안내', 6],
+        ['/guide/common', '공통 이용안내', 4],
+        ['/operation-guide', '공통 이용안내', 4],
+    ])('uses the guide frame and section count for %s', (path, title, sections) => {
+        const { container } = render(<RouteSkeletonPreview pathname={path} />);
+        expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth: '700px', padding: '60px 24px 80px' });
+        expect(container.querySelector('h1')).toHaveTextContent(title);
+        expect(container.querySelectorAll('h2')).toHaveLength(sections);
+        expect(container.querySelector('header .reserve-page-description')).toBeInTheDocument();
+        expect(container.querySelector('button,input,select,a,textarea')).toBeNull();
+    });
+
+    it('reuses benefit detail and shows the waiting directory frame', () => {
         const { container, rerender } = render(<RouteSkeletonPreview pathname="/benefits/3" />);
         expect(container.querySelector('.reserve-benefits-page.reserve-benefit-detail .reserve-route-skeleton-copy')).toBeInTheDocument();
         expect(screen.getAllByRole('status')).toHaveLength(1);
         expect(screen.getByRole('status').tagName).toBe('OUTPUT');
         rerender(<RouteSkeletonPreview pathname="/waiting" />);
-        expect(container.querySelector('.reserve-discovery-coming-soon h1')).toHaveTextContent('웨이팅은 아직 준비 중이에요');
-        expect(container.querySelector('.reserve-discovery-coming-soon .reserve-route-skeleton-text')).toBeInTheDocument();
+        expect(container.querySelector('.reserve-waiting-heading h1')).toHaveTextContent('웨이팅');
+        expect(container.querySelectorAll('.rsv-store-grid > div')).toHaveLength(4);
     });
 
     it('mirrors the payment verifying screen inside the 420px payment frame', () => {
@@ -159,15 +179,22 @@ describe('route chunk loading patterns', () => {
         expect(container.textContent).toContain('사업자번호');
     });
 
-    it('draws the partner panel reservation tab and only the header for other tabs', () => {
+    it('draws the six partner tabs and the selected reservations or statistics body', () => {
         const { container, rerender } = render(<RouteSkeletonPreview pathname="/business" />);
         expect(container.querySelector('h2')).toHaveTextContent('사업자 파트너 패널');
-        expect(container.querySelectorAll('.reserve-route-panel-tab')).toHaveLength(5);
+        expect(container.querySelectorAll('.reserve-route-panel-tab')).toHaveLength(6);
         expect(container.querySelector('.reserve-explore-filters')).toBeInTheDocument();
         // 사업자 예약 목록 뼈대(ReservationCardSkeleton): 행 5개 + 구분선 4개
         expect(container.querySelector('.reserve-filter-toolbar').nextElementSibling.children).toHaveLength(9);
         rerender(<RouteSkeletonPreview pathname="/business" search="?tab=analytics" />);
-        expect(container.querySelector('.reserve-explore-filters')).toBeNull();
+        const statistics = container.querySelector('.reserve-statistics-tab');
+        expect(statistics).toBeInTheDocument();
+        expect(statistics.querySelector('.reserve-filter-toolbar')).toBeInTheDocument();
+        expect(statistics.querySelectorAll('.reserve-segmented-btn')).toHaveLength(3);
+        for (const label of ['평균 별점', '리뷰 수', '예약금 순결제액', '광고 노출', '예약 추이', '상태별 분포', '광고 성과']) {
+            expect(statistics).toHaveTextContent(label);
+        }
+        expect(statistics.querySelector('button,input,select,a,textarea')).toBeNull();
     });
 
     it('mirrors the mobile messenger home, a store thread, and stays blank on PC', () => {
@@ -191,22 +218,27 @@ describe('route chunk loading patterns', () => {
             expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth, padding });
         });
 
-    it('renders the store form skeleton with the edit title on the edit route', () => {
+    it('renders the editing question and six choice slots on the edit route', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/store/12/edit" />);
-        expect(container.querySelector('.reserve-store-form-heading h2')).toHaveTextContent('가게 정보 수정');
+        expect(container.querySelector('.reserve-onboarding-heading')).toHaveTextContent('무엇을 수정하시겠어요?');
+        expect(container.querySelectorAll('.reserve-onboarding-edit-selection .reserve-service-domain-option')).toHaveLength(6);
+        expect(container.querySelector('button,input,select,a,textarea')).toBeNull();
     });
 
     it('keeps the minimum page height while the page skeleton chunk is still on its way', async () => {
         vi.resetModules();
         let release;
         vi.doMock('./RouteSkeletonPages', () => new Promise(resolve => { release = resolve; }));
-        const { RouteSkeletonPreview: FreshPreview } = await import('./RouteLoadingSkeleton');
-        const { container } = render(<FreshPreview pathname="/login" />);
-        expect(container.querySelector('[aria-hidden="true"] > div')).toHaveStyle({ minHeight: 'calc(100svh - 64px)' });
-        expect(container.querySelector('h2')).toBeNull();
-        await act(async () => release({ default: () => <h2>로그인</h2> }));
-        expect(container.querySelector('h2')).toHaveTextContent('로그인');
-        vi.doUnmock('./RouteSkeletonPages');
+        try {
+            const { RouteSkeletonPreview: FreshPreview } = await import('./RouteLoadingSkeleton');
+            const { container } = render(<FreshPreview pathname="/login" />);
+            expect(container.querySelector('[aria-hidden="true"] > div')).toHaveStyle({ minHeight: 'calc(100svh - 64px)' });
+            expect(container.querySelector('h2')).toBeNull();
+            await act(async () => release({ default: () => <h2>로그인</h2> }));
+            expect(container.querySelector('h2')).toHaveTextContent('로그인');
+        } finally {
+            vi.doUnmock('./RouteSkeletonPages');
+        }
     });
 
     it('draws the unknown-address skeleton in the same small centered frame as NotFound', () => {

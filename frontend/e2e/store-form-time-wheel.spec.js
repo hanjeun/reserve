@@ -30,12 +30,41 @@ test.beforeEach(async ({ page }) => {
     });
 });
 
-const openHours = async page => {
+const openRegistrationBooking = async page => {
+    await page.goto('/store/register');
+    await expect(page.getByRole('heading', { name: '어떤 가게를 운영하시나요?', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: '서비스 분야', exact: true })
+        .getByRole('button', { name: '맛집 · 카페', exact: true }).click();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님을 어떻게 받고 싶으세요?', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: '손님 접수 방식', exact: true })
+        .getByRole('button', { name: '예약', exact: true }).click();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '손님이 무엇을 선택하면 되나요?', exact: true })).toBeVisible();
+};
+
+const openRegistrationOperation = async page => {
+    await openRegistrationBooking(page);
+    await page.getByRole('group', { name: '예약 방식', exact: true })
+        .getByRole('button', { name: '시간대', exact: true }).click();
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '언제, 몇 명까지 받을까요?', exact: true })).toBeVisible();
+};
+
+const openEditOperation = async page => {
     await page.goto('/store/99/edit');
+    await expect(page.getByRole('heading', { name: '무엇을 수정하시겠어요?', exact: true })).toBeVisible();
+    await page.getByRole('group', { name: '수정할 항목', exact: true })
+        .getByRole('button', { name: '운영 설정', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '언제, 몇 명까지 받을까요?', exact: true })).toBeVisible();
+};
+
+const openHours = async page => {
+    await openEditOperation(page);
     const trigger = page.getByLabel('영업 시간', { exact: true });
     await expect(trigger).toContainText('09:00');
     await trigger.scrollIntoViewIfNeeded();
-    const pageBefore = await page.evaluate(() => ({ scrollY: window.scrollY, headingTop: document.querySelector('main h2').getBoundingClientRect().top }));
+    const pageBefore = await page.evaluate(() => ({ scrollY: window.scrollY, headingTop: document.querySelector('.reserve-onboarding-heading').getBoundingClientRect().top }));
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: '시간 범위 선택' });
     await expect(dialog).toBeVisible();
@@ -74,7 +103,7 @@ const centeredMinute = async dialog => {
 };
 
 test('an empty range requires both times and keeps calendar styling within the viewport', async ({ page }) => {
-    await page.goto('/store/register');
+    await openRegistrationOperation(page);
     const trigger = page.getByLabel('영업 시간', { exact: true });
     const dimensions = await trigger.evaluate(element => {
         const calendar = document.querySelector('.reserve-form-date-trigger:not(.reserve-form-time-trigger)');
@@ -184,9 +213,9 @@ test('native touch scrolling selects a centered row without scrolling the form',
 });
 
 test('session times use unique removable chips and save only after confirmation', async ({ page }) => {
-    await page.goto('/store/register');
-    await page.getByLabel('예약 방식', { exact: true }).click();
-    await page.getByText('회차제', { exact: true }).click();
+    await openRegistrationBooking(page);
+    await page.getByRole('group', { name: '예약 방식', exact: true })
+        .getByRole('button', { name: '회차제', exact: true }).click();
     const trigger = page.getByLabel('회차 시각', { exact: true });
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: '회차 시각 선택' });
@@ -202,7 +231,7 @@ test('session times use unique removable chips and save only after confirmation'
 });
 
 test('break-time bounds remain enforced by the existing form validation', async ({ page }) => {
-    await page.goto('/store/99/edit');
+    await openEditOperation(page);
     const trigger = page.getByLabel('브레이크 타임', { exact: true });
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: '시간 범위 선택' });
@@ -214,8 +243,8 @@ test('break-time bounds remain enforced by the existing form validation', async 
     await expect(trigger).not.toHaveAttribute('aria-invalid', /.*/);
     await expect(trigger).toHaveAttribute('aria-describedby', /breakTimes_help/);
     await trigger.click();
-    await expect(dialog.getByRole('textbox', { name: '시작 직접 입력' })).toHaveAttribute('aria-invalid', 'true');
-    await expect(dialog.getByRole('textbox', { name: '종료 직접 입력' })).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog.getByRole('textbox', { name: '시작 시간 직접 입력' })).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog.getByRole('textbox', { name: '종료 시간 직접 입력' })).toHaveAttribute('aria-invalid', 'true');
 });
 
 test('keyboard selection also works with reduced motion enabled', async ({ page }) => {
@@ -318,7 +347,7 @@ test('time modal actions match and background/edge touches keep the original pag
         await page.mouse.move(4, 300);
         await page.mouse.wheel(0, 100);
     }
-    expect(await page.evaluate(() => document.querySelector('main h2').getBoundingClientRect().top)).toBeCloseTo(pageBefore.headingTop, 0);
+    expect(await page.evaluate(() => document.querySelector('.reserve-onboarding-heading').getBoundingClientRect().top)).toBeCloseTo(pageBefore.headingTop, 0);
     await dialog.getByRole('button', { name: '취소', exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(pageBefore.scrollY);
@@ -326,7 +355,7 @@ test('time modal actions match and background/edge touches keep the original pag
 });
 
 test('calendar modal contains swipes, preserves month navigation and has the same paired actions', async ({ page, isMobile }) => {
-    await page.goto('/store/register');
+    await openRegistrationOperation(page);
     const trigger = page.getByLabel('운영 기간', { exact: true });
     await trigger.scrollIntoViewIfNeeded();
     const before = await page.evaluate(() => window.scrollY);
@@ -363,7 +392,7 @@ test('the shared inquiry form uses matching bordered actions and releases the ba
 
 test('paired picker actions stay inside a 320px viewport', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 700 });
-    await page.goto('/store/register');
+    await openRegistrationOperation(page);
     await page.getByLabel('영업 시간', { exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '시간 범위 선택' });
     const cancelWidth = await equalActions(dialog, '다음');

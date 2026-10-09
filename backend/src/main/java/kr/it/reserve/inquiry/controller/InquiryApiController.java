@@ -27,9 +27,9 @@ public class InquiryApiController {
 
     // 관리자 권한 체크 공통 로직
     private void validateAdmin() {
-        Member member = SecurityUtil.getCurrentMember("인증 정보가 없습니다.");
+        Member member = SecurityUtil.getCurrentMember("인증 정보가 없어요.");
         if (member.getRole() != Role.ADMIN) {
-            throw new InquiryException("관리자 권한이 필요한 서비스입니다.", HttpStatus.FORBIDDEN);
+            throw new InquiryException("관리자 권한이 필요한 서비스예요.", HttpStatus.FORBIDDEN);
         }
     }
 
@@ -91,11 +91,11 @@ public class InquiryApiController {
             HttpServletRequest httpRequest) {
         if (!rateLimiter.tryConsume(IpExtractor.extract(httpRequest), RateLimiter.Policy.INQUIRY_CREATE)) {
             return ResponseEntity.status(429)
-                    .body(ApiResponse.error("문의가 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                    .body(ApiResponse.error("문의가 너무 많아요. 잠시 후 다시 시도해주세요."));
         }
         Long memberId = SecurityUtil.isLoggedIn() ? SecurityUtil.getCurrentMemberId() : null;
         InquiryDto.InquiryResponse response = inquiryService.createInquiry(memberId, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "문의가 성공적으로 등록되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(response, "문의가 성공적으로 등록됐어요."));
     }
 
     // 문의 삭제 (사용자 본인)
@@ -103,7 +103,7 @@ public class InquiryApiController {
     public ApiResponse<Void> deleteInquiry(@PathVariable Long inquiryId) {
         Long memberId = SecurityUtil.getCurrentMemberId();
         inquiryService.deleteInquiry(inquiryId, memberId);
-        return ApiResponse.success(null, "문의가 삭제되었습니다.");
+        return ApiResponse.success(null, "문의가 삭제됐어요.");
     }
 
     // 답변 작성 (관리자 전용)
@@ -113,7 +113,7 @@ public class InquiryApiController {
             @Valid @RequestBody InquiryDto.AnswerRequest request) {
         validateAdmin();
         InquiryDto.InquiryResponse response = inquiryService.answerInquiry(inquiryId, request);
-        return ApiResponse.success(response, "문의 답변이 등록되었습니다.");
+        return ApiResponse.success(response, "문의 답변이 등록됐어요.");
     }
 
     // 문의 삭제 (관리자용)
@@ -121,7 +121,7 @@ public class InquiryApiController {
     public ApiResponse<Void> deleteInquiryAsAdmin(@PathVariable Long inquiryId) {
         validateAdmin();
         inquiryService.deleteInquiryAsAdmin(inquiryId);
-        return ApiResponse.success(null, "관리자 권한으로 문의를 삭제했습니다.");
+        return ApiResponse.success(null, "관리자 권한으로 문의를 삭제했어요.");
     }
 
     // 미답변 문의 개수 (내 것)

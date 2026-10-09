@@ -58,7 +58,7 @@ public class CommunityApiController {
     // 게시글 작성
     @PostMapping("/posts")
     public ApiResponse<CommunityDto.PostResponse> createPost(@RequestBody CommunityDto.PostRequest request) {
-        return ApiResponse.success(communityService.createPost(SecurityUtil.getCurrentMemberId(), request), "게시글이 등록되었습니다.");
+        return ApiResponse.success(communityService.createPost(SecurityUtil.getCurrentMemberId(), request), "게시글이 등록됐어요.");
     }
 
     // 게시글 수정
@@ -66,14 +66,14 @@ public class CommunityApiController {
     public ApiResponse<CommunityDto.PostResponse> updatePost(
             @PathVariable Long postId,
             @RequestBody CommunityDto.PostRequest request) {
-        return ApiResponse.success(communityService.updatePost(postId, SecurityUtil.getCurrentMemberId(), request), "게시글이 수정되었습니다.");
+        return ApiResponse.success(communityService.updatePost(postId, SecurityUtil.getCurrentMemberId(), request), "게시글이 수정됐어요.");
     }
 
     // 게시글 삭제
     @DeleteMapping("/posts/{postId}")
     public ApiResponse<Void> deletePost(@PathVariable Long postId) {
         communityService.deletePost(postId, SecurityUtil.getCurrentMemberId());
-        return ApiResponse.success(null, "게시글이 삭제되었습니다.");
+        return ApiResponse.success(null, "게시글이 삭제됐어요.");
     }
 
     // 댓글 목록 조회 (비로그인 시 memberId null 전달)
@@ -88,14 +88,14 @@ public class CommunityApiController {
     public ApiResponse<CommunityDto.CommentResponse> createComment(
             @PathVariable Long postId,
             @RequestBody CommunityDto.CommentRequest request) {
-        return ApiResponse.success(communityService.createComment(postId, SecurityUtil.getCurrentMemberId(), request), "댓글이 작성되었습니다.");
+        return ApiResponse.success(communityService.createComment(postId, SecurityUtil.getCurrentMemberId(), request), "댓글이 작성됐어요.");
     }
 
     // 댓글 삭제
     @DeleteMapping("/comments/{commentId}")
     public ApiResponse<Void> deleteComment(@PathVariable Long commentId) {
         communityService.deleteComment(commentId, SecurityUtil.getCurrentMemberId());
-        return ApiResponse.success(null, "댓글이 삭제되었습니다.");
+        return ApiResponse.success(null, "댓글이 삭제됐어요.");
     }
 
     // 좋아요 토글

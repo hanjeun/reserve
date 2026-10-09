@@ -5,6 +5,7 @@ import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.waiting.dto.CreateWaitingRequest;
 import kr.it.reserve.waiting.dto.UpdateWaitingStatusRequest;
+import kr.it.reserve.waiting.dto.UpdateWaitingIntakeRequest;
 import kr.it.reserve.waiting.dto.WaitingBoardResponse;
 import kr.it.reserve.waiting.dto.WaitingEntryResponse;
 import kr.it.reserve.waiting.service.WaitingService;
@@ -30,14 +31,14 @@ public class WaitingApiController {
     @GetMapping
     public ResponseEntity<ApiResponse<WaitingBoardResponse>> board(@PathVariable Long storeId) {
         return ResponseEntity.ok(ApiResponse.success(
-                waiting.getBoard(SecurityUtil.getCurrentMember(), storeId), "대기 접수를 불러왔습니다."));
+                waiting.getBoard(SecurityUtil.getCurrentMember(), storeId), "대기 접수를 불러왔어요."));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<WaitingEntryResponse>> create(@PathVariable Long storeId,
                                                                    @Valid @RequestBody CreateWaitingRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                waiting.create(SecurityUtil.getCurrentMember(), storeId, request), "대기 접수를 등록했습니다."));
+                waiting.create(SecurityUtil.getCurrentMember(), storeId, request), "대기 접수를 등록했어요."));
     }
 
     @PatchMapping("/{entryId}/status")
@@ -45,6 +46,14 @@ public class WaitingApiController {
                                                                          @PathVariable Long entryId,
                                                                          @Valid @RequestBody UpdateWaitingStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                waiting.updateStatus(SecurityUtil.getCurrentMember(), storeId, entryId, request), "대기 상태를 변경했습니다."));
+                waiting.updateStatus(SecurityUtil.getCurrentMember(), storeId, entryId, request), "대기 상태를 변경했어요."));
+    }
+
+    @PatchMapping("/intake")
+    public ResponseEntity<ApiResponse<WaitingBoardResponse>> updateIntake(@PathVariable Long storeId,
+                                                                         @Valid @RequestBody UpdateWaitingIntakeRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                waiting.updateIntake(SecurityUtil.getCurrentMember(), storeId, request.paused()),
+                "웨이팅 접수 상태를 변경했어요."));
     }
 }

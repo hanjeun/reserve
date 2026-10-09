@@ -1,0 +1,530 @@
+[
+  {
+    "asset": "edit-operation",
+    "blender_version": "4.3.2",
+    "engine": "BLENDER_EEVEE_NEXT",
+    "samples": 128,
+    "mesh_objects": 12,
+    "curve_objects": 2,
+    "external_images": 0,
+    "linked_libraries": 0,
+    "animations": 0,
+    "text_objects": 0,
+    "static_only": true,
+    "style_matches_reference_exactly": true,
+    "style": {
+      "camera": {
+        "location": [
+          3.200000047683716,
+          -9.0,
+          4.800000190734863
+        ],
+        "rotation": [
+          1.1957879066467285,
+          1.289480433541712e-08,
+          0.3416154980659485
+        ],
+        "type": "ORTHO",
+        "ortho_scale": 3.75
+      },
+      "lights": [
+        {
+          "name": "Edge separation",
+          "location": [
+            1.0,
+            4.0,
+            5.0
+          ],
+          "rotation": [
+            0.8055741190910339,
+            -5.3024400870071986e-08,
+            2.8966140747070312
+          ],
+          "energy": 650.0,
+          "shape": "DISK",
+          "size": 3.0
+        },
+        {
+          "name": "Large soft key",
+          "location": [
+            -3.0,
+            -4.0,
+            7.0
+          ],
+          "rotation": [
+            0.6980299949645996,
+            2.1354791712724364e-08,
+            -0.643501341342926
+          ],
+          "energy": 550.0,
+          "shape": "DISK",
+          "size": 4.5
+        },
+        {
+          "name": "Soft fill",
+          "location": [
+            4.0,
+            -2.0,
+            4.0
+          ],
+          "rotation": [
+            0.9861174821853638,
+            -2.8577392896522724e-08,
+            1.1071487665176392
+          ],
+          "energy": 350.0,
+          "shape": "DISK",
+          "size": 4.0
+        }
+      ],
+      "world_color": [
+        0.30000001192092896,
+        0.30000001192092896,
+        0.30000001192092896
+      ],
+      "view_transform": "AgX",
+      "look": "AgX - Medium High Contrast",
+      "exposure": 0.3499999940395355,
+      "gamma": 1.0,
+      "materials": {
+        "blue": {
+          "base_color": [
+            0.03071344457566738,
+            0.22322796285152435,
+            0.9215818643569946,
+            1.0
+          ],
+          "metallic": 0.11999999731779099,
+          "roughness": 0.25
+        },
+        "ink": {
+          "base_color": [
+            0.21952620148658752,
+            0.28314873576164246,
+            0.38132601976394653,
+            1.0
+          ],
+          "metallic": 0.03999999910593033,
+          "roughness": 0.36000001430511475
+        },
+        "pale": {
+          "base_color": [
+            0.4793201684951782,
+            0.5840784311294556,
+            0.7304607629776001,
+            1.0
+          ],
+          "metallic": 0.07999999821186066,
+          "roughness": 0.30000001192092896
+        },
+        "white": {
+          "base_color": [
+            0.8879231214523315,
+            0.9130986332893372,
+            0.9559733271598816,
+            1.0
+          ],
+          "metallic": 0.05000000074505806,
+          "roughness": 0.2800000011920929
+        }
+      }
+    },
+    "roundtrip_png": "edit-operation-512.png"
+  },
+  {
+    "asset": "edit-identity",
+    "blender_version": "4.3.2",
+    "engine": "BLENDER_EEVEE_NEXT",
+    "samples": 128,
+    "mesh_objects": 10,
+    "curve_objects": 0,
+    "external_images": 0,
+    "linked_libraries": 0,
+    "animations": 0,
+    "text_objects": 0,
+    "static_only": true,
+    "style_matches_reference_exactly": true,
+    "style": {
+      "camera": {
+        "location": [
+          3.200000047683716,
+          -9.0,
+          4.800000190734863
+        ],
+        "rotation": [
+          1.1957879066467285,
+          1.289480433541712e-08,
+          0.3416154980659485
+        ],
+        "type": "ORTHO",
+        "ortho_scale": 3.75
+      },
+      "lights": [
+        {
+          "name": "Edge separation",
+          "location": [
+            1.0,
+            4.0,
+            5.0
+          ],
+          "rotation": [
+            0.8055741190910339,
+            -5.3024400870071986e-08,
+            2.8966140747070312
+          ],
+          "energy": 650.0,
+          "shape": "DISK",
+          "size": 3.0
+        },
+        {
+          "name": "Large soft key",
+          "location": [
+            -3.0,
+            -4.0,
+            7.0
+          ],
+          "rotation": [
+            0.6980299949645996,
+            2.1354791712724364e-08,
+            -0.643501341342926
+          ],
+          "energy": 550.0,
+          "shape": "DISK",
+          "size": 4.5
+        },
+        {
+          "name": "Soft fill",
+          "location": [
+            4.0,
+            -2.0,
+            4.0
+          ],
+          "rotation": [
+            0.9861174821853638,
+            -2.8577392896522724e-08,
+            1.1071487665176392
+          ],
+          "energy": 350.0,
+          "shape": "DISK",
+          "size": 4.0
+        }
+      ],
+      "world_color": [
+        0.30000001192092896,
+        0.30000001192092896,
+        0.30000001192092896
+      ],
+      "view_transform": "AgX",
+      "look": "AgX - Medium High Contrast",
+      "exposure": 0.3499999940395355,
+      "gamma": 1.0,
+      "materials": {
+        "blue.001": {
+          "base_color": [
+            0.03071344457566738,
+            0.22322796285152435,
+            0.9215818643569946,
+            1.0
+          ],
+          "metallic": 0.11999999731779099,
+          "roughness": 0.25
+        },
+        "ink.001": {
+          "base_color": [
+            0.21952620148658752,
+            0.28314873576164246,
+            0.38132601976394653,
+            1.0
+          ],
+          "metallic": 0.03999999910593033,
+          "roughness": 0.36000001430511475
+        },
+        "pale.001": {
+          "base_color": [
+            0.4793201684951782,
+            0.5840784311294556,
+            0.7304607629776001,
+            1.0
+          ],
+          "metallic": 0.07999999821186066,
+          "roughness": 0.30000001192092896
+        },
+        "white.001": {
+          "base_color": [
+            0.8879231214523315,
+            0.9130986332893372,
+            0.9559733271598816,
+            1.0
+          ],
+          "metallic": 0.05000000074505806,
+          "roughness": 0.2800000011920929
+        }
+      }
+    },
+    "roundtrip_png": "edit-identity-512.png"
+  },
+  {
+    "asset": "intake-paused",
+    "blender_version": "4.3.2",
+    "engine": "BLENDER_EEVEE_NEXT",
+    "samples": 128,
+    "mesh_objects": 9,
+    "curve_objects": 0,
+    "external_images": 0,
+    "linked_libraries": 0,
+    "animations": 0,
+    "text_objects": 0,
+    "static_only": true,
+    "style_matches_reference_exactly": true,
+    "style": {
+      "camera": {
+        "location": [
+          3.200000047683716,
+          -9.0,
+          4.800000190734863
+        ],
+        "rotation": [
+          1.1957879066467285,
+          1.289480433541712e-08,
+          0.3416154980659485
+        ],
+        "type": "ORTHO",
+        "ortho_scale": 3.75
+      },
+      "lights": [
+        {
+          "name": "Edge separation",
+          "location": [
+            1.0,
+            4.0,
+            5.0
+          ],
+          "rotation": [
+            0.8055741190910339,
+            -5.3024400870071986e-08,
+            2.8966140747070312
+          ],
+          "energy": 650.0,
+          "shape": "DISK",
+          "size": 3.0
+        },
+        {
+          "name": "Large soft key",
+          "location": [
+            -3.0,
+            -4.0,
+            7.0
+          ],
+          "rotation": [
+            0.6980299949645996,
+            2.1354791712724364e-08,
+            -0.643501341342926
+          ],
+          "energy": 550.0,
+          "shape": "DISK",
+          "size": 4.5
+        },
+        {
+          "name": "Soft fill",
+          "location": [
+            4.0,
+            -2.0,
+            4.0
+          ],
+          "rotation": [
+            0.9861174821853638,
+            -2.8577392896522724e-08,
+            1.1071487665176392
+          ],
+          "energy": 350.0,
+          "shape": "DISK",
+          "size": 4.0
+        }
+      ],
+      "world_color": [
+        0.30000001192092896,
+        0.30000001192092896,
+        0.30000001192092896
+      ],
+      "view_transform": "AgX",
+      "look": "AgX - Medium High Contrast",
+      "exposure": 0.3499999940395355,
+      "gamma": 1.0,
+      "materials": {
+        "blue.002": {
+          "base_color": [
+            0.03071344457566738,
+            0.22322796285152435,
+            0.9215818643569946,
+            1.0
+          ],
+          "metallic": 0.11999999731779099,
+          "roughness": 0.25
+        },
+        "ink.002": {
+          "base_color": [
+            0.21952620148658752,
+            0.28314873576164246,
+            0.38132601976394653,
+            1.0
+          ],
+          "metallic": 0.03999999910593033,
+          "roughness": 0.36000001430511475
+        },
+        "pale.002": {
+          "base_color": [
+            0.4793201684951782,
+            0.5840784311294556,
+            0.7304607629776001,
+            1.0
+          ],
+          "metallic": 0.07999999821186066,
+          "roughness": 0.30000001192092896
+        },
+        "white.002": {
+          "base_color": [
+            0.8879231214523315,
+            0.9130986332893372,
+            0.9559733271598816,
+            1.0
+          ],
+          "metallic": 0.05000000074505806,
+          "roughness": 0.2800000011920929
+        }
+      }
+    },
+    "roundtrip_png": "intake-paused-512.png"
+  },
+  {
+    "asset": "waiting-off",
+    "blender_version": "4.3.2",
+    "engine": "BLENDER_EEVEE_NEXT",
+    "samples": 128,
+    "mesh_objects": 9,
+    "curve_objects": 0,
+    "external_images": 0,
+    "linked_libraries": 0,
+    "animations": 0,
+    "text_objects": 0,
+    "static_only": true,
+    "style_matches_reference_exactly": true,
+    "style": {
+      "camera": {
+        "location": [
+          3.200000047683716,
+          -9.0,
+          4.800000190734863
+        ],
+        "rotation": [
+          1.1957879066467285,
+          1.289480433541712e-08,
+          0.3416154980659485
+        ],
+        "type": "ORTHO",
+        "ortho_scale": 3.75
+      },
+      "lights": [
+        {
+          "name": "Edge separation",
+          "location": [
+            1.0,
+            4.0,
+            5.0
+          ],
+          "rotation": [
+            0.8055741190910339,
+            -5.3024400870071986e-08,
+            2.8966140747070312
+          ],
+          "energy": 650.0,
+          "shape": "DISK",
+          "size": 3.0
+        },
+        {
+          "name": "Large soft key",
+          "location": [
+            -3.0,
+            -4.0,
+            7.0
+          ],
+          "rotation": [
+            0.6980299949645996,
+            2.1354791712724364e-08,
+            -0.643501341342926
+          ],
+          "energy": 550.0,
+          "shape": "DISK",
+          "size": 4.5
+        },
+        {
+          "name": "Soft fill",
+          "location": [
+            4.0,
+            -2.0,
+            4.0
+          ],
+          "rotation": [
+            0.9861174821853638,
+            -2.8577392896522724e-08,
+            1.1071487665176392
+          ],
+          "energy": 350.0,
+          "shape": "DISK",
+          "size": 4.0
+        }
+      ],
+      "world_color": [
+        0.30000001192092896,
+        0.30000001192092896,
+        0.30000001192092896
+      ],
+      "view_transform": "AgX",
+      "look": "AgX - Medium High Contrast",
+      "exposure": 0.3499999940395355,
+      "gamma": 1.0,
+      "materials": {
+        "blue.003": {
+          "base_color": [
+            0.03071344457566738,
+            0.22322796285152435,
+            0.9215818643569946,
+            1.0
+          ],
+          "metallic": 0.11999999731779099,
+          "roughness": 0.25
+        },
+        "ink.003": {
+          "base_color": [
+            0.21952620148658752,
+            0.28314873576164246,
+            0.38132601976394653,
+            1.0
+          ],
+          "metallic": 0.03999999910593033,
+          "roughness": 0.36000001430511475
+        },
+        "pale.003": {
+          "base_color": [
+            0.4793201684951782,
+            0.5840784311294556,
+            0.7304607629776001,
+            1.0
+          ],
+          "metallic": 0.07999999821186066,
+          "roughness": 0.30000001192092896
+        },
+        "white.003": {
+          "base_color": [
+            0.8879231214523315,
+            0.9130986332893372,
+            0.9559733271598816,
+            1.0
+          ],
+          "metallic": 0.05000000074505806,
+          "roughness": 0.2800000011920929
+        }
+      }
+    },
+    "roundtrip_png": "waiting-off-512.png"
+  }
+]

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Tag } from 'antd';
 import AdPaymentOperations from './AdPaymentOperations';
-import { ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AdminTableSkeleton, Button, DataState, DataTable, FilterToolbar, SegmentedControl } from '../common';
 import CopyableText from '../common/CopyableText';
@@ -91,7 +90,7 @@ const PaymentOperationsTab = () => {
             message.success(`PG 재확인 결과: ${label}`);
             void invalidatePaymentOutcome();
         },
-        onError: () => message.error('PG 재확인에 실패했습니다.'),
+        onError: () => message.error('PG 재확인에 실패했어요.'),
     });
 
     const retryWebhookMutation = useMutation({
@@ -99,10 +98,10 @@ const PaymentOperationsTab = () => {
             API_ENDPOINTS.PAYMENT_OPERATIONS.RETRY_WEBHOOK(inboxId),
         ),
         onSuccess: () => {
-            message.success('웹훅 재처리를 요청했습니다.');
+            message.success('웹훅 재처리를 요청했어요.');
             void invalidatePaymentOutcome();
         },
-        onError: () => message.error('웹훅 재처리 요청에 실패했습니다.'),
+        onError: () => message.error('웹훅 재처리 요청에 실패했어요.'),
     });
 
     const handleQueueChange = (value) => {
@@ -116,7 +115,7 @@ const PaymentOperationsTab = () => {
 
     const confirmReconcile = (record) => confirm({
         title: 'PG 결제 상태 재확인',
-        content: `결제 #${record.paymentId}를 PG에서 다시 확인합니다. 자동으로 단정할 수 없는 결과는 수동 대사 큐에 남습니다.`,
+        content: `결제 #${record.paymentId}를 PG에서 다시 확인해요. 자동으로 단정할 수 없는 결과는 수동 대사 큐에 남아요.`,
         okText: '재확인',
         cancelText: '취소',
         centered: true,
@@ -138,8 +137,6 @@ const PaymentOperationsTab = () => {
             render: (_, record) => (
                 <Button
                     variant="ghost-sm-primary"
-                    icon={<ReloadOutlined aria-hidden="true" />}
-                    loadingIcon={<ReloadOutlined spin aria-hidden="true" />}
                     loading={reconcileMutation.isPending && reconcileMutation.variables === record.paymentId}
                     onClick={() => confirmReconcile(record)}
                 >
@@ -171,8 +168,6 @@ const PaymentOperationsTab = () => {
             render: (_, record) => (
                 <Button
                     variant="ghost-sm-primary"
-                    icon={<ReloadOutlined aria-hidden="true" />}
-                    loadingIcon={<ReloadOutlined spin aria-hidden="true" />}
                     loading={retryWebhookMutation.isPending && retryWebhookMutation.variables === record.id}
                     onClick={() => retryWebhookMutation.mutate(record.id)}
                 >
@@ -190,9 +185,9 @@ const PaymentOperationsTab = () => {
     const loading = activeQuery?.isLoading || activeQuery?.isPlaceholderData;
 
     const descriptions = {
-        ready: '오래된 READY 결제를 PG 원장과 다시 맞춥니다. PAID·금액 불일치처럼 자동 확정이 위험한 결과는 수동 대사 큐로 보냅니다.',
-        issues: '자동 처리에서 결말을 단정하지 못한 건입니다. PG 대시보드와 주문번호를 함께 확인하세요.',
-        webhooks: '처리가 끝나지 않은 PortOne 웹훅입니다. 재처리는 같은 멱등 관문을 통과합니다.',
+        ready: '오래된 READY 결제를 PG 원장과 다시 맞춰요. PAID·금액 불일치처럼 자동 확정이 위험한 결과는 수동 대사 큐로 보내요.',
+        issues: '자동으로 처리 결과를 확정하지 못한 건이에요. PG 대시보드와 주문번호를 함께 확인해주세요.',
+        webhooks: '처리가 끝나지 않은 PortOne 웹훅이에요. 재처리는 같은 멱등 관문을 통과해요.',
     };
 
     // 목록 영역 — 오류 / 스켈레톤 / 표. 광고 큐에서는 activeQuery·columns 가 없으므로
@@ -201,7 +196,7 @@ const PaymentOperationsTab = () => {
         if (activeQuery.isError) {
             return (
                 <DataState state="error" kind="payment" subject="결제 운영 목록" error={activeQuery.error}
-                    onRetry={activeQuery.refetch} retrying={activeQuery.isFetching} compact />
+                    onRetry={activeQuery.refetch} retrying={activeQuery.isFetching} />
             );
         }
         if (loading) {
@@ -219,7 +214,7 @@ const PaymentOperationsTab = () => {
                 columns={columns}
                 dataSource={data}
                 rowKey={queue === 'ready' ? 'paymentId' : 'id'}
-                locale={{ emptyText: '처리할 항목이 없습니다.' }}
+                locale={{ emptyText: '처리할 항목이 없어요.' }}
                 pagination={{
                     current: page,
                     pageSize: PAGE_SIZE,
@@ -251,6 +246,7 @@ const PaymentOperationsTab = () => {
                 count={total}
                 onReload={activeQuery.refetch}
                 loading={activeQuery?.isFetching}
+                initialLoading={activeQuery?.isLoading}
             />
 
             {renderTableBody()}

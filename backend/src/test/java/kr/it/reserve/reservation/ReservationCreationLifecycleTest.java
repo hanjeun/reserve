@@ -130,7 +130,7 @@ class ReservationCreationLifecycleTest {
 
         if (rejected) {
             assertRejectedCreation(fixture, request,
-                    "이 가게는 나중 결제를 허용하지 않습니다. 예약금을 즉시 결제해주세요.");
+                    "이 가게는 나중 결제를 허용하지 않아요. 예약금을 즉시 결제해주세요.");
         } else {
             assertCreatedReservation(fixture, store, request);
         }
@@ -167,7 +167,7 @@ class ReservationCreationLifecycleTest {
 
         if (rejected) {
             assertRejectedCreation(fixture, request,
-                    "브레이크 타임(12:00 ~ 13:00) 중에는 예약이 불가합니다. 다른 시간대를 선택해주세요.");
+                    "브레이크 타임(12:00 ~ 13:00) 중에는 예약할 수 없어요. 다른 시간대를 선택해주세요.");
         } else {
             assertCreatedReservation(fixture, store, request);
         }
@@ -222,7 +222,7 @@ class ReservationCreationLifecycleTest {
 
         assertThatThrownBy(operation::run).isInstanceOfSatisfying(ReservationException.class, exception -> {
             assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
-            assertThat(exception).hasMessage("가게를 찾을 수 없습니다.");
+            assertThat(exception).hasMessage("가게를 찾을 수 없어요.");
         });
 
         if (lookup == MissingStoreLookup.UPDATE) {
@@ -285,6 +285,19 @@ class ReservationCreationLifecycleTest {
                 .name("계약 검사 가게").bookingType(Store.BookingType.SLOT)
                 .openTime(LocalTime.of(9, 0)).closeTime(LocalTime.of(18, 0))
                 .reservationSlotMinutes(30).emailNotificationEnabled(false).build();
+    }
+
+    @Test
+    void waitingOnlyStoreRejectsDirectReservationRequestsBeforeAnyReservationOrPaymentWrite() {
+        Fixture fixture = fixture();
+        Store store = bookableStore();
+        store.setReservationEnabled(false);
+        when(fixture.members().findActiveByIdForUpdate(1L)).thenReturn(Optional.of(fixture.member()));
+        when(fixture.stores().findByIdForUpdate(10L)).thenReturn(Optional.of(store));
+        var request = new ReservationCreateRequest(10L, ServiceTime.today().plusDays(1), LocalTime.NOON, 1, null, false);
+        assertThatThrownBy(() -> fixture.service().createReservation(request, fixture.member()))
+                .isInstanceOf(ReservationException.class).hasMessageContaining("예약 접수");
+        verifyNoInteractions(fixture.reservations(), fixture.payments(), fixture.emails(), fixture.audits());
     }
 
     private static Fixture fixture() {

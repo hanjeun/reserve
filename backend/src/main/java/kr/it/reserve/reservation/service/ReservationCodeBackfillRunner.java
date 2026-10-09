@@ -39,7 +39,7 @@ public class ReservationCodeBackfillRunner {
     public void backfillMissingCodes() {
         List<Reservation> missing = reservationRepository.findByReservationCodeIsNull();
         if (missing.isEmpty()) {
-            log.debug("예약번호 백필 대상 없음 — 건너뜀");
+            log.debug("Reservation code backfill skipped: no missing codes");
             return;
         }
 
@@ -53,6 +53,6 @@ public class ReservationCodeBackfillRunner {
             reservation.setReservationCode(code);
             filled++;
         }
-        log.info("예약번호 백필 완료: {}건에 reservationCode 채움", filled);
+        log.info("Reservation code backfill completed: filled={}", filled);
     }
 }

@@ -20,7 +20,7 @@ public class ChatReportAuditService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordAccess(Member admin, Long reportId, Long messageId, ChatReportAccessAudit.Action action) {
         if (admin == null || admin.getId() == null || admin.getRole() != Role.ADMIN)
-            throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
         audits.save(new ChatReportAccessAudit(reportId, admin.getId(), messageId, action));
     }
 }

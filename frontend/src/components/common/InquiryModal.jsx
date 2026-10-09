@@ -94,10 +94,10 @@ const InquiryModal = ({ open, onClose }) => {
                 category, title: title.trim(), content: content.trim(),
                 ...(!isLoggedIn && { guestName: guestName.trim(), guestEmail: guestEmail.trim() }),
             });
-            message.success('문의가 접수되었습니다. 빠르게 답변드릴게요.');
+            message.success('문의가 접수됐어요. 빠르게 답변드릴게요.');
             handleClose();
         } catch {
-            message.error('문의 등록에 실패했습니다.');
+            message.error('문의 등록에 실패했어요.');
         } finally {
             setSending(false);
         }

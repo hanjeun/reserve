@@ -13,6 +13,7 @@ import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -103,6 +104,15 @@ class ReservationAvailabilityTest {
 
         assertThat(times).contains("09:00", "20:30").doesNotContain("21:00");
         assertThat(times.get(times.size() - 1)).isEqualTo("20:30");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(Store.BookingType.class)
+    void waitingOnlyStoresReturnNoReservationSlots(Store.BookingType type) {
+        Store store = storeWithHours(LocalTime.of(9, 0), LocalTime.of(21, 0), 30);
+        store.setBookingType(type);
+        store.setReservationEnabled(false);
+        assertThat(availableTimes(store)).isEmpty();
     }
 
     @Test

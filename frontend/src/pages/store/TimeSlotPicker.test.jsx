@@ -298,7 +298,7 @@ describe('reservation edit lookup failure', () => {
         const onRetry = vi.fn();
         render(<EditErrorHarness onRetry={onRetry} />);
 
-        expect(screen.getByRole('alert')).toHaveTextContent('변경할 예약 정보를 불러오지 못했습니다.');
+        expect(screen.getByRole('alert')).toHaveTextContent('변경할 예약 정보를 불러오지 못했어요.');
         // 채워지지 않은 폼과 제출 버튼이 없어야 한다 — 누르면 새 예약처럼 보인다.
         expect(screen.queryByRole('button', { name: '예약 변경하기' })).not.toBeInTheDocument();
         expect(api.get).not.toHaveBeenCalled();

@@ -53,14 +53,24 @@ describe('discovery banner motion policy', () => {
         expect(transforms.every(value => value === 'none')).toBe(true);
     });
 
-    it('keeps the small 3D shortcut press effect without applying it to the carousel', () => {
-        const shortcutTransforms = [];
+    it('lifts shortcut images on fine hover without resizing the pressed link or carousel', () => {
+        const hoverTransforms = [];
+        const pressTransforms = [];
         stylesheet.walkRules(rule => {
-            if (rule.selectors.includes('.reserve-discovery-shortcut:active')) {
-                rule.walkDecls('transform', declaration => shortcutTransforms.push(declaration.value));
+            if (rule.selectors.includes('.reserve-discovery-shortcut:hover img')) {
+                rule.walkDecls('transform', declaration => {
+                    expect(rule.parent.type).toBe('atrule');
+                    expect(rule.parent.params).toBe('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)');
+                    hoverTransforms.push(declaration.value);
+                });
+            }
+            if (rule.selectors.some(selector => /^\.reserve-discovery-shortcut:active(?=[:\s]|$)/.test(selector))) {
+                rule.walkDecls('transform', declaration => pressTransforms.push(declaration.value));
             }
         });
-        expect(shortcutTransforms).toContain('scale(0.97)');
+        expect(hoverTransforms).toEqual(['translateY(-2px)']);
+        expect(pressTransforms).toEqual(['none']);
+        expect(styleAtWidth('.reserve-discovery-shortcut:active', 390).color).toBe('var(--c-text-primary, #191f28)');
     });
 });
 

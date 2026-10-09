@@ -161,7 +161,7 @@ export const threadCopyOf = ({ selection, thread, selectedRow, supportName }) =>
         return {
             title: thread?.title || selectedRow?.counterpartName || '회원 문의',
             threadKind: 'RESERVE 고객지원 · 관리자',
-            emptyText: '회원의 문의에 답변할 수 있습니다.',
+            emptyText: '회원의 문의에 답변할 수 있어요.',
         };
     }
     if (selection.kind === 'support') {
@@ -197,9 +197,9 @@ export const introVisibilityOf = ({ selection, thread, messageCount, hasMoreHist
 };
 
 export const disabledMessageOf = (reason) => {
-    if (reason === 'BLOCKED_BY_ME') return '내가 차단한 대화입니다. 대화 관리에서 차단을 해제할 수 있습니다.';
-    if (reason === 'BLOCKED_BY_OTHER') return '상대방이 차단해 새 메시지를 보낼 수 없습니다. 이전 대화는 계속 볼 수 있습니다.';
-    return '현재 운영 상태에서는 새 메시지를 보낼 수 없지만 이전 대화는 계속 볼 수 있습니다.';
+    if (reason === 'BLOCKED_BY_ME') return '내가 차단한 대화예요. 대화 관리에서 차단을 해제할 수 있어요.';
+    if (reason === 'BLOCKED_BY_OTHER') return '상대방이 차단해 새 메시지를 보낼 수 없어요. 이전 대화는 계속 볼 수 있어요.';
+    return '현재 운영 상태에서는 새 메시지를 보낼 수 없지만 이전 대화는 계속 볼 수 있어요.';
 };
 
 export const footerViewOf = (isHome, isSettings) => {

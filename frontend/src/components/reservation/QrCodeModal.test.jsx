@@ -33,7 +33,7 @@ describe('QrCodeModal lookup failure', () => {
             .mockResolvedValueOnce({ token: 'fresh-token' });
         renderModal();
 
-        expect(await screen.findByRole('alert')).toHaveTextContent('QR 코드를 불러오지 못했습니다.');
+        expect(await screen.findByRole('alert')).toHaveTextContent('QR 코드를 불러오지 못했어요.');
         expect(screen.getByRole('dialog', { name: '방문 체크인 QR' })).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));

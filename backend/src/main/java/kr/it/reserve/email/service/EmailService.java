@@ -66,7 +66,7 @@ public class EmailService {
             log.info("Verification email sent");
         } catch (MessagingException | UnsupportedEncodingException | MailException e) {
             log.error("Email send failed: errorType={}", e.getClass().getSimpleName());
-            throw new EmailException("인증 이메일 발송 중 서버 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new EmailException("인증 이메일 발송 중 서버 오류가 발생했어요.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -80,9 +80,9 @@ public class EmailService {
                                               String storeName, String reservationDate,
                                               String reservationTime, int guestCount) {
         String name = resolveName(memberName, toEmail);
-        sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 승인되었습니다",
+        sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 승인됐어요",
                 buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
-                        reservationTime, guestCount), "승인", "#1db954", "예약이 확정되었습니다! 방문 당일 즐거운 시간 되세요.", null, null));
+                        reservationTime, guestCount), "승인", "#1db954", "예약이 확정됐어요! 방문 당일 즐거운 시간 되세요.", null, null));
     }
 
     /**
@@ -98,10 +98,10 @@ public class EmailService {
                                                      String reservationTime, int guestCount,
                                                      String cancelReason) {
         String name = resolveName(memberName, toEmail);
-        sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 취소되었습니다",
+        sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 취소됐어요",
                 buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
                         reservationTime, guestCount), "취소", DECLINED_COLOR,
-                        "가게 사정으로 예약이 취소되었습니다. 결제하신 예약금은 전액 환불됩니다.",
+                        "가게 사정으로 예약이 취소됐어요. 결제하신 예약금은 전액 환불돼요.",
                         cancelReason, "취소 사유"));
     }
 
@@ -112,9 +112,9 @@ public class EmailService {
                                              String reservationTime, int guestCount,
                                              String rejectionReason) {
         String name = resolveName(memberName, toEmail);
-        sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 거절되었습니다",
+        sendReservationStatusEmail(toEmail, "[RESERVE] 예약이 거절됐어요",
                 buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
-                        reservationTime, guestCount), "거절", DECLINED_COLOR, "아쉽게도 예약이 거절되었습니다. 다른 날짜에 다시 시도해보세요.",
+                        reservationTime, guestCount), "거절", DECLINED_COLOR, "아쉽게도 예약이 거절됐어요. 다른 날짜에 다시 시도해보세요.",
                         rejectionReason, "거절 사유"));
     }
 
@@ -130,10 +130,10 @@ public class EmailService {
                                                     String storeName, String reservationDate,
                                                     String reservationTime, int guestCount) {
         String name = resolveName(memberName, toEmail);
-        sendReservationStatusEmail(toEmail, "[RESERVE] 예약 승인이 취소되었습니다",
+        sendReservationStatusEmail(toEmail, "[RESERVE] 예약 승인이 취소됐어요",
                 buildReservationStatusContent(name, new ReservationMailDetails(storeName, reservationDate,
                         reservationTime, guestCount), "대기", "#faad14",
-                        "앞서 보내드린 승인 안내를 취소합니다. 예약은 다시 승인 대기 상태입니다.",
+                        "앞서 보내드린 승인 안내를 취소해요. 예약은 다시 승인 대기 상태예요.",
                         null, null));
     }
 
@@ -155,7 +155,7 @@ public class EmailService {
             if (memberEmail != null && !memberEmail.isBlank()) {
                 helper.setReplyTo(memberEmail);  // 사장님이 이 메일에 바로 "답장" 누르면 예약자한테 감
             }
-            helper.setSubject("[RESERVE] 새로운 예약이 접수되었습니다");
+            helper.setSubject("[RESERVE] 새로운 예약이 접수됐어요");
             helper.setText(buildOwnerAlertContent(oName, details.storeName(), mName, memberEmail,
                     details.reservationDate(), details.reservationTime(), details.guestCount()), true);
             mailSender.send(message);
@@ -243,7 +243,7 @@ public class EmailService {
             + "    <div style=\"margin-bottom:24px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
             + "    <div style=\"display:inline-block;background:#3182f6;color:#fff;font-size:13px;font-weight:700;border-radius:20px;padding:4px 14px;margin-bottom:16px;\">새 예약</div>"
             + "    <h1 style=\"font-size:22px;font-weight:700;color:#191f28;margin:0 0 8px;font-family:" + FONT_FAMILY + ";\">" + safeOwnerName + "님, 새로운 예약이 들어왔어요!</h1>"
-            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + safeStoreName + "에 예약 요청이 접수되었습니다. 확인 후 승인해주세요.</p>"
+            + "    <p style=\"font-size:15px;color:#4e5968;margin:0 0 28px;\">" + safeStoreName + "에 예약 요청이 접수됐어요. 확인 후 승인해주세요.</p>"
             + "    <div style=\"background:#f2f4f6;border-radius:16px;padding:24px;margin-bottom:28px;\">"
             + "      <table style=\"width:100%;border-collapse:collapse;font-family:" + FONT_FAMILY + ";\">"
             + "        <tr><td style=\"color:#8b95a1;padding:8px 0;\">고객명</td><td style=\"color:#191f28;font-weight:600;\">" + safeMemberName + "</td></tr>"
@@ -271,11 +271,11 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("[RESERVE] 사업자 인증이 승인되었습니다");
+            helper.setSubject("[RESERVE] 사업자 인증이 승인됐어요");
             helper.setText(buildBusinessStatusContent(
                 name, businessName,
                 "승인", "#1db954",
-                "사업자 인증이 완료되었습니다!",
+                "사업자 인증이 완료됐어요!",
                 "이제 RESERVE에서 가게를 등록하고 예약을 받아보세요.",
                 null
             ), true);
@@ -294,11 +294,11 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, MAIL_CHARSET);
             helper.setFrom(fromEmail, fromName);
             helper.setTo(toEmail);
-            helper.setSubject("[RESERVE] 사업자 인증이 반려되었습니다");
+            helper.setSubject("[RESERVE] 사업자 인증이 반려됐어요");
             helper.setText(buildBusinessStatusContent(
                 name, businessName,
                 "반려", DECLINED_COLOR,
-                "아쉽게도 사업자 인증이 반려되었습니다.",
+                "아쉽게도 사업자 인증이 반려됐어요.",
                 "반려 사유를 확인하신 후 서류를 수정하여 다시 신청해주세요.",
                 rejectionReason
             ), true);
@@ -436,7 +436,7 @@ public class EmailService {
             + "    <div style=\"max-width:500px;margin:0 auto;background-color:#ffffff;border-radius:24px;padding:48px 32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);\">"
             + "      <div style=\"margin-bottom:32px;\"><span style=\"font-size:20px;font-weight:800;color:#3182f6;letter-spacing:-0.5px;font-family:" + FONT_FAMILY + ";\">RESERVE</span></div>"
             + "      <h1 style=\"font-size:24px;font-weight:700;color:#191f28;line-height:1.4;margin:0 0 12px 0;font-family:" + FONT_FAMILY + ";\">비밀번호를<br/>재설정해주세요.</h1>"
-            + "      <p style=\"font-size:16px;color:#4e5968;line-height:1.6;margin:0 0 32px 0;\">아래 인증 코드를 입력해 비밀번호를 재설정하세요.<br/>코드는 5분간 유효합니다.</p>"
+            + "      <p style=\"font-size:16px;color:#4e5968;line-height:1.6;margin:0 0 32px 0;\">아래 인증 코드를 입력해 비밀번호를 재설정하세요.<br/>코드는 5분간 유효해요.</p>"
             + "      <div style=\"background-color:#f2f4f6;border-radius:16px;padding:32px;text-align:center;margin-bottom:32px;\">"
             + "        <span style=\"display:block;font-size:14px;color:#8b95a1;margin-bottom:8px;\">인증번호</span>"
             + "        <span style=\"font-size:36px;font-weight:800;color:#3182f6;letter-spacing:8px;font-family:" + FONT_FAMILY + ";\">" + code + "</span>"
@@ -463,8 +463,8 @@ public class EmailService {
             + "        <span style=\"font-size:36px;font-weight:800;color:#3182f6;letter-spacing:8px;font-family:" + FONT_FAMILY + ";\">" + code + "</span>"
             + "      </div>"
             + "      <div style=\"font-size:13px;color:#b0b8c1;line-height:1.6;border-top:1px solid #f2f4f6;padding-top:24px;\">"
-            + "        본 메일은 회원가입을 위한 본인 확인 메일입니다.<br/>"
-            + "        인증 코드는 <span style=\"color:#8b95a1;\">5분간</span> 유효합니다.<br/><br/>"
+            + "        본 메일은 회원가입을 위한 본인 확인 메일이에요.<br/>"
+            + "        인증 코드는 <span style=\"color:#8b95a1;\">5분간</span> 유효해요.<br/><br/>"
             + "        © 2026 RESERVE. All rights reserved."
             + "      </div>"
             + "    </div>"

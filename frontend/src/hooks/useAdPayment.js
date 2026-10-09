@@ -38,7 +38,7 @@ const useAdPayment = () => {
         const { merchantUid, storeId, amount, productName, buyerName, buyerEmail, buyerTel } = prepared;
 
         if (!storeId) {
-            message.error('결제 설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+            message.error('결제 설정을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
             return { success: false };
         }
 
@@ -70,17 +70,17 @@ const useAdPayment = () => {
                 || (payment.message || '').includes('취소')
                 || (payment.message || '').toLowerCase().includes('cancel');
             if (!isCancelled) {
-                message.error(payment.message || '결제에 실패했습니다.');
+                message.error(payment.message || '결제에 실패했어요.');
             }
             return { success: false, cancelled: isCancelled };
         }
 
         try {
             const ad = await adService.verifyPayment(merchantUid);
-            message.success('광고가 등록되었습니다.');
+            message.success('광고가 등록됐어요.');
             return { success: true, ad };
         } catch (err) {
-            message.error(err instanceof Error ? err.message : '결제 결과 확인이 필요합니다. 이미 결제됐다면 다시 결제하지 마세요.');
+            message.error(err instanceof Error ? err.message : '결제 결과 확인이 필요해요. 이미 결제됐다면 다시 결제하지 마세요.');
             return { success: false };
         }
     }, [message]);
@@ -101,7 +101,7 @@ const useAdPayment = () => {
                 // 여기서는 typeof err === 'string'으로 검사해서 항상 false가 되고 있었다 — 그 결과 백엔드가
                 // 보낸 구체적인 오류 문구(예: 이미 결제 대기 중인 신청이 있음, 노출 기간 오류 등)가 한 번도 사용자에게
                 // 보이지 않고 늘 같은 뭉뚝한 fallback 문구만 떠 있었다. BusinessVerificationTab 등과 동일한 컨벤션으로 통일.
-                message.error(err instanceof Error ? err.message : '광고 신청에 실패했습니다.');
+                message.error(err instanceof Error ? err.message : '광고 신청에 실패했어요.');
                 return { success: false };
             }
         },
@@ -116,7 +116,7 @@ const useAdPayment = () => {
                 return await runPayment(prepared);
             } catch (err) {
                 // 위 createMutation과 동일한 이유로 err.message를 읽도록 수정(2026-07)
-                message.error(err instanceof Error ? err.message : '결제 준비에 실패했습니다.');
+                message.error(err instanceof Error ? err.message : '결제 준비에 실패했어요.');
                 return { success: false };
             }
         },

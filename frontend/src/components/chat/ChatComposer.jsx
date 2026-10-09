@@ -1,7 +1,8 @@
 import { useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Popover } from 'antd';
-import { ArrowRightOutlined, LoadingOutlined, SmileOutlined, StopOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '@ant-design/icons';
+import { SpinIndicator } from '../common/Loading';
 import ChatImagePicker from './ChatImagePicker';
 
 const usesTouchInput = () => globalThis.matchMedia?.('(pointer: coarse)').matches === true;
@@ -52,7 +53,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                 aria-label={`${keywords.split(' ')[0]} ${emoji}`} onClick={() => selectEmoji(emoji)}
                 onKeyDown={closePickerOnEscape}>{emoji}</button>)}
         </div>
-        {emojis.length === 0 && <p><output>검색 결과가 없습니다.</output></p>}
+        {emojis.length === 0 && <p><output>검색 결과가 없어요.</output></p>}
     </section>;
     // 전송 버튼: 보내는 중이면 (중단 가능 시) 중단 · 아니면 로딩, 평소에는 보내기.
     const canCancel = sending && Boolean(onCancel);
@@ -63,7 +64,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
         sendIcon = <StopOutlined />;
     } else if (sending) {
         sendLabel = '보내는 중';
-        sendIcon = <LoadingOutlined />;
+        sendIcon = <span aria-hidden="true"><SpinIndicator /></span>;
     }
     return <div className="reserve-chat-composer reserve-messenger-composer">
         <textarea ref={input} value={value} onChange={event => onChange(event.target.value)}

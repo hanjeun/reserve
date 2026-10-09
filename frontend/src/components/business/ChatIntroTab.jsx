@@ -38,11 +38,11 @@ export default function ChatIntroTab() {
     if (storesLoading || (store && isLoading)) {
         content = <ChatIntroEditorSkeleton />;
     } else if (storesError) {
-        content = <DataState state="error" kind="store" subject="가게 목록" error={storesError} onRetry={refetchStores} compact />;
+        content = <DataState state="error" kind="store" subject="가게 목록" error={storesError} onRetry={refetchStores} />;
     } else if (!store) {
-        content = <DataState state="empty" kind="store" title="등록된 가게가 없습니다." style={{ marginTop: 80 }} />;
+        content = <DataState state="empty" kind="store" title="등록된 가게가 없어요." style={{ marginTop: 80 }} />;
     } else if (isError) {
-        content = <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error} onRetry={refetch} retrying={isFetching} compact />;
+        content = <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error} onRetry={refetch} retrying={isFetching} />;
     } else {
         content = (
             <ChatIntroEditor
@@ -52,7 +52,7 @@ export default function ChatIntroTab() {
                 identity={{ name: store.name, imageSrc: store.mainImageUrl || undefined }}
                 saving={saveMutation.isPending}
                 onSave={body => saveMutation.mutateAsync({ storeId: store.id, body })}
-                noticeHelp="대화창 맨 위 확성기 줄에 보여요. 휴무·주차처럼 먼저 알려야 할 내용을 적어 주세요. 비워 두면 '안녕하세요. 가게 이름입니다.'가 보여요."
+                noticeHelp="대화창 맨 위 확성기 줄에 보여요. 휴무·주차처럼 먼저 알려야 할 내용을 적어 주세요. 비워 두면 '안녕하세요. 가게 이름에서 안내해드려요.'가 보여요."
             />
         );
     }
@@ -70,6 +70,7 @@ export default function ChatIntroTab() {
                 }] : []}
                 onReload={store ? refetch : refetchStores}
                 loading={storesLoading || isFetching}
+                initialLoading={storesLoading || isLoading}
             />
             {content}
         </div>

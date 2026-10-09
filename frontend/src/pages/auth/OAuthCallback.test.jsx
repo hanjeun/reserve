@@ -9,7 +9,13 @@ import { clearRedirect, peekRedirect, saveRedirect } from '../../utils/redirect'
 const { checkAuth, navigate, message } = vi.hoisted(() => ({
     checkAuth: vi.fn(), navigate: vi.fn(), message: { success: vi.fn(), error: vi.fn() },
 }));
-vi.mock('../../store/useAuthStore', () => ({ default: () => ({ checkAuth }) }));
+vi.mock('../../store/useAuthStore', () => {
+    const state = { checkAuth, user: null, isLoggedIn: false, sessionRevision: 0 };
+    return { default: Object.assign(selector => selector ? selector(state) : state, {
+        getState: () => state,
+        subscribe: () => () => {},
+    }) };
+});
 vi.mock('react-router-dom', async importOriginal => ({ ...(await importOriginal()), useNavigate: () => navigate }));
 
 describe('OAuth pending presentation', () => {

@@ -55,7 +55,7 @@ describe('HeaderAccountMenu logout', () => {
 
         expect(authState.setLoggingOut).toHaveBeenCalledWith(true);
         expect(message.loading).toHaveBeenCalledWith(expect.objectContaining({
-            content: '로그아웃하는 중입니다.', duration: 0,
+            content: '로그아웃하는 중이에요.', duration: 0,
         }));
         const progress = render(message.loading.mock.calls[0][0].icon);
         expect(screen.getByRole('img', { name: '로딩 중' })).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe('HeaderAccountMenu logout', () => {
         expect(dismissProgress).toHaveBeenCalledTimes(1);
         expect(logout).toHaveBeenCalledTimes(1);
         expect(navigate).toHaveBeenCalledWith('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
-        expect(message.success).toHaveBeenCalledWith('성공적으로 로그아웃되었습니다.');
+        expect(message.success).toHaveBeenCalledWith('로그아웃했어요.');
     });
 
     it('still clears this device session when the server logout cannot be confirmed', async () => {
@@ -79,6 +79,6 @@ describe('HeaderAccountMenu logout', () => {
 
         await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
         expect(navigate).toHaveBeenCalledWith('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
-        expect(message.warning).toHaveBeenCalledWith('이 기기에서 로그아웃했습니다. 서버 연결은 확인하지 못했습니다.');
+        expect(message.warning).toHaveBeenCalledWith('이 기기에서 로그아웃했어요. 서버 연결은 확인하지 못했어요.');
     });
 });

@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Input, Typography } from 'antd';
 import FilterMenu from './FilterMenu';
 import RefreshButton from './RefreshButton';
+import FilterToolbarSkeleton from './FilterToolbarSkeleton';
 import { SearchOutlined } from '@ant-design/icons';
 import { colors, fontSize } from '../../styles/tokens';
 
@@ -24,10 +25,13 @@ const FilterToolbar = ({
     search,
     onReload,
     loading = false,
+    initialLoading = false,
     extra,
+    extraSkeleton,
     spread = false,
     style,
 }) => {
+    if (initialLoading) return <FilterToolbarSkeleton selects={selects} count={count} search={search} extra={extra} extraSkeleton={extraSkeleton} spread={spread} style={style} />;
     /* 쿨다운·스피너 정지는 RefreshButton 이 갖는다 — 예전엔 이 파일과 MailboxTab, ChatTab 이
        같은 3초 쿨다운을 각자 구현하고 있었고(정리 안 되는 setTimeout 포함),
        회전이 중간에서 끊겨 아이콘이 튀는 문제도 네 곳에 똑같이 있었다. */
@@ -144,7 +148,9 @@ FilterToolbar.propTypes = {
     }),
     onReload: PropTypes.func,
     loading: PropTypes.bool,
+    initialLoading: PropTypes.bool,
     extra: PropTypes.node,
+    extraSkeleton: PropTypes.node,
     spread: PropTypes.bool,
     style: PropTypes.object,
 };

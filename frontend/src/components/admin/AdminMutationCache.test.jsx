@@ -79,7 +79,7 @@ describe('admin decisions with real mutation and query caches', () => {
         fireEvent.click(await screen.findByRole('button', { name: /거절 처리$/ }));
         expect(api.post).not.toHaveBeenCalled();
         expect(screen.getByRole('alert')).toHaveTextContent('거절 사유를 입력해주세요.');
-        fireEvent.change(screen.getByPlaceholderText('예: 사업자등록증 이미지가 불명확합니다.'), { target: { value: '  등록증 재확인  ' } });
+        fireEvent.change(screen.getByPlaceholderText('예: 사업자등록증 이미지가 잘 보이지 않아요.'), { target: { value: '  등록증 재확인  ' } });
         fireEvent.click(screen.getByRole('button', { name: /거절 처리$/ }));
         await waitFor(() => expect(api.post).toHaveBeenCalledWith(API_ENDPOINTS.BUSINESS.ADMIN_REJECT(73), { reason: '등록증 재확인' }));
         await expectAdminRefresh(client);
@@ -112,7 +112,7 @@ it('closes a successful nonmarketing mail draft and refreshes the sent cache', a
     const client = mount(<MailboxTab />);
     const retainedKey = [...adminKeys.sentMails(), 2, 'retained'];
     client.setQueryData(retainedKey, { mails: [] });
-    fireEvent.click(screen.getByRole('button', { name: /새 메일$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /새 메일$/ }));
     fillMail();
     fireEvent.click(screen.getByRole('button', { name: '보내기' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

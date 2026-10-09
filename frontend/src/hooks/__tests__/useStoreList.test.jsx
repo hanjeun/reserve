@@ -7,6 +7,7 @@ import useStoreList from '../useStoreList';
 import useStoreImageHint from '../useStoreImageHint';
 import { storeKeys } from '../queryKeys';
 import storeService from '../../services/storeService';
+import { DISCOVERY_REGION_STORAGE_KEY, saveDiscoveryRegion } from '../../utils/discoveryRegion';
 
 vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } }));
 
@@ -44,6 +45,7 @@ const routeParams = () => new URLSearchParams(screen.getByTestId('route').textCo
 
 describe('공개 가게 서버 페이지네이션', () => {
     beforeEach(() => {
+        saveDiscoveryRegion('');
         storeService.getStores.mockReset();
         storeService.getStores.mockImplementation(async ({ page }) => serverPage(page));
     });
@@ -71,6 +73,72 @@ describe('공개 가게 서버 페이지네이션', () => {
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(result.current.totalElements).toBe(37);
         expect(result.current.totalPages).toBe(4);
+    });
+
+    it('URL에 지역이 없으면 같은 탭의 선택을 복원하고 검색·페이지·좌표를 유지한다', async () => {
+        saveDiscoveryRegion('경기 안산시');
+        const { result } = renderList('/stores?keyword=공방&page=2&sort=distance&lat=37.321&lng=126.813&domain=OTHER');
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(storeService.getStores).toHaveBeenLastCalledWith({
+            keyword: '공방', page: 1, size: 12, sort: 'distance', lat: '37.321', lng: '126.813',
+            domain: 'OTHER', region: '경기 안산시',
+        });
+        expect(result.current.searchParams.region).toBe('경기 안산시');
+        expect(routeParams().get('page')).toBe('2');
+        expect(routeParams().get('keyword')).toBe('공방');
+    });
+
+    it('복원한 같은 지역을 다시 지정해도 현재 페이지와 조회 결과를 유지한다', async () => {
+        saveDiscoveryRegion('경기 안산시');
+        const { result } = renderList('/stores?page=2');
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        act(() => result.current.setSearchParams({ region: '경기 안산시' }));
+        expect(routeParams().get('page')).toBe('2');
+        expect(storeService.getStores).toHaveBeenCalledTimes(1);
+    });
+
+    it('유효한 URL 지역을 저장값보다 우선하고 다음 진입에도 저장한다', async () => {
+        saveDiscoveryRegion('경기 안산시');
+        const first = renderList('/stores?region=서울 종로구');
+        await waitFor(() => expect(first.result.current.loading).toBe(false));
+        expect(storeService.getStores.mock.calls[0][0].region).toBe('서울 종로구');
+        expect(sessionStorage.getItem(DISCOVERY_REGION_STORAGE_KEY)).toBe('서울 종로구');
+        first.unmount();
+        const next = renderList('/stores');
+        await waitFor(() => expect(next.result.current.loading).toBe(false));
+        expect(next.result.current.searchParams.region).toBe('서울 종로구');
+    });
+
+    it('복원한 지역을 전체로 바꾸면 페이지를 초기화하고 전체 선택을 다시 복원한다', async () => {
+        saveDiscoveryRegion('경기 안산시');
+        const first = renderList('/stores?keyword=공방&page=2&sort=distance&lat=37.321&lng=126.813');
+        await waitFor(() => expect(first.result.current.loading).toBe(false));
+        act(() => first.result.current.setSearchParams({ region: '' }));
+        await waitFor(() => expect(first.result.current.searchParams.region).toBe(''));
+        await waitFor(() => expect(first.result.current.loading).toBe(false));
+        expect(routeParams().has('page')).toBe(false);
+        expect(routeParams().get('keyword')).toBe('공방');
+        expect(routeParams().get('lat')).toBe('37.321');
+        expect(routeParams().get('lng')).toBe('126.813');
+        expect(storeService.getStores.mock.calls.at(-1)[0]).not.toHaveProperty('region');
+        expect(sessionStorage.getItem(DISCOVERY_REGION_STORAGE_KEY)).toBe('');
+        first.unmount();
+        const next = renderList('/stores');
+        await waitFor(() => expect(next.result.current.loading).toBe(false));
+        expect(next.result.current.searchParams.region).toBe('');
+    });
+
+    it('명시적인 전체 URL 선택을 우선하고 잘못된 지역은 API에 전달하지 않는다', async () => {
+        saveDiscoveryRegion('경기 안산시');
+        const whole = renderList('/stores?region=');
+        await waitFor(() => expect(whole.result.current.loading).toBe(false));
+        expect(whole.result.current.searchParams.region).toBe('');
+        expect(storeService.getStores.mock.calls.at(-1)[0]).not.toHaveProperty('region');
+        whole.unmount();
+        const invalid = renderList('/stores?region=없는지역');
+        await waitFor(() => expect(invalid.result.current.loading).toBe(false));
+        expect(invalid.result.current.searchParams.region).toBe('');
+        expect(storeService.getStores.mock.calls.at(-1)[0]).not.toHaveProperty('region');
     });
 
     it.each([

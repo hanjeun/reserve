@@ -30,7 +30,7 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class BusinessVerificationService {
 
-    private static final String MEMBER_NOT_FOUND_MESSAGE = "회원을 찾을 수 없습니다.";
+    private static final String MEMBER_NOT_FOUND_MESSAGE = "회원을 찾을 수 없어요.";
 
     private final BusinessVerificationRepository verificationRepository;
     private final MemberRepository memberRepository;
@@ -49,12 +49,12 @@ public class BusinessVerificationService {
 
         // 1. 이미 사업자인지 확인
         if (activeMember.getRole() == Role.BUSINESS) {
-            throw new BizVerificationException("이미 사업자로 등록되어 있습니다.");
+            throw new BizVerificationException("이미 사업자로 등록되어 있어요.");
         }
 
         // 2. 이미 대기중인 요청이 있는지 확인 (id만 사용)
         if (verificationRepository.existsByMemberIdAndStatus(activeMember.getId(), VerificationStatus.PENDING)) {
-            throw new BizVerificationException("이미 대기 중인 사업자 인증 요청이 있습니다.");
+            throw new BizVerificationException("이미 대기 중인 사업자 인증 요청이 있어요.");
         }
 
         // 3. 파일 유효성 검사
@@ -86,7 +86,7 @@ public class BusinessVerificationService {
         BusinessVerification verification = findVerificationOrThrow(verificationId);
 
         if (verification.getStatus() != VerificationStatus.PENDING) {
-            throw new BizVerificationException("심사 대기 상태인 요청만 승인할 수 있습니다.");
+            throw new BizVerificationException("심사 대기 상태인 요청만 승인할 수 있어요.");
         }
 
         // 인증 승인 처리 (엔티티 메서드 활용)
@@ -122,7 +122,7 @@ public class BusinessVerificationService {
         BusinessVerification verification = findVerificationOrThrow(verificationId);
 
         if (verification.getStatus() != VerificationStatus.PENDING) {
-            throw new BizVerificationException("심사 대기 상태인 요청만 거절할 수 있습니다.");
+            throw new BizVerificationException("심사 대기 상태인 요청만 거절할 수 있어요.");
         }
 
         // 인증 거절 처리 (엔티티 메서드 활용)
@@ -152,7 +152,7 @@ public class BusinessVerificationService {
                 .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (targetMember.getRole() != Role.BUSINESS) {
-            throw new BizVerificationException("해당 회원은 사업자 권한이 없습니다.");
+            throw new BizVerificationException("해당 회원은 사업자 권한이 없어요.");
         }
 
         // 권한 회수
@@ -161,7 +161,7 @@ public class BusinessVerificationService {
 
         // 기존 승인된 인증을 거절(취소) 상태로 변경
         verificationRepository.findTopByMemberAndStatusOrderByCreatedAtDesc(targetMember, VerificationStatus.APPROVED)
-                .ifPresent(v -> v.reject(admin, "관리자에 의해 사업자 자격이 취소되었습니다."));
+                .ifPresent(v -> v.reject(admin, "관리자에 의해 사업자 자격이 취소됐어요."));
 
         log.info("Business role revoked: memberId={}, adminId={}", memberId, admin.getId());
     }
@@ -176,7 +176,7 @@ public class BusinessVerificationService {
                 .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
 
         if (freshMember.getRole() != Role.BUSINESS) {
-            throw new BizVerificationException("사업자 권한을 보유하고 있지 않습니다.");
+            throw new BizVerificationException("사업자 권한을 보유하고 있지 않아요.");
         }
 
         freshMember.setRole(Role.USER);
@@ -193,10 +193,10 @@ public class BusinessVerificationService {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(activeMember.getId())
-                .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException("신청 내역이 없어요.", HttpStatus.NOT_FOUND));
 
         if (verification.getStatus() != VerificationStatus.PENDING) {
-            throw new BizVerificationException("심사 대기 중인 신청만 수정할 수 있습니다.");
+            throw new BizVerificationException("심사 대기 중인 신청만 수정할 수 있어요.");
         }
 
         // 텍스트 필드 업데이트
@@ -232,10 +232,10 @@ public class BusinessVerificationService {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
                 .orElseThrow(() -> new BizVerificationException(MEMBER_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
         BusinessVerification verification = verificationRepository.findTopByMemberIdOrderByCreatedAtDesc(activeMember.getId())
-                .orElseThrow(() -> new BizVerificationException("신청 내역이 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException("신청 내역이 없어요.", HttpStatus.NOT_FOUND));
 
         if (verification.getStatus() != VerificationStatus.PENDING) {
-            throw new BizVerificationException("이미 처리가 완료된 신청은 취소할 수 없습니다.");
+            throw new BizVerificationException("이미 처리가 완료된 신청은 취소할 수 없어요.");
         }
 
         verificationRepository.delete(verification);
@@ -290,7 +290,7 @@ public class BusinessVerificationService {
 
     private BusinessVerification findVerificationOrThrow(Long id) {
         return verificationRepository.findById(id)
-                .orElseThrow(() -> new BizVerificationException("해당 인증 요청을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BizVerificationException("해당 인증 요청을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     private void validateSubmitRequest(BusinessVerificationRequest request) {

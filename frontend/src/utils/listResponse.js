@@ -11,7 +11,7 @@ export const normalizeListPage = (value, page = 0) => {
         };
     }
     if (Array.isArray(value.content)) return value;
-    throw new Error('목록 응답 형식을 확인할 수 없습니다.');
+    throw new Error('목록 응답 형식을 확인할 수 없어요.');
 };
 
 export const listRows = value => normalizeListPage(value).content;

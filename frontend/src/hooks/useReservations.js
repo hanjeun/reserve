@@ -28,7 +28,7 @@ const useReservations = () => {
     });
 
     React.useEffect(() => {
-        if (error) handleApiError(error, message, '예약 목록을 불러오지 못했습니다');
+        if (error) handleApiError(error, message, '예약 목록을 불러오지 못했어요');
     }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const cancelMutation = useMutation({
@@ -42,10 +42,10 @@ const useReservations = () => {
             );
             return { prev };
         },
-        onSuccess: () => message.success('예약이 취소되었습니다'),
+        onSuccess: () => message.success('예약이 취소됐어요'),
         onError: (err, _, ctx) => {
             if (ctx?.prev) queryClient.setQueryData(reservationKeys.my(), ctx.prev);
-            handleApiError(err, message, '예약 취소에 실패했습니다');
+            handleApiError(err, message, '예약 취소에 실패했어요');
         },
         // 코드리뷰 지적사항 반영(2026-07): 낙관적 업데이트는 status만 미리 바꿔주는 거라, 서버가
         // 같이 계산하는 다른 필드(환불 여부 등)는 반영이 안 될 수 있음 — 성공/실패 관계없이 마지막에

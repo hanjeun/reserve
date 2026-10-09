@@ -84,7 +84,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(screen.queryByText(/쿠폰|발급|선착순|할인|오늘만/)).not.toBeInTheDocument();
     });
 
-    it('provides one real store-discovery link and no image in a genuinely empty news state', async () => {
+    it('provides one real store-discovery link and the shared empty illustration in a genuinely empty news state', async () => {
         benefitService.getList.mockResolvedValue({ content: [], page: { totalElements: 0 } });
         renderPage();
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
@@ -94,7 +94,9 @@ describe('actual photo benefits banners without invented campaign or general sto
         const link = within(empty).getByRole('link', { name: '가게 둘러보기' });
         expect(link.tagName).toBe('A');
         expect(link).toHaveAttribute('href', '/stores');
-        expect(empty.querySelector('img, button')).toBeNull();
+        expect(empty.querySelector('img')).toHaveAttribute('alt', '');
+        expect(empty.querySelector('img')).toHaveAttribute('src', expect.stringContaining('empty-news'));
+        expect(empty.querySelector('button')).toBeNull();
         expect(screen.getAllByRole('link')).toHaveLength(1);
     });
 
@@ -293,7 +295,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(await screen.findByRole('heading', { level: 1, name: item.title })).toBeInTheDocument();
         expect(document.querySelector('.reserve-benefit-detail-content').textContent).toBe(item.content);
         expect(document.querySelector('.reserve-benefit-detail-content script, .reserve-benefit-detail-content img')).toBeNull();
-        expect(screen.getByRole('img', { name: '가게 사진이 등록되지 않았습니다' })).toHaveAttribute('src', BENEFIT_IMAGE_FALLBACK);
+        expect(screen.getByRole('img', { name: '가게 사진이 등록되지 않았어요' })).toHaveAttribute('src', BENEFIT_IMAGE_FALLBACK);
         expect(screen.getByRole('link', { name: '가게 보기 →' })).toHaveAttribute('href', '/store/12');
         expect(benefitService.getDetail).toHaveBeenCalledTimes(3);
     });

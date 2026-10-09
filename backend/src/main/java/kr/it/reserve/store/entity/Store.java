@@ -278,6 +278,30 @@ public class Store {
     @Builder.Default
     private Boolean imageAutoplayEnabled = true;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
+    @org.hibernate.annotations.ColumnDefault("'OFF'")
+    @Column(name = "waiting_intake_mode", nullable = false, length = 16)
+    private WaitingIntakeMode waitingIntakeMode = WaitingIntakeMode.OFF;
+
+    public WaitingIntakeMode resolveWaitingIntakeMode() {
+        return waitingIntakeMode == null ? WaitingIntakeMode.OFF : waitingIntakeMode;
+    }
+
+    @Builder.Default
+    @org.hibernate.annotations.ColumnDefault("false")
+    @Column(name = "waiting_paused", nullable = false)
+    private Boolean waitingPaused = false;
+
+    @Builder.Default
+    @org.hibernate.annotations.ColumnDefault("true")
+    @Column(name = "reservation_enabled", nullable = false)
+    private Boolean reservationEnabled = true;
+
+    public boolean isWaitingPaused() { return Boolean.TRUE.equals(waitingPaused); }
+    public boolean isReservationEnabled() { return !Boolean.FALSE.equals(reservationEnabled); }
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -459,7 +483,7 @@ public class Store {
      * 9월 30일은 여는 날이라고 읽는 게 자연스럽다.
      */
     public boolean isBookableOn(LocalDate date) {
-        if (date == null) return false;
+        if (date == null || !isReservationEnabled()) return false;
         if (openDate != null && date.isBefore(openDate)) return false;
         if (closeDate != null && date.isAfter(closeDate)) return false;
         return !isClosedOn(date);

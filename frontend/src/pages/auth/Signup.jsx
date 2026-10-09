@@ -1,3 +1,4 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
@@ -9,9 +10,9 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
-import { colors, fontWeight, fontSize, animation, agreement as A } from '../../styles/tokens';
+import { fontSize, animation, agreement as A } from '../../styles/tokens';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const Signup = () => {
     const navigate = useNavigate();
@@ -23,7 +24,7 @@ const Signup = () => {
     const {
         isCodeSent, isVerified,
         sendLoading, verifyLoading,
-        sendCode, verifyCode,
+        sendCode, verifyCode, getVerificationTicket,
         timerInfo,
     } = useEmailVerification({
         sendEndpoint:   API_ENDPOINTS.EMAIL.SEND_CODE,
@@ -49,9 +50,12 @@ const Signup = () => {
     }, [isLoggedIn, navigate]);
 
     const onSignupSubmit = async (values) => {
-        // isVerified 는 제출 버튼의 disabled={!isVerified} 가 이미 막는다 — 여기서 다시 검사하면
-        // 절대 안 걸리는 죽은 코드다. 약관은 버튼 조건에 없으므로 여기서 검사하고,
-        // 토스트가 아니라 약관 블록 아래에 붙인다(눈을 떼지 않고 이유를 볼 수 있게).
+        // 버튼을 누른 뒤 Form 검증 중에도 인증이 만료될 수 있어 제출 시 다시 확인한다.
+        const verificationTicket = getVerificationTicket();
+        if (!verificationTicket) {
+            form.setFields([{ name: 'verificationCode', errors: ['이메일 인증을 다시 진행해주세요.'] }]);
+            return;
+        }
         if (!agreeValidate((e) => {
             if (!allRequired) e.agreements = '필수 약관에 동의해주세요.';
         })) return;
@@ -61,6 +65,7 @@ const Signup = () => {
             const res = await api.post(API_ENDPOINTS.AUTH.SIGNUP, {
                 name:            values.name.trim(),
                 email:           values.email.trim(),
+                verificationTicket,
                 password:        values.password,
                 passwordConfirm: values.confirmPassword,
                 termsAgreed:     true,                    // UI에서 이미 필수 체크 강제
@@ -69,7 +74,7 @@ const Signup = () => {
             if (res) {
                 const { login } = useAuthStore.getState();
                 login(res);
-                message.success(`${res.name || ''}님, 환영합니다!`);
+                message.success(`${res.name || ''}님, 환영해요!`);
                 // 가입 완료 → 홈. 홈으로 가는 다른 이동(로고·로그아웃)과 같은 방향.
                 navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
             } else {
@@ -78,7 +83,7 @@ const Signup = () => {
         } catch (err) {
             if (err?.isSessionExpired) return;
             const msg = typeof err === 'string' ? err : err?.message;
-            message.error(msg || '가입에 실패했습니다.');
+            message.error(msg || '가입에 실패했어요.');
         } finally {
             setSubmitLoading(false);
         }
@@ -87,8 +92,8 @@ const Signup = () => {
     return (
         <PageContainer size="sm" paddingTop="60px" center>
             <div className="fade-in-up">
-                <Title level={2} style={styles.title}>회원가입</Title>
-                <Text type="secondary" style={styles.subtitle}>간편한 가입으로 예약을 시작하세요</Text>
+                <PageTitle style={styles.title}>회원가입</PageTitle>
+                <PageDescription style={styles.subtitle}>간편한 가입으로 예약을 시작하세요</PageDescription>
 
                 <Form form={form} onFinish={onSignupSubmit} layout="vertical" size="large" requiredMark={false}
                       scrollToFirstError={SCROLL_TO_FIRST_ERROR}>
@@ -148,7 +153,7 @@ const Signup = () => {
                             ({ getFieldValue }) => ({
                                 validator(_, value) {
                                     if (!value || getFieldValue('password') === value) return Promise.resolve();
-                                    return Promise.reject(new Error('비밀번호가 일치하지 않습니다'));
+                                    return Promise.reject(new Error('비밀번호가 일치하지 않아요'));
                                 },
                             }),
                         ]}
@@ -224,15 +229,10 @@ const Signup = () => {
 const styles = {
     title: {
         marginBottom: '12px',
-        fontWeight: fontWeight.extrabold,
-        letterSpacing: '-1.2px',
-        color: colors.text.primary,
     },
     subtitle: {
         display: 'block',
         marginBottom: '40px',
-        color: colors.text.tertiary,
-        fontSize: fontSize.lg,
     },
 };
 

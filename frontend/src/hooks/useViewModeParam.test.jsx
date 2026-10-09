@@ -37,6 +37,32 @@ describe('explicit view URL contract', () => {
         expect(params.has('keep')).toBe(false);
     });
 
+    it('keeps the waiting tab and page during URL normalization and view changes', async () => {
+        const user = userEvent.setup();
+        render(<MemoryRouter initialEntries={['/my-reservations?tab=waiting&waitingPage=3&status=CONFIRMED']}>
+            <Probe defaultView="list" />
+        </MemoryRouter>);
+
+        await waitFor(() => expect(new URLSearchParams(screen.getByTestId('search').textContent).get('view')).toBe('list'));
+        await user.click(screen.getByRole('button', { name: 'cards' }));
+        const params = new URLSearchParams(screen.getByTestId('search').textContent);
+        expect(params.get('tab')).toBe('waiting');
+        expect(params.get('waitingPage')).toBe('3');
+        expect(params.get('status')).toBe('CONFIRMED');
+        expect(params.get('view')).toBe('cards');
+    });
+
+    it.each(['0', '-1', '1.5', '100001', 'invalid'])('removes invalid waiting pages (%s) without leaving waiting', async page => {
+        render(<MemoryRouter initialEntries={[`/my-reservations?tab=waiting&waitingPage=${page}`]}>
+            <Probe defaultView="list" />
+        </MemoryRouter>);
+
+        await waitFor(() => expect(new URLSearchParams(screen.getByTestId('search').textContent).get('view')).toBe('list'));
+        const params = new URLSearchParams(screen.getByTestId('search').textContent);
+        expect(params.get('tab')).toBe('waiting');
+        expect(params.has('waitingPage')).toBe(false);
+    });
+
     it('normalizes an invalid value to the supplied default instead of a remembered view', async () => {
         sessionStorage.setItem('reserve:view-mode:/stores', 'list');
         render(<MemoryRouter initialEntries={['/stores?view=grid&region=서울특별시+종로구&keep=yes']}>

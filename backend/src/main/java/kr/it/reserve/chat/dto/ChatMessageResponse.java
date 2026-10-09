@@ -76,10 +76,10 @@ public class ChatMessageResponse {
 
     private static String resolveContent(ChatMessage message, boolean reportContext) {
         if (message.isPurged()) {
-            return "보존 기간이 지난 메시지입니다.";
+            return "보존 기간이 지난 메시지예요.";
         }
         if (message.isRetracted() && !reportContext) {
-            return "전송이 취소된 메시지입니다.";
+            return "전송이 취소된 메시지예요.";
         }
         return message.getContent();
     }

@@ -1,0 +1,123 @@
+{
+  "algorithm": "SHA-256",
+  "checked_file_count": 2179,
+  "checked_bytes": 315125554,
+  "unchanged_file_count": 2179,
+  "changed_file_count": 0,
+  "missing_file_count": 0,
+  "all_originals_preserved": true,
+  "snapshot_taken_before_modeling": true,
+  "verification_completed_after_native_renders": true,
+  "scope": "All pre-existing reserve-/RESERVE- files and folders, including original 48 assets, eight small-size refinements, source models, PNGs, licenses, previews and seven prior ZIP archives. New output folder is isolated.",
+  "groups": {
+    "RESERVE-category-icons-6.zip": 1,
+    "RESERVE-empty-news-two-styles.zip": 1,
+    "RESERVE-extra-icons-13.zip": 1,
+    "RESERVE-original-style-28.zip": 1,
+    "RESERVE-small-size-refinements-v1.zip": 1,
+    "RESERVE-state-illustrations-delivery.zip": 1,
+    "RESERVE-state-illustrations.zip": 1,
+    "reserve-category-blend-validation.log": 1,
+    "reserve-category-image-validation.log": 1,
+    "reserve-category-kit": 52,
+    "reserve-category-native.log": 1,
+    "reserve-category-proof": 18,
+    "reserve-category-proof.log": 1,
+    "reserve-category-roundtrip-food-0001.png": 1,
+    "reserve-category-roundtrip.log": 1,
+    "reserve-category-ticket-final.log": 1,
+    "reserve-category-ticket-proof.log": 1,
+    "reserve-empty-news-addon": 46,
+    "reserve-empty-news-pack-report.json": 1,
+    "reserve-extra-icons-13": 99,
+    "reserve-extra-icons-13-blend-validation.log": 1,
+    "reserve-extra-icons-13-heart-roundtrip-0001.png": 1,
+    "reserve-extra-icons-13-heart-roundtrip.log": 1,
+    "reserve-extra-icons-13-image-validation.log": 1,
+    "reserve-extra-icons-13-motion-validation.log": 1,
+    "reserve-extra-icons-13-native.log": 1,
+    "reserve-extra-icons-13-proof": 28,
+    "reserve-extra-icons-13-proof-v2": 33,
+    "reserve-extra-icons-13-proof-v2.log": 1,
+    "reserve-extra-icons-13-proof-v3": 3,
+    "reserve-extra-icons-13-proof-v3.log": 1,
+    "reserve-extra-icons-13-proof.log": 1,
+    "reserve-extra-icons-13-qa-summary.log": 1,
+    "reserve-extra-icons-13-qr-final.log": 1,
+    "reserve-extra-icons-13-qr-proof": 6,
+    "reserve-extra-icons-13-qr-proof.log": 1,
+    "reserve-extra-icons-13-qr-roundtrip-verified.log": 1,
+    "reserve-extra-icons-13-roundtrip.log": 1,
+    "reserve-gallery-qa.cjs": 1,
+    "reserve-kit-qa": 35,
+    "reserve-original-qa": 9,
+    "reserve-original-style-kit": 320,
+    "reserve-preview-retired-pages": 42,
+    "reserve-preview-site": 973,
+    "reserve-preview-site-update.tar.gz": 1,
+    "reserve-small-refinement-v1": 65,
+    "reserve-state-kit": 417,
+    "reserve-two-style-preview.tar.gz": 1
+  },
+  "prior_zip_archives": [
+    {
+      "file": "RESERVE-category-icons-6.zip",
+      "bytes": 3420591,
+      "sha256_before": "4c034643151479a5c880edccde3e352dc6cda6bc5a17bdfcf65be2cb34868d23",
+      "sha256_after": "4c034643151479a5c880edccde3e352dc6cda6bc5a17bdfcf65be2cb34868d23",
+      "unchanged": true
+    },
+    {
+      "file": "RESERVE-empty-news-two-styles.zip",
+      "bytes": 2120601,
+      "sha256_before": "6144befc09e138f5a538556aec6c3adc368ca8c3000751f90f9bb288f5e5aa21",
+      "sha256_after": "6144befc09e138f5a538556aec6c3adc368ca8c3000751f90f9bb288f5e5aa21",
+      "unchanged": true
+    },
+    {
+      "file": "RESERVE-extra-icons-13.zip",
+      "bytes": 8491968,
+      "sha256_before": "1a5211b0dc66fe94a13e4e715509f71b50481d15efab706be3eb34a094f07d00",
+      "sha256_after": "1a5211b0dc66fe94a13e4e715509f71b50481d15efab706be3eb34a094f07d00",
+      "unchanged": true
+    },
+    {
+      "file": "RESERVE-original-style-28.zip",
+      "bytes": 18879760,
+      "sha256_before": "7ec8f4b83b0dabdb65b6d0020132e9b7f5a0871375fb2814b6c4566b833593ff",
+      "sha256_after": "7ec8f4b83b0dabdb65b6d0020132e9b7f5a0871375fb2814b6c4566b833593ff",
+      "unchanged": true
+    },
+    {
+      "file": "RESERVE-small-size-refinements-v1.zip",
+      "bytes": 213179,
+      "sha256_before": "79b58b7db84a68d87e5e6a7ab51f2c248843a207e643b300b974422a96fd003f",
+      "sha256_after": "79b58b7db84a68d87e5e6a7ab51f2c248843a207e643b300b974422a96fd003f",
+      "unchanged": true
+    },
+    {
+      "file": "RESERVE-state-illustrations-delivery.zip",
+      "bytes": 16209274,
+      "sha256_before": "91bf399949837b68063d2d3af62cea0cc61c487229ac49f649ae0be63b11d3ff",
+      "sha256_after": "91bf399949837b68063d2d3af62cea0cc61c487229ac49f649ae0be63b11d3ff",
+      "unchanged": true
+    },
+    {
+      "file": "RESERVE-state-illustrations.zip",
+      "bytes": 31590026,
+      "sha256_before": "c227983dcf85733ccd110285664c64c37693425c7f96f8c370359c79cb0b8587",
+      "sha256_after": "c227983dcf85733ccd110285664c64c37693425c7f96f8c370359c79cb0b8587",
+      "unchanged": true
+    }
+  ],
+  "licenses_copied_unchanged": [
+    {
+      "file": "LICENSE-ASSETS.txt",
+      "sha256": "17ca6d87383d5d63f8096020a802a7cdc791ea456657e6e349baa028bb168032"
+    },
+    {
+      "file": "LICENSE-CODE.txt",
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    }
+  ]
+}

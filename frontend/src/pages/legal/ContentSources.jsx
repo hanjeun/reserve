@@ -1,7 +1,11 @@
+import { PageTitle } from '../../components/common/PageTypography';
 import React, { useMemo } from 'react';
 import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { DataState, PageContainer } from '../../components/common';
+import Bone from '../../components/common/Bone';
+import LoadingStatus from '../../components/common/LoadingStatus';
+import TextLink from '../../components/common/TextLink';
 import { formatRegionLabel } from '../../constants/regions';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -29,7 +33,7 @@ const tableHeaderStyle = {
 
 const ContentSources = () => {
     useDocumentTitle('콘텐츠 출처·권리 안내');
-    const { data: dynamicPhotos = [] } = useQuery({
+    const { data: dynamicPhotos = [], isLoading, isFetching, error, refetch } = useQuery({
         queryKey: tourismKeys.catalog(),
         queryFn: tourismService.getRegionPhotoCatalog,
         staleTime: 1000 * 60 * 60 * 24,
@@ -47,24 +51,24 @@ const ContentSources = () => {
     return (
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
-                <Title level={2} style={{ fontWeight: fontWeight.extrabold, color: colors.text.primary, marginBottom: 8 }}>
+                <PageTitle>
                     콘텐츠 출처·권리 안내
-                </Title>
+                </PageTitle>
                 <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>최종 수정: 2026년 9월 21일</Text>
             </div>
 
             <Section title="안내">
                 <Paragraph>
-                    이 페이지는 RESERVE 화면에서 직접 사용하는 외부 사진, 서체, 서비스명·표시의 출처와 이용 조건을 안내합니다.
-                    이용 조건이나 출처가 확인되지 않은 자산은 등록하지 않습니다.
+                    이 페이지는 RESERVE 화면에서 직접 사용하는 외부 사진, 서체, 서비스명·표시의 출처와 이용 조건을 안내해요.
+                    이용 조건이나 출처가 확인되지 않은 자산은 등록하지 않아요.
                 </Paragraph>
             </Section>
 
             <Section id="region-photos" title="지역 대표 사진">
                 <Paragraph>
-                    지역 선택 화면의 대표 사진은 제공기관, 저작물명, 이용 유형을 확인한 자산만 사용합니다.
-                    관광정보 API 사진은 서버가 공공누리 제1유형을 확인한 뒤 같은 화면에서 중앙 기준으로 표시합니다.
-                    조건을 확인할 수 없거나 사진을 불러오지 못하면 지역 핀 아이콘으로 대체합니다.
+                    지역 선택 화면의 대표 사진은 제공기관, 저작물명, 이용 유형을 확인한 자산만 사용해요.
+                    관광정보 API 사진은 서버가 공공누리 제1유형을 확인한 뒤 같은 화면에서 중앙 기준으로 표시해요.
+                    조건을 확인할 수 없거나 사진을 불러오지 못하면 지역 핀 아이콘으로 대체해요.
                 </Paragraph>
                 <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: `1px solid ${colors.border.light}`, borderRadius: 12 }}>
                     <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: fontSize.sm }}>
@@ -78,58 +82,74 @@ const ContentSources = () => {
                             </tr>
                         </thead>
                         <tbody>
+                            {isLoading && ['first', 'second', 'third'].map(key => (
+                                <tr key={key} aria-hidden="true">
+                                    {['region', 'provider', 'work', 'date', 'license'].map(column => (
+                                        <td key={column} style={tableCellStyle}><Bone width="80%" height={14} /></td>
+                                    ))}
+                                </tr>
+                            ))}
+                            {error && (
+                                <tr>
+                                    <td colSpan="5" style={tableCellStyle}>
+                                        <DataState state="error" subject="지역 대표 사진 출처" error={error}
+                                            title={photoAttributions.length ? '최신 출처를 확인하지 못해 이전 목록을 보여드리고 있어요.' : '지역 대표 사진 출처를 불러오지 못했어요.'}
+                                            onRetry={refetch} retrying={isFetching} compact={photoAttributions.length > 0} />
+                                    </td>
+                                </tr>
+                            )}
                             {photoAttributions.map((photo) => (
                                 <tr key={`${photo.region}-${photo.sourceUrl}-${photo.contentId ?? photo.workTitle}`}>
                                     <td style={tableCellStyle}>{formatRegionLabel(photo.region)}</td>
                                     <td style={tableCellStyle}>{photo.provider}</td>
                                     <td style={tableCellStyle}>
-                                        <a href={photo.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: colors.primary.main }}>
+                                        <TextLink href={photo.sourceUrl} target="_blank" rel="noopener noreferrer">
                                             {photo.workTitle}{photo.contentId ? ` (콘텐츠 ID ${photo.contentId})` : ''}
-                                        </a>
+                                        </TextLink>
                                     </td>
                                     <td style={tableCellStyle}>{photo.recordDate}</td>
                                     <td style={tableCellStyle}>{photo.license}</td>
                                 </tr>
                             ))}
-                            {photoAttributions.length === 0 && (
+                            {!isLoading && !error && photoAttributions.length === 0 && (
                                 <tr>
                                     <td colSpan="5" style={{ ...tableCellStyle, textAlign: 'center', color: colors.text.tertiary }}>
-                                        <DataState state="empty" kind="store" title="아직 확인된 지역 대표 사진이 없습니다." />
+                                        <DataState state="empty" kind="store" title="아직 확인된 지역 대표 사진이 없어요." />
                                     </td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
                 </div>
+                {isLoading && <LoadingStatus aria-label="지역 대표 사진 출처를 불러오는 중" aria-busy="true" />}
             </Section>
 
             <Section title="RESERVE 자체 제작 시각 자산">
                 <Paragraph>
-                    홈 탐색의 분야 아이콘, 탐색 배너, 서비스 로고·R 마크와 공유용 이미지는 RESERVE가 제작하거나 편집한 서비스 자산입니다.
-                    이 이미지는 실제 입점 가게, 판매 상품 또는 행사 사진임을 뜻하지 않습니다.
+                    홈 탐색의 분야 아이콘, 탐색 배너, 서비스 로고·R 마크와 공유용 이미지는 RESERVE가 제작하거나 편집한 서비스 자산이에요.
+                    이 이미지는 실제 입점 가게, 판매 상품 또는 행사 사진임을 뜻하지 않아요.
                 </Paragraph>
             </Section>
 
             <Section title="외부 서비스명과 상표">
                 <Paragraph>
-                    GitHub, Velog, Amazon Web Services, Kakao 및 KakaoPay 관련 명칭과 표지는 각 권리자에게 귀속될 수 있습니다.
-                    RESERVE는 화면에서 서비스와 연동 대상을 식별하는 범위에서만 이를 표시하며, 제휴나 보증을 뜻하지 않습니다.
+                    GitHub, Velog, Amazon Web Services, Kakao 및 KakaoPay 관련 명칭과 표지는 각 권리자에게 귀속될 수 있어요.
+                    RESERVE는 화면에서 서비스와 연동 대상을 식별하는 범위에서만 이를 표시하며, 제휴나 보증을 뜻하지 않아요.
                 </Paragraph>
             </Section>
 
             <Section title="서체와 오픈소스">
                 <Paragraph>
-                    서비스에는 Pretendard와 SUITE 서체를 사용하며, 두 서체는 SIL Open Font License 1.1 조건에 따라 제공합니다.
-                    프런트엔드와 백엔드의 오픈소스 구성 요소 및 라이선스 요약은 아래 공개 고지에서 확인할 수 있습니다.
+                    서비스에는 Pretendard와 SUITE 서체를 사용하며, 두 서체는 SIL Open Font License 1.1 조건에 따라 제공해요.
+                    프런트엔드와 백엔드의 오픈소스 구성 요소 및 라이선스 요약은 아래 공개 고지에서 확인할 수 있어요.
                 </Paragraph>
-                <a
+                <TextLink
                     href="https://github.com/hanjeun/reserve/blob/dev/THIRD_PARTY_NOTICES.md"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: colors.primary.main }}
                 >
                     서드파티 라이선스 고지 보기
-                </a>
+                </TextLink>
             </Section>
 
             <Section title="정정·권리 문의">

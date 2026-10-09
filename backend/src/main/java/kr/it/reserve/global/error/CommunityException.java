@@ -16,12 +16,12 @@ public class CommunityException extends BusinessException {
 
     /** 404 - 게시글을 찾을 수 없을 때 */
     public static CommunityException postNotFound() {
-        return new CommunityException("게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new CommunityException("게시글을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 
     /** 404 - 댓글을 찾을 수 없을 때 */
     public static CommunityException commentNotFound() {
-        return new CommunityException("댓글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new CommunityException("댓글을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 
     /** 403 - 권한 없음 */

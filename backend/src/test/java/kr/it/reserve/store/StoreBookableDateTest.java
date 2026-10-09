@@ -31,6 +31,16 @@ class StoreBookableDateTest {
         return Store.builder().build();
     }
 
+    @Test
+    void waitingOnlyStoreDoesNotOfferBookingDatesAndExistingStoresRemainEnabled() {
+        Store store = store();
+        assertThat(store.isBookableOn(D_09_10)).isTrue();
+        store.setReservationEnabled(false);
+        assertThat(store.isBookableOn(D_09_10)).isFalse();
+        store.setReservationEnabled(true);
+        assertThat(store.isBookableOn(D_09_10)).isTrue();
+    }
+
     @Nested
     @DisplayName("운영 기간이 없으면 (기존 가게)")
     class NoPeriod {

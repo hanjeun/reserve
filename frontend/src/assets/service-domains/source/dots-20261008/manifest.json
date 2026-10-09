@@ -1,0 +1,709 @@
+{
+  "title": "RESERVE category icons — first-set style",
+  "asset_count": 6,
+  "asset_ids": [
+    "food",
+    "beauty",
+    "sports",
+    "performance",
+    "popup",
+    "other"
+  ],
+  "reference": "RESERVE-state-illustrations-delivery.zip (first 28 set)",
+  "production": "Blender 4.3.2 / Eevee Next / 128 samples",
+  "static_file_count": 24,
+  "rendered_independently_at": [
+    512,
+    768
+  ],
+  "transparent_film": true,
+  "no_ai_upscaling": true,
+  "encoding": {
+    "png": "RGBA8 lossless",
+    "webp": "quality 92, method 6, lossless alpha; lossy RGB"
+  },
+  "palette_srgb": [
+    "#F2F5FA",
+    "#B8C9DE",
+    "#3182F6"
+  ],
+  "color_note": "These are material base colors; AgX, light and reflection alter output pixel colors.",
+  "motion": {
+    "type": "CSS image transforms",
+    "entrance_seconds": 1.4,
+    "entrance_iterations": 1,
+    "loop_seconds": 2.4,
+    "loop_iterations": "infinite",
+    "loop_optional": true,
+    "reduced_motion": "still",
+    "fixed_fps": null,
+    "true_3d_animation": false
+  },
+  "license": {
+    "original_images_and_scenes": "CC0-1.0 to extent rights exist",
+    "original_source_code": "MIT",
+    "third_party_production_tools": "Their own licenses"
+  },
+  "qa": [
+    {
+      "asset": "food",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        95,
+        122,
+        410,
+        400
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 95,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "beauty",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        162,
+        97,
+        350,
+        421
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 91,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "sports",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        96,
+        167,
+        416,
+        342
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 96,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "performance",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        108,
+        125,
+        397,
+        374
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 108,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "popup",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        87,
+        91,
+        431,
+        392
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 81,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "other",
+      "resolution": [
+        512,
+        512
+      ],
+      "alpha_bbox": [
+        111,
+        86,
+        408,
+        418
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 86,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "food",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        143,
+        183,
+        615,
+        599
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 143,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "beauty",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        244,
+        146,
+        524,
+        631
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 137,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "sports",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        144,
+        252,
+        624,
+        513
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 144,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "performance",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        163,
+        189,
+        594,
+        561
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 163,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "popup",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        131,
+        137,
+        647,
+        588
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 121,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    },
+    {
+      "asset": "other",
+      "resolution": [
+        768,
+        768
+      ],
+      "alpha_bbox": [
+        167,
+        130,
+        612,
+        627
+      ],
+      "alpha_range": [
+        0,
+        255
+      ],
+      "all_canvas_edges_alpha_zero": true,
+      "minimum_margin_px": 130,
+      "png_recompression_pixel_identical": true,
+      "webp_alpha_pixel_identical": true
+    }
+  ],
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 5760,
+      "sha256": "5b986f654016361639fb420f03cbe7f44bb4c312c5e7c61909eb88f191d47dd1"
+    },
+    {
+      "file": "motion/README.md",
+      "bytes": 4143,
+      "sha256": "2113dc6e4d99af3bed3fab8967341dad3e605f54662dfa69ae8367d52d063afb"
+    },
+    {
+      "file": "motion/category-motion.css",
+      "bytes": 3120,
+      "sha256": "301aeec25499fdf39778e39eabc52fbed932c30de1a892449b055f4d71ade75f"
+    },
+    {
+      "file": "motion/example.html",
+      "bytes": 13595,
+      "sha256": "4f731ce8091cf30649133db3413bf2e0968a9effb1484c2411d15e1c87a74cd0"
+    },
+    {
+      "file": "previews/dark-actual-48-64.png",
+      "bytes": 32430,
+      "sha256": "ce254e383ff132a83b80fff68b3187e20d86fe15abaeeeba4d3f01d78f69695d"
+    },
+    {
+      "file": "previews/dark-overview.webp",
+      "bytes": 60466,
+      "sha256": "3b50895409f1db1c5e64d5dfde6aedb043098e0a0c4225788522dbae46f7cfc9"
+    },
+    {
+      "file": "previews/light-actual-48-64.png",
+      "bytes": 30849,
+      "sha256": "5988d8a45657fda0c24489c4ccfdb0e4df2c6ca65d307e6e2497512c346c2fb6"
+    },
+    {
+      "file": "previews/light-overview.webp",
+      "bytes": 59900,
+      "sha256": "b672fdfb2032e9bf757f085c90d877ad1b0415e96c702c4966420d9b4e62b526"
+    },
+    {
+      "file": "source/LICENSE-ASSETS.txt",
+      "bytes": 811,
+      "sha256": "f6abe52f31d97f04f41c2b86c70898767ecf5e44ad3d721760e810c4d7f00d0e"
+    },
+    {
+      "file": "source/LICENSE-CODE.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "source/beauty.blend",
+      "bytes": 105591,
+      "sha256": "cbdf58594162f022223318ecab23dce5a960e076f64b274816ccf93cf2bfeb15"
+    },
+    {
+      "file": "source/blend-validation.json",
+      "bytes": 2970,
+      "sha256": "63d1dc308562c2fe8717d501fa2aa6eb8744e2bfe9c33c58daa54054771a3359"
+    },
+    {
+      "file": "source/build_assets.py",
+      "bytes": 14210,
+      "sha256": "4c339924c09d65bb6932cf07a1b621ac87f40d37a530e417500637696434b64a"
+    },
+    {
+      "file": "source/encode_and_validate.py",
+      "bytes": 5588,
+      "sha256": "b37f6a3f7281fd4d5638b2e5823cb261b7042f019b05ca1666df42c132a3f4bf"
+    },
+    {
+      "file": "source/food.blend",
+      "bytes": 146534,
+      "sha256": "7ed3a21f8e4c4a850fece11679b790517613ed52105d7fed22388ba115897160"
+    },
+    {
+      "file": "source/native-render-evidence.jsonl",
+      "bytes": 3040,
+      "sha256": "66ee81420cc13d82e23f3df74bcc03ead6ce73ce51ce9acf7f6207be6db81d9f"
+    },
+    {
+      "file": "source/other.blend",
+      "bytes": 192623,
+      "sha256": "a52b601345aca7b513e76085ca719708d878e789d29b1f094c1693b68cdd6868"
+    },
+    {
+      "file": "source/package_zip.py",
+      "bytes": 1363,
+      "sha256": "254dc2cc0366c6e1224bed74d173770958355da111d53bb612d3f73ed404ea49"
+    },
+    {
+      "file": "source/performance.blend",
+      "bytes": 196728,
+      "sha256": "d0fa0b7443e1702c73dbef983ffb129b6de411ce2fe2db30bc2156478d5e3e81"
+    },
+    {
+      "file": "source/popup.blend",
+      "bytes": 110705,
+      "sha256": "2f65ca805a3755c1b83edc80ac08e02a5abe00565eff7a532bc8ebb971dc8ce5"
+    },
+    {
+      "file": "source/qa-summary.json",
+      "bytes": 877,
+      "sha256": "c5d4f2595aab0ca45dd0f6d23fdae1ac4068bf8a5003021dd0069defefaad3bf"
+    },
+    {
+      "file": "source/reproduction-validation.json",
+      "bytes": 205,
+      "sha256": "221153d51769a1895e3fef7b23283c4e33d6a7af23b2de639d927a13d082d967"
+    },
+    {
+      "file": "source/sports.blend",
+      "bytes": 109751,
+      "sha256": "7d63535fb3ce7369ccc8b698a2a6a7fa2c43ed28eafb61a104509abedcb7de58"
+    },
+    {
+      "file": "source/validate_blends.py",
+      "bytes": 2398,
+      "sha256": "762f0de2bd23a7c25717cac87184f880123b9db689c34017370375f0508cc69c"
+    },
+    {
+      "file": "static/512/beauty-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 110740,
+      "sha256": "4b87bbaf9ef5ee8065dc74164668f199c73824eb433a59bff651809e2be3a408",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/beauty-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 8026,
+      "sha256": "7fb9e679493d0fed764078baac6e999bb6c387a21038891f20d734d11b0b9aca",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/food-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 128613,
+      "sha256": "6f98ff1971939b18cd0fe84b393654c9905b3d98a54150492061544c8f9d38c8",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/food-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 12512,
+      "sha256": "22a78bc40a80b9165c6c863b9f445628b5836d5a4998109b13835c5ff0d092d7",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/other-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 134470,
+      "sha256": "f35fa247476c05daa61374e5e50298563bc450825fa34277df5c75c08ed49eed",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/other-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 10242,
+      "sha256": "24dc69f68015f02f28b8b07e172eaf98951e62ee1d510f01d6d6d93914ed8497",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/performance-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 112572,
+      "sha256": "5d94525f49447469e1829b5238ec1d8a6e275c85ac7a8a91c88292295941096a",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/performance-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 8640,
+      "sha256": "4608ed241d56855615413ea4e7803a2b3193c9d26bfd914614f1975bc22cf890",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/popup-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 142160,
+      "sha256": "9eb7a76fd182f83fd9a29e8bdeca3b6ad8ec2dda5dbc6fb4d8fefbf45cfd1b47",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/popup-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 13434,
+      "sha256": "a8cd6e224146ab3a88df34e0e9a52b0b66525efebee349e427e9d1e7251d9ecf",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/sports-512.png",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 107381,
+      "sha256": "b3c823b7b9392ace6487c7e5fae8626c45b0244677ebdbce9827f93e7f487449",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/sports-512.webp",
+      "resolution": [
+        512,
+        512
+      ],
+      "bytes": 10704,
+      "sha256": "41147519e8cd77c9033657020904ab7e008dc20414444755d575eec1726e3995",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/beauty-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 232523,
+      "sha256": "5405ed4f4f5d63f659e51a543247dcf92bb88e2683598ea88e763b93defa0225",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/beauty-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 12522,
+      "sha256": "42decc2810b6c9f66a36138d0ec86b405dec2e6798ef707d42c6ddff1cebe503",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/food-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 264488,
+      "sha256": "5c4ecd722fcc24d61c4a3d46aee771d60044cd4f576345c214798b336c353a0d",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/food-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 20072,
+      "sha256": "e335422eefa5e7e49c4dac8c0b49ff0ae24da7cf07e9e16ce43d5faae4f32fcc",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/other-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 285387,
+      "sha256": "930870983c431ae6a11f003973e1d9b3cb35eeefe3916760f22d97a9c2ad2c21",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/other-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 16080,
+      "sha256": "55c250922de15218ecf9c75a5c920712f16e2b3a13983a6cb39b5391c0bfda5a",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/performance-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 234003,
+      "sha256": "f8a21e55be89172a81af67fde4935bdc40528f8725fd4f0e699fbcb1445a20c0",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/performance-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 13540,
+      "sha256": "233feb09ff2c8cbd2203371936dfc3ea82d010e2e64f92bfc48778dded763e45",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/popup-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 294735,
+      "sha256": "2f3adba61d66dbc24d5371aa1e4707fe2cb651273ea8202ceb0dd9c8ef643a8a",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/popup-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 20246,
+      "sha256": "62fda426a8c86dc317b59f166be6f38b2befef5fe69fca28ef2a608cfc2b3f12",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/sports-768.png",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 217206,
+      "sha256": "2d7b03c4c038e7324af5eb4e9ed5634ce4dad72a693a350b37643797cf67eb21",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/sports-768.webp",
+      "resolution": [
+        768,
+        768
+      ],
+      "bytes": 17158,
+      "sha256": "36675435e952be7e8d81f69dabd148627f34f235b755f2daaf7397046b475da8",
+      "transparent": true,
+      "native_resolution": true
+    }
+  ],
+  "verification_summary": {
+    "status": "passed",
+    "static_files": 24,
+    "native_png_render_count": 12,
+    "editable_blend_scenes": 6,
+    "native_sizes": [
+      512,
+      768
+    ],
+    "all_canvas_edges_transparent": true,
+    "webp_alpha_matches_png": true,
+    "minimum_transparent_canvas_margin_pixels": {
+      "512": 81,
+      "768": 121
+    },
+    "html_local_image_paths_verified": 24,
+    "motion_static_checks": "Nested entrance and loop, 1.4s single entrance, 2.4s infinite optional loop, reduced-motion still, no remote dependencies",
+    "live_browser_test_completed": false,
+    "browser_test_limitation": "The execution environment prevented Chromium launch; CSS/HTML were statically checked.",
+    "source_roundtrip": "food.blend reopened and 768px render was byte-identical in decoded RGBA pixels",
+    "visual_review": "Six silhouettes reviewed on light and dark surfaces at actual 48/64px display canvas sizes"
+  }
+}

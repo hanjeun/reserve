@@ -39,7 +39,7 @@ public class ChatRetentionService {
             deletions.enqueue(imageKey, "CHAT_RETENTION", item.getId());
         item.purge(now, room.nextRetractionRevision());
         if (messages.findLatestByRoomIds(List.of(roomId)).stream().anyMatch(latest -> item.getId().equals(latest.getId())))
-            room.replaceLastMessagePreview("보존 기간이 지난 메시지입니다.");
+            room.replaceLastMessagePreview("보존 기간이 지난 메시지예요.");
         log.info("Chat content expired: roomId={}, messageId={}", roomId, messageId);
     }
 

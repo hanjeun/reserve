@@ -32,7 +32,7 @@ public class ReviewApiController {
     public ResponseEntity<ApiResponse<ReviewResponse>> createReview(@Valid @RequestBody ReviewCreateRequest request) {
         ReviewResponse review = reviewService.createReview(request, SecurityUtil.getCurrentMember());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(review, "리뷰가 성공적으로 작성되었습니다."));
+                .body(ApiResponse.success(review, "리뷰가 성공적으로 작성됐어요."));
     }
 
     /**
@@ -69,7 +69,7 @@ public class ReviewApiController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteReview(@PathVariable Long id) {
         reviewService.deleteReview(id, SecurityUtil.getCurrentMember());
-        return ApiResponse.success(null, "리뷰가 삭제되었습니다.");
+        return ApiResponse.success(null, "리뷰가 삭제됐어요.");
     }
 
     /**
@@ -78,7 +78,7 @@ public class ReviewApiController {
     @PutMapping("/{id}")
     public ApiResponse<ReviewResponse> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewUpdateRequest request) {
         ReviewResponse review = reviewService.updateReview(id, request, SecurityUtil.getCurrentMember());
-        return ApiResponse.success(review, "리뷰가 수정되었습니다.");
+        return ApiResponse.success(review, "리뷰가 수정됐어요.");
     }
 
     /**

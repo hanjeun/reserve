@@ -32,6 +32,10 @@ RESERVE가 쓰는 제3자 소프트웨어와 글꼴의 라이선스 안내예요
 
 Spring Boot, Jackson, JJWT, AWS SDK 등의 원문 라이선스·고지를 보존해야 해요. 백엔드 전체가 MIT/Apache-2.0이라고 단정하지 않아요.
 
+의존성 [PR #318](https://github.com/hanjeun/reserve/pull/318)의 Sentry Java `8.59.0` 후보는 해당 태그의 [원문 LICENSE](https://github.com/getsentry/sentry-java/blob/8.59.0/LICENSE)를 `backend/licenses/upstream/sentry-8.59.0.txt`에 보존하고, 실제 Maven Central JAR 5종의 SHA-256을 보충 목록에 연결했어요. 기존 `8.58.0` 고지는 함께 유지해요. 이번 로컬 출시 후보의 build·lockfile은 `8.59.0`을 선택했으며, 운영 적용과 최종 실행 JAR의 원문 동봉 확인은 별도로 진행해요.
+
+같은 PR의 AWS SDK `2.55.11` JAR 30종은 각 아티팩트의 `META-INF/LICENSE.txt`·`NOTICE.txt`를 제공해요. `third-party-jackson-core`의 추가 LICENSE·NOTICE도 기존 수집 규칙에 포함돼요. BOM과 Gradle wrapper는 production runtime JAR 목록과 구분하며, 후보 버전과 실제 릴리스 산출물의 고지 목록을 출시 단계에서 대조해요.
+
 **MySQL Connector/J** — 현재 lockfile의 `9.7.0`은 GPLv2와 추가 허용 및 Universal FOSS Exception 적용 대상이에요. [해당 버전 원문](https://github.com/mysql/mysql-connector-j/blob/9.7.0/LICENSE)을 확인해요. runtime 의존성도 실행 JAR·Docker 이미지에 포함되므로, 서버에서만 쓴다고 재배포 의무가 없다고 단정할 수 없어요. 외부에 바이너리/이미지를 제공한다면 배포 방식과 예외 적용 조건을 따로 검토해야 해요.
 
 **MariaDB Connector/J** — LGPL 계열 라이선스라 무조건적인 copyleft 회피책이 아니에요. 드라이버 교체는 라이선스 판단과 JDBC URL·옵션·트랜잭션 호환성 검증이 필요한 별도 변경이에요. [MariaDB 공식 안내](https://mariadb.com/docs/connectors/mariadb-connector-j/about-mariadb-connector-j)
@@ -39,8 +43,7 @@ Spring Boot, Jackson, JJWT, AWS SDK 등의 원문 라이선스·고지를 보존
 Vite 빌드는 실제 출력 청크가 사용한 npm 패키지의 LICENSE·NOTICE를 `THIRD_PARTY_NOTICES.txt`에 동봉해요.
 루트 고지가 없는 icons-svg·victory-vendor는 해당 버전의 공식 저장소 원문을 함께 보관해요.
 is-mobile의 원문은 패키지 README의 License 절에 있어요. victory-vendor 내부의 D3 고지도 포함해요.
-PortOne browser-sdk 0.1.11 패키지에는 OSS 라이선스 선언·원문이 없어요. 공식 연동 안내와 배포 README를
-보존하되 MIT 등으로 간주하지 않아요. 서비스 계약상의 권리 범위까지 검증한 결과는 아니에요.
+이번 후보의 PortOne browser-sdk `0.1.13`은 패키지에 `(MIT OR Apache-2.0)`을 선언하고 `LICENSE-MIT`·`LICENSE-APACHE` 원문을 제공해요. Vite는 실제 출력 청크에 사용된 버전의 두 원문을 수집해요. 이전 `0.1.11`의 라이선스 선언·원문 부재와 공식 연동 안내/README 보존은 그 버전에 해당하며 새 버전의 원문으로 대신하지 않아요.
 
 ## English
 
@@ -72,6 +75,10 @@ Upstream: [Pretendard](https://github.com/orioncactus/pretendard), [SUITE](https
 `bootJar` bundles the actual production dependencies' original notices into `META-INF/THIRD_PARTY_NOTICES.txt`. Version-specific supplemental texts and source/JAR/document hashes are pinned in `backend/licenses/supplemental.json`; missing or changed originals fail the build. Builds never fetch notice texts. Notice inclusion does not certify every external binary distribution obligation.
 
 Retain upstream licenses and notices for Spring Boot, Jackson, JJWT, AWS SDK and other dependencies. Do not assume the entire backend is MIT/Apache-2.0 licensed.
+
+For the Sentry Java `8.59.0` candidate in [PR #318](https://github.com/hanjeun/reserve/pull/318), the tag's [original LICENSE](https://github.com/getsentry/sentry-java/blob/8.59.0/LICENSE) is retained in `backend/licenses/upstream/sentry-8.59.0.txt`, with hashes for all five Maven Central JARs pinned in the supplemental manifest. The `8.58.0` notices remain available. The local release candidate's build and lockfile select `8.59.0`; production application and original-notice verification in the final executable JAR remain separate steps.
+
+The same PR's 30 AWS SDK `2.55.11` JARs supply `META-INF/LICENSE.txt` and `NOTICE.txt`; the additional LICENSE/NOTICE entries in `third-party-jackson-core` also match the existing collection rule. The BOM and Gradle wrapper are separate from the production runtime JAR inventory. Compare the chosen versions and packaged notices at release time.
 
 **MySQL Connector/J** — The locked `9.7.0` is GPLv2 with additional permissions and the Universal FOSS Exception. See its [original license](https://github.com/mysql/mysql-connector-j/blob/9.7.0/LICENSE). Runtime dependencies are bundled into the executable JAR/Docker image. Server use alone does not establish absence of distribution obligations; review external binary/image distribution separately.
 

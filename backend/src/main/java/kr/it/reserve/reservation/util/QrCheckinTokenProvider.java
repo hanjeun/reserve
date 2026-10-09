@@ -114,8 +114,8 @@ public class QrCheckinTokenProvider {
             if (trimmed.length() < MIN_EXPLICIT_SECRET_LENGTH) {
                 // 조용히 파생으로 폴백하지 않는다 — 값을 넣었는데 안 쓰이는 게 제일 나쁘다.
                 throw new IllegalStateException(
-                        "qr.token-secret 은 최소 " + MIN_EXPLICIT_SECRET_LENGTH + "자 이상이어야 합니다. "
-                                + "(현재 " + trimmed.length() + "자) 값을 비우면 로그인 시크릿에서 파생합니다.");
+                        "qr.token-secret must contain at least " + MIN_EXPLICIT_SECRET_LENGTH + " characters. "
+                                + "(actual " + trimmed.length() + ") Leave it empty to derive the key from the JWT secret.");
             }
             this.secretKey = Keys.hmacShaKeyFor(trimmed.getBytes(StandardCharsets.UTF_8));
             log.info("QR check-in signing key: dedicated secret (qr.token-secret)");
@@ -138,7 +138,7 @@ public class QrCheckinTokenProvider {
         } catch (java.security.GeneralSecurityException e) {
             // HmacSHA256 은 모든 JRE 가 반드시 제공한다. 여기 오면 런타임이 망가진 것이므로
             // 조용히 로그인 키로 폴백하지 않는다 — 그러면 분리가 없던 일이 된다.
-            throw new IllegalStateException("QR 서명 키 유도에 실패했습니다.", e);
+            throw new IllegalStateException("QR signing key derivation failed", e);
         }
     }
 
@@ -188,17 +188,17 @@ public class QrCheckinTokenProvider {
                     .getPayload();
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
             log.debug("Expired QR check-in token");
-            throw new ReservationException("만료된 QR 코드입니다. 예약 상세에서 QR을 다시 열어주세요.");
+            throw new ReservationException("만료된 QR 코드예요. 예약 상세에서 QR을 다시 열어주세요.");
         } catch (Exception e) {
             log.debug("Invalid QR check-in token: errorType={}", e.getClass().getSimpleName());
-            throw new ReservationException("유효하지 않은 QR 코드입니다.");
+            throw new ReservationException("유효하지 않은 QR 코드예요.");
         }
         // 짧은 클레임(신규)과 긴 클레임(기존 발급분)을 둘 다 받는다.
         // 배포 시점에 이미 열려 있던 QR이 즉시 무효가 되지 않도록 한 과도기 처리다.
         boolean purposeOk = PURPOSE_SHORT.equals(claims.get(CLAIM_PURPOSE_SHORT, String.class))
                 || PURPOSE.equals(claims.get(CLAIM_PURPOSE, String.class));
         if (!purposeOk) {
-            throw new ReservationException("유효하지 않은 QR 코드입니다.");
+            throw new ReservationException("유효하지 않은 QR 코드예요.");
         }
 
         Long reservationId = claims.get(CLAIM_RESERVATION_ID_SHORT, Long.class);
@@ -206,7 +206,7 @@ public class QrCheckinTokenProvider {
             reservationId = claims.get(CLAIM_RESERVATION_ID, Long.class);
         }
         if (reservationId == null) {
-            throw new ReservationException("유효하지 않은 QR 코드입니다.");
+            throw new ReservationException("유효하지 않은 QR 코드예요.");
         }
         return reservationId;
     }

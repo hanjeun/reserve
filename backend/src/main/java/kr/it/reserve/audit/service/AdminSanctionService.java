@@ -98,13 +98,13 @@ public class AdminSanctionService {
 
     private void requireSanctionable(Member member) {
         if (member.isAdmin()) {
-            throw new MemberException("관리자는 제재할 수 없습니다.");
+            throw new MemberException("관리자는 제재할 수 없어요.");
         }
     }
 
     private void validateDays(int days) {
         if (days < 1 || days > 3650) {
-            throw new MemberException("정지 기간은 1일 이상 3650일 이하여야 합니다.", HttpStatus.BAD_REQUEST);
+            throw new MemberException("정지 기간은 1일 이상 3650일 이하여야 해요.", HttpStatus.BAD_REQUEST);
         }
     }
 

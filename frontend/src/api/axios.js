@@ -35,12 +35,12 @@ const isAuthEndpoint = (url) => {
 
 // 상태 코드별 기본 에러 메시지
 const getStatusMessage = (status) => {
-    if (status === 403) return '권한이 없습니다.';
-    if (status === 404) return '정보를 찾을 수 없습니다.';
-    if (status === 409) return '이미 사용 중입니다.';
+    if (status === 403) return '권한이 없어요.';
+    if (status === 404) return '정보를 찾을 수 없어요.';
+    if (status === 409) return '이미 사용 중이에요.';
     if (status === 429) return '잠시 후 다시 시도해주세요.';
-    if (status >= 500) return '서버 오류가 발생했습니다.';
-    return '요청에 실패했습니다.';
+    if (status >= 500) return '서버 오류가 발생했어요.';
+    return '요청에 실패했어요.';
 };
 
 // 401 처리: 토큰 재발급 또는 대기열 처리
@@ -98,9 +98,9 @@ instance.interceptors.response.use(
         // 인증·세션 관문을 통과한 사진 다운로드만 binary 본문을 반환한다.
         if (response.config.responseType === 'blob' && response.data instanceof Blob) return response.data;
         const res = response.data;
-        if (!res || typeof res !== 'object') throw new Error('서버 응답 형식을 확인할 수 없습니다.');
+        if (!res || typeof res !== 'object') throw new Error('서버 응답 형식을 확인할 수 없어요.');
         if (res.success) return res.data;
-        throw new Error(res.message ?? '요청에 실패했습니다.');
+        throw new Error(res.message ?? '요청에 실패했어요.');
     },
     async (error) => {
         if (error instanceof StaleSessionError) throw error;
@@ -149,7 +149,7 @@ instance.interceptors.response.use(
             throw new Error('응답이 너무 늦어요. 잠시 후 다시 시도해주세요.');
         }
         if (globalThis.navigator?.onLine === false) {
-            throw new Error('인터넷 연결이 끊겼습니다.');
+            throw new Error('인터넷 연결이 끊겼어요.');
         }
         // 서버 다운 · 연결 거부 · DNS · CORS — 원인이 어디든 "연결이 안 됐다"는 사실은 참이다.
         // 범인을 지목하지 않으면서 다음 행동은 알려주는 문장.

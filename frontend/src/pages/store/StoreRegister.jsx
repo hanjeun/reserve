@@ -1,6 +1,6 @@
 import React from 'react';
 import { Form } from 'antd';
-import StoreForm from '../../components/store/StoreForm';
+import StoreOnboarding from '../../components/store/StoreOnboarding';
 import { useStoreForm, useImagePreview } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 
@@ -36,8 +36,7 @@ const StoreRegister = () => {
 
     return (
         <>
-            <StoreForm
-                mode="create"
+            <StoreOnboarding
                 form={form}
                 onSubmit={handleSubmit}
                 loading={loading}

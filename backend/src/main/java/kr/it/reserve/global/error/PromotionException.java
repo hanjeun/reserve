@@ -16,7 +16,7 @@ public class PromotionException extends BusinessException {
 
     /** 404 - 홈보글을 찾을 수 없을 때 */
     public static PromotionException notFound() {
-        return new PromotionException("홈보글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        return new PromotionException("홈보글을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
     }
 
     /** 403 - 권한 없음 */

@@ -12,7 +12,7 @@ export const advanceSession = () => {
 };
 export class StaleSessionError extends Error {
     constructor() {
-        super('계정이 변경되어 이전 요청을 취소했습니다.');
+        super('계정이 변경되어 이전 요청을 취소했어요.');
         this.name = 'StaleSessionError';
         this.isStaleSession = true;
     }

@@ -164,7 +164,7 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
                         <p>{noticeHelp}</p>
                     </div>
                     <FormInput value={draft.notice} onChange={event => setField('notice', event.target.value)}
-                        maxLength={LIMITS.notice} showCount placeholder="예: 9월 30일은 임시 휴무입니다." aria-label="공지사항" />
+                        maxLength={LIMITS.notice} showCount placeholder="예: 9월 30일은 임시 휴무예요." aria-label="공지사항" />
                 </section>
 
                 <section className="reserve-chat-intro-card">
@@ -197,10 +197,8 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
                                 <li key={item.id} className="reserve-chat-intro-item">
                                     <div className="reserve-chat-intro-item-head">
                                         <span className="reserve-chat-intro-item-index">질문 {index + 1}</span>
-                                        <button type="button" className="reserve-chat-icon-button"
-                                            aria-label={`질문 ${index + 1} 삭제`} onClick={() => removeItem(item.id)}>
-                                            <DeleteOutlined aria-hidden="true" />
-                                        </button>
+                                        <Button variant="ghost" icon={<DeleteOutlined aria-hidden="true" />}
+                                            aria-label={`질문 ${index + 1} 삭제`} onClick={() => removeItem(item.id)} />
                                     </div>
                                     <FormField label="질문" error={errors[`question-${item.id}`]}>
                                         <FormInput value={item.question}

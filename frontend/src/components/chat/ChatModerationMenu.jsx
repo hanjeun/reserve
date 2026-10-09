@@ -30,8 +30,8 @@ const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pendi
         confirm({
             title: nextBlocked ? '대화를 차단할까요?' : '차단을 해제할까요?',
             content: nextBlocked
-                ? '차단하면 양쪽 모두 새 메시지를 보낼 수 없습니다. 이전 대화와 신고 기록은 그대로 보존됩니다.'
-                : '상대방도 차단한 상태라면 내 차단을 풀어도 메시지는 계속 보낼 수 없습니다.',
+                ? '차단하면 양쪽 모두 새 메시지를 보낼 수 없어요. 이전 대화와 신고 기록은 그대로 보존돼요.'
+                : '상대방도 차단한 상태라면 내 차단을 풀어도 메시지는 계속 보낼 수 없어요.',
             okText: nextBlocked ? '차단' : '차단 해제',
             okButtonProps: nextBlocked ? { danger: true } : undefined,
             onOk: async () => {
@@ -39,10 +39,10 @@ const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pendi
                 try {
                     await chatService.setBlocked(thread.roomId, viewerRole, nextBlocked);
                     if (revision !== useAuthStore.getState().sessionRevision) return;
-                    message.success(nextBlocked ? '대화를 차단했습니다.' : '내 차단을 해제했습니다.');
+                    message.success(nextBlocked ? '대화를 차단했어요.' : '내 차단을 해제했어요.');
                     onChanged?.();
                 } catch {
-                    if (revision === useAuthStore.getState().sessionRevision) message.error('차단 상태를 변경하지 못했습니다.');
+                    if (revision === useAuthStore.getState().sessionRevision) message.error('차단 상태를 변경하지 못했어요.');
                 }
             },
         });
@@ -51,7 +51,7 @@ const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pendi
     const changeVisibility = () => {
         const revision = useAuthStore.getState().sessionRevision;
         confirm({ title: hidden ? '대화를 목록에 복원할까요?' : '내 목록에서 대화를 숨길까요?',
-            content: '상대방 화면과 원문·신고 자료는 삭제되지 않습니다. 숨긴 대화에서 이전 내용을 확인하거나 신고할 수 있으며 새 메시지가 오면 다시 표시됩니다.',
+            content: '상대방 화면과 원문·신고 자료는 삭제되지 않아요. 숨긴 대화에서 이전 내용을 확인하거나 신고할 수 있으며 새 메시지가 오면 다시 표시돼요.',
             okText: hidden ? '복원' : '숨기기',
             onOk: async () => {
                 if (revision !== useAuthStore.getState().sessionRevision) return;
@@ -59,8 +59,8 @@ const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pendi
                     await chatService.setHidden(thread.roomId, viewerRole, !hidden);
                     if (revision !== useAuthStore.getState().sessionRevision) return;
                     onHidden?.();
-                    message.success(hidden ? '대화를 복원했습니다.' : '내 목록에서 숨겼습니다.');
-                } catch { if (revision === useAuthStore.getState().sessionRevision) message.error('대화 표시 상태를 변경하지 못했습니다.'); }
+                    message.success(hidden ? '대화를 복원했어요.' : '내 목록에서 숨겼어요.');
+                } catch { if (revision === useAuthStore.getState().sessionRevision) message.error('대화 표시 상태를 변경하지 못했어요.'); }
             },
         });
     };

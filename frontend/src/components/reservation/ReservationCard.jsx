@@ -31,15 +31,15 @@ import { colors } from '../../styles/tokens';
 const REASON_MODALS = {
     reject: {
         title: '예약 거절',
-        description: '거절 사유를 입력하면 고객에게 표시됩니다. (선택)',
-        placeholder: '예) 해당 시간대 예약이 마감되었습니다.',
+        description: '거절 사유를 입력하면 고객에게 표시돼요. (선택)',
+        placeholder: '예) 해당 시간대 예약이 마감됐어요.',
         okText: '거절 확인',
     },
     cancel: {
         title: '예약 취소',
         // 환불을 여기서 반드시 알린다 — 사장님 돈이 나가는 동작인데 버튼만 보고는 알 수 없다.
-        description: '확정된 예약을 취소합니다. 결제된 예약금은 고객에게 전액 환불됩니다.',
-        placeholder: '예) 가게 사정으로 당일 휴무하게 되었습니다.',
+        description: '확정된 예약을 취소해요. 결제된 예약금은 고객에게 전액 환불돼요.',
+        placeholder: '예) 가게 사정으로 당일 휴무하게 됐어요.',
         okText: '취소 확인',
     },
 };
@@ -72,7 +72,7 @@ const ReservationCard = ({ reservation, actionLoading, onApprove, onReject, onCo
     const handleNoShow = () => {
         confirm({
             title: '노쇼 처리',
-            content: '이 예약을 노쇼로 기록합니다. 고객에게 불이익이 남을 수 있고 되돌릴 수 없습니다.',
+            content: '이 예약을 노쇼로 기록해요. 고객에게 불이익이 남을 수 있고 되돌릴 수 없어요.',
             okText: '노쇼 확인', cancelText: '닫기',
             okButtonProps: { danger: true }, centered: true,
             onOk: () => onNoShow(id),

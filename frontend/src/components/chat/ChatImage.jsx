@@ -30,7 +30,7 @@ export default function ChatImage({ url, width, height }) {
     const style = { display: 'block', width: '100%', height: 'auto', maxWidth: 240, borderRadius: 10,
         aspectRatio: width && height ? `${width} / ${height}` : '1', objectFit: 'contain' };
     // <output> 은 암묵 role=status 이고 span 과 같은 인라인 요소다.
-    if (current?.error) return <output>사진을 불러오지 못했습니다.</output>;
+    if (current?.error) return <output>사진을 불러오지 못했어요.</output>;
     if (!current?.src) return <Bone width={180} height={140} />;
     return <Image src={current.src} alt="대화에 첨부한 사진" style={style}
         classNames={{ root: 'reserve-chat-photo', image: 'reserve-chat-photo-image' }}

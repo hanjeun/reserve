@@ -20,7 +20,8 @@ public class SitemapService {
     private static final String MONTHLY_CHANGE_FREQ = "monthly";
 
     private static final String ORIGIN = "https://reserve.it.kr";
-    private static final int MAX_STORE_URLS = 49_996;
+    // Home, discovery, three policy pages, and three guides reserve eight URLs.
+    private static final int MAX_STORE_URLS = 49_992;
 
     private final StoreRepository storeRepository;
 
@@ -50,7 +51,9 @@ public class SitemapService {
         appendUrl(xml, ORIGIN + "/terms", null, MONTHLY_CHANGE_FREQ, "0.3");
         appendUrl(xml, ORIGIN + "/privacy", null, MONTHLY_CHANGE_FREQ, "0.3");
         appendUrl(xml, ORIGIN + "/content-sources", null, MONTHLY_CHANGE_FREQ, "0.3");
-        appendUrl(xml, ORIGIN + "/operation-guide", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, ORIGIN + "/guide/user", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, ORIGIN + "/guide/business", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, ORIGIN + "/guide/common", null, MONTHLY_CHANGE_FREQ, "0.3");
 
         for (StoreSitemapEntry store : stores) {
             LocalDate lastModified = store.lastModifiedAt() == null

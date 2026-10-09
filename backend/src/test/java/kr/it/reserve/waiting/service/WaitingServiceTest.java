@@ -4,6 +4,7 @@ import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.waiting.dto.CreateWaitingRequest;
 import kr.it.reserve.waiting.dto.UpdateWaitingStatusRequest;
@@ -99,7 +100,40 @@ class WaitingServiceTest {
         assertStatus(() -> service.getBoard(other, 31L), HttpStatus.FORBIDDEN);
         assertStatus(() -> service.create(other, 31L, new CreateWaitingRequest(null, 1, "new-ticket")), HttpStatus.FORBIDDEN);
         assertStatus(() -> service.updateStatus(other, 31L, 1L, new UpdateWaitingStatusRequest(WaitingStatus.CALLED)), HttpStatus.FORBIDDEN);
+        assertStatus(() -> service.updateIntake(other, 31L, true), HttpStatus.FORBIDDEN);
         verifyNoInteractions(entries);
+    }
+
+    @Test
+    void intakePausePreservesModeAndBoardAndResumeRequiresAnActiveStore() {
+        store.setWaitingIntakeMode(WaitingIntakeMode.BOTH);
+        when(stores.findByIdForUpdate(31L)).thenReturn(Optional.of(store));
+        when(stores.findById(31L)).thenReturn(Optional.of(store));
+        when(entries.findBoard(org.mockito.ArgumentMatchers.eq(31L), any(), any(), any(), any()))
+                .thenReturn(List.of(entry(TODAY)));
+        var board = service.updateIntake(owner, 31L, true);
+        assertThat(board.waitingPaused()).isTrue();
+        assertThat(board.waitingIntakeMode()).isEqualTo("BOTH");
+        assertThat(board.entries()).hasSize(1);
+        assertThat(service.updateIntake(owner, 31L, false).waitingPaused()).isFalse();
+        store.setStatus(StoreStatus.SUSPENDED);
+        assertStatus(() -> service.updateIntake(owner, 31L, false), HttpStatus.CONFLICT);
+        assertStatus(() -> service.updateIntake(owner, 31L, null), HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pausedIntakeRejectsNewTicketsButKeepsIdempotentRetriesAndExistingAdmission() {
+        store.setWaitingPaused(true);
+        when(stores.findByIdForUpdate(31L)).thenReturn(Optional.of(store));
+        assertStatus(() -> service.create(owner, 31L, new CreateWaitingRequest(null, 1, "new-ticket")), HttpStatus.CONFLICT);
+        WaitingEntry existing = entry(TODAY);
+        when(entries.findByStoreIdAndClientRequestId(31L, "request-1")).thenReturn(Optional.of(existing));
+        assertThat(service.create(owner, 31L, new CreateWaitingRequest("팀 하나", 2, "request-1")).entryNumber()).isEqualTo(1);
+        when(entries.findByIdAndStoreIdForUpdate(7L, 31L)).thenReturn(Optional.of(existing));
+        assertThat(service.updateStatus(owner, 31L, 7L, new UpdateWaitingStatusRequest(WaitingStatus.CALLED)).status()).isEqualTo(WaitingStatus.CALLED);
+        assertThat(service.updateStatus(owner, 31L, 7L, new UpdateWaitingStatusRequest(WaitingStatus.SEATED)).status()).isEqualTo(WaitingStatus.SEATED);
+        verify(entries, never()).save(any());
+        verify(entries, never()).lastEntryNumber(anyLong(), any());
     }
 
     @Test
@@ -120,7 +154,7 @@ class WaitingServiceTest {
         store.setStatus(StoreStatus.SUSPENDED);
         when(stores.findByIdForUpdate(31L)).thenReturn(Optional.of(store));
         assertStatus(() -> service.create(owner, 31L, new CreateWaitingRequest(null, 1, "new-ticket")), HttpStatus.CONFLICT);
-        when(entries.findByIdAndStoreId(7L, 31L)).thenReturn(Optional.of(entry(TODAY)));
+        when(entries.findByIdAndStoreIdForUpdate(7L, 31L)).thenReturn(Optional.of(entry(TODAY)));
         assertThat(service.updateStatus(owner, 31L, 7L, new UpdateWaitingStatusRequest(WaitingStatus.CANCELLED)).status())
                 .isEqualTo(WaitingStatus.CANCELLED);
         verify(entries, never()).save(any());
@@ -132,7 +166,7 @@ class WaitingServiceTest {
         store.softDelete();
         assertStatus(() -> service.updateStatus(owner, 31L, 7L, new UpdateWaitingStatusRequest(WaitingStatus.CALLED)), HttpStatus.NOT_FOUND);
         store.setDeletedAt(null);
-        when(entries.findByIdAndStoreId(7L, 31L)).thenReturn(Optional.empty());
+        when(entries.findByIdAndStoreIdForUpdate(7L, 31L)).thenReturn(Optional.empty());
         assertStatus(() -> service.updateStatus(owner, 31L, 7L, new UpdateWaitingStatusRequest(WaitingStatus.CALLED)), HttpStatus.NOT_FOUND);
     }
 

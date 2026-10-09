@@ -139,30 +139,30 @@ const MembersTab = () => {
     const suspendMutation = useMutation({
         mutationFn: ({ id, days, reason }) => api.post(API_ENDPOINTS.ADMIN_MANAGE.MEMBER_SUSPEND(id), { days: String(days), reason: reason || '' }),
         onSuccess: (_, { days }) => {
-            message.success(`${days}일간 정지 처리되었습니다.`);
+            message.success(`${days}일간 정지 처리됐어요.`);
             setSuspendOpen(false);
             void invalidateMembers();
         },
-        onError: () => message.error('정지 처리에 실패했습니다.'),
+        onError: () => message.error('정지 처리에 실패했어요.'),
     });
 
     const banMutation = useMutation({
         mutationFn: ({ id, reason }) => api.post(API_ENDPOINTS.ADMIN_MANAGE.MEMBER_BAN(id), { reason: reason || '' }),
         onSuccess: () => {
-            message.success('영구 정지 처리되었습니다.');
+            message.success('영구 정지 처리됐어요.');
             setBanOpen(false);
             void invalidateMembers();
         },
-        onError: () => message.error('영구 정지에 실패했습니다.'),
+        onError: () => message.error('영구 정지에 실패했어요.'),
     });
 
     const unbanMutation = useMutation({
         mutationFn: (id) => api.post(API_ENDPOINTS.ADMIN_MANAGE.MEMBER_UNBAN(id)),
         onSuccess: () => {
-            message.success('정지가 해제되었습니다.');
+            message.success('정지가 해제됐어요.');
             void invalidateMembers();
         },
-        onError: () => message.error('해제에 실패했습니다.'),
+        onError: () => message.error('해제에 실패했어요.'),
     });
 
     const handleSuspend = ({ days, reason }) => {
@@ -179,7 +179,7 @@ const MembersTab = () => {
     const handleUnban = (r) => {
         confirm({
             title: '정지 해제',
-            content: `'${r.name || r.email}' 님의 정지를 해제하시겠습니까?`,
+            content: `'${r.name || r.email}' 님의 정지를 해제할까요?`,
             okText: '해제', cancelText: '취소', centered: true,
             onOk: () => unbanMutation.mutateAsync(r.id),
         });
@@ -217,7 +217,7 @@ const MembersTab = () => {
     if (membersError) {
         tableBody = (
             <DataState state="error" kind="member" subject="회원 목록" error={membersError}
-                onRetry={refetch} retrying={isFetching} compact />
+                onRetry={refetch} retrying={isFetching} />
         );
     } else if (memberLoading || isPlaceholderData) {
         tableBody = (
@@ -236,7 +236,7 @@ const MembersTab = () => {
                 dataSource={members}
                 rowKey="id"
                 pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                locale={{ emptyText: '회원이 없습니다.' }}
+                locale={{ emptyText: '회원이 없어요.' }}
             />
         );
     }
@@ -248,6 +248,7 @@ const MembersTab = () => {
                 search={{ value: memberSearch, onChange: handleSearchChange, placeholder: '이름, 이메일로 검색' }}
                 onReload={refetch}
                 loading={memberLoading || isFetching}
+                initialLoading={memberLoading}
             />
             {tableBody}
 

@@ -39,7 +39,7 @@ describe('store closure readiness scope', () => {
     it('rechecks on reopen without remounting the modal or reusing the prior permission', async () => {
         service.getClosureReadiness.mockResolvedValueOnce({ canClose: true });
         const rendered = render(modal(true, 12));
-        await screen.findByText('미결 운영 항목이 없습니다');
+        await screen.findByText('미결 운영 항목이 없어요');
         const dialog = screen.getByRole('dialog');
         rendered.rerender(modal(false, null));
         const next = deferred();
@@ -48,7 +48,7 @@ describe('store closure readiness scope', () => {
         expect(screen.getByRole('dialog')).toBe(dialog);
         expect(screen.getByRole('button', { name: '영업 종료' })).toBeDisabled();
         await act(async () => { next.resolve({ unresolvedReservations: 0 }); });
-        expect(screen.getByText('영업 종료 준비 상태를 확인하지 못했습니다')).toBeInTheDocument();
+        expect(screen.getByText('영업 종료 준비 상태를 확인하지 못했어요')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '영업 종료' })).toBeDisabled();
     });
 
@@ -61,7 +61,7 @@ describe('store closure readiness scope', () => {
         await act(async () => { old.resolve({ canClose: true }); });
         expect(screen.getByRole('button', { name: '영업 종료' })).toBeDisabled();
         await act(async () => { next.resolve({ canClose: false, unresolvedReservations: 1 }); });
-        expect(screen.getByText('먼저 처리해야 할 항목이 1건 있습니다')).toBeInTheDocument();
+        expect(screen.getByText('먼저 처리해야 할 항목이 1건 있어요')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '영업 종료' })).toBeDisabled();
     });
 });

@@ -59,7 +59,7 @@ StoreListResult.propTypes = {
 const StoreList = () => {
     const {
         stores, totalElements,
-        loading, refetching, page, pageSize, setPage, refetch,
+        loading, initialLoading = loading, refetching, page, pageSize, setPage, refetch,
         searchParams, setSearchParams,
         error,
     } = useStoreList();
@@ -96,7 +96,7 @@ const StoreList = () => {
         pageTitle = domainLabel;
     }
 
-    useDocumentTitle('가게 목록', '원하는 조건으로 최고의 가게를 찾아보세요. RESERVE에서 다양한 업종을 간편하게 예약할 수 있습니다.');
+    useDocumentTitle('가게 목록', '원하는 조건으로 최고의 가게를 찾아보세요. RESERVE에서 다양한 업종을 간편하게 예약할 수 있어요.');
 
     const { request: requestLocation, requesting: locating } = useGeolocation();
     const { user } = useAuthStore();
@@ -218,7 +218,7 @@ const StoreList = () => {
         if (stores.length === 0) {
             return (
                 <DataState state="empty" kind="store"
-                    title={searchParams.region ? '이 지역에 등록된 가게가 없습니다.' : '조건에 맞는 가게가 없습니다.'}
+                    title={searchParams.region ? '이 지역에 등록된 가게가 없어요.' : '조건에 맞는 가게가 없어요.'}
                     style={{ marginTop: 100 }} />
             );
         }
@@ -262,6 +262,7 @@ const StoreList = () => {
                 onSortChange={handleSortChange}
                 sortOptions={SORT_OPTIONS}
                 disabled={loading || refetching}
+                initialLoading={initialLoading}
                 sortDisabled={loading || locating || refetching}
                 sortLoading={locating}
                 onAnimationEnd={event => {

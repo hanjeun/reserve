@@ -35,11 +35,11 @@ public class TourismRegionPhotoController {
             @RequestParam(name = "regions") List<String> regions,
             HttpServletRequest request) {
         if (regions.size() > MAX_REGIONS_PER_REQUEST) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("한 번에 최대 6개 지역만 조회할 수 있습니다."));
+            return ResponseEntity.badRequest().body(ApiResponse.error("한 번에 최대 6개 지역만 조회할 수 있어요."));
         }
         if (!rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.TOURISM_REGION_PHOTO)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(ApiResponse.error("지역 사진 조회가 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                    .body(ApiResponse.error("지역 사진 조회가 너무 많아요. 잠시 후 다시 시도해주세요."));
         }
         return ResponseEntity.ok(ApiResponse.success(
                 tourismRegionPhotoService.findRegionPhotos(regions), "지역 대표 사진 조회 성공"));
@@ -49,7 +49,7 @@ public class TourismRegionPhotoController {
     public ResponseEntity<ApiResponse<List<TourismRegionPhotoResponse>>> catalog(HttpServletRequest request) {
         if (!rateLimiter.tryConsume(IpExtractor.extract(request), RateLimiter.Policy.TOURISM_REGION_PHOTO)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(ApiResponse.error("지역 사진 조회가 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                    .body(ApiResponse.error("지역 사진 조회가 너무 많아요. 잠시 후 다시 시도해주세요."));
         }
         return ResponseEntity.ok(ApiResponse.success(
                 tourismRegionPhotoService.catalog(), "지역 사진 출처 목록 조회 성공"));

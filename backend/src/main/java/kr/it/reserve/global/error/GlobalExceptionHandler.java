@@ -33,13 +33,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     protected ResponseEntity<ApiResponse<Void>> handleUnsupportedMethod(HttpRequestMethodNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(e.getHeaders())
-                .body(ApiResponse.error("지원하지 않는 요청 방식입니다."));
+                .body(ApiResponse.error("지원하지 않는 요청 방식이에요."));
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     protected ResponseEntity<ApiResponse<Void>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).headers(e.getHeaders())
-                .body(ApiResponse.error("지원하지 않는 요청 형식입니다."));
+                .body(ApiResponse.error("지원하지 않는 요청 형식이에요."));
     }
 
     /**
@@ -93,7 +93,7 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ApiResponse<Void>> handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {
         log.warn("Access denied");
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("해당 리소스에 대한 접근 권한이 없습니다."));
+                .body(ApiResponse.error("해당 리소스에 대한 접근 권한이 없어요."));
     }
 
     /**
@@ -114,7 +114,7 @@ public class GlobalExceptionHandler {
         log.warn("No handler found: errorType={}", e.getClass().getSimpleName());
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error("요청하신 경로를 찾을 수 없습니다."));
+                .body(ApiResponse.error("요청하신 경로를 찾을 수 없어요."));
     }
 
     /**
@@ -127,6 +127,6 @@ public class GlobalExceptionHandler {
         log.error("Unhandled exception occurred: errorType={}, location={}", e.getClass().getSimpleName(), location);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요."));
+                .body(ApiResponse.error("서버 내부 오류가 발생했어요. 잠시 후 다시 시도해주세요."));
     }
 }

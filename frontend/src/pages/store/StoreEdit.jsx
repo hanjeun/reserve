@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Form } from 'antd';
-import StoreFormSkeleton from "../../components/store/StoreFormSkeleton";
-import StoreForm from "../../components/store/StoreForm";
+import StoreOnboardingSkeleton from "../../components/store/StoreOnboardingSkeleton";
+import StoreOnboarding from "../../components/store/StoreOnboarding";
 import { Button, DataState, PageContainer } from '../../components/common';
 import { useStoreData, useMessage, useFormReady, useImagePreview, useStoreForm } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -45,7 +45,7 @@ const StoreEdit = () => {
         const isAdmin = user?.role === 'ADMIN';
         const isOwner = store.ownerId && user?.id === store.ownerId;
         if (!isAdmin && !isOwner) {
-            message.error('접근 권한이 없습니다.');
+            message.error('접근 권한이 없어요.');
             navigate('/', { replace: true });
         }
     }, [store, user, message, navigate]);
@@ -73,7 +73,7 @@ const StoreEdit = () => {
     // 가게 데이터 로딩 중에는 폼의 골격을 유지한다.
     // (initialValues는 Form 최초 마운트 시 1회만 읽히므로 store가 준비된 후 렌더해야 함)
     if (loading) {
-        return <output className="reserve-route-skeleton reserve-route-skeleton--store-form" aria-label="가게 정보를 불러오는 중" aria-busy="true" style={{ display: 'block' }}><div aria-hidden="true"><StoreFormSkeleton mode="edit" /></div></output>;
+        return <output className="reserve-route-skeleton reserve-route-skeleton--store-form" aria-label="가게 정보를 불러오는 중" aria-busy="true" style={{ display: 'block' }}><div aria-hidden="true"><StoreOnboardingSkeleton mode="edit" /></div></output>;
     }
 
     if (!store) {
@@ -85,7 +85,7 @@ const StoreEdit = () => {
                     kind="store"
                     subject="내 가게 정보"
                     error={error}
-                    title={error ? undefined : '수정할 가게를 찾을 수 없습니다.'}
+                    title={error ? undefined : '수정할 가게를 찾을 수 없어요.'}
                     onRetry={error ? refetch : undefined}
                     missingAction={<Button variant="ghost" size="sm" onClick={() => navigate('/my-stores')}>내 가게 목록으로</Button>}
                     style={{ marginTop: 100 }}
@@ -96,7 +96,7 @@ const StoreEdit = () => {
 
     return (
         <>
-            <StoreForm
+            <StoreOnboarding
                 mode="edit"
                 form={form}
                 formRef={formRef}
@@ -112,6 +112,7 @@ const StoreEdit = () => {
                 onSaveDraft={saveDraftNow}
                 draftState={draftState}
                 initialValues={getInitialValues()}
+                originalStore={store}
             />
             
             {/* 이미지 미리보기 모달 */}

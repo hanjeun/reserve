@@ -147,7 +147,7 @@ public class PaymentOperationsAdminController {
     public ApiResponse<String> retryWebhook(@PathVariable Long inboxId) {
         PaymentWebhookInbox inbox = inboxRepository.findById(inboxId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "웹훅 inbox 항목을 찾을 수 없습니다."));
+                        HttpStatus.NOT_FOUND, "웹훅 inbox 항목을 찾을 수 없어요."));
         inboxProcessor.retryNow(inbox.getWebhookId());
         return ApiResponse.success(inbox.getWebhookId(), "재처리 요청 완료");
     }

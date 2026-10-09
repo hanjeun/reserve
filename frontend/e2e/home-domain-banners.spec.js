@@ -21,7 +21,7 @@ test('all four home banners retain readable copy, responsive photos and exact de
     const banners = featured.locator('.reserve-discovery-banner');
     await expect(banners).toHaveCount(4);
     const slides = [
-        { path: '/operation-guide', asset: 'operation-guide-cover', mobileSuffix: '-v1', title: '예약 전에 확인하면,', description: '예약·결제·취소 기준을 한눈에 확인하세요' },
+        { path: '/guide/common', asset: 'operation-guide-cover', mobileSuffix: '-v1', title: '예약 전에 확인하면,', description: '예약·웨이팅부터 가게 운영까지 확인하세요' },
         { path: '/stores?domain=FOOD', asset: 'dining-cover', title: '오늘의 한 끼,', description: '마음에 드는 맛집을 찾아보세요' },
         { path: '/stores?domain=PERFORMANCE', asset: 'class-cover', title: '잠깐의 몰입,', description: '나를 위한 시간을 예약해보세요' },
         { path: '/stores?domain=POPUP', asset: 'popup-cover', title: '이번 주의 발견,', description: '새로운 공간을 둘러보세요' },
@@ -51,16 +51,17 @@ test('all four home banners retain readable copy, responsive photos and exact de
 test('six service shortcuts lead to their own domain filters', async ({ page }) => {
     await page.goto('/');
     const domains = [
-        ['FOOD', '맛집 · 카페'],
-        ['BEAUTY_CLINIC', '뷰티 · 클리닉'],
-        ['SPORTS', '운동 · 웰니스'],
-        ['PERFORMANCE', '공연 · 클래스'],
-        ['POPUP', '팝업 · 대관'],
-        ['OTHER', '기타 예약'],
+        ['FOOD', '맛집 · 카페', 'food'],
+        ['BEAUTY_CLINIC', '뷰티 · 클리닉', 'beauty'],
+        ['SPORTS', '운동 · 웰니스', 'sports'],
+        ['PERFORMANCE', '공연 · 클래스', 'performance'],
+        ['POPUP', '팝업 · 대관', 'popup'],
+        ['OTHER', '기타 예약', 'other'],
     ];
-    for (const [value, label] of domains) {
+    for (const [value, label, asset] of domains) {
         const shortcut = page.getByRole('link', { name: `${label} 가게 둘러보기`, exact: true });
         await expect(shortcut).toHaveAttribute('href', `/stores?domain=${value}`);
-        await expect(shortcut.locator('img')).toHaveAttribute('src', /\/images\/discovery-v3\//);
+        const importedImage = new RegExp(`/(?:src/assets/service-domains|assets)/${asset}-512(?:-[A-Za-z0-9_-]+)?\\.webp(?:\\?.*)?$`);
+        await expect(shortcut.locator('img')).toHaveAttribute('src', importedImage);
     }
 });

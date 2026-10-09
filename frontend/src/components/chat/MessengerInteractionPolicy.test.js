@@ -91,10 +91,10 @@ describe('messenger interaction roles', () => {
             '.reserve-messenger-mobile-back:focus-visible',
             '.reserve-chat-send:focus-visible',
         ]) {
-            expect(declarations(selector).outline).toBe('2px solid var(--c-text-secondary, #4e5968)');
+            expect(declarations(selector).outline).toBe('var(--reserve-focus-ring)');
         }
         expect(declarations('.reserve-messenger-primary-action:focus-visible').outline)
-            .toBe('2px solid var(--c-text-secondary, #4e5968)');
+            .toBe('var(--reserve-focus-ring)');
     });
 
     it('stops press motion in reduced-motion mode', () => {

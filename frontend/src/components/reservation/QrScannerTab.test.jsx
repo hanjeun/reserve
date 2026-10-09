@@ -78,7 +78,7 @@ describe('QrScannerTab sheet surface', () => {
         client.clear();
     });
 
-    it('keeps actions at the bottom and reports a scan only through the message layer', async () => {
+    it('keeps actions at the bottom and shows only the server-confirmed scan result', async () => {
         const onClose = vi.fn();
         // 체크인이 성공하면 예약 캐시를 무효화한다(invalidateAfterWrite.js) — 그 호출을 감시한다.
         const queryClient = new QueryClient();
@@ -106,6 +106,9 @@ describe('QrScannerTab sheet surface', () => {
         expect(reservationService.checkInByQr).toHaveBeenCalledWith('signed-qr-payload');
         expect(invalidate).toHaveBeenCalledWith({ queryKey: ['reservations'] });
         expect(container.querySelector('.reserve-qr-scanner')).not.toHaveTextContent('체크인 완료');
-        expect(container.querySelector('[class*="result"]')).toBeNull();
+        const result = container.querySelector('.reserve-qr-result');
+        expect(result).toHaveAttribute('data-result-state', 'success');
+        expect(result).toHaveTextContent('예약 체크인이 완료됐어요.');
+        expect(result).not.toHaveTextContent('signed-qr-payload');
     });
 });

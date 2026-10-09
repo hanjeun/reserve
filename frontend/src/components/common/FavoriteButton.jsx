@@ -4,12 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { HeartOutlined, HeartFilled } from '@ant-design/icons';
 import favoriteService from '../../services/favoriteService';
 import useAuthStore from '../../store/useAuthStore';
-import { useMessage } from '../../hooks';
+import useMessage from '../../hooks/useMessage';
 import { favoriteKeys } from '../../hooks/queryKeys';
 import { invalidateFavoriteData } from '../../hooks/invalidateAfterWrite';
 import { colors } from '../../styles/tokens';
 
-const toggleSuccessMessage = (added) => (added ? '즐겨찾기에 추가되었습니다.' : '즐겨찾기에서 삭제되었습니다.');
+const toggleSuccessMessage = (added) => (added ? '즐겨찾기에 추가됐어요.' : '즐겨찾기에서 삭제됐어요.');
 
 // 낙관적 업데이트 + 실패 시 되돌리기
 function useFavoriteToggle(storeId, queryClient, message) {

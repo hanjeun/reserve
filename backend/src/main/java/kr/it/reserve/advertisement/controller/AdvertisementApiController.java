@@ -36,7 +36,7 @@ import java.util.Map;
 @RequestMapping("/api/advertisements")
 public class AdvertisementApiController {
 
-    private static final String LOGIN_REQUIRED = "로그인이 필요합니다.";
+    private static final String LOGIN_REQUIRED = "로그인이 필요해요.";
     private static final String QUERY_SUCCESS = "조회 성공";
     private static final String FAILED_REDIRECT_QUERY = "?success=false&type=ad&merchant_uid=";
     private static final String ERROR_MESSAGE_QUERY = "&error_msg=";
@@ -81,7 +81,7 @@ public class AdvertisementApiController {
 
         if (!isSuccess) {
             return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
-                    + ERROR_MESSAGE_QUERY + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+                    + ERROR_MESSAGE_QUERY + enc("광고 결제 완료를 확인하지 못했어요. 내역을 확인해주세요."));
         }
 
         try {
@@ -91,13 +91,13 @@ public class AdvertisementApiController {
             // 외부 API 래퍼의 도메인 예외에도 원문이 섞일 수 있으므로 URL에 전달하지 않는다.
             log.warn("Ad mobile redirect verification failed: errorType={}", e.getClass().getSimpleName());
             return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
-                    + ERROR_MESSAGE_QUERY + enc("광고 결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+                    + ERROR_MESSAGE_QUERY + enc("광고 결제 완료를 확인하지 못했어요. 내역을 확인해주세요."));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
             // URL과 일반 로그에는 원문 대신 고정 문구·오류 종류만 남긴다.
             log.error("Ad mobile redirect error: errorType={}", e.getClass().getSimpleName());
             return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
-                    + ERROR_MESSAGE_QUERY + enc("광고 결제 처리 중 오류가 발생했습니다."));
+                    + ERROR_MESSAGE_QUERY + enc("광고 결제 처리 중 오류가 발생했어요."));
         }
     }
 
@@ -145,7 +145,7 @@ public class AdvertisementApiController {
         validateBusinessAuth(member);
         String merchantUid = body.get("merchantUid");
         AdvertisementResponse response = advertisementService.verifyPayment(merchantUid, member);
-        return ApiResponse.success(response, "광고가 활성화되었습니다.");
+        return ApiResponse.success(response, "광고가 활성화됐어요.");
     }
 
     // 노출용 — 공개 API (StoreList 배지/배너 위젯)
@@ -249,7 +249,7 @@ public class AdvertisementApiController {
         validateAdminAuth(member);
         String reason = body != null ? body.get("reason") : null;
         advertisementService.suspendAd(id, reason);
-        return ApiResponse.success(null, "광고가 중단되었습니다.");
+        return ApiResponse.success(null, "광고가 중단됐어요.");
     }
 
     // 배너 광고 콘텐츠(제목/설명/이미지) 수정 (사업자용, 본인 가게만)
@@ -258,7 +258,7 @@ public class AdvertisementApiController {
         Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         AdvertisementResponse response = advertisementService.updateAd(id, request, member);
-        return ApiResponse.success(response, "광고가 수정되었습니다.");
+        return ApiResponse.success(response, "광고가 수정됐어요.");
     }
 
     // 광고 취소 (사업자용, 본인 가게만) — 결제 전이면 그냥 취소, 결제 후면 전액 환불
@@ -267,7 +267,7 @@ public class AdvertisementApiController {
         Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         advertisementService.cancelAd(id, member);
-        return ApiResponse.success(null, "광고 취소 요청을 접수했습니다. 환불 여부는 광고 내역에서 확인해주세요.");
+        return ApiResponse.success(null, "광고 취소 요청을 접수했어요. 환불 여부는 광고 내역에서 확인해주세요.");
     }
 
     // 종료상태(만료/취소/환불/중단) 광고를 목록에서 숨기기(소프트삭제) — 2026-07 추가, 사업자용
@@ -276,18 +276,18 @@ public class AdvertisementApiController {
         Member member = SecurityUtil.getCurrentMember(LOGIN_REQUIRED);
         validateBusinessAuth(member);
         advertisementService.removeAd(id, member);
-        return ApiResponse.success(null, "목록에서 삭제되었습니다.");
+        return ApiResponse.success(null, "목록에서 삭제됐어요.");
     }
 
     private void validateBusinessAuth(Member member) {
         if (!member.isBusiness() && !member.isAdmin()) {
-            throw ReservationException.forbidden("사업자 권한이 없습니다.");
+            throw ReservationException.forbidden("사업자 권한이 없어요.");
         }
     }
 
     private void validateAdminAuth(Member member) {
         if (!member.isAdmin()) {
-            throw ReservationException.forbidden("관리자 권한이 없습니다.");
+            throw ReservationException.forbidden("관리자 권한이 없어요.");
         }
     }
 }

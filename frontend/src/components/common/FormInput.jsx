@@ -12,6 +12,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Input, InputNumber } from 'antd';
+import { SpinIndicator } from './Loading';
 import { colors, radius, heights, fontSize } from '../../styles/tokens';
 
 const FormInput = ({ 
@@ -168,7 +169,7 @@ FormInput.WithButton = ({
                 aria-busy={buttonLoading || undefined}
                 style={btnStyle}
             >
-                {buttonLoading ? <span className="reserve-form-field-button-spin" aria-hidden="true" /> : buttonText}
+                {buttonLoading ? <span className="reserve-form-field-button-spin" aria-hidden="true"><SpinIndicator /></span> : buttonText}
             </button>
         </div>
     );

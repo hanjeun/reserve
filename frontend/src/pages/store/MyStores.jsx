@@ -1,3 +1,4 @@
+import { PageTitle, PageDescription } from '../../components/common/PageTypography';
 import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useState, useCallback } from 'react';
 import { Typography, Modal, Flex } from 'antd';
@@ -7,7 +8,7 @@ import { PageContainer, Button, Card, DataState, StoreCardSkeleton, ModalLoading
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
-import { colors, radius, fontWeight, fontSize } from '../../styles/tokens';
+import { colors, radius, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
 import { canCloseStore } from '../../utils/lifecycleReadiness';
 import StoreListingToolbar from '../../components/store/StoreListingToolbar';
@@ -17,7 +18,7 @@ import StoreListRow from '../../components/store/StoreListRow';
 import { OWNER_STORE_SORT_OPTIONS } from '../../constants';
 import { filterAndSortOwnedStores } from './ownedStoreFilters';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const OWNER_SORT_OPTIONS = OWNER_STORE_SORT_OPTIONS;
 
 const managedActions = (store, onEdit, onDelete, inRow = false) => [
@@ -94,10 +95,10 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
         readinessContent = (
             <div style={{ marginTop: 16, background: colors.error.light, borderRadius: radius.md, padding: '12px 14px' }}>
                 <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main, display: 'block', marginBottom: 2 }}>
-                    영업 종료 준비 상태를 확인하지 못했습니다
+                    영업 종료 준비 상태를 확인하지 못했어요
                 </Text>
                 <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                    잠시 후 다시 시도해주세요. 확인 전에는 영업을 종료할 수 없습니다.
+                    잠시 후 다시 시도해주세요. 확인 전에는 영업을 종료할 수 없어요.
                 </Text>
             </div>
         );
@@ -107,16 +108,16 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
                 {canClose && (
                     <div style={{ background: colors.success.light, borderRadius: radius.md, padding: '12px 14px' }}>
                         <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
-                            미결 운영 항목이 없습니다
+                            미결 운영 항목이 없어요
                         </Text>
-                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>거래 원장을 보존한 채 공개 영업을 종료할 수 있습니다.</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>거래 원장을 보존한 채 공개 영업을 종료할 수 있어요.</Text>
                     </div>
                 )}
 
                 {!canClose && (
                     <div style={{ background: colors.warning.light, borderRadius: radius.md, padding: '12px 14px' }}>
                         <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block', marginBottom: 2 }}>
-                            먼저 처리해야 할 항목이 {blockerCount}건 있습니다
+                            먼저 처리해야 할 항목이 {blockerCount}건 있어요
                         </Text>
                         <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
                             예약 {readiness.unresolvedReservations} · 광고 {readiness.activeAdvertisements} · 환불 {readiness.unresolvedRefunds} · 결제 확인 {readiness.openPaymentIssues} · 웹훅 {readiness.unfinishedWebhooks}
@@ -155,7 +156,7 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
             <div style={{ padding: '4px 0 8px' }}>
                 {/* 가게명 */}
                 <Text style={{ fontSize: fontSize.md, color: colors.text.primary }}>
-                    <Text strong>"{storeName}"</Text>의 영업을 종료하려고 합니다.
+                    <Text strong>"{storeName}"</Text>의 영업을 종료하려고 해요.
                 </Text>
 
                 {/* 예약 수 로딩 */}
@@ -170,7 +171,7 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
                     border: `1px solid ${colors.border.default}`,
                 }}>
                     <Text type="secondary" style={{ fontSize: fontSize.sm }}>
-                        영업 종료 후 가게는 공개 목록에서 사라지고 이미지는 삭제 대기열로 이동합니다. 예약·결제·환불·리뷰 기록은 대사와 분쟁 대응을 위해 비공개로 보존합니다.
+                        영업 종료 후 가게는 공개 목록에서 사라지고 이미지는 삭제 대기열로 이동해요. 예약·결제·환불·리뷰 기록은 대사와 분쟁 대응을 위해 비공개로 보존해요.
                     </Text>
                 </div>
             </div>
@@ -234,7 +235,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
     }
     return (
         <DataState state="empty" kind="store" style={{ marginTop: '100px' }}
-            title={stores.length > 0 ? '조건에 맞는 내 가게가 없습니다.' : '등록된 가게가 없습니다.'}
+            title={stores.length > 0 ? '조건에 맞는 내 가게가 없어요.' : '등록된 가게가 없어요.'}
             action={stores.length > 0
                 ? <Button variant="secondary" size="sm" onClick={onResetFilters}>필터 초기화</Button>
                 : <Button variant="secondary" size="sm" onClick={onRegister}>새 가게 등록하기</Button>} />
@@ -311,7 +312,7 @@ const MyStores = () => {
                 {/* 다시 불러오기만 실패했으면 이전 목록은 그대로 두고, 그 위에 작은 띠로만 알린다. */}
                 {error && (
                     <DataState state="error" kind="store" subject="가게 목록" error={error}
-                        title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있습니다."
+                        title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
                         onRetry={handleRetry} retrying={retrying} compact style={{ marginBottom: 16 }} />
                 )}
                 <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
@@ -325,12 +326,12 @@ const MyStores = () => {
         <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page" aria-busy={loading || retrying}>
             {/* 헤더 */}
             <div style={{ marginBottom: '40px' }}>
-                <Title level={2} style={{ margin: '0 0 8px 0', fontWeight: fontWeight.extrabold }}>
+                <PageTitle style={{ margin: '0 0 8px 0' }}>
                     내 가게 관리
-                </Title>
-                <Text type="secondary" style={{ fontSize: fontSize.lg }}>
-                    등록된 가게를 수정하거나 관리할 수 있습니다.
-                </Text>
+                </PageTitle>
+                <PageDescription>
+                    등록된 가게를 수정하거나 관리할 수 있어요.
+                </PageDescription>
             </div>
 
             <StoreListingToolbar
@@ -343,6 +344,7 @@ const MyStores = () => {
                 onSortChange={nextSort => setToolbarParam('sort', nextSort)}
                 sortOptions={OWNER_SORT_OPTIONS}
                 disabled={loading || retrying}
+                initialLoading={loading}
                 sortDisabled={loading || retrying}
                 label="내 가게 목록 필터"
             />

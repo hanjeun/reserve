@@ -75,13 +75,13 @@ public class PaymentApiController {
 
         if (!isSuccess) {
             return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
-                    + ERROR_MESSAGE_QUERY + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+                    + ERROR_MESSAGE_QUERY + enc("결제 완료를 확인하지 못했어요. 내역을 확인해주세요."));
         }
 
         try {
             // 결제 정보를 조회하고 서버 검증을 진행합니다.
             Payment payment = paymentRepository.findByMerchantUid(merchantUid)
-                    .orElseThrow(() -> new PaymentException("결제 정보를 찾을 수 없습니다."));
+                    .orElseThrow(() -> new PaymentException("결제 정보를 찾을 수 없어요."));
 
             PaymentVerifyDto verifyDto = new PaymentVerifyDto();
             verifyDto.setMerchantUid(merchantUid);
@@ -93,13 +93,13 @@ public class PaymentApiController {
             // 외부 API 래퍼의 도메인 예외에도 원문이 섞일 수 있으므로 URL에 전달하지 않는다.
             log.warn("Mobile payment redirect failed: errorType={}", e.getClass().getSimpleName());
             return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
-                    + ERROR_MESSAGE_QUERY + enc("결제 완료를 확인하지 못했습니다. 내역을 확인해주세요."));
+                    + ERROR_MESSAGE_QUERY + enc("결제 완료를 확인하지 못했어요. 내역을 확인해주세요."));
         } catch (Exception e) {
             // 예상치 못한 예외의 메시지에는 내부 구조(클래스명·SQL·외부 API 응답)가 섞일 수 있다.
             // URL과 일반 로그에는 원문 대신 고정 문구·오류 종류만 남긴다.
             log.error("Mobile payment redirect error: errorType={}", e.getClass().getSimpleName());
             return redirect(redirectBase + FAILED_REDIRECT_QUERY + enc(merchantUid)
-                    + ERROR_MESSAGE_QUERY + enc("결제 처리 중 오류가 발생했습니다."));
+                    + ERROR_MESSAGE_QUERY + enc("결제 처리 중 오류가 발생했어요."));
         }
     }
 
@@ -127,9 +127,9 @@ public class PaymentApiController {
      */
     @PostMapping("/prepare")
     public ApiResponse<PaymentPrepareDto> preparePayment(@RequestBody PaymentRequestDto requestDto) {
-        Long memberId = SecurityUtil.getCurrentMember("결제 준비를 위해 로그인이 필요합니다.").getId();
+        Long memberId = SecurityUtil.getCurrentMember("결제 준비를 위해 로그인이 필요해요.").getId();
         PaymentPrepareDto response = paymentService.preparePayment(requestDto, memberId);
-        return ApiResponse.success(response, "결제 준비가 완료되었습니다.");
+        return ApiResponse.success(response, "결제 준비가 완료됐어요.");
     }
 
     /**
@@ -137,9 +137,9 @@ public class PaymentApiController {
      */
     @PostMapping("/verify")
     public ApiResponse<PaymentResponseDto> verifyPayment(@RequestBody PaymentVerifyDto verifyDto) {
-        Member requester = SecurityUtil.getCurrentMember("인증되지 않은 사용자입니다.");
+        Member requester = SecurityUtil.getCurrentMember("인증되지 않은 사용자예요.");
         PaymentResponseDto response = paymentService.verifyAndCompletePaymentByMember(verifyDto, requester);
-        return ApiResponse.success(response, "결제 검증 및 처리가 완료되었습니다.");
+        return ApiResponse.success(response, "결제 검증 및 처리가 완료됐어요.");
     }
 
     /**
@@ -159,12 +159,12 @@ public class PaymentApiController {
      */
     @PostMapping("/refund")
     public ApiResponse<PaymentResponseDto> refundPayment(@RequestBody PaymentRefundDto refundDto) {
-        Member requester = SecurityUtil.getCurrentMember("환불을 위해 로그인이 필요합니다.");
+        Member requester = SecurityUtil.getCurrentMember("환불을 위해 로그인이 필요해요.");
         PaymentResponseDto response = paymentService.refundByMemberRequest(
                 refundDto.getReservationId(), refundDto.getRefundReason(), requester);
         String message = Payment.PaymentStatus.REFUND_PENDING.name().equals(response.getStatus())
-                ? "환불 요청을 확인하고 있습니다. 처리 결과는 결제 내역에서 확인해주세요."
-                : "환불 처리가 완료되었습니다.";
+                ? "환불 요청을 확인하고 있어요. 처리 결과는 결제 내역에서 확인해주세요."
+                : "환불 처리가 완료됐어요.";
         return ApiResponse.success(response, message);
     }
 
@@ -173,7 +173,7 @@ public class PaymentApiController {
      */
     @GetMapping("/my-payments")
     public ApiResponse<List<PaymentResponseDto>> getMyPayments() {
-        Long memberId = SecurityUtil.getCurrentMember("로그인이 필요합니다.").getId();
+        Long memberId = SecurityUtil.getCurrentMember("로그인이 필요해요.").getId();
         List<PaymentResponseDto> response = paymentService.getPaymentsByMember(memberId);
         return ApiResponse.success(response, "내 결제 내역 조회 성공");
     }
@@ -183,7 +183,7 @@ public class PaymentApiController {
      */
     @GetMapping("/refund-preview/{reservationId}")
     public ApiResponse<Map<String, Object>> getRefundPreview(@PathVariable Long reservationId) {
-        Member requester = SecurityUtil.getCurrentMember("조회 권한이 없습니다.");
+        Member requester = SecurityUtil.getCurrentMember("조회 권한이 없어요.");
         PaymentService.RefundCalculationResult result =
                 paymentService.calculateRefundAmountForMember(reservationId, requester);
 

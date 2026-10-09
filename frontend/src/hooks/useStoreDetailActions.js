@@ -110,7 +110,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     useEffect(() => {
         if (!editId) return;
         if (!isLoggedIn) {
-            message.warning('로그인이 필요한 서비스입니다.');
+            message.warning('로그인이 필요한 서비스예요.');
             navigate('/login', { state: { from: { pathname: `/store/${id}` } } });
             return;
         }
@@ -121,7 +121,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 setEditRetrying(false);
                 setEditLoadError(null);
                 if (Number(r.storeId) !== Number(id)) {
-                    message.error('이 가게의 예약이 아닙니다.');
+                    message.error('이 가게의 예약이 아니에요.');
                     navigate('/my-reservations', { replace: true });
                     return;
                 }
@@ -139,7 +139,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 // 남의 예약(403)·없는 예약(404)은 다시 불러와도 결과가 같다 — 알리고 내 예약으로 돌려보낸다.
                 const status = httpStatusOf(error);
                 if (status === 403 || status === 404) {
-                    message.error(status === 404 ? '예약을 찾을 수 없습니다.' : '변경할 수 없는 예약입니다.');
+                    message.error(status === 404 ? '예약을 찾을 수 없어요.' : '변경할 수 없는 예약이에요.');
                     navigate('/my-reservations', { replace: true });
                     return;
                 }
@@ -178,20 +178,20 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         // 모든 경로가 한 번은 지나가는 지점이라 여기 한 곳에 두면 빠뜨릴 일이 없다.
         void invalidateReservations();
         if ((Number(reservation?.depositAmount) || 0) <= 0) {
-            message.success('예약이 완료되었습니다.');
+            message.success('예약이 완료됐어요.');
             navigate('/my-reservations');
             return;
         }
         if (store?.allowLatePayment) {
             const amount = Number(reservation.depositAmount).toLocaleString('ko-KR');
             message.success({
-                content: `예약이 완료되었습니다. 예약금 ${amount}원을 나중에 결제해주세요.`,
+                content: `예약이 완료됐어요. 예약금 ${amount}원을 나중에 결제해주세요.`,
                 duration: 4,
             });
             navigate('/my-reservations');
             return;
         }
-        message.info({ content: '예약이 접수되었습니다. 노쇼 예약금을 결제해주세요.', duration: 3 });
+        message.info({ content: '예약이 접수됐어요. 노쇼 예약금을 결제해주세요.', duration: 3 });
         await pay(
             { id: reservation.id, storeName: store?.name, depositAmount: reservation.depositAmount },
             { name: user?.name, email: user?.email, phone: user?.phone }
@@ -208,7 +208,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
                 guestCount:      values.guestCount,
                 specialRequest:  values.specialRequest ?? null,
             });
-            message.success('예약이 변경되었습니다.');
+            message.success('예약이 변경됐어요.');
             // 수정 경로는 원래 state.refetch로 강제 재조회를 시켜서 동작은 했다.
             // invalidate가 정석이라 같이 걸어두고, state.refetch는 호환을 위해 남긴다
             // (둘이 겹쳐도 TanStack Query가 중복 요청을 합쳐서 한 번만 나간다).
@@ -216,21 +216,21 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             navigate('/my-reservations', { state: { refetch: true } });
         } catch (err) {
             const errMsg = toErrorMessage(err);
-            message.error({ content: errMsg || '예약 변경에 실패했습니다. 다시 시도해주세요.', duration: 5 });
+            message.error({ content: errMsg || '예약 변경에 실패했어요. 다시 시도해주세요.', duration: 5 });
         }
     };
 
     // ── 예약 제출 ────────────────────────────────────────────────────────────
     const onFinish = async (values) => {
         if (!isLoggedIn) {
-            message.warning('로그인이 필요한 서비스입니다.');
+            message.warning('로그인이 필요한 서비스예요.');
             navigate('/login', { state: { from: { pathname: `/store/${id}` } } });
             return;
         }
 
         // 수정 모드로 진입했는데 아직 예약 정보 로딩 중이면, 실수로 새 예약이 생성되지 않도록 막는다.
         if (editId && !editingReservation) {
-            message.info('예약 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+            message.info('예약 정보를 불러오는 중이에요. 잠시 후 다시 시도해주세요.');
             return;
         }
 
@@ -242,7 +242,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             .second(0).millisecond(0);
 
         if (dt.isBefore(dayjs())) {
-            form.setFields([{ name: 'reservationTime', errors: ['이미 지난 시간입니다.'] }]);
+            form.setFields([{ name: 'reservationTime', errors: ['이미 지난 시간이에요.'] }]);
             return;
         }
 
@@ -272,7 +272,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
             await handleReservationResult(reservation);
         } catch (err) {
             const errMsg = toErrorMessage(err);
-            message.error({ content: errMsg || '예약에 실패했습니다. 다시 시도해주세요.', duration: 5 });
+            message.error({ content: errMsg || '예약에 실패했어요. 다시 시도해주세요.', duration: 5 });
         }
     };
 

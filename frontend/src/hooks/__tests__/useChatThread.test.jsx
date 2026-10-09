@@ -415,7 +415,7 @@ describe('chat initial-load and same-room retry boundaries', () => {
         expect(send).not.toHaveBeenCalled();
         expect(poll).not.toHaveBeenCalled();
         expect(onLoaded).not.toHaveBeenCalled();
-        expect(onError).toHaveBeenCalledExactlyOnceWith('대화를 불러오지 못했습니다.');
+        expect(onError).toHaveBeenCalledExactlyOnceWith('대화를 불러오지 못했어요.');
     });
 
     it('pauses polling and sending during a same-room reload and keeps them paused after a failed reload', async () => {

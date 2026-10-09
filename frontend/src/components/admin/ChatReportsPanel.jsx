@@ -75,8 +75,8 @@ const ChatReportsPanel = () => {
             status,
             resolutionNote: note || undefined,
         }),
-        onSuccess: () => message.success('신고 처리 상태를 저장했습니다.'),
-        onError: () => message.error('신고 처리 상태를 저장하지 못했습니다.'),
+        onSuccess: () => message.success('신고 처리 상태를 저장했어요.'),
+        onError: () => message.error('신고 처리 상태를 저장하지 못했어요.'),
         onSettled: () => client.invalidateQueries({ queryKey: ['admin', 'chatReports'] }),
     });
 
@@ -148,7 +148,7 @@ const ChatReportsPanel = () => {
         if (query.isError) {
             return (
                 <DataState state="error" kind="message" subject="채팅 신고" error={query.error}
-                    onRetry={query.refetch} retrying={query.isFetching} compact />
+                    onRetry={query.refetch} retrying={query.isFetching} />
             );
         }
         if (query.isPending) {
@@ -162,7 +162,7 @@ const ChatReportsPanel = () => {
                 columns={columns}
                 dataSource={rows}
                 rowKey="id"
-                locale={{ emptyText: '해당 상태의 채팅 신고가 없습니다.' }}
+                locale={{ emptyText: '해당 상태의 채팅 신고가 없어요.' }}
                 pagination={{ current: page, pageSize: PAGE_SIZE, total, onChange: setPage }}
                 scroll={{ x: 1360 }}
             />
@@ -171,12 +171,12 @@ const ChatReportsPanel = () => {
     // 신고 대화 내용: 로딩 → 실패 → 본문 순으로 판정한다.
     const renderContext = () => {
         if (contextQuery.isPending) {
-            return <ModalLoading text="대화 내용을 불러오는 중입니다." minHeight="160px" />;
+            return <ModalLoading text="대화 내용을 불러오는 중이에요." minHeight="160px" />;
         }
         if (contextQuery.isError) {
             return (
                 <DataState state="error" requestType="detail" kind="message" subject="신고된 대화 내용" error={contextQuery.error}
-                    onRetry={contextQuery.refetch} retrying={contextQuery.isFetching} compact />
+                    onRetry={contextQuery.refetch} retrying={contextQuery.isFetching} />
             );
         }
         return (
@@ -193,7 +193,7 @@ const ChatReportsPanel = () => {
                     </div>
                 )}
                 {(contextQuery.data?.recentMessages ?? []).length === 0 ? (
-                    <DataState state="empty" kind="message" title="저장된 메시지가 없습니다." />
+                    <DataState state="empty" kind="message" title="저장된 메시지가 없어요." />
                 ) : (contextQuery.data?.recentMessages ?? []).map((item) => (
                     <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--c-border-light, #f2f4f6)' }}>
                         <strong>{item.senderRole === 'OWNER' ? '사장님' : '회원'}</strong>
@@ -223,6 +223,7 @@ const ChatReportsPanel = () => {
                 count={total}
                 onReload={query.refetch}
                 loading={query.isFetching}
+                initialLoading={query.isLoading}
             />
             {renderReports()}
             <ChatRetentionModal reportId={retentionReportId} onClose={() => setRetentionReportId(null)} />

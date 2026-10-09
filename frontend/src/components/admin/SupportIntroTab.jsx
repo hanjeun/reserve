@@ -33,7 +33,7 @@ export default function SupportIntroTab() {
             return <ChatIntroEditorSkeleton />;
         }
         if (isError) {
-            return <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error} onRetry={refetch} retrying={isFetching} compact />;
+            return <DataState state="error" requestType="detail" kind="message" subject="채팅 설정" error={error} onRetry={refetch} retrying={isFetching} />;
         }
         return (
             <ChatIntroEditor
@@ -43,14 +43,14 @@ export default function SupportIntroTab() {
                 saving={saveMutation.isPending}
                 onSave={body => saveMutation.mutateAsync(body)}
                 onUploadAvatar={file => chatService.uploadSupportAvatar(file).then(result => result.url)}
-                noticeHelp="대화창 맨 위 확성기 줄에 보여요. 점검·운영시간처럼 먼저 알려야 할 내용을 적어 주세요. 비워 두면 '안녕하세요. 표시 이름입니다.'가 보여요."
+                noticeHelp="대화창 맨 위 확성기 줄에 보여요. 점검·운영시간처럼 먼저 알려야 할 내용을 적어 주세요. 비워 두면 '안녕하세요. 표시 이름에서 안내해드려요.'가 보여요."
             />
         );
     };
 
     return (
         <div className="reserve-chat-intro-tab">
-            <FilterToolbar onReload={refetch} loading={isFetching} />
+            <FilterToolbar onReload={refetch} loading={isFetching} initialLoading={isLoading} />
             {renderEditor()}
         </div>
     );

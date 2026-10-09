@@ -35,6 +35,10 @@ describe('route SEO policy', () => {
         expect(isIndexablePath('/privacy')).toBe(true);
         expect(isIndexablePath('/content-sources')).toBe(true);
         expect(isIndexablePath('/operation-guide')).toBe(true);
+        expect(isIndexablePath('/guide/user')).toBe(true);
+        expect(isIndexablePath('/guide/business/')).toBe(true);
+        expect(isIndexablePath('/guide/common')).toBe(true);
+        expect(isIndexablePath('/guide/unknown')).toBe(false);
 
         expect(isIndexablePath('/signup')).toBe(false);
         expect(isIndexablePath('/payment/result')).toBe(false);
@@ -88,12 +92,25 @@ describe('route SEO policy', () => {
         expect(data.itemListElement[2].item).toBeUndefined();
     });
 
-    it('indexes the public operation guide with its own breadcrumb', () => {
+    it('points the public legacy guide at the common guide canonical and breadcrumb', () => {
         renderAt('/operation-guide');
 
         expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
-        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://reserve.it.kr/operation-guide');
-        expect(breadcrumb().itemListElement.map((item) => item.name)).toEqual(['RESERVE', '운영 안내']);
+        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://reserve.it.kr/guide/common');
+        expect(breadcrumb().itemListElement.map((item) => item.name)).toEqual(['RESERVE', '공통 이용안내']);
+        expect(canonicalUrlForPath('/operation-guide///')).toBe('https://reserve.it.kr/guide/common');
+    });
+
+    it.each([
+        ['/guide/user', '사용자 이용안내'],
+        ['/guide/business', '사업자 이용안내'],
+        ['/guide/common', '공통 이용안내'],
+    ])('indexes %s with its own canonical and breadcrumb without query or fragment', (path, title) => {
+        renderAt(path + '/?source=footer#policy');
+        expect(document.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+        expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://reserve.it.kr' + path);
+        expect(document.querySelector('meta[property="og:url"]')).toHaveAttribute('content', 'https://reserve.it.kr' + path);
+        expect(breadcrumb().itemListElement.map(item => item.name)).toEqual(['RESERVE', title]);
     });
 
     it('indexes the linked content-source notice with its own breadcrumb', () => {

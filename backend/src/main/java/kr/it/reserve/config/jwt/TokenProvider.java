@@ -189,18 +189,18 @@ public class TokenProvider {
         // Access와 refresh가 같은 키로 서명되므로 서명·만료만 확인해서는 refresh를 Bearer로
         // 사용할 수 있다. 무클레임 구버전 access는 짧은 access 수명 뒤 /refresh로 교체된다.
         if (!Purpose.ACCESS.name().equals(claims.get(PURPOSE_CLAIM, String.class))) {
-            throw new AuthException("접근 토큰이 아닙니다. 다시 로그인해주세요.");
+            throw new AuthException("접근 토큰이 아니에요. 다시 로그인해주세요.");
         }
         Long userId = claims.get("id", Long.class);
         Member member = memberRepository.findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new AuthException("토큰과 일치하는 사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new AuthException("토큰과 일치하는 사용자를 찾을 수 없어요."));
         if (member.isSuspended()) {
-            throw new AuthException("현재 인증할 수 없는 사용자입니다.");
+            throw new AuthException("현재 인증할 수 없는 사용자예요.");
         }
         // authVersion claim이 없던 구버전 JWT는 0으로 읽어 무중단 배포한다. 비밀번호를 한 번
         // 바꾸면 회원 행이 1 이상이 되어 그 이전 access JWT도 즉시 전부 거부된다.
         if (readAuthVersion(claims) != member.getAuthVersion()) {
-            throw new AuthException("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+            throw new AuthException("로그인 세션이 만료됐어요. 다시 로그인해주세요.");
         }
         return member;
     }

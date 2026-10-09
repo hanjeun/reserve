@@ -69,7 +69,7 @@ public class ChatIntroService {
         boolean ownsStore = owner != null && owner.isBusiness()
                 && store.getOwner() != null && store.getOwner().getId().equals(owner.getId());
         if (!ownsStore) {
-            throw new ChatException("내 가게의 자동 응답만 바꿀 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("내 가게의 자동 응답만 바꿀 수 있어요.", HttpStatus.FORBIDDEN);
         }
         // 입력을 먼저 검증한다 — 틀린 요청이 빈 설정 행부터 만들지 않게.
         String notice = normalizeNotice(request.notice());
@@ -86,7 +86,7 @@ public class ChatIntroService {
     @Transactional
     public ChatIntroResponse updateSupportIntro(Member admin, ChatIntroRequest request) {
         if (admin == null || !admin.isAdmin()) {
-            throw new ChatException("관리자만 고객지원 자동 응답을 바꿀 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("관리자만 고객지원 자동 응답을 바꿀 수 있어요.", HttpStatus.FORBIDDEN);
         }
         String notice = normalizeNotice(request.notice());
         String greeting = normalizeGreeting(request.greeting());
@@ -108,7 +108,7 @@ public class ChatIntroService {
     @Transactional
     public String uploadSupportAvatar(Member admin, MultipartFile image) {
         if (admin == null || !admin.isAdmin()) {
-            throw new ChatException("관리자만 고객지원 사진을 바꿀 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("관리자만 고객지원 사진을 바꿀 수 있어요.", HttpStatus.FORBIDDEN);
         }
         if (image == null || image.isEmpty()) throw new ChatException("사진을 선택해주세요.");
         String key = fileStorageService.storeFile(image, SUPPORT_AVATAR_PREFIX);
@@ -117,9 +117,9 @@ public class ChatIntroService {
 
     private Store findExistingStore(Long storeId) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ChatException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("가게를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         if (store.isDeleted()) {
-            throw new ChatException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            throw new ChatException("가게를 찾을 수 없어요.", HttpStatus.NOT_FOUND);
         }
         return store;
     }
@@ -130,7 +130,7 @@ public class ChatIntroService {
         String value = greeting.replace("\r\n", "\n").replaceAll("\n{3,}", "\n\n").strip();
         if (value.isEmpty()) return null;
         if (value.length() > MAX_GREETING) {
-            throw new ChatException("인사말은 " + MAX_GREETING + "자까지 입력할 수 있습니다.");
+            throw new ChatException("인사말은 " + MAX_GREETING + "자까지 입력할 수 있어요.");
         }
         return value;
     }
@@ -140,7 +140,7 @@ public class ChatIntroService {
         String value = displayName.replaceAll("\\s+", " ").strip();
         if (value.isEmpty()) return null;
         if (value.length() > MAX_DISPLAY_NAME) {
-            throw new ChatException("표시 이름은 " + MAX_DISPLAY_NAME + "자까지 입력할 수 있습니다.");
+            throw new ChatException("표시 이름은 " + MAX_DISPLAY_NAME + "자까지 입력할 수 있어요.");
         }
         return value;
     }
@@ -150,7 +150,7 @@ public class ChatIntroService {
         if (avatarUrl == null || avatarUrl.isBlank()) return null;
         String value = avatarUrl.strip();
         if (!fileStorageService.isManagedFileUnderPrefix(value, SUPPORT_AVATAR_PREFIX)) {
-            throw new ChatException("올린 사진만 쓸 수 있습니다. 사진을 다시 올려주세요.");
+            throw new ChatException("올린 사진만 쓸 수 있어요. 사진을 다시 올려주세요.");
         }
         return value;
     }
@@ -161,7 +161,7 @@ public class ChatIntroService {
         String value = notice.replaceAll("\\s+", " ").strip();
         if (value.isEmpty()) return null;
         if (value.length() > MAX_NOTICE) {
-            throw new ChatException("공지사항은 " + MAX_NOTICE + "자까지 입력할 수 있습니다.");
+            throw new ChatException("공지사항은 " + MAX_NOTICE + "자까지 입력할 수 있어요.");
         }
         return value;
     }
@@ -173,7 +173,7 @@ public class ChatIntroService {
     static List<ChatIntroItem> normalizeItems(List<ChatIntroRequest.Item> items) {
         if (items == null || items.isEmpty()) return List.of();
         if (items.size() > MAX_ITEMS) {
-            throw new ChatException("자주 묻는 질문은 " + MAX_ITEMS + "개까지 등록할 수 있습니다.");
+            throw new ChatException("자주 묻는 질문은 " + MAX_ITEMS + "개까지 등록할 수 있어요.");
         }
         List<ChatIntroItem> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
@@ -183,7 +183,7 @@ public class ChatIntroService {
             String answer = item.answer() == null ? "" : item.answer().replace("\r\n", "\n").strip();
             validateItemText(question, answer);
             if (!seen.add(question.toLowerCase(Locale.ROOT))) {
-                throw new ChatException("같은 질문이 두 번 들어 있습니다.");
+                throw new ChatException("같은 질문이 두 번 들어 있어요.");
             }
             result.add(new ChatIntroItem(question, answer));
         }
@@ -194,10 +194,10 @@ public class ChatIntroService {
         if (question.isEmpty()) throw new ChatException("질문을 입력해주세요.");
         if (answer.isEmpty()) throw new ChatException("답변을 입력해주세요.");
         if (question.length() > MAX_QUESTION) {
-            throw new ChatException("질문은 " + MAX_QUESTION + "자까지 입력할 수 있습니다.");
+            throw new ChatException("질문은 " + MAX_QUESTION + "자까지 입력할 수 있어요.");
         }
         if (answer.length() > MAX_ANSWER) {
-            throw new ChatException("답변은 " + MAX_ANSWER + "자까지 입력할 수 있습니다.");
+            throw new ChatException("답변은 " + MAX_ANSWER + "자까지 입력할 수 있어요.");
         }
     }
 }

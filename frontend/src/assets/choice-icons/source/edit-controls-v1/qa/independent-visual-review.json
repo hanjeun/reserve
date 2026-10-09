@@ -1,0 +1,153 @@
+{
+  "verdict": "pass",
+  "blocking_issues": [],
+  "visual_review": {
+    "style_match": "Matches existing RESERVE extra-icon family camera, soft three-point lighting, bevel softness, neutral body palette and small blue accents.",
+    "semantic_clarity": {
+      "edit-operation": "Rounded clock with readable front-right settings gear.",
+      "edit-identity": "Abstract mountain/sun gallery card with small diagonal pencil; no photo, face or text.",
+      "intake-paused": "Queue ticket plus neutral two-bar pause, visually distinct from switch.",
+      "waiting-off": "Queue ticket plus neutral gray switch with knob on left; distinct from pause."
+    },
+    "small_sizes": "Reviewed PNG/WebP previews at actual 48, 56 and 64px canvas sizes on light and dark. Intended silhouettes and distinguishing secondary controls remain legible. Fine ticket perforations and clock markers soften normally at48; no fix needed.",
+    "alpha": "Clean transparent silhouettes on light/dark composites; no visible matte fringe, rectangular background or clipping.",
+    "native_768": "All four 768px native PNGs reviewed at full size; same visual pass."
+  },
+  "source_review": {
+    "blender_version": "4.3.2",
+    "engine": "BLENDER_EEVEE_NEXT",
+    "samples": 128,
+    "film_transparent": true,
+    "camera_location": [
+      3.2,
+      -9,
+      4.8
+    ],
+    "orthographic_scale": 3.75,
+    "source_palette": [
+      "#F2F5FA",
+      "#B8C9DE",
+      "#3182F6",
+      "#8191A6"
+    ],
+    "textures_or_text_objects": "None",
+    "lighting": "Shared key/fill/edge positions, energies and area sizes match existing build source."
+  },
+  "prior_assets": {
+    "checked_files": 2179,
+    "changed_or_missing": 0,
+    "method": "SHA-256 comparison against original-sha256.json"
+  },
+  "image_checks": [
+    {
+      "asset": "edit-operation",
+      "checks": [
+        {
+          "resolution": 512,
+          "mode": "RGBA",
+          "bbox": [
+            110,
+            100,
+            397,
+            417
+          ],
+          "transparent_canvas_edges": true
+        },
+        {
+          "resolution": 768,
+          "mode": "RGBA",
+          "bbox": [
+            166,
+            151,
+            595,
+            625
+          ],
+          "transparent_canvas_edges": true
+        }
+      ]
+    },
+    {
+      "asset": "edit-identity",
+      "checks": [
+        {
+          "resolution": 512,
+          "mode": "RGBA",
+          "bbox": [
+            113,
+            101,
+            396,
+            395
+          ],
+          "transparent_canvas_edges": true
+        },
+        {
+          "resolution": 768,
+          "mode": "RGBA",
+          "bbox": [
+            170,
+            153,
+            594,
+            591
+          ],
+          "transparent_canvas_edges": true
+        }
+      ]
+    },
+    {
+      "asset": "intake-paused",
+      "checks": [
+        {
+          "resolution": 512,
+          "mode": "RGBA",
+          "bbox": [
+            111,
+            95,
+            423,
+            413
+          ],
+          "transparent_canvas_edges": true
+        },
+        {
+          "resolution": 768,
+          "mode": "RGBA",
+          "bbox": [
+            167,
+            144,
+            634,
+            619
+          ],
+          "transparent_canvas_edges": true
+        }
+      ]
+    },
+    {
+      "asset": "waiting-off",
+      "checks": [
+        {
+          "resolution": 512,
+          "mode": "RGBA",
+          "bbox": [
+            113,
+            106,
+            404,
+            395
+          ],
+          "transparent_canvas_edges": true
+        },
+        {
+          "resolution": 768,
+          "mode": "RGBA",
+          "bbox": [
+            170,
+            160,
+            605,
+            592
+          ],
+          "transparent_canvas_edges": true
+        }
+      ]
+    }
+  ],
+  "scope": "Read-only asset review; only this QA report was written.",
+  "reviewed_at_utc": "2026-10-09T03:12:55Z"
+}

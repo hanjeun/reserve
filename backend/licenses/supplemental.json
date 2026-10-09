@@ -145,6 +145,11 @@
       "source": "https://raw.githubusercontent.com/getsentry/sentry-java/8.58.0/LICENSE",
       "sha256": "c90147c075a17f4aecfea27a56510ddf7c76508c8488df533623402008b9d052"
     },
+    "sentry-8.59.0": {
+      "file": "upstream/sentry-8.59.0.txt",
+      "source": "https://raw.githubusercontent.com/getsentry/sentry-java/8.59.0/LICENSE",
+      "sha256": "c90147c075a17f4aecfea27a56510ddf7c76508c8488df533623402008b9d052"
+    },
     "snakeyaml": {
       "file": "upstream/snakeyaml.txt",
       "source": "https://bitbucket.org/snakeyaml/snakeyaml/raw/snakeyaml-2.4/LICENSE.txt",
@@ -356,6 +361,26 @@
       "documents": [
         "sentry"
       ]
+    },
+    "io.sentry:sentry-reactor:8.59.0": {
+      "jarSha256": "1b0e2fe7eec77b92e95f62c207799edb4a25ab3c4f5a22832a538cf0d3a7aed8",
+      "documents": ["sentry-8.59.0"]
+    },
+    "io.sentry:sentry-spring-boot-jakarta:8.59.0": {
+      "jarSha256": "d3e886d4f433c3467e4dcee7af91df1dac34a3e8dfb77fa6eeb59c42cae0bbac",
+      "documents": ["sentry-8.59.0"]
+    },
+    "io.sentry:sentry-spring-boot-starter-jakarta:8.59.0": {
+      "jarSha256": "6b12e1bcc12ad426685391e20276b5bc79bd2432187c062d368cca7ebc60f85c",
+      "documents": ["sentry-8.59.0"]
+    },
+    "io.sentry:sentry-spring-jakarta:8.59.0": {
+      "jarSha256": "83bf999a5751ecdff60ac4fb4de04c321eba0e1abc84b4b47bfe301d50deadfe",
+      "documents": ["sentry-8.59.0"]
+    },
+    "io.sentry:sentry:8.59.0": {
+      "jarSha256": "2cc8d326c199df031499d44ca72f72dc6ad9a1768e911808b40a65c2435dd6eb",
+      "documents": ["sentry-8.59.0"]
     },
     "io.smallrye:jandex:3.2.0": {
       "jarSha256": "6da3e9ce8d0c0a433f3e7ce610a3c66accb00c71fee67aa0ff3e5a841395ac15",

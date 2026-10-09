@@ -59,6 +59,7 @@ public class RateLimiter {
         LOGIN_ACCOUNT(5, Duration.ofMinutes(10)),
         EMAIL_SEND(5, Duration.ofMinutes(10)),
         RESERVATION_CREATE(5, Duration.ofMinutes(1)),   // 1분에 5회 예약
+        WAITING_JOIN(5, Duration.ofMinutes(1)),         // 회원·IP별 고객 웨이팅 접수 제한
         SIGNUP(5, Duration.ofMinutes(10)),              // 10분에 5회 회원가입
         /**
          * 이메일로 받은 <b>6자리 인증 코드</b> 대조 시도 제한 — IP 축 (2026-08-16 신설).

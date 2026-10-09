@@ -40,7 +40,7 @@ public class AdPaymentAdminController {
 
     @PostMapping("/{id}/refund")
     public ApiResponse<AdPaymentAttemptResponse> refund(@PathVariable Long id) {
-        var admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        var admin = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         payments.requestReviewedRefund(id, admin.getId());
         return result(id);
     }

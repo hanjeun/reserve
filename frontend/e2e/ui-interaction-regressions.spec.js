@@ -135,7 +135,7 @@ test('out-of-period dates stay disabled without visible period labels and valid 
     await expect(calendar).toBeVisible();
     const blocked = calendar.locator('button.reserve-cal-cell').filter({ hasText: /^4$/ });
     await expect(blocked).toBeDisabled();
-    await expect(blocked).toHaveAccessibleName(/예약 가능한 기간이 아닙니다$/);
+    await expect(blocked).toHaveAccessibleName(/예약 가능한 기간이 아니에요$/);
     await expect(calendar.getByText('기간 밖', { exact: true })).toHaveCount(0);
     await expect(calendar.getByRole('button', { name: /2일 휴무$/ })).toBeDisabled();
     await expect(calendar.getByRole('button', { name: /3일 마감$/ })).toBeDisabled();
@@ -158,7 +158,7 @@ test('withdrawal opens confirmation first, cancellation sends nothing, and serve
     await withdraw.click();
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: '탈퇴하기', exact: true }).click();
-    await expect(page.getByText(/먼저 처리할 항목이 있습니다. 운영 중 가게 1곳, 예약 2건/)).toBeVisible();
+    await expect(page.getByText(/먼저 처리할 항목이 있어요. 운영 중 가게 1곳, 예약 2건/)).toBeVisible();
     expect(requests).toEqual({ readiness: 1, deletion: 0 });
     await expect(withdraw).toBeEnabled();
     await expect(page).toHaveURL(/\/my-page$/);
@@ -171,8 +171,8 @@ test('mobile messages fill changing viewport heights without bottom dead space o
     const surface = page.locator('.reserve-messenger--page');
     const footer = surface.locator('.reserve-messenger-footer');
     await expect(footer).toBeVisible();
-    // The bottom stays anchored even while entry scaling still changes the top.
-    await expect(page.locator('.reserve-messages-route')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+    // A visible lazy skeleton suppresses the second entry animation; the page stays untransformed.
+    await expect(page.locator('.reserve-messages-route')).toHaveCSS('transform', 'none');
     for (const size of [{ width: 390, height: 844 }, { width: 390, height: 674 }, { width: 667, height: 400 }, { width: 767, height: 674 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(size);
         await expect.poll(() => footer.evaluate(element => Math.abs(element.getBoundingClientRect().bottom - window.innerHeight))).toBeLessThan(1);

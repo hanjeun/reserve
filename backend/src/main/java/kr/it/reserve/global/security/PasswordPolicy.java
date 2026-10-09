@@ -10,8 +10,8 @@ public final class PasswordPolicy {
     public static final int MAX_BCRYPT_BYTES = 72;
     public static final String LENGTH_MESSAGE = "비밀번호는 8~64자로 입력해주세요.";
     public static final String COMPOSITION_MESSAGE = "비밀번호에 영문과 숫자를 포함해주세요.";
-    public static final String BYTE_LENGTH_MESSAGE = "비밀번호가 너무 깁니다. 영문 기준 72자 이내로 입력해주세요.";
-    public static final String MISMATCH_MESSAGE = "비밀번호가 일치하지 않습니다.";
+    public static final String BYTE_LENGTH_MESSAGE = "비밀번호가 너무 길어요. 영문 기준 72자 이내로 입력해주세요.";
+    public static final String MISMATCH_MESSAGE = "비밀번호가 일치하지 않아요.";
 
     private PasswordPolicy() {
     }

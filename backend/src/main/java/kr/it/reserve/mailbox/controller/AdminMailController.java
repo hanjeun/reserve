@@ -48,7 +48,7 @@ public class AdminMailController {
     @DeleteMapping("/sent/{id}")
     public ResponseEntity<ApiResponse<Void>> moveToTrash(@PathVariable Long id) {
         adminMailService.moveToTrash(id);
-        return ResponseEntity.ok(ApiResponse.success(null, "휴지통으로 옮겼습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "휴지통으로 옮겼어요."));
     }
 
     // ── 새 메일 작성 발송 (ADMIN) ─────────────────────────
@@ -58,6 +58,6 @@ public class AdminMailController {
             @Valid @RequestBody ComposeMailRequest request) {
 
         adminMailService.compose(request);
-        return ResponseEntity.ok(ApiResponse.success(null, "메일을 보냈습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "메일을 보냈어요."));
     }
 }

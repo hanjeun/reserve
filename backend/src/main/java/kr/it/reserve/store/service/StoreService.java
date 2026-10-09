@@ -59,7 +59,7 @@ import org.springframework.data.domain.Pageable;
 @RequiredArgsConstructor
 @Service
 public class StoreService {
-    private static final String EDIT_FORBIDDEN_MESSAGE = "가게를 수정할 권한이 없습니다.";
+    private static final String EDIT_FORBIDDEN_MESSAGE = "가게를 수정할 권한이 없어요.";
     private static final String DISTANCE_SORT = "distance";
 
 
@@ -169,13 +169,14 @@ public class StoreService {
     public StoreResponse createStore(StoreCreateRequest request, Member owner) {
 
         if (request.getName() == null || request.getName().trim().isEmpty()) {
-            throw new StoreException("가게 이름은 필수입니다.", HttpStatus.BAD_REQUEST);
+            throw new StoreException("가게 이름은 필수예요.", HttpStatus.BAD_REQUEST);
         }
 
         // 1단계: 이미지 없이 Store 먼저 저장 → storeId 확보
         Store store = Store.builder()
                 .owner(owner)
                 .name(request.getName().trim())
+                .reservationEnabled(!Boolean.FALSE.equals(request.getReservationEnabled()))
                 .description(request.getDescription())
                 .address(request.getAddress())
                 .zipCode(request.getZipCode())
@@ -203,6 +204,7 @@ public class StoreService {
                 .allowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()))
                 .emailNotificationEnabled(!Boolean.FALSE.equals(request.getEmailNotificationEnabled()))
                 .imageAutoplayEnabled(!Boolean.FALSE.equals(request.getImageAutoplayEnabled()))
+                .waitingIntakeMode(kr.it.reserve.store.entity.WaitingIntakeMode.parse(request.getWaitingIntakeMode()))
                 .maxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()))
                 .build();
 
@@ -341,6 +343,10 @@ public class StoreService {
             // emailNotificationEnabled: null이면 변경 안 함
             if (request.getEmailNotificationEnabled() != null) store.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
             if (request.getImageAutoplayEnabled() != null) store.setImageAutoplayEnabled(request.getImageAutoplayEnabled());
+            if (request.getReservationEnabled() != null) store.setReservationEnabled(request.getReservationEnabled());
+            if (request.getWaitingIntakeMode() != null) {
+                store.setWaitingIntakeMode(kr.it.reserve.store.entity.WaitingIntakeMode.parse(request.getWaitingIntakeMode()));
+            }
             // 휴무는 "항상 덮어쓴다" — 요일·날짜를 **빼는** 것도 정상적인 수정이라
             // null 가드를 두면 마지막 휴무를 지울 방법이 없어진다.
             store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
@@ -430,7 +436,7 @@ public class StoreService {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게를 조회할 권한이 없습니다.");
+            throw StoreException.forbidden("가게를 조회할 권한이 없어요.");
         }
         return reservationRepository.countActiveReservationsByStoreId(id);
     }
@@ -440,7 +446,7 @@ public class StoreService {
         Store store = storeRepository.findById(id)
                 .orElseThrow(StoreException::notFound);
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게를 조회할 권한이 없습니다.");
+            throw StoreException.forbidden("가게를 조회할 권한이 없어요.");
         }
         return dataLifecycleGuard.inspectStore(id);
     }
@@ -457,7 +463,7 @@ public class StoreService {
         boolean isAdmin = member.isAdmin();
         boolean isOwner = store.getOwner() != null && store.getOwner().getId().equals(member.getId());
         if (!isAdmin && !isOwner) {
-            throw StoreException.forbidden("통계를 조회할 권한이 없습니다.");
+            throw StoreException.forbidden("통계를 조회할 권한이 없어요.");
         }
 
         int days = switch (range == null ? "30d" : range) {
@@ -544,7 +550,7 @@ public class StoreService {
             throw StoreException.notFound();
         }
         if (store.getOwner() != null && !store.getOwner().getId().equals(member.getId())) {
-            throw StoreException.forbidden("가게 영업을 종료할 권한이 없습니다.");
+            throw StoreException.forbidden("가게 영업을 종료할 권한이 없어요.");
         }
 
         dataLifecycleGuard.requireStoreClosureAllowed(id);
@@ -750,13 +756,13 @@ public class StoreService {
 
     private StoreException invalidDetailImageOrder() {
         return new StoreException(
-                "상세 이미지 순서 정보가 올바르지 않습니다. 새로고침한 뒤 다시 시도해주세요.",
+                "상세 이미지 순서 정보가 올바르지 않아요. 새로고침한 뒤 다시 시도해주세요.",
                 HttpStatus.BAD_REQUEST);
     }
 
     private StoreException staleStoreImageReference() {
         return new StoreException(
-                "가게 이미지가 다른 곳에서 변경되었습니다. 새로고침한 뒤 다시 시도해주세요.",
+                "가게 이미지가 다른 곳에서 변경됐어요. 새로고침한 뒤 다시 시도해주세요.",
                 HttpStatus.CONFLICT);
     }
 
@@ -813,7 +819,7 @@ public class StoreService {
 
         if (open != null && close != null && close.isBefore(open)) {
             throw new StoreException(
-                    "운영 종료일은 시작일보다 뒤여야 합니다.", HttpStatus.BAD_REQUEST);
+                    "운영 종료일은 시작일보다 뒤여야 해요.", HttpStatus.BAD_REQUEST);
         }
         store.setOpenDate(open);
         store.setCloseDate(close);
@@ -930,7 +936,7 @@ public class StoreService {
             //    지원하려면 "다음날로 넘어가는 영업"을 모델에 넣어야 하므로 별도 작업이다.
             //    그때까지는 여기서 걸러서 "저장은 됐는데 예약이 안 되는" 상태를 막는다.
             throw new StoreException(
-                    "마감 시간은 오픈 시간보다 뒤여야 합니다. 자정을 넘겨 영업하는 경우는 아직 지원하지 않습니다.",
+                    "마감 시간은 오픈 시간보다 뒤여야 해요. 자정을 넘겨 영업하는 경우는 아직 지원하지 않아요.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -945,7 +951,7 @@ public class StoreService {
         }
 
         if (!breakStart.isBefore(breakEnd)) {
-            throw new StoreException("브레이크 타임 종료는 시작보다 뒤여야 합니다.", HttpStatus.BAD_REQUEST);
+            throw new StoreException("브레이크 타임 종료는 시작보다 뒤여야 해요.", HttpStatus.BAD_REQUEST);
         }
 
         // 영업시간이 아직 정해지지 않은 가게라면 범위 비교를 할 수 없다 — 여기서 멈춘다.
@@ -953,7 +959,7 @@ public class StoreService {
 
         if (breakStart.isBefore(open) || breakEnd.isAfter(close)) {
             throw new StoreException(
-                    "브레이크 타임은 영업시간 안에 있어야 합니다.", HttpStatus.BAD_REQUEST);
+                    "브레이크 타임은 영업시간 안에 있어야 해요.", HttpStatus.BAD_REQUEST);
         }
     }
 

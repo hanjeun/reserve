@@ -96,11 +96,11 @@ public class NoticeService {
 
     private Notice findNoticeOrThrow(Long id) {
         return noticeRepository.findById(id)
-                .orElseThrow(() -> new NoticeException("존재하지 않는 공지사항입니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new NoticeException("존재하지 않는 공지사항이에요.", HttpStatus.NOT_FOUND));
     }
 
     private Member findMemberByEmailOrThrow(String email) {
         return memberRepository.findByEmail(email)
-                .orElseThrow(() -> new NoticeException("사용자 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new NoticeException("사용자 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 }

@@ -15,6 +15,7 @@ import java.util.List;
 public class StoreUpdateRequest {
     
     private String name;
+    private Boolean reservationEnabled;
     private String description;
     private String address;
     private String zipCode;
@@ -95,6 +96,8 @@ public class StoreUpdateRequest {
     private Boolean emailNotificationEnabled;
 
     private Boolean imageAutoplayEnabled;
+
+    private String waitingIntakeMode;
 
     /**
      * 정기 휴무 요일 — ISO 요일 번호 목록 (월=1 … 일=7). 빈 목록·null = 연중무휴.

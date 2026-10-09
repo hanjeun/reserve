@@ -1,9 +1,10 @@
 import { useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { DEFAULT_GUIDE_PATH, GUIDE_PAGES } from '../pages/legal/GuidePageMetadata';
 
 const SITE_ORIGIN = 'https://reserve.it.kr';
 
-// 검색 결과로 공개할 SPA 경로의 단일 관문. sitemap 정책과 반드시 같은 집합을 유지한다.
+// 검색에 공개할 SPA 경로의 관문. sitemap은 정본 경로를 싣고 공개 별칭은 같은 canonical로 이어진다.
 const INDEXABLE_PATHS = [
     /^\/$/,
     /^\/stores$/,
@@ -12,6 +13,7 @@ const INDEXABLE_PATHS = [
     /^\/privacy$/,
     /^\/content-sources$/,
     /^\/operation-guide$/,
+    /^\/guide\/(user|business|common)$/,
 ];
 
 // 끝의 '/'를 전부 걷어낸다 — /\/+$/ 정규식은 '/'가 길게 이어지면 역추적이 커서 반복문으로 같은 결과를 만든다.
@@ -31,7 +33,12 @@ export const isIndexablePath = (pathname) => {
     return INDEXABLE_PATHS.some((pattern) => pattern.test(normalized));
 };
 
-export const canonicalUrlForPath = (pathname) => `${SITE_ORIGIN}${normalizeSeoPath(pathname)}`;
+const canonicalPathFor = pathname => {
+    const normalized = normalizeSeoPath(pathname);
+    return normalized === '/operation-guide' ? DEFAULT_GUIDE_PATH : normalized;
+};
+
+export const canonicalUrlForPath = (pathname) => `${SITE_ORIGIN}${canonicalPathFor(pathname)}`;
 
 /** 검색 결과의 사이트 계층(빵부스러기)에 쓰이는 경로별 이름표. */
 const BREADCRUMB_LABELS = [
@@ -40,7 +47,9 @@ const BREADCRUMB_LABELS = [
     { pattern: /^\/terms$/, trail: [{ name: '서비스 이용약관', path: '/terms' }] },
     { pattern: /^\/privacy$/, trail: [{ name: '개인정보 처리방침', path: '/privacy' }] },
     { pattern: /^\/content-sources$/, trail: [{ name: '콘텐츠 출처·권리 안내', path: '/content-sources' }] },
-    { pattern: /^\/operation-guide$/, trail: [{ name: '운영 안내', path: '/operation-guide' }] },
+    ...Object.entries(GUIDE_PAGES).map(([path, guide]) => ({
+        pattern: new RegExp('^' + path + '$'), trail: [{ name: guide.title, path }],
+    })),
 ];
 
 const BREADCRUMB_SCRIPT_ID = 'reserve-breadcrumb-jsonld';
@@ -53,7 +62,7 @@ const BREADCRUMB_SCRIPT_ID = 'reserve-breadcrumb-jsonld';
  * 색인하지 않는 경로에는 붙이지 않는다 — 노출되지 않을 페이지의 계층은 의미가 없다.
  */
 const syncBreadcrumbJsonLd = (pathname) => {
-    const normalized = normalizeSeoPath(pathname);
+    const normalized = canonicalPathFor(pathname);
     const matched = isIndexablePath(normalized)
         ? BREADCRUMB_LABELS.find((entry) => entry.pattern.test(normalized))
         : null;

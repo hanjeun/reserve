@@ -16,7 +16,7 @@ public class NoticeException extends BusinessException {
 
     /** 404 - 공지사항을 찾을 수 없을 때 */
     public static NoticeException notFound() {
-        return new NoticeException("존재하지 않는 공지사항입니다.", HttpStatus.NOT_FOUND);
+        return new NoticeException("존재하지 않는 공지사항이에요.", HttpStatus.NOT_FOUND);
     }
 
     /** 403 - 권한 없음 */

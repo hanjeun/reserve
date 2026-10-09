@@ -1,3 +1,4 @@
+import { PageTitle, PageDescription } from '../common/PageTypography';
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import Bone from '../common/Bone';
@@ -8,7 +9,7 @@ import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import { STORE_FORM_COPY, STORE_FORM_DENSITY_VARS, storeFormFrame } from './storeFormFrame';
 import { STORE_FORM_SKELETON_HINTS, STORE_FORM_SKELETON_TOGGLES } from './storeFormSkeletonCopy';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 // 2026-09-29 재작성 — 실제 폼(StoreForm/StoreBasicInfo/StoreImages/StoreFormActions)과 같은 순서·배치로 그린다.
 // 예전 뼈대는 라벨 14px + 간격 10px 로 칸마다 24px(데스크톱 라벨 상자는 40 + 8), 안내 문구 줄,
@@ -100,6 +101,7 @@ function SettingsSection() {
             </FieldRow>
             <Divider />
             <SectionLabel>운영 옵션</SectionLabel>
+            <Field label="고객 웨이팅 접수" control="select" hint={STORE_FORM_SKELETON_HINTS.waitingIntake} />
             <div className="reserve-store-form-skeleton-toggles">
                 {STORE_FORM_SKELETON_TOGGLES.map(([key, label, desc]) => (
                     <div className="reserve-store-form-skeleton-toggle" key={key}>
@@ -139,8 +141,8 @@ export default function StoreFormSkeleton({ mode = 'create' }) {
     return (
         <PageContainer className="reserve-store-form-page reserve-store-form-skeleton" {...container} style={STORE_FORM_DENSITY_VARS}>
             <div className="reserve-store-form-heading" style={{ marginBottom: headingGap }}>
-                <Title level={2} style={{ fontWeight: fontWeight.extrabold, margin: '0 0 8px' }}>{title}</Title>
-                <Text type="secondary" style={{ fontSize: fontSize.lg }}>{subtitle}</Text>
+                <PageTitle>{title}</PageTitle>
+                <PageDescription>{subtitle}</PageDescription>
             </div>
 
             {isSingleColumn ? (

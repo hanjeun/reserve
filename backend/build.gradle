@@ -12,7 +12,7 @@ dependencyLocking {
 group = 'kr.it.reserve'
 // ⚠️ frontend/package.json 의 version 과 항상 같이 올린다.
 //    2.0.2 · 2.0.3 · 2.1.0 세 번을 여기만 안 올려서 프론트 2.1.0 / 백엔드 2.0.1 로 벌어져 있었다.
-version = '2.8.8'
+version = '2.9.0'
 description = 'We are reserve'
 
 java {
@@ -36,10 +36,10 @@ ext {
 
 dependencies {
     // AWS SDK Platform BOM — 관련 의존성보다 먼저 선언해두는 게 관례상 가독성이 좋음(기능적 차이는 없음)
-    implementation platform('software.amazon.awssdk:bom:2.55.6')
+    implementation platform('software.amazon.awssdk:bom:2.55.11')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.58.0'
+    implementation 'io.sentry:sentry-spring-boot-starter-jakarta:8.59.0'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-security'

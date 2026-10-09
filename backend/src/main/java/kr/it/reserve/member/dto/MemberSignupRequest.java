@@ -21,22 +21,26 @@ import lombok.Setter;
 @JsonIgnoreProperties("role")
 public class MemberSignupRequest {
 
-    @NotBlank(message = "이름은 필수 항목입니다.")
+    @NotBlank(message = "이름은 필수 항목이에요.")
     @Size(min = 2, max = 20, message = "이름은 2~20자로 입력해주세요.")
     private String name;
 
-    @NotBlank(message = "이메일은 필수 항목입니다.")
-    @Email(message = "올바른 이메일 형식이 아닙니다.")
+    @NotBlank(message = "이메일은 필수 항목이에요.")
+    @Email(message = "올바른 이메일 형식이 아니에요.")
     @Size(max = 100, message = "이메일은 100자 이내로 작성해주세요.")
     private String email;
 
-    @NotBlank(message = "비밀번호는 필수 항목입니다.")
+    @NotBlank(message = "이메일 인증을 다시 진행해주세요.")
+    @Pattern(regexp = "[A-Za-z0-9_-]{43}", message = "이메일 인증을 다시 진행해주세요.")
+    private String verificationTicket;
+
+    @NotBlank(message = "비밀번호는 필수 항목이에요.")
     @Size(min = PasswordPolicy.MIN_LENGTH, max = PasswordPolicy.MAX_LENGTH,
             message = PasswordPolicy.LENGTH_MESSAGE)
     @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$", message = PasswordPolicy.COMPOSITION_MESSAGE)
     private String password;
 
-    @NotBlank(message = "비밀번호 확인은 필수 항목입니다.")
+    @NotBlank(message = "비밀번호 확인은 필수 항목이에요.")
     private String passwordConfirm;
 
     // 필수 약관 동의 여부 (서비스 이용약관 + 개인정보 처리방침)

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Dropdown } from 'antd';
-import { CheckOutlined, DownOutlined, LoadingOutlined } from '@ant-design/icons';
+import { CheckOutlined, DownOutlined } from '@ant-design/icons';
+import { SpinIndicator } from './Loading';
+import { renderRollingChoiceLabel } from './rollingChoiceLabel';
 
 const renderFilterPopup = (menu, popupRef) => <div ref={popupRef}>{menu}</div>;
 
@@ -88,8 +90,8 @@ export default function FilterMenu({ value, options, onChange, appearance = 'chi
             >
                 <span className="reserve-filter-menu-surface">
                     {icon}
-                    <span className="reserve-filter-menu-label">{selected?.label ?? '선택'}</span>
-                    {loading ? <LoadingOutlined aria-hidden="true" /> : <DownOutlined className="reserve-filter-menu-chevron" aria-hidden="true" />}
+                    <span className="reserve-filter-menu-label">{renderRollingChoiceLabel({ value, label: selected?.label ?? '선택' }, { options })}</span>
+                    {loading ? <span aria-hidden="true"><SpinIndicator /></span> : <DownOutlined className="reserve-filter-menu-chevron" aria-hidden="true" />}
                 </span>
             </button>
         </Dropdown>

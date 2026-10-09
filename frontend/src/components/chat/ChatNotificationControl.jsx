@@ -3,10 +3,10 @@ import { BellOutlined } from '@ant-design/icons';
 import { Button } from '../common';
 
 const NOTES = {
-    denied: '브라우저 알림 권한이 차단되어 있습니다. 사이트 설정에서 변경할 수 있어요.',
-    unsupported: '이 브라우저에서는 PC 세션 알림을 지원하지 않습니다.',
-    insecure: '보안 연결에서만 알림을 사용할 수 있습니다.',
-    error: '알림을 켜지 못했습니다. 브라우저 설정을 확인해주세요.',
+    denied: '브라우저 알림 권한이 차단되어 있어요. 사이트 설정에서 변경할 수 있어요.',
+    unsupported: '이 브라우저에서는 PC 세션 알림을 지원하지 않아요.',
+    insecure: '보안 연결에서만 알림을 사용할 수 있어요.',
+    error: '알림을 켜지 못했어요. 브라우저 설정을 확인해주세요.',
 };
 
 export default function ChatNotificationControl({ state, onEnable, onDisable }) {

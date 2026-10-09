@@ -3,7 +3,8 @@ import { Typography, Tag, Upload } from 'antd';
 import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { PlusOutlined, CreditCardOutlined, CloseOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Button, DataState, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl, AdminTableSkeleton, DataTable, FilterMenu, FilterToolbar } from '../common';
+import { Bone, Button, DataState, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl, AdminTableSkeleton, DataTable, FilterMenu, FilterToolbar } from '../common';
+import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
 import { useAdPayment, useMessage, useImagePreview, useMyStores, useFormErrors, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
@@ -136,7 +137,7 @@ const collectCreateErrors = (e, { storeId, dateRange, adType, imageFiles, banner
     }
     if (adType !== 'BANNER') return;
     if (imageFiles.length === 0) {
-        e.images = '배너 광고는 이미지가 최소 1장 필요합니다.';
+        e.images = '배너 광고는 이미지가 최소 1장 필요해요.';
     }
     if (!bannerTitle.trim()) {
         e.bannerTitle = '광고 제목을 입력해주세요.';
@@ -188,8 +189,8 @@ const cancelConfirmOptions = (ad) => {
     return {
         title: '광고 취소',
         content: isPaid
-            ? `노출을 중단하고 ${ad.amount?.toLocaleString()}원 전액 환불을 요청합니다. 환불 완료는 PG 확인 후 표시됩니다.`
-            : '신청을 취소하고 결제 상태를 확인합니다. 결제 중이었다면 미결 내역이 남을 수 있으며, 확인 후 환불을 처리합니다.',
+            ? `노출을 중단하고 ${ad.amount?.toLocaleString()}원 전액 환불을 요청해요. 환불 완료는 PG 확인 후 표시돼요.`
+            : '신청을 취소하고 결제 상태를 확인해요. 결제 중이었다면 미결 내역이 남을 수 있으며, 확인 후 환불을 처리해요.',
         okText: isPaid ? '환불하기' : '취소하기', cancelText: '닫기',
         okButtonProps: { danger: true }, centered: true,
     };
@@ -252,7 +253,7 @@ const renderAdsContent = ({ adsError, refetch, isFetching, loading, isPlaceholde
     if (adsError) {
         return (
             <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
-                onRetry={refetch} retrying={isFetching} compact />
+                onRetry={refetch} retrying={isFetching} />
         );
     }
     if (loading || isPlaceholderData) {
@@ -278,7 +279,7 @@ const renderAdsContent = ({ adsError, refetch, isFetching, loading, isPlaceholde
                 showSizeChanger: false,
                 onChange: onPageChange,
             }}
-            locale={{ emptyText: '신청한 광고가 없습니다.' }}
+            locale={{ emptyText: '신청한 광고가 없어요.' }}
         />
     );
 };
@@ -324,6 +325,10 @@ const AdManageTab = () => {
     // 2026-07 추가 — ReservationTab과 동일한 가게 필터 컨벤션(FilterToolbar selects,
     // 가게 2개 이상일 때만 노출, "전체 가게" 옵션 포함)
     const storeFilter = advertisementStore;
+    const filterStoreOptions = [
+        { value: 'ALL', label: '전체 가게' },
+        ...myStores.map(s => ({ value: String(s.id), label: s.name })),
+    ];
     const page = Math.max(0, Number.parseInt(advertisementPage, 10) || 0);
 
     const [storeId, setStoreId] = useState(undefined);
@@ -378,8 +383,8 @@ const AdManageTab = () => {
     const totalElements = data?.totalElements ?? 0;
     const cancelMutation = useMutation({
         mutationFn: (adId) => adService.cancelAd(adId),
-        onSuccess: () => message.success('취소 요청을 접수했습니다. 환불 여부는 광고 내역에서 확인해주세요.'),
-        onError: (err) => message.error(errorMessageOr(err, '결과를 확인하지 못했습니다. 내역을 다시 확인해주세요.')),
+        onSuccess: () => message.success('취소 요청을 접수했어요. 환불 여부는 광고 내역에서 확인해주세요.'),
+        onError: (err) => message.error(errorMessageOr(err, '결과를 확인하지 못했어요. 내역을 다시 확인해주세요.')),
         // 노출 중이던 광고를 취소하면 공개 배너·배지와 통계의 광고 요약도 바뀐다.
         onSettled: () => invalidateAdData(queryClient),
     });
@@ -389,10 +394,10 @@ const AdManageTab = () => {
     const removeMutation = useMutation({
         mutationFn: (adId) => adService.removeAd(adId),
         onSuccess: () => {
-            message.success('목록에서 삭제되었습니다.');
+            message.success('목록에서 삭제됐어요.');
             void queryClient.invalidateQueries({ queryKey: adKeys.my() });
         },
-        onError: (err) => message.error(errorMessageOr(err, '삭제에 실패했습니다.')),
+        onError: (err) => message.error(errorMessageOr(err, '삭제에 실패했어요.')),
     });
 
     // 2026-07 추가 — 배너 광고 수정 mutation. 새 이미지를 고르지 않으면 images를 보내지 않아
@@ -400,13 +405,13 @@ const AdManageTab = () => {
     const updateMutation = useMutation({
         mutationFn: ({ adId, formData }) => adService.updateAd(adId, formData),
         onSuccess: () => {
-            message.success('광고가 수정되었습니다.');
+            message.success('광고가 수정됐어요.');
             // 배너 문구·이미지는 공개 목록의 배너에도 보인다.
             void invalidateAdData(queryClient);
             setEditTarget(null);
             resetEditErrors();
         },
-        onError: (err) => message.error(errorMessageOr(err, '수정에 실패했습니다.')),
+        onError: (err) => message.error(errorMessageOr(err, '수정에 실패했어요.')),
     });
 
     const handleBannerCopyChange = (key) => {
@@ -466,7 +471,7 @@ const AdManageTab = () => {
 
     const withinImageRequestLimit = (fileList) => {
         if (uploadListBytes(fileList) <= MAX_IMAGE_REQUEST_BYTES) return true;
-        message.error(`새로 올리는 이미지 전체 합계는 ${MAX_IMAGE_REQUEST_MB}MB 이하여야 합니다.`);
+        message.error(`새로 올리는 이미지 전체 합계는 ${MAX_IMAGE_REQUEST_MB}MB 이하여야 해요.`);
         return false;
     };
 
@@ -559,7 +564,7 @@ const AdManageTab = () => {
     const handleRemove = (ad) => {
         confirm({
             title: '광고 삭제',
-            content: '이 광고를 목록에서 삭제합니다. 결제/노출 이력은 삭제되지 않고 관리자 측에서만 보관됩니다.',
+            content: '이 광고를 목록에서 삭제해요. 결제/노출 이력은 삭제되지 않고 관리자 측에서만 보관돼요.',
             okText: '삭제', cancelText: '취소',
             okButtonProps: { danger: true }, centered: true,
             onOk: () => removeMutation.mutateAsync(ad.id),
@@ -591,19 +596,18 @@ const AdManageTab = () => {
                     새 광고 신청
                 </Button>
                 <div className="reserve-ad-manage-store-summary">
-                    <FilterMenu
+                    {storesLoading ? <span aria-hidden="true"><FilterMenuSkeleton select={{
+                        value: storeFilter, options: filterStoreOptions, ariaLabel: '광고 가게 필터',
+                    }} /></span> : <FilterMenu
                         appearance="plain"
                         value={storeFilter}
                         onChange={value => setAdListParams({ advertisementStore: value, advertisementPage: '0' })}
-                        options={[
-                            { value: 'ALL', label: '전체 가게' },
-                            ...myStores.map(s => ({ value: String(s.id), label: s.name })),
-                        ]}
+                        options={filterStoreOptions}
                         disabled={loading || storesLoading || Boolean(storesError)}
                         loading={storesLoading}
                         aria-label="광고 가게 필터"
-                    />
-                    {!loading && (
+                    />}
+                    {loading ? <span className="reserve-ad-manage-count" aria-hidden="true"><Bone width={40} height={16} /></span> : (
                         <Text type="secondary" className="reserve-ad-manage-count">
                             {visibleCount.toLocaleString('ko-KR')}건
                         </Text>
@@ -615,6 +619,7 @@ const AdManageTab = () => {
                 search={{ value: search, onChange: (e) => setAdListParams({ advertisementSearch: e.target.value, advertisementPage: '0' }), placeholder: '가게명으로 검색' }}
                 onReload={refetch}
                 loading={loading || isFetching}
+                initialLoading={loading}
             />
 
             {/* 가게 선택지는 목록과 별도 요청이다. 실패해도 전체 광고 목록은 그대로 두고,

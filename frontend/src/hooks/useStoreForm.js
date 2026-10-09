@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { storeService } from '../services';
@@ -18,7 +18,10 @@ import {
     purgeExpiredStoreDrafts,
     readStoreDraft,
     saveStoreDraft,
+    serializeDraftImages,
+    serializeStoreFormValues,
 } from '../utils/storeDraftStorage';
+import { clearRegistrationNavigation, readRegistrationNavigation, rememberRegistrationNavigation } from '../utils/storeRegistrationNavigation';
 import { invalidateStoreData } from './invalidateAfterWrite';
 
 const AUTO_SAVE_IDLE_MS = 1000;
@@ -39,12 +42,14 @@ const initialValuesFromStore = initialData => {
         phone: initialData.phone,
         description: initialData.description,
         noShowDeposit: initialData.noShowDeposit,
+        reservationEnabled: initialData.reservationEnabled !== false,
         maxCapacityPerSlot: initialData.maxCapacityPerSlot ?? undefined,
         autoApprovalEnabled: initialData.autoApprovalEnabled ?? false,
         allowLatePayment: initialData.allowLatePayment ?? false,
         allowDuplicateReservation: initialData.allowDuplicateReservation ?? false,
         emailNotificationEnabled: initialData.emailNotificationEnabled ?? true,
         imageAutoplayEnabled: initialData.imageAutoplayEnabled ?? true,
+        waitingIntakeMode: initialData.waitingIntakeMode ?? 'OFF',
         fullRefundDays: initialData.fullRefundDays ?? 3,
         partialRefundDays: initialData.partialRefundDays ?? 1,
         partialRefundRate: initialData.partialRefundRate ?? 50,
@@ -92,9 +97,9 @@ const existingImagesFromStore = initialData => {
 
 const draftFailureMessage = error => {
     if (error?.name === 'QuotaExceededError') {
-        return '브라우저 저장 공간이 부족해 임시저장하지 못했습니다. 새 이미지 수나 크기를 줄여주세요.';
+        return '브라우저 저장 공간이 부족해 임시저장하지 못했어요. 새 이미지 수나 크기를 줄여주세요.';
     }
-    return error?.message || '이 브라우저에 임시저장하지 못했습니다.';
+    return error?.message || '이 브라우저에 임시저장하지 못했어요.';
 };
 
 /** StoreRegister, StoreEdit에서 공유하는 폼·이미지·로컬 임시저장 로직 */
@@ -106,6 +111,7 @@ export const useStoreForm = ({
     formReady = true,
 }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const queryClient = useQueryClient();
     const { message, confirm } = useMessage();
     const user = useAuthStore(state => state.user);
@@ -118,6 +124,9 @@ export const useStoreForm = ({
     const [draftState, setDraftState] = useState({ status: 'idle', savedAt: null, error: null });
 
     const draftKey = makeStoreDraftKey({ userId, mode, storeId });
+    const navigationKey = `${draftKey}:${sessionRevision}:${location.key}`;
+    const navigationCompletedRef = useRef(false);
+    const draftStateRef = useRef(draftState);
     const mainImageRef = useRef([]);
     const detailImagesRef = useRef([]);
     const baseFingerprintRef = useRef(null);
@@ -134,6 +143,7 @@ export const useStoreForm = ({
     const draftSessionRef = useRef({ userId, role: user?.role, sessionRevision });
     const confirmRef = useRef(confirm);
     useEffect(() => { confirmRef.current = confirm; }, [confirm]);
+    useEffect(() => { draftStateRef.current = draftState; }, [draftState]);
 
     const isCurrentDraftSession = useCallback(() => {
         const auth = useAuthStore.getState();
@@ -143,6 +153,22 @@ export const useStoreForm = ({
             && auth.user?.role === started.role
             && auth.sessionRevision === started.sessionRevision;
     }, []);
+
+    useEffect(() => () => {
+        if (mode !== 'create' || !form || !draftKey || navigationCompletedRef.current || !isCurrentDraftSession()) return;
+        const values = form.getFieldsValue(true);
+        const hasProgress = values.serviceDomain || values.category || values.name
+            || (values._onboardingStep && values._onboardingStep !== 'industry')
+            || mainImageRef.current.length || detailImagesRef.current.length;
+        if (!hasProgress) return;
+        rememberRegistrationNavigation(navigationKey, {
+            values: serializeStoreFormValues(values),
+            mainImage: serializeDraftImages(mainImageRef.current),
+            detailImages: serializeDraftImages(detailImagesRef.current),
+            state: draftStateRef.current,
+            changed: hasChangesRef.current,
+        });
+    }, [draftKey, form, isCurrentDraftSession, mode, navigationKey]);
 
     const cancelAutoSave = useCallback(() => {
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -197,7 +223,7 @@ export const useStoreForm = ({
         });
     }, [form, formReady, mode]);
 
-    const applyDraft = useCallback(draft => {
+    const applyDraft = useCallback((draft, navigation = false) => {
         const restoredMain = hydrateDraftImages(draft.mainImage);
         const restoredDetail = hydrateDraftImages(draft.detailImages);
         const restoredValues = hydrateStoreFormValues(draft.values);
@@ -217,20 +243,31 @@ export const useStoreForm = ({
             mainImage: restoredMain.files,
             detailImages: restoredDetail.files,
         });
-        setDraftState({ status: 'saved', savedAt: draft.savedAt, error: null });
-        hasChangesRef.current = false;
-        message.info('이 브라우저에 임시저장한 내용을 불러왔습니다.');
+        setDraftState(navigation
+            ? { ...draft.state, status: draft.state?.savedAt ? 'saved' : 'idle', error: null }
+            : { status: 'saved', savedAt: draft.savedAt, error: null });
+        hasChangesRef.current = navigation ? draft.changed : false;
+        if (!navigation) message.info('이 브라우저에 임시저장한 내용을 불러왔어요.');
     }, [form, message, revokeRestoredUrls]);
 
     useEffect(() => {
         const ready = form && formReady && draftKey && isCurrentDraftSession() && (mode === 'create' || initialData);
         if (!ready || restoredKeyRef.current === draftKey) return;
         restoredKeyRef.current = draftKey;
+        const navigationDraft = mode === 'create' && readRegistrationNavigation(navigationKey);
         let cancelled = false;
         let settled = false;
 
         const restore = async () => {
             try {
+                if (navigationDraft) {
+                    // RAM continuity uses the same cancellable restore boundary without opening IndexedDB.
+                    const draft = await Promise.resolve(navigationDraft);
+                    if (cancelled || !isCurrentDraftSession()) return;
+                    applyDraft(draft, true);
+                    settled = true;
+                    return;
+                }
                 await purgeExpiredStoreDrafts();
                 const draft = await readStoreDraft(draftKey);
                 if (cancelled || !isCurrentDraftSession()) return;
@@ -249,7 +286,7 @@ export const useStoreForm = ({
                 confirmRef.current({
                     title: baseChanged ? '가게 정보가 달라졌어요' : '임시저장된 내용이 있어요',
                     content: baseChanged
-                        ? `${savedLabel}에 저장한 초안과 현재 가게 정보가 다릅니다. 초안을 불러오면 최신 값 일부가 바뀔 수 있습니다.`
+                        ? `${savedLabel}에 저장한 초안과 현재 가게 정보가 달라요. 초안을 불러오면 최신 값 일부가 바뀔 수 있어요.`
                         : `${savedLabel}에 이 브라우저에 저장한 내용을 이어서 작성할까요?`,
                     okText: '이어서 작성',
                     cancelText: mode === 'create' ? '새로 작성' : '최신 정보 유지',
@@ -279,14 +316,14 @@ export const useStoreForm = ({
             // StrictMode의 effect 재실행 중 첫 비동기 조회가 취소됐으면 두 번째 setup이 다시 읽게 한다.
             if (!settled && restoredKeyRef.current === draftKey) restoredKeyRef.current = null;
         };
-    }, [applyDraft, draftKey, form, formReady, initialData, isCurrentDraftSession, mode]);
+    }, [applyDraft, draftKey, form, formReady, initialData, isCurrentDraftSession, mode, navigationKey]);
 
     const persistDraft = useCallback(({ announce = false, automatic = false } = {}) => {
         if (automatic && (!isCurrentDraftSession() || !getStoreDraftAutoSaveEnabled(useAuthStore.getState().user))) {
             return Promise.resolve(undefined);
         }
         if (!draftKey || !form || !isCurrentDraftSession()) {
-            const error = new Error('로그인 정보를 확인할 수 없어 임시저장하지 못했습니다.');
+            const error = new Error('로그인 정보를 확인할 수 없어 임시저장하지 못했어요.');
             if (announce) message.error(error.message);
             return Promise.reject(error);
         }
@@ -323,7 +360,7 @@ export const useStoreForm = ({
                 setDraftState({ status: 'saved', savedAt: record.savedAt, error: null });
                 hasChangesRef.current = false;
             }
-            if (announce) message.success('이 브라우저에 임시저장했습니다.');
+            if (announce) message.success('이 브라우저에 임시저장했어요.');
             return record;
         }).catch(error => {
             const errorMessage = draftFailureMessage(error);
@@ -342,11 +379,13 @@ export const useStoreForm = ({
         saveSequenceRef.current += 1;
         if (!getStoreDraftAutoSaveEnabled(useAuthStore.getState().user)) {
             cancelAutoSave();
-            setDraftState(current => ({ ...current, status: 'idle', error: null }));
+            setDraftState(current => current.status === 'idle' && current.error == null
+                ? current : { ...current, status: 'idle', error: null });
             return;
         }
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-        setDraftState(current => ({ ...current, status: 'pending', error: null }));
+        setDraftState(current => current.status === 'pending' && current.error == null
+            ? current : { ...current, status: 'pending', error: null });
         autoSaveTimerRef.current = setTimeout(() => {
             autoSaveTimerRef.current = null;
             void persistDraft({ automatic: true }).catch(() => undefined);
@@ -463,6 +502,11 @@ export const useStoreForm = ({
             if (mode === 'create') await storeService.createStore(formData);
             else await storeService.updateStore(storeId, formData);
 
+            if (mode === 'create') {
+                navigationCompletedRef.current = true;
+                clearRegistrationNavigation();
+            }
+
             // 서버 반영 뒤의 캐시 갱신 실패를 등록·수정 실패로 오인하면 사용자가 같은 요청을
             // 다시 보내 중복 가게를 만들 수 있다. 다음 화면 진입 때 다시 조회할 수 있으므로
             // 제출 성공 경계 밖의 보조 작업으로 취급한다.
@@ -474,11 +518,11 @@ export const useStoreForm = ({
             saveSequenceRef.current += 1;
             await saveQueueRef.current.catch(() => undefined);
             await deleteStoreDraft(draftKey).catch(() => undefined);
-            message.success(mode === 'create' ? '가게가 등록되었습니다' : '가게 정보가 수정되었습니다');
+            message.success(mode === 'create' ? '가게가 등록됐어요' : '가게 정보가 수정됐어요');
             navigate('/my-stores');
         } catch (error) {
             void persistDraft({ automatic: true }).catch(() => undefined);
-            handleApiError(error, message, mode === 'create' ? '가게 등록에 실패했습니다' : '가게 수정에 실패했습니다');
+            handleApiError(error, message, mode === 'create' ? '가게 등록에 실패했어요' : '가게 수정에 실패했어요');
         } finally {
             setLoading(false);
         }

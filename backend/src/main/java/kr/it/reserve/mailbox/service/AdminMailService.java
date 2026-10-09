@@ -86,12 +86,12 @@ public class AdminMailService {
         if (member == null) {
             log.warn("Marketing mail blocked - recipient is not an active member");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "회원이 아닌 주소로는 광고성 메일을 보낼 수 없습니다. 광고가 아니라면 '광고성 정보' 체크를 해제해주세요.");
+                    "회원이 아닌 주소로는 광고성 메일을 보낼 수 없어요. 광고가 아니라면 '광고성 정보' 체크를 해제해주세요.");
         }
         if (!member.isMarketingAgreed()) {
             log.warn("Marketing mail blocked - consent not given: memberId={}", member.getId());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "이 회원은 마케팅 정보 수신에 동의하지 않았습니다. 광고가 아니라면 '광고성 정보' 체크를 해제해주세요.");
+                    "이 회원은 마케팅 정보 수신에 동의하지 않았어요. 광고가 아니라면 '광고성 정보' 체크를 해제해주세요.");
         }
     }
 
@@ -152,7 +152,7 @@ public class AdminMailService {
             mailSender.send(message);
         } catch (MessagingException | UnsupportedEncodingException e) {
             log.error("Mail send failed: errorType={}", e.getClass().getSimpleName());
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "메일 발송 중 오류가 발생했습니다.");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "메일 발송 중 오류가 발생했어요.");
         }
     }
 

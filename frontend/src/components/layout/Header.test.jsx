@@ -10,7 +10,12 @@ const { goBack, authState, reducedMotionState } = vi.hoisted(() => ({
 }));
 vi.mock('../../hooks/useReducedMotion', () => ({ default: () => reducedMotionState.value }));
 vi.mock('../../hooks/useGoBack', () => ({ default: () => goBack }));
-vi.mock('../../store/useAuthStore', () => ({ default: () => authState }));
+vi.mock('../../store/useAuthStore', () => ({
+    default: Object.assign(selector => selector ? selector(authState) : authState, {
+        getState: () => authState,
+        subscribe: () => () => {},
+    }),
+}));
 vi.mock('./HeaderAccountMenu', () => ({ default: () => <button>내 계정 메뉴 열기</button> }));
 
 function CurrentRoute() {
@@ -126,6 +131,26 @@ describe('shared wordmark and result search header', () => {
         renderHeader('/messages');
         fireEvent.click(screen.getByRole('button', { name: '이전 화면으로 돌아가기' }));
         expect(goBack).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['/store/register', '/store/12/edit'])('returns through store questions before route history at %s', path => {
+        const onStepBack = vi.fn(event => event.preventDefault());
+        window.addEventListener('reserve:registration-step-back', onStepBack);
+        try {
+            renderHeader(path);
+            fireEvent.click(screen.getByRole('button', { name: '이전 화면으로 돌아가기' }));
+            expect(onStepBack).toHaveBeenCalledOnce();
+            expect(goBack).not.toHaveBeenCalled();
+            expect(screen.getByLabelText('현재 경로')).toHaveTextContent(path);
+        } finally {
+            window.removeEventListener('reserve:registration-step-back', onStepBack);
+        }
+    });
+
+    it('uses route history when store edit has no active question back request', () => {
+        renderHeader('/store/12/edit');
+        fireEvent.click(screen.getByRole('button', { name: '이전 화면으로 돌아가기' }));
+        expect(goBack).toHaveBeenCalledOnce();
     });
 
     it('lets the messages page close with its animation before the logo goes home', () => {

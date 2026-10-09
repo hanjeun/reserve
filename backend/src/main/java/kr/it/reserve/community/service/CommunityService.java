@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class CommunityService {
 
-    private static final String POST_NOT_FOUND = "게시글을 찾을 수 없습니다.";
+    private static final String POST_NOT_FOUND = "게시글을 찾을 수 없어요.";
 
     private final CommunityPostRepository postRepository;
     private final CommunityCommentRepository commentRepository;
@@ -145,7 +145,7 @@ public class CommunityService {
     @Transactional
     public void deleteComment(Long commentId, Long memberId) {
         CommunityComment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new CommunityException("댓글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CommunityException("댓글을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
         validateAuthor(comment.getAuthor().getId(), memberId, "삭제");
         commentRepository.delete(comment);
@@ -184,12 +184,12 @@ public class CommunityService {
 
     private Member findMemberOrThrow(Long memberId) {
         return memberRepository.findActiveByIdForUpdate(memberId)
-                .orElseThrow(() -> new CommunityException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new CommunityException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     private void validateAuthor(Long authorId, Long memberId, String action) {
         if (!authorId.equals(memberId)) {
-            throw new CommunityException("게시글 작성자만 " + action + "할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new CommunityException("게시글 작성자만 " + action + "할 수 있어요.", HttpStatus.FORBIDDEN);
         }
     }
 }

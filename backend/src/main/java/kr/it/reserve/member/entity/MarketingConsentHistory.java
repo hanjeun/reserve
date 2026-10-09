@@ -34,7 +34,7 @@ import java.time.LocalDateTime;
 public class MarketingConsentHistory {
 
     /** 개인정보 처리방침의 현재 최종 수정일. 문서를 바꾸면 이 값도 함께 올린다. */
-    public static final String CURRENT_POLICY_VERSION = "2026-09-01";
+    public static final String CURRENT_POLICY_VERSION = "2026-10-08";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

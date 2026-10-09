@@ -1,0 +1,69 @@
+{
+  "all_saved_scenes_reproduced": true,
+  "all_within_one_channel_value_tolerance": true,
+  "exactly_pixel_identical_scenes": 3,
+  "note": "Three scenes are RGBA pixel-identical. waiting-off differs in one RGB channel value by 1/255 in the entire 512px image; alpha is identical. This negligible native-render rounding difference is disclosed, not removed by postprocessing.",
+  "checks": [
+    {
+      "asset": "edit-operation",
+      "size": 512,
+      "roundtrip_from_saved_editable_blend": true,
+      "rgba_pixel_identical": true,
+      "different_channel_values": 0,
+      "max_abs_channel_difference": 0,
+      "alpha_pixel_identical": true,
+      "source_rgba_sha256": "a7e34a19dbb634e94e34585f00b6c1ff3ed7164518e57a713ba88234fb3e360e",
+      "roundtrip_rgba_sha256": "a7e34a19dbb634e94e34585f00b6c1ff3ed7164518e57a713ba88234fb3e360e",
+      "within_one_channel_value_tolerance": true,
+      "differences": []
+    },
+    {
+      "asset": "edit-identity",
+      "size": 512,
+      "roundtrip_from_saved_editable_blend": true,
+      "rgba_pixel_identical": true,
+      "different_channel_values": 0,
+      "max_abs_channel_difference": 0,
+      "alpha_pixel_identical": true,
+      "source_rgba_sha256": "c90daa1b92a82f1250d35cb581028386541901e2a022176a4c03b4ae47e1bdfb",
+      "roundtrip_rgba_sha256": "c90daa1b92a82f1250d35cb581028386541901e2a022176a4c03b4ae47e1bdfb",
+      "within_one_channel_value_tolerance": true,
+      "differences": []
+    },
+    {
+      "asset": "intake-paused",
+      "size": 512,
+      "roundtrip_from_saved_editable_blend": true,
+      "rgba_pixel_identical": true,
+      "different_channel_values": 0,
+      "max_abs_channel_difference": 0,
+      "alpha_pixel_identical": true,
+      "source_rgba_sha256": "2cbb811eb4763249d216ef158c170aafe1143439ac17bf5aca174df1bda6f8f6",
+      "roundtrip_rgba_sha256": "2cbb811eb4763249d216ef158c170aafe1143439ac17bf5aca174df1bda6f8f6",
+      "within_one_channel_value_tolerance": true,
+      "differences": []
+    },
+    {
+      "asset": "waiting-off",
+      "size": 512,
+      "roundtrip_from_saved_editable_blend": true,
+      "rgba_pixel_identical": false,
+      "different_channel_values": 1,
+      "max_abs_channel_difference": 1,
+      "alpha_pixel_identical": true,
+      "source_rgba_sha256": "33be3419fafe113fad1738188c0297cbdee826dd06a396988f85901f1f06f27c",
+      "roundtrip_rgba_sha256": "6c919de022bd90e48779fe2ead6556b1bc2cf423a19e124ce8b8afc7887e7b3d",
+      "within_one_channel_value_tolerance": true,
+      "differences": [
+        {
+          "y": 304,
+          "x": 310,
+          "channel": "B",
+          "source": 181,
+          "roundtrip": 182,
+          "alpha": 255
+        }
+      ]
+    }
+  ]
+}

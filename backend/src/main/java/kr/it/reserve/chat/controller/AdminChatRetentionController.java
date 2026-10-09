@@ -26,13 +26,13 @@ public class AdminChatRetentionController {
     @GetMapping("/{reportId}/retention")
     public ResponseEntity<ApiResponse<ChatReportRetentionResponse>> get(@PathVariable Long reportId) {
         return ResponseEntity.ok(ApiResponse.success(retention.get(
-                SecurityUtil.getCurrentMember("로그인이 필요합니다."), reportId), "채팅 신고 보존 정책 조회 성공"));
+                SecurityUtil.getCurrentMember("로그인이 필요해요."), reportId), "채팅 신고 보존 정책 조회 성공"));
     }
 
     @PatchMapping("/{reportId}/retention")
     public ResponseEntity<ApiResponse<ChatReportRetentionResponse>> update(@PathVariable Long reportId,
             @Valid @RequestBody UpdateChatReportRetentionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(retention.update(
-                SecurityUtil.getCurrentMember("로그인이 필요합니다."), reportId, request), "채팅 신고 보존 정책 변경 완료"));
+                SecurityUtil.getCurrentMember("로그인이 필요해요."), reportId, request), "채팅 신고 보존 정책 변경 완료"));
     }
 }

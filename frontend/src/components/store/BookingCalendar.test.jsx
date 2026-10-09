@@ -42,7 +42,7 @@ describe('booking calendar loading boundary', () => {
             <BookingCalendar storeId={12} onChange={onChange} />
         </Form.Item></Form>);
         fireEvent.click(document.querySelector('.reserve-cal-trigger'));
-        const period = screen.getByRole('button', { name: `${month.format('M')}월 4일 예약 가능한 기간이 아닙니다` });
+        const period = screen.getByRole('button', { name: `${month.format('M')}월 4일 예약 가능한 기간이 아니에요` });
         expect(period).toBeDisabled();
         expect(period).toHaveTextContent(/^4$/);
         expect(screen.queryByText('기간 밖')).not.toBeInTheDocument();

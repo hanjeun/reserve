@@ -62,6 +62,7 @@ class MemberWithdrawalSafetyTest {
     @Mock private OAuthUnlinkOutboxService oAuthUnlinkOutboxService;
     @Mock private PwnedPasswordChecker pwnedPasswordChecker;
     @Mock private MarketingConsentHistoryRepository marketingConsentHistoryRepository;
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
 
     @InjectMocks private MemberService memberService;
 
@@ -96,6 +97,7 @@ class MemberWithdrawalSafetyTest {
         memberService.deleteMember(memberId);
 
         verify(dataLifecycleGuard).requireMemberWithdrawalAllowed(memberId);
+        verify(events).publishEvent(new kr.it.reserve.member.event.MemberWithdrawn(memberId));
         verify(fileDeletionOutboxService).enqueue(
                 "https://cdn.example/users/7/profile.png", "MEMBER_PROFILE_IMAGE", memberId);
         verify(fileDeletionOutboxService).enqueue(

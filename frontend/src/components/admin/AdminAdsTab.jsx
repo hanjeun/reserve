@@ -102,12 +102,12 @@ const AdminAdsTab = () => {
     const suspendMutation = useMutation({
         mutationFn: ({ adId, reason }) => adService.suspendAd(adId, reason),
         onSuccess: () => {
-            message.success('광고가 중단되었습니다.');
+            message.success('광고가 중단됐어요.');
             // 관리자 광고 목록(adKeys.admin)뿐 아니라 공개 배너·배지에서도 빠져야 한다.
             void invalidateAdData(queryClient);
             setSuspendTarget(null);
         },
-        onError: () => message.error('중단 처리에 실패했습니다.'),
+        onError: () => message.error('중단 처리에 실패했어요.'),
     });
 
     // 클라이언트 필터(filteredAds)는 제거했다 — 서버가 검색까지 처리하므로 받은 결과가 곧 정답이다.
@@ -144,7 +144,7 @@ const AdminAdsTab = () => {
         if (adsError) {
             return (
                 <DataState state="error" kind="advertisement" subject="광고 목록" error={adsError}
-                    onRetry={refetch} retrying={isFetching} compact />
+                    onRetry={refetch} retrying={isFetching} />
             );
         }
         if (loading || isPlaceholderData) {
@@ -170,7 +170,7 @@ const AdminAdsTab = () => {
                     showSizeChanger: false,
                     onChange: (p) => setPage(p - 1),
                 }}
-                locale={{ emptyText: '등록된 광고가 없습니다.' }}
+                locale={{ emptyText: '등록된 광고가 없어요.' }}
             />
         );
     };
@@ -182,6 +182,7 @@ const AdminAdsTab = () => {
                 search={{ value: search, onChange: handleSearchChange, placeholder: '가게명으로 검색 (현재 페이지 내)', disabled: loading }}
                 onReload={refetch}
                 loading={loading || isFetching}
+                initialLoading={loading}
             />
             {renderAdList()}
 

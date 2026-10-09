@@ -157,7 +157,7 @@ describe('session chat notifications', () => {
         expect(notifier.notify({ ...packet(1), messages: [secret] })).toBe(true);
         expect(instances[0].title).toBe('RESERVE 새 메시지');
         expect(instances[0].options).toEqual({
-            body: '새 메시지가 도착했습니다. RESERVE에서 확인해주세요.',
+            body: '새 메시지가 도착했어요. RESERVE에서 확인해주세요.',
             tag: 'reserve-chat',
         });
     });

@@ -11,6 +11,7 @@ import { rememberImageHints } from '../utils/imageHintCache';
 import { hasDistanceCoordinates } from '../utils/distanceSort';
 import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 import { normalizeListQueryParams } from '../utils/listQueryParams';
+import useDiscoveryRegion from './useDiscoveryRegion';
 
 export { STORE_LIST_PAGE_SIZE };
 const FILTER_KEYS = new Set(['keyword', 'domain', 'region', 'sort', 'lat', 'lng']);
@@ -33,7 +34,7 @@ const useStoreList = () => {
     const lat     = normalizedParams.get('lat');
     const lng     = normalizedParams.get('lng');
     const domain  = normalizedParams.get('domain') || '';
-    const region  = normalizedParams.get('region') || '';
+    const [region, rememberRegion] = useDiscoveryRegion(urlSearchParams);
     const rawPage = urlSearchParams.get('page');
     const page = readPage(rawPage);
 
@@ -91,18 +92,22 @@ const useStoreList = () => {
 
     // 필터와 페이지를 한 번의 URL 갱신으로 바꿔 검색어 유실을 막는다.
     const setSearchParams = useCallback((newParams) => {
+        const changesRegion = Object.hasOwn(newParams, 'region');
+        const nextRegion = changesRegion ? String(newParams.region ?? '') : region;
+        if (changesRegion && !rememberRegion(nextRegion)) return;
         setUrlSearchParams(prev => {
             const next = new URLSearchParams(prev);
-            let filtersChanged = false;
+            // 복원한 지역은 URL에 없을 수 있다. 전체 선택도 실제 조건 변경으로 판단한다.
+            let filtersChanged = changesRegion && nextRegion !== region;
             Object.entries(newParams).forEach(([key, value]) => {
                 if (value === '' || value == null) next.delete(key);
                 else next.set(key, String(value));
-                if (FILTER_KEYS.has(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
+                if (key !== 'region' && FILTER_KEYS.has(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
             });
             if (filtersChanged || readPage(next.get('page')) === 1) next.delete('page');
             return next;
         });
-    }, [setUrlSearchParams]);
+    }, [rememberRegion, region, setUrlSearchParams]);
 
     const setPage = useCallback((nextPage) => {
         const bounded = Math.min(readPage(String(nextPage)), lastPage);
@@ -116,6 +121,7 @@ const useStoreList = () => {
         page,
         pageSize: STORE_LIST_PAGE_SIZE,
         loading: isLoading || pageOutOfRange || isPlaceholderData,
+        initialLoading: isLoading,
         refetching: isFetching && !isLoading,
         error:        error?.message || null,
         refetch,

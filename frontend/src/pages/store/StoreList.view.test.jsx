@@ -20,12 +20,14 @@ vi.mock('../../hooks', async () => ({
     useMessage: () => ({ message: { error: vi.fn() } }),
     useWindowWidth: () => viewport.width,
 }));
+vi.mock('../../components/common/FilterMenu', () => ({
+    default: ({ value, onChange, 'aria-label': label, options, disabled }) => <select aria-label={label} value={value} onChange={event => onChange(event.target.value)} disabled={disabled}>
+        {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>,
+}));
 vi.mock('../../components/common', () => ({
     PageContainer: ({ children, className }) => <main className={className}>{children}</main>,
     StoreCardSkeleton: ({ count }) => <div data-testid="card-skeleton">{count}</div>,
-    FilterMenu: ({ value, onChange, 'aria-label': label, options, disabled }) => <select aria-label={label} value={value} onChange={event => onChange(event.target.value)} disabled={disabled}>
-        {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select>,
     Button: ({ children, onClick }) => <button type="button" onClick={onClick}>{children}</button>,
     DataState: ({ state = 'empty', title, subject, onRetry }) => (
         <section role={state === 'error' ? 'alert' : undefined}>
@@ -156,18 +158,18 @@ describe('store list view selection with real URL pagination', () => {
     ])('locks the view control during the selected %s loading skeleton', async (url, skeleton) => {
         let resolve;
         storeService.getStores.mockReturnValue(new Promise(done => { resolve = done; }));
-        const user = userEvent.setup();
         const { container } = renderList(url);
         if (skeleton === 'card-skeleton') expect(screen.getByTestId('card-skeleton')).toHaveTextContent('12');
         else expect(container.querySelectorAll('.reserve-store-list-row-skeleton')).toHaveLength(12);
-        const toggle = screen.getByRole('button', { name: skeleton === 'card-skeleton' ? '목록형 보기로 전환' : '사진형 보기로 전환' });
-        expect(toggle).toBeDisabled();
-        await user.click(toggle);
+        const toggleLabel = skeleton === 'card-skeleton' ? '목록형 보기로 전환' : '사진형 보기로 전환';
+        expect(screen.queryByRole('button', { name: toggleLabel })).toBeNull();
+        expect(container.querySelector('.reserve-explore-filters')).toHaveAttribute('aria-hidden', 'true');
         expect(screen.getByRole('status', { name: '가게 목록을 불러오는 중' })).toHaveAttribute('aria-busy', 'true');
         expect(storeService.getStores).toHaveBeenCalledTimes(1);
         await act(async () => resolve({ content: [{ id: 1, name: '정상 가게' }], page: { totalElements: 1, totalPages: 1 } }));
         if (skeleton === 'card-skeleton') expect(await screen.findByTestId('original-card')).toHaveTextContent('정상 가게');
         else expect(await screen.findByTestId('list-row')).toHaveTextContent('정상 가게');
+        expect(screen.getByRole('button', { name: toggleLabel })).toBeEnabled();
     });
 
     it('normalizes an unknown view to explicit cards without discarding other URL values', async () => {
@@ -185,7 +187,7 @@ describe('store list view selection with real URL pagination', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('가게 목록을 불러오지 못했습니다.');
         await user.click(screen.getByRole('button', { name: '목록형 보기로 전환' }));
         expect(screen.getByRole('alert')).toHaveTextContent('가게 목록을 불러오지 못했습니다.');
-        expect(screen.queryByText('조건에 맞는 가게가 없습니다.')).not.toBeInTheDocument();
+        expect(screen.queryByText('조건에 맞는 가게가 없어요.')).not.toBeInTheDocument();
         storeService.getStores.mockResolvedValue({ content: [{ id: 1, name: '복구 가게' }], page: { totalElements: 1, totalPages: 1 } });
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
         expect(await screen.findByTestId('list-row')).toHaveTextContent('복구 가게');

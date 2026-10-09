@@ -52,36 +52,36 @@ public class ChatImageService {
     @Transactional(readOnly = true)
     public ImageContent read(Member member, Long messageId) {
         var message = messages.findById(messageId)
-                .orElseThrow(() -> new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         chatService.assertImageReader(message.getRoom().getId(), member);
-        if (message.isRetracted()) throw new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        if (message.isRetracted()) throw new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
         return readContent(message);
     }
 
     /** 관리자 가게 사진 접근은 신고 검토에 반환된 메시지로만 한정한다. */
     @Transactional(readOnly = true)
     public ImageContent readForReport(Member admin, Long reportId, Long messageId) {
-        if (admin.getRole() != Role.ADMIN) throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        if (admin.getRole() != Role.ADMIN) throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
         var context = moderation.contextForImage(admin, reportId);
         boolean reported = context.getReportedMessage() != null && messageId.equals(context.getReportedMessage().getId());
         boolean recent = context.getRecentMessages().stream().anyMatch(message -> messageId.equals(message.getId()));
-        if (!reported && !recent) throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        if (!reported && !recent) throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
         var snapshot = evidence.findByReportIdAndMessageId(reportId, messageId);
         ImageContent content;
         if (snapshot.isPresent()) {
             var item = snapshot.get();
-            if (item.getImageKey() == null) throw new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+            if (item.getImageKey() == null) throw new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
             String prefix = FileStoragePaths.chatImage(item.getSenderMemberId(), item.getRoomId());
             content = bounded(() -> new ImageContent(cipher.decrypt(storage.readEncryptedChatImage(item.getImageKey(), prefix), prefix),
                     item.getImageContentType(), item.getImageOriginalFilename()));
         } else content = readContent(messages.findById(messageId)
-                .orElseThrow(() -> new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND)));
+                .orElseThrow(() -> new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND)));
         audit.recordAccess(admin, reportId, messageId, ChatReportAccessAudit.Action.IMAGE);
         return content;
     }
 
     private ImageContent readContent(ChatMessage message) {
-        if (message.getImageKey() == null) throw new ChatException("사진을 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
+        if (message.getImageKey() == null) throw new ChatException("사진을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
         String prefix = FileStoragePaths.chatImage(message.getSenderMemberId(), message.getRoom().getId());
         return bounded(() -> new ImageContent(cipher.decrypt(storage.readEncryptedChatImage(message.getImageKey(), prefix), prefix),
                 message.getImageContentType(), message.getImageOriginalFilename()));

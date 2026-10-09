@@ -36,11 +36,11 @@ export default function ChatReportDialog({ roomId, viewerRole, messageId, onClos
                 details: details.trim() || undefined, ...(messageId ? { messageId } : {}) });
             if (openedRevision !== useAuthStore.getState().sessionRevision) return;
             setVisible(false);
-            message.success('신고를 접수했습니다. 관리자가 확인할게요.');
+            message.success('신고를 접수했어요. 관리자가 확인할게요.');
         } catch (error_) {
             if (openedRevision === useAuthStore.getState().sessionRevision) message.error(
                 (error_?.status ?? error_?.response?.status) === 429
-                    ? '신고 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' : '신고를 접수하지 못했습니다.');
+                    ? '신고 요청이 너무 많아요. 잠시 후 다시 시도해주세요.' : '신고를 접수하지 못했어요.');
         } finally { active.current = false; setSubmitting(false); }
     };
     return <FormModal title={messageId ? '메시지 신고' : '대화 신고'} open={visible && openedRevision === revision}

@@ -16,7 +16,7 @@ public class InquiryException extends BusinessException {
 
     /** 404 - 문의를 찾을 수 없을 때 */
     public static InquiryException notFound() {
-        return new InquiryException("존재하지 않는 문의입니다.", HttpStatus.NOT_FOUND);
+        return new InquiryException("존재하지 않는 문의예요.", HttpStatus.NOT_FOUND);
     }
 
     /** 403 - 권한 없음 */

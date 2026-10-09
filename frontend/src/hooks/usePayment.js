@@ -53,7 +53,7 @@ const usePayment = () => {
                     buyerName, buyerEmail, buyerTel } = prepared;
 
             if (!storeId) {
-                message.error('결제 설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+                message.error('결제 설정을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
                 setPaying(false);
                 return { success: false };
             }
@@ -86,7 +86,7 @@ const usePayment = () => {
                     || (payment.message || '').includes('취소')
                     || (payment.message || '').toLowerCase().includes('cancel');
                 if (!isCancelled) {
-                    message.error(payment.message || '결제에 실패했습니다.');
+                    message.error(payment.message || '결제에 실패했어요.');
                 }
                 setPaying(false);
                 return { success: false, cancelled: isCancelled };
@@ -106,7 +106,7 @@ const usePayment = () => {
                 );
                 return { success: true };
             } catch (err) {
-                const msg = err instanceof Error ? err.message : '결제 검증에 실패했습니다.';
+                const msg = err instanceof Error ? err.message : '결제 검증에 실패했어요.';
                 navigate(
                     `/payment/result?success=false` +
                     `&merchant_uid=${encodeURIComponent(payment.paymentId)}` +
@@ -118,7 +118,7 @@ const usePayment = () => {
             }
         } catch (err) {
             // requestPayment 는 결제창이 뜨기 전 단계의 오류(파라미터 형식·네트워크)만 throw 한다.
-            const msg = err instanceof Error ? err.message : '결제 준비에 실패했습니다.';
+            const msg = err instanceof Error ? err.message : '결제 준비에 실패했어요.';
             message.error(msg);
             setPaying(false);
             return { success: false };

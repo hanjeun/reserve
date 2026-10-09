@@ -36,11 +36,11 @@ public class ReviewService {
         log.info("Review created: reservationId={}, memberId={}", request.getReservationId(), member.getId());
 
         if (!member.isTermsAgreed()) {
-            throw new ReviewException("서비스 이용 약관에 동의해야 리뷰를 작성할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ReviewException("서비스 이용 약관에 동의해야 리뷰를 작성할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         Reservation reservation = reservationRepository.findById(request.getReservationId())
-                .orElseThrow(() -> new ReviewException("예약을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReviewException("예약을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
         // 작성 자격 검증 (분리된 메서드 호출)
         validateReviewEligibility(reservation, member);
@@ -149,7 +149,7 @@ public class ReviewService {
         Long storeId = store.getId();
         // LAZY 프록시 충돌 방지: DB에서 직접 조회한 엔티티에 갱신
         Store managed = storeRepository.findById(storeId)
-                .orElseThrow(() -> new RuntimeException("가게를 찾을 수 없습니다: " + storeId));
+                .orElseThrow(() -> new RuntimeException("가게를 찾을 수 없어요: " + storeId));
         Double avg = reviewRepository.findAverageRatingByStoreId(storeId);
         long count = reviewRepository.countByStoreId(storeId);
         managed.setRating(avg != null ? Math.round(avg * 10) / 10.0 : null);
@@ -160,27 +160,27 @@ public class ReviewService {
 
     private Review findReviewByIdOrThrow(Long id) {
         return reviewRepository.findById(id)
-                .orElseThrow(() -> new ReviewException("리뷰를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ReviewException("리뷰를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     private void validateReviewOwnership(Review review, Member member) {
         if (!review.getMember().getId().equals(member.getId())) {
-            throw new ReviewException("본인의 리뷰만 관리할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ReviewException("본인의 리뷰만 관리할 수 있어요.", HttpStatus.FORBIDDEN);
         }
     }
 
     private void validateReviewEligibility(Reservation reservation, Member member) {
         // 1. 본인 확인
         if (!reservation.getMember().getId().equals(member.getId())) {
-            throw new ReviewException("본인의 예약에만 리뷰를 작성할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new ReviewException("본인의 예약에만 리뷰를 작성할 수 있어요.", HttpStatus.FORBIDDEN);
         }
         // 2. 상태 확인
         if (reservation.getStatus() != Reservation.ReservationStatus.COMPLETED) {
-            throw new ReviewException("이용완료된 예약에만 리뷰를 작성할 수 있습니다.", HttpStatus.BAD_REQUEST);
+            throw new ReviewException("이용완료된 예약에만 리뷰를 작성할 수 있어요.", HttpStatus.BAD_REQUEST);
         }
         // 3. 중복 확인
         if (reviewRepository.existsByReservationId(reservation.getId())) {
-            throw new ReviewException("이미 리뷰를 작성한 예약입니다.", HttpStatus.CONFLICT);
+            throw new ReviewException("이미 리뷰를 작성한 예약이에요.", HttpStatus.CONFLICT);
         }
     }
 }

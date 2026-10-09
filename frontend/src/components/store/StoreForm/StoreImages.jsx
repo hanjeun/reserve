@@ -46,7 +46,7 @@ const StoreImages = ({
 }) => {
     const withinRequestLimit = (nextMain, nextDetails) => {
         if (uploadListBytes([...nextMain, ...nextDetails]) <= MAX_IMAGE_REQUEST_BYTES) return true;
-        antMessage.error(`새로 올리는 이미지 전체 합계는 ${MAX_IMAGE_REQUEST_MB}MB 이하여야 합니다.`);
+        antMessage.error(`새로 올리는 이미지 전체 합계는 ${MAX_IMAGE_REQUEST_MB}MB 이하여야 해요.`);
         return false;
     };
 
@@ -69,7 +69,7 @@ const StoreImages = ({
                 label="대표 이미지"
                 name="mainImage"
                 getValueFromEvent={normFileList}
-                extra={<span>대표 이미지는 가게 카드와 고객의 가게 문의 채팅 사진에 표시됩니다. 변경하면 채팅 사진도 함께 바뀝니다.<br />JPG · PNG · WEBP · GIF / 새 이미지 전체 합계 최대 {MAX_IMAGE_REQUEST_MB}MB</span>}
+                extra={<span>대표 이미지는 가게 카드와 고객의 가게 문의 채팅 사진에 표시돼요. 변경하면 채팅 사진도 함께 바뀌어요.<br />JPG · PNG · WEBP · GIF / 새 이미지 전체 합계 최대 {MAX_IMAGE_REQUEST_MB}MB</span>}
                 rules={mainImageRequired ? [{ required: true, message: '대표 이미지를 등록해주세요' }] : []}
             >
                 <Upload
@@ -114,7 +114,7 @@ const StoreImages = ({
                 label="사진 자동 넘김"
                 name="imageAutoplayEnabled"
                 valuePropName="checked"
-                extra="가게 상세의 사진을 자동으로 넘깁니다. 끄면 직접 넘길 수 있어요."
+                extra="가게 상세의 사진을 자동으로 넘겨요. 끄면 직접 넘길 수 있어요."
             >
                 <Switch />
             </Form.Item>

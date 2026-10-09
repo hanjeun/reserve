@@ -92,21 +92,21 @@ class EmailServiceEnvelopeTest {
                         List.of("이메일 인증을", "742915")),
                 new MailCase("예약 취소", service -> service.sendReservationCancelledByStoreEmail(
                         MEMBER_EMAIL, MEMBER_NAME, STORE_NAME, "2026-10-03", "오후 2시", 3, REASON),
-                        MEMBER_EMAIL, "[RESERVE] 예약이 취소되었습니다", null,
+                        MEMBER_EMAIL, "[RESERVE] 예약이 취소됐어요", null,
                         List.of(MEMBER_HTML, STORE_HTML, "2026-10-03", "오후 2시", "3명", REASON_HTML)),
                 new MailCase("사업자 신규 예약", service -> service.sendNewReservationAlertToOwner(
                         OWNER_EMAIL, "점주 한글 🏠 <b>김사장</b>", MEMBER_NAME, MEMBER_EMAIL,
                         new EmailService.ReservationMailDetails(STORE_NAME, "2026-10-03", "오후 2시", 3)),
-                        OWNER_EMAIL, "[RESERVE] 새로운 예약이 접수되었습니다", MEMBER_EMAIL,
+                        OWNER_EMAIL, "[RESERVE] 새로운 예약이 접수됐어요", MEMBER_EMAIL,
                         List.of("점주 한글 🏠 &lt;b&gt;김사장&lt;/b&gt;", STORE_HTML, MEMBER_HTML,
                                 "mailto:" + MEMBER_EMAIL, "오후 2시", "3명")),
                 new MailCase("사업자 승인", service -> service.sendBusinessApprovedEmail(
                         MEMBER_EMAIL, MEMBER_NAME, STORE_NAME),
-                        MEMBER_EMAIL, "[RESERVE] 사업자 인증이 승인되었습니다", null,
-                        List.of(MEMBER_HTML, STORE_HTML, "예약팀 한글 caf&eacute; 🌿", "사업자 인증이 완료되었습니다!")),
+                        MEMBER_EMAIL, "[RESERVE] 사업자 인증이 승인됐어요", null,
+                        List.of(MEMBER_HTML, STORE_HTML, "예약팀 한글 caf&eacute; 🌿", "사업자 인증이 완료됐어요!")),
                 new MailCase("사업자 반려", service -> service.sendBusinessRejectedEmail(
                         MEMBER_EMAIL, MEMBER_NAME, STORE_NAME, REASON),
-                        MEMBER_EMAIL, "[RESERVE] 사업자 인증이 반려되었습니다", null,
+                        MEMBER_EMAIL, "[RESERVE] 사업자 인증이 반려됐어요", null,
                         List.of(MEMBER_HTML, STORE_HTML, "예약팀 한글 caf&eacute; 🌿", REASON_HTML)),
                 new MailCase("운영자 문의", service -> service.sendNewInquiryAlert(
                         MEMBER_NAME, MEMBER_EMAIL, "결제 & <b>계정</b>",

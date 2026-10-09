@@ -84,10 +84,10 @@ public class PasswordResetService {
     @Transactional(noRollbackFor = BusinessException.class)
     public void verifyCode(String email, String code) {
         PasswordResetToken token = findLatestTokenForUpdate(email)
-                .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST));
+                .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않아요. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST));
 
         if (token.isExpired()) {
-            throw new MemberException("인증 시간이 만료되었습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
+            throw new MemberException("인증 시간이 만료됐어요. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
         }
         requireAttemptsLeft(token);
 
@@ -95,7 +95,7 @@ public class PasswordResetService {
             token.recordFailedAttempt();
             log.warn("Password reset code mismatch: attempt={}/{}",
                     token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
-            throw new MemberException("인증 코드가 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new MemberException("인증 코드가 일치하지 않아요.", HttpStatus.BAD_REQUEST);
         }
         token.markVerified();
     }
@@ -110,7 +110,7 @@ public class PasswordResetService {
         if (token.isAttemptExhausted()) {
             log.warn("Password reset code attempts exhausted");
             throw new MemberException(
-                    "인증 시도 횟수를 초과했습니다. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
+                    "인증 시도 횟수를 초과했어요. 코드를 재발송해주세요.", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -133,10 +133,10 @@ public class PasswordResetService {
         // 재발송과 같은 member → token 순서를 지켜 잠금 순환과 중복 소비를 막는다.
         var memberOpt = memberRepository.findActiveByEmailForUpdate(email);
         PasswordResetToken token = findLatestTokenForUpdate(email)
-                .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않습니다.", HttpStatus.BAD_REQUEST));
+                .orElseThrow(() -> new MemberException("인증 코드가 존재하지 않아요.", HttpStatus.BAD_REQUEST));
 
         if (token.isExpired()) {
-            throw new MemberException("인증 시간이 만료되었습니다. 다시 시도해주세요.", HttpStatus.BAD_REQUEST);
+            throw new MemberException("인증 시간이 만료됐어요. 다시 시도해주세요.", HttpStatus.BAD_REQUEST);
         }
         requireAttemptsLeft(token);
 
@@ -144,7 +144,7 @@ public class PasswordResetService {
             token.recordFailedAttempt();
             log.warn("Password reset code mismatch on reset: attempt={}/{}",
                     token.getAttemptCount(), PasswordResetToken.MAX_VERIFY_ATTEMPTS);
-            throw new MemberException("잘못된 접근입니다.", HttpStatus.BAD_REQUEST);
+            throw new MemberException("잘못된 접근이에요.", HttpStatus.BAD_REQUEST);
         }
         if (!token.isVerified()) {
             throw new MemberException("코드 인증을 먼저 완료해주세요.", HttpStatus.BAD_REQUEST);
@@ -162,7 +162,7 @@ public class PasswordResetService {
         // 토큰 검증을 먼저 통과한 뒤에 두었으므로 임의의 외부인이 이 경로로 외부 API 를 두드릴 수 없다.
         if (pwnedPasswordChecker.isPwned(newPassword)) {
             throw new MemberException(
-                    "다른 사이트에서 유출된 적이 있는 비밀번호입니다. 다른 비밀번호를 사용해주세요.",
+                    "다른 사이트에서 유출된 적이 있는 비밀번호예요. 다른 비밀번호를 사용해주세요.",
                     HttpStatus.BAD_REQUEST);
         }
 

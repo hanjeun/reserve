@@ -21,8 +21,8 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/member")
 public class MemberApiController {
 
-    private static final String MEMBER_NOT_FOUND_MESSAGE = "인증된 사용자 정보를 찾을 수 없습니다.";
-    private static final String UPDATE_PERMISSION_DENIED_MESSAGE = "수정 권한이 없습니다.";
+    private static final String MEMBER_NOT_FOUND_MESSAGE = "인증된 사용자 정보를 찾을 수 없어요.";
+    private static final String UPDATE_PERMISSION_DENIED_MESSAGE = "수정 권한이 없어요.";
 
     private final MemberService memberService;
     private final CookieUtil cookieUtil;
@@ -40,7 +40,7 @@ public class MemberApiController {
     public ApiResponse<MemberResponse> updateMember(@RequestBody MemberUpdateRequest request) {
         Member member = SecurityUtil.getCurrentMember(UPDATE_PERMISSION_DENIED_MESSAGE);
         MemberResponse updated = memberService.updateMember(member.getId(), request);
-        return ApiResponse.success(updated, "회원 정보가 성공적으로 수정되었습니다.");
+        return ApiResponse.success(updated, "회원 정보가 성공적으로 수정됐어요.");
     }
 
     // 비밀번호 변경은 일반 프로필 수정과 분리한다. 현재 비밀번호 재인증과 전체 세션 폐기가 필수다.
@@ -48,11 +48,11 @@ public class MemberApiController {
     public ApiResponse<Void> changePassword(
             @Valid @RequestBody PasswordChangeRequest request,
             HttpServletResponse response) {
-        Member member = SecurityUtil.getCurrentMember("비밀번호 변경 권한이 없습니다.");
+        Member member = SecurityUtil.getCurrentMember("비밀번호 변경 권한이 없어요.");
         memberService.changePassword(member.getId(), request);
         cookieUtil.deleteCookie(response, "access_token");
         cookieUtil.deleteCookie(response, "refresh_token");
-        return ApiResponse.success(null, "비밀번호가 변경되었습니다. 다시 로그인해주세요.");
+        return ApiResponse.success(null, "비밀번호가 변경됐어요. 다시 로그인해주세요.");
     }
 
     // 프로필 이미지 업로드
@@ -60,7 +60,7 @@ public class MemberApiController {
     public ApiResponse<MemberResponse> uploadProfileImage(@RequestParam("image") MultipartFile image) {
         Member member = SecurityUtil.getCurrentMember(UPDATE_PERMISSION_DENIED_MESSAGE);
         MemberResponse updated = memberService.updateProfileImage(member.getId(), image);
-        return ApiResponse.success(updated, "프로필 이미지가 업데이트되었습니다.");
+        return ApiResponse.success(updated, "프로필 이미지가 업데이트됐어요.");
     }
 
     // 프로필 이미지 삭제 (기본 이미지로 초기화)
@@ -68,7 +68,7 @@ public class MemberApiController {
     public ApiResponse<MemberResponse> deleteProfileImage() {
         Member member = SecurityUtil.getCurrentMember(UPDATE_PERMISSION_DENIED_MESSAGE);
         MemberResponse updated = memberService.deleteProfileImage(member.getId());
-        return ApiResponse.success(updated, "프로필 이미지가 초기화되었습니다.");
+        return ApiResponse.success(updated, "프로필 이미지가 초기화됐어요.");
     }
 
     // 마케팅 수신 동의 토글 (선택 동의 — 가입 후 언제든 변경 가능)
@@ -77,7 +77,7 @@ public class MemberApiController {
         Member member = SecurityUtil.getCurrentMember(MEMBER_NOT_FOUND_MESSAGE);
         boolean agreed = Boolean.TRUE.equals(body.get("marketingAgreed"));
         MemberResponse updated = memberService.updateMarketingConsent(member.getId(), agreed);
-        return ApiResponse.success(updated, agreed ? "마케팅 수신에 동의했습니다." : "마케팅 수신 동의를 철회했습니다.");
+        return ApiResponse.success(updated, agreed ? "마케팅 수신에 동의했어요." : "마케팅 수신 동의를 철회했어요.");
     }
 
     // 위치(위도/경도) 등록 — 거리순 가게 정렬용. Geolocation 거부/미지원 시 주소 검색 폴백으로 호출
@@ -85,13 +85,13 @@ public class MemberApiController {
     public ApiResponse<MemberResponse> updateLocation(@RequestBody LocationUpdateRequest body) {
         Member member = SecurityUtil.getCurrentMember(MEMBER_NOT_FOUND_MESSAGE);
         MemberResponse updated = memberService.updateLocation(member.getId(), body);
-        return ApiResponse.success(updated, "위치가 등록되었습니다.");
+        return ApiResponse.success(updated, "위치가 등록됐어요.");
     }
 
     // 회원 탈퇴
     @GetMapping("/withdrawal-readiness")
     public ApiResponse<MemberWithdrawalReadiness> getWithdrawalReadiness() {
-        Member member = SecurityUtil.getCurrentMember("탈퇴 준비 상태를 확인할 권한이 없습니다.");
+        Member member = SecurityUtil.getCurrentMember("탈퇴 준비 상태를 확인할 권한이 없어요.");
         return ApiResponse.success(
                 memberService.getWithdrawalReadiness(member.getId()),
                 "탈퇴 준비 상태 조회 성공");
@@ -99,10 +99,10 @@ public class MemberApiController {
 
     @DeleteMapping("/delete")
     public ApiResponse<Void> deleteMember(HttpServletResponse response) {
-        Member member = SecurityUtil.getCurrentMember("탈퇴 권한이 없습니다.");
+        Member member = SecurityUtil.getCurrentMember("탈퇴 권한이 없어요.");
         memberService.deleteMember(member.getId());
         cookieUtil.deleteCookie(response, "access_token");
         cookieUtil.deleteCookie(response, "refresh_token");
-        return ApiResponse.success(null, "회원 탈퇴가 완료되었습니다.");
+        return ApiResponse.success(null, "회원 탈퇴가 완료됐어요.");
     }
 }

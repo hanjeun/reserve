@@ -24,6 +24,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -69,8 +72,9 @@ class EmailVerificationServiceContractTest {
     @NullSource
     @MethodSource("resendEligibleCreationTimes")
     @DisplayName("생성 시각이 없거나 정확히 1분이 지난 코드는 재발급하여 인증에 사용할 수 있다")
-    void eligibleResendIssuesAndConsumesTheMailedCode(LocalDateTime previousCreationTime) {
+    void eligibleResendReplacesTheLockedCodeAndInvalidatesItsProof(LocalDateTime previousCreationTime) {
         EmailVerification previous = verification(previousCreationTime, NOW.plusMinutes(4));
+        previous.setVerificationTicketHash("old-proof");
         when(memberRepository.findByEmailAndDeletedAtIsNull(EMAIL)).thenReturn(Optional.empty());
         when(verificationRepository.findTopByEmailOrderByCreatedAtDesc(EMAIL))
                 .thenReturn(Optional.of(previous));
@@ -79,15 +83,15 @@ class EmailVerificationServiceContractTest {
 
         InOrder delivery = inOrder(verificationRepository, emailService);
         ArgumentCaptor<EmailVerification> saved = ArgumentCaptor.forClass(EmailVerification.class);
-        delivery.verify(verificationRepository).deleteByEmail(EMAIL);
-        delivery.verify(verificationRepository).save(saved.capture());
+        delivery.verify(verificationRepository).saveAndFlush(saved.capture());
         EmailVerification issued = saved.getValue();
-        assertThat(issued).isNotSameAs(previous);
+        assertThat(issued).isSameAs(previous);
         assertThat(issued.getEmail()).isEqualTo(EMAIL);
         assertThat(issued.getVerificationCode()).matches("[0-9]{6}");
         assertThat(issued.getExpiresAt()).isEqualTo(LocalDateTime.of(2026, 10, 3, 12, 5));
         assertThat(issued.getVerified()).isFalse();
         assertThat(issued.getAttemptCount()).isZero();
+        assertThat(issued.getVerificationTicketHash()).isNull();
         delivery.verify(emailService).sendVerificationEmail(EMAIL, issued.getVerificationCode());
         delivery.verifyNoMoreInteractions();
 
@@ -95,11 +99,9 @@ class EmailVerificationServiceContractTest {
                 .thenReturn(Optional.of(issued));
         assertThat(service.verifyCode(EMAIL, issued.getVerificationCode())).isTrue();
         assertThat(issued.getVerified()).isTrue();
-        assertThat(previous.getVerified()).isFalse();
-        assertThat(previous.getAttemptCount()).isEqualTo(2);
         verify(memberRepository).findByEmailAndDeletedAtIsNull(EMAIL);
         verify(verificationRepository, times(2)).findTopByEmailOrderByCreatedAtDesc(EMAIL);
-        verify(verificationRepository, times(2)).save(issued);
+        verify(verificationRepository).save(issued);
         verifyNoMoreInteractions(memberRepository, verificationRepository, emailService);
     }
 
@@ -114,7 +116,7 @@ class EmailVerificationServiceContractTest {
         assertThatThrownBy(() -> service.sendVerificationCode(EMAIL))
                 .isInstanceOfSatisfying(EmailException.class, exception -> {
                     assertThat(exception.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-                    assertThat(exception).hasMessage("인증 코드를 이미 발송했습니다. 1분 후 다시 시도해주세요.");
+                    assertThat(exception).hasMessage("인증 코드를 이미 발송했어요. 1분 후 다시 시도해주세요.");
                 });
 
         assertThat(previous.getVerificationCode()).isEqualTo(EXISTING_CODE);
@@ -136,7 +138,7 @@ class EmailVerificationServiceContractTest {
         assertThatThrownBy(() -> service.verifyCode(EMAIL, EXISTING_CODE))
                 .isInstanceOfSatisfying(EmailException.class, exception -> {
                     assertThat(exception.getStatus()).isEqualTo(HttpStatus.GONE);
-                    assertThat(exception).hasMessage("인증 시간이 만료되었습니다. 다시 요청해주세요.");
+                    assertThat(exception).hasMessage("인증 시간이 만료됐어요. 다시 요청해주세요.");
                 });
 
         assertThat(expired.getVerified()).isFalse();
@@ -144,6 +146,62 @@ class EmailVerificationServiceContractTest {
         verify(verificationRepository).findTopByEmailOrderByCreatedAtDesc(EMAIL);
         verifyNoMoreInteractions(verificationRepository);
         verifyNoInteractions(memberRepository, emailService);
+    }
+
+    @Test
+    void verifiedProofKeepsTheOriginalExpiryAndIsConsumedOnce() throws Exception {
+        EmailVerification verification = verification(NOW.minusMinutes(1), NOW.plusMinutes(4));
+        when(verificationRepository.findTopByEmailOrderByCreatedAtDesc(EMAIL)).thenReturn(Optional.of(verification));
+
+        var result = service.verifyCodeAndIssueTicket(EMAIL, EXISTING_CODE);
+        assertThat(result.verificationTicket()).matches("[A-Za-z0-9_-]{43}");
+        assertThat(result.expiresAt()).isEqualTo(NOW.plusMinutes(4).atZone(ZoneId.systemDefault()).toInstant());
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(result.verificationTicket().getBytes(StandardCharsets.US_ASCII)));
+        assertThat(verification.getVerificationTicketHash()).isEqualTo(hash).isNotEqualTo(result.verificationTicket());
+
+        service.consumeVerifiedEmail(EMAIL, result.verificationTicket());
+        InOrder consumption = inOrder(verificationRepository);
+        consumption.verify(verificationRepository).delete(verification);
+        consumption.verify(verificationRepository).flush();
+        when(verificationRepository.findTopByEmailOrderByCreatedAtDesc(EMAIL)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.consumeVerifiedEmail(EMAIL, result.verificationTicket())).isInstanceOf(EmailException.class);
+        verify(verificationRepository).delete(verification);
+    }
+
+    @Test
+    void knowingTheEmailAloneCannotConsumeSomeoneElsesVerification() {
+        EmailVerification verification = verification(NOW.minusMinutes(1), NOW.plusMinutes(4));
+        when(verificationRepository.findTopByEmailOrderByCreatedAtDesc(EMAIL)).thenReturn(Optional.of(verification));
+        service.verifyCodeAndIssueTicket(EMAIL, EXISTING_CODE);
+        assertThatThrownBy(() -> service.consumeVerifiedEmail(EMAIL, "wrong".repeat(8) + "abc")).isInstanceOf(EmailException.class);
+        verify(verificationRepository, org.mockito.Mockito.never()).delete(verification);
+        assertThat(verification.getVerified()).isTrue();
+    }
+
+    @Test
+    void aVerifiedEmailIsStillExpiredAtItsOriginalDeadline() {
+        EmailVerification verification = verification(NOW.minusMinutes(5), NOW);
+        verification.setVerified(true);
+        when(verificationRepository.findByEmailAndVerifiedTrue(EMAIL)).thenReturn(Optional.of(verification));
+        when(verificationRepository.findTopByEmailOrderByCreatedAtDesc(EMAIL)).thenReturn(Optional.of(verification));
+        assertThat(service.isEmailVerified(EMAIL)).isFalse();
+        assertThatThrownBy(() -> service.consumeVerifiedEmail(EMAIL, "a".repeat(43))).isInstanceOf(EmailException.class);
+        verify(verificationRepository, org.mockito.Mockito.never()).delete(verification);
+    }
+
+    @Test
+    void failedTicketVerificationCountsAttemptsAndStopsAtFive() {
+        EmailVerification verification = verification(NOW.minusMinutes(1), NOW.plusMinutes(4));
+        verification.setAttemptCount(0);
+        when(verificationRepository.findTopByEmailOrderByCreatedAtDesc(EMAIL)).thenReturn(Optional.of(verification));
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThatThrownBy(() -> service.verifyCodeAndIssueTicket(EMAIL, "000000")).isInstanceOf(EmailException.class);
+        }
+        assertThat(verification.getAttemptCount()).isEqualTo(5);
+        assertThatThrownBy(() -> service.verifyCodeAndIssueTicket(EMAIL, EXISTING_CODE)).isInstanceOf(EmailException.class);
+        assertThat(verification.getVerified()).isFalse();
+        assertThat(verification.getVerificationTicketHash()).isNull();
     }
 
     private static Stream<LocalDateTime> resendEligibleCreationTimes() {

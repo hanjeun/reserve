@@ -34,18 +34,18 @@ describe('ChatReportsPanel', () => {
         chatService.listReports.mockResolvedValue(null);
         renderPanel();
 
-        expect(await screen.findByText('해당 상태의 채팅 신고가 없습니다.')).toBeInTheDocument();
+        expect(await screen.findByText('해당 상태의 채팅 신고가 없어요.')).toBeInTheDocument();
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: '가게 대화 신고' })).not.toBeInTheDocument();
     });
 
     it('distinguishes a missing server route from an empty report list', async () => {
-        chatService.listReports.mockRejectedValue(Object.assign(new Error('정보를 찾을 수 없습니다.'), { status: 404 }));
+        chatService.listReports.mockRejectedValue(Object.assign(new Error('정보를 찾을 수 없어요.'), { status: 404 }));
         renderPanel();
 
         const alert = await screen.findByRole('alert');
-        expect(alert).toHaveTextContent('요청한 채팅 신고를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
-        expect(screen.queryByText('해당 상태의 채팅 신고가 없습니다.')).not.toBeInTheDocument();
+        expect(alert).toHaveTextContent('요청한 채팅 신고를 불러올 수 없어요. 잠시 후 다시 시도해주세요.');
+        expect(screen.queryByText('해당 상태의 채팅 신고가 없어요.')).not.toBeInTheDocument();
     });
 
     it('uses one status roller on the left and keeps the count and refresh control in the toolbar', async () => {

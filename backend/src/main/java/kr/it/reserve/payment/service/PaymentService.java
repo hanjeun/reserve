@@ -64,15 +64,15 @@ public class PaymentService {
         if (reservation.getMember() == null || !reservation.getMember().getId().equals(memberId)) {
             log.warn("Payment prepare denied - not owner: reservationId={}, memberId={}",
                     reservation.getId(), memberId);
-            throw new PaymentException("본인의 예약만 결제할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new PaymentException("본인의 예약만 결제할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         if (isPaymentClosedFor(reservation)) {
-            throw new PaymentException("취소되거나 종료된 예약은 결제할 수 없습니다.", HttpStatus.CONFLICT);
+            throw new PaymentException("취소되거나 종료된 예약은 결제할 수 없어요.", HttpStatus.CONFLICT);
         }
 
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
-            throw new PaymentException("이미 결제가 완료된 예약입니다.", HttpStatus.CONFLICT);
+            throw new PaymentException("이미 결제가 완료된 예약이에요.", HttpStatus.CONFLICT);
         }
 
         // ★ 결제 금액은 서버에서만 정한다 (2026-08-09).
@@ -82,7 +82,7 @@ public class PaymentService {
         //   예약금을 그 금액으로 덮어썼다. 요청 본문의 amount 는 이제 무시한다.
         int amount = resolveDepositAmount(reservation);
         if (amount <= 0) {
-            throw new PaymentException("결제할 예약금이 없는 예약입니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("결제할 예약금이 없는 예약이에요.", HttpStatus.BAD_REQUEST);
         }
 
         // 기존 READY 상태 Payment가 있으면 재사용 (결제창 재시도 지원)
@@ -173,7 +173,7 @@ public class PaymentService {
         if (payment.getMember() == null || !payment.getMember().getId().equals(requester.getId())) {
             log.warn("Payment verify denied - not owner: merchantUid={}, requesterId={}",
                     verifyDto.getMerchantUid(), requester.getId());
-            throw new PaymentException("본인의 결제만 검증할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new PaymentException("본인의 결제만 검증할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         return verifyAndCompletePayment(verifyDto);
@@ -192,7 +192,7 @@ public class PaymentService {
             return PaymentResponseDto.fromEntity(payment);
         }
         if (payment.getStatus() != Payment.PaymentStatus.READY) {
-            throw new PaymentException("검증할 수 있는 결제 상태가 아닙니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("검증할 수 있는 결제 상태가 아니에요.", HttpStatus.BAD_REQUEST);
         }
 
         // V2 API: merchantUid(=paymentId)로 조회
@@ -232,7 +232,7 @@ public class PaymentService {
                     payment,
                     payment.getStatus().name());
             throw new PaymentException(
-                    "결제 완료 상태를 자동 반영할 수 없습니다. 관리자 확인이 필요합니다.",
+                    "결제 완료 상태를 자동 반영할 수 없어요. 관리자 확인이 필요해요.",
                     HttpStatus.CONFLICT);
         }
 
@@ -460,7 +460,7 @@ public class PaymentService {
             return PaymentResponseDto.fromEntity(lockedPayment);
         }
         if (lockedPayment.getStatus() != Payment.PaymentStatus.READY) {
-            throw new PaymentException("검증할 수 있는 결제 상태가 아닙니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("검증할 수 있는 결제 상태가 아니에요.", HttpStatus.BAD_REQUEST);
         }
 
         completeLockedReadyPayment(lockedPayment, portonePayment, fallbackImpUid);
@@ -478,7 +478,7 @@ public class PaymentService {
                     payment,
                     payment.getReservation().getStatus().name());
             throw new PaymentException(
-                    "취소되거나 종료된 예약의 결제가 확인되었습니다. 관리자 확인이 필요합니다.",
+                    "취소되거나 종료된 예약의 결제가 확인됐어요. 관리자 확인이 필요해요.",
                     HttpStatus.CONFLICT);
         }
 
@@ -489,12 +489,12 @@ public class PaymentService {
                     payment,
                     "EXPECTED_" + payment.getAmount() + "_ACTUAL_" + portonePayment.getAmount());
             payment.failPayment("결제 금액 불일치");
-            throw new PaymentException("결제 금액이 일치하지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("결제 금액이 일치하지 않아요.", HttpStatus.BAD_REQUEST);
         }
 
         if (!portonePayment.isPaid()) {
             payment.failPayment("결제 상태 이상: " + portonePayment.getStatus());
-            throw new PaymentException("결제가 완료되지 않았습니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("결제가 완료되지 않았어요.", HttpStatus.BAD_REQUEST);
         }
 
         // V2에서 pgTxId = imp_uid에 해당하는 PG사 거래번호
@@ -515,7 +515,7 @@ public class PaymentService {
                     payment,
                     reservation.getStatus().name());
             throw new PaymentException(
-                    "취소되거나 종료된 예약의 결제가 확인되었습니다. 관리자 확인이 필요합니다.",
+                    "취소되거나 종료된 예약의 결제가 확인됐어요. 관리자 확인이 필요해요.",
                     HttpStatus.CONFLICT);
         }
         reservation.markDepositPaid(payment.getAmount());
@@ -614,18 +614,18 @@ public class PaymentService {
         // 잠근 뒤에 다시 본다. 앞선 요청이 방금 바꿔놨을 수 있고, 그걸 여기서 걸러야 한다.
         if (payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING) {
             // 결말을 모르는 채로 또 취소를 걸면 이중 환불이다. 재시도는 스케줄러·웹훅이 결말을 확정한 뒤에.
-            throw new PaymentException("직전 환불 요청의 처리 결과를 확인하는 중입니다. 잠시 후 다시 시도해주세요.",
+            throw new PaymentException("직전 환불 요청의 처리 결과를 확인하는 중이에요. 잠시 후 다시 시도해주세요.",
                     HttpStatus.CONFLICT);
         }
         if (payment.getStatus() != Payment.PaymentStatus.PAID) {
-            throw new PaymentException("환불 가능한 결제 상태가 아닙니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("환불 가능한 결제 상태가 아니에요.", HttpStatus.BAD_REQUEST);
         }
         if (refundAttemptRepository.existsByPaymentIdAndStatusIn(
                 payment.getId(), RefundAttempt.UNRESOLVED)) {
             // 외부 취소 뒤 로컬 트랜잭션이 롤백되면 결제는 PAID지만 원장에는 미결 시도가 남는다.
             // 결제 상태만 보고 다시 보내지 말고, 먼저 앞선 요청을 PG 조회로 해소한다.
             throw new PaymentException(
-                    "직전 환불 요청의 처리 결과를 확인하는 중입니다. 잠시 후 다시 시도해주세요.",
+                    "직전 환불 요청의 처리 결과를 확인하는 중이에요. 잠시 후 다시 시도해주세요.",
                     HttpStatus.CONFLICT);
         }
 
@@ -639,7 +639,7 @@ public class PaymentService {
         if (attemptId == null) {
             // 추적할 내구성 있는 원장 없이 PG에 돈 요청을 보내지 않는다.
             throw new PaymentException(
-                    "환불 요청을 안전하게 기록하지 못했습니다. 잠시 후 다시 시도해주세요.",
+                    "환불 요청을 안전하게 기록하지 못했어요. 잠시 후 다시 시도해주세요.",
                     HttpStatus.SERVICE_UNAVAILABLE);
         }
 
@@ -707,7 +707,7 @@ public class PaymentService {
                 refundLedgerService.failed(attemptId, cancelResult.failureReason());
                 log.error("Refund rejected by PG: paymentId={}, merchantUid={}, status={}",
                         payment.getId(), payment.getMerchantUid(), cancelStatus);
-                throw new PaymentException("환불이 거절되었습니다. 고객센터로 문의해주세요.",
+                throw new PaymentException("환불이 거절됐어요. 고객센터로 문의해주세요.",
                         HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }
@@ -722,14 +722,14 @@ public class PaymentService {
         //   넘는 값이 들어오면 PG 가 거절하거나, 받아버리면 결제액보다 많은 돈이 나간다.
         //   호출측을 믿지 않고 여기서 한 번 더 자른다.
         if (refundAmount == null || refundAmount <= 0) {
-            throw new PaymentException("환불 금액이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("환불 금액이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
         // 2026-08-23: 비교 대상이 결제액 → **남은 환불 가능액** 으로 바뀌었다.
         // 부분 환불이 이미 있었다면 결제액 기준으로는 통과하면서 총액을 넘길 수 있었다.
         if (refundAmount > payment.remainingRefundable()) {
             log.warn("Refund amount exceeds refundable balance: paymentId={}, requested={}, paid={}, alreadyRefunded={}",
                     payment.getId(), refundAmount, payment.getAmount(), payment.refundedSoFar());
-            throw new PaymentException("환불 금액이 남은 환불 가능 금액을 초과합니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("환불 금액이 남은 환불 가능 금액을 초과해요.", HttpStatus.BAD_REQUEST);
         }
 
         return refundAmount;
@@ -951,7 +951,7 @@ public class PaymentService {
      */
     public PaymentResponseDto refundByMemberRequest(Long reservationId, String reason, Member requester) {
         if (reservationId == null) {
-            throw new PaymentException("예약 정보가 필요합니다.", HttpStatus.BAD_REQUEST);
+            throw new PaymentException("예약 정보가 필요해요.", HttpStatus.BAD_REQUEST);
         }
 
         Member currentRequester = memberRepository.findActiveByIdForUpdate(requester.getId())
@@ -968,18 +968,18 @@ public class PaymentService {
             // 남의 예약이 "존재한다"는 사실까지 알려줄 필요는 없다 — 404 가 아니라 403 으로도
             // 충분히 새지만, 여기서는 권한 없음을 명확히 하는 쪽이 디버깅에 낫다.
             log.warn("Refund denied - not owner: reservationId={}, requesterId={}", reservationId, currentRequester.getId());
-            throw new PaymentException("본인의 예약만 환불할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new PaymentException("본인의 예약만 환불할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         // 예약 상태 전환과 결제 취소는 취소·거절 흐름이 한 번에 관리한다.
         // 이 엔드포인트는 그 흐름의 환불이 실패로 끝났을 때의 재시도만 허용한다.
         // 예약이 살아 있는데 환불만 나가면 "예약은 유지, 돈은 환불"이라는 불일치가 생긴다.
         if (!REFUND_RETRYABLE_RESERVATION_STATUSES.contains(reservation.getStatus())) {
-            throw new PaymentException("환불은 예약을 취소한 후에 요청할 수 있습니다.", HttpStatus.CONFLICT);
+            throw new PaymentException("환불은 예약을 취소한 후에 요청할 수 있어요.", HttpStatus.CONFLICT);
         }
 
         Payment payment = paymentRepository.findPaidByReservationId(reservationId)
-                .orElseThrow(() -> new PaymentException("다시 환불할 결제가 없습니다.", HttpStatus.CONFLICT));
+                .orElseThrow(() -> new PaymentException("다시 환불할 결제가 없어요.", HttpStatus.CONFLICT));
 
         // ★ 금액은 원장의 마지막 실패 시도에서만 가져온다. 정책을 다시 태우지 않는다(위 주석 참고).
         RefundAttempt lastAttempt = lastRefundAttempt(payment.getId());
@@ -988,8 +988,8 @@ public class PaymentService {
                     reservationId, payment.getId(), lastAttempt == null ? "NONE" : lastAttempt.getStatus());
             throw new PaymentException(
                     lastAttempt != null && lastAttempt.isUnresolved()
-                            ? "직전 환불 요청의 처리 결과를 확인하는 중입니다. 잠시 후 다시 시도해주세요."
-                            : "다시 시도할 환불 요청이 없습니다. 고객센터로 문의해주세요.",
+                            ? "직전 환불 요청의 처리 결과를 확인하는 중이에요. 잠시 후 다시 시도해주세요."
+                            : "다시 시도할 환불 요청이 없어요. 고객센터로 문의해주세요.",
                     HttpStatus.CONFLICT);
         }
 
@@ -1136,7 +1136,7 @@ public class PaymentService {
         if (!isOwner && !isAdmin) {
             log.warn("Refund preview denied - not owner: reservationId={}, requesterId={}",
                     reservationId, requester.getId());
-            throw new PaymentException("본인의 예약만 조회할 수 있습니다.", HttpStatus.FORBIDDEN);
+            throw new PaymentException("본인의 예약만 조회할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
         return computeRefundAmount(reservationId);
@@ -1149,7 +1149,7 @@ public class PaymentService {
 
     private RefundCalculationResult computeRefundAmount(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new PaymentException("예약 정보를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new PaymentException("예약 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
         Store store = reservation.getStore();
         // ★ KST 기준 오늘이어야 한다 — 환불 구간을 가르는 숫자다.

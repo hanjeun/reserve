@@ -19,7 +19,7 @@ describe('useStoreData failure boundary', () => {
     beforeEach(() => vi.resetAllMocks());
 
     it.each([404, 410])('retains status %s and hides a cached store once the server says it is missing', async (status) => {
-        const missing = Object.assign(new Error('정보를 찾을 수 없습니다.'), { status });
+        const missing = Object.assign(new Error('정보를 찾을 수 없어요.'), { status });
         storeService.getStoreById.mockResolvedValueOnce({ id: 12, name: '가게' }).mockRejectedValue(missing);
 
         const { result } = renderStoreData(12);
@@ -34,7 +34,7 @@ describe('useStoreData failure boundary', () => {
     });
 
     it.each([401, 403])('hides previously loaded edit data after access is denied with %s', async (status) => {
-        const denied = Object.assign(new Error('접근 권한이 없습니다.'), { status });
+        const denied = Object.assign(new Error('접근 권한이 없어요.'), { status });
         storeService.getStoreForEdit.mockResolvedValueOnce({ id: 12, ownerId: 7 }).mockRejectedValueOnce(denied);
 
         const { result } = renderStoreData(12, { forEdit: true });

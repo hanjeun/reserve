@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRightOutlined, CloseCircleFilled, SearchOutlined } from '@ant-design/icons';
+import { CloseCircleFilled, CloseOutlined, SearchOutlined } from '@ant-design/icons';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
-import { DISCOVERY_ASSET_ROOT, SERVICE_DOMAIN_IMAGES } from '../../constants/discovery';
+import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
+import useRecentSearches from '../../hooks/useRecentSearches';
 
 // 안내용 예시다. 실측 인기 순위나 현재 위치 기반 추천으로 표현하지 않는다.
 const SEARCH_EXIT_DURATION_MS = 220;
@@ -17,6 +18,7 @@ export default function SearchPage() {
     const [keyword, setKeyword] = useState(() => searchParams.get('keyword') || '');
     const [isClosing, setIsClosing] = useState(false);
     const reducedMotion = useReducedMotion();
+    const { terms: recentSearches, add: rememberSearch, remove: removeSearch, clear: clearRecentSearches } = useRecentSearches();
     const inputRef = useRef(null);
     // 연달아 누른 취소가 뒤로가기를 두 번 하지 않게 한다(뒤로가기는 비동기라 화면이 잠깐 남아 있다).
     const closingRef = useRef(false);
@@ -52,7 +54,10 @@ export default function SearchPage() {
             inputRef.current?.focus();
             return;
         }
-        leaveSearch(() => navigate('/stores?keyword=' + encodeURIComponent(normalized)));
+        leaveSearch(() => {
+            rememberSearch(normalized);
+            navigate('/stores?keyword=' + encodeURIComponent(normalized), { replace: true });
+        });
     };
 
     const submitSearch = event => {
@@ -70,7 +75,7 @@ export default function SearchPage() {
         if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
         const destination = event.currentTarget.getAttribute('href');
-        leaveSearch(() => navigate(destination));
+        leaveSearch(() => navigate(destination, { replace: true }));
     };
 
     let motionClass = '';
@@ -122,11 +127,10 @@ export default function SearchPage() {
                     <h2 id="search-domains-title">어떤 서비스를 찾으세요?</h2>
                     <div className="reserve-search-domain-grid">
                         {SERVICE_DOMAIN_OPTIONS.map(domain => {
-                            const image = SERVICE_DOMAIN_IMAGES[domain.value];
                             return (
                                 <Link key={domain.value} to={'/stores?domain=' + encodeURIComponent(domain.value)} className="reserve-search-domain" onClick={followSearchLink}>
                                     <span className="reserve-search-domain-media" aria-hidden="true">
-                                        <img src={DISCOVERY_ASSET_ROOT + image.asset + '.webp'} alt="" width={image.width} height={image.height} />
+                                        <ServiceDomainIcon domain={domain.value} />
                                     </span>
                                     <span>{domain.label.replaceAll(' · ', '·')}</span>
                                 </Link>
@@ -144,10 +148,30 @@ export default function SearchPage() {
                     </div>
                 </section>
 
-                <Link to="/stores" className="reserve-search-browse-all" onClick={followSearchLink}>
-                    <span>가게 전체 보기</span>
-                    <ArrowRightOutlined aria-hidden="true" />
-                </Link>
+                <section className="reserve-search-recent" aria-labelledby="search-recent-title">
+                    <div className="reserve-search-recent-heading">
+                        <h2 id="search-recent-title">최근 검색</h2>
+                        {recentSearches.length > 0 && (
+                            <button type="button" className="reserve-search-recent-clear" onClick={clearRecentSearches}>전체 삭제</button>
+                        )}
+                    </div>
+                    <p className="reserve-search-recent-note">이 브라우저에만 저장돼요.</p>
+                    {recentSearches.length > 0 ? (
+                        <ul className="reserve-search-recent-list">
+                            {recentSearches.map(term => (
+                                <li key={term} className="reserve-search-recent-item">
+                                    <button type="button" className="reserve-search-recent-term" aria-label={`최근 검색: ${term}`} onClick={() => searchFor(term)}>
+                                        <SearchOutlined aria-hidden="true" />
+                                        <span>{term}</span>
+                                    </button>
+                                    <button type="button" className="reserve-search-recent-remove" aria-label={`최근 검색 삭제: ${term}`} onClick={() => removeSearch(term)}>
+                                        <CloseOutlined aria-hidden="true" />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : <p className="reserve-search-recent-empty">최근 검색한 내용이 없어요.</p>}
+                </section>
             </div>
         </div>
     );

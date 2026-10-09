@@ -92,7 +92,7 @@ public class AdminManagementController {
         int days = parseDays(body.getOrDefault("days", "7"));
         String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.suspendMember(id, days, reason);
-        return ApiResponse.success(null, days + "일간 정지 처리되었습니다.");
+        return ApiResponse.success(null, days + "일간 정지 처리됐어요.");
     }
 
     @PostMapping("/members/{id}/ban")
@@ -101,13 +101,13 @@ public class AdminManagementController {
             @RequestBody Map<String, String> body) {
         String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.banMember(id, reason);
-        return ApiResponse.success(null, "영구 정지 처리되었습니다.");
+        return ApiResponse.success(null, "영구 정지 처리됐어요.");
     }
 
     @PostMapping("/members/{id}/unban")
     public ApiResponse<Void> unbanMember(@PathVariable Long id) {
         adminSanctionService.unbanMember(id);
-        return ApiResponse.success(null, "정지가 해제되었습니다.");
+        return ApiResponse.success(null, "정지가 해제됐어요.");
     }
 
     // ── 가게 목록 조회 ────────────────────────────────────────────
@@ -138,7 +138,7 @@ public class AdminManagementController {
         int days = parseDays(body.getOrDefault("days", "7"));
         String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.suspendStore(id, days, reason);
-        return ApiResponse.success(null, days + "일간 영업정지 처리되었습니다.");
+        return ApiResponse.success(null, days + "일간 영업정지 처리됐어요.");
     }
 
     @PostMapping("/stores/{id}/ban")
@@ -147,13 +147,13 @@ public class AdminManagementController {
             @RequestBody Map<String, String> body) {
         String reason = body.getOrDefault(REASON_KEY, "");
         adminSanctionService.banStore(id, reason);
-        return ApiResponse.success(null, "영구 폐업 처리되었습니다.");
+        return ApiResponse.success(null, "영구 폐업 처리됐어요.");
     }
 
     @PostMapping("/stores/{id}/unban")
     public ApiResponse<Void> unbanStore(@PathVariable Long id) {
         adminSanctionService.unbanStore(id);
-        return ApiResponse.success(null, "영업정지가 해제되었습니다.");
+        return ApiResponse.success(null, "영업정지가 해제됐어요.");
     }
 
     // ── 예약 소프트 삭제 ──────────────────────────────────────────
@@ -163,7 +163,7 @@ public class AdminManagementController {
     public ApiResponse<Void> softDeleteReservation(@PathVariable Long id) {
         log.info("Admin soft-delete reservation: id={}", id);
         auditLogService.softDeleteReservation(id);
-        return ApiResponse.success(null, "예약이 휴지통으로 이동되었습니다.");
+        return ApiResponse.success(null, "예약이 휴지통으로 이동됐어요.");
     }
 
     private int parseDays(String rawDays) {

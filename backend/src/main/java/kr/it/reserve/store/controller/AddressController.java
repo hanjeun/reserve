@@ -44,19 +44,19 @@ public class AddressController {
         // 다른 비용성 엔드포인트(이메일 발송 등)와 동일하게 IP 기준 rate limit을 건다.
         String ip = IpExtractor.extract(httpRequest);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.ADDRESS_SEARCH)) {
-            throw new StoreException("주소 검색 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+            throw new StoreException("주소 검색 요청이 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
         Map<String, Object> empty = Map.of("documents", List.of());
 
         if (query == null || query.trim().length() < 2) {
-            return ResponseEntity.ok(ApiResponse.success(empty, "검색어가 너무 짧습니다."));
+            return ResponseEntity.ok(ApiResponse.success(empty, "검색어가 너무 짧아요."));
         }
         // size 최대 10개 제한
         int safeSize = Math.clamp(size, 1, 10);
         if (kakaoRestApiKey == null || kakaoRestApiKey.isBlank()) {
             log.warn("KAKAO_REST_API_KEY is not configured");
-            return ResponseEntity.ok(ApiResponse.success(empty, "API 키가 설정되지 않았습니다."));
+            return ResponseEntity.ok(ApiResponse.success(empty, "API 키가 설정되지 않았어요."));
         }
 
         try {
@@ -84,7 +84,7 @@ public class AddressController {
         } catch (Exception e) {
             log.error("Kakao address search failed: errorType={}", e.getClass().getSimpleName());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(ApiResponse.error("주소 검색에 실패했습니다."));
+                    .body(ApiResponse.error("주소 검색에 실패했어요."));
         }
     }
 }

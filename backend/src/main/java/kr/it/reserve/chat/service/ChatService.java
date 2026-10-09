@@ -82,7 +82,7 @@ public class ChatService {
     private ChatRoom findOrCreateSupportRoom(Member member) {
         // 회원 행을 먼저 잠그면 같은 회원의 첫 두 요청이 동시에 빈 방을 보고 중복 생성하지 못한다.
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
-                .orElseThrow(() -> new ChatException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         return roomRepository.findByMemberIdAndTypeForUpdate(
                         activeMember.getId(), ChatRoom.RoomType.SUPPORT)
                 .orElseGet(() -> roomRepository.save(ChatRoom.builder()
@@ -186,13 +186,13 @@ public class ChatService {
     /** GET은 방 생성·읽음 변경 없이 조회한다. 새 방을 여는 동작은 POST/open 전용이다. */
     public ConversationThreadResponse getSupportConversation(Member member) {
         ChatRoom room = roomRepository.findByMemberIdAndType(member.getId(), ChatRoom.RoomType.SUPPORT)
-                .orElseThrow(() -> new ChatException("대화를 아직 시작하지 않았습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("대화를 아직 시작하지 않았어요.", HttpStatus.NOT_FOUND));
         return threadForMember(room);
     }
 
     public ConversationThreadResponse getStoreConversation(Member member, Long storeId) {
         ChatRoom room = roomRepository.findByMemberIdAndTypeAndStoreId(member.getId(), ChatRoom.RoomType.STORE, storeId)
-                .orElseThrow(() -> new ChatException("대화를 아직 시작하지 않았습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("대화를 아직 시작하지 않았어요.", HttpStatus.NOT_FOUND));
         return threadForMember(room);
     }
 
@@ -221,13 +221,13 @@ public class ChatService {
 
     private ChatRoom findOrCreateStoreRoom(Member member, Long storeId) {
         Member activeMember = memberRepository.findActiveByIdForUpdate(member.getId())
-                .orElseThrow(() -> new ChatException("회원을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("회원을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         return roomRepository.findStoreChatForUpdate(
                         activeMember.getId(), ChatRoom.RoomType.STORE, storeId)
                 .orElseGet(() -> {
                     Store store = findMessageableStore(storeId);
                     if (store.getOwner() != null && store.getOwner().getId().equals(activeMember.getId())) {
-                        throw new ChatException("내 가게에는 문의를 보낼 수 없습니다.", HttpStatus.BAD_REQUEST);
+                        throw new ChatException("내 가게에는 문의를 보낼 수 없어요.", HttpStatus.BAD_REQUEST);
                     }
                     return roomRepository.save(ChatRoom.builder()
                             .member(activeMember)
@@ -404,7 +404,7 @@ public class ChatService {
 
     public ChatHistoryResponse getOlderMessages(Long roomId, Long beforeId, int requestedSize, Long viewerId) {
         if (beforeId == null || beforeId <= 0) {
-            throw new ChatException("메시지 기준값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new ChatException("메시지 기준값이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
         int size = Math.clamp(requestedSize, 10, PAGE_SIZE);
         var slice = messageRepository.findByRoomIdAndIdLessThanOrderByIdDesc(
@@ -418,7 +418,7 @@ public class ChatService {
     public void assertOwnedBy(Long roomId, Member member) {
         ChatRoom room = findRoom(roomId);
         if (!room.getMember().getId().equals(member.getId())) {
-            throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
         }
     }
 
@@ -427,7 +427,7 @@ public class ChatService {
         ChatRoom room = findRoom(roomId);
         if (room.getMember().getId().equals(member.getId())) return;
         if (room.getType() == ChatRoom.RoomType.STORE && ownsStore(room.getStoreId(), member)) return;
-        throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+        throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
     }
 
     /** 활성 화면이 새 메시지를 실제로 받은 뒤 호출한다. 회원/사장님 읽음 축을 섞지 않는다. */
@@ -445,10 +445,10 @@ public class ChatService {
             return;
         }
         if (!MEMBER_VIEWER_ROLE.equalsIgnoreCase(viewerRole)) {
-            throw new ChatException("읽음 처리 역할이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new ChatException("읽음 처리 역할이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
         if (!room.getMember().getId().equals(member.getId())) {
-            throw new ChatException("접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
         }
         markReadThrough(room, SenderRole.MEMBER, readThroughId);
     }
@@ -463,19 +463,19 @@ public class ChatService {
         }
         if (readThroughId == 0L) return;
         if (readThroughId < 0L || messageRepository.findByIdAndRoomId(readThroughId, room.getId()).isEmpty()) {
-            throw new ChatException("읽음 기준값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+            throw new ChatException("읽음 기준값이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
         room.markRead(reader, messageRepository.countUnreadAfter(room.getId(), readThroughId, reader));
     }
 
     private ChatRoom findRoom(Long roomId) {
         return roomRepository.findById(roomId)
-                .orElseThrow(() -> new ChatException("대화를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("대화를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     private ChatRoom findRoomForUpdate(Long roomId) {
         return roomRepository.findByIdForUpdate(roomId)
-                .orElseThrow(() -> new ChatException("대화를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("대화를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     private ChatHistoryResponse recentWindow(Long roomId, Long viewerId) {
@@ -572,9 +572,9 @@ public class ChatService {
 
     private Store findMessageableStore(Long storeId) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ChatException("가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ChatException("가게를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
         if (store.isDeleted() || store.isSuspended()) {
-            throw new ChatException("현재 문의를 받을 수 없는 가게입니다.", HttpStatus.CONFLICT);
+            throw new ChatException("현재 문의를 받을 수 없는 가게예요.", HttpStatus.CONFLICT);
         }
         return store;
     }
@@ -608,19 +608,19 @@ public class ChatService {
     private void assertStoreOwner(ChatRoom room, Member owner) {
         requireType(room, ChatRoom.RoomType.STORE);
         if (!ownsStore(room.getStoreId(), owner)) {
-            throw new ChatException("가게 문의를 볼 권한이 없습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("가게 문의를 볼 권한이 없어요.", HttpStatus.FORBIDDEN);
         }
     }
 
     private void assertNotBlocked(ChatRoom room) {
         if (room.isBlocked()) {
-            throw new ChatException("차단된 대화에는 새 메시지를 보낼 수 없습니다.", HttpStatus.CONFLICT);
+            throw new ChatException("차단된 대화에는 새 메시지를 보낼 수 없어요.", HttpStatus.CONFLICT);
         }
     }
 
     private void requireType(ChatRoom room, ChatRoom.RoomType expected) {
         if (room.getType() != expected) {
-            throw new ChatException("대화 유형이 올바르지 않습니다.", HttpStatus.FORBIDDEN);
+            throw new ChatException("대화 유형이 올바르지 않아요.", HttpStatus.FORBIDDEN);
         }
     }
 }

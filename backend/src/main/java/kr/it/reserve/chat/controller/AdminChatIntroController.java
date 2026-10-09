@@ -31,17 +31,17 @@ public class AdminChatIntroController {
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping
     public ResponseEntity<ApiResponse<ChatIntroResponse>> updateSupport(@Valid @RequestBody ChatIntroRequest request) {
-        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member admin = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         return ResponseEntity.ok(ApiResponse.success(
-                introService.updateSupportIntro(admin, request), "고객지원 채팅 설정을 저장했습니다."));
+                introService.updateSupportIntro(admin, request), "고객지원 채팅 설정을 저장했어요."));
     }
 
     /** 고객지원 채팅 사진 올리기. 돌려준 주소를 PUT 의 avatarUrl 로 저장해야 적용된다. */
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/avatar")
     public ResponseEntity<ApiResponse<Map<String, String>>> uploadAvatar(@RequestParam("image") MultipartFile image) {
-        Member admin = SecurityUtil.getCurrentMember("로그인이 필요합니다.");
+        Member admin = SecurityUtil.getCurrentMember("로그인이 필요해요.");
         return ResponseEntity.ok(ApiResponse.success(
-                Map.of("url", introService.uploadSupportAvatar(admin, image)), "사진을 올렸습니다."));
+                Map.of("url", introService.uploadSupportAvatar(admin, image)), "사진을 올렸어요."));
     }
 }

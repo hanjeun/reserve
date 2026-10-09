@@ -48,9 +48,9 @@ const NameTab = ({ user }) => {
         try {
             await memberService.updateMember({ name });
             useAuthStore.getState().updateUser({ ...user, name });
-            message.success('이름이 변경되었습니다');
+            message.success('이름이 변경됐어요');
         } catch (err) {
-            handleApiError(err, message, '이름 변경에 실패했습니다');
+            handleApiError(err, message, '이름 변경에 실패했어요');
         } finally {
             setLoading(false);
         }
@@ -87,11 +87,11 @@ const PasswordTab = () => {
                 newPasswordConfirm: confirmPassword,
             });
             useAuthStore.getState().logout();
-            message.success('비밀번호가 변경되었습니다. 다시 로그인해주세요.');
+            message.success('비밀번호가 변경됐어요. 다시 로그인해주세요.');
             // 비밀번호 변경 → 다시 로그인: 흐름이 이어지는 이동(오른쪽에서)
             navigate('/login', { replace: true, state: { reserveRouteMotion: 'from-right' } });
         } catch (err) {
-            handleApiError(err, message, '비밀번호 변경에 실패했습니다');
+            handleApiError(err, message, '비밀번호 변경에 실패했어요');
         } finally {
             setLoading(false);
         }
@@ -116,7 +116,7 @@ const PasswordTab = () => {
                 ({ getFieldValue }) => ({
                     validator(_, value) {
                         if (!value || getFieldValue('newPassword') === value) return Promise.resolve();
-                        return Promise.reject(new Error('비밀번호가 일치하지 않습니다'));
+                        return Promise.reject(new Error('비밀번호가 일치하지 않아요'));
                     },
                 }),
             ]}>
@@ -170,13 +170,13 @@ const ProfileImageTab = ({ user }) => {
         try {
             if (pending?.file) {
                 await memberService.uploadProfileImage(pending.file);
-                message.success('프로필 사진이 변경되었습니다');
+                message.success('프로필 사진이 변경됐어요');
             }
             await useAuthStore.getState().checkAuth(true);
             setPending(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
         } catch (err) {
-            handleApiError(err, message, '프로필 사진 변경에 실패했습니다');
+            handleApiError(err, message, '프로필 사진 변경에 실패했어요');
         } finally {
             setLoading(false);
         }
@@ -185,16 +185,16 @@ const ProfileImageTab = ({ user }) => {
     const handleResetToDefault = () => {
         confirm({
             title: '기본 이미지로 변경',
-            content: '현재 프로필 사진을 삭제하고 기본 이미지로 되돌립니다. 계속하시겠습니까?',
+            content: '현재 프로필 사진을 삭제하고 기본 이미지로 되돌려요. 계속할까요?',
             okText: '변경', cancelText: '취소', centered: true,
             onOk: async () => {
                 setLoading(true);
                 try {
                     await memberService.deleteProfileImage();
-                    message.success('기본 이미지로 변경되었습니다');
+                    message.success('기본 이미지로 변경됐어요');
                     await useAuthStore.getState().checkAuth(true);
                 } catch (err) {
-                    handleApiError(err, message, '프로필 사진 변경에 실패했습니다');
+                    handleApiError(err, message, '프로필 사진 변경에 실패했어요');
                 } finally {
                     setLoading(false);
                 }
@@ -328,9 +328,9 @@ const LocationTab = ({ user }) => {
                 addressDetail: values.addressDetail,
             });
             await useAuthStore.getState().checkAuth(true);
-            message.success('위치가 등록되었습니다');
+            message.success('위치가 등록됐어요');
         } catch (err) {
-            handleApiError(err, message, '위치 등록에 실패했습니다');
+            handleApiError(err, message, '위치 등록에 실패했어요');
         } finally {
             setLoading(false);
         }
@@ -474,11 +474,11 @@ const BusinessTab = ({ user }) => {
         setUpdateLoading(true);
         try {
             await businessService.update({ ...form, licenseImage: licenseFile || undefined });
-            message.success('수정되었습니다.');
+            message.success('수정됐어요.');
             setIsEditing(false);
             setLicenseList([]);
         } catch (err) {
-            handleApiError(err, message, '수정에 실패했습니다');
+            handleApiError(err, message, '수정에 실패했어요');
         } finally {
             setUpdateLoading(false);
         }
@@ -527,10 +527,10 @@ const BusinessTab = ({ user }) => {
         setSubmitLoading(true);
         try {
             await businessService.submit({ ...form, licenseImage: licenseFile });
-            message.success('사업자 인증 신청이 완료되었습니다. 관리자 승인 후 이용 가능합니다.');
+            message.success('사업자 인증 신청이 완료됐어요. 관리자 승인 후 이용할 수 있어요.');
             setStatus('PENDING');
         } catch (err) {
-            handleApiError(err, message, '신청에 실패했습니다');
+            handleApiError(err, message, '신청에 실패했어요');
         } finally {
             setSubmitLoading(false);
         }
@@ -538,7 +538,7 @@ const BusinessTab = ({ user }) => {
 
     const handleCancel = () => {
         confirm({
-            title: '신청 취소', content: '사업자 인증 신청을 취소하시겠습니까?',
+            title: '신청 취소', content: '사업자 인증 신청을 취소할까요?',
             okText: '취소하기', cancelText: '닫기', okButtonProps: { danger: true }, centered: true,
             onOk: async () => {
                 // 취소 중 뒤늦게 도착한 프리필이 편집창을 다시 열지 못하게 한다.
@@ -547,12 +547,12 @@ const BusinessTab = ({ user }) => {
                 setCancelLoading(true);
                 try {
                     await businessService.cancel();
-                    message.success('신청이 취소되었습니다');
+                    message.success('신청이 취소됐어요');
                     setStatus(null);
                     setForm({ businessName: '', businessNumber: '', memo: '' });
                     setLicenseList([]);
                 } catch (err) {
-                    handleApiError(err, message, '취소에 실패했습니다');
+                    handleApiError(err, message, '취소에 실패했어요');
                 } finally {
                     setCancelLoading(false);
                 }
@@ -563,16 +563,16 @@ const BusinessTab = ({ user }) => {
     const handleResign = () => {
         confirm({
             title: '사업자 자격 포기',
-            content: '사업자 자격을 포기하면 가게 관리 및 예약 수신이 불가합니다. 정말 포기하시겠습니까?',
+            content: '사업자 자격을 포기하면 가게 관리와 예약 문의를 받을 수 없어요. 포기할까요?',
             okText: '포기하기', cancelText: '취소', okButtonProps: { danger: true }, centered: true,
             onOk: async () => {
                 setResignLoading(true);
                 try {
                     await businessService.resign();
                     await useAuthStore.getState().checkAuth(true);
-                    message.success('사업자 자격이 포기되었습니다');
+                    message.success('사업자 자격이 포기됐어요');
                 } catch (err) {
-                    handleApiError(err, message, '처리에 실패했습니다');
+                    handleApiError(err, message, '처리에 실패했어요');
                 } finally {
                     setResignLoading(false);
                 }
@@ -594,8 +594,8 @@ const BusinessTab = ({ user }) => {
     );
 
     if (statusError && !isBusiness) return <DataState state="error" kind="member"
-        title="사업자 인증 상태를 불러오지 못했습니다."
-        description="신청 상태를 확인한 뒤 인증 신청을 진행할 수 있습니다."
+        title="사업자 인증 상태를 불러오지 못했어요."
+        description="신청 상태를 확인한 뒤 인증 신청을 진행할 수 있어요."
         onRetry={retryStatus} />;
 
     // ── 사업자 이미 완료 ──
@@ -604,14 +604,14 @@ const BusinessTab = ({ user }) => {
             <div style={bizStyles.statusCard('success')}>
                 <div>
                     <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>파트너 사장님으로 활동 중이에요</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>가게 등록 및 예약 관리 기능을 이용할 수 있습니다</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>가게 등록 및 예약 관리 기능을 이용할 수 있어요</Text>
                 </div>
             </div>
             <div style={bizStyles.resignSection}>
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main }}>사업자 자격 포기</Text>
                     <Text type="secondary" style={{ display: 'block', fontSize: fontSize.xs, marginTop: 2 }}>
-                        포기 시 가게 관리 기능을 더 이상 이용할 수 없습니다
+                        포기 시 가게 관리 기능을 더 이상 이용할 수 없어요
                     </Text>
                 </div>
                 <Button variant="danger" size="sm" loading={resignLoading} onClick={handleResign}
@@ -631,7 +631,7 @@ const BusinessTab = ({ user }) => {
                     <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
                     <div>
                         <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>신청 내용 수정</Text>
-                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>수정 후 저장하면 기존 신청이 업데이트됩니다</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>수정 후 저장하면 기존 신청이 업데이트돼요</Text>
                     </div>
                 </div>
                 <BusinessForm
@@ -653,15 +653,15 @@ const BusinessTab = ({ user }) => {
                     <ClockCircleOutlined style={{ fontSize: 20, color: colors.warning.main }} />
                     <div>
                         <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>심사 중이에요</Text>
-                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>관리자 검토 후 승인 여부를 알려드립니다</Text>
+                        <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>관리자 검토 후 승인 여부를 알려드려요</Text>
                     </div>
                 </div>
                 {editLoading && <div aria-busy="true">
-                    <output aria-label="사업자 신청 내용을 불러오는 중">기존 신청 내용을 확인하고 있습니다.</output>
+                    <output aria-label="사업자 신청 내용을 불러오는 중">기존 신청 내용을 확인하고 있어요.</output>
                 </div>}
                 {editError && <DataState state="error" kind="member"
-                    title="사업자 신청 내용을 불러오지 못했습니다."
-                    description="기존 신청은 변경되지 않았습니다. 다시 확인한 뒤 수정할 수 있습니다."
+                    title="사업자 신청 내용을 불러오지 못했어요."
+                    description="기존 신청은 변경되지 않았어요. 다시 확인한 뒤 수정할 수 있어요."
                     onRetry={handleStartEdit} compact />}
                 <div style={{ display: 'flex', gap: 8 }}>
                     <Button variant="secondary" loading={cancelLoading} onClick={handleCancel} style={{ flex: 1 }}>신청 취소</Button>
@@ -676,8 +676,8 @@ const BusinessTab = ({ user }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={bizStyles.statusCard('error')}>
                 <div>
-                    <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>인증이 거절되었습니다</Text>
-                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>내용을 수정하여 다시 신청할 수 있습니다</Text>
+                    <Text strong style={{ color: colors.text.primary, display: 'block', marginBottom: 2 }}>인증이 거절됐어요</Text>
+                    <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>내용을 수정하여 다시 신청할 수 있어요</Text>
                 </div>
             </div>
             {status === 'REJECTED' && rejectionReason && (
@@ -874,9 +874,9 @@ const NotificationSection = ({ user }) => {
             const auth = useAuthStore.getState();
             if (auth.sessionRevision !== sessionRevision || auth.user?.id !== user?.id || auth.user?.role !== user?.role) return;
             auth.updateUser({ ...auth.user, emailNotificationEnabled: checked });
-            message.success(checked ? '메일 알림에 동의했습니다' : '메일 알림 동의를 철회했습니다');
+            message.success(checked ? '메일 알림에 동의했어요' : '메일 알림 동의를 철회했어요');
         } catch (err) {
-            handleApiError(err, message, '설정 변경에 실패했습니다');
+            handleApiError(err, message, '설정 변경에 실패했어요');
         } finally {
             setNotiLoading(false);
         }
@@ -889,9 +889,9 @@ const NotificationSection = ({ user }) => {
             const auth = useAuthStore.getState();
             if (auth.sessionRevision !== sessionRevision || auth.user?.id !== user?.id || auth.user?.role !== user?.role) return;
             auth.updateUser({ ...auth.user, marketingAgreed: checked });
-            message.success(checked ? '마케팅 수신에 동의했습니다' : '마케팅 수신 동의를 철회했습니다');
+            message.success(checked ? '마케팅 수신에 동의했어요' : '마케팅 수신 동의를 철회했어요');
         } catch (err) {
-            handleApiError(err, message, '설정 변경에 실패했습니다');
+            handleApiError(err, message, '설정 변경에 실패했어요');
         } finally {
             setMarketingLoading(false);
         }
@@ -934,13 +934,13 @@ const StoreDraftSection = ({ user }) => {
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>자동 임시저장</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                        가게 등록·수정 내용과 새 이미지를 이 브라우저에 자동 저장합니다
+                        가게 등록·수정 내용과 새 이미지를 이 브라우저에 자동 저장해요
                     </Text>
                 </div>
                 <Switch size="small" aria-label="가게 자동 임시저장" checked={autoSaveEnabled} onChange={setAutoSaveEnabled} />
             </div>
             <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                이 계정의 이 브라우저에만 적용됩니다. 꺼도 임시저장·수정완료 버튼과 기존 초안은 유지됩니다.
+                이 계정의 이 브라우저에만 적용돼요. 꺼도 임시저장·수정완료 버튼과 기존 초안은 유지돼요.
             </Text>
         </div>
     );
@@ -969,7 +969,7 @@ const AppearanceSection = () => {
                 <div style={styles.designLabel}>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>모양</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary }}>
-                        시스템을 고르면 기기 설정을 따라갑니다
+                        시스템을 고르면 기기 설정을 따라가요
                     </Text>
                 </div>
                 <SegmentedControl
@@ -995,7 +995,7 @@ const AppearanceSection = () => {
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>글꼴</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block', marginBottom: 8 }}>
-                        앱 전체에 적용됩니다
+                        앱 전체에 적용돼요
                     </Text>
                     <FormSelect
                         value={font}
@@ -1014,7 +1014,7 @@ const AppearanceSection = () => {
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.text.primary, display: 'block' }}>포인트 색</Text>
                     <Text style={{ fontSize: fontSize.xs, color: colors.text.tertiary, display: 'block', marginBottom: 8 }}>
-                        버튼·강조 표시에 쓰입니다
+                        버튼·강조 표시에 쓰여요
                     </Text>
                     {/* 색은 이름만으로는 고르기 어렵다 — 옵션마다 실제 색 점을 함께 보여준다.
                         점 색은 지금 테마(라이트/다크)에 맞는 값이어야 실제 적용 결과와 일치한다. */}
@@ -1088,7 +1088,7 @@ const MyPage = () => {
             title: '회원 탈퇴',
             icon: <ExclamationCircleOutlined style={{ color: colors.error.main }} />,
             // 문장 단위 줄바꿈은 useMessage의 confirm 래퍼가 처리한다 — 여기선 평범한 문자열이면 된다.
-            content: '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 됩니다. 거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존됩니다. 정말 탈퇴하시겠습니까?',
+            content: '로그인·연락·위치 정보는 제거되고 계정은 즉시 사용할 수 없게 돼요. 거래·환불·분쟁 대응에 필요한 기록은 비식별 상태로 보존돼요. 정말 탈퇴할까요?',
             okText: '탈퇴하기',
             cancelText: '취소',
             okButtonProps: { danger: true },
@@ -1108,12 +1108,12 @@ const MyPage = () => {
                     const readiness = await memberService.getWithdrawalReadiness();
                     if (!isCurrent()) return;
                     if (typeof readiness?.canWithdraw !== 'boolean') {
-                        message.error('탈퇴 준비 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+                        message.error('탈퇴 준비 상태를 확인하지 못했어요. 잠시 후 다시 시도해주세요.');
                         return;
                     }
                     if (!canWithdrawMember(readiness)) {
                         message.warning(
-                            `먼저 처리할 항목이 있습니다. 운영 중 가게 ${readiness?.openStores ?? 0}곳, ` +
+                            `먼저 처리할 항목이 있어요. 운영 중 가게 ${readiness?.openStores ?? 0}곳, ` +
                             `예약 ${readiness?.unresolvedReservations ?? 0}건, 환불 ${readiness?.unresolvedRefunds ?? 0}건, ` +
                             `결제 확인 ${readiness?.openPaymentIssues ?? 0}건, 웹훅 ${readiness?.unfinishedWebhooks ?? 0}건`
                         );
@@ -1126,10 +1126,10 @@ const MyPage = () => {
                     logout();
                     // 탈퇴 → 홈: 로그아웃과 같은 방향(왼쪽에서)
                     navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
-                    message.success('탈퇴가 완료되었습니다');
+                    message.success('탈퇴가 완료됐어요');
                 } catch (err) {
                     if (isCurrent()) handleApiError(err, message, request.phase === 'deleting'
-                        ? '탈퇴에 실패했습니다' : '탈퇴 준비 상태를 확인하지 못했습니다');
+                        ? '탈퇴에 실패했어요' : '탈퇴 준비 상태를 확인하지 못했어요');
                 } finally {
                     if (isCurrent()) {
                         setWithdrawState({ scope: withdrawScope, checking: false });
@@ -1227,7 +1227,7 @@ const MyPage = () => {
                 <div>
                     <Text strong style={{ fontSize: fontSize.sm, color: colors.error.main }}>회원 탈퇴</Text>
                     <Text type="secondary" style={{ display: 'block', fontSize: fontSize.xs, marginTop: 2 }}>
-                        개인정보는 제거되며 필요한 거래 기록은 비식별 상태로 보존됩니다
+                        개인정보는 제거되며 필요한 거래 기록은 비식별 상태로 보존돼요
                     </Text>
                 </div>
                 <Button variant="danger" size="sm" loading={withdrawChecking} onClick={handleDeleteAccount}

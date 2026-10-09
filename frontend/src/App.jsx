@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, matchPath, useLocation, useNavigationType } from 'react-router-dom';
 import SessionQueryProvider from './components/common/SessionQueryProvider';
 import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import koKR from 'antd/locale/ko_KR';
@@ -9,41 +9,61 @@ import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
 import useModalScrollLock from './hooks/useModalScrollLock';
 import useRouteSeo from './hooks/useRouteSeo';
+import { installRecentSearchPrivacyBoundary } from './utils/recentSearches';
 
 // 라우트 단위 Code Splitting (2026-07): 예전엔 모든 페이지를 정적 import해서 첫 번들 JS에
 // 관리자 패널·예약 화면 등 무거운 페이지 코드까지 전부 번들링되었음. React.lazy로 쪼개서
 // 각 페이지 청크를 처음 방문할 때만 다운로드하도록 함(초기 번들 크기 감소). Header/Footer/
 // OfflineBanner는 항상 필요하므로 정적 import 유지.
-const Home = lazy(() => import('./pages/Home'));
-const SearchPage = lazy(() => import('./pages/Search'));
-const DiscoveryComingSoon = lazy(() => import('./pages/discovery/ComingSoon'));
-const Benefits = lazy(() => import('./pages/discovery/Benefits'));
-const BenefitDetail = lazy(() => import('./pages/discovery/BenefitDetail'));
-const Login = lazy(() => import('./pages/auth/Login'));
-const Signup = lazy(() => import('./pages/auth/Signup'));
-const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const initialPageLoaders = [];
+const lazyPublicPage = (path, loadPage) => {
+    initialPageLoaders.push({ path, loadPage });
+    return lazy(loadPage);
+};
+
+const Home = lazyPublicPage('/', () => import('./pages/Home'));
+const SearchPage = lazyPublicPage('/search', () => import('./pages/Search'));
+const DiscoveryComingSoon = lazyPublicPage('/feed', () => import('./pages/discovery/ComingSoon'));
+const Benefits = lazyPublicPage('/benefits', () => import('./pages/discovery/Benefits'));
+const BenefitDetail = lazyPublicPage('/benefits/:id', () => import('./pages/discovery/BenefitDetail'));
+const Login = lazyPublicPage('/login', () => import('./pages/auth/Login'));
+const Signup = lazyPublicPage('/signup', () => import('./pages/auth/Signup'));
+const ForgotPassword = lazyPublicPage('/forgot-password', () => import('./pages/auth/ForgotPassword'));
 const OAuthCallback = lazy(() => import('./pages/auth/OAuthCallback'));
-const StoreList = lazy(() => import('./pages/store/StoreList'));
-const StoreDetail = lazy(() => import('./pages/store/StoreDetail'));
+const StoreList = lazyPublicPage('/stores', () => import('./pages/store/StoreList'));
+const StoreDetail = lazyPublicPage('/store/:id', () => import('./pages/store/StoreDetail'));
 const StoreRegister = lazy(() => import('./pages/store/StoreRegister'));
 const StoreEdit = lazy(() => import('./pages/store/StoreEdit'));
 const MyStores = lazy(() => import('./pages/store/MyStores'));
 const MyReservations = lazy(() => import('./pages/reservation/MyReservations'));
+const Waiting = lazyPublicPage('/waiting', () => import('./pages/discovery/Waiting'));
 const BusinessPanel = lazy(() => import('./pages/business/BusinessPanel'));
 const MyPage = lazy(() => import('./pages/member/MyPage'));
 const MyFavorites = lazy(() => import('./pages/favorite/MyFavorites'));
 const PaymentResult = lazy(() => import('./pages/payment/PaymentResult'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
-const Terms = lazy(() => import('./pages/legal/Terms'));
+const Terms = lazyPublicPage('/terms', () => import('./pages/legal/Terms'));
 const SocialAgreement = lazy(() => import('./pages/auth/SocialAgreement'));
-const Privacy = lazy(() => import('./pages/legal/Privacy'));
-const ContentSources = lazy(() => import('./pages/legal/ContentSources'));
-const OperationGuide = lazy(() => import('./pages/legal/OperationGuide'));
+const Privacy = lazyPublicPage('/privacy', () => import('./pages/legal/Privacy'));
+const ContentSources = lazyPublicPage('/content-sources', () => import('./pages/legal/ContentSources'));
+const OperationGuide = lazyPublicPage('/operation-guide', () => import('./pages/legal/OperationGuide'));
+const UserGuide = lazyPublicPage('/guide/user', () => import('./pages/legal/UserGuide'));
+const BusinessGuide = lazyPublicPage('/guide/business', () => import('./pages/legal/BusinessGuide'));
+const CommonGuide = lazyPublicPage('/guide/common', () => import('./pages/legal/CommonGuide'));
 const MessagesPage = lazy(() => import('./pages/member/MessagesPage'));
 // 어떤 라우트에도 맞지 않는 주소(path="*"). 예전엔 이 라우트가 없어 헤더·푸터 사이가 비어 보였다.
 const NotFound = lazy(() => import('./pages/NotFound'));
 // 로그인한 사용자만 쓰는 통합 메신저는 익명 랜딩의 초기 번들에서 제외한다.
 const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
+
+const preloadInitialPage = pathname => {
+    // 고정된 보호 경로가 공개 상세 경로의 :id로 잡히지 않게 한다.
+    if (matchPath('/store/register', pathname)) return;
+    const page = initialPageLoaders.find(candidate => matchPath(candidate.path, pathname));
+    if (!page) return;
+    // 미리 읽기만 한다. 실패해도 React.lazy에는 저장하지 않아 실제 렌더 때 원래 loader로 재시도한다.
+    void page.loadPage().catch(() => null);
+};
 
 import Header, { HeaderPlaceholder } from './components/layout/Header';
 import DiscoveryNav from './components/layout/DiscoveryNav';
@@ -54,7 +74,7 @@ import { LoadingPresentationContext, createLoadingPresentation, useSkeletonShown
 import { DISCOVERY_NAV_ITEMS, isDiscoveryRootPath } from './constants/discovery';
 import AppFooter from './components/layout/Footer';
 import OfflineBanner from './components/layout/OfflineBanner';
-import { SpinIndicator } from './components/common/Loading';
+import { loadingConfig } from './components/common/loadingConfig';
 import PrivateRoute from './components/PrivateRoute';
 import ScrollToTop from './components/ScrollToTop';
 import { AppErrorBoundary, RouteErrorBoundary } from './components/layout/AppErrorBoundary';
@@ -64,12 +84,12 @@ const { Content } = Layout;
 const validateMessages = {
     required: '${label}을(를) 입력해주세요.',
     types: {
-        email: '올바른 이메일 형식이 아닙니다.',
+        email: '올바른 이메일 형식이 아니에요.',
         number: '숫자를 입력해주세요.',
     },
     string: {
         min: '최소 ${min}자 이상 입력해주세요.',
-        max: '최대 ${max}자까지 입력 가능합니다.',
+        max: '최대 ${max}자까지 입력할 수 있어요.',
     },
 };
 
@@ -179,18 +199,6 @@ const buildThemeConfig = (isDark, accent) => {
     };
 };
 
-/**
- * AntD <Spin>(및 Table의 loading prop)의 기본 인디케이터를 우리 링 스피너로 교체.
- *
- * 2026-07 전수조사: 예전엔 CSS로 `.ant-spin-dot > i { display:none }` + `.ant-spin-dot::before`에
- * 링을 그리는 방식이었는데, 브라우저에서 실측(getComputedStyle + offsetWidth)해보니 antd 6의
- * Spin은 크기를 `.ant-spin-dot-holder`(1em x 1em)가 갖고 있고 안쪽 `.ant-spin-dot`은 자체 크기가
- * 없어서(0x0), 점 4개는 사라지지만 우리 링도 0x0이라 결국 "아무것도 안 보이는" 상태였음.
- * AntD 내부 DOM에 의존하는 CSS 해킹은 버전 업그레이드에 취약하므로 ConfigProvider가 정식 지원하는
- * spin.indicator로 대체 — 이제 <Spin>이든 Table loading이든 전부 우리 링 스피너를 그린다.
- */
-const spinConfig = { indicator: <SpinIndicator /> };
-
 const isSearchPath = pathname => /^\/search\/?$/.test(pathname);
 const isMessagesPath = pathname => /^\/messages\/?$/.test(pathname);
 const appLayoutStyle = { backgroundColor: colors.background.default };
@@ -206,11 +214,16 @@ function appLayoutClassName(pathname) {
 
 function AppContent() {
     const { pathname, search, key: locationKey } = useLocation();
+    const initialPathnameRef = useRef(pathname);
     const presentation = useMemo(() => createLoadingPresentation(locationKey), [locationKey]);
     const { initializeAuth, sessionRevision } = useAuthStore();
     const [loading, setLoading] = useState(true);
 
+    useEffect(() => installRecentSearchPrivacyBoundary(useAuthStore), []);
+
     useEffect(() => {
+        // 현재 공개 페이지의 코드만 인증 복구와 병렬로 받는다. 마운트와 API 조회는 인증 뒤에 유지한다.
+        preloadInitialPage(initialPathnameRef.current);
         const initAuth = async () => {
             try {
                 await initializeAuth();
@@ -328,7 +341,7 @@ function AppRoutes() {
                     <Route path="/search" element={<SearchPage />} />
                     <Route path="/benefits" element={<Benefits />} />
                     <Route path="/benefits/:id" element={<BenefitDetail />} />
-                    <Route path="/waiting" element={<DiscoveryComingSoon />} />
+                    <Route path="/waiting" element={<Waiting />} />
                     <Route path="/feed" element={<DiscoveryComingSoon />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
@@ -341,6 +354,9 @@ function AppRoutes() {
                     <Route path="/privacy" element={<Privacy />} />
                     <Route path="/content-sources" element={<ContentSources />} />
                     <Route path="/operation-guide" element={<OperationGuide />} />
+                    <Route path="/guide/user" element={<UserGuide />} />
+                    <Route path="/guide/business" element={<BusinessGuide />} />
+                    <Route path="/guide/common" element={<CommonGuide />} />
 
                     {/* OWNER / ADMIN 전용 */}
                     <Route element={<PrivateRoute allowedRoles={['ADMIN', 'BUSINESS']} />}>
@@ -413,7 +429,7 @@ function App() {
                 <ConfigProvider
                     locale={koKR}
                     theme={themeConfig}
-                    spin={spinConfig}
+                    {...loadingConfig}
                     form={{ validateMessages }}
                 >
                     {/* AntApp 바깥의 마지막 그물 — 헤더·메신저 등 앱 셸 자체의 렌더 오류가 흰 화면이 되지 않게 한다. */}

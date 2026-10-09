@@ -6,6 +6,7 @@ import { ClockCircleOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Button from './Button';
 import ModalActions from './ModalActions';
+import RollingFieldValue from './RollingFieldValue';
 import TimeWheelColumn, { TIME_WHEEL_ROW_HEIGHT } from './TimeWheelColumn';
 import { colors, field, fontSize, fontWeight } from '../../styles/tokens';
 
@@ -14,6 +15,10 @@ const HOURS = Array.from({ length: 12 }, (_, index) => ({ value: index + 1, labe
 const MINUTES = Array.from({ length: 60 }, (_, index) => ({ value: index, label: String(index).padStart(2, '0') }));
 const validTime = value => (dayjs.isDayjs(value) && value.isValid() ? value : null);
 const timeKey = value => validTime(value)?.format('HH:mm') ?? '';
+const minuteValue = value => {
+    const time = validTime(value);
+    return time ? time.hour() * 60 + time.minute() : undefined;
+};
 const initialTime = () => dayjs('2000-01-01T09:00:00');
 const sortTimes = values => [...values].sort((left, right) => timeKey(left).localeCompare(timeKey(right)));
 const uniqueTimes = values => sortTimes([...new Map(values.filter(validTime).map(item => [timeKey(item), item])).values()]);
@@ -192,12 +197,18 @@ const FormTimePickerBase = ({
                             <React.Fragment key={part}>
                                 {index === 1 && <span aria-hidden="true" style={{ color: field.placeholderColor }}>→</span>}
                                 <span style={currentValue?.[part] ? styles.value : styles.placeholder}>
-                                    {validTime(currentValue?.[part])?.format(format) ?? rangeLabels[part]}
+                                    <RollingFieldValue value={minuteValue(currentValue?.[part])} modalOpen={open}>
+                                        {validTime(currentValue?.[part])?.format(format) ?? rangeLabels[part]}
+                                    </RollingFieldValue>
                                 </span>
                             </React.Fragment>
                         ))}
                     </span>
-                ) : <span style={hasValue ? styles.value : styles.placeholder}>{label}</span>}
+                ) : <span style={hasValue ? styles.value : styles.placeholder}>
+                    <RollingFieldValue modalOpen={open} value={mode === 'multiple'
+                        ? uniqueTimes(Array.isArray(currentValue) ? currentValue : []).map(timeKey).join('|') || undefined
+                        : minuteValue(currentValue)}>{label}</RollingFieldValue>
+                </span>}
                 <ClockCircleOutlined aria-hidden="true" style={{ color: iconColor, fontSize: field.iconSize }} />
             </button>
 

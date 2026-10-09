@@ -82,8 +82,9 @@ describe('scoped UI interaction styles', () => {
         expect(declarations(findRule(buttons, cardSelector, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
         expect(declarations(findRule(buttons, cardPressedSelector, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(declarations(normalRule(`${link}:active`)).opacity).toBe(card.opacity);
-        expect(declarations(normalRule(`${link}:active`)).transform).toBeUndefined();
-        expect(declarations(normalRule(link))).toMatchObject({ transition: 'opacity 0.12s ease', '-webkit-tap-highlight-color': 'transparent' });
+        expect(declarations(normalRule(`${link}:active`)).transform).toBe(card.transform);
+        expect(declarations(normalRule(link))).toMatchObject({ transition: 'transform 0.12s ease, opacity 0.12s ease', 'transform-origin': 'left center', '-webkit-tap-highlight-color': 'transparent' });
+        expect(declarations(findRule(surfaces, `${link}:active`, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         expect(declarations(findRule(surfaces, link, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
         expect(declarations(normalRule('.reserve-store-list-row-link:active')).opacity).toBeUndefined();
     });

@@ -67,7 +67,7 @@ class AdvertisementResponseContractTest {
         SecurityContextHolder.clearContext();
 
         assertThatThrownBy(() -> action.accept(controller))
-                .isInstanceOf(MemberException.class).hasMessage("로그인이 필요합니다.");
+                .isInstanceOf(MemberException.class).hasMessage("로그인이 필요해요.");
         verifyNoInteractions(service, limiter);
     }
 
@@ -124,7 +124,7 @@ class AdvertisementResponseContractTest {
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getData()).isSameAs(activated);
-        assertThat(response.getMessage()).isEqualTo("광고가 활성화되었습니다.");
+        assertThat(response.getMessage()).isEqualTo("광고가 활성화됐어요.");
         verify(service).verifyPayment(paymentId, business);
         verifyNoMoreInteractions(service);
         verifyNoInteractions(limiter);
@@ -181,7 +181,7 @@ class AdvertisementResponseContractTest {
         assertThat(location).startsWith("https://reserve.it.kr/payment/result?success=false&type=ad&merchant_uid=")
                 .contains("merchant_uid=ad-id%26success%3Dtrue").doesNotContain(internalMessage);
         assertThat(URLDecoder.decode(location, StandardCharsets.UTF_8))
-                .contains("error_msg=광고 결제 처리 중 오류가 발생했습니다.");
+                .contains("error_msg=광고 결제 처리 중 오류가 발생했어요.");
         verify(service).verifyPaymentByMerchantUid(paymentId);
         verifyNoMoreInteractions(service);
         verifyNoInteractions(limiter);

@@ -27,7 +27,7 @@ public class FavoriteService {
     @Transactional
     public FavoriteDto.ToggleResponse toggleFavorite(Long storeId, Member member) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new FavoriteException("해당 가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FavoriteException("해당 가게를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
         return favoriteRepository.findByMemberAndStore(member, store)
                 .map(favorite -> {
@@ -48,7 +48,7 @@ public class FavoriteService {
 
     public FavoriteDto.StatusResponse getFavoriteStatus(Long storeId, Member member) {
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new FavoriteException("해당 가게를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FavoriteException("해당 가게를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
         boolean isFavorite = member != null && favoriteRepository.existsByMemberAndStore(member, store);
         long favoriteCount = favoriteRepository.countByStore(store);

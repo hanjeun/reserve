@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 public class ComposeMailRequest {
 
     @NotBlank(message = "받는 사람 이메일을 입력해주세요.")
-    @Email(message = "올바른 이메일 형식이 아닙니다.")
+    @Email(message = "올바른 이메일 형식이 아니에요.")
     private String toEmail;
 
     @NotBlank(message = "제목을 입력해주세요.")

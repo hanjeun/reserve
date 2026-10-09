@@ -11,6 +11,11 @@ const ownedStores = [
 
 vi.mock('../../hooks', () => ({ useMyStores: () => ({ stores: ownedStores, loading: false, error: null, refetch: vi.fn(), deleteStore: vi.fn() }) }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
+vi.mock('../../components/common/FilterMenu', () => ({
+    default: ({ value, onChange, 'aria-label': label, options }) => <select aria-label={label} value={value} onChange={event => onChange(event.target.value)}>
+        {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>,
+}));
 vi.mock('../../components/common', () => {
     const Card = ({ children, actions }) => <div data-testid="manage-card">{children}<div>{actions}</div></div>;
     Card.Cover = ({ alt }) => <img alt={alt} />;
@@ -22,9 +27,6 @@ vi.mock('../../components/common', () => {
         StoreCardSkeleton: () => null,
         Badge: ({ children }) => <span>{children}</span>,
         ModalLoading: () => null,
-        FilterMenu: ({ value, onChange, 'aria-label': label, options }) => <select aria-label={label} value={value} onChange={event => onChange(event.target.value)}>
-            {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>,
         DataState: ({ state: dataState = 'empty', title, subject, onRetry, action }) => (
             <section role={dataState === 'error' ? 'alert' : undefined}>
                 <span>{title ?? `${subject ?? '목록'}을 불러오지 못했습니다.`}</span>
@@ -39,7 +41,7 @@ vi.mock('../../components/discovery/RegionSheet', () => ({ default: ({ open, ava
 </div> : null }));
 vi.mock('antd', () => ({
     Alert: () => null,
-    Typography: { Title: ({ children }) => <h2>{children}</h2>, Text: ({ children }) => <span>{children}</span> },
+    Typography: { Title: ({ children }) => <h2>{children}</h2>, Paragraph: ({ children }) => <p>{children}</p>, Text: ({ children }) => <span>{children}</span> },
     Empty: ({ description, children }) => <div>{description}{children}</div>,
     Modal: () => null,
     Flex: ({ children }) => <div>{children}</div>,
@@ -84,7 +86,7 @@ describe('my stores shared toolbar', () => {
     it('offers a filter reset when a management filter has no matches', async () => {
         const user = userEvent.setup();
         renderMyStores('/my-stores?view=list&domain=SPORTS&region=부산&utm_source=yes');
-        expect(screen.getByText('조건에 맞는 내 가게가 없습니다.')).toBeInTheDocument();
+        expect(screen.getByText('조건에 맞는 내 가게가 없어요.')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '필터 초기화' }));
         expect(screen.getAllByRole('article')).toHaveLength(2);
         expect(routeParams().get('domain')).toBeNull();

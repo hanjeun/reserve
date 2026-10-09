@@ -1,0 +1,69 @@
+.reserve-onboarding-shell { max-width: 640px; margin-inline: auto; }
+.reserve-onboarding-page[data-onboarding-step="review"] .reserve-onboarding-shell { max-width: 1100px; }
+.reserve-onboarding-heading { --reserve-page-title-margin: 0 0 32px; scroll-margin-top: 100px; }
+.reserve-onboarding-heading:focus { outline: none; }
+.reserve-onboarding-step { margin: 0; padding: 0; min-width: 0; border: 0; }
+.reserve-onboarding-step[hidden], .reserve-onboarding-fields[hidden] { display: none; }
+.reserve-onboarding-choice-description { color: var(--c-text-secondary); font-size: 14px; line-height: 1.6; margin: 12px 0 24px; min-height: 1.6em; }
+.reserve-onboarding-choice-description .reserve-rolling-field-value { display: grid !important; }
+.reserve-onboarding-choice-description .reserve-rolling-field-value > [aria-hidden="true"] { white-space: normal !important; }
+.reserve-onboarding-help { color: var(--c-text-secondary); line-height: 1.7; margin: 16px 0 24px; }
+.reserve-onboarding-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.reserve-onboarding-advanced { margin: 24px 0; border-block: 1px solid var(--c-border-light); }
+.reserve-onboarding-advanced summary { cursor: pointer; padding: 20px 0; font-weight: 600; display: flex; align-items: center; gap: 8px; list-style: none; }
+.reserve-onboarding-advanced summary::-webkit-details-marker { display: none; }
+.reserve-onboarding-advanced[open] summary .reserve-filter-menu-chevron { transform: rotate(180deg); }
+.reserve-onboarding-advanced > div { padding-bottom: 12px; }
+.reserve-onboarding-review { display: flex; flex-direction: column; gap: 32px; }
+.reserve-onboarding-summary { width: 100%; max-width: 640px; }
+.reserve-onboarding-edit-selection .reserve-service-domain-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 16px; }
+.reserve-onboarding-preview { display: flex; flex-direction: column; gap: 20px; }
+.reserve-onboarding-preview-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; line-height: 24px; }
+.reserve-onboarding-preview-controls { display: flex; align-items: center; gap: 12px; }
+.reserve-onboarding-preview-help { display: flex; flex-direction: column; gap: 8px; color: var(--c-text-secondary); font-size: 14px; line-height: 1.7; }
+.reserve-onboarding-preview-help p { margin: 0; }
+.reserve-onboarding-preview-host { position: relative; width: 100%; min-width: 0; box-sizing: border-box; }
+.reserve-onboarding-preview-host[data-device="mobile"] { display: flex; justify-content: center; }
+.reserve-onboarding-preview-host[data-device="pc"] { overflow-x: auto; overflow-y: hidden; border: 1px solid var(--c-border-light); border-radius: 14px; }
+.reserve-onboarding-preview-stage { position: relative; flex-shrink: 0; }
+.reserve-onboarding-preview-device { position: absolute; inset: 0; box-sizing: border-box; transform-origin: top left; }
+.reserve-onboarding-preview-device[data-device="mobile"] { padding: 9px; border: 3px solid var(--c-text-primary); border-radius: 38px; background: var(--c-bg-paper); box-shadow: 0 8px 24px rgb(0 0 0 / 10%); overflow: hidden; }
+.reserve-onboarding-preview-host iframe { display: block; border: 0; }
+.reserve-store-detail--preview { --c-input-disabled-fg: var(--c-text-secondary); }
+.reserve-store-detail--preview .reserve-onboarding-summary { margin-top: 20px; }
+.reserve-store-detail--preview .reserve-cal-trigger:disabled { opacity: 1; }
+.reserve-service-domain-picker { display: grid; grid-template-columns: repeat(var(--reserve-choice-columns, 6), minmax(0, 1fr)); gap: 12px; }
+.reserve-store-form-skeleton .reserve-service-domain-picker { margin-bottom: 24px; }
+.reserve-store-form-skeleton .reserve-onboarding-edit-selection .reserve-service-domain-picker { margin-bottom: 0; }
+.reserve-service-domain-option {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    min-height: 92px; padding: 8px 0; border: 0; background: transparent;
+    color: var(--c-text-secondary); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.reserve-service-domain-option__media { display: flex; width: 56px; height: 56px; align-items: center; justify-content: center; border-radius: 50%; font-size: 32px; }
+.reserve-service-domain-option__media img { display: block; object-fit: contain; }
+.reserve-service-domain-option__label { font-size: 14px; line-height: 20px; }
+.reserve-service-domain-option[aria-pressed="true"] { color: var(--c-text-primary); }
+.reserve-service-domain-option[aria-pressed="true"] .reserve-service-domain-option__label { font-weight: 700; text-decoration: underline; text-underline-offset: 5px; }
+.reserve-service-domain-option:focus { outline: none; }
+.reserve-service-domain-option:focus-visible:not([data-pointer-focus="true"]) .reserve-service-domain-option__media { outline: var(--reserve-focus-ring); outline-offset: 2px; }
+.reserve-service-domain-option:disabled { cursor: not-allowed; opacity: .6; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .reserve-service-domain-option:hover:not(:disabled) { color: var(--c-text-primary); }
+    .reserve-service-domain-option:hover:not(:disabled) .reserve-service-domain-option__media { transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .reserve-service-domain-option__media { transition: transform .12s ease; }
+    .reserve-service-domain-option:active:not(:disabled) .reserve-service-domain-option__media { transform: translateY(-2px); }
+    .reserve-onboarding-page:not(:has(.reserve-store-form-skeleton)) .reserve-onboarding-heading,
+    .reserve-onboarding-step:not([hidden]), .reserve-onboarding-review { animation: reserve-discovery-page-rise .18s cubic-bezier(.22, 1, .36, 1) both; }
+    .reserve-onboarding-page[data-step-motion="false"] .reserve-onboarding-heading,
+    .reserve-onboarding-page[data-step-motion="false"] .reserve-onboarding-step:not([hidden]),
+    .reserve-onboarding-page[data-step-motion="false"] .reserve-onboarding-review { animation: none; }
+}
+@media (max-width: 767px) {
+    .reserve-onboarding-heading { --reserve-page-title-margin: 0 0 24px; }
+    .reserve-service-domain-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; }
+    .reserve-onboarding-edit-selection .reserve-service-domain-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; }
+    .reserve-store-form-skeleton .reserve-service-domain-picker { margin-bottom: 12px; }
+}

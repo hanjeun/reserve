@@ -83,10 +83,10 @@ const AppFooter = () => {
 
                         <div className="reserve-app-footer-links">
                             <div className="reserve-app-footer-section">
-                                <Text className="reserve-app-footer-heading">서비스</Text>
-                                <FooterLink label="가게 탐색" onClick={() => navigate('/stores')} />
-                                <FooterLink label="예약 확인" onClick={() => navigate('/my-reservations')} />
-                                <FooterLink label="운영 안내" onClick={() => navigate('/operation-guide')} />
+                                <Text className="reserve-app-footer-heading">이용안내</Text>
+                                <FooterLink label="사용자 이용안내" onClick={() => navigate('/guide/user')} />
+                                <FooterLink label="사업자 이용안내" onClick={() => navigate('/guide/business')} />
+                                <FooterLink label="공통 이용안내" onClick={() => navigate('/guide/common')} />
                             </div>
                             <div className="reserve-app-footer-section">
                                 <Text className="reserve-app-footer-heading">법적 고지</Text>
@@ -106,7 +106,7 @@ const AppFooter = () => {
                     <Divider style={{ margin: '0 0 16px' }} />
                     <div className="footer-copyright">
                         <div className="footer-copyright-left" style={{ color: colors.text.tertiary }}>
-                            © 2026 RESERVE &middot; 본 서비스는 포트폴리오 목적으로 제작되었습니다.<br />
+                            © 2026 RESERVE &middot; 본 서비스는 포트폴리오 목적으로 제작됐어요.<br />
                             호스팅 서비스 제공자: Amazon Web Services (AWS)
                         </div>
                         <div className="footer-copyright-right" style={{ color: colors.text.tertiary }}>

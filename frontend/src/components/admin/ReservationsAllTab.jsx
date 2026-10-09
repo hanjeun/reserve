@@ -85,16 +85,16 @@ const ReservationsAllTab = () => {
     const deleteMutation = useMutation({
         mutationFn: (id) => api.delete(API_ENDPOINTS.ADMIN_MANAGE.RESERVATION_DELETE(id)),
         onSuccess: () => {
-            message.success('휴지통으로 이동되었습니다.');
+            message.success('휴지통으로 이동됐어요.');
             // 휴지통 탭·대시보드·감사 로그와 예약 달력까지 함께 바뀐다.
             void invalidateAdminData(queryClient);
             void invalidateReservationData(queryClient);
         },
-        onError: () => message.error('삭제에 실패했습니다.'),
+        onError: () => message.error('삭제에 실패했어요.'),
     });
 
     const handleSoftDeleteReservation = (r) => confirm({
-        title: '예약 휴지통으로 이동', content: `예약 #${r.id}을 휴지통으로 이동하시겠습니까?`,
+        title: '예약 휴지통으로 이동', content: `예약 #${r.id}을 휴지통으로 이동할까요?`,
         okText: '삭제', cancelText: '취소', okButtonProps: { danger: true }, centered: true,
         onOk: () => deleteMutation.mutateAsync(r.id),
     });
@@ -124,7 +124,7 @@ const ReservationsAllTab = () => {
     if (resError) {
         listContent = (
             <DataState state="error" kind="reservation" subject="예약 목록" error={resError}
-                onRetry={loadReservations} retrying={isFetching} compact />
+                onRetry={loadReservations} retrying={isFetching} />
         );
     } else if (resLoading || isPlaceholderData) {
         if (viewMode === 'cards') {
@@ -145,7 +145,7 @@ const ReservationsAllTab = () => {
     } else if (viewMode === 'cards') {
         if (reservations.length === 0) {
             listContent = (
-                <DataState state="empty" kind="reservation" title="예약 내역이 없습니다." style={{ marginTop: 80 }} />
+                <DataState state="empty" kind="reservation" title="예약 내역이 없어요." style={{ marginTop: 80 }} />
             );
         } else {
             listContent = (
@@ -186,7 +186,7 @@ const ReservationsAllTab = () => {
                 dataSource={reservations}
                 rowKey="id"
                 pagination={{ current: page, pageSize: PAGE_SIZE, total: totalElements, onChange: setPage }}
-                locale={{ emptyText: '예약 내역이 없습니다.' }}
+                locale={{ emptyText: '예약 내역이 없어요.' }}
             />
         );
     }
@@ -204,12 +204,14 @@ const ReservationsAllTab = () => {
                 sortOptions={RESERVATION_SORT_OPTIONS}
                 count={totalElements}
                 disabled={resLoading || isFetching}
+                initialLoading={resLoading}
                 label="관리자 예약 목록 필터"
             />
             <FilterToolbar
                 search={{ value: resSearch, onChange: handleSearchChange, placeholder: '가게명, 예약자로 검색', disabled: resLoading }}
                 onReload={loadReservations}
                 loading={resLoading || isFetching}
+                initialLoading={resLoading}
             />
             {/* 본문 스켈레톤은 첫 조회·쿼리 전환에만 표시한다. 수동 새로고침은 기존 행을 유지하고
                 툴바의 진행 상태만 바뀌므로, 읽던 목록과 페이지 위치가 사라지지 않는다. */}

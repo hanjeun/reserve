@@ -33,7 +33,7 @@ public class PasswordResetController {
         String ip = IpExtractor.extract(request);
         if (!rateLimiter.tryConsume(ip, RateLimiter.Policy.EMAIL_SEND)) {
             return ResponseEntity.status(429)
-                    .body(ApiResponse.error("요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                    .body(ApiResponse.error("요청이 너무 많아요. 잠시 후 다시 시도해주세요."));
         }
 
         String email = body.get("email");
@@ -63,7 +63,7 @@ public class PasswordResetController {
         log.info("Password reset queued (not yet delivered): queued={}", queued);
 
         return ResponseEntity.ok(ApiResponse.success(
-                null, "입력하신 이메일로 인증 코드를 보냈습니다. 메일이 오지 않으면 가입 여부를 확인해주세요."));
+                null, "입력하신 이메일로 인증 코드를 보냈어요. 메일이 오지 않으면 가입 여부를 확인해주세요."));
     }
 
     /** 코드 검증 */
@@ -81,7 +81,7 @@ public class PasswordResetController {
         }
 
         passwordResetService.verifyCode(email, code);
-        return ResponseEntity.ok(ApiResponse.success(null, "인증이 완료되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "인증이 완료됐어요."));
     }
 
     /** 비밀번호 재설정 */
@@ -102,7 +102,7 @@ public class PasswordResetController {
         }
 
         passwordResetService.resetPassword(email, code, newPassword);
-        return ResponseEntity.ok(ApiResponse.success(null, "비밀번호가 변경되었습니다."));
+        return ResponseEntity.ok(ApiResponse.success(null, "비밀번호가 변경됐어요."));
     }
 
     /**
@@ -133,7 +133,7 @@ public class PasswordResetController {
             log.warn("Password reset code attempt throttled: ipQuotaLeft={}, accountQuotaLeft={}",
                     ipQuotaLeft, accountQuotaLeft);
             return ResponseEntity.status(429)
-                    .body(ApiResponse.error("요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                    .body(ApiResponse.error("요청이 너무 많아요. 잠시 후 다시 시도해주세요."));
         }
         return null;
     }

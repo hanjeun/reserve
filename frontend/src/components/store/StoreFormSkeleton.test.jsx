@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import StoreOnboardingSkeleton from './StoreOnboardingSkeleton';
-import questionSource from './StoreOnboardingFields.jsx?raw';
+import questionSource from './onboarding/IndustryQuestion.jsx?raw';
 import selectionSource from './StoreEditSelection.jsx?raw';
 import { STORE_EDIT_SELECTION_HELP } from '../../utils/storeOnboarding';
 
@@ -30,11 +30,11 @@ describe('StoreOnboardingSkeleton used by registration and editing', () => {
         expect(container.querySelector('input,button,select,textarea,a,img')).toBeNull();
     });
 
-    it('reserves the six editing choices instead of presenting an already-open full form', () => {
+    it('reserves the nine editing choices instead of presenting an already-open full form', () => {
         const { container } = render(<StoreOnboardingSkeleton mode="edit" />);
         expect(container.querySelector('h1')).toHaveTextContent('무엇을 수정하시겠어요?');
         expect(container.querySelector('.reserve-onboarding-edit-selection')).toBeInTheDocument();
-        expect(container.querySelectorAll('.reserve-service-domain-option')).toHaveLength(6);
+        expect(container.querySelectorAll('.reserve-service-domain-option')).toHaveLength(9);
         expect(container.querySelector('.reserve-store-form-skeleton-label')).toBeNull();
         expect(container.querySelector('input,button,select,textarea,a,img')).toBeNull();
     });
@@ -44,7 +44,7 @@ describe('StoreOnboardingSkeleton used by registration and editing', () => {
         const picker = container.querySelector('.reserve-service-domain-picker');
         expect(picker).toHaveAttribute('aria-hidden', 'true');
         const choices = picker.querySelectorAll('.reserve-service-domain-option');
-        expect(choices).toHaveLength(6);
+        expect(choices).toHaveLength(mode === 'edit' ? 9 : 6);
         choices.forEach(choice => {
             expect(choice.querySelector('.reserve-service-domain-option__media > .reserve-skeleton-block'))
                 .toHaveStyle({ width: '56px', height: '56px', borderRadius: '50%' });

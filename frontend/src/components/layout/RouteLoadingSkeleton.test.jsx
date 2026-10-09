@@ -231,10 +231,10 @@ describe('route chunk loading patterns', () => {
             expect(container.querySelector('.reserve-page-container')).toHaveStyle({ maxWidth, padding });
         });
 
-    it('renders the editing question and six choice slots on the edit route', () => {
+    it('renders the editing question and nine choice slots on the edit route', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/store/12/edit" />);
         expect(container.querySelector('.reserve-onboarding-heading')).toHaveTextContent('무엇을 수정하시겠어요?');
-        expect(container.querySelectorAll('.reserve-onboarding-edit-selection .reserve-service-domain-option')).toHaveLength(6);
+        expect(container.querySelectorAll('.reserve-onboarding-edit-selection .reserve-service-domain-option')).toHaveLength(9);
         expect(container.querySelector('button,input,select,a,textarea')).toBeNull();
     });
 

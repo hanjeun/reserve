@@ -60,6 +60,8 @@ test.beforeEach(async ({ context, page }) => {
     let editFetchCount = 0;
     await context.clearCookies();
     await page.addInitScript(() => {
+        // A same-origin preview frame shares storage with the page under test.
+        if (window !== window.top) return;
         window.localStorage.clear();
         window.sessionStorage.clear();
     });

@@ -433,9 +433,17 @@ describe('MessengerContent', () => {
         await screen.findByText('답변 문구');
         await user.type(screen.getByRole('textbox'), '제가 쓴 문장');
         await user.click(screen.getByText('답변 문구'));
+        const toggle = screen.getByRole('button', { name: '답변 문구' });
+        const replies = document.getElementById(toggle.getAttribute('aria-controls'));
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
         await user.click(screen.getByRole('button', { name: '인사' }));
         expect(screen.getByRole('textbox')).toHaveValue('제가 쓴 문장\n안녕하세요. 문의해주셔서 감사해요. 확인 후 안내해드릴게요.');
         expect(chatService.sendStoreInbox).not.toHaveBeenCalled();
+        await user.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(replies).toHaveAttribute('aria-hidden', 'true');
+        expect(replies).toHaveAttribute('inert');
+        expect(replies.isConnected).toBe(true);
     });
 
     it('requires explicit notification opt-in and uses new polling, not initial history', async () => {
@@ -655,6 +663,29 @@ describe('MessengerContent', () => {
         expect(screen.getByText('이전 메시지')).toBeInTheDocument();
         expect(screen.getByText('최근 메시지')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '이전 메시지 보기' })).not.toBeInTheDocument();
+    });
+
+    it.each([false, true])('keeps older history reachable after hiding the whole recent window (older hidden: %s)', async hidden => {
+        const user = userEvent.setup();
+        chatService.getSupport.mockResolvedValue({
+            roomId: 1, type: 'SUPPORT', title: 'RESERVE 고객지원', viewerRole: 'MEMBER', canSend: true,
+            hasOlderMessages: true, nextBeforeId: 51,
+            messages: [{ id: 51, senderRole: 'MEMBER', content: '개인 삭제한 최근 메시지', hidden: true,
+                createdAt: '2026-09-12T22:00:00' }],
+        });
+        chatService.getHistory.mockResolvedValue({
+            hasMore: false, nextBeforeId: 1,
+            messages: [{ id: 1, senderRole: 'ADMIN', content: '이전 대화 내용', hidden,
+                createdAt: '2026-09-01T09:00:00' }],
+        });
+        renderMessenger();
+
+        await user.click(await screen.findByRole('button', { name: '이전 메시지 보기' }));
+        await waitFor(() => expect(chatService.getHistory).toHaveBeenCalledWith(1, 51, 50));
+        await waitFor(() => expect(screen.queryByRole('button', { name: '이전 메시지 보기' })).not.toBeInTheDocument());
+        expect(screen.queryByText('개인 삭제한 최근 메시지')).not.toBeInTheDocument();
+        if (hidden) expect(screen.queryByText('이전 대화 내용')).not.toBeInTheDocument();
+        else expect(screen.getByText('이전 대화 내용')).toBeInTheDocument();
     });
 
     it('retries stale history once and keeps its cursor available after another retraction', async () => {

@@ -112,9 +112,9 @@ class ChatControllerResponseContractTest {
     private static Stream<Arguments> adminResponses() {
         return Stream.of(
                 success("AdminChat.rooms", f -> {
-                    when(f.chatService.listRoomsForAdmin(PAGE)).thenReturn(f.rooms);
+                    when(f.chatService.listRoomsForAdmin(PAGE, ACTOR_ID)).thenReturn(f.rooms);
                     assertSuccess(f.admin.rooms(PAGE), f.rooms, EXPECTED_QUERY_SUCCESS);
-                    verify(f.chatService).listRoomsForAdmin(PAGE);
+                    verify(f.chatService).listRoomsForAdmin(PAGE, ACTOR_ID);
                 }),
                 success("AdminChat.messages", f -> {
                     when(f.chatService.getRoomAsAdmin(ROOM_ID, ACTOR_ID)).thenReturn(f.messages);

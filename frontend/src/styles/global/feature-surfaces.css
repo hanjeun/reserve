@@ -583,6 +583,8 @@ button.reserve-date-part-label:focus-visible { outline: var(--reserve-focus-ring
 .reserve-chat-sender-avatar-slot .reserve-messenger-avatar { width: 28px; height: 28px; border-radius: 11px; font-size: 14px; }
 .reserve-chat-bubble-group { min-width: 0; }
 .reserve-chat-image-message { background: transparent; border: 0; padding: 0; }
+.reserve-chat-photo-frame { position: relative; border-radius: 10px; }
+.reserve-chat-photo-loading { position: absolute; inset: 0; display: block; }
 .reserve-chat-image-message .ant-image { display: block; overflow: hidden; border-radius: 10px; background: transparent; }
 .reserve-chat-retention-notice { margin: 0 0 14px; color: var(--c-text-tertiary, #8b95a1); font-size: 12px; line-height: 1.5; }
 .reserve-chat-retention-notice a { color: var(--c-text-secondary, #4e5968); text-decoration: underline; }
@@ -1071,19 +1073,23 @@ button.reserve-date-part-label:focus-visible { outline: var(--reserve-focus-ring
 .reserve-chat-color-option { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
 .reserve-chat-color-option > span { width: 12px; height: 12px; border-radius: 50%; }
 .reserve-messenger-replies { margin: 0 4px 10px; }
-.reserve-messenger-replies summary {
+.reserve-messenger-replies-toggle {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: inherit;
+    text-align: left;
     min-height: 44px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    list-style: none;
     color: var(--c-text-secondary, #4e5968);
     font-size: 12px;
     cursor: pointer;
 }
-.reserve-messenger-replies summary::-webkit-details-marker { display: none; }
-.reserve-messenger-replies summary::marker { content: ''; }
+.reserve-messenger-replies-toggle:focus-visible { outline: 2px solid var(--c-text-tertiary, #8b95a1); outline-offset: 2px; border-radius: 6px; }
 .reserve-messenger-replies-chevron {
     flex-shrink: 0;
     font-size: 10px;
@@ -1091,14 +1097,27 @@ button.reserve-date-part-label:focus-visible { outline: var(--reserve-focus-ring
     transform: rotate(0deg);
     transition: transform 0.2s ease;
 }
-.reserve-messenger-replies[open] .reserve-messenger-replies-chevron { transform: rotate(180deg); }
+.reserve-messenger-replies.is-open .reserve-messenger-replies-chevron { transform: rotate(180deg); }
 .reserve-messenger-replies p {
     margin: 0 0 6px;
     color: var(--c-text-tertiary, #8b95a1);
     font-size: 11px;
     line-height: 1.6;
 }
-.reserve-messenger-replies[open] .reserve-messenger-replies-content { animation: slideUpIn 0.2s ease both; }
+.reserve-messenger-replies-content {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition: grid-template-rows 0.2s ease, opacity 0.2s ease, visibility 0s 0.2s;
+}
+.reserve-messenger-replies.is-open .reserve-messenger-replies-content {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}
+.reserve-messenger-replies-inner { min-height: 0; overflow: hidden; }
 .reserve-messenger-replies-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .reserve-messenger-replies .reserve-btn { min-height: 44px; }
 .reserve-messenger-closed {
@@ -1272,7 +1291,7 @@ button.reserve-date-part-label:focus-visible { outline: var(--reserve-focus-ring
     .reserve-messenger.is-returning-to-list > .reserve-messenger-list,
     .reserve-messenger.is-returning-to-list > .reserve-messenger-thread { animation-duration: 0.01ms; }
     .reserve-messenger-list-refresh.is-refreshing .anticon { animation: none; }
-    .reserve-messenger-replies[open] .reserve-messenger-replies-content { animation: none; }
+    .reserve-messenger-replies-content { transition: none; }
     .reserve-chat-photo-image { transition: none; }
     .reserve-messenger-launcher-wrap,
     .reserve-chat-launcher,

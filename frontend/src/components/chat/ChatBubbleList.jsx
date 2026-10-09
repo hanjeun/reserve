@@ -54,14 +54,15 @@ const inSameGroup = (a, b) => {
  * @param {Array}  messages 시간순 메시지
  * @param {string} mine     내 메시지로 볼 senderRole ('MEMBER' | 'ADMIN')
  */
-const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => {
+const ChatBubbleList = ({ messages, mine, roomId, onRetracted, onHidden = onRetracted, reportRole }) => {
     const { palette } = useChatPreferences();
+    const visibleMessages = messages.filter(message => !message.hidden);
     return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {messages.map((m, i) => {
+        {visibleMessages.map((m, i) => {
             const isMine = m.senderRole === mine;
-            const first = !inSameGroup(messages[i - 1], m);
-            const last = !inSameGroup(m, messages[i + 1]);
+            const first = !inSameGroup(visibleMessages[i - 1], m);
+            const last = !inSameGroup(m, visibleMessages[i + 1]);
             const timestamp = last ? formatTime(m.createdAt) : '';
             const ownTimestamp = m.pending ? '보내는 중' : timestamp;
 
@@ -84,7 +85,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                     {!isMine && m.senderRole === 'ADMIN' && <span className="reserve-chat-sender-avatar-slot">
                         {first && <SupportAvatar />}
                     </span>}
-                    {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted}
+                    {isMine && <ChatMessageActions message={m} roomId={roomId} onRetracted={onRetracted} onHidden={onHidden}
                         timestamp={ownTimestamp} />}
                     <div className="reserve-chat-bubble-group" style={{ maxWidth: m.senderRole === 'ADMIN' && !isMine ? '72%' : '78%' }}>
                         {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
@@ -102,7 +103,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, reportRole }) => 
                             <span>{m.content}</span>
                         </div>}
                     </div>
-                    {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole}
+                    {!isMine && <ChatMessageActions message={m} roomId={roomId} reportRole={reportRole} onHidden={onHidden}
                         timestamp={timestamp} />}
                 </div>
             );

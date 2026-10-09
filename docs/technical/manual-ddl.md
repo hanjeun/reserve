@@ -568,3 +568,41 @@ ALTER TABLE email_verification
 ```
 
 여기서 `--rerun-tasks`는 일반 CI에서 환경값 없이 스킵했던 결과나 이전 task 상태를 실제 MySQL 검사로 재사용하지 않기 위한 옵션이에요. 대상은 위 클래스의 5개 검사이며, **실행 5·실패 0·스킵 0**과 MySQL 8.0.45 연결을 실제 결과로 확인해야 해요. 일반 CI·H2의 성공이나 환경값을 빠뜨린 스킵을 이 근거로 대신하지 않아요. 성공한 같은 입력의 MySQL 검사는 반복하지 않고, 실패 수정 후에는 바뀐 입력이 영향을 주는 실패 항목만 다시 확인해요. 종료 시 검사 프로세스의 전용 자격 환경값도 비워요.
+
+## 14. 메시지 나에게만 삭제 (프리뷰 준비, 운영 미적용)
+
+`chat_message_hidden`은 메시지 ID·본인 계정 ID·표시 제외 시각만 저장해요. 상대방 대화·원문·사진·신고 증거를 삭제하거나 기존 90일 보존/신고 보류 정책을 변경하지 않아요. 조회와 개인 변경 커서는 인증된 계정과 참가 가능한 방으로 한정해요. 숨긴 행도 메시지·읽음 커서의 ID는 유지하며 본문·사진은 일반 응답에 넣지 않아요. 계정 탈퇴 시 해당 계정의 표시 설정만 제거해요.
+
+이 절은 v2.9.0에 포함되지 않아요. 운영 적용에는 새 출시 범위·DDL·배포 승인이 필요해요. 실제 대상 DB와 `SELECT DATABASE()`·회원/메시지 PK의 타입·아래 테이블 존재 여부를 먼저 조회하고, 직전 새 백업과 격리 복원 근거를 확보해요. 기존 테이블이 있으면 `IF NOT EXISTS`로 차이를 숨기지 않고 컬럼·unique·FK·인덱스가 같은지 확인해요.
+
+```sql
+SELECT DATABASE(), @@hostname;
+SELECT TABLE_NAME FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chat_message_hidden';
+SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('chat_message', 'member') AND COLUMN_KEY = 'PRI';
+
+-- 테이블이 없고 새 승인 범위에 포함된 대상에서만 DDL 계정으로 실행해요.
+CREATE TABLE chat_message_hidden (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  message_id BIGINT NOT NULL,
+  member_id BIGINT NOT NULL,
+  hidden_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (id),
+  CONSTRAINT uk_chat_hidden_viewer UNIQUE (message_id, member_id),
+  INDEX idx_chat_hidden_poll (member_id, id),
+  CONSTRAINT fk_chat_hidden_message FOREIGN KEY (message_id) REFERENCES chat_message(id) ON DELETE CASCADE,
+  CONSTRAINT fk_chat_hidden_member FOREIGN KEY (member_id) REFERENCES member(member_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+SHOW CREATE TABLE chat_message_hidden;
+SHOW INDEX FROM chat_message_hidden;
+```
+
+새 테이블을 만든 뒤 제한된 앱 계정의 `ddl-auto=validate`로 새 JAR을 확인하고, 개인 삭제를 이해하는 백엔드·프론트·환경 설정·백업을 같은 복구 세트로 보관한 후 전환해요. 방 잠금과 unique가 재시도를 한 행으로 만들고, 다른 계정의 숨김 이벤트는 폴링으로 노출하지 않아요. 본인/상대/비참가자·다른 방·사진 조회·원문 신고·폴링/이전 페이지·탈퇴 경계를 최종 입력 검사에 포함해요.
+
+복구 시 테이블이나 표시 설정을 제거하지 않아요. v2.9.0 이미지에는 개인 삭제 관문이 없으므로, 실제 개인 삭제가 사용된 이후 그 이미지만 다시 띄우면 지웠던 내용이 본인에게 다시 보일 수 있어요. 이 절의 동작을 유지하는 새 호환 복구 이미지가 필요하며, v2.9.0의 복구 묶음을 이 근거로 재사용하지 않아요.
+
+프리뷰의 다음 자동 배포는 `reserve.feature-compat=waiting-signup-hidden-v2`를 live와 target 양쪽에 요구해요. Docker 빌드는 실제 JAR의 개인 삭제 entity·repository·service 포함 여부를 확인한 뒤에만 완료되며, 코드와 계정별 조회·사진·폴링 동작 검사를 통과한 이미지에 이 표식을 붙여요. 운영의 v2.9.0 이미지를 재표시하지 않고, 별도 승인된 첫 전환에서 새 호환 이미지·프론트·현재 환경값·백업을 확보해야 해요.
+
+2026-10-09 격리 MySQL 8.0.45에서 복원본의 **스키마만** 별도 빈 합성 DB로 복사한 뒤 이 절의 SQL을 적용했어요. 초기 회원 FK의 `member(id)` 오류를 실제 `member(member_id)`로 수정했고, 채팅·회원 모델을 DDL 권한 없는 전용 계정의 `validate`로 확인했어요. `ChatMessageVisibilityMySqlReleaseTest`의 중복 동시 삭제·개인 커서 커밋 순서·트랜잭션 롤백 **3개가 실패 0·스킵 0**으로 통과했어요. 기존 복원 DB는 변경하지 않았고, 새 합성 DB와 전용 검사 계정만 종료 후 제거했어요. 이 결과는 운영 DDL·전체 새 JAR/복구 이미지 검증이나 실제 고객 메시지 삭제를 실행했다는 뜻이 아니에요.

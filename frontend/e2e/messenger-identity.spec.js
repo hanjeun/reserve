@@ -218,13 +218,19 @@ test('thread entry uses the same calm easing and duration as returning to the li
     ]);
 });
 
-test('composer uses emoji, neutral send controls, white surfaces and owner-only unlimited retraction', async ({ page }, testInfo) => {
+test('composer keeps neutral controls and scopes retraction and private deletion', async ({ page }, testInfo) => {
     await mockApi(page, account, [{ roomId: 1, type: 'SUPPORT', viewerRole: 'MEMBER', lastMessagePreview: '문의합니다' }]);
     let retracts = 0;
+    let hides = 0;
     await page.route('**/api/chat/rooms/1/messages/11/retract', route => {
         retracts++;
         expect(route.request().method()).toBe('POST');
         return ok(route, { id: 11, senderRole: 'MEMBER', canRetract: false, content: '전송이 취소된 메시지입니다.', retracted: true, retractionRevision: 1 });
+    });
+    await page.route('**/api/chat/rooms/1/messages/12/hide', route => {
+        hides++;
+        expect(route.request().method()).toBe('POST');
+        return ok(route, { id: 12, senderRole: 'ADMIN', hidden: true, content: null, imageUrl: null });
     });
     if (testInfo.project.name === 'mobile-chromium') await page.goto('/messages');
     else {
@@ -241,8 +247,9 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     await page.getByRole('button', { name: '커피 ☕' }).click();
     await expect(input).toHaveValue('☕');
     await expect(page.getByRole('button', { name: '보내기', exact: true })).toHaveCSS('background-color', 'rgb(242, 244, 246)');
-    await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(1);
-    const messageMenu = page.getByRole('button', { name: '메시지 관리' });
+    await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(2);
+    const ownRow = page.locator('.reserve-chat-message-row').filter({ has: page.getByText('문의합니다', { exact: true }) });
+    const messageMenu = ownRow.getByRole('button', { name: '메시지 관리' });
     await expect(messageMenu).toHaveCSS('width', '44px');
     await expect(messageMenu).toHaveCSS('height', '44px');
     const row = messageMenu.locator('xpath=ancestor::*[contains(@class,"reserve-chat-message-row")]');
@@ -260,6 +267,7 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     }
     await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-actions-aligned.png') });
     await messageMenu.click();
+    await expect(page.getByRole('menuitem', { name: '나에게만 삭제' })).toBeVisible();
     const retractMenuItem = page.getByRole('menuitem', { name: '전송 취소' });
     await expect(retractMenuItem).toBeVisible();
     // AntD animates the popup ancestor, not the menu item Playwright checks for stability.
@@ -273,10 +281,24 @@ test('composer uses emoji, neutral send controls, white surfaces and owner-only 
     await expect(retractDialog).toBeVisible();
     await retractDialog.getByRole('button', { name: '전송 취소', exact: true }).click();
     await expect(page.locator('.reserve-chat-bubble-group')).toContainText(['전송이 취소된 메시지입니다.', '확인했습니다']);
-    await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(2);
     expect(retracts).toBe(1);
     await expect(page.getByRole('dialog', { name: '메시지 전송을 취소할까요?' })).not.toBeVisible();
     await expect(page.locator('.reserve-messenger')).not.toContainText('문의합니다');
+    const incomingRow = page.locator('.reserve-chat-message-row').filter({ has: page.getByText('확인했습니다', { exact: true }) });
+    await incomingRow.getByRole('button', { name: '메시지 관리' }).click();
+    await expect(page.getByRole('menuitem', { name: '전송 취소' })).toHaveCount(0);
+    const hideMenuItem = page.getByRole('menuitem', { name: '나에게만 삭제' });
+    await expect(hideMenuItem).toBeVisible();
+    await hideMenuItem.click();
+    const hideDialog = page.getByRole('dialog', { name: '이 메시지를 나에게만 삭제할까요?' });
+    await expect(hideDialog).toContainText('상대방 대화와 신고·분쟁 검토 원본은 유지');
+    await hideDialog.getByRole('button', { name: '나에게만 삭제', exact: true }).click();
+    await expect(page.locator('.reserve-messenger')).not.toContainText('확인했습니다');
+    await expect(page.locator('.reserve-messenger')).toContainText('전송이 취소된 메시지입니다.');
+    await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(1);
+    expect(hides).toBe(1);
+    expect(retracts).toBe(1);
     await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-composer-light.png') });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
     await expect(page.locator('.reserve-messenger-thread-body')).not.toHaveCSS('background-color', 'rgb(255, 255, 255)');

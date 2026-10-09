@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId, useState } from 'react';
 import { ArrowLeftOutlined, CloseOutlined, DownOutlined, MessageOutlined } from '@ant-design/icons';
 import { Bone, Button, DataState } from '../common';
 import ConversationListSkeleton from './ConversationListSkeleton';
@@ -215,7 +215,7 @@ function ThreadAvatar({ selection, thread, selectedRow }) {
     return <span className="reserve-messenger-thread-avatar" aria-hidden="true"><MessageOutlined /></span>;
 }
 
-function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onRetracted }) {
+function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onRetracted, emptyText }) {
     return (
         <div>
             {history.hasMore && (
@@ -230,9 +230,10 @@ function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onR
                     </Button>
                 </div>
             )}
-            <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
+            {messages.some(message => !message.hidden) ? <ChatBubbleList messages={messages} mine={thread?.viewerRole || viewerRoleOf(selection)}
                 roomId={thread?.roomId} onRetracted={onRetracted}
                 reportRole={thread?.type === 'STORE' ? thread.viewerRole : undefined} />
+                : <DataState state="empty" kind="message" title={emptyText} />}
         </div>
     );
 }
@@ -260,36 +261,37 @@ function ThreadBody({ loading, loadError, onReload, intro, emptyText, messagePro
                 onAsk={intro.onAsk} disabled={intro.disabled} draftLength={intro.draftLength} />
         );
     }
-    if (messageProps.messages.length === 0) {
-        return (
-            <DataState state="empty" kind="message" title={emptyText} />
-        );
-    }
-    return <ThreadMessages {...messageProps} />;
+    return <ThreadMessages {...messageProps} emptyText={emptyText} />;
 }
 
 function OwnerReplies({ draft, sending, onInsert }) {
+    const [open, setOpen] = useState(false);
+    const contentId = useId();
     return (
-        <details className="reserve-messenger-replies">
-            <summary>
+        <div className={`reserve-messenger-replies${open ? ' is-open' : ''}`}>
+            <button type="button" className="reserve-messenger-replies-toggle"
+                aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(value => !value)}>
                 <span>답변 문구</span>
                 <DownOutlined className="reserve-messenger-replies-chevron" aria-hidden="true" />
-            </summary>
-            <div className="reserve-messenger-replies-content">
-                <p>직접 만든 안내 문구예요. 수정 후 보내기를 눌러주세요.</p>
-                <div className="reserve-messenger-replies-options">
-                    {OWNER_REPLIES.map(reply => (
-                        <Button
-                            key={reply.label}
-                            variant="ghost-sm"
-                            size="sm"
-                            disabled={sending || draft.length + reply.text.length + (draft ? 1 : 0) > 2000}
-                            onClick={() => onInsert(draft ? `${draft}\n${reply.text}` : reply.text)}
-                        >{reply.label}</Button>
-                    ))}
+            </button>
+            <div id={contentId} className="reserve-messenger-replies-content"
+                aria-hidden={!open} inert={!open ? true : undefined}>
+                <div className="reserve-messenger-replies-inner">
+                    <p>직접 만든 안내 문구예요. 수정 후 보내기를 눌러주세요.</p>
+                    <div className="reserve-messenger-replies-options">
+                        {OWNER_REPLIES.map(reply => (
+                            <Button
+                                key={reply.label}
+                                variant="ghost-sm"
+                                size="sm"
+                                disabled={sending || draft.length + reply.text.length + (draft ? 1 : 0) > 2000}
+                                onClick={() => onInsert(draft ? `${draft}\n${reply.text}` : reply.text)}
+                            >{reply.label}</Button>
+                        ))}
+                    </div>
                 </div>
             </div>
-        </details>
+        </div>
     );
 }
 

@@ -10,6 +10,7 @@ import kr.it.reserve.chat.entity.ChatMessage;
 import kr.it.reserve.chat.entity.ChatRoom;
 import kr.it.reserve.chat.entity.SenderRole;
 import kr.it.reserve.chat.repository.ChatMessageRepository;
+import kr.it.reserve.chat.repository.ChatMessageHiddenRepository;
 import kr.it.reserve.chat.repository.ChatRoomRepository;
 import kr.it.reserve.global.error.ChatException;
 import kr.it.reserve.member.entity.Member;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -65,6 +67,7 @@ public class ChatService {
     private final ChatMessageRepository messageRepository;
     private final MemberRepository memberRepository;
     private final StoreRepository storeRepository;
+    private final ChatMessageHiddenRepository hiddenRepository;
 
     // ── 손님 ────────────────────────────────────────────────────────────────
 
@@ -138,7 +141,7 @@ public class ChatService {
         assertNotBlocked(room);
         var existing = messageRepository.findByRoomIdAndSenderMemberIdAndClientMessageId(
                 roomId, member.getId(), clientMessageId);
-        if (existing.isPresent()) return ChatMessageResponse.from(existing.get(), member.getId());
+        if (existing.isPresent()) return messageResponses(List.of(existing.get()), member.getId()).getFirst();
         ChatImagePayload image = upload.get();
         String caption = content == null ? "" : content.trim();
         ChatMessage saved = messageRepository.save(ChatMessage.builder().room(room).senderRole(sender)
@@ -147,7 +150,7 @@ public class ChatService {
                 .imageOriginalFilename(ChatImageFilename.sanitize(image.originalFilename(), image.contentType())).imageWidth(image.width())
                 .imageHeight(image.height()).imageBytes(image.bytes()).build());
         room.onMessageSent(sender, LocalDateTime.now(Clock.systemDefaultZone()), caption.isEmpty() ? "사진" : "사진 · " + caption);
-        return ChatMessageResponse.from(saved, member.getId());
+        return messageResponses(List.of(saved), member.getId()).getFirst();
     }
 
     /** 관리자는 고객지원 사진만 직접 조회한다. 가게 대화는 실제 참가자만 통과한다. */
@@ -168,9 +171,10 @@ public class ChatService {
                 : roomRepository.findForMember(member.getId(), pageable);
         Map<Long, String> previews = missingPreviewFallbacks(rooms.getContent());
         Map<Long, String> storeImages = storeImageUrls(rooms.getContent());
-        return rooms.map(room -> ConversationSummaryResponse.forMember(
+        Map<Long, String> personalPreviews = personalPreviewOverrides(rooms.getContent(), member.getId());
+        return rooms.map(room -> withPersonalPreview(ConversationSummaryResponse.forMember(
                 room, previews.get(room.getId()), room.getStoreId() == null
-                        ? null : storeImages.get(room.getStoreId())));
+                        ? null : storeImages.get(room.getStoreId())), personalPreviews));
     }
 
     @Transactional
@@ -278,8 +282,9 @@ public class ChatService {
                 ChatRoom.RoomType.STORE, storeIds, owner.getId(), hidden, pageable);
         Map<Long, String> previews = missingPreviewFallbacks(rooms.getContent());
         Map<Long, String> storeImages = storeImageUrls(rooms.getContent());
-        return rooms.map(room -> ConversationSummaryResponse.forOwner(
-                room, previews.get(room.getId()), storeImages.get(room.getStoreId())));
+        Map<Long, String> personalPreviews = personalPreviewOverrides(rooms.getContent(), owner.getId());
+        return rooms.map(room -> withPersonalPreview(ConversationSummaryResponse.forOwner(
+                room, previews.get(room.getId()), storeImages.get(room.getStoreId())), personalPreviews));
     }
 
     @Transactional
@@ -307,11 +312,20 @@ public class ChatService {
     // ── 관리자 ──────────────────────────────────────────────────────────────
 
     public Page<ChatRoomResponse> listRoomsForAdmin(int page) {
+        return listRoomsForAdmin(page, null);
+    }
+
+    public Page<ChatRoomResponse> listRoomsForAdmin(int page, Long viewerId) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), ROOM_PAGE_SIZE);
         Page<ChatRoom> rooms = roomRepository.findAllForAdmin(
                 ChatRoom.RoomType.SUPPORT, pageable);
         Map<Long, String> previews = missingPreviewFallbacks(rooms.getContent());
-        return rooms.map(room -> ChatRoomResponse.from(room, previews.get(room.getId())));
+        Map<Long, String> personalPreviews = personalPreviewOverrides(rooms.getContent(), viewerId);
+        return rooms.map(room -> {
+            var response = ChatRoomResponse.from(room, previews.get(room.getId()));
+            return personalPreviews.containsKey(room.getId())
+                    ? response.toBuilder().lastMessagePreview(personalPreviews.get(room.getId())).build() : response;
+        });
     }
 
     @Transactional
@@ -524,7 +538,32 @@ public class ChatService {
 
     /** 한 메시지 창의 발신 역할만 표시한다. 지원 담당자의 개인 계정 정보는 조회하지 않는다. */
     private List<ChatMessageResponse> messageResponses(List<ChatMessage> messages, Long viewerId) {
-        return messages.stream().map(item -> ChatMessageResponse.from(item, viewerId)).toList();
+        List<Long> ids = messages.stream().map(ChatMessage::getId).filter(Objects::nonNull).toList();
+        Set<Long> hiddenIds = viewerId == null || ids.isEmpty() ? Set.of()
+                : Set.copyOf(hiddenRepository.findHiddenMessageIds(viewerId, ids));
+        return messages.stream().map(item -> ChatMessageResponse.from(item, viewerId,
+                item.getId() != null && hiddenIds.contains(item.getId()))).toList();
+    }
+
+    public boolean isMessageHidden(Long viewerId, Long messageId) {
+        return hiddenRepository.existsByMemberIdAndMessageId(viewerId, messageId);
+    }
+
+    private Map<Long, String> personalPreviewOverrides(List<ChatRoom> rooms, Long viewerId) {
+        if (viewerId == null || rooms.isEmpty()) return Map.of();
+        List<Long> roomIds = hiddenRepository.findHiddenRoomIds(viewerId, rooms.stream().map(ChatRoom::getId).toList());
+        if (roomIds.isEmpty()) return Map.of();
+        Map<Long, String> previews = new HashMap<>();
+        roomIds.forEach(id -> previews.put(id, "메시지를 나에게만 삭제했어요."));
+        for (var message : messageRepository.findLatestVisibleByRoomIds(roomIds, viewerId)) {
+            previews.put(message.getRoom().getId(), ChatRoom.previewContent(ChatMessageResponse.from(message, viewerId).getContent()));
+        }
+        return previews;
+    }
+
+    private ConversationSummaryResponse withPersonalPreview(ConversationSummaryResponse response, Map<Long, String> previews) {
+        return previews.containsKey(response.getRoomId())
+                ? response.toBuilder().lastMessagePreview(previews.get(response.getRoomId())).build() : response;
     }
 
     /** 기존 방의 요약 칼럼이 비어 있을 때만, 이미 권한 확인한 한 페이지의 마지막 실제 메시지를 읽는다. */

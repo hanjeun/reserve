@@ -65,6 +65,15 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
     List<ChatMessage> findLatestByRoomIds(@Param("roomIds") List<Long> roomIds);
 
+    @Query("""
+            SELECT message FROM ChatMessage message WHERE message.room.id IN :roomIds
+             AND message.id = (SELECT MAX(latest.id) FROM ChatMessage latest
+               WHERE latest.room.id = message.room.id AND NOT EXISTS (
+                 SELECT hidden.id FROM ChatMessageHidden hidden
+                  WHERE hidden.message.id = latest.id AND hidden.member.id = :viewerId))
+            """)
+    List<ChatMessage> findLatestVisibleByRoomIds(@Param("roomIds") List<Long> roomIds, @Param("viewerId") Long viewerId);
+
     /**
      * 방의 메시지를 <b>최신부터</b> 페이지 단위로. 화면이 뒤집어서 그린다.
      *

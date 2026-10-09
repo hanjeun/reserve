@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 /** 관리자 목록 한 줄. 손님 화면은 방이 하나뿐이라 이걸 안 쓴다. */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class ChatRoomResponse {
 
     private Long id;

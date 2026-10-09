@@ -5,6 +5,42 @@ import useChatThread from '../useChatThread';
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 
 describe('chat response ownership', () => {
+    it('preserves message/read cursors while removing private contents and never restores them through stale changes', async () => {
+        const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [
+            { id: 2, content: '삭제할 내용', imageUrl: '/api/chat/images/2', canRetract: true },
+            { id: 99, content: '최근 메시지' }, { id: 100, hidden: true },
+        ] });
+        const poll = vi.fn().mockResolvedValue([]);
+        const pollChanges = vi.fn().mockResolvedValueOnce({ messages: [], nextRevision: 0,
+            hiddenMessageIds: [2], nextHiddenId: 8 }).mockResolvedValue({ messages: [
+            { id: 2, retracted: true, content: '낡은 취소 응답', imageUrl: '/api/chat/images/2' },
+        ], nextRevision: 1, hiddenMessageIds: [], nextHiddenId: 8 });
+        const hook = renderHook(() => useChatThread({ threadKey: 'A', myRole: 'MEMBER', load, poll,
+            send: vi.fn(), pollChanges, pollMs: 60000 }));
+        await waitFor(() => expect(hook.result.current.messages[0].hidden).toBe(true));
+        expect(hook.result.current.messages.map(message => message.id)).toEqual([2, 99, 100]);
+        expect(hook.result.current.messages[0]).toMatchObject({ content: null, imageUrl: null, canRetract: false });
+        await act(async () => window.dispatchEvent(new Event('focus')));
+        await waitFor(() => expect(pollChanges).toHaveBeenLastCalledWith(1, 0, 8));
+        expect(poll).toHaveBeenLastCalledWith(1, 100);
+        expect(hook.result.current.messages[0]).toMatchObject({ hidden: true, content: null, imageUrl: null });
+        hook.unmount();
+    });
+
+    it('clears omitted private fields in a hide response and rejects history captured before a private cursor change', async () => {
+        const pending = deferred();
+        const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [{ id: 2, content: '사진 설명', imageUrl: '/api/chat/images/2' }] });
+        const pollChanges = vi.fn().mockReturnValue(pending.promise);
+        const hook = renderHook(() => useChatThread({ threadKey: 'A', myRole: 'MEMBER', load,
+            poll: vi.fn().mockResolvedValue([]), send: vi.fn(), pollChanges, pollMs: 60000 }));
+        await waitFor(() => expect(pollChanges).toHaveBeenCalledTimes(1));
+        const snapshot = hook.result.current.captureHistory();
+        act(() => hook.result.current.updateMessage({ id: 2, hidden: true }));
+        expect(hook.result.current.messages[0]).toMatchObject({ hidden: true, content: null, imageUrl: null });
+        await act(async () => pending.resolve({ messages: [], hiddenMessageIds: [1], nextHiddenId: 3 }));
+        expect(hook.result.current.prepend([{ id: 1, content: '낡은 이전 조회' }], snapshot)).toBe(false);
+        hook.unmount();
+    });
     it('interrupts the pending request and keeps the same retry identity for an ambiguous delivery', async () => {
         const load = vi.fn().mockResolvedValue({ roomId: 1, messages: [] });
         const poll = vi.fn().mockResolvedValue([]);
@@ -38,7 +74,7 @@ describe('chat response ownership', () => {
         await waitFor(() => expect(hook.result.current.messages[0].retracted).toBe(true));
         expect(hook.result.current.messages.map(message => message.id)).toEqual([2, 99]);
         await act(async () => { window.dispatchEvent(new Event('focus')); });
-        await waitFor(() => expect(pollChanges).toHaveBeenLastCalledWith(1, 9));
+        await waitFor(() => expect(pollChanges).toHaveBeenLastCalledWith(1, 9, 0));
         expect(poll).toHaveBeenLastCalledWith(1, 99);
         expect(onPolled).not.toHaveBeenCalled();
         expect(onChanged).toHaveBeenCalledTimes(1);
@@ -157,19 +193,19 @@ describe('chat retraction delta boundaries', () => {
         expect(poll).toHaveBeenCalledTimes(1);
         await act(async () => { firstMessages.resolve([{ id: 51, content: '원문', imageUrl: '/image/51' }]); });
         await waitFor(() => expect(hook.result.current.messages[1].retracted).toBe(true));
-        expect(pollChanges).toHaveBeenCalledWith(1, 0);
+        expect(pollChanges).toHaveBeenCalledWith(1, 0, 0);
         expect(hook.result.current.messages[1]).toMatchObject({ content: '취소', imageUrl: null });
 
         const replacement = vi.fn();
         hook.rerender({ changed: replacement });
         await waitFor(() => expect(pollChanges).toHaveBeenCalledTimes(2));
-        expect(pollChanges).toHaveBeenLastCalledWith(1, 100);
+        expect(pollChanges).toHaveBeenLastCalledWith(1, 100, 0);
         await act(async () => { window.dispatchEvent(new Event('focus')); });
-        expect(pollChanges).toHaveBeenLastCalledWith(1, 100);
+        expect(pollChanges).toHaveBeenLastCalledWith(1, 100, 0);
         expect(poll).toHaveBeenLastCalledWith(1, 51);
         poll.mockRejectedValueOnce(new Error('message polling failed'));
         await act(async () => { window.dispatchEvent(new Event('focus')); });
-        expect(pollChanges).toHaveBeenLastCalledWith(1, 101);
+        expect(pollChanges).toHaveBeenLastCalledWith(1, 101, 0);
         expect(onChanged).toHaveBeenCalledTimes(1);
         expect(replacement).not.toHaveBeenCalled();
     });
@@ -205,7 +241,7 @@ describe('chat retraction delta boundaries', () => {
                 await act(async () => { currentMessages.resolve([{ id: 2 }]); });
                 expect(hook.result.current.messages).toEqual([{ id: 1 }, { id: 2 }]);
             }
-            await waitFor(() => expect(pollChanges).toHaveBeenCalledExactlyOnceWith(1, 0));
+            await waitFor(() => expect(pollChanges).toHaveBeenCalledExactlyOnceWith(1, 0, 0));
         } finally {
             hook.unmount();
             visibility.mockRestore();
@@ -231,7 +267,7 @@ describe('chat retraction delta boundaries', () => {
         expect(firstChanged).not.toHaveBeenCalled();
         expect(pollChanges).toHaveBeenCalledTimes(1);
         await act(async () => { window.dispatchEvent(new Event('focus')); });
-        expect(pollChanges).toHaveBeenLastCalledWith(1, 0);
+        expect(pollChanges).toHaveBeenLastCalledWith(1, 0, 0);
         expect(hook.result.current.messages[0]).toMatchObject({ retracted: true, content: '취소' });
         expect(currentChanged).toHaveBeenCalledTimes(1);
     });

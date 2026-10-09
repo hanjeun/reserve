@@ -45,6 +45,7 @@ class SupportDisplayContractTest {
     @Mock ChatMessageRepository messageRepository;
     @Mock MemberRepository memberRepository;
     @Mock StoreRepository storeRepository;
+    @Mock private kr.it.reserve.chat.repository.ChatMessageHiddenRepository hiddenRepository;
     @InjectMocks ChatService chatService;
 
     private final Member customer = Member.builder().id(7L).name("손님")

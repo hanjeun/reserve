@@ -23,7 +23,7 @@ vi.mock('../common', () => {
     return {
     Card,
     Button: ({ children, onClick, disabled, loading, ...props }) => <button onClick={onClick} disabled={disabled || loading} aria-label={props['aria-label']}>{children}</button>,
-    DataState: ({ title, error }) => <div>{title || error?.message}</div>,
+    DataState: ({ title, error, compact }) => <div data-compact={Boolean(compact)}>{title || error?.message}</div>,
     FilterMenu: ({ options, value, onChange, ...props }) => <select aria-label={props['aria-label']}
         value={value} onChange={event => onChange(event.target.value)}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>,
     FilterToolbar: ({ search }) => <input placeholder={search.placeholder} value={search.value} onChange={search.onChange} />,
@@ -55,6 +55,32 @@ beforeEach(() => {
     waitingService.create.mockReset(); waitingService.updateStatus.mockReset(); waitingService.updateIntake.mockReset();
 });
 afterEach(() => vi.restoreAllMocks());
+
+it('places a failed cached refresh in the list body with a full illustration state instead of a false empty result', async () => {
+    const view = setup();
+    await screen.findByText('대기 중인 팀이 없어요.');
+    waitingService.getBoard.mockRejectedValueOnce(new Error('대기 명단 갱신 실패'));
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 5] }); });
+    const error = await screen.findByText('대기 명단 갱신 실패');
+    expect(error).toHaveAttribute('data-compact', 'false');
+    expect(screen.queryByText('대기 중인 팀이 없어요.')).toBeNull();
+    const summary = view.container.querySelector('.reserve-waiting-summary');
+    expect(summary.compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.client.getQueryData(['waiting', 1, 5]).entries).toEqual([]);
+    view.unmount(); view.client.clear();
+});
+
+it('does not claim a zero-team count or allow intake writes when the first board lookup fails', async () => {
+    waitingService.getBoard.mockRejectedValue(new Error('최초 조회 실패'));
+    const view = setup();
+    await screen.findByText('최초 조회 실패');
+    expect(screen.getByText('대기 현황을 확인하지 못했어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/대기 0팀/)).toBeNull();
+    expect(screen.getByRole('button', { name: '대기 접수' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '접수 중지' })).toBeDisabled();
+    expect(waitingService.updateIntake).not.toHaveBeenCalled();
+    view.unmount(); view.client.clear();
+});
 
 it('pauses new intake while keeping existing call actions and preserves the chosen intake mode on resume', async () => {
     const activeBoard = { ...board([entry(1)]), waitingIntakeMode: 'BOTH', waitingPaused: false };

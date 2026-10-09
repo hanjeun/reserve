@@ -33,6 +33,7 @@ class ChatHistoryTest {
     @Mock ChatMessageRepository messageRepository;
     @Mock MemberRepository memberRepository;
     @Mock StoreRepository storeRepository;
+    @Mock private kr.it.reserve.chat.repository.ChatMessageHiddenRepository hiddenRepository;
     @InjectMocks ChatService chatService;
 
     @Test

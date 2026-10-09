@@ -5,12 +5,14 @@ import kr.it.reserve.chat.entity.ChatMessage;
 import kr.it.reserve.chat.entity.ChatRoom;
 import kr.it.reserve.chat.entity.SenderRole;
 import kr.it.reserve.chat.repository.ChatMessageRepository;
+import kr.it.reserve.chat.repository.ChatMessageHiddenRepository;
 import kr.it.reserve.chat.repository.ChatRoomRepository;
 import kr.it.reserve.chat.service.ChatRetractionService;
 import kr.it.reserve.chat.service.ChatService;
 import kr.it.reserve.global.error.ChatException;
 import kr.it.reserve.member.entity.Member;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.SliceImpl;
 import org.springframework.http.HttpStatus;
@@ -26,9 +28,15 @@ class ChatRetractionServiceTest {
     private final ChatService chats = mock(ChatService.class);
     private final ChatRoomRepository rooms = mock(ChatRoomRepository.class);
     private final ChatMessageRepository messages = mock(ChatMessageRepository.class);
-    private final ChatRetractionService service = new ChatRetractionService(chats, rooms, messages);
+    private final ChatMessageHiddenRepository hidden = mock(ChatMessageHiddenRepository.class);
+    private final ChatRetractionService service = new ChatRetractionService(chats, rooms, messages, hidden);
     private final Member actor = Member.builder().id(7L).build();
     private final ChatRoom room = ChatRoom.builder().id(21L).member(actor).build();
+
+    @BeforeEach void privateChangesAreEmptyByDefault() {
+        when(hidden.findByMember_IdAndMessage_Room_IdAndIdGreaterThanOrderByIdAsc(anyLong(), anyLong(), anyLong(), any()))
+                .thenReturn(new SliceImpl<>(List.of()));
+    }
 
     @Test void oldMessageCanBeRetractedWithoutChangingItsOriginalOrUnreadCounts() {
         ChatMessage message = message(90L, 7L);

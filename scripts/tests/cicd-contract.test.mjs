@@ -183,12 +183,12 @@ test('the live backend must be schema and refund compatible before deployment', 
     assert.match(detect.with.script, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
 });
 
-test('automatic cutover requires recovery support for waiting settings and signup tickets', () => {
+test('automatic cutover requires recovery support for waiting settings, signup tickets and private message deletion', () => {
     const build = backend.steps.find(entry => entry.name === 'Build Docker image');
     const detect = step(deployment, 'detect');
     const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
-    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-v1/);
-    assert.match(detect.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-v1'/);
+    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-v2/);
+    assert.match(detect.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-v2'/);
     assert.ok(detect.with.script.indexOf('"$FEATURE_COMPAT" !=') < detect.with.script.indexOf('DETECTED_UPSTREAM='));
     assert.equal(cutover.env.CURRENT_UPSTREAM, '${{ env.CURRENT_UPSTREAM }}');
     assert.ok(cutover.with.envs.split(',').includes('CURRENT_UPSTREAM'));
@@ -196,10 +196,22 @@ test('automatic cutover requires recovery support for waiting settings and signu
     assert.match(cutover.with.script, /for COMPATIBLE_UPSTREAM in "\$CURRENT_UPSTREAM" "\$TARGET_UPSTREAM"/);
     const compatibilityGuard = cutover.with.script.indexOf('"$FEATURE_COMPAT" !=');
     assert.ok(compatibilityGuard > 0);
+    assert.match(cutover.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-v2'/);
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('trap rollback_cutover'));
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('sudo touch "$ROLLBACK_DIR/cutover-started"'));
     assert.ok(deployment.steps.indexOf(detect) < deployment.steps.indexOf(cutover));
     for (const entry of [detect, cutover]) assert.equal(entry['continue-on-error'], undefined);
+});
+
+test('backend image compatibility requires the private deletion classes in the actual packaged jar', () => {
+    const dockerfile = read('backend/Dockerfile');
+    const guard = dockerfile.indexOf('RUN for REQUIRED_CLASS');
+    assert.ok(guard > dockerfile.indexOf('COPY ${JAR_FILE} app.jar'));
+    assert.ok(guard < dockerfile.indexOf('ENTRYPOINT'));
+    for (const entry of ['entity/ChatMessageHidden', 'repository/ChatMessageHiddenRepository', 'service/ChatMessageVisibilityService']) {
+        assert.ok(dockerfile.includes(`BOOT-INF/classes/kr/it/reserve/chat/${entry}.class`));
+    }
+    assert.match(dockerfile, /jar tf app\.jar \| grep -F -x "\$REQUIRED_CLASS" > \/dev\/null \|\| exit 1/);
 });
 
 test('test failures retain reports without uploading frontend secret files', () => {

@@ -40,7 +40,8 @@ public class AdminChatController {
     @GetMapping("/rooms")
     public ResponseEntity<ApiResponse<Page<ChatRoomResponse>>> rooms(
             @RequestParam(defaultValue = "0") int page) {
-        return ResponseEntity.ok(ApiResponse.success(chatService.listRoomsForAdmin(page), QUERY_SUCCESS_MESSAGE));
+        Member admin = SecurityUtil.getCurrentMember(LOGIN_REQUIRED_MESSAGE);
+        return ResponseEntity.ok(ApiResponse.success(chatService.listRoomsForAdmin(page, admin.getId()), QUERY_SUCCESS_MESSAGE));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

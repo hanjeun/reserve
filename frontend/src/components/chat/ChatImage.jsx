@@ -27,16 +27,26 @@ export default function ChatImage({ url, width, height }) {
         };
     }, [scope, url]);
     const current = result?.scope === scope ? result : null;
-    const style = { display: 'block', width: '100%', height: 'auto', maxWidth: 240, borderRadius: 10,
-        aspectRatio: width && height ? `${width} / ${height}` : '1', objectFit: 'contain' };
+    const aspectRatio = width > 0 && height > 0 ? `${width} / ${height}` : '1';
+    const loaded = current?.loaded === true;
+    const style = { display: 'block', width: '100%', height: '100%', borderRadius: 10,
+        aspectRatio, objectFit: 'contain', opacity: loaded ? 1 : 0 };
+    const settle = (failed = false) => setResult(previous => previous?.scope === scope
+        && previous.src === current?.src ? { ...previous, loaded: !failed, error: failed } : previous);
     // <output> 은 암묵 role=status 이고 span 과 같은 인라인 요소다.
     if (current?.error) return <output>사진을 불러오지 못했어요.</output>;
-    if (!current?.src) return <Bone width={180} height={140} />;
-    return <Image src={current.src} alt="대화에 첨부한 사진" style={style}
+    return <div className="reserve-chat-photo-frame" style={{ width: 240, maxWidth: '100%', aspectRatio }}>
+        {!loaded && <output className="reserve-chat-photo-loading" aria-label="사진을 불러오는 중" aria-busy="true">
+            <Bone width="100%" height="100%" borderRadius={10} />
+        </output>}
+        {current?.src && <Image src={current.src} alt="대화에 첨부한 사진" style={style}
         classNames={{ root: 'reserve-chat-photo', image: 'reserve-chat-photo-image' }}
-        styles={{ root: { width: 240, maxWidth: '100%' } }}
-        role="button" tabIndex={0} aria-label="사진 크게 보기"
+        styles={{ root: { width: '100%', height: '100%' } }}
+        onLoad={() => settle()} onError={() => settle(true)}
+        role={loaded ? 'button' : undefined} tabIndex={loaded ? 0 : -1} aria-hidden={!loaded}
+        aria-label="사진 크게 보기"
         onKeyDown={event => {
+            if (!loaded) return;
             // 확대 후 초점이 원래 사진에 남아 있어도 Escape는 사진만 닫는다.
             if (event.key === 'Escape' && previewScope === scope) {
                 event.stopPropagation();
@@ -49,6 +59,8 @@ export default function ChatImage({ url, width, height }) {
             }
         }}
         preview={{ cover: false, rootClassName: 'reserve-image-preview',
-            open: previewScope === scope, onOpenChange: open => setPreviewScope(open ? scope : null) }} />;
+            open: loaded && previewScope === scope,
+            onOpenChange: open => setPreviewScope(open && loaded ? scope : null) }} />}
+    </div>;
 }
 ChatImage.propTypes = { url: PropTypes.string.isRequired, width: PropTypes.number, height: PropTypes.number };

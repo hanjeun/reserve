@@ -37,6 +37,7 @@ class ChatReadReceiptTest {
     @Mock ChatMessageRepository messages;
     @Mock MemberRepository members;
     @Mock StoreRepository stores;
+    @Mock private kr.it.reserve.chat.repository.ChatMessageHiddenRepository hiddenRepository;
     @InjectMocks ChatService service;
 
     @Test

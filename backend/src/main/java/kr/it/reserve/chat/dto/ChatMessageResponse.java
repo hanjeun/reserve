@@ -27,6 +27,7 @@ public class ChatMessageResponse {
     private LocalDateTime createdAt;
     private boolean retracted;
     private boolean expired;
+    private boolean hidden;
     private Long retractionRevision;
 
     public static ChatMessageResponse forEvidence(ChatReportEvidence evidence) {
@@ -45,6 +46,13 @@ public class ChatMessageResponse {
     /** 신원 ID를 직렬화하지 않고, 인증된 조회자의 본인 메시지 여부만 내려준다. */
     public static ChatMessageResponse from(ChatMessage m, Long viewerId) {
         return build(m, false, viewerId);
+    }
+
+    public static ChatMessageResponse from(ChatMessage m, Long viewerId, boolean hidden) {
+        if (!hidden) return from(m, viewerId);
+        // ID는 페이지/읽음 커서에 남기되 개인 삭제한 원문·사진은 응답에도 넣지 않는다.
+        return builder().id(m.getId()).senderRole(m.getSenderRole().name()).createdAt(m.getCreatedAt())
+                .retractionRevision(m.getRetractionRevision()).hidden(true).build();
     }
 
     /** 신고 컨텍스트 전용. 일반 참가자 응답에는 원문/사진을 다시 노출하지 않는다. */

@@ -250,7 +250,7 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             --label reserve.schema-compat=v270-refund-v1 \
-            --label reserve.feature-compat=waiting-signup-v1 \
+            --label reserve.feature-compat=waiting-signup-hidden-v2 \
             -t "$DOCKERHUB_USERNAME/reserve:latest" \
             -t "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA" \
             ./backend
@@ -486,8 +486,8 @@ jobs:
               exit 1
             fi
             FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$ACTIVE_IMAGE")
-            if [ "$FEATURE_COMPAT" != 'waiting-signup-v1' ]; then
-              echo "Active recovery image does not support waiting settings and signup tickets; prepare an approved compatible baseline before automatic deployment"
+            if [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-v2' ]; then
+              echo "Active recovery image does not support waiting settings, signup tickets and private message deletion; prepare an approved compatible baseline before automatic deployment"
               exit 1
             fi
             if { [ "$CURRENT_UPSTREAM" = "blue" ] && [ "$STATUS_BLUE" != "200" ]; } \
@@ -703,7 +703,7 @@ jobs:
               COMPATIBLE_IMAGE=$(sudo docker inspect --format '{{.Image}}' "$COMPATIBLE_UPSTREAM")
               SCHEMA_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.schema-compat"}}' "$COMPATIBLE_IMAGE")
               FEATURE_COMPAT=$(sudo docker image inspect --format '{{index .Config.Labels "reserve.feature-compat"}}' "$COMPATIBLE_IMAGE")
-              if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ] || [ "$FEATURE_COMPAT" != 'waiting-signup-v1' ]; then
+              if [ "$SCHEMA_COMPAT" != 'v270-refund-v1' ] || [ "$FEATURE_COMPAT" != 'waiting-signup-hidden-v2' ]; then
                 echo "Cutover requires compatible target and recovery images"
                 exit 1
               fi

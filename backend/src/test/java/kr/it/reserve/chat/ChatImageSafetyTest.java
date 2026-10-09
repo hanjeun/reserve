@@ -25,7 +25,7 @@ import static org.mockito.Mockito.*;
 class ChatImageSafetyTest {
     private final ChatRoomRepository rooms = mock(ChatRoomRepository.class);
     private final ChatMessageRepository messages = mock(ChatMessageRepository.class);
-    private final ChatService chats = new ChatService(rooms, messages, mock(MemberRepository.class), mock(StoreRepository.class));
+    private final ChatService chats = new ChatService(rooms, messages, mock(MemberRepository.class), mock(StoreRepository.class), mock(kr.it.reserve.chat.repository.ChatMessageHiddenRepository.class));
     private final Member owner = Member.builder().id(1L).role(Role.USER).build();
     private final ChatRoom room = ChatRoom.builder().id(10L).member(owner).type(ChatRoom.RoomType.SUPPORT).build();
 

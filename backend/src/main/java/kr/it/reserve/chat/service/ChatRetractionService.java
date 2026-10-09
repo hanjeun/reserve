@@ -2,6 +2,7 @@ package kr.it.reserve.chat.service;
 
 import kr.it.reserve.chat.dto.ChatMessageResponse;
 import kr.it.reserve.chat.repository.ChatMessageRepository;
+import kr.it.reserve.chat.repository.ChatMessageHiddenRepository;
 import kr.it.reserve.chat.repository.ChatRoomRepository;
 import kr.it.reserve.global.error.ChatException;
 import kr.it.reserve.member.entity.Member;
@@ -16,6 +17,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -25,6 +27,7 @@ public class ChatRetractionService {
     private final ChatService chats;
     private final ChatRoomRepository rooms;
     private final ChatMessageRepository messages;
+    private final ChatMessageHiddenRepository hidden;
 
     @Transactional
     public ChatMessageResponse retract(Member actor, Long roomId, Long messageId) {
@@ -47,18 +50,30 @@ public class ChatRetractionService {
             }
             log.info("Chat message retracted: roomId={}, messageId={}, actorId={}", roomId, messageId, actor.getId());
         }
-        return ChatMessageResponse.from(message, actor.getId());
+        return ChatMessageResponse.from(message, actor.getId(), hidden.existsByMemberIdAndMessageId(actor.getId(), messageId));
     }
 
     public Retractions changes(Member actor, Long roomId, long afterRevision) {
-        if (afterRevision < 0) throw new ChatException("조회 기준값이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
+        return changes(actor, roomId, afterRevision, 0);
+    }
+
+    public Retractions changes(Member actor, Long roomId, long afterRevision, long afterHiddenId) {
+        if (afterRevision < 0 || afterHiddenId < 0) throw new ChatException("조회 기준값이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         chats.assertImageReader(roomId, actor);
         var page = messages.findByRoomIdAndRetractionRevisionGreaterThanOrderByRetractionRevisionAsc(
                 roomId, afterRevision, PageRequest.of(0, 100));
-        var updates = page.getContent().stream().map(item -> ChatMessageResponse.from(item, actor.getId())).toList();
+        Set<Long> hiddenIds = page.isEmpty() ? Set.of() : Set.copyOf(hidden.findHiddenMessageIds(
+                actor.getId(), page.getContent().stream().map(item -> item.getId()).toList()));
+        var updates = page.getContent().stream().map(item -> ChatMessageResponse.from(item, actor.getId(), hiddenIds.contains(item.getId()))).toList();
         long next = updates.isEmpty() ? afterRevision : updates.getLast().getRetractionRevision();
-        return new Retractions(updates, next, page.hasNext());
+        // 개인 삭제 커서는 본인 계정/방만 읽는다. 상대방에게 숨김 여부를 보내지 않는다.
+        var hiddenPage = hidden.findByMember_IdAndMessage_Room_IdAndIdGreaterThanOrderByIdAsc(
+                actor.getId(), roomId, afterHiddenId, PageRequest.of(0, 100));
+        var deletedIds = hiddenPage.getContent().stream().map(item -> item.getMessage().getId()).toList();
+        long nextHiddenId = hiddenPage.isEmpty() ? afterHiddenId : hiddenPage.getContent().getLast().getId();
+        return new Retractions(updates, next, page.hasNext(), deletedIds, nextHiddenId, hiddenPage.hasNext());
     }
 
-    public record Retractions(List<ChatMessageResponse> messages, long nextRevision, boolean hasMore) { }
+    public record Retractions(List<ChatMessageResponse> messages, long nextRevision, boolean hasMore,
+                              List<Long> hiddenMessageIds, long nextHiddenId, boolean hasMoreHidden) { }
 }

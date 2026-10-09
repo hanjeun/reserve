@@ -24,7 +24,8 @@ class ChatImageAccessTest {
     private final ChatRoomRepository rooms = mock(ChatRoomRepository.class);
     private final ChatMessageRepository messages = mock(ChatMessageRepository.class);
     private final StoreRepository stores = mock(StoreRepository.class);
-    private final ChatService chats = new ChatService(rooms, messages, mock(MemberRepository.class), stores);
+    private final ChatMessageHiddenRepository hidden = mock(ChatMessageHiddenRepository.class);
+    private final ChatService chats = new ChatService(rooms, messages, mock(MemberRepository.class), stores, hidden);
     private final FileStorageService storage = mock(FileStorageService.class);
     private final ChatModerationService moderation = mock(ChatModerationService.class);
     private final ChatImageCipher cipher = new ChatImageCipher(Base64.getEncoder().encodeToString(new byte[32]));
@@ -34,6 +35,15 @@ class ChatImageAccessTest {
     private final Member customer = Member.builder().id(1L).role(Role.USER).build();
     private final Member admin = Member.builder().id(9L).role(Role.ADMIN).build();
     private final ChatRoom room = ChatRoom.builder().id(10L).member(customer).storeId(5L).type(ChatRoom.RoomType.STORE).build();
+
+    @Test void privatelyDeletedPhotoIsNotReadableByTheDeletingAccountBeforeAnyStorageRequest() {
+        when(messages.findById(33L)).thenReturn(Optional.of(photo()));
+        when(rooms.findById(10L)).thenReturn(Optional.of(room));
+        when(hidden.existsByMemberIdAndMessageId(customer.getId(), 33L)).thenReturn(true);
+        assertThatThrownBy(() -> images.read(customer, 33L)).isInstanceOf(ChatException.class)
+                .extracting("status").isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND);
+        verifyNoInteractions(storage);
+    }
 
     @Test void adminCannotReadUnreportedStorePhotoThroughParticipantApi() {
         var photo = photo();

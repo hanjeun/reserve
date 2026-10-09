@@ -24,3 +24,14 @@ it('preserves the layout of text-only messages', () => {
     ]} />);
     expect(screen.getByText('일반 메시지')).not.toHaveAttribute('style');
 });
+
+it('does not render personal-deletion text, photos or action slots', () => {
+    const view = render(<ChatBubbleList mine="MEMBER" roomId={1} messages={[
+        { id: 1, senderRole: 'OWNER', hidden: true, content: '낡은 캐시 원문', imageUrl: '/api/chat/images/1' },
+        { id: 2, senderRole: 'OWNER', content: '계속 보이는 답변' },
+    ]} />);
+    expect(screen.queryByText('낡은 캐시 원문')).toBeNull();
+    expect(screen.queryByAltText('대화에 첨부한 사진')).toBeNull();
+    expect(view.container.querySelectorAll('.reserve-chat-message-row')).toHaveLength(1);
+    expect(screen.getByText('계속 보이는 답변')).toBeInTheDocument();
+});

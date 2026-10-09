@@ -4,14 +4,57 @@ import ChatBubbleList from './ChatBubbleList';
 import ChatMessageActions from './ChatMessageActions';
 import { downloadChatImage } from '../../utils/chatImageTransfer';
 import { chatService } from '../../services';
+import messageService from '../../services/chatService';
 
-vi.mock('../../hooks', () => ({ useMessage: () => ({ message: { success: vi.fn(), error: vi.fn() }, confirm: vi.fn() }) }));
+const feedback = vi.hoisted(() => ({ confirm: vi.fn(), success: vi.fn(), error: vi.fn() }));
+
+vi.mock('../../hooks', () => ({ useMessage: () => ({ message: { success: feedback.success, error: feedback.error }, confirm: feedback.confirm }) }));
 vi.mock('../../services', () => ({ chatService: { reportConversation: vi.fn() } }));
+vi.mock('../../services/chatService', () => ({ default: { hideMessage: vi.fn(), retract: vi.fn() } }));
 vi.mock('../../utils/chatImageTransfer', () => ({ downloadChatImage: vi.fn(), getChatImageBlob: vi.fn() }));
 describe('message-scoped actions', () => {
     beforeEach(() => {
+        feedback.confirm.mockReset(); feedback.success.mockReset(); feedback.error.mockReset();
+        messageService.hideMessage.mockReset(); messageService.retract.mockReset();
         chatService.reportConversation.mockResolvedValue({ id: 1 });
         downloadChatImage.mockReset().mockResolvedValue(undefined);
+    });
+    it('offers personal deletion for an incoming message and confirms its scope before a guarded single write', async () => {
+        const onHidden = vi.fn();
+        let complete;
+        messageService.hideMessage.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+        render(<ChatMessageActions roomId={7} reportRole="MEMBER" onHidden={onHidden}
+            message={{ id: 2, senderRole: 'OWNER', content: '상대 메시지' }} />);
+        fireEvent.click(screen.getByRole('button', { name: '메시지 관리' }));
+        fireEvent.click(await screen.findByText('나에게만 삭제'));
+        const confirmation = feedback.confirm.mock.calls[0][0];
+        expect(confirmation.content).toContain('상대방 대화와 신고·분쟁 검토 원본은 유지');
+        let first;
+        act(() => { first = confirmation.onOk(); });
+        await act(async () => { await confirmation.onOk(); });
+        expect(messageService.hideMessage).toHaveBeenCalledExactlyOnceWith(7, 2, { signal: expect.any(AbortSignal) });
+        await act(async () => { complete({ id: 2, hidden: true }); await first; });
+        expect(onHidden).toHaveBeenCalledExactlyOnceWith({ id: 2, hidden: true });
+        expect(feedback.success).toHaveBeenCalledWith('나에게만 삭제했어요.');
+    });
+
+    it('does not write an old confirmation or apply an in-flight response after leaving its message', async () => {
+        const onHidden = vi.fn();
+        let finish;
+        messageService.hideMessage.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+        const view = render(<ChatMessageActions roomId={7} onHidden={onHidden} message={{ id: 2, senderRole: 'OWNER' }} />);
+        fireEvent.click(screen.getByRole('button', { name: '메시지 관리' }));
+        fireEvent.click(await screen.findByText('나에게만 삭제'));
+        const confirmation = feedback.confirm.mock.calls[0][0];
+        let request;
+        act(() => { request = confirmation.onOk(); });
+        const signal = messageService.hideMessage.mock.calls[0][2].signal;
+        view.unmount();
+        expect(signal.aborted).toBe(true);
+        await act(async () => { finish({ id: 2, hidden: true }); await request; await confirmation.onOk(); });
+        expect(messageService.hideMessage).toHaveBeenCalledTimes(1);
+        expect(onHidden).not.toHaveBeenCalled();
+        expect(feedback.success).not.toHaveBeenCalled();
     });
     it('places own actions before the bubble and reports a retracted opponent by stable ID', async () => {
         const view = render(<ChatBubbleList mine="MEMBER" roomId={7} reportRole="MEMBER" onRetracted={vi.fn()}

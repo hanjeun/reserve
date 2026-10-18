@@ -90,7 +90,7 @@ describe('store list view selection with real URL pagination', () => {
         expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 3 가게');
         expect(screen.queryByTestId('original-card')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' }).querySelector('.anticon-appstore')).toBeInTheDocument();
-        expect(Object.fromEntries(routeParams())).toEqual({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: '3', utm_source: 'yes', view: 'list', region: '' });
+        expect(Object.fromEntries(routeParams())).toEqual({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: '3', utm_source: 'yes', view: 'list', region: 'all' });
         expect(storeService.getStores).toHaveBeenCalledTimes(1);
         expect(storeService.getStores).toHaveBeenLastCalledWith({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 2, size: 12 });
         await user.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));

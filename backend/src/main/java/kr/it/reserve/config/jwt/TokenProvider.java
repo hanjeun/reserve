@@ -1,33 +1,35 @@
 package kr.it.reserve.config.jwt;
 
-import kr.it.reserve.config.jwt.entity.RefreshToken;
-import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
-import kr.it.reserve.global.error.AuthException;
-import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.member.entity.AuthProvider;
-import kr.it.reserve.member.entity.Role;
-import kr.it.reserve.member.repository.MemberRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import kr.it.reserve.config.jwt.entity.RefreshToken;
+import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
+import kr.it.reserve.global.error.AuthException;
+import kr.it.reserve.member.entity.AuthProvider;
+import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import javax.crypto.SecretKey;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -80,12 +82,12 @@ public class TokenProvider {
      * - 한 계정당 최대 5개 유지, 초과 시 가장 오래된 것부터 삭제
      * - @Transactional로 race condition 방지
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public String generateRefreshToken(Member member) {
         return generateRefreshToken(member, oauthAuthenticationAt(member));
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public String generateRefreshToken(Member member, LocalDateTime oauthAuthenticatedAt) {
         Duration expiration = jwtProperties.getRefreshTokenExpiration();
         String token = createRefreshJwt(member, oauthAuthenticatedAt);
@@ -188,7 +190,7 @@ public class TokenProvider {
         if (!(raw instanceof Long || raw instanceof Integer)) throw new JwtException("Invalid OAuth authentication time");
         try {
             return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Number) raw).longValue()), ZoneOffset.UTC);
-        } catch (java.time.DateTimeException exception) {
+        } catch (DateTimeException exception) {
             throw new JwtException("Invalid OAuth authentication time");
         }
     }
@@ -218,10 +220,7 @@ public class TokenProvider {
 
     public boolean validToken(String token) {
         try {
-            Jwts.parser()
-                    .verifyWith(cachedSecretKey)
-                    .build()
-                    .parseSignedClaims(token);
+            getClaims(token);
             return true;
         } catch (Exception e) {
             log.debug("Invalid token: errorType={}", e.getClass().getSimpleName());
@@ -271,10 +270,18 @@ public class TokenProvider {
     }
 
     private Claims getClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(cachedSecretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        try {
+            return Jwts.parser()
+                    .verifyWith(cachedSecretKey)
+                    .requireIssuer(jwtProperties.getIssuer())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (ExpiredJwtException exception) {
+            if (!jwtProperties.getIssuer().equals(exception.getClaims().getIssuer())) {
+                throw new JwtException("Invalid token issuer");
+            }
+            throw exception;
+        }
     }
 }

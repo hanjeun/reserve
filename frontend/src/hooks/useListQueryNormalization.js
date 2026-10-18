@@ -10,7 +10,7 @@ export default function useListQueryNormalization(searchParams, resolvedSelectio
     const selectionsKey = JSON.stringify(resolvedSelections);
     useEffect(() => {
         const normalized = normalizeListQueryParams(pathname, searchParams);
-        Object.entries(JSON.parse(selectionsKey)).forEach(([key, value]) => normalized.set(key, String(value)));
+        Object.entries(JSON.parse(selectionsKey)).forEach(([key, value]) => normalized.set(key, String(key === 'region' ? value || 'all' : value)));
         if (normalized.toString() === search) return;
         navigate({ pathname, search: normalized.size ? `?${normalized}` : '', hash }, { replace: true, state });
     }, [hash, navigate, pathname, search, searchParams, selectionsKey, state]);

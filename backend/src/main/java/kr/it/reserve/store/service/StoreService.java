@@ -1,41 +1,50 @@
 package kr.it.reserve.store.service;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
+import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
-import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.service.FileDeletionOutboxService;
+import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.util.FileStoragePaths;
+import kr.it.reserve.global.common.PageRequests;
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.StoreException;
 import kr.it.reserve.lifecycle.dto.StoreClosureReadiness;
 import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
 import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
+import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
-import kr.it.reserve.store.repository.StoreRepository;
-import kr.it.reserve.store.search.StoreFulltextSearch;
 import kr.it.reserve.store.dto.StoreCreateRequest;
-import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.dto.StoreRegionGroup;
+import kr.it.reserve.store.dto.StoreResponse;
 import kr.it.reserve.store.dto.StoreStatisticsResponse;
 import kr.it.reserve.store.dto.StoreUpdateRequest;
-import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.ServiceDomain;
+import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
+import kr.it.reserve.store.event.StoreClosed;
+import kr.it.reserve.store.repository.StoreRepository;
+import kr.it.reserve.store.search.StoreFulltextSearch;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,9 +54,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import org.springframework.data.domain.Page;
-import kr.it.reserve.global.common.PageRequests;
-import org.springframework.data.domain.Pageable;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -67,8 +73,8 @@ public class StoreService {
     private final AdvertisementRepository advertisementRepository;
     private final PaymentRepository paymentRepository;
     private final ObjectMapper objectMapper;
-    private final org.springframework.context.ApplicationEventPublisher events;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private final ApplicationEventPublisher events;
+    @Autowired(required = false)
     private StoreUpdates updates;
 
     /**
@@ -133,7 +139,7 @@ public class StoreService {
                 .allowDuplicateReservation(Boolean.TRUE.equals(request.getAllowDuplicateReservation()))
                 .emailNotificationEnabled(!Boolean.FALSE.equals(request.getEmailNotificationEnabled()))
                 .imageAutoplayEnabled(!Boolean.FALSE.equals(request.getImageAutoplayEnabled()))
-                .waitingIntakeMode(kr.it.reserve.store.entity.WaitingIntakeMode.parse(request.getWaitingIntakeMode()))
+                .waitingIntakeMode(WaitingIntakeMode.parse(request.getWaitingIntakeMode()))
                 .maxAdvanceBookingDays(clampMaxAdvanceBookingDays(request.getMaxAdvanceBookingDays()))
                 .build();
 
@@ -235,7 +241,7 @@ public class StoreService {
             if (request.getImageAutoplayEnabled() != null) store.setImageAutoplayEnabled(request.getImageAutoplayEnabled());
             if (request.getReservationEnabled() != null) store.setReservationEnabled(request.getReservationEnabled());
             if (request.getWaitingIntakeMode() != null) {
-                store.setWaitingIntakeMode(kr.it.reserve.store.entity.WaitingIntakeMode.parse(request.getWaitingIntakeMode()));
+                store.setWaitingIntakeMode(WaitingIntakeMode.parse(request.getWaitingIntakeMode()));
             }
             // 누락 = 유지, 빈 목록/빈 값 = 해제. 영역별 수정에서도 다른 영역을 지우지 않는다.
             if (request.hasField("closedDays")) store.setClosedDayList(normalizeClosedDays(request.getClosedDays()));
@@ -304,9 +310,9 @@ public class StoreService {
                 : clampPartialRefundRate(request.getPartialRefundRate());
         if (!refundPolicy(store).equals(effectiveRefundPolicy(nextFullDays, nextPartialDays, nextRate))
                 && reservationRepository.existsRefundPolicyObligation(store.getId(), List.of(
-                        kr.it.reserve.reservation.entity.Reservation.ReservationStatus.PENDING,
-                        kr.it.reserve.reservation.entity.Reservation.ReservationStatus.CONFIRMED,
-                        kr.it.reserve.reservation.entity.Reservation.ReservationStatus.UNCONFIRMED), ServiceTime.today())) {
+                        Reservation.ReservationStatus.PENDING,
+                        Reservation.ReservationStatus.CONFIRMED,
+                        Reservation.ReservationStatus.UNCONFIRMED), ServiceTime.today())) {
             throw new StoreException("남아 있는 유료 예약이 있어 환불 기준을 바꿀 수 없어요. 기존 예약을 처리한 뒤 다시 수정해주세요.", HttpStatus.CONFLICT);
         }
         // 옵션 값은 전부 clamp/normalize 를 거친다(생성 경로와 동일) — "가게 옵션 정규화" 절 참고.
@@ -409,8 +415,8 @@ public class StoreService {
 
         // 공개/추천 연결은 즉시 제거한다. 거래 원장과 후기 이력은 그대로 둔다.
         favoriteRepository.deleteByStoreId(id);
-        promotionRepository.softDeleteByStoreId(id, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
-        events.publishEvent(new kr.it.reserve.store.event.StoreClosed(id));
+        promotionRepository.softDeleteByStoreId(id, LocalDateTime.now(ZoneOffset.UTC));
+        events.publishEvent(new StoreClosed(id));
 
         Long ownerId = store.getOwner() != null ? store.getOwner().getId() : null;
         enqueueManagedFileDeletion(

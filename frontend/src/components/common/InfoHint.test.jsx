@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import InfoHint from './InfoHint';
@@ -26,13 +27,14 @@ const pointer = (target, type, pointerType = 'mouse') => {
     fireEvent(target, event);
 };
 const settle = async () => { await act(async () => { await new Promise(resolve => window.setTimeout(resolve, 250)); }); };
-const shell = child => <ConfigProvider theme={{ token: { motion: false } }}>{child}</ConfigProvider>;
+let client;
+const shell = child => <QueryClientProvider client={client}><ConfigProvider theme={{ token: { motion: false } }}>{child}</ConfigProvider></QueryClientProvider>;
 const setup = child => render(shell(child));
 const hint = <InfoHint label="웨이팅 정보: 현장 접수만 가능, 대기 3팀"><span>현장 접수만 가능</span><span>대기 3팀</span></InfoHint>;
 const infoButton = () => screen.getByRole('button', { name: /웨이팅 정보:/ });
 const user = () => userEvent.setup();
 
-beforeEach(() => { auth.loggedIn = true; });
+beforeEach(() => { auth.loggedIn = true; client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }); });
 
 describe('state information hints', () => {
     it('keeps the first focus-and-click open, pins on leave, and toggles on the next click', async () => {

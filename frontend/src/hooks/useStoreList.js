@@ -103,7 +103,7 @@ const useStoreList = () => {
             let filtersChanged = changesRegion && nextRegion !== region;
             Object.entries(newParams).forEach(([key, value]) => {
                 if (value == null || value === '' && key !== 'domain' && key !== 'region') next.delete(key);
-                else next.set(key, String(value));
+                else next.set(key, String(key === 'region' ? value || 'all' : value));
                 if (key !== 'region' && FILTER_KEYS.has(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
             });
             if (filtersChanged || readPage(next.get('page')) === 1) next.set('page', '1');

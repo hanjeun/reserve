@@ -56,6 +56,39 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
     const returnFocusRef = useRef(null);
     const previousOpenRef = useRef(false);
     const previousStoreOpenRevisionRef = useRef(storeOpenRevision);
+    const [launcherObstructed, setLauncherObstructed] = useState(false);
+
+    // 모바일 댓글 입력과 겹칠 때만 런처가 자리를 비운다. 입력 폼의 크기·위치는 바꾸지 않는다.
+    useEffect(() => {
+        if (!isMobile || isMessagesPage || open || !user) return undefined;
+        let frame;
+        const measure = () => {
+            const launcher = launcherRef.current?.getBoundingClientRect();
+            if (!launcher) return;
+            const obstructed = [...document.querySelectorAll('.reserve-chat-composer')].some(composer => {
+                const field = composer.getBoundingClientRect();
+                return field.width > 0 && field.height > 0 && field.left < launcher.right && field.right > launcher.left
+                    && field.top < launcher.bottom && field.bottom > launcher.top;
+            });
+            setLauncherObstructed(obstructed);
+        };
+        const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+        observer?.observe(document.body);
+        document.addEventListener('scroll', schedule, true);
+        window.addEventListener('resize', schedule);
+        window.visualViewport?.addEventListener('resize', schedule);
+        window.visualViewport?.addEventListener('scroll', schedule);
+        schedule();
+        return () => {
+            cancelAnimationFrame(frame);
+            observer?.disconnect();
+            document.removeEventListener('scroll', schedule, true);
+            window.removeEventListener('resize', schedule);
+            window.visualViewport?.removeEventListener('resize', schedule);
+            window.visualViewport?.removeEventListener('scroll', schedule);
+        };
+    }, [isMobile, isMessagesPage, open, user, pathname]);
 
     useEffect(() => { syncIdentity(identity); }, [identity, syncIdentity]);
 
@@ -170,7 +203,8 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                     <MessengerPanelBody coverImageSrc={coverImageSrc} />
                 </div>
             )}
-            <div className="reserve-messenger-launcher-wrap">
+            <div className="reserve-messenger-launcher-wrap"
+                style={isMobile && !open && launcherObstructed ? { visibility: 'hidden' } : undefined}>
                 <Badge count={!isMobile && open ? 0 : unreadCount} offset={[-4, 4]}
                     styles={{ indicator: { background: 'var(--reserve-messenger-unread-bg)', color: 'var(--c-error-fg)' } }}>
                     <Tooltip title={!isMobile && open ? '메시지 창 닫기' : `${messagesLabel} 열기`}><button

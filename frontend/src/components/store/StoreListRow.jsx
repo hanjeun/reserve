@@ -74,7 +74,7 @@ const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, ad
                 <div className="reserve-store-list-row-actions">{actions}{extraTools}</div>
             ) : (
                 <div className={`reserve-store-list-row-favorite${extraTools ? ' reserve-store-list-row-favorite--with-tools' : ''}`}>
-                    <FavoriteButton storeId={store.id} size="md" appearance="plain" preview={preview} />
+                    <FavoriteButton storeId={store.id} appearance="plain" preview={preview} />
                     {extraTools}
                 </div>
             )}

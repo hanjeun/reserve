@@ -1,26 +1,29 @@
 package kr.it.reserve.feed.service;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.FeedDto;
-import kr.it.reserve.feed.news.StoreNewsAvailability;
 import kr.it.reserve.feed.entity.*;
+import kr.it.reserve.feed.news.StoreNewsAvailability;
+import kr.it.reserve.feed.news.service.StoreNewsEvents;
 import kr.it.reserve.feed.repository.*;
+import kr.it.reserve.global.common.PageRequests;
+import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
-import kr.it.reserve.promotion.StoreNewsPolicy;
-import kr.it.reserve.global.common.PageRequests;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-import java.util.Set;
+
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Service @RequiredArgsConstructor
 public class FeedModerationService {
@@ -34,8 +37,8 @@ public class FeedModerationService {
     private final FeedAuditRepository audits;
     private final ObjectMapper mapper;
     private final PromotionRepository promotions;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.feed.news.service.StoreNewsEvents newsEvents;
+    @Autowired(required = false)
+    private StoreNewsEvents newsEvents;
 
     @Transactional
     public void report(Long reporter, Long postId, FeedDto.ReportRequest request) {
@@ -146,7 +149,7 @@ public class FeedModerationService {
             }
         }
         if (!request.hidden() && (!StoreNewsPolicy.usable(news.getStore()) || !StoreNewsPolicy.newsWriter(news.getMember())
-                || !java.util.Objects.equals(news.getMember().getId(), news.getStore().getOwner().getId()))) {
+                || !Objects.equals(news.getMember().getId(), news.getStore().getOwner().getId()))) {
             throw new FeedException("현재 가게나 작성자 상태로는 소식을 다시 공개할 수 없어요.", HttpStatus.CONFLICT);
         }
         String reason = FeedService.clean(request.reason(), 500, "처리 사유");

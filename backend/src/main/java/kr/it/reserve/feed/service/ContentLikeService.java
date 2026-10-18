@@ -1,24 +1,27 @@
 package kr.it.reserve.feed.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import kr.it.reserve.config.updates.EntityUpdates;
-
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.FeedInteractionDto;
 import kr.it.reserve.feed.entity.*;
-import kr.it.reserve.feed.repository.*;
 import kr.it.reserve.feed.news.service.StoreNewsService;
+import kr.it.reserve.feed.repository.*;
 import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
+import java.util.Set;
 
 @Service @RequiredArgsConstructor @Transactional(readOnly = true)
 public class ContentLikeService {
@@ -33,7 +36,7 @@ public class ContentLikeService {
     private final FeedNotificationService notifications;
     private final FeedProfileRepository profiles;
     private final EntityManager entityManager;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EntityUpdates updates;
 
     public FeedInteractionDto.Status status(String type, Long id, Long viewer) {
@@ -63,17 +66,17 @@ public class ContentLikeService {
                 : target.post() != null && target.post().getStore() != null ? target.post().getStore().getId() : null;
         updates.publish(EntityUpdates.Domain.LIKE, target.id(), parent, store,
                 EntityUpdates.Operation.UPDATED,
-                EntityUpdates.TargetType.valueOf(target.type()), false, java.util.Set.of(member), false);
+                EntityUpdates.TargetType.valueOf(target.type()), false, Set.of(member), false);
         if (!visible(target)) return;
         var domain = target.comment() != null ? EntityUpdates.Domain.COMMENT
                 : target.news() != null ? EntityUpdates.Domain.NEWS
                 : EntityUpdates.Domain.FEED;
         updates.publish(domain, target.id(), parent, store, EntityUpdates.Operation.UPDATED,
-                EntityUpdates.TargetType.valueOf(target.type()), true, java.util.Set.of(), false);
+                EntityUpdates.TargetType.valueOf(target.type()), true, Set.of(), false);
     }
     public Page<FeedInteractionDto.LikedItem> mine(Long member, String type, int page, int size) {
         policy.requireAnyEnabled(); feeds.activeReader(member); // 활성 계정 확인. 좋아요에는 공개 닉네임이 필수가 아니다.
-        if (!java.util.Set.of("ALL", "POST", "NEWS", "COMMENT").contains(type)) throw FeedException.invalid("좋아요 종류를 다시 선택해주세요.");
+        if (!Set.of("ALL", "POST", "NEWS", "COMMENT").contains(type)) throw FeedException.invalid("좋아요 종류를 다시 선택해주세요.");
         var bounds = PageRequests.bounded(page, size);
         var result = switch (type) {
             case "POST" -> likes.findByMember_IdAndPostIsNotNullOrderByCreatedAtDescIdDesc(member, bounds);
@@ -123,7 +126,7 @@ public class ContentLikeService {
         if (target.comment() != null) count = likes.countByComment_Id(target.id());
         else count = target.news() == null ? likes.countByPost_Id(target.id()) : likes.countByNews_Id(target.id());
         FeedPost post = target.post();
-        long replies = post != null && feeds.isPublic(post) ? comments.countVisible(post.getId(), java.time.LocalDateTime.now()) : 0;
+        long replies = post != null && feeds.isPublic(post) ? comments.countVisible(post.getId(), LocalDateTime.now()) : 0;
         return new FeedInteractionDto.Status(target.type(), target.id(), existing(target, viewer).isPresent(), count, replies);
     }
     private void requireEnabled(String type) { if ("NEWS".equals(type)) policy.requireNewsEnabled(); else policy.requireEnabled(); }

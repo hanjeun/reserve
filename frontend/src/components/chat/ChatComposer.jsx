@@ -21,8 +21,9 @@ const EMOJI = [
 /** 고객·사업자·관리자 입력의 IME/길이/도구/전송 규칙을 한 관문에 둔다. */
 export default function ChatComposer({ value, onChange, onSend, sending = false, disabled = false,
     file, onFileChange, imageEnabled = false, imageLoading = false, onCancel,
+    files, onFilesChange, onRemoveFile,
     maxLength = 2000, placeholder = '메시지를 입력하세요', inputLabel = '메시지 입력', sendText = '보내기',
-    inputRef, attachmentControl, attachments, hasAttachments = Boolean(file) }) {
+    inputRef, attachmentControl, attachments, hasAttachments = Boolean(files?.length || file) }) {
     const input = useRef(null);
     useImperativeHandle(inputRef, () => input.current, []);
     const trigger = useRef(null);
@@ -70,7 +71,8 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
         sendLabel = '보내는 중';
         sendIcon = <span aria-hidden="true"><SpinIndicator /></span>;
     }
-    return <div className="reserve-chat-composer reserve-messenger-composer">
+    const renderComposer = (control, previews) => <div className="reserve-chat-composer reserve-messenger-composer">
+        <div className="reserve-chat-composer-input-area">
         <textarea ref={input} value={value} onChange={event => onChange(event.target.value)}
             onKeyDown={event => {
                 if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
@@ -78,11 +80,11 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                     if (!blocked && (value.trim() || hasAttachments)) onSend();
                 }
             }} placeholder={placeholder} aria-label={inputLabel} maxLength={maxLength} rows={2} disabled={disabled} />
-        {attachments}
+        <div className="reserve-chat-composer-attachments">{attachments ?? previews}</div>
+        </div>
         <div className="reserve-chat-composer-toolbar">
             <div className="reserve-chat-composer-tools">
-                {attachmentControl ?? <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled || imageLoading}
-                    disabled={blocked || imageLoading} />}
+                {control}
                 <Popover trigger="click" placement="topLeft" content={picker} open={emojiOpen && !blocked}
                     onOpenChange={open => {
                         setEmojiOpen(open);
@@ -103,6 +105,9 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             </button></Tooltip>
         </div>
     </div>;
+    if (attachmentControl != null) return renderComposer(attachmentControl, attachments);
+    return <ChatImagePicker file={file} onChange={onFileChange} files={files} onFilesChange={onFilesChange} onRemoveFile={onRemoveFile}
+        enabled={imageEnabled || imageLoading} disabled={blocked || imageLoading} renderContent={renderComposer} />;
 }
 
 ChatComposer.propTypes = {
@@ -112,4 +117,5 @@ ChatComposer.propTypes = {
     onCancel: PropTypes.func, maxLength: PropTypes.number, placeholder: PropTypes.string, inputLabel: PropTypes.string,
     sendText: PropTypes.string, inputRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
     attachmentControl: PropTypes.node, attachments: PropTypes.node, hasAttachments: PropTypes.bool,
+    files: PropTypes.arrayOf(PropTypes.object), onFilesChange: PropTypes.func, onRemoveFile: PropTypes.func,
 };

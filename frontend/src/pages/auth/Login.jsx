@@ -194,7 +194,7 @@ const Login = () => {
                     <button type="button" className="reserve-social-login" aria-label="네이버로 로그인" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
                         <NaverIcon />
                     </button>
-                    <button type="button" className="reserve-social-login" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: '#fff' }}>
+                    <button type="button" className="reserve-social-login" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: '#fff', border: '1px solid #dadce0' }}>
                         <GoogleIcon />
                     </button>
                 </Flex>

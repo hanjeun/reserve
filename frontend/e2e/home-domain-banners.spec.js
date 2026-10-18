@@ -22,9 +22,9 @@ test('all four home banners retain readable copy, responsive photos and exact de
     await expect(banners).toHaveCount(4);
     const slides = [
         { path: '/guide/common', asset: 'operation-guide-cover', mobileSuffix: '-v1', title: '예약 전에 확인하면,', description: '예약·웨이팅부터 가게 운영까지 확인하세요' },
-        { path: '/stores?domain=FOOD', asset: 'dining-cover', title: '오늘의 한 끼,', description: '마음에 드는 맛집을 찾아보세요' },
-        { path: '/stores?domain=PERFORMANCE', asset: 'class-cover', title: '잠깐의 몰입,', description: '나를 위한 시간을 예약해보세요' },
-        { path: '/stores?domain=POPUP', asset: 'popup-cover', title: '이번 주의 발견,', description: '새로운 공간을 둘러보세요' },
+        { path: '/stores?domain=FOOD&region=all', asset: 'dining-cover', title: '오늘의 한 끼,', description: '마음에 드는 맛집을 찾아보세요' },
+        { path: '/stores?domain=PERFORMANCE&region=all', asset: 'class-cover', title: '잠깐의 몰입,', description: '나를 위한 시간을 예약해보세요' },
+        { path: '/stores?domain=POPUP&region=all', asset: 'popup-cover', title: '이번 주의 발견,', description: '새로운 공간을 둘러보세요' },
     ];
     for (const [index, slide] of slides.entries()) {
         const current = banners.nth(index);
@@ -60,7 +60,7 @@ test('six service shortcuts lead to their own domain filters', async ({ page }) 
     ];
     for (const [value, label, asset] of domains) {
         const shortcut = page.getByRole('link', { name: `${label} 가게 둘러보기`, exact: true });
-        await expect(shortcut).toHaveAttribute('href', `/stores?domain=${value}`);
+        await expect(shortcut).toHaveAttribute('href', `/stores?domain=${value}&region=all`);
         const importedImage = new RegExp(`/(?:src/assets/service-domains|assets)/${asset}-512(?:-[A-Za-z0-9_-]+)?\\.webp(?:\\?.*)?$`);
         await expect(shortcut.locator('img')).toHaveAttribute('src', importedImage);
     }

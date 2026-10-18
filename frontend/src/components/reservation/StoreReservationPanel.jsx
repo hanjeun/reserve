@@ -301,8 +301,7 @@ const timeSlotStyles = {
         //   colors.*는 var(--c-...) 문자열이라 브라우저가 페인트 시점에 테마별로 해석한다.
         //   colors.text.placeholder는 AntD의 colorTextPlaceholder와 같은 값이라
         //   바로 옆 BookingCalendar의 "날짜 선택"과 톤이 정확히 일치한다.
-        fontSize: fontSize.lg, fontWeight: fontWeight.regular, color: colors.text.placeholder,
-        fontFamily: 'inherit',
+        ...field.textStyle, color: field.placeholderColor,
         background: colors.gray[50], borderRadius: radius.lg,
         transition: 'box-shadow 0.2s',
     },

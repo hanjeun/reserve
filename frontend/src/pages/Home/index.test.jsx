@@ -169,7 +169,7 @@ describe('app discovery home', () => {
         expect(guide).toHaveTextContent(/예약 전에 확인하면,\s*더 편리해요/);
         expect(within(guide).getByText('예약·웨이팅부터 가게 운영까지 확인하세요')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: '운동 · 웰니스 가게 둘러보기' }))
-            .toHaveAttribute('href', '/stores?domain=SPORTS');
+            .toHaveAttribute('href', '/stores?domain=SPORTS&region=all');
         expect(await screen.findByText('모던 필라테스')).toBeInTheDocument();
         expect(storeService.getStores).toHaveBeenCalledWith({ page: 0, size: 4, sort: 'rating' });
     });
@@ -357,7 +357,7 @@ describe('app discovery home', () => {
         expect(await screen.findByText('아직 추천할 가게가 없어요.')).toBeInTheDocument();
         expect(screen.queryByText('추천 가게를 불러오지 못했어요.')).toBeNull();
         expect(screen.queryByRole('button', { name: '다시 불러오기' })).toBeNull();
-        expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/stores?sort=rating');
+        expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/stores?sort=rating&region=all');
     });
 
     it('preserves the error retry without turning a failed request into empty cards', async () => {
@@ -461,7 +461,7 @@ describe('app discovery home', () => {
         await user.click(within(dialog).getByRole('button', { name: '전국 적용' }));
         expect(await screen.findByRole('link', { name: '모던 필라테스 상세 보기' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '전체 지역' })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/stores?sort=rating');
+        expect(screen.getByRole('link', { name: '전체 보기' })).toHaveAttribute('href', '/stores?sort=rating&region=all');
     });
 
     it('dismisses the region sheet with Escape without changing the selected region', async () => {
@@ -485,7 +485,7 @@ describe('app discovery home', () => {
 
         expect(locationRequest).toHaveBeenCalledTimes(1);
         expect(setLiveLocation).toHaveBeenCalledWith(position);
-        expect(navigate).toHaveBeenCalledWith('/stores?sort=distance&lat=37.321&lng=126.813');
+        expect(navigate).toHaveBeenCalledWith('/stores?sort=distance&lat=37.321&lng=126.813&region=all');
     });
 
     it('keeps the selected region when moving from home to distance sort', async () => {
@@ -519,7 +519,7 @@ describe('app discovery home', () => {
         await user.click(screen.getByRole('button', { name: '현재 위치로' }));
 
         expect(messageInfo).toHaveBeenCalledWith('마이페이지에 등록된 위치 기준으로 정렬할게요.');
-        expect(navigate).toHaveBeenCalledWith('/stores?sort=distance&lat=37.581&lng=126.979');
+        expect(navigate).toHaveBeenCalledWith('/stores?sort=distance&lat=37.581&lng=126.979&region=all');
         expect(setLiveLocation).not.toHaveBeenCalled();
     });
 

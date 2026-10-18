@@ -14,7 +14,7 @@ import java.time.Duration;
 @Setter
 @Component
 @ConfigurationProperties("jwt")
-public class    JwtProperties {
+public class JwtProperties {
 
     private String issuer;
     private String secretKey;
@@ -23,6 +23,9 @@ public class    JwtProperties {
 
     @PostConstruct
     public void validate() {
+        if (issuer == null || issuer.isBlank()) {
+            throw new IllegalStateException("JWT issuer is not configured");
+        }
         if (secretKey == null || secretKey.trim().isEmpty()) {
             throw new IllegalStateException("JWT secret key is not configured");
         }
@@ -30,6 +33,11 @@ public class    JwtProperties {
         if (secretKey.length() < 64) {
             throw new IllegalStateException("JWT secret key must contain at least 64 characters");
         }
+        if (accessToken == null || refreshToken == null) {
+            throw new IllegalStateException("JWT token expiration is not configured");
+        }
+        getAccessTokenExpiration();
+        getRefreshTokenExpiration();
 
         log.info("JWT config loaded: issuer={}, accessTokenExpiry={}m, refreshTokenExpiry={}d",
                 issuer, accessToken.expirationMinutes, refreshToken.expirationDays);
@@ -42,9 +50,15 @@ public class    JwtProperties {
         private Integer expirationDays;
 
         public Duration getExpirationDuration() {
-            if (expirationMinutes != null) return Duration.ofMinutes(expirationMinutes);
-            if (expirationDays != null) return Duration.ofDays(expirationDays);
-            throw new IllegalStateException("Token expiration is not configured");
+            if ((expirationMinutes == null) == (expirationDays == null)) {
+                throw new IllegalStateException("Configure exactly one token expiration unit");
+            }
+            Duration duration = expirationMinutes != null
+                    ? Duration.ofMinutes(expirationMinutes) : Duration.ofDays(expirationDays);
+            if (duration.isZero() || duration.isNegative()) {
+                throw new IllegalStateException("Token expiration must be positive");
+            }
+            return duration;
         }
     }
 

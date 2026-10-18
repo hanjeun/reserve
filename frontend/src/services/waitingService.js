@@ -15,7 +15,9 @@ const waitingService = {
     updateIntake: (storeId, paused, signal) => api.patch(`${API_ENDPOINTS.WAITING.BOARD(storeId)}/intake`, { paused }, { signal }),
     updateStatus: (storeId, entryId, status, signal) => api.patch(
         API_ENDPOINTS.WAITING.STATUS(storeId, entryId), { status }, { signal }),
-    getStores: (params, signal) => api.get(API_ENDPOINTS.WAITING.STORES, { params, signal }).then(normalizeListPage),
+    getStores: ({ region, ...params } = {}, signal) => api.get(API_ENDPOINTS.WAITING.STORES, {
+        params: { ...params, ...(region && region !== 'all' ? { region } : {}) }, signal,
+    }).then(normalizeListPage),
     getMine: (page, signal, { keyword, status, sort } = {}) => api.get(API_ENDPOINTS.WAITING.MY, {
         params: { page, size: 20,
             ...(keyword ? { keyword } : {}), ...(status ? { status } : {}), ...(sort ? { sort } : {}) }, signal,

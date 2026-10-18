@@ -12,12 +12,12 @@ vi.mock('../../store/useAuthStore', () => ({ default: selector => (typeof select
 vi.mock('../../hooks', () => ({ useMessage: () => ({ message: { success: vi.fn(), error: vi.fn() } }) }));
 
 describe('favorite button appearance', () => {
-    it('keeps a 44px tap target without a circular background in plain mode', () => {
+    it('uses the shared target and circular hover convention in plain mode', () => {
         render(<FavoriteButton storeId={12} size="sm" appearance="plain" />);
         const button = screen.getByRole('button', { name: '즐겨찾기 추가' });
 
         expect(button).toHaveClass('reserve-favorite-button--plain');
-        expect(button).toHaveStyle({ width: '44px', height: '44px', background: 'transparent', boxShadow: 'none', borderRadius: '10px' });
+        expect(button).toHaveStyle({ width: 'var(--reserve-icon-target-size)', height: 'var(--reserve-icon-target-size)', background: 'transparent', 'box-shadow': 'none', 'border-radius': '50%' });
         expect(button).toHaveAttribute('aria-pressed', 'false');
     });
 
@@ -26,6 +26,6 @@ describe('favorite button appearance', () => {
         const button = screen.getByRole('button', { name: '즐겨찾기 추가' });
 
         expect(button).not.toHaveClass('reserve-favorite-button--plain');
-        expect(button).toHaveStyle({ width: '44px', height: '44px', borderRadius: '50%' });
+        expect(button).toHaveStyle({ width: 'var(--reserve-icon-target-size)', height: 'var(--reserve-icon-target-size)', 'border-radius': '50%' });
     });
 });

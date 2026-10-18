@@ -16,7 +16,7 @@
 .reserve-benefit-detail .reserve-store-news-conditions p { margin: 0; font-size: 15px; line-height: 1.7; }
 .reserve-benefit-detail .reserve-benefit-detail-links { margin-top: 0; gap: 8px 16px; }
 .reserve-benefit-photos { position: relative; min-width: 0; overflow: hidden; border-radius: 16px; background: var(--c-gray-50); }
-.reserve-benefit-photo-count { position: absolute; bottom: 12px; right: 12px; padding: 5px 9px; border-radius: 10px; background: var(--c-bg-paper); color: var(--c-text-primary); font-size: 12px; line-height: 18px; pointer-events: none; }
+.reserve-benefit-photo-count { position: absolute; bottom: 12px; right: 12px; pointer-events: none; }
 .reserve-benefit-detail--photo { --reserve-benefit-detail-photo-height: 480px; }
 .reserve-benefit-detail--photo > :is(.reserve-benefit-photos, .reserve-benefit-detail-image) { order: -1; }
 .reserve-benefit-detail--compact { --reserve-benefit-detail-photo-height: 220px; gap: 16px; }

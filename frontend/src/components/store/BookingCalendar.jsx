@@ -327,9 +327,8 @@ const styles = {
     // 바로 아래 "예약 시간" 자리표시자와 같은 값을 써야 두 칸이 같은 말을 한다.
     triggerError: { boxShadow: field.errorRing },
     triggerText: {
-        fontSize: fontSize.lg, fontWeight: fontWeight.regular,
+        ...field.textStyle,
         color: colors.text.primary,
-        fontVariantNumeric: 'tabular-nums',
     },
     // AntD placeholder 와 같은 색 — 바로 아래 "예약 시간"의 자리표시자와 톤이 정확히 맞는다.
     placeholder: { color: field.placeholderColor },

@@ -5,7 +5,7 @@ import { RESERVATION_SORT_OPTIONS, RESERVATION_STATUS_FILTER_OPTIONS } from '../
 import { hasDistanceCoordinates } from './distanceSort';
 import { WAITING_STORE_STATUSES, WAITING_STORE_SORTS } from '../components/waiting/waitingDirectoryFilters';
 import { STORE_NEWS_TYPES } from './storeNews';
-import { feedRegion } from './feed';
+import { feedRegion, FEED_DIRECTORY_VIEWS } from './feed';
 import { VIEW_MODES } from './viewMode';
 
 const valuesOf = options => new Set(options.map(option => option.value));
@@ -20,6 +20,7 @@ const regions = new Set([
     '강원도', '전라북도', '제주도',
 ]);
 const isRegion = value => {
+    if (value === 'all') return true;
     const parts = value.trim().split(/\s+/);
     return parts.length <= 2 && regions.has(parts[0]);
 };
@@ -39,7 +40,7 @@ const schemas = {
         page: value => isPage(value) && Number(value) <= 100_000 },
     '/benefits': { newsType: new Set(['ALL', ...STORE_NEWS_TYPES.map(option => option.value)]),
         period: new Set(['ONGOING', 'ALL']), page: value => isPage(value) && Number(value) <= 10_000 },
-    '/feed': { view: new Set(['all', 'favorites', 'mine', 'drafts']), region: value => feedRegion(value) !== null,
+    '/feed': { view: valuesOf(FEED_DIRECTORY_VIEWS), region: value => value === 'all' || feedRegion(value) !== null,
         page: value => isPage(value) && Number(value) <= 10_000 },
     '/feed/u/:publicId': { page: value => isPage(value) && Number(value) <= 10_000 },
     '/feed/notifications': { view: new Set(['all', 'unread']), page: value => isPage(value) && Number(value) <= 10_000 },
@@ -70,12 +71,16 @@ export function normalizeListQueryParams(pathname, searchParams) {
             ? { waitingStatus: 'ALL', waitingSort: 'recent', waitingPage: '1' }
             : { status: 'ALL', sort: 'recent' });
     }
-    if (path === '/feed' && !['mine', 'drafts'].includes(next.get('view'))) defaultValues.region = '';
+    if (path === '/feed' && !['mine', 'drafts'].includes(next.get('view'))) defaultValues.region = 'all';
     for (const key of new Set(next.keys())) {
         if (isAttribution(key)) continue;
-        const value = next.get(key);
+        let value = next.get(key);
+        if (key === 'region' && value === '' && ['/stores', '/waiting', '/feed'].includes(path)) {
+            value = 'all';
+            next.set(key, value);
+        }
         const rule = schema[key];
-        // 지역 기억값과 구분되는 명시적 전체 선택(region=)은 빈 필터가 아니다.
+        // 예전 빈 전체 선택도 region=all로 보정하고, 지역 기억값과 구분한다.
         const emptySelection = value === '' && (defaultValues[key] === ''
             || key === 'region' && (path === '/stores' || path === '/waiting'));
         const valid = Object.hasOwn(schema, key) && (emptySelection || value !== ''

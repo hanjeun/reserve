@@ -10,6 +10,13 @@
 - **FULLTEXT 인덱스**
 - 인덱스 **이름 변경**
 
+
+## 2026-10-18 운영 적용 상태
+
+v2.12.0 main `b150ba5ac53fb2e2aaee1fc1f3866106615f5fbc`의 `scripts/sql/feed-v6-from-v2.sql`(15절 본문·15.1~15.8 전체)과 `scripts/sql/oauth-security-v7.sql`(16절)을 승인된 `reserve_ddl`로 실제 적용했어요. 아래 후보·운영 미적용 표시는 준비 당시의 기록이며 적용 SQL을 다시 실행하는 지시가 아니에요.
+
+새 직전 백업의 독립 다운로드·격리 복원 뒤 적용했으며 실제 49개 테이블·49개 FK·12개 CHECK와 unique·인덱스 정의를 대조했어요. 기존 66개 행의 원래 컬럼 값과 FK 고아 0을 확인했고, 실제 최종 JAR이 `reserve_app`·`validate`로 49개 모델 검증을 통과했어요. 복원 덤프에서 명시 인덱스로 남은 `promotion.member_id`의 중복 FK 보조 인덱스는 격리 복원본에서만 제거해 운영의 동일 선두 컬럼 복합 인덱스와 대조했어요. benefit 디자인 CHECK의 latin1/utf8mb4 표기는 같은 ASCII 허용값이며 그 밖의 정의는 같아요. 운영에 이를 맞추기 위한 추가 DDL은 실행하지 않았어요. [실제 전환 기록](deployments.md#2026-10-18-v2120-실제-운영-전환)을 함께 봐요.
+
 ## 적용 원칙
 
 1. 백업과 격리 `reserve_restore_*` 복원을 확인한 뒤 적용해요([백업·복구](backup.md)).

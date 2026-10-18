@@ -1,7 +1,6 @@
 package kr.it.reserve.payment.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-
 import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.PaymentException;
@@ -17,9 +16,11 @@ import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.payment.repository.RefundAttemptRepository;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationUpdates;
 import kr.it.reserve.store.entity.Store;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -31,7 +32,11 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -39,8 +44,8 @@ import java.util.UUID;
 @Transactional
 @RequiredArgsConstructor
 public class PaymentService {
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.reservation.service.ReservationUpdates reservationUpdates;
+    @Autowired(required = false)
+    private ReservationUpdates reservationUpdates;
 
     private static final String PG_READY_STATUS = "READY";
     private static final String EXPIRY_CHECK_SOURCE = "EXPIRY";
@@ -60,28 +65,17 @@ public class PaymentService {
 
 
 
-    /**
-     * 외부(사용자) 결제 검증 요청 — <b>본인 결제만.</b>
-     *
-     * <p>2026-08-09 추가. 예전 컨트롤러는 {@code SecurityUtil.getCurrentMember()} 의 반환값을
-     * 버리고 body 의 merchantUid 를 그대로 신뢰했다. 환불 엔드포인트에서 고친 것과 같은 구멍이다.
-     */
-    public PaymentResponseDto verifyAndCompletePaymentByMember(PaymentVerifyDto verifyDto, Member requester) {
-        Payment payment = paymentRepository.findByMerchantUid(verifyDto.getMerchantUid())
+    /** 사용자 요청은 소유권을 먼저 확인한다. requesterId가 없는 내부 모바일 복귀도 상태 검사는 공유한다. */
+    @Transactional(readOnly = true)
+    public VerificationSnapshot prepareVerification(String merchantUid, Long requesterId) {
+        Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(PaymentException::notFound);
 
-        if (payment.getMember() == null || !payment.getMember().getId().equals(requester.getId())) {
+        if (requesterId != null && (payment.getMember() == null || !payment.getMember().getId().equals(requesterId))) {
             log.warn("Payment verify denied - not owner: merchantUid={}, requesterId={}",
-                    verifyDto.getMerchantUid(), requester.getId());
+                    merchantUid, requesterId);
             throw new PaymentException("본인의 결제만 검증할 수 있어요.", HttpStatus.FORBIDDEN);
         }
-
-        return verifyAndCompletePayment(verifyDto);
-    }
-
-    public PaymentResponseDto verifyAndCompletePayment(PaymentVerifyDto verifyDto) {
-        Payment payment = paymentRepository.findByMerchantUid(verifyDto.getMerchantUid())
-                .orElseThrow(PaymentException::notFound);
 
         // ★ 상태 가드 (2026-08-09) — 예전엔 상태를 보지 않아 몇 번이든 다시 돌릴 수 있었다.
         //   PC 결제는 usePayment 와 PaymentResult 에서 실제로 두 번 호출되고 있고,
@@ -89,20 +83,16 @@ public class PaymentService {
         //   이미 끝난 검증은 같은 결과를 그대로 돌려주고(멱등), 그 외 상태는 막는다.
         if (payment.getStatus() == Payment.PaymentStatus.PAID) {
             log.info("Payment already verified, returning existing result: {}", payment.getMerchantUid());
-            return PaymentResponseDto.fromEntity(payment);
+            return new VerificationSnapshot(payment.getMerchantUid(), PaymentResponseDto.fromEntity(payment));
         }
         if (payment.getStatus() != Payment.PaymentStatus.READY) {
             throw new PaymentException("검증할 수 있는 결제 상태가 아니에요.", HttpStatus.BAD_REQUEST);
         }
 
-        // V2 API: merchantUid(=paymentId)로 조회
-        PortoneV2PaymentResponse portonePayment = portoneService.getPaymentInfo(payment.getMerchantUid());
-
-        return completeReadyPaymentFromPg(
-                payment.getMerchantUid(),
-                portonePayment,
-                verifyDto.getImpUid());
+        return new VerificationSnapshot(payment.getMerchantUid(), null);
     }
+
+    public record VerificationSnapshot(String merchantUid, PaymentResponseDto completed) { }
 
     /**
      * 브라우저가 돌아오지 않아도 웹훅이 확인한 PAID 상태를 복구한다.
@@ -348,7 +338,7 @@ public class PaymentService {
                 outcome);
     }
 
-    private PaymentResponseDto completeReadyPaymentFromPg(
+    public PaymentResponseDto completeReadyPaymentFromPg(
             String merchantUid,
             PortoneV2PaymentResponse portonePayment,
             String fallbackImpUid) {
@@ -760,13 +750,13 @@ public class PaymentService {
             RefundAttempt attempt, UnresolvedRefundView view, Payment payment, int refundAmount, String cancellationId) {
         return attempt != null && attempt.isUnresolved()
                 && cancellationId != null && !cancellationId.isBlank()
-                && java.util.Objects.equals(attempt.getPaymentId(), payment.getId())
-                && java.util.Objects.equals(attempt.getMerchantUid(), payment.getMerchantUid())
-                && java.util.Objects.equals(view.merchantUid(), payment.getMerchantUid())
-                && java.util.Objects.equals(attempt.getCancellationId(), cancellationId)
-                && java.util.Objects.equals(view.cancellationId(), cancellationId)
-                && java.util.Objects.equals(attempt.getRequestedAmount(), refundAmount)
-                && java.util.Objects.equals(view.requestedAmount(), refundAmount);
+                && Objects.equals(attempt.getPaymentId(), payment.getId())
+                && Objects.equals(attempt.getMerchantUid(), payment.getMerchantUid())
+                && Objects.equals(view.merchantUid(), payment.getMerchantUid())
+                && Objects.equals(attempt.getCancellationId(), cancellationId)
+                && Objects.equals(view.cancellationId(), cancellationId)
+                && Objects.equals(attempt.getRequestedAmount(), refundAmount)
+                && Objects.equals(view.requestedAmount(), refundAmount);
     }
 
     /**
@@ -918,8 +908,8 @@ public class PaymentService {
      * 환불 재시도를 받을 수 있는 예약 상태. 이용자·가게 취소({@code CANCELLED})와 가게 거절({@code REJECTED}).
      * 노쇼·이용완료는 환불 대상이 아니고, 대기·승인 상태는 아직 예약이 살아 있다.
      */
-    private static final java.util.Set<Reservation.ReservationStatus> REFUND_RETRYABLE_RESERVATION_STATUSES =
-            java.util.Collections.unmodifiableSet(java.util.EnumSet.of(
+    private static final Set<Reservation.ReservationStatus> REFUND_RETRYABLE_RESERVATION_STATUSES =
+            Collections.unmodifiableSet(EnumSet.of(
                     Reservation.ReservationStatus.CANCELLED,
                     Reservation.ReservationStatus.REJECTED));
 

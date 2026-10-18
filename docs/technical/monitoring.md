@@ -27,9 +27,9 @@
 
 2026-10-09 v2.9.0의 승인된 운영 전환 뒤에도 실제 채팅 고지는 `2026-10-04T09:44:15Z`, 적용 시작은 **2026-11-03 18:44:15 KST**이고 90일·30일 유예·`enabled=true`, `active=false`를 유지했어요. 고객 웨이팅의 새 고지 시각은 채팅 정책에 재사용하지 않았어요. 확인을 위해 고지일을 바꾸거나 작업을 앞당기지 않아요.
 
-운영 최종 SHA `b32c08943c5215ebaf589b1311efefc01f6c4024`에 포함된 `ChatRetentionScheduler`는 정책이 활성화되고 신고 → 메시지 → 접근기록 처리가 끝난 경우에만 `Chat retention sweep completed`를 기록해요. `runAtUtc`는 해당 실행의 UTC 시작 시각이며 각 영역의 `Candidates`·`Failures`를 집계해요. 후보 0건도 완료 로그를 남기고, 조회가 실패하면 완료 로그를 남기지 않아요. 이 완료 집계에 회원·방·자료 ID, 본문, 연락처나 예외 메시지를 추가하지 않았어요. 기존 batch 50·10분 주기·항목별 예외 격리·보존 정책은 유지해요. 후보 0건·항목별 실패 격리·실제 고지 유예·조회 실패를 다룬 회귀 검사는 출시 백엔드 검사에 포함해 통과했어요. 이 검사 결과가 아직 오지 않은 운영 첫 활성 작업의 결과를 대신하지 않아요.
+v2.9.0 최종 SHA `b32c08943c5215ebaf589b1311efefc01f6c4024`에 포함된 `ChatRetentionScheduler`는 정책이 활성화되고 신고 → 메시지 → 접근기록 처리가 끝난 경우에만 `Chat retention sweep completed`를 기록해요. `runAtUtc`는 해당 실행의 UTC 시작 시각이며 각 영역의 `Candidates`·`Failures`를 집계해요. 후보 0건도 완료 로그를 남기고, 조회가 실패하면 완료 로그를 남기지 않아요. 이 완료 집계에 회원·방·자료 ID, 본문, 연락처나 예외 메시지를 추가하지 않았어요. 기존 batch 50·10분 주기·항목별 예외 격리·보존 정책은 유지해요. 후보 0건·항목별 실패 격리·실제 고지 유예·조회 실패를 다룬 회귀 검사는 출시 백엔드 검사에 포함해 통과했어요. 이 검사 결과가 아직 오지 않은 운영 첫 활성 작업의 결과를 대신하지 않아요.
 
-유예 종료 후에는 먼저 실제 운영 이미지에 이 코드가 포함됐는지와 정책·로그 스트림을 확인해요. 첫 활성 완료 로그의 시각·후보·실패, 실제 파기 로그·잔여 후보·보류 집계를 대조해요. 서비스의 재확인으로 후보가 남을 수 있으므로 **후보 수 − 실패 수를 실제 파기 수로 계산하지 않아요**. 파일 삭제는 별도 outbox worker와 공유 참조 보호를 거치므로 `file_deletion_task`의 완료·보류·실패와 실제 객체 삭제 결과를 따로 확인해요. 현재 첫 활성 작업·파기·파일 삭제 결과는 아직 확인하지 않았어요.
+유예 종료 후에는 먼저 실제 운영 이미지에 이 코드가 포함됐는지와 정책·로그 스트림을 확인해요. 첫 활성 완료 로그의 시각·후보·실패, 실제 파기 로그·잔여 후보·보류 집계를 대조해요. 서비스의 재확인으로 후보가 남을 수 있으므로 **후보 수 − 실패 수를 실제 파기 수로 계산하지 않아요**. 파일 삭제는 별도 outbox worker와 공유 참조 보호를 거치므로 `file_deletion_task`의 완료·보류·실패와 실제 객체 삭제 결과를 따로 확인해요. 현재 첫 활성 작업·파기·파일 삭제 결과는 아직 확인하지 않았어요. 기존 `reserve-2` 확인 예약은 2026-11-03 19:05 KST에 ACTIVE로 재확인했으며 중복 예약을 만들지 않아요.
 
 ## 구성
 
@@ -43,48 +43,39 @@
 | **collect-metrics.sh** | 호스트·컨테이너 지표 수집 (cron 1분) | `/var/log/metrics/` |
 | **Sentry** | 런타임 에러 트래킹 | [sentry.io](https://sentry.io) |
 | **UptimeRobot** | 업타임 모니터링 | [uptimerobot.com](https://uptimerobot.com) |
-| **SonarCloud** | Java·프론트 CI 정적 분석 | [sonarcloud.io](https://sonarcloud.io/projects) |
+| **SonarCloud** | 요청 시 수동 Java·프론트 정적 분석 | [sonarcloud.io](https://sonarcloud.io/projects) |
 
 ```
 Spring Boot ─ Logback ─→ /var/log/reserve/app.log ─┐
-cron ─ collect-metrics.sh ─→ /var/log/metrics/*.log ─┴─ Promtail ─→ Loki ─→ Grafana
+cron ─ collect-metrics.sh ─→ /var/log/metrics/*.log ─┴─ Alloy ─→ Loki ─→ Grafana
 nginx ─ privacy-safe Docker timing 로그 ─────────────┘
 ```
 
 ## 컨테이너
 
-`docker-compose-monitoring.yml`이 `app-network`에 붙어요. nginx는 `grafana:3000`, Promtail은 `loki:3100`으로 접근해요. 레포 기본 구성은 호스트 포트를 publish하지 않아요. 현재 운영 설치본은 기존 Loki 3100 publish를 유지하며, 승인된 옵션 하나만 바꿨어요. 포트 변경은 별도 운영 승인 대상이에요.
+`docker-compose-monitoring.yml`과 `docker-compose-alloy.yml`이 `app-network`에 붙어요. nginx는 `grafana:3000`, 현재 수집기 Alloy는 `loki:3100`으로 접근해요. 2026-10-10 읽기 전용 조회에서도 Alloy 1.20.1이 실행 중이고 Promtail은 정지 상태였어요. 기본 compose의 Promtail 정의는 복구용으로 보존한 것이므로 전체 `up -d`로 다시 시작하지 않아요. 레포 기본 구성은 호스트 포트를 publish하지 않으며 운영의 기존 Loki 3100 publish 변경은 별도 승인 대상이에요.
 
 ```bash
-docker compose -f ~/docker-compose-monitoring.yml up -d
-docker ps | grep -E "loki|promtail|grafana"
+docker ps --format '{{.Names}} {{.Image}} {{.Status}}' | grep -E 'alloy|loki|grafana'
+docker ps -a --format '{{.Names}} {{.Status}}' | grep promtail
 ```
 
 | 볼륨 | 용도 |
 |---|---|
 | `grafana-data` | 대시보드·알림 규칙 |
 | `loki-data` | 로그 |
-| `promtail-positions` | 파일별 읽은 위치 |
+| `alloy-data` | 현재 수집 위치와 Alloy 영속 상태 (`--storage.path=/var/lib/alloy/data`) |
+| `promtail-positions` | 전환 당시 위치·복구 입력 보존, Alloy에 읽기 전용 연결 |
 
-`promtail-config.yml`은 서버의 `~/promtail-config.yml`이 마운트돼요. 레포에서 고친 뒤 서버로 복사하고 재시작해요.
+현재 설정은 `alloy-config.alloy` → `/etc/alloy/config.alloy` 읽기 전용 마운트예요. 앱·백업·지표·검증된 nginx 로그 디렉터리만 읽고 Alloy 상태는 별도 볼륨에 써요. 추가 설정·마운트 변경과 재시작은 실제 설치본을 확인한 뒤 별도 운영 승인으로 진행해요.
 
 앱은 `app.log`, 백업은 `backup.log`를 서로 다른 job과 UTC 파서로 읽어요. 기존 positions 볼륨을 보존해요. 과거 로그를 다시 넣으려고 positions를 초기화하거나 백업을 강제 실행하지 않아요.
 
-[Promtail은 2026년 3월 2일 지원이 종료됐어요](https://grafana.com/docs/loki/latest/send-data/promtail/). 아래 설정은 기존 2.9.0 수집 공백에 대한 작은 후속이고, 지원되는 Alloy로의 전환·메모리 예산·positions 이관은 별도 검증 대상이에요. 이 설정만으로 유지보수 문제가 해결되지는 않아요.
+[Promtail의 지원 종료 안내](https://grafana.com/docs/loki/latest/send-data/promtail/)에 따라 2026-10-02 Alloy로 전환했어요. 이전 `promtail-config.yml`·컨테이너·positions·전환 전 원본은 복구 입력으로 보존해요. 두 수집기를 동시에 실행하거나 위치 파일을 초기화하지 않아요.
 
-```bash
-scp promtail-config.yml ubuntu@<서버>:~/
-docker restart promtail
-```
+## 로그 타임스탬프
 
-```bash
-grep 'job_name' ~/promtail-config.yml
-docker exec promtail ls /var/log/metrics
-```
-
-## Promtail 타임스탬프
-
-`promtail-config.yml`의 `pipeline_stages`가 로그 줄 안의 시각을 타임스탬프로 쓰고 `level` 라벨을 붙여요.
+현재 `alloy-config.alloy`의 `stage.regex`·`stage.labels`·`stage.timestamp`가 앱·백업 줄의 UTC 시각과 `level`을 읽어요. 다음 YAML은 보존한 Promtail 설정의 같은 파서 규칙으로, 현재 실행 명령이 아니에요.
 
 ```yaml
     pipeline_stages:
@@ -153,10 +144,10 @@ readiness, 기존 6줄, 앱 로그, 새 날짜의 정기 백업과 알림의 다
 새 로그 누락이나 자원 악화가 생기면 보존한 실행 인자로 Loki만 되돌리고 같은 조회를 반복한다.
 기존 데이터 볼륨과 Promtail positions는 유지한다.
 
-### Promtail → Alloy 전환 후보 (운영 미적용)
+### Promtail → Alloy 전환 전 격리 검증과 복구 절차
 
 [Promtail 공식 안내](https://grafana.com/docs/loki/latest/send-data/promtail/)의 지원 종료일은
-2026-03-02다. 현재 운영 Promtail 2.9.0을 임의로 제거하지 않고 전환 후보를 먼저 검증했다.
+2026-03-02다. 전환 전에 당시 운영 Promtail 2.9.0을 제거하지 않고 후보를 먼저 검증했다. 아래는 전환 전 검사 기록이며 운영 적용은 2026-10-02 완료했다.
 `alloy-config.alloy`는 운영과 동일한 Promtail 설정을 Alloy 1.20.1의 엄격 변환으로 생성했다.
 변환 오류 우회 없이 일반 공개 컴포넌트 수준의 `validate`도 통과했다.
 `docker-compose-alloy.yml`은 이미지 digest를 고정한 추가 overlay이며 호스트 포트를 열지 않는다.
@@ -174,7 +165,7 @@ readiness, 기존 6줄, 앱 로그, 새 날짜의 정기 백업과 알림의 다
 
 [파일 수집기 공식 문서](https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.file/)에 따라
 legacy positions는 새 Alloy positions가 없을 때만 가져온다. `--storage.path`와 볼륨을 유지해야 한다.
-운영 전환은 다음 순서의 별도 승인 대상이다.
+처음 전환할 때 사용한 순서는 다음과 같다. 현재는 Alloy가 실행 중이며, 이 절차의 재실행이나 복구 전환은 새 운영 승인 대상이다.
 
 1. 서버의 실제 Compose 두 파일, 네 job, 현재 nginx Docker 로그 디렉터리, 이미지와 볼륨을 대조한다.
    `RESERVE_NGINX_LOG_DIR`에는 `nginxserver`의 현재 로그 디렉터리 하나만 지정한다.
@@ -191,7 +182,7 @@ legacy positions는 새 Alloy positions가 없을 때만 가져온다. `--storag
    기존 상태를 보존하고 새 상태 볼륨으로 최신 Promtail positions를 가져오는 별도 변경안을 검증한다.
 
 내보내기 도구의 거부·우선순위 검사 7건과 격리 왕복 검사는 통과했다. 운영 환경의 파일 회전·
-nginx 재생성·자연 날짜 전환과 장시간 메모리 사용은 전환 전후 확인이 남아 있다.
+nginx 재생성·자연 날짜 전환과 장시간 메모리 사용은 일회성 격리 검사의 통과와 구분해 관측한다. 실제 전환 근거는 아래 "Alloy 운영 전환"에 있다.
 
 ## 지표 수집 (collect-metrics.sh)
 
@@ -391,25 +382,22 @@ sudo mkdir -p /var/log/reserve && sudo chown -R 1000:1000 /var/log/reserve
 
 `nginx/default.conf`의 `reserve_timing`은 IP·동적 ID·쿼리·쿠키·토큰·본문 없이 route 종류와 지연만 기록해요. 현재 Docker json-file을 그대로 읽으므로 nginx는 재시작하지 않아요.
 
-- `docker-compose-observability.yml`을 기존 monitoring compose에 더해 nginx 컨테이너의 **검증된 로그 디렉터리 하나만** read-only 마운트해요. Docker socket이나 전체 containers 경로는 마운트하지 않아요.
+- 현재 `docker-compose-alloy.yml`이 nginx 컨테이너의 **검증된 로그 디렉터리 하나만** read-only 마운트해요. Docker socket이나 전체 containers 경로는 마운트하지 않아요. `docker-compose-observability.yml`은 옛 Promtail 복구 입력으로 보존해요.
 - Docker 시각을 보존하고 stdout의 완전한 allowlist 스키마만 전송해요. stderr·다른 형식·추가 식별 필드·1시간보다 오래된 nginx 항목은 버려요. 기존 app/backup positions는 그대로예요.
-- nginx 컨테이너가 나중에 재생성되면 LogPath도 달라지므로 새 경로를 다시 확인하고 Promtail 마운트만 갱신해요. 수집 부재는 지연/오류 0건이 아니에요.
-- 기존 compose의 `~/promtail-config.yml`은 sudo 실행 시 `/root`로 풀릴 수 있어요. overlay는 현재 설치된 `/home/ubuntu/promtail-config.yml`을 명시적으로 read-only 마운트해요. 다른 서버에서는 실제 설치 경로를 먼저 확인해요.
+- nginx 컨테이너가 나중에 재생성되면 LogPath도 달라지므로 새 경로를 다시 확인하고 Alloy의 해당 마운트만 갱신해요. 수집 부재는 지연/오류 0건이 아니에요.
+- 옛 Promtail 복구 overlay는 `~`의 sudo 해석을 피하도록 `/home/ubuntu/promtail-config.yml`을 명시해요. 현재 Alloy와 복구 설치본 모두 실제 source 경로를 확인해요.
 
-기존 설정과 positions를 보존하고 새 config의 2.9.0 syntax·합성 파이프라인 검사를 통과한 뒤, 적용은 **Promtail만** 해요. Grafana·Loki·앱·DB는 재생성하지 않아요.
+추가 운영 변경은 기존 설정과 Alloy 상태·Promtail 복구 positions를 보존하고 새 설정·합성 파이프라인을 확인한 뒤 별도 승인으로 **Alloy만** 적용해요. Grafana·Loki·앱·DB는 재생성하지 않아요. 다음은 현재 nginx 로그 경로를 읽기 전용으로 확인하는 명령이며 재생성은 포함하지 않아요.
 
 ```bash
 NGINX_LOG_PATH=$(sudo docker inspect --format '{{.LogPath}}' nginxserver)
 NGINX_LOG_DIR=${NGINX_LOG_PATH%/*}
 [[ "$NGINX_LOG_DIR" =~ ^/var/lib/docker/containers/[0-9a-f]{64}$ ]] || exit 1
 sudo test -f "$NGINX_LOG_PATH" || exit 1
-sudo env RESERVE_NGINX_LOG_DIR="$NGINX_LOG_DIR" docker compose \
-  -f /home/ubuntu/docker-compose-monitoring.yml \
-  -f /home/ubuntu/docker-compose-observability.yml \
-  up -d --no-deps --force-recreate promtail
+printf '%s\n' "$NGINX_LOG_DIR"
 ```
 
-적용 뒤 새 원본 CPU 표본과 Loki `job="metrics"`, 새 nginx 요청과 `job="nginx"`의 시각·스키마를 대조해요. 이전 compose와 config로 Promtail만 복구할 수 있어야 해요. 호스트 CPU 표본 한 개로 장기 지연 원인을 단정하지 않아요.
+승인된 변경 뒤에는 새 원본 CPU 표본과 Loki `job="metrics"`, 새 nginx 요청과 `job="nginx"`의 시각·스키마를 대조해요. 복구가 필요하면 Alloy를 중지하고 최신 positions를 확인한 뒤 보존한 Promtail 입력으로 돌아가는 별도 절차를 따라요. 호스트 CPU 표본 한 개로 장기 지연 원인을 단정하지 않아요.
 
 ## Sentry
 
@@ -422,11 +410,13 @@ sudo env RESERVE_NGINX_LOG_DIR="$NGINX_LOG_DIR" docker compose \
 
 5분 간격으로 `https://reserve.it.kr`를 헬스체크하고, 다운 시 이메일로 알려요.
 
-## SonarQube Cloud
+## 수동 정적 분석
 
-2026-10-02부터 `.github/workflows/sonar.yml`의 Java 21·Gradle CI 분석을 사용해요.
-자동 분석은 껐고 `SONAR_CI_ENABLED=true`를 적용했어요. `SONAR_TOKEN`은 GitHub Actions
-Secret으로만 전달하며 IntelliJ 실행 환경변수에는 필요하지 않아요.
+2026-10-04부터 Sonar 자동 실행과 커버리지 80% 목표를 위한 반복 테스트·빌드·PR을 중지해요. 일반 CI는 커버리지 계측 없이 기존 테스트와 필수 빌드·보안 검사를 유지해요. `.github/workflows/sonar.yml`은 요청한 `workflow_dispatch`에서만 Java 21·Gradle 정적 분석을 실행해요. 분석 입력은 컴파일하되 테스트 실행이나 커버리지 수집을 추가하지 않아요. `SONAR_TOKEN`은 GitHub Actions Secret으로만 전달하며 IntelliJ 실행 환경변수에는 필요하지 않아요.
+
+### 2026-10-02~03 과거 분석 기록
+
+2026-10-02 당시 Java 21·Gradle CI 분석을 사용하고 자동 분석을 끈 뒤 `SONAR_CI_ENABLED=true`를 적용했어요. 아래 수치와 커버리지는 당시 입력의 분석 기록이며 현재의 자동 실행·커버리지 목표를 뜻하지 않아요.
 
 첫 dev 전체 분석은 Java를 포함해 400건을 찾았어요. 이전 57건은 Java가 빠진 범위였어요.
 실제 보안·신뢰성 문제를 수정한 뒤 같은 범위를 다시 분석해요. PR 분석과 dev 전체 분석은
@@ -443,9 +433,7 @@ Secret으로만 전달하며 IntelliJ 실행 환경변수에는 필요하지 않
 CLI 결과 출력·순차 재시도/화면 캡처·계산된 색 대비의 기존 계약을 확인해 유지해요.
 지적을 숨기거나 Quality Gate 기준을 낮추지 않아요.
 
-CI의 기존 테스트에서 JaCoCo XML과 Vitest LCOV를 만들어요. 같은 입력·도구·성공 실행·해시·
-유효기간이 검증된 보고서만 재사용하며, 검증할 수 없으면 새로 생성해요. 임계값을 낮추거나
-검사 범위를 줄여서 통과시키지 않아요.
+당시 일반 CI는 기존 테스트에서 JaCoCo XML·Vitest LCOV를 만들고, 같은 입력·도구·성공 실행·해시·유효기간을 확인한 보고서만 재사용했어요. 10/4 이후의 일반 CI와 수동 분석은 위의 현재 정책을 따르며 과거 커버리지 수치를 맞추려고 검사를 반복하지 않아요. 검사 범위나 품질 관문을 낮추지 않아요.
 
 ## Alloy 운영 전환
 
@@ -513,3 +501,11 @@ Report-Only를 유지하며 7일 연속 관측을 완료한 것으로 처리하�
 모두 HTTPS 이미지이며 발생 소스 분류는 `first-party` 6건·`unknown` 4건이에요.
 차단 대상 도메인은 수집하지 않으므로 이 분류를 차단 대상의 출처나 실제 원인으로 해석하지 않아요.
 위반 0건이나 7일 연속 관측 완료로 표시하지 않고 Report-Only를 유지해요.
+
+## 2026-10-12 현재 운영 지도와 초기 로딩 관측
+
+현재 프론트의 release-id는 `cfa3702fdb66c19f8f31e3edf95945a1d0b49294`예요. 실제 가게 상세에서 앱 청크가 `dapi.kakao.com/v2/maps/sdk.js`를 요청하고, 그 SDK가 `t1.kakaocdn.net/mapjsapi/js/main/4.5.28/kakao.js`와 services 후속 스크립트를 요청하는 것을 확인했어요. 브라우저 Log의 문자열 실행 위반 출처는 이 `t1`의 `kakao.js`였고 Report-Only라 차단하지 않았으며 지도는 표시됐어요. 진입 SDK 허용 도메인과 후속 SDK의 eval 문제를 구분하고 앱 전체 `unsafe-eval`은 추가하지 않아요. 강제 CSP는 이 SDK의 별도 실행 경계 또는 지도 대체 방식을 검토한 뒤 전환하며 이 한 번의 관측을 7일 무위반 근거로 쓰지 않아요.
+
+동일 운영 SHA의 홈을 별도 Chromium PC 1440×900 컨텍스트에서 실제 요청으로 읽었어요. routing·cache 비활성화·CPU/네트워크 제한 없이 새 컨텍스트와 같은 컨텍스트의 reload를 각각 한 번 관측했어요. load 후 3.5초 창에서 첫 방문 TTFB/FCP/LCP는 113/744/1232ms, reload는 17/180/580ms였으며 LCP는 `operation-guide-cover-desktop-v1.webp`였어요. reload의 같은 원본 JS `transferSize=0`은 관측했지만 단일 표본 차이를 캐시만의 효과나 일반 모바일 사용자 성능으로 단정하지 않아요. [LCP 관측 방법](https://web.dev/articles/lcp)과 [routing 시 HTTP cache 비활성화](https://playwright.dev/docs/api/class-page#page-route)를 구분하며 v2.9.0 표본은 현재 개선 근거로 재사용하지 않아요.
+
+로컬 후보는 Sentry 오류·tracing 초기화를 유지하고 Replay만 window load 이후 idle에 별도 청크로 준비해요. 텍스트 마스킹·사진 차단과 기존 표본 비율을 유지하되 Replay 준비 전의 초기 DOM 기록은 포함되지 않는 한계가 있어요. 해당 변경은 운영 미적용이며 빌드 예산 통과를 실제 운영 LCP 개선으로 표현하지 않아요. 로컬 `VITE_SKELETON_DELAY`는 개발 모드에서만 적용돼요.

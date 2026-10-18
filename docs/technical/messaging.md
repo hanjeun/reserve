@@ -58,19 +58,25 @@
 | `GET /api/chat/rooms/{roomId}/history?beforeId=&size=` | 참가자 cursor 과거 내역 |
 | `POST /api/chat/rooms/{roomId}/read?viewerRole=` | 읽음 처리 |
 | `PUT /api/chat/rooms/{roomId}/block?viewerRole=&blocked=` | 역할별 차단·차단 해제 |
+| `PUT /api/chat/rooms/{roomId}/visibility?viewerRole=&hidden=` | 자기 역할의 대화 목록 숨김·복원 |
+| `POST /api/chat/rooms/{roomId}/messages/{messageId}/hide` | 로그인 참여자의 나에게만 삭제 |
+| `POST /api/chat/rooms/{roomId}/messages/{messageId}/retract` | 발신자의 전송 취소 |
 | `POST /api/chat/rooms/{roomId}/reports?viewerRole=` | 대화 전체 또는 상대 메시지 신고 |
 | `GET /api/chat/unread` | 회원·소유 가게를 합친 launcher 배지 |
 | `GET /api/admin/chat/reports` / `GET .../{id}/context` | 관리자 신고 목록·문맥 조회 |
 | `PATCH /api/admin/chat/reports/{id}` | 신고 검토 시작·조치 완료/기각 |
 
 - `/api/chat/my*`와 관리자 `/api/admin/chat*` 경로도 기존 화면용으로 유지돼요.
+- 제품 API는 같은 컨트롤러의 `/api/v1/...` 경로도 지원해요. 프론트의 운영 빌드는 v1을 사용하고 기존 `/api/...`는 호환 경로로 유지해요.
 - 관리자 증분 조회(`getNewMessagesAsAdmin`)는 `SUPPORT`만 허용해요. 가게 대화는 신고 문맥 API로만 봐요.
 
 전송 취소·목록 숨김·보존 기간은 [채팅 입력·설정·전송 취소](chat-controls.md)에 있어요.
 
 ## 차단과 신고
 
-메시지에는 수정·삭제 API가 없고, 회원 탈퇴·가게 폐업 뒤에도 남아요.
+메시지 수정 API는 없어요. **나에게만 삭제**는 `chat_message_hidden`에 본인의 숨김을 기록하고 본인의 텍스트·사진 조회에서 제외해요. 상대방의 표시나 원문·신고 증거는 지우지 않아요. 대화 목록 숨김은 별도 역할 설정이며, 발신자 전송 취소도 별도 정책을 따라요.
+
+원문 파기는 개인 숨김과 구분해 보존 worker가 처리해요. 일반 메시지 90일·기존 자료 고지 후 30일 유예와 신고 보류 규칙을 적용하고, 사진 객체는 별도 파일 삭제 outbox를 거쳐요. 회원 탈퇴·가게 폐업 자체로 원문·신고 증거를 즉시 파기하지 않아요. 실제 고지는 `2026-10-04T09:44:15Z`, 유예 종료는 **2026-11-03 18:44:15 KST**이며 첫 자연 worker의 파기·보류·파일 삭제 결과는 아직 확인 전이에요. [채팅 정책](chat-controls.md)과 [모니터링](monitoring.md)을 함께 확인해요.
 
 - 한쪽이라도 차단하면 양쪽 모두 새 전송이 막혀요. 각자 자기 차단만 해제할 수 있어요.
 - 가게 쪽 차단은 가게 역할에 걸려 있어 소유자가 바뀌어도 이어져요.

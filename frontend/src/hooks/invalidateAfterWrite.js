@@ -1,4 +1,4 @@
-import { adKeys, adminKeys, favoriteKeys, reservationKeys, storeKeys } from './queryKeys';
+import { adKeys, adminKeys, benefitKeys, favoriteKeys, reservationKeys, storeKeys } from './queryKeys';
 
 /**
  * 쓰기 후 캐시 무효화 규칙 (2026-09)
@@ -22,9 +22,9 @@ import { adKeys, adminKeys, favoriteKeys, reservationKeys, storeKeys } from './q
 const invalidateAll = (queryClient, keys) =>
     Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 
-/** 찜 추가·해제. 개별 하트(status)는 호출부가 응답으로 직접 채우므로 목록만 무효화한다. */
+/** 찜 추가·해제. 목록과 피드의 관심 가게 필터를 갱신하며 개별 하트는 응답으로 채운다. */
 export const invalidateFavoriteData = (queryClient) =>
-    invalidateAll(queryClient, [favoriteKeys.my()]);
+    invalidateAll(queryClient, [favoriteKeys.my(), ['feed', 'posts']]);
 
 /**
  * 리뷰 작성·수정·삭제. 리뷰 목록(reviewKeys.byStore)은 호출부가 setQueryData 로 직접 고친다.
@@ -49,7 +49,7 @@ export const invalidateReservationData = (queryClient) =>
  * (StoreService.deleteStore). 이름·대표 사진이 바뀌면 즐겨찾기 카드에도 보인다.
  */
 export const invalidateStoreData = (queryClient) =>
-    invalidateAll(queryClient, [storeKeys.all(), favoriteKeys.all(), adKeys.all()]);
+    invalidateAll(queryClient, [storeKeys.all(), favoriteKeys.all(), adKeys.all(), ['feed'], ['store-news'], benefitKeys.all()]);
 
 /**
  * 광고 등록·결제·취소·수정·삭제·중단. 내 광고·관리자 광고 목록과 공개 배너·배지,
@@ -63,4 +63,4 @@ export const invalidateAdData = (queryClient) =>
  * 대시보드 집계, 감사 로그를 함께 바꾼다. 탭별로 골라내지 않고 관리자 캐시 전체를 무효화한다.
  */
 export const invalidateAdminData = (queryClient) =>
-    invalidateAll(queryClient, [adminKeys.all()]);
+    invalidateAll(queryClient, [adminKeys.all(), ['feed'], ['store-news'], benefitKeys.all()]);

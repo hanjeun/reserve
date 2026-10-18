@@ -1,14 +1,16 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '../common/icons';
 import { Button, DataState, FormField, FormInput, FormTextArea, SegmentedControl } from '../common';
+import IconTool from '../common/IconTool';
 import useFormErrors from '../../hooks/useFormErrors';
+import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
 import ChatIntroPreview from './ChatIntroPreview';
 import MessengerAvatar from './MessengerAvatar';
+import ProfilePhotoUpload from '../common/ProfilePhotoUpload';
 import { DEFAULT_STORE_GREETING, DEFAULT_SUPPORT_GREETING, SUPPORT_DISPLAY_NAME } from '../../constants/chatIntro';
 
 const LIMITS = Object.freeze({ items: 5, notice: 100, greeting: 200, displayName: 30, question: 40, answer: 300 });
-const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const MOBILE_PANES = [
     { value: 'edit', label: '설정' },
     { value: 'preview', label: '미리보기' },
@@ -51,7 +53,6 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
     const [mobilePane, setMobilePane] = useState('edit');
     const [previewRound, setPreviewRound] = useState(0);
     const [avatarState, setAvatarState] = useState({ uploading: false, error: null });
-    const fileInputRef = useRef(null);
     const { errors, validate, clearError, resetErrors } = useFormErrors();
 
     const body = bodyOf(draft, items, identityEditable);
@@ -76,13 +77,9 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
         resetErrors();
     };
     const revert = () => apply(JSON.parse(savedSnapshot));
+    useWorkspaceDraftGuard({ dirty, busy: saving || avatarState.uploading, onDiscard: revert });
 
-    const pickAvatar = async (event) => {
-        const file = event.target.files?.[0];
-        event.target.value = '';
-        if (!file) return;
-        if (!file.type.startsWith('image/')) { setAvatarState({ uploading: false, error: '사진 파일만 올릴 수 있어요.' }); return; }
-        if (file.size > AVATAR_MAX_BYTES) { setAvatarState({ uploading: false, error: '사진은 5MB까지 올릴 수 있어요.' }); return; }
+    const pickAvatar = async file => {
         setAvatarState({ uploading: true, error: null });
         try {
             const url = await onUploadAvatar(file);
@@ -131,21 +128,21 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
                             : '대화창 위쪽, 대화 목록, 답변 말풍선에 보이는 이름과 사진이에요.'}</p>
                     </div>
                     <div className="reserve-chat-intro-identity">
-                        <MessengerAvatar variant={isStore ? 'store' : 'brand'} imageSrc={shownImage || undefined}
-                            className="reserve-chat-intro-identity-avatar" />
+                        {isStore && <MessengerAvatar variant="store" imageSrc={shownImage || undefined}
+                            className="reserve-chat-intro-identity-avatar" />}
                         {identityEditable ? (
                             <div className="reserve-chat-intro-identity-fields">
                                 <FormField label="표시 이름">
                                     <FormInput value={draft.displayName} onChange={event => setField('displayName', event.target.value)}
                                         maxLength={LIMITS.displayName} showCount placeholder={SUPPORT_DISPLAY_NAME} aria-label="표시 이름" />
                                 </FormField>
+                                <ProfilePhotoUpload src={shownImage} disabled={saving || avatarState.uploading}
+                                    onSelect={pickAvatar} label="고객지원 사진 파일" />
                                 <div className="reserve-chat-intro-identity-actions">
-                                    <Button variant="outline" size="sm" loading={avatarState.uploading}
-                                        onClick={() => fileInputRef.current?.click()}>사진 바꾸기</Button>
+                                    {avatarState.uploading && <span role="status">사진을 올리고 있어요.</span>}
                                     {draft.avatarUrl && (
-                                        <Button variant="ghost-sm" size="sm" onClick={() => setField('avatarUrl', '')}>기본 사진으로</Button>
+                                        <Button variant="ghost-sm" size="sm" disabled={saving || avatarState.uploading} onClick={() => setField('avatarUrl', '')}>기본 사진으로</Button>
                                     )}
-                                    <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={pickAvatar} aria-label="고객지원 사진 파일" />
                                 </div>
                                 {avatarState.error && <p className="reserve-chat-intro-error" role="alert">{avatarState.error}</p>}
                             </div>
@@ -229,7 +226,7 @@ export default function ChatIntroEditor({ intro, onSave, onUploadAvatar, saving 
                 <div className="reserve-chat-intro-preview-head">
                     <div className="reserve-chat-intro-title-row">
                         <strong>미리보기</strong>
-                        <Button variant="ghost-sm" size="sm" icon={<ReloadOutlined />} onClick={() => setPreviewRound(round => round + 1)}>처음부터</Button>
+                        <IconTool label="처음부터" icon={<ReloadOutlined aria-hidden="true" />} onClick={() => setPreviewRound(round => round + 1)} />
                     </div>
                     <p>손님이 처음 문의할 때 보이는 화면이에요. 질문을 눌러 보세요.</p>
                 </div>

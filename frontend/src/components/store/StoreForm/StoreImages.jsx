@@ -1,6 +1,5 @@
 import React from 'react';
 import { Form, Upload, Divider, Switch, message as antMessage } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
 import {
     IMAGE_ACCEPT,
     MAX_IMAGE_REQUEST_BYTES,
@@ -9,6 +8,8 @@ import {
     uploadListBytes,
 } from '../../../utils/imageUploadPolicy';
 import SortableImageUpload from '../../common/SortableImageUpload';
+import LoadingUpload from '../../common/LoadingUpload';
+import ImageUploadButton from '../../common/ImageUploadButton';
 
 /**
  * Upload 의 onChange 이벤트에서 폼 값으로 쓸 배열만 꺼낸다.
@@ -72,7 +73,7 @@ const StoreImages = ({
                 extra={<span>대표 이미지는 가게 카드와 고객의 가게 문의 채팅 사진에 표시돼요. 변경하면 채팅 사진도 함께 바뀌어요.<br />JPG · PNG · WEBP · GIF / 새 이미지 전체 합계 최대 {MAX_IMAGE_REQUEST_MB}MB</span>}
                 rules={mainImageRequired ? [{ required: true, message: '대표 이미지를 등록해주세요' }] : []}
             >
-                <Upload
+                <LoadingUpload
                     listType="picture-card"
                     fileList={mainImage}
                     onChange={handleMainChange}
@@ -82,8 +83,8 @@ const StoreImages = ({
                     accept={IMAGE_ACCEPT}
                     onClickCapture={onPreviewClickCapture}
                 >
-                    {mainImage.length === 0 && <UploadButton />}
-                </Upload>
+                    {mainImage.length === 0 && <ImageUploadButton />}
+                </LoadingUpload>
             </Form.Item>
 
             {/* 상세 이미지 */}
@@ -106,7 +107,7 @@ const StoreImages = ({
                     accept={IMAGE_ACCEPT}
                     onClickCapture={onPreviewClickCapture}
                 >
-                    {detailImages.length < 5 && <UploadButton />}
+                    {detailImages.length < 5 && <ImageUploadButton />}
                 </SortableImageUpload>
             </Form.Item>
             <Form.Item
@@ -121,12 +122,5 @@ const StoreImages = ({
         </>
     );
 };
-
-const UploadButton = () => (
-    <div>
-        <PlusOutlined />
-        <div style={{ marginTop: 8 }}>업로드</div>
-    </div>
-);
 
 export default StoreImages;

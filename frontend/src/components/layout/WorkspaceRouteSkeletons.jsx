@@ -1,14 +1,21 @@
 import PropTypes from 'prop-types';
 import Bone from '../common/Bone';
+import SkeletonText from '../common/SkeletonText';
 import FilterToolbarSkeleton from '../common/FilterToolbarSkeleton';
 import AdminTableSkeletonTable from '../common/AdminTableSkeletonTable';
 import StatCard from '../common/StatCard';
 import ChartCard from '../common/ChartCard';
 import { ReservationSummaryCardSkeleton } from '../common/Skeletons';
 import ChatIntroEditorSkeleton from '../chat/ChatIntroEditorSkeleton';
+import { FeedReportsSkeleton } from '../feed/FeedSkeleton';
+import { BenefitApplicationsSkeleton } from '../admin/ManagementReviewSkeletons';
+import { REPORT_STATUS_OPTIONS, reportMode, reviewOption } from '../admin/managementReviewQuery';
+import ManagementListToolbar from '../common/ManagementListToolbar';
+import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
 import { ListingToolbarSkeleton, SegmentedControlSkeleton } from './routeSkeletonParts';
 import { reservationSkeletonFilters } from './reservationSkeletonFilters';
-import { colors, radius } from '../../styles/tokens';
+import { breakpoints, colors, radius } from '../../styles/tokens';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import {
     BUSINESS_VERIFICATION_SKELETON_COLS,
@@ -37,8 +44,10 @@ function TableTabSkeleton({ tab }) {
     const spec = TABLES[tab];
     if (!spec) return null;
     return <>
-        <FilterToolbarSkeleton count={0} search={spec.search ? SEARCH : undefined}
-            selects={spec.filterWidth ? [{ key: 'filter', value: '', options: [], width: spec.filterWidth }] : []} />
+        {tab === 'reports' ? <ManagementListToolbar leading={<Bone width={48} height={16} />}
+            trailing={<><FilterMenuSkeleton select={{ value: 'ALL', options: [{ value: 'ALL', label: '전체 상태' }] }} /><Bone width={44} height={44} borderRadius={10} /></>} />
+            : <FilterToolbarSkeleton count={0} search={spec.search ? SEARCH : undefined}
+                selects={spec.filterWidth ? [{ key: 'filter', value: '', options: [], width: spec.filterWidth }] : []} />}
         {spec.notice && <NoticeSkeleton />}
         <AdminTableSkeletonTable headers={spec.headers} cols={spec.cols} rows={spec.rows ?? 8} actionBtns={spec.actionBtns ?? 0} />
     </>;
@@ -94,13 +103,13 @@ export function StatisticsRouteSkeleton({ dashboard = false, search = '' }) {
             {labels.map(label => <StatCard key={label} icon={<Bone width={20} height={20} />} label={label} value={0} loading />)}
         </div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            {charts.map((title, index) => <ChartCard key={title} title={title} height={dashboard ? 240 : 260}
+            {charts.map((title, index) => <ChartCard key={title} title={title} loading height={dashboard ? 240 : 260}
                 minWidth={dashboard ? undefined : index === 1 ? 280 : 340}>
                 <ChartBodySkeleton donut={dashboard ? index === 0 : index === 1} dashboard={dashboard}
                     heights={dashboard ? [70, 110, 55, 90] : index === 2 ? [90, 60, 120, 80, 140, 100] : undefined} />
             </ChartCard>)}
         </div>
-        <ChartCard title={dashboard ? '최근 감사 로그 요약' : '광고 성과'} height="auto"><MetricsSkeleton /></ChartCard>
+        <ChartCard title={dashboard ? '최근 감사 로그 요약' : '광고 성과'} loading height="auto"><MetricsSkeleton /></ChartCard>
     </div>;
 }
 StatisticsRouteSkeleton.propTypes = { dashboard: PropTypes.bool, search: PropTypes.string };
@@ -117,7 +126,7 @@ ChatIntroRouteSkeleton.propTypes = { business: PropTypes.bool };
 export function AdsRouteSkeleton() {
     return <div className="reserve-ad-manage-tab">
         <div className="reserve-ad-manage-heading" style={{ color: colors.text.secondary, fontSize: 13 }}>
-            노출형(1,000원/일)은 가게 목록 상단에 카드·리스트로 우선 노출되고 작은 &quot;광고&quot; 표기가 붙어요. 배너형(5,000원/일)은 화면 우측 하단에 표시돼요.
+            <SkeletonText>노출형(1,000원/일)은 가게 목록 상단에 카드·리스트로 우선 노출되고 작은 &quot;광고&quot; 표기가 붙어요. 배너형(5,000원/일)은 화면 우측 하단에 표시돼요.</SkeletonText>
         </div>
         <div className="reserve-ad-manage-primary-row" aria-hidden="true">
             <Bone width={112} height={36} />
@@ -129,11 +138,17 @@ export function AdsRouteSkeleton() {
 }
 
 function PaymentOperationsRouteSkeleton() {
+    const narrow = useWindowWidth() < breakpoints.card;
+    const options = [
+        { value: 'ready', label: '오래된 READY' }, { value: 'issues', label: '수동 대사' },
+        { value: 'webhooks', label: '웹훅 inbox' }, { value: 'ads', label: '광고 결제' },
+    ];
     return <div>
-        <div style={{ maxWidth: 560, marginBottom: 16 }}><SegmentedControlSkeleton block value="ready" options={[
-            { value: 'ready', label: '오래된 READY' }, { value: 'issues', label: '수동 대사' },
-            { value: 'webhooks', label: '웹훅 inbox' }, { value: 'ads', label: '광고 결제' },
-        ]} /></div>
+        <div style={{ maxWidth: 560, marginBottom: 16 }}>{narrow
+            ? <div className="reserve-segmented" aria-hidden="true" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4, width: '100%' }}>
+                {options.map(option => <span key={option.value} className={'reserve-segmented-btn reserve-segmented-btn--wrap' + (option.value === 'ready' ? ' reserve-segmented-btn--active' : '')}>
+                    <SkeletonText>{option.label}</SkeletonText></span>)}
+            </div> : <SegmentedControlSkeleton block value="ready" options={options} />}</div>
         <NoticeSkeleton />
         <FilterToolbarSkeleton count={0}
             selects={[{ key: 'age', value: '', options: [], width: 76 }]} />
@@ -151,6 +166,11 @@ export default function AdminTabRouteSkeleton({ tab, search = '' }) {
     </>;
     if (tab === 'mailbox') return <MailboxTabSkeleton />;
     if (tab === 'chat-intro') return <ChatIntroRouteSkeleton />;
+    if (tab === 'feed-reports') {
+        const mode = reportMode(params.get('reportMode'));
+        return <FeedReportsSkeleton mode={mode} status={reviewOption(REPORT_STATUS_OPTIONS, params.get(mode === 'comments' ? 'commentReportStatus' : 'reportStatus'), 'ALL')} />;
+    }
+    if (tab === 'benefit-applications') return <BenefitApplicationsSkeleton state={params.get('benefitState') || 'PENDING'} />;
     if (tab === 'dashboard') return <StatisticsRouteSkeleton dashboard />;
     if (tab === 'payments') return <PaymentOperationsRouteSkeleton />;
     if (tab === 'reservations') return <>

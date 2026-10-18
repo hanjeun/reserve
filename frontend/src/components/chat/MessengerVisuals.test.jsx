@@ -123,7 +123,7 @@ describe('messenger image display boundary', () => {
     it('falls back from a failed profile to the brand and then an icon, and retries a changed source', () => {
         const { container, rerender } = render(<MessengerAvatar imageSrc="https://images.example.invalid/first.png" />);
         let image = container.querySelector('img');
-        expect(image).toHaveAttribute('alt', '');
+        expect(image).toHaveAttribute('alt', '프로필');
         expect(image).toHaveAttribute('draggable', 'false');
         expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
         fireEvent.error(image);
@@ -132,6 +132,8 @@ describe('messenger image display boundary', () => {
         fireEvent.error(image);
         expect(container.querySelector('img')).toBeNull();
         expect(container.querySelector('.anticon-customer-service')).toBeInTheDocument();
+        rerender(<MessengerAvatar imageSrc="https://images.example.invalid/first.png" />);
+        expect(container.querySelector('img')).toBeNull();
         rerender(<MessengerAvatar imageSrc="https://images.example.invalid/second.png" />);
         expect(container.querySelector('img')).toHaveAttribute('src', 'https://images.example.invalid/second.png');
         expect(container.querySelector('.anticon-customer-service')).toBeNull();
@@ -161,6 +163,27 @@ describe('messenger image display boundary', () => {
         fireEvent.error(container.querySelector('img'));
         expect(container.querySelector('img')).toBeNull();
         expect(container.querySelector('.anticon-user')).toBeInTheDocument();
+    });
+
+    it.each(['brand', 'store', 'person'])('reuses the account avatar circle for %s photos without changing the outer size', variant => {
+        const { container } = render(<MessengerAvatar variant={variant} imageSrc="https://images.example.invalid/profile.png" />);
+        const outer = container.querySelector('.reserve-messenger-avatar');
+        expect(outer.firstElementChild).toHaveStyle({ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' });
+        expect(outer.querySelector('img')).toHaveStyle({ objectFit: 'cover', position: 'absolute', inset: '0' });
+        expect(outer).toHaveAttribute('aria-hidden', 'true');
+        expect(outer.querySelector('a,button')).toBeNull();
+    });
+
+    it('keeps avatar cropping circular in base, sender and mobile header rules', () => {
+        const css = postcss.parse(readFileSync(resolve(cwd(), 'src/styles/global/feature-surfaces.css'), 'utf8'));
+        for (const selector of ['.reserve-messenger-avatar', '.reserve-chat-sender-avatar-slot .reserve-messenger-avatar', '.reserve-messenger-thread-avatar']) {
+            const radii = [];
+            css.walkRules(rule => {
+                if (rule.selectors.includes(selector)) rule.walkDecls('border-radius', declaration => radii.push(declaration.value));
+            });
+            expect(radii.length).toBeGreaterThan(0);
+            expect(radii.every(value => value === '50%')).toBe(true);
+        }
     });
 
     it('retains an accessible heading without a cover wordmark after failure and retries a new cover', () => {
@@ -500,7 +523,7 @@ describe('shared composer source contract', () => {
         expect(declarations('.reserve-messenger-composer')).toMatchObject({ 'min-height': '104px', padding: '8px', 'flex-direction': 'column', 'align-items': 'stretch' });
         expect(declarations('.reserve-messenger-composer textarea')).toMatchObject({ height: '56px', padding: '8px 10px', 'line-height': '24px' });
         expect(declarations('.reserve-chat-send')).toMatchObject({ width: '44px', height: '44px', 'border-radius': '10px' });
-        expect(declarations('.reserve-messenger-send')).toMatchObject({ flex: '0 0 40px', width: '40px', height: '40px' });
+        expect(declarations('.reserve-messenger-send')).toMatchObject({ flex: '0 0 44px', width: '44px', height: '44px' });
         expect(declarations('.reserve-messenger-composer textarea', true)['font-size']).toBe('16px');
     });
 });

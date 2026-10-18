@@ -8,7 +8,7 @@ import {
 import {
     ShopOutlined, CalendarOutlined,
     DeleteOutlined, AuditOutlined,
-} from '@ant-design/icons';
+} from '../common/icons';
 import { DataState, FilterToolbar, StatCard, ChartCard, PieLegend } from '../common';
 import { Bone } from '../common/Skeletons';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -130,6 +130,7 @@ const DashboardTab = () => {
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ChartCard
                     title="예약 상태 분포"
+                    loading={loading}
                     height={240}
                     summary={reservationSummary}
                     tableColumns={COUNT_TABLE_COLUMNS}
@@ -182,6 +183,7 @@ const DashboardTab = () => {
 
                 <ChartCard
                     title="최근 50개 휴지통 유형"
+                    loading={loading}
                     height={240}
                     summary={trashSummary}
                     tableColumns={TRASH_TABLE_COLUMNS}
@@ -218,7 +220,7 @@ const DashboardTab = () => {
             {/* 감사 로그 요약 — 로딩 중엔 낙관적으로 스켈레톤을 보여주고(대부분 로그가 있는 게
                 일반적이므로), 데이터 도착 후 실제로 로그가 하나도 없으면 기존처럼 카드 자체를 숨김 */}
             {(loading || sourceFailed('audit') || (stats?.actionCount && Object.keys(stats.actionCount).length > 0)) && (
-                <ChartCard title="최근 감사 로그 요약" height="auto">
+                <ChartCard title="최근 감사 로그 요약" loading={loading} height="auto">
                     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                         {renderAuditSummary()}
                     </div>

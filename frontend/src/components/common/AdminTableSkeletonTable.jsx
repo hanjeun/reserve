@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { colors } from '../../styles/tokens';
 import Bone from './Bone';
+import SkeletonText from './SkeletonText';
 
 // 표 본문만 그린다 — 페이지 버튼(antd Pagination)은 AdminTableSkeleton 이 붙인다.
 // 이 파일은 청크 로딩 뼈대(RouteLoadingSkeleton)도 쓰므로 Pagination 을 import 하지 않는다 — 초기 번들에 끌려 들어가지 않게(2026-09-29).
@@ -21,7 +22,7 @@ const FLEX_COL_MIN = 160;
  * props:
  *   rows       {number}          행 개수
  *   cols       {(number|null)[]} 각 열의 width(px). null이면 "width 미지정(유동) 컬럼"
- *   headers    {string[]}        각 열의 제목 (고정 텍스트라 스켈레톤으로 가리지 않고 실제 글자로 렌더)
+ *   headers    {string[]}        각 열의 제목 (실제 글자의 폭·줄 높이를 유지하는 골격으로 렌더)
  *   actionBtns {number}          마지막 열에 그릴 버튼 Bone 개수. 0이면 텍스트 Bone
  *   stackFirstCol {bool}         첫 열이 "이름 + 이메일" 2줄인 테이블(사업자 인증 탭)만 true
  *   pagination {object|null}     { current, pageSize, total } — 주면 스켈레톤 중에도 페이지 버튼 유지
@@ -76,7 +77,7 @@ const AdminTableSkeletonTable = ({
           overflowY: 'hidden',
         }}
       >
-        {/* 헤더 행 — 고정 텍스트이므로 스켈레톤으로 가리지 않고 실제 제목을 그대로 노출 */}
+        {/* 헤더도 본문과 함께 골격으로 표시하며 실제 제목의 폭을 유지한다. */}
         <div
           style={{
             display: 'flex',
@@ -101,7 +102,7 @@ const AdminTableSkeletonTable = ({
                 textOverflow: 'ellipsis',
               }}
             >
-              {headers?.[i] ?? ''}
+              <SkeletonText>{headers?.[i] ?? ''}</SkeletonText>
             </div>
           ))}
         </div>

@@ -53,7 +53,7 @@ it('keeps server count adjacent to the view icon and applies status and sorting 
     fireEvent.click(await screen.findByRole('menuitemradio', { name: '리뷰순' }));
     await waitFor(() => expect(waitingService.getStores).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'PAUSED', sort: 'reviewCount', page: 0 }), expect.any(AbortSignal)));
     expect(currentParams().get('view')).toBe('list'); expect(currentParams().get('utm_source')).toBe('guide');
-    expect(currentParams().has('page')).toBe(false);
+    expect(currentParams().get('page')).toBe('1');
 });
 
 it('restores the selected region on a same-tab revisit and sends it to the waiting query', async () => {

@@ -1,8 +1,9 @@
 import { useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { DEFAULT_GUIDE_PATH, GUIDE_PAGES } from '../pages/legal/GuidePageMetadata';
+import { APP_ORIGIN } from '../config/siteUrls';
 
-const SITE_ORIGIN = 'https://reserve.it.kr';
+const SITE_ORIGIN = APP_ORIGIN;
 
 // 검색에 공개할 SPA 경로의 관문. sitemap은 정본 경로를 싣고 공개 별칭은 같은 canonical로 이어진다.
 const INDEXABLE_PATHS = [

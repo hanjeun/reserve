@@ -56,12 +56,12 @@ describe('favorites reuse the store card/list view contract', () => {
         const card = await screen.findByTestId('card');
         const originalStore = card.getAttribute('data-store');
         const toggle = screen.getByRole('button', { name: '목록형 보기로 전환' });
-        expect(toggle.querySelector('[data-icon="unordered-list"]')).toBeInTheDocument();
+        expect(toggle.querySelector('.anticon-unordered-list')).toBeInTheDocument();
         toggle.focus();
         await user.keyboard('{Enter}');
         expect(screen.getByTestId('list-row')).toHaveAttribute('data-store', originalStore);
         expect(screen.queryByTestId('card')).toBeNull();
-        expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route').textContent))).toEqual({ utm_source: 'yes', view: 'list' });
+        expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route').textContent))).toEqual({ utm_source: 'yes', view: 'list', kind: 'all' });
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toHaveFocus();
         await user.keyboard(' ');
         expect(screen.getByTestId('card')).toHaveTextContent(favorite.storeName);

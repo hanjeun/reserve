@@ -16,7 +16,8 @@ vi.mock('../../components/common/FilterMenu', () => ({
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>,
 }));
-vi.mock('../../components/common', () => {
+vi.mock('../../components/common', async () => {
+    const { default: Tooltip } = await import('../../components/common/Tooltip');
     const Card = ({ children, actions }) => <div data-testid="manage-card">{children}<div>{actions}</div></div>;
     Card.Cover = ({ alt }) => <img alt={alt} />;
     Card.Add = ({ children }) => <button type="button">{children}</button>;
@@ -27,6 +28,7 @@ vi.mock('../../components/common', () => {
         StoreCardSkeleton: () => null,
         Badge: ({ children }) => <span>{children}</span>,
         ModalLoading: () => null,
+        Tooltip,
         DataState: ({ state: dataState = 'empty', title, subject, onRetry, action }) => (
             <section role={dataState === 'error' ? 'alert' : undefined}>
                 <span>{title ?? `${subject ?? '목록'}을 불러오지 못했습니다.`}</span>
@@ -39,7 +41,8 @@ vi.mock('../../components/discovery/RegionSheet', () => ({ default: ({ open, ava
     <output data-testid="owned-region-groups">{JSON.stringify(availableGroups)}</output>
     <button type="button" onClick={() => onApply('경기')}>경기 적용</button>
 </div> : null }));
-vi.mock('antd', () => ({
+vi.mock('antd', async importOriginal => ({
+    Tooltip: (await importOriginal()).Tooltip,
     Alert: () => null,
     Typography: { Title: ({ children }) => <h2>{children}</h2>, Paragraph: ({ children }) => <p>{children}</p>, Text: ({ children }) => <span>{children}</span> },
     Empty: ({ description, children }) => <div>{description}{children}</div>,
@@ -66,7 +69,7 @@ describe('my stores shared toolbar', () => {
         expect(screen.getAllByRole('article')).toHaveLength(2);
         expect(screen.getByRole('button', { name: '안산 한식 수정' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '안산 한식 삭제' })).toBeInTheDocument();
-        expect(Object.fromEntries(routeParams())).toEqual({ utm_source: 'yes', view: 'list' });
+        expect(Object.fromEntries(routeParams())).toEqual({ utm_source: 'yes', view: 'list', sort: 'recent', domain: '' });
     });
 
     it('filters owned stores locally and keeps the view without offering a region control', async () => {
@@ -89,7 +92,7 @@ describe('my stores shared toolbar', () => {
         expect(screen.getByText('조건에 맞는 내 가게가 없어요.')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '필터 초기화' }));
         expect(screen.getAllByRole('article')).toHaveLength(2);
-        expect(routeParams().get('domain')).toBeNull();
+        expect(routeParams().get('domain')).toBe('');
         expect(routeParams().get('region')).toBeNull();
         expect(routeParams().get('view')).toBe('list');
         expect(routeParams().get('utm_source')).toBe('yes');

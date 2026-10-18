@@ -1,6 +1,6 @@
 import React, { useReducer, useState, useRef, useEffect, useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
-import { EnvironmentOutlined } from '@ant-design/icons';
+import { EnvironmentOutlined } from '../../common/icons';
 import api from '../../../api/axios';
 import useDebounce from '../../../hooks/useDebounce';
 import { colors, fontSize, radius, heights } from '../../../styles/tokens';

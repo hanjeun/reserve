@@ -129,8 +129,8 @@ FormInput.WithButton = ({
         ...style,
     };
 
-    let buttonBackground = colors.primary.main;
-    if (verified) buttonBackground = colors.success.main;
+    let buttonBackground = colors.primary.solid;
+    if (verified) buttonBackground = colors.success.solid;
     else if (buttonDisabled) buttonBackground = colors.gray[200];
 
     const btnStyle = {
@@ -140,7 +140,7 @@ FormInput.WithButton = ({
         padding: '0 20px',
         border: 'none',
         backgroundColor: buttonBackground,
-        color: '#fff',
+        color: verified ? colors.success.foreground : buttonDisabled ? colors.text.secondary : colors.primary.foreground,
         fontSize: '14px',
         ...buttonStyle,
     };

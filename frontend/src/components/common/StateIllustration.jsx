@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import PropTypes from 'prop-types';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useIllustrationMotion from '../../hooks/useIllustrationMotion';
 import { stateIllustrationSize, stateIllustrationDesktopSize } from '../../styles/tokens';
 import Bone from './Bone';
+import LoadingImage from './LoadingImage';
 
 // Vite emits content-hashed files. URL metadata does not fetch the other pictures.
 const files = import.meta.glob('../../assets/state-illustrations/*.webp', { eager: true, query: '?url&no-inline', import: 'default' });
@@ -26,7 +27,6 @@ export function StateIllustrationSkeleton({ size = 'lg', style }) {
 }
 StateIllustrationSkeleton.propTypes = { size: PropTypes.oneOf(['sm', 'md', 'lg']), style: PropTypes.object };
 function IllustrationImage({ name, size, fallback, interactive }) {
-    const picture = useRef(null);
     const [replayable, setReplayable] = useState(false);
     const [failed, setFailed] = useState(false);
     const reduced = useReducedMotion();
@@ -34,7 +34,7 @@ function IllustrationImage({ name, size, fallback, interactive }) {
     const desktopPixels = stateIllustrationDesktopSize[size] ?? stateIllustrationDesktopSize.md;
     const src = sources[`${name}-512.webp`];
     const large = sources[`${name}-768.webp`];
-    const replay = useIllustrationMotion(picture, interactive && !failed ? src : null);
+    const { pictureRef, replay } = useIllustrationMotion(interactive && !failed ? src : null);
     const updateReplayable = host => {
         if (!host) return;
         // An illustration inside a real action must not become a nested button.
@@ -50,7 +50,7 @@ function IllustrationImage({ name, size, fallback, interactive }) {
             if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); replay(); }
         } : undefined}>
         {failed || !src ? <span className="reserve-state-illustration__fallback" style={{ fontSize: `calc(var(--state-illustration-size, ${pixels}px) / 2)` }}>{fallback}</span>
-            : <img ref={picture} src={src} srcSet={`${src} 512w, ${large} 768w`} sizes={`(min-width: 768px) ${desktopPixels}px, ${pixels}px`}
+            : <LoadingImage ref={pictureRef} src={src} srcSet={`${src} 512w, ${large} 768w`} sizes={`(min-width: 768px) ${desktopPixels}px, ${pixels}px`}
                 width={pixels} height={pixels} alt="" loading="lazy" decoding="async" draggable={false}
                 style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none',
                     userSelect: 'none', transformOrigin: '50% 55%' }}

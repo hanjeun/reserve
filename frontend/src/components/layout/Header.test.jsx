@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import Header from './Header';
 
@@ -76,7 +76,7 @@ describe('shared wordmark and result search header', () => {
         expect(screen.queryByRole('button', { name: '시작하기' })).toBeNull();
     });
 
-    it('opens dedicated search with the current result keyword and return state', () => {
+    it('opens dedicated search with the current result keyword and return state', async () => {
         renderHeader('/stores?keyword=' + encodeURIComponent('카페 안산') + '&page=2');
         const query = screen.getByRole('link', { name: '검색어 수정: 카페 안산' });
         expect(query.textContent).toBe('카페 안산');
@@ -87,7 +87,7 @@ describe('shared wordmark and result search header', () => {
         expect(screen.getByRole('banner')).toHaveClass('reserve-header-has-query');
         expect(screen.getByRole('link', { name: 'RESERVE 홈' }).querySelector('.reserve-header-logo-compact')).toBeNull();
         fireEvent.click(query);
-        expect(screen.getByLabelText('현재 경로').textContent).toBe('/search?keyword=' + encodeURIComponent('카페 안산') + ':searchEntry');
+        await waitFor(() => expect(screen.getByLabelText('현재 경로').textContent).toBe('/search?keyword=' + encodeURIComponent('카페 안산') + ':searchEntry'));
     });
 
     it('marks only a nonempty store keyword result so mobile hides the brand there', () => {
@@ -183,15 +183,15 @@ describe('shared wordmark and result search header', () => {
         scroll.mockRestore();
     });
 
-    it('plays a brief motion before going back but moves home at once with a still logo', () => {
+    it('goes back at once while retaining the arrow until the route no longer needs it', () => {
         vi.useFakeTimers();
         reducedMotionState.value = false;
         try {
             const { unmount } = renderHeader('/store/12');
             const back = screen.getByRole('button', { name: '이전 화면으로 돌아가기' });
             fireEvent.click(back);
-            expect(back).toHaveClass('reserve-header-back--leaving');
-            expect(goBack).not.toHaveBeenCalled();
+            expect(back).not.toHaveClass('reserve-header-back--leaving');
+            expect(goBack).toHaveBeenCalledOnce();
             act(() => { vi.advanceTimersByTime(180); });
             expect(goBack).toHaveBeenCalledOnce();
 
@@ -215,7 +215,7 @@ describe('shared wordmark and result search header', () => {
             fireEvent.click(screen.getByRole('link', { name: 'RESERVE 홈' }));
             // 로고는 기다리지 않고 바로 홈으로 간다.
             expect(screen.getByLabelText('현재 경로').textContent).toBe('/');
-            // 버튼은 그 자리에서 사라지지 않고 ← 를 눌렀을 때와 같은 접힘 모션을 재생한다.
+            // 뒤로가기가 필요 없는 화면에 도착할 때만 접힌다.
             const leaving = document.querySelector('.reserve-header-back');
             expect(leaving).toHaveClass('reserve-header-back--leaving');
             expect(leaving).toBeDisabled();
@@ -227,7 +227,7 @@ describe('shared wordmark and result search header', () => {
         }
     });
 
-    it('keeps one collapse and one back action until the asynchronous history move commits', () => {
+    it('keeps the arrow still and deduplicates back actions until the history move commits', () => {
         vi.useFakeTimers();
         reducedMotionState.value = false;
         try {
@@ -237,15 +237,16 @@ describe('shared wordmark and result search header', () => {
             fireEvent.click(back);
             act(() => { vi.advanceTimersByTime(180); });
             expect(goBack).toHaveBeenCalledOnce();
-            // navigate(-1)는 타이머가 끝나도 아직 현재 화면에 머물 수 있다.
-            expect(back).toHaveClass('reserve-header-back--leaving');
-            expect(back).toBeDisabled();
+            // 비동기 이동을 기다리는 동안 버튼을 다시 접었다 펼치지 않는다.
+            expect(back).not.toHaveClass('reserve-header-back--leaving');
+            expect(back).not.toBeDisabled();
             fireEvent.click(back);
             act(() => { vi.advanceTimersByTime(180); });
             expect(goBack).toHaveBeenCalledOnce();
             fireEvent.click(screen.getByRole('button', { name: '이동 완료' }));
             expect(document.querySelector('.reserve-header-back')).toBe(back);
             expect(back).toHaveClass('reserve-header-back--leaving');
+            expect(back).toBeDisabled();
             act(() => { vi.advanceTimersByTime(180); });
             expect(document.querySelector('.reserve-header-back')).toBeNull();
         } finally {
@@ -253,20 +254,23 @@ describe('shared wordmark and result search header', () => {
         }
     });
 
-    it('cancels an old delayed back when another navigation commits first', () => {
+    it('retains the same arrow and releases the navigation lock after a deeper route change', () => {
         vi.useFakeTimers();
         reducedMotionState.value = false;
         try {
             renderHeader('/store/12');
-            fireEvent.click(screen.getByRole('button', { name: '이전 화면으로 돌아가기' }));
+            const original = screen.getByRole('button', { name: '이전 화면으로 돌아가기' });
+            fireEvent.click(original);
             fireEvent.click(screen.getByRole('button', { name: '다른 화면 이동' }));
             act(() => { vi.advanceTimersByTime(180); });
-            expect(goBack).not.toHaveBeenCalled();
+            expect(goBack).toHaveBeenCalledOnce();
             const back = screen.getByRole('button', { name: '이전 화면으로 돌아가기' });
+            expect(back).toBe(original);
+            expect(back).not.toHaveClass('reserve-header-back--leaving');
             expect(back).not.toBeDisabled();
             fireEvent.click(back);
             act(() => { vi.advanceTimersByTime(180); });
-            expect(goBack).toHaveBeenCalledOnce();
+            expect(goBack).toHaveBeenCalledTimes(2);
         } finally {
             vi.useRealTimers();
         }

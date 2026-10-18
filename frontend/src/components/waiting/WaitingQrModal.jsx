@@ -6,6 +6,7 @@ import useAuthStore from '../../store/useAuthStore';
 import waitingService from '../../services/waitingService';
 import { Button, DataState, ModalLoading } from '../common';
 import ResponsiveModal from '../common/ResponsiveModal';
+import { appUrl } from '../../config/siteUrls';
 
 export default function WaitingQrModal({ open, onClose, entryId, storeId }) {
     const revision = useAuthStore(state => state.sessionRevision);
@@ -27,7 +28,7 @@ export default function WaitingQrModal({ open, onClose, entryId, storeId }) {
     }, [qr.data]);
     const valid = qr.data?.token && qr.data.token !== expiredToken;
     const value = valid ? onsite
-        ? `${window.location.origin}/store/${storeId}#waiting-token=${encodeURIComponent(qr.data.token)}` : qr.data.token : null;
+        ? appUrl(`/store/${storeId}#waiting-token=${encodeURIComponent(qr.data.token)}`) : qr.data.token : null;
     return <ResponsiveModal title={onsite ? '현장 웨이팅 접수 QR' : '웨이팅 입장 QR'} open={open} onCancel={onClose}
         footer={null} width={340} mobileSize="content" centered>
         <div className="reserve-waiting-qr">

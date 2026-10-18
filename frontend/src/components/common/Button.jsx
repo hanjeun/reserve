@@ -14,12 +14,13 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { SpinIndicator } from './Loading';
+import Tooltip from './Tooltip';
 import { colors, radius, heights, fontWeight, fontSize, shadows, transitions } from '../../styles/tokens';
 
 const VARIANTS = {
     primary: {
-        background: colors.primary.main,
-        color: '#fff',
+        background: colors.primary.solid,
+        color: colors.primary.foreground,
         border: 'none',
         borderRadius: radius.xl,
         boxShadow: 'none',
@@ -64,8 +65,8 @@ const VARIANTS = {
         padding: '0',
     },
     hero: {
-        background: colors.primary.main,
-        color: '#fff',
+        background: colors.primary.solid,
+        color: colors.primary.foreground,
         border: 'none',
         borderRadius: radius.pill,
         boxShadow: shadows.buttonHover,
@@ -89,8 +90,8 @@ const VARIANTS = {
         boxShadow: 'none',
     },
     danger: {
-        background: colors.error?.main || '#ff4d4f',
-        color: '#fff',
+        background: colors.error.solid,
+        color: colors.error.foreground,
         border: 'none',
         borderRadius: radius.xl,
         boxShadow: 'none',
@@ -145,14 +146,14 @@ function resolvePadding(variant, size) {
 }
 
 // 아이콘 자리 — 로딩 중이면 로딩 아이콘(없으면 스피너), 아니면 넘겨받은 아이콘.
-function renderLeadingIcon({ loading, loadingIcon, icon, children }) {
+function renderLeadingIcon({ loading, loadingIcon, icon, children, iconOnly }) {
     if (loading) {
         return loadingIcon
             ? <span className="reserve-btn-loading-icon" aria-hidden="true">{loadingIcon}</span>
             : <span className="reserve-btn-spin" aria-hidden="true"><SpinIndicator /></span>;
     }
     return icon && (
-        <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '0.9em' }} aria-hidden={children ? 'true' : undefined}>{icon}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: iconOnly ? 'var(--reserve-icon-glyph-size, 20px)' : '0.9em' }} aria-hidden={children ? 'true' : undefined}>{icon}</span>
     );
 }
 
@@ -173,6 +174,7 @@ const Button = ({
 }) => {
     const isGhostSm = variant.startsWith('ghost-sm');
     const iconOnly = icon != null && React.Children.count(children) === 0;
+    const smallButtonRadius = iconOnly ? radius.md : radius.pill;
 
     const v = VARIANTS[variant] || VARIANTS.primary;
 
@@ -196,6 +198,7 @@ const Button = ({
         userSelect: 'none',
         padding: buttonPadding,
         ...v,
+        ...(size === 'sm' && !isGhostSm && variant !== 'link' ? { borderRadius: smallButtonRadius } : {}),
         ...(iconOnly ? { height: heights.buttonMd, width: heights.buttonMd, minWidth: heights.buttonMd, flexShrink: 0, padding: 0 } : {}),
         ...style,
     };
@@ -205,9 +208,9 @@ const Button = ({
         onClick?.(e);
     };
 
-    const leadingIcon = renderLeadingIcon({ loading, loadingIcon, icon, children });
+    const leadingIcon = renderLeadingIcon({ loading, loadingIcon, icon, children, iconOnly });
 
-    return (
+    const button = (
         <button
             type={htmlType}
             disabled={disabled || loading}
@@ -216,6 +219,7 @@ const Button = ({
             className={['reserve-btn', `reserve-btn--${variant}`, iconOnly && 'reserve-btn--icon-only', className].filter(Boolean).join(' ')}
             style={baseStyle}
             {...rest}
+            title={iconOnly ? undefined : rest.title}
         >
             {/* ★ 로딩 중에도 children 을 그대로 둔다. 스피너는 **아이콘 자리**를 대신할 뿐이다.
                 예전에는 loading 이면 children 을 통째로 버렸는데, 그 결과 호출부가 정성껏 넘긴
@@ -226,6 +230,7 @@ const Button = ({
             {children}
         </button>
     );
+    return iconOnly && rest['aria-label'] ? <Tooltip title={rest['aria-label']}>{button}</Tooltip> : button;
 };
 /* hover·active 등 상호작용 CSS 는 index.css 의 "Button 상호작용 상태" 블록에 있다.
    예전에는 이 파일 안의 <style> 태그였는데, JSX 안의 style 은 **인스턴스마다 렌더**되어

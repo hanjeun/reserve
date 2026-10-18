@@ -6,15 +6,31 @@ import chatService from '../../services/chatService';
 import { downloadChatImage, getChatImageBlob } from '../../utils/chatImageTransfer';
 
 const state = vi.hoisted(() => ({ revision: 1 }));
-vi.mock('../../store/useAuthStore', () => ({ default: selector => selector({ sessionRevision: state.revision }) }));
+vi.mock('../../store/useAuthStore', () => ({ default: Object.assign(
+    selector => selector({ sessionRevision: state.revision }),
+    { getState: () => ({ sessionRevision: state.revision }) },
+) }));
 vi.mock('../../services/chatService', () => ({ default: { getImage: vi.fn() } }));
 vi.mock('antd', () => ({ Image: props => <button aria-label={props['aria-label']}
     aria-hidden={props['aria-hidden']} aria-expanded={props.preview.open} onKeyDown={props.onKeyDown}
     onClick={() => props.preview.onOpenChange(true)}><img src={props.src} alt={props.alt} style={props.style}
         onLoad={props.onLoad} onError={props.onError} /></button> }));
 const NativeURL = URL;
+let observers;
+let autoIntersect;
+let visibility;
+const flush = async () => { await act(async () => {}); };
+const intersect = (near, observer = observers.at(-1)) => act(() => observer.callback([{ target: observer.node, isIntersecting: near }]));
 beforeEach(() => {
     state.revision = 1;
+    observers = [];
+    autoIntersect = true;
+    visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    vi.stubGlobal('IntersectionObserver', class {
+        constructor(callback, options) { this.callback = callback; this.options = options; observers.push(this); }
+        observe(node) { this.node = node; if (autoIntersect) this.callback([{ target: node, isIntersecting: true }]); }
+        disconnect() {}
+    });
     const urls = class extends NativeURL {};
     urls.createObjectURL = vi.fn().mockReturnValueOnce('blob:first').mockReturnValueOnce('blob:second');
     urls.revokeObjectURL = vi.fn();
@@ -47,6 +63,7 @@ it('keeps the supplied photo ratio while fetching and decoding without showing a
     const frame = view.container.querySelector('.reserve-chat-photo-frame');
     expect(frame).toHaveStyle({ width: '240px', aspectRatio: '600 / 200' });
     expect(screen.getByLabelText('사진을 불러오는 중')).toBeInTheDocument();
+    await flush();
     await act(async () => resolve(new Blob(['png'], { type: 'image/png' })));
     expect(screen.getByLabelText('사진을 불러오는 중')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '사진 크게 보기' })).toBeNull();
@@ -62,6 +79,114 @@ it('shows a failure explanation when the image cannot be decoded', async () => {
     fireEvent.error(await screen.findByAltText('대화에 첨부한 사진'));
     expect(screen.getByText('사진을 불러오지 못했어요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '사진 크게 보기' })).toBeNull();
+});
+
+it('reads only near the chat scrollport and keeps the mounted Blob when scrolling away and back', async () => {
+    autoIntersect = false;
+    const view = render(<div className="reserve-messenger-thread-body"><ChatImage roomId={3} url="/api/chat/images/46" /></div>);
+    expect(observers[0].options).toMatchObject({ root: view.container.firstChild, rootMargin: '240px 0px' });
+    expect(chatService.getImage).not.toHaveBeenCalled();
+    intersect(true);
+    fireEvent.load(await screen.findByAltText('대화에 첨부한 사진'));
+    intersect(false);
+    intersect(true);
+    await flush();
+    expect(chatService.getImage).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+});
+
+it.each(['account', 'room', 'unmount'])('discards a late photo after its %s scope changes', async change => {
+    let finish;
+    chatService.getImage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const view = render(<ChatImage roomId={3} url="/api/chat/images/47" />);
+    await flush();
+    const signal = chatService.getImage.mock.calls[0][1];
+    if (change === 'account') state.revision = 2; // Store changes before React commits its next render.
+    else if (change === 'room') {
+        autoIntersect = false;
+        view.rerender(<ChatImage roomId={4} url="/api/chat/images/47" />);
+    } else view.unmount();
+    await act(async () => finish(new Blob(['png'], { type: 'image/png' })));
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    if (change !== 'account') expect(signal.aborted).toBe(true);
+});
+
+it('recovers from a network error and a server error within two automatic retries', async () => {
+    vi.useFakeTimers();
+    chatService.getImage.mockRejectedValueOnce(new Error('connection failed'))
+        .mockRejectedValueOnce(Object.assign(new Error('unavailable'), { status: 503 }));
+    render(<ChatImage roomId={3} url="/api/chat/images/48" />);
+    await flush();
+    expect(chatService.getImage).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(chatService.getImage).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(1500));
+    expect(chatService.getImage).toHaveBeenCalledTimes(3);
+    expect(screen.getByAltText('대화에 첨부한 사진')).toHaveAttribute('src', 'blob:first');
+});
+
+it('stops repeated 429 responses after two retries even after leaving and re-entering', async () => {
+    vi.useFakeTimers();
+    chatService.getImage.mockRejectedValue(Object.assign(new Error('busy'), { status: 429 }));
+    render(<ChatImage roomId={3} url="/api/chat/images/49" />);
+    await flush();
+    await act(async () => vi.advanceTimersByTimeAsync(12000));
+    expect(chatService.getImage).toHaveBeenCalledTimes(3);
+    expect(screen.getByText('사진을 불러오지 못했어요.')).toBeInTheDocument();
+    intersect(false);
+    intersect(true);
+    await act(async () => vi.advanceTimersByTimeAsync(12000));
+    expect(chatService.getImage).toHaveBeenCalledTimes(3);
+});
+
+it.each([401, 403, 404, 410])('never automatically retries a %s photo response', async status => {
+    vi.useFakeTimers();
+    chatService.getImage.mockRejectedValue(Object.assign(new Error('unavailable'), { status }));
+    render(<ChatImage roomId={3} url="/api/chat/images/50" />);
+    await flush();
+    await act(async () => vi.advanceTimersByTimeAsync(12000));
+    expect(chatService.getImage).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('사진을 불러오지 못했어요.')).toBeInTheDocument();
+});
+
+it('does not mistake a non-image response for a retryable network failure', async () => {
+    vi.useFakeTimers();
+    chatService.getImage.mockResolvedValue(new Blob(['html'], { type: 'text/html' }));
+    render(<ChatImage roomId={3} url="/api/chat/images/51" />);
+    await flush();
+    await act(async () => vi.advanceTimersByTimeAsync(12000));
+    expect(chatService.getImage).toHaveBeenCalledTimes(1);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+it('measures only nearby photos without IO and pauses hidden-tab work before resuming visible work', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('IntersectionObserver', undefined);
+    let top = 1000;
+    const bounds = (y, height) => ({ top: y, bottom: y + height, left: 0, right: 300, width: 300, height });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+        return this.classList.contains('reserve-chat-photo-frame') ? bounds(top, 100) : bounds(0, 300);
+    });
+    let finish;
+    chatService.getImage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const view = render(<div className="reserve-messenger-thread-body"><ChatImage roomId={3} url="/api/chat/images/52" /></div>);
+    await flush();
+    expect(chatService.getImage).not.toHaveBeenCalled();
+    top = 100;
+    fireEvent.scroll(view.container.firstChild);
+    await act(async () => vi.advanceTimersByTimeAsync(20));
+    expect(chatService.getImage).toHaveBeenCalledTimes(1);
+    const signal = chatService.getImage.mock.calls[0][1];
+    visibility.mockReturnValue('hidden');
+    fireEvent(document, new Event('visibilitychange'));
+    expect(signal.aborted).toBe(true);
+    await act(async () => finish(new Blob(['png'], { type: 'image/png' })));
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    visibility.mockReturnValue('visible');
+    fireEvent(document, new Event('visibilitychange'));
+    await flush();
+    expect(chatService.getImage).toHaveBeenCalledTimes(2);
+    expect(screen.getByAltText('대화에 첨부한 사진')).toHaveAttribute('src', 'blob:first');
 });
 
 it.each([

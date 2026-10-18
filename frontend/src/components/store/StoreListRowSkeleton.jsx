@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import Bone from '../common/Bone';
 
-export default function StoreListRowSkeleton({ count = 12 }) {
+export default function StoreListRowSkeleton({ count = 12, metadata, extraTools, showFavorite = true }) {
     return Array.from({ length: count }, (_, index) => (
         <div className="reserve-store-list-row reserve-store-list-row-skeleton" key={`store-row-skeleton-${index}`} aria-hidden="true">
             <div className="reserve-store-list-row-link">
@@ -13,11 +13,17 @@ export default function StoreListRowSkeleton({ count = 12 }) {
                         <Bone width={72} height={16} />
                         <Bone width="28%" height={16} />
                     </div>
+                    {metadata}
                 </div>
             </div>
-            <div className="reserve-store-list-row-favorite"><Bone width={20} height={20} /></div>
+            <div className={`reserve-store-list-row-favorite${extraTools ? ' reserve-store-list-row-favorite--with-tools' : ''}`}>
+                {showFavorite && (extraTools
+                    ? <span className="reserve-icon-tool reserve-icon-tool--skeleton"><Bone width={20} height={20} /></span>
+                    : <Bone width={20} height={20} />)}
+                {extraTools}
+            </div>
         </div>
     ));
 }
 
-StoreListRowSkeleton.propTypes = { count: PropTypes.number };
+StoreListRowSkeleton.propTypes = { count: PropTypes.number, metadata: PropTypes.node, extraTools: PropTypes.node, showFavorite: PropTypes.bool };

@@ -257,3 +257,21 @@ export const deleteStoreDraft = async key => {
 };
 
 export const STORE_DRAFT_TTL_DAYS = DRAFT_TTL_MS / (24 * 60 * 60 * 1000);
+
+/** Export/import uses the same account-scoped store and keeps the original expiry. */
+export const listStoreDrafts = async userId => {
+    if (userId == null) return [];
+    return runTransaction('readonly', store => new Promise((resolve, reject) => {
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.filter(record => record.key.startsWith(`member:${userId}:store:`)
+            && record.schemaVersion === DRAFT_SCHEMA_VERSION && record.expiresAt > Date.now()).sort((a, b) => b.savedAt - a.savedAt));
+        request.onerror = () => reject(request.error);
+    }));
+};
+export const importStoreDraftRecords = async (records, overwrite = false, guard = () => {}) => runTransaction('readwrite', store => {
+    guard();
+    for (const record of records) {
+        if (overwrite) store.put(record);
+        else { const request = store.get(record.key); request.onsuccess = () => { if (!request.result || request.result.expiresAt <= Date.now()) store.put(record); }; }
+    }
+});

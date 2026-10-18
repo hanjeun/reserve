@@ -10,7 +10,7 @@ vi.mock('../../api/axios', () => ({ default: api }));
 vi.mock('../../store/useAuthStore', () => ({ default: () => ({ isLoggedIn: false, login: vi.fn() }) }));
 vi.mock('../../hooks', () => ({ useMessage: () => feedback }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
-vi.mock('@ant-design/icons', () => ({ ExclamationCircleFilled: () => null }));
+vi.mock('../../components/common/icons', () => ({ ExclamationCircleFilled: () => null }));
 vi.mock('../../components/common', () => ({
     PageContainer: ({ children }) => <main>{children}</main>,
     FormInput: () => <input />,

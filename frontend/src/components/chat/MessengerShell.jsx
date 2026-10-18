@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Badge } from 'antd';
-import { CloseOutlined } from '@ant-design/icons';
+import { CloseOutlined } from '../common/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { chatService } from '../../services';
@@ -14,6 +14,7 @@ import { breakpoints } from '../../styles/tokens';
 import MessengerLauncherVisual from './MessengerLauncherVisual';
 import { chatListQueryPolicy, shouldAutoRefreshChatMetadata } from './chatListQueryPolicy';
 import ConversationListSkeleton from './ConversationListSkeleton';
+import Tooltip from '../common/Tooltip';
 import { LoadingPresentationContext, createLoadingPresentation } from '../layout/loadingPresentation';
 
 const MessengerContent = lazy(() => import('./MessengerContent'));
@@ -158,21 +159,21 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                     aria-modal="false"
                     aria-label="메시지"
                 >
-                    <button
+                    <Tooltip title="메시지 닫기"><button
                         type="button"
                         className="reserve-chat-close reserve-messenger-shell-close"
                         onClick={closePanel}
                         aria-label="메시지 닫기"
                     >
                         <CloseOutlined />
-                    </button>
+                    </button></Tooltip>
                     <MessengerPanelBody coverImageSrc={coverImageSrc} />
                 </div>
             )}
             <div className="reserve-messenger-launcher-wrap">
                 <Badge count={!isMobile && open ? 0 : unreadCount} offset={[-4, 4]}
-                    styles={{ indicator: { background: 'var(--reserve-messenger-unread-bg)', color: '#fff' } }}>
-                    <button
+                    styles={{ indicator: { background: 'var(--reserve-messenger-unread-bg)', color: 'var(--c-error-fg)' } }}>
+                    <Tooltip title={!isMobile && open ? '메시지 창 닫기' : `${messagesLabel} 열기`}><button
                         ref={launcherRef}
                         type="button"
                         className={`reserve-chat-launcher reserve-messenger-launcher${!isMobile && open ? ' is-open' : ''}`}
@@ -181,7 +182,7 @@ const MessengerShell = ({ launcherImageSrc = null, coverImageSrc }) => {
                         aria-expanded={!isMobile && open}
                     >
                         <MessengerLauncherVisual isOpen={!isMobile && open} imageSrc={launcherImageSrc} />
-                    </button>
+                    </button></Tooltip>
                 </Badge>
             </div>
         </>

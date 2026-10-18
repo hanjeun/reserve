@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Tag } from 'antd';
 import AdPaymentOperations from './AdPaymentOperations';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { AdminTableSkeleton, Button, DataState, DataTable, FilterToolbar, SegmentedControl } from '../common';
+import { AdminTableSkeleton, Button, DataState, DataTable, FilterToolbar, SegmentedControl, SegmentedGrid } from '../common';
 import CopyableText from '../common/CopyableText';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
 import { invalidateAdminData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import api from '../../api/axios';
 import { API_ENDPOINTS } from '../../constants';
-import { colors, fontSize, radius } from '../../styles/tokens';
+import { breakpoints, colors, fontSize, radius } from '../../styles/tokens';
+import { useWindowWidth } from '../../hooks/useWindowWidth';
 
 const PAGE_SIZE = 20;
 
@@ -43,6 +44,7 @@ const pageTotal = (data) => data?.page?.totalElements ?? data?.totalElements ?? 
 const shortDateTime = (value) => value ? value.replace('T', ' ').substring(0, 16) : '-';
 
 const PaymentOperationsTab = () => {
+    const narrow = useWindowWidth() < breakpoints.card;
     const { message, confirm } = useMessage();
     const queryClient = useQueryClient();
     const [queue, setQueue] = useState('ready');
@@ -228,7 +230,8 @@ const PaymentOperationsTab = () => {
     return (
         <div>
             <div style={{ maxWidth: 560, marginBottom: 16 }}>
-                <SegmentedControl options={QUEUES} value={queue} onChange={handleQueueChange} />
+                {narrow ? <SegmentedGrid columns={2} options={QUEUES} value={queue} onChange={handleQueueChange} />
+                    : <SegmentedControl options={QUEUES} value={queue} onChange={handleQueueChange} />}
             </div>
 
             {queue === 'ads' ? <AdPaymentOperations /> : <>

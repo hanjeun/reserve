@@ -54,7 +54,7 @@ describe('StoreForm responsive layout contract', () => {
     });
 
     it('pairs short structured fields without changing their actual field values', () => {
-        render(<Harness mode="edit" initialValues={{ fullRefundDays: 3, partialRefundDays: 1, partialRefundRate: 50, bookingDeadlineHours: 1, paymentTimeoutMinutes: 10 }} />);
+        render(<Harness mode="edit" initialValues={{ noShowDeposit: 3000, allowLatePayment: false, fullRefundDays: 3, partialRefundDays: 1, partialRefundRate: 50, bookingDeadlineHours: 1, paymentTimeoutMinutes: 10 }} />);
         expect(rowFor('예약 방식')).toHaveClass('reserve-store-form-row--compact');
         expect(rowFor('서비스 분야')).toBe(rowFor('예약 방식'));
         expect(rowFor('예약 단위')).toHaveClass('reserve-store-form-row--compact');

@@ -1,5 +1,5 @@
 import { Typography } from 'antd';
-import { CheckCircleFilled } from '@ant-design/icons';
+import { CheckCircleFilled } from '../../../components/common/icons';
 import { colors } from '../../../styles/tokens';
 import { styles } from '../Home.styles';
 

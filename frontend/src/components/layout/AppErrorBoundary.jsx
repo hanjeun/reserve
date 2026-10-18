@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import * as Sentry from '@sentry/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 // Filled 아이콘은 이미 첫 번들에 있다(메시지 토스트). Outlined 를 새로 넣으면 번들 예산을 넘는다.
-import { ExclamationCircleFilled } from '@ant-design/icons';
+import { ExclamationCircleFilled } from '../common/icons';
 import Button from '../common/Button';
 import PageStatus from '../common/PageStatus';
 import { isChunkLoadError } from '../../utils/chunkReload';

@@ -265,6 +265,8 @@ test('business analytics: refresh stays in place while the first store list load
     const refreshSlot = page.locator('.reserve-statistics-tab .reserve-filter-toolbar-refresh');
 
     await expect(refreshSlot.locator('.reserve-skeleton-block')).toBeVisible();
+    // 라우트 청크 뼈대가 실제 통계의 첫 데이터 뼈대로 교체된 뒤 같은 슬롯을 측정한다.
+    await expect(page.locator('.reserve-route-skeleton')).toHaveCount(0);
     await expect(refresh).toHaveCount(0);
     const before = await refreshSlot.boundingBox();
 

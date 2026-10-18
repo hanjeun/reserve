@@ -12,6 +12,7 @@ import { Button, Bone } from '../common';
 import reservationService from '../../services/reservationService';
 import waitingService from '../../services/waitingService';
 import { useMessage } from '../../hooks';
+import useQrCameraLifecycle from '../../hooks/useQrCameraLifecycle';
 import { invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import { colors, radius, shadows, fontSize } from '../../styles/tokens';
 
@@ -100,13 +101,17 @@ const MAX_ASPECT_FIXES = 3;
  * 다시 추가했다. 실제 디코딩 영역(=카메라 프레임 전체)에는 전혀 관여하지 않는 장식 요소라
  * 위 크롭 버그와는 무관하다.)
  *
- * [중요 - 탭 전환해도 카메라 안 꺼지던 버그] BusinessPanel의 Tabs에 destroyInactiveTabPane을
- * 켜서, 다른 탭으로 이동하면 이 컴포넌트가 언마운트되고 아래 cleanup useEffect가 카메라를 끔.
+ * QrScannerSheet의 destroyOnHidden이 닫힘 모션 뒤 스캐너를 해제한다.
+ * 직접 진입·뒤로가기·다른 업무 이동도 아래 cleanup에서 카메라와 보정 타이머를 정리한다.
  */
 const QrScannerTab = ({ sheet = false, onClose }) => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
     const html5QrRef = useRef(/** @type {import('html5-qrcode').Html5Qrcode | null} */ (null));
+    const { stopCamera, trackStartup } = useQrCameraLifecycle();
+    const scanGenerationRef = useRef(0);
+    const startBusyRef = useRef(false);
+    const decodeCheckTimerRef = useRef(null);
     // 같은 프레임에서 같은 QR이 연속으로 감지되어 중복 요청되는 것을 막는 락
     const processingRef = useRef(false);
     const lastDecodedRef = useRef(null);
@@ -314,6 +319,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     }, []);
 
     const startScanning = useCallback(async () => {
+        if (startBusyRef.current) return;
         if (window.isSecureContext === false || typeof navigator.mediaDevices?.getUserMedia !== 'function') {
             const presentation = unsupportedCameraPresentation();
             setErrorIcon(presentation.icon);
@@ -322,6 +328,9 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
             return;
         }
         setStatus('starting');
+        startBusyRef.current = true;
+        const generation = ++scanGenerationRef.current;
+        clearTimeout(decodeCheckTimerRef.current);
         setErrorMsg('');
         setScanResult(null);
         setProcessing(false);
@@ -337,16 +346,17 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         const previous = html5QrRef.current;
         if (previous) {
             html5QrRef.current = null;
-            try { await previous.stop(); } catch { /* 이미 멈춰 있으면 무시 */ }
+            await stopCamera(previous);
         }
 
         try {
+            if (generation !== scanGenerationRef.current) return;
             const html5Qr = new Html5Qrcode(SCANNER_ELEMENT_ID);
             html5QrRef.current = html5Qr;
             // qrbox는 여전히 주지 않는다 — 프레임 전체를 스캔 영역으로 쓴다.
             // (예전에 qrbox를 넣었다가 비디오가 잘려 보이고 검은 여백이 생겼던 이력이 있다.
             //  해상도는 qrbox가 아니라 위 DECODE_WIDTH 방식으로 해결한다.)
-            await html5Qr.start(
+            const startup = html5Qr.start(
                 { facingMode: 'environment' },
                 {
                     fps: 10,
@@ -368,8 +378,11 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                     // 프레임이 버려진다. QR은 반전되면 못 읽으므로 끄는 쪽이 항상 이득이다.
                     disableFlip: true,
                 },
-                handleScanSuccess,
+                decodedText => {
+                    if (generation === scanGenerationRef.current && html5QrRef.current === html5Qr) return handleScanSuccess(decodedText);
+                },
                 () => {
+                    if (generation !== scanGenerationRef.current || html5QrRef.current !== html5Qr) return;
                     // 이 콜백은 "이번 프레임에서 QR을 못 찾음"으로 초당 10회 호출된다.
                     // 예전엔 빈 함수라 통째로 버렸는데, 이게 **디코딩 루프가 살아 있다는 유일한 신호**다.
                     // start()의 Promise는 video.play()를 부른 직후 resolve되고, 실제 스캔 루프는
@@ -381,6 +394,9 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                     if (consecutiveMissesRef.current >= 5) lastDecodedRef.current = null;
                 }
             );
+            trackStartup(html5Qr, startup);
+            await startup;
+            if (generation !== scanGenerationRef.current || html5QrRef.current !== html5Qr) return;
 
             setStatus('scanning');
 
@@ -396,19 +412,22 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
             attachAspectWatcher();
 
             // 루프가 정말 도는지 확인한다. 1.5초면 fps 10 기준 10회 이상 들어와야 한다.
-            setTimeout(() => {
+            decodeCheckTimerRef.current = setTimeout(() => {
                 if (html5QrRef.current === html5Qr && decodeTickRef.current === 0) {
                     console.warn('[QR] decode loop did not start (no error-callback ticks)');
                 }
             }, 1500);
         } catch (err) {
+            if (generation !== scanGenerationRef.current) return;
             console.warn('[QR] camera start unavailable');
             setStatus('error');
             const presentation = cameraFailurePresentation(err);
             setErrorIcon(presentation.icon);
             setErrorMsg(presentation.message);
+        } finally {
+            startBusyRef.current = false;
         }
-    }, [handleScanSuccess, attachAspectWatcher]);
+    }, [handleScanSuccess, attachAspectWatcher, stopCamera, trackStartup]);
 
     // 종횡비 보정 뒤 재시작 — decodeAspect 가 반영돼 컨테이너가 새 높이로 그려진 다음에 돈다.
     // 플래그가 없으면 마운트 시점과 startScanning 재생성 시점에도 카메라가 켜져버린다.
@@ -424,6 +443,8 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
     //   트랙만 살아남았다(녹색 표시등이 계속 켜져 있는 상태). 무조건 stop()을 부르고
     //   "이미 멈춰 있음" 예외는 삼킨다.
     const stopScanning = useCallback(async () => {
+        const generation = ++scanGenerationRef.current;
+        clearTimeout(decodeCheckTimerRef.current);
         aspectWatcherCleanupRef.current?.();
         aspectWatcherCleanupRef.current = null;
         clearTimeout(resumeTimerRef.current);
@@ -432,25 +453,21 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         setScanResult(result => result?.state === 'checking' ? null : result);
         const scanner = html5QrRef.current;
         html5QrRef.current = null;
-        if (scanner) {
-            try { await scanner.stop(); } catch { /* 아직 시작 전이거나 이미 멈춤 */ }
-        }
-        setStatus('idle');
-    }, []);
+        await stopCamera(scanner);
+        if (generation === scanGenerationRef.current) setStatus('idle');
+    }, [stopCamera]);
 
     // 컴포넌트가 언마운트될 때(다른 탭으로 이동 등) 카메라를 반드시 끔
     useEffect(() => () => {
+        scanGenerationRef.current += 1;
+        clearTimeout(decodeCheckTimerRef.current);
         aspectWatcherCleanupRef.current?.();
         aspectWatcherCleanupRef.current = null;
         clearTimeout(resumeTimerRef.current);
         const scanner = html5QrRef.current;
         html5QrRef.current = null;
-        if (scanner) {
-            Promise.resolve()
-                .then(() => scanner.stop())
-                .catch(() => {});
-        }
-    }, []);
+        void stopCamera(scanner);
+    }, [stopCamera]);
 
     // 탭 마운트 직후 짧게 보여주는 카드 모양 skeleton (위 ready 관련 주석 참고)
     if (!ready) {

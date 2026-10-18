@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Dropdown } from 'antd';
-import { EyeInvisibleOutlined, EyeOutlined, FlagOutlined, MoreOutlined, StopOutlined, UnlockOutlined } from '@ant-design/icons';
+import { EyeInvisibleOutlined, EyeOutlined, FlagOutlined, MoreOutlined, StopOutlined, UnlockOutlined } from '../common/icons';
 import { useMessage } from '../../hooks';
 import { chatService } from '../../services';
 import useAuthStore from '../../store/useAuthStore';
 import ChatReportDialog from './ChatReportDialog';
+import Tooltip from '../common/Tooltip';
 
 /** STORE 대화에만 노출되는 차단·신고 메뉴. 자동 제재는 하지 않는다. */
 const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pending = false, disabled = false }) => {
@@ -95,9 +96,9 @@ const ChatModerationMenu = ({ thread, onChanged, onHidden, hidden = false, pendi
                 }}
             >
                 {/* 옆의 닫기(X)와 같은 44×44 아이콘 버튼 — 평소 투명, hover 에 회색 판 (2026-09-23) */}
-                <button type="button" className="reserve-chat-icon-button" aria-label="대화 관리">
+                <Tooltip title="대화 관리"><button type="button" className="reserve-chat-icon-button" aria-label="대화 관리">
                     <MoreOutlined />
-                </button>
+                </button></Tooltip>
             </Dropdown>
             {reportOpen && <ChatReportDialog roomId={thread.roomId} viewerRole={viewerRole} onClose={() => setReportOpen(false)} />}
         </>

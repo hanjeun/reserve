@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DataState, FilterToolbar } from '../common';
 import ChatIntroEditor from '../chat/ChatIntroEditor';
@@ -5,6 +6,7 @@ import ChatIntroEditorSkeleton from '../chat/ChatIntroEditorSkeleton';
 import { useMyStores, useQueryParamsState } from '../../hooks';
 import useChatIntro from '../../hooks/useChatIntro';
 import useMessage from '../../hooks/useMessage';
+import useWorkspaceAction from '../../hooks/useWorkspaceAction';
 import { chatKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
 
@@ -19,10 +21,14 @@ export default function ChatIntroTab() {
     const { stores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();
     const [{ chatIntroStore }, setParams] = useQueryParamsState(CHAT_INTRO_QUERY_DEFAULTS);
     const store = stores.find(item => String(item.id) === chatIntroStore) ?? stores[0] ?? null;
+    useEffect(() => {
+        if (store && chatIntroStore !== String(store.id)) setParams({ chatIntroStore: String(store.id) });
+    }, [store, chatIntroStore, setParams]);
     const scope = store ? `store:${store.id}` : null;
     const { intro, isLoading, isError, error, isFetching, refetch } = useChatIntro(scope, { enabled: Boolean(store) });
     const queryClient = useQueryClient();
     const { message } = useMessage();
+    const requestAction = useWorkspaceAction();
 
     const saveMutation = useMutation({
         mutationFn: ({ storeId, body }) => chatService.saveStoreIntro(storeId, body),
@@ -37,7 +43,7 @@ export default function ChatIntroTab() {
     let content;
     if (storesLoading || (store && isLoading)) {
         content = <ChatIntroEditorSkeleton />;
-    } else if (storesError) {
+    } else if (storesError && !stores.length) {
         content = <DataState state="error" kind="store" subject="가게 목록" error={storesError} onRetry={refetchStores} />;
     } else if (!store) {
         content = <DataState state="empty" kind="store" title="등록된 가게가 없어요." style={{ marginTop: 80 }} />;
@@ -63,7 +69,7 @@ export default function ChatIntroTab() {
                 selects={stores.length > 1 ? [{
                     key: 'store',
                     value: store ? String(store.id) : undefined,
-                    onChange: value => setParams({ chatIntroStore: String(value) }),
+                    onChange: value => requestAction(() => setParams({ chatIntroStore: String(value) })),
                     options: stores.map(item => ({ value: String(item.id), label: item.name })),
                     ariaLabel: '채팅을 관리할 가게',
                     width: 200,
@@ -72,6 +78,8 @@ export default function ChatIntroTab() {
                 loading={storesLoading || isFetching}
                 initialLoading={storesLoading || isLoading}
             />
+            {storesError && stores.length > 0 && <DataState state="error" kind="store" subject="가게 목록" error={storesError}
+                onRetry={refetchStores} retrying={storesLoading} compact style={{ marginBottom: 16 }} />}
             {content}
         </div>
     );

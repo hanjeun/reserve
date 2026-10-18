@@ -4,6 +4,7 @@
 @import './styles/global/foundation.css';
 @import './styles/global/navigation-and-media.css';
 @import './styles/global/components-and-forms.css';
+@import './styles/global/icons.css';
 @import './styles/global/interactions.css';
 @import './styles/global/feature-surfaces.css';
 @import './styles/global/chat-intro.css';
@@ -16,3 +17,6 @@
 @import './styles/global/modal-sheet.css';
 @import './styles/global/store-listing-toolbar.css';
 @import './styles/global/store-onboarding.css';
+@import './styles/global/feed.css';
+@import './styles/global/store-news.css';
+@import './styles/global/workspace.css';

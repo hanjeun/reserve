@@ -1,5 +1,5 @@
 import React from 'react';
-import { WifiOutlined } from '@ant-design/icons';
+import { WifiOutlined } from '../common/icons';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
@@ -38,7 +38,8 @@ const OfflineBanner = () => {
         <div
             role="status"
             aria-live="polite"
-            style={{ ...styles.bar, background: reconnected ? colors.success.main : colors.text.primary }}
+            style={{ ...styles.bar, background: reconnected ? colors.success.solid : colors.text.primary,
+                color: reconnected ? colors.success.foreground : colors.background.default }}
         >
             <WifiOutlined style={{ fontSize: 14 }} />
             <span>
@@ -60,7 +61,6 @@ const styles = {
         justifyContent: 'center',
         gap: 8,
         padding: '8px 16px',
-        color: '#fff',
         fontSize: fontSize.sm,
         fontWeight: fontWeight.medium,
         textAlign: 'center',

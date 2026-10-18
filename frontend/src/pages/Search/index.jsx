@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { CloseCircleFilled, CloseOutlined, SearchOutlined } from '@ant-design/icons';
+import { CloseCircleFilled, CloseOutlined, SearchOutlined } from '../../components/common/icons';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useRecentSearches from '../../hooks/useRecentSearches';
+import Tooltip from '../../components/common/Tooltip';
+import { SEARCH_MOTION_DURATION_MS } from '../../components/layout/searchTransition';
 
 // 안내용 예시다. 실측 인기 순위나 현재 위치 기반 추천으로 표현하지 않는다.
-const SEARCH_EXIT_DURATION_MS = 220;
 const QUICK_SEARCHES = ['카페', '스튜디오', '필라테스', '공방', '클리닉', '팝업'];
 
 export default function SearchPage() {
@@ -40,7 +41,7 @@ export default function SearchPage() {
             return;
         }
         setIsClosing(true);
-        exitTimerRef.current = window.setTimeout(leave, SEARCH_EXIT_DURATION_MS);
+        exitTimerRef.current = window.setTimeout(leave, SEARCH_MOTION_DURATION_MS);
     };
 
     const closeSearch = () => leaveSearch(() => {
@@ -83,13 +84,14 @@ export default function SearchPage() {
     else if (!reducedMotion) motionClass = ' reserve-search-page--entering';
 
     return (
-        <div className={'reserve-search-page' + motionClass}>
+        <div className={'reserve-search-page' + motionClass} inert={isClosing ? true : undefined}
+            style={{ '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
             <h1 className="reserve-discovery-visually-hidden">가게 검색</h1>
             <header className="reserve-search-header">
                 <form className="reserve-search-field" role="search" onSubmit={submitSearch}>
-                    <button type="submit" className="reserve-search-icon" aria-label="검색">
+                    <Tooltip title="검색"><button type="submit" className="reserve-search-icon" aria-label="검색">
                         <SearchOutlined aria-hidden="true" />
-                    </button>
+                    </button></Tooltip>
                     <input
                         ref={inputRef}
                         type="search"
@@ -114,9 +116,9 @@ export default function SearchPage() {
                         }}
                     />
                     {keyword && (
-                        <button type="button" className="reserve-search-clear" aria-label="검색어 지우기" onClick={clearSearch}>
+                        <Tooltip title="검색어 지우기"><button type="button" className="reserve-search-clear" aria-label="검색어 지우기" onClick={clearSearch}>
                             <CloseCircleFilled aria-hidden="true" />
-                        </button>
+                        </button></Tooltip>
                     )}
                 </form>
                 <button type="button" className="reserve-search-cancel" onClick={closeSearch}>취소</button>
@@ -155,7 +157,6 @@ export default function SearchPage() {
                             <button type="button" className="reserve-search-recent-clear" onClick={clearRecentSearches}>전체 삭제</button>
                         )}
                     </div>
-                    <p className="reserve-search-recent-note">이 브라우저에만 저장돼요.</p>
                     {recentSearches.length > 0 ? (
                         <ul className="reserve-search-recent-list">
                             {recentSearches.map(term => (
@@ -164,9 +165,9 @@ export default function SearchPage() {
                                         <SearchOutlined aria-hidden="true" />
                                         <span>{term}</span>
                                     </button>
-                                    <button type="button" className="reserve-search-recent-remove" aria-label={`최근 검색 삭제: ${term}`} onClick={() => removeSearch(term)}>
+                                    <Tooltip title={`최근 검색 삭제: ${term}`}><button type="button" className="reserve-search-recent-remove" aria-label={`최근 검색 삭제: ${term}`} onClick={() => removeSearch(term)}>
                                         <CloseOutlined aria-hidden="true" />
-                                    </button>
+                                    </button></Tooltip>
                                 </li>
                             ))}
                         </ul>

@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { SendOutlined } from '@ant-design/icons';
+import { SendOutlined } from '../common/icons';
 import MessengerBrandCover from './MessengerBrandCover';
 import { SupportAvatar, SupportName } from './SupportIdentity';
 

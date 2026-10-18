@@ -4,7 +4,7 @@ import AddressSearch from './AddressSearch';
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock('../../../api/axios', () => ({ default: api }));
-vi.mock('@ant-design/icons', async importOriginal => ({
+vi.mock('../../common/icons', async importOriginal => ({
     ...(await importOriginal()),
     EnvironmentOutlined: () => <span />,
 }));

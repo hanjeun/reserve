@@ -13,7 +13,7 @@ afterEach(async () => {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
 });
 vi.mock('../../api/axios', () => ({ default: api }));
-vi.mock('@ant-design/icons', () => ({
+vi.mock('../../components/common/icons', () => ({
     PlusOutlined: () => null, MinusOutlined: () => null, ClockCircleOutlined: () => null,
     CreditCardOutlined: () => null, FieldTimeOutlined: () => null, ThunderboltOutlined: () => null,
     RollbackOutlined: () => null, HourglassOutlined: () => null, TeamOutlined: () => null,

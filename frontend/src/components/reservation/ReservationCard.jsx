@@ -4,7 +4,7 @@ import {
     CheckOutlined, CloseOutlined,
     CheckCircleOutlined, WarningOutlined,
     DeleteOutlined, ExclamationCircleFilled, StopOutlined,
-} from '@ant-design/icons';
+} from '../common/icons';
 import ReservationRow from './ReservationRow';
 import ReservationSummaryCard from './ReservationSummaryCard';
 import ReservationDetailModal from './ReservationDetailModal';

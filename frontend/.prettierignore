@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+package-lock.json
+public/
+patches/
+licenses/
+preview/
+previews/
+snapshots/
+artifacts/
+outputs/
+.env*

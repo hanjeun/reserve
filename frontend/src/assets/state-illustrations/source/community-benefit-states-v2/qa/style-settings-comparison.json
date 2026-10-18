@@ -1,0 +1,116 @@
+[
+  {
+    "asset": "benefit-review-pending",
+    "reference": "reserve-extra-icons-13/source/waiting-onsite.blend",
+    "checks": {
+      "engine": true,
+      "samples": true,
+      "transparent": true,
+      "camera_location": true,
+      "camera_rotation": true,
+      "ortho": true,
+      "view": true,
+      "look": true,
+      "exposure": true,
+      "gamma": true,
+      "lighting": true,
+      "materials": true
+    },
+    "all_identical": true
+  },
+  {
+    "asset": "draft-transfer",
+    "reference": "reserve-extra-icons-13/source/waiting-onsite.blend",
+    "checks": {
+      "engine": true,
+      "samples": true,
+      "transparent": true,
+      "camera_location": true,
+      "camera_rotation": true,
+      "ortho": true,
+      "view": true,
+      "look": true,
+      "exposure": true,
+      "gamma": true,
+      "lighting": true,
+      "materials": true
+    },
+    "all_identical": true
+  },
+  {
+    "asset": "empty-comment",
+    "reference": "reserve-extra-icons-13/source/waiting-onsite.blend",
+    "checks": {
+      "engine": true,
+      "samples": true,
+      "transparent": true,
+      "camera_location": true,
+      "camera_rotation": true,
+      "ortho": true,
+      "view": true,
+      "look": true,
+      "exposure": true,
+      "gamma": true,
+      "lighting": true,
+      "materials": true
+    },
+    "all_identical": true
+  },
+  {
+    "asset": "empty-feed",
+    "reference": "reserve-extra-icons-13/source/waiting-onsite.blend",
+    "checks": {
+      "engine": true,
+      "samples": true,
+      "transparent": true,
+      "camera_location": true,
+      "camera_rotation": true,
+      "ortho": true,
+      "view": true,
+      "look": true,
+      "exposure": true,
+      "gamma": true,
+      "lighting": true,
+      "materials": true
+    },
+    "all_identical": true
+  },
+  {
+    "asset": "benefit-review-rejected",
+    "reference": "reserve-extra-icons-13/source/waiting-onsite.blend",
+    "checks": {
+      "engine": true,
+      "samples": true,
+      "transparent": true,
+      "camera_location": true,
+      "camera_rotation": true,
+      "ortho": true,
+      "view": true,
+      "look": true,
+      "exposure": true,
+      "gamma": true,
+      "lighting": true,
+      "materials": true
+    },
+    "all_identical": true
+  },
+  {
+    "asset": "draft-conflict",
+    "reference": "reserve-extra-icons-13/source/waiting-onsite.blend",
+    "checks": {
+      "engine": true,
+      "samples": true,
+      "transparent": true,
+      "camera_location": true,
+      "camera_rotation": true,
+      "ortho": true,
+      "view": true,
+      "look": true,
+      "exposure": true,
+      "gamma": true,
+      "lighting": true,
+      "materials": true
+    },
+    "all_identical": true
+  }
+]

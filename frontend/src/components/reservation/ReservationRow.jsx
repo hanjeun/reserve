@@ -1,10 +1,12 @@
 import React from 'react';
-import { Typography, Tooltip } from 'antd';
-import { FileTextOutlined, NumberOutlined, UserOutlined, TeamOutlined, CalendarOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Typography } from 'antd';
+import Tooltip from '../common/Tooltip';
+import { FileTextOutlined, NumberOutlined, UserOutlined, TeamOutlined, CalendarOutlined, ClockCircleOutlined } from '../common/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import { formatCurrency, formatTime, getThumbnailUrl } from '../../utils';
 import { colors, radius, fontSize, fontWeight } from '../../styles/tokens';
 import { useWindowWidth } from '../../hooks';
+import LoadingImage from '../common/LoadingImage';
 
 const { Text } = Typography;
 
@@ -38,10 +40,11 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
 
     // 예약금이 있는데 아직 결제되지 않은 승인 대기 건.
     const unpaid = depositAmount > 0 && !depositPaid && status === 'PENDING';
-    // 나중 결제를 허용하지 않은 가게는 이 시간이 지나면 ReservationExpiryScheduler가 자동 취소한다.
+    // 나중 결제를 허용하지 않고 양수 제한 시간이 있는 미결제 대기 예약만 자동 취소 대상이다.
     // "시각"이 아니라 "분"으로 적는다 — 서버 컨테이너에 TZ 설정이 없어 createdAt이 UTC로 내려올 수 있다.
-    const timeoutNote = unpaid && !allowLatePayment
-        ? `${paymentTimeoutMinutes || 30}분 내 결제`
+    const timeout = paymentTimeoutMinutes ?? 30;
+    const timeoutNote = unpaid && !allowLatePayment && timeout > 0
+        ? `${timeout}분 내 결제`
         : null;
 
     const actionsNode = renderActions ? renderActions(isWide) : null;
@@ -57,10 +60,10 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
     // user-select:none 은 같은 CSS 관문에 있다 — 이게 없으면 텍스트 위를 살짝 끌며 누른 탭이
     // iOS/안드로이드에서 "글자 선택" 제스처로 해석돼 밑줄 같은 하이라이트가 먼저 뜬다.
     return (
-        <div className="reserve-tap-card" style={styles.row}>
+        <div className="reserve-tap-card" style={styles.row} data-list-item-id={`reservation:${reservation.id}`}>
             <div style={styles.mainRow}>
                 <div style={isWide ? styles.imgWrapWide : styles.imgWrap}>
-                    <img src={getThumbnailUrl(storeMainImageUrl)} alt="" style={styles.img} />
+                    <LoadingImage src={getThumbnailUrl(storeMainImageUrl)} alt="" style={styles.img} />
                 </div>
 
                 <div style={styles.lines}>

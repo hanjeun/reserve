@@ -3,8 +3,10 @@
     --reserve-toolbar-hover-surface: var(--c-gray-50, #f9fafb);
 }
 .reserve-explore-filters .reserve-explore-region-trigger::before {
-    inset: 6px 4px;
-    border-radius: 8px;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    border-radius: var(--reserve-icon-navigation-radius);
     background: var(--reserve-toolbar-hover-surface);
 }
 .reserve-explore-filters .reserve-filter-menu--plain .reserve-filter-menu-surface {

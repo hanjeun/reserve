@@ -1,0 +1,1 @@
+export const SEARCH_MOTION_DURATION_MS = 220;

@@ -116,10 +116,16 @@ button, input, textarea, select {
 
 /* Ant Design v6: Select open 상태 화살표 회전 */
 .ant-select-suffix {
+    transform: rotate(0deg);
+    transform-origin: center;
     transition: transform 0.2s;
 }
 .ant-select-open .ant-select-suffix {
     transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ant-select-suffix { transition: none; }
 }
 
 /* 관리자/사업자 패널 탭 — 탭이 좌우로 넘칠 때 AntD 자체 "더보기"(∨) 버튼으로 접근하게 둔.

@@ -4,14 +4,14 @@
 }
 .reserve-icon-action:focus { outline: none; }
 .reserve-icon-action:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
+.reserve-social-login, .reserve-social-login:is(:hover, :active, :focus) { transform: none; filter: none; transition: none !important; box-shadow: none; }
+.reserve-social-login:focus { outline: none; }
+.reserve-social-login:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) {
     .reserve-icon-action:hover:not(:disabled) { filter: brightness(0.94); }
 }
 @media (prefers-reduced-motion: no-preference) {
     .reserve-icon-action:active:not(:disabled),
-    .reserve-chat-tool:active:not(:disabled),
-    .reserve-chat-message-actions:active:not(:disabled),
-    .reserve-store-view-toggle:active:not(:disabled),
     .reserve-cal-nav:active:not(:disabled) { transform: scale(0.96); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -19,6 +19,7 @@
     .reserve-chat-tool,
     .reserve-chat-message-actions,
     .reserve-store-view-toggle,
+    .reserve-icon-tool,
     .reserve-cal-nav { transition: none; }
 }
 
@@ -353,7 +354,7 @@
     height: 44px;
     padding: 0;
     border: 0;
-    border-radius: 100px;
+    border-radius: 10px;
     background: transparent;
     color: var(--c-text-primary, #191f28);
     font: inherit;
@@ -370,14 +371,15 @@
     align-items: center;
     gap: 6px;
     border: 1px solid var(--c-border-default, #e5e8eb);
-    border-radius: 100px;
+    border-radius: 10px;
     background: var(--c-bg-paper, #fff);
     line-height: 20px;
     transition: border-color 0.16s ease, background-color 0.16s ease;
 }
 .reserve-filter-menu-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reserve-filter-menu-chevron { font-size: 10px; color: var(--c-text-tertiary, #8b95a1); transform: rotate(0deg); transition: transform 0.2s ease; }
-.reserve-filter-menu[aria-expanded='true'] .reserve-filter-menu-chevron { transform: rotate(180deg); }
+.reserve-filter-menu[aria-expanded='true'] .reserve-filter-menu-chevron,
+.reserve-feed-region-input[aria-expanded='true'] .reserve-filter-menu-chevron { transform: rotate(180deg); }
 .reserve-filter-menu:not(:disabled):hover .reserve-filter-menu-surface,
 .reserve-filter-menu[aria-expanded='true'] .reserve-filter-menu-surface { border-color: var(--c-gray-400, #b5b8bd); }
 .reserve-filter-menu:not(:disabled):active .reserve-filter-menu-surface { background: var(--c-gray-50, #f9fafb); }
@@ -570,7 +572,7 @@
     background-color: transparent !important;
 }
 .ant-modal-root .ant-modal-close:hover {
-    background-color: var(--c-gray-100, #f2f4f6) !important;
+    background-color: transparent !important;
 }
 
 /* ── 모달 박스(.ant-modal) 포커스 파란 테두리 제거 ──────────────────────
@@ -813,13 +815,32 @@
         display: none !important;
     }
 }
-/* 닫기(X) 버튼 — AntD 6에서는 툴바(actions)가 아니라 별도 <button class="ant-image-preview-close">로
-   떨어져 있어서 위 규칙들에 해당되지 않았다 — 화살표와 같은 톤(각진 네모 + 반투명)으로 맞춘다. */
+/* 사진 확대 닫기도 44px 동작 영역 안에 32px 둥근 네모 면을 사용한다. */
 .reserve-image-preview .ant-image-preview-close {
-    border-radius: 8px !important;
-    background-color: var(--preview-btn-bg) !important;
-    transition: background-color 0.15s ease !important;
+    width: var(--reserve-icon-target-size) !important;
+    height: var(--reserve-icon-target-size) !important;
+    border-radius: var(--reserve-icon-tool-radius) !important;
+    background-color: transparent !important;
+    isolation: isolate;
 }
-.reserve-image-preview .ant-image-preview-close:hover {
-    background-color: var(--preview-btn-hover) !important;
+.reserve-image-preview .ant-image-preview-close::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--reserve-icon-surface-size);
+    height: var(--reserve-icon-surface-size);
+    transform: translate(-50%, -50%);
+    border-radius: var(--reserve-icon-tool-radius);
+    background: var(--preview-btn-bg);
+    z-index: -1;
+    pointer-events: none;
+}
+.reserve-image-preview .ant-image-preview-close .anticon { font-size: var(--reserve-icon-glyph-size) !important; }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-image-preview .ant-image-preview-close:hover::before { background: var(--preview-btn-hover); }
+}
+.reserve-image-preview .ant-image-preview-close:focus-visible {
+    outline: var(--reserve-focus-ring);
+    outline-offset: -2px;
 }

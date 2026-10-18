@@ -19,7 +19,7 @@ export const depositApplies = values => reservationApplies(values) && depositSel
 const always = () => true;
 const slotApplies = values => reservationApplies(values) && values.bookingType === 'SLOT';
 const sessionApplies = values => reservationApplies(values) && values.bookingType === 'SESSION';
-const latePaymentApplies = values => depositApplies(values) && values.allowLatePayment === true;
+export const paymentTimeoutApplies = values => depositApplies(values) && values.allowLatePayment !== true;
 const refundWindowApplies = values => depositApplies(values) && Number(values.fullRefundDays) > 0;
 const partialRefundApplies = values => refundWindowApplies(values) && Number(values.partialRefundDays) > 0;
 const required = message => [{ required: true, message }];
@@ -62,7 +62,7 @@ export const STORE_ONBOARDING_DOMAINS = Object.freeze([
     { key: 'deposit', label: '노쇼 예약금·결제', title: '노쇼 예약금을 설정하실 건가요?', asset: 'edit-deposit',
         description: '예약금 사용 여부·금액과 결제 시점을 바꿔요.', applies: reservationApplies,
         fields: [field('_depositEnabled'), field('noShowDeposit', positiveDeposit, depositApplies), field('allowLatePayment'),
-            field('paymentTimeoutMinutes', required('결제 마감을 선택해주세요.'), latePaymentApplies)] },
+            field('paymentTimeoutMinutes', required('결제 마감을 선택해주세요.'), paymentTimeoutApplies)] },
     { key: 'refund', label: '취소·환불 정책', title: '예약금을 언제까지 돌려드릴까요?', asset: 'edit-refund',
         description: '예약금의 전액·부분 환불 기준을 바꿔요.', applies: depositApplies,
         fields: [field('fullRefundDays', required('전액 환불 기준을 선택해주세요.'), depositApplies),

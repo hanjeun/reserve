@@ -87,18 +87,18 @@ it('reuses the reservation toolbar with an adjacent server count and only recent
     const toolbar = screen.getByLabelText('내 웨이팅 목록 필터');
     expect(toolbar.querySelector('.reserve-store-view-toggle').nextElementSibling).toHaveTextContent('41건');
     expect(container.querySelector('.reserve-filter-toolbar-secondary input')).toBe(screen.getByPlaceholderText('가게명, 대기번호로 검색'));
-    fireEvent.click(screen.getByRole('button', { name: '예약 정렬' }));
-    expect(await screen.findByRole('menuitemradio', { name: '최신 예약순' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitemradio', { name: '오래된 예약순' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '웨이팅 정렬' }));
+    expect(await screen.findByRole('menuitemradio', { name: '최신 접수순' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitemradio', { name: '오래된 접수순' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitemradio', { name: '방문일 빠른순' })).toBeNull();
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '최신 예약순' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '최신 접수순' }));
     await waitFor(() => expect(waitingService.getMine).toHaveBeenCalledWith(0, expect.anything(), { keyword: '', status: 'CALLED', sort: 'recent' }));
-    fireEvent.click(screen.getByRole('button', { name: '예약 상태' }));
+    fireEvent.click(screen.getByRole('button', { name: '웨이팅 상태' }));
     fireEvent.click(await screen.findByRole('menuitemradio', { name: '대기 중' }));
     await waitFor(() => expect(waitingService.getMine).toHaveBeenCalledWith(0, expect.anything(), { keyword: '', status: 'WAITING', sort: 'recent' }));
     expect(currentParams().get('status')).toBe('CONFIRMED');
     expect(currentParams().get('sort')).toBe('visit');
-    expect(currentParams().has('waitingPage')).toBe(false);
+    expect(currentParams().get('waitingPage')).toBe('1');
     expect(currentParams().get('waitingStatus')).toBe('WAITING');
     fireEvent.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));
     expect(currentParams().get('waitingStatus')).toBe('WAITING');
@@ -117,7 +117,7 @@ it('keeps the same focused search field and prior own data while a debounced ser
     expect(input).toHaveFocus(); expect(input).toBeEnabled();
     expect(screen.getByText('이전 내 웨이팅')).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: '내 웨이팅을 불러오는 중' })).toBeNull();
-    expect(currentParams().has('waitingPage')).toBe(false);
+    expect(currentParams().get('waitingPage')).toBe('1');
     expect(currentParams().get('status')).toBe('CONFIRMED');
     expect(currentParams().get('sort')).toBe('oldest');
     await act(async () => request.resolve(pageWith('새 가게', 1)));
@@ -190,12 +190,15 @@ it('keeps search focus after a failed initial request instead of replacing the t
 it('normalizes waiting keys independently while preserving the existing reservation options', () => {
     const input = new URLSearchParams('tab=waiting&waitingPage=3&waitingStatus=CALLED&waitingSort=oldest&waitingKeyword=가게&status=CONFIRMED&sort=visit');
     const result = normalizeListQueryParams('/my-reservations', input);
-    expect(result.toString()).toBe(input.toString());
+    expect(result.toString()).toBe(input.toString() + '&view=list');
     const invalid = normalizeListQueryParams('/my-reservations', new URLSearchParams({
         tab: 'waiting', waitingStatus: 'CONFIRMED', waitingSort: 'visit', waitingKeyword: '가'.repeat(101), waitingPage: '100001',
         status: 'CONFIRMED', sort: 'visit',
     }));
-    ['waitingStatus', 'waitingSort', 'waitingKeyword', 'waitingPage'].forEach(key => expect(invalid.has(key)).toBe(false));
+    expect(invalid.get('waitingStatus')).toBe('ALL');
+    expect(invalid.get('waitingSort')).toBe('recent');
+    expect(invalid.get('waitingPage')).toBe('1');
+    expect(invalid.has('waitingKeyword')).toBe(false);
     expect(invalid.get('status')).toBe('CONFIRMED'); expect(invalid.get('sort')).toBe('visit');
     expect(invalid.get('tab')).toBe('waiting');
     expect(normalizeListQueryParams('/my-favorites', input).has('waitingStatus')).toBe(false);

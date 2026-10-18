@@ -1,4 +1,4 @@
-import { AppstoreOutlined, CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CreditCardOutlined, EnvironmentOutlined, FieldTimeOutlined, FileTextOutlined, HourglassOutlined, MailOutlined, PhoneOutlined, PictureOutlined, QrcodeOutlined, RollbackOutlined, ShopOutlined, TeamOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, CreditCardOutlined, EnvironmentOutlined, FieldTimeOutlined, FileTextOutlined, HourglassOutlined, MailOutlined, PhoneOutlined, PictureOutlined, QrcodeOutlined, RollbackOutlined, ShopOutlined, TeamOutlined, ThunderboltOutlined } from '../../common/icons';
 import { Button } from '../../common';
 import StoreInfoSection from '../StoreInfoSection';
 import { intakeService, onboardingPreviewStore, onboardingPreviewDestination } from '../../../utils/storeOnboarding';
@@ -48,7 +48,7 @@ export function RegistrationSummary({ values, goTo, imageCounts = { main: 0, det
             { Icon: MailOutlined, label: '예약 알림 메일', value: enabled ? values.emailNotificationEnabled ? '켜짐' : '꺼짐' : '사용 안 함'},
             bookingDetail('노쇼 예약금', CreditCardOutlined, '없음'),
             bookingDetail('환불 정책', RollbackOutlined, paid ? '환불 불가' : '예약금 없음'),
-            bookingDetail('결제 마감', ThunderboltOutlined, paid ? store.allowLatePayment ? '제한 없음' : '신청할 때 결제' : '예약금 없음'),
+            bookingDetail('결제 마감', ThunderboltOutlined, paid ? '결제 시간 제한 없음' : '예약금 없음'),
             { Icon: CreditCardOutlined, label: '나중 결제', value: paid ? values.allowLatePayment ? '허용' : '허용 안 함' : enabled ? '예약금 없음' : '사용 안 함'},
             bookingDetail('예약 범위', FieldTimeOutlined, '제한 없음'),
             bookingDetail('예약 마감', FieldTimeOutlined, '제한 없음'),

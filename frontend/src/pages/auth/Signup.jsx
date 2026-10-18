@@ -123,7 +123,7 @@ const Signup = () => {
                             style={{ animation: animation.slideUpIn }}
                             extra={
                                 timerInfo
-                                    ? <span style={{ color: timerInfo.isWarning ? '#ff4d4f' : '#8b95a1', fontSize: 12 }}>{timerInfo.text}</span>
+                                    ? <span style={{ color: timerInfo.isWarning ? colors.error.main : colors.text.tertiary, fontSize: 12 }}>{timerInfo.text}</span>
                                     : null
                             }
                         >

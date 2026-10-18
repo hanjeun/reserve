@@ -1,5 +1,5 @@
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
-import { ClockCircleOutlined, ReadOutlined, RightOutlined } from '@ant-design/icons';
+import { ClockCircleOutlined, ReadOutlined, RightOutlined } from '../../components/common/icons';
 import { Link, useLocation } from 'react-router-dom';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { discoveryComingSoonScreen } from '../../constants/discoveryComingSoon';

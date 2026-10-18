@@ -17,12 +17,15 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
     padding: 6px 20px !important;
     max-width: 100%;
     line-height: 20px;
-    border-radius: 16px;
+    border-radius: 10px;
     white-space: normal;
     overflow-wrap: anywhere;
 }
 .ant-modal-footer .ant-btn,
-.ant-modal-confirm-btns .ant-btn { box-sizing: border-box; min-width: 0; min-height: 36px; border-radius: 16px; }
+.ant-modal-confirm-btns .ant-btn { box-sizing: border-box; min-width: 0; min-height: 36px; border-radius: 10px; }
+.reserve-modal-actions > .reserve-btn:not(.reserve-btn--icon-only),
+.ant-modal-footer .ant-btn:not(.ant-btn-icon-only),
+.ant-modal-confirm-btns .ant-btn:not(.ant-btn-icon-only) { border-radius: 100px; }
 .ant-modal-footer:has(> .ant-btn),
 .ant-modal-confirm-btns {
     display: flex;
@@ -130,25 +133,29 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
     margin-inline-start: 0;
 }
 
-/* 광고 작성은 입력과 실제 표면 미리보기를 한 모달에서 전환한다. 낮은 데스크톱·모바일에서도
+/* 광고·피드·가게 소식 작성과 신고·혜택 검토는 낮은 데스크톱·모바일에서도
    제목과 footer가 화면 밖으로 밀리지 않게 본문만 스크롤한다. */
-.reserve-ad-create-modal {
+.reserve-ad-create-modal,
+.reserve-feed-modal {
     --reserve-ad-modal-available-height: calc(100svh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
 }
 
-.reserve-ad-create-modal .ant-modal-wrap.ant-modal-centered {
+.reserve-ad-create-modal .ant-modal-wrap.ant-modal-centered,
+.reserve-feed-modal .ant-modal-wrap.ant-modal-centered {
     box-sizing: border-box;
     padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
 }
 
-.reserve-ad-create-modal .ant-modal {
+.reserve-ad-create-modal .ant-modal,
+.reserve-feed-modal .ant-modal {
     max-width: calc(100vw - 32px);
     max-height: var(--reserve-ad-modal-available-height);
     margin-block: 0;
     padding-bottom: 0;
 }
 
-.reserve-ad-create-modal .ant-modal-container {
+.reserve-ad-create-modal .ant-modal-container,
+.reserve-feed-modal .ant-modal-container {
     display: flex;
     max-height: var(--reserve-ad-modal-available-height);
     min-height: 0;
@@ -156,11 +163,14 @@ html[data-reserve-modal-open="true"] { overscroll-behavior: none; }
 }
 
 .reserve-ad-create-modal .ant-modal-header,
-.reserve-ad-create-modal .ant-modal-footer {
+.reserve-ad-create-modal .ant-modal-footer,
+.reserve-feed-modal .ant-modal-header,
+.reserve-feed-modal .ant-modal-footer {
     flex: none;
 }
 
-.reserve-ad-create-modal .ant-modal-body {
+.reserve-ad-create-modal .ant-modal-body,
+.reserve-feed-modal .ant-modal-body {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;

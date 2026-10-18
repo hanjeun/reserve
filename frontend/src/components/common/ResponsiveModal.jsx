@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useContext, useEffect, useRef, useSyncExternalStore } from 'react';
 import PropTypes from 'prop-types';
 import { Modal } from 'antd';
 import { fillRef } from '@rc-component/util';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { breakpoints, mq } from '../../styles/tokens';
+import { WorkspaceActivityContext } from '../layout/workspaceActivity';
 
 const MOBILE_QUERY = mq.below(breakpoints.card);
 const mobileSnapshot = () => typeof window !== 'undefined'
@@ -21,6 +22,10 @@ export default function ResponsiveModal({
     panelRef: forwardedPanelRef, afterOpenChange, transitionName, maskTransitionName,
     ...modalProps
 }) {
+    const workspaceActive = useContext(WorkspaceActivityContext);
+    const requestedOpen = open;
+    open = open && workspaceActive;
+    useEffect(() => { if (!workspaceActive && requestedOpen) modalProps.onCancel?.(); }, [workspaceActive, requestedOpen, modalProps.onCancel]);
     const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, () => false);
     const reducedMotion = useReducedMotion();
     const panelRef = useRef(null);

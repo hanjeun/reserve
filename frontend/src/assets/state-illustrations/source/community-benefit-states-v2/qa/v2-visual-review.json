@@ -1,0 +1,82 @@
+{
+  "version": 2,
+  "reviewed_utc": "2026-10-15T07:10:46.582371+00:00",
+  "source": "Actual delivered 768px WebP decoded with Pillow and downsampled only for review sheets. Delivery image bytes unchanged.",
+  "reviewed_sizes_px": [
+    64,
+    72,
+    80,
+    96,
+    112
+  ],
+  "backgrounds": [
+    "#FFFFFF",
+    "#161C27"
+  ],
+  "findings": {
+    "silhouettes": "Six motifs distinct; two-document silhouettes intentionally lower in height. No forced scaling adjustment.",
+    "contrast": "White background lower contrast than dark but silhouettes and blue accents remain visible. Self-shading only; no floor or new drop shadow.",
+    "edges": "No visible matte halo or clipping in reviewed sheets; all canvas-edge alpha numerically zero.",
+    "semantic_limits": "Draft conflict comparison symbol and review-return pencil are small at64/72. State-specific UI labels remain necessary; no user comprehension study performed.",
+    "industry_neutral": "Documents, photo placeholder, comments and generic benefit gift motif; no particular service industry.",
+    "text_numbers_logos": "No text, numbers or brand logos within asset canvases. Review-sheet captions are outside assets."
+  },
+  "parent_review": "Parent independently inspected light/dark72px and agreed no optical-scale enlargement needed.",
+  "current_run": [
+    "Decoded WebP comparison sheets",
+    "PNG RGBA8/dimensions and WebP dimensions",
+    "Pixel-identical alpha for all12 PNG/WebP pairs",
+    "Fully transparent canvas edges and bounding margins",
+    "All WebPs <=40960 bytes",
+    "Current PNG versus inherited saved-scene rerender pixel comparison",
+    "Existing2349files SHA256 preservation",
+    "v1 final24images6blend2license byte equality"
+  ],
+  "inherited_run": [
+    "2026-10-15 v1 native Blender4.3.2 Eevee128 renders at512/768",
+    "2026-10-15 v1 saved6blend reopen renders at both sizes; logs retained unchanged",
+    "Accessible reference scene inspection and inaccessible latest3kit HTTP502 evidence from v1"
+  ],
+  "not_performed": [
+    "New Blender render execution in v2",
+    "App integration",
+    "Real device tests",
+    "Browser UI tests",
+    "User comprehension study",
+    "New download attempts for latest3referencekits"
+  ],
+  "unchanged_from_v1": [
+    "static/768/benefit-review-rejected-768.png",
+    "static/768/draft-conflict-768.webp",
+    "static/768/draft-conflict-768.png",
+    "static/768/draft-transfer-768.png",
+    "static/768/empty-comment-768.png",
+    "static/768/benefit-review-rejected-768.webp",
+    "static/768/empty-feed-768.webp",
+    "static/768/empty-comment-768.webp",
+    "static/768/empty-feed-768.png",
+    "static/768/draft-transfer-768.webp",
+    "static/768/benefit-review-pending-768.png",
+    "static/768/benefit-review-pending-768.webp",
+    "static/512/empty-feed-512.webp",
+    "static/512/draft-conflict-512.webp",
+    "static/512/benefit-review-pending-512.webp",
+    "static/512/draft-transfer-512.png",
+    "static/512/draft-conflict-512.png",
+    "static/512/empty-comment-512.webp",
+    "static/512/benefit-review-rejected-512.png",
+    "static/512/benefit-review-rejected-512.webp",
+    "static/512/empty-feed-512.png",
+    "static/512/draft-transfer-512.webp",
+    "static/512/empty-comment-512.png",
+    "static/512/benefit-review-pending-512.png",
+    "source/draft-conflict.blend",
+    "source/benefit-review-pending.blend",
+    "source/empty-comment.blend",
+    "source/empty-feed.blend",
+    "source/draft-transfer.blend",
+    "source/benefit-review-rejected.blend",
+    "licenses/assets-cc0.txt",
+    "licenses/code-mit.txt"
+  ]
+}

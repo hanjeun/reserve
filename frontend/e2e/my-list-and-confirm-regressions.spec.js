@@ -137,7 +137,7 @@ test('confirmation buttons have their former compact height and creating a new d
     await expect(page.getByPlaceholder('가게 이름')).toBeVisible();
     await page.getByPlaceholder('가게 이름').fill('이전 초안 가게');
     await page.getByRole('button', { name: '임시저장' }).click();
-    await expect(page.getByText(/이 브라우저에 저장됨/)).toBeVisible();
+    await expect(page.getByText(/임시저장됨/)).toBeVisible();
     await page.reload();
     const restore = page.getByRole('dialog').filter({ hasText: '임시저장된 내용이 있어요' });
     await expect(restore).toBeVisible();

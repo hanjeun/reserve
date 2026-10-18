@@ -24,12 +24,12 @@ const styleAtWidth = (selector, width) => {
 };
 
 describe('store result layout pattern', () => {
-    it('shows the next view action using existing Ant Design icons without changing the view on mount', async () => {
+    it('shows the next view action using shared UI icons without changing the view on mount', async () => {
         const onChange = vi.fn();
         render(<StoreListViewToggle view="cards" onChange={onChange} />);
         const toggle = screen.getByRole('button', { name: '목록형 보기로 전환' });
         expect(toggle).toHaveAttribute('type', 'button');
-        expect(toggle.querySelector('[data-icon="unordered-list"]')).toBeInTheDocument();
+        expect(toggle.querySelector('.anticon-unordered-list')).toBeInTheDocument();
         expect(toggle.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
         expect(onChange).not.toHaveBeenCalled();
         await userEvent.setup().click(toggle);
@@ -47,7 +47,7 @@ describe('store result layout pattern', () => {
         await user.keyboard('{Enter}');
         const toggle = screen.getByRole('button', { name: '사진형 보기로 전환' });
         expect(toggle).toHaveFocus();
-        expect(toggle.querySelector('[data-icon="appstore"]')).toBeInTheDocument();
+        expect(toggle.querySelector('.anticon-appstore')).toBeInTheDocument();
         await user.keyboard(' ');
         expect(screen.getByRole('button', { name: '목록형 보기로 전환' })).toHaveFocus();
     });

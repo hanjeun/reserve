@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Modal, Typography, InputNumber, Flex } from 'antd';
-import { ExclamationCircleFilled } from '@ant-design/icons';
+import { Typography, InputNumber, Flex } from 'antd';
+import { ExclamationCircleFilled } from '../common/icons';
 import { FormTextArea } from '../common';
 import { colors } from '../../styles/tokens';
+import ResponsiveModal from '../common/ResponsiveModal';
+import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
+import { surfaceForWhiteText } from '../../utils/colorContrast';
 
 const { Text } = Typography;
 
@@ -93,7 +96,7 @@ const SANCTION_PRESETS = {
 };
 
 const OK_BUTTON_PROPS = {
-    warning: { style: { backgroundColor: '#fa8c16', borderColor: '#fa8c16' } },
+    warning: { style: { backgroundColor: surfaceForWhiteText('#fa8c16'), borderColor: surfaceForWhiteText('#fa8c16'), color: '#ffffff' } },
     danger:  { danger: true },
 };
 
@@ -144,6 +147,8 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
     const preset = SANCTION_PRESETS[presetKey];
     // SanctionBody가 렌더될 때마다 최신 입력값을 여기에 흘려보낸다 (state가 아니라 ref라 리렌더 안 유발)
     const valuesRef = React.useRef({ days: 7, reason: '' });
+    const requestClose = useWorkspaceDraftGuard({ dirty: () => open && Boolean(valuesRef.current.reason || valuesRef.current.days !== 7),
+        busy: open && loading, onDiscard: onCancel });
 
     if (!preset) return null;
 
@@ -151,7 +156,7 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
     const iconColor = preset.icon === 'danger' ? colors.error.main : colors.warning.main;
 
     return (
-        <Modal
+        <ResponsiveModal mobileSheet={false}
             title={
                 <Flex align="center" gap={8}>
                     <ExclamationCircleFilled style={{ color: iconColor, fontSize: 18 }} />
@@ -159,7 +164,7 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
                 </Flex>
             }
             open={open}
-            onCancel={onCancel}
+            onCancel={() => requestClose(onCancel, { discard: false })}
             onOk={() => onOk({ ...valuesRef.current })}
             okText={preset.okText}
             cancelText="취소"
@@ -173,7 +178,7 @@ const SanctionModal = ({ open, presetKey, target, onCancel, onOk, loading }) => 
             destroyOnHidden
         >
             <SanctionBody preset={preset} onReady={(v) => { valuesRef.current = v; }} />
-        </Modal>
+        </ResponsiveModal>
     );
 };
 

@@ -2,12 +2,14 @@ import { PageTitle, PageDescription } from '../../components/common/PageTypograp
 import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useState, useCallback } from 'react';
 import { Typography, Modal, Flex } from 'antd';
-import { EditOutlined, DeleteOutlined, ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ExclamationCircleFilled, PlusOutlined } from '../../components/common/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { PageContainer, Button, Card, DataState, StoreCardSkeleton, ModalLoading } from '../../components/common';
+import { PageContainer, Button, Card, DataState, StoreCardSkeleton, ModalLoading, Tooltip } from '../../components/common';
 import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
+import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import { queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import { colors, radius, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
 import { canCloseStore } from '../../utils/lifecycleReadiness';
@@ -22,16 +24,16 @@ const { Text } = Typography;
 const OWNER_SORT_OPTIONS = OWNER_STORE_SORT_OPTIONS;
 
 const managedActions = (store, onEdit, onDelete, inRow = false) => [
-    <button key="edit" type="button" aria-label={`${store.name} 수정`}
+    <Tooltip key="edit" title={`${store.name} 수정`}><button type="button" aria-label={`${store.name} 수정`}
         onClick={event => { event.stopPropagation(); onEdit(store); }}
         className={'reserve-card-action' + (inRow ? ' reserve-mystore-list-action' : '')} style={styles.cardAction}>
         <EditOutlined style={{ fontSize: '18px' }} />
-    </button>,
-    <button key="delete" type="button" aria-label={`${store.name} 삭제`}
+    </button></Tooltip>,
+    <Tooltip key="delete" title={`${store.name} 삭제`}><button type="button" aria-label={`${store.name} 삭제`}
         onClick={event => onDelete(event, store)}
         className={'reserve-card-action' + (inRow ? ' reserve-mystore-list-action' : '')} style={styles.cardAction}>
         <DeleteOutlined style={{ fontSize: '18px', color: colors.error.main }} />
-    </button>,
+    </button></Tooltip>,
 ];
 
 // ─── 영업 종료 확인 모달 ──────────────────────────────────────────────────────
@@ -182,10 +184,10 @@ export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel
 const resolveOwnerSort = (params) => (OWNER_SORT_OPTIONS.some(option => option.value === params.get('sort'))
     ? params.get('sort') : 'recent');
 
-// 툴바 값 하나를 URL 에 반영한다 — 빈 값과 기본 정렬(recent)은 URL 에서 뺀다.
+// 같은 위계의 선택은 기본값도 URL에 표시한다. 빈 분야 값은 전체 분야다.
 const withToolbarParam = (current, key, value) => {
     const next = new URLSearchParams(current);
-    if (value && !(key === 'sort' && value === 'recent')) next.set(key, value);
+    if (value != null) next.set(key, String(value));
     else next.delete(key);
     return next;
 };
@@ -199,11 +201,11 @@ const OwnedStoresSkeleton = ({ view }) => (
 );
 
 // 가게 목록 본문 — 목록형 / 카드형 / 빈 안내 중 하나.
-const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegister, onResetFilters }) => {
+const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegister, onResetFilters, listRef }) => {
     if (visibleStores.length > 0 && view === 'list') {
         return (
             <>
-                <div className="reserve-store-list-rows reserve-mystore-list-rows">
+                <div ref={listRef} className="reserve-store-list-rows reserve-mystore-list-rows">
                     {visibleStores.map(store => (
                         <StoreListRow key={store.id} store={store} className="reserve-mystore-list-row"
                             actions={managedActions(store, onEdit, onDelete, true)} />
@@ -217,7 +219,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
     }
     if (visibleStores.length > 0) {
         return (
-            <div className="rsv-mystore-grid">
+            <div ref={listRef} className="rsv-mystore-grid">
                 {/* 가게 전체보기와 같은 StoreCard 를 재사용한다. 관리 화면이라 하트 대신 수정·삭제 줄을 붙인다. */}
                 {visibleStores.map(store => (
                     <div key={store.id}>
@@ -246,15 +248,21 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
 const MyStores = () => {
     const navigate = useNavigate();
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
-    const { stores, loading, error, refetch, deleteStore } = useMyStores();
+    const { stores, loading, refetching = false, error, refetch, deleteStore, hasData = stores.length > 0 || !loading && !error } = useMyStores();
     useDocumentTitle('내 가게');
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [targetStore, setTargetStore] = useState(null); // { id, name }
     const [retrying, setRetrying] = useState(false);
-    const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'cards');
+    const [view, setView] = useViewModeParam(urlSearchParams, 'cards');
     const domain = urlSearchParams.get('domain') || '';
     const sort = resolveOwnerSort(urlSearchParams);
     const visibleStores = filterAndSortOwnedStores(stores, { domain, sort });
+    const listRef = React.useRef(null);
+    const accessDenied = [401, 403].includes(queryErrorStatus(error));
+    useListRefreshAnchor(listRef, JSON.stringify([view, domain, sort]), refetching || retrying, hasData ? stores : null);
+    React.useEffect(() => {
+        if (accessDenied) { setDeleteModalOpen(false); setTargetStore(null); }
+    }, [accessDenied]);
 
     const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const resetOwnedFilters = () => setUrlSearchParams(current => {
@@ -300,11 +308,11 @@ const MyStores = () => {
     let storesContent;
     if (loading) {
         storesContent = <OwnedStoresSkeleton view={view} />;
-    } else if (error && stores.length === 0) {
+    } else if (error && !hasData) {
         storesContent = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
             <DataState state="error" kind="store" subject="가게 목록" error={error}
-                onRetry={handleRetry} retrying={retrying} style={{ marginTop: 100 }} />
+                onRetry={handleRetry} retrying={retrying || refetching} style={{ marginTop: 100 }} />
         );
     } else {
         storesContent = (
@@ -313,9 +321,10 @@ const MyStores = () => {
                 {error && (
                     <DataState state="error" kind="store" subject="가게 목록" error={error}
                         title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                        onRetry={handleRetry} retrying={retrying} compact style={{ marginBottom: 16 }} />
+                        onRetry={handleRetry} retrying={retrying || refetching} compact style={{ marginBottom: 16 }} />
                 )}
                 <OwnedStoresBody stores={stores} visibleStores={visibleStores} view={view}
+                    listRef={listRef}
                     onEdit={handleEdit} onDelete={handleDeleteClick}
                     onRegister={() => navigate('/store/register')} onResetFilters={resetOwnedFilters} />
             </>
@@ -323,13 +332,13 @@ const MyStores = () => {
     }
 
     return (
-        <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page" aria-busy={loading || retrying}>
+        <PageContainer size="xl" paddingTop="40px" className="reserve-mystore-page" aria-busy={loading || refetching || retrying}>
             {/* 헤더 */}
             <div style={{ marginBottom: '40px' }}>
-                <PageTitle style={{ margin: '0 0 8px 0' }}>
+                <PageTitle loading={loading} style={{ margin: '0 0 8px 0' }}>
                     내 가게 관리
                 </PageTitle>
-                <PageDescription>
+                <PageDescription loading={loading}>
                     등록된 가게를 수정하거나 관리할 수 있어요.
                 </PageDescription>
             </div>
@@ -337,15 +346,15 @@ const MyStores = () => {
             <StoreListingToolbar
                 view={view}
                 onViewChange={setView}
-                count={!loading && !error ? visibleStores.length : undefined}
+                count={!loading && hasData ? visibleStores.length : undefined}
                 domain={domain}
                 onDomainChange={nextDomain => setToolbarParam('domain', nextDomain)}
                 sort={sort}
                 onSortChange={nextSort => setToolbarParam('sort', nextSort)}
                 sortOptions={OWNER_SORT_OPTIONS}
-                disabled={loading || retrying}
+                disabled={loading}
                 initialLoading={loading}
-                sortDisabled={loading || retrying}
+                sortDisabled={loading}
                 label="내 가게 목록 필터"
             />
 
@@ -354,13 +363,13 @@ const MyStores = () => {
             {storesContent}
 
             {/* 삭제 모달 */}
-            <DeleteStoreModal
+            {!accessDenied && <DeleteStoreModal
                 open={deleteModalOpen}
                 storeId={targetStore?.id}
                 storeName={targetStore?.name}
                 onConfirm={handleDeleteConfirm}
                 onCancel={handleDeleteCancel}
-            />
+            />}
         </PageContainer>
     );
 };

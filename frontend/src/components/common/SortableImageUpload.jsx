@@ -18,7 +18,8 @@
  */
 import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Upload } from 'antd';
+import { ConfigProvider } from 'antd';
+import LoadingUpload from './LoadingUpload';
 import {
     DndContext,
     KeyboardSensor,
@@ -38,8 +39,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import useReducedMotion from '../../hooks/useReducedMotion';
 
-const SortableItem = ({ file, originNode, reducedMotion }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.uid });
+const SortableItem = ({ file, originNode, reducedMotion, disabled }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: file.uid, disabled });
     return (
         <div
             ref={setNodeRef}
@@ -47,6 +48,7 @@ const SortableItem = ({ file, originNode, reducedMotion }) => {
             style={{
                 transform: CSS.Translate.toString(transform),
                 transition: reducedMotion ? undefined : transition,
+                cursor: disabled ? 'default' : undefined,
             }}
             {...attributes}
             {...listeners}
@@ -62,9 +64,13 @@ SortableItem.propTypes = {
     file: PropTypes.shape({ uid: PropTypes.string.isRequired, status: PropTypes.string }).isRequired,
     originNode: PropTypes.node.isRequired,
     reducedMotion: PropTypes.bool,
+    disabled: PropTypes.bool,
 };
 
-const SortableImageUpload = ({ fileList = [], onReorder, children, ...uploadProps }) => {
+const SortableImageUpload = ({ fileList = [], onReorder, children, itemRender, disabled: disabledProp, ...uploadProps }) => {
+    const { componentDisabled } = ConfigProvider.useConfig();
+    // 기존 가게 Form의 disabled도 그대로 상속한다. 업로드와 드래그가 같은 잠금을 쓴다.
+    const disabled = disabledProp ?? componentDisabled;
     const reducedMotion = useReducedMotion();
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -72,12 +78,13 @@ const SortableImageUpload = ({ fileList = [], onReorder, children, ...uploadProp
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
-    const renderSortableItem = useCallback((originNode, file) => (
-        <SortableItem file={file} originNode={originNode} reducedMotion={reducedMotion} />
-    ), [reducedMotion]);
+    const renderSortableItem = useCallback((originNode, file, files, actions) => (
+        <SortableItem file={file} originNode={itemRender ? itemRender(originNode, file, files, actions) : originNode}
+            reducedMotion={reducedMotion} disabled={disabled} />
+    ), [reducedMotion, disabled, itemRender]);
 
     const handleDragEnd = ({ active, over }) => {
-        if (!over || active.id === over.id) return;
+        if (disabled || !over || active.id === over.id) return;
         const from = fileList.findIndex(file => file.uid === active.id);
         const to = fileList.findIndex(file => file.uid === over.id);
         if (from < 0 || to < 0) return;
@@ -87,22 +94,25 @@ const SortableImageUpload = ({ fileList = [], onReorder, children, ...uploadProp
     return (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={fileList.map(file => file.uid)} strategy={rectSortingStrategy}>
-                <Upload
+                <LoadingUpload
                     {...uploadProps}
+                    disabled={disabled}
                     fileList={fileList}
                     itemRender={renderSortableItem}
                 >
                     {children}
-                </Upload>
+                </LoadingUpload>
             </SortableContext>
         </DndContext>
     );
 };
 
 SortableImageUpload.propTypes = {
+    itemRender: PropTypes.func,
     fileList: PropTypes.arrayOf(PropTypes.object),
     onReorder: PropTypes.func,
     children: PropTypes.node,
+    disabled: PropTypes.bool,
 };
 
 export default SortableImageUpload;

@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Dropdown } from 'antd';
-import { DeleteOutlined, DownloadOutlined, FlagOutlined, MoreOutlined, UndoOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, FlagOutlined, MoreOutlined, UndoOutlined } from '../common/icons';
 import { useMessage } from '../../hooks';
 import chatService from '../../services/chatService';
 import useAuthStore from '../../store/useAuthStore';
 import ChatReportDialog from './ChatReportDialog';
 import { downloadChatImage } from '../../utils/chatImageTransfer';
+import Tooltip from '../common/Tooltip';
 
 export default function ChatMessageActions({ message: item, roomId, onRetracted, onHidden = onRetracted, reportRole, timestamp = '' }) {
     const { message, confirm } = useMessage();
@@ -110,7 +111,7 @@ export default function ChatMessageActions({ message: item, roomId, onRetracted,
         else if (key === 'download') void download();
         else changeMessage(key);
     } }}>
-        <button type="button" className="reserve-chat-message-actions" disabled={busy} aria-label="메시지 관리" aria-expanded={menuOpen}><MoreOutlined /></button>
+        <Tooltip title="메시지 관리" disabled={menuOpen}><button type="button" className="reserve-chat-message-actions" disabled={busy} aria-label="메시지 관리" aria-expanded={menuOpen}><MoreOutlined /></button></Tooltip>
     </Dropdown>
     </span>
         {reportOpen && <ChatReportDialog roomId={roomId} viewerRole={reportRole} messageId={item.id}

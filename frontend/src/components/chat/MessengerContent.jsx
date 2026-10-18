@@ -9,6 +9,7 @@ import ChatNotificationControl from './ChatNotificationControl';
 import useChatImageDraft from '../../hooks/useChatImageDraft';
 import useChatThread from '../../hooks/useChatThread';
 import useChatNotifications from '../../hooks/useChatNotifications';
+import useChatRetentionNotice from '../../hooks/useChatRetentionNotice';
 import { useMessage, useWindowWidth } from '../../hooks';
 import { chatKeys } from '../../hooks/queryKeys';
 import { chatService } from '../../services';
@@ -49,6 +50,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const { message } = useMessage();
     const user = useAuthStore((state) => state.user);
     const sessionIdentity = useMessengerStore((state) => state.sessionIdentity);
+    const { visible: retentionNoticeVisible, dismiss: dismissRetentionNotice } = useChatRetentionNotice(user?.id, sessionIdentity);
     const storedSelection = useMessengerStore((state) => state.selection);
     const storedView = useMessengerStore((state) => state.view);
     const activeThread = useMessengerStore((state) => state.activeThread);
@@ -187,6 +189,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         void queryClient.invalidateQueries({ queryKey: chatKeys.adminInbox() });
         void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     }, [queryClient]);
+    const onMessageSent = useCallback(() => {
+        dismissRetentionNotice();
+        onSent();
+    }, [dismissRetentionNotice, onSent]);
     const onError = useCallback((text) => message.error(text), [message]);
     const onPolled = useCallback((roomId, fresh, { caughtUp = true, readThroughId } = {}) => {
         const readScope = readScopeRef.current;
@@ -224,7 +230,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         cancellable: true,
         send: sendFn,
         onLoaded,
-        onSent,
+        onSent: onMessageSent,
         onChanged: onSent,
         onPolled,
         onError,
@@ -445,6 +451,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                         disabled: returningToList || loading,
                     }}
                     threadBodyRef={threadBodyRef}
+                    retentionNoticeVisible={retentionNoticeVisible}
                     isSupport={selection.kind === 'support'}
                     bodyProps={{
                         loading,

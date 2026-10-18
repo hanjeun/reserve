@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, matchPath, useLocation, useNavigationType } from 'react-router-dom';
 import SessionQueryProvider from './components/common/SessionQueryProvider';
+import WorkspaceNavigationProvider from './components/layout/WorkspaceNavigationProvider';
+import WorkspaceMenuProvider from './components/layout/WorkspaceMenuProvider';
+import LegacyDomainNotice from './components/layout/LegacyDomainNotice';
+import { uiIconConfig } from './components/common/uiIconConfig';
 import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore';
-import { colors, rawColors, field, fieldPx, zIndex } from './styles/tokens';
+import { colors, rawColors, semanticActionPalettes, field, fieldPx, zIndex } from './styles/tokens';
 import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
 import useModalScrollLock from './hooks/useModalScrollLock';
+import { useWindowWidth } from './hooks/useWindowWidth';
 import useRouteSeo from './hooks/useRouteSeo';
 import { installRecentSearchPrivacyBoundary } from './utils/recentSearches';
 
@@ -23,7 +28,10 @@ const lazyPublicPage = (path, loadPage) => {
 
 const Home = lazyPublicPage('/', () => import('./pages/Home'));
 const SearchPage = lazyPublicPage('/search', () => import('./pages/Search'));
-const DiscoveryComingSoon = lazyPublicPage('/feed', () => import('./pages/discovery/ComingSoon'));
+const Feed = lazyPublicPage('/feed', () => import('./pages/discovery/Feed'));
+const FeedDetail = lazyPublicPage('/feed/posts/:id', () => import('./pages/discovery/FeedDetail'));
+const FeedAuthor = lazyPublicPage('/feed/u/:publicId', () => import('./pages/discovery/FeedAuthor'));
+const FeedNotifications = lazy(() => import('./pages/discovery/FeedNotifications'));
 const Benefits = lazyPublicPage('/benefits', () => import('./pages/discovery/Benefits'));
 const BenefitDetail = lazyPublicPage('/benefits/:id', () => import('./pages/discovery/BenefitDetail'));
 const Login = lazyPublicPage('/login', () => import('./pages/auth/Login'));
@@ -34,6 +42,7 @@ const StoreList = lazyPublicPage('/stores', () => import('./pages/store/StoreLis
 const StoreDetail = lazyPublicPage('/store/:id', () => import('./pages/store/StoreDetail'));
 const StoreRegister = lazy(() => import('./pages/store/StoreRegister'));
 const StoreEdit = lazy(() => import('./pages/store/StoreEdit'));
+const DraftTransfer = lazy(() => import('./pages/store/DraftTransfer'));
 const MyStores = lazy(() => import('./pages/store/MyStores'));
 const MyReservations = lazy(() => import('./pages/reservation/MyReservations'));
 const Waiting = lazyPublicPage('/waiting', () => import('./pages/discovery/Waiting'));
@@ -55,6 +64,7 @@ const MessagesPage = lazy(() => import('./pages/member/MessagesPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 // 로그인한 사용자만 쓰는 통합 메신저는 익명 랜딩의 초기 번들에서 제외한다.
 const MessengerShell = lazy(() => import('./components/chat/MessengerShell'));
+const DiscoverySwipe = lazy(() => import('./components/layout/DiscoverySwipe'));
 
 const preloadInitialPage = pathname => {
     // 고정된 보호 경로가 공개 상세 경로의 :id로 잡히지 않게 한다.
@@ -70,6 +80,8 @@ import DiscoveryNav from './components/layout/DiscoveryNav';
 import RouteLoadingSkeleton from './components/layout/RouteLoadingSkeleton';
 import { resolveRouteSkeletonLocation } from './components/layout/routeSkeletonKind';
 import { applyRouteEntryMotion, clearRouteEntryMotion, getRouteHistoryIndex, resolveRouteEntryMotion } from './components/layout/routeEntryMotion';
+import { SEARCH_MOTION_DURATION_MS } from './components/layout/searchTransition';
+import { TooltipScopeContext } from './components/common/tooltipScope';
 import { LoadingPresentationContext, createLoadingPresentation, useSkeletonShown } from './components/layout/loadingPresentation';
 import { DISCOVERY_NAV_ITEMS, isDiscoveryRootPath } from './constants/discovery';
 import AppFooter from './components/layout/Footer';
@@ -122,6 +134,7 @@ const buildNeutralFocus = isDark => ({
  */
 const buildThemeConfig = (isDark, accent) => {
     const neutralFocus = buildNeutralFocus(isDark);
+    const semantic = semanticActionPalettes[isDark ? 'dark' : 'light'];
     return {
         algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         token: {
@@ -139,7 +152,7 @@ const buildThemeConfig = (isDark, accent) => {
             // var(--c-error) 같은 CSS 값을 넣으면 계산에 실패한다(리터럴이어야 한다).
             // 값의 출처는 styles/theme.css 의 --c-error / --c-warning (라이트 :root, 다크 [data-theme=dark]).
             // 그 파일을 고치면 여기도 함께 고쳐야 한다 — CSS 변수를 못 쓰는 자리라 중복이 불가피하다.
-            colorError:   isDark ? '#ff6b76' : '#f04452',
+            colorError: semantic.error.main,
             colorWarning: isDark ? '#ffc633' : '#ffb800',
             // 다크에서 placeholder·비활성 글자를 AntD 기본값보다 밝게 올린다.
             // 기본값은 라이트/다크 모두 25% 알파인데, 흰 배경 위의 25% 검정은 잘 보이는 반면
@@ -155,9 +168,23 @@ const buildThemeConfig = (isDark, accent) => {
             fontFamily: 'inherit',
         },
         components: {
+            Tooltip: {
+                colorBgSpotlight: isDark ? '#ffffff' : '#1a1f27',
+                colorTextLightSolid: isDark ? '#1a1f27' : '#ffffff',
+                borderRadius: 10,
+            },
             Button: {
-                primaryColor: '#fff',
-                colorPrimary: accent.main,
+                primaryColor: accent.foreground,
+                colorPrimaryHover: accent.solidHover,
+                colorPrimaryActive: accent.solidHover,
+                dangerColor: semantic.error.foreground,
+                colorError: semantic.error.solid,
+                colorErrorHover: semantic.error.solidHover,
+                colorErrorActive: semantic.error.solidHover,
+                colorPrimary: accent.solid,
+                borderRadius: 16,
+                borderRadiusSM: 10,
+                borderRadiusLG: 16,
             },
             // 테두리형 입력(검색창 등)의 포커스도 채움형 입력과 같은 중립 회색 1px 이다 — 브랜드 파랑은 실행 버튼에만.
             // AntD 기본값은 파란 테두리 + 파란 halo 라, 목록 검색창만 파랗게 튀었다(2026-09-29).
@@ -201,7 +228,7 @@ const buildThemeConfig = (isDark, accent) => {
 
 const isSearchPath = pathname => /^\/search\/?$/.test(pathname);
 const isMessagesPath = pathname => /^\/messages\/?$/.test(pathname);
-const appLayoutStyle = { backgroundColor: colors.background.default };
+const appLayoutStyle = { backgroundColor: colors.background.default, '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` };
 
 // 부트 셸과 AppRoutes 가 같은 레이아웃 클래스를 쓴다 — 홈·검색은 폭·좌우 여백 변수를 이 클래스에서 받는다.
 // 부트 셸에만 없으면 로그인 확인 중 검색 화면의 좌우 여백이 0 이 됐다(2026-09-29 실측).
@@ -245,7 +272,7 @@ function AppContent() {
         return (
             <LoadingPresentationContext.Provider value={presentation}>
             <Layout className={appLayoutClassName(pending.pathname) + ' reserve-boot-shell'} style={appLayoutStyle}>
-                {!isSearchPath(pending.pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} />}
+                {!isSearchPath(pending.pathname) && !isMessagesPath(pending.pathname) && <HeaderPlaceholder discoveryRoot={discoveryRoot} workspace={/^\/(admin|business)\/?$/.test(pending.pathname)} />}
                 {discoveryRoot && <DiscoveryNav pendingPathname={pending.pathname} />}
                 <Content>
                     <RouteLoadingSkeleton />
@@ -259,7 +286,7 @@ function AppContent() {
         <LoadingPresentationContext.Provider value={presentation}>
         <AntApp message={{ maxCount: 3 }}>
             <SessionQueryProvider key={sessionRevision}>
-                <AppRoutes />
+                <WorkspaceNavigationProvider><WorkspaceMenuProvider><AppRoutes /></WorkspaceMenuProvider></WorkspaceNavigationProvider>
             </SessionQueryProvider>
         </AntApp>
         </LoadingPresentationContext.Provider>
@@ -273,10 +300,13 @@ function AppRoutes() {
     const displayLocation = resolveRouteSkeletonLocation(pathname, search);
     const discoveryRoot = isDiscoveryRootPath(displayLocation.pathname, displayLocation.search);
     const isSearchLayout = isSearchPath(displayLocation.pathname);
+    const isMessagesLayout = isMessagesPath(displayLocation.pathname);
     const skeletonShown = useSkeletonShown();
     const navigationType = useNavigationType();
     const isSearchPage = isSearchPath(pathname);
+    const homeLogoEntry = pathname === '/' && locationState?.reserveHomeEntry === true;
     const routeContentRef = useRef(null);
+    const mobileDiscovery = useWindowWidth() <= 767 && discoveryRoot && !isOAuthCallback;
     const previousPathnameRef = useRef(/** @type {string | null} */ (null));
     const previousDiscoveryTabRef = useRef(null);
     const previousHistoryIndexRef = useRef(null);
@@ -301,10 +331,10 @@ function AppRoutes() {
             navigationType,
             explicitDirection: locationState?.reserveRouteMotion,
         });
-        // 검색은 헤더를 고정하는 전용 진입·닫힘 모션이 이미 있어, 부모 전환을 겹치지 않는다.
-        const routeMotion = isSearchPage ? null : resolvedRouteMotion;
+        // 검색의 헤더/본문 전환과 복원은 전용 모션을 사용해 가로 페이지 전환을 겹치지 않는다.
+        const routeMotion = isSearchPage || homeLogoEntry ? null : resolvedRouteMotion;
 
-        // 검색을 닫으며 재생성된 헤더도 이전 위치로 바로 돌아온다. 쿼리 정규화에서는 유지한다.
+        // 검색 뒤 복원되는 헤더와 본문에 같은 진입 표식을 둔다. 쿼리 정규화에서는 유지한다.
         if (previousPathname !== pathname) {
             content?.parentElement?.toggleAttribute('data-search-restored',
                 /^\/search\/?$/.test(previousPathname || '') && !isSearchPage);
@@ -318,15 +348,18 @@ function AppRoutes() {
         previousPathnameRef.current = pathname;
         previousDiscoveryTabRef.current = currentTabIndex;
         previousHistoryIndexRef.current = historyIndex;
-    }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, skeletonShown]);
+    }, [pathname, search, locationKey, locationState, navigationType, isSearchPage, homeLogoEntry, skeletonShown]);
 
     return (
+        <TooltipScopeContext.Provider value={locationKey}>
         <Layout className={appLayoutClassName(displayLocation.pathname)} style={appLayoutStyle}>
             <ScrollToTop />
+            {mobileDiscovery && <Suspense fallback={null}><DiscoverySwipe contentRef={routeContentRef} /></Suspense>}
             <OfflineBanner />
-            {!isSearchLayout && (isOAuthCallback ? <HeaderPlaceholder discoveryRoot={discoveryRoot} /> : <Header />)}
+            {!isSearchLayout && !isMessagesLayout && (isOAuthCallback ? <HeaderPlaceholder discoveryRoot={discoveryRoot} /> : <Header />)}
             {discoveryRoot && <DiscoveryNav pendingPathname={isOAuthCallback ? displayLocation.pathname : undefined} />}
             <Content ref={routeContentRef} data-skeleton-shown={skeletonShown ? 'true' : undefined}
+                data-home-logo-entry={homeLogoEntry ? 'true' : undefined}
                 onAnimationEnd={event => {
                     if (['reserve-discovery-page-from-right', 'reserve-discovery-page-from-left'].includes(event.animationName)) {
                         clearRouteEntryMotion(routeContentRef.current);
@@ -334,6 +367,7 @@ function AppRoutes() {
                 }}>
                 {/* 라우트 콘텐츠의 렌더 오류는 여기서 멈춘다 — 헤더·푸터는 남아 다른 화면으로 갈 수 있다. */}
                 <RouteErrorBoundary>
+                <LegacyDomainNotice />
                 <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
                     {/* 공용 페이지 */}
@@ -342,7 +376,9 @@ function AppRoutes() {
                     <Route path="/benefits" element={<Benefits />} />
                     <Route path="/benefits/:id" element={<BenefitDetail />} />
                     <Route path="/waiting" element={<Waiting />} />
-                    <Route path="/feed" element={<DiscoveryComingSoon />} />
+                    <Route path="/feed" element={<Feed />} />
+                    <Route path="/feed/posts/:id" element={<FeedDetail />} />
+                    <Route path="/feed/u/:publicId" element={<FeedAuthor />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -363,6 +399,7 @@ function AppRoutes() {
                         <Route path="/my-stores" element={<MyStores />} />
                         <Route path="/store/register" element={<StoreRegister />} />
                         <Route path="/store/:id/edit" element={<StoreEdit />} />
+                        <Route path="/drafts/transfer" element={<DraftTransfer />} />
                         <Route path="/business" element={<BusinessPanel />} />
                     </Route>
 
@@ -373,6 +410,7 @@ function AppRoutes() {
 
                     {/* 로그인 유저 공통 */}
                     <Route element={<PrivateRoute />}>
+                        <Route path="/feed/notifications" element={<FeedNotifications />} />
                         <Route path="/my-reservations" element={<MyReservations />} />
                         <Route path="/my-favorites" element={<MyFavorites />} />
                         <Route path="/payment/result" element={<PaymentResult />} />
@@ -387,7 +425,7 @@ function AppRoutes() {
                 </RouteErrorBoundary>
             </Content>
 
-            {!isMessagesPath(displayLocation.pathname) && !isSearchLayout && <AppFooter />}
+            {!isMessagesLayout && !isSearchLayout && <AppFooter />}
             {/* 라우트마다 붙이지 않고 레이아웃에 한 번만 둔다. 익명 사용자는 청크도 받지 않는다. */}
             {isLoggedIn && !isOAuthCallback && (
                 <LoadingPresentationContext.Provider value={null}>
@@ -397,6 +435,7 @@ function AppRoutes() {
                 </LoadingPresentationContext.Provider>
             )}
         </Layout>
+        </TooltipScopeContext.Provider>
     );
 }
 
@@ -429,7 +468,9 @@ function App() {
                 <ConfigProvider
                     locale={koKR}
                     theme={themeConfig}
+                    {...uiIconConfig}
                     {...loadingConfig}
+                    select={{ ...uiIconConfig.select, ...loadingConfig.select }}
                     form={{ validateMessages }}
                 >
                     {/* AntApp 바깥의 마지막 그물 — 헤더·메신저 등 앱 셸 자체의 렌더 오류가 흰 화면이 되지 않게 한다. */}

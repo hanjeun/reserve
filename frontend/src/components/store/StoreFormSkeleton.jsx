@@ -1,4 +1,5 @@
-import { PageTitle, PageDescription } from '../common/PageTypography';
+import { SkeletonPageTitle as PageTitle, SkeletonPageDescription as PageDescription } from '../common/PageTypography';
+import SkeletonText from '../common/SkeletonText';
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import Bone from '../common/Bone';
@@ -14,8 +15,7 @@ const { Text } = Typography;
 // 2026-09-29 재작성 — 실제 폼(StoreForm/StoreBasicInfo/StoreImages/StoreFormActions)과 같은 순서·배치로 그린다.
 // 예전 뼈대는 라벨 14px + 간격 10px 로 칸마다 24px(데스크톱 라벨 상자는 40 + 8), 안내 문구 줄,
 // '우리동네 배지'·'정기 휴무'·'운영 기간'·환불 3칸이 통째로 빠져 있어 로딩이 끝나면 폼 끝이 약 900px 아래로 늘어났다.
-// 라벨·안내 문구는 서버 데이터가 아닌 고정 문구라 실제 글자로 둔다(StoreDetailSkeleton 의 라벨과 같은 원칙) —
-// 그래야 폭에 따라 한 줄/두 줄로 접히는 것까지 실제 폼과 같다. 입력칸·버튼만 뼈대다.
+// 라벨·안내 문구도 SkeletonText로 가리고, 실제 문구의 줄바꿈·크기는 유지한다.
 // 문구는 storeFormSkeletonCopy.js 에 있다. 예약 방식별로 달라지는 칸(회차 시각 등)은 로딩 시점에 알 수 없어 기본값(SLOT) 배치를 따른다.
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
 const hintStyle = { fontSize: fontSize.xs, color: colors.text.tertiary };
@@ -24,14 +24,14 @@ const hintStyle = { fontSize: fontSize.xs, color: colors.text.tertiary };
 function Field({ label, hint, plainHint, control = 'input', gap = 'default', style }) {
     return (
         <div className={`reserve-store-form-skeleton-field reserve-store-form-skeleton-field--gap-${gap}`} data-label={label} style={style}>
-            <div className="reserve-store-form-skeleton-label">{label}</div>
+            <div className="reserve-store-form-skeleton-label"><SkeletonText>{label}</SkeletonText></div>
             <div className={`reserve-store-form-skeleton-control reserve-store-form-skeleton-control--${control}`}>
                 {control === 'check' ? WEEKDAYS.map(day => (
                     <span key={day} className="reserve-store-form-skeleton-check"><Bone width={16} height={16} borderRadius={4} /><Bone width={14} height={14} /></span>
                 )) : <Bone width={control === 'upload' ? 102 : '100%'} height="100%" borderRadius="var(--reserve-store-form-skeleton-radius)" />}
             </div>
-            {hint && <div className="reserve-store-form-skeleton-help"><Text style={hintStyle}>{hint}</Text></div>}
-            {plainHint && <div className="reserve-store-form-skeleton-help reserve-store-form-skeleton-help--plain">{plainHint}</div>}
+            {hint && <div className="reserve-store-form-skeleton-help"><Text style={hintStyle}><SkeletonText>{hint}</SkeletonText></Text></div>}
+            {plainHint && <div className="reserve-store-form-skeleton-help reserve-store-form-skeleton-help--plain"><SkeletonText>{plainHint}</SkeletonText></div>}
         </div>
     );
 }
@@ -53,7 +53,7 @@ FieldRow.propTypes = { compact: PropTypes.bool, time: PropTypes.bool, gap: PropT
 
 const SectionLabel = ({ children }) => (
     <div style={{ marginBottom: 10 }}>
-        <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary, fontWeight: fontWeight.medium }}>{children}</Text>
+        <Text style={{ fontSize: fontSize.sm, color: colors.text.secondary, fontWeight: fontWeight.medium }}><SkeletonText>{children}</SkeletonText></Text>
     </div>
 );
 SectionLabel.propTypes = { children: PropTypes.node.isRequired };
@@ -105,8 +105,8 @@ function SettingsSection() {
             <div className="reserve-store-form-skeleton-toggles">
                 {STORE_FORM_SKELETON_TOGGLES.map(([key, label, desc]) => (
                     <div className="reserve-store-form-skeleton-toggle" key={key}>
-                        <Text className="reserve-store-form-skeleton-toggle-label">{label}</Text>
-                        <Text className="reserve-store-form-skeleton-toggle-desc">{desc}</Text>
+                        <Text className="reserve-store-form-skeleton-toggle-label"><SkeletonText>{label}</SkeletonText></Text>
+                        <Text className="reserve-store-form-skeleton-toggle-desc"><SkeletonText>{desc}</SkeletonText></Text>
                         <Bone width={28} height={16} borderRadius={100} style={{ gridArea: 'switch', alignSelf: 'center' }} />
                     </div>
                 ))}
@@ -160,7 +160,7 @@ export default function StoreFormSkeleton({ mode = 'create' }) {
             )}
 
             <div data-skeleton-section="images">
-                <div className="reserve-store-form-skeleton-images-divider"><span>이미지 등록</span></div>
+                <div className="reserve-store-form-skeleton-images-divider"><span><SkeletonText>이미지 등록</SkeletonText></span></div>
                 <Field label="대표 이미지" control="upload"
                     plainHint={<>{STORE_FORM_SKELETON_HINTS.mainImage}<br />JPG · PNG · WEBP · GIF / 새 이미지 전체 합계 최대 {MAX_IMAGE_REQUEST_MB}MB</>} />
                 <Field label="상세 이미지 (최대 5장)" control="upload"
@@ -169,7 +169,6 @@ export default function StoreFormSkeleton({ mode = 'create' }) {
             </div>
 
             <div className="reserve-store-form-skeleton-actions" data-skeleton-section="actions">
-                <Text style={{ display: 'block', marginBottom: 10, fontSize: fontSize.xs, color: colors.text.tertiary }}>{STORE_FORM_SKELETON_HINTS.draft}</Text>
                 <div className="reserve-store-form-skeleton-buttons">
                     <Bone height="100%" borderRadius="var(--reserve-store-form-skeleton-button-radius)" style={{ flex: '1 1 0', minWidth: 0 }} />
                     <Bone height="100%" borderRadius="var(--reserve-store-form-skeleton-button-radius)" style={{ flex: '1 1 0', minWidth: 0 }} />

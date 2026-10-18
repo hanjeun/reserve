@@ -41,7 +41,7 @@
     padding: 24px;
 }
 .reserve-region-sheet-root .reserve-region-sheet {
-    max-width: min(600px, calc(100vw - 48px));
+    max-width: min(520px, calc(100vw - 48px));
     top: 0;
     margin: min(8svh, 72px) auto 24px;
     padding-bottom: 0;
@@ -49,9 +49,9 @@
 .reserve-region-sheet-root .reserve-region-sheet .ant-modal-container {
     display: flex;
     flex-direction: column;
-    height: min(700px, calc(100svh - 96px));
+    height: min(560px, calc(100svh - 96px));
     overflow: hidden;
-    border-radius: 24px;
+    border-radius: 20px;
     padding: 0;
 }
 .reserve-region-sheet-root .reserve-region-sheet .ant-modal-header {
@@ -61,8 +61,8 @@
 }
 .reserve-region-sheet-root .reserve-region-sheet .ant-modal-title {
     color: var(--c-text-primary);
-    font-size: 22px;
-    line-height: 28px;
+    font-size: 18px;
+    line-height: 24px;
     font-weight: 700;
 }
 .reserve-region-sheet-root .reserve-region-sheet .ant-modal-close {
@@ -72,6 +72,8 @@
     height: 44px;
     color: var(--c-text-secondary);
 }
+.reserve-region-sheet-title { display: inline-flex; align-items: center; gap: 8px; }
+.reserve-region-sheet-title > .anticon { font-size: 20px; color: var(--c-text-secondary); }
 .reserve-region-sheet-root .reserve-region-sheet .ant-modal-close:hover {
     color: var(--c-text-primary);
     background: var(--c-hover-surface);
@@ -82,7 +84,9 @@
     min-height: 0;
     flex-direction: column;
     padding: 0;
+    overflow-y: auto;
 }
+.reserve-region-sheet-root .reserve-region-sheet .ant-modal-footer { flex: none; margin: 0; padding: 0; }
 .reserve-qr-sheet-root .reserve-qr-sheet .ant-modal-body {
     overflow-x: clip;
     overflow-y: auto;
@@ -113,14 +117,14 @@
     line-height: 20px;
 }
 .reserve-region-sheet-feedback {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 16px 24px 0;
-    color: var(--c-text-secondary);
-    font-size: 13px;
+    flex: none;
+    width: auto;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: start;
+    margin: 0;
+    padding: 0;
 }
+.reserve-region-sheet-feedback .reserve-data-state__retry { grid-column: 2; padding-inline: 0; }
 .reserve-region-sheet-popular {
     flex: none;
     min-height: 140px;
@@ -214,7 +218,7 @@
 .reserve-region-sheet-regions {
     display: grid;
     flex: 1 1 auto;
-    min-height: 0;
+    min-height: 128px;
     grid-template-columns: minmax(156px, 34%) minmax(0, 1fr);
     border-top: 1px solid var(--c-border-light);
 }
@@ -265,16 +269,13 @@
 .reserve-region-sheet-country p { margin: 6px 0 12px; padding-inline: 20px; }
 .reserve-region-sheet-loading { margin: 20px; }
 .reserve-region-sheet-actions {
-    display: grid;
+    display: flex;
     flex: none;
-    grid-template-columns: minmax(96px, 1fr) minmax(0, 2fr);
-    gap: 10px;
+    justify-content: flex-end;
     padding: 14px 24px max(20px, env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--c-border-light);
     background: var(--c-bg-paper);
 }
-.reserve-region-sheet-actions button { min-height: 48px; }
-.reserve-region-sheet-actions button:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reserve-region-sheet-root button:focus-visible,
 .reserve-discovery-location-link:focus-visible,
 .reserve-explore-region-trigger:focus-visible {
@@ -299,18 +300,21 @@
     justify-content: center;
     padding: 0;
     border: 0;
-    border-radius: 10px;
     background: transparent;
     color: var(--c-text-secondary);
     font: inherit;
-    font-size: 16px;
     cursor: pointer;
 }
 .reserve-explore-region-trigger::before {
     content: '';
     position: absolute;
-    inset: 6px 2px;
-    border-radius: 8px;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: var(--reserve-icon-surface-size);
+    height: var(--reserve-icon-surface-size);
+    transform: translate(-50%, -50%);
+    border-radius: var(--reserve-icon-navigation-radius);
     background: var(--c-hover-surface);
     opacity: 0;
     pointer-events: none;

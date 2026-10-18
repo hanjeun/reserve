@@ -1,0 +1,60 @@
+/* 관리자·사업자·로딩 화면이 공유하는 작업 공간. */
+.reserve-workspace-heading { margin-bottom: 32px; }
+.reserve-workspace-heading-label { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.reserve-workspace-heading .reserve-page-title:focus { outline: none; }
+.reserve-workspace-heading-label > .reserve-ui-icon { flex: none; }
+.reserve-workspace-layout.ant-layout { gap: 32px; background: transparent; align-items: flex-start; transition: gap .2s; }
+.reserve-workspace-layout.ant-layout.is-menu-collapsed { gap: 0; }
+.reserve-workspace-sider.ant-layout-sider { background: transparent; position: sticky; top: var(--workspace-sticky-top); }
+.reserve-workspace-sider.ant-layout-sider-collapsed { overflow: hidden; }
+.reserve-workspace-sider .ant-layout-sider-children { max-height: calc(100svh - var(--workspace-sticky-top) - 24px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 8px; }
+/* AntD의 has-sider 직계 본문 width: 0 규칙보다 우선한다. 모바일에서는 숨긴 Sider가 남아 있다. */
+.reserve-workspace-layout.ant-layout > .reserve-workspace-main.ant-layout-content { min-width: 0; width: 100%; }
+.reserve-workspace-navigation { display: flex; flex-direction: column; gap: 24px; }
+.reserve-workspace-menu-group h2 { margin: 0 0 8px; padding: 0 12px; color: var(--c-text-tertiary); font-size: 12px; font-weight: 600; line-height: 20px; }
+.reserve-workspace-menu-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.reserve-workspace-menu-group :is(a, .reserve-workspace-menu-placeholder) { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 12px; box-sizing: border-box; border-radius: 12px; color: var(--c-text-secondary); font-size: 14px; line-height: 24px; text-decoration: none; transition: background-color .18s, color .18s; }
+.reserve-workspace-menu-group :is(a, .reserve-workspace-menu-placeholder) > .reserve-ui-icon { flex: none; }
+.reserve-workspace-menu-group :is(a, .reserve-workspace-menu-placeholder)[aria-current="page"] { background: var(--c-gray-200); color: var(--c-text-primary); font-weight: 600; }
+@media (hover: hover) { .reserve-workspace-menu-group a:hover { background: var(--c-gray-100); color: var(--c-text-primary); } }
+.reserve-workspace-menu-group a:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
+.reserve-workspace-content { min-width: 0; }
+.reserve-workspace-content [data-workspace-panel][hidden] { display: none; }
+.reserve-workspace-drawer .ant-drawer-header { box-sizing: border-box; border-bottom-color: var(--c-border-light); padding: 10px 16px; gap: 8px; }
+.reserve-workspace-drawer .ant-drawer-header-title { min-width: 0; }
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close { display: inline-grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--c-text-secondary); -webkit-tap-highlight-color: transparent; }
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close:focus { outline: none; box-shadow: none; }
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close:hover { background: transparent; color: var(--c-text-primary); }
+}
+.reserve-workspace-drawer .ant-drawer-body { padding: 24px 16px max(24px, env(safe-area-inset-bottom)); }
+.reserve-workspace-drawer .reserve-workspace-menu-group a { min-height: 48px; font-size: 15px; }
+.reserve-workspace-drawer.is-reduced-motion .ant-drawer-mask,
+.reserve-workspace-drawer.is-reduced-motion .ant-drawer-content-wrapper { transition: none !important; animation: none !important; }
+
+/* 주 목록 전환·상태 필터는 같은 줄, 좁은 화면에서는 같은 순서로 줄바꿈한다. */
+.reserve-management-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 24px; min-width: 0; }
+.reserve-management-toolbar--with-controls { grid-template-columns: minmax(0, 1fr) auto; }
+.reserve-management-toolbar-leading { min-width: 0; }
+.reserve-management-toolbar-trailing { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-left: auto; }
+.reserve-management-toolbar-trailing .reserve-filter-menu { margin-left: 0; }
+.reserve-management-count { color: var(--c-text-secondary); font-size: 14px; line-height: 24px; }
+
+@media (max-width: 899px) {
+    .reserve-workspace-sider.ant-layout-sider { display: none; }
+    .reserve-workspace-layout.ant-layout { display: block; }
+    .reserve-workspace-heading { margin-bottom: 24px; }
+}
+@media (max-width: 575px) {
+    .reserve-management-toolbar { gap: 8px 12px; }
+    .reserve-management-toolbar--with-controls { grid-template-columns: minmax(0, 1fr); }
+    .reserve-management-toolbar-trailing { min-height: 40px; }
+    .reserve-management-toolbar--with-controls:has(.reserve-management-count) { grid-template-columns: minmax(0, 1fr) auto; }
+    .reserve-management-toolbar-trailing { gap: 4px; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .reserve-workspace-menu-group a { transition: none; }
+    .reserve-workspace-layout.ant-layout,
+    .reserve-workspace-sider.ant-layout-sider { transition: none !important; }
+}

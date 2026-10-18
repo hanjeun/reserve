@@ -13,9 +13,10 @@ import {
     DoubleRightOutlined,
     LeftOutlined,
     RightOutlined,
-} from '@ant-design/icons';
+} from './icons';
 import dayjs from 'dayjs';
 import Button from './Button';
+import Tooltip from './Tooltip';
 import ModalActions from './ModalActions';
 import RollingFieldValue from './RollingFieldValue';
 import useHolidayDates from '../../hooks/useHolidayDates';
@@ -197,11 +198,10 @@ function TriggerLabel({ mode, label, hasValue, value, modalOpen }) {
         </span>
     );
     return (
-        <span key={hasValue ? String(label) : 'empty'} style={{
-            ...(hasValue ? styles.value : styles.placeholder),
-            animation: animation.slideUpIn,
-        }}>
-            {label}
+        <span style={hasValue ? styles.value : styles.placeholder}>
+            <RollingFieldValue value={validDays(value).map(dayKey).join('|') || undefined} modalOpen={modalOpen}>
+                {label}
+            </RollingFieldValue>
         </span>
     );
 }
@@ -544,21 +544,21 @@ const FormDatePickerBase = ({
 
                 <div style={styles.header}>
                     <div style={styles.navGroup}>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goYear(-1)} aria-label="이전 해">
+                        <Tooltip title="이전 해"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goYear(-1)} aria-label="이전 해">
                             <DoubleLeftOutlined style={{ fontSize: 11 }} />
-                        </button>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(-1)} aria-label="이전 달">
+                        </button></Tooltip>
+                        <Tooltip title="이전 달"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(-1)} aria-label="이전 달">
                             <LeftOutlined style={{ fontSize: 12 }} />
-                        </button>
+                        </button></Tooltip>
                     </div>
                     <span style={styles.monthLabel}>{month.format('YYYY년 M월')}</span>
                     <div style={styles.navGroup}>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(1)} aria-label="다음 달">
+                        <Tooltip title="다음 달"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goMonth(1)} aria-label="다음 달">
                             <RightOutlined style={{ fontSize: 12 }} />
-                        </button>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goYear(1)} aria-label="다음 해">
+                        </button></Tooltip>
+                        <Tooltip title="다음 해"><button type="button" className="rsv-tap-btn reserve-cal-nav" onClick={() => goYear(1)} aria-label="다음 해">
                             <DoubleRightOutlined style={{ fontSize: 11 }} />
-                        </button>
+                        </button></Tooltip>
                     </div>
                 </div>
 

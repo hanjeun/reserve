@@ -10,7 +10,8 @@ vi.mock('../../../services/holidayService', () => ({
     default: { getMonth: vi.fn(month => Promise.resolve([`${month}-25`])) },
 }));
 
-vi.mock('antd', async () => {
+vi.mock('antd', async importOriginal => {
+    const { Tooltip } = await importOriginal();
     const ReactModule = await import('react');
     const Modal = ({ open, children, title }) => (
         open ? ReactModule.createElement(
@@ -21,7 +22,7 @@ vi.mock('antd', async () => {
         ) : null
     );
     const Form = { Item: { useStatus: () => ({ status: undefined }) } };
-    return { Form, Modal };
+    return { Form, Modal, Tooltip };
 });
 
 describe('FormDatePicker', () => {

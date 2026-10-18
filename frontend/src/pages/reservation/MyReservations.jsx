@@ -6,7 +6,7 @@ import { Typography } from 'antd';
 import {
     CreditCardOutlined, DeleteOutlined, QrcodeOutlined,
     CloseOutlined, StarOutlined, EditOutlined,
-} from '@ant-design/icons';
+} from '../../components/common/icons';
 import { PageContainer, Button, DataState, FilterToolbar, MyReservationCardSkeleton, ReservationSummaryCardSkeleton, SpinIndicator, SegmentedControl } from '../../components/common';
 import MyWaiting from '../../components/waiting/MyWaiting';
 import ReservationRow from '../../components/reservation/ReservationRow';
@@ -17,6 +17,8 @@ import QrCodeModal from '../../components/reservation/QrCodeModal';
 import { useReservations, useMessage, usePayment } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
+import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import { queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
 import paymentService from '../../services/paymentService';
@@ -120,10 +122,10 @@ const createReservationActions = ({ res, paying, onPay, onEdit, onQr, onCancel, 
 const resolveOptionParam = (params, key, options, fallback) => (options.some(option => option.value === params.get(key))
     ? params.get(key) : fallback);
 
-// 툴바 값 하나를 URL 에 반영한다 — 빈 값과 기본값(정렬 recent, 상태 ALL)은 URL 에서 뺀다.
+// 상태·정렬의 모든 선택을 같은 방식으로 URL에 표시한다.
 const withToolbarParam = (current, key, value) => {
     const next = new URLSearchParams(current);
-    if (value && !(key === 'sort' && value === 'recent') && !(key === 'status' && value === 'ALL')) next.set(key, value);
+    if (value != null) next.set(key, String(value));
     else next.delete(key);
     return next;
 };
@@ -177,19 +179,30 @@ const ReservationHistory = () => {
     const location = useLocation();
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();
     const { message, confirm } = useMessage();
-    const { reservations, loading, refetching, error, cancelReservation, refetch } = useReservations();
+    const { reservations, loading, refetching, error, cancelReservation, refetch,
+        hasData = reservations.length > 0 || !loading && !error } = useReservations();
     const { user } = useAuthStore();
     const { pay, paying } = usePayment();
     useDocumentTitle('내 예약');
 
     const statusFilter = resolveOptionParam(urlSearchParams, 'status', STATUS_OPTIONS, 'ALL');
     const sort = resolveOptionParam(urlSearchParams, 'sort', SORT_OPTIONS, 'recent');
-    const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'list');
+    const [view, setView] = useViewModeParam(urlSearchParams, 'list');
     const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const [keyword, setKeyword] = useState('');
     const debouncedKeyword = useDebounce(keyword, 300);
     const [qrReservationId, setQrReservationId] = useState(null);
     const [detailReservation, setDetailReservation] = useState(null);
+    const currentDetailReservation = detailReservation ? reservations.find(item => item.id === detailReservation.id) ?? null : null;
+    const listRef = React.useRef(null);
+    const accessDenied = [401, 403].includes(queryErrorStatus(error));
+    useListRefreshAnchor(listRef, JSON.stringify([view, statusFilter, sort, debouncedKeyword]), refetching, hasData ? reservations : null);
+    useEffect(() => {
+        if (accessDenied) { setQrReservationId(null); setDetailReservation(null); return; }
+        if (!hasData || refetching || error) return;
+        if (detailReservation && !currentDetailReservation) setDetailReservation(null);
+        if (qrReservationId != null && !reservations.some(item => item.id === qrReservationId)) setQrReservationId(null);
+    }, [accessDenied, hasData, refetching, error, detailReservation, currentDetailReservation, qrReservationId, reservations]);
 
     // 코드리뷰 지적사항 반영(2026-07): 마운트마다 무조건 refetch()를 불렀는데, useQuery가 이미
     // 마운트 시 자동으로 fetch하므로 이건 대부분 중복 호출이었음 — 특히 staleTime(3분) 안에
@@ -329,7 +342,7 @@ const ReservationHistory = () => {
                     : <MyReservationCardSkeleton count={4} />}
             </div></LoadingStatus>
         );
-    } else if (error && reservations.length === 0) {
+    } else if (error && !hasData) {
         listBody = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
             <DataState state="error" kind="reservation" subject="예약 목록" error={error}
@@ -352,16 +365,17 @@ const ReservationHistory = () => {
     }
 
     return (
-        <section aria-label="내 예약 목록" aria-busy={loading || refetching}>
+        <section ref={listRef} aria-label="내 예약 목록" aria-busy={loading || refetching}>
             <ReservationListingToolbar view={view}
                 initialLoading={loading}
                 onViewChange={setView}
                 status={statusFilter} onStatusChange={nextStatus => setToolbarParam('status', nextStatus)}
                 statusOptions={STATUS_OPTIONS} sort={sort}
                 onSortChange={nextSort => setToolbarParam('sort', nextSort)} sortOptions={SORT_OPTIONS}
-                count={loading || (error && reservations.length === 0) ? undefined : filtered.length} disabled={loading || refetching} />
+                count={loading || !hasData ? undefined : filtered.length} disabled={loading} />
             <FilterToolbar
-                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약번호로 검색', disabled: loading || refetching }}
+                autoRefreshDomain="RESERVATION"
+                search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약번호로 검색', disabled: loading }}
                 onReload={refetch}
                 loading={loading || refetching}
                 initialLoading={loading}
@@ -370,16 +384,16 @@ const ReservationHistory = () => {
             {/* 첫 조회에만 스켈레톤을 표시한다. 폴링·창 포커스·수동 새로고침은 현재 예약과
                 읽던 위치를 유지하고 툴바에서만 진행 상태를 알린다. */}
             {listBody}
-            <QrCodeModal
+            {!accessDenied && <><QrCodeModal
                 reservationId={qrReservationId}
                 open={qrReservationId != null}
                 onClose={() => setQrReservationId(null)}
             />
             <ReservationDetailModal
-                reservation={detailReservation}
-                open={detailReservation != null}
+                reservation={currentDetailReservation}
+                open={currentDetailReservation != null}
                 onClose={() => setDetailReservation(null)}
-            />
+            /></>}
         </section>
     );
 };
@@ -398,7 +412,7 @@ const MyReservations = () => {
             options={[{ value: 'reservation', label: '예약' }, { value: 'waiting', label: '웨이팅' }]}
             onChange={value => setParams(current => {
                 const next = new URLSearchParams(current);
-                if (value === 'waiting') next.set('tab', value); else next.delete('tab');
+                next.set('tab', value);
                 return next;
             })} /></div>
         {waiting ? <MyWaiting key={revision} /> : <ReservationHistory key={revision} />}

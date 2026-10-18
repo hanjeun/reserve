@@ -43,6 +43,7 @@ export default function useModalScrollLock() {
             window.scrollTo({ left: position.x, top: position.y, behavior: 'instant' });
             saved = null;
             touch = null;
+            document.dispatchEvent(new CustomEvent('reserve:modal-unlocked'));
         };
 
         const sync = () => {

@@ -39,7 +39,8 @@ vi.mock('../../components/common', () => ({
 vi.mock('../../components/store', () => ({ StoreCard: ({ store }) => <div data-testid="original-card">{store.name}</div> }));
 vi.mock('../../components/store/StoreListRow', () => ({ default: ({ store }) => <article data-testid="list-row">{store.name}</article> }));
 vi.mock('../../components/advertisement/AdBanner', () => ({ default: () => null }));
-vi.mock('antd', () => ({
+vi.mock('antd', async (importOriginal) => ({
+    Tooltip: (await importOriginal()).Tooltip,
     Modal: () => null,
     Typography: { Text: ({ children }) => <span>{children}</span> },
     Empty: ({ description, children }) => <div>{description}{children}</div>,
@@ -76,7 +77,7 @@ describe('store list view selection with real URL pagination', () => {
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     });
 
-    it('writes both card and list modes explicitly without refetching or resetting filters/page', async () => {
+    it('writes both views without refetching or resetting filters/page', async () => {
         const user = userEvent.setup();
         renderList('/stores?keyword=카페&domain=FOOD&sort=reviewCount&page=3&utm_source=yes');
         await screen.findByTestId('original-card');
@@ -84,12 +85,12 @@ describe('store list view selection with real URL pagination', () => {
         const toggle = screen.getByRole('button', { name: '목록형 보기로 전환' });
         expect(toggle.parentElement?.firstElementChild).toBe(toggle);
         expect(toggle.parentElement?.lastElementChild).toHaveClass('reserve-explore-filter-controls');
-        expect(toggle.querySelector('[data-icon="unordered-list"]')).toBeInTheDocument();
+        expect(toggle.querySelector('.anticon-unordered-list')).toBeInTheDocument();
         await user.click(toggle);
         expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 3 가게');
         expect(screen.queryByTestId('original-card')).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '사진형 보기로 전환' }).querySelector('[data-icon="appstore"]')).toBeInTheDocument();
-        expect(Object.fromEntries(routeParams())).toEqual({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: '3', utm_source: 'yes', view: 'list' });
+        expect(screen.getByRole('button', { name: '사진형 보기로 전환' }).querySelector('.anticon-appstore')).toBeInTheDocument();
+        expect(Object.fromEntries(routeParams())).toEqual({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: '3', utm_source: 'yes', view: 'list', region: '' });
         expect(storeService.getStores).toHaveBeenCalledTimes(1);
         expect(storeService.getStores).toHaveBeenLastCalledWith({ keyword: '카페', domain: 'FOOD', sort: 'reviewCount', page: 2, size: 12 });
         await user.click(screen.getByRole('button', { name: '사진형 보기로 전환' }));
@@ -106,7 +107,7 @@ describe('store list view selection with real URL pagination', () => {
         await user.selectOptions(screen.getByLabelText('가게 정렬'), 'reviewCount');
         await waitFor(() => expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 1 가게'));
         expect(routeParams().get('view')).toBe('list');
-        expect(routeParams().has('page')).toBe(false);
+        expect(routeParams().get('page')).toBe('1');
         await user.click(screen.getByRole('button', { name: '다음 페이지' }));
         await waitFor(() => expect(screen.getByTestId('list-row')).toHaveTextContent('페이지 2 가게'));
         expect(routeParams().get('view')).toBe('list');

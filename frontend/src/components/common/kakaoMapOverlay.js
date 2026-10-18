@@ -1,9 +1,12 @@
+import { colors } from '../../styles/tokens';
+
 /**
  * Kakao CustomOverlay에 넣을 가게 링크를 안전한 DOM 노드로 만든다.
  * 사용자 입력을 HTML 또는 JavaScript 문자열에 합치지 않는 것이 이 함수의 보안 계약이다.
  */
 export const createStoreOverlayContent = (storeName, mapUrl) => {
     const link = document.createElement('a');
+    link.className = 'reserve-kakao-map-callout';
     link.href = mapUrl;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
@@ -13,8 +16,8 @@ export const createStoreOverlayContent = (storeName, mapUrl) => {
         position: 'relative',
         display: 'inline-flex',
         alignItems: 'center',
-        background: '#fff',
-        color: '#111',
+        background: colors.background.paper,
+        color: colors.text.primary,
         fontSize: '12px',
         fontWeight: '600',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -23,7 +26,7 @@ export const createStoreOverlayContent = (storeName, mapUrl) => {
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         whiteSpace: 'nowrap',
         cursor: 'pointer',
-        border: '1px solid rgba(0,0,0,0.08)',
+        border: `1px solid ${colors.border.default}`,
         textDecoration: 'none',
     });
 
@@ -38,7 +41,7 @@ export const createStoreOverlayContent = (storeName, mapUrl) => {
         height: '0',
         borderLeft: '5px solid transparent',
         borderRight: '5px solid transparent',
-        borderTop: '6px solid #fff',
+        borderTop: `6px solid ${colors.background.paper}`,
         filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.08))',
     });
     link.appendChild(arrow);

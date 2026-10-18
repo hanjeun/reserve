@@ -7,8 +7,8 @@ import {
 } from '../common';
 import {
     UserOutlined, EditOutlined, DeleteOutlined,
-    CheckOutlined, CloseOutlined,
-} from '@ant-design/icons';
+    CheckOutlined, CloseOutlined, StarFilled,
+} from '../common/icons';
 import reviewService from '../../services/reviewService';
 import { formatRelativeTime } from '../../utils';
 import { useMessage, useFormErrors } from '../../hooks';
@@ -44,7 +44,7 @@ const ReviewForm = ({ userName, form, setForm, onSubmit, onCancel, loading: form
                     <div>
                         <Text strong style={styles.authorName}>{userName}</Text>
                         <div style={{ marginTop: 2 }}>
-                            <Rate
+                            <Rate character={<StarFilled aria-hidden="true" />}
                                 value={displayRating}
                                 onChange={val => { setForm(f => ({ ...f, rating: val })); clearError('rating'); }}
                                 onHoverChange={setHover}
@@ -291,7 +291,7 @@ const ReviewList = ({
                 <div style={styles.summary}>
                     <span style={styles.avgScore}>{avgRating}</span>
                     <div style={styles.summaryMeta}>
-                        <Rate disabled allowHalf value={Number(avgRating)}
+                        <Rate character={<StarFilled aria-hidden="true" />} disabled allowHalf value={Number(avgRating)}
                             style={{ fontSize: 15, color: colors.warning.main }} />
                         <Text style={styles.reviewCount}>리뷰 {reviews.length}개</Text>
                     </div>
@@ -341,7 +341,7 @@ const ReviewList = ({
                                         </div>
                                         <div>
                                             <Text strong style={styles.authorName}>{review.memberName}</Text>
-                                            <Rate disabled value={review.rating}
+                                            <Rate character={<StarFilled aria-hidden="true" />} disabled value={review.rating}
                                                 style={{ fontSize: 15, color: colors.warning.main, marginTop: 2, display: 'block' }} />
                                         </div>
                                     </div>

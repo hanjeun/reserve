@@ -2,6 +2,7 @@ import React, { useId } from 'react';
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
 import { colors, radius, shadows, fontSize, fontWeight } from '../../styles/tokens';
+import SkeletonText from './SkeletonText';
 
 const { Text } = Typography;
 
@@ -22,6 +23,7 @@ const ChartCard = ({
     height = 260,
     minWidth = 300,
     summary,
+    loading = false,
     tableColumns = [],
     tableRows = [],
 }) => {
@@ -29,12 +31,12 @@ const ChartCard = ({
     const hasTable = tableColumns.length > 0 && tableRows.length > 0;
 
     return (
-        <section style={{ ...styles.card, minWidth }} aria-labelledby={titleId}>
+        <section style={{ ...styles.card, minWidth: `min(100%, ${typeof minWidth === 'number' ? `${minWidth}px` : minWidth})` }} aria-labelledby={titleId}>
             <div style={styles.header}>
-                <h3 id={titleId} style={styles.title}>{title}</h3>
+                <h3 id={titleId} style={styles.title}><SkeletonText loading={loading}>{title}</SkeletonText></h3>
                 {extra}
             </div>
-            {summary && <Text style={styles.summary}>{summary}</Text>}
+            {summary && <Text style={styles.summary}><SkeletonText loading={loading}>{summary}</SkeletonText></Text>}
             {/* Recharts SVG는 키보드·스크린리더 데이터 탐색을 제공하지 않는다.
                 표가 있으면 시각 차트는 중복 낭독에서 제외하고 아래 실제 table을 대체 표현으로 둔다. */}
             <div style={{ height }} aria-hidden={hasTable ? 'true' : undefined}>
@@ -42,14 +44,14 @@ const ChartCard = ({
             </div>
             {hasTable && (
                 <details style={styles.details}>
-                    <summary style={styles.detailsSummary}>데이터 표 보기</summary>
+                    <summary style={styles.detailsSummary}><SkeletonText loading={loading}>데이터 표 보기</SkeletonText></summary>
                     <div style={styles.tableScroller}>
                         <table style={styles.table}>
-                            <caption style={styles.caption}>{title} 원본 데이터</caption>
+                            <caption style={styles.caption}><SkeletonText loading={loading}>{title} 원본 데이터</SkeletonText></caption>
                             <thead>
                                 <tr>
                                     {tableColumns.map((column) => (
-                                        <th key={column.key} scope="col" style={styles.th}>{column.label}</th>
+                                        <th key={column.key} scope="col" style={styles.th}><SkeletonText loading={loading}>{column.label}</SkeletonText></th>
                                     ))}
                                 </tr>
                             </thead>
@@ -58,7 +60,7 @@ const ChartCard = ({
                                     <tr key={row.key ?? row.id ?? row.date ?? row.name ?? rowIndex}>
                                         {tableColumns.map((column) => (
                                             <td key={column.key} style={styles.td}>
-                                                {column.render ? column.render(row[column.key], row) : row[column.key]}
+                                                <SkeletonText loading={loading}>{column.render ? column.render(row[column.key], row) : row[column.key]}</SkeletonText>
                                             </td>
                                         ))}
                                     </tr>
@@ -141,6 +143,7 @@ ChartCard.propTypes = {
     height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     minWidth: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     summary: PropTypes.node,
+    loading: PropTypes.bool,
     tableColumns: PropTypes.arrayOf(PropTypes.shape({
         key: PropTypes.string.isRequired,
         label: PropTypes.string.isRequired,

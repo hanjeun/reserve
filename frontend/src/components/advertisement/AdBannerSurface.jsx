@@ -1,9 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
-import { CloseOutlined } from '@ant-design/icons';
+import { CloseOutlined } from '../common/icons';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import AdMark from './AdMark';
+import LoadingImage from '../common/LoadingImage';
 
 const { Text } = Typography;
 
@@ -47,7 +48,7 @@ const AdBannerSurface = ({ ad, imageSrc, interactive = true, onActivate, onClose
 const BannerContent = ({ ad, imageSrc }) => (
     <>
         <span style={styles.imageWrapper}>
-            <img
+            <LoadingImage
                 className="reserve-ad-banner-image"
                 src={imageSrc}
                 alt={`${ad.storeName} 광고 이미지`}

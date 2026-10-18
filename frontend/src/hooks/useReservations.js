@@ -5,10 +5,14 @@ import { handleApiError } from '../utils/errorHandler';
 import useMessage from './useMessage';
 import { reservationKeys } from './queryKeys';
 import { invalidateReservationData } from './invalidateAfterWrite';
+import { queryErrorStatus } from './liveUpdateQueries';
+import useLiveUpdatesStatus from './useLiveUpdatesStatus';
 
 const useReservations = () => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
+    const live = useLiveUpdatesStatus();
+    const liveReservations = live.connected && live.domains.includes('RESERVATION');
 
     // 코드리뷰 지적사항 반영(2026-07): 예전엔 loading: isLoading || isFetching라서, 취소 후
     // 백그라운드 재조회나 focus 재검증처럼 "조용히 갱신"되는 순간에도 화면 전체가 다시
@@ -20,7 +24,7 @@ const useReservations = () => {
         select: (data) => (Array.isArray(data) ? data : []),
         // 사업자 승인은 서버에서 즉시 확정된다. 대기 예약이 화면에 있을 때만 짧게 재검증해
         // 다른 계정/기기에서 승인한 결과도 열린 "내 예약" 화면에 10초 안에 반영한다.
-        refetchInterval: query => Array.isArray(query.state.data)
+        refetchInterval: query => !liveReservations && Array.isArray(query.state.data)
             && query.state.data.some(reservation => reservation.status === 'PENDING')
             ? 10000 : false,
         refetchIntervalInBackground: false,
@@ -28,8 +32,8 @@ const useReservations = () => {
     });
 
     React.useEffect(() => {
-        if (error) handleApiError(error, message, '예약 목록을 불러오지 못했어요');
-    }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
+        if (error && data === undefined) handleApiError(error, message, '예약 목록을 불러오지 못했어요');
+    }, [error, data]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const cancelMutation = useMutation({
         mutationFn: (reservationId) => reservationService.cancelReservation(reservationId),
@@ -55,10 +59,12 @@ const useReservations = () => {
         onSettled: () => invalidateReservationData(queryClient),
     });
 
+    const accessDenied = [401, 403].includes(queryErrorStatus(error));
     return {
-        reservations: data || [],
+        reservations: accessDenied ? [] : data || [],
         loading: isLoading,
         refetching: isFetching && !isLoading,
+        hasData: data !== undefined && !accessDenied,
         error: error ?? null,
         cancelReservation: cancelMutation.mutateAsync,
         refetch,

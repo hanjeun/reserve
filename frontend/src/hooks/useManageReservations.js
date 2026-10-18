@@ -6,6 +6,7 @@ import useMessage from './useMessage';
 import { reservationKeys } from './queryKeys';
 import { invalidateReservationData } from './invalidateAfterWrite';
 import { colors } from '../styles/tokens';
+import { queryErrorStatus } from './liveUpdateQueries';
 
 const useManageReservations = (params) => {
     const { message } = useMessage();
@@ -116,10 +117,12 @@ const useManageReservations = (params) => {
         return null;
     };
 
+    const accessDenied = [401, 403].includes(queryErrorStatus(error));
     return {
-        reservations:  data?.content ?? [],
-        total:         data?.page?.totalElements ?? data?.totalElements ?? 0,
-        totalPages:    data?.page?.totalPages ?? data?.totalPages ?? 0,
+        reservations:  accessDenied ? [] : data?.content ?? [],
+        total:         accessDenied ? 0 : data?.page?.totalElements ?? data?.totalElements ?? 0,
+        totalPages:    accessDenied ? 0 : data?.page?.totalPages ?? data?.totalPages ?? 0,
+        hasData:       data !== undefined && !accessDenied,
         error,
         // 코드리뷰 지적사항 반영(2026-07): useReservations.js와 동일한 이유로 isLoading만 노출 —
         // onSettled의 invalidateQueries가 백그라운드 재조회(isFetching)를 유발하는데, 이걸

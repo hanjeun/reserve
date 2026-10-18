@@ -53,6 +53,7 @@ test.beforeEach(async ({ page }) => {
     await page.route(/\/api\/waiting\/stores(?:\?|$)/, route => route.fulfill({
         json: { success: true, data: { content: [], page: { number: 0, totalElements: 0, totalPages: 0, size: 12 } } },
     }));
+    await page.route('**/api/feed/config', route => route.fulfill({ json: { success: true, data: { enabled: false } } }));
 });
 
 test('top tabs move only their content in the selected direction, including browser back', async ({ page }) => {
@@ -76,14 +77,14 @@ test('top tabs move only their content in the selected direction, including brow
     await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toBeVisible();
     await expect(page.getByText('접수 가능한 가게가 없어요.', { exact: true })).toBeVisible();
     const waitingDestination = page.locator('.ant-layout-content > .reserve-page-container');
-    const feedDestination = page.locator('.ant-layout-content > .reserve-discovery-coming-soon');
+    const feedDestination = page.locator('.ant-layout-content > .reserve-feed-page');
     await expectContentEntry(page, waitingDestination, 'from-right');
     await expect(header).toHaveCSS('animation-name', 'none');
     await expect(tabs).toHaveCSS('animation-name', 'none');
 
     await feedTab.click();
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { name: '새로운 이야기를 준비하고 있어요' })).toBeVisible();
+    await expect(page.getByText('피드를 준비하고 있어요.', { exact: true })).toBeVisible();
     await expectContentEntry(page, feedDestination, 'from-right');
     await page.goBack();
     await expect(waitingTab).toHaveAttribute('aria-current', 'page');
@@ -96,7 +97,7 @@ test('top tabs move only their content in the selected direction, including brow
     await page.evaluate(() => { window.__reservePageEntries = []; });
     await feedTab.click();
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { name: '새로운 이야기를 준비하고 있어요' })).toBeVisible();
+    await expect(page.getByText('피드를 준비하고 있어요.', { exact: true })).toBeVisible();
     await expectContentEntry(page, feedDestination, 'from-right', { cached: true });
     await page.evaluate(() => { window.__reservePageEntries = []; });
     await page.goBack();
@@ -186,17 +187,17 @@ test('top tab switch is immediate with reduced motion', async ({ page }) => {
     await expect(page.locator('.reserve-boot-shell')).toHaveCount(0);
     await expect(page.locator('.ant-layout-content > .reserve-discovery-home')).toBeVisible();
     await page.getByRole('link', { name: '피드', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '새로운 이야기를 준비하고 있어요' })).toBeVisible();
+    await expect(page.getByText('피드를 준비하고 있어요.', { exact: true })).toBeVisible();
     await page.getByRole('link', { name: '웨이팅', exact: true }).click();
     await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toBeVisible();
     await expect(page.getByText('접수 가능한 가게가 없어요.', { exact: true })).toBeVisible();
     await page.getByRole('link', { name: '피드', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '새로운 이야기를 준비하고 있어요' })).toBeVisible();
+    await expect(page.getByText('피드를 준비하고 있어요.', { exact: true })).toBeVisible();
     const content = page.locator('.ant-layout-content');
     await expect(content).not.toHaveAttribute('data-skeleton-shown', 'true');
     await expect(content).toHaveClass(/reserve-route-entry--from-right/);
     await expect(content).toHaveCSS('animation-name', 'none');
-    await expect(page.locator('.reserve-discovery-coming-soon')).toHaveCSS('animation-name', 'none');
+    await expect(page.locator('.reserve-feed-page')).toHaveCSS('animation-name', 'none');
 });
 
 test('a slow lazy tab stays still through the visible skeleton and the resolved page', async ({ page }) => {

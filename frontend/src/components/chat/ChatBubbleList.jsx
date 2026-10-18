@@ -90,7 +90,7 @@ const ChatBubbleList = ({ messages, mine, roomId, onRetracted, onHidden = onRetr
                     <div className="reserve-chat-bubble-group" style={{ maxWidth: m.senderRole === 'ADMIN' && !isMine ? '72%' : '78%' }}>
                         {!isMine && m.senderRole === 'ADMIN' && first && <span className="reserve-chat-sender-name"><SupportName /></span>}
                         {m.imageUrl && <div className="reserve-chat-image-message" style={m.pending ? styles.bubblePending : undefined}>
-                            <ChatImage url={m.imageUrl} width={m.imageWidth} height={m.imageHeight} />
+                            <ChatImage url={m.imageUrl} roomId={roomId} width={m.imageWidth} height={m.imageHeight} />
                         </div>}
                         {(!m.imageUrl || m.content) && <div className="reserve-chat-message-bubble" style={{
                             ...styles.bubble,

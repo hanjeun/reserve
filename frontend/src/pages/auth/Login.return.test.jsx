@@ -35,8 +35,7 @@ describe('workspace login return', () => {
         fixture.post.mockResolvedValue({ id: 9, name: '점검 계정', role: 'ADMIN', termsAgreed: true });
     });
     afterEach(() => sessionStorage.clear());
-    it.each(['/business?tab=ads&advertisementPage=2#return', '/admin?tab=feed-reports&reportMode=comments#return'])
-        ('email login keeps the complete return address %s', async path => {
+    it.each(['/business?tab=ads&advertisementPage=2#return', '/admin?tab=feed-reports&reportMode=comments#return'])('email login keeps the complete return address %s', async path => {
             const user = userEvent.setup(); show(path);
             await user.type(await screen.findByPlaceholderText('이메일 주소'), 'fixture@example.test');
             await user.type(screen.getByPlaceholderText('비밀번호'), 'fixture-password');

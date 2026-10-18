@@ -91,6 +91,10 @@ export function isLiveReadQuery(query) {
 export const queryErrorStatus = error => Number(error?.status ?? error?.response?.status);
 export const isReadAccessDenied = error => [401, 403, 404, 410].includes(queryErrorStatus(error));
 
+/** A failed read may retain visible rows, but must never turn an empty cache into a successful empty result. */
+export const isBlockingListReadError = (error, items) => Boolean(error)
+    && (isReadAccessDenied(error) || !items?.length);
+
 export function clearDeniedQueryData(error, query) {
     const status = queryErrorStatus(error);
     const key = query.queryKey;

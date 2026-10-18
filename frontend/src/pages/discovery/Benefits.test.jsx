@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Benefits from './Benefits';
 import BenefitDetail from './BenefitDetail';
 import benefitService from '../../services/benefitService';
 import { BENEFIT_IMAGE_FALLBACK, getBenefitImageUrl } from './benefitPresentation';
+import { feedKeys } from '../../hooks/feedQueries';
+import { storeNewsKeys } from '../../hooks/storeNewsQueries';
 
 vi.mock('../../services/benefitService', () => ({ default: { getList: vi.fn(), getDetail: vi.fn() } }));
 const item = { id: 1, storeId: 12, storeName: '가게 이름', title: '신메뉴 안내', excerpt: '가게의 새 소식', content: '<img src=x onerror="window.hacked=true">\n<script>alert(1)</script>', mainImageUrl: 'https://tracker.example/photo.png', createdAt: '2026-09-13T10:00:00' };
@@ -13,10 +15,34 @@ const StoreRouteProbe = () => {
     const location = useLocation();
     return <output data-testid="store-route">{location.pathname}{location.search}</output>;
 };
-const renderPage = (path = '/benefits') => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={[path]}><Routes><Route path="/benefits" element={<Benefits />} /><Route path="/benefits/:id" element={<BenefitDetail />} /><Route path="/stores" element={<StoreRouteProbe />} /></Routes></MemoryRouter></QueryClientProvider>);
+const renderPage = (path = '/benefits') => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(feedKeys.config(), { enabled: false });
+    client.setQueryData(storeNewsKeys.config(), { enabled: false, benefitApprovalEnabled: true });
+    return { ...render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Routes><Route path="/benefits" element={<Benefits />} /><Route path="/benefits/:id" element={<BenefitDetail />} /><Route path="/stores" element={<StoreRouteProbe />} /></Routes></MemoryRouter></QueryClientProvider>), client };
+};
 
 describe('public store news and benefit guidance', () => {
     beforeEach(() => { vi.clearAllMocks(); window.scrollTo = vi.fn(); });
+    it.each([false, true])('distinguishes a failed refresh from a successful cached empty result (rows=%s)', async hasRows => {
+        benefitService.getList.mockResolvedValue({ content: hasRows ? [item] : [], page: { totalElements: hasRows ? 1 : 0 } });
+        const { client } = renderPage('/benefits?page=1&period=ALL');
+        if (hasRows) await screen.findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' });
+        else await screen.findByText('아직 등록된 가게 소식이 없어요.');
+        const period = screen.getByRole('button', { name: '가게 소식 기간' });
+        benefitService.getList.mockRejectedValue(Object.assign(new Error('offline'), { status: 503 }));
+        await act(() => client.invalidateQueries({ queryKey: ['public-promotions', 'list'] }));
+        expect(screen.getByRole('button', { name: '가게 소식 기간' })).toBe(period);
+        expect(period).toHaveTextContent('전체 기간');
+        if (hasRows) {
+            expect(await screen.findByText('목록을 갱신하지 못했어요. 현재 내용은 유지했어요.')).toBeInTheDocument();
+            expect(screen.getByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' })).toBeInTheDocument();
+        } else {
+            expect(await screen.findByText('가게 소식을 불러오지 못했어요.')).toBeInTheDocument();
+            expect(screen.queryByText('아직 등록된 가게 소식이 없어요.')).toBeNull();
+            expect(screen.queryByText('목록을 갱신하지 못했어요. 현재 내용은 유지했어요.')).toBeNull();
+        }
+    });
     it('shows only actual photo news banners beneath an accessible hidden benefits title', async () => {
         benefitService.getList.mockResolvedValue({ content: [item], page: { totalElements: 1 } });
         renderPage();

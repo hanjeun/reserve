@@ -20,6 +20,7 @@ import { discoveryTabDestination } from '../../utils/discoveryNavigation';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
 
@@ -45,7 +46,8 @@ export default function FeedAuthor() {
         staleTime: 30_000, placeholderData: keepPreviousData });
     const listRef = useRef(null);
     const unavailable = authorUnavailable || [config, posts].some(query => [401, 403].includes(httpStatusOf(query.error)));
-    const backgroundFailure = [config, author, posts].find(query => query.isError && query.data !== undefined);
+    const blockingError = isBlockingListReadError(posts.error, posts.data?.content);
+    const backgroundFailure = [config, author, ...(!blockingError ? [posts] : [])].find(query => query.isError && query.data !== undefined);
     useListRefreshAnchor(listRef, `${publicId}:${page}`, posts.isFetching && !posts.isPlaceholderData, unavailable ? null : posts.data);
     const totalPages = Math.max(1, Math.ceil(feedTotal(posts.data) / FEED_PAGE_SIZE));
     useEffect(() => {
@@ -69,7 +71,7 @@ export default function FeedAuthor() {
         if (author.isError && (!author.data || authorUnavailable)) return <DataState state={isMissingRequestError(author.error) ? 'empty' : 'error'} requestType="detail" title="공개 프로필을 불러올 수 없어요."
             error={author.error} onRetry={isMissingRequestError(author.error) ? undefined : author.refetch} retrying={author.isFetching} />;
         if (!author.data && author.isPending || !posts.data && posts.isPending) return <FeedSkeleton />;
-        if (posts.isError && (!posts.data || unavailable)) return <DataState state="error" title="게시물을 불러오지 못했어요." error={posts.error} onRetry={posts.refetch} retrying={posts.isFetching} />;
+        if (blockingError || posts.isError && unavailable) return <DataState state="error" title="게시물을 불러오지 못했어요." error={posts.error} onRetry={posts.refetch} retrying={posts.isFetching} />;
         if (!posts.data?.content?.length) return <DataState state="empty" kind="feed" title="공개한 게시물이 없어요." />;
         return <div className="reserve-feed-list" aria-busy={posts.isFetching}>{posts.data.content.map(post => <FeedPostCard key={post.id} post={post} listItemId={`post:${post.id}`}
             onEdit={mine ? item => { setEditorMounted(true); setEditingPost(item); } : undefined}
@@ -86,7 +88,7 @@ export default function FeedAuthor() {
                 onClick={() => navigate('/my-page?tab=public-profile')} />}</div>}
         {!unavailable && backgroundFailure && <DataState compact state="error" title="게시물을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
         {renderList()}
-        {enabled && !unavailable && posts.data && feedTotal(posts.data) > FEED_PAGE_SIZE && <nav className="reserve-feed-pagination" aria-label="작성자 게시물 페이지">
+        {enabled && !unavailable && !blockingError && posts.data && feedTotal(posts.data) > FEED_PAGE_SIZE && <nav className="reserve-feed-pagination" aria-label="작성자 게시물 페이지">
             <Pagination current={page} total={feedTotal(posts.data)} pageSize={FEED_PAGE_SIZE} showSizeChanger={false}
                 onChange={value => { const next = new URLSearchParams(params); next.set('page', String(value)); setParams(next); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} />
         </nav>}

@@ -11,6 +11,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf } from '../../utils/listErrorMessage';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import useMessage from '../../hooks/useMessage';
 import service from '../../services/feedInteractionService';
 import { feedDate, feedPage, feedRelativeDate, feedTotal } from '../../utils/feed';
@@ -37,7 +38,8 @@ export default function FeedNotifications() {
         enabled, placeholderData: keepPreviousData, staleTime: 20_000 });
     const listRef = useRef(null);
     const unavailable = [config, list].some(query => [401, 403].includes(httpStatusOf(query.error)));
-    const backgroundFailure = [config, list].find(query => query.isError && query.data !== undefined);
+    const blockingError = isBlockingListReadError(list.error, list.data?.content);
+    const backgroundFailure = [config, ...(!blockingError ? [list] : [])].find(query => query.isError && query.data !== undefined);
     useListRefreshAnchor(listRef, `${view}:${page}`, list.isFetching && !list.isPlaceholderData, unavailable ? null : list.data);
     const lastPage = Math.max(1, Math.ceil(feedTotal(list.data) / 20));
     useEffect(() => {
@@ -56,7 +58,7 @@ export default function FeedNotifications() {
     onError: failure => { if (!failure.isStaleSession) message.error(failure.message); } });
     const content = () => {
         const failure = config.isError && (!config.data || [401, 403].includes(httpStatusOf(config.error))) ? config
-            : list.isError && (!list.data || unavailable) ? list : null;
+            : blockingError || list.isError && unavailable ? list : null;
         if (failure) return <DataState state="error" title="알림을 불러오지 못했어요." error={failure.error}
             onRetry={failure.refetch} retrying={failure.isFetching} />;
         if (!enabled) return <DataState state="empty" kind="notification" title="피드 알림을 준비하고 있어요." />;
@@ -82,7 +84,7 @@ export default function FeedNotifications() {
             })} /></div>
         {!unavailable && backgroundFailure && <DataState compact state="error" title="알림을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
         <AnimatedContent motionKey={`${view}:${page}`} ready={!config.isPending && (!enabled || !list.isPending && !list.isPlaceholderData)}>{content()}</AnimatedContent>
-        {enabled && !unavailable && list.data && feedTotal(list.data) > 20 && <Pagination current={page} total={feedTotal(list.data)} pageSize={20} showSizeChanger={false}
+        {enabled && !unavailable && !blockingError && list.data && feedTotal(list.data) > 20 && <Pagination current={page} total={feedTotal(list.data)} pageSize={20} showSizeChanger={false}
             onChange={value => setParams(previous => { const next = new URLSearchParams(previous); next.set('page', String(value)); return next; })} />}
         <p className="reserve-feed-note">{FEED_NOTIFICATION_RETENTION_NOTE}</p>
     </PageContainer>;

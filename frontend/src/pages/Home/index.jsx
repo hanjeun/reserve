@@ -26,7 +26,7 @@ import useMessagesEntry from '../../hooks/useMessagesEntry';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useAuthStore from '../../store/useAuthStore';
 import useLocationStore from '../../store/useLocationStore';
-import { isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { storeService } from '../../services';
 import { distanceSortParams } from '../../utils/distanceSort';
 import { formatRegionLabel } from '../../constants/regions';
@@ -337,7 +337,8 @@ function RecommendedStores({ region = '' }) {
         staleTime: 1000 * 60 * 3,
     });
     const stores = storeContent(data);
-    const refreshFailure = isError && data !== undefined && !isReadAccessDenied(error)
+    const blockingError = isBlockingListReadError(error, stores);
+    const refreshFailure = isError && !blockingError
         ? <DataState compact state="error" role="status" aria-live="polite"
             title="최신 정보를 불러오지 못했어요." error={error} onRetry={refetch} retrying={isFetching} /> : null;
 
@@ -351,7 +352,7 @@ function RecommendedStores({ region = '' }) {
                 </output>
             );
         }
-        if (isError && (data === undefined || isReadAccessDenied(error))) {
+        if (blockingError) {
             return (
                 <DataState state="error" kind="store" subject="추천 가게" error={error}
                     title="추천 가게를 불러오지 못했어요." onRetry={refetch} retrying={isFetching} compact />

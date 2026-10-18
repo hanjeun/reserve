@@ -10,7 +10,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { API_ENDPOINTS } from '../../constants';
 import { VALIDATION_RULES } from '../../utils/validation';
 import { SCROLL_TO_FIRST_ERROR } from '../../utils/form';
-import { fontSize, animation, agreement as A } from '../../styles/tokens';
+import { colors, fontSize, animation, agreement as A } from '../../styles/tokens';
 
 const { Text } = Typography;
 

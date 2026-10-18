@@ -16,6 +16,7 @@ vi.mock('../../hooks', () => ({
     usePayment: () => ({ pay: vi.fn(), paying: false }),
 }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: () => {} }));
+vi.mock('../../hooks/feedInteractionQueries', () => ({ useFeedInteractions: () => ({ data: { enabled: false, newsEnabled: false } }) }));
 vi.mock('../../store/useAuthStore', () => ({ default: selector => typeof selector === 'function' ? selector({ user: { id: 7 } }) : { user: { id: 7 } } }));
 vi.mock('../../components/store', () => ({ StoreCard: ({ store }) => <div>{store.name}</div> }));
 vi.mock('../../components/reservation/ReservationRow', () => ({ default: ({ reservation }) => <div>{reservation.storeName}</div> }));
@@ -29,13 +30,15 @@ vi.mock('antd', () => ({
     Alert: ({ title, action }) => <div role="alert">{title}{action}</div>,
     Modal: ({ open, children }) => open ? <div>{children}</div> : null,
     Flex: ({ children }) => <div>{children}</div>,
+    Tooltip: ({ children }) => children,
 }));
 vi.mock('../../components/common', () => {
     const Card = ({ children }) => <div>{children}</div>;
     Card.Cover = ({ alt }) => <span>{alt}</span>;
     Card.Add = () => <span>가게 추가</span>;
     return {
-        PageContainer: ({ children }) => <main>{children}</main>,
+        PageContainer: ({ children, 'aria-busy': busy }) => <main aria-busy={busy}>{children}</main>,
+        Tooltip: ({ children }) => children,
         Button: ({ children, onClick, loading }) => <button onClick={onClick} disabled={loading}>{children}</button>,
         StoreCardSkeleton: () => <span>가게 placeholder</span>,
         MyReservationCardSkeleton: () => <span>예약 placeholder</span>,
@@ -91,8 +94,9 @@ describe('personal page loading presentation', () => {
         expect(screen.queryByText('아직 즐겨찾기한 가게가 없어요.')).toBeNull();
     });
 
-    it('distinguishes a failed favorites query and retries the existing query', () => {
-        state.query.error = new Error('offline');
+    it.each([undefined, []])('distinguishes a failed favorites query from missing or empty cached data (%j)', data => {
+        state.query.data = data;
+        state.query.error = Object.assign(new Error('unavailable'), { status: 503 });
         show(<MyFavorites />);
         expect(screen.getByRole('alert')).toHaveTextContent('즐겨찾기 목록을 불러오지 못했습니다.');
         expect(screen.queryByText('아직 즐겨찾기한 가게가 없어요.')).toBeNull();
@@ -100,15 +104,24 @@ describe('personal page loading presentation', () => {
         expect(state.refetch).toHaveBeenCalledTimes(1);
     });
 
-    // 2026-09-26: 즐겨찾기는 하트 한 번에 카드가 생기거나 빠지는 화면이라, 재조회 동안 카드 자리에
-    // 스켈레톤을 보여 준 뒤 새 목록으로 바꾼다('내 예약'의 목록 유지 규칙과 일부러 다르다).
-    it('shows a same-slot skeleton instead of the old cards while favorites refetch', () => {
+    it('keeps cached favorites visible while the existing list is being refreshed', () => {
         state.query.data = [{ id: 1, storeId: 12, storeName: '내 관심 가게' }];
         state.query.isFetching = true;
         show(<MyFavorites />);
-        expect(screen.getByRole('status', { name: '즐겨찾기를 새로 불러오는 중' })).toBeInTheDocument();
-        expect(screen.getByText('가게 placeholder')).toBeInTheDocument();
-        expect(screen.queryByText('내 관심 가게')).toBeNull();
+        expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+        expect(screen.queryByRole('status', { name: '즐겨찾기를 새로 불러오는 중' })).toBeNull();
+        expect(screen.queryByText('가게 placeholder')).toBeNull();
+        expect(screen.getByText('내 관심 가게')).toBeInTheDocument();
+    });
+
+    it.each([401, 403, 404, 410])('hides cached favorites after an access-denied refresh (%s)', status => {
+        state.query.data = [{ id: 1, storeId: 12, storeName: '이전 계정의 관심 가게' }];
+        state.query.error = Object.assign(new Error('access denied'), { status });
+        show(<MyFavorites />);
+        expect(screen.getByRole('alert')).toHaveTextContent('즐겨찾기 목록을 불러오지 못했습니다.');
+        expect(screen.queryByText('이전 계정의 관심 가게')).toBeNull();
+        expect(screen.queryByText('아직 즐겨찾기한 가게가 없어요.')).toBeNull();
+        expect(screen.queryByText('가게 placeholder')).toBeNull();
     });
 
     it('shows a genuinely empty favorites list only after a successful query', () => {

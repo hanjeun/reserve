@@ -21,7 +21,7 @@ import useMessage from '../../hooks/useMessage';
 import useQueryParamsState from '../../hooks/useQueryParamState';
 import AnimatedContent from '../common/AnimatedContent';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 
 const PAGE_SIZE = 12;
 const QUERY_DEFAULTS = { newsStore: 'ALL', newsState: 'ALL', newsPage: '1' };
@@ -50,6 +50,7 @@ export default function StoreNewsTab() {
     const total = feedTotal(list.data), lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
     useListRefreshAnchor(listRef, `${storeId}:${selectedState}:${page}`, list.isFetching, list.data);
     const visibleNews = (list.data?.content || []).filter(item => item.state !== 'DELETED');
+    const blockingError = isBlockingListReadError(list.error, visibleNews);
     const [editor, setEditor] = useState({ open: false, id: undefined });
     const [preview, setPreview] = useState({ open: false, news: null });
     const previewQuery = useQuery({ queryKey: storeNewsKeys.detail(preview.news?.id),
@@ -77,7 +78,7 @@ export default function StoreNewsTab() {
         : stores.isError ? '내 가게를 불러오지 못했어요. 다시 불러온 뒤 작성해주세요.'
             : !owned.length ? '소식을 게시할 수 있는 내 가게가 있어야 작성할 수 있어요.' : '';
     return <section ref={listRef} className="reserve-store-news-management" aria-label="내 가게 소식 관리">
-        <div className="reserve-explore-filters reserve-store-news-manage-toolbar"><StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} /><span className="reserve-explore-count">{total.toLocaleString('ko-KR')}개 소식</span>
+        <div className="reserve-explore-filters reserve-store-news-manage-toolbar"><StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ open: true, mounted: true })} /><span className="reserve-explore-count">{blockingError ? '소식 확인 필요' : `${total.toLocaleString('ko-KR')}개 소식`}</span>
             <div className="reserve-explore-filter-controls"><FilterMenu appearance="plain" value={storeId || 'ALL'} aria-label="내 소식 가게 필터" options={[{ value: 'ALL', label: '전체 가게' }, ...owned.map(store => ({ value: store.id, label: store.name }))]}
                 loading={stores.isPending} disabled={stores.isPending || stores.isError && !stores.data} onChange={value => change({ newsStore: value })} />
                 <FilterMenu appearance="plain" value={selectedState} options={STORE_NEWS_STATES} aria-label="내 소식 상태 필터" onChange={value => change({ newsState: value })} />
@@ -85,8 +86,8 @@ export default function StoreNewsTab() {
         {stores.isError && <DataState state="error" compact title="내 가게를 불러오지 못했어요." error={stores.error} onRetry={stores.refetch} retrying={stores.isFetching} />}
         {stores.isSuccess && !owned.length && <p className="reserve-feed-note" role="status">소식을 게시할 수 있는 내 가게가 없어요. <Link to="/my-stores">내 가게 확인</Link></p>}
         <AnimatedContent motionKey={`${storeId || 'ALL'}:${selectedState}:${page}`} ready={!list.isPending && !list.isPlaceholderData}>
-        {list.isRefetchError && list.data && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />}
-        {list.isPending ? <StoreNewsSkeleton contentOnly /> : list.isError && !list.data ? <DataState state="error" title="내 소식을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />
+        {list.isRefetchError && !blockingError && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />}
+        {list.isPending ? <StoreNewsSkeleton contentOnly /> : blockingError ? <DataState state="error" title="내 소식을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />
             : !visibleNews.length ? <DataState state="empty" kind="news" title="조건에 맞는 가게 소식이 없어요." />
                 : <div className="reserve-store-news-manage-list" aria-busy={list.isFetching}>{visibleNews.map(item => <article className="reserve-store-news-manage-row" key={item.id} data-list-item-id={item.id}>
                     <h3>{item.title || '제목 없는 소식'}</h3>

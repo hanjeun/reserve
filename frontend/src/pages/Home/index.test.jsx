@@ -122,6 +122,42 @@ describe('app discovery home', () => {
         client.clear();
     });
 
+    it('replaces a cached empty success with only an error after a failed refresh and restores empty after retry', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+        const key = ['home', 'recommended-stores', ''];
+        const emptyPage = { content: [] };
+        storeService.getStores.mockResolvedValueOnce(emptyPage)
+            .mockRejectedValueOnce({ status: 503 })
+            .mockResolvedValueOnce(emptyPage);
+        const view = renderHome(['/'], client);
+        const recommendations = within(screen.getByRole('region', { name: '이런 곳은 어때요?' }));
+        try {
+            expect(await recommendations.findByText('아직 추천할 가게가 없어요.')).toBeInTheDocument();
+            expect(client.getQueryState(key).status).toBe('success');
+            expect(recommendations.queryByRole('alert')).toBeNull();
+
+            await act(async () => { await client.refetchQueries({ queryKey: key, exact: true }); });
+
+            expect(await recommendations.findByText('추천 가게를 불러오지 못했어요.')).toBeInTheDocument();
+            expect(recommendations.getAllByRole('alert')).toHaveLength(1);
+            expect(recommendations.queryByText('아직 추천할 가게가 없어요.')).toBeNull();
+            expect(recommendations.queryByText('최신 정보를 불러오지 못했어요.')).toBeNull();
+            expect(client.getQueryData(key)).toEqual(emptyPage);
+
+            await userEvent.setup().click(recommendations.getByRole('button', { name: '다시 불러오기' }));
+
+            expect(await recommendations.findByText('아직 추천할 가게가 없어요.')).toBeInTheDocument();
+            expect(recommendations.queryByRole('alert')).toBeNull();
+            expect(recommendations.queryByText('추천 가게를 불러오지 못했어요.')).toBeNull();
+            expect(recommendations.queryByText('최신 정보를 불러오지 못했어요.')).toBeNull();
+            expect(client.getQueryState(key).status).toBe('success');
+            expect(storeService.getStores).toHaveBeenCalledTimes(3);
+        } finally {
+            view.unmount();
+            client.clear();
+        }
+    });
+
     it('shows the operation-guide photo as the first home banner, service domains, and recommended stores', async () => {
         renderHome();
 

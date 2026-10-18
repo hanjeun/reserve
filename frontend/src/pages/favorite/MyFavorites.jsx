@@ -14,7 +14,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { queryErrorStatus } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import { favoriteKeys } from '../../hooks/queryKeys';
 import favoriteService from '../../services/favoriteService';
 
@@ -53,6 +53,7 @@ const MyFavorites = () => {
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
     const hasData = data !== undefined && !accessDenied;
     const favorites = accessDenied ? [] : data || [];
+    const blockingError = isBlockingListReadError(error, favorites);
     // 자동 재조회는 기존 카드와 도구줄을 유지한다. 첫 조회에만 골격을 사용한다.
     const refetching = isFetching && !loading;
     const listRef = useRef(null);
@@ -79,7 +80,7 @@ const MyFavorites = () => {
     // 헤더 안내 문구 — 로딩 → 실패(빈 목록) → 목록 있음 → 빈 목록 순으로 판정한다.
     const headerMessage = () => {
         if (loading) return '즐겨찾기를 불러오는 중이에요.';
-        if (error && !hasData) return '즐겨찾기 목록을 확인하지 못했어요.';
+        if (blockingError) return '즐겨찾기 목록을 확인하지 못했어요.';
         if (favorites.length > 0) return `총 ${favorites.length}개의 가게를 즐겨찾기했어요.`;
         return '마음에 드는 가게를 즐겨찾기에 추가해보세요.';
     };
@@ -95,7 +96,7 @@ const MyFavorites = () => {
                 </output>
             );
         }
-        if (error && !hasData) {
+        if (blockingError) {
             return (
                 <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
                     onRetry={refetch} retrying={isFetching} style={{ marginTop: 100 }} />
@@ -139,7 +140,7 @@ const MyFavorites = () => {
 
             {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
             {showStores && <section ref={listRef} className="reserve-liked-section" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}
-                {error && hasData && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
+                {error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
                     title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
                     onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />}{renderContent()}</section>}
             {hasContentLikes && kind !== 'stores' && <section className="reserve-liked-section" aria-label="좋아요한 게시물과 소식">

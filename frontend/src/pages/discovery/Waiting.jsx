@@ -21,7 +21,7 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 import waitingService from '../../services/waitingService';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 
 const PAGE_SIZE = 12;
 export default function Waiting() {
@@ -63,7 +63,7 @@ export default function Waiting() {
         try { await result.refetch(); } finally { setRefreshing(false); }
     };
     const stores = result.data?.content || [];
-    const blockingError = result.error && (!result.data || isReadAccessDenied(result.error));
+    const blockingError = isBlockingListReadError(result.error, stores);
     useListRefreshAnchor(listRef, `${term}:${region}:${status}:${sort}:${page}:${view}`, result.isFetching, result.data);
     const total = result.data?.page?.totalElements ?? result.data?.totalElements ?? 0;
     useEffect(() => {
@@ -79,7 +79,7 @@ export default function Waiting() {
     if (!settled) return <WaitingPageSkeleton view={view} status={status} sort={sort} />;
     return <PageContainer size="xl" paddingTop="32px">
         <div className="reserve-waiting-heading"><PageTitle level={1}>웨이팅</PageTitle><PageDescription>접수 가능한 가게를 찾고, 내 예약에서 대기 현황을 확인해요.</PageDescription></div>
-        <WaitingStoreToolbar view={view} onViewChange={setView} count={total} region={region} regionOpen={regionOpen}
+        <WaitingStoreToolbar view={view} onViewChange={setView} count={blockingError ? undefined : total} region={region} regionOpen={regionOpen}
             onRegionOpen={() => setRegionOpen(true)} status={status} onStatusChange={value => change('status', value)}
             sort={sort} onSortChange={value => change('sort', value)} disabled={false} />
         <FilterToolbar search={{ value: keyword, onChange: event => change('keyword', event.target.value),

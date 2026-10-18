@@ -18,7 +18,7 @@ import { useReservations, useMessage, usePayment } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
-import { queryErrorStatus } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import useDebounce from '../../hooks/useDebounce';
 import useAuthStore from '../../store/useAuthStore';
 import paymentService from '../../services/paymentService';
@@ -196,13 +196,15 @@ const ReservationHistory = () => {
     const currentDetailReservation = detailReservation ? reservations.find(item => item.id === detailReservation.id) ?? null : null;
     const listRef = React.useRef(null);
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
+    const blockingError = isBlockingListReadError(error, reservations);
     useListRefreshAnchor(listRef, JSON.stringify([view, statusFilter, sort, debouncedKeyword]), refetching, hasData ? reservations : null);
-    useEffect(() => {
-        if (accessDenied) { setQrReservationId(null); setDetailReservation(null); return; }
-        if (!hasData || refetching || error) return;
+    if (accessDenied) {
+        if (qrReservationId !== null) setQrReservationId(null);
+        if (detailReservation !== null) setDetailReservation(null);
+    } else if (hasData && !refetching && !error) {
         if (detailReservation && !currentDetailReservation) setDetailReservation(null);
         if (qrReservationId != null && !reservations.some(item => item.id === qrReservationId)) setQrReservationId(null);
-    }, [accessDenied, hasData, refetching, error, detailReservation, currentDetailReservation, qrReservationId, reservations]);
+    }
 
     // 코드리뷰 지적사항 반영(2026-07): 마운트마다 무조건 refetch()를 불렀는데, useQuery가 이미
     // 마운트 시 자동으로 fetch하므로 이건 대부분 중복 호출이었음 — 특히 staleTime(3분) 안에
@@ -342,7 +344,7 @@ const ReservationHistory = () => {
                     : <MyReservationCardSkeleton count={4} />}
             </div></LoadingStatus>
         );
-    } else if (error && !hasData) {
+    } else if (blockingError) {
         listBody = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
             <DataState state="error" kind="reservation" subject="예약 목록" error={error}
@@ -372,7 +374,7 @@ const ReservationHistory = () => {
                 status={statusFilter} onStatusChange={nextStatus => setToolbarParam('status', nextStatus)}
                 statusOptions={STATUS_OPTIONS} sort={sort}
                 onSortChange={nextSort => setToolbarParam('sort', nextSort)} sortOptions={SORT_OPTIONS}
-                count={loading || !hasData ? undefined : filtered.length} disabled={loading} />
+                count={loading || !hasData || blockingError ? undefined : filtered.length} disabled={loading} />
             <FilterToolbar
                 autoRefreshDomain="RESERVATION"
                 search={{ value: keyword, onChange: e => setKeyword(e.target.value), placeholder: '가게명, 예약번호로 검색', disabled: loading }}

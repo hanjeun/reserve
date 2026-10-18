@@ -13,6 +13,12 @@ import { APP_ORIGIN, LEGACY_ORIGIN, appUrl } from '../../config/siteUrls';
 import DraftTransferSkeleton from '../../components/store/DraftTransferSkeleton';
 
 export default function DraftTransfer() {
+    const memberId = useAuthStore(state => state.user?.id);
+    const revision = useAuthStore(state => state.sessionRevision);
+    return <DraftTransferSession key={memberId + ':' + revision} />;
+}
+
+function DraftTransferSession() {
     useDocumentTitle('가게 초안 옮기기');
     const user = useAuthStore(state => state.user);
     const { message } = useMessage();
@@ -32,7 +38,6 @@ export default function DraftTransfer() {
     useEffect(() => {
         const session = currentSession().epoch;
         const stamp = ++generation.current;
-        lock.current = false; setBusy(false); setRecords(null); setIncoming(null); setError('');
         void listStoreDrafts(user.id).then(drafts => { if (isCurrentSession(session) && generation.current === stamp) { setRecords(drafts); setSelected(drafts.map(record => record.key)); } })
             .catch(failure => { if (isCurrentSession(session) && generation.current === stamp) setError(failure.message); });
         return () => { generation.current += 1; };

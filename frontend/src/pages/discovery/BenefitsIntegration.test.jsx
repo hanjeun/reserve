@@ -7,6 +7,8 @@ import Benefits from './Benefits';
 import benefitService from '../../services/benefitService';
 import storeService from '../../services/storeService';
 import { benefitKeys } from '../../hooks/queryKeys';
+import { feedKeys } from '../../hooks/feedQueries';
+import { storeNewsKeys } from '../../hooks/storeNewsQueries';
 
 vi.mock('../../services/benefitService', () => ({ default: { getList: vi.fn() } }));
 vi.mock('../../services/storeService', () => ({ default: { getStores: vi.fn() } }));
@@ -16,6 +18,7 @@ vi.mock('../../components/common', async () => ({
     DataState: (await import('../../components/common/DataState')).default,
     FilterMenu: (await import('../../components/common/FilterMenu')).default,
     FormModal: (await import('../../components/common/FormModal')).default,
+    RefreshButton: (await import('../../components/common/RefreshButton')).default,
 }));
 
 const NEWS_TOTAL = 37;
@@ -38,6 +41,8 @@ function RouteProbe({ onLocation }) {
 
 function renderPage(url) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 60000 } } });
+    client.setQueryData(feedKeys.config(), { enabled: false });
+    client.setQueryData(storeNewsKeys.config(), { enabled: false, benefitApprovalEnabled: true });
     const onLocation = vi.fn();
     clients.push(client);
     const result = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[url]}>
@@ -63,33 +68,37 @@ describe('benefits-only query integration; general store pagination remains on /
     });
     afterEach(() => { clients.splice(0).forEach(client => client.clear()); });
 
-    it('repairs only an invalid news page without consuming or changing unrelated store URL state', async () => {
+    it('repairs an invalid news page, removes unsupported store options and preserves attribution', async () => {
         const news = deferred();
         benefitService.getList.mockReturnValueOnce(news.promise);
-        const { client, onLocation } = renderPage('/benefits?page=-1&domain=bad&sort=bad&storePage=bad&keep=1');
+        const { client, onLocation } = renderPage('/benefits?page=-1&domain=bad&sort=bad&storePage=bad&utm_source=campaign');
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledTimes(1));
         expect(screen.getByRole('status', { name: '가게 소식을 불러오는 중' })).toBeInTheDocument();
         await act(async () => { news.resolve(newsPage(0)); await news.promise; });
         await newsLink(1);
-        await waitFor(() => expect(params()).toEqual({ domain: 'bad', sort: 'bad', storePage: 'bad', keep: '1' }));
+        await waitFor(() => expect(params()).toEqual({ page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' }));
         expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
-        expect(client.getQueryData(benefitKeys.list({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' })).page.number).toBe(0);
+        expect(client.getQueryData([...benefitKeys.list({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }), 'approved-only']).page.number).toBe(0);
         expect(client.getQueryCache().findAll({ queryKey: ['stores'] })).toHaveLength(0);
         expect(storeService.getStores).not.toHaveBeenCalled();
         expect(screen.queryByRole('region', { name: '일반 가게 탐색' })).not.toBeInTheDocument();
         const locationCount = onLocation.mock.calls.length;
         await act(async () => { await Promise.resolve(); });
         expect(onLocation).toHaveBeenCalledTimes(locationCount);
-        expect(locationCount).toBeLessThanOrEqual(2);
+        expect(onLocation.mock.calls.map(([search]) => Object.fromEntries(new URLSearchParams(search)))).toEqual([
+            { page: '-1', domain: 'bad', sort: 'bad', storePage: 'bad', utm_source: 'campaign' },
+            { page: '1', domain: 'bad', sort: 'bad', storePage: 'bad', utm_source: 'campaign' },
+            { page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' },
+        ]);
         expect(benefitService.getList).toHaveBeenCalledTimes(1);
     });
 
-    it('paginates 12-item news with nested totals and reuses fresh page cache while preserving all other params', async () => {
-        const { client } = renderPage('/benefits?page=2&storePage=3&domain=FOOD&sort=reviews&keep=1');
+    it('paginates 12-item news with nested totals and reuses fresh cache while preserving news filters and attribution', async () => {
+        const { client } = renderPage('/benefits?page=2&newsType=EVENT&period=ALL&utm_source=campaign');
         await newsLink(2);
-        expect(params()).toEqual({ page: '2', storePage: '3', domain: 'FOOD', sort: 'reviews', keep: '1' });
-        expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
-        expect(client.getQueryData(benefitKeys.list({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' })).page.totalElements).toBe(NEWS_TOTAL);
+        expect(params()).toEqual({ page: '2', newsType: 'EVENT', period: 'ALL', utm_source: 'campaign' });
+        expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: 'EVENT', period: 'ALL' }, expect.any(AbortSignal));
+        expect(client.getQueryData([...benefitKeys.list({ page: 1, size: 12, newsType: 'EVENT', period: 'ALL' }), 'approved-only']).page.totalElements).toBe(NEWS_TOTAL);
         expect(screen.getByText('37개 소식')).toBeInTheDocument();
         expect(screen.queryByText(/총 .*개 가게/)).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '서비스 분야 선택' })).not.toBeInTheDocument();
@@ -97,23 +106,23 @@ describe('benefits-only query integration; general store pagination remains on /
 
         paginate(3);
         await newsLink(3);
-        expect(params()).toEqual({ page: '3', storePage: '3', domain: 'FOOD', sort: 'reviews', keep: '1' });
+        expect(params()).toEqual({ page: '3', newsType: 'EVENT', period: 'ALL', utm_source: 'campaign' });
         expect(benefitService.getList).toHaveBeenCalledTimes(2);
         paginate(2);
         await newsLink(2);
         expect(benefitService.getList).toHaveBeenCalledTimes(2);
         paginate(1);
         await newsLink(1);
-        expect(params()).toEqual({ storePage: '3', domain: 'FOOD', sort: 'reviews', keep: '1' });
-        expect(benefitService.getList).toHaveBeenLastCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
+        expect(params()).toEqual({ page: '1', newsType: 'EVENT', period: 'ALL', utm_source: 'campaign' });
+        expect(benefitService.getList).toHaveBeenLastCalledWith({ page: 0, size: 12, newsType: 'EVENT', period: 'ALL' }, expect.any(AbortSignal));
         expect(storeService.getStores).not.toHaveBeenCalled();
     });
 
     it('does not query general stores even when their mocked endpoint would fail', async () => {
         storeService.getStores.mockRejectedValue(new Error('stores offline'));
-        renderPage('/benefits?domain=SPORTS&sort=bad&storePage=999&keep=1');
+        renderPage('/benefits?domain=SPORTS&sort=bad&storePage=999&utm_source=campaign');
         await newsLink(1);
-        expect(params()).toEqual({ domain: 'SPORTS', sort: 'bad', storePage: '999', keep: '1' });
+        expect(params()).toEqual({ page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
         expect(storeService.getStores).not.toHaveBeenCalled();
         expect(screen.queryByText('가게 목록을 불러오지 못했어요.')).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { level: 2, name: '소식 가게' })).toBeInTheDocument();
@@ -121,11 +130,11 @@ describe('benefits-only query integration; general store pagination remains on /
 
     it('keeps a valid page through failure and explicitly retries the same news request without manufacturing zero', async () => {
         benefitService.getList.mockRejectedValueOnce(new Error('news offline')).mockResolvedValueOnce(newsPage(1));
-        renderPage('/benefits?page=2&storePage=3&domain=FOOD&sort=reviews&keep=1');
+        renderPage('/benefits?page=2&storePage=3&domain=FOOD&sort=reviews&utm_source=campaign');
         await screen.findByText('가게 소식을 불러오지 못했어요.');
         expect(screen.getByRole('alert')).toBeInTheDocument();
         expect(screen.queryByText('아직 등록된 가게 소식이 없어요.')).not.toBeInTheDocument();
-        expect(params()).toEqual({ page: '2', storePage: '3', domain: 'FOOD', sort: 'reviews', keep: '1' });
+        expect(params()).toEqual({ page: '2', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
         fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
         await newsLink(2);
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -136,7 +145,7 @@ describe('benefits-only query integration; general store pagination remains on /
     });
 
     it('keeps real banners visible during background refetch and updates only the news cache after completion', async () => {
-        const { client } = renderPage('/benefits?page=2&keep=1');
+        const { client } = renderPage('/benefits?page=2&utm_source=campaign');
         await newsLink(2);
         const next = deferred();
         benefitService.getList.mockReturnValueOnce(next.promise);
@@ -152,14 +161,14 @@ describe('benefits-only query integration; general store pagination remains on /
         expect(await screen.findByRole('link', { name: '소식 가게 · 새로 받은 소식 소식 보기' })).toBeInTheDocument();
         expect(document.querySelector('.reserve-benefit-list')).toHaveAttribute('aria-busy', 'false');
         expect(screen.queryByText('소식을 새로 불러오는 중')).not.toBeInTheDocument();
-        expect(client.getQueryData(benefitKeys.list({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' })).content[0].title).toBe('새로 받은 소식');
-        expect(params()).toEqual({ page: '2', keep: '1' });
+        expect(client.getQueryData([...benefitKeys.list({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }), 'approved-only']).content[0].title).toBe('새로 받은 소식');
+        expect(params()).toEqual({ page: '2', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
         expect(storeService.getStores).not.toHaveBeenCalled();
     });
 
     it('passes an abortable signal and cancels the pending news request when its page unmounts', async () => {
         benefitService.getList.mockReturnValue(new Promise(() => {}));
-        const { unmount } = renderPage('/benefits?page=2&keep=1');
+        const { unmount } = renderPage('/benefits?page=2&utm_source=campaign');
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledTimes(1));
         const signal = benefitService.getList.mock.calls[0][1];
         expect(signal).toBeInstanceOf(AbortSignal);
@@ -169,14 +178,14 @@ describe('benefits-only query integration; general store pagination remains on /
         expect(storeService.getStores).not.toHaveBeenCalled();
     });
 
-    it('corrects a safe upper-bound page using legacy total metadata without modifying store params', async () => {
+    it('corrects a safe upper-bound page using legacy total metadata and preserves attribution', async () => {
         benefitService.getList.mockResolvedValueOnce({ content: [], totalElements: 13 })
             .mockResolvedValueOnce({ content: newsPage(1).content, totalElements: 13 });
-        renderPage('/benefits?page=10000&domain=CAFE&sort=rating&storePage=4&keep=1');
+        renderPage('/benefits?page=10000&domain=CAFE&sort=rating&storePage=4&utm_source=campaign');
         await newsLink(2);
         expect(benefitService.getList).toHaveBeenNthCalledWith(1, { page: 9999, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         expect(benefitService.getList).toHaveBeenNthCalledWith(2, { page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
-        expect(params()).toEqual({ page: '2', domain: 'CAFE', sort: 'rating', storePage: '4', keep: '1' });
+        expect(params()).toEqual({ page: '2', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
         expect(screen.queryByText('아직 등록된 가게 소식이 없어요.')).not.toBeInTheDocument();
         expect(screen.getByRole('navigation', { name: '가게 소식 페이지' })).toBeInTheDocument();
         expect(storeService.getStores).not.toHaveBeenCalled();
@@ -184,9 +193,9 @@ describe('benefits-only query integration; general store pagination remains on /
 
     it('normalizes a successful real zero to the first news page and exposes only the existing /stores link', async () => {
         benefitService.getList.mockResolvedValue({ content: [], page: { totalElements: 0 } });
-        renderPage('/benefits?page=3&domain=FOOD&storePage=4&keep=1');
+        renderPage('/benefits?page=3&domain=FOOD&storePage=4&utm_source=campaign');
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
-        await waitFor(() => expect(params()).toEqual({ domain: 'FOOD', storePage: '4', keep: '1' }));
+        await waitFor(() => expect(params()).toEqual({ page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' }));
         expect(benefitService.getList).toHaveBeenNthCalledWith(1, { page: 2, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         await waitFor(() => expect(benefitService.getList).toHaveBeenNthCalledWith(2, { page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         expect(await screen.findByRole('link', { name: '가게 둘러보기' })).toHaveAttribute('href', '/stores');

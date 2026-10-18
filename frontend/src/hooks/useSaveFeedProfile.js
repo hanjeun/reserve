@@ -25,7 +25,7 @@ export default function useSaveFeedProfile(onSaved) {
                 client.setQueryData(feedKeys.profile(), data);
                 await invalidateFeed(client);
                 assertCurrentSession(values.session);
-                throw new Error(`프로필 내용은 저장했지만 사진을 올리지 못했어요. 선택한 사진으로 다시 저장해주세요. ${error.message || ''}`.trim());
+                throw new Error(`프로필 내용은 저장했지만 사진을 올리지 못했어요. 선택한 사진으로 다시 저장해주세요. ${error.message || ''}`.trim(), { cause: error });
             }
         },
         onSuccess: async (data, values) => {

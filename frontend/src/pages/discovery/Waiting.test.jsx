@@ -19,12 +19,37 @@ function Probe() {
 }
 const page = (name, total = 1) => ({ content: [{ id: 1, name }], page: { totalElements: total } });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
-const show = (url = '/waiting') => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}>
-    <MemoryRouter initialEntries={[url]}><Probe /><Routes><Route path="/waiting" element={<Waiting />} />
-        <Route path="/other" element={<div>다른 탭</div>} /></Routes></MemoryRouter></QueryClientProvider>);
+const show = (url = '/waiting') => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    return { ...render(<QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[url]}><Probe /><Routes><Route path="/waiting" element={<Waiting />} />
+            <Route path="/other" element={<div>다른 탭</div>} /></Routes></MemoryRouter></QueryClientProvider>), client };
+};
 const currentParams = () => new URLSearchParams(screen.getByTestId('route').textContent);
 
 beforeEach(() => { vi.resetAllMocks(); sessionStorage.clear(); });
+
+it.each([false, true])('keeps view and filters on refresh failure without declaring an empty cache successful (rows=%s)', async hasRows => {
+    waitingService.getStores.mockResolvedValue({ content: hasRows ? [{ id: 1, name: '기존 가게' }] : [], page: { totalElements: hasRows ? 1 : 0 } });
+    const { client } = show('/waiting?view=list&status=PAUSED&sort=reviewCount&page=1');
+    if (hasRows) await screen.findByText('기존 가게');
+    else await screen.findByText('접수 가능한 가게가 없어요.');
+    const input = screen.getByPlaceholderText('웨이팅 가게 검색');
+    waitingService.getStores.mockRejectedValue(Object.assign(new Error('offline'), { status: 503 }));
+    await act(() => client.invalidateQueries({ queryKey: ['waiting-stores'] }));
+    await screen.findByRole('button', { name: '다시 불러오기' });
+    expect(screen.getByPlaceholderText('웨이팅 가게 검색')).toBe(input);
+    expect(screen.getByRole('button', { name: '웨이팅 접수 상태' })).toHaveTextContent('접수 중지');
+    expect(screen.getByRole('button', { name: '가게 정렬' })).toHaveTextContent('리뷰순');
+    expect(currentParams().get('view')).toBe('list');
+    expect(screen.queryByText('접수 가능한 가게가 없어요.')).toBeNull();
+    if (hasRows) expect(screen.getByText('기존 가게')).toBeInTheDocument();
+    else {
+        expect(screen.getByRole('alert')).toHaveTextContent('서버에서 웨이팅 가게를 처리하지 못했어요. 잠시 후 다시 시도해주세요.');
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+        expect(screen.getByText('목록 확인 필요')).toBeInTheDocument();
+    }
+});
 
 it('reserves the view/count and right-hand controls without interactive filters on the first request', () => {
     waitingService.getStores.mockReturnValue(new Promise(() => {}));

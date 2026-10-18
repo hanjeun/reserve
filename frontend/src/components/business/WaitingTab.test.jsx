@@ -89,10 +89,47 @@ it('places a failed cached refresh in the list body with a full illustration sta
     view.unmount(); view.client.clear();
 });
 
+it('keeps the cached board with an inline refresh failure instead of a false empty result', async () => {
+    const cached = board([{ ...entry(9), displayName: '기존 대기 손님' }]);
+    waitingService.getBoard.mockResolvedValue(cached);
+    const view = setup();
+    const row = await screen.findByRole('listitem', { name: '9번 대기 접수' });
+    waitingService.getBoard.mockRejectedValueOnce(new Error('대기 명단 갱신 실패'));
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 5] }); });
+    const error = await screen.findByText('대기 명단 갱신 실패');
+    expect(error).toHaveAttribute('data-compact', 'true');
+    expect(screen.getByRole('listitem', { name: '9번 대기 접수' })).toBe(row);
+    expect(row).toHaveTextContent('기존 대기 손님');
+    expect(screen.queryByText('대기 중인 팀이 없어요.')).toBeNull();
+    const summary = view.container.querySelector('.reserve-waiting-summary');
+    expect(summary.compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(view.client.getQueryData(['waiting', 1, 5])).toEqual(cached);
+    view.unmount(); view.client.clear();
+});
+
+it.each([401, 403])('hides cached waiting details and blocks writes after access is denied (%s)', async status => {
+    waitingService.getBoard.mockResolvedValue(board([{ ...entry(9), displayName: '보호할 대기 손님' }]));
+    const view = setup();
+    fireEvent.click(await screen.findByRole('button', { name: '9번 웨이팅 상세 보기' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('보호할 대기 손님');
+    waitingService.getBoard.mockRejectedValueOnce(Object.assign(new Error('대기 명단 조회 권한 없음'), { status }));
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 5] }); });
+    expect(await screen.findByText('대기 명단 조회 권한 없음')).toHaveAttribute('data-compact', 'false');
+    expect(screen.queryByRole('listitem', { name: '9번 대기 접수' })).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('보호할 대기 손님')).toBeNull();
+    expect(screen.getByRole('button', { name: '대기 접수' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '접수 중지' })).toBeDisabled();
+    expect(waitingService.create).not.toHaveBeenCalled();
+    expect(waitingService.updateStatus).not.toHaveBeenCalled();
+    expect(waitingService.updateIntake).not.toHaveBeenCalled();
+    view.unmount(); view.client.clear();
+});
+
 it('does not claim a zero-team count or allow intake writes when the first board lookup fails', async () => {
     waitingService.getBoard.mockRejectedValue(new Error('최초 조회 실패'));
     const view = setup();
-    await screen.findByText('최초 조회 실패');
+    expect(await screen.findByText('최초 조회 실패')).toHaveAttribute('data-compact', 'false');
     expect(screen.getByText('대기 현황을 확인하지 못했어요.')).toBeInTheDocument();
     expect(screen.queryByText(/대기 0팀/)).toBeNull();
     expect(screen.getByRole('button', { name: '대기 접수' })).toBeDisabled();

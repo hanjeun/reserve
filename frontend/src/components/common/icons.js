@@ -18,11 +18,13 @@ import {
 // 기존 앱 호출부의 span/ref/접근성/회전/이벤트 계약을 유지하는 공통 아이콘 관문.
 const createIcon = (type, glyph, filled = false) => {
     const label = type.replace(/(?:Outlined|Filled)$/, '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-    const Icon = forwardRef(({ className, spin = false, rotate, tabIndex, onClick, twoToneColor: _twoToneColor, ...rest }, ref) =>
-        createElement('span', { role: 'img', 'aria-label': label, ...rest, ref, onClick,
+    const Icon = forwardRef(({ className, spin = false, rotate, tabIndex, onClick, twoToneColor: _twoToneColor, ...rest }, ref) => {
+        void _twoToneColor; // AntD compatibility prop must not reach the DOM.
+        return createElement('span', { role: 'img', 'aria-label': label, ...rest, ref, onClick,
             tabIndex: tabIndex ?? (onClick ? -1 : undefined),
             className: ['anticon', `anticon-${label}`, 'reserve-ui-icon', spin && 'anticon-spin', className].filter(Boolean).join(' '),
-        }, createElement(SvgIcon, { glyph, filled, style: rotate == null ? undefined : { transform: `rotate(${rotate}deg)` } })));
+        }, createElement(SvgIcon, { glyph, filled, style: rotate == null ? undefined : { transform: `rotate(${rotate}deg)` } }));
+    });
     Icon.displayName = type;
     Icon.propTypes = { className: PropTypes.string, spin: PropTypes.bool, rotate: PropTypes.number,
         tabIndex: PropTypes.number, onClick: PropTypes.func, twoToneColor: PropTypes.oneOfType([PropTypes.string, PropTypes.arrayOf(PropTypes.string)]) };

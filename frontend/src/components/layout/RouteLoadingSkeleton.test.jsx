@@ -26,10 +26,10 @@ const routes = {
 const originalWidth = window.innerWidth;
 const setWidth = width => Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
 const clients = [];
-const render = ui => {
+const render = (ui, { initialEntries = ['/'] } = {}) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     client.setQueryData(feedKeys.config(), { enabled: true }); clients.push(client);
-    return renderUi(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    return renderUi(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}><MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter></QueryClientProvider> });
 };
 
 describe('route chunk loading patterns', () => {
@@ -169,8 +169,8 @@ describe('route chunk loading patterns', () => {
         });
 
     it.each([
-        ['/guide/user', '사용자 이용안내', 5],
-        ['/guide/business', '사업자 이용안내', 6],
+        ['/guide/user', '사용자 이용안내', 6],
+        ['/guide/business', '사업자 이용안내', 7],
         ['/guide/common', '공통 이용안내', 4],
         ['/operation-guide', '공통 이용안내', 4],
     ])('uses the guide frame and section count for %s', (path, title, sections) => {
@@ -302,7 +302,7 @@ describe('route chunk loading patterns', () => {
     it('resolves and removes the page skeleton when the chunk is ready', async () => {
         let resolve;
         const Page = lazy(() => new Promise(yes => { resolve = yes; }));
-        render(<MemoryRouter initialEntries={['/store/register']}><Suspense fallback={<RouteLoadingSkeleton />}><Page /></Suspense></MemoryRouter>);
+        render(<Suspense fallback={<RouteLoadingSkeleton />}><Page /></Suspense>, { initialEntries: ['/store/register'] });
         expect(screen.getByRole('status')).toBeInTheDocument();
         await act(async () => resolve({ default: () => <h1>가게 등록</h1> }));
         expect(screen.getByRole('heading', { name: '가게 등록' })).toBeInTheDocument();

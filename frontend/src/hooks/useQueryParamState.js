@@ -73,7 +73,7 @@ export const useQueryParamsState = (defaults, activeKeys = Object.keys(defaults)
 
     const setValues = useCallback((patch, options = {}) => {
         // 숨겨진 관리자 작업의 페이지 보정이 현재 작업의 URL을 덮어쓰지 않는다.
-        if (!activeRef.current) return;
+        if (!active || !activeRef.current) return;
         const stableDefaults = JSON.parse(defaultsKey);
         const latest = locationRef.current;
         const params = new URLSearchParams(latest.search);

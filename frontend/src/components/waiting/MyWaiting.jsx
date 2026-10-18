@@ -12,7 +12,7 @@ import { WAITING_ENTRY_LABELS as LABELS, MY_WAITING_STATUSES as STATUS_OPTIONS, 
 import useWaitingEvents from '../../hooks/useWaitingEvents';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 import useMessage from '../../hooks/useMessage';
 import useAuthStore from '../../store/useAuthStore';
 import useViewModeParam from '../../hooks/useViewModeParam';
@@ -59,7 +59,11 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
         setToolbarReady(true);
     }
     useWaitingEvents(loggedIn);
-    const blockingError = mine.error && (!mine.data || isReadAccessDenied(mine.error));
+    const blockingError = isBlockingListReadError(mine.error, mine.data?.content);
+    const accessLost = isReadAccessDenied(mine.error);
+    if (accessLost && (qrId !== null || detailId !== null)) {
+        setQrId(null); setDetailId(null);
+    }
     useListRefreshAnchor(listRef, `${page}:${status}:${sort}:${debouncedKeyword}:${view}`, mine.isFetching, mine.data);
     useEffect(() => {
         alive.current = true;
@@ -105,7 +109,7 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
                 } finally { operation.current = null; if (current()) setPending(null); }
             } });
     };
-    const rows = loggedIn ? mine.data?.content || [] : [];
+    const rows = loggedIn && !blockingError ? mine.data?.content || [] : [];
     const total = loggedIn ? mine.data?.page?.totalElements ?? mine.data?.totalElements ?? 0 : 0;
     useEffect(() => {
         const lastPage = Math.max(0, Math.ceil(total / 20) - 1);
@@ -171,8 +175,8 @@ function MyWaitingSession({ revision, loggedIn, memberId }) {
                     window.scrollTo({ top: 0, left: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
                 }} />
         </nav>}
-        <WaitingQrModal open={qrActive} entryId={qrId} onClose={() => setQrId(null)} />
-        <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />
+        {!accessLost && <WaitingQrModal open={qrActive} entryId={qrId} onClose={() => setQrId(null)} />}
+        {!accessLost && <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />}
     </div>;
 }
 MyWaitingSession.propTypes = {

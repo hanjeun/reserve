@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Form} from 'antd';
 import Pagination from '../common/Pagination';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +18,7 @@ import { useQueryParamsState } from '../../hooks/useQueryParamState';
 import useStoreNewsEvents from '../../hooks/useStoreNewsEvents';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 import { useWindowWidth } from '../../hooks';
 import ManagementListToolbar from '../common/ManagementListToolbar';
 import { BenefitApplicationsSkeleton } from './ManagementReviewSkeletons';
@@ -50,17 +50,17 @@ export default function BenefitApplicationsPanel() {
     const params = { page: page - 1, size: PAGE_SIZE, state };
     const list = useQuery({ queryKey: storeNewsKeys.applications(params), queryFn: ({ signal }) => storeNewsService.applications(params, signal),
         enabled: active && enabled, placeholderData: keepPreviousData });
+    const blockingError = isBlockingListReadError(list.error, list.data?.content);
     const detail = useQuery({ queryKey: storeNewsKeys.application(selection.id), queryFn: ({ signal }) => storeNewsService.application(selection.id, signal),
         enabled: active && enabled && selection.open && Boolean(selection.id), staleTime: 0, retry: false });
     useListRefreshAnchor(listRef, `${state}:${page}`, list.isFetching, list.data);
     const latestReady = selection.open && detail.isSuccess && !detail.isFetching && detail.data?.id === selection.id;
     const changedRevision = latestReady && selection.news && selection.news.revision !== detail.data.revision;
-    useLayoutEffect(() => {
-        if (!latestReady || selection.news?.revision === detail.data.revision) return;
+    if (latestReady && selection.news?.revision !== detail.data.revision) {
         if (selection.news) setConflict(true);
         setLoaded(new Set());
-        setSelection(current => current.open && current.id === detail.data.id ? { ...current, news: detail.data } : current);
-    }, [latestReady, selection.news, detail.data]);
+        setSelection({ ...selection, news: detail.data });
+    }
     const news = selection.news;
     const total = feedTotal(list.data);
     const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -71,7 +71,7 @@ export default function BenefitApplicationsPanel() {
         const src = image.getAttribute('src');
         if (!(news?.images || []).some(item => feedMediaUrl(item.url) === src)) return;
         setLoaded(current => current.has(src) ? current : new Set([...current, src]));
-    }, [news]);
+    }, [news, setLoaded]);
     useEffect(() => {
         // 이미 브라우저에서 읽은 동일 사진도 인식한다. URL만 확인하고 승인하지 않는다.
         previewRef.current?.querySelectorAll('img').forEach(recordPhoto);
@@ -114,7 +114,7 @@ export default function BenefitApplicationsPanel() {
         if (config.isPending || enabled && list.isPending) return <FeedReportListSkeleton />;
         if (config.isError && !config.data) return <DataState state="error" title="혜택 심사 상태를 불러오지 못했어요." error={config.error} onRetry={config.refetch} retrying={config.isFetching} />;
         if (!enabled) return <DataState state="empty" kind="news" title="혜택 신청·심사를 준비하고 있어요." />;
-        if (list.isError && !list.data) return <DataState state="error" title="혜택 신청을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
+        if (blockingError) return <DataState state="error" title="혜택 신청을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
         if (!list.data?.content?.length) return <DataState state="empty" kind="news" title="해당 상태의 혜택 신청이 없어요." />;
         return <ul className="reserve-feed-report-list reserve-benefit-review-list" aria-busy={list.isFetching}>{list.data.content.map(item => <li key={item.id} data-list-item-id={item.id}>
             <div><strong>{item.title}</strong><p>{item.storeName} · {benefitReviewLabel(item.benefitState)} · {feedDate(item.benefitRequestedAt)}</p></div>
@@ -124,13 +124,13 @@ export default function BenefitApplicationsPanel() {
     const busy = validating || review.isPending;
     if (config.isPending || enabled && list.isPending) return <BenefitApplicationsSkeleton state={state} showRefresh={!automatic} />;
     return <section ref={listRef} aria-label="혜택 신청 심사">
-        <ManagementListToolbar leading={<span className="reserve-management-count">{total.toLocaleString('ko-KR')}건</span>}
+        <ManagementListToolbar leading={<span className="reserve-management-count">{blockingError ? '목록 확인 필요' : `${total.toLocaleString('ko-KR')}건`}</span>}
             trailing={<FilterMenu appearance="plain" value={state} options={BENEFIT_STATE_OPTIONS}
                 aria-label="혜택 승인 상태" onChange={value => setQuery({ benefitState: value, benefitPage: '1' })} />}
             refresh={!automatic && <RefreshButton onReload={reload} loading={list.isFetching || selection.open && detail.isFetching} disabled={busy} label={mobile ? '' : '새로고침'} aria-label="혜택 신청 새로고침" />} />
-        {list.isRefetchError && list.data && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />}
+        {list.isRefetchError && !blockingError && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />}
         {renderList()}
-        {list.data && total > PAGE_SIZE && <Pagination current={page} total={total} pageSize={PAGE_SIZE} showSizeChanger={false}
+        {!blockingError && list.data && total > PAGE_SIZE && <Pagination current={page} total={total} pageSize={PAGE_SIZE} showSizeChanger={false}
             disabled={busy} onChange={setPage} />}
         <FormModal open={selection.open} title="혜택 신청 검토" width={680} rootClassName="reserve-feed-modal reserve-store-news-modal"
             submitting={busy} navigationDirty={Boolean(selection.open && note)}

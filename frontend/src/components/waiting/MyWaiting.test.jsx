@@ -142,16 +142,87 @@ it('keeps manual reload spinning and blocked until it finishes while retaining t
     const request = deferred();
     waitingService.getMine.mockResolvedValueOnce(pageWith('갱신 전')).mockReturnValue(request.promise);
     showMine(); await screen.findByText('갱신 전');
+    const search = screen.getByPlaceholderText('가게명, 대기번호로 검색');
     const refresh = screen.getByRole('button', { name: '새로고침' }); fireEvent.click(refresh);
     await waitFor(() => expect(waitingService.getMine).toHaveBeenCalledTimes(2));
     expect(refresh).toBeDisabled(); expect(refresh.querySelector('.anticon-spin')).not.toBeNull();
-    expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBeDisabled();
+    expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBe(search);
+    expect(search).toBeEnabled();
     expect(screen.getByText('갱신 전')).toBeInTheDocument();
     fireEvent.click(refresh); expect(waitingService.getMine).toHaveBeenCalledTimes(2);
     await act(async () => request.resolve(pageWith('갱신 후')));
     await screen.findByText('갱신 후');
     await waitFor(() => expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBeEnabled());
     expect(refresh.querySelector('.anticon-spin')).toBeNull();
+});
+
+it.each([
+    { name: 'empty cache and 503', hasRows: false, status: 503 },
+    { name: 'nonempty cache and 503', hasRows: true, status: 503 },
+    ...[401, 403, 404, 410].map(status => ({ name: `nonempty cache and ${status}`, hasRows: true, status })),
+])('keeps the waiting toolbar and shows only permitted cached content after $name', async ({ hasRows, status }) => {
+    waitingService.getMine.mockResolvedValueOnce(hasRows ? pageWith('기존 개인 웨이팅', 1, 'CALLED')
+        : { content: [], page: { totalElements: 0 } })
+        .mockRejectedValueOnce(Object.assign(new Error('read unavailable'), { status }));
+    const view = showMine('/my-reservations?tab=waiting&view=cards&waitingStatus=CALLED&waitingSort=oldest&waitingKeyword=유지할검색');
+    const trigger = hasRows ? await screen.findByRole('button', { name: '기존 개인 웨이팅 4번 웨이팅 상세 보기' }) : null;
+    if (!hasRows) await screen.findByText('조건에 맞는 웨이팅이 없어요.');
+    const toolbar = screen.getByLabelText('내 웨이팅 목록 필터');
+    const search = screen.getByPlaceholderText('가게명, 대기번호로 검색');
+    const params = currentParams().toString();
+    if (hasRows && status !== 503) {
+        fireEvent.click(trigger);
+        expect(await screen.findByRole('dialog')).toHaveTextContent('기존 개인 웨이팅');
+    }
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 'my', 7] }); });
+    const error = await screen.findByRole('alert');
+    if (status !== 503) expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(error.classList.contains('reserve-data-state--compact')).toBe(hasRows && status === 503);
+    expect(screen.queryByText('조건에 맞는 웨이팅이 없어요.')).toBeNull();
+    expect(screen.queryByText('대기 중인 웨이팅이 없어요.')).toBeNull();
+    if (hasRows && status === 503) {
+        expect(screen.getByRole('button', { name: '기존 개인 웨이팅 4번 웨이팅 상세 보기' })).toBe(trigger);
+    } else {
+        expect(screen.queryByRole('list', { name: '내 웨이팅 목록' })).toBeNull();
+        expect(screen.queryByText('기존 개인 웨이팅')).toBeNull();
+    }
+    expect(screen.getByLabelText('내 웨이팅 목록 필터')).toBe(toolbar);
+    expect(screen.getByPlaceholderText('가게명, 대기번호로 검색')).toBe(search);
+    expect(search).toHaveValue('유지할검색');
+    expect(search).toBeEnabled();
+    expect(screen.getByRole('button', { name: '웨이팅 상태' })).toHaveTextContent('호출됨');
+    expect(screen.getByRole('button', { name: '웨이팅 정렬' })).toHaveTextContent('오래된 접수순');
+    expect(screen.getByRole('button', { name: '목록형 보기로 전환' })).toHaveAttribute('data-view', 'cards');
+    expect(currentParams().toString()).toBe(params);
+    expect(waitingService.getMine).toHaveBeenCalledTimes(2);
+    if (status !== 503) {
+        waitingService.getMine.mockResolvedValueOnce(pageWith('복구된 개인 웨이팅', 1, 'CALLED'));
+        await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 'my', 7] }); });
+        expect(await screen.findByRole('button', { name: '복구된 개인 웨이팅 4번 웨이팅 상세 보기' })).toBeInTheDocument();
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(screen.queryByText('기존 개인 웨이팅')).toBeNull();
+        expect(currentParams().toString()).toBe(params);
+        expect(waitingService.getMine).toHaveBeenCalledTimes(3);
+    }
+});
+
+it('removes an open entry QR after a forbidden refresh of the cached personal waiting list', async () => {
+    waitingService.getMine.mockResolvedValueOnce(pageWith('보호할 호출 가게', 1, 'CALLED'))
+        .mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }));
+    const view = showMine();
+    fireEvent.click(await screen.findByRole('button', { name: '입장 QR' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('입장 QR 12');
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 'my', 7] }); });
+    expect(await screen.findByRole('alert')).not.toHaveClass('reserve-data-state--compact');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: '입장 QR' })).toBeNull();
+    expect(screen.queryByText('보호할 호출 가게')).toBeNull();
+    waitingService.getMine.mockResolvedValueOnce(pageWith('다시 조회한 호출 가게', 1, 'CALLED'));
+    await act(async () => { await view.client.invalidateQueries({ queryKey: ['waiting', 1, 'my', 7] }); });
+    expect(await screen.findByRole('button', { name: '입장 QR' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(waitingService.getMine).toHaveBeenCalledTimes(3);
 });
 
 it('never borrows a previous session list or applies its late manual reload to a new owner', async () => {

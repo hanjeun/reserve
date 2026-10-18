@@ -32,6 +32,7 @@ export function BenefitRow({ item, preview = false }) {
     const design = ['PHOTO', 'COMPACT'].includes(item.design) ? item.design.toLowerCase() : 'standard';
     const className = `reserve-benefit-row reserve-benefit-row--${design}`;
     const content = <><BannerImage key={imageUrl} imageUrl={imageUrl} /><div className="reserve-benefit-row-copy">
+        {item.excerpt && <p className="reserve-benefit-description">{item.excerpt}</p>}
         <h2 className="reserve-benefit-store">{item.storeName}</h2>
         <span className="reserve-benefit-title-badge"><span>{item.title}</span></span>
         <StoreNewsMetadata item={item} />

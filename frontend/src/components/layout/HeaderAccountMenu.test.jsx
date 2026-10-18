@@ -29,6 +29,7 @@ vi.mock('antd', () => ({
         </div>
     ),
     Typography: { Text: ({ children }) => <span>{children}</span> },
+    Tooltip: ({ children }) => children,
 }));
 vi.mock('../../api/axios', () => ({ default: { post: vi.fn() } }));
 vi.mock('../../store/useAuthStore', () => ({

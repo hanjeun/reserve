@@ -29,7 +29,8 @@ const base64 = bytes => {
     return btoa(binary);
 };
 const existingImage = value => {
-    if (typeof value !== 'string' || value.length > 1000 || /[\u0000-\u001f\\]/.test(value)) throw invalid();
+    if (typeof value !== 'string' || value.length > 1000 || value.includes('\\')
+        || Array.from(value).some(character => character.charCodeAt(0) < 32)) throw invalid();
     const url = new URL(value, window.location.origin);
     const sameLocal = import.meta.env.DEV && url.origin === window.location.origin;
     if (!sameLocal && (url.protocol !== 'https:' || !['cdn.reserve.it.kr', 'reserve.it.kr', 'app.reserve.it.kr'].includes(url.hostname))) throw invalid();

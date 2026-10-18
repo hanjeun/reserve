@@ -13,6 +13,7 @@ import useAuthStore from '../../store/useAuthStore';
 import useImagePreview from '../../hooks/useImagePreview';
 import { colors, radius, fontSize } from '../../styles/tokens';
 const { Text } = Typography;
+const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 
 const BusinessTab = ({ user }) => {

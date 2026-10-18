@@ -20,6 +20,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { STORE_NEWS_TYPES } from '../../utils/storeNews';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 
 export const BENEFIT_PAGE_SIZE = 12;
 
@@ -64,6 +65,7 @@ export default function Benefits() {
         placeholderData: keepPreviousData,
     });
     const items = Array.isArray(data?.content) ? data.content : [];
+    const blockingError = isBlockingListReadError(error, items);
     useListRefreshAnchor(listRef, `${page}:${type}:${period}`, isFetching, data);
     const rawTotal = data?.page?.totalElements ?? data?.totalElements ?? 0;
     const total = Number.isSafeInteger(rawTotal) && rawTotal >= 0 ? rawTotal : 0;
@@ -89,7 +91,7 @@ export default function Benefits() {
         if (config.data?.benefitApprovalEnabled !== true) return <DataState state="empty" kind="news" title="관리자 승인형 혜택을 준비하고 있어요."
             description="혜택은 사진과 이용 조건을 확인하고 승인 후 공개해요." />;
         if (isPending) return <BenefitsSkeleton />;
-        if (isError && !data) {
+        if (blockingError) {
             return (
                 <DataState state="error" kind="news" subject="가게 소식" error={error}
                     title="가게 소식을 불러오지 못했어요." onRetry={refetch} retrying={isFetching} />
@@ -110,7 +112,7 @@ export default function Benefits() {
                     <StoreNewsWriteAction unavailableReason={writeUnavailable} onWrite={() => setEditor({ mounted: true, open: true })} />
                     <StoreNewsManageAction />
                 </div>}
-                <span className="reserve-explore-count">{approvalReady && data ? `${total.toLocaleString('ko-KR')}개 소식` : '혜택 상태 확인 필요'}</span>
+                <span className="reserve-explore-count">{approvalReady && data && !blockingError ? `${total.toLocaleString('ko-KR')}개 소식` : approvalReady ? '소식 확인 필요' : '혜택 상태 확인 필요'}</span>
                 <div className="reserve-explore-filter-controls">
                     <FilterMenu appearance="plain" aria-label="가게 소식 종류" value={type} options={[{ value: 'ALL', label: '모든 소식' }, ...STORE_NEWS_TYPES]} onChange={value => changeFilter('newsType', value)} />
                     <FilterMenu appearance="plain" aria-label="가게 소식 기간" value={period} options={[{ value: 'ONGOING', label: '진행 소식' }, { value: 'ALL', label: '전체 기간' }]} onChange={value => changeFilter('period', value)} />
@@ -119,11 +121,11 @@ export default function Benefits() {
             </div>}
             <section ref={listRef} id="benefit-news" className="reserve-benefits-news" aria-label="가게 소식">
                 <div className="reserve-benefits-news-content">
-                    {isError && data && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={error} onRetry={refetch} retrying={isFetching} />}
+                    {isError && !blockingError && <DataState compact state="error" title="목록을 갱신하지 못했어요. 현재 내용은 유지했어요." error={error} onRetry={refetch} retrying={isFetching} />}
                     {renderNews()}
                 </div>
                 {isFetching && !isPending && !isError && <p className="reserve-discovery-visually-hidden"><output>소식을 새로 불러오는 중</output></p>}
-                {!isPending && data && total > BENEFIT_PAGE_SIZE && (
+                {!isPending && !blockingError && data && total > BENEFIT_PAGE_SIZE && (
                     <nav aria-label="가게 소식 페이지" className="reserve-benefits-pagination"><Pagination current={page} pageSize={BENEFIT_PAGE_SIZE} total={total} showSizeChanger={false} showLessItems={isMobile} size={isMobile ? 'small' : 'default'} onChange={next => { const updated = new URLSearchParams(params); updated.set('page', String(next)); setParams(updated); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }} /></nav>
                 )}
             </section>

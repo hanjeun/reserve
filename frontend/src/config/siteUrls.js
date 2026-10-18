@@ -9,7 +9,8 @@ export const APP_ORIGIN = checkedOrigin(import.meta.env.VITE_APP_ORIGIN, 'https:
 export const MARKETING_ORIGIN = checkedOrigin(import.meta.env.VITE_MARKETING_ORIGIN, 'https://reserve.it.kr');
 export const LEGACY_ORIGIN = checkedOrigin(import.meta.env.VITE_LEGACY_APP_ORIGIN, 'https://reserve.it.kr');
 export const appUrl = path => {
-    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(path)) throw new Error('앱 내부 경로가 필요해요.');
+    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || path.includes('\\')
+        || Array.from(path).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) throw new Error('앱 내부 경로가 필요해요.');
     const origin = import.meta.env.DEV && typeof window !== 'undefined' ? window.location.origin : APP_ORIGIN;
     return origin + path;
 };

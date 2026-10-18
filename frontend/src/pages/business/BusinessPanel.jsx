@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useEffect } from 'react';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Pagination from '../../components/common/Pagination';
 import { ReservationCardSkeleton, ReservationSummaryCardSkeleton, DataState, FilterToolbar } from '../../components/common';
@@ -63,7 +64,7 @@ const buildManageQuery = ({ page, debouncedKeyword, statusFilter, storeFilter, s
 });
 
 // 예약 목록 본문 — 로딩 스켈레톤 / 빈 안내 / 목록 중 하나.
-const renderListBody = ({ loading, view, reservations, statusFilter, debouncedKeyword, cardProps, listRef }) => {
+const ReservationListBody = ({ loading, view, reservations, statusFilter, debouncedKeyword, cardProps, listRef }) => {
     if (loading) {
         return (
             view === 'cards'
@@ -96,15 +97,15 @@ const renderListBody = ({ loading, view, reservations, statusFilter, debouncedKe
 };
 
 // 가게 목록·예약 목록이 둘 다 실패하면 하나의 오류로, 예약만 실패하면 예약 오류만 보여 준다.
-const renderMainContent = ({ error, hasData, myStoresError, myStoresLoading, busy, retryAll, refetch, retryStores, listBody }) => {
-    if (error && myStoresError && !hasData) {
+const renderMainContent = ({ error, blockingError, myStoresError, myStoresLoading, busy, retryAll, refetch, retryStores, listBody }) => {
+    if (blockingError && myStoresError) {
         return (
             <DataState state="error" kind="reservation" subject="예약 관리 데이터"
                 title="예약 관리 데이터를 불러오지 못했어요." error={error}
                 onRetry={retryAll} retrying={busy} />
         );
     }
-    if (error && !hasData) {
+    if (blockingError) {
         return (
             <DataState state="error" kind="reservation" subject="예약 목록" error={error}
                 onRetry={refetch} retrying={busy} />
@@ -144,6 +145,7 @@ const ReservationTab = () => {
         buildManageQuery({ page, debouncedKeyword, statusFilter, storeFilter, sort }),
     );
     const { message, confirm } = useMessage();
+    const blockingError = isBlockingListReadError(error, reservations);
     const listRef = React.useRef(null);
     useListRefreshAnchor(listRef, JSON.stringify([view, page, debouncedKeyword, statusFilter, storeFilter, sort]), refetching, hasData ? reservations : null);
     const retryStores = () => refetchStores();
@@ -177,9 +179,9 @@ const ReservationTab = () => {
         });
     };
 
-    const listBody = renderListBody({
-        loading, view, reservations, statusFilter, debouncedKeyword, listRef,
-        cardProps: {
+    const listBody = <ReservationListBody
+        {...{ loading, view, reservations, statusFilter, debouncedKeyword, listRef }}
+        cardProps={{
             actionLoading,
             onApprove: approve,
             onReject: reject,
@@ -187,11 +189,10 @@ const ReservationTab = () => {
             onNoShow: noShow,
             onStoreCancel: storeCancel,
             onRemove: handleRemove,
-        },
-    });
+        }} />;
 
     const mainContent = renderMainContent({
-        error, hasData, myStoresError, myStoresLoading, busy: loading || refetching,
+        error, blockingError, myStoresError, myStoresLoading, busy: loading || refetching,
         retryAll, refetch, retryStores, listBody,
     });
 
@@ -214,7 +215,7 @@ const ReservationTab = () => {
                 sort={sort}
                 onSortChange={value => changeFilter({ reservationSort: value })}
                 sortOptions={SORT_OPTIONS}
-                count={hasData ? total : undefined}
+                count={hasData && !blockingError ? total : undefined}
                 disabled={loading}
                 initialLoading={loading || myStoresLoading}
                 label="사업자 예약 목록 필터"
@@ -231,7 +232,7 @@ const ReservationTab = () => {
                 조회된다. 그래서 가게 목록만 실패했을 때 예약까지 가리면 멀쩡히 받아 온 예약을 버리는 셈이다.
                 그때는 목록 위에 좁은 오류만 얹고, 둘 다 실패했을 때만 하나의 오류로 합친다. */}
             {mainContent}
-            {hasData && total > 0 && (
+            {hasData && !blockingError && total > 0 && (
                 <nav aria-label="예약 목록 페이지" style={{ marginTop: 16 }}>
                     <Pagination
                         current={page}

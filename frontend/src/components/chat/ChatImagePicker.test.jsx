@@ -12,7 +12,7 @@ describe('chat photo picker', () => {
         await screen.findByRole('button', { name: '첨부 사진 크게 보기' });
         const firstAttachment = view.container.querySelector('.reserve-chat-attachment');
         view.rerender(<ChatImagePicker enabled file={second} onChange={vi.fn()} />);
-        await waitFor(() => expect(screen.getByAltText('전송할 사진')).toHaveAttribute('src', 'blob:second'));
+        await waitFor(() => expect(screen.getByAltText('첨부 사진')).toHaveAttribute('src', 'blob:second'));
         const secondAttachment = view.container.querySelector('.reserve-chat-attachment');
         expect(secondAttachment).not.toBe(firstAttachment);
         expect(secondAttachment.style.animation).toContain('slideUpIn');
@@ -47,7 +47,7 @@ describe('chat photo picker', () => {
         const file = new File(['image'], 'photo.png', { type: 'image/png' });
         const view = render(<ChatImagePicker enabled file={file} onChange={vi.fn()} />);
         await act(async () => {});
-        expect(screen.getByAltText('전송할 사진')).toHaveAttribute('src', 'blob:preview');
+        expect(screen.getByAltText('첨부 사진')).toHaveAttribute('src', 'blob:preview');
         view.unmount();
         expect(revoke).toHaveBeenCalledWith('blob:preview');
         create.mockRestore(); revoke.mockRestore();
@@ -60,7 +60,7 @@ describe('chat photo picker', () => {
         fireEvent.click(await screen.findByRole('button', { name: '첨부 사진 크게 보기' }));
         await waitFor(() => expect(document.querySelector('.reserve-image-preview')).not.toBeNull());
         view.rerender(<ChatImagePicker enabled file={null} onChange={vi.fn()} />);
-        expect(revoke).toHaveBeenCalledWith('blob:attachment');
+        await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:attachment'));
         await waitFor(() => expect(document.querySelector('.reserve-image-preview')).toBeNull());
         create.mockRestore(); revoke.mockRestore();
     });

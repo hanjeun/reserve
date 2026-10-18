@@ -84,7 +84,7 @@ describe('store result layout pattern', () => {
         expect(styleAtWidth('.reserve-store-identity-text', width)).toMatchObject({ 'flex-wrap': 'wrap', 'min-width': '0' });
         expect(styleAtWidth('.reserve-store-identity-text-ad', width)).toMatchObject({ color: 'var(--c-text-tertiary, #8b95a1)' });
         expect(styleAtWidth('.reserve-store-view-toggle', width)).toMatchObject({ width: '44px', height: '44px', background: 'transparent', color: 'var(--c-text-secondary)' });
-        expect(styleAtWidth('.reserve-store-view-toggle:hover:not(:disabled)', width)).toMatchObject({ background: 'var(--c-gray-50, #f9fafb)', color: 'var(--c-text-primary)' });
+        expect(styleAtWidth('.reserve-store-view-toggle:hover:not(:disabled)', width)).toMatchObject({ background: 'transparent', color: 'var(--c-text-primary)' });
         const hover = stylesheet.nodes.find(node => node.type === 'atrule'
             && node.params === '(hover: hover) and (pointer: fine)'
             && node.nodes.some(child => child.type === 'rule' && child.selectors.includes('.reserve-store-view-toggle:hover:not(:disabled)')))

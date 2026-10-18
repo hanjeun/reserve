@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from 'react';
+import { useId, useImperativeHandle, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Popover } from 'antd';
 import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '../common/icons';
@@ -24,11 +24,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
     maxLength = 2000, placeholder = '메시지를 입력하세요', inputLabel = '메시지 입력', sendText = '보내기',
     inputRef, attachmentControl, attachments, hasAttachments = Boolean(file) }) {
     const input = useRef(null);
-    const setInput = useCallback(node => {
-        input.current = node;
-        if (typeof inputRef === 'function') inputRef(node);
-        else if (inputRef) inputRef.current = node;
-    }, [inputRef]);
+    useImperativeHandle(inputRef, () => input.current, []);
     const trigger = useRef(null);
     const searchInput = useRef(null);
     const id = useId();
@@ -75,7 +71,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
         sendIcon = <span aria-hidden="true"><SpinIndicator /></span>;
     }
     return <div className="reserve-chat-composer reserve-messenger-composer">
-        <textarea ref={setInput} value={value} onChange={event => onChange(event.target.value)}
+        <textarea ref={input} value={value} onChange={event => onChange(event.target.value)}
             onKeyDown={event => {
                 if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
                     event.preventDefault();

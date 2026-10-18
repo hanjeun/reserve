@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -26,6 +26,7 @@ import { saveRedirect } from '../../utils/redirect';
 import { forgetFeedCommentForProfile, readFeedCommentForProfile, rememberFeedCommentForProfile } from '../../utils/feedCommentProfileNavigation';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 
 const FeedReportModal = lazy(() => import('./FeedReportModal'));
 const nextPage = (last, pages) => pages.reduce((count, page) => count + (page.content?.length || 0), 0) < feedTotal(last) ? pages.length : undefined;
@@ -33,10 +34,14 @@ const requestPage = { size: 20 };
 
 function CommentReplies({ parent, focusedReply, onReply, onEdit, onDelete, onReport }) {
     const [expanded, setExpanded] = useState(Boolean(focusedReply));
+    const [previousFocusedId, setPreviousFocusedId] = useState(focusedReply?.id);
+    if (previousFocusedId !== focusedReply?.id) {
+        setPreviousFocusedId(focusedReply?.id);
+        if (focusedReply?.id) setExpanded(true);
+    }
     const listRef = useRef(null);
     const reduced = useReducedMotion();
     const { shouldRender, isClosing } = useExitAnimation(expanded, reduced ? 0 : 200);
-    useEffect(() => { if (focusedReply?.id) setExpanded(true); }, [focusedReply?.id]);
     const replies = useInfiniteQuery({ queryKey: interactionKeys.replies(parent.id), initialPageParam: 0,
         queryFn: ({ pageParam, signal }) => service.replies(parent.id, { ...requestPage, page: pageParam }, signal), enabled: expanded, getNextPageParam: nextPage });
     const unavailable = [401, 403].includes(httpStatusOf(replies.error)) || isMissingRequestError(replies.error);
@@ -85,9 +90,16 @@ function CommentItem({ item, focusedReply, onReply, onEdit, onDelete, onReport }
 CommentItem.propTypes = { item: PropTypes.object.isRequired, focusedReply: PropTypes.object, onReply: PropTypes.func, onEdit: PropTypes.func, onDelete: PropTypes.func, onReport: PropTypes.func };
 
 export default function FeedComments({ postId }) {
+    const memberId = useAuthStore(state => state.user?.id);
+    const role = useAuthStore(state => state.user?.role);
+    const revision = useAuthStore(state => state.sessionRevision);
+    return <FeedCommentsSession key={`${postId}:${memberId}:${role}:${revision}`} postId={postId} />;
+}
+
+function FeedCommentsSession({ postId }) {
     const user = useAuthStore(state => state.user);
     const sessionRevision = useAuthStore(state => state.sessionRevision);
-    const returningDraft = useMemo(() => readFeedCommentForProfile(postId), [postId, sessionRevision]);
+    const [returningDraft] = useState(() => readFeedCommentForProfile(postId));
     const config = useFeedInteractions();
     const enabled = config.data?.enabled === true;
     const profile = useFeedProfile(enabled && Boolean(user));
@@ -95,14 +107,14 @@ export default function FeedComments({ postId }) {
     const { message, confirm } = useMessage();
     const navigate = useNavigate();
     const location = useLocation();
-    const [content, setContent] = useState('');
+    const [content, setContent] = useState(returningDraft?.content || '');
     const [images, setImages] = useState([]);
     const [preparing, setPreparing] = useState(false);
-    const [target, setTarget] = useState(null);
+    const [target, setTarget] = useState(returningDraft?.target || null);
     const [error, setError] = useState('');
     const [reportId, setReportId] = useState(null);
     const [reportMounted, setReportMounted] = useState(false);
-    const nonce = useRef(null);
+    const nonce = useRef(returningDraft?.nonce || null);
     const input = useRef(null);
     const listRef = useRef(null);
     const lock = useRef(false);
@@ -116,17 +128,20 @@ export default function FeedComments({ postId }) {
     const revokePhotos = () => { objectUrls.current.forEach(url => URL.revokeObjectURL(url)); objectUrls.current.clear(); };
     useEffect(() => () => { generation.current += 1; objectUrls.current.forEach(url => URL.revokeObjectURL(url)); objectUrls.current.clear(); }, []);
     useEffect(() => {
-        generation.current += 1; revokePhotos(); setContent(''); setImages([]); setTarget(null); setError(''); nonce.current = null;
         if (!returningDraft || !isCurrentSession(returningDraft.session)) return;
-        setContent(returningDraft.content); setTarget(returningDraft.target); nonce.current = returningDraft.nonce;
-        setImages(returningDraft.images.map(image => {
-            if (!image.file) return image;
-            const url = URL.createObjectURL(image.file); objectUrls.current.add(url); return { ...image, url };
-        }));
-        forgetFeedCommentForProfile(returningDraft.key);
-        const frame = requestAnimationFrame(() => { input.current?.focus({ preventScroll: true }); document.getElementById('feed-comment-composer')?.scrollIntoView({ block: 'nearest' }); });
+        // The keyed session clears local state; recreate file previews only after its DOM has mounted.
+        const frame = requestAnimationFrame(() => {
+            if (!isCurrentSession(returningDraft.session)) return;
+            setImages(returningDraft.images.map(image => {
+                if (!image.file) return image;
+                const url = URL.createObjectURL(image.file); objectUrls.current.add(url); return { ...image, url };
+            }));
+            forgetFeedCommentForProfile(returningDraft.key);
+            input.current?.focus({ preventScroll: true });
+            document.getElementById('feed-comment-composer')?.scrollIntoView({ block: 'nearest' });
+        });
         return () => cancelAnimationFrame(frame);
-    }, [user?.id, postId, sessionRevision, returningDraft]);
+    }, [returningDraft]);
     const focusedId = /^#comment-[1-9]\d*$/.test(location.hash) ? Number(location.hash.slice(9)) : null;
     const focused = useQuery({ queryKey: interactionKeys.comment(focusedId), queryFn: ({ signal }) => service.comment(focusedId, signal),
         enabled: enabled && Number.isSafeInteger(focusedId) && focusedId > 0, retry: false });
@@ -154,9 +169,10 @@ export default function FeedComments({ postId }) {
         queryFn: ({ pageParam, signal }) => service.comments(postId, { ...requestPage, page: pageParam }, signal), enabled, getNextPageParam: nextPage });
     const unavailable = [config, comments].some(query => [401, 403].includes(httpStatusOf(query.error))) || isMissingRequestError(comments.error);
     const failure = config.isError && [401, 403].includes(httpStatusOf(config.error)) ? config : comments;
-    const backgroundFailure = [config, comments].find(query => query.isError && query.data !== undefined);
     const profileUnavailable = [401, 403].includes(httpStatusOf(profile.error));
     const items = [...new Map((comments.data?.pages.flatMap(page => page.content || []) || []).map(item => [item.id, item])).values()];
+    const blockingError = isBlockingListReadError(comments.error, items);
+    const backgroundFailure = [config, ...(!blockingError ? [comments] : [])].find(query => query.isError && query.data !== undefined);
     useListRefreshAnchor(listRef, `comments:${postId}:${sessionRevision}`, comments.isFetching && !comments.isFetchingNextPage, unavailable ? null : comments.data);
     const save = useMutation({ mutationFn: async variables => {
         assertCurrentSession(variables.session);
@@ -256,7 +272,7 @@ export default function FeedComments({ postId }) {
         {!unavailable && focusedRoot?.postId === postId && <CommentItem key={`focused-${focusedRoot.id}`} item={focusedRoot} focusedReply={focusedComment?.parentId ? focusedComment : undefined} {...actions} />}
         {!unavailable && backgroundFailure && <DataState compact state="error" title="댓글을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
         {unavailable ? <DataState state="error" compact title="댓글을 불러오지 못했어요." error={failure.error} onRetry={failure.refetch} retrying={failure.isFetching} />
-            : comments.isPending && !comments.data ? <Bone width="85%" height={44} /> : comments.isError && !comments.data ? <DataState state="error" compact title="댓글을 불러오지 못했어요." error={comments.error} onRetry={comments.refetch} retrying={comments.isFetching} />
+            : comments.isPending && !comments.data ? <Bone width="85%" height={44} /> : blockingError ? <DataState state="error" compact title="댓글을 불러오지 못했어요." error={comments.error} onRetry={comments.refetch} retrying={comments.isFetching} />
             : comments.data && !items.length && focusedRoot?.postId !== postId
                 ? <DataState state="empty" kind="comment" title="아직 댓글이 없어요." style={{ minHeight: 0, padding: '16px 0' }} />
             : items.filter(item => item.id !== focusedRoot?.id).map(item => <CommentItem key={item.id} item={item} {...actions} />)}

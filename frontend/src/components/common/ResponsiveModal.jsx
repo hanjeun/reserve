@@ -18,14 +18,14 @@ const subscribeMobile = callback => {
 
 /** AntD owns the portal, focus trap and close lifecycle; mobile changes only the surface. */
 export default function ResponsiveModal({
-    mobileSize = 'content', mobileSheet = true, open, title, rootClassName,
+    mobileSize = 'content', mobileSheet = true, open: requestedOpen, title, rootClassName,
     panelRef: forwardedPanelRef, afterOpenChange, transitionName, maskTransitionName,
     ...modalProps
 }) {
     const workspaceActive = useContext(WorkspaceActivityContext);
-    const requestedOpen = open;
-    open = open && workspaceActive;
-    useEffect(() => { if (!workspaceActive && requestedOpen) modalProps.onCancel?.(); }, [workspaceActive, requestedOpen, modalProps.onCancel]);
+    const open = requestedOpen && workspaceActive;
+    const onCancel = modalProps.onCancel;
+    useEffect(() => { if (!workspaceActive && requestedOpen) onCancel?.(); }, [workspaceActive, requestedOpen, onCancel]);
     const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, () => false);
     const reducedMotion = useReducedMotion();
     const panelRef = useRef(null);

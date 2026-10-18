@@ -9,7 +9,7 @@ import { useMyStores } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
-import { queryErrorStatus } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import { colors, radius, fontSize } from '../../styles/tokens';
 import storeService from '../../services/storeService';
 import { canCloseStore } from '../../utils/lifecycleReadiness';
@@ -259,10 +259,11 @@ const MyStores = () => {
     const visibleStores = filterAndSortOwnedStores(stores, { domain, sort });
     const listRef = React.useRef(null);
     const accessDenied = [401, 403].includes(queryErrorStatus(error));
+    const blockingError = isBlockingListReadError(error, stores);
     useListRefreshAnchor(listRef, JSON.stringify([view, domain, sort]), refetching || retrying, hasData ? stores : null);
-    React.useEffect(() => {
-        if (accessDenied) { setDeleteModalOpen(false); setTargetStore(null); }
-    }, [accessDenied]);
+    if (accessDenied && (deleteModalOpen || targetStore !== null)) {
+        setDeleteModalOpen(false); setTargetStore(null);
+    }
 
     const setToolbarParam = (key, value) => setUrlSearchParams(current => withToolbarParam(current, key, value));
     const resetOwnedFilters = () => setUrlSearchParams(current => {
@@ -308,7 +309,7 @@ const MyStores = () => {
     let storesContent;
     if (loading) {
         storesContent = <OwnedStoresSkeleton view={view} />;
-    } else if (error && !hasData) {
+    } else if (blockingError) {
         storesContent = (
             // 처음부터 못 불러오면 목록 자리에 띄운다 — 제목·툴바 옆이 아니라 결과가 나올 자리.
             <DataState state="error" kind="store" subject="가게 목록" error={error}
@@ -346,7 +347,7 @@ const MyStores = () => {
             <StoreListingToolbar
                 view={view}
                 onViewChange={setView}
-                count={!loading && hasData ? visibleStores.length : undefined}
+                count={!loading && hasData && !blockingError ? visibleStores.length : undefined}
                 domain={domain}
                 onDomainChange={nextDomain => setToolbarParam('domain', nextDomain)}
                 sort={sort}

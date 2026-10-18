@@ -1,7 +1,7 @@
 import { QueryCache, QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-    clearDeniedQueryData, createLiveQueryRefresh, isLiveReadQuery, liveUpdateMatches,
+    clearDeniedQueryData, createLiveQueryRefresh, isBlockingListReadError, isLiveReadQuery, liveUpdateMatches,
     nextNewsBoundary, parseLiveUpdate,
 } from './liveUpdateQueries';
 
@@ -76,6 +76,15 @@ describe('metadata update routing', () => {
 });
 
 describe('read freshness and private-cache boundaries', () => {
+    it.each([
+        [undefined, undefined, false], [undefined, [], false], [undefined, [{ id: 7 }], false],
+        [{ status: 503 }, undefined, true], [{ status: 503 }, [], true], [{ status: 503 }, [{ id: 7 }], false],
+        [{ response: { status: 401 } }, [{ id: 7 }], true], [{ status: 403 }, [{ id: 7 }], true],
+        [{ status: 404 }, [{ id: 7 }], true], [{ status: 410 }, [{ id: 7 }], true],
+    ])('distinguishes failed empty reads from cached rows without changing successful emptiness (%#)', (error, items, expected) => {
+        expect(isBlockingListReadError(error, items)).toBe(expected);
+    });
+
     it('keeps audit-bearing benefit reads out of periodic polling but preserves targeted events and reconnect reconciliation', async () => {
         const value = client();
         const keys = [

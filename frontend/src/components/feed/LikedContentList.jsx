@@ -19,6 +19,7 @@ import { authorPath, feedMediaUrl, feedTotal } from '../../utils/feed';
 import { assertCurrentSession, currentSession, isCurrentSession } from '../../api/sessionScope';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf } from '../../utils/listErrorMessage';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 
 export default function LikedContentList({ type = 'ALL' }) {
     const params = { type, size: 20 };
@@ -38,9 +39,9 @@ export default function LikedContentList({ type = 'ALL' }) {
             if (failure.isStaleSession) return;
             if (failure.status === 404) void invalidateInteractions(client); else message.error(failure.message);
         } });
-    if (list.isPending && !list.data) return <FeedSkeleton />;
-    if (list.isError && (!list.data || unavailable)) return <DataState state="error" compact title="좋아요한 내용을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
     const items = [...new Map((list.data?.pages.flatMap(page => page.content || []) || []).map(item => [item.id, item])).values()];
+    if (list.isPending && !list.data) return <FeedSkeleton />;
+    if (isBlockingListReadError(list.error, items)) return <DataState state="error" compact title="좋아요한 내용을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
     const backgroundError = list.isError && list.data && <DataState compact state="error" title="좋아요한 내용을 갱신하지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
     if (!items.length) return <>{backgroundError}<DataState state="empty" compact kind="favorite" title="좋아요한 내용이 없어요." /></>;
     return <>{backgroundError}

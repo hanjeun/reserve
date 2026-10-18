@@ -19,6 +19,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useViewModeParam from '../../hooks/useViewModeParam';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import adService from '../../services/adService';
 import { adKeys } from '../../hooks/queryKeys';
 import { SERVICE_DOMAIN_FILTER_OPTIONS, SORT_OPTIONS } from '../../constants';
@@ -65,6 +66,7 @@ const StoreList = () => {
         error, hasData = stores.length > 0 || !loading && !error,
     } = useStoreList();
     const [urlSearchParams] = useSearchParams();
+    const blockingError = isBlockingListReadError(error, stores);
     const location = useLocation();
     const reducedMotion = useReducedMotion();
     const [bannerEntry, setBannerEntry] = useState(() => location.state?.reserveDiscoveryEntry === 'featured-banner');
@@ -212,7 +214,7 @@ const StoreList = () => {
                 </div>
             );
         }
-        if (error && !hasData) {
+        if (blockingError) {
             return (
                 <DataState state="error" kind="store" subject="가게 목록" error={error}
                     onRetry={refetch} retrying={refetching} style={{ marginTop: 100 }} />
@@ -256,7 +258,7 @@ const StoreList = () => {
             <StoreListingToolbar
                 view={view}
                 onViewChange={setView}
-                count={!loading && hasData ? totalElements : undefined}
+                count={!loading && hasData && !blockingError ? totalElements : undefined}
                 region={searchParams.region}
                 regionOpen={regionOpen}
                 onRegionOpen={() => setRegionOpen(true)}
@@ -277,11 +279,11 @@ const StoreList = () => {
             {/* 스켈레톤은 첫 조회나 쿼리 전환으로 이전 결과를 그대로 보여줄 수 없을 때만 쓴다.
                 수동 새로고침은 현재 카드와 읽던 위치를 유지하고, 툴바 버튼만 진행 상태를 표시한다.
                 grid는 고정 4열(rsv-store-grid)로 시작해 화면 폭에 따라 반응형으로 줄어든다. */}
-            {error && hasData && <DataState state="error" kind="store" subject="가게 목록" error={error}
+            {error && !blockingError && <DataState state="error" kind="store" subject="가게 목록" error={error}
                 title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
                 onRetry={refetch} retrying={refetching} compact style={{ marginBottom: 16 }} />}
             {renderResult()}
-            {hasData && totalElements > 0 && (
+            {hasData && !blockingError && totalElements > 0 && (
                 <nav aria-label="가게 목록 페이지" style={{ marginTop: 24 }}>
                     <Pagination
                         current={page}

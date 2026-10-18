@@ -15,7 +15,7 @@ import WaitingDetailModal from '../waiting/WaitingDetailModal';
 import { WaitingTabSkeleton } from '../waiting/WaitingSkeleton';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
-import { isReadAccessDenied } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 
 const QUERY_DEFAULTS = Object.freeze({ waitingStore: '', waitingSearch: '', waitingStatus: 'ACTIVE' });
 const STATUS_LABELS = Object.freeze({ WAITING: '대기 중', CALLED: '호출됨', SEATED: '입장 완료', CANCELLED: '취소됨' });
@@ -94,9 +94,11 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         refetchInterval: live.connected && live.domains.includes('WAITING') ? false : 30_000,
         refetchIntervalInBackground: false, refetchOnWindowFocus: !live.present });
     const accessLost = isReadAccessDenied(board.error) || isReadAccessDenied(storesError);
-    useEffect(() => {
+    const [previousAccessLost, setPreviousAccessLost] = useState(accessLost);
+    if (previousAccessLost !== accessLost) {
+        setPreviousAccessLost(accessLost);
         if (accessLost) { setOpen(false); setQrOpen(false); setDetailId(null); }
-    }, [accessLost]);
+    }
 
     useEffect(() => {
         alive.current = true;
@@ -175,7 +177,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         setOpen(true);
     };
     const entries = board.data?.entries || [];
-    const blockingError = board.error && (!board.data || isReadAccessDenied(board.error));
+    const blockingError = isBlockingListReadError(board.error, entries);
     useListRefreshAnchor(listRef, `${storeId}:${view}:${search}:${status}`, board.isFetching, board.data);
     const detailEntry = entries.find(entry => entry.id === detailId);
     const detail = detailEntry ? { entry: detailEntry, storeName: store?.name } : null;

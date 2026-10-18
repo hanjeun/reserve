@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Tag, Typography } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { StopOutlined } from '@ant-design/icons';
+import { StopOutlined } from '../common/icons';
 import { Button, AdminTableSkeleton, DataState, DataTable, FilterToolbar } from '../common';
 import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';

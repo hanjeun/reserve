@@ -1,7 +1,6 @@
 package kr.it.reserve.config.oauth2;
 
 import kr.it.reserve.config.jwt.JwtProperties;
-import kr.it.reserve.config.jwt.TokenProvider;
 import kr.it.reserve.config.util.CookieUtil;
 import kr.it.reserve.member.entity.Member;
 import jakarta.servlet.ServletException;
@@ -11,6 +10,8 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import kr.it.reserve.config.SiteUrls;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -25,12 +26,16 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final TokenProvider tokenProvider;
+    private final OAuthSessionIssuer sessionIssuer;
     private final JwtProperties jwtProperties;
     private final CookieUtil cookieUtil;
+    private final OAuth2AuthenticationFailureHandler failureHandler;
 
     @Value("${server.env:prod}")
     private String serverEnv;
+    @Value("#{siteUrls.frontendOrigin}")
+    private String frontendUrl = kr.it.reserve.config.SiteUrls.DEFAULT_APP_ORIGIN;
+    @Autowired private SiteUrls siteUrls;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -38,6 +43,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
         Member member = oAuth2User.getMember();
+        String destination = siteUrls == null ? frontendUrl : siteUrls.frontendFor(request);
 
         log.info("OAuth2 login success: memberId={}", member.getId());
 
@@ -51,9 +57,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 ? member.getSuspendedUntil().toLocalDate().toString()
                 : "";
 
-            String baseErrorUrl = "local".equals(serverEnv)
-                ? "http://localhost:5173/login"
-                : "https://reserve.it.kr/login";
+            String baseErrorUrl = destination + "/login";
 
             // 깨끗한 URL: /login?suspended=true&status=SUSPENDED&until=2026-08-15
             String redirectUrl = baseErrorUrl
@@ -67,8 +71,17 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         }
 
         // 1. 토큰 생성
-        String accessToken = tokenProvider.generateAccessToken(member);
-        String refreshToken = tokenProvider.generateRefreshToken(member);
+        OAuthSessionIssuer.SessionTokens pair;
+        try {
+            pair = sessionIssuer.issue(oAuth2User);
+        } catch (org.springframework.security.oauth2.core.OAuth2AuthenticationException exception) {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+            clearSessionAndCookies(request, response);
+            failureHandler.onAuthenticationFailure(request, response, exception);
+            return;
+        }
+        String accessToken = pair.accessToken();
+        String refreshToken = pair.refreshToken();
 
         // 2. CookieUtil을 사용한 쿠키 저장 (중복 메서드 제거)
         int accessMaxAge = (int) jwtProperties.getAccessTokenExpiration().toSeconds();
@@ -82,9 +95,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         // 4. 리액트 앱으로 리다이렉트
         // 신규 유저(약관 미동의)면 newUser=true 파라미터 추가
-        String baseUrl = "local".equals(serverEnv)
-                ? "http://localhost:5173/oauth2/callback"
-                : "https://reserve.it.kr/oauth2/callback";
+        String baseUrl = destination + "/oauth2/callback";
         String redirectUrl = oAuth2User.isNewUser() ? baseUrl + "?newUser=true" : baseUrl;
         log.info("OAuth2 redirect: url={}, env={}, newUser={}", redirectUrl, serverEnv, oAuth2User.isNewUser());
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import FilterToolbar from './FilterToolbar';
+import { LiveUpdatesContext } from '../../hooks/useLiveUpdatesStatus';
 
 const select = {
     key: 'status',
@@ -35,19 +36,32 @@ describe('FilterToolbar', () => {
         expect(screen.getByRole('button', { name: '상태 필터' })).toHaveStyle({ width: 'fit-content' });
     });
 
-    it('locks menus, search and refresh as one loading unit', () => {
+    it('keeps menus, search and the last count usable during background reads', () => {
         render(
             <FilterToolbar
                 selects={[select]}
+                count={12}
                 search={{ value: '', onChange: vi.fn(), placeholder: '이름으로 검색' }}
                 onReload={vi.fn()}
                 loading
             />,
         );
 
-        expect(screen.getByRole('button', { name: '상태 필터' })).toBeDisabled();
-        expect(screen.getByPlaceholderText('이름으로 검색')).toBeDisabled();
+        expect(screen.getByRole('button', { name: '상태 필터' })).toBeEnabled();
+        expect(screen.getByPlaceholderText('이름으로 검색')).toBeEnabled();
+        expect(screen.getByText('12건')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '새로고침' })).toBeDisabled();
+    });
+
+    it('hides refresh only after the server advertises support for this screen', () => {
+        const toolbar = <FilterToolbar search={{ value: '카페', onChange: vi.fn() }} onReload={vi.fn()} autoRefreshDomain="WAITING" />;
+        const { rerender } = render(<LiveUpdatesContext.Provider value={{ present: true, connected: false, domains: [] }}>{toolbar}</LiveUpdatesContext.Provider>);
+        expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
+        rerender(<LiveUpdatesContext.Provider value={{ present: true, connected: true, domains: ['NEWS'] }}>{toolbar}</LiveUpdatesContext.Provider>);
+        expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
+        rerender(<LiveUpdatesContext.Provider value={{ present: true, connected: true, domains: ['WAITING'] }}>{toolbar}</LiveUpdatesContext.Provider>);
+        expect(screen.queryByRole('button', { name: '새로고침' })).toBeNull();
+        expect(screen.getByDisplayValue('카페')).toBeEnabled();
     });
 
     it('keeps an adjacent period control beside the store menu', () => {

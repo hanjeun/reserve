@@ -87,7 +87,7 @@ test('payment, reservation, and administrator views fit 320, 375, 768, and 1440p
         await expectViewportFit(page);
 
         await page.goto('/admin');
-        await expect(page.getByRole('heading', { name: '관리자 패널' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '인증 대기', level: 1 })).toBeVisible();
         await expectViewportFit(page);
     }
 });

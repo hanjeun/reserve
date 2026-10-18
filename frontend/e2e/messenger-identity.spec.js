@@ -33,7 +33,7 @@ test('message actions center grouped short bubbles and keep tall bubbles bottom 
         expect(await button.evaluate(el => {
             const visual = getComputedStyle(el, '::before');
             return { width: visual.width, height: visual.height };
-        })).toEqual({ width: '28px', height: '28px' });
+        })).toEqual({ width: '32px', height: '32px' });
     }
     const tallRow = page.locator('.reserve-chat-message-row').filter({ has: page.getByText('여러 줄 안내입니다.', { exact: false }) });
     const tallButton = tallRow.getByRole('button', { name: '메시지 관리' });
@@ -107,13 +107,17 @@ test('neutral hidden-conversation controls keep touch clear and keyboard focus v
     if (testInfo.project.name === 'mobile-chromium') await toggle.tap();
     else {
         await toggle.hover();
-        await expect(toggle).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect.poll(() => toggle.evaluate(element => {
+            const surface = getComputedStyle(element, '::before');
+            return { background: surface.backgroundColor, opacity: surface.opacity, radius: surface.borderRadius };
+        })).toEqual({ background: 'rgb(249, 250, 251)', opacity: '1', radius: '10px' });
         await toggle.click();
         await page.mouse.move(0, 0);
     }
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(toggle).toHaveAccessibleName('일반 대화 보기');
     await expect(toggle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect.poll(() => toggle.evaluate(element => getComputedStyle(element, '::before').opacity)).toBe('0');
     await expect(toggle).toHaveCSS('color', neutralColor);
     if (testInfo.project.name === 'mobile-chromium') {
         await expect(toggle).toHaveCSS('outline-style', 'none');
@@ -246,7 +250,10 @@ test('composer keeps neutral controls and scopes retraction and private deletion
     await page.getByRole('searchbox', { name: '이모지 검색' }).fill('coffee');
     await page.getByRole('button', { name: '커피 ☕' }).click();
     await expect(input).toHaveValue('☕');
-    await expect(page.getByRole('button', { name: '보내기', exact: true })).toHaveCSS('background-color', 'rgb(242, 244, 246)');
+    await expect.poll(() => page.getByRole('button', { name: '보내기', exact: true }).evaluate(element => {
+        const surface = getComputedStyle(element, '::before');
+        return { background: surface.backgroundColor, opacity: surface.opacity, width: surface.width, height: surface.height };
+    })).toEqual({ background: 'rgb(242, 244, 246)', opacity: '1', width: '32px', height: '32px' });
     await expect(page.getByRole('button', { name: '메시지 관리' })).toHaveCount(2);
     const ownRow = page.locator('.reserve-chat-message-row').filter({ has: page.getByText('문의합니다', { exact: true }) });
     const messageMenu = ownRow.getByRole('button', { name: '메시지 관리' });
@@ -262,7 +269,7 @@ test('composer keeps neutral controls and scopes retraction and private deletion
         expect(await messageMenu.evaluate(element => {
             const visibleBox = getComputedStyle(element, '::before');
             return { width: visibleBox.width, height: visibleBox.height, background: visibleBox.backgroundColor };
-        })).toEqual({ width: '28px', height: '28px', background: 'rgb(242, 244, 246)' });
+        })).toEqual({ width: '32px', height: '32px', background: 'rgb(249, 250, 251)' });
         await expect(messageMenu).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     }
     await page.locator('.reserve-messenger').screenshot({ path: testInfo.outputPath('chat-actions-aligned.png') });
@@ -444,7 +451,7 @@ test('photo-only messages use multipart upload and an authenticated preview', as
     await page.locator('.reserve-messenger-row').click();
     await expect(page.getByRole('button', { name: '사진 첨부' })).toBeEnabled();
     await page.getByLabel('첨부할 사진 선택').setInputFiles({ name: 'test.png', mimeType: 'image/png', buffer: png });
-    await expect(page.getByAltText('전송할 사진')).toBeVisible();
+    await expect(page.getByRole('button', { name: '첨부 사진 크게 보기' }).getByAltText('첨부 사진')).toBeVisible();
     await page.getByRole('button', { name: '보내기', exact: true }).click();
     const photo = page.getByAltText('대화에 첨부한 사진');
     await expect(photo).toBeVisible();

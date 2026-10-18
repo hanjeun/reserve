@@ -25,7 +25,7 @@ describe('chat intro editor', () => {
         expect(within(preview()).getByText('카페 리저브')).toBeInTheDocument();
         fireEvent.click(within(preview()).getByRole('button', { name: '주차' }));
         expect(within(preview()).getByText('2대 가능')).toBeInTheDocument();
-        expect(within(preview()).getByText('가게 문의')).toBeInTheDocument();
+        expect(within(preview()).getByText('가게에 문의')).toBeInTheDocument();
         expect(within(preview()).getByPlaceholderText('메시지를 입력하세요')).toBeInTheDocument();
         fireEvent.click(within(preview()).getByRole('button', { name: '처음부터' }));
         expect(within(preview()).getByRole('button', { name: '주차' })).toBeInTheDocument();
@@ -143,9 +143,11 @@ describe('chat intro editor', () => {
         expect(within(preview()).getByText('리저브 도우미')).toBeInTheDocument();
         const file = screen.getByLabelText('고객지원 사진 파일');
         fireEvent.change(file, { target: { files: [new File(['x'], 'a.txt', { type: 'text/plain' })] } });
-        expect(screen.getByRole('alert')).toHaveTextContent('사진 파일만');
-        fireEvent.change(file, { target: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
-        await waitFor(() => expect(onUploadAvatar).toHaveBeenCalled());
+        expect(await screen.findByRole('alert')).toHaveTextContent('JPG · PNG · WEBP · GIF 이미지만 업로드할 수 있어요.');
+        expect(onUploadAvatar).not.toHaveBeenCalled();
+        const photo = new File(['x'], 'a.png', { type: 'image/png' });
+        fireEvent.change(screen.getByLabelText('고객지원 사진 파일'), { target: { files: [photo] } });
+        await waitFor(() => expect(onUploadAvatar).toHaveBeenCalledWith(photo));
         expect(await screen.findByRole('button', { name: '기본 사진으로' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '기본 문구로' }));
         expect(screen.getByLabelText('인사말').value).toContain('관리자가 확인 후 답변드릴게요');

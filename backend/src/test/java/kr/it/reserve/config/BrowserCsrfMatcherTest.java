@@ -58,16 +58,24 @@ class BrowserCsrfMatcherTest {
     }
 
     @Test
-    void onlySafeReadsAndTheTwoExplicitExternalCollectorsAreExempt() {
+    void onlySafeReadsAndExplicitSignedCollectorsAreExempt() {
         var read = write();
         read.setMethod("GET");
         assertThat(matcher.matches(read)).isFalse();
-        for (String path : List.of("/api/payment/webhook/portone", "/api/csp-reports")) {
+        for (String path : List.of("/api/payment/webhook/portone", "/api/csp-reports",
+                "/api/oauth/events/google", "/api/oauth/events/kakao", "/api/oauth/events/naver",
+                "/api/v1/oauth/events/google", "/api/v1/oauth/events/kakao", "/api/v1/oauth/events/naver")) {
             var collector = write();
             collector.setServletPath(path);
             assertThat(matcher.matches(collector)).isFalse();
             collector.setMethod("PUT");
             assertThat(matcher.matches(collector)).isTrue();
+        }
+        for (String path : List.of("/api/oauth/events/apple", "/api/oauth/events/naver/extra", "/api/oauth/events/google/extra",
+                "/api/v1/oauth/events/kakao/extra")) {
+            var other = write();
+            other.setServletPath(path);
+            assertThat(matcher.matches(other)).isTrue();
         }
     }
 }

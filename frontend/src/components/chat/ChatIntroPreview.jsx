@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { CloseOutlined, MoreOutlined } from '@ant-design/icons';
+import { CloseOutlined, MoreOutlined } from '../common/icons';
 import ChatComposer from './ChatComposer';
 import ChatIntro from './ChatIntro';
 import MessengerAvatar from './MessengerAvatar';
@@ -24,7 +24,7 @@ export default function ChatIntroPreview({ kind = 'store', name, imageSrc, userN
                         className="reserve-messenger-thread-avatar" />
                     <span className="reserve-messenger-thread-copy">
                         <strong>{displayName}</strong>
-                        {isStore && <span>가게 문의</span>}
+                        {isStore && <span>가게에 문의</span>}
                     </span>
                     <span className="reserve-chat-intro-device-icons" aria-hidden="true">
                         {isStore && <MoreOutlined />}

@@ -2,6 +2,9 @@ package kr.it.reserve.promotion;
 
 import kr.it.reserve.promotion.dto.PromotionDto;
 import kr.it.reserve.promotion.service.PromotionService;
+import kr.it.reserve.feed.news.service.StoreNewsService;
+import kr.it.reserve.feed.service.FeedModerationService;
+import kr.it.reserve.global.ratelimit.RateLimiter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,11 +32,14 @@ class PublicPromotionSecurityTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean PromotionService service;
+    @MockitoBean StoreNewsService news;
+    @MockitoBean FeedModerationService moderation;
+    @MockitoBean RateLimiter limiter;
 
     @Test
     void onlyThePublicListAndDetailAreAccessibleWithoutAuthentication() throws Exception {
-        when(service.getPublicPromotions(0, 12)).thenReturn(Page.empty(PageRequest.of(0, 12)));
-        when(service.getPublicPromotion(7L)).thenReturn(PromotionDto.PublicPromotionDetailResponse.builder()
+        when(news.publicList(0, 12, null, null, "ONGOING")).thenReturn(Page.empty(PageRequest.of(0, 12)));
+        when(news.publicDetail(7L)).thenReturn(PromotionDto.PublicPromotionDetailResponse.builder()
                 .id(7L).storeId(3L).title("가게 안내").content("plain text").build());
 
         mockMvc.perform(get("/api/promotions/public"))
@@ -57,6 +63,9 @@ class PublicPromotionSecurityTest {
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(delete("/api/promotions/7")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/promotions/public").contentType("application/json").content("{}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/promotions/public/7/reports").contentType("application/json")
+                        .content("{\"reason\":\"SPAM\",\"detail\":\"신고\"}"))
                 .andExpect(status().isUnauthorized());
     }
 }

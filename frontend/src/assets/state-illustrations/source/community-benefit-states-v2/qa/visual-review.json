@@ -1,0 +1,52 @@
+{
+  "review_type": "manual visual inspection of rendered comparison sheets, not app or device testing",
+  "existing_reference_checked": [
+    "empty-notification",
+    "empty-news",
+    "qr-ready",
+    "qr-invalid",
+    "qr-expired",
+    "qr-success",
+    "payment-pending",
+    "payment-failure",
+    "payment-success",
+    "quick-messages"
+  ],
+  "first_pass_issue": {
+    "asset": "draft-conflict",
+    "finding": "Unequal upright comparison swatches could resemble a bar chart.",
+    "change": "Replaced with a small geometric unequal-comparison mark; rerendered independently at 512 and 768."
+  },
+  "final_findings": {
+    "six_silhouettes": "Single photo post, indented comment pair, two-document arrow, two-document comparison, gift-card magnifier, gift-card return-pencil are distinct.",
+    "palette": "White/pale dominant; small blue accents; no red failure cues.",
+    "margins": "No clipping; established camera and normalization retained. Horizontal two-document compositions intentionally have shorter vertical extents.",
+    "small_sizes": "At 48px the main motifs and blue accent positions remain visible. Fine gift-bow loops and pencil tip lose detail; interpretation should be supported by accessible UI labels. 80/96/112px show state detail more clearly.",
+    "alpha": "No visible white matte/halo in white and #161C27 composites; numeric alpha and fully transparent canvas edges validated separately."
+  },
+  "actual_size_sheets": [
+    48,
+    56,
+    64,
+    80,
+    96,
+    112
+  ],
+  "backgrounds": [
+    "#FFFFFF",
+    "#161C27"
+  ],
+  "not_performed": [
+    "App integration",
+    "Real device testing",
+    "Browser screenshot testing",
+    "User comprehension study",
+    "Direct scene comparison against inaccessible latest three kits"
+  ],
+  "second_pass_refinement": {
+    "reviewer": "Independent parent visual review",
+    "draft-conflict": "Comparison symbol enlarged 1.4x, stroke 1.2x, raised toward document center for48px distinction.",
+    "benefit-review-rejected": "Pencil enlarged1.2x and shifted right/lower to avoid return arrowhead."
+  },
+  "provenance": "Inherited unchanged review statements from v1; see v2-visual-review.json for current verification."
+}

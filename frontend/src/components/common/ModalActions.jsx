@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import Button from './Button';
-import { colors } from '../../styles/tokens';
 
 export const ModalActionGroup = ({ children }) => <div className="reserve-modal-actions">{children}</div>;
 ModalActionGroup.propTypes = { children: PropTypes.node };
@@ -10,8 +9,7 @@ ModalActionGroup.propTypes = { children: PropTypes.node };
 const ModalActions = ({ onCancel, onConfirm, cancelText = '취소', confirmText = '확인', loading = false, disabled = false, cancelDisabled = false }) => (
     <ModalActionGroup>
         <Button variant="outline" size="sm" onClick={onCancel} disabled={cancelDisabled}>{cancelText}</Button>
-        <Button variant="primary" size="sm" onClick={onConfirm} loading={loading} disabled={disabled}
-            style={{ border: `1px solid ${colors.primary.main}` }}>{confirmText}</Button>
+        <Button variant="primary" size="sm" onClick={onConfirm} loading={loading} disabled={disabled}>{confirmText}</Button>
     </ModalActionGroup>
 );
 

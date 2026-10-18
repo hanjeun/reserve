@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { CheckOutlined, CopyOutlined } from '@ant-design/icons';
+import { CheckOutlined, CopyOutlined } from './icons';
+import Tooltip from './Tooltip';
 
 const COPY_FEEDBACK_MS = 1600;
 
@@ -50,15 +51,14 @@ const CopyableText = ({ value, label = '내용', fallback = '-', className = '',
         <span {...spanProps} className={className ? `reserve-copyable-text ${className}` : 'reserve-copyable-text'} style={style}>
             <span className="reserve-copyable-text__value">{hasText ? text : fallback}</span>
             {hasText && (
-                <button
+                <Tooltip title={`${label} ${copied ? '복사됨' : '복사'}`}><button
                     className="reserve-copyable-text__button"
                     type="button"
                     aria-label={`${label} ${copied ? '복사됨' : '복사'}`}
-                    title={`${label} ${copied ? '복사됨' : '복사'}`}
                     onClick={handleCopy}
                 >
                     {copied ? <CheckOutlined aria-hidden="true" /> : <CopyOutlined aria-hidden="true" />}
-                </button>
+                </button></Tooltip>
             )}
             <output className="reserve-copyable-text__status">
                 {copied ? `${label}를 복사했어요.` : ''}

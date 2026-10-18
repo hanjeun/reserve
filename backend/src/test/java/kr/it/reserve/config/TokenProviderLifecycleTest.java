@@ -7,6 +7,7 @@ import kr.it.reserve.config.jwt.TokenProvider;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,5 +135,33 @@ class TokenProviderLifecycleTest {
         assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(legacyToken))
                 .isInstanceOf(AuthException.class)
                 .hasMessageContaining("접근 토큰");
+    }
+
+    @Test
+    void aDelayedEventRejectsOldAuthenticationEvenWhenJwtIssuanceIsLaterButKeepsSameSecondFreshAuthentication() {
+        LocalDateTime eventTime = LocalDateTime.of(2026, 10, 16, 1, 0, 1);
+        member.setProvider(AuthProvider.GOOGLE);
+        member.setOauthAuthenticatedAt(eventTime.minusMinutes(1));
+        String oldFamily = tokenProvider.generateAccessToken(member);
+        member.setOauthAuthenticatedAt(eventTime.plusNanos(500_000_000));
+        String freshFamily = tokenProvider.generateAccessToken(member);
+        member.recordOAuthSecurityRevocation(eventTime);
+        when(memberRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));
+
+        assertThat(tokenProvider.validToken(oldFamily)).isTrue();
+        assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(oldFamily)).isInstanceOf(AuthException.class);
+        assertThat(tokenProvider.getOAuthAuthenticationAt(freshFamily)).isEqualTo(eventTime.plusNanos(500_000_000));
+        assertThat(tokenProvider.getActiveMemberFromToken(freshFamily)).isSameAs(member);
+    }
+
+    @Test
+    void aLegacyOAuthTokenNeedsReauthenticationAfterACutoffWhileLocalSessionPolicyIsUnchanged() {
+        member.setProvider(AuthProvider.NAVER);
+        when(memberRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));
+        assertThat(tokenProvider.getActiveMemberFromToken(token)).isSameAs(member);
+        member.recordOAuthSecurityRevocation(LocalDateTime.of(2026, 10, 16, 1, 0));
+        assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(token)).isInstanceOf(AuthException.class);
+        member.setProvider(AuthProvider.LOCAL);
+        assertThat(tokenProvider.getActiveMemberFromToken(token)).isSameAs(member);
     }
 }

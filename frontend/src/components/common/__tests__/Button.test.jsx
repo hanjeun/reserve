@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { EyeOutlined } from '@ant-design/icons';
+import { EyeOutlined } from '../icons';
 import Button from '../Button';
 
 describe('Button', () => {

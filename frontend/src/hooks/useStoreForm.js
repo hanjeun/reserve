@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { storeService } from '../services';
 import useMessage from './useMessage';
 import useAuthStore from '../store/useAuthStore';
+import StateIllustration from '../components/common/StateIllustration';
 import useStoreDraftPreferences, { getStoreDraftAutoSaveEnabled } from './useStoreDraftPreferences';
 import { buildStoreFormData } from '../utils/form';
 import { migrateOnboardingDraft, normalizeOnboardingSubmission } from '../utils/storeOnboarding';
@@ -100,7 +101,7 @@ const draftFailureMessage = error => {
     if (error?.name === 'QuotaExceededError') {
         return '브라우저 저장 공간이 부족해 임시저장하지 못했어요. 새 이미지 수나 크기를 줄여주세요.';
     }
-    return error?.message || '이 브라우저에 임시저장하지 못했어요.';
+    return error?.message || '임시저장하지 못했어요.';
 };
 
 /** StoreRegister, StoreEdit에서 공유하는 폼·이미지·로컬 임시저장 로직 */
@@ -250,7 +251,7 @@ export const useStoreForm = ({
             ? { ...draft.state, status: draft.state?.savedAt ? 'saved' : 'idle', error: null }
             : { status: 'saved', savedAt: draft.savedAt, error: null });
         hasChangesRef.current = navigation ? draft.changed : false;
-        if (!navigation) message.info('이 브라우저에 임시저장한 내용을 불러왔어요.');
+        if (!navigation) message.info('임시저장한 내용을 불러왔어요.');
     }, [form, message, mode, revokeRestoredUrls]);
 
     useEffect(() => {
@@ -289,8 +290,12 @@ export const useStoreForm = ({
                 confirmRef.current({
                     title: baseChanged ? '가게 정보가 달라졌어요' : '임시저장된 내용이 있어요',
                     content: baseChanged
-                        ? `${savedLabel}에 저장한 초안과 현재 가게 정보가 달라요. 초안을 불러오면 최신 값 일부가 바뀔 수 있어요.`
-                        : `${savedLabel}에 이 브라우저에 저장한 내용을 이어서 작성할까요?`,
+                        ? createElement('div', { style: { display: 'grid', gap: 8 } },
+                            createElement(StateIllustration, { name: 'draft-conflict', size: 'sm', interactive: false }),
+                            createElement('div', null,
+                                createElement('div', null, `${savedLabel}에 저장한 초안과 현재 가게 정보가 달라요.`),
+                                createElement('div', null, '초안을 불러오면 최신 값 일부가 바뀔 수 있어요.')))
+                        : `${savedLabel}에 임시저장한 내용을 이어서 작성할까요?`,
                     okText: '이어서 작성',
                     cancelText: mode === 'create' ? '새로 작성' : '최신 정보 유지',
                     onOk: () => {
@@ -363,7 +368,7 @@ export const useStoreForm = ({
                 setDraftState({ status: 'saved', savedAt: record.savedAt, error: null });
                 hasChangesRef.current = false;
             }
-            if (announce) message.success('이 브라우저에 임시저장했어요.');
+            if (announce) message.success('임시저장했어요.');
             return record;
         }).catch(error => {
             const errorMessage = draftFailureMessage(error);

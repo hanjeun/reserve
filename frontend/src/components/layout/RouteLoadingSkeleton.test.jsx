@@ -1,5 +1,7 @@
 import { Suspense, lazy } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render as renderUi, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { feedKeys } from '../../hooks/feedQueries';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import RouteLoadingSkeleton, { RouteSkeletonPreview } from './RouteLoadingSkeleton';
@@ -9,7 +11,8 @@ import RouteSkeletonPages from './RouteSkeletonPages';
 import DiscoveryRouteSkeleton from './DiscoveryRouteSkeleton';
 
 const routes = {
-    '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'benefit-detail', '/waiting': 'waiting', '/feed': 'coming-soon',
+    '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'benefit-detail', '/waiting': 'waiting', '/feed': 'feed',
+    '/feed/posts/1': 'feed-detail', '/feed/u/author': 'feed-author',
     '/login': 'auth', '/signup': 'auth', '/forgot-password': 'auth', '/oauth2/callback': 'discovery', '/signup/social': 'auth',
     '/stores': 'store-list', '/store/12': 'detail', '/terms': 'legal', '/privacy': 'legal', '/content-sources': 'legal',
     '/operation-guide': 'guide', '/guide/user': 'guide', '/guide/business': 'guide', '/guide/common': 'guide',
@@ -22,6 +25,12 @@ const routes = {
 
 const originalWidth = window.innerWidth;
 const setWidth = width => Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+const clients = [];
+const render = (ui, { initialEntries = ['/'] } = {}) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    client.setQueryData(feedKeys.config(), { enabled: true }); clients.push(client);
+    return renderUi(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}><MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter></QueryClientProvider> });
+};
 
 describe('route chunk loading patterns', () => {
     // 페이지별 뼈대는 별도 청크다. 앱처럼 먼저 받아 두면 이후 렌더는 동기적으로 그 모양을 그린다.
@@ -29,7 +38,7 @@ describe('route chunk loading patterns', () => {
         expect((await preloadRouteSkeletons())?.default).toBe(RouteSkeletonPages);
         expect((await preloadRouteSkeletons('discovery'))?.default).toBe(DiscoveryRouteSkeleton);
     });
-    afterEach(() => setWidth(originalWidth));
+    afterEach(() => { setWidth(originalWidth); clients.splice(0).forEach(client => client.clear()); });
 
     it('mirrors the search header, six domains and quick choices without a text input', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/search" />);
@@ -37,6 +46,12 @@ describe('route chunk loading patterns', () => {
         expect(container.querySelectorAll('.reserve-route-search-domain')).toHaveLength(6);
         expect(container.querySelectorAll('.reserve-search-keywords > div')).toHaveLength(6);
         expect(container.querySelector('input,button,a,form')).toBeNull();
+    });
+
+    it.each(['/waiting', '/feed'])('uses the page layout on the first boot frame at %s without starting a query', path => {
+        const { container } = renderUi(<RouteSkeletonPreview pathname={path} />);
+        expect(container.querySelector(path === '/feed' ? '.reserve-feed-page' : '.reserve-waiting-heading')).toBeInTheDocument();
+        expect(container.querySelector('button,input,select,a')).toBeNull();
     });
 
     it('mirrors my page profile, account editing and three app settings cards', () => {
@@ -92,10 +107,9 @@ describe('route chunk loading patterns', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/my-reservations" />);
         const row = container.querySelector('.reserve-filter-toolbar-secondary');
         expect(row.firstElementChild).toHaveStyle({ flexShrink: '1', minWidth: '0px', maxWidth: '480px' });
-        expect(row.querySelector('.reserve-filter-toolbar-refresh > .reserve-skeleton-block')).toHaveStyle({ width: '70px', height: '16px' });
+        expect(row.querySelector('.reserve-filter-toolbar-refresh > .reserve-icon-tool .reserve-skeleton-block')).toHaveStyle({ width: '32px', height: '32px', borderRadius: '10px' });
         // The shared toolbar is sized by its actual 44px view slot, including while it is a bone.
-        expect(container.querySelector('.reserve-explore-filters').firstElementChild)
-            .toHaveStyle({ width: '44px', height: '44px', flexShrink: '0' });
+        expect(container.querySelector('.reserve-explore-filters').firstElementChild).toHaveClass('reserve-icon-tool');
     });
 
     it('switches between the cached home and login skeletons without keeping the previous page', () => {
@@ -155,8 +169,8 @@ describe('route chunk loading patterns', () => {
         });
 
     it.each([
-        ['/guide/user', '사용자 이용안내', 5],
-        ['/guide/business', '사업자 이용안내', 6],
+        ['/guide/user', '사용자 이용안내', 6],
+        ['/guide/business', '사업자 이용안내', 7],
         ['/guide/common', '공통 이용안내', 4],
         ['/operation-guide', '공통 이용안내', 4],
     ])('uses the guide frame and section count for %s', (path, title, sections) => {
@@ -184,18 +198,21 @@ describe('route chunk loading patterns', () => {
         expect(container.querySelector('.reserve-payment-result__content .reserve-payment-result__hint')).toBeInTheDocument();
     });
 
-    it('draws the admin panel title, tabs, search toolbar and verification table', () => {
+    it('draws the admin workspace menu, search toolbar and verification table', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/admin" />);
-        expect(container.querySelector('h2')).toHaveTextContent('관리자 패널');
-        expect(container.querySelectorAll('.reserve-route-panel-tab')).toHaveLength(13);
+        expect(container.querySelector('h1')).toHaveTextContent('인증 대기');
+        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder')).toHaveLength(15);
+        expect(container.querySelector('.reserve-workspace button,.reserve-workspace a')).toBeNull();
+        expect(container.querySelectorAll('.reserve-workspace-menu-group')).toHaveLength(4);
         expect(container.querySelector('.reserve-filter-toolbar')).toBeInTheDocument();
         expect(container.textContent).toContain('사업자번호');
     });
 
-    it('draws the six partner tabs and the selected reservations or statistics body', () => {
+    it('draws the seven partner functions and the selected reservations or statistics body', () => {
         const { container, rerender } = render(<RouteSkeletonPreview pathname="/business" />);
-        expect(container.querySelector('h2')).toHaveTextContent('사업자 파트너 패널');
-        expect(container.querySelectorAll('.reserve-route-panel-tab')).toHaveLength(6);
+        expect(container.querySelector('h1')).toHaveTextContent('예약 관리');
+        expect(container.querySelectorAll('.reserve-workspace-sider nav .reserve-workspace-menu-placeholder')).toHaveLength(7);
+        expect(container.querySelector('.reserve-workspace button,.reserve-workspace a')).toBeNull();
         expect(container.querySelector('.reserve-explore-filters')).toBeInTheDocument();
         // 사업자 예약 목록 뼈대(ReservationCardSkeleton): 행 5개 + 구분선 4개
         expect(container.querySelector('.reserve-filter-toolbar').nextElementSibling.children).toHaveLength(9);
@@ -285,7 +302,7 @@ describe('route chunk loading patterns', () => {
     it('resolves and removes the page skeleton when the chunk is ready', async () => {
         let resolve;
         const Page = lazy(() => new Promise(yes => { resolve = yes; }));
-        render(<MemoryRouter initialEntries={['/store/register']}><Suspense fallback={<RouteLoadingSkeleton />}><Page /></Suspense></MemoryRouter>);
+        render(<Suspense fallback={<RouteLoadingSkeleton />}><Page /></Suspense>, { initialEntries: ['/store/register'] });
         expect(screen.getByRole('status')).toBeInTheDocument();
         await act(async () => resolve({ default: () => <h1>가게 등록</h1> }));
         expect(screen.getByRole('heading', { name: '가게 등록' })).toBeInTheDocument();

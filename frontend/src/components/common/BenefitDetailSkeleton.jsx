@@ -6,8 +6,8 @@ export default function BenefitDetailSkeleton(props) {
     return (
         <section className="reserve-benefits-page reserve-benefit-detail" {...props}>
             <div className="reserve-route-skeleton-copy" aria-hidden="true">
-                <Bone width="30%" height={14} />
                 <div className="reserve-page-title ant-typography" style={{ width: '80%', margin: 0 }}><Bone width="100%" height="1.4em" /></div>
+                <Bone width="45%" height={20} />
                 <Bone height={180} borderRadius={12} />
                 <Bone width="90%" height={14} />
                 <Bone width="80%" height={14} />

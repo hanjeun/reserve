@@ -1,34 +1,49 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { ArrowLeftOutlined, SearchOutlined } from '@ant-design/icons';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeftOutlined, MenuOutlined, SearchOutlined } from '../common/icons';
+import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useGoBack from '../../hooks/useGoBack';
+import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
+import useWorkspaceAction from '../../hooks/useWorkspaceAction';
 import useExitAnimation from '../../hooks/useExitAnimation';
 import { isDiscoveryRootPath } from '../../constants/discovery';
 import useAuthStore from '../../store/useAuthStore';
 import Button from '../common/Button';
+import Tooltip from '../common/Tooltip';
 import { requestMessengerRouteClose } from '../chat/messengerRouteTransition';
 import { requestRegistrationStepBack } from '../../utils/storeRegistrationNavigation';
 import { useSkeletonShown } from './loadingPresentation';
 import { colors, heights, fontWeight, radius } from '../../styles/tokens';
+import { WorkspaceMenuContext } from './workspaceMenu';
+import { SEARCH_MOTION_DURATION_MS } from './searchTransition';
 
 const HeaderAccountMenu = lazy(() => import('./HeaderAccountMenu'));
 const HEADER_ACTION_MOTION_MS = 180;
 
 const Header = () => {
     const skeletonShown = useSkeletonShown();
-    const navigate = useNavigate();
+    const navigate = useWorkspaceNavigate();
+    const requestAction = useWorkspaceAction();
     const location = useLocation();
+    const navigationType = useNavigationType();
     const reducedMotion = useReducedMotion();
     const { isLoggedIn } = useAuthStore();
     const currentPath = location.pathname.replace(/\/$/, '') || '/';
+    const workspaceControls = useContext(WorkspaceMenuContext);
+    const workspaceMenu = workspaceControls?.control;
+    const showWorkspaceMenu = isLoggedIn && /^\/(admin|business)$/.test(currentPath);
+    const menu = workspaceMenu?.pathname.replace(/\/$/, '') === currentPath ? workspaceMenu : null;
+    const menuAction = menu?.mobile ? (menu.expanded ? '닫기' : '열기') : (menu?.expanded ? '접기' : '펼치기');
+    const menuLabel = `${menu?.title || (currentPath === '/admin' ? '관리자 패널' : '사업자 파트너 패널')} 메뉴 ${menuAction}`;
     const isDiscoveryRoot = isDiscoveryRootPath(location.pathname, location.search);
     const showBack = !isDiscoveryRoot;
     const goBack = useGoBack(currentPath === '/stores' || currentPath.startsWith('/store/') ? '/stores' : '/');
     const [navigationIntent, setNavigationIntent] = useState(null);
     const navigationTimerRef = useRef(null);
     const navigationStartRef = useRef(/** @type {string | null} */ (null));
+    const navigationLocationRef = useRef({ location, navigationType });
+    useLayoutEffect(() => { navigationLocationRef.current = { location, navigationType }; }, [location, navigationType]);
     // 뒤로가기 버튼은 사라질 때도 나타날 때와 같은 접힘 모션을 탄다(2026-09-26).
     // 예전엔 ← 를 직접 눌렀을 때만 접혔고, 로고·하단 탭·브라우저 뒤로가기로 탐색 루트에 돌아갈 때는
     // 버튼이 그 자리에서 언마운트돼 RESERVE 로고가 48px 뚝 튀었다(사용자 지적).
@@ -37,51 +52,66 @@ const Header = () => {
     const { shouldRender: backMounted } = useExitAnimation(showBack, HEADER_ACTION_MOTION_MS);
     // 모션 최소화에서는 애니메이션이 꺼져 있으므로 남겨 둘 이유가 없다 — 즉시 나타나고 사라진다.
     const renderBack = reducedMotion ? showBack : backMounted;
-    // 누른 직후(navigationIntent)와 경로가 바뀐 뒤 남아 있는 동안(renderBack && !showBack)을 같은 클래스로 묶는다.
-    // 둘 사이에서 클래스가 한 번이라도 빠지면 애니메이션이 처음부터 다시 재생돼 버튼이 번쩍인다.
-    const backLeaving = (navigationIntent?.intent === 'back' && navigationIntent.locationKey === location.key)
-        || (renderBack && !showBack);
+    // 버튼이 계속 필요한 경로 사이에서는 같은 DOM을 유지하고, 실제로 없어질 때만 접는다.
+    const backLeaving = renderBack && !showBack;
     const keyword = currentPath === '/stores' ? new URLSearchParams(location.search).get('keyword')?.trim() : '';
     const searchTarget = keyword ? '/search?keyword=' + encodeURIComponent(keyword) : '/search';
+    const searchLeaving = navigationIntent?.intent === 'search'
+        && navigationIntent.pathname === location.pathname && navigationIntent.hash === location.hash;
 
-    useEffect(() => () => {
+    const cancelNavigation = useCallback(() => {
         if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
         navigationTimerRef.current = null;
         navigationStartRef.current = null;
         // 같은 history key로 앞으로 돌아와도 완료된 이동의 잠금이 되살아나지 않는다.
         setNavigationIntent(null);
-    }, [location.key]);
+    }, []);
+    useEffect(() => () => {
+        const next = navigationLocationRef.current;
+        // 같은 화면의 기본 선택 주소 보정은 이미 누른 검색 이동을 취소하지 않는다.
+        if (next.navigationType === 'REPLACE' && next.location.key !== location.key
+            && next.location.pathname === location.pathname && next.location.hash === location.hash) return;
+        cancelNavigation();
+    }, [location.key, location.pathname, location.hash, cancelNavigation]);
+    useEffect(() => cancelNavigation, [cancelNavigation]);
 
-    // 메시지 패널은 자체 닫힘 모션을 끝낸 뒤 이동한다. 뒤로가기 버튼은 짧은 피드백 뒤 이동한다.
+    // 검색은 퇴장 모션 뒤 이동하고 뒤로가기는 바로 이동한다. 중복 이동 잠금은 경로 커밋까지 유지한다.
     // 로고는 모션 없이 바로 이동한다(handleLogoClick).
     const runHeaderNavigation = useCallback((intent, action) => {
-        if (navigationStartRef.current === location.key) return;
+        if (navigationStartRef.current !== null) return;
         navigationStartRef.current = location.key;
-        if (reducedMotion) {
+        if (intent === 'back' || reducedMotion) {
             action();
             return;
         }
 
-        setNavigationIntent({ intent, locationKey: location.key });
+        setNavigationIntent({ intent, pathname: location.pathname, hash: location.hash });
         navigationTimerRef.current = window.setTimeout(() => {
             navigationTimerRef.current = null;
             // POP 이동은 비동기다. 경로 커밋 전 intent를 풀면 enter → leave가 다시 재생된다.
             action();
-        }, HEADER_ACTION_MOTION_MS);
-    }, [reducedMotion, location.key]);
+        }, intent === 'search' ? SEARCH_MOTION_DURATION_MS : HEADER_ACTION_MOTION_MS);
+    }, [reducedMotion, location.key, location.pathname, location.hash]);
 
     const handleBack = () => {
         const storeQuestions = currentPath === '/store/register' || /^\/store\/\d+\/edit$/.test(currentPath);
         if (storeQuestions && requestRegistrationStepBack()) return;
         if (currentPath === '/messages' && requestMessengerRouteClose()) return;
-        runHeaderNavigation('back', goBack);
+        void requestAction(() => runHeaderNavigation('back', goBack));
+    };
+
+    const handleSearchEntry = event => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        void requestAction(() => runHeaderNavigation('search', () => navigate(searchTarget, { state: { searchEntry: true } })));
     };
 
     // RESERVE 로고는 움직이지 않는다 — 눌림·축소·대기 없이 바로 이동한다(2026-09-21 사용자 결정:
     // "로고가 클릭되면서 안으로 들어가는 모션은 싫다, 로고는 정적이고 페이지만 움직이게").
-    // 움직임은 도착한 홈 페이지가 맡는다. App의 공통 경로 전환이 방향을 받아 콘텐츠만 밀어 넣는다.
+    // 도착한 홈의 준비된 영역만 들어온다. 아래 가게 목록의 로딩은 이 이동을 취소하지 않는다.
     // 홈에서 누르면 맨 위로 스크롤만 한다.
     const handleLogoClick = (e) => {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
         if (location.pathname === '/') {
             window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
@@ -90,21 +120,31 @@ const Header = () => {
         // 메시지 화면에서는 뒤로가기 버튼과 같이 닫힘 애니메이션을 먼저 재생하고 홈으로 간다.
         // 메시지 화면을 떠나는 이동에는 페이지 전환 슬라이드가 걸리지 않아 두 애니메이션이 겹치지 않는다.
         if (currentPath === '/messages' && requestMessengerRouteClose('/')) return;
-        navigate('/', { state: { reserveRouteMotion: 'from-left' } });
+        navigate('/', { state: { reserveRouteMotion: 'from-left', reserveHomeEntry: true } });
     };
 
     // 주의: 정지/영구정지 회원은 이제 로그인 자체가 차단되므로(이메일/소셜 공통)
     // 로그인된 상태에서 배너를 띄우는 분기는 더 이상 필요하지 않음 — 완전히 제거됨
     return (
-        <header data-skeleton-shown={skeletonShown ? 'true' : undefined} className={'reserve-header' + (keyword ? ' reserve-header-has-query' : '') + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '')} style={isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header}>
+        <header data-skeleton-shown={skeletonShown ? 'true' : undefined} className={'reserve-header' + (keyword ? ' reserve-header-has-query' : '') + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '') + (showWorkspaceMenu ? ' reserve-header-has-workspace-menu' : '') + (searchLeaving ? ' reserve-header--search-leaving' : '')}
+            inert={searchLeaving ? true : undefined} aria-busy={searchLeaving || undefined}
+            style={{ ...(isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header), '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
             <div className="reserve-header-inner" style={styles.inner}>
                 <div className="reserve-header-brand">
+                    {showWorkspaceMenu && <Tooltip title={menuLabel} disabled={menu?.mobile && menu.expanded}><button type="button" id={menu?.buttonId} className="reserve-header-workspace-menu"
+                        onClick={menu?.toggle} disabled={!menu}
+                        data-input-modality={workspaceControls?.inputModality}
+                        aria-label={menuLabel}
+                        aria-expanded={menu?.expanded ?? false} aria-controls={menu?.controlsId}
+                        aria-haspopup={menu?.mobile ? 'dialog' : undefined}>
+                        <MenuOutlined aria-hidden="true" />
+                    </button></Tooltip>}
                     {renderBack && (
-                        <button type="button" className={'reserve-header-back' + (backLeaving ? ' reserve-header-back--leaving' : '')}
+                        <Tooltip title="이전 화면으로 돌아가기" disabled={backLeaving || searchLeaving}><button type="button" className={'reserve-header-back' + (backLeaving ? ' reserve-header-back--leaving' : '')}
                             onClick={handleBack} aria-label="이전 화면으로 돌아가기" disabled={backLeaving}
                             aria-hidden={showBack ? undefined : true}>
                             <ArrowLeftOutlined aria-hidden="true" />
-                        </button>
+                        </button></Tooltip>
                     )}
                     <a className="reserve-header-logo"
                         href="/" onClick={handleLogoClick} style={styles.logo} aria-label="RESERVE 홈">
@@ -112,16 +152,16 @@ const Header = () => {
                     </a>
                 </div>
                 {keyword && (
-                    <Link to={searchTarget} state={{ searchEntry: true }} className="reserve-header-query" aria-label={'검색어 수정: ' + keyword} title={keyword}>
+                    <Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-query" aria-label={'검색어 수정: ' + keyword} title={keyword}>
                         <SearchOutlined aria-hidden="true" />
                         <span className="reserve-header-query-text">{keyword}</span>
                     </Link>
                 )}
                 <div className="reserve-header-actions" style={styles.actions}>
                     {!keyword && (
-                        <Link to={searchTarget} state={{ searchEntry: true }} className="reserve-header-search" aria-label="가게·지역·서비스 검색">
+                        <Tooltip title="가게·지역·서비스 검색" disabled={searchLeaving}><Link to={searchTarget} state={{ searchEntry: true }} onClick={handleSearchEntry} className="reserve-header-search" aria-label="가게·지역·서비스 검색">
                             <SearchOutlined aria-hidden="true" />
-                        </Link>
+                        </Link></Tooltip>
                     )}
                     {isLoggedIn ? (
                         <Suspense fallback={<span className="reserve-header-account-loading" aria-hidden="true" style={styles.avatarFallback} />}>
@@ -145,11 +185,12 @@ const Header = () => {
  * 예전엔 빈 64px 띠만 있어 헤더가 비어 보였다. 뒤로가기 버튼은 두지 않는다 — 진짜 헤더가 붙을 때 그 버튼은
  * 펼침 모션으로 들어오므로 로고가 옆으로 미끄러질 뿐 튀지 않는다.
  */
-export function HeaderPlaceholder({ discoveryRoot = false }) {
+export function HeaderPlaceholder({ discoveryRoot = false, workspace = false }) {
     return (
-        <div className="reserve-boot-shell-header" aria-hidden="true" style={discoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header}>
+        <div className={'reserve-boot-shell-header' + (workspace ? ' reserve-header-has-workspace-menu' : '')} aria-hidden="true" style={discoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header}>
             <div className="reserve-header-inner" style={styles.inner}>
                 <div className="reserve-header-brand">
+                    {workspace && <span className="reserve-header-workspace-menu"><MenuOutlined /></span>}
                     <span className="reserve-header-logo" style={{ color: styles.logo.color }}>
                         <span className="reserve-header-logo-wordmark">RESERVE</span>
                     </span>
@@ -158,7 +199,7 @@ export function HeaderPlaceholder({ discoveryRoot = false }) {
         </div>
     );
 }
-HeaderPlaceholder.propTypes = { discoveryRoot: PropTypes.bool };
+HeaderPlaceholder.propTypes = { discoveryRoot: PropTypes.bool, workspace: PropTypes.bool };
 
 const styles = {
     header: {
@@ -200,7 +241,7 @@ const styles = {
     actions: { display: 'flex', alignItems: 'center' },
     guestActions: { display: 'flex', alignItems: 'center', gap: 4 },
     navBtn: { color: colors.text.secondary, fontWeight: fontWeight.semibold, borderRadius: radius.md, height: heights.buttonMd, padding: '0 4px', whiteSpace: 'nowrap' },
-    actionBtn: { borderRadius: radius.md, fontWeight: fontWeight.semibold, backgroundColor: colors.primary.main, border: 'none', height: heights.buttonMd, padding: '0 12px', whiteSpace: 'nowrap' },
+    actionBtn: { borderRadius: radius.md, fontWeight: fontWeight.semibold, border: 'none', height: heights.buttonMd, padding: '0 12px', whiteSpace: 'nowrap' },
     avatarFallback: { width: 36, height: 36, borderRadius: radius.full, background: colors.primary.light },
 };
 

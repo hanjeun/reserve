@@ -1,5 +1,7 @@
 package kr.it.reserve.reservation.scheduler;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import kr.it.reserve.payment.service.PaymentService;
@@ -24,6 +26,8 @@ public class ReservationExpiryProcessor {
     private final ReservationRepository reservationRepository;
     private final PaymentService paymentService;
     private final EntityManager entityManager;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.reservation.service.ReservationUpdates updates;
 
     @Transactional
     public ExpiryResult expireIfDue(Long reservationId, LocalDateTime now) {
@@ -77,6 +81,7 @@ public class ReservationExpiryProcessor {
                 reservation.getCreatedAt(),
                 expireAt);
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+        if (updates != null) updates.changed(reservation, EntityUpdates.Operation.UPDATED);
         return ExpiryResult.CANCELLED;
     }
 

@@ -3,6 +3,7 @@ package kr.it.reserve.global.ratelimit;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -210,6 +211,9 @@ public class RateLimiter {
     // key = "POLICY_NAME:IP주소"
     private final ConcurrentHashMap<String, Entry> buckets = new ConcurrentHashMap<>();
 
+    @Autowired(required = false)
+    private RedisRequestLimiter sharedWaitingLimits;
+
     /** 버킷 + 마지막 접근 시각(ms). 접근 시각은 스윕 판단에만 쓰이므로 정확한 동기화가 필요 없다. */
     private static final class Entry {
         private final Bucket bucket;
@@ -236,7 +240,12 @@ public class RateLimiter {
                 k -> new Entry(newBucket(policy))
         );
         entry.lastAccessMs.set(System.currentTimeMillis());
-        return entry.bucket.tryConsume(1);
+        if (!entry.bucket.tryConsume(1)) return false;
+        if (sharedWaitingLimits == null || (policy != Policy.WAITING_JOIN && policy != Policy.QR_CHECKIN)) return true;
+        Boolean shared = sharedWaitingLimits.tryConsume(key, policy, policy.capacity, policy.refillDuration);
+        if (Boolean.FALSE.equals(shared)) entry.bucket.addTokens(1);
+        // 공유 거부는 거부하고, 장애 때는 이미 소비한 로컬 버킷을 사용한다. 무제한 허용하지 않는다.
+        return !Boolean.FALSE.equals(shared);
     }
 
     /** 성공한 검증이 예약했던 토큰 1개만 반환한다. 기존 실패와 리필 시점은 유지한다. */

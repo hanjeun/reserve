@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
-import { EyeInvisibleOutlined, EyeOutlined, SyncOutlined } from '@ant-design/icons';
+import { EyeInvisibleOutlined, EyeOutlined, SyncOutlined } from '../common/icons';
 import useRefreshCooldown from '../../hooks/useRefreshCooldown';
+import Tooltip from '../common/Tooltip';
 
 export default function MessengerListHeading({ headingLevel = 2, onRefresh, refreshing = false, showHidden = false, onToggleHidden }) {
     const Heading = `h${headingLevel}`;
@@ -11,28 +12,26 @@ export default function MessengerListHeading({ headingLevel = 2, onRefresh, refr
             <Heading>{showHidden ? '숨긴 대화' : '대화'}</Heading>
             <div className="reserve-messenger-list-actions">
                 {onToggleHidden && (
-                    <button
+                    <Tooltip title={hiddenLabel}><button
                         type="button"
                         className="reserve-messenger-list-refresh"
                         onClick={onToggleHidden}
                         aria-pressed={showHidden}
                         aria-label={hiddenLabel}
-                        title={hiddenLabel}
                     >
                         {showHidden ? <EyeOutlined aria-hidden="true" /> : <EyeInvisibleOutlined aria-hidden="true" />}
-                    </button>
+                    </button></Tooltip>
                 )}
-                <button
+                <Tooltip title="대화 목록 새로고침"><button
                     type="button"
                     className={`reserve-messenger-list-refresh${refreshing ? ' is-refreshing' : ''}`}
                     onClick={reload}
                     aria-disabled={blocked || undefined}
                     aria-label="대화 목록 새로고침"
-                    title="새로고침"
                     aria-busy={refreshing || undefined}
                 >
                     <SyncOutlined spin={refreshing} aria-hidden="true" />
-                </button>
+                </button></Tooltip>
             </div>
         </header>
     );

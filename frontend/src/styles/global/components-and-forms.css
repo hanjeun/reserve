@@ -125,9 +125,11 @@
     transform: scale(0.96);
     opacity: 0.88;
 }
-.reserve-btn--primary:hover:not(:disabled)   { opacity: 0.9; }
+.reserve-btn--primary:hover:not(:disabled)   { opacity: 1; background: var(--c-primary-solid-hover, #1b64da) !important; }
+.reserve-btn--danger:hover:not(:disabled)    { opacity: 1; background: var(--c-error-solid-hover, #c93643) !important; }
 .reserve-btn--secondary:hover:not(:disabled) { opacity: 0.85; }
-.reserve-btn--hero:hover:not(:disabled)      { opacity: 0.92; box-shadow: 0 12px 24px rgba(49, 130, 246, 0.28); }
+.reserve-btn--hero:hover:not(:disabled)      { opacity: 1; background: var(--c-primary-solid-hover, #1b64da) !important; box-shadow: 0 12px 24px rgba(49, 130, 246, 0.28); }
+.reserve-btn:is(.reserve-btn--primary, .reserve-btn--hero, .reserve-btn--danger):active:not(:disabled) { opacity: 1; }
 
 .reserve-btn--ghost-sm:hover:not(:disabled)          { opacity: 0.7; }
 .reserve-btn--ghost-sm:active:not(:disabled)         { opacity: 0.5; transform: scale(0.95); }
@@ -137,6 +139,20 @@
 .reserve-btn--ghost-sm-success:active:not(:disabled) { opacity: 0.5; transform: scale(0.95); }
 .reserve-btn--ghost-sm-danger:hover:not(:disabled)   { opacity: 0.7; }
 .reserve-btn--ghost-sm-danger:active:not(:disabled)  { opacity: 0.5; transform: scale(0.95); }
+
+/* 아이콘만 있는 보조 버튼은 IconTool과 같은 중립 면을 사용한다. */
+@media (hover: hover) and (pointer: fine) {
+    .reserve-btn--ghost-sm.reserve-btn--icon-only:hover:not(:disabled) {
+        opacity: 1;
+        background: transparent !important;
+        color: var(--c-text-primary) !important;
+    }
+}
+.reserve-btn--ghost-sm.reserve-btn--icon-only:focus-visible:not(:disabled) {
+    background: transparent !important;
+    color: var(--c-text-primary) !important;
+}
+.reserve-btn--ghost-sm.reserve-btn--icon-only:active:not(:disabled) { opacity: 1; }
 
 /* ── 조회 결과의 빈 상태 · 오류 상태 ───────────────────────────────────────
    빈 결과와 통신 실패는 다르지만, 일반 조회 실패를 빨간 경고 배지로 쌓으면 같은 서버
@@ -426,7 +442,23 @@
 
 /* outline: hover 시 테두리만 진해지고 글자는 진한 색 그대로 유지
    (예전엔 hover에서 color를 회색으로 바꿔서 더 흐릿해졌다) */
-.reserve-btn--outline:hover:not(:disabled)  { border-color: #adb5bd; background: rgba(0, 0, 0, 0.02); }
+.reserve-btn--outline:hover:not(:disabled)  { border-color: var(--c-outline-hover-border); background: var(--c-outline-hover-bg); }
+
+/* 정지 사유는 모바일에서도 툴팁 없이 읽을 수 있어야 한다. */
+.reserve-status-hint-description {
+    display: none;
+    margin-top: 4px;
+    max-width: 240px;
+    color: var(--c-text-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.reserve-status-hint-description[data-touch='true'] { display: block; }
+@media (hover: none) {
+    .reserve-status-hint-description { display: block; }
+}
 .reserve-btn--outline:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
 .reserve-btn--ghost:hover:not(:disabled)    { opacity: 0.7; }
 .reserve-btn--ghost:active:not(:disabled)   { opacity: 0.5; transform: scale(0.94); }
@@ -448,9 +480,8 @@
 }
 
 /* 즐겨찾기는 토글 버튼이다. JSX의 aria-pressed와 함께 키보드 포커스를 공통 정책으로 보인다. */
-.reserve-favorite-button:hover:not(:disabled) { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.16) !important; }
+.reserve-favorite-button:hover:not(:disabled) { box-shadow: none !important; }
 .reserve-favorite-button--plain:hover:not(:disabled) { box-shadow: none !important; }
-.reserve-favorite-button:active:not(:disabled) { transform: scale(0.94); }
 .reserve-favorite-button:focus { outline: none; }
 .reserve-favorite-button:focus-visible {
     outline: var(--reserve-focus-ring);
@@ -464,8 +495,8 @@
     cursor: pointer;
     transition: opacity 0.15s ease;
 }
-.reserve-form-field-button:hover:not(:disabled) { opacity: 0.9; }
-.reserve-form-field-button:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
+.reserve-form-field-button:hover:not(:disabled) { opacity: 1; background-color: var(--c-primary-solid-hover, #1b64da) !important; }
+.reserve-form-field-button:active:not(:disabled) { transform: scale(0.96); opacity: 1; }
 .reserve-form-field-button:disabled { cursor: not-allowed; }
 .reserve-form-field-button:focus { outline: none; }
 .reserve-form-field-button:focus-visible {
@@ -544,6 +575,21 @@
        사이클 끝마다 속도가 0으로 떨어졌다가 다시 붙는다 — 띠가 주기적으로 멈칫하는 원인이었다. */
     animation: reserve-shimmer 1.8s linear infinite;
     border-radius: 6px;
+}
+/* Text skeletons keep each real line's footprint, including narrow mobile wrapping. */
+.reserve-skeleton-text {
+    color: transparent !important;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    user-select: none;
+}
+.reserve-skeleton-text > * { visibility: hidden; }
+/* Native pictures retain their own dimensions, crop, transparency and eager/lazy priority. */
+.reserve-loading-image {
+    color: transparent;
+    border-radius: inherit;
 }
 /* 모션 최소화를 켠 사용자에게는 흐르지 않는 평면 블록으로 보여준다.
    로딩 중이라는 정보는 형태만으로 충분히 전달된다. */

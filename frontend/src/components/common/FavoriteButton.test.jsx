@@ -17,7 +17,7 @@ describe('favorite button appearance', () => {
         const button = screen.getByRole('button', { name: '즐겨찾기 추가' });
 
         expect(button).toHaveClass('reserve-favorite-button--plain');
-        expect(button).toHaveStyle({ width: '44px', height: '44px', background: 'transparent', boxShadow: 'none', borderRadius: '0' });
+        expect(button).toHaveStyle({ width: '44px', height: '44px', background: 'transparent', boxShadow: 'none', borderRadius: '10px' });
         expect(button).toHaveAttribute('aria-pressed', 'false');
     });
 
@@ -26,6 +26,6 @@ describe('favorite button appearance', () => {
         const button = screen.getByRole('button', { name: '즐겨찾기 추가' });
 
         expect(button).not.toHaveClass('reserve-favorite-button--plain');
-        expect(button).toHaveStyle({ width: '36px', height: '36px', borderRadius: '50%' });
+        expect(button).toHaveStyle({ width: '44px', height: '44px', borderRadius: '50%' });
     });
 });

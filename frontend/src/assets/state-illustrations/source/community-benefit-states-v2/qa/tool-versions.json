@@ -1,0 +1,8 @@
+{
+  "blender": "4.3.2",
+  "python": "3.12.14",
+  "pillow": "12.3.0",
+  "numpy": "2.3.5",
+  "engine": "BLENDER_EEVEE_NEXT",
+  "samples": 128
+}

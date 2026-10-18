@@ -2,12 +2,17 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { RouteSkeletonPreview } from './RouteLoadingSkeleton';
 import { usePageSkeletonModule } from './routeSkeletonLoader';
-import { createLoadingPresentation, LoadingPresentationContext } from './loadingPresentation';
+import { createLoadingPresentation, LoadingPresentationContext, useMarkSkeletonShown } from './loadingPresentation';
 
 vi.mock('./routeSkeletonLoader', () => ({ usePageSkeletonModule: vi.fn() }));
 
+function ArrivedSkeleton() {
+    useMarkSkeletonShown();
+    return <div className="arrived-skeleton">검색 골격</div>;
+}
+
 describe('pending route skeleton presentation', () => {
-    it('holds the viewport until the skeleton arrives and records only its committed content', () => {
+    it('keeps the route busy without showing or recording a mismatched generic skeleton', () => {
         vi.mocked(usePageSkeletonModule).mockReturnValue(null);
         const presentation = createLoadingPresentation('cold-navigation');
         const content = (
@@ -24,9 +29,10 @@ describe('pending route skeleton presentation', () => {
         expect(visual).toHaveAttribute('aria-hidden', 'true');
         expect(status).not.toContainElement(visual);
         expect(visual.firstElementChild).toHaveStyle({ minHeight: 'calc(100svh - 64px)' });
+        expect(visual.querySelector('.reserve-skeleton-block')).toBeNull();
         expect(presentation.getSnapshot()).toBe(false);
 
-        vi.mocked(usePageSkeletonModule).mockReturnValue({ default: () => <div className="arrived-skeleton">검색 골격</div> });
+        vi.mocked(usePageSkeletonModule).mockReturnValue({ default: ArrivedSkeleton });
         rerender(
             <LoadingPresentationContext.Provider value={presentation}>
                 <RouteSkeletonPreview pathname="/search" />

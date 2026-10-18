@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import kr.it.reserve.config.SiteUrls;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
@@ -22,8 +24,9 @@ import java.nio.charset.StandardCharsets;
 @Component
 public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
-    @Value("${server.env:prod}")
-    private String serverEnv;
+    @Value("#{siteUrls.frontendOrigin}")
+    private String frontendUrl = kr.it.reserve.config.SiteUrls.DEFAULT_APP_ORIGIN;
+    @Autowired private SiteUrls siteUrls;
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
@@ -33,9 +36,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
 
         String rawMessage = resolveMessage(exception);
         String errorMessage = URLEncoder.encode(rawMessage, StandardCharsets.UTF_8);
-        String baseUrl = "local".equals(serverEnv)
-                ? "http://localhost:5173"
-                : "https://reserve.it.kr";
+        String baseUrl = siteUrls == null ? frontendUrl : siteUrls.frontendFor(request);
 
         getRedirectStrategy().sendRedirect(request, response, baseUrl + "/login?error=oauth2&message=" + errorMessage);
     }
@@ -63,6 +64,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
             case "authorization_request_not_found" -> "로그인 요청이 만료됐어요. 다시 시도해주세요.";
             case "invalid_state"                   -> "잘못된 로그인 요청이에요. 다시 시도해주세요.";
             case "email_conflict"                  -> "이미 가입된 이메일이에요. 기존 가입 방식으로 로그인해주세요.";
+            case "oauth_reauthentication_required" -> "계정 보호를 위해 소셜 로그인을 다시 진행해주세요.";
             default                                -> "소셜 로그인에 실패했어요. 다시 시도해주세요.";
         };
     }

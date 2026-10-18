@@ -1,5 +1,4 @@
 import PropTypes from 'prop-types';
-import { ShopOutlined } from '@ant-design/icons';
 import MessengerAvatar from './MessengerAvatar';
 import { conversationTitle, useSupportIdentity } from './messengerIdentity';
 import { SupportAvatar } from './SupportIdentity';
@@ -25,10 +24,8 @@ export default function MessengerConversationRow({ row, selected = false, owner 
         icon = <MessengerAvatar imageSrc={row.counterpartProfileImage} variant="person" className="reserve-messenger-row-icon" />;
     } else if (row.type === 'SUPPORT') {
         icon = <SupportAvatar className="reserve-messenger-row-icon" />;
-    } else if (row.storeImageUrl) {
-        icon = <MessengerAvatar imageSrc={row.storeImageUrl} variant="store" className="reserve-messenger-row-icon" />;
     } else {
-        icon = <span className="reserve-messenger-row-icon" aria-hidden="true"><ShopOutlined /></span>;
+        icon = <MessengerAvatar imageSrc={row.storeImageUrl} variant="store" className="reserve-messenger-row-icon" />;
     }
     return (
         <button type="button" className={`reserve-messenger-row${selected ? ' is-selected' : ''}`}

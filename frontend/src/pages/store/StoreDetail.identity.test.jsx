@@ -7,6 +7,7 @@ vi.mock('../../api/axios', () => ({ default: {} }));
 vi.mock('../../components/common', () => ({
     Button: ({ children }) => <button>{children}</button>,
     Badge: ({ children }) => <span>{children}</span>,
+    Tooltip: ({ children }) => children,
     PageContainer: () => null, FormTextArea: () => null,
     FavoriteButton: ({ appearance }) => <button type="button" aria-label="즐겨찾기 추가" data-appearance={appearance}>♥</button>,
     KakaoMap: () => null, StoreDetailSkeleton: () => null, Bone: () => null,

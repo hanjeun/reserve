@@ -13,6 +13,9 @@ import useWaitingEvents from '../../hooks/useWaitingEvents';
 import WaitingQrModal from '../waiting/WaitingQrModal';
 import WaitingDetailModal from '../waiting/WaitingDetailModal';
 import { WaitingTabSkeleton } from '../waiting/WaitingSkeleton';
+import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
+import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 
 const QUERY_DEFAULTS = Object.freeze({ waitingStore: '', waitingSearch: '', waitingStatus: 'ACTIVE' });
 const STATUS_LABELS = Object.freeze({ WAITING: '대기 중', CALLED: '호출됨', SEATED: '입장 완료', CANCELLED: '취소됨' });
@@ -56,7 +59,7 @@ function WaitingEntry({ entry, businessDate, view, busy, changing, onChange, onC
             </Button>
         </div>;
     return <li className={view === 'cards' ? 'reserve-waiting-card-entry' : 'reserve-waiting-entry reserve-tap-card'}
-        aria-label={`${entry.entryNumber}번 대기 접수`}>
+        aria-label={`${entry.entryNumber}번 대기 접수`} data-list-item-id={`waiting:${entry.id}`}>
         {view === 'cards' ? <Card className="reserve-waiting-card reserve-tap-card">
             <Card.Body><div className="reserve-waiting-card-body">{content}{actions}</div></Card.Body>
         </Card> : <>{content}{actions}</>}
@@ -70,6 +73,8 @@ WaitingEntry.propTypes = { entry: PropTypes.object.isRequired, businessDate: Pro
 function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores, onStoreChange,
     revision, view, onViewChange, search, onSearchChange, status, onStatusChange }) {
     const storeId = store?.id;
+    const live = useLiveUpdatesStatus();
+    const listRef = useRef(null);
     const queryClient = useQueryClient();
     const { message, confirm } = useMessage();
     const alive = useRef(true);
@@ -85,8 +90,15 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     const clientRequestId = useRef(null);
     const queryKey = ['waiting', revision, storeId];
     const board = useQuery({ queryKey, queryFn: ({ signal }) => waitingService.getBoard(storeId, signal),
-        enabled: Boolean(storeId) && !storesError, retry: false, staleTime: 10_000,
-        refetchInterval: 30_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true });
+        enabled: Boolean(storeId) && (!storesError || stores.length > 0), retry: false, staleTime: 10_000,
+        refetchInterval: live.connected && live.domains.includes('WAITING') ? false : 30_000,
+        refetchIntervalInBackground: false, refetchOnWindowFocus: !live.present });
+    const accessLost = isReadAccessDenied(board.error) || isReadAccessDenied(storesError);
+    const [previousAccessLost, setPreviousAccessLost] = useState(accessLost);
+    if (previousAccessLost !== accessLost) {
+        setPreviousAccessLost(accessLost);
+        if (accessLost) { setOpen(false); setQrOpen(false); setDetailId(null); }
+    }
 
     useEffect(() => {
         alive.current = true;
@@ -97,7 +109,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     const refresh = () => queryClient.invalidateQueries({ queryKey, exact: true });
 
     const write = async (key, send, success, afterSuccess) => {
-        if (!isCurrent() || operation.current !== null || !storeId || storesError) return;
+        if (!isCurrent() || operation.current !== null || !storeId || storesError || accessLost) return;
         const controller = new AbortController();
         controllers.current.add(controller);
         operation.current = key;
@@ -165,6 +177,8 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         setOpen(true);
     };
     const entries = board.data?.entries || [];
+    const blockingError = isBlockingListReadError(board.error, entries);
+    useListRefreshAnchor(listRef, `${storeId}:${view}:${search}:${status}`, board.isFetching, board.data);
     const detailEntry = entries.find(entry => entry.id === detailId);
     const detail = detailEntry ? { entry: detailEntry, storeName: store?.name } : null;
     const active = entries.filter(isActive);
@@ -174,12 +188,13 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
     const visibleEntries = entries.filter(entry => matches(entry)
         && (status === 'ALL' || (status === 'ACTIVE' ? isActive(entry) : entry.status === status)));
     const entryClass = `reserve-waiting-entries reserve-waiting-entries--${view}${view === 'cards' ? ' rsv-store-grid' : ''}`;
-    const busy = pending !== null;
+    const busy = pending !== null || Boolean(storesError) || accessLost;
     const paused = board.data?.waitingPaused === true;
     const intakeMode = board.data?.waitingIntakeMode ?? store?.waitingIntakeMode ?? 'OFF';
-    if (storesLoading || board.isLoading) return <WaitingTabSkeleton view={view} />;
+    if (storesLoading || board.isLoading) return <WaitingTabSkeleton view={view}
+        intakeMode={store?.waitingIntakeMode ?? 'BOTH'} paused={store?.waitingPaused === true} />;
     let content;
-    if (storesError) content = <DataState state="error" kind="store" subject="가게 목록" error={storesError} onRetry={refetchStores} />;
+    if (storesError && !stores.length) content = <DataState state="error" kind="store" subject="가게 목록" error={storesError} onRetry={refetchStores} />;
     else if (!store) content = <DataState state="empty" kind="store" title="등록된 가게가 없어요." />;
     else content = <>
         <div className="reserve-waiting-summary">
@@ -198,9 +213,10 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
         </div>
         {board.data && <p className="reserve-waiting-form-help" role="status">{paused ? '신규 접수를 잠시 중지했어요. 기존 대기는 호출·입장 처리할 수 있어요.'
             : intakeMode === 'OFF' ? '직원 접수를 받고 있어요. 고객 접수 방식은 가게 수정에서 설정할 수 있어요.' : '웨이팅 접수를 받고 있어요.'}</p>}
-        {board.error ? <DataState state="error" kind="waiting" subject="대기 명단 갱신"
+        {board.error && board.data && !blockingError && <DataState compact state="error" kind="waiting" subject="대기 명단 갱신" error={board.error} onRetry={refresh} retrying={board.isFetching} />}
+        {blockingError ? <DataState state="error" kind="waiting" subject="대기 명단 갱신"
             error={board.error} onRetry={refresh} retrying={board.isFetching} />
-            : visibleEntries.length ? <ul className={entryClass} aria-label="대기 접수 목록">
+            : visibleEntries.length ? <ul ref={listRef} className={entryClass} aria-label="대기 접수 목록">
             {visibleEntries.map(entry => <WaitingEntry key={entry.id} entry={entry} businessDate={board.data?.businessDate} view={view}
                 busy={busy} changing={pending === entry.id} onChange={changeStatus} onCancel={cancel} onOpenDetail={setDetailId} />)}
         </ul> : <DataState state="empty" kind="waiting"
@@ -219,17 +235,18 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
                 <FilterMenu appearance="plain" aria-label="웨이팅을 관리할 가게"
                     value={storeId ? String(storeId) : undefined} onChange={onStoreChange}
                     options={stores.map(item => ({ value: String(item.id), label: item.name }))}
-                    disabled={storesLoading || Boolean(storesError)} loading={storesLoading} />
+                    disabled={storesLoading || Boolean(storesError) && !stores.length} loading={storesLoading} />
                 <FilterMenu appearance="plain" aria-label="대기 접수 상태" value={status}
-                    onChange={onStatusChange} options={STATUS_OPTIONS} disabled={storesLoading || Boolean(storesError)} />
+                    onChange={onStatusChange} options={STATUS_OPTIONS} disabled={storesLoading || Boolean(storesError) && !stores.length} />
             </div>
         </div>
         <FilterToolbar search={{ value: search, onChange: onSearchChange, placeholder: '이름, 대기번호로 검색' }}
-            onReload={store ? refresh : refetchStores} loading={storesLoading || board.isFetching} />
+            onReload={store ? refresh : refetchStores} loading={storesLoading || board.isFetching} autoRefreshDomain="WAITING" />
+        {storesError && stores.length > 0 && <DataState compact state="error" kind="store" subject="가게 목록 갱신" error={storesError} onRetry={refetchStores} />}
         {content}
-        <WaitingQrModal open={qrOpen} storeId={storeId} onClose={() => setQrOpen(false)} />
-        <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />
-        <FormModal title="대기 접수" open={open} mobileSize="content" width={440}
+        {!accessLost && <WaitingQrModal open={qrOpen} storeId={storeId} onClose={() => setQrOpen(false)} />}
+        {!accessLost && <WaitingDetailModal detail={detail} open={Boolean(detail)} onClose={() => setDetailId(null)} />}
+        {!accessLost && <FormModal title="대기 접수" open={open} mobileSize="content" width={440}
             onClose={() => { if (operation.current === null) setOpen(false); }} onSubmit={submit}
             submitting={pending === 'create'} submitText="접수하기" submitDisabled={busy}>
             <p className="reserve-waiting-form-help">이름 없이 대기번호로도 접수할 수 있어요.</p>
@@ -241,7 +258,7 @@ function WaitingBoard({ store, stores, storesLoading, storesError, refetchStores
                 <FormInput type="number" aria-label="대기 인원" value={draft.partySize} min={1} max={100} precision={0}
                     suffix="명" inputMode="numeric" disabled={busy} onChange={value => changeDraft('partySize', value)} />
             </FormField>
-        </FormModal>
+        </FormModal>}
     </div>;
 }
 WaitingBoard.propTypes = { store: PropTypes.object, stores: PropTypes.array.isRequired, storesLoading: PropTypes.bool,
@@ -254,9 +271,12 @@ export default function WaitingTab() {
     const { stores, loading, error, refetch } = useMyStores();
     const revision = useAuthStore(state => state.sessionRevision);
     const [{ waitingStore, waitingSearch, waitingStatus }, setParams] = useQueryParamsState(QUERY_DEFAULTS);
-    const [searchParams, setSearchParams] = useSearchParams();
-    const [view, setView] = useViewModeParam(searchParams, setSearchParams, 'list');
+    const [searchParams] = useSearchParams();
+    const [view, setView] = useViewModeParam(searchParams, 'list');
     const store = stores.find(item => String(item.id) === waitingStore) ?? stores[0] ?? null;
+    useEffect(() => {
+        if (store && waitingStore !== String(store.id)) setParams({ waitingStore: String(store.id) });
+    }, [store, waitingStore, setParams]);
     return <WaitingBoard key={`${revision}:${store?.id ?? 'none'}`} store={store} stores={stores}
         storesLoading={loading} storesError={error} refetchStores={refetch}
         onStoreChange={value => setParams({ waitingStore: String(value) })} revision={revision} view={view} onViewChange={setView}

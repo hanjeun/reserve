@@ -1,5 +1,5 @@
 import { Typography, Collapse } from 'antd';
-import { DownOutlined } from '@ant-design/icons';
+import { DownOutlined } from '../../../components/common/icons';
 import { colors, fontWeight, heights } from '../../../styles/tokens';
 import { FAQS } from '../Home.data';
 

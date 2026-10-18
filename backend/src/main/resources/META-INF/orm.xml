@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-mappings xmlns="https://jakarta.ee/xml/ns/persistence/orm" version="3.1">
+    <!-- 원문 모듈은 공개·삭제 계약을 사용하고, 여기서 구현 entity를 연결한다. FK와 소식 ID는 유지한다. -->
+    <entity class="kr.it.reserve.promotion.entity.Promotion">
+        <attributes>
+            <one-to-one name="newsPost" target-entity="kr.it.reserve.feed.entity.FeedPost"
+                        mapped-by="newsPromotion" fetch="LAZY" />
+        </attributes>
+    </entity>
+</entity-mappings>

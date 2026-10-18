@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { EnvironmentOutlined } from '@ant-design/icons';
-import { colors, rawColors, fontSize, radius } from '../../styles/tokens';
+import { EnvironmentOutlined } from './icons';
+import { colors, fontSize, radius } from '../../styles/tokens';
 import { createStoreOverlayContent } from './kakaoMapOverlay';
 import { loadKakaoMapsSdk } from './kakaoMapsLoader';
 import { Bone } from './Skeletons';
@@ -109,7 +109,7 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
     if (!address && !latitude && !longitude) return null;
 
     return (
-        <div ref={containerRef} style={{ position: 'relative', borderRadius: radius.lg, overflow: 'hidden' }}>
+        <div ref={containerRef} className="reserve-kakao-map" style={{ position: 'relative', borderRadius: radius.lg, overflow: 'hidden' }}>
             <div
                 ref={mapRef}
                 style={{ width: '100%', height, background: colors.gray[100] }}
@@ -133,24 +133,19 @@ const KakaoMap = ({ latitude, longitude, address, storeName, height = 240 }) => 
             )}
             {kakaoMapUrl && (
                 <a
+                    className="reserve-kakao-map-link"
                     href={kakaoMapUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
                         position: 'absolute', bottom: 10, right: 10,
                         display: 'inline-flex', alignItems: 'center', gap: 4,
-                        // ★ 테마 토큰을 쓰면 안 되는 자리다.
-                        // 이 버튼은 카카오 지도 타일 위에 얹히는데, 지도는 우리 테마와 무관하게
-                        // 항상 밝다. 다크에서 배경만 어두워지거나(우리가 칠하면) 글자만 밝아지면
-                        // (text.secondary가 #c3c8cf로 뒤집힘) 어느 쪽이든 대비가 무너진다.
-                        // 실제로 다크에서 "흰 배경 + 밝은 회색 글자"가 되어 거의 안 보였다.
-                        // 지도가 고정이므로 이 칩도 라이트 기준 고정색으로 둔다.
-                        background: '#ffffff',
-                        border: `1px solid ${rawColors.gray[200]}`,
+                        background: colors.background.paper,
+                        border: `1px solid ${colors.border.default}`,
                         borderRadius: radius.md,
                         padding: '5px 10px',
                         fontSize: fontSize.xs,
-                        color: rawColors.gray[700],
+                        color: colors.text.primary,
                         textDecoration: 'none',
                         boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
                         zIndex: 10,

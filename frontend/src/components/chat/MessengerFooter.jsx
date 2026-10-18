@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import PropTypes from 'prop-types';
-import { HomeOutlined, MessageOutlined, SettingOutlined } from '@ant-design/icons';
+import { HomeOutlined, MessageOutlined, SettingOutlined } from '../common/icons';
 
 const VIEWS = [
     { value: 'home', label: '홈', icon: <HomeOutlined /> },

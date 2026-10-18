@@ -6,6 +6,7 @@ import kr.it.reserve.member.controller.MemberApiController;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.service.MemberService;
+import kr.it.reserve.member.service.MemberWithdrawalService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,7 +31,8 @@ import static org.mockito.Mockito.when;
 class MemberControllerPrincipalContractTest {
     private final MemberService service = mock(MemberService.class);
     private final CookieUtil cookies = mock(CookieUtil.class);
-    private final MemberApiController controller = new MemberApiController(service, cookies);
+    private final MemberWithdrawalService withdrawal = mock(MemberWithdrawalService.class);
+    private final MemberApiController controller = new MemberApiController(service, cookies, withdrawal);
 
     @AfterEach
     void clearAuthentication() {
@@ -55,7 +57,7 @@ class MemberControllerPrincipalContractTest {
         SecurityContextHolder.clearContext();
         assertThatThrownBy(() -> action.accept(controller))
                 .isInstanceOf(MemberException.class).hasMessage(message);
-        verifyNoInteractions(service, cookies);
+        verifyNoInteractions(service, cookies, withdrawal);
     }
 
     @Test

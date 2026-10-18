@@ -54,9 +54,56 @@ class SecurityConfigAuthorizationTest {
     // ── 공개 API — 비로그인 상태에서도 401이 아니어야 함 (200/404 등은 데이터 유무에 따라 달라질 수 있어 허용) ──
 
     @Test
+    void feedInteractionReadsStayPublicButPersonalWritesAndModerationStayAuthenticated() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            for (String path : new String[]{"/feed/interactions/config", "/feed/likes/POST/1", "/feed/likes/NEWS/1", "/feed/likes/COMMENT/1", "/feed/posts/1/comments", "/feed/comments/1", "/feed/comments/1/replies"}) {
+                mockMvc.perform(get(prefix + path)).andExpect(result -> {
+                    assertNotEquals(401, result.getResponse().getStatus());
+                    assertNotEquals(403, result.getResponse().getStatus());
+                });
+            }
+            for (String path : new String[]{"/feed/me/likes", "/feed/notifications", "/feed/notifications/count", "/admin/feed/comment-reports", "/admin/feed/comments/1",
+                    "/admin/feed/comment-reports/1/images/1", "/admin/feed/comments/1/images/1"}) {
+                mockMvc.perform(get(prefix + path)).andExpect(status().isUnauthorized());
+            }
+            mockMvc.perform(put(prefix + "/feed/likes/POST/1").contentType("application/json").content("{\"liked\":true}")).andExpect(status().isUnauthorized());
+            mockMvc.perform(put(prefix + "/feed/likes/COMMENT/1").contentType("application/json").content("{\"liked\":true}")).andExpect(status().isUnauthorized());
+            mockMvc.perform(put(prefix + "/feed/notifications/1/read")).andExpect(status().isUnauthorized());
+            mockMvc.perform(put(prefix + "/feed/notifications/read-all")).andExpect(status().isUnauthorized());
+            mockMvc.perform(post(prefix + "/feed/posts/1/comments").contentType("application/json").content("{\"content\":\"hello\"}")).andExpect(status().isUnauthorized());
+            mockMvc.perform(delete(prefix + "/feed/comments/1")).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
     void publicStoreListIsAccessibleWithoutAuth() throws Exception {
         mockMvc.perform(get("/api/stores"))
                 .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus()));
+    }
+
+    @Test
+    void feedRegionReadIsPublicAndCannotOpenAnonymousWrites() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            mockMvc.perform(get(prefix + "/feed/regions")).andExpect(result -> {
+                assertNotEquals(401, result.getResponse().getStatus());
+                assertNotEquals(403, result.getResponse().getStatus());
+            });
+            mockMvc.perform(post(prefix + "/feed/regions")).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void benefitMediaHasPublicReadsAndAuthenticatedWritesWithoutOpeningOwnerDetails() throws Exception {
+        for (String prefix : new String[]{"/api", "/api/v1"}) {
+            for (String path : new String[]{"/store-news/config", "/store-news/media/1"}) {
+                mockMvc.perform(get(prefix + path)).andExpect(result -> {
+                    assertNotEquals(401, result.getResponse().getStatus());
+                    assertNotEquals(403, result.getResponse().getStatus());
+                });
+            }
+            mockMvc.perform(post(prefix + "/store-news/media")).andExpect(status().isUnauthorized());
+            mockMvc.perform(get(prefix + "/store-news/1")).andExpect(status().isUnauthorized());
+        }
     }
 
     @Test

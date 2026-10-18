@@ -1,7 +1,7 @@
 {
   "name": "reserve",
   "private": true,
-  "version": "2.11.0",
+  "version": "2.12.0",
   "type": "module",
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
@@ -12,10 +12,12 @@
     "postbuild": "node scripts/check-bundle-budget.mjs",
     "lint": "eslint .",
     "lint:ci": "eslint src --max-warnings 0",
+    "format": "node scripts/format-files.mjs --write",
+    "format:check": "node scripts/format-files.mjs --check",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:policy": "node --test scripts/apply-vendor-patches.test.mjs scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs ../scripts/tests/cicd-contract.test.mjs ../scripts/tests/ci-evidence.test.mjs ../scripts/tests/audit-preview-release.test.mjs",
+    "test:policy": "node --test scripts/apply-vendor-patches.test.mjs scripts/eslint-reserve-rules.test.mjs ../scripts/tests/pr-review-audit.test.mjs ../scripts/tests/cicd-contract.test.mjs ../scripts/tests/ci-evidence.test.mjs ../scripts/tests/audit-preview-release.test.mjs ../scripts/tests/domain-split.test.mjs",
     "test:e2e": "playwright test",
     "capture:readme": "node scripts/capture-readme-live.mjs",
     "capture:readme:auth": "node scripts/capture-readme-live.mjs --auth",
@@ -30,6 +32,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@portone/browser-sdk": "^0.1.13",
     "@sentry/react": "^10.69.0",
+    "@sentry/replay": "10.69.0",
     "@tanstack/react-query": "^5.104.1",
     "antd": "^6.6.5",
     "axios": "^1.20.0",
@@ -61,6 +64,7 @@
     "globals": "^17.13.0",
     "js-yaml": "^4.3.2",
     "jsdom": "^30.1.1",
+    "prettier": "3.9.10",
     "vite": "^7.2.4",
     "vitest": "^5.0.3"
   }

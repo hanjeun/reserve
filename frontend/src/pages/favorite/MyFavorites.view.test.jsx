@@ -8,12 +8,13 @@ import favoriteService from '../../services/favoriteService';
 
 vi.mock('../../services/favoriteService', () => ({ default: { getMyFavorites: vi.fn() } }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
+vi.mock('../../hooks/feedInteractionQueries', () => ({ useFeedInteractions: () => ({ data: { enabled: false, newsEnabled: false } }) }));
 vi.mock('../../components/common', () => ({
-    PageContainer: ({ children }) => <main>{children}</main>,
+    PageContainer: ({ children, 'aria-busy': busy }) => <main aria-busy={busy}>{children}</main>,
     StoreCardSkeleton: ({ count }) => <div data-testid="card-skeleton">{count}</div>,
     FilterToolbar: ({ extra, onReload, loading }) => <div>{extra}<button type="button" onClick={onReload} disabled={loading}>새로고침</button></div>,
-    DataState: ({ state, title, onRetry }) => <section role={state === 'error' ? 'alert' : undefined}>
-        {title}{onRetry && <button type="button" onClick={onRetry}>다시 불러오기</button>}
+    DataState: ({ state, title, subject, onRetry, compact }) => <section role={state === 'error' ? 'alert' : undefined} data-compact={Boolean(compact)}>
+        {title ?? `${subject}을 불러오지 못했습니다.`}{onRetry && <button type="button" onClick={onRetry}>다시 불러오기</button>}
     </section>,
 }));
 vi.mock('../../components/store', () => ({
@@ -56,12 +57,12 @@ describe('favorites reuse the store card/list view contract', () => {
         const card = await screen.findByTestId('card');
         const originalStore = card.getAttribute('data-store');
         const toggle = screen.getByRole('button', { name: '목록형 보기로 전환' });
-        expect(toggle.querySelector('[data-icon="unordered-list"]')).toBeInTheDocument();
+        expect(toggle.querySelector('.anticon-unordered-list')).toBeInTheDocument();
         toggle.focus();
         await user.keyboard('{Enter}');
         expect(screen.getByTestId('list-row')).toHaveAttribute('data-store', originalStore);
         expect(screen.queryByTestId('card')).toBeNull();
-        expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route').textContent))).toEqual({ utm_source: 'yes', view: 'list' });
+        expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route').textContent))).toEqual({ utm_source: 'yes', view: 'list', kind: 'all' });
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toHaveFocus();
         await user.keyboard(' ');
         expect(screen.getByTestId('card')).toHaveTextContent(favorite.storeName);
@@ -89,7 +90,7 @@ describe('favorites reuse the store card/list view contract', () => {
         expect(sessionStorage.getItem('reserve:view-mode:/stores')).toBe('cards');
     });
 
-    it('keeps list-shaped loading/refetch placeholders and disables the view toggle until data settles', async () => {
+    it('uses list-shaped initial placeholders and preserves rows and the view toggle during refresh', async () => {
         let finishInitial;
         let finishRefresh;
         favoriteService.getMyFavorites
@@ -101,26 +102,54 @@ describe('favorites reuse the store card/list view contract', () => {
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toBeDisabled();
         await waitFor(() => expect(finishInitial).toBeTypeOf('function'));
         await act(async () => finishInitial([favorite]));
-        await screen.findByTestId('list-row');
+        const cachedRow = await screen.findByTestId('list-row');
         fireEvent.click(screen.getByRole('button', { name: '새로고침' }));
         await waitFor(() => expect(finishRefresh).toBeTypeOf('function'));
-        expect(screen.getByRole('status', { name: '즐겨찾기를 새로 불러오는 중' })).toBeInTheDocument();
-        expect(screen.getByTestId('list-skeleton')).toHaveTextContent('1');
-        expect(screen.queryByTestId('list-row')).toBeNull();
-        expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toBeDisabled();
-        await act(async () => finishRefresh([favorite]));
-        await screen.findByTestId('list-row');
+        expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+        expect(screen.queryByRole('status', { name: '즐겨찾기를 새로 불러오는 중' })).toBeNull();
+        expect(screen.queryByTestId('list-skeleton')).toBeNull();
+        expect(screen.getByTestId('list-row')).toBe(cachedRow);
+        expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: '새로고침' })).toBeDisabled();
+        await act(async () => finishRefresh([{ ...favorite, storeName: '새로고침 후 관심 가게' }]));
+        expect(await screen.findByText('새로고침 후 관심 가게')).toBe(screen.getByTestId('list-row'));
+        expect(screen.queryByText(favorite.storeName)).toBeNull();
+        await waitFor(() => expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false'));
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toBeEnabled();
     });
 
     it('retains the selected layout and stale rows when a refresh fails', async () => {
-        favoriteService.getMyFavorites.mockResolvedValueOnce([favorite]).mockRejectedValueOnce(new Error('offline'));
+        favoriteService.getMyFavorites.mockResolvedValueOnce([favorite])
+            .mockRejectedValueOnce(Object.assign(new Error('unavailable'), { status: 503 }));
         show('/my-favorites?view=list');
-        await screen.findByTestId('list-row');
+        const row = await screen.findByTestId('list-row');
+        const params = screen.getByTestId('route').textContent;
         fireEvent.click(screen.getByRole('button', { name: '새로고침' }));
-        await screen.findByRole('alert');
-        expect(screen.getByTestId('list-row')).toHaveTextContent(favorite.storeName);
+        expect(await screen.findByRole('alert')).toHaveAttribute('data-compact', 'true');
+        expect(screen.getByTestId('list-row')).toBe(row);
+        expect(row).toHaveTextContent(favorite.storeName);
         expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toBeEnabled();
         expect(screen.queryByTestId('card')).toBeNull();
+        expect(screen.getByTestId('route')).toHaveTextContent(params);
+    });
+
+    it('replaces a cached empty favorites result with a full error after 503 and preserves the selected view', async () => {
+        favoriteService.getMyFavorites.mockResolvedValueOnce([])
+            .mockRejectedValueOnce(Object.assign(new Error('unavailable'), { status: 503 }));
+        show('/my-favorites?view=list&kind=stores&utm_source=kept');
+        await screen.findByText('아직 즐겨찾기한 가게가 없어요.');
+        const toggle = screen.getByRole('button', { name: '사진형 보기로 전환' });
+        const params = screen.getByTestId('route').textContent;
+        fireEvent.click(screen.getByRole('button', { name: '새로고침' }));
+        expect(await screen.findByRole('alert')).toHaveAttribute('data-compact', 'false');
+        expect(screen.getAllByRole('alert')).toHaveLength(1);
+        expect(screen.queryByText('아직 즐겨찾기한 가게가 없어요.')).toBeNull();
+        expect(screen.queryByTestId('card')).toBeNull();
+        expect(screen.queryByTestId('list-row')).toBeNull();
+        expect(screen.queryByTestId('list-skeleton')).toBeNull();
+        expect(screen.getByRole('button', { name: '사진형 보기로 전환' })).toBe(toggle);
+        expect(toggle).toBeEnabled();
+        expect(screen.getByTestId('route')).toHaveTextContent(params);
+        expect(favoriteService.getMyFavorites).toHaveBeenCalledTimes(2);
     });
 });

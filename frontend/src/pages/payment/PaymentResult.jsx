@@ -9,7 +9,7 @@ import {
     CheckOutlined,
     InfoCircleOutlined,
     WarningOutlined,
-} from '@ant-design/icons';
+} from '../../components/common/icons';
 import { invalidateAdData, invalidateReservationData } from '../../hooks/invalidateAfterWrite';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import PageContainer from '../../components/common/PageContainer';

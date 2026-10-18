@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { colors, radius, shadows, fontSize, fontWeight, withAlpha } from '../../styles/tokens';
 import { Bone } from './Skeletons';
+import SkeletonText from './SkeletonText';
 
 /**
  * RESERVE Design System - StatCard
@@ -28,10 +29,10 @@ import { Bone } from './Skeletons';
 const StatCard = ({ icon, label, value, suffix, trend, loading = false }) => (
     <div style={styles.card}>
         <div style={styles.iconBadge}>
-            {icon}
+            {loading ? <Bone width={20} height={20} /> : icon}
         </div>
         <div style={{ minWidth: 0 }}>
-            <span style={styles.label}>{label}</span>
+            <span style={styles.label}><SkeletonText loading={loading}>{label}</SkeletonText></span>
             {loading ? (
                 <Bone width={64} height={26} style={{ marginTop: 4 }} />
             ) : (

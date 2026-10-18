@@ -44,8 +44,8 @@ vi.mock('../../store/useLocationStore', () => ({
     default: selector => selector({ setLiveLocation }),
 }));
 
-const renderHome = (initialEntries = ['/']) => {
-    const queryClient = new QueryClient({
+const renderHome = (initialEntries = ['/'], providedClient) => {
+    const queryClient = providedClient ?? new QueryClient({
         defaultOptions: { queries: { retry: false } },
     });
     return render(
@@ -106,6 +106,56 @@ describe('app discovery home', () => {
             { name: '서울', count: 2, areas: [{ name: '종로구', count: 2 }] },
             { name: '경기', count: 1, areas: [{ name: '안산시', count: 1 }] },
         ]);
+    });
+
+    it('keeps cached recommendation rows visible when a background read fails', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+        const key = ['home', 'recommended-stores', ''];
+        client.setQueryData(key, { content: [{ id: 3, name: '읽던 가게', rating: 4.9, reviewCount: 10 }] });
+        renderHome(['/'], client);
+        expect(await screen.findByText('읽던 가게')).toBeInTheDocument();
+        storeService.getStores.mockRejectedValue({ status: 503 });
+        await act(async () => { await client.refetchQueries({ queryKey: key, exact: true }); });
+        expect(screen.getByText('읽던 가게')).toBeInTheDocument();
+        expect(await screen.findByText('최신 정보를 불러오지 못했어요.')).toBeInTheDocument();
+        expect(screen.queryByText('추천 가게를 불러오지 못했어요.')).toBeNull();
+        client.clear();
+    });
+
+    it('replaces a cached empty success with only an error after a failed refresh and restores empty after retry', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+        const key = ['home', 'recommended-stores', ''];
+        const emptyPage = { content: [] };
+        storeService.getStores.mockResolvedValueOnce(emptyPage)
+            .mockRejectedValueOnce({ status: 503 })
+            .mockResolvedValueOnce(emptyPage);
+        const view = renderHome(['/'], client);
+        const recommendations = within(screen.getByRole('region', { name: '이런 곳은 어때요?' }));
+        try {
+            expect(await recommendations.findByText('아직 추천할 가게가 없어요.')).toBeInTheDocument();
+            expect(client.getQueryState(key).status).toBe('success');
+            expect(recommendations.queryByRole('alert')).toBeNull();
+
+            await act(async () => { await client.refetchQueries({ queryKey: key, exact: true }); });
+
+            expect(await recommendations.findByText('추천 가게를 불러오지 못했어요.')).toBeInTheDocument();
+            expect(recommendations.getAllByRole('alert')).toHaveLength(1);
+            expect(recommendations.queryByText('아직 추천할 가게가 없어요.')).toBeNull();
+            expect(recommendations.queryByText('최신 정보를 불러오지 못했어요.')).toBeNull();
+            expect(client.getQueryData(key)).toEqual(emptyPage);
+
+            await userEvent.setup().click(recommendations.getByRole('button', { name: '다시 불러오기' }));
+
+            expect(await recommendations.findByText('아직 추천할 가게가 없어요.')).toBeInTheDocument();
+            expect(recommendations.queryByRole('alert')).toBeNull();
+            expect(recommendations.queryByText('추천 가게를 불러오지 못했어요.')).toBeNull();
+            expect(recommendations.queryByText('최신 정보를 불러오지 못했어요.')).toBeNull();
+            expect(client.getQueryState(key).status).toBe('success');
+            expect(storeService.getStores).toHaveBeenCalledTimes(3);
+        } finally {
+            view.unmount();
+            client.clear();
+        }
     });
 
     it('shows the operation-guide photo as the first home banner, service domains, and recommended stores', async () => {
@@ -451,6 +501,8 @@ describe('app discovery home', () => {
     it('stays on home when location is unavailable and no saved address exists', async () => {
         const user = userEvent.setup();
         renderHome();
+        // Initial URL normalization is separate from the user's location request.
+        navigate.mockClear();
 
         await user.click(screen.getByRole('button', { name: '현재 위치로' }));
 

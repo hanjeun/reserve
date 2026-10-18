@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 public class ChatReportResponse {
     private Long id;
+    private long revision;
     private Long roomId;
     private Long storeId;
     private String storeName;
@@ -27,6 +28,7 @@ public class ChatReportResponse {
     public static ChatReportResponse from(ChatReport report) {
         return ChatReportResponse.builder()
                 .id(report.getId())
+                .revision(report.getRevision())
                 .roomId(report.getRoom().getId())
                 .storeId(report.getRoom().getStoreId())
                 .storeName(report.getRoom().getStoreNameSnapshot())

@@ -13,7 +13,8 @@ export const normalizeRouteSkeletonPath = pathname => {
 const EXACT_SKELETON_KINDS = new Map([
     ['/', 'discovery'], ['/search', 'search'], ['/my-page', 'my-page'],
     ['/store/register', 'store-form'], ['/stores', 'store-list'], ['/benefits', 'benefits'],
-    ['/waiting', 'waiting'], ['/feed', 'coming-soon'],
+    ['/waiting', 'waiting'], ['/feed', 'feed'], ['/feed/notifications', 'feed-notifications'],
+    ['/drafts/transfer', 'draft-transfer'],
     ['/my-stores', 'cards'], ['/my-favorites', 'cards'], ['/my-reservations', 'reservations'],
     ['/login', 'auth'], ['/signup', 'auth'], ['/forgot-password', 'auth'], ['/signup/social', 'auth'],
     ['/terms', 'legal'], ['/privacy', 'legal'], ['/content-sources', 'legal'],
@@ -41,6 +42,8 @@ export const getRouteSkeletonKind = pathname => {
     if (/^\/store\/[^/]+\/edit$/.test(path)) return 'store-form';
     if (/^\/store\/[^/]+$/.test(path)) return 'detail';
     if (/^\/benefits\/[^/]+$/.test(path)) return 'benefit-detail';
+    if (/^\/feed\/posts\/[^/]+$/.test(path)) return 'feed-detail';
+    if (/^\/feed\/u\/[^/]+$/.test(path)) return 'feed-author';
     // App.jsx 의 어떤 라우트에도 맞지 않는 주소 — NotFound(path="*")와 같은 틀의 골격을 그린다.
     return 'not-found';
 };

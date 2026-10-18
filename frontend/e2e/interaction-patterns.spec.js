@@ -74,10 +74,19 @@ test('guest header separates neutral navigation hover from primary press and key
 
     if (!isMobile) {
         await search.hover();
-        await expect(search).toHaveCSS('background-color', 'rgb(249, 250, 251)');
+        await expect.poll(() => search.evaluate(element => {
+            const surface = getComputedStyle(element, '::before');
+            return { background: surface.backgroundColor, opacity: surface.opacity, width: surface.width, height: surface.height, radius: surface.borderRadius };
+        })).toEqual({ background: 'rgb(249, 250, 251)', opacity: '1', width: '32px', height: '32px', radius: '50%' });
+        await expect(search).toHaveCSS('width', '44px');
+        await expect(search).toHaveCSS('height', '44px');
         await expect(search).toHaveCSS('transform', 'none');
         await start.hover();
-        await expect(start).toHaveCSS('opacity', '0.9');
+        await expect(start).toHaveCSS('opacity', '1');
+        const hoverColor = await start.evaluate(element => getComputedStyle(element).getPropertyValue('--c-primary-solid-hover').trim());
+        expect(hoverColor).toMatch(/^#[a-f\d]{6}$/i);
+        const hoverChannels = hoverColor.slice(1).match(/.{2}/g).map(channel => Number.parseInt(channel, 16));
+        await expect(start).toHaveCSS('background-color', `rgb(${hoverChannels.join(', ')})`);
         await pressWithoutClick(page, start, async () => {
             await expect(start).toHaveCSS('transform', 'matrix(0.96, 0, 0, 0.96, 0, 0)');
         });
@@ -133,10 +142,13 @@ test('messenger uses neutral controls, a clear composer focus, and reduced press
     if (!isMobile) {
         const close = page.getByRole('button', { name: '메시지 닫기' }).first();
         await close.hover();
-        await expect(close).toHaveCSS('background-color', 'rgb(242, 244, 246)');
+        await expect.poll(() => close.evaluate(element => {
+            const surface = getComputedStyle(element, '::before');
+            return { background: surface.backgroundColor, opacity: surface.opacity, radius: surface.borderRadius };
+        })).toEqual({ background: 'rgb(249, 250, 251)', opacity: '1', radius: '10px' });
         await expect(close).toHaveCSS('transform', 'none');
         await pressWithoutClick(page, close, async () => {
-            await expect(close).toHaveCSS('opacity', '0.7');
+            await expect(close.locator('.anticon')).toHaveCSS('scale', '0.96');
             await expect(close).toHaveCSS('transform', 'none');
         });
         await pressWithoutClick(page, homeAction, async () => {
@@ -158,10 +170,13 @@ test('messenger uses neutral controls, a clear composer focus, and reduced press
     await expect(question).toHaveText('예약 내역을 확인하고 싶어요');
     if (!isMobile) {
         await back.hover();
-        await expect(back).toHaveCSS('background-color', 'rgb(249, 250, 251)');
+        await expect.poll(() => back.evaluate(element => {
+            const surface = getComputedStyle(element, '::before');
+            return { background: surface.backgroundColor, opacity: surface.opacity, radius: surface.borderRadius };
+        })).toEqual({ background: 'rgb(249, 250, 251)', opacity: '1', radius: '50%' });
         await expect(back).toHaveCSS('transform', 'none');
         await pressWithoutClick(page, back, async () => {
-            await expect(back).toHaveCSS('opacity', '0.7');
+            await expect(back.locator('.anticon')).toHaveCSS('scale', '1');
             await expect(back).toHaveCSS('transform', 'none');
         });
         await question.hover();

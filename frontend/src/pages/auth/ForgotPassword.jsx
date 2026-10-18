@@ -25,8 +25,8 @@ const StepIndicator = ({ current }) => (
                         width: 28, height: 28, borderRadius: '50%',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 12, fontWeight: 700,
-                        background: i <= current ? colors.primary?.main || '#3182f6' : colors.gray?.[100] || '#f2f4f6',
-                        color: i <= current ? '#fff' : colors.text?.tertiary || '#b0b8c1',
+                        background: i <= current ? colors.primary.solid : colors.gray?.[100] || '#f2f4f6',
+                        color: i <= current ? colors.primary.foreground : colors.text?.tertiary || '#b0b8c1',
                         transition: 'all 0.2s',
                     }}>
                         {i < current ? '✓' : i + 1}
@@ -226,7 +226,7 @@ const ForgotPassword = () => {
                                     style={{ animation: animation?.slideUpIn }}
                                     extra={
                                         timerInfo
-                                            ? <span style={{ color: timerInfo.isWarning ? '#ff4d4f' : '#8b95a1', fontSize: 12 }}>{timerInfo.text}</span>
+                                            ? <span style={{ color: timerInfo.isWarning ? colors.error.main : colors.text.tertiary, fontSize: 12 }}>{timerInfo.text}</span>
                                             : null
                                     }
                                 >

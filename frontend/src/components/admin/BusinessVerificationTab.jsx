@@ -26,16 +26,18 @@
  */
 import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Typography, Tag, Modal, Image, Flex } from 'antd';
+import { Typography, Tag, Flex } from 'antd';
+import LoadingAntImage from '../common/LoadingAntImage';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
     CheckOutlined, CloseOutlined, StopOutlined, EyeOutlined, ExclamationCircleFilled,
-} from '@ant-design/icons';
+} from '../common/icons';
 import {
     Button, AdminTableSkeleton, DataState, FilterToolbar, FormTextArea, FormField, DataTable, ModalLoading,
 } from '../common';
 import { ModalActionGroup } from '../common/ModalActions';
 import ResponsiveModal from '../common/ResponsiveModal';
+import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -130,6 +132,7 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
     const [error, setError] = useState('');
 
     const handleCancel = () => { setError(''); onCancel(); };
+    const requestClose = useWorkspaceDraftGuard({ dirty: () => open && Boolean(reasonRef.current), busy: open && loading, onDiscard: handleCancel });
     const handleOk = () => {
         const reason = reasonRef.current?.trim();
         if (!reason) { setError('거절 사유를 입력해주세요.'); return; }
@@ -138,7 +141,7 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
     };
 
     return (
-        <Modal
+        <ResponsiveModal mobileSheet={false}
             title={
                 <Flex align="center" gap={8}>
                     <ExclamationCircleFilled style={{ color: colors.error.main, fontSize: 18 }} />
@@ -146,7 +149,7 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
                 </Flex>
             }
             open={open}
-            onCancel={handleCancel}
+            onCancel={() => requestClose(handleCancel, { discard: false })}
             onOk={handleOk}
             /* mask.closable=false: 사업자 인증 거절 사유를 작성하는 모달 — 바깥 클릭으로 내용 유실 방지.
                컨벤션 — 입력 폼/파괴적 확인 모달은 바깥 클릭으로 안 닫히고, 읽기 전용 모달
@@ -160,7 +163,7 @@ const RejectModal = ({ open, target, onCancel, onOk, loading }) => {
         >
             <RejectModalBody target={target} onChange={(v) => { reasonRef.current = v; }}
                 error={error} onErrorClear={() => setError('')} />
-        </Modal>
+        </ResponsiveModal>
     );
 };
 
@@ -423,7 +426,7 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 )}
                 {detailItem.licenseImageUrl && (
                     <DetailRow label="사업자등록증">
-                        <Image src={getDetailImageUrl(detailItem.licenseImageUrl)} alt="사업자등록증"
+                        <LoadingAntImage src={getDetailImageUrl(detailItem.licenseImageUrl)} alt="사업자등록증"
                             style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }}
                             classNames={{ popup: { root: 'reserve-image-preview' } }} />
                     </DetailRow>

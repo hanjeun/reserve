@@ -1,6 +1,6 @@
 import { BOOKING_TYPE_HINTS } from '../../constants';
 
-// 가게 폼 로딩 뼈대(StoreFormSkeleton)가 실제 글자로 보여 주는 고정 문구(라벨 밑 안내·토글 설명).
+// 가게 폼 로딩 뼈대(StoreFormSkeleton)가 크기·줄바꿈을 유지하며 가리는 고정 문구(라벨 밑 안내·토글 설명).
 // ⚠ StoreBasicInfo·StoreImages·StoreFormActions 의 문구와 같아야 한다 — StoreFormSkeleton.test 가 원문 포함 여부를 검사한다.
 export const STORE_FORM_SKELETON_HINTS = Object.freeze({
     bookingType: BOOKING_TYPE_HINTS.SLOT,
@@ -20,12 +20,11 @@ export const STORE_FORM_SKELETON_HINTS = Object.freeze({
     detailImages: '사진을 끌어 옆 사진과 순서를 바꿀 수 있어요. 휴대폰에서는 사진을 길게 누른 뒤 끌어주세요.',
     detailImageLimits: 'JPG · PNG · WEBP · GIF / 대표 이미지와 합쳐 최대 ',
     imageAutoplay: '가게 상세의 사진을 자동으로 넘겨요. 끄면 직접 넘길 수 있어요.',
-    draft: '입력 내용과 새 이미지는 이 브라우저에만 자동 저장돼요.',
 });
 export const STORE_FORM_SKELETON_TOGGLES = Object.freeze([
     ['reservationEnabled', '예약 접수', '끄면 새로운 예약을 받지 않아요. 기존 예약은 유지돼요'],
     ['autoApprovalEnabled', '예약 자동 승인', 'ON 시 예약 요청이 즉시 확정돼요'],
-    ['allowLatePayment', '나중 결제 허용', '예약금이 있어도 나중에 결제 가능'],
+    ['allowLatePayment', '나중 결제 허용', '예약 후 결제 가능 · 미결제 자동 취소 없음'],
     ['allowDuplicateReservation', '중복 예약 허용', 'OFF 시 한 손님은 같은 날 1건만 (한 건에 여러 명은 가능)'],
     ['emailNotificationEnabled', '예약 알림 메일', '새 예약 접수 시 이메일로 알림 받기'],
 ]);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Typography, Tag } from 'antd';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { UndoOutlined } from '@ant-design/icons';
+import { UndoOutlined } from '../common/icons';
 import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
 import { useMessage, useQueryParamsState } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -53,7 +53,7 @@ const SnapshotChips = ({ value }) => {
  * 새로고침해도 유지되고 링크 공유도 가능해짐(MembersTab 등과 동일한 이유).
  */
 // 스켈레톤이 실제 테이블과 1:1로 대응하도록 컬럼 정의와 같은 값을 유지
-// (헤더는 서버 데이터가 아닌 고정 텍스트라 Bone으로 가리지 않고 실제 글자로 노출한다)
+// (고정 헤더도 AdminTableSkeletonTable에서 같은 글자 크기의 뼈대로 표시한다)
 // '핵심 정보'는 실제 columns에서 width를 안 준 유동 컬럼이라 null — 남는 공간을 혼자 흡수한다.
 const SKELETON_HEADERS = ['유형', 'ID', '핵심 정보', '삭제한 관리자', '삭제일', '잔여', '처리'];
 const SKELETON_COLS    = [80, 55, null, 190, 100, 60, 90];

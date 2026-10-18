@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import PropTypes from 'prop-types';
-import { Tooltip } from 'antd';
+import Tooltip from './Tooltip';
 import ChoiceIllustration from './ChoiceIllustration';
 import RollingFieldValue from './RollingFieldValue';
 
@@ -14,7 +14,7 @@ export default function IconChoicePicker({ value, selectedValue, onChange, optio
         <div id={id} className="reserve-service-domain-picker" role="group" aria-label={label}
             style={{ '--reserve-choice-columns': options.length }}>
             {options.map(option => {
-                return <Tooltip key={option.value} title={option.description || `${label} · ${option.label}`} trigger={['hover', 'focus']}>
+                return <Tooltip key={option.value} title={option.description || `${label} · ${option.label}`}>
                     <button type="button" disabled={disabled} className="reserve-service-domain-option"
                         aria-label={option.label} aria-pressed={selected === option.value}
                         aria-describedby={option.description ? `${descriptionId}-${option.value}` : undefined}

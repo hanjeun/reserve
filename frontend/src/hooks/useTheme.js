@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { surfaceForWhiteText } from '../utils/colorContrast';
+import { semanticActionPalettes } from '../styles/tokens/colors';
 
 /**
  * 화면 모양(라이트/다크/시스템)과 글꼴 설정.
@@ -92,7 +94,10 @@ export const ACCENT_OPTIONS = [
     { value: 'teal',   label: '틸',     light: { main: '#0ca678', dark: '#087f5b', tint: '#e6fcf5' }, darkMode: { main: '#38d9a9', dark: '#0ca678', tint: '#12312a' } },
     { value: 'rose',   label: '로즈',   light: { main: '#e64980', dark: '#c2255c', tint: '#fff0f6' }, darkMode: { main: '#f783ac', dark: '#e64980', tint: '#3a1b28' } },
     { value: 'amber',  label: '앰버',   light: { main: '#f08c00', dark: '#e67700', tint: '#fff9db' }, darkMode: { main: '#ffc078', dark: '#f08c00', tint: '#3a2c12' } },
-];
+].map(option => ({ ...option,
+    light: { ...option.light, foreground: '#ffffff', solid: surfaceForWhiteText(option.light.main), solidHover: surfaceForWhiteText(option.light.dark) },
+    darkMode: { ...option.darkMode, foreground: '#ffffff', solid: surfaceForWhiteText(option.darkMode.main), solidHover: surfaceForWhiteText(option.darkMode.dark) },
+}));
 
 const DEFAULT_ACCENT = 'blue';
 
@@ -151,6 +156,9 @@ const applyAccent = (value, resolvedTheme) => {
     root.style.setProperty('--c-primary', c.main);
     root.style.setProperty('--c-primary-dark', c.dark);
     root.style.setProperty('--c-primary-light', c.tint);
+    root.style.setProperty('--c-primary-fg', c.foreground);
+    root.style.setProperty('--c-primary-solid', c.solid);
+    root.style.setProperty('--c-primary-solid-hover', c.solidHover);
 };
 
 /** <html>에 반영. 전환 중에만 트랜지션을 켠다(theme.css의 data-theme-changing). */
@@ -163,6 +171,11 @@ const applyTheme = (pref, { animate = true } = {}) => {
     }
     const resolved = resolveTheme(pref);
     root.dataset.theme = resolved;
+    for (const [name, palette] of Object.entries(semanticActionPalettes[resolved])) {
+        root.style.setProperty(`--c-${name}-fg`, palette.foreground);
+        root.style.setProperty(`--c-${name}-solid`, palette.solid);
+        root.style.setProperty(`--c-${name}-solid-hover`, palette.solidHover);
+    }
     // ★ 테마가 바뀌면 강조색도 다시 적용해야 한다 — 라이트/다크에서 쓰는 hex 가 다르다.
     //   이걸 빼면 다크로 갔을 때 포인트 색이 라이트용 값에 머물러 채도가 죽어 보인다.
     applyAccent(state.accent, resolved);
@@ -214,10 +227,16 @@ export default function useTheme() {
 
     // StrictMode 이중 마운트나 HMR로 DOM 속성이 어긋나는 경우를 대비한 보정.
     useEffect(() => {
-        if (document.documentElement.dataset.theme !== resolveTheme(snap.theme)) {
+        const resolved = resolveTheme(snap.theme);
+        const palette = resolved === 'dark' ? resolveAccent(snap.accent).darkMode : resolveAccent(snap.accent).light;
+        if (document.documentElement.dataset.theme !== resolved
+            || document.documentElement.style.getPropertyValue('--c-primary-fg') !== palette.foreground
+            || document.documentElement.style.getPropertyValue('--c-primary-solid') !== palette.solid
+            || document.documentElement.style.getPropertyValue('--c-error-solid') !== semanticActionPalettes[resolved].error.solid
+            || document.documentElement.style.getPropertyValue('--c-success-fg') !== '#ffffff') {
             applyTheme(snap.theme, { animate: false });
         }
-    }, [snap.theme]);
+    }, [snap.theme, snap.accent]);
 
     const resolved = resolveTheme(snap.theme);
     const accentOpt = resolveAccent(snap.accent);

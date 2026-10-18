@@ -20,9 +20,10 @@ import java.util.regex.Pattern;
 /** 같은 릴리스의 SPA HTML에 공개 가게의 메타만 넣는다. 화면과 해시 자산은 그대로 둔다. */
 @Service
 public class StorePageService {
-    private static final String ORIGIN = "https://reserve.it.kr";
+    @Value("#{siteUrls.appOrigin}")
+    private String origin = kr.it.reserve.config.SiteUrls.DEFAULT_APP_ORIGIN;
     private static final String META_PROPERTY = "property";
-    private static final Set<String> IMAGE_HOSTS = Set.of("cdn.reserve.it.kr", "reserve.it.kr");
+    private static final Set<String> IMAGE_HOSTS = Set.of("cdn.reserve.it.kr", "reserve.it.kr", "app.reserve.it.kr");
     private static final Pattern TITLE = Pattern.compile("<title>[^<]*</title>");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private final StoreService stores;
@@ -46,7 +47,7 @@ public class StorePageService {
         String pageTitle = shorten(store.getName(), 100) + " | RESERVE";
         String description = shorten(store.getDescription(), 160);
         if (description.isBlank()) description = shorten(store.getName(), 100) + "의 정보를 확인하고 예약하세요.";
-        String canonical = ORIGIN + "/store/" + store.getId();
+        String canonical = origin + "/store/" + store.getId();
         String html = title(requireShell(), pageTitle);
         html = meta(html, "name", "description", description);
         html = meta(html, "name", "robots", "index, follow");
@@ -67,7 +68,7 @@ public class StorePageService {
             html = imageDimension(html, "og:image:width", store.getMainImageWidth());
             html = imageDimension(html, "og:image:height", store.getMainImageHeight());
         }
-        return html;
+        return withImageHint(html, store);
     }
 
     private String requireShell() {
@@ -76,21 +77,83 @@ public class StorePageService {
     }
 
     private static String publicThumbnail(StoreResponse store) {
-        String value = store.getMainImageUrl();
+        return publicStoreImage(store.getMainImageUrl(), store.getId(), "thumbnails");
+    }
+
+    private static String publicStoreImage(String value, Long storeId, String folder) {
         if (value == null || value.isBlank()) return null;
         try {
             URI uri = new URI(value);
-            // 채팅·인증 사진이나 서명 쿼리가 공유 수집기에 노출되지 않게 공개 썸네일만 받는다.
+            // Only this public store's managed photo is eligible; never signed/private URLs.
             String path = uri.getPath();
             return "https".equals(uri.getScheme()) && uri.getHost() != null
                     && IMAGE_HOSTS.contains(uri.getHost().toLowerCase(Locale.ROOT))
                     && uri.getUserInfo() == null && uri.getPort() == -1
                     && uri.getQuery() == null && uri.getFragment() == null
-                    && path != null && path.matches("/users/[0-9]+/stores/" + store.getId() + "/thumbnails/[^/]+")
+                    && path != null && !path.contains("\\") && !path.endsWith("/.") && !path.endsWith("/..")
+                    && path.equals(uri.normalize().getPath())
+                    && path.matches("/users/[0-9]+/stores/" + storeId + "/" + folder + "/[^/]+")
                     ? value : null;
         } catch (URISyntaxException exception) {
             return null;
         }
+    }
+
+    private record ImageHint(String url, Integer width, Integer height) {}
+
+    private static ImageHint coverImage(StoreResponse store) {
+        if (store.getDetailImageUrls() != null && !store.getDetailImageUrls().isEmpty()) {
+            String first = store.getDetailImageUrls().getFirst();
+            if (store.getDetailImageMeta() == null) return null;
+            for (StoreResponse.ImageMeta meta : store.getDetailImageMeta()) {
+                if (meta == null || first == null || !first.equals(meta.getUrl())) continue;
+                String url = publicStoreImage(first, store.getId(), "images");
+                return url != null && positive(meta.getWidth()) && positive(meta.getHeight())
+                        ? new ImageHint(url, meta.getWidth(), meta.getHeight()) : null;
+            }
+            // Main thumbnail dimensions never describe an unmeasured detail photo.
+            return null;
+        }
+        String url = publicThumbnail(store);
+        return url != null && positive(store.getMainImageWidth()) && positive(store.getMainImageHeight())
+                ? new ImageHint(url, store.getMainImageWidth(), store.getMainImageHeight()) : null;
+    }
+
+    private static boolean positive(Integer value) { return value != null && value > 0; }
+
+    private static Double galleryLayoutRatio(StoreResponse store) {
+        if (store.getDetailImageUrls() == null || store.getDetailImageUrls().size() < 2
+                || store.getDetailImageMeta() == null) return null;
+        double ratio = Double.POSITIVE_INFINITY;
+        for (String url : store.getDetailImageUrls()) {
+            if (publicStoreImage(url, store.getId(), "images") == null) return null;
+            StoreResponse.ImageMeta measured = null;
+            for (StoreResponse.ImageMeta meta : store.getDetailImageMeta()) {
+                if (meta != null && url.equals(meta.getUrl())) { measured = meta; break; }
+            }
+            if (measured == null || !positive(measured.getWidth()) || !positive(measured.getHeight())) return null;
+            ratio = Math.min(ratio, (double) measured.getWidth() / measured.getHeight());
+        }
+        return ratio;
+    }
+
+    private static String withImageHint(String html, StoreResponse store) {
+        ImageHint image = coverImage(store);
+        if (image == null) return html;
+        // Inert metadata, not executable code or a full/private DTO. The SPA checks the store id again.
+        String hint = """
+                <meta name="reserve-store-image-id" content="%s" />
+                <meta name="reserve-store-image-url" content="%s" />
+                <meta name="reserve-store-image-width" content="%s" />
+                <meta name="reserve-store-image-height" content="%s" />
+                <link rel="preload" as="image" href="%s" referrerpolicy="no-referrer" fetchpriority="high" />
+                """.formatted(store.getId(), escape(image.url()), image.width(), image.height(), escape(image.url()));
+        Double layoutRatio = galleryLayoutRatio(store);
+        if (layoutRatio != null) {
+            // Separate layout scalar: first-photo dimensions/preload and OG metadata keep their identities.
+            hint += "<meta name=\"reserve-store-image-layout-ratio\" content=\"" + layoutRatio + "\" />\n";
+        }
+        return html.replace("</head>", hint + "</head>");
     }
 
     private static String title(String html, String value) {

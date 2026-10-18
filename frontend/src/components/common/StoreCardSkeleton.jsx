@@ -4,7 +4,7 @@ import { shadows } from '../../styles/tokens/spacing';
 import Bone from './Bone';
 
 // The route fallback imports this directly so admin-only skeleton dependencies stay lazy.
-export default function StoreCardSkeleton({ count = 6, withActions = false }) {
+export default function StoreCardSkeleton({ count = 6, withActions = false, metadata, extraTools, showFavorite = true }) {
     return <>
         {Array.from({ length: count }, (_, index) => `store-${index}`).map(key => (
             <div key={key} style={{ breakInside: 'avoid', marginBottom: 24 }}>
@@ -16,10 +16,18 @@ export default function StoreCardSkeleton({ count = 6, withActions = false }) {
                     backgroundColor: colors.background.default,
                 }}>
                     <Bone height="auto" borderRadius={0} style={{ aspectRatio: '1 / 1', maxHeight: 200 }} />
-                    <div className="reserve-store-card-skeleton-info" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div className="reserve-store-card-skeleton-title-line" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 44 }}>
-                            <Bone width="70%" height={20} />
-                            <Bone width={20} height={20} />
+                    <div className="reserve-store-card-skeleton-info" style={{ padding: extraTools ? '12px 16px' : 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div className="reserve-store-card-skeleton-title-line" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: extraTools ? 4 : 8, minHeight: 44 }}>
+                            {extraTools ? <>
+                                <div style={{ flex: 1, minWidth: 0 }}><Bone width="70%" height={20} /></div>
+                                <div className="reserve-store-card-skeleton-tools">
+                                    {showFavorite && <span className="reserve-icon-tool reserve-icon-tool--skeleton"><Bone width={20} height={20} /></span>}
+                                    {extraTools}
+                                </div>
+                            </> : <>
+                                <Bone width="70%" height={20} />
+                                {showFavorite && <Bone width={20} height={20} />}
+                            </>}
                         </div>
                         <div className="reserve-store-card-skeleton-identity"><Bone width="35%" height={14} /></div>
                         <div className="reserve-store-card-skeleton-rating" style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 24 }}>
@@ -27,6 +35,7 @@ export default function StoreCardSkeleton({ count = 6, withActions = false }) {
                             <Bone width={28} height={14} />
                             <Bone width={36} height={14} />
                         </div>
+                        {metadata}
                     </div>
                     {withActions && <div style={{ borderTop: `1px solid ${colors.border.light}`, display: 'flex' }}>
                         <div style={{
@@ -48,4 +57,7 @@ export default function StoreCardSkeleton({ count = 6, withActions = false }) {
 StoreCardSkeleton.propTypes = {
     count: PropTypes.number,
     withActions: PropTypes.bool,
+    metadata: PropTypes.node,
+    extraTools: PropTypes.node,
+    showFavorite: PropTypes.bool,
 };

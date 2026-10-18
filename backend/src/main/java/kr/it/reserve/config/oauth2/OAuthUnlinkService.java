@@ -9,6 +9,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -23,10 +25,10 @@ public class OAuthUnlinkService {
     private final RestTemplate restTemplate;
 
     @Value("${spring.security.oauth2.client.registration.naver.client-id:}")
-    private String naverClientId;
+    private String naverClientId = "";
 
     @Value("${spring.security.oauth2.client.registration.naver.client-secret:}")
-    private String naverClientSecret;
+    private String naverClientSecret = "";
 
     /**
      * OAuth 연동 해제 (회원탈퇴 시 호출)
@@ -54,101 +56,69 @@ public class OAuthUnlinkService {
             return false;
         }
 
-        try {
-            return switch (provider) {
-                case NAVER -> unlinkNaver(accessToken);
-                case KAKAO -> unlinkKakao(accessToken);
-                case GOOGLE -> unlinkGoogle(accessToken);
-                case LOCAL -> true;
-            };
-        } catch (Exception e) {
-            log.error("OAuth unlink error: memberId={}, provider={}, errorType={}",
-                    memberId, provider, e.getClass().getSimpleName());
-            return false;
-        }
+        return unlinkWithResult(provider, accessToken, memberId).outcome() == Outcome.COMPLETED;
     }
 
-    /**
-     * Google 연동 해제
-     * https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke
-     */
-    private boolean unlinkGoogle(String accessToken) {
-        String revokeUrl = "https://oauth2.googleapis.com/revoke";
+    /** 영구적인 자격 증명/요청 오류를 자동 재시도에서 분리한다. 응답 원문은 보존하지 않는다. */
+    public Result unlinkWithResult(AuthProvider provider, String accessToken, Long memberId) {
+        if (provider == null || provider == AuthProvider.LOCAL) return Result.completed();
+        if (accessToken == null || accessToken.isBlank()) return Result.blocked("TOKEN_MISSING");
+        if (provider == AuthProvider.NAVER && (naverClientId.isBlank() || naverClientSecret.isBlank())) {
+            return Result.blocked("CLIENT_CONFIGURATION_MISSING");
+        }
 
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-            form.add("token", accessToken);
-
-            // 토큰을 URL query에 넣으면 프록시·접근 로그에 남을 수 있다. 표준 form body로만 보낸다.
-            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(form, headers);
-
+            String endpoint = switch (provider) {
+                case GOOGLE -> {
+                    form.add("token", accessToken);
+                    yield "https://oauth2.googleapis.com/revoke";
+                }
+                case NAVER -> {
+                    // https://developers.naver.com/docs/login/api/api.md#3-3-토큰-폐기-요청-oauth20revoke
+                    form.add("client_id", naverClientId);
+                    form.add("client_secret", naverClientSecret);
+                    form.add("token", accessToken);
+                    form.add("token_type_hint", "access_token");
+                    yield "https://nid.naver.com/oauth2.0/revoke";
+                }
+                case KAKAO -> {
+                    headers.setBearerAuth(accessToken);
+                    yield "https://kapi.kakao.com/v1/user/unlink";
+                }
+                case LOCAL -> throw new IllegalStateException("Local provider cannot require unlink");
+            };
             ResponseEntity<String> response = restTemplate.exchange(
-                    revokeUrl,
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-
-            log.info("Google unlink response: status={}", response.getStatusCode());
-            return response.getStatusCode().is2xxSuccessful();
-
-        } catch (Exception e) {
-            log.error("Google unlink failed: errorType={}", e.getClass().getSimpleName());
-            return false;
+                    endpoint, HttpMethod.POST, new HttpEntity<>(form, headers), String.class);
+            return classify(response.getStatusCode().value());
+        } catch (HttpStatusCodeException exception) {
+            return classify(exception.getStatusCode().value());
+        } catch (ResourceAccessException exception) {
+            return Result.retryable("NETWORK_UNAVAILABLE");
+        } catch (Exception exception) {
+            log.warn("OAuth unlink could not be requested: memberId={}, provider={}, errorType={}",
+                    memberId, provider, exception.getClass().getSimpleName());
+            return Result.blocked("REQUEST_CONFIGURATION_ERROR");
         }
     }
 
-    /**
-     * Naver 연동 해제
-     * https://developers.naver.com/docs/login/devguide/devguide.md#5-3-%EB%84%A4%EC%9D%B4%EB%B2%84-%EB%A1%9C%EA%B7%B8%EC%9D%B8-%EC%97%B0%EB%8F%99-%ED%95%B4%EC%A0%9C
-     */
-    private boolean unlinkNaver(String accessToken) {
-        String unlinkUrl = String.format(
-                "https://nid.naver.com/oauth2.0/token?grant_type=delete&client_id=%s&client_secret=%s&access_token=%s&service_provider=NAVER",
-                naverClientId, naverClientSecret, accessToken
-        );
-
-        try {
-            ResponseEntity<String> response = restTemplate.getForEntity(unlinkUrl, String.class);
-
-            log.info("Naver unlink response: status={}", response.getStatusCode());
-            return response.getStatusCode().is2xxSuccessful();
-
-        } catch (Exception e) {
-            log.error("Naver unlink failed: errorType={}", e.getClass().getSimpleName());
-            return false;
+    private Result classify(int status) {
+        if (status >= 200 && status < 300) return Result.completed();
+        String errorType = "REMOTE_HTTP_" + status;
+        if (status == 408 || status == 425 || status == 429 || status >= 500) {
+            return Result.retryable(errorType);
         }
+        // 만료된 토큰도 실제 연결 해제 완료를 입증하지는 못한다. 운영 확인 대상으로 남긴다.
+        return Result.blocked(errorType);
     }
 
-    /**
-     * Kakao 연동 해제
-     * https://developers.kakao.com/docs/latest/ko/kakaologin/rest-api#unlink
-     */
-    private boolean unlinkKakao(String accessToken) {
-        String unlinkUrl = "https://kapi.kakao.com/v1/user/unlink";
+    public enum Outcome { COMPLETED, RETRYABLE, BLOCKED }
 
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(accessToken);
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-            HttpEntity<String> entity = new HttpEntity<>("", headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    unlinkUrl,
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-
-            log.info("Kakao unlink response: status={}", response.getStatusCode());
-            return response.getStatusCode().is2xxSuccessful();
-
-        } catch (Exception e) {
-            log.error("Kakao unlink failed: errorType={}", e.getClass().getSimpleName());
-            return false;
-        }
+    public record Result(Outcome outcome, String errorType) {
+        public static Result completed() { return new Result(Outcome.COMPLETED, null); }
+        public static Result retryable(String errorType) { return new Result(Outcome.RETRYABLE, errorType); }
+        public static Result blocked(String errorType) { return new Result(Outcome.BLOCKED, errorType); }
     }
 }

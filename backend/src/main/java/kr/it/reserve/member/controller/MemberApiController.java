@@ -9,6 +9,7 @@ import kr.it.reserve.member.dto.MemberUpdateRequest;
 import kr.it.reserve.member.dto.PasswordChangeRequest;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.service.MemberService;
+import kr.it.reserve.member.service.MemberWithdrawalService;
 import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +27,7 @@ public class MemberApiController {
 
     private final MemberService memberService;
     private final CookieUtil cookieUtil;
+    private final MemberWithdrawalService memberWithdrawalService;
 
     // 내 정보 조회 (SecurityContext의 id로 DB 조회 - 최신 정보 보장)
     @GetMapping("/me")
@@ -100,7 +102,7 @@ public class MemberApiController {
     @DeleteMapping("/delete")
     public ApiResponse<Void> deleteMember(HttpServletResponse response) {
         Member member = SecurityUtil.getCurrentMember("탈퇴 권한이 없어요.");
-        memberService.deleteMember(member.getId());
+        memberWithdrawalService.withdraw(member, SecurityUtil.getOAuthAuthenticationAt());
         cookieUtil.deleteCookie(response, "access_token");
         cookieUtil.deleteCookie(response, "refresh_token");
         return ApiResponse.success(null, "회원 탈퇴가 완료됐어요.");

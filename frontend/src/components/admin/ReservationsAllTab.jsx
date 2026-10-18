@@ -9,9 +9,10 @@
  * 새로고침해도 필터가 유지되고 링크 공유도 가능해짐(MembersTab과 동일한 이유).
  */
 import React, { useState } from 'react';
-import { Pagination, Typography, Tag } from 'antd';
+import { Typography, Tag } from 'antd';
+import Pagination from '../common/Pagination';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { DeleteOutlined } from '@ant-design/icons';
+import { DeleteOutlined } from '../common/icons';
 import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable, ReservationSummaryCardSkeleton } from '../common';
 import ReservationListingToolbar from '../reservation/ReservationListingToolbar';
 import ReservationSummaryCard from '../reservation/ReservationSummaryCard';

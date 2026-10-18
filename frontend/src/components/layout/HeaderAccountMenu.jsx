@@ -4,13 +4,16 @@ import {
     CalendarOutlined,
     ExclamationCircleOutlined,
     HeartOutlined,
+    FolderOutlined,
     LogoutOutlined,
     PlusOutlined,
     ScheduleOutlined,
     SettingOutlined,
     ShopOutlined,
-} from '@ant-design/icons';
+} from '../common/icons';
 import { useNavigate } from 'react-router-dom';
+import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
+import useWorkspaceAction from '../../hooks/useWorkspaceAction';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import useMessage from '../../hooks/useMessage';
@@ -18,18 +21,23 @@ import { API_ENDPOINTS } from '../../constants';
 import { USER_ROLE_LABELS, hasOwnerAccess } from '../../constants/roles';
 import { colors, fontWeight, radius } from '../../styles/tokens';
 import Avatar from '../common/Avatar';
+import Tooltip from '../common/Tooltip';
 import { SpinIndicator } from '../common/Loading';
+import { APP_ORIGIN, LEGACY_ORIGIN } from '../../config/siteUrls';
 
 const { Text } = Typography;
 
 /** 로그인한 사용자에게만 필요한 Dropdown·메뉴·아이콘 묶음. Header에서 지연 로딩한다. */
 const HeaderAccountMenu = () => {
-    const navigate = useNavigate();
+    const navigate = useWorkspaceNavigate();
+    const navigateAfterLogout = useNavigate();
+    const requestAction = useWorkspaceAction();
     const { user, isLoggingOut, setLoggingOut } = useAuthStore();
     const { message } = useMessage();
 
     const handleLogout = async () => {
         if (isLoggingOut) return;
+        if (!await requestAction(() => {})) return;
         setLoggingOut(true);
         const dismissProgress = message.loading({ content: '로그아웃하는 중이에요.', duration: 0, icon: <SpinIndicator /> });
         let serverLogoutFailed = false;
@@ -44,7 +52,7 @@ const HeaderAccountMenu = () => {
             dismissProgress?.();
             useAuthStore.getState().logout();
             // 로그아웃 → 홈. 로고로 홈에 갈 때와 같은 방향(왼쪽에서)으로 돌아간다.
-            navigate('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
+            navigateAfterLogout('/', { replace: true, state: { reserveRouteMotion: 'from-left' } });
             if (serverLogoutFailed) {
                 message.warning('이 기기에서 로그아웃했어요. 서버 연결은 확인하지 못했어요.');
             } else {
@@ -100,6 +108,7 @@ const HeaderAccountMenu = () => {
                 { type: 'divider' },
                 { key: 'my-stores', icon: <ShopOutlined />, label: '내 가게 관리', onClick: () => navigate('/my-stores') },
                 { key: 'store-register', icon: <PlusOutlined />, label: '새 가게 등록', onClick: () => navigate('/store/register') },
+                ...(APP_ORIGIN !== LEGACY_ORIGIN ? [{ key: 'draft-transfer', icon: <FolderOutlined />, label: '가게 초안 옮기기', onClick: () => navigate('/drafts/transfer') }] : []),
             );
         }
 
@@ -118,7 +127,7 @@ const HeaderAccountMenu = () => {
             trigger={['click']}
             getPopupContainer={(trigger) => trigger.parentElement ?? document.body}
         >
-            <button
+            <Tooltip title="내 계정 메뉴"><button
                 type="button"
                 className="reserve-header-avatar-trigger"
                 style={styles.trigger}
@@ -126,7 +135,7 @@ const HeaderAccountMenu = () => {
                 aria-haspopup="menu"
             >
                 <Avatar src={user?.profileImageUrl || user?.profileImage} size={36} />
-            </button>
+            </button></Tooltip>
         </Dropdown>
     );
 };

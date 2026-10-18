@@ -1,19 +1,20 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
-import { StarFilled } from '@ant-design/icons';
+import { StarFilled } from '../common/icons';
 import FavoriteButton from '../common/FavoriteButton';
 import { getThumbnailUrl } from '../../utils';
 import { isNearby } from '../../utils/distance';
 import { normalizeStoreRating } from '../../utils/storeRating';
 import adService from '../../services/adService';
 import StoreIdentityText from './StoreIdentityText';
+import LoadingImage from '../common/LoadingImage';
 
 /**
  * 가게 목록 한 줄 — 가게 목록·홈 추천·내 가게 관리·광고 미리보기가 모두 이 컴포넌트를 재사용한다.
  * actions 를 주면 하트 자리에 관리 버튼(수정·삭제 등)을 둔다.
  */
-const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, adId, preview = false, actions, className }) => {
+const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, adId, preview = false, actions, className, metadata, extraTools }) => {
     const name = store.name || '가게';
     const { rating, reviewCount } = normalizeStoreRating(store.rating, store.reviewCount);
     const nearby = isNearby(userLocation, store.latitude, store.longitude, store.nearbyRadiusKm ?? undefined);
@@ -30,7 +31,7 @@ const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, ad
     const content = (
         <>
             <span className="reserve-store-list-row-image">
-                <img
+                <LoadingImage
                     src={getThumbnailUrl(store.mainImageUrl)}
                     alt={`${name} 대표 이미지`}
                     width={160}
@@ -55,12 +56,13 @@ const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, ad
                     </span>
                     <StoreIdentityText category={store.category} isAdvertised={isAdvertised} nearby={nearby} />
                 </span>
+                {metadata}
             </span>
         </>
     );
 
     return (
-        <article className={['reserve-store-list-row', className].filter(Boolean).join(' ')}>
+        <article className={['reserve-store-list-row', className].filter(Boolean).join(' ')} data-list-item-id={`store:${store.id}`}>
             {preview ? (
                 <span className="reserve-store-list-row-link">{content}</span>
             ) : (
@@ -69,10 +71,11 @@ const StoreListRow = React.memo(({ store, userLocation, isAdvertised = false, ad
                 </Link>
             )}
             {actions ? (
-                <div className="reserve-store-list-row-actions">{actions}</div>
+                <div className="reserve-store-list-row-actions">{actions}{extraTools}</div>
             ) : (
-                <div className="reserve-store-list-row-favorite">
+                <div className={`reserve-store-list-row-favorite${extraTools ? ' reserve-store-list-row-favorite--with-tools' : ''}`}>
                     <FavoriteButton storeId={store.id} size="md" appearance="plain" preview={preview} />
+                    {extraTools}
                 </div>
             )}
         </article>
@@ -101,6 +104,8 @@ StoreListRow.propTypes = {
     preview: PropTypes.bool,
     actions: PropTypes.arrayOf(PropTypes.node),
     className: PropTypes.string,
+    metadata: PropTypes.node,
+    extraTools: PropTypes.node,
 };
 
 export default StoreListRow;

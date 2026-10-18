@@ -159,8 +159,8 @@ export function useConversationLists({ showHidden, canOwnStores, canAdminSupport
 export const threadCopyOf = ({ selection, thread, selectedRow, supportName }) => {
     if (selection.kind === 'admin') {
         return {
-            title: thread?.title || selectedRow?.counterpartName || '회원 문의',
-            threadKind: 'RESERVE 고객지원 · 관리자',
+            title: thread?.title || selectedRow?.counterpartName || '고객 문의',
+            threadKind: '고객 문의',
             emptyText: '회원의 문의에 답변할 수 있어요.',
         };
     }
@@ -174,13 +174,13 @@ export const threadCopyOf = ({ selection, thread, selectedRow, supportName }) =>
     if (selection.kind === 'owner') {
         return {
             title: thread?.title || conversationTitle(selectedRow),
-            threadKind: `${selectedRow?.storeName || '가게'} · 받은 문의`,
-            emptyText: STORE_EMPTY_TEXT,
+            threadKind: `${selectedRow?.storeName || '가게'} · 손님 문의`,
+            emptyText: '아직 메시지가 없어요.',
         };
     }
     return {
         title: selectedRow?.storeName || thread?.title || conversationTitle(selectedRow),
-        threadKind: '가게 문의',
+        threadKind: '가게에 문의',
         emptyText: STORE_EMPTY_TEXT,
     };
 };

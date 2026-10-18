@@ -1,0 +1,1506 @@
+{
+  "title": "RESERVE community and benefit states, version 2",
+  "asset_count": 6,
+  "asset_ids": [
+    "empty-feed",
+    "empty-comment",
+    "draft-transfer",
+    "draft-conflict",
+    "benefit-review-pending",
+    "benefit-review-rejected"
+  ],
+  "production_tools": {
+    "blender": "4.3.2",
+    "python": "3.12.14",
+    "pillow": "12.3.0",
+    "numpy": "2.3.5",
+    "engine": "BLENDER_EEVEE_NEXT",
+    "samples": 128
+  },
+  "static_file_count": 24,
+  "rendered_independently_at": [
+    512,
+    768
+  ],
+  "image_encoding": {
+    "png": "original RGBA8 Blender PNG bytes; no resize or recompression",
+    "webp": {
+      "quality": 92,
+      "method": 6,
+      "lossless": false,
+      "alpha_quality": 100,
+      "exact": true,
+      "rgb": "lossy",
+      "alpha": "pixel-identical to PNG"
+    }
+  },
+  "transparency": "RGBA, alpha-zero edges, non-empty bounded content",
+  "review_sheets": [
+    {
+      "file": "previews/white-actual-48.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 48,
+      "sheet_size": [
+        1152,
+        180
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/white-actual-56.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 56,
+      "sheet_size": [
+        1152,
+        188
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/white-actual-64.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 64,
+      "sheet_size": [
+        1152,
+        196
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/white-actual-72.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 72,
+      "sheet_size": [
+        1152,
+        204
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/white-actual-80.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 80,
+      "sheet_size": [
+        1152,
+        212
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/white-actual-96.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 96,
+      "sheet_size": [
+        1152,
+        228
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/white-actual-112.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 112,
+      "sheet_size": [
+        1152,
+        244
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/white-overview.png",
+      "background": "#FFFFFF",
+      "actual_icon_canvas_px": 224,
+      "sheet_size": [
+        1536,
+        328
+      ],
+      "label": "larger detail overview"
+    },
+    {
+      "file": "previews/dark-actual-48.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 48,
+      "sheet_size": [
+        1152,
+        180
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/dark-actual-56.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 56,
+      "sheet_size": [
+        1152,
+        188
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/dark-actual-64.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 64,
+      "sheet_size": [
+        1152,
+        196
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/dark-actual-72.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 72,
+      "sheet_size": [
+        1152,
+        204
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/dark-actual-80.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 80,
+      "sheet_size": [
+        1152,
+        212
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/dark-actual-96.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 96,
+      "sheet_size": [
+        1152,
+        228
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/dark-actual-112.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 112,
+      "sheet_size": [
+        1152,
+        244
+      ],
+      "label": "actual-size review sheet; view at 100%"
+    },
+    {
+      "file": "previews/dark-overview.png",
+      "background": "#161C27",
+      "actual_icon_canvas_px": 224,
+      "sheet_size": [
+        1536,
+        328
+      ],
+      "label": "larger detail overview"
+    }
+  ],
+  "licenses": [
+    {
+      "file": "licenses/assets-cc0.txt",
+      "original_file": "LICENSE-ASSETS.txt",
+      "original_bytes_preserved": true,
+      "sha256": "f6abe52f31d97f04f41c2b86c70898767ecf5e44ad3d721760e810c4d7f00d0e"
+    },
+    {
+      "file": "licenses/code-mit.txt",
+      "original_file": "LICENSE-CODE.txt",
+      "original_bytes_preserved": true,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    }
+  ],
+  "blender_sources": [
+    {
+      "file": "source/empty-feed.blend",
+      "bytes": 149308,
+      "sha256": "3a900b931d54facf3f4612b3e249d656db446f84efd5f1fa856729827eb4e7a5",
+      "blender_or_compressed_header_recognized": true
+    },
+    {
+      "file": "source/empty-comment.blend",
+      "bytes": 160457,
+      "sha256": "a5d41bbe2272146984a9f2039018f6a539fe27b847696dd196d81fcc4918ed2d",
+      "blender_or_compressed_header_recognized": true
+    },
+    {
+      "file": "source/draft-transfer.blend",
+      "bytes": 199957,
+      "sha256": "789d69d31a21b89f4d573a15154087ba513d883a1e8fd46c5e130860d30b98b0",
+      "blender_or_compressed_header_recognized": true
+    },
+    {
+      "file": "source/draft-conflict.blend",
+      "bytes": 195202,
+      "sha256": "3cc58bfdce8505f32db22fc90f644145080ae7f949dfcaf0d54078b41731c243",
+      "blender_or_compressed_header_recognized": true
+    },
+    {
+      "file": "source/benefit-review-pending.blend",
+      "bytes": 177042,
+      "sha256": "fc206dbdb1d3b3b1c4a595aefdf89063d4be5f8ebecfb04a2aa70942f6d63f40",
+      "blender_or_compressed_header_recognized": true
+    },
+    {
+      "file": "source/benefit-review-rejected.blend",
+      "bytes": 195855,
+      "sha256": "5a5b1db6d2c835108aeb9a83f6f8dfb2a1bf0671c7812e8a3a0bbcd8f4da05c9",
+      "blender_or_compressed_header_recognized": true
+    }
+  ],
+  "saved_scene_roundtrip": {
+    "checked": true,
+    "report": "qa/saved-scene-roundtrip.json",
+    "report_record_count": 12,
+    "completed_renders": 12,
+    "expected_renders": 12,
+    "all_completed_rgba_and_alpha_pixel_identical": true,
+    "all_six_saved_scenes_both_native_sizes_verified": true,
+    "report_sha256": "a6231c5fbe711fdae719e640407b8437c509b88e3e14be7522ca0653740d0c87",
+    "stale_or_missing_current_renders": [],
+    "local_rerender_pixels_rechecked": true,
+    "provenance": "Native renders and saved-scene rerenders inherited unchanged from v1 produced 2026-10-15; v2 rechecks image pixels and hashes, does not claim a new Blender render run."
+  },
+  "images": [
+    {
+      "file": "static/512/empty-feed-512.png",
+      "asset": "empty-feed",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 151278,
+      "sha256": "584f4709b1f189141f7e0972a9b584eeb6fa0fb8b4b1e60bdc76b2ae155aab9b",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/empty-feed-512.webp",
+      "asset": "empty-feed",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 7082,
+      "sha256": "e40e2cd67597370187ea4eb9fc41c2987789fea840144ead4fc0eba5ea5dab1a",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/empty-comment-512.png",
+      "asset": "empty-comment",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 131802,
+      "sha256": "716d676c9f5425be2f20c2b8d43eb549c7db5e073d8a1208e517384b4360d7d6",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/empty-comment-512.webp",
+      "asset": "empty-comment",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 8880,
+      "sha256": "cba73b5711e9b60ad678a02efc95e6cddfa08af259e3bc309317b14ce2436fc7",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/draft-transfer-512.png",
+      "asset": "draft-transfer",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 131386,
+      "sha256": "2ee39820b20bf5731457b4b88e6a521176dad5b873632415b454c285e9279868",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/draft-transfer-512.webp",
+      "asset": "draft-transfer",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 8830,
+      "sha256": "71d12ccea58ba29464bd6631ddf0e53495c73b9b2c8e4f33a0046f68819c4b6c",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/draft-conflict-512.png",
+      "asset": "draft-conflict",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 130517,
+      "sha256": "af184992ef2c0e6b11769c7a1d674db7aec87ff6c68adf8f70f2fa8dd9a31044",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/draft-conflict-512.webp",
+      "asset": "draft-conflict",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 8924,
+      "sha256": "b536c1d2cba22e984076212f49c939309d29d4d0373b1ada4eb9e50908be1da1",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/benefit-review-pending-512.png",
+      "asset": "benefit-review-pending",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 148004,
+      "sha256": "57ec8360af209c27210771d1b5ce41025d092ceef1d34ae7b8964bf80876e001",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/benefit-review-pending-512.webp",
+      "asset": "benefit-review-pending",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 9256,
+      "sha256": "760bc1dc0614f5b982a48df0a387353405077c15471ae8c81fc3250314d5859a",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/benefit-review-rejected-512.png",
+      "asset": "benefit-review-rejected",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 160026,
+      "sha256": "5f63fd5248197d77987e4a7999c8e0002180b9669ec15112ca454630ade7771a",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/512/benefit-review-rejected-512.webp",
+      "asset": "benefit-review-rejected",
+      "resolution": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "bytes": 11110,
+      "sha256": "451fa10e87d6d3784894e132cb0512c15ca0d3f93dd0931e7685c6a0a53be8d7",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/empty-feed-768.png",
+      "asset": "empty-feed",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 323052,
+      "sha256": "f06b0cfa6e4e565e4dac968507d56c1d7b9967fabc32320f92be0c3f0bef4fc1",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/empty-feed-768.webp",
+      "asset": "empty-feed",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 11300,
+      "sha256": "d12f156a8e2e1d38706029ed384e4f0d9c3e5278e5a3daac8d2e71d75437ff74",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/empty-comment-768.png",
+      "asset": "empty-comment",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 277387,
+      "sha256": "3cfbb6eee2a2f56a398a5cd4343da11ff4255dcf31cb85b35e3adafcec6668d1",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/empty-comment-768.webp",
+      "asset": "empty-comment",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 13488,
+      "sha256": "ca2f0a0f29628629b58609ef7329b9199ec1d9d029b598ca1a7929bcc9c253b9",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/draft-transfer-768.png",
+      "asset": "draft-transfer",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 278986,
+      "sha256": "c0513ee4426855e7beff8091f52d7e3c1010b35edac85a917aea5c1d76a71c29",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/draft-transfer-768.webp",
+      "asset": "draft-transfer",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 14204,
+      "sha256": "24cd3dbe1e9506457486f1757bd429388698e76c8118cd4e3f6c75e0f4922f13",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/draft-conflict-768.png",
+      "asset": "draft-conflict",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 276782,
+      "sha256": "9452bc618ac2f966adbe52799ac4496d600431bb3690fa7fddc19cbd4255f91a",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/draft-conflict-768.webp",
+      "asset": "draft-conflict",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 14266,
+      "sha256": "3d9b02bd096c9421b787881e21a05f136b126478149a2960830726430f611e53",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/benefit-review-pending-768.png",
+      "asset": "benefit-review-pending",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 308958,
+      "sha256": "be1aeb27b15bddc9987ba4062a98002db59880c2e247cac90250e10de9a5eebf",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/benefit-review-pending-768.webp",
+      "asset": "benefit-review-pending",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 14882,
+      "sha256": "9c4c4474048461ce609ae7ff0dfa6ee1630294db5691c958d3c8685418d16348",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/benefit-review-rejected-768.png",
+      "asset": "benefit-review-rejected",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 334331,
+      "sha256": "a5af5f60e2f4d38ba6e4851d20aaa19dac25fbbf755cd9d40156b0eb72a7b3c0",
+      "transparent": true,
+      "native_resolution": true
+    },
+    {
+      "file": "static/768/benefit-review-rejected-768.webp",
+      "asset": "benefit-review-rejected",
+      "resolution": [
+        768,
+        768
+      ],
+      "mode": "RGBA",
+      "bytes": 17574,
+      "sha256": "73fce0fd07d677ac521e41884e44b2d9ca57a24039a0bf070dbde668904e1ea3",
+      "transparent": true,
+      "native_resolution": true
+    }
+  ],
+  "image_qa": [
+    {
+      "asset": "empty-feed",
+      "resolution": [
+        512,
+        512
+      ],
+      "png": "static/512/empty-feed-512.png",
+      "webp": "static/512/empty-feed-512.webp",
+      "png_ihdr": {
+        "width": 512,
+        "height": 512,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "584f4709b1f189141f7e0972a9b584eeb6fa0fb8b4b1e60bdc76b2ae155aab9b",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        120,
+        84,
+        398,
+        419
+      ],
+      "alpha_threshold_8_bbox": [
+        120,
+        85,
+        398,
+        418
+      ],
+      "margins_px_left_top_right_bottom": [
+        120,
+        84,
+        114,
+        93
+      ],
+      "minimum_margin_px": 84,
+      "minimum_margin_fraction": 0.1640625,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 2409,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 7082,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "empty-comment",
+      "resolution": [
+        512,
+        512
+      ],
+      "png": "static/512/empty-comment-512.png",
+      "webp": "static/512/empty-comment-512.webp",
+      "png_ihdr": {
+        "width": 512,
+        "height": 512,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "716d676c9f5425be2f20c2b8d43eb549c7db5e073d8a1208e517384b4360d7d6",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        110,
+        108,
+        402,
+        384
+      ],
+      "alpha_threshold_8_bbox": [
+        110,
+        109,
+        402,
+        384
+      ],
+      "margins_px_left_top_right_bottom": [
+        110,
+        108,
+        110,
+        128
+      ],
+      "minimum_margin_px": 108,
+      "minimum_margin_fraction": 0.2109375,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 3514,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 8880,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "draft-transfer",
+      "resolution": [
+        512,
+        512
+      ],
+      "png": "static/512/draft-transfer-512.png",
+      "webp": "static/512/draft-transfer-512.webp",
+      "png_ihdr": {
+        "width": 512,
+        "height": 512,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "2ee39820b20bf5731457b4b88e6a521176dad5b873632415b454c285e9279868",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        113,
+        130,
+        412,
+        366
+      ],
+      "alpha_threshold_8_bbox": [
+        114,
+        130,
+        411,
+        366
+      ],
+      "margins_px_left_top_right_bottom": [
+        113,
+        130,
+        100,
+        146
+      ],
+      "minimum_margin_px": 100,
+      "minimum_margin_fraction": 0.1953125,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 2952,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 8830,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "draft-conflict",
+      "resolution": [
+        512,
+        512
+      ],
+      "png": "static/512/draft-conflict-512.png",
+      "webp": "static/512/draft-conflict-512.webp",
+      "png_ihdr": {
+        "width": 512,
+        "height": 512,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "af184992ef2c0e6b11769c7a1d674db7aec87ff6c68adf8f70f2fa8dd9a31044",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        113,
+        138,
+        419,
+        352
+      ],
+      "alpha_threshold_8_bbox": [
+        114,
+        138,
+        419,
+        351
+      ],
+      "margins_px_left_top_right_bottom": [
+        113,
+        138,
+        93,
+        160
+      ],
+      "minimum_margin_px": 93,
+      "minimum_margin_fraction": 0.181640625,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 2929,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 8924,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "benefit-review-pending",
+      "resolution": [
+        512,
+        512
+      ],
+      "png": "static/512/benefit-review-pending-512.png",
+      "webp": "static/512/benefit-review-pending-512.webp",
+      "png_ihdr": {
+        "width": 512,
+        "height": 512,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "57ec8360af209c27210771d1b5ce41025d092ceef1d34ae7b8964bf80876e001",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        113,
+        108,
+        399,
+        397
+      ],
+      "alpha_threshold_8_bbox": [
+        113,
+        108,
+        399,
+        397
+      ],
+      "margins_px_left_top_right_bottom": [
+        113,
+        108,
+        113,
+        115
+      ],
+      "minimum_margin_px": 108,
+      "minimum_margin_fraction": 0.2109375,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 2231,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 9256,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "benefit-review-rejected",
+      "resolution": [
+        512,
+        512
+      ],
+      "png": "static/512/benefit-review-rejected-512.png",
+      "webp": "static/512/benefit-review-rejected-512.webp",
+      "png_ihdr": {
+        "width": 512,
+        "height": 512,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "5f63fd5248197d77987e4a7999c8e0002180b9669ec15112ca454630ade7771a",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        115,
+        77,
+        401,
+        424
+      ],
+      "alpha_threshold_8_bbox": [
+        116,
+        78,
+        401,
+        423
+      ],
+      "margins_px_left_top_right_bottom": [
+        115,
+        77,
+        111,
+        88
+      ],
+      "minimum_margin_px": 77,
+      "minimum_margin_fraction": 0.150390625,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 2778,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 11110,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "empty-feed",
+      "resolution": [
+        768,
+        768
+      ],
+      "png": "static/768/empty-feed-768.png",
+      "webp": "static/768/empty-feed-768.webp",
+      "png_ihdr": {
+        "width": 768,
+        "height": 768,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "f06b0cfa6e4e565e4dac968507d56c1d7b9967fabc32320f92be0c3f0bef4fc1",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        181,
+        127,
+        597,
+        628
+      ],
+      "alpha_threshold_8_bbox": [
+        181,
+        127,
+        596,
+        627
+      ],
+      "margins_px_left_top_right_bottom": [
+        181,
+        127,
+        171,
+        140
+      ],
+      "minimum_margin_px": 127,
+      "minimum_margin_fraction": 0.16536458333333334,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 3605,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 11300,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "empty-comment",
+      "resolution": [
+        768,
+        768
+      ],
+      "png": "static/768/empty-comment-768.png",
+      "webp": "static/768/empty-comment-768.webp",
+      "png_ihdr": {
+        "width": 768,
+        "height": 768,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "3cfbb6eee2a2f56a398a5cd4343da11ff4255dcf31cb85b35e3adafcec6668d1",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        165,
+        163,
+        603,
+        576
+      ],
+      "alpha_threshold_8_bbox": [
+        166,
+        164,
+        602,
+        575
+      ],
+      "margins_px_left_top_right_bottom": [
+        165,
+        163,
+        165,
+        192
+      ],
+      "minimum_margin_px": 163,
+      "minimum_margin_fraction": 0.21223958333333334,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 5357,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 13488,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "draft-transfer",
+      "resolution": [
+        768,
+        768
+      ],
+      "png": "static/768/draft-transfer-768.png",
+      "webp": "static/768/draft-transfer-768.webp",
+      "png_ihdr": {
+        "width": 768,
+        "height": 768,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "c0513ee4426855e7beff8091f52d7e3c1010b35edac85a917aea5c1d76a71c29",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        171,
+        195,
+        617,
+        548
+      ],
+      "alpha_threshold_8_bbox": [
+        171,
+        196,
+        617,
+        548
+      ],
+      "margins_px_left_top_right_bottom": [
+        171,
+        195,
+        151,
+        220
+      ],
+      "minimum_margin_px": 151,
+      "minimum_margin_fraction": 0.19661458333333334,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 4190,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 14204,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "draft-conflict",
+      "resolution": [
+        768,
+        768
+      ],
+      "png": "static/768/draft-conflict-768.png",
+      "webp": "static/768/draft-conflict-768.webp",
+      "png_ihdr": {
+        "width": 768,
+        "height": 768,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "9452bc618ac2f966adbe52799ac4496d600431bb3690fa7fddc19cbd4255f91a",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        170,
+        207,
+        628,
+        527
+      ],
+      "alpha_threshold_8_bbox": [
+        171,
+        208,
+        628,
+        527
+      ],
+      "margins_px_left_top_right_bottom": [
+        170,
+        207,
+        140,
+        241
+      ],
+      "minimum_margin_px": 140,
+      "minimum_margin_fraction": 0.18229166666666666,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 4767,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 14266,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "benefit-review-pending",
+      "resolution": [
+        768,
+        768
+      ],
+      "png": "static/768/benefit-review-pending-768.png",
+      "webp": "static/768/benefit-review-pending-768.webp",
+      "png_ihdr": {
+        "width": 768,
+        "height": 768,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "be1aeb27b15bddc9987ba4062a98002db59880c2e247cac90250e10de9a5eebf",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        169,
+        162,
+        599,
+        595
+      ],
+      "alpha_threshold_8_bbox": [
+        170,
+        163,
+        598,
+        594
+      ],
+      "margins_px_left_top_right_bottom": [
+        169,
+        162,
+        169,
+        173
+      ],
+      "minimum_margin_px": 162,
+      "minimum_margin_fraction": 0.2109375,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 3832,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 14882,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    },
+    {
+      "asset": "benefit-review-rejected",
+      "resolution": [
+        768,
+        768
+      ],
+      "png": "static/768/benefit-review-rejected-768.png",
+      "webp": "static/768/benefit-review-rejected-768.webp",
+      "png_ihdr": {
+        "width": 768,
+        "height": 768,
+        "bit_depth": 8,
+        "png_color_type": 6,
+        "interlaced": false
+      },
+      "png_input_bytes_preserved": true,
+      "png_sha256_before_and_after": "a5af5f60e2f4d38ba6e4851d20aaa19dac25fbbf755cd9d40156b0eb72a7b3c0",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "alpha_bbox": [
+        174,
+        116,
+        601,
+        635
+      ],
+      "alpha_threshold_8_bbox": [
+        174,
+        117,
+        601,
+        635
+      ],
+      "margins_px_left_top_right_bottom": [
+        174,
+        116,
+        167,
+        133
+      ],
+      "minimum_margin_px": 116,
+      "minimum_margin_fraction": 0.15104166666666666,
+      "all_four_canvas_edges_alpha_zero": true,
+      "partial_alpha_pixel_count": 3825,
+      "webp_alpha_pixel_identical": true,
+      "webp_bytes": 17574,
+      "webp_target_bytes": 40960,
+      "webp_within_target": true
+    }
+  ],
+  "manifest_note": "SHA-256 and byte sizes cover every packaged file except this self-referential manifest. The ZIP also contains this manifest.",
+  "file_count_excluding_manifest": 69,
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 7299,
+      "sha256": "05d77bf80c0b65a1a94bad1b937adce800ea2f269fa1fffae9112852f1dd73f2"
+    },
+    {
+      "file": "licenses/assets-cc0.txt",
+      "bytes": 811,
+      "sha256": "f6abe52f31d97f04f41c2b86c70898767ecf5e44ad3d721760e810c4d7f00d0e"
+    },
+    {
+      "file": "licenses/code-mit.txt",
+      "bytes": 1202,
+      "sha256": "b8419123a0d101028671bf46354be9dfd814d862172ada57a565cebbc6d0317b"
+    },
+    {
+      "file": "previews/dark-actual-112.png",
+      "bytes": 41766,
+      "sha256": "392eaebf607c3d8532c8798a431ec1d5922745a15faaa712bf88f489af5cd5c4"
+    },
+    {
+      "file": "previews/dark-actual-48.png",
+      "bytes": 21162,
+      "sha256": "eab0fbd25732b366fc6e028676a2cb95435c1c64c44ca6ad24e9b65f08e5e2f6"
+    },
+    {
+      "file": "previews/dark-actual-56.png",
+      "bytes": 23309,
+      "sha256": "5dd0623b037a103db1b7f74db235833b2321e82cab4afa9ad0d56227dc893852"
+    },
+    {
+      "file": "previews/dark-actual-64.png",
+      "bytes": 25534,
+      "sha256": "981640dfcee8a2347ee77bc73fc4e540a434e31f1bb75fda0b9fe314bc041c7a"
+    },
+    {
+      "file": "previews/dark-actual-72.png",
+      "bytes": 27998,
+      "sha256": "b47a56b14a199e91c50d0b878fb9e094539b3359256cefc005b6c9cf2f26fb69"
+    },
+    {
+      "file": "previews/dark-actual-80.png",
+      "bytes": 30951,
+      "sha256": "eb87015fd3dcf185cc2758c722de7333ad6c5a99ac3ece6ad7e61398d6f44ef5"
+    },
+    {
+      "file": "previews/dark-actual-96.png",
+      "bytes": 36224,
+      "sha256": "b1eddb46858e5a08c89e7b98e1803881a125d2b7201d45401f6302de4cecd5eb"
+    },
+    {
+      "file": "previews/dark-overview.png",
+      "bytes": 88408,
+      "sha256": "a90d51180ac1a743bc870e1e0fda90c0fc8a93cd44401e997ee470c72a9470a2"
+    },
+    {
+      "file": "previews/white-actual-112.png",
+      "bytes": 39535,
+      "sha256": "33c3552c061139d91b81e8f4eb66735087e90683088bb09ae5ae7247bcd233db"
+    },
+    {
+      "file": "previews/white-actual-48.png",
+      "bytes": 19579,
+      "sha256": "1245f136a53be8b632364b786d1235d035ebf03a4ebc55a1eb1343753510a811"
+    },
+    {
+      "file": "previews/white-actual-56.png",
+      "bytes": 21739,
+      "sha256": "21f433778aca9ef526cecf953d64d4666e1885f12e502f0858a7f40c3b7630f1"
+    },
+    {
+      "file": "previews/white-actual-64.png",
+      "bytes": 23861,
+      "sha256": "9f22ac8745b98e9d5384227d53f0b978947e29653c26f3ed16b4635cfbbfe027"
+    },
+    {
+      "file": "previews/white-actual-72.png",
+      "bytes": 26411,
+      "sha256": "71631ea6d41173b935330cc16f15d67c8f1d213c652a3508f6a2d79dcf4bc72b"
+    },
+    {
+      "file": "previews/white-actual-80.png",
+      "bytes": 29075,
+      "sha256": "e4e9c34081e5a43183db8ac08c9a9f79107be77f3bef5c6bc8efd89945bf30e3"
+    },
+    {
+      "file": "previews/white-actual-96.png",
+      "bytes": 34494,
+      "sha256": "c9cb9cbf8ed9e2fddf7454e97f41262a532eebcaef990a858bedf9c2b2d1fb2c"
+    },
+    {
+      "file": "previews/white-overview.png",
+      "bytes": 85982,
+      "sha256": "893bac84c06ef7e44436f15c2e389d3ca05545dd21f72a333c1eb849884f9f0d"
+    },
+    {
+      "file": "qa/delivered-scene-settings.json",
+      "bytes": 19894,
+      "sha256": "8854f67809dd60d86128e175f778cc2e1389f9865963ffbbf9fe0450441f006a"
+    },
+    {
+      "file": "qa/delivery-validation.json",
+      "bytes": 16166,
+      "sha256": "3a4c4d0929e7de2f561432fb87e11aee19c1d69a6eee6afe926560444ed4e6a8"
+    },
+    {
+      "file": "qa/native-render.log",
+      "bytes": 9031,
+      "sha256": "6cf948a6a32ca56e746f8c8cf610f3eea125adb1a1a22f2edfc09ae975fa54b0"
+    },
+    {
+      "file": "qa/reference-access.json",
+      "bytes": 972,
+      "sha256": "947bca432cfc431beaffc98ce14f899f71a0dad657951bbf0078654ab1bc3cd0"
+    },
+    {
+      "file": "qa/reference-inspection.log",
+      "bytes": 352,
+      "sha256": "3fb52c0878535009beecfc57245c5013625bcec7f9ff332a692c77848327c344"
+    },
+    {
+      "file": "qa/reference-scene-inspection.json",
+      "bytes": 10965,
+      "sha256": "d75de84da7c678fd92845d3f438b02a9f452d2caf5ee4c638629551ce9e01554"
+    },
+    {
+      "file": "qa/refined-roundtrip.log",
+      "bytes": 3534,
+      "sha256": "3b50557779e6448a4c3ae6deeff29320c3e3fa4b580539878f247f6bba8631ec"
+    },
+    {
+      "file": "qa/refinement-render.log",
+      "bytes": 2018,
+      "sha256": "0f50d0d5c53fb9ccf6d2c9604cf57b31327f73f25d0eb87b7daad8718d4595b0"
+    },
+    {
+      "file": "qa/saved-scene-roundtrip.json",
+      "bytes": 3794,
+      "sha256": "a6231c5fbe711fdae719e640407b8437c509b88e3e14be7522ca0653740d0c87"
+    },
+    {
+      "file": "qa/saved-scene-roundtrip.log",
+      "bytes": 9271,
+      "sha256": "167f5f2d6ca2719ae6e07a2d669c5ec063d15d61f4a75e77a4da95d045821c44"
+    },
+    {
+      "file": "qa/small-detail-refinement.log",
+      "bytes": 3447,
+      "sha256": "7998a09deca64bec0cb001cebe69cbb728bb41d70eeebd54b088ff52547b464a"
+    },
+    {
+      "file": "qa/style-settings-comparison.json",
+      "bytes": 2702,
+      "sha256": "31e9773fdaff190825491e6205cc41372885c6b2978844455b5589cea947a2a8"
+    },
+    {
+      "file": "qa/tool-versions.json",
+      "bytes": 141,
+      "sha256": "c0c3f266d7b0bdb5fdac41a98b22d79d8e6a0c89f892905537653c6a89a4aea1"
+    },
+    {
+      "file": "qa/v2-visual-review.json",
+      "bytes": 3586,
+      "sha256": "7ea3ca68b9a2ad6cdb3048819af9da7f33e5e9167cbe8e68ef05d4adce37410d"
+    },
+    {
+      "file": "qa/visual-review.json",
+      "bytes": 2203,
+      "sha256": "3453dadbace357b06ce0c69cc2c4cc7d7e95d87589aeae3541bceef3ed9cb3aa"
+    },
+    {
+      "file": "source/benefit-review-pending.blend",
+      "bytes": 177042,
+      "sha256": "fc206dbdb1d3b3b1c4a595aefdf89063d4be5f8ebecfb04a2aa70942f6d63f40"
+    },
+    {
+      "file": "source/benefit-review-rejected.blend",
+      "bytes": 195855,
+      "sha256": "5a5b1db6d2c835108aeb9a83f6f8dfb2a1bf0671c7812e8a3a0bbcd8f4da05c9"
+    },
+    {
+      "file": "source/build_assets.py",
+      "bytes": 13872,
+      "sha256": "044c5906d346f21bd42388d43d664c493c1afaa677ce3564a0a73754a3c7f885"
+    },
+    {
+      "file": "source/compare_settings.py",
+      "bytes": 1470,
+      "sha256": "e12d34fb0e6fc0ded453a7ca2bf8d01023dfdc5f898ed5c5bbc236d586402bc9"
+    },
+    {
+      "file": "source/draft-conflict.blend",
+      "bytes": 195202,
+      "sha256": "3cc58bfdce8505f32db22fc90f644145080ae7f949dfcaf0d54078b41731c243"
+    },
+    {
+      "file": "source/draft-transfer.blend",
+      "bytes": 199957,
+      "sha256": "789d69d31a21b89f4d573a15154087ba513d883a1e8fd46c5e130860d30b98b0"
+    },
+    {
+      "file": "source/empty-comment.blend",
+      "bytes": 160457,
+      "sha256": "a5d41bbe2272146984a9f2039018f6a539fe27b847696dd196d81fcc4918ed2d"
+    },
+    {
+      "file": "source/empty-feed.blend",
+      "bytes": 149308,
+      "sha256": "3a900b931d54facf3f4612b3e249d656db446f84efd5f1fa856729827eb4e7a5"
+    },
+    {
+      "file": "source/native-render-evidence.jsonl",
+      "bytes": 4926,
+      "sha256": "67f05ab2bc866a01093748f44dd02816b5647d87e648d55f222bcf0ab3d96c1a"
+    },
+    {
+      "file": "source/rerender_saved.py",
+      "bytes": 2867,
+      "sha256": "354f664f167b5eec89a9ef3f9b16e422f25c99f09846f47081ad37db4d8341df"
+    },
+    {
+      "file": "source/validate_delivery.py",
+      "bytes": 28266,
+      "sha256": "0efc978b09a006db6f4d02b9673c707b6c24bfb8596c228b5efd1370a23450d8"
+    },
+    {
+      "file": "static/512/benefit-review-pending-512.png",
+      "bytes": 148004,
+      "sha256": "57ec8360af209c27210771d1b5ce41025d092ceef1d34ae7b8964bf80876e001"
+    },
+    {
+      "file": "static/512/benefit-review-pending-512.webp",
+      "bytes": 9256,
+      "sha256": "760bc1dc0614f5b982a48df0a387353405077c15471ae8c81fc3250314d5859a"
+    },
+    {
+      "file": "static/512/benefit-review-rejected-512.png",
+      "bytes": 160026,
+      "sha256": "5f63fd5248197d77987e4a7999c8e0002180b9669ec15112ca454630ade7771a"
+    },
+    {
+      "file": "static/512/benefit-review-rejected-512.webp",
+      "bytes": 11110,
+      "sha256": "451fa10e87d6d3784894e132cb0512c15ca0d3f93dd0931e7685c6a0a53be8d7"
+    },
+    {
+      "file": "static/512/draft-conflict-512.png",
+      "bytes": 130517,
+      "sha256": "af184992ef2c0e6b11769c7a1d674db7aec87ff6c68adf8f70f2fa8dd9a31044"
+    },
+    {
+      "file": "static/512/draft-conflict-512.webp",
+      "bytes": 8924,
+      "sha256": "b536c1d2cba22e984076212f49c939309d29d4d0373b1ada4eb9e50908be1da1"
+    },
+    {
+      "file": "static/512/draft-transfer-512.png",
+      "bytes": 131386,
+      "sha256": "2ee39820b20bf5731457b4b88e6a521176dad5b873632415b454c285e9279868"
+    },
+    {
+      "file": "static/512/draft-transfer-512.webp",
+      "bytes": 8830,
+      "sha256": "71d12ccea58ba29464bd6631ddf0e53495c73b9b2c8e4f33a0046f68819c4b6c"
+    },
+    {
+      "file": "static/512/empty-comment-512.png",
+      "bytes": 131802,
+      "sha256": "716d676c9f5425be2f20c2b8d43eb549c7db5e073d8a1208e517384b4360d7d6"
+    },
+    {
+      "file": "static/512/empty-comment-512.webp",
+      "bytes": 8880,
+      "sha256": "cba73b5711e9b60ad678a02efc95e6cddfa08af259e3bc309317b14ce2436fc7"
+    },
+    {
+      "file": "static/512/empty-feed-512.png",
+      "bytes": 151278,
+      "sha256": "584f4709b1f189141f7e0972a9b584eeb6fa0fb8b4b1e60bdc76b2ae155aab9b"
+    },
+    {
+      "file": "static/512/empty-feed-512.webp",
+      "bytes": 7082,
+      "sha256": "e40e2cd67597370187ea4eb9fc41c2987789fea840144ead4fc0eba5ea5dab1a"
+    },
+    {
+      "file": "static/768/benefit-review-pending-768.png",
+      "bytes": 308958,
+      "sha256": "be1aeb27b15bddc9987ba4062a98002db59880c2e247cac90250e10de9a5eebf"
+    },
+    {
+      "file": "static/768/benefit-review-pending-768.webp",
+      "bytes": 14882,
+      "sha256": "9c4c4474048461ce609ae7ff0dfa6ee1630294db5691c958d3c8685418d16348"
+    },
+    {
+      "file": "static/768/benefit-review-rejected-768.png",
+      "bytes": 334331,
+      "sha256": "a5af5f60e2f4d38ba6e4851d20aaa19dac25fbbf755cd9d40156b0eb72a7b3c0"
+    },
+    {
+      "file": "static/768/benefit-review-rejected-768.webp",
+      "bytes": 17574,
+      "sha256": "73fce0fd07d677ac521e41884e44b2d9ca57a24039a0bf070dbde668904e1ea3"
+    },
+    {
+      "file": "static/768/draft-conflict-768.png",
+      "bytes": 276782,
+      "sha256": "9452bc618ac2f966adbe52799ac4496d600431bb3690fa7fddc19cbd4255f91a"
+    },
+    {
+      "file": "static/768/draft-conflict-768.webp",
+      "bytes": 14266,
+      "sha256": "3d9b02bd096c9421b787881e21a05f136b126478149a2960830726430f611e53"
+    },
+    {
+      "file": "static/768/draft-transfer-768.png",
+      "bytes": 278986,
+      "sha256": "c0513ee4426855e7beff8091f52d7e3c1010b35edac85a917aea5c1d76a71c29"
+    },
+    {
+      "file": "static/768/draft-transfer-768.webp",
+      "bytes": 14204,
+      "sha256": "24cd3dbe1e9506457486f1757bd429388698e76c8118cd4e3f6c75e0f4922f13"
+    },
+    {
+      "file": "static/768/empty-comment-768.png",
+      "bytes": 277387,
+      "sha256": "3cfbb6eee2a2f56a398a5cd4343da11ff4255dcf31cb85b35e3adafcec6668d1"
+    },
+    {
+      "file": "static/768/empty-comment-768.webp",
+      "bytes": 13488,
+      "sha256": "ca2f0a0f29628629b58609ef7329b9199ec1d9d029b598ca1a7929bcc9c253b9"
+    },
+    {
+      "file": "static/768/empty-feed-768.png",
+      "bytes": 323052,
+      "sha256": "f06b0cfa6e4e565e4dac968507d56c1d7b9967fabc32320f92be0c3f0bef4fc1"
+    },
+    {
+      "file": "static/768/empty-feed-768.webp",
+      "bytes": 11300,
+      "sha256": "d12f156a8e2e1d38706029ed384e4f0d9c3e5278e5a3daac8d2e71d75437ff74"
+    }
+  ]
+}

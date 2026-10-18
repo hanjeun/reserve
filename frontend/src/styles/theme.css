@@ -20,6 +20,9 @@
     --c-primary: #3182f6;
     --c-primary-light: #e8f3ff;
     --c-primary-dark: #2272eb;
+    --c-primary-fg: #ffffff;
+    --c-primary-solid: #1b64da;
+    --c-primary-solid-hover: #1b64da;
 
     --c-gray-50: #f9fafb;
     --c-gray-100: #f2f4f6;
@@ -41,14 +44,17 @@
 
     --c-success: #00c73c;
     --c-success-light: #e8f9ee;
+    --c-success-fg: #ffffff;
     --c-error: #f04452;
     --c-error-light: #fff0f1;
+    --c-error-fg: #ffffff;
     --c-warning: #ffb800;
     --c-warning-light: #fff8e6;
 
     --c-bg-default: #ffffff;
     --c-bg-subtle: #f8f9fa;
     --c-bg-paper: #ffffff;
+    --c-bg-overlay: rgba(255, 255, 255, 0.92);
 
     --c-text-primary: #1a1f27;
     --c-text-secondary: #4e5968;
@@ -76,6 +82,8 @@
        다크에서 gray-100(#23262b)이 카드 배경(#1e2126)과 거의 같아서 hover가 안 보였다.
        "면을 채운다"는 건 배경 대비 확실히 구분돼야 의미가 있으므로 전용 값을 둔다. */
     --c-hover-surface: #f2f4f6;
+    --c-outline-hover-bg: rgba(0, 0, 0, 0.02);
+    --c-outline-hover-border: #adb5bd;
 
     color-scheme: light;
 }
@@ -87,6 +95,9 @@
     --c-primary: #4c9aff;
     --c-primary-light: #1b2a41;
     --c-primary-dark: #3182f6;
+    --c-primary-fg: #ffffff;
+    --c-primary-solid: #1b64da;
+    --c-primary-solid-hover: #1b64da;
 
     /* 회색 스케일 반전 — 50이 가장 어둡고 900이 가장 밝다.
        이래야 `colors.gray[100]`을 "옅은 선"으로 쓰던 기존 코드가 다크에서도 옅은 선이 된다. */
@@ -107,14 +118,17 @@
 
     --c-success: #32d365;
     --c-success-light: #14301e;
+    --c-success-fg: #ffffff;
     --c-error: #ff6b76;
     --c-error-light: #3a1b1f;
+    --c-error-fg: #ffffff;
     --c-warning: #ffc633;
     --c-warning-light: #3a2e10;
 
     --c-bg-default: #16181c;
     --c-bg-subtle: #1a1d21;
     --c-bg-paper: #1e2126;
+    --c-bg-overlay: rgba(30, 33, 38, 0.92);
 
     --c-text-primary: #e8eaed;
     --c-text-secondary: #c3c8cf;
@@ -137,6 +151,8 @@
 
     /* 카드 배경(#1e2126)보다 확실히 밝게 — gray-200 수준. */
     --c-hover-surface: #333840;
+    --c-outline-hover-bg: rgba(255, 255, 255, 0.06);
+    --c-outline-hover-border: #575d66;
 
     /* 폼 컨트롤·스크롤바 등 브라우저 기본 UI도 같이 어두워진다 */
     color-scheme: dark;

@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { feedKeys } from '../../hooks/feedQueries';
 import UserGuide from './UserGuide';
 import BusinessGuide from './BusinessGuide';
 import CommonGuide from './CommonGuide';
 
-const renderGuide = path => render(<MemoryRouter initialEntries={[path]}>
+const renderGuide = path => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    client.setQueryData(feedKeys.config(), { enabled: false });
+    return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}>
     <Routes>
         <Route path="/guide/user" element={<UserGuide />} />
         <Route path="/guide/business" element={<BusinessGuide />} />
         <Route path="/guide/common" element={<CommonGuide />} />
     </Routes>
-</MemoryRouter>);
+</MemoryRouter></QueryClientProvider>);
+};
 
 describe('public user, business and common guides', () => {
     it('navigates between separate guides and marks the current guide', async () => {

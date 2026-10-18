@@ -50,8 +50,8 @@ public class RefundLedgerService {
                     id, paymentId, merchantUid, requestedAmount);
             return id;
         } catch (Exception e) {
-            log.error("Failed to open refund ledger entry: paymentId={}, merchantUid={}, amount={}",
-                    paymentId, merchantUid, requestedAmount, e);
+            log.error("Failed to open refund ledger entry: paymentId={}, merchantUid={}, amount={}, errorType={}",
+                    paymentId, merchantUid, requestedAmount, e.getClass().getSimpleName());
             return null;
         }
     }
@@ -106,7 +106,8 @@ public class RefundLedgerService {
                     },
                     () -> log.error("Refund ledger row vanished: attemptId={}, outcome={}", attemptId, label));
         } catch (Exception e) {
-            log.error("Failed to close refund ledger entry: attemptId={}, outcome={}", attemptId, label, e);
+            log.error("Failed to close refund ledger entry: attemptId={}, outcome={}, errorType={}",
+                    attemptId, label, e.getClass().getSimpleName());
         }
     }
 }

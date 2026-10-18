@@ -33,12 +33,12 @@ test('disabled detail photo autoplay stays still while manual navigation remains
     await page.goto('/store/81');
     const activePhoto = page.locator('.reserve-carousel .slick-active img').first();
     await expect(activePhoto).toBeVisible();
-    await expect(activePhoto).toHaveAttribute('alt', `${store.name}-0`);
+    await expect(activePhoto).toHaveAttribute('alt', `${store.name} 사진 1`);
     await page.clock.fastForward(10_000);
-    await expect(activePhoto).toHaveAttribute('alt', `${store.name}-0`);
+    await expect(activePhoto).toHaveAttribute('alt', `${store.name} 사진 1`);
     await page.clock.resume();
     await page.locator('.reserve-carousel .slick-dots li').nth(1).getByRole('button').click();
-    await expect(activePhoto).toHaveAttribute('alt', `${store.name}-1`);
+    await expect(activePhoto).toHaveAttribute('alt', `${store.name} 사진 2`);
 });
 
 test('first store-detail photo preview animates its entrance after a fresh navigation', async ({ page }) => {

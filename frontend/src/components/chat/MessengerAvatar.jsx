@@ -1,16 +1,19 @@
-import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { CustomerServiceOutlined, ShopOutlined, UserOutlined } from '@ant-design/icons';
+import { CustomerServiceOutlined, ShopOutlined, UserOutlined } from '../common/icons';
 import { getMessengerImageUrl, MESSENGER_BRAND_AVATAR } from './messengerImages';
+import Avatar from '../common/Avatar';
+
+const avatarStyle = { width: '100%', height: '100%', backgroundColor: 'transparent', color: 'inherit', fontSize: 'inherit' };
 
 function AvatarImage({ src, variant }) {
-    const [failed, setFailed] = useState(false);
-    const [brandFailed, setBrandFailed] = useState(false);
-    if (variant === 'store' && (failed || !src)) return <ShopOutlined />;
-    if (variant === 'person' && (failed || !src)) return <UserOutlined />;
-    if (brandFailed) return <CustomerServiceOutlined />;
-    return <img src={failed ? MESSENGER_BRAND_AVATAR : src} alt="" draggable={false}
-        referrerPolicy="no-referrer" onError={() => failed || src === MESSENGER_BRAND_AVATAR ? setBrandFailed(true) : setFailed(true)} />;
+    let fallback;
+    if (variant === 'store') fallback = <ShopOutlined />;
+    else if (variant === 'person') fallback = <UserOutlined />;
+    else if (src === MESSENGER_BRAND_AVATAR) fallback = <CustomerServiceOutlined />;
+    else fallback = <Avatar src={MESSENGER_BRAND_AVATAR} size={40} style={avatarStyle} draggable={false}
+        referrerPolicy="no-referrer" resolveSource={getMessengerImageUrl} fallback={<CustomerServiceOutlined />} />;
+    return <Avatar src={src} size={40} style={avatarStyle} draggable={false}
+        referrerPolicy="no-referrer" resolveSource={getMessengerImageUrl} fallback={fallback} />;
 }
 AvatarImage.propTypes = { src: PropTypes.string, variant: PropTypes.oneOf(['brand', 'store', 'person']).isRequired };
 

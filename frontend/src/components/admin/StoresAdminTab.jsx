@@ -13,9 +13,10 @@
  * 4) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab과 동일한 이유.
  */
 import React, { useState } from 'react';
-import { Typography, Tag, Tooltip } from 'antd';
+import { Typography, Tag } from 'antd';
+import StatusHint from '../common/StatusHint';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PauseCircleOutlined, StopOutlined, UndoOutlined, StarFilled } from '@ant-design/icons';
+import { PauseCircleOutlined, StopOutlined, UndoOutlined, StarFilled } from '../common/icons';
 import { Button, FilterToolbar, AdminTableSkeleton, DataState, DataTable } from '../common';
 import SanctionModal from './SanctionModal';
 import { useMessage, useQueryParamsState } from '../../hooks';
@@ -161,7 +162,8 @@ const StoresAdminTab = () => {
         } },
         { title: '상태', dataIndex: 'status', key: 'status', width: 90, render: (v, r) => {
             const cfg = STORE_STATUS_CONFIG[v] || STORE_STATUS_CONFIG.ACTIVE;
-            return <Tooltip title={getStoreSuspendTooltip(r)}><Tag color={cfg.color}>{cfg.label}</Tag></Tooltip>;
+            const reason = getStoreSuspendTooltip(r);
+            return <StatusHint label={cfg.label} color={cfg.color} description={reason} />;
         }},
         { title: '처리', key: 'actions', width: 230, render: (_, r) => (
             // 가게도 휴지통 미사용 — 영업정지/영구폐업/해제만 존재

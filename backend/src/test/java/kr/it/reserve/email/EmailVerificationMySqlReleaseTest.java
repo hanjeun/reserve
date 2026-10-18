@@ -55,7 +55,8 @@ import static org.mockito.Mockito.verify;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class EmailVerificationMySqlReleaseTest {
     @Configuration(proxyBeanMethods = false)
-    @EntityScan(basePackageClasses = EmailVerification.class)
+    @EntityScan({"kr.it.reserve.email.entity", "kr.it.reserve.member.entity", "kr.it.reserve.chat.entity",
+            "kr.it.reserve.store.entity", "kr.it.reserve.promotion.entity", "kr.it.reserve.feed.entity"})
     @EnableJpaRepositories(basePackageClasses = EmailVerificationRepository.class)
     @Import(EmailVerificationService.class)
     static class Config {}

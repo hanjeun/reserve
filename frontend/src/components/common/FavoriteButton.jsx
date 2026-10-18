@@ -1,13 +1,14 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { HeartOutlined, HeartFilled } from '@ant-design/icons';
+import { HeartOutlined, HeartFilled } from './icons';
 import favoriteService from '../../services/favoriteService';
 import useAuthStore from '../../store/useAuthStore';
 import useMessage from '../../hooks/useMessage';
 import { favoriteKeys } from '../../hooks/queryKeys';
 import { invalidateFavoriteData } from '../../hooks/invalidateAfterWrite';
 import { colors } from '../../styles/tokens';
+import Tooltip from './Tooltip';
 
 const toggleSuccessMessage = (added) => (added ? '즐겨찾기에 추가됐어요.' : '즐겨찾기에서 삭제됐어요.');
 
@@ -54,18 +55,18 @@ function FavoritePreview({ plain, btnSize, iconSize, style }) {
             style={{
                 width:          btnSize,
                 height:         btnSize,
-                borderRadius:   plain ? 0 : '50%',
+                borderRadius:   plain ? 10 : '50%',
                 display:        'flex',
                 alignItems:     'center',
                 justifyContent: 'center',
-                background:     plain ? 'transparent' : 'rgba(255,255,255,0.92)',
-                boxShadow:      plain ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
+                background:     'transparent',
+                boxShadow:      'none',
                 pointerEvents:  'none',
                 flexShrink:     0,
                 ...style,
             }}
         >
-            <HeartOutlined style={{ fontSize: iconSize, color: colors.text.tertiary }} />
+            <HeartOutlined style={{ fontSize: iconSize, color: colors.text.secondary }} />
         </span>
     );
 }
@@ -81,17 +82,15 @@ function buildButtonStyle({ plain, btnSize, blocked, statusUnknown, style }) {
     return {
         width:          btnSize,
         height:         btnSize,
-        borderRadius:   plain ? 0 : '50%',
+        borderRadius:   plain ? 10 : '50%',
         border:         'none',
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
         cursor:         blocked ? 'not-allowed' : 'pointer',
         opacity:        statusUnknown ? 0.55 : 1,
-        background:     plain ? 'transparent' : 'rgba(255,255,255,0.92)',
-        backdropFilter: plain ? 'none' : 'blur(8px)',
-        boxShadow:      plain ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
-        transition:     plain ? 'transform 0.15s' : 'transform 0.15s, box-shadow 0.15s',
+        background:     'transparent',
+        boxShadow:      'none',
         // 응답 대기 중 opacity를 낮추지 않는다. onMutate의 낙관적 업데이트로 하트는 이미
         // 즉시 채워지는데, 버튼 전체가 반투명해지면 그 빨강이 "덜 진한 빨강"으로 보이다가
         // 응답이 와서(=성공 메시지가 뜰 때) 비로소 제 색이 되는 것처럼 느껴진다.
@@ -106,15 +105,15 @@ function buildButtonStyle({ plain, btnSize, blocked, statusUnknown, style }) {
  * 각 카드가 개별적으로 조회하던 걸 캐시로 묶어서, 같은 가게가 여러 곳(목록+상세 등)에 동시에
  * 떠 있어도 한 번만 조회하고 토글 시 전부 같이 갱신된다.
  */
-const FavoriteButton = ({ storeId, initialStatus, size = 'md', appearance = 'overlay', style = {}, preview = false }) => {
+const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style = {}, preview = false }) => {
     // 필요한 값만 구독한다 — 스토어 전체를 구독하면 목록의 하트 수십 개가 로그인 정보가 바뀔 때마다 다시 그려진다.
     const isLoggedIn = useAuthStore(state => state.isLoggedIn);
     const { message } = useMessage();
     const queryClient = useQueryClient();
 
     const plain    = appearance === 'plain';
-    const iconSize = size === 'sm' ? 18 : 22;
-    const btnSize  = !plain && size === 'sm' ? 36 : 44;
+    const iconSize = 20;
+    const btnSize  = 44;
 
     // initialStatus가 주어지면 그 값으로 캐시를 미리 채워두고(자체 조회 스킵), 없으면 직접 조회
     const { data: favoriteData, isError: statusFailed, isFetching: statusFetching, refetch: refetchStatus } = useQuery({
@@ -156,7 +155,7 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', appearance = 'ove
     const blocked = toggleMutation.isPending || (statusUnknown && (!statusFailed || statusFetching));
 
     return (
-        <button
+        <Tooltip title={accessibleLabel}><button
             type="button"
             onClick={handleToggle}
             disabled={blocked}
@@ -165,13 +164,12 @@ const FavoriteButton = ({ storeId, initialStatus, size = 'md', appearance = 'ove
             aria-pressed={statusUnknown ? undefined : isFavorite}
             aria-busy={toggleMutation.isPending || (statusUnknown && statusFetching) || undefined}
             style={buildButtonStyle({ plain, btnSize, blocked, statusUnknown, style })}
-            title={accessibleLabel}
         >
             {isFavorite
                 ? <HeartFilled  style={{ fontSize: iconSize, color: colors.error.main }} />
-                : <HeartOutlined style={{ fontSize: iconSize, color: colors.text.tertiary }} />
+                : <HeartOutlined style={{ fontSize: iconSize, color: colors.text.secondary }} />
             }
-        </button>
+        </button></Tooltip>
     );
 };
 

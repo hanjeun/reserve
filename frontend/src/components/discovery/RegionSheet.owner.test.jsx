@@ -85,8 +85,9 @@ describe('owner region sheet source', () => {
             <RegionSheet open value="" onClose={vi.fn()} onApply={vi.fn()} />
         </QueryClientProvider></MemoryRouter>);
 
-        expect(await screen.findByRole('alert')).toHaveTextContent('세부 지역을 불러오지 못했어요');
-        expect(screen.getByRole('button', { name: /^서울특별시\s*0$/ })).toBeInTheDocument();
+        expect(await screen.findByRole('alert')).toHaveTextContent('지역 정보를 불러오지 못했어요.');
+        const province = screen.getByRole('button', { name: '서울특별시' });
+        expect(province.querySelector('.reserve-region-sheet-count')).toBeNull();
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
         expect(await screen.findByRole('button', { name: /^경기도\s*1$/ })).toBeInTheDocument();
         expect(storeService.getRegions).toHaveBeenCalledTimes(2);

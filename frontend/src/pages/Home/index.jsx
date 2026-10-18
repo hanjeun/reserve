@@ -5,10 +5,11 @@ import {
     DownOutlined,
     EnvironmentOutlined,
     RightOutlined,
-} from '@ant-design/icons';
+} from '../../components/common/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import DataState from '../../components/common/DataState';
+import LoadingImage from '../../components/common/LoadingImage';
 import ServiceDomainIcon from '../../components/common/ServiceDomainIcon';
 import ChoiceIllustration from '../../components/common/ChoiceIllustration';
 import RegionSheet from '../../components/discovery/RegionSheet';
@@ -18,12 +19,14 @@ import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
 import { DISCOVERY_ASSET_ROOT as ASSET_ROOT, SERVICE_DOMAIN_IMAGES } from '../../constants/discovery';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useDiscoveryRegion from '../../hooks/useDiscoveryRegion';
+import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useGeolocation from '../../hooks/useGeolocation';
 import useMessage from '../../hooks/useMessage';
 import useMessagesEntry from '../../hooks/useMessagesEntry';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useAuthStore from '../../store/useAuthStore';
 import useLocationStore from '../../store/useLocationStore';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import { storeService } from '../../services';
 import { distanceSortParams } from '../../utils/distanceSort';
 import { formatRegionLabel } from '../../constants/regions';
@@ -124,6 +127,7 @@ function FeaturedCarousel({ region = '' }) {
     const trackRef = useRef(null);
     const pointerInputRef = useRef(false);
     const [activeIndex, setActiveIndex] = useState(0);
+    const activeIndexRef = useRef(0);
     const [manualNavigationCount, setManualNavigationCount] = useState(0);
     const [isPageVisible, setIsPageVisible] = useState(() => typeof document === 'undefined' || document.visibilityState === 'visible');
     const [isInViewport, setIsInViewport] = useState(() => typeof IntersectionObserver === 'undefined');
@@ -144,6 +148,7 @@ function FeaturedCarousel({ region = '' }) {
                 distance = nextDistance;
             }
         });
+        activeIndexRef.current = nearest;
         setActiveIndex(nearest);
     }, []);
 
@@ -177,12 +182,18 @@ function FeaturedCarousel({ region = '' }) {
         return () => document.removeEventListener('visibilitychange', updateVisibility);
     }, []);
 
-    const showNextSlide = useCallback(() => {
+    const showNextSlide = useCallback(async () => {
         const track = trackRef.current;
         if (!track) return;
         // 마지막 슬라이드에서 처음으로 돌아가며 모바일 트랙의 좌우 여백도 고려한다.
         const maxScroll = track.scrollWidth - track.clientWidth;
         const nextIndex = (activeIndex + 1) % FEATURED_SLIDES.length;
+        const image = track.children[nextIndex]?.querySelector('img');
+        // Decode the next responsive picture before moving, including a return to slide one.
+        if (image && typeof image.decode === 'function') {
+            try { await image.decode(); } catch { /* A failed image must not disable the next button. */ }
+        }
+        if (trackRef.current !== track || !track.isConnected || activeIndexRef.current !== activeIndex || document.hidden) return;
         const nextLeft = nextIndex === 0
             ? 0
             : Math.min(track.children[nextIndex].offsetLeft - track.children[0].offsetLeft, maxScroll);
@@ -250,12 +261,12 @@ function FeaturedCarousel({ region = '' }) {
                                 media="(min-width: 900px)"
                                 srcSet={ASSET_ROOT + slide.desktopAsset + '.' + (slide.extension ?? 'webp')}
                             />
-                            <img
+                            <LoadingImage
                                 src={ASSET_ROOT + slide.asset + '.' + (slide.extension ?? 'webp')}
                                 alt=""
                                 width={960}
                                 height={640}
-                                loading={index === 0 ? 'eager' : 'lazy'}
+                                loading={index === 0 || index === activeIndex || index === (activeIndex + 1) % FEATURED_SLIDES.length ? 'eager' : 'lazy'}
                                 fetchPriority={index === 0 ? 'high' : 'auto'}
                                 draggable={false}
                             />
@@ -326,6 +337,10 @@ function RecommendedStores({ region = '' }) {
         staleTime: 1000 * 60 * 3,
     });
     const stores = storeContent(data);
+    const blockingError = isBlockingListReadError(error, stores);
+    const refreshFailure = isError && !blockingError
+        ? <DataState compact state="error" role="status" aria-live="polite"
+            title="최신 정보를 불러오지 못했어요." error={error} onRetry={refetch} retrying={isFetching} /> : null;
 
     // 로딩 → 실패 → 빈 목록 → 목록 순으로 판정한다.
     // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .reserve-discovery-store-list 가 grid 로 정한다.
@@ -337,7 +352,7 @@ function RecommendedStores({ region = '' }) {
                 </output>
             );
         }
-        if (isError) {
+        if (blockingError) {
             return (
                 <DataState state="error" kind="store" subject="추천 가게" error={error}
                     title="추천 가게를 불러오지 못했어요." onRetry={refetch} retrying={isFetching} compact />
@@ -345,17 +360,17 @@ function RecommendedStores({ region = '' }) {
         }
         if (stores.length === 0) {
             return (
-                <div className="reserve-discovery-empty">
+                <><div className="reserve-discovery-empty">
                     <DataState state="empty" kind="store" title={region ? '이 지역에 등록된 가게가 없어요.' : '아직 추천할 가게가 없어요.'} />
-                </div>
+                </div>{refreshFailure}</>
             );
         }
         return (
-            <ul className="reserve-discovery-store-list reserve-store-list-rows">
+            <><ul className="reserve-discovery-store-list reserve-store-list-rows">
                 {stores.map(store => (
                     <li key={store.id}><StoreListRow store={store} /></li>
                 ))}
-            </ul>
+            </ul>{refreshFailure}</>
         );
     };
 
@@ -381,6 +396,7 @@ export default function Home() {
     const setLiveLocation = useLocationStore(state => state.setLiveLocation);
     const [homeParams, setHomeParams] = useSearchParams();
     const [region, rememberRegion] = useDiscoveryRegion(homeParams);
+    useListQueryNormalization(homeParams, { region });
     const [regionOpen, setRegionOpen] = useState(false);
 
     const openRegion = () => {
@@ -391,8 +407,7 @@ export default function Home() {
         if (!rememberRegion(nextRegion)) return;
         setHomeParams(prev => {
             const next = new URLSearchParams(prev);
-            if (nextRegion) next.set('region', nextRegion);
-            else next.delete('region');
+            next.set('region', nextRegion);
             return next;
         });
         setRegionOpen(false);
@@ -426,7 +441,7 @@ export default function Home() {
                     aria-haspopup="dialog" aria-expanded={regionOpen} onClick={openRegion}>
                     <EnvironmentOutlined aria-hidden="true" />
                     <strong>{region ? formatRegionLabel(region) : '전체 지역'}</strong>
-                    <DownOutlined aria-hidden="true" />
+                    <DownOutlined className="reserve-filter-menu-chevron" aria-hidden="true" />
                 </button>
                 <button
                     type="button"

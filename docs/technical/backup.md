@@ -2,12 +2,54 @@
 
 RESERVE MySQL의 백업 구성과 복원 절차예요.
 
+## 2026-10-18 v7 준비용 정기 백업 독립 복원
+
+10/17 정기 백업 `mysql/reserve-20261017-181001.sql.gz`(VersionId `9IkDhjgzTYW9xz88cp938808mBDHJe5j`, 15,442바이트·SHA-256 `f35f1d3ff635002500821a4f932f08ad50a88d13b74351ae63fc109e1b778f7a`)은 SSH로 확인한 서버 원본·S3 수신자 콘솔 자격의 새 독립 CloudShell·보호된 PC에서 모두 같았어요. 전환 직전 백업이 아닌 준비용 자료예요. 고정한 MySQL 8.0.45 이미지의 `internal` Docker 격리 환경에 36테이블·66행을 복원하고 [feed-v6-from-v2.sql](../../scripts/sql/feed-v6-from-v2.sql)(SHA-256 `75d84c24c6e740c19a3f9eb4fd0c92ef7e7db91bae5ca67444cbd289edc26eb5`) → [oauth-security-v7.sql](../../scripts/sql/oauth-security-v7.sql)(`df5485625ef2ab32527cffd9bb47bd562d6897c1a458d6d8d6f3a3673d7f492c`)만 적용했어요. v6 묶음은 DDL 15절~15.8을 포함하므로 개별 SQL을 중복 실행하지 않아요. 적용 후 49테이블, 기존 66행의 원래 컬럼 값·행 수와 FK/인덱스/CHECK 보존, FK 49개의 orphan 0을 확인했어요. 실제 runtime JAR 142개를 포함한 준비용 2.12.0 JAR로 DDL 권한 없는 `reserve_app`의 49테이블 모델 `validate`를 통과했고, 공식 Corretto Java 21.0.12.1 컨테이너(UID 1000)의 `green/secret/common/prod`·합성 외부 자격·격리 `internal` 네트워크(호스트 포트·외부 연결 없음)에서 전체 기동과 health UP도 확인했어요. 시험 후 앱 컨테이너는 종료·제거하고 49테이블 복원 MySQL만 보존했으며 최종 수정 commit·main 산출물·CI의 통과 기록은 아니에요. 운영은 변경하지 않았으며 최종 main SHA와 전환 직전 백업으로 다시 확인해야 해요.
+
+## 2026-10-16 후보 변경과 검증 경계
+
+현재 전체 후보는 `waiting-signup-hidden-feed-oauth-v7`이에요. 10/15의 47테이블 복원 연습은 당시 v6 입력의 기록이며 새 OAuth inbox/subject·토큰 TEXT·UTC 인증/폐기 시각을 검증한 결과가 아니에요. 이번 [DDL 16절](manual-ddl.md#16-oauth-토큰-보호와-공급자-보안-사건-후보-운영-미적용)은 실제 원본 토큰을 읽지 않고 백업의 컬럼 정의만 대조해 선별했어요. 복구에는 미가입 주체의 cutoff와 사건 해시도 보존해야 하며 이를 임의로 비우거나 과거 시각을 추정해 백필하지 않아요.
+
+현재 subject/Naver·조회 인덱스 SQL의 SHA-256은 `df5485625ef2ab32527cffd9bb47bd562d6897c1a458d6d8d6f3a3673d7f492c`이에요. 일회용·네트워크 none·공개 포트/영구 볼륨 없는 MySQL 8.0.45에서 합성 자료로 적용해 2048자/NULL 토큰·authVersion·미지정 cutoff·기존 중복 주체 보존, 비고유 인덱스 열 순서, 세 CHECK·두 unique·Naver 허용·DML 롤백·재실행/잘못된 DB 차단·제한 앱/DDL 계정 경계를 확인했어요. 첫 후보의 두 CHECK·인덱스 전 검사와 현재 입력은 구분해요. 일회용 컨테이너는 제거했고 기존 개발/복원 DB와 로컬 Redis는 변경하지 않았어요. 이는 새 운영 백업의 독립 복원이나 최종 JAR validate를 대신하지 않아요.
+
+## 2026-10-15 승인된 중복 정리와 보관기간 축소
+
+사용자가 대상별 영구 삭제와 보관기간 변경을 승인한 뒤 적용했어요. 서버 `/etc/reserve-backup.env`의 `LOCAL_RETENTION_DAYS`와 설치된 `reserve-backup`의 기본값을 7→3으로 바꾸고, 다른 설정·비밀 값·`600 root`/`755 root` 권한은 보존했어요. 설치 스크립트는 Bash 구문 검사와 소스 SHA-256 `ca5e0b0caee04c0be7d6b1398df410b8a0259f022da237fa0a4993f3a4420449` 일치를 확인했어요. 정리만을 위해 새 백업을 만들거나 cron을 다시 실행하지 않았어요. 기존 `find -mtime +3`의 24시간 단위 판정을 유지하며, 오래된 로컬 정기 덤프는 다음 정상 백업의 검증·S3 업로드 성공 뒤 정리해요. 파일 개수를 정확히 3개로 제한하는 규칙은 아니에요.
+
+별도 CloudShell로 S3 `reserve-it-kr-backup/mysql/`의 9/25~9/30 객체 9개를 사전에 고정한 VersionId로 영구 삭제했어요. 합계 105,897바이트이며 다른 22개 버전·330,223바이트와 아래 준비용 10/14 객체의 VersionId·크기는 그대로예요. 삭제 표식만 추가한 것이 아니며 정리 직후 표식은 0개였어요. `mysql/` 라이프사이클의 ID와 현재 버전 만료를 `mysql-90d`/90일→`mysql-14d`/14일로 변경하고, 이전 버전 7일·중단 업로드 1일·나머지 설정의 불변을 재조회했어요.
+
+서버 `/var/backups/reserve-scripts/` 아래의 다음 **별도 이미지 사본만** 삭제했어요. 총 977,344,512바이트이며 당시 파일시스템 가용 공간은 977,350,656바이트 늘었어요.
+
+| 하위 폴더 | 삭제한 개별 사본 |
+|---|---|
+| `20261009T070416Z-after-customer-waiting-signup/` | `compatible-backend.tar` |
+| `20261009T091240Z-before-private-messages/` | `compatible-backend.tar`, `previous-backend.tar` |
+| `20261009T094216Z-after-private-messages/` | `backend-image.tar` |
+
+070416Z의 별도 `compatible-backend.tar`와 091240Z의 별도 `previous-backend.tar`는 SHA-256 `3f43e022910882629c22c079be98e9f3b7aaf47bf7214e3c8cc6a44ce04df438`로 070416Z 묶음의 `./compatible-backend.tar`와 같아요. 091240Z/094216Z의 호환 이미지 사본은 SHA-256 `fcbd1479d8ba94980c7c4ca1d7f015077c352be131eb126b44da2d44aa757e34`로 각 전체 묶음의 `compatible-backend.tar`/`backend-image.tar`와 같아요. 이 세 시점의 `compatible-recovery.tar.gz` 전체는 PC 보호 사본과 서버의 해시 일치를 확인하고 보존했으며 삭제 뒤에도 같은 해시예요. 과거 개별 파일 경로가 필요하면 위의 동일 항목이 들어 있는 묶음을 사용해요. 현재 운영 cfa의 `20261009T175943Z-after-v211/runtime/backend-image.tar`도 SHA-256 `148a396bea23009058681aba1d975aa1460b37f49b648a48926dc0a906bc4b8d` 그대로예요. DB 덤프·대응 키·역할·고유 소스·현재 복원 준비 입력은 삭제하지 않았어요. 정리 후 기존 cfa `green`의 계속 실행과 공개 가게 API의 HTTPS 200·실제 JSON 응답도 확인했어요. 이 정리는 운영 DB 변경·앱 배포·최종 v6 복구 준비를 대신하지 않아요.
+
+## 2026-10-15 준비용 정기 백업 독립 다운로드·격리 복원
+
+현재 운영의 MySQL 8.0.45·DB `reserve`·36테이블과 기존 백업 계정 `reserve_backup@localhost`를 읽기 전용으로 확인했어요. 설치된 `reserve-backup`·`reserve-restore`의 SHA-256은 현재 `scripts/backup-mysql.sh`·`scripts/restore-mysql.sh`와 일치하며 두 설정 파일은 `600 root`, 실행 파일은 `755 root`예요.
+
+기존 정기 백업 `reserve-20261014-181001.sql.gz`는 15,536바이트·SHA-256 `ffd694053ced69f1425d4bc7fdbc6881505f8c2a5582ac3bea42c755908d14c9`예요. 서울 리전의 별도 콘솔 CloudShell 접근으로 S3 객체 `mysql/reserve-20261014-181001.sql.gz`, VersionId `DEcCFZwTCZGXfPZ9FjGtkCpz.AKbBJ3t`, 수정 시각 `2026-10-14T18:10:05Z`, `AES256`을 조회하고 실제로 같은 버전을 다운로드했어요. CloudShell의 `/home/cloudshell-user/reserve-backup-verification/20261015-preparation/`는 `700`, 파일은 `600`이며 gzip·덤프 종료 표식·크기·서버 원본 해시 일치를 확인했어요. 원문 데이터나 서버 업로더 자격 증명을 출력·복사하지 않았어요.
+
+PC의 `C:/Users/USER/AppData/Local/RESERVE/release-prep/20261015/preparation/`는 USER·SYSTEM 전용 상속 차단 ACL로 준비했어요. 브라우저 다운로드는 기본 Downloads에 저장됐으므로 파일을 즉시 같은 두 주체만 접근하도록 제한하고 보호 폴더로 옮겼어요. Downloads의 사본 부재·보호 파일의 같은 해시와 gzip·종료 표식을 확인했어요. 원문을 채팅이나 검사 출력으로 내보내지 않았어요. 로컬 Docker Desktop을 시작해 기존 Redis 컨테이너의 healthy 상태를 확인했으며 기존 데이터 초기화·운영 Redis 설치는 하지 않았어요.
+
+같은 MySQL **8.0.45**의 새 로컬 컨테이너 `reserve-restore-preparation-20261015`와 전용 `reserve-restore-preparation-20261015-data` 볼륨에 이 백업을 실제 복원했어요. 네트워크는 `none`, 공개 포트 없음, `skip_networking=1`, 이벤트 스케줄러 OFF예요. 기존 개발 DB·운영 MySQL은 사용하지 않았으며 생성한 검사 자격은 보호된 PC 하위 폴더와 컨테이너 `600` 파일에만 보관해요. 기준 DB `reserve_original`과 DDL 연습 DB `reserve`를 분리하고 **36테이블·67행**, 덤프와 재추출 INSERT 값 일치, `CHECK TABLE` 36건을 확인했어요. 적용 전 제약 93개·인덱스 구성 요소 187개·CHECK 5개·FK 29개예요.
+
+[선별 첫 v6 SQL](../../scripts/sql/feed-v6-from-v2.sql)의 SHA-256은 `75d84c24c6e740c19a3f9eb4fd0c92ef7e7db91bae5ca67444cbd289edc26eb5`예요. 이 격리 DB의 제한된 `reserve_ddl`로 적용해 **47테이블·제약 141개·인덱스 구성 요소 319개·강제 CHECK 9개·FK 49개**를 확인했어요. 기존 36테이블의 원래 컬럼·값·67행과 기존 제약/인덱스/CHECK/FK 정의는 그대로예요. 새 FK 20개의 컬럼·참조·삭제 규칙과 명명 인덱스/unique 구성도 후보와 대조했어요. 잘못된 사진 출처·혜택 디자인·좋아요 대상·사진 부모의 CHECK 거부, 롤백하는 합성 소식의 기본값, DDL 계정의 DML 거부와 SQL 재실행의 DDL 전 중단을 확인했어요. 검사 행은 남기지 않았어요. 이 백업에는 기존 `promotion` 행이 0개이므로 로컬 개발의 기존 소식 2건 확인을 운영 자료 보존의 근거로 혼용하지 않아요.
+
+이 결과는 **기존 정기 백업의 준비용 복원과 현재 SQL 연습**이에요. 검사 후 새 격리 컨테이너는 중지하고 전용 볼륨·보호된 백업과 자격은 후속 검증용으로 보존했어요. 기존 로컬 Redis는 healthy 상태를 유지해요. 최종 후보 SHA는 아직 고정하지 않았고 새 전체 JAR의 제한된 앱 계정 `validate`·기동도 실행하지 않았어요. 전환 직전 새 백업·독립 다운로드·복원, 그 시각의 실제 스키마와 선별 SQL 재대조·최종 JAR·호환 복구 입력은 따로 필요해요. 이번 작업에서 운영 백업 생성·DDL·배포·Nginx 전환은 실행하지 않았어요.
+
+현재 미배포 전체 후보는 `waiting-signup-hidden-feed-oauth-v7`이며 아래 v2.9.0~v2.11.0 검증은 당시 운영 이력이에요. 다음 전환에는 [수동 DDL 15절 전체](manual-ddl.md#15-sns-피드-로컬-구현-운영-미적용)와 16절의 실제 차이를 포함한 새 직전 백업·독립 읽기·격리 복원·새 전체 JAR 검증이 필요해요. 복구 묶음에는 같은 SHA의 앱/홍보/기존 초안 복구 프론트와 실제 v7 호환 백엔드, Nginx root/upstream·세 포인터·환경값·피드/채팅/활성 OAuth/outbox 암호문과 대응 키를 보호해 보관해요. 이전 v6의 표식 변경이나 flag=false, 과거 백업으로 최신 상태를 덮어쓰는 방식은 복구 준비로 인정하지 않아요.
+
 | 항목 | 값 |
 |---|---|
 | 대상 | MySQL 8 컨테이너 `mysql`, DB `reserve` |
 | 방식 | `mysqldump --single-transaction` (서비스 중단 없음) |
 | 주기 | 매일 03:10 KST (root cron, 18:10 UTC) |
-| 보관 | 로컬 7일 + S3 `reserve-it-kr-backup/mysql/` 90일(Standard, 옛 버전은 7일 뒤 삭제) |
+| 보관 | 로컬 3일 기준 + S3 `reserve-it-kr-backup/mysql/` 현재 버전 14일(Standard, 옛 버전은 7일 뒤 삭제) |
 | 스크립트 | `scripts/backup-mysql.sh`, `scripts/restore-mysql.sh` |
 | 설치 위치 | `/usr/local/bin/reserve-backup`·`reserve-restore`, 설정 `/etc/reserve-backup.env`(600 root), 덤프 `/var/backups/reserve` |
 | 로그 | `/var/log/reserve/backup.log` → Alloy → Loki → Grafana |
@@ -119,7 +161,7 @@ sudo install -m 0755 /tmp/reserve-backup /tmp/reserve-restore /usr/local/bin/
   read -rsp 'AWS_SECRET_ACCESS_KEY: ' SK; echo
   test -n "$DBPW" && test -n "$AK" && test -n "$SK"
   sudo install -m 600 -o root -g root /dev/null /etc/reserve-backup.env
-  printf 'DB_USER=reserve_backup\nDB_PASSWORD=%q\nBACKUP_S3_BUCKET=reserve-it-kr-backup\nBACKUP_S3_PREFIX=mysql\nLOCAL_RETENTION_DAYS=7\nAWS_ACCESS_KEY_ID=%q\nAWS_SECRET_ACCESS_KEY=%q\nAWS_DEFAULT_REGION=ap-northeast-2\n' \
+  printf 'DB_USER=reserve_backup\nDB_PASSWORD=%q\nBACKUP_S3_BUCKET=reserve-it-kr-backup\nBACKUP_S3_PREFIX=mysql\nLOCAL_RETENTION_DAYS=3\nAWS_ACCESS_KEY_ID=%q\nAWS_SECRET_ACCESS_KEY=%q\nAWS_DEFAULT_REGION=ap-northeast-2\n' \
     "$DBPW" "$AK" "$SK" | sudo tee /etc/reserve-backup.env >/dev/null
   unset AK SK DBPW
   sudo stat -c '%a %U %n' /etc/reserve-backup.env
@@ -187,10 +229,10 @@ python -B scripts/tests/backup-mysql-roles_test.py --run --docker-host npipe:///
 | 버킷 정책 | `aws:SecureTransport=false` 요청 거부(TLS 강제), 공개 Allow 없음 |
 | 객체명 | `mysql/reserve-YYYYMMDD-HHMMSS.sql.gz` — `If-None-Match: *`로 덮어쓰기 거부 |
 
-라이프사이클은 Standard 90일 보관 후 만료, 옛 버전 7일 뒤 삭제, 끊긴 멀티파트 업로드 1일 뒤 정리예요.
+라이프사이클은 Standard 현재 버전 14일 보관 후 만료, 옛 버전 7일 뒤 삭제, 끊긴 멀티파트 업로드 1일 뒤 정리예요. 버전 관리 버킷에서는 현재 버전 만료가 삭제 표식을 만들고 이전 버전 정리는 별도 기간을 따르므로, 14일 시점에 모든 버전이 영구 삭제된다는 뜻은 아니에요.
 
 ```bash
-aws s3api put-bucket-lifecycle-configuration --bucket reserve-it-kr-backup --lifecycle-configuration '{"Rules":[{"ID":"mysql-90d","Filter":{"Prefix":"mysql/"},"Status":"Enabled","Expiration":{"Days":90},"NoncurrentVersionExpiration":{"NoncurrentDays":7},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":1}}]}'
+aws s3api put-bucket-lifecycle-configuration --bucket reserve-it-kr-backup --lifecycle-configuration '{"Rules":[{"ID":"mysql-14d","Filter":{"Prefix":"mysql/"},"Status":"Enabled","Expiration":{"Days":14},"NoncurrentVersionExpiration":{"NoncurrentDays":7},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":1}}]}'
 ```
 
 버킷 정책:
@@ -510,3 +552,9 @@ HeadObject/GetObject/ListBucket을 보장하지 않으며, 403은 객체가 없�
 사용자가 로그인한 독립 CloudShell에서 같은 S3 객체를 실제 다운로드했어요. 객체 수정 시각은 `2026-10-09T16:31:08Z`, 암호화는 AES256, VersionId는 `Ku8juHopxNtjRAAthGXQoNMlkjHaZI07`이며 크기·SHA-256이 서버 원본과 같아요. CloudShell 보호 디렉터리는 700, 파일은 600이에요.
 
 USER·SYSTEM 전용 PC 경로 `C:/Users/USER/AppData/Local/RESERVE/release-prep/20261010/production/20261009T163104Z/`로 전송한 같은 백업을 로컬 Docker MySQL 8.0.45의 새 격리 DB `reserve_restore_v211_20261009_163104`에 복원했어요. **36테이블·68행, CHECK TABLE 36건**을 통과했고 새 로컬 `reserve-2.11.0.jar`의 제한된 `reserve_app`·35모델 `validate`도 통과했어요. 검사 전후 덤프 해시로 복원 DB의 데이터·스키마 불변을 확인했어요. 운영 DB에 복원하거나 새 DDL을 실행하지 않았어요. 이 로컬 JAR 검증은 최종 CI 이미지의 운영 기동·사후 확인과 구분해요.
+
+## 2026-10-12 로컬 SNS 검증의 복구 경계
+
+보호된 PC 전용 경로 `${user.home}/.codex/local-data/RESERVE/`의 `before-local-feed-20261011T164920Z.sql`은 **83,878바이트·SHA-256 `c09ddf7a18fc694cf6d093015cef3a16527e9f0dc6e94081d52350bc59d809b4`**예요. 원래 로컬 DB를 덮지 않고 loopback의 격리 MySQL 8.0.45에 42테이블을 복원했어요. 실제 최종 JAR의 624개 클래스·142개 라이브러리·루트 ORM 매핑으로 DDL 권한 없는 `reserve_app`의 **41개 모델 validate**를 통과했으며 피드 6테이블과 소식 정본 CHECK도 정상이에요. 실행 중 원래 DB와 나중에 대조한 테이블 체크섬은 40개가 같고 `ad_payment_attempt`·`refresh_token` 2개는 달랐어요. 따라서 실행 중인 DB의 모든 값이 백업 시점과 같다고 보고하거나 백업으로 되돌리지 않아요. 이 파일은 로컬의 해당 시점 근거이며 새 운영 백업을 대신하지 않아요.
+
+로컬 피드·가게 소식의 신규 사진 저장소는 같은 보호 경로의 `feed-images/`이며 암호문 키는 `local.properties`에 있어요. 로컬 DB만 복원해서 사진까지 복구됐다고 판단하지 않아요. DB·암호문·동일한 별도 피드 키의 묶음과 기존 보존·신고 참조를 확인해야 하며, 기존 채팅 키와 보호된 운영 복구 묶음은 보존해요. PC·모바일 사진 게시의 API fixture와 로컬 암호문 저장 검사는 실제 운영 사진·키 복원의 근거로 확대하지 않아요. 로컬 Redis의 Pub/Sub와 TTL 요청 제한 키는 복구 정본이 아니며 접수 데이터는 계속 MySQL에 있어요.

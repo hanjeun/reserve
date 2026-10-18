@@ -1,7 +1,7 @@
 import { Form, Input } from 'antd';
 import { FormInput, FormSelect, SegmentedControl } from '../../common';
 import { PAYMENT_TIMEOUT_OPTIONS } from '../../../constants';
-import { depositApplies, depositSelected, onboardingFieldRules, reservationApplies } from '../../../utils/storeOnboarding';
+import { depositApplies, depositSelected, onboardingFieldRules, paymentTimeoutApplies, reservationApplies } from '../../../utils/storeOnboarding';
 import InactiveReservationNotice from './InactiveReservationNotice';
 import { usePolicyValues } from './questionValues';
 
@@ -33,10 +33,10 @@ export function DepositQuestion({ change, onEdit }) {
                     <SegmentedControl options={PAYMENT_OPTIONS} />
                 </Form.Item>
                 <p className="reserve-onboarding-help">{values.allowLatePayment
-                    ? '먼저 예약을 신청하고 내 예약에서 결제할 수 있어요. 정해진 시간까지 결제하지 않으면 자동 취소돼요.'
-                    : '예약을 신청하면서 예약금을 결제해요. 결제를 마친 뒤 신청 결과를 확인해주세요.'}</p>
-                <Form.Item label="결제 마감" name="paymentTimeoutMinutes" hidden={!values.allowLatePayment}
-                    rules={onboardingFieldRules('paymentTimeoutMinutes', values)} extra="나중 결제를 선택한 손님이 예약 신청 후 결제할 수 있는 시간이에요.">
+                    ? '먼저 예약을 신청하고 내 예약에서 결제할 수 있어요. 미결제만을 이유로 자동 취소하지 않아요.'
+                    : '예약 신청 후 바로 예약금을 결제해주세요. 결제 시간 제한이 있으면 제한 시간이 지난 미결제 대기 예약은 자동 취소돼요.'}</p>
+                <Form.Item label="결제 마감" name="paymentTimeoutMinutes" hidden={!paymentTimeoutApplies(values)}
+                    rules={onboardingFieldRules('paymentTimeoutMinutes', values)} extra="신청할 때 결제하는 예약의 결제 대기 시간이에요. 제한 없음을 선택하면 미결제로 자동 취소하지 않아요.">
                     <FormSelect options={PAYMENT_TIMEOUT_OPTIONS} />
                 </Form.Item>
             </div>

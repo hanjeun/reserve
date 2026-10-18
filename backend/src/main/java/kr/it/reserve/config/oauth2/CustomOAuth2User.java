@@ -2,6 +2,7 @@ package kr.it.reserve.config.oauth2;
 
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.member.entity.AuthProvider;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -10,6 +11,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.time.Instant;
+import java.time.LocalDateTime;
 
 /**
  * OAuth2 인증된 사용자 정보를 담는 클래스
@@ -22,19 +25,29 @@ public class CustomOAuth2User implements OAuth2User {
     private final Map<String, Object> attributes;
     private final String nameAttributeKey;
     private final boolean newUser;
+    private final OAuthAuthentication oauthAuthentication;
+
+    /** loadUser가 인증한 문맥이다. 이후 현재 Member 조회나 다른 로그인으로 시각을 덮지 않는다. */
+    public record OAuthAuthentication(Long memberId, AuthProvider provider, String providerId,
+            LocalDateTime authenticatedAt, Instant tokenExpiresAt, int authVersion) { }
 
     public CustomOAuth2User(Member member, Map<String, Object> attributes, String nameAttributeKey) {
-        this.member = member;
-        this.attributes = attributes;
-        this.nameAttributeKey = nameAttributeKey;
-        this.newUser = false;
+        this(member, attributes, nameAttributeKey, false);
     }
 
     public CustomOAuth2User(Member member, Map<String, Object> attributes, String nameAttributeKey, boolean newUser) {
+        this(member, attributes, nameAttributeKey, newUser, null);
+    }
+
+    public CustomOAuth2User(Member member, Map<String, Object> attributes, String nameAttributeKey, boolean newUser,
+            Instant tokenExpiresAt) {
         this.member = member;
         this.attributes = attributes;
         this.nameAttributeKey = nameAttributeKey;
         this.newUser = newUser;
+        this.oauthAuthentication = member.getProvider() == null || member.getProvider() == AuthProvider.LOCAL ? null
+                : new OAuthAuthentication(member.getId(), member.getProvider(), member.getProviderId(),
+                        member.getOauthAuthenticatedAt(), tokenExpiresAt, member.getAuthVersion());
     }
 
     @Override

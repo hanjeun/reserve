@@ -103,7 +103,7 @@ public class CustomerWaitingApiController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<SseEmitter> events() {
         return ResponseEntity.ok().header("Cache-Control", "no-store").header("X-Accel-Buffering", "no")
-                .body(streams.subscribe(SecurityUtil.getCurrentMember()));
+                .body(streams.subscribe(SecurityUtil.getCurrentMember(), SecurityUtil.getOAuthAuthenticationAt()));
     }
 
     public record QrRequest(@NotBlank(message = "QR 토큰이 필요해요.") @Size(max = 2048, message = "올바른 QR을 확인해주세요.") String token) {}

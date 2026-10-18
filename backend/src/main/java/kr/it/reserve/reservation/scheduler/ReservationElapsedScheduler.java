@@ -1,5 +1,7 @@
 package kr.it.reserve.reservation.scheduler;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
@@ -46,6 +48,8 @@ public class ReservationElapsedScheduler {
 
     private final ReservationRepository reservationRepository;
     private final PaymentService paymentService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.reservation.service.ReservationUpdates updates;
 
     /**
      * ★ 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 <b>KST</b> 값이다.
@@ -85,6 +89,7 @@ public class ReservationElapsedScheduler {
                 reservation.setStatus(Reservation.ReservationStatus.UNCONFIRMED);
                 unconfirmed++;
             }
+            if (updates != null) updates.changed(reservation, EntityUpdates.Operation.UPDATED);
         }
 
         log.info("[ElapsedScheduler] processed {} reservations: {} cancelled+refunded (was PENDING), {} marked unconfirmed (was CONFIRMED)",

@@ -4,7 +4,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/title-dark.svg" />
-  <img src="docs/images/title-light.svg" alt="예약이 필요한 순간, RESERVE" width="640" />
+  <img src="docs/images/title-light.svg" alt="예약이 필요한 순간, RESERVE" width="760" />
 </picture>
 
 [**서비스 바로가기**](https://reserve.it.kr)
@@ -97,11 +97,3 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 | **사용 안내** | [손님 가이드](docs/guide/user-guide.md) · [사장님 가이드](docs/guide/owner-guide.md) · [업데이트 소식](docs/CHANGELOG.md) |
 | **기술 · 운영** | [기술 문서 안내](docs/technical/README.md) |
 | **정책** | [보안 정책](SECURITY.md) · [서드파티 고지](THIRD_PARTY_NOTICES.md) |
-
-개발은 [코드 컨벤션](docs/rules/code-conventions.md)과 [Git 워크플로우](docs/rules/git-workflow.md)를 따라요.
-구현과 변경된 권한·데이터 경계의 최소 검사를 우선하고, 일반 화면·휴대폰 사용감은 사용자가 확인해요.
-결과는 채팅으로 전달하며 별도 요청 없이 보고서나 임시 PR 본문 파일을 만들지 않아요.
-
-자동 Sonar 실행은 중지해요(`SONAR_CI_ENABLED=false`). 요청받았을 때만 `sonar.yml`의
-`workflow_dispatch`로 수동 정적 분석을 실행하며, 커버리지 80% 달성을 위한 반복 보강은 하지 않아요.
-일반 CI는 커버리지 계측 없이 기존 검사를 실행하고, `build-backend`·`build-frontend`와 CodeQL은 유지해요.

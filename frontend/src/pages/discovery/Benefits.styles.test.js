@@ -94,10 +94,10 @@ describe('landscape benefits banner layout source contracts', () => {
 
     it('keeps copy readable and contains long titles without losing the accessible link text', () => {
         for (const width of [320, 390, 575]) {
-            const ticket = styleAtWidth('.reserve-benefit-ticket', width);
+            const ticket = styleAtWidth('.reserve-benefit-title-badge', width);
             expect(ticket['max-width']).toBe('100%');
             expect(ticket['overflow-wrap']).toBe('anywhere');
-            expect(styleAtWidth('.reserve-benefit-ticket > span', width)['-webkit-line-clamp']).toBe('2');
+            expect(styleAtWidth('.reserve-benefit-title-badge > span', width)['-webkit-line-clamp']).toBe('2');
             expect(styleAtWidth('.reserve-benefit-description', width)['white-space']).toBe('nowrap');
         }
         expect(styleAtWidth('.reserve-benefit-row', 576)['--reserve-benefit-store-size']).toBe('30px');

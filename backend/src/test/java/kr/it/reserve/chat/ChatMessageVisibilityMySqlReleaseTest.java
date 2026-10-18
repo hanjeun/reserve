@@ -51,7 +51,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ChatMessageVisibilityMySqlReleaseTest {
     @Configuration(proxyBeanMethods = false)
-    @EntityScan(basePackageClasses = {ChatMessage.class, Member.class})
+    @EntityScan({"kr.it.reserve.email.entity", "kr.it.reserve.member.entity", "kr.it.reserve.chat.entity",
+            "kr.it.reserve.store.entity", "kr.it.reserve.promotion.entity", "kr.it.reserve.feed.entity"})
     @EnableJpaRepositories(basePackageClasses = {ChatMessageRepository.class, MemberRepository.class})
     @EnableJpaAuditing
     @Import({ChatService.class, ChatMessageVisibilityService.class, ChatRetractionService.class})

@@ -25,7 +25,7 @@ test('home messages opens the desktop panel in place and keeps the mobile route'
         await expect(page.locator('.reserve-messages-page')).toBeVisible();
         await expect(page.locator('.reserve-messenger-launcher-wrap')).toHaveCount(0);
     } else {
-        await expect(page).toHaveURL(/\/$/);
+        await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.has('region') && url.searchParams.get('region') === '');
         await expect(home).toBeVisible();
         await expect(page.getByRole('dialog', { name: '메시지', exact: true })).toBeVisible();
     }

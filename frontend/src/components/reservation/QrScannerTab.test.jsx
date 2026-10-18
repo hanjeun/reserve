@@ -120,6 +120,22 @@ describe('QrScannerTab sheet surface', () => {
         client.clear();
     });
 
+    it('waits for pending camera startup to finish and stops it after the screen has closed', async () => {
+        let finish;
+        const pending = new Promise(resolve => { finish = resolve; });
+        scannerState.start.mockReturnValueOnce(pending);
+        const client = new QueryClient();
+        const { unmount } = render(<QueryClientProvider client={client}><AntApp><QrScannerTab sheet /></AntApp></QueryClientProvider>);
+        fireEvent.click(await screen.findByRole('button', { name: 'QR 스캔 시작' }));
+        await waitFor(() => expect(scannerState.start).toHaveBeenCalledTimes(1));
+        unmount();
+        expect(scannerState.stop).not.toHaveBeenCalled();
+        await act(async () => { finish(); await pending; });
+        await waitFor(() => expect(scannerState.stop).toHaveBeenCalledTimes(1));
+        await act(async () => { await scannerState.onSuccess('closed-camera-token'); });
+        expect(reservationService.checkInByQr).not.toHaveBeenCalled(); client.clear();
+    });
+
     it('keeps actions at the bottom and shows only the server-confirmed scan result', async () => {
         const onClose = vi.fn();
         // 체크인이 성공하면 예약 캐시를 무효화한다(invalidateAfterWrite.js) — 그 호출을 감시한다.

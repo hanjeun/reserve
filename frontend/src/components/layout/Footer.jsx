@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Divider, Typography } from 'antd';
-import { ArrowRightOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined } from '../common/icons';
 import { colors, fontSize } from '../../styles/tokens';
 
 const InquiryModal = lazy(() => import('../common/InquiryModal'));

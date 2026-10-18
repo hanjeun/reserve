@@ -4,6 +4,7 @@ import kr.it.reserve.global.error.FileException;
 import kr.it.reserve.file.util.ImageFileValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -59,6 +60,9 @@ public class FileStorageService {
     private S3Client s3Client;
     private S3Presigner s3Presigner;
 
+    @Autowired
+    private LocalFeedImageStore localFeedImages;
+
     @PostConstruct
     public void init() {
         StaticCredentialsProvider credentials = StaticCredentialsProvider.create(
@@ -83,7 +87,8 @@ public class FileStorageService {
             String key = fullPrefix + "/" + UUID.randomUUID() + image.extension();
             PutObjectRequest request = PutObjectRequest.builder()
                     .bucket(bucket).key(key).contentType(image.contentType()).contentLength((long) image.bytes().length)
-                    .cacheControl(prefixPath.matches("users/\\d+/businesses") ? "no-store" : "public, max-age=86400, must-revalidate")
+                    .cacheControl(prefixPath.matches("users/\\d+/(businesses|profiles|feed/profiles)")
+                            ? "no-store" : "public, max-age=86400, must-revalidate")
                     .build();
             s3Client.putObject(request, RequestBody.fromBytes(image.bytes()));
             registerRollbackCleanup(key);
@@ -134,6 +139,51 @@ public class FileStorageService {
             return bytes;
         } catch (IOException | software.amazon.awssdk.core.exception.SdkException exception) {
             log.error("Chat image read failed: errorType={}", exception.getClass().getSimpleName());
+            throw new FileException("사진을 불러오지 못했어요.");
+        }
+    }
+
+    /** 피드 암호문 전용. 기존 공개 사진·채팅 사진의 키와 저장 관문은 사용하지 않는다. */
+    public String storeEncryptedFeedImage(byte[] encrypted, String prefixPath) {
+        if (encrypted == null || encrypted.length < 28
+                || encrypted.length > ImageFileValidator.MAX_FILE_BYTES + 28
+                || prefixPath == null || !prefixPath.matches("users/\\d+/feed/images")) {
+            throw FileException.invalid("올바른 피드 사진이 아니에요.");
+        }
+        if (localFeedImages != null && localFeedImages.isEnabled()) {
+            String key = localFeedImages.store(encrypted, prefixPath);
+            registerRollbackCleanup(key);
+            return key;
+        }
+        String key = withEnvironmentPrefix(prefixPath) + "/" + UUID.randomUUID() + ".bin";
+        try {
+            s3Client.putObject(PutObjectRequest.builder().bucket(bucket).key(key)
+                    .contentType("application/octet-stream").cacheControl("no-store")
+                    .contentLength((long) encrypted.length).build(), RequestBody.fromBytes(encrypted));
+            registerRollbackCleanup(key);
+            return key;
+        } catch (RuntimeException exception) {
+            log.error("Feed image upload failed: errorType={}", exception.getClass().getSimpleName());
+            throw FileException.uploadFailed();
+        }
+    }
+
+    public byte[] readEncryptedFeedImage(String key, String prefixPath) {
+        if (prefixPath == null || !prefixPath.matches("users/\\d+/feed/images")
+                || !isManagedFileUnderPrefix(key, prefixPath)) {
+            throw FileException.invalid("올바른 피드 사진이 아니에요.");
+        }
+        if (LocalFeedImageStore.isLocalKey(key)) return localFeedImages.read(key, prefixPath);
+        int limit = (int) ImageFileValidator.MAX_FILE_BYTES + 28;
+        try (var stream = s3Client.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+            if (stream.response().contentLength() != null && stream.response().contentLength() > limit) {
+                stream.abort(); throw FileException.invalid("사진 크기가 허용 범위를 초과했어요.");
+            }
+            byte[] bytes = stream.readNBytes(limit + 1);
+            if (bytes.length > limit) { stream.abort(); throw FileException.invalid("사진 크기가 허용 범위를 초과했어요."); }
+            return bytes;
+        } catch (IOException | software.amazon.awssdk.core.exception.SdkException exception) {
+            log.error("Feed image read failed: errorType={}", exception.getClass().getSimpleName());
             throw new FileException("사진을 불러오지 못했어요.");
         }
     }
@@ -216,6 +266,14 @@ public class FileStorageService {
     public void deleteFileRequired(String fileUrlOrKey) {
         if (fileUrlOrKey == null || fileUrlOrKey.isEmpty()) return;
 
+        if (LocalFeedImageStore.isLocalKey(fileUrlOrKey)) {
+            if (localFeedImages == null || !localFeedImages.isEnabled()) {
+                throw new FileException("로컬 피드 사진 저장소를 사용할 수 없어요.");
+            }
+            localFeedImages.delete(fileUrlOrKey);
+            return;
+        }
+
         String key = resolveManagedKey(fileUrlOrKey);
         if (key == null) {
             log.warn("S3 delete skipped: target is outside the managed environment boundary");
@@ -234,6 +292,9 @@ public class FileStorageService {
      * {@link kr.it.reserve.file.util.FileStoragePaths} prefix를 넘겨 같은 리소스 경계까지 확인한다.
      */
     public boolean isManagedFileUnderPrefix(String fileUrlOrKey, String expectedPrefix) {
+        if (LocalFeedImageStore.isLocalKey(fileUrlOrKey)) {
+            return localFeedImages != null && localFeedImages.underPrefix(fileUrlOrKey, expectedPrefix);
+        }
         String key = resolveManagedKey(fileUrlOrKey);
         String scopedPrefix = withEnvironmentPrefix(expectedPrefix);
         return key != null

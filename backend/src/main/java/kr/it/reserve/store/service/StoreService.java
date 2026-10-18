@@ -1,6 +1,7 @@
 package kr.it.reserve.store.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.advertisement.entity.AdStatus;
@@ -17,7 +18,6 @@ import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.repository.StoreRepository;
-import kr.it.reserve.store.repository.StoreSearchSpecification;
 import kr.it.reserve.store.search.StoreFulltextSearch;
 import kr.it.reserve.store.dto.StoreCreateRequest;
 import kr.it.reserve.store.dto.StoreResponse;
@@ -27,16 +27,12 @@ import kr.it.reserve.store.dto.StoreUpdateRequest;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.ServiceDomain;
 import kr.it.reserve.store.entity.StoreStatus;
-import kr.it.reserve.store.util.StoreRegionNames;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -48,8 +44,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import org.springframework.data.domain.Page;
 import kr.it.reserve.global.common.PageRequests;
@@ -60,7 +54,6 @@ import org.springframework.data.domain.Pageable;
 @Service
 public class StoreService {
     private static final String EDIT_FORBIDDEN_MESSAGE = "가게를 수정할 권한이 없어요.";
-    private static final String DISTANCE_SORT = "distance";
 
 
     private final StoreRepository storeRepository;
@@ -74,6 +67,9 @@ public class StoreService {
     private final AdvertisementRepository advertisementRepository;
     private final PaymentRepository paymentRepository;
     private final ObjectMapper objectMapper;
+    private final org.springframework.context.ApplicationEventPublisher events;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private StoreUpdates updates;
 
     /**
      * MySQL ngram=2와 일치하는 인덱스가 확인되면 FULLTEXT 후보 검색을 사용한다.
@@ -89,77 +85,10 @@ public class StoreService {
     @Value("${search.store.fulltext-enabled:true}")
     private boolean fulltextEnabled;
 
-    /** 국내 서비스 전체를 포함하면서 좌표 없는/비정상 원거리 행을 거리 계산에서 배제하는 1차 후보 범위. */
-    private static final double DISTANCE_CANDIDATE_RADIUS_KM = 1_000.0;
     // 이름을 "imageUploadExecutor"로 맞춰서 AsyncConfig의 @Bean(name = "imageUploadExecutor")와
     // 매칭시킴 — Lombok의 @RequiredArgsConstructor는 @Qualifier를 생성자로 복사해주지 않아서
     // (IDE 경고 확인함), 대신 Spring의 "타입이 여러 개면 파라미터명=빈이름으로 매칭" 폴백에 의존.
     private final Executor imageUploadExecutor;
-
-    // 상세 이미지 하나의 원본 크기 — detailImagesMeta JSON 배열의 각 원소
-    private record ImageDimension(Integer width, Integer height) {}
-
-    private List<ImageDimension> parseDetailImagesMeta(String json) {
-        if (json == null || json.trim().isEmpty()) return new ArrayList<>();
-        try {
-            return objectMapper.readValue(json, new TypeReference<List<ImageDimension>>() {});
-        } catch (Exception e) {
-            log.warn("Failed to parse detailImagesMeta, treating as empty: errorType={}",
-                    e.getClass().getSimpleName());
-            return new ArrayList<>();
-        }
-    }
-
-    private String toDetailImagesMetaJson(List<ImageDimension> list) {
-        try {
-            return objectMapper.writeValueAsString(list);
-        } catch (Exception e) {
-            log.warn("Failed to serialize detailImagesMeta: errorType={}", e.getClass().getSimpleName());
-            return null;
-        }
-    }
-
-    private ImageDimension readImageDimension(MultipartFile file) {
-        int[] dim = fileStorageService.readImageDimensions(file);
-        return dim != null ? new ImageDimension(dim[0], dim[1]) : new ImageDimension(null, null);
-    }
-
-    // 상세 이미지 하나 업로드 결과(key + URL + 원본 크기) — key는 바깥 트랜잭션의 rollback cleanup 등록용
-    private record UploadedDetailImage(String key, String url, ImageDimension dim) {}
-
-    /**
-     * 상세 이미지 여러 장을 병렬로 S3 업로드(2026-07 추가 — "이미지 업로드 비동기 병렬 처리" 블로그 글 참고).
-     * 기존엔 파일 개수만큼 순차 블로킹 업로드라 이미지가 많을수록 응답이 선형으로 느려졌음 —
-     * CompletableFuture.supplyAsync로 동시에 여러 장을 올림. join은 입력 리스트 순서 그대로
-     * 수행하므로(완료 순서가 아니라), detailImages와 detailImagesMeta의 1:1 순서 대응이 그대로 유지됨.
-     * 트랜잭션 내부에서 동기적으로 join하므로(응답을 먼저 반환하는 방식이 아님) Store 등록/수정
-     * 트랜잭션의 원자성은 그대로 유지되고, 이미지 하나라도 업로드 실패하면 예외가 전파되어 롤백된다.
-     */
-    private List<UploadedDetailImage> uploadDetailImagesParallel(List<MultipartFile> files, Long memberId, Long storeId) {
-        List<CompletableFuture<UploadedDetailImage>> futures = files.stream()
-                .filter(f -> f != null && !f.isEmpty())
-                .map(f -> CompletableFuture.supplyAsync(() -> {
-                    String key = fileStorageService.storeFile(f, FileStoragePaths.storeImage(memberId, storeId));
-                    String url = fileStorageService.getPublicUrl(key);
-                    return new UploadedDetailImage(key, url, readImageDimension(f));
-                }, imageUploadExecutor))
-                .toList();
-        try {
-            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
-            List<UploadedDetailImage> results = futures.stream().map(CompletableFuture::join).toList();
-            // worker 스레드에는 Spring 트랜잭션 문맥이 없으므로 join 뒤 바깥 트랜잭션에 등록한다.
-            results.forEach(result -> fileStorageService.registerRollbackCleanup(result.key()));
-            return results;
-        } catch (CompletionException e) {
-            // allOf가 끝난 시점에는 모든 업로드가 끝났으므로, 부분 성공한 객체도 즉시 정리한다.
-            futures.stream()
-                    .filter(future -> !future.isCompletedExceptionally() && !future.isCancelled())
-                    .map(CompletableFuture::join)
-                    .forEach(result -> fileStorageService.deleteFile(result.key()));
-            if (e.getCause() instanceof RuntimeException re) throw re;
-            throw e;
-        }
-    }
 
     /**
      * 가게 등록
@@ -233,35 +162,11 @@ public class StoreService {
 
         Store savedStore = storeRepository.save(store);
         Long storeId = savedStore.getId();
-        Long memberId = owner.getId();
 
-        // 2단계: storeId 확보 후 이미지 업로드 → getPublicUrl로 CloudFront URL 변환
-        if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
-            String key = fileStorageService.storeFile(
-                    request.getMainImage(), FileStoragePaths.storeThumbnail(memberId, storeId));
-            savedStore.setMainImageUrl(fileStorageService.getPublicUrl(key));
-            int[] dim = fileStorageService.readImageDimensions(request.getMainImage());
-            if (dim != null) {
-                savedStore.setMainImageWidth(dim[0]);
-                savedStore.setMainImageHeight(dim[1]);
-            }
-        }
-
-        List<String> detailImageUrls = new ArrayList<>();
-        List<ImageDimension> detailImageDims = new ArrayList<>();
-        if (request.getDetailImages() != null && !request.getDetailImages().isEmpty()) {
-            for (UploadedDetailImage r : uploadDetailImagesParallel(request.getDetailImages(), memberId, storeId)) {
-                detailImageUrls.add(r.url());
-                detailImageDims.add(r.dim());
-            }
-        }
-
-        if (!detailImageUrls.isEmpty()) {
-            savedStore.setDetailImageList(detailImageUrls);
-            savedStore.setDetailImagesMeta(toDetailImagesMetaJson(detailImageDims));
-        }
+        images().create(savedStore, request, owner.getId());
 
         log.info("Store registered: storeId={}", storeId);
+        if (updates != null) updates.changed(savedStore, EntityUpdates.Operation.CREATED, false);
         return StoreResponse.fromEntity(savedStore);
     }
 
@@ -270,10 +175,7 @@ public class StoreService {
      */
     @Transactional(readOnly = true)
     public List<StoreResponse> getMyStores(Member member) {
-        List<Store> stores = storeRepository.findByOwnerAndDeletedAtIsNullOrderByCreatedAtDesc(member);
-        return stores.stream()
-                .map(StoreResponse::fromEntity)
-                .toList();
+        return directory().getMyStores(member);
     }
 
     /**
@@ -282,18 +184,7 @@ public class StoreService {
      */
     @Transactional(readOnly = true)
     public StoreResponse getStoreForEdit(Long id, Member member) {
-        Store store = storeRepository.findById(id)
-                .orElseThrow(StoreException::notFound);
-        if (store.getDeletedAt() != null) {
-            throw StoreException.notFound();
-        }
-        // 관리자는 모든 가게 수정 가능, 소유자는 본인 가게만
-        boolean isAdmin = member.isAdmin();
-        boolean isOwner = store.getOwner() != null && store.getOwner().getId().equals(member.getId());
-        if (!isAdmin && !isOwner) {
-            throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
-        }
-        return StoreResponse.fromEntity(store);
+        return directory().getStoreForEdit(id, member);
     }
 
     /**
@@ -302,12 +193,7 @@ public class StoreService {
      */
     @Transactional(readOnly = true)
     public StoreResponse getStore(Long id) {
-        Store store = storeRepository.findById(id)
-                .orElseThrow(StoreException::notFound);
-        if (store.getDeletedAt() != null || store.isSuspended()) {
-            throw StoreException.notFound();
-        }
-        return StoreResponse.fromEntity(store);
+        return directory().getStore(id);
     }
 
     /**
@@ -383,6 +269,7 @@ public class StoreService {
 
             Store savedStore = storeRepository.save(store);
             log.info("Store updated: storeId={}", savedStore.getId());
+            if (updates != null) updates.changed(savedStore, EntityUpdates.Operation.UPDATED, false);
 
             return StoreResponse.fromEntity(savedStore);
         } catch (Exception e) {
@@ -459,6 +346,7 @@ public class StoreService {
             throw StoreException.forbidden(EDIT_FORBIDDEN_MESSAGE);
         }
         store.setAutoApprovalEnabled(enabled);
+        if (updates != null) updates.changed(store, EntityUpdates.Operation.UPDATED, false);
         return StoreResponse.fromEntity(storeRepository.save(store));
     }
 
@@ -492,79 +380,7 @@ public class StoreService {
      */
     @Transactional(readOnly = true)
     public StoreStatisticsResponse getStoreStatistics(Long storeId, Member member, String range) {
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(StoreException::notFound);
-        boolean isAdmin = member.isAdmin();
-        boolean isOwner = store.getOwner() != null && store.getOwner().getId().equals(member.getId());
-        if (!isAdmin && !isOwner) {
-            throw StoreException.forbidden("통계를 조회할 권한이 없어요.");
-        }
-
-        int days = switch (range == null ? "30d" : range) {
-            case "7d" -> 7;
-            case "90d" -> 90;
-            default -> 30;
-        };
-        LocalDate end = ServiceTime.today();
-        LocalDate start = end.minusDays(days - 1L);
-
-        // 예약 추이 — 데이터 없는 날짜도 0건으로 빈칸 없이 채운다(차트가 중간에 끓기지 않게)
-        Map<LocalDate, Long> countMap = new HashMap<>();
-        for (Object[] row : reservationRepository.countGroupedByDate(storeId, start, end)) {
-            countMap.put((LocalDate) row[0], (Long) row[1]);
-        }
-        List<StoreStatisticsResponse.DailyValue> reservationTrend = new ArrayList<>();
-        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
-            reservationTrend.add(StoreStatisticsResponse.DailyValue.builder()
-                    .date(d.toString()).value(countMap.getOrDefault(d, 0L)).build());
-        }
-
-        // 상태별 분포
-        Map<String, Long> statusBreakdown = new LinkedHashMap<>();
-        for (Object[] row : reservationRepository.countGroupedByStatus(storeId, start, end)) {
-            statusBreakdown.put(row[0].toString(), (Long) row[1]);
-        }
-
-        // 예약금 순결제액 추이. 결제 완료일 기준이며 확정 환불액은 차감한다.
-        Map<LocalDate, Long> revenueMap = new HashMap<>();
-        for (Object[] row : paymentRepository.sumNetDepositByPaidDate(
-                storeId, start.atStartOfDay(), end.plusDays(1).atStartOfDay())) {
-            revenueMap.put((LocalDate) row[0], row[1] != null ? ((Number) row[1]).longValue() : 0L);
-        }
-        List<StoreStatisticsResponse.DailyValue> revenueTrend = new ArrayList<>();
-        long totalRevenue = 0L;
-        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
-            long v = revenueMap.getOrDefault(d, 0L);
-            totalRevenue += v;
-            revenueTrend.add(StoreStatisticsResponse.DailyValue.builder().date(d.toString()).value(v).build());
-        }
-
-        // 현재 활성 광고 요약 (없으면 null)
-        LocalDate today = ServiceTime.today();
-        StoreStatisticsResponse.AdSummary adSummary = advertisementRepository
-                .findFirstByStoreIdAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqualOrderByEndDateAscIdAsc(
-                        storeId, AdStatus.ACTIVE, today, today)
-                .map(ad -> StoreStatisticsResponse.AdSummary.builder()
-                        .adType(ad.getAdType().name())
-                        .status(ad.getStatus().name())
-                        .daysRemaining((int) ChronoUnit.DAYS.between(today, ad.getEndDate()))
-                        .impressionCount(ad.getImpressionCount())
-                        .clickCount(ad.getClickCount())
-                        .conversionCount(ad.getConversionCount())
-                        .clickThroughRate(ad.getClickThroughRate())
-                        .conversionRate(ad.getConversionRate())
-                        .build())
-                .orElse(null);
-
-        return StoreStatisticsResponse.builder()
-                .reservationTrend(reservationTrend)
-                .statusBreakdown(statusBreakdown)
-                .averageRating(store.getRating())
-                .reviewCount(store.getReviewCount())
-                .revenueTrend(revenueTrend)
-                .totalDepositRevenue(totalRevenue)
-                .adSummary(adSummary)
-                .build();
+        return new StoreStatistics(storeRepository, reservationRepository, paymentRepository, advertisementRepository).getStoreStatistics(storeId, member, range);
     }
 
     /**
@@ -593,7 +409,8 @@ public class StoreService {
 
         // 공개/추천 연결은 즉시 제거한다. 거래 원장과 후기 이력은 그대로 둔다.
         favoriteRepository.deleteByStoreId(id);
-        promotionRepository.deleteByStoreId(id);
+        promotionRepository.softDeleteByStoreId(id, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+        events.publishEvent(new kr.it.reserve.store.event.StoreClosed(id));
 
         Long ownerId = store.getOwner() != null ? store.getOwner().getId() : null;
         enqueueManagedFileDeletion(
@@ -626,194 +443,27 @@ public class StoreService {
         store.setMainImageHeight(null);
         store.setDetailImageList(List.of());
         store.setDetailImagesMeta(null);
+        boolean wasPublic = StoreUpdates.publicStore(store);
         store.softDelete();
+        if (updates != null) updates.changed(store, EntityUpdates.Operation.DELETED, wasPublic);
 
         log.info("Store closure completed: storeId={}", id);
     }
 
-    /**
-     * 이미지 업데이트 보조 메서드 (가독성을 위해 분리)
-     */
+    private StoreDirectory directory() {
+        return new StoreDirectory(storeRepository, storeFulltextSearch, fulltextEnabled);
+    }
+
+    private StoreImages images() {
+        return new StoreImages(fileStorageService, fileDeletionOutboxService, objectMapper, imageUploadExecutor);
+    }
+
     private void updateStoreImages(Store store, StoreUpdateRequest request) {
-        Long memberId = store.getOwner().getId();
-        Long storeId = store.getId();
-        String mainImagePrefix = FileStoragePaths.storeThumbnail(memberId, storeId);
-        String detailImagePrefix = FileStoragePaths.storeImage(memberId, storeId);
-
-        // 새 파일을 S3에 올리기 전에 기존 URL 참조를 전부 검증한다. 검증을 뒤로 미루면
-        // 잘못된 요청을 409로 거절하면서도 S3에는 새 객체가 남는 부분 성공이 생긴다.
-        validateExistingStoreImageReferences(store, request);
-        // 순서 정보도 업로드 전에 푼다 — 잘못된 순서를 거절하면서 새 파일만 S3 에 남기지 않게.
-        List<DetailImageSlot> detailOrder = resolveDetailImageOrder(request);
-
-        updateMainImage(store, request, mainImagePrefix);
-
-        // 상세 이미지: 이전 URL → 이전 크기 매핑을 미리 구성해둔다(순서가 바뀌어도 URL 기준으로 찾음)
-        List<String> oldUrls = store.getDetailImageList();
-        List<ImageDimension> oldDims = parseDetailImagesMeta(store.getDetailImagesMeta());
-        Map<String, ImageDimension> urlToDim = new HashMap<>();
-        for (int i = 0; i < oldUrls.size() && i < oldDims.size(); i++) {
-            urlToDim.put(oldUrls.get(i), oldDims.get(i));
-        }
-
-        List<String> keptUrls = request.getExistingDetailImageUrls() != null
-                ? request.getExistingDetailImageUrls() : List.of();
-        List<UploadedDetailImage> uploaded = request.getDetailImages() != null
-                ? uploadDetailImagesParallel(request.getDetailImages(), memberId, storeId) : List.of();
-
-        List<String> finalDetailImages = new ArrayList<>();
-        List<ImageDimension> finalDetailDims = new ArrayList<>();
-        appendDetailImagesInOrder(detailOrder, keptUrls, uploaded, urlToDim, finalDetailImages, finalDetailDims);
-
-        // 삭제된 파일 처리
-        List<String> currentDetailImages = store.getDetailImageList();
-        if (currentDetailImages != null) {
-            for (String existingUrl : currentDetailImages) {
-                if (!finalDetailImages.contains(existingUrl)) {
-                    enqueueManagedFileDeletion(
-                            existingUrl, detailImagePrefix, "STORE_DETAIL_IMAGE", storeId);
-                }
-            }
-        }
-        store.setDetailImageList(finalDetailImages);
-        store.setDetailImagesMeta(toDetailImagesMetaJson(finalDetailDims));
+        images().updateStoreImages(store, request);
     }
 
-    private void updateMainImage(Store store, StoreUpdateRequest request, String mainImagePrefix) {
-        if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
-            String oldMainImage = store.getMainImageUrl();
-            String key = fileStorageService.storeFile(
-                    request.getMainImage(), mainImagePrefix);
-            store.setMainImageUrl(fileStorageService.getPublicUrl(key));
-            int[] dim = fileStorageService.readImageDimensions(request.getMainImage());
-            store.setMainImageWidth(dim != null ? dim[0] : null);
-            store.setMainImageHeight(dim != null ? dim[1] : null);
-            enqueueManagedFileDeletion(
-                    oldMainImage, mainImagePrefix, "STORE_MAIN_IMAGE", store.getId());
-        } else if (request.getExistingMainImageUrl() != null) {
-            store.setMainImageUrl(request.getExistingMainImageUrl());
-            // 기존 이미지를 그대로 유지하는 경우에는 width/height도 이미 저장된 값 그대로 유지된다(건드리지 않음)
-        }
-    }
-
-    private void appendDetailImagesInOrder(
-            List<DetailImageSlot> detailOrder,
-            List<String> keptUrls,
-            List<UploadedDetailImage> uploaded,
-            Map<String, ImageDimension> urlToDim,
-            List<String> finalDetailImages,
-            List<ImageDimension> finalDetailDims) {
-        if (detailOrder.isEmpty()) {
-            // 순서 정보가 없는 예전 클라이언트: 기존 이미지 → 새 이미지
-            for (String url : keptUrls) {
-                finalDetailImages.add(url);
-                finalDetailDims.add(urlToDim.getOrDefault(url, new ImageDimension(null, null)));
-            }
-            for (UploadedDetailImage r : uploaded) {
-                finalDetailImages.add(r.url());
-                finalDetailDims.add(r.dim());
-            }
-        } else {
-            for (DetailImageSlot slot : detailOrder) {
-                if (slot.existing()) {
-                    String url = keptUrls.get(slot.index());
-                    finalDetailImages.add(url);
-                    finalDetailDims.add(urlToDim.getOrDefault(url, new ImageDimension(null, null)));
-                } else {
-                    UploadedDetailImage r = uploaded.get(slot.index());
-                    finalDetailImages.add(r.url());
-                    finalDetailDims.add(r.dim());
-                }
-            }
-        }
-    }
-
-    /**
-     * 기존 이미지 URL은 이 가게에 지금 저장된 같은 역할의 값과 정확히 같을 때만 받는다.
-     *
-     * <p>URL은 공개값이라 요청자가 다른 가게 URL을 보낼 수 있지만, 저장값과 달라 여기서 막힌다.
-     * 소유자·가게 ID 경로 검사는 받을 때가 아니라 지울 때({@link #enqueueManagedFileDeletion}) 한다 —
-     * 2026-04-26 이전 옛 경로(stores/…)로 저장된 가게도 사진을 유지한 채 수정할 수 있어야 하고,
-     * 이미 심어진 남의 URL이 있어도 경계 밖이라 교체·폐업 때 지워지지 않는다.
-     */
-    private void validateExistingStoreImageReferences(Store store, StoreUpdateRequest request) {
-        String requestedMain = request.getExistingMainImageUrl();
-        if (requestedMain != null
-                && (requestedMain.isBlank() || !requestedMain.equals(store.getMainImageUrl()))) {
-            throw staleStoreImageReference();
-        }
-
-        List<String> requestedDetails = request.getExistingDetailImageUrls();
-        if (requestedDetails == null) return;
-
-        Set<String> currentDetails = new HashSet<>(store.getDetailImageList());
-        Set<String> uniqueRequestedDetails = new HashSet<>();
-        for (String requestedDetail : requestedDetails) {
-            if (requestedDetail == null
-                    || requestedDetail.isBlank()
-                    || !currentDetails.contains(requestedDetail)
-                    || !uniqueRequestedDetails.add(requestedDetail)) {
-                throw staleStoreImageReference();
-            }
-        }
-    }
-
-    /** 상세 이미지 한 칸 — 기존 이미지(existingDetailImageUrls)의 i번째인지, 새 파일(detailImages)의 j번째인지. */
-    private record DetailImageSlot(boolean existing, int index) {}
-
-    /**
-     * {@code detailImageOrder} 를 칸 목록으로 푼다. 빈 목록이면 기존 → 새 순서를 그대로 쓴다.
-     *
-     * <p>기존 개수 + 새 개수와 길이가 같고, 모든 항목이 범위 안이며 중복이 없어야 한다 = 정확히 한 번씩 쓰는 순열.
-     * 하나라도 어긋나면 사진이 빠지거나 두 번 들어가므로 저장하지 않고 거절한다.
-     */
-    private List<DetailImageSlot> resolveDetailImageOrder(StoreUpdateRequest request) {
-        List<String> order = request.getDetailImageOrder();
-        if (order == null || order.isEmpty()) return List.of();
-
-        int existingCount = request.getExistingDetailImageUrls() != null ? request.getExistingDetailImageUrls().size() : 0;
-        int newCount = request.getDetailImages() == null ? 0
-                : (int) request.getDetailImages().stream().filter(f -> f != null && !f.isEmpty()).count();
-        if (order.size() != existingCount + newCount) throw invalidDetailImageOrder();
-
-        Set<String> seen = new HashSet<>();
-        List<DetailImageSlot> slots = new ArrayList<>();
-        for (String token : order) {
-            if (token == null || !token.matches("[en]\\d{1,2}") || !seen.add(token)) throw invalidDetailImageOrder();
-            boolean existing = token.charAt(0) == 'e';
-            int index = Integer.parseInt(token.substring(1));
-            if (index >= (existing ? existingCount : newCount)) throw invalidDetailImageOrder();
-            slots.add(new DetailImageSlot(existing, index));
-        }
-        return slots;
-    }
-
-    private StoreException invalidDetailImageOrder() {
-        return new StoreException(
-                "상세 이미지 순서 정보가 올바르지 않아요. 새로고침한 뒤 다시 시도해주세요.",
-                HttpStatus.BAD_REQUEST);
-    }
-
-    private StoreException staleStoreImageReference() {
-        return new StoreException(
-                "가게 이미지가 다른 곳에서 변경됐어요. 새로고침한 뒤 다시 시도해주세요.",
-                HttpStatus.CONFLICT);
-    }
-
-    /** 검증되지 않은 DB URL이 있어도 다른 리소스의 S3 객체를 삭제하지 않는다. */
-    private void enqueueManagedFileDeletion(
-            String target,
-            String expectedPrefix,
-            String sourceType,
-            Long sourceId) {
-        if (target == null || target.isBlank()) return;
-        if (expectedPrefix == null
-                || !fileStorageService.isManagedFileUnderPrefix(target, expectedPrefix)) {
-            log.warn("Skipped file deletion outside resource boundary: sourceType={}, sourceId={}",
-                    sourceType, sourceId);
-            return;
-        }
-        fileDeletionOutboxService.enqueue(target, sourceType, sourceId);
+    private void enqueueManagedFileDeletion(String target, String prefix, String type, Long id) {
+        images().enqueueManagedFileDeletion(target, prefix, type, id);
     }
 
     /**
@@ -1099,12 +749,14 @@ public class StoreService {
     }
 
     /** 노쇼 예약금. 음수가 들어가면 결제 금액이 음수가 된다. */
-    private static final int MAX_DEPOSIT = 10_000_000;
+    private static final int MAX_DEPOSIT = 100_000;
 
     private Integer clampDeposit(Integer amount) {
         if (amount == null) return 0;
-        if (amount < 0) return 0;
-        return Math.min(amount, MAX_DEPOSIT);
+        if (amount < 0 || amount > MAX_DEPOSIT) {
+            throw new StoreException("노쇼 예약금은 0~100,000원 사이로 설정해주세요.", HttpStatus.BAD_REQUEST);
+        }
+        return amount;
     }
 
     private static final int MAX_REFUND_DAYS = 365;
@@ -1165,46 +817,12 @@ public class StoreService {
 
     private Page<StoreResponse> sortedSearch(
             String keyword, String sort, Pageable pageable, Double lat, Double lng, String domain, String region) {
-        String normalizedSort = normalizeSort(sort);
-        if (DISTANCE_SORT.equals(normalizedSort) && !validCoordinates(lat, lng)) {
-            normalizedSort = "rating";
-        }
-        ServiceDomain domainFilter = ServiceDomain.parseOrNull(domain);
-        String regionFilter = region == null ? "" : region.trim();
-        String normalized = keyword == null ? "" : keyword.trim();
-        // 공개 상태·검색·분야(legacy null 추론)·지역·노출형 우선순위·거리 후보를 같은 DB 쿼리/count에 적용한다.
-        // Pageable은 그대로 전달하되 정렬은 Specification이 허용 목록으로만 구성한다.
-        Specification<Store> literalSearch = StoreSearchSpecification.publicSearch(
-                        normalized,
-                        normalizedSort,
-                        domainFilter,
-                        regionFilter,
-                        new StoreSearchSpecification.DistanceCandidates(lat, lng, DISTANCE_CANDIDATE_RADIUS_KM),
-                        ServiceTime.today());
-        if (fulltextEnabled) {
-            String candidate = storeFulltextSearch.candidateQuery(normalized);
-            if (!candidate.isEmpty()) {
-                try {
-                    return storeFulltextSearch.search(literalSearch, candidate, pageable);
-                } catch (DataAccessException exception) {
-                    // 독립 읽기 트랜잭션이 끝난 뒤 LIKE로 돌아가므로 실패한 MATCH가 폴백을 오염시키지 않는다.
-                    storeFulltextSearch.disable();
-                }
-            }
-        }
-        return storeRepository.findAll(literalSearch, pageable).map(StoreResponse::fromEntity);
+        return directory().search(keyword, sort, pageable, lat, lng, domain, region);
     }
 
-    private String normalizeSort(String sort) {
-        if ("reviewCount".equals(sort)) return "reviews";
-        return "recommended".equals(sort) || "recent".equals(sort) || "reviews".equals(sort)
-                || DISTANCE_SORT.equals(sort) ? sort : "rating";
-    }
 
-    private static boolean validCoordinates(Double lat, Double lng) {
-        return lat != null && lng != null && Double.isFinite(lat) && Double.isFinite(lng)
-                && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
-    }
+
+
 
     /** 내부 전체 조회도 공개 정책과 안정 정렬을 공유한다. */
     @Transactional(readOnly = true)
@@ -1230,34 +848,6 @@ public class StoreService {
     /** 현재 가게가 실제로 있는 시도·시군구만 모아 인기 지역과 계층 목록에 공유한다. */
     @Transactional(readOnly = true)
     public List<StoreRegionGroup> getAvailableRegions() {
-        Map<String, Long> regionCounts = new HashMap<>();
-        Map<String, Map<String, Long>> areaCounts = new HashMap<>();
-        for (String address : storeRepository.findPublicAddresses()) {
-            String[] parts = StoreRegionNames.addressParts(address);
-            if (parts.length == 0) continue;
-            String region = parts[0];
-            regionCounts.merge(region, 1L, Long::sum);
-            if (parts.length > 1) {
-                areaCounts.computeIfAbsent(region, ignored -> new HashMap<>())
-                        .merge(parts[1], 1L, Long::sum);
-            }
-        }
-        return regionCounts.entrySet().stream()
-                .sorted((a, b) -> {
-                    int byCount = Long.compare(b.getValue(), a.getValue());
-                    return byCount != 0 ? byCount : a.getKey().compareTo(b.getKey());
-                })
-                .map(entry -> {
-                    List<StoreRegionGroup.Area> areas = areaCounts
-                            .getOrDefault(entry.getKey(), Map.of()).entrySet().stream()
-                            .sorted((a, b) -> {
-                                int byCount = Long.compare(b.getValue(), a.getValue());
-                                return byCount != 0 ? byCount : a.getKey().compareTo(b.getKey());
-                            })
-                            .map(area -> new StoreRegionGroup.Area(area.getKey(), area.getValue()))
-                            .toList();
-                    return new StoreRegionGroup(entry.getKey(), entry.getValue(), areas);
-                })
-                .toList();
+        return directory().getAvailableRegions();
     }
 }

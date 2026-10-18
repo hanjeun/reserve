@@ -449,11 +449,13 @@ CREATE TABLE waiting_entry (
 - 업무 날짜는 KST, 접수·호출·종료 타임스탬프는 UTC `DATETIME(6)`이에요. 재시도 키는 소문자로 정규화해요.
 - 새 자료의 정리는 실제 고지 게시 시각을 `WAITING_RETENTION_NOTICE_PUBLISHED_AT`에 등록한 후 실행해요. `WAITING_RETENTION_ENABLED=false`면 중지해요.
 - 종료팀 표시명은 다음 KST 날짜에 제거하고 종료 기록은 7일 뒤 파기해요. 정상 가게의 진행팀은 날짜가 지나도 보존해요. 가게가 삭제되면 남은 진행팀을 취소하고 표시명을 제거해요.
-- 이전 앱으로 복구해도 이 테이블은 남겨 접수 자료를 보존해요. 10/4의 이 단계는 사업자 패널의 직원 접수 탭이었으며 일반 회원용 `/waiting`은 아래 11·12절과 v2.9.0 릴리스에서 확장했어요.
+- 이전 앱으로 복구해도 이 테이블은 남겨 접수 자료를 보존해요. 10절을 적용한 당시 범위는 사업자 패널의 직원 접수였고, 일반 회원의 고객 접수는 아래 11·12절과 후속 출시에서 적용했어요.
 
 2026-10-04 위 승인과 같은 DDL 계정으로 새 테이블을 만들었어요. nullable 원래 파일명·미분류 기본값·감사 enum 확장과 함께 적용했고, 기존 데이터 삭제는 실행하지 않았어요.
 
 ## 11. 고객 웨이팅 확장 (2026-10-09 운영 DDL 적용)
+
+11→12→13절은 2026-10-09 운영 적용을 완료했고, v2.10.0의 14절과 전체 35모델 제한 계정 validate·보존/복원 근거는 [실제 운영 적용 기록](#2026-10-09-v2100-실제-운영-적용)과 [백업 런북](backup.md)에 있어요. 아래 날짜별 미적용 조회와 격리 검증은 적용 전 기록이에요. 기존 운영에 SQL을 다시 실행하는 지시로 읽지 않으며, 새 대상에 적용하거나 복구할 때도 대상 재조회·새 백업·작업별 승인 관문을 유지해요.
 
 직원 명단과 고객 접수는 같은 `waiting_entry`를 사용해요. 가게의 고객 접수는 기존 가게까지 `OFF`로 시작하고, 직원 접수는 계속 가능해요. 운영 적용 전 제한된 백업 경로에 `store`·`waiting_entry`를 백업하고 복원 가능 여부를 확인한 뒤 별도 DDL 계정으로 실행해요. 실제 고지 게시와 릴리스 적용 승인을 확인해야 해요.
 
@@ -506,7 +508,7 @@ ALTER TABLE waiting_entry
 - 실제 고객 고지 게시 시각은 **별도** `WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT`에 offset 포함 ISO-8601로 등록해요. 기존 `WAITING_RETENTION_NOTICE_PUBLISHED_AT`는 직원 접수 고지예요. 고객 값이 없거나 잘못됐거나 미래면 새 고객 접수와 고객 기간 정리를 중지해요. 직원 접수 정리는 기존 스위치·고지를 따라요.
 - 고객의 종료 기록은 당일까지만 내 예약에서 확인할 수 있어요. 종료팀 이름과 회원 연결은 다음 KST 날짜에 제거하고 종료 기록은 7일 뒤 파기해요. 고객 동의 버전이 없는 기존 고객 자료에는 기간 정리를 소급 적용하지 않으며 별도 확인 대상으로 남겨요. 탈퇴 요청의 동일 트랜잭션 정리는 이 기간 정리 스위치와 별개예요.
 - 앱 복구 시 새 컬럼은 남겨요. 이전 앱은 직원 접수만 지원하므로 고객 접수가 사용된 뒤에는 구버전을 단순 재가동하지 않고 고객 접수를 닫고 활성 고객 접수·QR·보존 작업의 영향부터 확인해야 해요. DB 복원은 승인·검증된 복구 절차로 진행해요.
-- 이 DDL의 운영 적용은 위 이력에 기록하며 새 개인정보 고지의 실제 게시 시각은 [배포 런북](deployments.md)에서 별도로 확인해요. 기존 채팅 고지·30일 유예 시각은 바꾸지 않아요.
+- 고객 고지의 실제 운영 게시 시각은 `2026-10-09T06:54:37Z`이며 [실제 운영 적용 기록](#2026-10-09-v2100-실제-운영-적용)에 있어요. 기존 채팅 고지·30일 유예 시각은 바꾸지 않아요.
 
 ### 11·12절 적용 순서와 복구 경로
 
@@ -559,7 +561,7 @@ ALTER TABLE email_verification
 - 새 프론트·백엔드는 같은 릴리스로 전환해요. 서버가 반환한 원래 5분 만료 시각을 유지하고, 가입 증명은 프론트 메모리에만 둬요. 가입 성공의 같은 트랜잭션에서 인증을 삭제하며, 회원 저장 실패 시 삭제도 롤백돼요.
 - 새 설정 호환 복구 이미지에 이 인증 관문도 유지해요. 컬럼을 남긴 채 이전의 무기한·미소비 인증 동작으로 복구하지 않아요. 앱·DDL 계정 권한과 `validate`를 유지해요.
 
-가입 인증의 H2 트랜잭션 검사와 별도로 `EmailVerificationMySqlReleaseTest` 소스를 준비했어요. 두 최초 발송의 gap lock 경합·실패 횟수 누적·동시 한 번 소비·가입 실패 롤백/원래 만료·만료되거나 잘못된 증명의 미소비를 실제 서비스와 MySQL 8.0.45에서 확인해요. `RESERVE_MYSQL_SIGNUP_TEST_ISOLATED=1`이 없으면 실행하지 않으며, URL은 `127.0.0.1:<포트>/reserve_release_signup_<구분명>`과 전용 `reserve_signup_test*` 계정만 허용해요. 이 검사는 합성 인증 테이블을 create-drop 하므로 새 빈 검사 DB에만 사용하고 실제 백업 복원 DB·개발/운영 DB에 연결하지 않아요. 검사 소스 작성은 실행 성공 근거가 아니며 최종 입력 단계에서 명시적으로 실행해요.
+가입 인증의 H2 트랜잭션 검사와 별도로 `EmailVerificationMySqlReleaseTest`를 사용해요. 두 최초 발송의 gap lock 경합·실패 횟수 누적·동시 한 번 소비·가입 실패 롤백/원래 만료·만료되거나 잘못된 증명의 미소비를 실제 서비스와 MySQL 8.0.45에서 확인해요. `RESERVE_MYSQL_SIGNUP_TEST_ISOLATED=1`이 없으면 실행하지 않으며, URL은 `127.0.0.1:<포트>/reserve_release_signup_<구분명>`과 전용 `reserve_signup_test*` 계정만 허용해요. 합성 인증과 실제 ORM 조합이 참조하는 모델 테이블을 create-drop 하므로 새 빈 검사 DB에만 사용하고 실제 백업 복원 DB·개발/운영 DB에 연결하지 않아요. 2026-10-12 최종 로컬 후보에서 실제 8.0.45·이 격리 조건으로 **5개 실행·실패 0·스킵 0**을 확인했어요. 개인 숨김의 별도 합성 DB 검사도 제한된 DML 계정·`validate`로 **3개 실행·실패 0·스킵 0**을 확인했어요. 이 결과는 실제 운영 DDL·운영 백업의 전체 복구 근거와 구분해요.
 
 최종 입력으로 검사를 시작할 때 전용 계정은 위 빈 DB에만 권한을 주고, URL·계정·비밀번호는 `RESERVE_MYSQL_SIGNUP_TEST_URL`·`RESERVE_MYSQL_SIGNUP_TEST_USER`·`RESERVE_MYSQL_SIGNUP_TEST_PASSWORD`로 현재 검사 프로세스에만 전달해요. 비밀번호를 명령 인수·채팅·Git 파일에 넣지 않아요. 네 환경값을 준비한 뒤 **선별한 후보의 backend 디렉터리**에서 아래 필터만 실행해요.
 
@@ -616,3 +618,375 @@ v2.10.0 이후 자동 배포는 `reserve.feature-compat=waiting-signup-hidden-v2
 실제 배포 JAR은 **87,341,762바이트·SHA-256 `85f4e311f420ecf6b3a4134976167d3807dc7b7bc20bb1d5aa89db43a7de4d19`**이고, 원본 클래스 564개와 라이브러리 136개의 바이트로 격리/운영 검증을 수행했어요. 같은 SHA의 store-shell HTML과 프론트를 대조한 새 호환 blue로 **18:40:44 KST**에 공개 전환했어요. 익명 개인 삭제 요청은 401로 거부됐고 실제 고객 메시지 삭제·실결제·환불은 실행하지 않았어요.
 
 사전/사후 백업과 새 호환 이미지·프론트·현재 설정의 보호 보관, 사후 36테이블 백업의 별도 격리 복원은 [백업 런북](backup.md)을 따라요. 고객 고지 `2026-10-09T06:54:37Z`, 직원 접수·채팅 고지와 유예, 가게 접수·예약 설정, 메시지 원문·신고 증거를 유지했어요.
+
+## 15. SNS 피드 (로컬 구현, 운영 미적용)
+
+피드 후보의 DDL 범위는 15절 본문과 15.1~15.8 전체예요. 2026-10-16 전체 소스에는 [16절](#16-oauth-토큰-보호와-공급자-보안-사건-후보-운영-미적용)의 OAuth 스키마도 추가되어 현재 호환 표식은 `waiting-signup-hidden-feed-oauth-v7`예요. 초기 범위·검사 수·v3/v4/v5/v6 표식은 해당 날짜의 기록이에요. 최종 DDL은 실제 운영에 없는 정의만 의존 순서대로 선별하고, 댓글 확장·`promotion.benefit_design`·별도 피드 사진과 OAuth 변경까지 새 전체 JAR로 확인해요. 피드 게시와 혜택 승인은 별도 공개 정책이며, 댓글 알림은 후보 구현이에요. 저장·팔로우·영상·AI는 후속 범위로 남아요.
+
+2026-10-15 조회한 운영의 v2 구조와 같은 정기 백업에서 [feed-v6-from-v2.sql](../../scripts/sql/feed-v6-from-v2.sql)을 선별했어요. 15절에 이미 포함된 15.1의 승인 컬럼·신규 신고 revision과 후속 절의 중복 ALTER를 제외하고 15.6~15.8을 포함해요. MySQL 8.0.45·DB `reserve`·피드 테이블/신규 컬럼이 없는 시작 상태를 검사하며, **`--force` 없는 mysql CLI**에서 사전 검사가 실패하면 DDL 전에 중단해요. GUI의 오류 후 계속 실행이나 일부 적용 DB에 대한 재실행에는 사용하지 않아요. 각 절의 SQL을 이 파일 뒤에 다시 붙이지 않아요.
+
+같은 버전의 네트워크 없는 격리 복원본에 제한된 DDL 계정으로 적용했고, 36→47테이블과 기존 67행·원래 컬럼/제약/인덱스/CHECK/FK 보존, 신규 CHECK 거부·기본값·DDL 계정 DML 거부·재실행의 사전 차단을 확인했어요. 상세 입력과 해시는 [백업 준비 기록](backup.md#2026-10-15-준비용-정기-백업-독립-다운로드격리-복원)을 따라요. **운영에는 적용하지 않았으며 최종 후보 JAR 검증·새 직전 백업과 운영 DDL 승인은 별도예요.** 이후 스키마나 후보가 달라지면 이 파일을 자동 재사용하지 않고 차이를 다시 선별해요.
+
+2026-10-11의 피드는 모든 로그인 회원이 별도 공개 닉네임으로 글·사진을 게시하는 로컬 구현이에요. 예약 인증 리뷰·채팅과 구분하며, 당시 좋아요·저장·팔로우·댓글·영상·AI는 최초 범위에 없었어요. 10/12에 승인한 좋아요·댓글·답글·신고는 15.2절의 후속 후보이며 저장·팔로우·알림·영상·AI는 계속 후속으로 남겨요. 사업자 가게 소식은 혜택과 피드가 같은 `promotion` 원문을 읽어요. 소식 작성·수정·임시저장·최대 6장 사진·미리보기·내 소식과 NEWS/NOTICE/EVENT/BENEFIT 분류, 행사·혜택의 기간·조건을 포함해요. 피드에도 게시가 기본이며 소식별로 끌 수 있어요. 별도 SNS 자유글에 소식 링크를 붙이는 동작은 원문을 복제하지 않고, 소식 삭제 때 해당 자유글의 연결만 제외해요. 10/12에는 승인된 로컬 키·사진 저장소·새 JAR 연결과 배포 준비 검사를 진행했어요. 이 절의 운영 DDL·운영 키/환경 설정·배포는 적용하지 않았어요.
+
+`FEED_ENABLED`는 기본 `false`예요. 비활성 설정 조회는 새 테이블을 읽지 않으며 다른 피드 API는 닫혀 있어요. 이미 삭제한 글·미첨부 사진·처리 완료 신고의 기간 파기와 회원 탈퇴 정리는 기능 플래그와 무관하게 계속 적용해요. 탈퇴의 동일 트랜잭션에서 공개 프로필을 숨기고 닉네임을 `탈퇴한 회원`으로 익명화하며 unique 키는 공개 UUID 기반 탈퇴값으로 바꿔 기존 닉네임을 해제해요. 소개·계정 아바타 사용을 지우고 글의 삭제 시각을 남기되 신고 당시의 별도 스냅샷은 변경하지 않아요. **최초 entity 6개와 15.2절의 추가 entity 3개는 기능을 꺼도 새 JAR의 전체 `ddl-auto=validate` 대상이에요.** 따라서 기능 플래그만 끄고 기존 35모델 검증 결과를 새 JAR에 재사용하거나 운영 기동이 가능하다고 판단하지 않아요. 새 후보 JAR 전체의 모델 수·DDL 대조·제한된 앱 계정 검증과 복구 묶음을 별도로 확인해야 해요.
+
+사진은 별도 `FEED_IMAGE_ENCRYPTION_KEY`의 32바이트 Base64 키로 AES-GCM 암호화하며, JWT·채팅·AWS 키로 폴백하지 않아요. 키가 없으면 텍스트 기능만 사용할 수 있고 사진 업로드·읽기는 닫혀요. 키 값은 채팅·Git·명령 인수에 남기지 않으며 생성·환경 적용은 별도 승인 대상이에요. S3는 `users/{memberId}/feed/images/*.bin` 아래 암호문만 받아요. 공개 API가 현재 게시 상태를 검사한 뒤 `no-store`로 사진을 반환하며 공개 CDN 평문 URL·presigned URL을 제공하지 않아요. 원본 EXIF·위치·텍스트 메타데이터를 복사하지 않고 JPEG 방향만 픽셀에 적용해요. PNG는 투명도 유지 PNG, JPEG/GIF는 첫 프레임 JPEG로 재인코딩해요. 입력은 한 요청에 한 장·7MiB, 게시물은 6장이며 기존 multipart 요청 한도 8MB를 늘리지 않아요.
+
+닉네임은 NFKC·소문자로 정규화한 별도 unique 키를 사용해요. 공개 프로필은 계정 이름·이메일 대신 별도 닉네임을 표시하고 식별 필드는 UUID를 사용해요. 기존 계정 아바타도 `useAccountAvatar=true`를 직접 선택한 뒤 유효한 관리/허용 출처만 노출해요. 선택한 기존 사진 URL의 관리 경로에는 내부 회원 번호가 포함될 수 있으므로 URL까지 익명화한 것으로 표현하지 않아요. 초안·내 글은 본인만 읽으며 글 revision과 작성 요청 UUID의 unique가 편집 충돌·같은 생성 요청 재시도를 제어해요. 초안은 첫 게시 시각으로 최신순에 들어가며 공개 글의 일반 수정은 그 시각을 바꾸지 않아요.
+
+일반 사진 읽기는 공개 글·승인된 혜택 또는 작성자 본인으로 한정해요. 피드 노출을 끈 승인된 혜택의 사진도 읽을 수 있어요. 관리자는 일반 경로로 타인의 초안·미첨부 사진을 읽지 않으며, 신고 증거 또는 제출된 혜택 신청의 전용 경로로만 열람하고 감사를 남겨요. 신고 목록은 `OPEN`/`RESOLVED`로 필터링할 수 있고, 신고 스냅샷의 `post.state`는 변경하지 않아요. 별도 `postState`가 현재 원문 상태를 표시하며 파기된 원문은 `PURGED`예요. 신고 상세는 500자, 관리자 처리 메모는 1000자로 제한해요.
+
+아래는 **아직 적용하지 않은 후보 DDL**이에요. 대상 DB·기존 테이블·회원/가게/혜택 PK와 타입을 먼저 읽고 직전 새 백업의 독립 S3 읽기·격리 복원을 확보한 뒤, 새 승인 범위에 포함된 대상에만 DDL 계정으로 적용해요. 기존 같은 이름의 테이블이 있으면 `IF NOT EXISTS`로 덮지 않고 정확한 차이를 대조해요. 기존 계정·예약·결제·웨이팅·채팅 테이블을 수정하거나 원본을 지우지 않아요. 기존 `promotion`에는 아래의 소식 메타데이터·상태·revision을 추가하며 기존 행의 정본은 NEWS/PUBLISHED, 피드 노출 false로 유지하되 혜택 승인은 NONE으로 추가해요. 기존 소식을 자동 승인하거나 피드에 자동 게시하지 않으며 새 혜택 목록에는 심사를 통과한 항목만 포함해요. 제목·본문·업종 category·기존 PK와 `/benefits/{id}` 주소를 변환하거나 기존 소식을 피드에 자동 게시하지 않아요.
+
+```sql
+SELECT DATABASE(), @@hostname;
+SELECT TABLE_NAME FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN
+  ('feed_profile','feed_post','feed_media','feed_report','feed_report_image','feed_audit_record');
+SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('member','store','promotion') AND COLUMN_KEY = 'PRI';
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'promotion';
+
+ALTER TABLE promotion
+  ADD COLUMN news_type VARCHAR(16) NOT NULL DEFAULT 'NEWS',
+  ADD COLUMN state VARCHAR(16) NOT NULL DEFAULT 'PUBLISHED',
+  ADD COLUMN starts_at DATETIME(6),
+  ADD COLUMN ends_at DATETIME(6),
+  ADD COLUMN conditions VARCHAR(1000),
+  ADD COLUMN feed_enabled BIT(1) NOT NULL DEFAULT b'0',
+  ADD COLUMN benefit_state VARCHAR(16) NOT NULL DEFAULT 'NONE',
+  ADD COLUMN benefit_requested_at DATETIME(6),
+  ADD COLUMN benefit_reviewed_at DATETIME(6),
+  ADD COLUMN benefit_reviewer_id BIGINT,
+  ADD COLUMN benefit_review_note VARCHAR(1000),
+  ADD COLUMN revision BIGINT NOT NULL DEFAULT 0,
+  ADD COLUMN deleted_at DATETIME(6),
+  ADD INDEX ix_promotion_news_public (state,news_type,ends_at,created_at,promotion_id),
+  ADD INDEX ix_promotion_news_author (member_id,state,created_at,promotion_id),
+  ADD INDEX ix_promotion_news_deleted (state,deleted_at,promotion_id),
+  ADD INDEX ix_promotion_benefit_review (benefit_state,benefit_requested_at,promotion_id);
+
+CREATE TABLE feed_profile (
+  profile_id BIGINT NOT NULL AUTO_INCREMENT,
+  member_id BIGINT NOT NULL,
+  public_id VARCHAR(36) NOT NULL,
+  nickname VARCHAR(30) NOT NULL,
+  nickname_key VARCHAR(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  bio VARCHAR(160),
+  use_account_avatar BIT(1) NOT NULL,
+  hidden BIT(1) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (profile_id),
+  CONSTRAINT uk_feed_profile_member UNIQUE (member_id),
+  CONSTRAINT uk_feed_profile_public UNIQUE (public_id),
+  CONSTRAINT uk_feed_profile_nickname UNIQUE (nickname_key),
+  CONSTRAINT fk_feed_profile_member FOREIGN KEY (member_id) REFERENCES member(member_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE feed_post (
+  post_id BIGINT NOT NULL AUTO_INCREMENT,
+  profile_id BIGINT NOT NULL,
+  content TEXT NOT NULL,
+  region VARCHAR(50),
+  store_id BIGINT,
+  promotion_id BIGINT,
+  news_promotion_id BIGINT,
+  state VARCHAR(16) NOT NULL,
+  revision BIGINT NOT NULL,
+  client_request_id VARCHAR(36),
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  deleted_at DATETIME(6),
+  PRIMARY KEY (post_id),
+  CONSTRAINT uk_feed_post_request UNIQUE (profile_id,client_request_id),
+  CONSTRAINT uk_feed_post_news UNIQUE (news_promotion_id),
+  INDEX ix_feed_post_public (state,created_at,post_id),
+  INDEX ix_feed_post_region (region,state,created_at,post_id),
+  INDEX ix_feed_post_author (profile_id,state,created_at,post_id),
+  INDEX ix_feed_post_deleted (state,deleted_at,post_id),
+  CONSTRAINT fk_feed_post_profile FOREIGN KEY (profile_id) REFERENCES feed_profile(profile_id),
+  CONSTRAINT fk_feed_post_store FOREIGN KEY (store_id) REFERENCES store(store_id) ON DELETE SET NULL,
+  CONSTRAINT fk_feed_post_promotion FOREIGN KEY (promotion_id) REFERENCES promotion(promotion_id) ON DELETE SET NULL,
+  CONSTRAINT fk_feed_post_news FOREIGN KEY (news_promotion_id) REFERENCES promotion(promotion_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE feed_media (
+  media_id BIGINT NOT NULL AUTO_INCREMENT,
+  member_id BIGINT NOT NULL,
+  post_id BIGINT,
+  original_post_id BIGINT,
+  image_key VARCHAR(700) NOT NULL,
+  content_type VARCHAR(40) NOT NULL,
+  width INT NOT NULL,
+  height INT NOT NULL,
+  byte_count BIGINT NOT NULL,
+  position INT NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  detached_at DATETIME(6),
+  PRIMARY KEY (media_id),
+  INDEX ix_feed_media_post (post_id,position,media_id),
+  INDEX ix_feed_media_key (image_key),
+  INDEX ix_feed_media_orphan (post_id,created_at,media_id),
+  CONSTRAINT fk_feed_media_member FOREIGN KEY (member_id) REFERENCES member(member_id),
+  CONSTRAINT fk_feed_media_post FOREIGN KEY (post_id) REFERENCES feed_post(post_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE feed_report (
+  report_id BIGINT NOT NULL AUTO_INCREMENT,
+  revision BIGINT NOT NULL DEFAULT 0,
+  post_id BIGINT,
+  promotion_id BIGINT,
+  reporter_id BIGINT NOT NULL,
+  reason VARCHAR(20) NOT NULL,
+  detail VARCHAR(500),
+  snapshot_json LONGTEXT NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  hold BIT(1) NOT NULL,
+  note VARCHAR(1000),
+  created_at DATETIME(6) NOT NULL,
+  resolved_at DATETIME(6),
+  PRIMARY KEY (report_id),
+  CONSTRAINT uk_feed_report_target UNIQUE (post_id,reporter_id),
+  CONSTRAINT uk_feed_report_news UNIQUE (promotion_id,reporter_id),
+  INDEX ix_feed_report_status (status,created_at,report_id),
+  INDEX ix_feed_report_retention (status,hold,resolved_at,report_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE feed_report_image (
+  evidence_id BIGINT NOT NULL AUTO_INCREMENT,
+  report_id BIGINT NOT NULL,
+  original_media_id BIGINT NOT NULL,
+  owner_id BIGINT NOT NULL,
+  image_key VARCHAR(700) NOT NULL,
+  content_type VARCHAR(40) NOT NULL,
+  width INT NOT NULL,
+  height INT NOT NULL,
+  position INT NOT NULL,
+  PRIMARY KEY (evidence_id),
+  INDEX ix_feed_evidence_report (report_id,position,evidence_id),
+  INDEX ix_feed_evidence_key (image_key),
+  CONSTRAINT fk_feed_evidence_report FOREIGN KEY (report_id) REFERENCES feed_report(report_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE feed_audit_record (
+  audit_id BIGINT NOT NULL AUTO_INCREMENT,
+  actor_id BIGINT NOT NULL,
+  action VARCHAR(32) NOT NULL,
+  post_id BIGINT,
+  promotion_id BIGINT,
+  report_id BIGINT,
+  reason VARCHAR(2000),
+  created_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (audit_id),
+  INDEX ix_feed_audit_target (post_id,report_id,created_at,audit_id),
+  INDEX ix_feed_audit_news (promotion_id,report_id,created_at,audit_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+삭제는 즉시 비공개·본인 조회에서도 원문/사진 제외이며 복원하지 않아요. 삭제 시각부터 30일이 지난 원문·사진은 최대 100건 후보 batch로 정리하고 파일 삭제 outbox를 사용해요. 미첨부·편집에서 빠진 사진은 24시간 이후 정리해요. 신고의 본문/작성 당시 공개 프로필/사진 메타데이터는 별도 immutable 스냅샷이며 현재 글 편집으로 덮지 않아요. OPEN·hold는 신고 파기를 막고, RESOLVED 및 hold 해제 후 365일 보관해요. 신고 사진의 암호문은 원문과 같은 불변 객체를 참조할 수 있지만 살아 있는 원문/다른 신고 참조가 있으면 outbox 삭제를 넣지 않아요. 신고 증거 사진은 관리자 신고 API로만 읽고 열람·보류/해제·처리·게시물 숨김/복원은 append-only 기록에 남겨요. 회원 탈퇴는 글을 비공개·삭제 상태로 바꾸고 공개 프로필을 숨기며 거래 원장의 회원 FK를 삭제하지 않아요. 정지/폐업된 연결 가게·혜택은 공개 응답에서 연결을 제외해요.
+
+가게 소식의 제목·본문·종류·기간·조건·상태·revision은 `promotion`이 정본이에요. `feed_post.news_promotion_id`는 소식마다 하나만 연결하며 사진·피드 노출·신고를 함께 관리해요. 해당 피드 행의 content는 빈 문자열이고 읽을 때 정본 본문을 사용해요. 새 소식은 공개 프로필을 선택한 뒤 작성하며 기존 소식은 편집할 때 같은 ID에 이 연결을 추가해요. 기존 소식과 피드 노출을 끈 소식도 혜택에서 신고할 수 있고, carrier 없는 기존 신고는 `feed_report.post_id`가 null, promotion_id는 원래 소식 ID예요. 양쪽 화면에서 같은 회원이 같은 소식을 신고하면 하나로 처리하고 신고 원문·기간·조건·사진은 편집/삭제로 재구성하지 않아요. 신고·감사의 promotion_id는 파기 후에도 보존하는 scalar이므로 promotion FK를 걸지 않아요.
+
+행사·혜택 게시에는 offset 있는 시작/종료 시각이 필요하며 UTC로 저장하고 KST로 표시해요. 시작 포함·종료 제외이고 종료 시각은 시작보다 뒤여야 해요. 초안은 일부 입력을 허용하고, 소식·공지에는 기간을 두지 않아요. 기본 혜택 목록은 현재 진행 중인 항목만 보여주며 `period=ALL`과 공개 상세·피드는 지난 항목을 ENDED로 남겨요. 기간 종료는 원문 삭제나 사진 파기의 기산일이 아니에요. 소식의 새 생성/수정 timestamp도 해당 entity의 UTC 콜백을 사용하며 기존 행의 날짜를 일괄 치환하지 않아요.
+
+소식 삭제·관리자 숨김은 정본과 연결된 피드의 공개를 함께 차단하고, 피드에 게시 설정을 끄면 혜택만 공개해요. 공개 사진은 피드 목록 노출 여부와 별도로 소식의 공개 상태를 검사해요. 이전 로그인 전용 소식 목록/상세도 같은 공개 조건을 사용하며, 새 공개 닉네임 소식의 응답에 계정 이름·내부 회원 ID를 덧붙이지 않아요. 이미 삭제한 시각은 재요청·폐업·탈퇴로 다시 시작하지 않아요. 가게 폐업·회원 탈퇴는 기존 `promotion`의 즉시 물리 삭제를 수행하지 않고 소식과 연결 피드를 같은 트랜잭션에서 삭제 상태로 바꿔요. 30일 이후 파기는 연결 피드/미디어 행을 먼저 제거하고 정본을 지우되, 살아 있는 신고 사진 참조는 보존해요. 별도 SNS 자유글의 본문과 사진은 지우지 않으며 소식 선택 링크만 제외해요. 숨김 복원은 초안·삭제·탈퇴·폐업·현재 소유권 상실을 공개로 되돌리지 못해요. 실제 쿠폰 발급·사용과 할인 결제는 이번 소식의 조건 문구와 연결하지 않아요.
+
+피드 감사는 신고 목록에서도 원문 스냅샷을 반환하므로 관리자 원문·사진 열람 정책에 맞춰 각 기록일부터 최소 1년 보존하며 100건 이하 후보 batch로 정리해요. `feed.retention.access-audit-years`는 기본 `1`이며 `1` 또는 `2`만 허용해요. 그 밖의 값은 감사 파기를 중지하며 최소기간을 단축하지 않아요. 해당 신고 또는 같은 게시물의 다른 신고 스냅샷이 남아 있으면 열람·처리·보류·숨김/복원 기록도 함께 보존해요. 신고 자료가 모두 파기된 뒤에도 설정한 최소 1/2년이 지난 기록만 정리하며, 원문 파기만으로 기록을 제거하지 않아요. 이 기간 정리도 피드 API 기능 플래그와 별개예요. 기존 일반 감사의 `AuditRetentionPolicy.AUDIT_DAYS=90`은 변경하지 않아요.
+
+최종 배포 준비에는 익명/본인/타인/관리자, 두 계정, UUID 공개 프로필의 실명·이메일 부재, 초안·비공개·삭제 글과 사진 경계, 다른 글/다른 계정 미디어 재사용 거부, 동일 clientRequestId 재시도, revision 충돌, 닉네임 unique, 신고 후 편집/삭제의 스냅샷 고정, 보류/365일/30일/24시간과 outbox 공유 참조, 피드 감사 최소 1/2년·잘못된 기간의 파기 중지·같은 원문의 신고 연결 기록 보존, 탈퇴/정지/가게 폐업, multipart·픽셀·메타데이터·키 부재를 확인해요. 2026-10-12에 피드·가게 소식·로컬 저장·Redis 등 선별한 백엔드 조건과 새 JAR 전체 **41개 모델**의 제한 계정 `validate`를 실행했어요. 새 JAR의 실제 624개 클래스·142개 라이브러리와 JAR 루트의 `META-INF/orm.xml`을 사용했으며 H2나 소스 클래스 경로만으로 이 결과를 대신하지 않았어요. 테스트의 제한된 entity scan도 같은 ORM 조합이 참조하는 실제 모델을 포함하되 검사 전용 `schema_fixture`는 섞지 않아요. 소식/일반 회원의 사진 게시 PC·모바일 검사는 API fixture 근거이며 실제 휴대폰·로그인 계정의 사용감과 운영 사진 복구를 대신하지 않아요. 운영 적용 전에는 신규 피드 원문·암호문·키를 복구할 새 백업/호환 이미지·프론트·설정을 별도로 확인해요. 기존 `waiting-signup-hidden-v2` 표식이 새 피드 호환성까지 증명한다고 확대하지 않아요.
+
+현재 전체 후보의 자동 배포는 live와 target 모두 `reserve.feature-compat=waiting-signup-hidden-feed-oauth-v7`을 요구해요. 이전 v3~v6 이미지를 재표시해 복구 입력으로 쓰지 않아요. Docker 빌드는 실제 JAR의 기존 개인 숨김·피드·혜택·댓글 경계와 공통 Redis 중계, 16절의 OAuth converter/수신/보안 사건 클래스를 확인해요. 이 포함 관문은 실제 권한·보존·암호화·스키마 검사를 대신하지 않아요. 첫 SNS 전환에는 새 백업·15절/16절의 선별 DDL·제한 계정의 전체 JAR validate·동일 후보의 실제 호환 복구 이미지/프론트/키·설정과 별도 운영 승인이 필요해요. 기존 이미지를 재표시하거나 일반 자동 배포에 우회 옵션을 넣지 않아요.
+
+소식 작성 경로에는 사업자/관리자의 본인 가게·현재 가게 상태·동의·소유권, 업종과 소식 종류 분리, 사진만 수정하는 revision·동일 요청 재시도, 초안→첫 게시·게시→초안 금지, UTC 기간 경계와 종료 항목의 상세/피드 보존, 기본 양쪽 노출/피드 해제, 양쪽 편집·삭제·숨김·신고 중복, carrier 없는 기존 소식과 폐업/탈퇴·30일/사진 outbox·신고/감사 참조를 추가로 확인해요. 후보 ALTER 전후 기존 소식 행 수·제목/본문·주소 보존과 새 JAR 제한 계정 validate를 확인하고, 새 정책에서 삭제된 소식을 다시 공개하는 옛 복구 JAR을 복구 입력으로 쓰지 않아요. 10/12의 로컬 소식 조건·PC/모바일 작성 fixture·전체 41개 모델 검증과 운영 DDL 적용은 별개예요. 이 후보 DDL을 실제 운영 적용 기록으로 표현하지 않아요.
+
+### 15.1 혜택 탭 승인 정책 추가 (2026-10-12, 후보 코드·DDL)
+
+사용자 결정에 따라 혜택 탭 노출만 관리자 심사 대상으로 추가했어요. 별도 SNS 글과 가게 소식의 선택한 피드 게시에는 심사를 적용하지 않아요. 혜택 신청에는 저장된 본인 원문에 붙은 사진 1~6장이 필요해요. 승인 상태는 `NONE/DRAFT/PENDING/APPROVED/REJECTED`로 본문 공개 상태와 분리하고 신청 시각·심사 시각·관리자 scalar ID·사유를 저장해요. 작성/변경 요청의 `benefitRequested`로 신청 또는 철회를 명시해요. 초안은 사진 없이 신청 초안으로 저장할 수 있지만 공개 신청은 사진 없이 처리하지 않아요.
+
+관리자는 `/api/admin/promotions/applications` 목록·상세에서 실제 원문·사진·기간·조건을 검토하고 사유와 확인한 revision을 제출해요. 현재 사업자/관리자 작성 권한·동의·회원→가게→소식→피드→사진의 잠금·현재 소유권·상태를 다시 검사하고, 검토 중 편집·숨김·삭제 또는 다른 관리자의 처리가 있으면 승인하지 않아요. 사진은 `/api/admin/promotions/{id}/images/{imageId}`에서 해당 신청과 첨부 관계를 검사해 no-store로 읽어요. 신청·철회·수정 재심사·승인·반려·목록/원문/사진 열람은 기존 append-only 피드 감사에 남기고 기존 최소 1/2년 정책을 유지해요. 승인된 소식의 제목·본문·종류·기간·조건·사진 순서/구성이 바뀌면 혜택 노출을 중단하고 재심사하며 피드의 새 본문은 선택한 게시 상태로 바로 반영돼요. 피드 노출 선택만 바꾸거나 동일 내용을 다시 저장하면 승인을 취소하지 않아요.
+
+기간 전/종료 후 항목을 제외하는 진행 목록·종료 표시·즉시 숨김/30일 파기·신고 증거 보존 관문은 유지해요. 현재 사업자 권한을 잃은 소식은 승인·공개 목록/건수·상세·연결 피드 노출과 숨김 복원에서 차단하며 일반 회원의 독립 SNS 글은 유지해요. 일반 상세는 승인된 혜택 또는 피드에 공개한 소식만 반환하고, 혜택 미승인·피드 미게시 원문은 본인/전용 관리자 경로 외에 노출하지 않아요. 옛 홍보 API의 목록·조회수 변경 경로도 이 공개 조건을 우회하지 않아요. 가입·실제 결제·할인·쿠폰과 연결하지 않아요.
+
+위 15절의 최초 운영 후보 ALTER에는 이 컬럼을 함께 포함했어요. **15절의 로컬 피드 컬럼이 이미 존재하는 DB에서는 전체 ALTER를 다시 실행하지 않아요.** 먼저 해당 DB의 컬럼/인덱스·직전 백업과 복구 입력을 대조한 뒤, 이 다섯 컬럼이 모두 없을 때만 아래 추가분을 사용하는 후보예요. 일부만 있으면 정확한 차이만 준비해요. 동명 컬럼을 자동 덮거나 기존 행을 삭제하지 않아요.
+
+```sql
+SELECT DATABASE(), @@hostname;
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'promotion'
+  AND COLUMN_NAME IN ('benefit_state','benefit_requested_at','benefit_reviewed_at','benefit_reviewer_id','benefit_review_note');
+SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'promotion'
+  AND INDEX_NAME = 'ix_promotion_benefit_review';
+
+ALTER TABLE promotion
+  ADD COLUMN benefit_state VARCHAR(16) NOT NULL DEFAULT 'NONE',
+  ADD COLUMN benefit_requested_at DATETIME(6),
+  ADD COLUMN benefit_reviewed_at DATETIME(6),
+  ADD COLUMN benefit_reviewer_id BIGINT,
+  ADD COLUMN benefit_review_note VARCHAR(1000),
+  ADD INDEX ix_promotion_benefit_review (benefit_state,benefit_requested_at,promotion_id);
+```
+
+**이번 승인 정책의 코드/DDL을 추가한 뒤 테스트·린트·빌드·브라우저 검사·스키마 validate는 실행하지 않았어요.** 초기 기록 시점에는 로컬·운영 DDL 모두 미적용이었어요. 이후 로컬 3306의 읽기 조회에서 승인 컬럼 5개와 심사 인덱스가 이미 존재하고, 실행 서버의 설정에도 `benefitApprovalEnabled=true`가 있음을 확인했어요. 이 후속 작업에서는 DDL을 실행하거나 서버를 재시작하지 않았으며 운영은 미적용이에요. 앞선 10/12의 41개 모델 검증은 승인 컬럼을 추가하기 전 후보의 기록이며 현재 후보의 기동/호환성 근거로 재사용하지 않아요. 다음 배포 준비에서 익명·본인·타인·관리자, 사진 없는 신청/초안, 승인 전후 피드 독립 노출, 내용/사진/기간 수정 후 재심사, 동시 심사·stale revision·숨김/삭제·계정 제한, 관리자 사진 열람/감사, 승인된 혜택의 피드 해제 후 사진 읽기, 옛 API 우회, 새 JAR 전체 제한 계정 validate·새 백업/격리 복원·호환 복구 입력을 한 번에 확인해요. 운영 적용과 첫 v7 전환은 새 구체적인 승인 범위에서만 진행해요.
+
+### 15.2 좋아요·댓글·시군구 필터 후보 (2026-10-12, 실행 검증 전)
+
+가게의 기존 `favorite` 기록은 보존하고, `content_like`의 SNS 글/가게 소식을 같은 좋아요 화면에서 모아 보여줘요. 가게 소식의 피드 carrier는 promotion ID로 정규화해 혜택/피드 좋아요를 한 번만 집계해요. 좋아요 쓰기는 목표 상태를 지정하는 PUT이며 회원 잠금과 대상별 unique, 실제 원문 FK를 사용해 재전송·중복 생성·원문 파기 후 고아 기록을 막아요. 삭제·숨김·계정 제한으로 공개할 수 없는 대상은 내 좋아요에서도 본문/사진을 반환하지 않아요. 기존 가게 좋아요와 게시물 좋아요 수를 서로 합산하지 않아요.
+
+댓글은 공개 닉네임의 글과 한 단계 답글(1,000자), 작성 요청 UUID, 본인 수정/revision/삭제를 포함해요. 초안·숨김·삭제된 게시물에는 읽기/작성을 허용하지 않아요. 숨긴 부모 댓글의 답글도 공개 조회에서 제외하며 삭제된 부모는 기존 답글을 위한 빈 자리만 남겨요. 탈퇴 시 본인 댓글을 즉시 숨기고 좋아요를 제거해요. 댓글 삭제 원문은 30일 뒤 파기하며 답글이 남으면 본문을 비운 부모만 유지해요. 댓글 신고는 독립 스냅샷과 scalar 대상 ID로 보존하므로 원문/계정 삭제와 함께 지우지 않아요. 관리자 열람·숨김/복원·처리를 감사에 남기며 처리 완료 후 365일·파기 보류/보류 해제 시 재기산 정책을 적용해요. 해당 댓글 신고가 남으면 관련 게시물 감사도 보존해요.
+
+이 시군구 후보는 앞선 위치 모달 재사용 요청으로 구현했으며, 후속 선택에 따라 피드 위치 필터는 유지하고 공개 게시물 기준으로 조회해요. `GET /api/feed/regions`는 공개 목록과 같은 원문/프로필/회원/소식 상태 조건으로 집계하며 가게 수를 사용하지 않아요. 지역이 없거나 시도 단위인 글은 현재 공개 가능한 연결 가게 주소로 시군구를 조회하고, 비공개/삭제/제재된 가게나 소유자의 주소는 집계와 지역 필터에 사용하지 않아요. 응답은 시도·시군구·공개 게시물 수만 포함하고 상세 주소는 반환하지 않아요. 작성 지역 입력은 숨긴 상태이며 기존 값은 편집 때 보존해요. 기존 지역 값과 스키마를 보존하며 이번 후속에서 새 DDL을 실행하지 않아요. 새 후보의 region 길이는 50이고 시도 선택은 하위 지역도 포함해요. 임의의 문자열/LIKE 와일드카드는 지역 입력에서 허용하지 않아요.
+
+`FEED_INTERACTIONS_ENABLED`는 운영 기본 `false`, 로컬 프로필의 새 후보에서는 `true`예요. 일반 피드에는 FEED_ENABLED, 혜택 좋아요에는 독립적인 STORE_NEWS_ENABLED 활성화가 필요해요. 비활성화가 보존 기간 파기/탈퇴 정리를 막지 않으며 **세 entity는 기능 플래그와 무관하게 전체 JAR validate 대상**이에요. 아래는 대상/기존 컬럼/테이블을 대조한 뒤 사용하는 후보 입력이며 이번 작업에서 실행하지 않았어요. 후속 읽기 조회에서 로컬 3306의 region은 VARCHAR(50)이며 세 테이블과 unique/CHECK/FK, 원문 CASCADE·프로필/부모 SET NULL이 이미 존재함을 확인했어요. 따라서 로컬에 후보 DDL을 중복 적용하지 않았어요. 기존 15절 최초 CREATE는 이미 50자로 맞췄으므로 그 CREATE를 새로 적용했다면 ALTER를 반복하지 않아요.
+
+```sql
+SELECT DATABASE(), @@hostname, @@port;
+SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME IN ('feed_post','content_like','feed_comment','feed_comment_report');
+
+-- 기존 10자 컬럼이 확인된 경우에만 적용할 확대 후보
+ALTER TABLE feed_post MODIFY COLUMN region VARCHAR(50) NULL;
+
+CREATE TABLE content_like (
+  like_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  member_id BIGINT NOT NULL,
+  post_id BIGINT,
+  promotion_id BIGINT,
+  created_at DATETIME(6) NOT NULL,
+  CONSTRAINT uk_content_like_post UNIQUE (member_id,post_id),
+  CONSTRAINT uk_content_like_news UNIQUE (member_id,promotion_id),
+  CONSTRAINT ck_content_like_target CHECK
+    ((post_id IS NOT NULL AND promotion_id IS NULL) OR (post_id IS NULL AND promotion_id IS NOT NULL)),
+  INDEX ix_content_like_member (member_id,created_at,like_id),
+  CONSTRAINT fk_content_like_member FOREIGN KEY (member_id) REFERENCES member(member_id) ON DELETE CASCADE,
+  CONSTRAINT fk_content_like_post FOREIGN KEY (post_id) REFERENCES feed_post(post_id) ON DELETE CASCADE,
+  CONSTRAINT fk_content_like_news FOREIGN KEY (promotion_id) REFERENCES promotion(promotion_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE feed_comment (
+  comment_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  post_id BIGINT NOT NULL,
+  profile_id BIGINT,
+  parent_id BIGINT,
+  content TEXT NOT NULL,
+  state VARCHAR(16) NOT NULL,
+  revision BIGINT NOT NULL DEFAULT 0,
+  client_request_id VARCHAR(36),
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  deleted_at DATETIME(6),
+  CONSTRAINT uk_feed_comment_request UNIQUE (profile_id,client_request_id),
+  INDEX ix_feed_comment_post (post_id,parent_id,created_at,comment_id),
+  INDEX ix_feed_comment_profile (profile_id,state,comment_id),
+  INDEX ix_feed_comment_retention (state,deleted_at,comment_id),
+  CONSTRAINT fk_feed_comment_post FOREIGN KEY (post_id) REFERENCES feed_post(post_id) ON DELETE CASCADE,
+  CONSTRAINT fk_feed_comment_profile FOREIGN KEY (profile_id) REFERENCES feed_profile(profile_id) ON DELETE SET NULL,
+  CONSTRAINT fk_feed_comment_parent FOREIGN KEY (parent_id) REFERENCES feed_comment(comment_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE feed_comment_report (
+  report_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  revision BIGINT NOT NULL DEFAULT 0,
+  comment_id BIGINT NOT NULL,
+  post_id BIGINT NOT NULL,
+  reporter_id BIGINT NOT NULL,
+  reason VARCHAR(20) NOT NULL,
+  detail VARCHAR(500),
+  snapshot_json LONGTEXT NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  hold BIT(1) NOT NULL DEFAULT b'0',
+  note VARCHAR(1000),
+  created_at DATETIME(6) NOT NULL,
+  resolved_at DATETIME(6),
+  CONSTRAINT uk_feed_comment_report UNIQUE (comment_id,reporter_id),
+  INDEX ix_feed_comment_report_status (status,created_at,report_id),
+  INDEX ix_feed_comment_report_post (post_id,report_id),
+  INDEX ix_feed_comment_report_retention (status,hold,resolved_at,report_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+```
+
+다음 배포 준비에서는 공개/타인/본인/관리자 경로, 대상별 중복 좋아요·혜택 내부 행의 피드 경로 차단, 초안 비공개, 댓글 재전송·다른 게시물 답글·2단계 답글·stale revision, 부모 삭제/숨김, 탈퇴, 실제 FK/CHECK/unique/cascade, 댓글 원문 파기와 신고 보존/보류/감사를 확인해요. 새 전체 JAR·제한 계정 validate와 새 백업·격리 복원·현재 전체 후보의 v7 호환 복구 묶음이 필요해요. 로컬 `/api/feed/interactions/config`의 활성화·댓글 1,000자·답글 한 단계 설정과 사진 2장이 붙은 기존 임시저장 보존은 읽기로 확인했어요. 후속 구현의 로컬·격리 API/DB 검사 범위와 결과는 15.5를 참고해요. 운영 스키마의 새 전체 JAR validate·백업·격리 복원은 아직 실행하지 않았으며 로컬 성공을 운영 통과로 표현하지 않아요.
+
+
+### 15.4 피드·혜택 공개 경로 분리 (2026-10-13, 운영 미적용)
+
+SNS와 혜택의 작성·게시·지역 집계·좋아요 대상을 분리해요. STORE_NEWS_ENABLED는 FEED_ENABLED와 독립이며 혜택 사진은 /api/store-news/media 경로에서 승인 상태와 회원·가게 권한을 확인해요. 기존 promotion 원문·feed_post 사진 참조·feed_profile 소유 행·암호문·신고·감사 자료는 유지하며 새 컬럼·테이블이나 데이터 이관이 필요하지 않아요. 공개 닉네임이 없는 내부 사진 소유 행은 피드 프로필·목록에 노출하지 않아요. 기존 피드 ID 경로로 혜택을 조회·삭제·신고·좋아요 처리할 수 없어요. 혜택 수정 재심사와 30일 파기·신고 보존은 유지해요.
+
+### 15.5 신고 검토 동시 편집 보호 (2026-10-13, 운영 미적용)
+
+`feed_report`, `feed_comment_report`, `chat_report`에 JPA `@Version`용 `revision`을 추가해요. 신고 처리 API와 채팅 신고 보존 변경 API는 조회 당시의 버전을 필수로 받고 행 잠금 후 비교해요. 뒤늦은 상태 변경·파기 보류 해제는 409로 거부하며, 일반 피드·소식·댓글 신고의 처리 사유는 DTO와 서비스에서 모두 필수예요. 글·소식·댓글 숨김/복원은 신고 버전과 별도로 현재 원문의 버전을 검사하고 신고 당시 스냅샷은 바꾸지 않아요. 프론트는 신고 검토와 원문 공개 변경의 버전을 따로 고정하며 자동 재조회가 기존 입력을 새 버전으로 제출하게 하지 않아요. 명시적인 재조회가 성공해야 최신 상태로 다시 처리할 수 있고, 본인의 공개 변경 성공은 미저장 신고 처리 입력을 덮어쓰지 않아요.
+
+기존 테이블의 운영 후보 DDL은 아래와 같아요. 대상·직전 백업/격리 복원·현재 컬럼을 확인하고 별도 승인된 DDL 계정으로 새 서버 배포 전에 적용해요. 이미 있는 컬럼에는 다시 실행하지 않아요. 기존 증거·메모·보류·기산일은 변경하지 않으며 이전 행의 버전만 0으로 시작해요.
+
+```sql
+ALTER TABLE feed_report ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE feed_comment_report ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE chat_report ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
+```
+
+로컬 `localhost:3306/reserve`는 코드 컴파일 뒤 기존 개발 서버의 `ddl-auto:update` 재로딩으로 세 컬럼이 추가된 것을 읽기 조회로 확인했어요. 이 작업에서 수동 DDL이나 운영 DB 연결·DDL은 실행하지 않았어요. 제한 계정의 새 전체 JAR `validate`, 운영 적용, 운영 백업·복구는 별도 확인이 필요해요. 운영에서 `update`나 root 계정으로 검증 실패를 우회하지 않아요.
+
+최종 후보의 권한·초안 비공개·사진 접근·재심사·신고 보존·신고 사유/버전 충돌·CSRF·로그인 복귀·환불 안전장치는 선택한 백엔드 검사 188건에서 확인했어요. 별도의 격리 H2·HTTP API 흐름 검사 4건은 초안의 반복 조회/수정, 댓글 수정·삭제·한 단계 답글, 신고 검토 충돌, 혜택 승인 후 수정 재심사를 확인해요. 이 결과는 실제 결제·OAuth 제공자·사진 원본 저장소 또는 운영 스키마/복구 실행의 성공 근거가 아니에요. 운영 DDL·제한 계정의 새 전체 JAR validate·직전 백업/격리 복원은 별도 승인과 확인이 남아 있어요.
+
+
+### 15.6 댓글 사진·댓글 좋아요·피드 알림 후보 (2026-10-14, 운영 미적용)
+
+사진 1~6장을 댓글·한 단계 답글에 첨부하고 수정 시 순서를 교체할 수 있어요. 텍스트 또는 사진이 있어야 저장하며 사진은 작성자 소유·단일 원문 귀속을 검사하고 기존 암호화 업로드/읽기 관문을 사용해요. 글·소식·댓글 사이의 사진 재사용과 타인 사진 ID를 차단해요. 댓글 좋아요는 종합 좋아요에 포함하고 목표 상태 PUT·회원/원문 잠금·대상별 unique를 유지해요. 댓글·답글·댓글 좋아요의 앱 내 알림은 자기 자신에게 발송하지 않으며 동일 이벤트를 중복 생성하지 않아요. 수신자만 조회·읽음 처리할 수 있고 삭제/숨김/계정 제한된 원문과 작성자의 알림은 노출하지 않아요. 알림은 생성일로부터 90일 후 파기하고 탈퇴 시 수신/발신 알림을 제거해요. 이메일·브라우저 푸시 발송은 추가하지 않았어요.
+
+신고 당시 댓글 사진은 FK 없는 원문/회원 식별값과 독립 암호문 참조를 가진 feed_comment_report_image로 보존해요. 관리자 증거/현재 사진 읽기는 별도 관리자 경로·no-store·열람 감사로 처리해요. 원문 삭제 후 30일 파기와 신고 처리 완료/보류 해제 후 365일 파기는 같은 파일 소유자 잠금으로 직렬화하고, 원문과 모든 신고 증거 참조가 사라져야 파일 삭제 의도를 기록해요.
+
+후보 DDL 정본은 [feed-comment-v6.sql](../../scripts/sql/feed-comment-v6.sql)이에요. feed_media의 comment_id/original_comment_id·단일 부모 CHECK/인덱스/FK, content_like의 comment_id·unique/FK/세 대상 CHECK, 증거/알림 두 테이블을 추가해요. 이전 두 대상 CHECK는 실제 이름을 정보 스키마에서 읽어 같은 ALTER에서 교체해요. 조건에 맞는 CHECK가 정확히 한 개가 아니면 PREPARE 단계에서 중단해요. 이미 일부 컬럼/테이블이 있으면 파일을 재실행하지 말고 실제 구조를 대조해요. MySQL DDL은 자동 커밋이므로 운영 적용 전 새 전체 후보·제한 계정 validate·직전 백업과 격리 복원·복구 입력을 준비하고 별도 DDL 승인을 받아요.
+
+15.6을 추가한 당시 후보의 복구 호환 표시는 waiting-signup-hidden-feed-v6였어요. v5의 고아 사진 작업자는 댓글 사진을 고아로 잘못 분류하며 이전 좋아요 모델은 댓글 대상을 읽을 수 없어 재표시/복구에 쓰지 않아요. 당시 Docker JAR 포함·자동 배포/복구 관문과 CI 계약을 v6로 갱신했으며, 10/16 현재 전체 후보의 v7 관문은 위 최신 범위와 16절을 따라요. 첫 전환은 새로운 호환 복구 묶음과 운영 스키마 승인이 필요해요.
+
+이번 작업에서 확인한 로컬 127.0.0.1:3306/reserve(DESKTOP-2R1IST7)에 후보 DDL을 적용했어요. 새 컬럼 3개와 테이블 2개를 확인했고 기존 피드 DRAFT 2건/PUBLISHED 1건·소식 DRAFT 1건을 유지했어요. 별도 승인된 로컬 정리로 기존 삭제 글 4건·소식 2건·미디어 연결 4건을 삭제하고 파일 의도 4건을 큐에 넣었어요. 이후 같은 로컬 연결의 source_type=local_deleted_cleanup 집계에서 네 파일 삭제 작업 모두 COMPLETED임을 확인했어요. 테스트·린트·빌드·자동 브라우저 검사·새 JAR validate·운영 적용은 이번 후보에서 실행하지 않았어요. 15.5의 188/4건 기록은 이전 입력의 결과로 이 후보의 통과 근거가 아니에요.
+
+### 15.7 혜택 디자인·자동 갱신 후보 (2026-10-15, 운영 미적용)
+
+정본은 [benefit-design.sql](../../scripts/sql/benefit-design.sql)이에요. `promotion`에 `benefit_design VARCHAR(16) NOT NULL DEFAULT 'STANDARD'`와 `STANDARD|PHOTO|COMPACT` CHECK를 추가해요. 기존 행은 기본 디자인으로 시작하고 원문·사진·승인 기록은 바꾸지 않아요. 디자인 변경은 심사 대상 변경으로 처리하며 옛 클라이언트가 값을 생략하면 저장된 디자인을 유지해요. 기능 비활성 상태도 새 전체 JAR의 스키마 검증 대상이므로 컬럼을 먼저 준비해요.
+
+운영 적용 전 실제 컬럼/CHECK 유무와 직전 백업·격리 복원·제한 계정 validate·호환 복구 입력을 준비하고 승인된 DDL 계정으로 한 번만 적용해요. 이전 v6 JAR은 추가 컬럼을 읽지 않지만 새 디자인의 표시·저장은 지원하지 않아요. 복구를 위해 컬럼을 삭제하거나 기존 값을 다시 쓰지 않아요. SSE는 커밋 후 갱신 신호만 전송하며 별도 테이블이나 메시지 원문을 만들지 않아요.
+
+로컬 `localhost:3306/reserve`, 서버 `DESKTOP-2R1IST7`에서 적용했어요. 실행 도중 IDE 연결이 끊겨 동일 DDL을 재실행하지 않았으며, 재연결 후 정보 스키마에서 컬럼의 타입·NOT NULL·기본값과 CHECK를 확인했어요. 운영 DB 변경·서버 재시작·새 JAR validate·테스트·린트·빌드·자동 브라우저 검사는 실행하지 않았어요. 이전 후보의 검사 결과를 이 변경의 통과 근거로 사용하지 않아요.
+
+### 15.8 별도 피드 프로필 사진 후보 (2026-10-15, 운영 미적용)
+
+정본은 [feed-profile-avatar.sql](../../scripts/sql/feed-profile-avatar.sql)이에요. `feed_profile.custom_avatar_key VARCHAR(1024) NULL`과 `ck_feed_profile_avatar_source` CHECK를 추가해요. 별도 사진이 있으면 계정 사진 사용은 꺼져 있어야 해요. 기존 공개 동의 값은 바꾸지 않고, 새 공개 프로필은 별도 사진이 없으면 계정 사진을 사용해요. 사진을 교체·해제하거나 탈퇴하면 본인 경로의 이전 별도 사진만 삭제 outbox에 넣어요. `PUT /api/feed/me/profile/avatar`의 `image` multipart는 기존 계정 사진의 파일 검사·저장·롤백 보상을 재사용하고 `users/{memberId}/feed/profiles`에 저장해요.
+
+운영에서는 실제 컬럼·CHECK와 직전 백업·독립 다운로드·격리 복원·새 전체 JAR의 제한 계정 `validate`를 확인하고 별도 승인된 DDL 계정으로 적용해요. 이미 있는 컬럼에는 원본 ALTER를 다시 실행하지 않아요. 기존 v6 복구 JAR에는 새 컬럼·사진 삭제 수명주기가 없으므로 같은 v6 표식만으로 호환을 판단하지 않아요. 최종 후보와 새 호환 복구 묶음을 함께 검증하며 복구를 위해 컬럼·기존 사진 값을 삭제하지 않아요.
+
+#### 2026-10-15 로컬 적용과 후속 검증
+
+15.8의 별도 피드 프로필 사진에 한해 로컬 `127.0.0.1:3306/reserve`, 서버 `DESKTOP-2R1IST7`에서 개발 서버가 nullable 컬럼을 먼저 추가한 상태를 읽기로 확인했어요. 보호 경로에 직전 전체 SQL 백업을 만든 뒤 누락된 CHECK만 적용했고 기존 프로필 1건·별도 사진 0건을 유지했어요. IDE DDL 요청은 응답이 지연돼 중단했으며, 직접 메타데이터 조회에서 미반영·실행 중인 해당 DDL 없음·위반 행 0건을 확인한 다음 로컬 CLI로 CHECK만 적용했어요. 운영 DDL·운영 백업/복원·운영 제한 계정 검증은 수행하지 않았어요.
+
+이 15.8 변경 뒤 당시 새 전체 로컬 JAR을 `ddl-auto=validate`로 기동해 매핑 검증을 통과했어요. 이 서버는 로컬 개발 DB 계정을 사용하며 운영 `reserve_app` 검증을 대신하지 않아요. 선택한 백엔드 검사 43개 중 사진·저장소 경계 25개를 포함한 42개가 통과했고, 기존 삭제 글 소유자 조회의 테스트/서비스 기대 불일치 1개는 남았어요. 원형 프로필 사진 UI·새 피드 사진 저장 순서·계정 변경 경계와 실제 운영 S3 업로드/삭제 성공은 구분해요.
+
+같은 날 후속 점검에서 위 1건은 작성자에게 빈 삭제 표시를 반환하던 옛 테스트 기대임을 확인했어요. 현재 삭제 정책·서비스의 404를 유지하고 작성자·익명·타인 모두 404와 사진 조회 없음으로 검사를 수정했어요. 삭제 글·삭제 소식의 피드 경로·삭제 사진 접근을 대상으로 한 백엔드 검사 3건이 통과했어요. 이 수정은 삭제 원문 조회를 다시 허용하지 않으며 최종 후보의 전체 검사·새 JAR 검증을 대신하지 않아요. 이 기록은 아래 16절 OAuth DDL이나 v7 전체 JAR 검증 결과가 아니에요.
+
+## 16. OAuth 토큰 보호와 공급자 보안 사건 후보 (운영 미적용)
+
+2026-10-16 전체 후보는 활성 OAuth 토큰의 선택적 애플리케이션 암호화, Google/Kakao 서명 사건과 Naver 연결 해제 알림, 로그인/사건이 공유하는 주체별 잠금 상태를 추가해요. 모든 수신 flag는 기본 false이며 실제 공급자 등록·운영 활성화는 하지 않았어요. 지원 범위·검증 상태·키 복구는 [계정 보안](account-security.md)을 따라요. flag=false여도 새 엔티티/컬럼은 새 전체 JAR의 스키마 검사 대상이에요.
+
+| 정의 | 새 후보 | 보존 규칙 |
+|---|---|---|
+| `member.oauth_access_token` | nullable `VARCHAR(2048)` → `TEXT` | 기존 charset/collation·평문/NULL 그대로, 일괄 암호화 없음 |
+| `member.oauth_authenticated_at` | nullable `DATETIME(6)` | 정상 새 인증의 UTC 시각, 과거 회원 시각을 추정해 백필하지 않음 |
+| `member.oauth_security_revoked_at` | nullable `DATETIME(6)` | 기존 회원의 사건 cutoff, 사건 전 진행 중인 로그인 복원 차단 |
+| `idx_member_oauth_subject` | `(provider, provider_id, deleted_at)` 비고유 인덱스 | 다른 주체까지 전체 스캔으로 잠그지 않도록 조회 범위를 좁힘. 기존 중복을 지우거나 unique로 바꾸지 않음 |
+| `oauth_subject_security` | 새 테이블 | provider+subject의 SHA-256 가명 키 PK·provider·UTC 인증/폐기 고수위·갱신 시각. 회원이 없을 때의 cutoff도 유지 |
+| `oauth_security_event` | 새 테이블 | provider+사건 ID 해시 unique, 처리 시각/결과만 보관. 원문·subject·토큰 저장 없음 |
+
+선별 후보는 [oauth-security-v7.sql](../../scripts/sql/oauth-security-v7.sql)이에요. 10/14 준비용 백업의 실제 member 정의를 읽어 MySQL 8.0.45·DB reserve·원래 nullable varchar(2048)/utf8mb4_0900_ai_ci·provider enum/식별자/삭제 시각·새 정의와 인덱스 부재를 사전 검사해요. `feed-v6-from-v2.sql`은 당시 v6 DDL 연습의 정본 그대로 보존하고 필요한 16절을 별도 단계로 적용해요. 운영 조회가 달라지면 이 파일을 그대로 실행하지 않고 차이부터 다시 선별해요. **`--force` 없는 mysql CLI**를 사용하고 사전 검사 실패·부분 적용 때 자동 재실행하지 않아요. DDL 계정은 정의를 읽을 `SELECT`와 승인된 DDL 권한이 필요하며 DML 권한은 주지 않아요.
+
+실제 정의 대조에는 두 새 테이블의 PK·`uk_oauth_security_event_hash(event_hash)`·`idx_oauth_security_event_processed(processed_at)`와 세 CHECK(두 provider: GOOGLE/KAKAO/NAVER, outcome: APPLIED/IGNORED)의 강제 여부를 포함해요. `validate`만으로 CHECK·unique·인덱스의 검증을 대신하지 않아요. 독립 `VerifyDatabaseSchema`는 폴더명과 무관한 실제 어노테이션 스캔으로 OAuth outbox/새 inbox/subject 모델도 포함해요. 15절의 47테이블 복원 연습은 v6 입력의 기록이에요. 새 v7의 실제 JAR 모델 수와 전체 테이블 수는 최종 JAR의 어노테이션·ORM 매핑 및 격리 복원 스키마로 각각 확인하며, 이전 수치를 재사용하지 않아요.
+
+subject와 Naver·조회 인덱스를 포함한 현재 SQL을 MySQL 8.0.45의 network none·공개 포트/영구 볼륨 없는 일회용 합성 DB에 적용했어요. 2048자/NULL 원본 두 행·authVersion·NULL 시각과 기존 중복 주체 보존, 비고유 인덱스의 실제 열 순서, 세 CHECK와 두 unique의 실제 거절, Naver 허용, DML 롤백, 재실행/다른 DB의 DDL 전 중단, 앱 DDL/DDL 계정 DML 거부를 확인했어요. SQL SHA-256은 `df5485625ef2ab32527cffd9bb47bd562d6897c1a458d6d8d6f3a3673d7f492c`이며 시험 컨테이너는 제거했어요. 앞선 두 CHECK·인덱스 전 해시의 검사는 당시 입력의 기록으로 현재 SQL을 대신하지 않아요. 이 검사는 운영 스키마 재조회·새 백업의 전체 복원·새 실제 JAR validate를 대신하지 않아요.
+
+복구는 `waiting-signup-hidden-feed-oauth-v7`의 실제 JAR/이미지·같은 SHA의 세 프론트·필요한 키/환경·현재 DB를 함께 준비해요. 암호문 저장 뒤 구 v6 앱이나 단순 flag=false로 복귀하지 않아요. `TEXT`를 다시 varchar로 줄이거나 새 컬럼/처리 이력을 삭제하는 것을 기본 복구로 삼지 않아요. 기존 운영 DB·개발 DB에 이 DDL을 적용한 기록은 없으며 최종 후보 JAR·전체 스키마의 독립 복원 검증은 남아 있어요.

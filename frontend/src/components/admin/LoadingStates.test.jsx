@@ -17,7 +17,7 @@ import BusinessPanel from '../../pages/business/BusinessPanel';
 
 const state = vi.hoisted(() => ({
     query: {}, stores: {}, thread: {}, reload: vi.fn(), apiGet: vi.fn(), renderBusinessRows: false,
-    queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null, manage: {},
+    queryOptions: null, dataTableProps: null, setQueryParams: vi.fn(), queryParams: null, manage: {}, width: 390,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -33,7 +33,7 @@ vi.mock('../../api/axios', () => ({ default: { get: state.apiGet, post: vi.fn(),
 vi.mock('../../hooks', () => ({
     useMessage: () => ({ message: { error: vi.fn(), success: vi.fn() }, confirm: vi.fn() }),
     useQueryParamsState: (defaults) => [state.queryParams ?? defaults, state.setQueryParams],
-    useWindowWidth: () => 390,
+    useWindowWidth: () => state.width,
     useMyStores: () => state.stores,
     useAdPayment: () => ({ pay: vi.fn(), payExisting: vi.fn(), paying: false, payingId: null }),
     useImagePreview: () => ({ handlePreview: vi.fn(), suppressLinkNavigation: vi.fn(), previewNode: null }),
@@ -42,7 +42,7 @@ vi.mock('../../hooks', () => ({
 vi.mock('../../hooks/useDebounce', () => ({ default: (value) => value }));
 vi.mock('../../hooks/useChatThread', () => ({ default: () => state.thread }));
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { error: vi.fn(), success: vi.fn() }, confirm: vi.fn() }) }));
-vi.mock('../../hooks/useWindowWidth', () => ({ useWindowWidth: () => 390 }));
+vi.mock('../../hooks/useWindowWidth', () => ({ useWindowWidth: () => state.width }));
 vi.mock('../../hooks/useDocumentTitle', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/useManageReservations', () => ({ default: () => ({
     reservations: [], total: 0, totalPages: 0, error: null, loading: false, refetching: false,
@@ -77,6 +77,7 @@ vi.mock('../common', () => {
         Button: ({ children, onClick, disabled }) => <button onClick={onClick} disabled={disabled}>{children}</button>,
         UnreadPill: Placeholder,
         SegmentedControl: Placeholder,
+        SegmentedGrid: Placeholder,
         FormModal: Placeholder,
         FormInput: Placeholder,
         FormTextArea: Placeholder,
@@ -108,6 +109,7 @@ beforeEach(() => {
     state.queryParams = null;
     state.renderBusinessRows = false;
     state.manage = {};
+    state.width = 390;
     state.query = {
         data: undefined, isLoading: false, isPending: false, isFetching: false, isPlaceholderData: false,
         error: null, isError: false, refetch: vi.fn(),
@@ -328,16 +330,17 @@ it('keeps a failed business verification detail open and retries only that item'
 });
 
 it('marks QR check-in as the active partner tab only while its sheet is open', async () => {
+    state.width = 1100;
     render(<MemoryRouter><BusinessPanel /></MemoryRouter>);
-    const reservationsTab = screen.getByRole('tab', { name: /예약 관리$/ });
-    const qrTab = screen.getByRole('tab', { name: /QR 체크인$/ });
+    const reservationsTab = screen.getByRole('link', { name: /예약 관리$/ });
+    const qrTab = screen.getByRole('link', { name: /QR 체크인$/ });
 
     fireEvent.click(qrTab);
-    expect(qrTab).toHaveAttribute('aria-selected', 'true');
+    expect(qrTab).toHaveAttribute('aria-current', 'page');
     expect(await screen.findByRole('dialog', { name: 'QR 체크인' })).toBeInTheDocument();
 
     fireEvent.click(document.querySelector('.reserve-qr-sheet .ant-modal-close'));
-    await waitFor(() => expect(reservationsTab).toHaveAttribute('aria-selected', 'true'));
+    await waitFor(() => expect(reservationsTab).toHaveAttribute('aria-current', 'page'));
 });
 
 it('retries both independent lookups when partner stores and reservations fail together', () => {

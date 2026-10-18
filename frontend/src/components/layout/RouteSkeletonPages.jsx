@@ -1,23 +1,33 @@
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import { PageStatusSkeleton } from '../common/PageStatus';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
+import FeedRouteSkeleton from '../feed/FeedRouteSkeleton';
+import WaitingRouteSkeleton from '../waiting/WaitingRouteSkeleton';
+import StoreNewsSkeleton, { StoreNewsPublicToolbarSkeleton } from '../store-news/StoreNewsSkeleton';
+import useAuthStore from '../../store/useAuthStore';
 import BenefitDetailSkeleton from '../common/BenefitDetailSkeleton';
 import StoreListRowSkeleton from '../store/StoreListRowSkeleton';
 import DiscoveryRouteSkeleton from './DiscoveryRouteSkeleton';
 import { STORE_LIST_PAGE_SIZE } from '../../constants/storeListPageSize';
 import MyPageSkeleton from './MyPageSkeleton';
+import DraftTransferSkeleton from '../store/DraftTransferSkeleton';
 import { SERVICE_DOMAIN_OPTIONS, SERVICE_DOMAIN_FILTER_OPTIONS, OWNER_STORE_SORT_OPTIONS, SORT_OPTIONS,
     RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../../constants';
 import PropTypes from 'prop-types';
-import { PageTitle, PageDescription } from '../common/PageTypography';
+import { SkeletonPageTitle as PageTitle, SkeletonPageDescription as PageDescription } from '../common/PageTypography';
+import TextBone from '../common/SkeletonText';
 import Bone from '../common/Bone';
 import PageContainer from '../common/PageContainer';
-import { ReservationCardSkeleton, ReservationSummaryCardSkeleton, StoreDetailSkeleton, MyReservationCardSkeleton } from '../common/Skeletons';
+import { ReservationCardSkeleton, ReservationSummaryCardSkeleton, MyReservationCardSkeleton } from '../common/Skeletons';
+import StoreDetailLoading from '../store/StoreDetailLoading';
 import StoreOnboardingSkeleton from '../store/StoreOnboardingSkeleton';
 import { ListingHeader, ListingToolbarSkeleton, RefreshToolbarSkeleton, SegmentedControlSkeleton } from './routeSkeletonParts';
 import { reservationSkeletonFilters } from './reservationSkeletonFilters';
-import { WaitingTabSkeleton, MyWaitingSkeleton, WaitingStoresSkeleton } from '../waiting/WaitingSkeleton';
+import { WaitingTabSkeleton, MyWaitingSkeleton } from '../waiting/WaitingSkeleton';
+import { MY_WAITING_STATUSES, MY_WAITING_SORTS } from '../waiting/waitingDirectoryFilters';
 import AdminTabRouteSkeleton, { AdsRouteSkeleton, StatisticsRouteSkeleton, ChatIntroRouteSkeleton } from './WorkspaceRouteSkeletons';
+import WorkspaceLayout from './WorkspaceLayout';
+import { ADMIN_WORKSPACE_GROUPS, BUSINESS_WORKSPACE_GROUPS, resolveAdminTab, resolveBusinessTab } from '../../constants/workspaces';
 import { normalizeRouteSkeletonPath } from './routeSkeletonKind';
 import { discoveryComingSoonScreen } from '../../constants/discoveryComingSoon';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
@@ -27,15 +37,10 @@ import { StateIllustrationSkeleton } from '../common/StateIllustration';
 import { GUIDE_PAGES, guidePageForPath, guideStyles } from '../../pages/legal/GuidePageMetadata';
 
 // 2026-09-29 — 청크 로딩 뼈대가 실제 페이지와 같은 틀·여백·순서로 그려지도록 페이지별 뼈대를 모았다.
-// 제목·설명·라벨처럼 서버 데이터가 아닌 고정 문구는 실제 글자로 둔다(ListingHeader 와 같은 원칙) —
-// 글자 크기·줄바꿈이 실제와 같아 로딩이 끝나도 아래 내용이 밀리지 않는다. 입력칸·버튼·목록만 뼈대다.
+// 고정 문구도 SkeletonText로 가린다. 실제 글자 크기·줄바꿈을 유지해 로딩 후 내용이 밀리지 않는다.
 
 
-/** 글자 모양 뼈대 — 문구는 투명하게 두고 줄마다 막대를 그린다. 폭에 따른 줄바꿈이 실제 문구와 같다. */
-export function TextBone({ children }) {
-    return <span className="reserve-skeleton-block reserve-route-skeleton-text">{children}</span>;
-}
-TextBone.propTypes = { children: PropTypes.node.isRequired };
+export { TextBone };
 
 const optionValueOr = (options, value, fallback) => options.some(option => option.value === value) ? value : fallback;
 const storeSkeletonFilters = (params, sortOptions, fallbackSort) => [
@@ -206,7 +211,7 @@ export function GuideRouteSkeleton({ pathname = '' }) {
             </span>)}
         </div>
         {guide.sections.map(section => <section key={section.id} style={guideStyles.section}>
-            <h2 style={guideStyles.sectionTitle}>{section.title}</h2>
+            <h2 style={guideStyles.sectionTitle}><TextBone>{section.title}</TextBone></h2>
             {[100, 92, 64].map(width => <div key={width} style={{ height: 27, display: 'flex', alignItems: 'center' }}>
                 <Bone width={width + '%'} height={13} />
             </div>)}
@@ -216,7 +221,7 @@ export function GuideRouteSkeleton({ pathname = '' }) {
 }
 GuideRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
-/* ── 준비 중 탐색 화면(/waiting, /feed) ───────────────────────────────── */
+/* ── 준비 중 피드 화면(/feed) ──────────────────────────────────────── */
 
 // 실제 화면과 같은 틀(.reserve-discovery-coming-soon — 최소 높이·세로 가운데 정렬)과 같은 문구 줄바꿈을 쓴다.
 export function ComingSoonRouteSkeleton({ pathname = '' }) {
@@ -225,8 +230,8 @@ export function ComingSoonRouteSkeleton({ pathname = '' }) {
         <StateIllustrationSkeleton style={{ marginBottom: 8 }} />
         <Bone width={60} height={27} borderRadius={100} />
         {screen && <>
-            <PageTitle level={1}><TextBone>{screen.heading}</TextBone></PageTitle>
-            <PageDescription><TextBone>{screen.description}</TextBone></PageDescription>
+            <PageTitle level={1}>{screen.heading}</PageTitle>
+            <PageDescription>{screen.description}</PageDescription>
         </>}
         <div style={{ minHeight: 44, marginTop: 8, display: 'flex', alignItems: 'center' }}><Bone width={110} height={16} /></div>
     </section>;
@@ -256,62 +261,40 @@ export function PaymentResultRouteSkeleton() {
     </PageContainer>;
 }
 
-/* ── 관리자·파트너 패널 — 제목/설명 → 알약 탭 → (탭별) 도구줄 → 목록 ─────────── */
-
-const ADMIN_TAB_TEXT_WIDTHS = [67, 80, 62, 62, 80, 62, 94, 76, 76, 80, 80, 80, 80];
-const ADMIN_TAB_KEYS = ['pending', 'all', 'mailbox', 'reports', 'chat-intro', 'trash', 'audit-logs', 'dashboard', 'members', 'stores-admin', 'reservations', 'payments', 'ads'];
-const BUSINESS_TAB_KEYS = ['reservations', 'waiting', 'qr-checkin', 'ads', 'analytics', 'chat-intro'];
-const BUSINESS_TAB_TEXT_WIDTHS = [81, 62, 87, 80, 89, 80];
-
-// AntD Tabs(reserve-pill-tabs) 자리 — 탭 한 칸은 위아래 8·좌우 18(≤768px 은 7·10) 여백 + 24px 글자 줄, 탭 사이 4.
-function PanelTabsSkeleton({ widths, more = false, activeIndex = 0 }) {
-    return <div className="reserve-route-panel-tabs">
-        <div className="reserve-route-panel-tabs-list">
-            {widths.map((width, index) => (
-                <span key={`${width}-${index}`} className={`reserve-route-panel-tab${index === activeIndex ? ' is-active' : ''}`}><Bone width={width} height={14} /></span>
-            ))}
-        </div>
-        {more && <span className="reserve-route-panel-tabs-more"><Bone width={16} height={16} /></span>}
-    </div>;
-}
-PanelTabsSkeleton.propTypes = { widths: PropTypes.arrayOf(PropTypes.number).isRequired, more: PropTypes.bool, activeIndex: PropTypes.number };
+/* ── 관리자·파트너 패널 — 실제 작업 공간과 같은 메뉴·작업 영역 ─────────── */
 
 export function AdminRouteSkeleton({ search = '' }) {
-    const requestedTab = new URLSearchParams(search).get('tab') || 'pending';
-    const tab = requestedTab === 'chat' ? 'reports' : requestedTab;
-    return <PageContainer size="xl" paddingTop="40px">
-        <ListingHeader title="관리자 패널" description="사업자 인증 신청을 검토하고, 전체 예약 현황을 모니터링하세요." marginBottom={40} />
-        <PanelTabsSkeleton widths={ADMIN_TAB_TEXT_WIDTHS} activeIndex={ADMIN_TAB_KEYS.indexOf(tab)} more />
+    const tab = resolveAdminTab(new URLSearchParams(search).get('tab'));
+    return <WorkspaceLayout loading title="관리자 패널"
+        groups={ADMIN_WORKSPACE_GROUPS} activeKey={tab} hrefFor={key => '?tab=' + key}>
         <AdminTabRouteSkeleton tab={tab} search={search} />
-    </PageContainer>;
+    </WorkspaceLayout>;
 }
 AdminRouteSkeleton.propTypes = { search: PropTypes.string };
 
 export function BusinessRouteSkeleton({ search = '' }) {
     const params = new URLSearchParams(search);
-    const requestedTab = params.get('tab');
-    const tab = BUSINESS_TAB_KEYS.includes(requestedTab) ? requestedTab : 'reservations';
+    const tab = resolveBusinessTab(params.get('tab'));
+    const returnTab = resolveBusinessTab(params.get('qrReturn'));
+    const contentTab = tab === 'qr-checkin' ? (returnTab === 'qr-checkin' ? 'reservations' : returnTab) : tab;
     const isCards = resolveViewMode('/business', params, 'list') === 'cards';
-    return <PageContainer size="xl" paddingTop="40px">
-        <ListingHeader title="사업자 파트너 패널" description="예약 현황을 실시간으로 확인하고 승인·거절하세요." marginBottom={40} />
-        {/* 실제 Tabs 는 style={{ marginBottom: 8 }} — 탭+내용 묶음 아래 8px */}
-        <div style={{ marginBottom: 8 }}>
-            <PanelTabsSkeleton widths={BUSINESS_TAB_TEXT_WIDTHS} activeIndex={BUSINESS_TAB_KEYS.indexOf(tab)} />
-            {tab === 'waiting' && <WaitingTabSkeleton view={isCards ? 'cards' : 'list'} />}
-            {tab === 'ads' && <AdsRouteSkeleton />}
-            {tab === 'analytics' && <StatisticsRouteSkeleton search={search} />}
-            {tab === 'chat-intro' && <ChatIntroRouteSkeleton business />}
-            {tab === 'reservations' && <>
-                <ListingToolbarSkeleton filters={reservationSkeletonFilters({
-                    store: params.get('reservationStore') || 'ALL',
-                    status: optionValueOr(RESERVATION_STATUS_FILTER_OPTIONS, params.get('reservationStatus'), 'ALL'),
-                    sort: optionValueOr(RESERVATION_SORT_OPTIONS, params.get('reservationSort'), 'recent'),
-                })} />
-                <RefreshToolbarSkeleton search />
-                {isCards ? <ReservationSummaryCardSkeleton count={5} /> : <ReservationCardSkeleton count={5} />}
-            </>}
-        </div>
-    </PageContainer>;
+    return <WorkspaceLayout loading title="사업자 파트너 패널"
+        groups={BUSINESS_WORKSPACE_GROUPS} activeKey={tab} hrefFor={key => '?tab=' + key}>
+        {contentTab === 'waiting' && <WaitingTabSkeleton view={isCards ? 'cards' : 'list'} />}
+        {contentTab === 'news' && <StoreNewsSkeleton />}
+        {contentTab === 'ads' && <AdsRouteSkeleton />}
+        {contentTab === 'analytics' && <StatisticsRouteSkeleton search={search} />}
+        {contentTab === 'chat-intro' && <ChatIntroRouteSkeleton business />}
+        {contentTab === 'reservations' && <>
+            <ListingToolbarSkeleton filters={reservationSkeletonFilters({
+                store: params.get('reservationStore') || 'ALL',
+                status: optionValueOr(RESERVATION_STATUS_FILTER_OPTIONS, params.get('reservationStatus'), 'ALL'),
+                sort: optionValueOr(RESERVATION_SORT_OPTIONS, params.get('reservationSort'), 'recent'),
+            })} />
+            <RefreshToolbarSkeleton search />
+            {isCards ? <ReservationSummaryCardSkeleton count={5} /> : <ReservationCardSkeleton count={5} />}
+        </>}
+    </WorkspaceLayout>;
 }
 BusinessRouteSkeleton.propTypes = { search: PropTypes.string };
 
@@ -370,7 +353,6 @@ export function StoreFormRouteSkeleton({ pathname = '' }) {
 StoreFormRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
 // StoreDetail.jsx 의 BREAKPOINT 와 같은 값 — PC 두 칸 배치가 시작되는 폭.
-const STORE_DETAIL_BREAKPOINT = 900;
 
 // 페이지가 데이터 로딩 때 그리는 것과 같은 컴포넌트·개수·보기 방식 — 코드 로딩 → 데이터 로딩으로 넘어갈 때 모양이 안 바뀐다(2026-09-24).
 function CardsSkeleton({ pathname = '', search = '' }) {
@@ -410,14 +392,6 @@ function StoreListRouteSkeleton({ pathname = '/stores', search = '' }) {
 }
 StoreListRouteSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };
 
-function WaitingRouteSkeleton({ pathname, search }) {
-    const isList = resolveViewMode(pathname, new URLSearchParams(search), 'cards') === 'list';
-    return <PageContainer size="xl" paddingTop="32px">
-        <div className="reserve-waiting-heading"><PageTitle level={1}>웨이팅</PageTitle><PageDescription>접수 가능한 가게를 찾고, 내 예약에서 대기 현황을 확인해요.</PageDescription></div>
-        <WaitingStoresSkeleton view={isList ? 'list' : 'cards'} />
-    </PageContainer>;
-}
-WaitingRouteSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };
 
 function ReservationsSkeleton({ pathname = '/my-reservations', search = '' }) {
     const params = new URLSearchParams(search);
@@ -428,7 +402,9 @@ function ReservationsSkeleton({ pathname = '/my-reservations', search = '' }) {
         <div style={{ marginBottom: 20 }}><SegmentedControlSkeleton
             value={waiting ? 'waiting' : 'reservation'}
             options={[{ value: 'reservation', label: '예약' }, { value: 'waiting', label: '웨이팅' }]} /></div>
-        {waiting ? <MyWaitingSkeleton view={isCards ? 'cards' : 'list'} /> : <>
+        {waiting ? <MyWaitingSkeleton view={isCards ? 'cards' : 'list'}
+            statusLabel={MY_WAITING_STATUSES.find(option => option.value === optionValueOr(MY_WAITING_STATUSES, params.get('waitingStatus'), 'ALL')).label}
+            sortLabel={MY_WAITING_SORTS.find(option => option.value === optionValueOr(MY_WAITING_SORTS, params.get('waitingSort'), 'recent')).label} /> : <>
             <ListingToolbarSkeleton filters={reservationSkeletonFilters({
                 status: optionValueOr(RESERVATION_STATUS_FILTER_OPTIONS, params.get('status'), 'ALL'),
                 sort: optionValueOr(RESERVATION_SORT_OPTIONS, params.get('sort'), 'recent'),
@@ -440,23 +416,17 @@ function ReservationsSkeleton({ pathname = '/my-reservations', search = '' }) {
 }
 ReservationsSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };
 
-function BenefitsRouteSkeleton() {
-    return <section className="reserve-benefits-page"><section className="reserve-benefits-news">
+function BenefitsRouteSkeleton({ search }) {
+    const business = useAuthStore(state => state.user?.role === 'BUSINESS');
+    const params = new URLSearchParams(search);
+    return <section className="reserve-benefits-page"><StoreNewsPublicToolbarSkeleton business={business} type={params.get('newsType') || 'ALL'} period={params.get('period') === 'ALL' ? 'ALL' : 'ONGOING'} /><section className="reserve-benefits-news">
         <div className="reserve-benefits-news-content"><BenefitListSkeleton /></div>
     </section></section>;
 }
+BenefitsRouteSkeleton.propTypes = { search: PropTypes.string };
 
 // 가게 소식 상세 — 페이지가 데이터 로딩 때 그리는 뼈대를 그대로 쓴다.
 const BenefitDetailRouteSkeleton = () => <BenefitDetailSkeleton />;
-
-// 가게 상세 — 페이지의 데이터 로딩과 같은 틀(PC xl·32 / 900px 미만 md 700·20)과 같은 뼈대.
-// 예전엔 라우트 틀(최대 1200·여백 32/20)에 넣어 태블릿(768~899)에서 폭·여백이 실제와 달랐다(2026-09-29).
-function DetailRouteSkeleton() {
-    const isPC = useWindowWidth() >= STORE_DETAIL_BREAKPOINT;
-    return <PageContainer size={isPC ? 'xl' : 'md'} paddingTop={isPC ? '32px' : '20px'}>
-        <StoreDetailSkeleton isPC={isPC} />
-    </PageContainer>;
-}
 
 
 function SearchSkeleton() {
@@ -479,27 +449,32 @@ function SearchSkeleton() {
                 </div>
             </div>
             <section className="reserve-search-recent">
-                <div className="reserve-search-recent-heading"><h2>최근 검색</h2></div>
-                <p className="reserve-search-recent-note">이 브라우저에만 저장돼요.</p>
+                <div className="reserve-search-recent-heading"><h2><TextBone>최근 검색</TextBone></h2></div>
                 <div className="reserve-search-recent-empty"><Bone width={150} height={16} /></div>
             </section>
         </div>
     </div>;
 }
 
+
 const KINDS = {
     search: SearchSkeleton,
     'my-page': MyPageSkeleton,
+    'draft-transfer': DraftTransferSkeleton,
     discovery: DiscoveryRouteSkeleton,
     'store-form': StoreFormRouteSkeleton,
     // 가게 상세 페이지가 데이터 로딩 때 쓰는 것과 같은 틀·스켈레톤
-    detail: DetailRouteSkeleton,
+    detail: StoreDetailLoading,
     cards: CardsSkeleton,
     'store-list': StoreListRouteSkeleton,
     waiting: WaitingRouteSkeleton,
     reservations: ReservationsSkeleton,
     benefits: BenefitsRouteSkeleton,
     'benefit-detail': BenefitDetailRouteSkeleton,
+    feed: FeedRouteSkeleton,
+    'feed-detail': FeedRouteSkeleton,
+    'feed-author': FeedRouteSkeleton,
+    'feed-notifications': FeedRouteSkeleton,
     'coming-soon': ComingSoonRouteSkeleton,
     auth: AuthRouteSkeleton,
     legal: LegalRouteSkeleton,

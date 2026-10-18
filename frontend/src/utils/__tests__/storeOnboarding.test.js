@@ -26,10 +26,13 @@ describe('onboarding domain policy and compatibility', () => {
             .toMatchObject({ bookingDeadlineHours: 0, noShowDeposit: 0, allowLatePayment: false });
     });
 
-    it('requires late-payment expiry only for the enabled paid timing branch', () => {
-        expect(validated({ noShowDeposit: 1000, allowLatePayment: false })).not.toContain('paymentTimeoutMinutes');
-        expect(validated({ noShowDeposit: 1000, allowLatePayment: true })).toContain('paymentTimeoutMinutes');
-        expect(validated({ noShowDeposit: 1000, _depositEnabled: false, allowLatePayment: true })).not.toContain('paymentTimeoutMinutes');
+    it('requires a timeout only for paid reservations that do not allow late payment', () => {
+        expect(validated({ noShowDeposit: 1000, allowLatePayment: false })).toContain('paymentTimeoutMinutes');
+        expect(validated({ noShowDeposit: 1000, allowLatePayment: true })).not.toContain('paymentTimeoutMinutes');
+        expect(validated({ noShowDeposit: 1000, _depositEnabled: false, allowLatePayment: false })).not.toContain('paymentTimeoutMinutes');
+        expect(validated({ noShowDeposit: 1000, reservationEnabled: false, allowLatePayment: false })).not.toContain('paymentTimeoutMinutes');
+        expect(normalizeOnboardingSubmission(defaults({ noShowDeposit: 1000, allowLatePayment: false, paymentTimeoutMinutes: 0 }), 'edit'))
+            .toMatchObject({ paymentTimeoutMinutes: 0, allowLatePayment: false });
         expect(validated({ noShowDeposit: 1000, fullRefundDays: 0 })).not.toContain('partialRefundDays');
     });
 

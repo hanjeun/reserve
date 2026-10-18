@@ -42,11 +42,13 @@ public class ChatReportRetentionService {
         rooms.findByIdForUpdate(roomId).orElseThrow(this::notFound);
         var report = reports.findByIdForUpdate(reportId).orElseThrow(this::notFound);
         if (!roomId.equals(report.getRoom().getId())) throw notFound();
+        ChatReportEditPolicy.requireRevision(request.getRevision(), report.getRevision());
         LocalDateTime basisAt = request.getCategory() == ChatReport.RetentionCategory.CONTRACT_PAYMENT
                 && request.getRetentionBasisAt() != null
                 ? request.getRetentionBasisAt().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime() : null;
         report.changeRetention(request.getCategory(), request.getHold(), basisAt, request.getNote().trim(), admin.getId(), now);
         audits.save(new ChatReportAccessAudit(reportId, admin.getId(), null, ChatReportAccessAudit.Action.RETENTION_CHANGE));
+        reports.flush();
         return ChatReportRetentionResponse.from(report);
     }
 

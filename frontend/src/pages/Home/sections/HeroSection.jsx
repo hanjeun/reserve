@@ -1,5 +1,5 @@
 import { Typography } from 'antd';
-import { ArrowRightOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined } from '../../../components/common/icons';
 import { useNavigate } from 'react-router-dom';
 import { colors, fontWeight } from '../../../styles/tokens';
 import { Button } from '../../../components/common';

@@ -1,4 +1,22 @@
 import GuidePage, { GuideLinks, GuideParagraph } from './GuidePage';
+import { useStoreNewsConfig } from '../../hooks/storeNewsQueries';
+
+function StoreNewsGuide() {
+    const { data } = useStoreNewsConfig(true);
+    if (!data?.enabled) return null;
+    if (data.benefitApprovalEnabled !== true) return <>
+        <GuideParagraph>파트너 패널의 가게 소식에서 글·사진을 작성하고 임시저장·미리보기·내 소식 관리를 이용해요. 관리자 승인형 혜택 신청은 준비 중이에요.</GuideParagraph>
+        <GuideLinks links={[{ to: '/business?tab=news', label: '내 가게 소식 관리' }]} />
+    </>;
+    return <>
+        <GuideParagraph>혜택 탭의 작성 아이콘 또는 파트너 패널의 가게 소식에서 운영 중인 본인 가게의 소식·공지·행사·혜택을 작성해요. 제목·본문·사진을 넣고 임시저장하거나 실제 혜택 목록·상세 미리보기에서 확인해주세요. 공개 닉네임 설정은 필요하지 않아요.</GuideParagraph>
+        <GuideParagraph>사진 1~6장을 첨부해 혜택 노출을 신청하고 관리자 승인 후 게시해요. 피드 글은 피드에서 별도로 작성하며 혜택의 글·사진·게시 상태와 연결하지 않아요.</GuideParagraph>
+        {data.benefitDesignEnabled && <GuideParagraph>디자인은 기본·사진 강조·간결형 중에서 선택해요. 미리보기와 공개 목록·상세에 같은 디자인을 사용하며 승인 후 디자인을 바꾸면 다시 심사해요.</GuideParagraph>}
+        <GuideParagraph>승인된 소식의 글·사진·종류·기간·조건을 수정하면 혜택 노출을 중단하고 재심사해요. 내 소식에서 승인 대기·승인·반려와 심사 사유를 확인하고 수정 후 다시 신청할 수 있어요. 행사·혜택의 시작·종료 시각은 한국 시간으로 정해요. 기간이 끝나면 진행 목록에서 빠지고 승인된 공개 상세에는 종료 표시로 남아요. 목록의 제목 배지를 누르면 상세 안내로 이동하며 쿠폰 발급과 할인 결제는 제공하지 않아요.</GuideParagraph>
+        <GuideParagraph>내 소식에서 수정·삭제할 수 있어요. 삭제하면 혜택을 즉시 숨기고 30일 뒤 원문·사진을 파기하며 신고 자료는 별도로 보관해요. 가게 폐업과 회원 탈퇴에도 같은 파기 절차를 적용해요.</GuideParagraph>
+        <GuideLinks links={[{ to: '/business?tab=news', label: '내 가게 소식 관리' }, { to: '/benefits', label: '혜택·가게 소식 보기' }]} />
+    </>;
+}
 
 export default function BusinessGuide() {
     return <GuidePage pathname="/guide/business" sections={{
@@ -10,9 +28,14 @@ export default function BusinessGuide() {
         </>,
         edit: <>
             <GuideParagraph>내 가게에서 수정할 가게를 선택해 9개 영역 중 바꿀 항목을 고르세요. 해당 질문을 수정한 뒤 미리보기에서 확인하고 수정 완료로 저장해요. 미리보기의 수정 버튼은 그 항목의 질문으로 이동해요. 예약 방식과 웨이팅의 현장 QR·원격 접수 설정도 여기에서 확인할 수 있어요.</GuideParagraph>
-            <GuideParagraph>예약 마감의 제한 없음은 등록·수정 모두 사용할 수 있어요. 날짜는 직접 입력하거나 달력에서 고르고, 시간은 00시부터 23시까지의 24시간제로 선택해요. 예약금이 있을 때만 결제 시점을 고르며 나중 결제를 허용할 때 결제 마감을 설정해요.</GuideParagraph>
+            <GuideParagraph>예약 마감의 제한 없음은 등록·수정 모두 사용할 수 있어요. 날짜는 직접 입력하거나 달력에서 고르고, 시간은 00시부터 23시까지의 24시간제로 선택해요. 예약금이 있을 때만 결제 시점을 고르며 신청할 때 결제를 선택하면 결제 마감을 설정해요. 제한 시간이 지난 미결제 대기 예약은 자동 취소돼요. 나중 결제를 허용하거나 결제 마감을 제한 없음으로 선택하면 미결제로 자동 취소하지 않아요.</GuideParagraph>
             <GuideParagraph>가게의 접수 중지 선택은 새 예약과 웨이팅 접수를 끄는 설정이에요. 기존 예약과 대기 내역은 관리 화면에서 계속 확인하고 처리해주세요.</GuideParagraph>
             <GuideLinks links={[{ to: '/my-stores', label: '가게 수정 열기' }]} />
+        </>,
+        draft: <>
+            <GuideParagraph>가게 등록·수정 초안과 새 사진은 작성한 브라우저에 저장해요. 피드와 가게 소식의 서버 임시저장과 저장 위치가 달라요. 마이페이지에서 자동 임시저장 설정을 바꿀 수 있고, 꺼도 수동 임시저장과 기존 초안은 유지돼요.</GuideParagraph>
+            <GuideParagraph>앱 주소나 브라우저를 옮길 때는 기존 브라우저의 가게 임시저장 옮기기에서 초안을 선택해 파일로 내보내주세요. 옮길 브라우저에서 같은 계정으로 로그인하고 파일을 가져와요. 기존 초안을 덮어쓸지는 직접 선택하며 원래 보관 기한 30일은 연장되지 않아요.</GuideParagraph>
+            <GuideLinks links={[{ to: '/drafts/transfer', label: '가게 임시저장 옮기기' }]} />
         </>,
         reservation: <>
             <GuideParagraph>파트너 패널의 예약 관리에서 가게와 예약 상태를 고르거나 예약자를 검색해요. 각 예약의 상태에 따라 표시되는 승인·거절·취소·완료 등의 처리 버튼을 이용하고, 결제와 환불 상태도 함께 확인해주세요.</GuideParagraph>
@@ -32,6 +55,7 @@ export default function BusinessGuide() {
             <GuideParagraph>광고 관리에서 가게별 광고 유형과 노출 기간을 선택해 신청·결제·상태를 관리해요. 현재 금액과 노출·취소 조건은 신청 화면에서 확인해주세요.</GuideParagraph>
             <GuideParagraph>채팅 관리에서 가게별 공지사항·인사말·자주 묻는 질문을 설정하고, 손님과의 대화는 메시지 화면에서 확인해요.</GuideParagraph>
             <GuideLinks links={[{ to: '/business?tab=ads', label: '광고 관리 열기' }, { to: '/business?tab=chat-intro', label: '채팅 관리 열기' }, { to: '/messages', label: '메시지 확인하기' }]} />
+            <StoreNewsGuide />
         </>,
     }} />;
 }

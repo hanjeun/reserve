@@ -15,6 +15,7 @@ vi.mock('../../services', () => ({
     businessService: { getMyStatus: vi.fn() },
 }));
 vi.mock('../../hooks', () => ({ useMessage: () => feedback, useWindowWidth: () => 1200 }));
+vi.mock('../../hooks/useMessage', () => ({ default: () => feedback }));
 vi.mock('../../hooks/useTheme', () => ({
     default: () => ({ theme: 'light', resolvedTheme: 'light', font: 'pretendard', accent: 'blue' }),
     FONT_OPTIONS: [], ACCENT_OPTIONS: [],

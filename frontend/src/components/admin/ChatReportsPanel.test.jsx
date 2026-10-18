@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatReportsPanel from './ChatReportsPanel';
 import { chatService } from '../../services';
@@ -22,7 +23,7 @@ const renderPanel = () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     return render(
         <QueryClientProvider client={client}>
-            <AntApp><ChatReportsPanel /></AntApp>
+            <MemoryRouter initialEntries={['/admin?tab=reports']}><AntApp><ChatReportsPanel /></AntApp></MemoryRouter>
         </QueryClientProvider>,
     );
 };
@@ -48,15 +49,16 @@ describe('ChatReportsPanel', () => {
         expect(screen.queryByText('해당 상태의 채팅 신고가 없어요.')).not.toBeInTheDocument();
     });
 
-    it('uses one status roller on the left and keeps the count and refresh control in the toolbar', async () => {
+    it('keeps the count on the left and the status and refresh controls together on the right', async () => {
         const user = userEvent.setup();
         chatService.listReports.mockResolvedValue({ content: [], page: { number: 0, totalPages: 0, totalElements: 0 } });
         const { container } = renderPanel();
 
-        const statusFilter = await screen.findByRole('button', { name: '신고 상태' });
+        const statusFilter = await screen.findByRole('button', { name: '채팅 신고 상태' });
         expect(statusFilter).toHaveTextContent('전체 상태');
-        expect(container.querySelector('.reserve-explore-filters')).toContainElement(statusFilter);
-        expect(container.querySelector('.reserve-filter-toolbar-refresh')).toContainElement(
+        expect(container.querySelector('.reserve-management-toolbar-leading')).toHaveTextContent('0건');
+        expect(container.querySelector('.reserve-management-toolbar-trailing')).toContainElement(statusFilter);
+        expect(container.querySelector('.reserve-management-toolbar-trailing')).toContainElement(
             screen.getByRole('button', { name: '새로고침' }),
         );
 
@@ -70,6 +72,7 @@ describe('ChatReportsPanel', () => {
         chatService.listReports.mockResolvedValue({
             content: [{
                 id: 5,
+                revision: 0,
                 roomId: 21,
                 storeId: 31,
                 storeName: '가게31',
@@ -94,6 +97,7 @@ describe('ChatReportsPanel', () => {
         await waitFor(() => expect(chatService.reviewReport).toHaveBeenCalledWith(5, {
             status: 'RESOLVED',
             resolutionNote: '스팸 확인 후 경고',
+            revision: 0,
         }));
     });
 
@@ -127,7 +131,7 @@ describe('ChatReportsPanel', () => {
                 messageId: 90, details: '외부 결제 유도', status: 'RESOLVED', createdAt: '2026-09-12T22:00:00' }],
             page: { number: 0, totalPages: 1, totalElements: 1 },
         });
-        chatRetentionService.get.mockResolvedValue({ reportId: 9, category: 'GENERAL_REPORT', hold: false, note: '' });
+        chatRetentionService.get.mockResolvedValue({ reportId: 9, revision: 0, category: 'GENERAL_REPORT', hold: false, note: '' });
         chatRetentionService.update.mockResolvedValue({ reportId: 9 });
         renderPanel();
         await user.click(await screen.findByRole('button', { name: '보존 설정' }));
@@ -139,7 +143,7 @@ describe('ChatReportsPanel', () => {
         await user.type(within(dialog).getByPlaceholderText('자료 분류 또는 파기 보류의 근거를 적어주세요'), '일반 신고 처리 완료');
         await user.click(within(dialog).getByRole('button', { name: '보존 설정 저장' }));
         await waitFor(() => expect(chatRetentionService.update).toHaveBeenCalledWith(9, {
-            category: 'GENERAL_REPORT', hold: false, retentionBasisAt: null, note: '일반 신고 처리 완료',
+            revision: 0, category: 'GENERAL_REPORT', hold: false, retentionBasisAt: null, note: '일반 신고 처리 완료',
         }));
     });
 });

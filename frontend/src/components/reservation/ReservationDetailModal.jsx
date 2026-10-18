@@ -3,7 +3,7 @@ import { Typography, Flex, Divider } from 'antd';
 import {
     UserOutlined, CalendarOutlined, ClockCircleOutlined, TeamOutlined, MailOutlined, DollarOutlined,
     CheckCircleOutlined,
-} from '@ant-design/icons';
+} from '../common/icons';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import CopyableText from '../common/CopyableText';
 import ResponsiveModal from '../common/ResponsiveModal';

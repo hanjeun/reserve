@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import { initTheme } from './hooks/useTheme'
 import { installChunkReloadHandler } from './utils/chunkReload'
+import { scheduleSessionReplay } from './utils/sessionReplay'
 
 // React 렌더보다 먼저 <html>에 data-theme / --app-font를 반영한다.
 // 렌더 이후에 하면 라이트로 한 번 그려졌다가 다크로 바뀌는 번쩍임(FOUC)이 생긴다.
@@ -16,12 +17,6 @@ Sentry.init({
   sendDefaultPii: false,
   integrations: [
     Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration({
-      // Replay is useful for diagnosing failures, but user-entered text and
-      // uploaded/store media must never be captured by default.
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
   ],
   tracesSampleRate: 0.1,
   tracePropagationTargets: ["localhost", /^https:\/\/reserve\.it\.kr\/api/],
@@ -37,3 +32,6 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+const cancelReplay = scheduleSessionReplay()
+if (import.meta.hot) import.meta.hot.dispose(cancelReplay)

@@ -9,7 +9,7 @@ export default function UserGuide() {
         reservation: <>
             <GuideParagraph>로그인한 뒤 예약을 받는 가게에서 가능한 날짜와 시간을 선택해 예약을 신청해요. 날짜만 고르는 가게와 정해진 회차를 고르는 가게도 있으므로 화면에 표시되는 방식을 따라주세요.</GuideParagraph>
             <GuideParagraph>신청 결과와 예약 상태는 내 예약에서 확인해요. 예약금이 있는 경우 결제 안내와 마감, 변경·취소 조건을 확인해주세요. 신청 후에는 내 예약의 현재 상태에서 예약 확정과 결제 여부를 확인해요.</GuideParagraph>
-            <GuideParagraph>예약금이 없는 가게에서는 결제하지 않아요. 예약금을 받는 가게는 신청할 때 결제하거나, 나중 결제를 허용한 경우 내 예약에서 결제할 수 있어요. 나중 결제에 마감이 설정되어 있으면 시간 안에 결제해주세요.</GuideParagraph>
+            <GuideParagraph>예약금이 없는 가게에서는 결제하지 않아요. 신청할 때 결제가 필요한 가게는 예약 신청 후 바로 결제해주세요. 결제 마감이 있으면 시간이 지난 미결제 대기 예약은 자동 취소돼요. 나중 결제를 허용한 가게는 내 예약에서 결제할 수 있고 미결제로 자동 취소하지 않아요. 결제 마감이 제한 없음인 경우에도 미결제 자동 취소는 적용하지 않아요.</GuideParagraph>
             <GuideLinks links={[{ to: '/my-reservations', label: '내 예약 확인하기' }]} />
         </>,
         waiting: <>
@@ -31,6 +31,13 @@ export default function UserGuide() {
         history: <>
             <GuideParagraph>내 예약에서 예약과 웨이팅 탭을 나누어 확인해요. 현재 상태에 따라 표시되는 결제·변경·취소·QR 버튼을 이용해주세요. 가게 이용에 관한 문의는 가게 상세의 채팅에서 시작하고 메시지 화면에서 이어서 확인할 수 있어요.</GuideParagraph>
             <GuideLinks links={[{ to: '/my-reservations', label: '내 예약 열기' }, { to: '/messages', label: '메시지 확인하기' }]} />
+        </>,
+        feed: <>
+            <GuideParagraph>피드에서는 공개 닉네임으로 글과 사진을 나눠요. 작성 아이콘을 눌러 시작하고 처음 한 번 공개 프로필을 설정해주세요. 계정 사진 공개는 직접 선택하며, 닉네임과 소개는 내 공개 프로필에서 바꿀 수 있어요.</GuideParagraph>
+            <GuideParagraph>임시저장한 글은 피드 왼쪽의 폴더 아이콘에서 확인해요. 폴더를 다시 누르면 최신 피드로 돌아와요. 임시저장 글을 열어 수정·저장하거나 게시할 수 있고, 내 글의 더 보기에서 수정·삭제할 수 있어요.</GuideParagraph>
+            <GuideParagraph>글을 열면 댓글과 한 단계 답글을 남길 수 있어요. 댓글에는 글 또는 사진을 넣고 사진은 최대 6장까지 첨부해 순서를 바꿀 수 있어요. 내 댓글·답글은 수정·삭제하고 문제가 있는 내용은 신고할 수 있어요.</GuideParagraph>
+            <GuideParagraph>가게·피드 글·혜택·댓글의 좋아요는 좋아요 화면에서 함께 확인해요. 댓글·답글·댓글 좋아요의 새 반응은 피드의 알림 아이콘에서 확인하고 해당 댓글로 이동해요. 읽음 상태를 관리할 수 있으며 알림은 90일 보관해요. 삭제되거나 숨겨진 내용은 알림에서 제외돼요.</GuideParagraph>
+            <GuideLinks links={[{ to: '/feed', label: '피드 열기' }, { to: '/feed?view=drafts', label: '피드 임시저장 보기' }, { to: '/feed/notifications', label: '피드 알림 보기' }, { to: '/my-favorites', label: '좋아요 모아보기' }]} />
         </>,
     }} />;
 }

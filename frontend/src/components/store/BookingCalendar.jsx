@@ -43,8 +43,9 @@ import LoadingStatus from '../common/LoadingStatus';
 import React, { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import RollingFieldValue from '../common/RollingFieldValue';
+import Tooltip from '../common/Tooltip';
 import { Form, Modal } from 'antd';
-import { LeftOutlined, RightOutlined, DoubleLeftOutlined, DoubleRightOutlined, CalendarOutlined } from '@ant-design/icons';
+import { LeftOutlined, RightOutlined, DoubleLeftOutlined, DoubleRightOutlined, CalendarOutlined } from '../common/icons';
 import dayjs from 'dayjs';
 import { useBookingCalendar } from '../../hooks';
 import { colors, radius, fontSize, fontWeight, animation, field, transitions } from '../../styles/tokens';
@@ -273,25 +274,25 @@ const BookingCalendar = ({ storeId, value, onChange, style, disabled = false }) 
             >
                 <div style={styles.header}>
                     <div style={styles.navGroup}>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav" disabled={!canGoPrev}
+                        <Tooltip title="이전 해"><button type="button" className="rsv-tap-btn reserve-cal-nav" disabled={!canGoPrev}
                                 onClick={() => goYear(-1)} aria-label="이전 해">
                             <DoubleLeftOutlined style={{ fontSize: 11 }} />
-                        </button>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav" disabled={!canGoPrev}
+                        </button></Tooltip>
+                        <Tooltip title="이전 달"><button type="button" className="rsv-tap-btn reserve-cal-nav" disabled={!canGoPrev}
                                 onClick={() => goMonth(-1)} aria-label="이전 달">
                             <LeftOutlined style={{ fontSize: 12 }} />
-                        </button>
+                        </button></Tooltip>
                     </div>
                     <span style={styles.monthLabel}>{month.format('YYYY년 M월')}</span>
                     <div style={styles.navGroup}>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav"
+                        <Tooltip title="다음 달"><button type="button" className="rsv-tap-btn reserve-cal-nav"
                                 onClick={() => goMonth(1)} aria-label="다음 달">
                             <RightOutlined style={{ fontSize: 12 }} />
-                        </button>
-                        <button type="button" className="rsv-tap-btn reserve-cal-nav"
+                        </button></Tooltip>
+                        <Tooltip title="다음 해"><button type="button" className="rsv-tap-btn reserve-cal-nav"
                                 onClick={() => goYear(1)} aria-label="다음 해">
                             <DoubleRightOutlined style={{ fontSize: 11 }} />
-                        </button>
+                        </button></Tooltip>
                     </div>
                 </div>
 

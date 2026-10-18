@@ -13,7 +13,8 @@ export { default as FormInput } from './FormInput';
 export { default as FormTextArea } from './FormTextArea';
 export { default as FormSelect } from './FormSelect';
 // 폼 입력이 아니라 목록·툴바 위의 조작 도구용 셀렉트(흰 면 + 테두리).
-// 어느 쪽을 쓸지는 FilterSelect.jsx 상단 주석 참고.
+// 목록 필터는 FilterMenu, 값을 입력하는 칸은 FormSelect를 사용한다.
+// FilterSelect는 과거 호환용이며 현재 화면과 신규 구현에서는 사용하지 않는다.
 export { default as FilterSelect } from './FilterSelect';
 export { default as FilterMenu } from './FilterMenu';
 export { default as FormDatePicker } from './FormDatePicker';
@@ -25,6 +26,7 @@ export { StoreCardSkeleton, ReservationCardSkeleton, ReservationSummaryCardSkele
 export { default as AdminTableSkeleton } from './AdminTableSkeleton';
 export { default as KakaoMap } from './KakaoMap';
 export { default as FavoriteButton } from './FavoriteButton';
+export { default as Tooltip } from './Tooltip';
 export { default as FilterToolbar } from './FilterToolbar';
 // NOTE(2026-07 전수조사): CustomPagination 제거됨 — 자기 파일 안에서만 참조되고 앱 어디서도
 // 사용되지 않는 죽은 코드였음(모든 테이블은 DataTable의 AntD 기본 pagination을 쓴다).

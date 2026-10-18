@@ -1,18 +1,24 @@
 import { useEffect, useState } from 'react';
 import { getRouteSkeletonKind, resolveRouteSkeletonLocation } from './routeSkeletonKind';
+import FeedRouteSkeleton from '../feed/FeedRouteSkeleton';
+import WaitingRouteSkeleton from '../waiting/WaitingRouteSkeleton';
+import StoreDetailLoading from '../store/StoreDetailLoading';
+import DiscoveryRouteSkeleton from './DiscoveryRouteSkeleton';
 
 // 첫 주소의 골격만 미리 받는다. 홈 때문에 메신저·관리자 골격과 그 UI까지 로딩하지 않는다.
-const modules = new Map();
+// 새 탭의 첫 골격부터 같은 형태를 쓴다. 일반 임시 골격→페이지 골격의 두 단계 전환을 하지 않는다.
+const modules = new Map([['feed', { default: FeedRouteSkeleton }], ['waiting', { default: WaitingRouteSkeleton }],
+    ['detail', { default: StoreDetailLoading }], ['discovery', { default: DiscoveryRouteSkeleton }]]);
 const requests = new Map();
-const moduleKey = kind => kind === 'discovery' ? 'discovery' : 'pages';
-// import 두 개를 같은 삼항식에 넣으면 Vite가 두 분기의 modulepreload를 합친다.
+const moduleKey = kind => ['waiting', 'detail'].includes(kind) ? kind : ['feed', 'feed-detail', 'feed-author', 'feed-notifications'].includes(kind) ? 'feed' : kind === 'discovery' ? 'discovery' : 'pages';
+// 업무별 골격은 해당 주소에서만 내려받는다.
 const loaders = {
-    discovery: () => import('./DiscoveryRouteSkeleton'),
     pages: () => import('./RouteSkeletonPages'),
 };
 
 export function preloadRouteSkeletons(kind) {
     const key = moduleKey(kind);
+    if (modules.has(key)) return Promise.resolve(modules.get(key));
     if (!requests.has(key)) {
         const request = loaders[key]();
         requests.set(key, request

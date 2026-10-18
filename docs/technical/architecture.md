@@ -2,6 +2,11 @@
 
 RESERVE의 인프라 구성, 저장소 경로, 배포 흐름을 정리했어요.
 
+
+## 2026-10-18 운영 구성
+
+v2.12.0 main `b150ba5ac53fb2e2aaee1fc1f3866106615f5fbc`를 앱 `https://app.reserve.it.kr`와 소개 `https://reserve.it.kr`로 전환했어요. MySQL 8.0.45는 정본, 별도 Redis는 공유 제한·서버 이벤트 중계, SSE는 브라우저 전달을 담당해요. 운영 Redis는 `reserve-redis-redis-1`에서 인증·데이터 64MB·컨테이너 128MiB·호스트 포트 없음으로 동작하며 local과 production namespace를 구분해요. 공개 프로필 두 경로의 CloudFront 캐시는 TTL 0이고 그 밖의 기본 캐시 동작은 유지해요. 이하 준비 단계의 상태는 [실제 전환 기록](deployments.md#2026-10-18-v2120-실제-운영-전환)과 날짜를 함께 확인해요.
+
 ## 인프라 구성
 
 ![RESERVE 아키텍처](../images/RESERVE_Architecture.png)

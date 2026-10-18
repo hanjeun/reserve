@@ -177,7 +177,7 @@ test('store quick actions share one horizontal title row without covering a long
         const style = getComputedStyle(element);
         return { borderWidth: style.borderTopWidth, borderRadius: style.borderRadius, background: style.backgroundColor };
     });
-    expect(contactStyle).toEqual({ borderWidth: '0px', borderRadius: '0px', background: 'rgba(0, 0, 0, 0)' });
+    expect(contactStyle).toEqual({ borderWidth: '0px', borderRadius: '50%', background: 'rgba(0, 0, 0, 0)' });
 
     const titleBox = await titleRow.boundingBox();
     const summaryBox = await page.locator('.reserve-store-identity-summary').boundingBox();

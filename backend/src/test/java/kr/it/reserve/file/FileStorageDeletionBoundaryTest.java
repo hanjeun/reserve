@@ -39,6 +39,19 @@ class FileStorageDeletionBoundaryTest {
     }
 
     @Test
+    void feedAvatarPrefixCannotAdoptAccountPhotosOtherMembersOrAnotherEnvironment() {
+        String prefix = kr.it.reserve.file.util.FileStoragePaths.feedProfile(7L);
+        assertThat(prefix).isEqualTo("users/7/feed/profiles");
+        assertThat(fileStorageService.isManagedFileUnderPrefix("local/users/7/feed/profiles/photo.png", prefix)).isTrue();
+        assertThat(fileStorageService.isManagedFileUnderPrefix("https://cdn.example.test/local/users/7/feed/profiles/photo.png", prefix)).isTrue();
+        assertThat(fileStorageService.isManagedFileUnderPrefix("local/users/7/profiles/photo.png", prefix)).isFalse();
+        assertThat(fileStorageService.isManagedFileUnderPrefix("local/users/8/feed/profiles/photo.png", prefix)).isFalse();
+        assertThat(fileStorageService.isManagedFileUnderPrefix("users/7/feed/profiles/photo.png", prefix)).isFalse();
+        assertThat(fileStorageService.isManagedFileUnderPrefix("https://other.example/local/users/7/feed/profiles/photo.png", prefix)).isFalse();
+        verify(s3Client, never()).deleteObject(org.mockito.ArgumentMatchers.any(DeleteObjectRequest.class));
+    }
+
+    @Test
     @DisplayName("현재 환경의 정확한 CloudFront URL만 canonical key로 삭제한다")
     void deletesOnlyExactCloudfrontHostInCurrentEnvironment() {
         fileStorageService.deleteFileRequired(

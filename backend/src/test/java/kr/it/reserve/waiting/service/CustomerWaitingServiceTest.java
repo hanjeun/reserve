@@ -21,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.mockito.ArgumentCaptor;
 
 import java.time.*;
@@ -210,6 +211,28 @@ class CustomerWaitingServiceTest {
         assertThat(result.getContent().getFirst().storeName()).isEqualTo("예약%_!");
         assertThat(result.getContent().getFirst().teamsAhead()).isEqualTo(5);
         verify(entries, never()).findPersonal(any(), any(), any(), any());
+    }
+
+    @Test void directoryAggregatesOnlyTheReturnedStoresAndIncludesCalledTeams() {
+        Store other = Store.builder().id(32L).owner(owner).status(StoreStatus.ACTIVE)
+                .waitingIntakeMode(WaitingIntakeMode.ONSITE).waitingPaused(true).build();
+        when(stores.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(store, other), PageRequest.of(0, 12), 2));
+        WaitingEntryRepository.StoreWaitingCount count = mock(WaitingEntryRepository.StoreWaitingCount.class);
+        when(count.getStoreId()).thenReturn(31L); when(count.getTeams()).thenReturn(3L);
+        when(entries.countActiveByStores(List.of(31L, 32L), WaitingStatus.ACTIVE)).thenReturn(List.of(count));
+        var result = customer.directory("", 0, 12, new CustomerWaitingService.DirectoryFilters("", "ALL", "recent"));
+        assertThat(result.getContent()).extracting(kr.it.reserve.store.dto.StoreResponse::getWaitingTeams).containsExactly(3L, 0L);
+        assertThat(result.getContent().get(1).getWaitingPaused()).isTrue();
+        assertThat(WaitingStatus.ACTIVE).contains(WaitingStatus.CALLED);
+        verify(entries).countActiveByStores(List.of(31L, 32L), WaitingStatus.ACTIVE);
+        verifyNoMoreInteractions(entries);
+    }
+
+    @Test void emptyDirectoryDoesNotQueryOtherStoresWaitingEntries() {
+        when(stores.findAll(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
+        assertThat(customer.directory("", 0, 12).isEmpty()).isTrue();
+        verifyNoInteractions(entries);
     }
 
     @Test void invalidPersonalFiltersAndUnavailableMembersCannotReachTheRepository() {

@@ -1,5 +1,7 @@
 package kr.it.reserve.favorite.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.favorite.dto.FavoriteDto;
 import kr.it.reserve.favorite.entity.Favorite;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
@@ -23,6 +25,8 @@ public class FavoriteService {
 
     private final FavoriteRepository favoriteRepository;
     private final StoreRepository storeRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EntityUpdates updates;
 
     @Transactional
     public FavoriteDto.ToggleResponse toggleFavorite(Long storeId, Member member) {
@@ -32,6 +36,7 @@ public class FavoriteService {
         return favoriteRepository.findByMemberAndStore(member, store)
                 .map(favorite -> {
                     favoriteRepository.delete(favorite);
+                    changed(store, member.getId());
                     log.info("Favorite removed: memberId={}, storeId={}", member.getId(), store.getId());
                     return createToggleResponse(false, store);
                 })
@@ -41,9 +46,19 @@ public class FavoriteService {
                             .store(store)
                             .build();
                     favoriteRepository.save(favorite);
+                    changed(store, member.getId());
                     log.info("Favorite added: memberId={}, storeId={}", member.getId(), store.getId());
                     return createToggleResponse(true, store);
                 });
+    }
+
+    private void changed(Store store, Long memberId) {
+        if (updates == null) return;
+        updates.publish(EntityUpdates.Domain.FAVORITE, store.getId(), store.getId(), store.getId(),
+                EntityUpdates.Operation.UPDATED, false, java.util.Set.of(memberId), false);
+        if (!store.isDeleted() && !store.isSuspended()) updates.publish(EntityUpdates.Domain.STORE,
+                store.getId(), null, store.getId(), EntityUpdates.Operation.UPDATED,
+                true, java.util.Set.of(), false);
     }
 
     public FavoriteDto.StatusResponse getFavoriteStatus(Long storeId, Member member) {

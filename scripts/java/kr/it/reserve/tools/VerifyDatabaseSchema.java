@@ -28,22 +28,7 @@ class VerifyDatabaseSchema {
         var registry = new StandardServiceRegistryBuilder().applySettings(settings).build();
         try {
             var sources = new MetadataSources(registry);
-            int models = 0;
-            try (var jar = new JarFile(Path.of(args[0]).toFile())) {
-                var entries = jar.entries();
-                while (entries.hasMoreElements()) {
-                    String name = entries.nextElement().getName();
-                    if (!name.startsWith("BOOT-INF/classes/kr/it/reserve/")
-                            || !name.contains("/entity/") || !name.endsWith(".class") || name.contains("$")) continue;
-                    String className = name.substring("BOOT-INF/classes/".length(), name.length() - 6).replace('/', '.');
-                    Class<?> model = Class.forName(className, false, VerifyDatabaseSchema.class.getClassLoader());
-                    if (model.isAnnotationPresent(Entity.class) || model.isAnnotationPresent(Embeddable.class)
-                            || model.isAnnotationPresent(MappedSuperclass.class)) {
-                        sources.addAnnotatedClass(model);
-                        models++;
-                    }
-                }
-            }
+            int models = addReleaseModels(sources, Path.of(args[0]));
             if (models < 1) throw new IllegalStateException("Release contains no entity models");
             try (var factory = sources.buildMetadata().buildSessionFactory()) {
                 System.out.println("PASS: release schema validates with restricted app account; models=" + models);
@@ -51,6 +36,32 @@ class VerifyDatabaseSchema {
         } finally {
             StandardServiceRegistryBuilder.destroy(registry);
         }
+    }
+
+    static int addReleaseModels(MetadataSources sources, Path release) throws Exception {
+        int models = 0;
+        try (var jar = new JarFile(release.toFile())) {
+            var mapping = jar.getJarEntry("BOOT-INF/classes/META-INF/orm.xml");
+            // BootJar는 META-INF 자원을 실행 JAR 루트에 보존한다. 어느 위치든 실제 후보의 원문만 읽는다.
+            if (mapping == null) mapping = jar.getJarEntry("META-INF/orm.xml");
+            if (mapping != null) {
+                try (var xml = jar.getInputStream(mapping)) { sources.addInputStream(xml); }
+            }
+            var entries = jar.entries();
+            while (entries.hasMoreElements()) {
+                String name = entries.nextElement().getName();
+                // Spring's application scan also finds entities outside a directory named "entity".
+                if (!name.startsWith("BOOT-INF/classes/kr/it/reserve/") || !name.endsWith(".class")) continue;
+                String className = name.substring("BOOT-INF/classes/".length(), name.length() - 6).replace('/', '.');
+                Class<?> model = Class.forName(className, false, VerifyDatabaseSchema.class.getClassLoader());
+                if (model.isAnnotationPresent(Entity.class) || model.isAnnotationPresent(Embeddable.class)
+                        || model.isAnnotationPresent(MappedSuperclass.class)) {
+                    sources.addAnnotatedClass(model);
+                    models++;
+                }
+            }
+        }
+        return models;
     }
 
     private static String required(String name) {

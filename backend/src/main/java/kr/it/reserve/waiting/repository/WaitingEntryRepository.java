@@ -76,6 +76,21 @@ public interface WaitingEntryRepository extends JpaRepository<WaitingEntry, Long
     @Query("SELECT DISTINCT w.memberId FROM WaitingEntry w WHERE w.storeId = :storeId AND w.status IN :active AND w.memberId IS NOT NULL")
     Set<Long> activeMemberIds(@Param("storeId") Long storeId, @Param("active") Set<WaitingStatus> active);
 
+    @Query("SELECT DISTINCT w.storeId FROM WaitingEntry w WHERE w.memberId = :memberId AND w.status IN :active")
+    List<Long> activeStoreIdsByMember(@Param("memberId") Long memberId, @Param("active") Set<WaitingStatus> active);
+
+    interface StoreWaitingCount {
+        Long getStoreId();
+        Long getTeams();
+    }
+
+    @Query("""
+            SELECT w.storeId AS storeId, COUNT(w) AS teams FROM WaitingEntry w
+             WHERE w.storeId IN :storeIds AND w.status IN :active GROUP BY w.storeId
+            """)
+    List<StoreWaitingCount> countActiveByStores(@Param("storeIds") List<Long> storeIds,
+                                               @Param("active") Set<WaitingStatus> active);
+
     // 탈퇴 요청과 같은 트랜잭션에서 연결·표시명을 지운다. 진행 접수만 취소하고 종료 이력은 유지한다.
     @Modifying(flushAutomatically = true)
     @Query("""

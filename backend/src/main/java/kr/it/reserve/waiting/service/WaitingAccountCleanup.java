@@ -16,11 +16,18 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 public class WaitingAccountCleanup {
     private final WaitingEntryRepository entries;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WaitingEventPublisher updates;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.store.repository.StoreRepository stores;
 
     @EventListener
     @Transactional(propagation = Propagation.MANDATORY)
     public void withdraw(MemberWithdrawn event) {
+        var affected = updates != null && stores != null
+                ? entries.activeStoreIdsByMember(event.memberId(), WaitingStatus.ACTIVE) : java.util.List.<Long>of();
         entries.anonymizeMember(event.memberId(), WaitingStatus.ACTIVE, WaitingStatus.CANCELLED,
                 LocalDateTime.now(ZoneOffset.UTC));
+        for (Long storeId : affected) stores.findById(storeId).ifPresent(store -> updates.changed(store, null));
     }
 }

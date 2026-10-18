@@ -1,10 +1,13 @@
 package kr.it.reserve.file;
 
 import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.util.FileStoragePaths;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -12,13 +15,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.core.sync.RequestBody;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -77,6 +84,38 @@ class FileStorageTransactionCompensationTest {
         fileStorageService.storeEncryptedChatImage(new byte[32], "users/1/chat/10");
         complete(TransactionSynchronization.STATUS_ROLLED_BACK);
         verify(s3Client).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    void feedAvatarUsesSharedImageValidationAndCompensatesOnlyNewKeyOnDatabaseRollback() {
+        String key = fileStorageService.storeFile(image(), kr.it.reserve.file.util.FileStoragePaths.feedProfile(7L));
+
+        complete(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+        assertThat(key).startsWith("test/users/7/feed/profiles/").endsWith(".png");
+        verify(s3Client).deleteObject(org.mockito.ArgumentMatchers.<DeleteObjectRequest>argThat(request -> key.equals(request.key())));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "local"})
+    void avatarAndBusinessUploadsPreventCachingWithoutChangingOtherImagePolicies(String environmentPrefix) {
+        ReflectionTestUtils.setField(fileStorageService, "envPrefix", environmentPrefix);
+        String publicCache = "public, max-age=86400, must-revalidate";
+        Map<String, String> policies = Map.of(
+                FileStoragePaths.userProfile(7L), "no-store",
+                FileStoragePaths.feedProfile(7L), "no-store",
+                FileStoragePaths.business(7L), "no-store",
+                FileStoragePaths.storeImage(7L, 3L), publicCache,
+                FileStoragePaths.storeThumbnail(7L, 3L), publicCache,
+                FileStoragePaths.advertisement(7L, 3L), publicCache,
+                FileStoragePaths.notice(3L), publicCache,
+                FileStoragePaths.supportAvatar(), publicCache);
+        policies.forEach((prefix, policy) -> {
+            String key = fileStorageService.storeFile(image(), prefix);
+            assertThat(key).startsWith((environmentPrefix.isEmpty() ? "" : environmentPrefix + "/") + prefix + "/");
+            verify(s3Client).putObject(argThat((PutObjectRequest request) -> key.equals(request.key())
+                    && "test-bucket".equals(request.bucket()) && policy.equals(request.cacheControl())), any(RequestBody.class));
+        });
     }
 
     private MockMultipartFile image() {

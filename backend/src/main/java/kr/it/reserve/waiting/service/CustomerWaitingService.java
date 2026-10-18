@@ -26,6 +26,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -86,8 +87,13 @@ public class CustomerWaitingService {
         var publicSearch = StoreSearchSpecification.publicSearch(null, "reviewCount".equals(sort) ? "reviews" : sort,
                 null, region, new StoreSearchSpecification.DistanceCandidates(null, null, 0),
                 clock.instant().atZone(ServiceTime.ZONE).toLocalDate());
-        return stores.findAll(publicSearch.and(directory), PageRequests.bounded(page, size))
-                .map(StoreResponse::fromEntity);
+        Page<Store> matches = stores.findAll(publicSearch.and(directory), PageRequests.bounded(page, size));
+        var ids = matches.getContent().stream().map(Store::getId).toList();
+        // 호출 중인 팀도 입장하기 전까지 대기에 포함한다. 공개 응답에는 집계만 담는다.
+        Map<Long, Long> counts = ids.isEmpty() ? Map.of() : entries.countActiveByStores(ids, WaitingStatus.ACTIVE)
+                .stream().collect(Collectors.toMap(WaitingEntryRepository.StoreWaitingCount::getStoreId,
+                        WaitingEntryRepository.StoreWaitingCount::getTeams));
+        return matches.map(store -> StoreResponse.fromWaitingDirectory(store, counts.getOrDefault(store.getId(), 0L)));
     }
 
     public Page<MyWaitingResponse> mine(Member actor, int page, int size) {

@@ -54,7 +54,7 @@ esac`,
                     TASK_DETECTION_SCRIPT: bashPath(fileURLToPath(new URL('../detect-active-upstream.sh', import.meta.url))),
                     GITHUB_OUTPUT: bashPath(output), TASK_SSH_CALLED: bashPath(called),
                     RESERVE_SERVER_IP: 'reserve.test', EC2_SSH_KEY: 'fixture-key', RESERVE_SSH_FINGERPRINT: 'SHA256:fixture',
-                    MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v270-refund-v1', MOCK_FEATURE: 'waiting-signup-hidden-v2',
+                    MOCK_BLUE: '200', MOCK_GREEN: '000', MOCK_SCHEMA: 'v270-refund-v1', MOCK_FEATURE: 'waiting-signup-hidden-feed-oauth-v7',
                     MOCK_REMOTE_FAILURE: '0', MOCK_AMBIGUOUS: 'false', ...overrides },
             });
         assert.ifError(result.error);
@@ -82,6 +82,9 @@ test('SSH failure propagates its exit code without leaving a partial EOF output'
 for (const [description, overrides] of [
     ['wrong host fingerprint', { RESERVE_SSH_FINGERPRINT: 'SHA256:wrong' }],
     ['unsupported recovery features', { MOCK_FEATURE: 'waiting-signup-v1' }],
+    ['recovery without feed and store-news retention', { MOCK_FEATURE: 'waiting-signup-hidden-v2' }],
+    ['recovery without benefit approval isolation', { MOCK_FEATURE: 'waiting-signup-hidden-feed-v3' }],
+    ['recovery without provider-token and security-event support', { MOCK_FEATURE: 'waiting-signup-hidden-feed-v6' }],
     ['unsupported refund schema', { MOCK_SCHEMA: 'old' }],
     ['unhealthy live upstream', { MOCK_BLUE: '503' }],
     ['ambiguous upstream marker', { MOCK_AMBIGUOUS: 'true' }],
@@ -99,6 +102,8 @@ test('production deployment requires the restricted app account and cannot fall 
         assert.ok(environment.includes('DB_USERNAME=reserve_app'));
         assert.ok(environment.includes('SPRING_JPA_HIBERNATE_DDL_AUTO=validate'));
         assert.ok(environment.includes('WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT=${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:-}'));
+        assert.ok(environment.includes('FEED_ENABLED=${FEED_ENABLED:-false}'));
+        assert.ok(environment.includes('FEED_IMAGE_ENCRYPTION_KEY=${FEED_IMAGE_ENCRYPTION_KEY:-}'));
         assert.ok(environment.includes('DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required for deployment}'));
         assert.ok(!environment.some(value => /DB_USERNAME=.*root|DDL_AUTO=.*update|DB_PASSWORD.*\$\{DB_PASSWORD/.test(value)));
     }
@@ -107,9 +112,34 @@ test('production deployment requires the restricted app account and cannot fall 
     assert.equal(launch.env.DB_APP_PASSWORD, '${{ secrets.DB_APP_PASSWORD }}');
     assert.equal(launch.env.DB_PASSWORD, undefined);
     assert.ok(!launch.with.envs.split(',').includes('DB_PASSWORD'));
+    assert.equal(launch.env.FEED_ENABLED, "${{ vars.FEED_ENABLED || 'false' }}");
+    assert.equal(launch.env.FEED_IMAGE_ENCRYPTION_KEY, '${{ secrets.FEED_IMAGE_ENCRYPTION_KEY }}');
+    for (const name of ['FEED_ENABLED', 'FEED_IMAGE_ENCRYPTION_KEY']) assert.ok(launch.with.envs.split(',').includes(name));
+    assert.ok(launch.with.script.indexOf('case "$FEED_ENABLED"') < launch.with.script.indexOf('sudo docker pull'));
+    assert.match(launch.with.script, /FEED_IMAGE_ENCRYPTION_KEY:\?A dedicated feed image key is required/);
     const guard = ': "${DB_APP_PASSWORD:?DB_APP_PASSWORD is required for deployment}"';
     assert.ok(launch.with.script.includes(guard));
     assert.ok(launch.with.script.indexOf(guard) < launch.with.script.indexOf('sudo docker pull'));
+});
+
+test('provider security remains opt-in and forwards dedicated keys through the protected deployment boundary', () => {
+    const launch = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const flags = ['OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED', 'OAUTH_SECURITY_EVENTS_GOOGLE_ENABLED', 'OAUTH_SECURITY_EVENTS_KAKAO_ENABLED', 'OAUTH_SECURITY_EVENTS_NAVER_ENABLED'];
+    const keys = ['OAUTH_UNLINK_ENCRYPTION_KEY', 'OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY'];
+    for (const name of flags) assert.equal(launch.env[name], `\${{ vars.${name} || 'false' }}`);
+    for (const name of keys) assert.equal(launch.env[name], `\${{ secrets.${name} }}`);
+    for (const name of [...flags, ...keys, 'KAKAO_APP_ID']) assert.ok(launch.with.envs.split(',').includes(name));
+    for (const color of ['blue', 'green']) {
+        const environment = require('js-yaml').load(read(`docker-compose-${color}.yml`)).services[color].environment;
+        for (const name of flags) assert.ok(environment.includes(`${name}=\${${name}:-false}`));
+        for (const name of [...keys, 'KAKAO_APP_ID']) assert.ok(environment.includes(`${name}=\${${name}:-}`));
+    }
+    for (const guard of ['case "$OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED"', 'for OAUTH_EVENTS_FLAG', 'unset OAUTH_UNLINK_ENCRYPTION_KEY']) {
+        assert.ok(launch.with.script.indexOf(guard) >= 0);
+        assert.ok(launch.with.script.indexOf(guard) < launch.with.script.indexOf('sudo docker pull'));
+    }
+    assert.match(launch.with.script, /OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY:\?A dedicated provider-token encryption key is required/);
+    assert.match(launch.with.script, /KAKAO_APP_ID:\?Kakao app ID is required/);
 });
 
 test('CodeQL skips duplicate dev pushes without removing PR, main or scheduled security scans', () => {
@@ -201,14 +231,18 @@ test('PC and mobile browser checks use separate projects and failure evidence', 
 });
 
 test('image publication and frontend staging remain main-push-only', () => {
+    const mainPush = "github.ref == 'refs/heads/main' && github.event_name == 'push'";
     assert.ok(!frontend.steps.some(entry => /^appleboy\//.test(entry.uses ?? '')));
     assert.match(staging.steps.find(entry => entry.name === "Download this run's frontend").run, /GITHUB_RUN_ID/);
+    assert.equal(staging.if, mainPush);
+    assert.equal(staging.steps.find(entry => entry.name === 'Stage marketing files').if, "vars.RESERVE_DOMAIN_SPLIT == 'true'");
     for (const job of [backend, staging]) {
         const writes = job.steps.filter(entry => /^docker\/login-action@|^appleboy\/(scp|ssh)-action@/.test(entry.uses ?? '')
             || /docker (build|push)\b/.test(entry.run ?? ''));
         assert.ok(writes.length > 0);
         for (const entry of writes) {
-            assert.equal(entry.if, "github.ref == 'refs/heads/main' && github.event_name == 'push'", entry.name);
+            // GitHub requires the job condition as well as any step condition.
+            if (job.if !== mainPush) assert.equal(entry.if, mainPush, entry.name);
         }
     }
 });
@@ -275,12 +309,12 @@ test('the live backend must be schema and refund compatible before deployment', 
     assert.match(detectionScript, /"\$SCHEMA_COMPAT" != 'v270-refund-v1'/);
 });
 
-test('automatic cutover requires recovery support for waiting settings, signup tickets and private message deletion', () => {
+test('automatic cutover requires recovery support for waiting, signup, private deletion, feed retention, benefit approval and interactions', () => {
     const build = backend.steps.find(entry => entry.name === 'Build Docker image');
     const detect = step(deployment, 'detect');
     const cutover = deployment.steps.find(entry => entry.name === 'Cut over frontend and backend');
-    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-v2/);
-    assert.match(detectionScript, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-v2'/);
+    assert.match(build.run, /--label reserve\.feature-compat=waiting-signup-hidden-feed-oauth-v7/);
+    assert.match(detectionScript, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-v7'/);
     assert.ok(detectionScript.indexOf('"$FEATURE_COMPAT" !=') < detectionScript.indexOf('DETECTED_UPSTREAM='));
     assert.equal(cutover.env.CURRENT_UPSTREAM, '${{ env.CURRENT_UPSTREAM }}');
     assert.ok(cutover.with.envs.split(',').includes('CURRENT_UPSTREAM'));
@@ -288,14 +322,14 @@ test('automatic cutover requires recovery support for waiting settings, signup t
     assert.match(cutover.with.script, /for COMPATIBLE_UPSTREAM in "\$CURRENT_UPSTREAM" "\$TARGET_UPSTREAM"/);
     const compatibilityGuard = cutover.with.script.indexOf('"$FEATURE_COMPAT" !=');
     assert.ok(compatibilityGuard > 0);
-    assert.match(cutover.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-v2'/);
+    assert.match(cutover.with.script, /"\$FEATURE_COMPAT" != 'waiting-signup-hidden-feed-oauth-v7'/);
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('trap rollback_cutover'));
     assert.ok(compatibilityGuard < cutover.with.script.indexOf('sudo touch "$ROLLBACK_DIR/cutover-started"'));
     assert.ok(deployment.steps.indexOf(detect) < deployment.steps.indexOf(cutover));
     for (const entry of [detect, cutover]) assert.equal(entry['continue-on-error'], undefined);
 });
 
-test('backend image compatibility requires the private deletion classes in the actual packaged jar', () => {
+test('backend image compatibility requires private deletion and feed retention classes in the actual jar', () => {
     const dockerfile = read('backend/Dockerfile');
     const guard = dockerfile.indexOf('RUN for REQUIRED_CLASS');
     assert.ok(guard > dockerfile.indexOf('COPY ${JAR_FILE} app.jar'));
@@ -303,6 +337,27 @@ test('backend image compatibility requires the private deletion classes in the a
     for (const entry of ['entity/ChatMessageHidden', 'repository/ChatMessageHiddenRepository', 'service/ChatMessageVisibilityService']) {
         assert.ok(dockerfile.includes(`BOOT-INF/classes/kr/it/reserve/chat/${entry}.class`));
     }
+    for (const entry of ['entity/FeedPost', 'entity/FeedMedia', 'entity/FeedProfile', 'entity/FeedReport', 'entity/FeedReportImage',
+        'entity/FeedAuditRecord', 'service/FeedMediaService', 'service/FeedRetentionService', 'service/FeedModerationService',
+        'entity/ContentLike', 'entity/FeedComment', 'entity/FeedCommentReport', 'entity/FeedCommentReportImage', 'entity/FeedNotification', 'service/FeedNotificationService', 'FeedInteractionPolicy', 'service/ContentLikeService',
+        'service/FeedCommentService', 'service/FeedCommentRetentionService', 'controller/FeedInteractionController', 'controller/AdminFeedCommentController']) {
+        assert.ok(dockerfile.includes(`BOOT-INF/classes/kr/it/reserve/feed/${entry}.class`));
+    }
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/feed/news/service/StoreNewsService.class'));
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/promotion/entity/Promotion\\$BenefitState.class'));
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/feed/news/dto/StoreNewsDto\\$BenefitReview.class'));
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/feed/news/controller/AdminStoreNewsController.class'));
+    for (const entry of ['OAuthProviderTokenCipher', 'OAuthProviderTokenConverter', 'OAuthSessionIssuer', 'CustomOAuth2User\\$OAuthAuthentication', 'events/OAuthSecurityEventController',
+        'events/OAuthSecurityEventKeys', 'events/OAuthSecurityEventMetadataClient', 'events/OAuthSecurityEventVerifier', 'events/OAuthSecurityEventRecord',
+        'events/OAuthSecurityEventRepository', 'events/OAuthSecurityEventService', 'events/OAuthSecurityEventTransaction',
+        'subject/OAuthSubjectSecurity', 'subject/OAuthSubjectSecurityRepository', 'subject/OAuthSubjectSecurityService',
+        'events/NaverUnlinkEventVerifier', 'events/NaverUnlinkEventController']) {
+        assert.ok(dockerfile.includes(`BOOT-INF/classes/kr/it/reserve/config/oauth2/${entry}.class`));
+    }
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/config/updates/RedisEntityUpdateRelay.class'));
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/config/util/SecurityUtil\\$OAuthAuthenticationDetails.class'));
+    assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/member/service/MemberWithdrawalService.class'));
+    assert.ok(dockerfile.includes('META-INF/orm.xml'));
     assert.match(dockerfile, /jar tf app\.jar \| grep -F -x "\$REQUIRED_CLASS" > \/dev\/null \|\| exit 1/);
 });
 

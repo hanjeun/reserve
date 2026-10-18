@@ -1,5 +1,7 @@
 package kr.it.reserve.audit.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.StoreException;
 import kr.it.reserve.member.entity.Member;
@@ -24,6 +26,10 @@ public class AdminSanctionService {
     private final MemberRepository memberRepository;
     private final StoreRepository storeRepository;
     private final AuditLogService auditLogService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.config.updates.AccountUpdateInvalidations contentUpdates;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.store.service.StoreUpdates storeUpdates;
 
     @Transactional
     public void suspendMember(Long id, int days, String rawReason) {
@@ -34,6 +40,7 @@ public class AdminSanctionService {
         String reason = normalize(rawReason);
         LocalDateTime until = LocalDateTime.now(Clock.systemDefaultZone()).plusDays(days);
         member.suspend(until, reason);
+        if (contentUpdates != null) contentUpdates.publicContentChanged();
         auditLogService.logMemberSanction(id, member.getEmail(), "SUSPEND",
                 days + "일 정지" + suffix(reason));
         log.info("Admin suspended member: id={}, until={}", id, until);
@@ -46,6 +53,7 @@ public class AdminSanctionService {
         requireSanctionable(member);
         String reason = normalize(rawReason);
         member.ban(reason);
+        if (contentUpdates != null) contentUpdates.publicContentChanged();
         auditLogService.logMemberSanction(id, member.getEmail(), "BAN",
                 "영구 정지" + suffix(reason));
         log.info("Admin banned member: id={}", id);
@@ -56,6 +64,7 @@ public class AdminSanctionService {
         Member member = memberRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(MemberException::notFound);
         member.unban();
+        if (contentUpdates != null) contentUpdates.publicContentChanged();
         auditLogService.logMemberSanction(id, member.getEmail(), "UNBAN", "정지 해제");
         log.info("Admin unbanned member: id={}", id);
     }
@@ -66,7 +75,9 @@ public class AdminSanctionService {
         Store store = findOpenStore(id);
         String reason = normalize(rawReason);
         LocalDateTime until = LocalDateTime.now(Clock.systemDefaultZone()).plusDays(days);
+        boolean wasPublic = kr.it.reserve.store.service.StoreUpdates.publicStore(store);
         store.suspend(until, reason);
+        storeChanged(store, wasPublic);
         auditLogService.logStoreSanction(id, store.getName(), "SUSPEND",
                 days + "일 영업정지" + suffix(reason));
         log.info("Admin suspended store: id={}, until={}", id, until);
@@ -76,7 +87,9 @@ public class AdminSanctionService {
     public void banStore(Long id, String rawReason) {
         Store store = findOpenStore(id);
         String reason = normalize(rawReason);
+        boolean wasPublic = kr.it.reserve.store.service.StoreUpdates.publicStore(store);
         store.ban(reason);
+        storeChanged(store, wasPublic);
         auditLogService.logStoreSanction(id, store.getName(), "BAN",
                 "영구 정지" + suffix(reason));
         log.info("Admin banned store: id={}", id);
@@ -86,8 +99,14 @@ public class AdminSanctionService {
     public void unbanStore(Long id) {
         Store store = findOpenStore(id);
         store.unban();
+        storeChanged(store, false);
         auditLogService.logStoreSanction(id, store.getName(), "UNBAN", "영업정지 해제");
         log.info("Admin unbanned store: id={}", id);
+    }
+
+    private void storeChanged(Store store, boolean wasPublic) {
+        if (storeUpdates != null) storeUpdates.changed(store, EntityUpdates.Operation.UPDATED, wasPublic);
+        if (contentUpdates != null) contentUpdates.publicContentChanged();
     }
 
     private Store findOpenStore(Long id) {

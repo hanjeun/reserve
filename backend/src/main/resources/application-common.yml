@@ -139,6 +139,19 @@ waiting:
     # 직원 접수 고지 시각을 고객 접수 고지로 재사용하지 않는다. 비면 새 고객 접수·고객 정리를 중지한다.
     customer-notice-published-at: ${WAITING_CUSTOMER_RETENTION_NOTICE_PUBLISHED_AT:}
 
+reserve:
+  redis:
+    enabled: ${RESERVE_REDIS_ENABLED:false}
+    port: ${RESERVE_REDIS_PORT:6379}
+    password: ${RESERVE_REDIS_PASSWORD:}
+    username: ${RESERVE_REDIS_USERNAME:}
+
+app:
+  frontend-url: ${APP_FRONTEND_URL:}
+  public-url: ${APP_PUBLIC_URL:}
+  marketing-url: ${APP_MARKETING_URL:https://reserve.it.kr}
+  legacy-frontend-url: ${APP_LEGACY_FRONTEND_URL:}
+
 # Sentry 에러 모니터링
 sentry:
   dsn: ${SENTRY_DSN:}

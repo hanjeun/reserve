@@ -1,5 +1,7 @@
 package kr.it.reserve.reservation.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
@@ -55,12 +57,14 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final StoreRepository storeRepository;
     /** 달력을 빨갛게 칠하는 용도. 죽어도 예약 판정에는 영향이 없다(HolidayService 주석 참고). */
-    private final HolidayService holidayService;
+    private final ReservationAvailability availability;
     private final PaymentService paymentService;
     private final EmailService emailService;
     private final MemberRepository memberRepository;
     private final AuditLogService auditLogService;
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ReservationUpdates updates;
 
     /** Undo 허용 시간(분). 토스트가 떠 있는 몇 초보다 넉넉하되, 실수 정정 범위를 넘지 않는 값. */
     private static final int UNDO_WINDOW_MINUTES = 10;
@@ -76,7 +80,7 @@ public class ReservationService {
             QrCheckinTokenProvider qrCheckinTokenProvider) {
         this.reservationRepository = reservationRepository;
         this.storeRepository = storeRepository;
-        this.holidayService = holidayService;
+        this.availability = new ReservationAvailability(reservationRepository, storeRepository, holidayService);
         this.paymentService = paymentService;
         this.emailService = emailService;
         this.memberRepository = memberRepository;
@@ -157,6 +161,7 @@ public class ReservationService {
                 .build();
 
         ReservationResponse response = ReservationResponse.fromEntity(reservationRepository.save(reservation));
+        changed(reservation, EntityUpdates.Operation.CREATED);
 
         // 사장님에게 새 예약 알림 (비동기) — 이메일 알림 설정 ON일 때만
         notifyOwnerOfNewReservation(store, freshMember, request);
@@ -256,7 +261,7 @@ public class ReservationService {
         //
         //   ⚠️ 이 변경으로 격자에서 벗어난 시각은 이제 거절된다. UI 로 만든 예약은 항상 격자 위에
         //      있으므로 정상 경로에는 영향이 없다.
-        List<LocalTime> bookable = bookableSlotTimes(store, date);
+        List<LocalTime> bookable = availability.bookableSlotTimes(store, date);
         if (!bookable.contains(time)) {
             throw new ReservationException(
                 bookable.isEmpty()
@@ -346,207 +351,11 @@ public class ReservationService {
      * 슬롯별 예약 가능 여부를 내려준다. (정원 기준 미만 시 모든 시간대 available=true)
      */
     @Transactional(readOnly = true)
-    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) {
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
+    public List<SlotAvailabilityResponse> getAvailability(Long storeId, LocalDate date) { return availability.getAvailability(storeId, date); }
 
-        Map<LocalTime, Long> guestSumByTime = reservationRepository
-                .sumActiveGuestsGroupedByTime(storeId, date).stream()
-                .collect(Collectors.toMap(
-                        row -> (LocalTime) row[0],
-                        row -> ((Number) row[1]).longValue()
-                ));
-        Integer capacity = store.getMaxCapacityPerSlot();
-
-        return bookableSlotTimesNow(store, date).stream()
-                .map(t -> {
-                    long booked = guestSumByTime.getOrDefault(t, 0L);
-                    boolean available = capacity == null || capacity <= 0 || booked < capacity;
-                    return new SlotAvailabilityResponse(t.toString().substring(0, 5), available);
-                })
-                .toList();
-    }
-
-    /**
-     * <b>그 가게가 그 날 받을 수 있는 예약 시각 목록.</b> 예약 방식별 분기는 여기 한 곳뿐이다.
-     *
-     * <p>★ 이 메서드가 이 클래스에서 가장 중요한 관문이다. 예전에는 같은 판정이 두 벌 있었다 —
-     * {@code getAvailability} 는 슬롯을 <b>생성</b>했고, {@code validateReservationSlot} 은
-     * 범위를 <b>비교</b>했다. 두 코드가 다른 모양이라 실제로 어긋나 있었다:
-     * 30분 단위 가게에 {@code 09:07} 을 API 로 직접 보내면 범위 검사는 통과했다(슬롯 목록엔 없는데도).
-     * 목록을 만들어 <b>포함 여부로 검사</b>하면 그 틈이 원천적으로 사라지고,
-     * 예약 방식이 셋으로 늘어도 분기가 한 곳에만 생긴다.
-     *
-     * <p>비어 있는 목록 = 그 날은 예약을 받지 않는다. 화면은 "예약 가능한 시간이 없습니다"를
-     * 그대로 보여주므로 호출측에 별도 분기가 필요 없다.
-     */
-    private List<LocalTime> bookableSlotTimes(Store store, LocalDate date) {
-        // 휴무일·운영기간 밖 (2026-08-11, 2026-08-24). 판정은 Store 한 곳에 있다.
-        if (!store.isBookableOn(date)) return List.of();
-
-        return switch (store.resolveBookingType()) {
-            // 사장님이 나열한 회차 그대로. 영업시간·브레이크타임을 적용하지 않는다 —
-            // 회차를 직접 적었다는 건 그 시각에 받겠다는 뜻이고, 그 위에 다른 규칙을 얹으면
-            // "적었는데 안 보이는" 상태가 된다.
-            case SESSION -> store.getSessionTimeList();
-
-            // 하루 = 슬롯 한 개. 정원·중복·마감·결제가 전부 그대로 재사용된다.
-            case DAY -> List.of(store.dayBookingTime());
-
-            case SLOT -> slotGrid(store);
-        };
-    }
-
-    /**
-     * <b>지금 실제로 고를 수 있는 시각 목록.</b> = 구조적 목록 − (이미 지난 시각) − (예약 가능 기간 밖) − (마감이 지난 시각)
-     *
-     * <p>★ {@link #bookableSlotTimes} 와 나눠 둔 이유 — 저쪽은 <b>가게의 성질</b>이고
-     * (영업시간·회차·휴무로 정해지며 "지금"과 무관하다), 이쪽은 <b>지금 시점의 사실</b>이다.
-     * 한 메서드에 섞으면 "이 가게는 그 날 09:00 을 받는가"라는 질문에 오후 2시엔 아니라고 답하게 된다.
-     *
-     * <p>★ 그런데 <b>화면은 이쪽을 봐야 한다.</b> 그전까지 {@code getAvailability} 는 구조적 목록을
-     * 그대로 내려줬다. 그래서 <b>오후 2시에 오늘 09:00 이 예약 가능한 것처럼 보였고</b>, 눌러서
-     * 제출하면 그제서야 "예약 날짜/시간은 현재 이후여야 합니다"가 떴다. 마감 시간
-     * ({@code bookingDeadlineHours})도 똑같이 화면에는 안 보이고 제출할 때만 걸렸다.
-     * 이 프로젝트가 계속 경계해 온 <b>"눌리는데 예약하면 거절"</b>의 전형이다.
-     *
-     * <p>{@code validateReservationSlot} 은 여전히 구조적 목록을 쓴다 — 거기엔 지난 시각·마감을
-     * <b>각각 따로 검사하는 코드가 이미 있고</b>, 그래야 "왜 안 되는지"를 구분해서 말해줄 수 있다.
-     * 여기서 걸러버리면 전부 "예약 가능한 시간대를 선택해주세요" 하나로 뭉개진다.
-     */
-    private List<LocalTime> bookableSlotTimesNow(Store store, LocalDate date) {
-        LocalDateTime now = ServiceTime.now();
-        Integer deadlineHours = store.getBookingDeadlineHours();
-        Integer maxAdvance = store.getMaxAdvanceBookingDays();
-        if (date != null && maxAdvance != null && maxAdvance > 0
-                && date.isAfter(now.toLocalDate().plusDays(maxAdvance))) {
-            return List.of();
-        }
-
-        return bookableSlotTimes(store, date).stream()
-                .filter(t -> {
-                    LocalDateTime slotAt = LocalDateTime.of(date, t);
-                    if (!slotAt.isAfter(now)) return false;
-                    if (deadlineHours == null || deadlineHours <= 0) return true;
-                    return !now.isAfter(slotAt.minusHours(deadlineHours));
-                })
-                .toList();
-    }
-
-    /**
-     * 달력(월 단위) — 날짜마다 <b>상태와 그 사유</b>를 내려준다.
-     *
-     * <p>이 API 가 생긴 이유는 {@link CalendarDayResponse} 주석에 있다. 요약하면,
-     * {@code disabledDate} 는 회색으로 막는 것밖에 못 해서 휴무·기간밖·마감이 전부 한 색이 된다.
-     *
-     * <p><b>★ 판정 순서를 {@code validateReservationSlot} 과 맞춘다.</b>
-     * 지난날 → 휴무 → 운영기간 → 예약범위 → 정원. 순서가 다르면 달력이 말하는 이유와
-     * 예약 실패 메시지가 서로 다른 말을 하게 된다(둘 다 맞는 말이라도 사용자는 혼란스럽다).
-     *
-     * <p>쿼리는 <b>한 번</b>이다. 날짜마다 조회하면 달을 넘길 때마다 31 쿼리가 나간다.
-     */
     @Transactional(readOnly = true)
-    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) {
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new ReservationException(STORE_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
+    public List<CalendarDayResponse> getMonthCalendar(Long storeId, YearMonth month) { return availability.getMonthCalendar(storeId, month); }
 
-        LocalDate from = month.atDay(1);
-        LocalDate to = month.atEndOfMonth();
-
-        // [날짜][시각] -> 이미 잡힌 인원
-        Map<LocalDate, Map<LocalTime, Long>> bookedByDate = new HashMap<>();
-        for (Object[] row : reservationRepository.sumActiveGuestsGroupedByDateAndTime(storeId, from, to)) {
-            bookedByDate
-                    .computeIfAbsent((LocalDate) row[0], d -> new HashMap<>())
-                    .put((LocalTime) row[1], ((Number) row[2]).longValue());
-        }
-
-        Integer capacity = store.getMaxCapacityPerSlot();
-
-        LocalDate today = ServiceTime.today();
-        Integer maxAdvance = store.getMaxAdvanceBookingDays();
-        // null 또는 0 = 제한 없음. 기존 가게의 동작을 그대로 둔다(validateReservationSlot 과 같은 규칙).
-        LocalDate lastBookable = (maxAdvance != null && maxAdvance > 0) ? today.plusDays(maxAdvance) : null;
-
-        // 빨간날. 키가 없거나 포털이 죽어 있으면 빈 집합이 오고, 달력은 그대로 뜬다.
-        Set<LocalDate> holidays = holidayService.holidaysOf(month);
-
-        List<CalendarDayResponse> days = new ArrayList<>();
-        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
-            days.add(describeDay(store, date, today, lastBookable, capacity,
-                    bookedByDate.getOrDefault(date, Map.of()), holidays.contains(date)));
-        }
-        return days;
-    }
-
-    /** 달력 한 칸. 순서가 곧 사유의 우선순위다 — {@link #getMonthCalendar} 주석 참고. */
-    private CalendarDayResponse describeDay(Store store, LocalDate date, LocalDate today,
-                                            LocalDate lastBookable, Integer capacity,
-                                            Map<LocalTime, Long> booked, boolean holiday) {
-        String ymd = date.toString();
-
-        if (date.isBefore(today)) {
-            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.PAST.name(), 0, 0, holiday);
-        }
-        // 휴무를 운영기간보다 먼저 본다 — validateReservationSlot 의 문구 분기와 같은 순서다.
-        if (store.isClosedOn(date)) {
-            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.CLOSED.name(), 0, 0, holiday);
-        }
-        if (!store.isBookableOn(date)) {
-            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.OUT_OF_PERIOD.name(), 0, 0, holiday);
-        }
-        if (lastBookable != null && date.isAfter(lastBookable)) {
-            return new CalendarDayResponse(ymd, CalendarDayResponse.DayStatus.TOO_FAR.name(), 0, 0, holiday);
-        }
-
-        boolean capped = capacity != null && capacity > 0;
-        int total = bookableSlotTimes(store, date).size();
-        long open = bookableSlotTimesNow(store, date).stream()
-                .filter(t -> !capped || booked.getOrDefault(t, 0L) < capacity)
-                .count();
-
-        // total 이 0 이면 영업시간이 비었거나 회차를 안 적은 가게다. 막힌 것은 맞지만
-        // 휴무도 기간밖도 아니므로 FULL 로 표현한다 — 화면에서는 둘 다 "예약 불가"다.
-        String status = open > 0
-                ? CalendarDayResponse.DayStatus.OPEN.name()
-                : CalendarDayResponse.DayStatus.FULL.name();
-        return new CalendarDayResponse(ymd, status, total, (int) open, holiday);
-    }
-
-    /** SLOT 방식의 시각 격자 — 영업시간을 예약 단위로 쪼개고 브레이크타임을 뺀다. */
-    private List<LocalTime> slotGrid(Store store) {
-        if (store.getOpenTime() == null || store.getCloseTime() == null) return List.of();
-
-        int slotMin = store.getReservationSlotMinutes() != null ? store.getReservationSlotMinutes() : 30;
-        // ★ slotMin 이 0 이면 cursor 가 전진하지 않아 **무한루프 + OOM** 이 된다.
-        //   저장 시 clampSlotMinutes 가 막지만, 그 전에 저장된 데이터나 수동 DB 변경이 있을 수 있어
-        //   읽는 쪽에도 가드를 둔다. 이 경로는 로그인만 하면 누구나 호출할 수 있다.
-        if (slotMin <= 0) {
-            log.warn("Invalid reservationSlotMinutes: storeId={}, value={} - returning empty slots",
-                    store.getId(), slotMin);
-            return List.of();
-        }
-
-        LocalTime open  = store.getOpenTime();
-        LocalTime close = store.getCloseTime();
-        LocalTime breakStart = store.getBreakStartTime();
-        LocalTime breakEnd   = store.getBreakEndTime();
-        boolean hasBreak = breakStart != null && breakEnd != null;
-
-        List<LocalTime> result = new ArrayList<>();
-        LocalTime cursor = open;
-        // close 는 "영업 종료 시각"이므로, 예약이 예약 단위만큼 자리를 점유한다고 보고
-        // 마지막 슬롯 + slotMin 이 close 를 넘어가면 제외한다.
-        // 예) 09:00~21:00 / 30분 → 마지막 슬롯 20:30. 21:00 은 21:30 이 되어 제외.
-        // (close 가 자정을 넘어가는 가게는 지원하지 않는다 — StoreService 가 저장 단계에서 거절한다.)
-        // LocalTime.plusMinutes 는 자정을 돌면 00시로 돌아오므로, 남은 당일 시간을 먼저 비교한다.
-        while (Duration.between(cursor, close).toMinutes() >= slotMin) {
-            boolean inBreak = hasBreak && !cursor.isBefore(breakStart) && cursor.isBefore(breakEnd);
-            if (!inBreak) result.add(cursor);
-            cursor = cursor.plusMinutes(slotMin);
-        }
-        return result;
-    }
 
     /**
      * 예약 상세 조회
@@ -623,7 +432,9 @@ public class ReservationService {
         reservation.setStatus(newStatus);
 
         log.info("Reservation updated: id={}, memberId={}, newStatus={}", id, member.getId(), newStatus);
-        return ReservationResponse.fromEntity(reservationRepository.save(reservation));
+        Reservation saved = reservationRepository.save(reservation);
+        changed(saved, EntityUpdates.Operation.UPDATED);
+        return ReservationResponse.fromEntity(saved);
     }
 
     /**
@@ -646,6 +457,7 @@ public class ReservationService {
         //   (refundByReservationCancel 의 REQUIRES_NEW)에서 시도하고, 실패하면 로그로 남긴다.
         // 환불 요청과 미결 결말은 refund_attempt 원장과 결제 대사 큐에서 추적한다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
 
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
             try {
@@ -667,13 +479,7 @@ public class ReservationService {
      */
     @Transactional(readOnly = true)
     public String generateQrCheckinToken(Long reservationId, Member member) {
-        Reservation reservation = findByIdOrThrow(reservationId);
-        validateOwnership(reservation, member);
-        if (!isApprovedForCheckIn(reservation)) {
-            throw new ReservationException("승인된 예약만 QR 체크인을 사용할 수 있어요.",
-                    HttpStatus.BAD_REQUEST);
-        }
-        return qrCheckinTokenProvider.generateToken(reservationId, reservation.getReservationDate());
+        return attendance().generateQrCheckinToken(reservationId, member);
     }
 
     /**
@@ -682,65 +488,7 @@ public class ReservationService {
      */
     @Transactional
     public QrCheckinResponse checkInByQrToken(String token, Member owner) {
-        Long reservationId = qrCheckinTokenProvider.parseReservationId(token);
-        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
-                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
-        validateStoreOwner(reservation, owner);
-
-        // ★★ 방문 당일에만 체크인할 수 있다 (2026-08-19 신설).
-        //
-        //   그 전까지 날짜 검사가 아예 없었다. 토큰 만료는 "방문일 다음 날 새벽" 과 "발급 후 24시간"
-        //   중 빠른 쪽인데, **3개월 뒤 예약이라도 방금 발급한 QR 은 24시간 동안 유효하다.**
-        //   그래서 손님이 오늘 그 QR 을 보여주면 사장님의 승인 절차를 건너뛰고 곧바로 CONFIRMED 가 됐다.
-        //   QR 체크인은 "왔다"를 증명하는 수단이지 "미리 확정받는" 수단이 아니다.
-        //
-        //   비교 기준은 반드시 KST 다 — reservationDate 는 손님이 고른 한국 날짜이고
-        //   컨테이너는 UTC 로 돈다(ServiceTime 참고). 이걸 놓치면 매일 09시 이전에 오탐이 난다.
-        LocalDate today = ServiceTime.today();
-        if (!today.equals(reservation.getReservationDate())) {
-            // 감사 로그: 거부는 WARN 으로 남긴다. Loki 에 level 인덱스가 있어
-            // {job="reserve", level="WARN"} |= "QR check-in" 한 줄로 이상 패턴을 볼 수 있다.
-            log.warn("QR check-in rejected (date mismatch): reservationId={}, storeId={}, ownerId={}, reservationDate={}, today={}",
-                    reservation.getId(), reservation.getStore().getId(), owner.getId(),
-                    reservation.getReservationDate(), today);
-            throw new ReservationException(
-                    "방문 당일에만 QR 체크인을 할 수 있어요. (예약일: " + reservation.getReservationDate() + ")",
-                    HttpStatus.BAD_REQUEST
-            );
-        }
-
-        if (reservation.getCheckedInAt() != null) {
-            log.info("QR check-in repeated: reservationId={}, storeId={}, ownerId={}",
-                    reservation.getId(), reservation.getStore().getId(), owner.getId());
-            return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), true);
-        }
-
-        // UNCONFIRMED도 원래 CONFIRMED였다가 예약 시각이 지나도록 마감되지 않은 상태다.
-        // 지각 도착 직전에 스케줄러가 상태를 바꿨다는 이유로 실제 출석 기록을 막지 않는다.
-        if (!isApprovedForCheckIn(reservation)) {
-            log.warn("QR check-in rejected (bad status): reservationId={}, storeId={}, ownerId={}, status={}",
-                    reservation.getId(), reservation.getStore().getId(), owner.getId(), reservation.getStatus());
-            throw new ReservationException(
-                    "승인된 예약만 QR 체크인을 할 수 있어요. (현재 상태: " + reservation.getStatus() + ")",
-                    HttpStatus.BAD_REQUEST
-            );
-        }
-
-        // DB timestamp는 createdAt과 같은 JVM(운영 컨테이너 UTC) 시계를 사용하고,
-        // 사용자에게 내보낼 때 ReservationResponse에서 한국 시각으로 바꾼다.
-        reservation.setCheckedInAt(LocalDateTime.now(Clock.systemDefaultZone()));
-
-        // 개인정보 없이 출석 사실을 운영 로그에 남긴다. checkedInAt은 DB의 장기 근거다.
-        //
-        //   audit_log 테이블(AuditLogService)이 아니라 로그로 남기는 이유: 그 테이블은
-        //   "휴지통 스냅샷 + 관리자 행위"용이고 90일 뒤 스케줄러가 지운다. 체크인은 영업 중 반복되는
-        //   일반 동작이라 매 스캔마다 행을 쌓으면 성격이 다른 데이터가 섞이고 조회도 느려진다.
-        //   Loki 가 이미 이 로그를 수집하고 level 라벨로 인덱싱하므로 조회는 그쪽이 낫다.
-        log.info("QR check-in recorded: reservationId={}, storeId={}, ownerId={}, reservationDate={}, reservationTime={}",
-                reservation.getId(), reservation.getStore().getId(), owner.getId(),
-                reservation.getReservationDate(), reservation.getReservationTime());
-
-        return new QrCheckinResponse(ReservationResponse.fromEntity(reservation), false);
+        return attendance().checkInByQrToken(token, owner);
     }
 
     /**
@@ -756,6 +504,7 @@ public class ReservationService {
         }
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
 
         // 유저에게 승인 알림 (비동기) — 개인 알림 설정 ON일 때만
         if (reservation.getMember().isEmailNotificationEnabled()) {
@@ -789,6 +538,7 @@ public class ReservationService {
         }
 
         reservation.setStatus(Reservation.ReservationStatus.REJECTED);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
         reservation.setRejectionReason(reason != null ? reason : "가게 사정으로 인한 거절");
 
         // ★ 거절은 전액 환불이다 (2026-08-11 추가).
@@ -856,6 +606,7 @@ public class ReservationService {
         // cancelReservation 과 같은 순서 — 상태를 먼저 확정하고 환불은 별도 트랜잭션에서 시도한다.
         // PG 장애가 예약 취소 자체를 막으면 사장님도 이용자도 아무것도 못 하는 상태로 갇힌다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
         reservation.setCancelReason(cancelReason);
 
         refundFullByStoreDecisionQuietly(id, "가게의 예약 취소에 따른 전액 환불", reservation);
@@ -946,6 +697,7 @@ public class ReservationService {
         requireWithinUndoWindow(reservation);
 
         reservation.setStatus(Reservation.ReservationStatus.PENDING);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
         log.info("Approval undone: reservationId={}, ownerId={}", id, owner.getId());
 
         if (reservation.getMember().isEmailNotificationEnabled()) {
@@ -982,6 +734,7 @@ public class ReservationService {
         requireWithinUndoWindow(reservation);
 
         reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
+        changed(reservation, EntityUpdates.Operation.UPDATED);
         log.info("Completion undone: reservationId={}, ownerId={}", id, owner.getId());
     }
 
@@ -1008,16 +761,7 @@ public class ReservationService {
      */
     @Transactional
     public void completeReservation(Long id, Member owner) {
-        Reservation reservation = findByIdForUpdateOrThrow(id);
-        validateStoreOwner(reservation, owner);
-
-        // UNCONFIRMED 도 받는다 (2026-08-11) — 그건 "승인됐는데 시간이 지나도록 사장님이
-        // 처리를 안 한" 상태다. 처리를 안 했다는 이유로 처리 수단을 막으면 영영 못 닫는다.
-        if (!isClosable(reservation)) {
-            throw new ReservationException("승인된 예약만 이용완료 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
-        }
-
-        reservation.setStatus(Reservation.ReservationStatus.COMPLETED);
+        attendance().completeReservation(id, owner);
     }
 
     /**
@@ -1025,17 +769,7 @@ public class ReservationService {
      */
     @Transactional
     public void markNoShow(Long id, Member owner) {
-        Reservation reservation = findByIdForUpdateOrThrow(id);
-        validateStoreOwner(reservation, owner);
-
-        if (!isClosable(reservation)) {
-            throw new ReservationException("승인된 예약만 노쇼 처리할 수 있어요.", HttpStatus.BAD_REQUEST);
-        }
-        if (reservation.getCheckedInAt() != null) {
-            throw new ReservationException("체크인된 예약은 노쇼로 처리할 수 없어요.", HttpStatus.BAD_REQUEST);
-        }
-
-        reservation.setStatus(Reservation.ReservationStatus.NO_SHOW);
+        attendance().markNoShow(id, owner);
     }
 
     /**
@@ -1164,6 +898,7 @@ public class ReservationService {
         }
 
         reservation.softDelete();
+        changed(reservation, EntityUpdates.Operation.DELETED);
         auditLogService.logReservationDelete(reservation);  // 관리자 휴지통에 기록 (삭제 주체 = 현재 로그인 유저)
         log.info("Reservation removed: id={}, memberId={}", id, member.getId());
     }
@@ -1185,6 +920,14 @@ public class ReservationService {
         return ReservationCodeGenerator.generate(reservationDate) + System.nanoTime() % 1000;
     }
 
+    private ReservationAttendance attendance() {
+        return new ReservationAttendance(reservationRepository, qrCheckinTokenProvider, updates);
+    }
+
+    private void changed(Reservation reservation, EntityUpdates.Operation operation) {
+        if (updates != null) updates.changed(reservation, operation);
+    }
+
     private Reservation findByIdOrThrow(Long id) {
         return reservationRepository.findById(id)
                 .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
@@ -1197,9 +940,7 @@ public class ReservationService {
     }
 
     private void validateOwnership(Reservation reservation, Member member) {
-        if (!reservation.getMember().getId().equals(member.getId())) {
-            throw new ReservationException("해당 예약에 대한 권한이 없어요.", HttpStatus.FORBIDDEN);
-        }
+        ReservationAccess.member(reservation, member);
     }
 
     /**
@@ -1210,19 +951,14 @@ public class ReservationService {
      * 나중에 상태가 하나 더 생겼을 때 한 곳만 고쳐지는 사고가 난다.
      */
     private boolean isClosable(Reservation reservation) {
-        return reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED
-                || reservation.getStatus() == Reservation.ReservationStatus.UNCONFIRMED;
+        return ReservationAccess.approved(reservation);
     }
 
     private boolean isApprovedForCheckIn(Reservation reservation) {
-        return reservation.getStatus() == Reservation.ReservationStatus.CONFIRMED
-                || reservation.getStatus() == Reservation.ReservationStatus.UNCONFIRMED;
+        return ReservationAccess.approved(reservation);
     }
 
     private void validateStoreOwner(Reservation reservation, Member owner) {
-        if (owner.isAdmin()) return; // 관리자는 모든 예약 접근 가능
-        if (!reservation.getStore().getOwner().getId().equals(owner.getId())) {
-            throw new ReservationException("가게 소유자만 접근할 수 있어요.", HttpStatus.FORBIDDEN);
-        }
+        ReservationAccess.owner(reservation, owner);
     }
 }

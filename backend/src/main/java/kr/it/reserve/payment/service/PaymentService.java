@@ -1,5 +1,7 @@
 package kr.it.reserve.payment.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.PaymentException;
@@ -37,6 +39,8 @@ import java.util.UUID;
 @Transactional
 @RequiredArgsConstructor
 public class PaymentService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.reservation.service.ReservationUpdates reservationUpdates;
 
     private static final String PG_READY_STATUS = "READY";
     private static final String EXPIRY_CHECK_SOURCE = "EXPIRY";
@@ -51,115 +55,10 @@ public class PaymentService {
     private final PaymentReconciliationIssueService reconciliationIssueService;
 
     public PaymentPrepareDto preparePayment(PaymentRequestDto requestDto, Long memberId) {
-        Reservation reservation = reservationRepository.findById(requestDto.getReservationId())
-                .orElseThrow(ReservationException::notFound);
-
-        Member member = memberRepository.findActiveByIdForUpdate(memberId)
-                .orElseThrow(MemberException::notFound);
-
-        // ★ 본인 예약인지 확인한다 (2026-08-09).
-        //   예전엔 reservationId 를 body 에서 받아 그대로 조회만 했다. 로그인만 하면
-        //   남의 예약에 대해 결제를 준비하고, 아래 금액 문제와 겹쳐 남의 예약을
-        //   임의 금액으로 "결제 완료" 상태로 만들 수 있었다.
-        if (reservation.getMember() == null || !reservation.getMember().getId().equals(memberId)) {
-            log.warn("Payment prepare denied - not owner: reservationId={}, memberId={}",
-                    reservation.getId(), memberId);
-            throw new PaymentException("본인의 예약만 결제할 수 있어요.", HttpStatus.FORBIDDEN);
-        }
-
-        if (isPaymentClosedFor(reservation)) {
-            throw new PaymentException("취소되거나 종료된 예약은 결제할 수 없어요.", HttpStatus.CONFLICT);
-        }
-
-        if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
-            throw new PaymentException("이미 결제가 완료된 예약이에요.", HttpStatus.CONFLICT);
-        }
-
-        // ★ 결제 금액은 서버에서만 정한다 (2026-08-09).
-        //   예전엔 requestDto.getAmount() 를 그대로 Payment.amount 에 넣었고,
-        //   verifyAndCompletePayment 는 PG 결제액을 "그 값"과 비교했다. 즉 검증이
-        //   공격자가 정한 숫자를 기준으로 통과했고, markDepositPaid 가 예약의
-        //   예약금을 그 금액으로 덮어썼다. 요청 본문의 amount 는 이제 무시한다.
-        int amount = resolveDepositAmount(reservation);
-        if (amount <= 0) {
-            throw new PaymentException("결제할 예약금이 없는 예약이에요.", HttpStatus.BAD_REQUEST);
-        }
-
-        // 기존 READY 상태 Payment가 있으면 재사용 (결제창 재시도 지원)
-        // findReadyByReservationId 사용 → 여러 레코드 있어도 안전 (첫 번째만 사용)
-        List<Payment> readyPayments = paymentRepository.findReadyByReservationId(reservation.getId());
-        Payment existingReady = readyPayments.isEmpty() ? null : readyPayments.getFirst();
-
-        if (existingReady != null) {
-            // 재사용 시에도 금액을 예약 당시 확정된 값으로 다시 맞춘다 — 예전 READY 행에는
-            // 클라이언트가 보냈던 금액이 그대로 남아 있을 수 있다.
-            if (!Integer.valueOf(amount).equals(existingReady.getAmount())) {
-                log.info("Resyncing READY payment amount: paymentId={}, {} -> {}",
-                        existingReady.getId(), existingReady.getAmount(), amount);
-                existingReady.setAmount(amount);
-            }
-            log.info("Reusing existing READY payment: paymentId={}, merchantUid={}",
-                    existingReady.getId(), existingReady.getMerchantUid());
-            return PaymentPrepareDto.builder()
-                    .merchantUid(existingReady.getMerchantUid())
-                    .amount(amount)
-                    .productName(existingReady.getProductName())
-                    .buyerName(existingReady.getBuyerName())
-                    .buyerEmail(existingReady.getBuyerEmail())
-                    .buyerTel(existingReady.getBuyerTel())
-                    .storeId(portoneService.getStoreId())
-                    .pgProvider(existingReady.getPgProvider())
-                    .reservationId(reservation.getId())
-                    .build();
-        }
-
-        String merchantUid = generateMerchantUid();
-
-        Payment payment = Payment.builder()
-                .member(member)
-                .reservation(reservation)
-                .merchantUid(merchantUid)
-                .amount(amount)
-                .productName(requestDto.getProductName())
-                .buyerName(requestDto.getBuyerName() != null ? requestDto.getBuyerName() : member.getName())
-                .buyerEmail(requestDto.getBuyerEmail() != null ? requestDto.getBuyerEmail() : member.getEmail())
-                .buyerTel(requestDto.getBuyerTel())
-                .pgProvider(requestDto.getPgProvider())
-                .status(Payment.PaymentStatus.READY)
-                .build();
-
-        paymentRepository.save(payment);
-
-        return PaymentPrepareDto.builder()
-                .merchantUid(merchantUid)
-                .amount(amount)
-                .productName(requestDto.getProductName())
-                .buyerName(payment.getBuyerName())
-                .buyerEmail(payment.getBuyerEmail())
-                .buyerTel(payment.getBuyerTel())
-                .storeId(portoneService.getStoreId())
-                .pgProvider(requestDto.getPgProvider())
-                .reservationId(reservation.getId())
-                .build();
+        return new PaymentPreparation(paymentRepository, reservationRepository, memberRepository, portoneService).preparePayment(requestDto, memberId);
     }
 
-    /**
-     * 결제할 예약금을 서버에서 결정한다.
-     *
-     * <p>예약 생성 시 {@code store.noShowDeposit} 을 예약에 복사해 두므로(ReservationService)
-     * 예약의 값이 1순위다. 과거 데이터 등으로 비어 있으면 가게의 현재 설정으로 폴백한다.
-     * 어느 쪽도 없으면 0 을 돌려주고 호출측이 400 으로 막는다.
-     */
-    private int resolveDepositAmount(Reservation reservation) {
-        Integer fromReservation = reservation.getDepositAmount();
-        if (fromReservation != null) {
-            // 0원도 예약 당시 확정된 금액이다. 가게의 이후 가격을 가져와 유료 예약으로 바꾸지 않는다.
-            return Math.max(0, fromReservation);
-        }
-        Store store = reservation.getStore();
-        Integer fromStore = (store != null) ? store.getNoShowDeposit() : null;
-        return (fromStore != null && fromStore > 0) ? fromStore : 0;
-    }
+
 
     /**
      * 외부(사용자) 결제 검증 요청 — <b>본인 결제만.</b>
@@ -529,13 +428,11 @@ public class PaymentService {
             reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
             log.info("Auto-approve processed: reservationId={}", reservation.getId());
         }
+        if (reservationUpdates != null) reservationUpdates.changed(reservation, EntityUpdates.Operation.UPDATED);
     }
 
     /** 결제를 더 받을 수 없는 예약인지 — 대기·확정 상태만 결제를 받는다. */
-    private boolean isPaymentClosedFor(Reservation reservation) {
-        return reservation.getStatus() != Reservation.ReservationStatus.PENDING
-                && reservation.getStatus() != Reservation.ReservationStatus.CONFIRMED;
-    }
+    private boolean isPaymentClosedFor(Reservation reservation) { return PaymentReservationPolicy.closedFor(reservation); }
 
     private void recordIssue(
             String category,
@@ -769,6 +666,7 @@ public class PaymentService {
             reservation.setDepositPaid(false);
             reservation.setDepositAmount(0);
         }
+        if (reservationUpdates != null) reservationUpdates.changed(payment.getReservation(), EntityUpdates.Operation.UPDATED);
         log.info("Refund confirmed: paymentId={}, merchantUid={}, amount={}, totalRefunded={}, status={}",
                 payment.getId(), payment.getMerchantUid(), refundAmount,
                 payment.refundedSoFar(), payment.getStatus());
@@ -1220,9 +1118,7 @@ public class PaymentService {
                 .toList();
     }
 
-    private String generateMerchantUid() {
-        return "ORD-" + LocalDateTime.now(Clock.systemDefaultZone()).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + "-" + UUID.randomUUID().toString().substring(0, 6);
-    }
+
 
     @lombok.Getter
     @lombok.AllArgsConstructor

@@ -29,11 +29,13 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,6 +58,7 @@ class StoreDeletionSafetyTest {
     @Mock private AdvertisementRepository advertisementRepository;
     @Mock private ObjectMapper objectMapper;
     @Mock private Executor imageUploadExecutor;
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
 
     @InjectMocks
     private StoreService storeService;
@@ -104,10 +107,11 @@ class StoreDeletionSafetyTest {
         verify(dataLifecycleGuard).requireStoreClosureAllowed(storeId);
         verify(storeRepository).findByIdForUpdate(storeId);
         verify(favoriteRepository, never()).deleteByStoreId(storeId);
-        verify(promotionRepository, never()).deleteByStoreId(storeId);
+        verify(promotionRepository, never()).softDeleteByStoreId(eq(storeId), any(LocalDateTime.class));
         verify(storeRepository, never()).delete(any(Store.class));
         verifyNoInteractions(fileStorageService);
         verifyNoInteractions(fileDeletionOutboxService);
+        verifyNoInteractions(events);
     }
 
     @Test
@@ -135,7 +139,8 @@ class StoreDeletionSafetyTest {
 
         verify(dataLifecycleGuard).requireStoreClosureAllowed(storeId);
         verify(favoriteRepository).deleteByStoreId(storeId);
-        verify(promotionRepository).deleteByStoreId(storeId);
+        verify(promotionRepository).softDeleteByStoreId(eq(storeId), any(LocalDateTime.class));
+        verify(events).publishEvent(new kr.it.reserve.store.event.StoreClosed(storeId));
         verify(storeRepository, never()).delete(any(Store.class));
         verify(fileDeletionOutboxService).enqueue(
                 "users/1/stores/8/thumbnails/main.png", "STORE_MAIN_IMAGE", storeId);

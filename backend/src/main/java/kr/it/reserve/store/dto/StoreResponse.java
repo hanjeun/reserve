@@ -1,6 +1,7 @@
 package kr.it.reserve.store.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.store.entity.Store;
@@ -95,6 +96,8 @@ public class StoreResponse {
 
     private String waitingIntakeMode;
     private Boolean waitingPaused;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long waitingTeams;
     private Boolean reservationEnabled;
 
     // 휴무·예약범위 (2026-08-11). 달력이 어떤 날짜를 막을지 결정하는 데 쓰인다 —
@@ -147,6 +150,12 @@ public class StoreResponse {
         } catch (Exception e) {
             return Collections.emptyList();
         }
+    }
+
+    public static StoreResponse fromWaitingDirectory(Store store, long waitingTeams) {
+        StoreResponse response = fromEntity(store);
+        response.waitingTeams = waitingTeams;
+        return response;
     }
 
     public static StoreResponse fromEntity(Store store) {

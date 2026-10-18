@@ -67,9 +67,22 @@ class ChatReportRetentionServiceTest {
 
     private UpdateChatReportRetentionRequest request(ChatReport.RetentionCategory category) {
         var request = new UpdateChatReportRetentionRequest();
+        request.setRevision(0L);
         request.setCategory(category);
         request.setHold(false);
         request.setNote(" 기산 근거 ");
         return request;
+    }
+
+    @Test void anOldRetentionFormCannotReleaseAHoldAfterAnotherReview() {
+        var room = ChatRoom.builder().id(10L).build();
+        var report = ChatReport.builder().id(5L).room(room).revision(3L).retentionHold(true).build();
+        when(reports.findRoomIdById(5L)).thenReturn(Optional.of(10L));
+        when(rooms.findByIdForUpdate(10L)).thenReturn(Optional.of(room));
+        when(reports.findByIdForUpdate(5L)).thenReturn(Optional.of(report));
+        var request = request(ChatReport.RetentionCategory.GENERAL_REPORT); request.setRevision(2L);
+        assertThatThrownBy(() -> service.update(admin, 5L, request))
+                .isInstanceOfSatisfying(ChatException.class, error -> assertThat(error.getStatus()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT));
+        assertThat(report.isRetentionHold()).isTrue(); verifyNoInteractions(audits); verify(reports, never()).flush();
     }
 }

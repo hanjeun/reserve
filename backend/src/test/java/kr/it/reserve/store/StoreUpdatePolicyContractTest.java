@@ -11,6 +11,8 @@ import kr.it.reserve.store.dto.StoreUpdateRequest;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.service.StoreService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,6 +82,28 @@ class StoreUpdatePolicyContractTest {
         service.updateStore(store.getId(), request, store.getOwner());
         assertThat(store.getAllowLatePayment()).isFalse();
         assertThat(store.getNoShowDeposit()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-1, 100001, 10000000})
+    void outOfRangeDepositsAreRejectedWithoutReplacingTheExistingAmount(int amount) {
+        Store store = store();
+        StoreUpdateRequest request = new StoreUpdateRequest();
+        request.setNoShowDeposit(amount);
+        assertThatThrownBy(() -> service.updateStore(store.getId(), request, store.getOwner()))
+                .isInstanceOf(StoreException.class).hasMessageContaining("0~100,000원");
+        assertThat(store.getNoShowDeposit()).isEqualTo(3000);
+    }
+
+    @Test
+    void theMaximumDepositIsAcceptedWithoutRewritingAnExistingReservation() {
+        Store store = store();
+        Reservation existing = reservation(store, Reservation.ReservationStatus.CONFIRMED, 3000);
+        StoreUpdateRequest request = new StoreUpdateRequest();
+        request.setNoShowDeposit(100000);
+        service.updateStore(store.getId(), request, store.getOwner());
+        assertThat(store.getNoShowDeposit()).isEqualTo(100000);
+        assertThat(existing.getDepositAmount()).isEqualTo(3000);
     }
 
     @Test

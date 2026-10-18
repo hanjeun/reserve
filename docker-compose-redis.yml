@@ -1,0 +1,40 @@
+# 운영 준비용: Blue/Green과 별도로 설치하며 호스트 포트를 공개하지 않는다.
+# 설정 파일의 requirepass는 앱의 RESERVE_REDIS_PASSWORD와 같아야 한다.
+name: reserve-redis
+
+services:
+  redis:
+    image: redis:8.2.9-alpine@sha256:5f2e6a105b2a8cc721911d5d29aadb032c25fe55b43e829e3d03413753ff47c2
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    user: "999:999"
+    volumes:
+      - type: bind
+        source: ${RESERVE_REDIS_CONFIG_PATH:?Set the private production redis.conf path}
+        target: /usr/local/etc/redis/redis.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(sed -n 's/^requirepass //p' /usr/local/etc/redis/redis.conf)\" redis-cli -h 127.0.0.1 ping | grep -qx PONG"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true

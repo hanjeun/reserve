@@ -75,6 +75,10 @@ export function bundleNotices() {
                     sections.push(`--- RESERVE ${kit} / ${name} ---\n${readFileSync(join(directory, name), 'utf8')}`);
                 }
             }
+            const communityKit = 'state-illustrations/source/community-benefit-states-v2';
+            for (const name of ['assets-cc0.txt', 'code-mit.txt']) {
+                sections.push(`--- RESERVE ${communityKit} / ${name} ---\n${readFileSync(resolve('src/assets', communityKit, 'licenses', name), 'utf8')}`);
+            }
             for (const [identity, { directory, pkg }] of [...packages].sort(([a], [b]) => a.localeCompare(b))) {
                 const notices = readdirSync(directory).filter(name =>
                     /^(licen[cs]e|notice|copying)(?:[._-].*)?$/i.test(name)

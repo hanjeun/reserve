@@ -179,6 +179,11 @@
       "source": "https://repo.maven.apache.org/maven2/redis/clients/authentication/redis-authx-core/0.1.1-beta2/redis-authx-core-0.1.1-beta2-sources.jar",
       "sha256": "62533790d055d7b88f86106865dd146fccabef8811e7c790c7ae8c3782195d5a",
       "file": "upstream/redis-authx-source-notices.txt"
+    },
+    "sentry-8.61.0": {
+      "file": "upstream/sentry-8.59.0.txt",
+      "source": "https://raw.githubusercontent.com/getsentry/sentry-java/8.61.0/LICENSE",
+      "sha256": "c90147c075a17f4aecfea27a56510ddf7c76508c8488df533623402008b9d052"
     }
   },
   "packages": {
@@ -494,6 +499,36 @@
       "documents": [
         "redis-authx",
         "redis-authx-source-notices"
+      ]
+    },
+    "io.sentry:sentry-reactor:8.61.0": {
+      "jarSha256": "5effd4bdddf13c02e91bb909b512475a3a630e36e40517fa9a35168cd798561d",
+      "documents": [
+        "sentry-8.61.0"
+      ]
+    },
+    "io.sentry:sentry-spring-boot-jakarta:8.61.0": {
+      "jarSha256": "8a370552f6fb5ce304917389dac861a20136e0f9686793ca6db479a9eaefd860",
+      "documents": [
+        "sentry-8.61.0"
+      ]
+    },
+    "io.sentry:sentry-spring-boot-starter-jakarta:8.61.0": {
+      "jarSha256": "d20920fb55f21c4ba7e5415c3b8ea036e1f0d838c1a79fbbd6dfbaa2fcf8019b",
+      "documents": [
+        "sentry-8.61.0"
+      ]
+    },
+    "io.sentry:sentry-spring-jakarta:8.61.0": {
+      "jarSha256": "3f5c328982bc633b6b94db419a10801bb6017acb7dcdff31dcc40ea96aaf5702",
+      "documents": [
+        "sentry-8.61.0"
+      ]
+    },
+    "io.sentry:sentry:8.61.0": {
+      "jarSha256": "6f216e48f46146bad58091a77b740791cd793bff6e6cb3e42b719bcb82631f27",
+      "documents": [
+        "sentry-8.61.0"
       ]
     }
   }

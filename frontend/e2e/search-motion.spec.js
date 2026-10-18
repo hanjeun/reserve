@@ -37,7 +37,7 @@ test('search entry and cancel pair the header controls and content without a sid
     await expect(header).toHaveCSS('animation-name', 'reserve-search-controls-leave');
     await expect(header).toHaveCSS('animation-duration', '0.22s');
     await expect(content).toHaveCSS('animation-name', isMobile ? 'reserve-search-content-leave-mobile' : 'reserve-search-content-leave');
-    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === '');
+    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     await expect(page.locator('.ant-layout-content')).not.toHaveClass(/reserve-route-entry--/);
 });
 
@@ -61,5 +61,5 @@ test('reduced-motion search navigation is immediate', async ({ page }) => {
     await expect(page.locator('.reserve-search-content')).toHaveCSS('animation-name', 'none');
     await expect(page.locator('.reserve-search-header')).toHaveCSS('animation-name', 'none');
     await page.getByRole('button', { name: '취소' }).click();
-    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === '');
+    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
 });

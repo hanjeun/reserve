@@ -17,14 +17,14 @@ const profile = {
     bio: '',
     useAccountAvatar: false,
 };
-const config = { enabled: true, imageEnabled: true, maxImages: 6, maxImageBytes: 7340032, deleteGraceDays: 30 };
+const config = { enabled: true, imageEnabled: true, maxImages: 6, maxImageBytes: 7340032, deleteGraceDays: 30, benefitApprovalEnabled: true };
 const pageData = (content) => ({
     content,
     page: { number: 0, size: 12, totalElements: content.length, totalPages: content.length ? 1 : 0 },
 });
 
 async function setup(page, role) {
-    const state = { profile: role === 'BUSINESS' ? null : profile, news: [], posts: [], uploads: 0, saved: null };
+    const state = { profile: null, news: [], posts: [], uploads: 0, saved: null };
     await page.route('**/api/**', async (route) => {
         const request = route.request();
         const path = new URL(request.url()).pathname;
@@ -37,11 +37,11 @@ async function setup(page, role) {
             if (request.method() === 'PUT') state.profile = { ...profile, ...request.postDataJSON() };
             data = state.profile;
         } else if (path === '/api/store-news/stores') data = [{ id: 12, name: '내 가게' }];
-        else if (path === '/api/feed/media' && request.method() === 'POST') {
+        else if (['/api/feed/media', '/api/store-news/media'].includes(path) && request.method() === 'POST') {
             expect(request.headers()['content-type']).toContain('multipart/form-data');
             state.uploads++;
-            data = { id: state.uploads, url: `/api/feed/media/${state.uploads}`, width: 1, height: 1 };
-        } else if (/^\/api\/feed\/media\/\d+$/.test(path)) {
+            data = { id: state.uploads, url: `${path}/${state.uploads}`, width: 1, height: 1 };
+        } else if (/^\/api\/(?:feed|store-news)\/media\/\d+$/.test(path)) {
             return route.fulfill({ body: image, contentType: 'image/png' });
         } else if (path === '/api/store-news' && request.method() === 'POST') {
             const values = request.postDataJSON();
@@ -51,8 +51,9 @@ async function setup(page, role) {
                 id: 7,
                 revision: 0,
                 state: values.draft ? 'DRAFT' : 'PUBLISHED',
+                benefitState: values.benefitRequested ? 'PENDING' : 'NONE',
                 storeName: '내 가게',
-                images: values.mediaIds.map((id) => ({ id, url: `/api/feed/media/${id}`, width: 1, height: 1 })),
+                images: values.mediaIds.map((id) => ({ id, url: `/api/store-news/media/${id}`, width: 1, height: 1 })),
                 excerpt: values.content,
                 createdAt: new Date().toISOString(),
             };
@@ -72,7 +73,7 @@ async function setup(page, role) {
                 images: values.mediaIds.map((id) => ({ id, url: `/api/feed/media/${id}`, width: 1, height: 1 })),
             };
             state.posts = [data];
-        } else if (path === '/api/promotions/public') data = pageData(state.news);
+        } else if (path === '/api/promotions/public') data = pageData(state.news.filter(item => item.benefitState === 'APPROVED'));
         else if (path === '/api/feed/posts' || path === '/api/feed/me/posts') data = pageData(state.posts);
         else if (path.endsWith('/unread')) data = 0;
         return route.fulfill({ json: { success: true, data } });
@@ -80,48 +81,62 @@ async function setup(page, role) {
     return state;
 }
 
-test('benefits write icon opens the writer directly, selects a public profile and publishes news with a photo', async ({
+test('benefits write icon opens the approval writer directly and keeps a photo application private until approved', async ({
     page,
-}) => {
+}, testInfo) => {
     const state = await setup(page, 'BUSINESS');
     await page.goto('/benefits');
     const write = page.getByRole('button', { name: '가게 소식 작성', exact: true });
-    await expect(write).toHaveAttribute('aria-disabled', 'false');
+    await expect(write).toBeEnabled();
     await expect(write).toHaveCSS('width', '44px');
     await expect(write).toHaveCSS('height', '44px');
     await expect(page.getByRole('link', { name: '내 가게 소식 관리' })).toHaveAttribute('href', '/business?tab=news');
     await write.click();
-    await expect(page).toHaveURL(/\/benefits$/);
-    const publicProfile = page.getByRole('dialog', { name: '피드 공개 프로필' });
-    await publicProfile.getByRole('textbox', { name: '공개 닉네임' }).fill(profile.nickname);
-    await expect(publicProfile.getByRole('checkbox')).not.toBeChecked();
-    await publicProfile.getByRole('button', { name: '저장', exact: true }).click();
+    expect(new URL(page.url()).pathname).toBe('/benefits');
+    expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({ newsType: 'ALL', period: 'ONGOING', page: '1' });
     const editor = page.getByRole('dialog', { name: /새 가게 소식|가게 소식 미리보기/ });
     await editor.getByRole('textbox', { name: '가게 소식 제목' }).fill('새로운 가게 소식');
     await editor.getByRole('textbox', { name: '가게 소식 본문' }).fill('같은 원문으로 전하는 소식이에요.');
     await editor
-        .getByLabel('가게 소식 사진 선택')
+        .getByLabel('혜택 사진 선택')
         .setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: image });
-    await expect(editor.getByRole('checkbox')).toBeChecked();
+    await expect(editor).toContainText('혜택은 승인 후 공개돼요.');
     await editor.getByRole('button', { name: '미리보기', exact: true }).click();
     await expect(editor.getByText('새로운 가게 소식', { exact: true })).toBeVisible();
-    await editor.getByRole('button', { name: '게시하기', exact: true }).click();
+    await expect(editor.locator('.reserve-benefit-description')).toHaveText('같은 원문으로 전하는 소식이에요.');
+    await page.screenshot({ path: testInfo.outputPath('benefit-preview.png') });
+    await editor.getByRole('button', { name: '혜택 신청', exact: true }).click();
     await expect(editor).not.toBeVisible();
-    await expect(page.getByRole('link', { name: '내 가게 · 새로운 가게 소식 소식 보기' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '내 가게 · 새로운 가게 소식 소식 보기' })).toHaveCount(0);
     expect(state.uploads).toBe(1);
     expect(state.saved).toMatchObject({
         storeId: 12,
         mediaIds: [1],
-        feedEnabled: true,
+        feedEnabled: false,
+        benefitRequested: true,
         draft: false,
         newsType: 'NEWS',
     });
+    expect(state.news[0].benefitState).toBe('PENDING');
+    // The public-list fixture returns the application only after a simulated review approves it.
+    state.news[0].benefitState = 'APPROVED';
+    await page.reload();
+    const approved = page.getByRole('link', { name: '내 가게 · 새로운 가게 소식 소식 보기' });
+    await expect(approved).toBeVisible();
+    await expect(approved.locator('.reserve-benefit-description')).toHaveText('같은 원문으로 전하는 소식이에요.');
+    await page.screenshot({ path: testInfo.outputPath('benefits-approved.png') });
 });
 
-test('an ordinary member publishes text and a photo without a store or real-name disclosure', async ({ page }) => {
+test('an ordinary member chooses a public profile and publishes a photo without a store or real-name disclosure', async ({ page }, testInfo) => {
     const state = await setup(page, 'USER');
     await page.goto('/feed');
     await page.getByRole('button', { name: '새 글 작성', exact: true }).click();
+    const publicProfile = page.getByRole('dialog', { name: '처음 글쓰기 · 공개 닉네임' });
+    await publicProfile.getByRole('textbox', { name: '공개 닉네임' }).fill(profile.nickname);
+    await publicProfile.getByRole('checkbox', { name: '계정의 프로필 사진을 피드에 공개해요.' }).uncheck();
+    await expect(publicProfile.getByRole('checkbox')).not.toBeChecked();
+    await publicProfile.getByRole('button', { name: '저장하고 작성하기', exact: true }).click();
+    expect(state.profile).toMatchObject({ nickname: profile.nickname, useAccountAvatar: false });
     const editor = page.getByRole('dialog', { name: /피드 글쓰기|게시물 미리보기/ });
     await editor.getByRole('textbox', { name: '게시물 글' }).fill('회원 모두가 나누는 일상이에요.');
     await editor
@@ -136,6 +151,8 @@ test('an ordinary member publishes text and a photo without a store or real-name
         '회원 모두가 나누는 일상이에요.'
     );
     await expect(page.locator('.reserve-feed-page')).not.toContainText('비공개 계정 이름');
-    expect(state.saved).toMatchObject({ storeId: null, promotionId: null, mediaIds: [1], draft: false });
+    expect(state.saved).toMatchObject({ storeId: null, mediaIds: [1], draft: false });
+    expect(state.saved).not.toHaveProperty('promotionId');
     expect(state.uploads).toBe(1);
+    await page.screenshot({ path: testInfo.outputPath('feed-published.png') });
 });

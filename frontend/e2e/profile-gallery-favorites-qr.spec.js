@@ -36,7 +36,7 @@ async function mockUiApi(page, initialRead = {}) {
         if (path === '/api/favorites/my') {
             requests.favorites += 1;
             if (requests.favorites === 2) await refreshGate;
-            return ok(route, [favorite]);
+            return ok(route, [requests.favorites === 2 ? { ...favorite, storeName: '새 관심 가게' } : favorite]);
         }
         if (path.startsWith('/api/favorites/status/')) return ok(route, { isFavorite: true });
         if (path === '/api/stores/81') return ok(route, store);
@@ -58,7 +58,7 @@ async function theme(page, mode, colorScheme = 'light') {
     }, mode);
 }
 
-test('chat settings reuse the exact account profile crop and image request policy', async ({ page }) => {
+test('chat settings reuse the exact account profile crop and image request policy', async ({ page }, testInfo) => {
     const { requests } = await mockUiApi(page);
     await theme(page, 'dark');
     await page.goto('/my-page');
@@ -76,6 +76,7 @@ test('chat settings reuse the exact account profile crop and image request polic
         };
     };
     const accountGeometry = await accountImage.evaluate(geometry);
+    await page.screenshot({ path: testInfo.outputPath('account-profile.png') });
     await page.goto('/messages');
     await page.getByRole('navigation', { name: '메신저 화면', exact: true }).getByRole('button', { name: '설정', exact: true }).click();
     const settingsImage = page.locator('.reserve-messenger-settings-avatar img');
@@ -83,6 +84,7 @@ test('chat settings reuse the exact account profile crop and image request polic
     expect(await settingsImage.evaluate(geometry)).toEqual(accountGeometry);
     await expect(settingsImage).toHaveAttribute('referrerpolicy', 'no-referrer');
     await expect(settingsImage).toHaveAttribute('draggable', 'false');
+    await page.screenshot({ path: testInfo.outputPath('chat-profile.png') });
     expect(requests.writes).toBe(0);
 });
 
@@ -106,7 +108,7 @@ for (const [mode, scheme] of [['light', 'dark'], ['dark', 'light'], ['system', '
     });
 }
 
-test('favorites switch card/list layouts without refetching and preserve list-shaped refetch skeletons', async ({ page }) => {
+test('favorites switch layouts without refetching and retain cached rows and view during refresh', async ({ page }) => {
     const mock = await mockUiApi(page);
     await theme(page, 'dark');
     await page.goto('/my-favorites?view=cards&utm_source=yes');
@@ -116,7 +118,8 @@ test('favorites switch card/list layouts without refetching and preserve list-sh
     await page.keyboard.press('Enter');
     await expect(page.locator('.reserve-store-list-rows .reserve-store-list-row')).toHaveCount(1);
     await expect(page.getByRole('link', { name: '관심 가게 상세 보기', exact: true })).toHaveAttribute('href', '/store/81');
-    await expect(page).toHaveURL(/view=list&utm_source=yes$/);
+    await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
+        .toEqual({ view: 'list', utm_source: 'yes', kind: 'all' });
     expect(mock.requests.favorites).toBe(1);
     await expect(page.getByRole('button', { name: '사진형 보기로 전환' })).toBeFocused();
     await page.keyboard.press('Space');
@@ -124,15 +127,76 @@ test('favorites switch card/list layouts without refetching and preserve list-sh
     await page.goBack();
     await expect(page.locator('.reserve-store-list-rows .reserve-store-list-row')).toHaveCount(1);
     expect(mock.requests.favorites).toBe(1);
-    await page.getByRole('button', { name: '새로고침', exact: true }).click();
-    await expect(page.getByRole('status', { name: '즐겨찾기를 새로 불러오는 중' })).toBeVisible();
-    await expect(page.locator('.reserve-store-list-row-skeleton')).toHaveCount(1);
-    await expect(page.getByRole('button', { name: '사진형 보기로 전환' })).toBeDisabled();
+    const row = page.locator('.reserve-store-list-rows .reserve-store-list-row');
+    const retainedRow = await row.elementHandle();
+    const container = page.locator('.ant-layout-content > .reserve-page-container');
+    const refresh = page.getByRole('button', { name: '새로고침', exact: true });
+    await refresh.click();
     await expect.poll(() => mock.requests.favorites).toBe(2);
+    await expect(container).toHaveAttribute('aria-busy', 'true');
+    await expect(refresh).toHaveAttribute('aria-busy', 'true');
+    await expect(refresh).toBeDisabled();
+    await expect(row).toHaveCount(1);
+    expect(await row.evaluate((current, original) => current === original, retainedRow)).toBe(true);
+    await expect(page.locator('.reserve-store-list-row-skeleton')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: '관심 가게 상세 보기', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '사진형 보기로 전환' })).toBeEnabled();
+    await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
+        .toEqual({ view: 'list', utm_source: 'yes', kind: 'all' });
     mock.finishRefresh();
-    await expect(page.locator('.reserve-store-list-rows .reserve-store-list-row:not(.reserve-store-list-row-skeleton)')).toHaveCount(1);
+    await expect(container).toHaveAttribute('aria-busy', 'false');
+    await expect(refresh).not.toHaveAttribute('aria-busy', 'true');
+    await expect(page.getByRole('link', { name: '새 관심 가게 상세 보기', exact: true })).toBeVisible();
+    expect(await row.evaluate((current, original) => current === original, retainedRow)).toBe(true);
     await expect(page.getByRole('button', { name: '사진형 보기로 전환' })).toBeEnabled();
     expect(mock.requests.writes).toBe(0);
+});
+
+test('an empty favorites cache shows only the refresh error and can recover without changing the view', async ({ page }, testInfo) => {
+    const { requests } = await mockUiApi(page);
+    let reads = 0;
+    let recovering = false;
+    let releaseRefresh;
+    const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+    await page.route(/\/api\/favorites\/my(?:\?|$)/, async route => {
+        reads += 1;
+        if (reads === 1 || recovering) return ok(route, []);
+        await refreshGate;
+        return route.fulfill({ status: 503, json: { success: false, message: 'fixture backend unavailable' } });
+    });
+    await theme(page, 'light');
+    await page.goto('/my-favorites?view=list&utm_source=error-check');
+    const empty = page.getByText('아직 즐겨찾기한 가게가 없어요.', { exact: true });
+    await expect(empty).toBeVisible();
+    const container = page.locator('.ant-layout-content > .reserve-page-container');
+    await page.getByRole('button', { name: '새로고침', exact: true }).click();
+    try {
+        await expect(container).toHaveAttribute('aria-busy', 'true');
+    } finally {
+        releaseRefresh();
+    }
+    const section = page.getByRole('region', { name: '좋아요한 가게', exact: true });
+    const error = section.getByRole('alert');
+    await expect(error).toHaveCount(1);
+    await expect(error).toContainText('서버에서 즐겨찾기 목록을 처리하지 못했어요. 잠시 후 다시 시도해주세요.');
+    await expect(error).not.toHaveClass(/reserve-data-state--compact/);
+    await expect(section.locator('.reserve-data-state')).toHaveCount(1);
+    await expect(empty).toHaveCount(0);
+    await expect(page.getByText('마음에 드는 가게를 즐겨찾기에 추가해보세요.', { exact: true })).toHaveCount(0);
+    await expect(section.locator('.reserve-skeleton-block')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '사진형 보기로 전환' })).toBeEnabled();
+    await expect(container).toHaveAttribute('aria-busy', 'false');
+    await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
+        .toEqual({ view: 'list', utm_source: 'error-check', kind: 'all' });
+    await page.screenshot({ path: testInfo.outputPath('favorites-empty-refresh-error.png') });
+    recovering = true;
+    await error.getByRole('button', { name: '다시 불러오기', exact: true }).click();
+    await expect(empty).toBeVisible();
+    await expect(error).toHaveCount(0);
+    await expect(container).toHaveAttribute('aria-busy', 'false');
+    await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
+        .toEqual({ view: 'list', utm_source: 'error-check', kind: 'all' });
+    expect(requests.writes).toBe(0);
 });
 
 for (const [label, path, menu, destination] of [

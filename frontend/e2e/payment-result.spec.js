@@ -31,7 +31,9 @@ test('forged success cannot confirm a READY payment or issue a new payment reque
     await expect.poll(() => requests.length).toBe(2);
     expect(requests.every(request => request.method === 'GET' && request.path === '/api/payment/status')).toBe(true);
     await page.getByRole('button', { name: '내 예약에서 다시 열기' }).click();
-    await expect(page).toHaveURL(/\/my-reservations$/);
+    await expect(page).toHaveURL(url => url.pathname === '/my-reservations');
+    await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
+        .toEqual({ view: 'list', tab: 'reservation', status: 'ALL', sort: 'recent' });
     expect(requests.every(request => request.method === 'GET' && request.path === '/api/payment/status')).toBe(true);
 });
 
@@ -43,15 +45,24 @@ test('server PAID overrides a stale failure URL', async ({ page }) => {
     await expect(page.getByText('old-error')).not.toBeVisible();
 });
 
-test('unknown ad result leads directly to the ad tab, including after reload', async ({ page }) => {
+test('unknown ad result leads directly to the ad tab, including after reload', async ({ page, isMobile }) => {
+    const expectAdSelection = async () => {
+        await expect(page.getByRole('heading', { level: 1, name: '광고 관리' })).toBeVisible();
+        if (isMobile) await page.getByRole('button', { name: '사업자 파트너 패널 메뉴 열기' }).click();
+        await expect(page.getByRole('navigation', { name: '사업자 파트너 패널 메뉴', exact: true })
+            .getByRole('link', { name: '광고 관리', exact: true })).toHaveAttribute('aria-current', 'page');
+        if (isMobile) await page.getByRole('button', { name: '메뉴 닫기', exact: true }).click();
+    };
     await mockResult(page, 'ad', 'PENDING_PAYMENT');
     await page.goto('/payment/result?success=true&type=ad&merchant_uid=RESULT-TEST');
     await expect(page.getByText('결제 상태를 확인하고 있어요', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '광고 관리에서 다시 열기' }).click();
-    await expect(page).toHaveURL(/\/business\?tab=ads$/);
-    await expect(page.getByRole('tab', { name: /광고 관리/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page).toHaveURL(url => url.pathname === '/business');
+    await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
+        .toEqual({ tab: 'ads', advertisementStore: 'ALL', advertisementPage: '0' });
+    await expectAdSelection();
     await page.reload();
-    await expect(page.getByRole('tab', { name: /광고 관리/ })).toHaveAttribute('aria-selected', 'true');
+    await expectAdSelection();
 });
 
 test('a status lookup failure never appears as payment success', async ({ page }) => {

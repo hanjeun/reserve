@@ -170,18 +170,18 @@ test('admin: admin role can open server-paginated verification and payment opera
     await mockApi(page, admin);
     await page.goto('/admin');
 
-    await expect(page.getByRole('heading', { name: '관리자 패널' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /대기 중/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('heading', { name: '인증 대기', level: 1 })).toBeVisible();
 
     if (testInfo.project.name === 'mobile-chromium') {
-        await page.getByRole('button', { name: 'ellipsis' }).click();
-        await page.getByRole('option', { name: /결제 운영/ }).click();
-    } else {
-        const paymentTab = page.getByRole('tab', { name: /결제 운영/ });
-        await paymentTab.focus();
-        await paymentTab.press('Enter');
-        await expect(paymentTab).toHaveAttribute('aria-selected', 'true');
+        await page.getByRole('button', { name: '관리자 패널 메뉴 열기' }).click();
     }
+    const menu = page.getByRole('navigation', { name: '관리자 패널 메뉴', exact: true });
+    await expect(menu.getByRole('link', { name: '인증 대기', exact: true })).toHaveAttribute('aria-current', 'page');
+    const paymentLink = menu.getByRole('link', { name: '결제 운영', exact: true });
+    await paymentLink.focus();
+    await paymentLink.press('Enter');
+    await expect(page.getByRole('heading', { name: '결제 운영', level: 1 })).toBeVisible();
+    if (testInfo.project.name !== 'mobile-chromium') await expect(paymentLink).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('radio', { name: '오래된 READY' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByText('처리할 항목이 없어요.')).toBeVisible();
 });
@@ -190,13 +190,16 @@ test('QR: business user sees attendance semantics before enabling the camera', a
     await mockApi(page, business);
     await page.goto('/business');
 
-    await expect(page.getByRole('heading', { name: '사업자 파트너 패널' })).toBeVisible();
-    await page.getByRole('tab', { name: /QR 체크인/ }).click();
+    await expect(page.getByRole('heading', { name: '예약 관리', level: 1 })).toBeVisible();
+    if (testInfo.project.name === 'mobile-chromium') {
+        await page.getByRole('button', { name: '사업자 파트너 패널 메뉴 열기' }).click();
+    }
+    await page.getByRole('navigation', { name: '사업자 파트너 패널 메뉴', exact: true }).getByRole('link', { name: 'QR 체크인', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'QR 체크인' });
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('.ant-modal-container')).toHaveCSS(
         'border-radius',
-        testInfo.project.name.includes('mobile') ? '24px 24px 0px 0px' : '24px',
+        testInfo.project.name.includes('mobile') ? '24px 24px 0px 0px' : '20px',
     );
     await expect(page.getByRole('status', { name: 'QR 스캐너를 준비하는 중' })).toBeVisible();
     await expect(page.getByText('예약·웨이팅 QR을 비추면 입장 기록을 확인해요.')).toBeVisible();
@@ -472,7 +475,7 @@ test('messenger: every internal view keeps a close X and shared refresh feedback
     await expect(messenger).not.toHaveClass(/has-thread/);
     await checkClose();
     await close.click();
-    if (isMobile) await expect(page).toHaveURL(/\/$/);
+    if (isMobile) await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === '');
     else await expect(surface).toHaveCount(0);
 });
 
@@ -496,19 +499,33 @@ test('messenger: message actions, private photo preview and motion settle withou
     const surface = page.locator(isMobile ? '.reserve-messages-page' : '.reserve-chat-panel');
     await surface.getByRole('button', { name: '대화', exact: true }).click();
     const frames = await surface.evaluate(async element => {
-        element.querySelector('.reserve-messenger-row')?.click();
+        const row = element.querySelector('.reserve-messenger-row');
+        if (!row) throw new Error('The conversation row must be ready before measuring entry.');
+        const animationReady = new Promise(resolve => {
+            const observer = new MutationObserver(() => {
+                const entrance = element.querySelector('.reserve-messenger-thread')?.getAnimations()
+                    .find(animation => animation.animationName === 'reserve-messenger-thread-in');
+                if (entrance) { observer.disconnect(); resolve(entrance); }
+            });
+            observer.observe(element, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+        });
+        row.click();
+        const entrance = await animationReady;
+        await entrance.ready;
+        const start = entrance.startTime;
+        if (typeof start !== 'number') throw new Error('The thread entrance must have a running animation timeline.');
         const samples = [];
-        const start = performance.now();
-        while (performance.now() - start < 420) {
+        while (Number(document.timeline.currentTime) - start < 420) {
             await new Promise(resolve => requestAnimationFrame(resolve));
             const thread = element.querySelector('.reserve-messenger-thread');
             const list = element.querySelector('.reserve-messenger-list');
-            if (thread) samples.push({ time: performance.now() - start, x: thread.getBoundingClientRect().x,
+            if (thread) samples.push({ time: Number(document.timeline.currentTime) - start, x: thread.getBoundingClientRect().x,
                 opacity: Number(getComputedStyle(thread).opacity), opening: element.querySelector('.reserve-messenger').classList.contains('is-opening-thread'),
                 listOpacity: list ? Number(getComputedStyle(list).opacity) : 0 });
         }
         return samples;
     });
+    expect(frames.some(frame => frame.opening)).toBe(true);
     const settled = frames.filter(frame => !frame.opening);
     expect(settled.length).toBeGreaterThan(1);
     expect(settled.every(frame => frame.opacity === 1 && frame.listOpacity === 0)).toBe(true);
@@ -554,7 +571,7 @@ test('messenger: a direct messages URL stays mobile-only and hands desktop back 
         return;
     }
 
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.has('region') && url.searchParams.get('region') === '');
     await expect(page.locator('.reserve-messages-route')).toHaveCount(0);
     await expect(page.locator('.reserve-chat-panel')).toBeVisible();
 });

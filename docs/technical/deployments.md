@@ -428,7 +428,7 @@ Contact point의 **Test**로 수신을 확인한 뒤 [모니터링](monitoring.m
 
 ## 5. 프론트엔드 원자적 배포와 롤백
 
-프론트는 새 백엔드가 준비된 뒤에 live로 바뀌어요.
+프론트는 새 백엔드가 준비된 뒤에 live로 바뀌어요. 아래 일반 자동 배포는 live와 target 모두 v7 호환 기준선을 갖춘 뒤에 사용해요. 현재 v2 운영에서의 첫 전환은 [첫 v7 및 도메인 전환 순서](#첫-v7-및-도메인-전환-순서)를 따르며 기존 호환성 관문을 유지해요.
 
 1. `stage-release`가 dist 아티팩트를 `/usr/share/nginx/html/releases/<commit-sha>`에 staging하고 SHA별 nginx 템플릿을 보관해요. `current` symlink, nginx 설정, backend upstream은 바꾸지 않아요.
    - `scripts/preserve-frontend-assets.sh`가 live와 보존된 릴리스 하나의 해시 자산을 새 staging에 복사해요.
@@ -438,7 +438,7 @@ Contact point의 **Test**로 수신을 확인한 뒤 [모니터링](monitoring.m
 3. 전환 직전 `default.conf`, `service-env.inc`, `current` 포인터를
    `/home/ubuntu/release-rollback-<새 commit-sha>-<run-id>-<run-attempt>/`에 저장해요.
 4. nginx 후보에 새 프론트의 **SHA 절대 경로**와 새 backend upstream을 함께 넣고, `nginx -t`가 통과하면 `current` 포인터를 갱신한 뒤 nginx를 **한 번만 reload**해요.
-5. nginx를 거치는 HTML·정적 asset·공개 API smoke가 성공하면 구 backend를 정지하고 오래된 릴리스를 정리해요.
+5. nginx를 거치는 HTML·정적 asset·공개 API smoke가 성공하면 구 backend를 정지·제거하고 오래된 릴리스와 해당 실행의 임시 rollback 디렉터리를 정리해요. 이 정리가 보호된 v7 복구 묶음을 만들어 주지는 않아요.
 6. health, 후보 검사, reload, smoke 중 하나라도 실패하거나 실행이 취소되면 저장한 두 nginx 파일과 프론트 포인터를 복원하고 새 backend를 제거해요.
 
 - 자동 정리는 현재 프론트와 최신 두 릴리스 디렉터리만 보존해요.
@@ -446,15 +446,15 @@ Contact point의 **Test**로 수신을 확인한 뒤 [모니터링](monitoring.m
 
 ### 수동 롤백
 
-nginx `root`가 SHA 절대 경로에 고정되므로 두 nginx 파일을 함께 복구해요.
+실패 중 자동 복구가 사용하는 실행별 rollback 디렉터리와 성공 후 수동 복구 입력을 구분해요. 현재 CI는 성공 시 `/home/ubuntu/release-rollback-<SHA>-<run-id>-<run-attempt>/`를 삭제하므로 성공 후에도 이 경로가 남아 있다고 가정하지 않아요.
 
-아래 v2 표식은 피드 전환 전 운영 계약이에요. 다음 전체 후보에는 [첫 v7 및 도메인 전환 순서](#첫-v7-및-도메인-전환-순서)의 피드 DDL과 16절 OAuth 정의를 함께 지원하는 `waiting-signup-hidden-feed-oauth-v7` 복구 입력을 준비해요. v2·이전 v6 이미지나 표식 변경만으로 최신 사진·신고·토큰/키 계약의 적합성을 판단하지 않아요.
+성공 후 수동 복구에는 검증된 보호 **current-v7 복구 묶음 하나**가 필요해요. 실제 v7 JAR·백엔드 이미지와 그 digest, 같은 SHA의 앱/홍보/기존 초안 복구 프론트, 현재 환경과 암호문에 대응하는 키, Nginx 설정·upstream·세 포인터, DB 스키마와 검증한 백업을 연결해 보관해요. CI가 이 묶음을 자동 생성하지 않으며 현재 준비가 완료됐다는 뜻도 아니에요. 현재 복구 입력의 완전성·해시·접근 권한을 먼저 확인하고, 묶음 밖에 같은 이미지의 개별 export나 중복 묶음을 추가하지 않아요. 기존 보관 정책은 확대하지 않아요. [백업 런북](backup.md)의 보호·복원 관문을 유지해요.
 
-1. 대상 SHA·현재 upstream·해당 실행의 rollback 디렉터리를 읽기 전용으로 확인해요. 복구할 프론트 자산, 백엔드 SHA 이미지, 현재 보호된 설정과 [DB·설정 복구 경로](backup.md)를 함께 제시하고 별도 운영 승인을 받아요.
-2. 성공한 배포는 이전 백엔드 컨테이너를 제거하므로 nginx 파일만 되돌리면 종료된 upstream으로 연결될 수 있어요. 복구 이미지가 `reserve.schema-compat=v270-refund-v1`과 `reserve.feature-compat=waiting-signup-hidden-v2`를 갖고 실제로 예약 사용·웨이팅 중지·접수 방식·가입 증명·개인 메시지 표시 설정을 유지하는지 확인해요. 현재 live를 덮어쓰지 않는 반대편 Blue/Green을 같은 SHA 이미지·해당 compose와 **현재 보호된 환경값**으로 준비해요. 제한된 앱 계정의 `validate`와 loopback health가 실패하면 라우팅을 바꾸지 않아요.
-3. 최신 DB·가게 설정·고객 고지 시각을 유지해요. 과거 `.env`나 전체 DB 덤프를 함께 되돌리지 않아요. 새 명단·QR 처리와 예약 차단을 유지할 호환 이미지가 없으면 트래픽·신규 쓰기를 닫는 승인된 복구 경로를 사용해요. 구 이미지에 표식만 추가하거나 `ddl-auto=update`로 우회하지 않아요.
-4. 백엔드와 프론트가 동일한 인증·웨이팅 계약을 지원하는 상태에서 rollback 디렉터리의 `default.conf`와 `service-env.inc`를 함께 복구해요. 해당 파일에 지정된 upstream이 준비한 백엔드인지, 프론트 SHA 경로와 자산이 존재하는지 대조해요. `current` 포인터도 해당 프론트 SHA로 맞춰요.
-5. `nginx -t` 뒤 한 번 reload하고 nginx를 거치는 HTML·자산·API와 새 설정의 유지 상태를 확인해요. 성공이 확인되기 전에는 기존 live 컨테이너와 복구 자료를 정리하지 않아요.
+1. 대상 main SHA·현재 upstream과 보호 current-v7 묶음의 실제 파일·해시·복구 가능 범위를 읽기 전용으로 확인하고 별도 운영 승인을 받아요. 임시 rollback 폴더나 SHA 라벨만으로 복구 입력을 대신하지 않아요.
+2. 실제 JAR·이미지가 `reserve.schema-compat=v270-refund-v1`과 `reserve.feature-compat=waiting-signup-hidden-feed-oauth-v7`을 지원하고, 피드·댓글 사진·신고 보존·OAuth 토큰/주체 상태를 유지하는지 확인해요. 같은 SHA의 프론트·해당 compose·현재 보호된 환경값과 대응 키로 복구 앱을 준비하고 제한된 앱 계정의 `validate`와 loopback health를 확인해요. 두 JVM을 함께 띄울 용량이 확인되지 않았다면 승인된 유지보수에서 기존 JVM을 종료한 뒤 복구 JVM을 기동해요. 구 v2·이전 v6 이미지의 라벨만 바꾸지 않아요.
+3. 최신 DB·가게 설정·고객 고지 시각과 새 피드/OAuth 상태를 유지해요. 과거 `.env`나 전체 DB 덤프를 함께 되돌리지 않아요. 호환 v7 앱이 없으면 트래픽·신규 쓰기를 닫고 수정 이미지를 준비하며 `ddl-auto=update`로 우회하지 않아요. 전체 DB 복원은 별도 승인·직전 백업·최신 자료 보존 계획을 요구해요.
+4. 묶음의 `default.conf`와 `service-env.inc`가 준비한 복구 백엔드와 실제 프론트 SHA 절대 경로를 가리키는지 대조해요. 앱 `current`·홍보 `marketing/current`·기존 초안 `legacy-domain.current` 포인터도 같은 복구 입력으로 맞춰요. 포인터만 바꾸거나 종료된 upstream으로 Nginx만 되돌리지 않아요.
+5. `nginx -t` 뒤 한 번 reload하고 nginx를 거치는 HTML·자산·API와 최신 설정의 유지 상태를 확인해요. 성공이 확인되기 전에는 기존 live와 필요한 복구 자료를 정리하지 않아요.
 
 로컬 회귀 검사는 `bash scripts/test-frontend-release-swap.sh`와 `bash scripts/test-frontend-assets.sh`예요.
 
@@ -625,13 +625,13 @@ SNS는 공개 닉네임·소개와 선택한 계정 사진, 글·여러 사진·
 
 #### 첫 v7 및 도메인 전환 순서
 
-1. 현재 혼합 프리뷰의 정식 반영 범위를 정하고 승인된 브랜치/PR로 최종 후보를 고정해요. 필수 CI·새 전체 JAR·권한/사진/댓글/신고 충돌·결제 경계를 이 입력으로 확인해요. 이전 후보의 증거를 재사용하려면 기존 입력/도구/유효기간 관문을 통과해야 해요.
-2. [수동 DDL](manual-ddl.md) 15절 본문·15.1~15.8 및 16절과 실제 운영 스키마를 대조해 미적용 정의만 의존 순서대로 선별해요. 15절의 피드/혜택/별도 사진과 16절의 토큰 TEXT·인증/폐기 시각·inbox/subject·주체 조회 인덱스가 대상이에요. 직전 백업·독립 S3 읽기·운영과 같은 MySQL의 격리 복원에서 기존 값/제약/FK/인덱스와 선별 DDL을 확인한 뒤, 별도 승인된 DDL 계정으로 운영에 적용해요. 제한된 앱 계정으로 새 전체 JAR `validate`·시작과 실제 암호화 주입을 확인하고 전체 v7 지원 복구 묶음을 준비해요. flag=false여도 새 엔티티는 validate 대상이며 역방향 수신은 최종 검증·공급자 등록·별도 운영 승인 전까지 false를 유지해요. 첫 호환 전환은 일반 자동 배포의 live/target=v7 관문을 약하게 만들어 우회하지 않아요.
-3. DNS 연결 뒤 HTTP-01용 Nginx 후보를 먼저 준비하고 별도의 앱 HTTPS 인증서/ACME 갱신을 구성해요. 새 인증서가 없는 상태에서 전체 HTTPS 후보를 먼저 적용하면 Nginx 시작이 실패해요. `--http-only` 후보는 기존 호스트를 유지하고 app의 ACME 경로만 열며 나머지는 404로 닫아요. 기존 `reserve.it.kr` 인증서와 운영 링크는 유지해요. 인증서 발급 후 전체 후보를 준비하며 앱 인증서 경로는 `/etc/letsencrypt/live/app.reserve.it.kr/`예요. Docker의 기존 html 볼륨 아래 앱 releases/홍보 marketing/releases/legacy-domain.current를 사용해요.
-4. 기존 Google·네이버·카카오 서비스 앱에 `https://app.reserve.it.kr/login/oauth2/code/google`, `/naver`, `/kakao`를 추가해요. 기존 주소 초안 복구 동안에는 기존 Root의 콜백도 유지하며 공급자가 허용하는 등록 방법을 사용해요. Kakao 지도 JavaScript 허용 도메인과 PG의 모바일 결제 복귀 설정도 새 앱 주소에 맞춰요. 클라이언트 키/시크릿/상점 계정을 새로 만들거나 토큰을 URL로 넘기지 않아요. OAuth 요청의 동적 baseUrl은 `TrustedOAuth2AuthorizationRequestResolver`에서 고정 허용 출처·등록 경로만 받아요.
-5. 운영 앱 설정을 `APP_FRONTEND_URL=APP_PUBLIC_URL=https://app.reserve.it.kr`, `APP_MARKETING_URL=APP_LEGACY_FRONTEND_URL=https://reserve.it.kr`로 맞추고 프론트의 대응 VITE 출처를 같은 후보에 넣어요. 기존 앱 주소의 host-only 쿠키는 앱 주소로 옮기지 않으므로 새 앱에서 다시 로그인해요. 기존 Root `/drafts/transfer`에서 같은 계정의 IndexedDB 초안/사진을 내보내고 앱에서 가져오며 원래 만료일·서버 원본 지문을 유지해요.
-6. 준비가 완료된 뒤에만 승인된 전환에서 저장소 변수 `RESERVE_DOMAIN_SPLIT=true`를 적용해요. 워크플로는 앱과 홍보 산출물의 같은 release-id, 새 앱 API의 실제 JSON, Nginx 문법과 기존 blue/green 호환성을 확인하는 관문을 유지해요. 앱·홍보·legacy 포인터와 Nginx 설정을 같은 복구 기록에 넣고 실패 시 함께 복원해요. 활성화 후 일반 배포에서 변수를 false로 바꿔 산출물 일부만 되돌리는 동작은 거부해요.
-7. 로그인/가입/로그인 복귀·기존 공유/QR·결제 결과·초안 이전·메신저 전체 화면과 PC/모바일 메뉴의 실제 사용을 확인해요. 처음에는 기존 링크의 임시 302를 유지하고, 공개 링크의 영구 이전이나 기존 초안 복구 화면 종료는 이용자 이전 기간을 정한 후 별도로 승인해요. QR 실기기·TEST PG·11월 3일 자연 파기 확인은 소스 구현을 실행 성공으로 대신하지 않아요.
+1. 정식 반영 범위와 최종 빌드·운영 설정을 확정해요. 준비 중에는 `RESERVE_DOMAIN_SPLIT=false`와 feature SHA 산출물을 사용할 수 있지만, 실제 도메인 분리용 **최종 main SHA의 빌드·staging 전에는 승인된 `RESERVE_DOMAIN_SPLIT=true`를 고정**해요. 이 값이 `VITE_APP_ORIGIN`, 같은 출처 API, marketing 아티팩트와 Nginx 후보를 결정하므로 false로 빌드한 뒤 전환 때만 true로 바꾸지 않아요.
+2. 승인된 main squash 뒤 새 main SHA로 앱·홍보·JAR·실제 v7 이미지를 새로 빌드하고 필수 검사와 산출물 바이트·해시를 연결해요. feature SHA의 로컬 검사·JAR·이미지나 같은 release-id만으로 최종 main 산출물을 대신하지 않아요. 현재 v2 live를 거부하는 자동 배포 결과는 유지하고 일반 자동 배포의 live/target=v7 관문을 약하게 만들지 않아요.
+3. 실제 DNS·앱 인증서/ACME 경로, 기존·앱 호스트의 Google/Naver/Kakao 로그인 Callback과 Kakao 지도·PG 복귀 등록을 대조해요. 아래의 10/15 발급·등록 전달 기록은 보존하되 필요한 항목만 재확인해요. 새 앱 설정 `APP_FRONTEND_URL=APP_PUBLIC_URL=https://app.reserve.it.kr`, `APP_MARKETING_URL=APP_LEGACY_FRONTEND_URL=https://reserve.it.kr`가 앞서 빌드에 고정한 VITE 출처와 일치하는지 대조하고 현재 키·고지 시각을 보존해요. 공급자 보안 사건 수신 3종은 최종 검증·공급자 등록·별도 활성화 승인 전까지 false를 유지해요.
+4. [수동 DDL](manual-ddl.md) 15절 본문·15.1~15.8 및 16절과 실제 운영 스키마를 대조해 미적용 정의만 의존 순서대로 선별해요. 별도 승인된 유지보수에서 공개 트래픽·새 쓰기를 닫고 **구 v2 JVM을 종료해 writer 0을 확인한 뒤** 직전 백업·독립 S3 읽기·운영과 같은 MySQL의 격리 복원을 진행해요. 최종 main의 실제 전체 JAR로 원래 값·제약·FK·인덱스와 선별 DDL·제한 계정 `validate`를 확인한 뒤 승인된 DDL 계정으로 운영에 적용해요. flag=false여도 새 엔티티는 검증 대상이며 이전 v6의 47테이블 연습은 v7의 전체 검증을 대신하지 않아요.
+5. 구 JVM이 종료된 유지보수 상태에서 최종 main의 **새 v7 JVM 하나**를 기동하고 제한된 앱 계정·`validate`·loopback health·실제 암호화 키 주입을 확인해요. Redis 용량은 아래 절의 단일 v7 JVM 기준으로 확인하고, 준비되지 않았다면 off를 유지해요. 공개 전환 전에 위 수동 롤백 요건의 보호 current-v7 묶음 하나를 실제 이미지/프론트·환경/대응 키·Nginx/upstream/세 포인터·DB 스키마/백업으로 준비·검증해요. 이 묶음은 자동 생성되거나 현재 이미 준비된 상태가 아니에요.
+6. 같은 main SHA의 앱·홍보·기존 초안 복구 프론트와 준비한 v7 upstream을 Nginx 후보에 고정해요. `nginx -t`와 준비 확인 뒤 세 포인터·Nginx 설정·upstream을 함께 전환하고 HTML·자산·release-id·실제 API JSON을 확인해요. 첫 전환이 실패하면 유지보수를 유지하거나 검증된 v7 묶음으로 복구해요. 구 v2 앱 재기동이나 일반 CI의 호환 관문 우회를 복구로 사용하지 않아요. 활성화 후 일반 배포에서 도메인 변수를 false로 바꿔 일부 산출물만 되돌리지 않아요.
+7. 기존 주소의 host-only 쿠키는 앱 주소로 옮기지 않으므로 새 앱에서 다시 로그인해요. 기존 Root `/drafts/transfer`에서 같은 계정의 IndexedDB 초안/사진을 내보내고 앱에서 가져오며 원래 만료일·서버 원본 지문을 유지해요. 로그인/가입/복귀·기존 공유/QR·결제 결과·초안 이전·메신저와 PC/모바일 메뉴를 확인해요. 기존 링크의 임시 302를 유지하고 영구 이전·초안 복구 화면 종료는 별도로 승인해요. QR 실기기·TEST PG·11월 3일 자연 파기는 소스 구현으로 확인 완료를 대신하지 않아요.
 
 #### 2026-10-15 앱 DNS 연결과 TLS 준비
 
@@ -689,11 +689,11 @@ RESERVE 탈퇴의 발신은 암호화된 영속 outbox를 사용해요. 현재 �
 
 #### 동일 SHA의 앱·홍보·기존 초안 복구 입력
 
-최종 후보가 고정되면 프론트·marketing 아티팩트의 `release-id.txt`, JAR store-shell과 해당 SHA에서 빌드한 실제 백엔드 image digest의 연결을 확인해요. 앱은 `html/releases/<SHA>`, 홍보는 `html/marketing/releases/<SHA>`, 기존 초안 복구 앱은 같은 앱 릴리스를 가리키는 `html/legacy-domain.current`를 사용해요. `scripts/domain-release.sh`는 앱 포인터 교체와 같은 배포 트랜잭션에서 marketing/legacy 포인터를 snapshot/promote/restore하며, 기존 프론트 교체·Nginx 백업/복구 경로를 함께 유지해요. 세 포인터만 복원하고 Nginx·upstream·백엔드의 호환 상태를 빼먹지 않아요.
+도메인 설정을 고정하고 실제 main squash가 끝난 뒤 그 main SHA로 새로 만든 프론트·marketing 아티팩트의 `release-id.txt`, JAR store-shell과 실제 백엔드 image digest의 바이트·해시 연결을 확인해요. feature SHA 산출물은 준비 근거이며 최종 main의 검증 결과가 아니에요. 앱은 `html/releases/<SHA>`, 홍보는 `html/marketing/releases/<SHA>`, 기존 초안 복구 앱은 같은 앱 릴리스를 가리키는 `html/legacy-domain.current`를 사용해요. `scripts/domain-release.sh`는 앱 포인터 교체와 같은 배포 트랜잭션에서 marketing/legacy 포인터를 snapshot/promote/restore하며, 기존 프론트 교체·Nginx 백업/복구 경로를 함께 유지해요. 세 포인터만 복원하고 Nginx·upstream·백엔드의 호환 상태를 빼먹지 않아요.
 
 검토용 설치 설정에는 앱 root가 이전 SHA에 고정돼 있을 수 있어요. `--source`로 만든 전체 HTTPS 후보도 그 root를 보존하므로 설치 전에 앱/홍보 root를 이번에 staging한 동일 SHA의 절대 경로로 확정해야 해요. CI는 저장소의 `html/current`·`marketing/current` 후보를 새 릴리스 경로로 치환하고 앱 root가 해당 SHA가 아니면 중단해요. 검토용 생성 결과를 이 확인 없이 바로 설치하지 않아요.
 
-빌드 입력은 `VITE_APP_ORIGIN=https://app.reserve.it.kr`, `VITE_MARKETING_ORIGIN=VITE_LEGACY_APP_ORIGIN=https://reserve.it.kr`, 앱의 같은 출처 API예요. 현재 혼합 프리뷰의 HEAD만으로 최종 후보 SHA를 대신하거나 지금 산출물을 만들었다고 기록하지 않아요. 커밋/PR·필수 CI와 새 전체 후보 검사를 거쳐 같은 입력의 산출물을 만든 뒤 별도 승인된 첫 v7 전환에 사용해요.
+실제 최종 main 빌드 전에 `RESERVE_DOMAIN_SPLIT=true`를 고정하며 빌드 입력은 `VITE_APP_ORIGIN=https://app.reserve.it.kr`, `VITE_MARKETING_ORIGIN=VITE_LEGACY_APP_ORIGIN=https://reserve.it.kr`, 앱의 같은 출처 API예요. 준비 중의 false 설정·feature SHA·혼합 프리뷰 HEAD·기존 로컬 산출물을 최종 main의 빌드나 staging 근거로 재표시하지 않아요. 최종 main의 필수 CI와 실제 새 산출물을 확인한 뒤 별도 승인된 첫 v7 전환에 사용해요.
 
 #### 2026-10-15 자동 갱신과 아이콘 규칙 후속 — 미배포
 
@@ -719,11 +719,11 @@ Redis의 MySQL 정본/서버 중계/SSE 브라우저 전달 구분과 범위는 
 
 운영 이식은 아래 준비 순서로 진행해요. 코드/설정 계약을 로컬과 맞추되 실제 데이터·암호·채널은 환경별로 분리해요.
 
-1. 승인된 최종 후보와 서버 메모리 여유를 확인해요. 별도의 `docker-compose-redis.yml`은 Blue/Green 교체와 독립적으로 관리하고 호스트 포트를 추가하지 않아요.
+1. 승인된 최종 후보와 실제 서버 용량을 확인해요. 첫 v7 유지보수에서는 구 JVM을 종료한 **단일 v7 JVM**의 실제 RSS·가용 메모리·swap/OOM 상태에 Redis의 `maxmemory 64mb`와 컨테이너 메모리/전체 메모리+swap 상한 128MiB를 더해 여유를 확인해요. 이 용량 확인이 끝나면 Redis를 한 번 설치·초기화할 수 있어요. 별도의 `docker-compose-redis.yml`은 Blue/Green 교체와 독립적으로 관리하고 호스트 포트를 추가하지 않아요. 로컬 격리는 운영 이식 전 시험 단계예요.
 2. 서버에 전용 보호 `redis.conf`를 준비해요. 비루트 UID/GID 999가 읽을 수 있는 root 소유 파일(예: 640·그룹 999)과 접근 제한 부모 폴더를 사용해요. `bind 0.0.0.0`, `protected-mode yes`, `port 6379`, 32자 이상 무작위 `requirepass`, `save ""`, `appendonly no`, `maxmemory 64mb`, `maxmemory-policy noeviction`을 확인해요. 이 bind는 컨테이너 안의 인터페이스이며 Compose는 호스트 포트를 공개하지 않아요. 비밀 값·설정 전문은 채팅이나 로그에 출력하지 않아요.
 3. `RESERVE_REDIS_CONFIG_PATH`를 그 절대 경로로 지정해 Redis 서비스만 설치하고 health·메모리 상한·내부 이름 `redis` 연결을 확인해요. 로컬 Redis나 현재 앱 컨테이너의 데이터는 옮기지 않아요. 현재 템플릿 health는 기본 사용자의 `requirepass`를 사용하므로 별도 ACL 사용자를 도입할 때는 health 인증도 함께 대조해요.
 4. GitHub Actions의 `RESERVE_REDIS_PASSWORD` Secret에 같은 전용 값을 보관하고 Variables의 `RESERVE_REDIS_HOST=redis`, `RESERVE_REDIS_PORT=6379`와 기본 off를 확인해요. `RESERVE_REDIS_USERNAME`은 별도 ACL 사용자가 있을 때만 설정해요. 5개 값의 Actions→SSH→Blue/Green 전달 경로는 준비했고, Redis 설치 파일은 자동 앱 배포가 시작하거나 재기동하지 않아요.
-5. 별도 승인된 배포에서만 `RESERVE_REDIS_ENABLED=true`를 사용해요. 새 앱의 제한·웨이팅 신호·끊김 복구·로그를 확인하고 실패하면 이 옵션을 false로 되돌리는 호환 후보를 사용해요. Redis 장애는 앱 전체 health를 DOWN으로 바꾸지 않으므로 앱 health 200만으로 공유 제한의 정상 여부를 판정하지 않아요. 원본 데이터는 MySQL을 유지해요.
+5. 단일 v7 JVM과 Redis의 용량·연결을 확인한 뒤 별도 승인된 배포에서 `RESERVE_REDIS_ENABLED=true`를 사용해요. 첫 전환에서 이 설정을 반영하려고 앱을 다시 기동할 때도 기존 JVM을 종료한 뒤 새 JVM을 시작해요. 새 앱의 제한·웨이팅 신호·끊김 복구·로그를 확인하고 실패하면 이 옵션을 false로 되돌리는 호환 후보를 사용해요. Redis 장애는 앱 전체 health를 DOWN으로 바꾸지 않으므로 앱 health 200만으로 공유 제한의 정상 여부를 판정하지 않아요. 원본 데이터는 MySQL을 유지해요.
 
 준비한 4개 YAML의 구문·기본 off·비밀 값의 Secret 참조·5개 변수 전달·고정 Redis 이미지·호스트 포트 부재와 배포 shell 구문을 확인했어요. 일반 전체 suite·린트·제품 빌드·자동 브라우저 행렬·새 전체 JAR validate는 실행하지 않았어요. GitHub Secrets/Variables·운영 Redis·DB·배포·도메인 설정은 변경하지 않았어요.
 
@@ -762,3 +762,7 @@ Redis의 MySQL 정본/서버 중계/SSE 브라우저 전달 구분과 범위는 
 OAuth DDL의 최종 파일 SHA-256은 `df5485625ef2ab32527cffd9bb47bd562d6897c1a458d6d8d6f3a3673d7f492c`예요. 새 subject 테이블과 비고유 주체 조회 인덱스를 포함한 이 파일을 MySQL 8.0.45의 별도 tmpfs/네트워크 차단 컨테이너에 적용해 기존 2행 값·토큰 NULL/2048자·인증 세대 보존, 인덱스/CHECK/unique·계정 권한과 잘못된 DB/재실행 차단을 확인하고 해당 컨테이너를 제거했어요. 운영 자료 복원·현재 전체 JAR validate를 대신하지 않아요.
 
 기존 혼합 프리뷰·미추적 파일·Claude outputs를 보존하고 Git 쓰기·운영 DB/Redis·도메인·CDN·공급자 설정을 변경하지 않았어요. 새 DDL은 기존 개발/복원 DB에 적용하지 않았고 일회용 MySQL만 제거했어요. 다음 순서는 출시 범위/남은 보안 경계 결정 → 승인된 후보 SHA → 그 입력의 필수 CI/빌드 → 실제 스키마·직전 백업/독립 복원·전체 JAR validate → 같은 SHA의 세 프론트/호환 복구 → 구체적인 운영 승인과 전환이에요.
+
+#### 2026-10-18 v7 출시 준비 — 미배포
+
+후보 [초안 PR #337](https://github.com/hanjeun/reserve/pull/337)은 초기 `50b2afb`의 검사 실패 뒤 최소 수정 검증 중이에요. [10/17 정기 백업의 독립 다운로드·격리 복원](backup.md#2026-10-18-v7-준비용-정기-백업-독립-복원)에서 49테이블·기존 66행 보존과 준비용 2.12.0 JAR의 제한 앱 계정 `validate`·격리 전체 기동 health UP을 확인했어요. 실제 `/api/stores?page=0&size=48&sort=rating`의 success/content 배열과 `/api/store-news/config`·`/api/feed/interactions/config`의 JSON success도 확인했어요. 빈 `PORTONE_WEBHOOK_SECRET`의 fail-closed 경고는 합성 fixture 설정이며 실제 결제 호출은 0건이에요. 전환 직전 백업이나 최종 main SHA의 commit·산출물·CI 통과는 아니에요. 실제 운영 Nginx 이미지 digest `7f0adca1fc6c29c8dc49a2e90037a10ba20dc266baaed0988e9fb4d0d8b85ba0`와 live 설정으로 생성한 후보는 동일 이미지·합성 TLS 인증서·격리 Grafana DNS에서 `nginx -t`를 통과했어요. 실제 운영 TLS 왕복의 증거는 아니며 운영 개인키 복사·설치·reload는 하지 않았어요. CloudFront `E1VOAW2W8K0VA4`의 custom behavior는 여전히 0개이고 기존 프로필 객체 2개의 Cache-Control은 미설정/`max-age=86400`이었어요. 독립 CloudShell의 보호된 before/candidate 설정에 `users/*/profiles/*`·`users/*/feed/profiles/*`의 `Managed-CachingDisabled`(TTL 모두 0)를 준비했으며 실제 배포·객체·캐시는 변경하지 않았어요. 기존 outbox의 확인한 세 집계는 `0/0/0`이고 기존 JWT 목적 파생 키를 유지하며 GitHub 새 키는 설정하지 않았어요. 10/18 새 UI 요청은 계획만이며 이번 출시 완료 목록에 포함하지 않아요. 이 준비에서 운영 DDL·앱/Redis 배포·도메인/CDN·운영 키 변경은 하지 않았어요.

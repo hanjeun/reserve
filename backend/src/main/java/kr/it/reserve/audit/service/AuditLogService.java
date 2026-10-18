@@ -11,10 +11,13 @@ import kr.it.reserve.mailbox.repository.AdminSentMailRepository;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationUpdates;
 import kr.it.reserve.review.entity.Review;
 import kr.it.reserve.review.repository.ReviewRepository;
+import kr.it.reserve.review.service.ReviewUpdates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -52,10 +55,10 @@ public class AuditLogService {
     private final AdvertisementRepository advertisementRepository;
     private final ObjectMapper objectMapper;
     private final AuditCleanupWorker auditCleanupWorker;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.reservation.service.ReservationUpdates reservationUpdates;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.review.service.ReviewUpdates reviewUpdates;
+    @Autowired(required = false)
+    private ReservationUpdates reservationUpdates;
+    @Autowired(required = false)
+    private ReviewUpdates reviewUpdates;
 
     // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
 

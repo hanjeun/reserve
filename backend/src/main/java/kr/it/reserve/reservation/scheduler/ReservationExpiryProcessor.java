@@ -1,14 +1,15 @@
 package kr.it.reserve.reservation.scheduler;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
+import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationUpdates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,8 +27,8 @@ public class ReservationExpiryProcessor {
     private final ReservationRepository reservationRepository;
     private final PaymentService paymentService;
     private final EntityManager entityManager;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.reservation.service.ReservationUpdates updates;
+    @Autowired(required = false)
+    private ReservationUpdates updates;
 
     @Transactional
     public ExpiryResult expireIfDue(Long reservationId, LocalDateTime now) {

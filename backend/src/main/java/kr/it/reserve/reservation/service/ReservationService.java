@@ -1,30 +1,30 @@
 package kr.it.reserve.reservation.service;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import kr.it.reserve.audit.service.AuditLogService;
+import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
-import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.global.error.ReservationException;
+import kr.it.reserve.global.holiday.HolidayService;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
-import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.QrCheckinResponse;
+import kr.it.reserve.reservation.dto.ReservationCreateRequest;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationSearchDto;
-import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse;
+import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.util.QrCheckinTokenProvider;
 import kr.it.reserve.reservation.util.ReservationCodeGenerator;
-import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.repository.StoreRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -63,7 +63,7 @@ public class ReservationService {
     private final MemberRepository memberRepository;
     private final AuditLogService auditLogService;
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private ReservationUpdates updates;
 
     /** Undo 허용 시간(분). 토스트가 떠 있는 몇 초보다 넉넉하되, 실수 정정 범위를 넘지 않는 값. */
@@ -799,7 +799,7 @@ public class ReservationService {
                 .map(Reservation::getId)
                 .toList();
 
-        Map<Long, Long> reviewIdByReservationId = new java.util.HashMap<>();
+        Map<Long, Long> reviewIdByReservationId = new HashMap<>();
         if (!completedIds.isEmpty()) {
             reservationRepository.findReviewIdsByReservationIds(completedIds)
                     .forEach(row -> reviewIdByReservationId.put((Long) row[0], (Long) row[1]));

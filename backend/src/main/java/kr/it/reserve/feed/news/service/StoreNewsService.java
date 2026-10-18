@@ -4,10 +4,11 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.feed.FeedPolicy;
-import kr.it.reserve.feed.news.StoreNewsAvailability;
 import kr.it.reserve.feed.dto.FeedDto;
-import kr.it.reserve.feed.entity.FeedPost;
 import kr.it.reserve.feed.entity.FeedAuditRecord;
+import kr.it.reserve.feed.entity.FeedPost;
+import kr.it.reserve.feed.news.StoreNewsAvailability;
+import kr.it.reserve.feed.news.dto.StoreNewsDto;
 import kr.it.reserve.feed.repository.FeedAuditRepository;
 import kr.it.reserve.feed.repository.FeedMediaRepository;
 import kr.it.reserve.feed.repository.FeedPostRepository;
@@ -18,18 +19,21 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.dto.PromotionDto;
-import kr.it.reserve.feed.news.dto.StoreNewsDto;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 import kr.it.reserve.store.repository.StoreRepository;
+import kr.it.reserve.store.util.StoreRegionNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -47,7 +51,7 @@ public class StoreNewsService {
     private final StoreRepository stores;
     private final EntityManager entityManager;
     private final FeedAuditRepository audits;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private StoreNewsEvents changes;
 
     public Page<PromotionDto.PublicPromotionSummaryResponse> publicList(int page, int size, Long storeId, String type, String period) {
@@ -72,7 +76,7 @@ public class StoreNewsService {
         return stores.findByOwnerId(memberId).stream().filter(StoreNewsPolicy::usable)
                 .map(store -> new StoreNewsDto.StoreChoice(store.getId(), store.getName(), store.getCategory(), store.getAddress(),
                         store.getMainImageUrl(), store.isReservationEnabled(),
-                        store.resolveWaitingIntakeMode() != kr.it.reserve.store.entity.WaitingIntakeMode.OFF)).toList();
+                        store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF)).toList();
     }
 
     public Page<StoreNewsDto.News> mine(Long memberId, Long storeId, String state, int page, int size) {
@@ -312,7 +316,7 @@ public class StoreNewsService {
                 "/api/store-news/media/" + image.getId(), image.getWidth(), image.getHeight())).toList();
     }
     private String region(Store store) {
-        String[] parts = kr.it.reserve.store.util.StoreRegionNames.addressParts(store.getAddress());
+        String[] parts = StoreRegionNames.addressParts(store.getAddress());
         if (parts.length == 0 || !FeedPolicy.REGIONS.contains(parts[0])) return null;
         return parts.length > 1 && parts[1].matches("[가-힣A-Za-z0-9·-]+") && parts[1].length() <= 40
                 ? FeedPolicy.region(parts[0] + " " + parts[1]) : parts[0];

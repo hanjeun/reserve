@@ -1,12 +1,12 @@
 package kr.it.reserve.feed.news.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-
 import kr.it.reserve.feed.FeedException;
 import kr.it.reserve.feed.news.StoreNewsAvailability;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,7 +14,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Only invalidation signals cross the stream; the existing APIs authorize every data read. */
@@ -22,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class StoreNewsEvents {
     private final ApplicationEventPublisher events;
     private final StoreNewsAvailability policy;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EntityUpdates updates;
     private final Map<SseEmitter, Subscriber> subscribers = new ConcurrentHashMap<>();
 
@@ -30,7 +33,7 @@ public class StoreNewsEvents {
         events.publishEvent(new Changed(newsId, ownerId, publicChanged));
         if (updates != null) updates.publish(EntityUpdates.Domain.NEWS, newsId, null, null,
                 EntityUpdates.Operation.UPDATED, publicChanged,
-                ownerId == null ? java.util.Set.of() : java.util.Set.of(ownerId), true);
+                ownerId == null ? Set.of() : Set.of(ownerId), true);
     }
 
     public SseEmitter subscribe(Member member) {
@@ -74,7 +77,7 @@ public class StoreNewsEvents {
 
     private void send(SseEmitter emitter, String name) {
         try { emitter.send(SseEmitter.event().name(name).data(Map.of())); }
-        catch (java.io.IOException | IllegalStateException disconnected) { subscribers.remove(emitter); }
+        catch (IOException | IllegalStateException disconnected) { subscribers.remove(emitter); }
     }
     public record Changed(Long newsId, Long ownerId, boolean publicChanged) {}
     private record Subscriber(Long memberId, boolean admin, String publicAddress) {}

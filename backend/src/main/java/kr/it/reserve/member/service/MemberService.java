@@ -6,40 +6,46 @@ import kr.it.reserve.community.repository.CommunityPostRepository;
 import kr.it.reserve.community.repository.PostLikeRepository;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.config.oauth2.outbox.OAuthUnlinkOutboxService;
-import kr.it.reserve.email.service.EmailVerificationService;
+import kr.it.reserve.config.updates.AccountUpdateInvalidations;
 import kr.it.reserve.email.repository.EmailVerificationRepository;
+import kr.it.reserve.email.service.EmailVerificationService;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
+import kr.it.reserve.file.service.FileDeletionOutboxService;
+import kr.it.reserve.file.service.FileStorageService;
+import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.error.MemberException;
-import kr.it.reserve.global.security.PwnedPasswordChecker;
 import kr.it.reserve.global.security.PasswordPolicy;
+import kr.it.reserve.global.security.PwnedPasswordChecker;
+import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
+import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
 import kr.it.reserve.member.dto.LocationUpdateRequest;
 import kr.it.reserve.member.dto.MemberResponse;
 import kr.it.reserve.member.dto.MemberSignupRequest;
 import kr.it.reserve.member.dto.MemberUpdateRequest;
 import kr.it.reserve.member.dto.PasswordChangeRequest;
 import kr.it.reserve.member.entity.AuthProvider;
-import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.MarketingConsentHistory;
+import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
-import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.member.event.MemberWithdrawn;
 import kr.it.reserve.member.repository.MarketingConsentHistoryRepository;
+import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.member.repository.PasswordResetTokenRepository;
-import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.payment.repository.PaymentRepository;
+import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.reservation.repository.ReservationRepository;
-import kr.it.reserve.file.service.FileStorageService;
-import kr.it.reserve.file.service.FileDeletionOutboxService;
-import kr.it.reserve.file.util.FileStoragePaths;
-import kr.it.reserve.lifecycle.service.DataLifecycleGuard;
-import kr.it.reserve.lifecycle.dto.MemberWithdrawalReadiness;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Slf4j
@@ -67,11 +73,11 @@ public class MemberService {
     private final EmailVerificationRepository emailVerificationRepository;
     private final DataLifecycleGuard dataLifecycleGuard;
     private final OAuthUnlinkOutboxService oAuthUnlinkOutboxService;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.config.updates.AccountUpdateInvalidations contentUpdates;
+    @Autowired(required = false)
+    private AccountUpdateInvalidations contentUpdates;
     private final PwnedPasswordChecker pwnedPasswordChecker;
     private final MarketingConsentHistoryRepository marketingConsentHistoryRepository;
-    private final org.springframework.context.ApplicationEventPublisher events;
+    private final ApplicationEventPublisher events;
 
     /**
      * 유출 비밀번호 거부 문구. 회원가입·비밀번호 변경에서 같은 문구를 쓴다.
@@ -344,7 +350,7 @@ public class MemberService {
         // 개인화·커뮤니티는 제거하고 소식은 즉시 비공개 후 30일 파기한다. 예약·결제·환불·후기·문의·채팅은
         // 거래/분쟁 이력과 FK를 보존하되 아래 회원 행을 비식별화해 개인을 식별하지 못하게 한다.
         favoriteRepository.deleteByMemberId(memberId);
-        promotionRepository.softDeleteByMemberId(memberId, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+        promotionRepository.softDeleteByMemberId(memberId, LocalDateTime.now(ZoneOffset.UTC));
 
         List<Long> postIds = communityPostRepository.findPostIdsByAuthorId(memberId);
         if (!postIds.isEmpty()) {
@@ -366,7 +372,7 @@ public class MemberService {
 
         // Bulk cleanup queries clear the persistence context; mutate a managed, still-locked member.
         findByIdForUpdate(memberId).withdraw("withdrawn-" + memberId + "@reserve.invalid");
-        events.publishEvent(new kr.it.reserve.member.event.MemberWithdrawn(memberId));
+        events.publishEvent(new MemberWithdrawn(memberId));
         log.info("Member withdrawal completed: memberId={}", memberId);
     }
 }

@@ -1,12 +1,12 @@
 package kr.it.reserve.waiting.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.waiting.entity.WaitingEntry;
 import kr.it.reserve.waiting.entity.WaitingStatus;
 import kr.it.reserve.waiting.repository.WaitingEntryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +18,7 @@ import java.util.Set;
 public class WaitingEventPublisher {
     private final WaitingEntryRepository entries;
     private final ApplicationEventPublisher events;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EntityUpdates updates;
 
     public void changed(Store store, WaitingEntry entry) {

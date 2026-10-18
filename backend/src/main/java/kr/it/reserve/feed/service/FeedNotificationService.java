@@ -1,9 +1,8 @@
 package kr.it.reserve.feed.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-
-import kr.it.reserve.feed.FeedInteractionPolicy;
 import kr.it.reserve.feed.FeedException;
+import kr.it.reserve.feed.FeedInteractionPolicy;
 import kr.it.reserve.feed.dto.FeedInteractionDto;
 import kr.it.reserve.feed.entity.*;
 import kr.it.reserve.feed.repository.FeedNotificationRepository;
@@ -11,21 +10,24 @@ import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.event.MemberWithdrawn;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
+
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Objects;
+import java.util.Set;
 
 @Service @RequiredArgsConstructor @Transactional(readOnly = true)
 public class FeedNotificationService {
     private final FeedInteractionPolicy policy;
     private final FeedService feeds;
     private final FeedNotificationRepository notifications;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EntityUpdates updates;
     @Transactional(propagation = Propagation.MANDATORY)
     public void comment(FeedComment item) {
@@ -68,7 +70,7 @@ public class FeedNotificationService {
     }
     private void changed(Long member, Long id, Long post, EntityUpdates.Operation operation) {
         if (updates != null) updates.publish(EntityUpdates.Domain.NOTIFICATION, id, post, null,
-                operation, false, java.util.Set.of(member), false);
+                operation, false, Set.of(member), false);
     }
     @EventListener @Transactional(propagation = Propagation.MANDATORY)
     public void withdraw(MemberWithdrawn event) { notifications.withdraw(event.memberId()); }

@@ -1,8 +1,11 @@
 package kr.it.reserve.store.entity;
 
-import kr.it.reserve.member.entity.Member;
 import jakarta.persistence.*;
+import kr.it.reserve.member.entity.Member;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -13,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Entity
 /*
@@ -280,8 +284,8 @@ public class Store {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
-    @org.hibernate.annotations.ColumnDefault("'OFF'")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @ColumnDefault("'OFF'")
     @Column(name = "waiting_intake_mode", nullable = false, length = 16)
     private WaitingIntakeMode waitingIntakeMode = WaitingIntakeMode.OFF;
 
@@ -290,12 +294,12 @@ public class Store {
     }
 
     @Builder.Default
-    @org.hibernate.annotations.ColumnDefault("false")
+    @ColumnDefault("false")
     @Column(name = "waiting_paused", nullable = false)
     private Boolean waitingPaused = false;
 
     @Builder.Default
-    @org.hibernate.annotations.ColumnDefault("true")
+    @ColumnDefault("true")
     @Column(name = "reservation_enabled", nullable = false)
     private Boolean reservationEnabled = true;
 
@@ -401,7 +405,7 @@ public class Store {
 
     public void setClosedDayList(List<Integer> days) {
         this.closedDays = (days == null || days.isEmpty()) ? null
-                : days.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+                : days.stream().map(String::valueOf).collect(Collectors.joining(","));
     }
 
     /** 임시 휴무일. 값이 없으면 빈 리스트. */
@@ -411,7 +415,7 @@ public class Store {
 
     public void setClosedDateList(List<LocalDate> dates) {
         this.closedDates = (dates == null || dates.isEmpty()) ? null
-                : dates.stream().map(LocalDate::toString).collect(java.util.stream.Collectors.joining(","));
+                : dates.stream().map(LocalDate::toString).collect(Collectors.joining(","));
     }
 
     /**
@@ -453,7 +457,7 @@ public class Store {
         this.sessionTimes = (times == null || times.isEmpty()) ? null
                 : times.stream().distinct().sorted()
                        .map(t -> t.toString().substring(0, 5))
-                       .collect(java.util.stream.Collectors.joining(","));
+                       .collect(Collectors.joining(","));
     }
 
     /**

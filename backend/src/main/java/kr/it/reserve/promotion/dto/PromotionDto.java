@@ -1,13 +1,19 @@
 package kr.it.reserve.promotion.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
-import kr.it.reserve.promotion.StoreNewsPolicy;
 
 public class PromotionDto {
 
@@ -131,7 +137,7 @@ public class PromotionDto {
                     .feedEnabled(false)
                     .benefitVisible(StoreNewsPolicy.publicBenefit(promotion))
                     .reservationEnabled(promotion.getStore().isReservationEnabled())
-                    .waitingEnabled(promotion.getStore().resolveWaitingIntakeMode() != kr.it.reserve.store.entity.WaitingIntakeMode.OFF)
+                    .waitingEnabled(promotion.getStore().resolveWaitingIntakeMode() != WaitingIntakeMode.OFF)
                     .build();
         }
     }
@@ -142,21 +148,21 @@ public class PromotionDto {
     @AllArgsConstructor
     @Builder
     public static class PromotionRequest {
-        @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Positive
+        @NotNull @Positive
         private Long storeId; // 홍보할 가게 ID
-        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 200)
+        @NotBlank @Size(max = 200)
         private String title;
-        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 2000)
+        @NotBlank @Size(max = 2000)
         private String content;
-        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "RESTAURANT|CAFE|BEAUTY|ACTIVITY|ETC")
+        @NotBlank @Pattern(regexp = "RESTAURANT|CAFE|BEAUTY|ACTIVITY|ETC")
         private String category;
-        @jakarta.validation.constraints.Size(max = 500)
+        @Size(max = 500)
         private String imageUrl;
-        @jakarta.validation.constraints.Size(max = 500)
+        @Size(max = 500)
         private String specialMenu; // 특색 메뉴
-        @jakarta.validation.constraints.Size(max = 2000)
+        @Size(max = 2000)
         private String storyHistory; // 가게 역사/스토리
-        @jakarta.validation.constraints.Size(max = 500)
+        @Size(max = 500)
         private String tags;
     }
 

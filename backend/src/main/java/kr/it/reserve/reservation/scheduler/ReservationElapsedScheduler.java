@@ -1,12 +1,14 @@
 package kr.it.reserve.reservation.scheduler;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-
+import kr.it.reserve.global.common.ServiceTime;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
+import kr.it.reserve.reservation.service.ReservationUpdates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -48,8 +50,8 @@ public class ReservationElapsedScheduler {
 
     private final ReservationRepository reservationRepository;
     private final PaymentService paymentService;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.reservation.service.ReservationUpdates updates;
+    @Autowired(required = false)
+    private ReservationUpdates updates;
 
     /**
      * ★ 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 <b>KST</b> 값이다.
@@ -59,7 +61,7 @@ public class ReservationElapsedScheduler {
      */
     // 값은 ServiceTime 한 곳에서만 정한다 — 예전엔 이 상수가 여기와 QrCheckinTokenProvider 에
     // 따로 복사돼 있었고, 규칙은 두 파일 주석에만 있어서 나머지 열 몇 곳이 조용히 UTC 로 돌았다.
-    private static final ZoneId SERVICE_ZONE = kr.it.reserve.global.common.ServiceTime.ZONE;
+    private static final ZoneId SERVICE_ZONE = ServiceTime.ZONE;
 
     /**
      * 한 번에 처리할 최대 건수. 첫 배포 때 밀린 과거 예약이 한꺼번에 걸릴 수 있는데,

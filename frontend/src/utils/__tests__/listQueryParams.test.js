@@ -11,7 +11,7 @@ describe('list URL conventions', () => {
         ['/my-reservations', { view: 'list', tab: 'reservation', status: 'ALL', sort: 'recent' }],
         ['/waiting', { view: 'cards', status: 'ALL', sort: 'recommended', page: '1' }],
         ['/benefits', { newsType: 'ALL', period: 'ONGOING', page: '1' }],
-        ['/feed', { view: 'all', page: '1', region: '' }],
+        ['/feed', { view: 'all', page: '1', region: 'all' }],
         ['/feed/u/author-id', { page: '1' }],
     ])('shows every default selection on %s and retains it on refresh', (pathname, expected) => {
         const normalized = normalizeListQueryParams(pathname, new URLSearchParams());
@@ -30,7 +30,7 @@ describe('list URL conventions', () => {
 
     it.each(['/stores', '/waiting'])('keeps the explicit all-region choice separate from a remembered region on %s', path => {
         const normalized = normalizeListQueryParams(path, new URLSearchParams('region=&view=list&keyword='));
-        expect(normalized.get('region')).toBe('');
+        expect(normalized.get('region')).toBe('all');
         expect(normalized.get('view')).toBe('list');
         expect(normalized.has('keyword')).toBe(false);
     });

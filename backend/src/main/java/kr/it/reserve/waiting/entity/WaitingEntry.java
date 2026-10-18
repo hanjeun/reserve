@@ -14,6 +14,7 @@ import kr.it.reserve.waiting.error.WaitingException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.springframework.http.HttpStatus;
@@ -52,7 +53,7 @@ public class WaitingEntry {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
-    @org.hibernate.annotations.ColumnDefault("'STAFF'")
+    @ColumnDefault("'STAFF'")
     @Column(name = "source", nullable = false, length = 16)
     private WaitingSource source = WaitingSource.STAFF;
 

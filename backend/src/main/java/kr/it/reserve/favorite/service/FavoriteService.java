@@ -1,7 +1,6 @@
 package kr.it.reserve.favorite.service;
 
 import kr.it.reserve.config.updates.EntityUpdates;
-
 import kr.it.reserve.favorite.dto.FavoriteDto;
 import kr.it.reserve.favorite.entity.Favorite;
 import kr.it.reserve.favorite.repository.FavoriteRepository;
@@ -11,11 +10,13 @@ import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -25,7 +26,7 @@ public class FavoriteService {
 
     private final FavoriteRepository favoriteRepository;
     private final StoreRepository storeRepository;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EntityUpdates updates;
 
     @Transactional
@@ -55,10 +56,10 @@ public class FavoriteService {
     private void changed(Store store, Long memberId) {
         if (updates == null) return;
         updates.publish(EntityUpdates.Domain.FAVORITE, store.getId(), store.getId(), store.getId(),
-                EntityUpdates.Operation.UPDATED, false, java.util.Set.of(memberId), false);
+                EntityUpdates.Operation.UPDATED, false, Set.of(memberId), false);
         if (!store.isDeleted() && !store.isSuspended()) updates.publish(EntityUpdates.Domain.STORE,
                 store.getId(), null, store.getId(), EntityUpdates.Operation.UPDATED,
-                true, java.util.Set.of(), false);
+                true, Set.of(), false);
     }
 
     public FavoriteDto.StatusResponse getFavoriteStatus(Long storeId, Member member) {

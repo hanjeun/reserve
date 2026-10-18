@@ -380,14 +380,14 @@ function StoreListRouteSkeleton({ pathname = '/stores', search = '' }) {
     const params = new URLSearchParams(search);
     const isList = resolveViewMode(pathname, params, 'cards') === 'list';
     return (
-        <>
+        <PageContainer size="xl" paddingTop="16px" className="reserve-explore-page">
             <ListingToolbarSkeleton className="" region count={null} filters={storeSkeletonFilters(params, SORT_OPTIONS, 'recommended')} />
             <div className={isList ? 'reserve-store-list-rows' : 'rsv-store-grid'}>
                 {isList
                     ? <StoreListRowSkeleton count={STORE_LIST_PAGE_SIZE} />
                     : <StoreCardSkeleton count={STORE_LIST_PAGE_SIZE} />}
             </div>
-        </>
+        </PageContainer>
     );
 }
 StoreListRouteSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes.string };

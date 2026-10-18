@@ -1,20 +1,21 @@
 package kr.it.reserve.payment.controller;
 
+import kr.it.reserve.config.SiteUrls;
 import kr.it.reserve.config.util.SecurityUtil;
-import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.global.common.ApiResponse;
 import kr.it.reserve.global.error.BusinessException;
 import kr.it.reserve.global.error.PaymentException;
+import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.payment.dto.*;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.repository.PaymentRepository;
 import kr.it.reserve.payment.service.PaymentService;
+import kr.it.reserve.payment.service.PaymentVerificationService;
 import kr.it.reserve.payment.service.PortoneService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Import;
-import kr.it.reserve.config.SiteUrls;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +37,7 @@ public class PaymentApiController {
     private static final String ERROR_MESSAGE_QUERY = "&error_msg=";
 
     private final PaymentService paymentService;
+    private final PaymentVerificationService paymentVerificationService;
     private final PortoneService portoneService;
     private final PaymentRepository paymentRepository;
 
@@ -90,7 +92,7 @@ public class PaymentApiController {
             verifyDto.setMerchantUid(merchantUid);
             verifyDto.setReservationId(payment.getReservation().getId());
 
-            paymentService.verifyAndCompletePayment(verifyDto);
+            paymentVerificationService.verifyRedirect(verifyDto);
             return redirect(redirectBase + "?success=true&merchant_uid=" + enc(merchantUid));
         } catch (BusinessException e) {
             // 외부 API 래퍼의 도메인 예외에도 원문이 섞일 수 있으므로 URL에 전달하지 않는다.
@@ -141,7 +143,7 @@ public class PaymentApiController {
     @PostMapping("/verify")
     public ApiResponse<PaymentResponseDto> verifyPayment(@RequestBody PaymentVerifyDto verifyDto) {
         Member requester = SecurityUtil.getCurrentMember("인증되지 않은 사용자예요.");
-        PaymentResponseDto response = paymentService.verifyAndCompletePaymentByMember(verifyDto, requester);
+        PaymentResponseDto response = paymentVerificationService.verifyByMember(verifyDto, requester);
         return ApiResponse.success(response, "결제 검증 및 처리가 완료됐어요.");
     }
 

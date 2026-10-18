@@ -98,6 +98,10 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     const showThread = isConversations && ((isWide && activeThread) || mobileThreadVisible);
     const threadKey = showThread ? selectionKey : null;
     const imageDraft = useChatImageDraft(threadKey);
+    const batchRef = useRef(null);
+    const [batchScope, setBatchScope] = useState(null);
+    const sendScope = `${sessionIdentity}:${threadKey}`;
+    useEffect(() => () => { batchRef.current = null; }, []);
     const readScopeRef = useRef(/** @type {{threadKey: string | null, identity: string, loading: boolean, roomId: number | null} | null} */ (null));
     const notificationTargetRef = useRef(null);
     const openNotifiedConversation = useCallback(roomId => {
@@ -220,7 +224,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     }, [isWide, notify, onSent, selection, threadKey]);
 
     const {
-        messages, thread, loading, loadError, sending, send, reload, captureHistory, prepend, cancelSend, updateMessage,
+        messages, thread, loading, loadError, sending: messageSending, send, reload, captureHistory, prepend, cancelSend, updateMessage,
     } = useChatThread({
         threadKey,
         myRole: viewerRoleOf(selection),
@@ -236,6 +240,7 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
         onError,
         pollMs: POLL_THREAD_MS,
     });
+    const sending = messageSending || batchScope === sendScope;
     useLayoutEffect(() => {
         const readScope = { threadKey, identity: sessionIdentity, loading, roomId: thread?.roomId ?? null };
         readScopeRef.current = readScope;
@@ -346,17 +351,37 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
     }, [finishConversationList, returningToList]);
     const handleSend = async () => {
         const text = draft.trim();
-        const file = imageDraft.file;
-        if ((!text && !file) || sending || thread?.canSend === false) return;
+        const files = imageDraft.files;
+        if ((!text && !files.length) || sending || batchRef.current?.scope === sendScope || thread?.canSend === false) return;
         const identity = useMessengerStore.getState().sessionIdentity;
+        const batch = { scope: sendScope, cancelled: false };
+        batchRef.current = batch;
+        setBatchScope(sendScope);
         setDraft(selectionKey, '', identity);
         imageDraft.clear();
-        const ok = await send(text, file);
-        if (ok === false && file) imageDraft.restore(file);
-        // 전송 실패가 나중에 와도 새 입력이나 다른 세션의 초안을 덮지 않는다.
-        if (ok === false && !useMessengerStore.getState().drafts[selectionKey]) {
-            setDraft(selectionKey, text, identity);
+        try {
+            // Existing one-photo messages retain their own idempotency key and cancellation.
+            // Only the first carries the caption; a partial failure restores the unsent suffix.
+            const queue = files.length ? files : [null];
+            for (let index = 0; index < queue.length; index++) {
+                if (batchRef.current !== batch || batch.cancelled || useMessengerStore.getState().sessionIdentity !== identity) return;
+                const ok = await send(index === 0 ? text : '', queue[index]);
+                if (ok !== true) {
+                    if (ok === false) {
+                        if (files.length) imageDraft.restore(files.slice(index));
+                        // A late failure cannot overwrite a new draft or another account.
+                        if (index === 0 && !useMessengerStore.getState().drafts[selectionKey]) setDraft(selectionKey, text, identity);
+                    }
+                    return;
+                }
+            }
+        } finally {
+            if (batchRef.current === batch) { batchRef.current = null; setBatchScope(null); }
         }
+    };
+    const handleCancelSend = () => {
+        if (batchRef.current) batchRef.current.cancelled = true;
+        cancelSend();
     };
 
     const { title, threadKind, emptyText } = threadCopyOf({
@@ -487,12 +512,13 @@ const MessengerContentBody = ({ surface = 'page', initialStoreId = null, coverIm
                         onDraftChange: changeDraft,
                         composerProps: {
                             onSend: handleSend,
-                            file: imageDraft.file,
-                            onFileChange: imageDraft.choose,
+                            files: imageDraft.files,
+                            onFilesChange: imageDraft.choose,
+                            onRemoveFile: imageDraft.remove,
                             imageEnabled: imageDraft.enabled,
                             imageLoading: imageDraft.loading,
                             disabled: loading || loadError,
-                            onCancel: cancelSend,
+                            onCancel: handleCancelSend,
                         },
                     }}
                 />

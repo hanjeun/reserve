@@ -1,13 +1,15 @@
 package kr.it.reserve.promotion.entity;
 
-import kr.it.reserve.member.entity.Member;
-import kr.it.reserve.store.entity.Store;
 import jakarta.persistence.*;
+import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.promotion.StoreNewsPolicy;
+import kr.it.reserve.store.entity.Store;
 import lombok.*;
-
-import java.time.LocalDateTime;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "promotion", indexes = {
@@ -21,7 +23,7 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@org.hibernate.annotations.DynamicUpdate
+@DynamicUpdate
 public class Promotion {
 
     @Id
@@ -112,12 +114,12 @@ public class Promotion {
     // 행사 기간·30일 파기·새 응답은 UTC를 사용한다. 기존 저장 시각은 일괄 변환하지 않는다.
     @PrePersist
     private void createTimestamps() {
-        LocalDateTime now = kr.it.reserve.promotion.StoreNewsPolicy.now();
+        LocalDateTime now = StoreNewsPolicy.now();
         if (createdAt == null) createdAt = now;
         updatedAt = now;
     }
     @PreUpdate
-    private void updateTimestamp() { updatedAt = kr.it.reserve.promotion.StoreNewsPolicy.now(); }
+    private void updateTimestamp() { updatedAt = StoreNewsPolicy.now(); }
 
     public enum PromotionCategory {
         RESTAURANT("음식점"),

@@ -1,30 +1,31 @@
 package kr.it.reserve.feed.service;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
+import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.*;
 import kr.it.reserve.feed.entity.*;
 import kr.it.reserve.feed.repository.*;
 import kr.it.reserve.global.common.PageRequests;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.HashSet;
 
 @Service @RequiredArgsConstructor @Transactional(readOnly = true)
 public class FeedCommentService {
@@ -40,7 +41,7 @@ public class FeedCommentService {
     private final ContentLikeRepository likes;
     private final FeedCommentReportImageRepository evidence;
     private final FeedNotificationService notifications;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EntityUpdates updates;
 
     public FeedInteractionDto.Comment readPublic(Long id, Long viewer) {

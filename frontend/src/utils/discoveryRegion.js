@@ -4,10 +4,10 @@ export const DISCOVERY_REGION_STORAGE_KEY = 'reserve:discovery-region';
 let memoryRegion = '';
 let useMemory = false;
 
-// 목록 URL과 같은 검증을 사용한다. 빈 값은 사용자가 고른 전체 지역이다.
+// API·화면 상태의 빈 값은 전체 지역이며, 브라우저 주소에서는 all로 표시한다.
 export const validDiscoveryRegion = value => {
     if (typeof value !== 'string') return null;
-    if (value === '') return '';
+    if (value === '' || value === 'all') return '';
     const params = new URLSearchParams({ region: value });
     return normalizeListQueryParams('/stores', params).get('region');
 };

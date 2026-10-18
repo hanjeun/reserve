@@ -1028,10 +1028,39 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     align-items: stretch;
     gap: 4px;
 }
+.reserve-chat-composer-input-area {
+    display: flex;
+    align-items: center;
+    height: 56px;
+    min-height: 56px;
+    min-width: 0;
+    gap: 8px;
+}
+.reserve-chat-composer-attachments {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 55%;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+}
+.reserve-chat-composer-attachments:empty { display: none; }
+.reserve-chat-composer-attachments > .reserve-chat-attachments {
+    flex-wrap: nowrap;
+    margin: 0;
+    max-width: none;
+}
+.reserve-chat-composer-attachments .reserve-chat-attachment { flex-shrink: 0; }
+.reserve-chat-composer-attachments [role="alert"] { flex: 0 0 auto !important; max-width: 220px; }
 .reserve-messenger-composer textarea {
     box-sizing: border-box;
     min-width: 0;
     width: 100%;
+    flex: 1 1 0;
     height: 56px;
     max-height: 100px;
     padding: 8px 10px;
@@ -1059,6 +1088,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-composer-toolbar, .reserve-chat-composer-tools { display: flex; align-items: center; gap: 4px; }
 .reserve-chat-composer-toolbar { justify-content: space-between; }
 .reserve-chat-composer-tools { flex: 1; min-width: 0; flex-wrap: wrap; }
+.reserve-chat-attachments { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; max-width: 100%; margin-block: 8px; }
 .reserve-chat-tool {
     width: var(--reserve-icon-target-size); height: var(--reserve-icon-target-size); flex-shrink: 0; padding: 0; border: 0; border-radius: var(--reserve-icon-tool-radius);
     background: transparent; color: var(--c-text-secondary, #4e5968); font-size: 20px;
@@ -1245,7 +1275,6 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     border: 0; background: transparent; color: var(--c-text-secondary, #4e5968); cursor: pointer;
     border-radius: 10px; width: 44px; min-width: 44px; height: 44px; padding: 0;
     display: inline-flex; align-items: center; justify-content: center;
-    transition: transform 0.2s ease;
 }
 .reserve-chat-message-actions > .anticon { position: relative; }
 .reserve-chat-message-meta { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
@@ -1512,10 +1541,9 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-store-card-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .reserve-store-card-info > .reserve-store-identity-text { margin-bottom: 2px; }
 .reserve-store-card-rating { min-height: 20px; }
-.reserve-store-card-favorite { position: absolute; z-index: 2; right: 0; top: 50%; transform: translateY(-50%); }
+.reserve-store-card-favorite { position: absolute; z-index: 2; right: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; }
 .reserve-store-card-favorite:empty { display: none; }
-.reserve-store-card-title-line--with-tools { min-height: 44px; padding-right: 0; gap: 4px; }
-.reserve-store-card-title-line--with-tools > .reserve-store-card-favorite { position: relative; top: auto; right: auto; transform: none; display: flex; flex: 0 0 auto; align-items: center; }
+.reserve-store-card-title-line:has(> .reserve-store-card-favorite > :nth-child(2)) { padding-right: 88px; }
 .reserve-store-card-skeleton-tools { display: flex; flex: 0 0 auto; align-items: center; }
 .reserve-info-hint-popup { --reserve-info-hint-background: #1a1f27; --reserve-info-hint-foreground: #ffffff; }
 [data-theme='dark'] .reserve-info-hint-popup { --reserve-info-hint-background: #ffffff; --reserve-info-hint-foreground: #1a1f27; }
@@ -1893,6 +1921,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
    뒤에 선언된 그쪽이 이겨 여백이 두 번 들어가고, 1200px 제한이 혜택(1248px) 틀을 좁혀 로딩 뒤 넓어졌다(2026-09-29 실측).
    2026-09-29: 로그인·약관·결제 결과·관리자·파트너·메시지·가게 상세·준비 중 화면도 실제 틀을 그대로 그리게 바꿔 전부 여기로 모았다. */
 .reserve-route-skeleton.reserve-route-skeleton--reservations,
+.reserve-route-skeleton.reserve-route-skeleton--store-list,
 .reserve-route-skeleton.reserve-route-skeleton--cards,
 .reserve-route-skeleton.reserve-route-skeleton--benefits,
 .reserve-route-skeleton.reserve-route-skeleton--benefit-detail,
@@ -2188,6 +2217,10 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     right: calc(var(--reserve-home-gutter) + 12px);
     bottom: 10px;
     z-index: 2;
+    cursor: pointer;
+}
+.reserve-photo-count,
+.reserve-image-preview .ant-image-preview-progress {
     min-width: 65px;
     min-height: 32px;
     padding: 6px 10px;
@@ -2202,7 +2235,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     font: inherit;
     font-size: 11px;
     line-height: 1;
-    cursor: pointer;
+    box-sizing: border-box;
 }
 .reserve-discovery-banner-next > .anticon { font-size: 9px; }
 .reserve-discovery-shortcuts {
@@ -2384,7 +2417,8 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     .reserve-discovery-banner-copy strong { font-size: 28px; }
     .reserve-discovery-banner-kicker,
     .reserve-discovery-banner-description { font-size: 12px; }
-    .reserve-discovery-banner-next { min-height: 32px; padding-inline: 12px; font-size: 12px; }
+    .reserve-photo-count,
+    .reserve-image-preview .ant-image-preview-progress { min-height: 32px; padding-inline: 12px; font-size: 12px; }
     .reserve-discovery-shortcut { font-size: 13px; }
     .reserve-app-layout--home .reserve-app-footer { padding-bottom: 36px !important; }
     .reserve-app-layout--home .reserve-app-footer-inner { padding-top: 40px !important; }
@@ -2702,8 +2736,8 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 }
 .reserve-store-contact-action {
     box-sizing: border-box;
-    width: 44px;
-    height: 44px;
+    width: var(--reserve-icon-target-size);
+    height: var(--reserve-icon-target-size);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2712,7 +2746,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     border-radius: 0;
     background: transparent;
     color: var(--c-text-tertiary, #8b95a1);
-    font-size: 22px;
+    font-size: var(--reserve-icon-glyph-size);
     line-height: 1;
     text-decoration: none;
     cursor: pointer;

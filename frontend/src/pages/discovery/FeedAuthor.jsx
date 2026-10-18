@@ -18,6 +18,7 @@ import feedService from '../../services/feedService';
 import { FEED_PAGE_SIZE, feedPage, feedTotal } from '../../utils/feed';
 import { discoveryTabDestination } from '../../utils/discoveryNavigation';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
+import useGoBack from '../../hooks/useGoBack';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
@@ -27,6 +28,7 @@ const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal
 export default function FeedAuthor() {
     const { publicId } = useParams();
     const navigate = useNavigate();
+    const goBack = useGoBack(discoveryTabDestination('/feed'));
     const user = useAuthStore(state => state.user);
     const [editingPost, setEditingPost] = useState(null);
     const [editorMounted, setEditorMounted] = useState(false);
@@ -81,7 +83,7 @@ export default function FeedAuthor() {
         return <FeedPageSkeleton kind="feed-author" />;
     }
     return <PageContainer ref={listRef} size="md" paddingTop="12px" paddingX="0px" paddingBottom="40px" style={{ maxWidth: 640, backgroundColor: 'transparent' }} className="reserve-feed-page" aria-labelledby="feed-author-title">
-        <header className="reserve-feed-heading"><IconTool kind="navigation" label="피드로" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={() => navigate(discoveryTabDestination('/feed'))} /><PageTitle level={1} id="feed-author-title">공개 프로필</PageTitle></header>
+        <header className="reserve-feed-heading"><IconTool kind="navigation" label="이전 화면으로 돌아가기" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={goBack} /><PageTitle level={1} id="feed-author-title">공개 프로필</PageTitle></header>
         {enabled && !unavailable && author.data && <div className="reserve-feed-profile"><Avatar src={author.data.avatarUrl} size={64} referrerPolicy="no-referrer" />
             <div><h2>{author.data.nickname}</h2><p>{author.data.bio}</p></div>
             {mine && <IconTool label="공개 프로필 수정" icon={<InterfaceIcon name="edit" />}

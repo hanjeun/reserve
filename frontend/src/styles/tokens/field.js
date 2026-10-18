@@ -1,5 +1,6 @@
 import { radius, heights } from './spacing';
 import { colors } from './colors';
+import { fontSize, fontWeight } from './typography';
 
 /**
  * 폼 컨트롤 껍데기 토큰 — 입력칸처럼 보이는 모든 것의 단일 출처.
@@ -32,6 +33,9 @@ export const field = {
     bgDisabled: colors.gray[100],
     /** 자리표시자 글자색 — AntD colorTextPlaceholder 와 같은 값. */
     placeholderColor: colors.text.placeholder,
+    /** Date and time placeholder text share one measured line box. */
+    textStyle: { fontSize: fontSize.lg, fontWeight: fontWeight.regular, lineHeight: 1.5,
+        fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' },
     /**
      * 접미 아이콘 크기(px).
      * AntD 기본값을 그냥 두면 커스텀 자리표시자와 1~2px 어긋나는데,

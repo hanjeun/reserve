@@ -475,7 +475,7 @@ test('messenger: every internal view keeps a close X and shared refresh feedback
     await expect(messenger).not.toHaveClass(/has-thread/);
     await checkClose();
     await close.click();
-    if (isMobile) await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === '');
+    if (isMobile) await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     else await expect(surface).toHaveCount(0);
 });
 
@@ -571,7 +571,7 @@ test('messenger: a direct messages URL stays mobile-only and hands desktop back 
         return;
     }
 
-    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.has('region') && url.searchParams.get('region') === '');
+    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.has('region') && url.searchParams.get('region') === 'all');
     await expect(page.locator('.reserve-messages-route')).toHaveCount(0);
     await expect(page.locator('.reserve-chat-panel')).toBeVisible();
 });

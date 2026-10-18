@@ -1,6 +1,7 @@
 package kr.it.reserve.config;
 
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
 import kr.it.reserve.config.jwt.JwtProperties;
 import kr.it.reserve.config.jwt.TokenProvider;
@@ -13,6 +14,9 @@ import kr.it.reserve.member.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -24,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class TokenProviderLifecycleTest {
 
@@ -70,6 +75,28 @@ class TokenProviderLifecycleTest {
 
         assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(token))
                 .isInstanceOf(AuthException.class);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "another-issuer")
+    void rejectsMissingOrForeignIssuerBeforeMemberLookupIncludingExpiredRefresh(String issuer) {
+        for (long expiryOffset : new long[]{60_000, -60_000}) {
+            String foreign = Jwts.builder()
+                    .issuer(issuer)
+                    .expiration(new Date(System.currentTimeMillis() + expiryOffset))
+                    .subject(member.getEmail())
+                    .claim("id", member.getId())
+                    .claim("purpose", "REFRESH")
+                    .signWith(Keys.hmacShaKeyFor(TEST_SECRET.getBytes(StandardCharsets.UTF_8)))
+                    .compact();
+            assertThat(tokenProvider.validToken(foreign)).isFalse();
+            assertThat(tokenProvider.inspectRefreshToken(foreign).state())
+                    .isEqualTo(TokenProvider.RefreshTokenState.INVALID);
+            assertThatThrownBy(() -> tokenProvider.getActiveMemberFromToken(foreign))
+                    .isInstanceOf(JwtException.class);
+        }
+        verifyNoInteractions(memberRepository, refreshTokenRepository);
     }
 
     @Test

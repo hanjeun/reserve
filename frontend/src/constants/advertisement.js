@@ -29,10 +29,10 @@ export const getBannerCopyPreset = (value) => BANNER_COPY_PRESETS.find(
     preset => preset.value === value,
 );
 
-export const bannerCopyOptions = BANNER_COPY_PRESETS.map(({ value, title }) => ({
-    value,
-    label: title,
-}));
+export const bannerCopyOptions = [
+    { value: 'CUSTOM', label: '직접 작성' },
+    ...BANNER_COPY_PRESETS.map(({ value, title }) => ({ value, label: title })),
+];
 
 export const findBannerCopyKey = (ad) => BANNER_COPY_PRESETS.find(
     preset => preset.title === ad?.title && preset.description === ad?.description,

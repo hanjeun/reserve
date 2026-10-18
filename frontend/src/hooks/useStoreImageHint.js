@@ -9,7 +9,7 @@ const useStoreImageHint = storeId => {
     const queries = client?.getQueryCache().findAll({ predicate: query => {
         const key = query.queryKey;
         return key[0] === 'stores' && (key[1] === 'list' || key[1] === 'detail' && key.length === 3)
-            || key[0] === 'home' && key[1] === 'recommended-stores';
+            || key[0] === 'home' && key[1] === 'recommended-stores' || key[0] === 'waiting-stores';
     } }) ?? [];
     const denied = queries.some(query => query.queryKey[0] === 'stores' && query.queryKey[1] === 'detail'
         && String(query.queryKey[2]) === String(storeId) && [401, 403, 404, 410].includes(httpStatusOf(query.state.error)));

@@ -1,6 +1,7 @@
 package kr.it.reserve.config.updates;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.annotation.PreDestroy;
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
@@ -14,18 +15,19 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
-import java.util.function.Predicate;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /** A bounded, ephemeral stream: every ready event requires REST reconciliation, never event replay. */
 @Component
@@ -86,7 +88,7 @@ public class EntityUpdateStream {
         emitter.onTimeout(() -> { subscribers.remove(emitter); emitter.complete(); });
         emitter.onError(error -> subscribers.remove(emitter));
         send(emitter, "ready", Map.of("epoch", epoch, "revision", revision, "domains", EntityUpdates.Domain.values(),
-                "serverTime", java.time.Instant.now().toString()), null);
+                "serverTime", Instant.now().toString()), null);
         return emitter;
     }
 
@@ -141,7 +143,7 @@ public class EntityUpdateStream {
         subscribers.clear();
     }
 
-    @jakarta.annotation.PreDestroy
+    @PreDestroy
     public void close() {
         disconnectAll();
         if (delivery instanceof ExecutorService executor) executor.shutdownNow();

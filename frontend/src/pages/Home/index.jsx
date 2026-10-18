@@ -32,10 +32,10 @@ import { distanceSortParams } from '../../utils/distanceSort';
 import { formatRegionLabel } from '../../constants/regions';
 
 const withRegion = (path, region) => {
-    if (!region || !path.startsWith('/stores')) return path;
+    if (!path.startsWith('/stores')) return path;
     const [pathname, query = ''] = path.split('?');
     const params = new URLSearchParams(query);
-    params.set('region', region);
+    params.set('region', region || 'all');
     return `${pathname}?${params.toString()}`;
 };
 
@@ -281,7 +281,7 @@ function FeaturedCarousel({ region = '' }) {
             </div>
             <button
                 type="button"
-                className="reserve-discovery-banner-next"
+                className="reserve-discovery-banner-next reserve-photo-count"
                 onClick={handleNextClick}
                 onKeyDown={handleKeyboardInput}
                 aria-label="다음 추천 배너 보기"
@@ -407,7 +407,7 @@ export default function Home() {
         if (!rememberRegion(nextRegion)) return;
         setHomeParams(prev => {
             const next = new URLSearchParams(prev);
-            next.set('region', nextRegion);
+            next.set('region', nextRegion || 'all');
             return next;
         });
         setRegionOpen(false);
@@ -427,7 +427,7 @@ export default function Home() {
         const distanceParams = distanceSortParams(location);
         if (!distanceParams) return;
         const params = new URLSearchParams(distanceParams);
-        if (region) params.set('region', region);
+        params.set('region', region || 'all');
         navigate('/stores?' + params.toString());
     }, [requestLocation, setLiveLocation, user, message, navigate, region]);
 

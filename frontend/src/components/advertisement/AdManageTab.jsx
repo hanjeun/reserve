@@ -304,7 +304,7 @@ const AdManageTab = () => {
         clearError: clearEditError,
         resetErrors: resetEditErrors,
     } = useFormErrors();
-    const [editBannerCopyKey, setEditBannerCopyKey] = useState(undefined);
+    const [editBannerCopyKey, setEditBannerCopyKey] = useState('CUSTOM');
     const [editBannerTitle, setEditBannerTitle] = useState('');
     const [editBannerDescription, setEditBannerDescription] = useState('');
     const [editBannerMotionKey, setEditBannerMotionKey] = useState(DEFAULT_BANNER_MOTION_KEY);
@@ -365,9 +365,9 @@ const AdManageTab = () => {
     });
 
     const handleBannerCopyChange = (key) => {
+        setBannerCopyKey(key);
         const preset = getBannerCopyPreset(key);
         if (!preset) return;
-        setBannerCopyKey(key);
         setBannerTitle(preset.title);
         setBannerDescription(preset.description);
         clearError('bannerTitle');
@@ -375,9 +375,9 @@ const AdManageTab = () => {
     };
 
     const handleEditBannerCopyChange = (key) => {
+        setEditBannerCopyKey(key);
         const preset = getBannerCopyPreset(key);
         if (!preset) return;
-        setEditBannerCopyKey(key);
         setEditBannerTitle(preset.title);
         setEditBannerDescription(preset.description);
         clearEditError('bannerTitle');
@@ -474,7 +474,7 @@ const AdManageTab = () => {
     // (사용자가 지우지 않는 한 그 그대로 유지되고, 새로 고르면 전체 교체된다 — AdUpdateRequest 규칙과 일치).
     const handleEdit = (ad) => {
         setEditTarget(ad);
-        setEditBannerCopyKey(findBannerCopyKey(ad));
+        setEditBannerCopyKey(findBannerCopyKey(ad) || 'CUSTOM');
         setEditBannerTitle(ad.title || DEFAULT_BANNER_COPY.title);
         setEditBannerDescription(ad.description || DEFAULT_BANNER_COPY.description);
         setEditBannerMotionKey(findBannerMotionKey(ad));
@@ -655,7 +655,7 @@ const AdManageTab = () => {
                                     <FormInput
                                         aria-label="광고 제목"
                                         value={bannerTitle}
-                                        onChange={(event) => { setBannerTitle(event.target.value); clearError('bannerTitle'); }}
+                                        onChange={(event) => { setBannerTitle(event.target.value); setBannerCopyKey('CUSTOM'); clearError('bannerTitle'); }}
                                         maxLength={BANNER_TITLE_MAX_LENGTH}
                                         showCount
                                     />
@@ -665,7 +665,7 @@ const AdManageTab = () => {
                                         aria-label="광고 내용"
                                         rows={2}
                                         value={bannerDescription}
-                                        onChange={(event) => { setBannerDescription(event.target.value); clearError('bannerDescription'); }}
+                                        onChange={(event) => { setBannerDescription(event.target.value); setBannerCopyKey('CUSTOM'); clearError('bannerDescription'); }}
                                         maxLength={BANNER_DESCRIPTION_MAX_LENGTH}
                                         showCount
                                     />
@@ -723,7 +723,7 @@ const AdManageTab = () => {
                 open={!!editTarget}
                 navigationDirty={Boolean(editTarget && (editBannerTitle !== (editTarget.title || DEFAULT_BANNER_COPY.title)
                     || editBannerDescription !== (editTarget.description || DEFAULT_BANNER_COPY.description) || editBannerMotionKey !== findBannerMotionKey(editTarget)
-                    || editBannerCopyKey !== findBannerCopyKey(editTarget) || editImageFiles.some(file => Boolean(file.originFileObj))
+                    || editBannerCopyKey !== (findBannerCopyKey(editTarget) || 'CUSTOM') || editImageFiles.some(file => Boolean(file.originFileObj))
                     || editImageFiles.map(file => file.url).join(',') !== existingImageFiles(editTarget).map(file => file.url).join(',')))}
                 onClose={closeEditModal}
                 onSubmit={handleUpdateSubmit}
@@ -746,7 +746,7 @@ const AdManageTab = () => {
                     <FormInput
                         aria-label="광고 제목"
                         value={editBannerTitle}
-                        onChange={(event) => { setEditBannerTitle(event.target.value); clearEditError('bannerTitle'); }}
+                        onChange={(event) => { setEditBannerTitle(event.target.value); setEditBannerCopyKey('CUSTOM'); clearEditError('bannerTitle'); }}
                         maxLength={BANNER_TITLE_MAX_LENGTH}
                         showCount
                     />
@@ -756,7 +756,7 @@ const AdManageTab = () => {
                         aria-label="광고 내용"
                         rows={2}
                         value={editBannerDescription}
-                        onChange={(event) => { setEditBannerDescription(event.target.value); clearEditError('bannerDescription'); }}
+                        onChange={(event) => { setEditBannerDescription(event.target.value); setEditBannerCopyKey('CUSTOM'); clearEditError('bannerDescription'); }}
                         maxLength={BANNER_DESCRIPTION_MAX_LENGTH}
                         showCount
                     />

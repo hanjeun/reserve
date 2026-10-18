@@ -60,14 +60,14 @@ describe('scoped UI interaction styles', () => {
         }
     });
 
-    it('shares existing press feedback with date fields, guest steps and store links while preserving reduced motion', () => {
+    it('keeps date fields stable and shares button press feedback with guest steps and store links', () => {
         const buttons = parse('components-and-forms.css');
         const surfaces = parse('feature-surfaces.css');
         const date = '.reserve-cal-trigger:not(.reserve-form-time-trigger)';
         const step = '.reserve-guest-count-step';
         const pressed = findRule(buttons, '.reserve-btn--secondary:active:not(:disabled)');
         for (const selector of [date, step]) {
-            expect(findRule(buttons, `${selector}:active:not(:disabled)`)).toBe(pressed);
+            expect(findRule(buttons, `${selector}:active:not(:disabled)`)).toBe(selector === date ? undefined : pressed);
             expect(declarations(findRule(surfaces, selector, '(prefers-reduced-motion: reduce)')).transition).toBe('none');
             expect(declarations(findRule(surfaces, `${selector}:active`, '(prefers-reduced-motion: reduce)')).transform).toBe('none');
         }

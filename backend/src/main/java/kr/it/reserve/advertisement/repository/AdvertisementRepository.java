@@ -1,5 +1,6 @@
 package kr.it.reserve.advertisement.repository;
 
+import jakarta.persistence.LockModeType;
 import kr.it.reserve.advertisement.entity.AdStatus;
 import kr.it.reserve.advertisement.entity.AdType;
 import kr.it.reserve.advertisement.entity.Advertisement;
@@ -7,17 +8,19 @@ import kr.it.reserve.member.entity.Member;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface AdvertisementRepository extends JpaRepository<Advertisement, Long> {
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Advertisement a WHERE a.id = :id")
     Optional<Advertisement> findByIdForUpdate(@Param("id") Long id);
 
@@ -71,7 +74,7 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
     Optional<Advertisement> findFirstByStoreIdAndAdTypeAndStatusInAndStartDateGreaterThanEqual(
             Long storeId, AdType adType, List<AdStatus> statuses, LocalDate earliestStartDate);
 
-    long countByStoreIdAndStatusInAndDeletedAtIsNull(Long storeId, java.util.Collection<AdStatus> statuses);
+    long countByStoreIdAndStatusInAndDeletedAtIsNull(Long storeId, Collection<AdStatus> statuses);
 
     // 만료 스케줄러용 — ACTIVE인데 endDate 지난 것들
     List<Advertisement> findByStatusAndEndDateBefore(AdStatus status, LocalDate date);
@@ -82,7 +85,7 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
      * <p>{@code PENDING_PAYMENT}(결제창을 닫았거나 이탈)와 {@code PAYMENT_FAILED} 둘 다 본다 —
      * 사용자 입장에선 "아직 돈을 안 낸 신청"으로 똑같고, 둘 다 재결제 버튼이 붙기 때문이다.
      */
-    List<Advertisement> findByStatusInAndStartDateBefore(java.util.Collection<AdStatus> statuses, LocalDate date);
+    List<Advertisement> findByStatusInAndStartDateBefore(Collection<AdStatus> statuses, LocalDate date);
 
     @Query("SELECT a FROM Advertisement a JOIN FETCH a.store WHERE a.deletedAt IS NULL ORDER BY a.createdAt DESC")
     Page<Advertisement> findAllByOrderByCreatedAtDesc(Pageable pageable);

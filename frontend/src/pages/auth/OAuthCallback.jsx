@@ -4,6 +4,7 @@ import { App } from 'antd';
 import useAuthStore from '../../store/useAuthStore';
 import RouteLoadingSkeleton from '../../components/layout/RouteLoadingSkeleton';
 import { consumeRedirect } from '../../utils/redirect';
+import { rememberLoginFeedback } from '../../utils/loginFeedback';
 
 /**
  * 소셜 로그인 콜백.
@@ -51,8 +52,7 @@ const OAuthCallback = () => {
                         // 약관 동의가 먼저 — 복귀 경로는 소비하지 않고 남겨둔다(SocialAgreement가 소비)
                         window.location.replace('/signup/social');
                     } else {
-                        const greeting = user.name ? `${user.name}님, 반가워요!` : '로그인됐어요.';
-                        message.success(greeting);
+                        rememberLoginFeedback(user);
                         // OAuth 문서를 교체해 모바일 주소창과 접수 화면의 주소를 함께 갱신한다.
                         // 검증된 내부 경로만 사용하고 QR의 fragment를 그대로 보존한다.
                         window.location.replace(consumeRedirect() || '/');

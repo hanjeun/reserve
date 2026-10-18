@@ -41,15 +41,15 @@ export const StoreIdentity = ({ store, nearby, canContact, onContact, preview = 
             <div className="reserve-store-identity-title-row">
                 <PageTitle level={1}>{store.name}</PageTitle>
                 <fieldset className="reserve-store-identity-actions" aria-label="가게 빠른 작업" style={{ border: 0, padding: 0, minWidth: 0, marginInline: 0 }}>
-                    {!preview && <FavoriteButton storeId={store.id} size="md" appearance="plain" />}
+                    {!preview && <FavoriteButton storeId={store.id} appearance="plain" />}
                     {canContact && onContact && (
-                        <Tooltip title="가게에 채팅 문의하기"><button type="button" className="reserve-store-contact-action"
+                        <Tooltip title="가게에 채팅 문의하기"><button type="button" className="reserve-store-contact-action reserve-icon-tool" data-icon-kind="navigation"
                             onClick={onContact} aria-label="가게에 채팅 문의하기">
                             <MessageOutlined aria-hidden="true" />
                         </button></Tooltip>
                     )}
                     {canContact && dialNumber && (
-                        <Tooltip title={`전화 ${store.phone}`}><a className="reserve-store-contact-action" href={`tel:${dialNumber}`}
+                        <Tooltip title={`전화 ${store.phone}`}><a className="reserve-store-contact-action reserve-icon-tool" data-icon-kind="navigation" href={`tel:${dialNumber}`}
                             aria-label={`가게에 전화하기 ${store.phone}`}>
                             <PhoneOutlined aria-hidden="true" />
                         </a></Tooltip>

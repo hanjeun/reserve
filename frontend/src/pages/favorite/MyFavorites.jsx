@@ -134,9 +134,11 @@ const MyFavorites = () => {
                 autoRefreshDomain={autoRefreshDomain}
                 loading={showStores && (loading || refetching)} initialLoading={showStores && loading}
                 extraSkeleton={<Bone width={44} height={44} borderRadius={10} />}
-                extra={showStores ? <StoreListViewToggle view={view} onChange={setView} disabled={loading} /> : undefined} />
-            {hasContentLikes && <div className="reserve-feed-toolbar"><FilterMenu appearance="plain" value={kind} options={kinds} aria-label="좋아요 종류"
-                onChange={value => setSearchParams(previous => { const next = new URLSearchParams(previous); next.set('kind', value); return next; })} /></div>}
+                extra={showStores || hasContentLikes ? <div className="reserve-favorites-toolbar">
+                    {showStores && <StoreListViewToggle view={view} onChange={setView} disabled={loading} />}
+                    {hasContentLikes && <FilterMenu appearance="plain" value={kind} options={kinds} aria-label="좋아요 종류"
+                        onChange={value => setSearchParams(previous => { const next = new URLSearchParams(previous); next.set('kind', value); return next; })} />}
+                </div> : undefined} />
 
             {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
             {showStores && <section ref={listRef} className="reserve-liked-section" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}

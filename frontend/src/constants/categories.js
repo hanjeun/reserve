@@ -40,27 +40,27 @@ export const SERVICE_DOMAIN_FILTER_OPTIONS = [
     ...SERVICE_DOMAIN_OPTIONS.map(({ value, label }) => ({ value, label })),
 ];
 
-// 전액 환불 기준일 옵션 (제한 없음 계열 → 맨 아래)
+// 해제·제한 없음은 메뉴 맨 위에 두어 선택 전부터 바로 찾을 수 있게 한다.
 export const FULL_REFUND_DAYS_OPTIONS = [
+    { value: 0,  label: '환불 없음' },
     { value: 1,  label: '1일 전' },
     { value: 2,  label: '2일 전' },
     { value: 3,  label: '3일 전' },
     { value: 5,  label: '5일 전' },
     { value: 7,  label: '7일 전' },
     { value: 14, label: '14일 전' },
-    { value: 0,  label: '환불 없음' },
 ];
 
-// 부분 환불 기준일 옵션 (적용 안 함 → 맨 아래)
+// 부분 환불 기준일 옵션
 export const PARTIAL_REFUND_DAYS_OPTIONS = [
+    { value: 0, label: '적용 안 함' },
     { value: 1, label: '1일 전' },
     { value: 2, label: '2일 전' },
     { value: 3, label: '3일 전' },
     { value: 5, label: '5일 전' },
-    { value: 0, label: '적용 안 함' },
 ];
 
-// 부분 환불율 옵션 (0% → 맨 아래)
+// 부분 환불율 옵션
 export const PARTIAL_REFUND_RATE_OPTIONS = [
     { value: 0,   label: '0%' },
     { value: 30,  label: '30%' },
@@ -69,8 +69,9 @@ export const PARTIAL_REFUND_RATE_OPTIONS = [
     { value: 100, label: '100% (전액)' },
 ];
 
-// 예약 마감 시간 옵션 (제한 없음 → 맨 아래)
+// 예약 마감 시간 옵션
 export const BOOKING_DEADLINE_OPTIONS = [
+    { value: 0,  label: '제한 없음' },
     { value: 1,  label: '1시간 전' },
     { value: 2,  label: '2시간 전' },
     { value: 3,  label: '3시간 전' },
@@ -78,10 +79,9 @@ export const BOOKING_DEADLINE_OPTIONS = [
     { value: 12, label: '12시간 전' },
     { value: 24, label: '24시간 전' },
     { value: 48, label: '48시간 전' },
-    { value: 0,  label: '제한 없음' },
 ];
 
-// 결제 마감 시간 옵션 (제한 없음 → 맨 아래)
+// 결제 마감 시간 옵션
 //
 // ★ 2026-08-09 — "제한 없음"의 값을 1440 → 0 으로 바꿨다.
 //   1440분은 제한 없음이 아니라 **24시간 뒤 자동 취소**였다(ReservationExpiryScheduler).
@@ -90,13 +90,13 @@ export const BOOKING_DEADLINE_OPTIONS = [
 //   이젠 0 이 sentinel 이고 스케줄러가 그 가게를 건너뛴다.
 //   24시간이 필요한 사람을 위해 1440 은 제 이름으로 남겨둔다.
 export const PAYMENT_TIMEOUT_OPTIONS = [
+    { value: 0,    label: '제한 없음' },
     { value: 10,   label: '10분' },
     { value: 15,   label: '15분' },
     { value: 30,   label: '30분' },
     { value: 60,   label: '1시간' },
     { value: 120,  label: '2시간' },
     { value: 1440, label: '24시간' },
-    { value: 0,    label: '제한 없음' },
 ];
 
 // 예약 단위 시간 옵션
@@ -110,13 +110,13 @@ export const RESERVATION_SLOT_OPTIONS = [
 
 // "우리동네" 배지 표시 기준 거리 옵션 (백엔드 StoreService와 동일하게 1~10km로 제한, 0 = 배지 끄기)
 export const NEARBY_RADIUS_OPTIONS = [
+    { value: 0,  label: '없음 (배지 표시 안 함)' },
     { value: 1,  label: '1km' },
     { value: 2,  label: '2km' },
     { value: 3,  label: '3km' },
     { value: 5,  label: '5km' },
     { value: 7,  label: '7km' },
     { value: 10, label: '10km' },
-    { value: 0,  label: '없음 (배지 표시 안 함)' },
 ];
 
 /**

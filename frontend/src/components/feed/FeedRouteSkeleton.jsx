@@ -4,7 +4,7 @@ import { QueryClientContext } from '@tanstack/react-query';
 import { FeedNotificationsPageSkeleton, FeedPageSkeleton } from './FeedSkeleton';
 import useAuthStore from '../../store/useAuthStore';
 import { feedKeys } from '../../hooks/feedQueries';
-import { feedRegion } from '../../utils/feed';
+import { feedRegion, FEED_DIRECTORY_VIEWS } from '../../utils/feed';
 import { interactionKeys } from '../../hooks/feedInteractionQueries';
 
 export default function FeedRouteSkeleton({ pathname, search = '' }) {
@@ -16,7 +16,7 @@ export default function FeedRouteSkeleton({ pathname, search = '' }) {
     const config = client?.getQueryData(feedKeys.config());
     const interactions = client?.getQueryData(interactionKeys.config());
     const params = new URLSearchParams(search);
-    const view = ['all', 'favorites', 'mine', 'drafts'].includes(params.get('view')) ? params.get('view') : 'all';
+    const view = FEED_DIRECTORY_VIEWS.some(item => item.value === params.get('view')) ? params.get('view') : 'all';
     if (pathname === '/feed/notifications') return <FeedNotificationsPageSkeleton view={params.get('view') === 'unread' ? 'unread' : 'all'} enabled={interactions?.notificationsEnabled !== false} />;
     return (
         <FeedPageSkeleton
@@ -24,7 +24,7 @@ export default function FeedRouteSkeleton({ pathname, search = '' }) {
             postId={detail ? Number(pathname.match(/^\/feed\/posts\/([1-9]\d*)\/?$/)?.[1]) : undefined}
             signedIn={signedIn}
             enabled={config?.enabled !== false}
-            notificationsEnabled={interactions?.notificationsEnabled === true}
+            notificationsEnabled={interactions?.notificationsEnabled !== false}
             ownView={view === 'mine' || view === 'drafts'}
             view={view}
             region={feedRegion(params.get('region')) || ''}

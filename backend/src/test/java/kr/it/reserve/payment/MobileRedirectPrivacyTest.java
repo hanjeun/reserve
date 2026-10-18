@@ -46,7 +46,8 @@ class MobileRedirectPrivacyTest {
     }
 
     private PaymentApiController paymentController(PaymentRepository repository) {
-        var controller = new PaymentApiController(mock(PaymentService.class), mock(PortoneService.class), repository);
+        var controller = new PaymentApiController(mock(PaymentService.class),
+                mock(kr.it.reserve.payment.service.PaymentVerificationService.class), mock(PortoneService.class), repository);
         ReflectionTestUtils.setField(controller, "frontendUrl", "https://reserve.example.test");
         return controller;
     }

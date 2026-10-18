@@ -55,7 +55,7 @@ function FavoritePreview({ plain, btnSize, iconSize, style }) {
             style={{
                 width:          btnSize,
                 height:         btnSize,
-                borderRadius:   plain ? 10 : '50%',
+                borderRadius:   '50%',
                 display:        'flex',
                 alignItems:     'center',
                 justifyContent: 'center',
@@ -73,16 +73,16 @@ function FavoritePreview({ plain, btnSize, iconSize, style }) {
 
 FavoritePreview.propTypes = {
     plain: PropTypes.bool,
-    btnSize: PropTypes.number,
-    iconSize: PropTypes.number,
+    btnSize: PropTypes.string,
+    iconSize: PropTypes.string,
     style: PropTypes.object,
 };
 
-function buildButtonStyle({ plain, btnSize, blocked, statusUnknown, style }) {
+function buildButtonStyle({ btnSize, blocked, statusUnknown, style }) {
     return {
         width:          btnSize,
         height:         btnSize,
-        borderRadius:   plain ? 10 : '50%',
+        borderRadius:   '50%',
         border:         'none',
         display:        'flex',
         alignItems:     'center',
@@ -112,8 +112,8 @@ const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style 
     const queryClient = useQueryClient();
 
     const plain    = appearance === 'plain';
-    const iconSize = 20;
-    const btnSize  = 44;
+    const iconSize = 'var(--reserve-icon-glyph-size)';
+    const btnSize  = 'var(--reserve-icon-target-size)';
 
     // initialStatus가 주어지면 그 값으로 캐시를 미리 채워두고(자체 조회 스킵), 없으면 직접 조회
     const { data: favoriteData, isError: statusFailed, isFetching: statusFetching, refetch: refetchStatus } = useQuery({
@@ -163,7 +163,7 @@ const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style 
             aria-label={accessibleLabel}
             aria-pressed={statusUnknown ? undefined : isFavorite}
             aria-busy={toggleMutation.isPending || (statusUnknown && statusFetching) || undefined}
-            style={buildButtonStyle({ plain, btnSize, blocked, statusUnknown, style })}
+            style={buildButtonStyle({ btnSize, blocked, statusUnknown, style })}
         >
             {isFavorite
                 ? <HeartFilled  style={{ fontSize: iconSize, color: colors.error.main }} />

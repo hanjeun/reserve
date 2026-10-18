@@ -7,7 +7,7 @@ import useInputModality from '../../hooks/useInputModality';
 import useReducedMotion from '../../hooks/useReducedMotion';
 
 /** State details can be pinned with a click or tap without changing action tooltips. */
-export default function InfoHint({ label, children }) {
+export default function InfoHint({ label, children, onOpenChange }) {
     const descriptionId = useId();
     const scope = useContext(TooltipScopeContext);
     const modality = useInputModality();
@@ -19,6 +19,7 @@ export default function InfoHint({ label, children }) {
     const [state, setState] = useState({ scope, open: false, pinned: false });
     if (state.scope !== scope) setState({ scope, open: false, pinned: false });
     const open = state.scope === scope && state.open;
+    useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
 
     const clearTimer = () => { window.clearTimeout(timer.current); timer.current = null; };
     const reveal = () => {
@@ -96,4 +97,4 @@ export default function InfoHint({ label, children }) {
         </button>
     </Popover>;
 }
-InfoHint.propTypes = { label: PropTypes.string.isRequired, children: PropTypes.node.isRequired };
+InfoHint.propTypes = { label: PropTypes.string.isRequired, children: PropTypes.node.isRequired, onOpenChange: PropTypes.func };

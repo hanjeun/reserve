@@ -44,6 +44,8 @@ html {
 /* 앱 첫 로딩(로그인 확인) 동안의 정적 헤더(Header.jsx 의 HeaderPlaceholder) — 크기·구분선은 진짜 헤더와 같은 인라인 스타일을 쓴다.
    누를 수 있는 것이 없으므로 로고의 hover·눌림 효과가 걸리지 않게 포인터를 받지 않는다. */
 .reserve-boot-shell-header { pointer-events: none; }
+/* 인증 확인 전에도 Ant App의 기본 본문 크기·줄 높이와 같은 틀을 유지한다. */
+.reserve-boot-shell { font-size: 14px; line-height: 22px; }
 
 @supports (scrollbar-gutter: stable) {
   html { scrollbar-gutter: stable; }

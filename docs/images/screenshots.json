@@ -6,50 +6,50 @@
     "height": 900
   },
   "generators": [
-    "frontend/scripts/capture-readme-live.mjs"
+    "Browser Use / Chrome live production capture"
   ],
   "files": [
     {
       "path": "home.png",
-      "bytes": 613626,
-      "sha256": "b9e484f0618a6df2ef43652f462b239c2047314e61228c9885989aa5eb364e84",
-      "source": "https://reserve.it.kr",
-      "capturedAt": "2026-09-28T10:58:28.043Z"
+      "bytes": 603299,
+      "sha256": "5b7535a35fc532b48fe5dedd5175d5b734bcbc1ebac6205d6d6ec40a23a86b05",
+      "source": "https://app.reserve.it.kr",
+      "capturedAt": "2026-10-18T10:08:21.526Z"
     },
     {
       "path": "stores.png",
-      "bytes": 48498,
-      "sha256": "818deef166154cf3403bc2c71edeb67d1f2fc2c6110609788162a70d47434a7a",
-      "source": "https://reserve.it.kr",
-      "capturedAt": "2026-09-28T10:58:28.045Z"
+      "bytes": 88845,
+      "sha256": "7531e616e5f2abcd82ff15c79821e3779610561b20ccf639a305f0528fa47c1d",
+      "source": "https://app.reserve.it.kr",
+      "capturedAt": "2026-10-18T10:08:23.970Z"
     },
     {
       "path": "store-detail.png",
-      "bytes": 137450,
-      "sha256": "6e0a931f7acb19bec1f8173adad762e12f3bde17af6c56e5115e0e3d619ffef4",
-      "source": "https://reserve.it.kr",
-      "capturedAt": "2026-09-28T10:58:28.047Z"
+      "bytes": 141160,
+      "sha256": "eed79b286b331ccdfca6d5fa782d6f2f2c5c246f121b7f1587c9e5a8cfc1c06b",
+      "source": "https://app.reserve.it.kr",
+      "capturedAt": "2026-10-18T10:08:30.004Z"
     },
     {
       "path": "business.png",
-      "bytes": 70097,
-      "sha256": "d7be28c16f8f9cc80123ae1c4b3d66e7189e7430a549e221a6c84bc30a36d200",
-      "source": "https://reserve.it.kr",
-      "capturedAt": "2026-09-28T10:58:28.048Z"
+      "bytes": 80322,
+      "sha256": "e3f61f5babb3a80ec794c1317ee5fed9409b6c0e65665a25e3b13bca0ba5a6c1",
+      "source": "https://app.reserve.it.kr",
+      "capturedAt": "2026-10-18T10:08:34.363Z"
     },
     {
       "path": "admin.png",
-      "bytes": 63787,
-      "sha256": "fbc14158cae79a18fef23a481bc75295aa0950c7dd50a03c5b9c0e07151e198c",
-      "source": "https://reserve.it.kr",
-      "capturedAt": "2026-09-28T10:58:28.050Z"
+      "bytes": 87051,
+      "sha256": "4d0a89c4b24cb721e74fd12b3c2ecb0e2393cf9ece15c9a62a98612c437d4f99",
+      "source": "https://app.reserve.it.kr",
+      "capturedAt": "2026-10-18T10:05:53.999Z"
     },
     {
       "path": "grafana.png",
-      "bytes": 60407,
-      "sha256": "c42511262eb30656e3a9ff198fb873a2fae1e535975e7a71c177c9d126c9095f",
+      "bytes": 56558,
+      "sha256": "c8c984ca909b875a3c2ce18fe48c2a6d191ef84548894c412917cb97d59ba763",
       "source": "https://grafana.reserve.it.kr",
-      "provenanceNote": "Existing local screenshot verified on 2026-09-30. Its original capture time is unverified."
+      "capturedAt": "2026-10-18T10:08:02.094Z"
     }
   ]
 }

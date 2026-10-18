@@ -92,7 +92,7 @@ test('top tabs move only their content in the selected direction, including brow
 
     await waitingTab.click();
     await expect(waitingTab).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toBeVisible();
+    await expect(page.locator('.reserve-explore-page[aria-label="웨이팅 가게"]')).toBeVisible();
     await expect(page.getByText('접수 가능한 가게가 없어요.', { exact: true })).toBeVisible();
     const waitingDestination = page.locator('.ant-layout-content > .reserve-page-container');
     const feedDestination = page.locator('.ant-layout-content > .reserve-feed-page');
@@ -106,7 +106,7 @@ test('top tabs move only their content in the selected direction, including brow
     await expectContentEntry(page, feedDestination, 'from-right');
     await page.goBack();
     await expect(waitingTab).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toBeVisible();
+    await expect(page.locator('.reserve-explore-page[aria-label="웨이팅 가게"]')).toBeVisible();
     await expect(page.getByText('접수 가능한 가게가 없어요.', { exact: true })).toBeVisible();
     await expectContentEntry(page, waitingDestination, 'from-left', { cached: true });
     await expect(waitingDestination).toHaveCSS('transform', 'none');
@@ -120,7 +120,7 @@ test('top tabs move only their content in the selected direction, including brow
     await page.evaluate(() => { window.__reservePageEntries = []; });
     await page.goBack();
     await expect(waitingTab).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toBeVisible();
+    await expect(page.locator('.reserve-explore-page[aria-label="웨이팅 가게"]')).toBeVisible();
     await expect(page.getByText('접수 가능한 가게가 없어요.', { exact: true })).toBeVisible();
     await expectContentEntry(page, waitingDestination, 'from-left', { cached: true });
     await expect(waitingDestination).toHaveCSS('transform', 'none');
@@ -135,7 +135,7 @@ test('the header logo and store section stay still while ready home sections ent
     await expect(page.getByRole('heading', { name: '서비스 이용약관', exact: true })).toBeVisible();
     const logo = page.getByRole('link', { name: 'RESERVE 홈' });
     await logo.click();
-    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === '');
+    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     await expect(logo).not.toHaveClass(/reserve-header-logo--home-motion/);
     await expect(logo).toHaveCSS('animation-name', 'none');
     await expectContentEntry(page, page.locator('.reserve-discovery-home'), 'from-left', { cached: true, homeLogo: true });
@@ -167,7 +167,7 @@ test('rapid header back presses produce one collapse and one history move', asyn
         button.click();
         setTimeout(() => button.click(), 185);
     });
-    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === '');
+    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     await expect(page.locator('.reserve-header-back')).toHaveCount(0);
     expect(await page.evaluate(() => window.__reserveHeaderBackAnimations)).toEqual(['reserve-header-back-leave']);
     await page.goForward();
@@ -186,7 +186,7 @@ test('ordinary routes and the password return use the same content-only directio
     await expect(page.locator('.reserve-header-inner')).toHaveCSS('animation-name', 'none');
 
     await page.getByRole('button', { name: '이전 화면으로 돌아가기' }).click();
-    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === '');
+    await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('region') === 'all');
     await expectContentEntry(page, page.locator('.reserve-discovery-home'), 'from-left', { cached: true });
 
     await page.goto('/login');
@@ -207,7 +207,7 @@ test('top tab switch is immediate with reduced motion', async ({ page }) => {
     await page.getByRole('link', { name: '피드', exact: true }).click();
     await expect(page.getByText('피드를 준비하고 있어요.', { exact: true })).toBeVisible();
     await page.getByRole('link', { name: '웨이팅', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toBeVisible();
+    await expect(page.locator('.reserve-explore-page[aria-label="웨이팅 가게"]')).toBeVisible();
     await expect(page.getByText('접수 가능한 가게가 없어요.', { exact: true })).toBeVisible();
     await page.getByRole('link', { name: '피드', exact: true }).click();
     await expect(page.getByText('피드를 준비하고 있어요.', { exact: true })).toBeVisible();
@@ -251,7 +251,7 @@ test('a slow lazy tab stays still through the visible skeleton and the resolved 
         releaseLazyModule();
     }
 
-    await expect(page.getByRole('heading', { name: '웨이팅', exact: true })).toBeVisible();
+    await expect(page.locator('.reserve-explore-page[aria-label="웨이팅 가게"]')).toBeVisible();
     await expect(page.getByText('접수 가능한 가게가 없어요.', { exact: true })).toBeVisible();
     await expect(page.locator('.ant-layout-content')).toHaveAttribute('data-skeleton-shown', 'true');
     await expectContentEntry(page, page.locator('.ant-layout-content > .reserve-page-container'), 'from-right');

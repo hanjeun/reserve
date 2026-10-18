@@ -10,6 +10,10 @@ import java.util.HashSet;
 public class ReservationUpdates {
     private final EntityUpdates updates;
 
+    public void updated(Reservation reservation) { changed(reservation, EntityUpdates.Operation.UPDATED); }
+
+    public void deleted(Reservation reservation) { changed(reservation, EntityUpdates.Operation.DELETED); }
+
     public void changed(Reservation reservation, EntityUpdates.Operation operation) {
         var recipients = new HashSet<Long>();
         if (reservation.getMember() != null) recipients.add(reservation.getMember().getId());

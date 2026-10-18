@@ -32,7 +32,7 @@ class PromotionViewConcurrencyTest {
             var store = Store.builder().owner(member).name("조회수 검증").build();
             em.persist(store);
             var promotion = Promotion.builder().member(member).store(store).title("before").content("test")
-                    .category(Promotion.PromotionCategory.ETC).build();
+                    .category(Promotion.PromotionCategory.ETC).benefitState(Promotion.BenefitState.APPROVED).build();
             em.persist(promotion);
             return promotion.getId();
         });

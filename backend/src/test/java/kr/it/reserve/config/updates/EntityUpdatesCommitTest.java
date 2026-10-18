@@ -1,5 +1,7 @@
 package kr.it.reserve.config.updates;
 
+import kr.it.reserve.global.event.PublicContentChanged;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.transaction.event.TransactionalEventListenerFactory;
@@ -30,6 +32,39 @@ class EntityUpdatesCommitTest {
             verify(stream).changed(any(EntityUpdates.Change.class));
             clearInvocations(stream);
             transaction(() -> updates.publish(FEED, 17L, null, null, UPDATED, true, Set.of(), false), false);
+            verifyNoInteractions(stream);
+        }
+    }
+
+    @Test
+    void visibilityInvalidationsKeepIdentifiersPrivateAndDeliverOnlyAfterCommit() {
+        try (var context = new AnnotationConfigApplicationContext()) {
+            EntityUpdateStream stream = mock(EntityUpdateStream.class);
+            context.registerBean(TransactionalEventListenerFactory.class);
+            context.registerBean(EntityUpdateStream.class, () -> stream);
+            context.registerBean(EntityUpdates.class, () -> new EntityUpdates(context));
+            context.registerBean(AccountUpdateInvalidations.class);
+            context.refresh();
+            context.publishEvent(new PublicContentChanged());
+            verifyNoInteractions(stream);
+            transaction(() -> {
+                context.publishEvent(new PublicContentChanged());
+                verifyNoInteractions(stream);
+            }, true);
+            var delivered = ArgumentCaptor.forClass(EntityUpdates.Change.class);
+            verify(stream, times(5)).changed(delivered.capture());
+            assertThat(delivered.getAllValues()).extracting(EntityUpdates.Change::domain)
+                    .containsExactlyInAnyOrder(FEED, COMMENT, NEWS, REVIEW, STORE);
+            assertThat(delivered.getAllValues()).allSatisfy(change -> {
+                assertThat(change.entityId()).isZero();
+                assertThat(change.parentId()).isNull();
+                assertThat(change.storeId()).isNull();
+                assertThat(change.members()).isEmpty();
+                assertThat(change.publiclyVisible()).isTrue();
+                assertThat(change.operation()).isEqualTo(INVALIDATED);
+            });
+            clearInvocations(stream);
+            transaction(() -> context.publishEvent(new PublicContentChanged()), false);
             verifyNoInteractions(stream);
         }
     }

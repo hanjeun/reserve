@@ -11,6 +11,10 @@ import java.util.HashSet;
 public class ReviewUpdates {
     private final EntityUpdates updates;
 
+    public void updated(Review review) { changed(review, EntityUpdates.Operation.UPDATED); }
+
+    public void deleted(Review review) { changed(review, EntityUpdates.Operation.DELETED); }
+
     public void changed(Review review, EntityUpdates.Operation operation) {
         var recipients = new HashSet<Long>();
         if (review.getMember() != null) recipients.add(review.getMember().getId());

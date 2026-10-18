@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.global.redis.LocalRedisConfiguration;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.waiting.service.RedisWaitingRelay;
+import kr.it.reserve.waiting.config.WaitingRedisConfiguration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -138,7 +139,7 @@ class RedisEntityUpdateRelayIntegrationTest {
         context.registerBean(EntityUpdateStream.class, () -> new EntityUpdateStream(access, () -> mock(SseEmitter.class)));
         context.registerBean(EntityUpdates.class, () -> new EntityUpdates(context));
         context.registerBean(TransactionalEventListenerFactory.class);
-        context.register(LocalRedisConfiguration.class);
+        context.register(LocalRedisConfiguration.class, WaitingRedisConfiguration.class, EntityUpdateRedisConfiguration.class);
         context.refresh();
         context.addApplicationListener(event -> {
             if (event instanceof PayloadApplicationEvent<?> payload && payload.getPayload() instanceof RedisEntityUpdateRelay.Reconnected) {

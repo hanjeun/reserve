@@ -10,6 +10,8 @@ import java.util.Set;
 public class StoreUpdates {
     private final EntityUpdates updates;
 
+    public void updated(Store store, boolean wasPublic) { changed(store, EntityUpdates.Operation.UPDATED, wasPublic); }
+
     public void changed(Store store, EntityUpdates.Operation operation, boolean wasPublic) {
         Long owner = store.getOwner() == null ? null : store.getOwner().getId();
         updates.publish(EntityUpdates.Domain.STORE, store.getId(), null, store.getId(), operation,

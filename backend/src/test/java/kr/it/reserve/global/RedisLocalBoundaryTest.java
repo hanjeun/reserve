@@ -3,8 +3,10 @@ package kr.it.reserve.global;
 import kr.it.reserve.global.redis.LocalRedisConfiguration;
 import kr.it.reserve.global.redis.RedisNamespace;
 import kr.it.reserve.config.updates.RedisEntityUpdateRelay;
+import kr.it.reserve.config.updates.EntityUpdateRedisConfiguration;
 import kr.it.reserve.global.ratelimit.RedisRequestLimiter;
 import kr.it.reserve.waiting.service.RedisWaitingRelay;
+import kr.it.reserve.waiting.config.WaitingRedisConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -23,7 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RedisLocalBoundaryTest {
     private static final String PASSWORD = "synthetic-redis-boundary-password-at-least-32-characters";
     private final ApplicationContextRunner context = new ApplicationContextRunner()
-            .withUserConfiguration(LocalRedisConfiguration.class).withBean(ObjectMapper.class, () -> new ObjectMapper());
+            .withUserConfiguration(LocalRedisConfiguration.class, WaitingRedisConfiguration.class,
+                    EntityUpdateRedisConfiguration.class).withBean(ObjectMapper.class, () -> new ObjectMapper());
 
     @Test
     void localAndProductionAreDisabledByDefaultAndByExplicitFalse() {

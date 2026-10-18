@@ -4,17 +4,13 @@ import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
 import io.lettuce.core.resource.ClientResources;
 import io.lettuce.core.resource.DefaultClientResources;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.global.ratelimit.RedisRequestLimiter;
-import kr.it.reserve.config.updates.RedisEntityUpdateRelay;
-import kr.it.reserve.waiting.service.RedisWaitingRelay;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
@@ -47,19 +43,6 @@ public class LocalRedisConfiguration {
     @Bean
     RedisRequestLimiter redisRequestLimiter(StringRedisTemplate redis, RedisFailureBackoff fallback, RedisNamespace namespace) {
         return new RedisRequestLimiter(redis, fallback, namespace);
-    }
-
-    @Bean
-    RedisWaitingRelay redisWaitingRelay(StringRedisTemplate redis, RedisMessageListenerContainer container,
-            ObjectMapper mapper, ApplicationEventPublisher events, RedisFailureBackoff fallback, RedisNamespace namespace) {
-        return new RedisWaitingRelay(redis, container, mapper, events, fallback, namespace);
-    }
-
-    @Bean(destroyMethod = "close")
-    RedisEntityUpdateRelay redisEntityUpdateRelay(StringRedisTemplate redis, RedisMessageListenerContainer container,
-            ObjectMapper mapper, ApplicationEventPublisher events, RedisFailureBackoff fallback, RedisNamespace namespace,
-            @Value("${reserve.redis.password:}") String password) {
-        return new RedisEntityUpdateRelay(redis, container, mapper, events, fallback, namespace, password);
     }
 
     @Bean(destroyMethod = "shutdown")

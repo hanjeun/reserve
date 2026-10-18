@@ -7,6 +7,8 @@ import kr.it.reserve.global.redis.LocalRedisConfiguration;
 import kr.it.reserve.global.redis.RedisFailureBackoff;
 import kr.it.reserve.global.redis.RedisNamespace;
 import kr.it.reserve.config.updates.UpdateStreamAccess;
+import kr.it.reserve.config.updates.EntityUpdateRedisConfiguration;
+import kr.it.reserve.waiting.config.WaitingRedisConfiguration;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import org.junit.jupiter.api.AfterAll;
@@ -205,7 +207,8 @@ class RedisSharedBoundaryIntegrationTest {
                     || identity(99L).equals(call.getArgument(0)));
             return access;
         });
-        context.register(LocalRedisConfiguration.class, WaitingEventStream.class);
+        context.register(LocalRedisConfiguration.class, WaitingRedisConfiguration.class,
+                EntityUpdateRedisConfiguration.class, WaitingEventStream.class);
         context.refresh();
         return context;
     }

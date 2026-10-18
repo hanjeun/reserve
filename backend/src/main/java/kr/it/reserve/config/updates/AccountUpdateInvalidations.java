@@ -1,6 +1,7 @@
 package kr.it.reserve.config.updates;
 
 import kr.it.reserve.member.event.MemberWithdrawn;
+import kr.it.reserve.global.event.PublicContentChanged;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,9 @@ public class AccountUpdateInvalidations {
 
     @EventListener
     public void withdrawn(MemberWithdrawn ignored) { publicContentChanged(); }
+
+    @EventListener
+    public void visibilityChanged(PublicContentChanged ignored) { publicContentChanged(); }
 
     public void publicContentChanged() {
         invalidate(Set.of(EntityUpdates.Domain.FEED, EntityUpdates.Domain.COMMENT, EntityUpdates.Domain.NEWS,

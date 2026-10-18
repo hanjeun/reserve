@@ -1,7 +1,5 @@
 package kr.it.reserve.audit.service;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.advertisement.entity.Advertisement;
 import kr.it.reserve.advertisement.repository.AdvertisementRepository;
@@ -89,7 +87,7 @@ public class AuditLogService {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> AuditException.notFound("Reservation not found: " + reservationId));
         reservation.softDelete();
-        if (reservationUpdates != null) reservationUpdates.changed(reservation, EntityUpdates.Operation.DELETED);
+        if (reservationUpdates != null) reservationUpdates.deleted(reservation);
         saveAuditLog(RESERVATION_ENTITY_TYPE, reservationId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   reservation.getStore().getName(),
                 "예약자", nullSafe(reservation.getMember().getName()),
@@ -104,7 +102,7 @@ public class AuditLogService {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> AuditException.notFound("Review not found: " + reviewId));
         review.softDelete();
-        if (reviewUpdates != null) reviewUpdates.changed(review, EntityUpdates.Operation.DELETED);
+        if (reviewUpdates != null) reviewUpdates.deleted(review);
         saveAuditLog("REVIEW", reviewId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   review.getStore().getName(),
                 "작성자", nullSafe(review.getMember().getName()),
@@ -145,9 +143,9 @@ public class AuditLogService {
             default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목이에요: " + entityType);
         }
         if (RESERVATION_ENTITY_TYPE.equalsIgnoreCase(entityType) && reservationUpdates != null) {
-            reservationRepository.findById(entityId).ifPresent(item -> reservationUpdates.changed(item, EntityUpdates.Operation.UPDATED));
+            reservationRepository.findById(entityId).ifPresent(reservationUpdates::updated);
         } else if ("REVIEW".equalsIgnoreCase(entityType) && reviewUpdates != null) {
-            reviewRepository.findById(entityId).ifPresent(item -> reviewUpdates.changed(item, EntityUpdates.Operation.UPDATED));
+            reviewRepository.findById(entityId).ifPresent(reviewUpdates::updated);
         }
         // 휴지통에서 제거 (SOFT_DELETE 로그 삭제)
         auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);

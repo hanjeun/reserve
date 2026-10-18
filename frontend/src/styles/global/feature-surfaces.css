@@ -372,19 +372,17 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 @media (hover: hover) and (pointer: fine) {
     .reserve-chat-close:hover,
     .reserve-chat-icon-button:hover {
-        background: var(--c-gray-100, #f2f4f6);
+        background: transparent;
         color: var(--c-text-secondary, #4e5968);
     }
 }
 .reserve-chat-close:focus,
 .reserve-chat-icon-button:focus { outline: none; box-shadow: none; }
-.reserve-chat-close:active,
-.reserve-chat-icon-button:active { opacity: 0.7; }
 /* 헤더 안의 아이콘 버튼(대화 관리 ⋮ 등) — 닫기(X)와 같은 44×44 크기·아이콘 크기.
    대화를 불러오는 동안·목록으로 돌아가는 동안에는 비활성(옅게, hover 면 없음). */
 .reserve-chat-icon-button:disabled,
 .reserve-chat-icon-button:disabled:hover { background: transparent; color: var(--c-text-tertiary, #8b95a1); opacity: 0.4; cursor: default; }
-.reserve-chat-icon-button { width: 44px; height: 44px; padding: 0; border: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; cursor: pointer; }
+.reserve-chat-icon-button { width: 44px; height: 44px; padding: 0; border: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: var(--reserve-icon-glyph-size); cursor: pointer; }
 .reserve-chat-close:focus-visible,
 .reserve-chat-icon-button:focus-visible {
     outline: var(--reserve-focus-ring);
@@ -417,15 +415,13 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     width: 44px;
     height: 44px;
     border-radius: 10px;
-    background: var(--c-gray-100, #f2f4f6);
+    background: transparent;
     color: var(--c-text-secondary, #4e5968);
-    transition: background 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+    transition: color 0.15s ease;
 }
-.reserve-chat-send:hover:not(:disabled), .reserve-chat-send:focus-visible {
-    background: var(--c-gray-200, #e5e8eb);
+.reserve-chat-send:hover:not(:disabled), .reserve-chat-send:focus-visible:not(:disabled) {
     color: var(--c-text-primary, #1a1f27);
 }
-.reserve-chat-send:active:not(:disabled) { transform: scale(0.96); }
 .reserve-chat-send:focus { outline: none; }
 .reserve-chat-send:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-chat-send:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -433,7 +429,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 /* ══ 통합 MessengerShell — 고객지원·가게 문의·사장님 받은 문의 ══════════════ */
 .reserve-messenger,
 .reserve-messenger-launcher-wrap {
-    --reserve-messenger-unread-bg: var(--c-error, #f04452);
+    --reserve-messenger-unread-bg: var(--c-error-solid, #c93643);
 }
 .reserve-messenger-panel-shell {
     box-sizing: border-box;
@@ -576,13 +572,13 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-messenger-brand-cover { position: relative; flex-shrink: 0; height: 200px; overflow: hidden; background: var(--c-primary-light, #e8f3ff); }
 .reserve-messenger-cover-image { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 65%; pointer-events: none; }
 .reserve-messenger-brand-cover::after { content: ''; position: absolute; inset: 48% 0 0; background: linear-gradient(transparent, var(--c-bg-paper, #fff)); pointer-events: none; }
-.reserve-messenger-avatar { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; overflow: hidden; border-radius: 15px; background: var(--c-bg-paper, #fff); color: var(--c-primary, #3182f6); font-size: 20px; }
+.reserve-messenger-avatar { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; overflow: hidden; border-radius: 50%; background: var(--c-bg-paper, #fff); color: var(--c-primary, #3182f6); font-size: 20px; }
 .reserve-messenger-avatar--store { background: var(--c-gray-100, #f2f4f6); color: var(--c-text-secondary, #4e5968); }
 .reserve-messenger-avatar--person { border-radius: 50%; background: var(--c-gray-100, #f2f4f6); color: var(--c-text-secondary, #4e5968); }
 .reserve-messenger-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .reserve-messenger-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .reserve-chat-sender-avatar-slot { width: 28px; min-width: 28px; align-self: flex-start; padding-top: 16px; }
-.reserve-chat-sender-avatar-slot .reserve-messenger-avatar { width: 28px; height: 28px; border-radius: 11px; font-size: 14px; }
+.reserve-chat-sender-avatar-slot .reserve-messenger-avatar { width: 28px; height: 28px; border-radius: 50%; font-size: 14px; }
 .reserve-chat-bubble-group { min-width: 0; }
 .reserve-chat-image-message { background: transparent; border: 0; padding: 0; }
 .reserve-chat-photo-frame { position: relative; border-radius: 10px; }
@@ -590,6 +586,23 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-image-message .ant-image { display: block; overflow: hidden; border-radius: 10px; background: transparent; }
 .reserve-chat-retention-notice { margin: 0 0 14px; color: var(--c-text-tertiary, #8b95a1); font-size: 12px; line-height: 1.5; }
 .reserve-chat-retention-notice a { color: var(--c-text-secondary, #4e5968); text-decoration: underline; }
+.reserve-chat-retention-notice-wrap {
+    display: grid;
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transform: translateY(0);
+    transition: grid-template-rows 0.2s ease, opacity 0.16s ease, transform 0.2s ease;
+}
+.reserve-chat-retention-notice-wrap.is-closing {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transform: translateY(-4px);
+}
+.reserve-chat-retention-notice-inner { min-height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+    .reserve-chat-retention-notice-wrap,
+    .reserve-chat-retention-notice-wrap.is-closing { transition: none; transform: none; }
+}
 .reserve-chat-image-message + .reserve-chat-message-bubble { margin-top: 8px; }
 .reserve-chat-sender-name { display: block; margin-bottom: 4px; font-size: 11px; line-height: 1.5; color: var(--c-text-secondary, #4e5968); overflow-wrap: anywhere; }
 .reserve-messenger-home-scroll {
@@ -603,11 +616,11 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-messenger-welcome { position: relative; z-index: 1; padding: 18px; border-radius: 20px; background: var(--c-bg-paper, #fff); }
 .reserve-messenger-welcome-sender { display: flex; align-items: center; gap: 10px; }
-.reserve-messenger-welcome-sender strong { font-size: 14px; }
+.reserve-messenger-welcome-sender strong { font-size: 14px; font-weight: 600; }
 .reserve-messenger-welcome p { margin: 14px 0 18px; font-size: 14px; line-height: 1.65; color: var(--c-text-secondary, #4e5968); }
-.reserve-messenger-primary-action { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--c-primary, #3182f6); color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s ease, transform 0.12s ease; }
-.reserve-messenger-primary-action:hover { opacity: 0.88; }
-.reserve-messenger-primary-action:active { opacity: 0.78; transform: scale(0.98); }
+.reserve-messenger-primary-action { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--c-primary-solid, #1b64da); color: var(--c-primary-fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 0.15s ease, transform 0.12s ease; }
+.reserve-messenger-primary-action:hover { background: var(--c-primary-solid-hover, #1b64da); }
+.reserve-messenger-primary-action:active { background: var(--c-primary-solid-hover, #1b64da); transform: scale(0.98); }
 .reserve-messenger-primary-action:focus { outline: none; }
 .reserve-messenger-primary-action:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 3px; }
 .reserve-messenger-footer { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px 10px calc(4px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--c-bg-paper, #fff) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--c-border-light, #f2f4f6); z-index: 3; }
@@ -619,7 +632,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-messenger-footer-tab.is-active { color: var(--c-primary, #3182f6); font-weight: 700; }
 .reserve-messenger-footer-tab:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
 .reserve-messenger-footer-icon { position: relative; display: inline-flex; font-size: 21px; transition: color 0.15s ease; }
-.reserve-messenger-footer-badge { position: absolute; top: 3px; left: calc(50% + 8px); min-width: 16px; padding: 2px 4px; border-radius: 20px; background: var(--reserve-messenger-unread-bg); color: #fff; font-size: 9px; }
+.reserve-messenger-footer-badge { position: absolute; top: 3px; left: calc(50% + 8px); min-width: 16px; padding: 2px 4px; border-radius: 20px; background: var(--reserve-messenger-unread-bg); color: var(--c-error-fg); font-size: 9px; }
 .reserve-messenger-settings { display: flex; flex-direction: column; min-height: 0; }
 .reserve-messenger-settings-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
 .reserve-messenger-settings-profile { display: flex; flex-direction: column; align-items: center; padding: 16px 0 28px; gap: 12px; text-align: center; }
@@ -691,6 +704,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     margin: 0 !important;
     color: var(--c-text-primary, #191f28) !important;
     font-size: 22px !important;
+    font-weight: 600;
     line-height: 1.3 !important;
 }
 .reserve-messenger-list-actions {
@@ -719,10 +733,9 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 @media (hover: hover) and (pointer: fine) {
     .reserve-messenger-list-refresh:hover:not([aria-disabled='true']) {
         color: var(--c-text-primary, #191f28);
-        background: var(--c-gray-50, #f9fafb);
+        background: transparent;
     }
 }
-.reserve-messenger-list-refresh:active:not([aria-disabled='true']) { opacity: 0.7; }
 .reserve-messenger-list-refresh[aria-disabled='true'] { opacity: 0.5; cursor: default; }
 .reserve-messenger-list-refresh:focus { outline: none; }
 .reserve-messenger-list-refresh:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
@@ -761,7 +774,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     margin: 16px 18px 7px;
     color: var(--c-text-tertiary, #8b95a1);
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.04em;
 }
 .reserve-messenger-row {
@@ -854,7 +867,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     padding: 0 6px;
     border-radius: 999px;
     background: var(--reserve-messenger-unread-bg);
-    color: #fff;
+    color: var(--c-error-fg);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -920,14 +933,13 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     height: 44px;
     padding: 0;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--reserve-icon-navigation-radius);
     background: transparent;
     color: var(--c-text-primary, #191f28);
 }
 @media (hover: hover) and (pointer: fine) {
-    .reserve-messenger-mobile-back:hover { background: var(--c-gray-50, #f9fafb); }
+    .reserve-messenger-mobile-back:hover { background: transparent; }
 }
-.reserve-messenger-mobile-back:active { opacity: 0.7; }
 .reserve-messenger-mobile-back:focus { outline: none; }
 .reserve-messenger-mobile-back:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
 .reserve-messenger-thread-body {
@@ -1034,26 +1046,28 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     line-height: 24px;
 }
 .reserve-messenger-send {
-    flex: 0 0 40px;
-    width: 40px;
-    height: 40px;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: var(--reserve-icon-glyph-size);
 }
 .reserve-chat-composer-toolbar, .reserve-chat-composer-tools { display: flex; align-items: center; gap: 4px; }
 .reserve-chat-composer-toolbar { justify-content: space-between; }
 .reserve-chat-composer-tools { flex: 1; min-width: 0; flex-wrap: wrap; }
 .reserve-chat-tool {
-    width: 40px; height: 40px; flex-shrink: 0; padding: 0; border: 0; border-radius: 10px;
+    width: var(--reserve-icon-target-size); height: var(--reserve-icon-target-size); flex-shrink: 0; padding: 0; border: 0; border-radius: var(--reserve-icon-tool-radius);
     background: transparent; color: var(--c-text-secondary, #4e5968); font-size: 20px;
     display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.2s ease;
 }
-.reserve-chat-tool:hover:not(:disabled) { background: var(--c-gray-200, #e5e8eb); color: var(--c-text-primary, #1a1f27); }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-tool:hover:not(:disabled) { background: transparent; color: var(--c-text-primary, #1a1f27); }
+}
 .reserve-chat-tool:focus-visible, .reserve-chat-emoji-grid button:focus-visible {
     outline: var(--reserve-focus-ring); outline-offset: 2px;
 }
@@ -1067,7 +1081,9 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-emoji-grid button {
     min-height: 40px; border: 0; padding: 4px; border-radius: 10px; background: transparent; font-size: 24px; cursor: pointer;
 }
-.reserve-chat-emoji-grid button:hover { background: var(--c-gray-100, #f2f4f6); }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-emoji-grid button:hover { background: var(--c-gray-100, #f2f4f6); }
+}
 .reserve-chat-emoji-picker p, .reserve-chat-preferences p { color: var(--c-text-secondary, #4e5968); font-size: 12px; line-height: 1.5; }
 .reserve-chat-preferences { display: grid; gap: 8px; margin-bottom: 16px; }
 .reserve-chat-preferences label { font-size: 14px; font-weight: 600; color: var(--c-text-primary, #1a1f27); }
@@ -1161,7 +1177,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     .reserve-messenger-list-heading h1,
     .reserve-messenger-settings-heading h1 { font-size: 20px !important; }
     .reserve-messenger-row { min-height: 76px; padding-inline: 16px; }
-    .reserve-messenger--page.has-thread { --reserve-messenger-heading-height: 64px; }
+    .reserve-messenger--page.has-thread > .reserve-messenger-shell-close { --reserve-messenger-heading-height: 64px; }
     .reserve-messenger-thread-heading { min-height: 64px; padding: 10px 52px 10px 14px; }
     .reserve-messenger-mobile-back {
         display: inline-flex;
@@ -1169,7 +1185,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
         justify-content: center;
         cursor: pointer;
     }
-    .reserve-messenger-thread-avatar { width: 38px; height: 38px; border-radius: 12px; }
+    .reserve-messenger-thread-avatar { width: 38px; height: 38px; border-radius: 50%; }
     .reserve-messenger-thread-body { padding: 15px 14px; }
     .reserve-messenger-composer textarea { font-size: 16px; }
 }
@@ -1231,9 +1247,6 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     display: inline-flex; align-items: center; justify-content: center;
     transition: transform 0.2s ease;
 }
-.reserve-chat-message-actions::before {
-    content: ''; position: absolute; inset: 8px; border-radius: 8px; pointer-events: none;
-}
 .reserve-chat-message-actions > .anticon { position: relative; }
 .reserve-chat-message-meta { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
 .reserve-chat-message-row:has(> .reserve-chat-message-meta) > .reserve-chat-bubble-group {
@@ -1243,9 +1256,11 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-message-row > .reserve-chat-message-time { margin-bottom: 2px; }
 .reserve-chat-message-meta > .reserve-chat-message-time { position: absolute; bottom: 2px; inset-inline: 0; text-align: center; pointer-events: none; }
 .reserve-chat-message-meta > .reserve-chat-message-actions { position: absolute; inset: 0; height: 44px; }
-.reserve-chat-attachment-preview { position: relative; overflow: hidden; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; display: flex; }
+.reserve-chat-attachment-preview { position: relative; flex: 0 0 44px; width: 44px; height: 44px; overflow: hidden; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; display: flex; }
 .reserve-chat-attachment-preview::after { content: ''; position: absolute; inset: 0; background: var(--c-gray-500, #8b95a1); opacity: 0; transition: opacity 0.15s ease; }
-.reserve-chat-attachment-preview:hover::after { opacity: 0.2; }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-attachment-preview:hover::after { opacity: 0.2; }
+}
 .reserve-chat-attachment-preview:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-chat-photo-image { transition: filter 0.15s ease; }
 /* 원본의 투명한 모양을 유지하며 사진 픽셀에만 hover·키보드 피드백을 준다. */
@@ -1260,7 +1275,6 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     .reserve-chat-message-row:focus-within .reserve-chat-message-meta > .reserve-chat-message-time,
     .reserve-chat-message-meta[data-menu-open="true"] > .reserve-chat-message-time { visibility: hidden; }
 }
-.reserve-chat-message-actions:hover::before { background: var(--c-gray-100, #f2f4f6); }
 .reserve-chat-message-actions:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 
 /* ⚠️ animation: none 으로 끄면 안 된다 — 패널을 DOM 에서 내리는 신호가 animationend 라
@@ -1345,6 +1359,8 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     transform: scale(0.96);
     opacity: 0.88;
 }
+.ant-btn.ant-btn-variant-solid:not(.reserve-btn):active:not(:disabled):not(.ant-btn-loading),
+.ant-btn.ant-btn-primary:not(.reserve-btn):active:not(:disabled):not(.ant-btn-loading) { opacity: 1; }
 .ant-modal-footer .ant-btn-default:not(.reserve-btn),
 .ant-modal-confirm-btns .ant-btn-default:not(.reserve-btn) {
     border-color: var(--c-border-default, #e5e8eb);
@@ -1352,9 +1368,9 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .ant-modal-footer .ant-btn-default:not(.reserve-btn):hover,
 .ant-modal-confirm-btns .ant-btn-default:not(.reserve-btn):hover {
-    border-color: #adb5bd;
+    border-color: var(--c-outline-hover-border);
     color: var(--c-text-primary, #1a1f27);
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--c-outline-hover-bg);
 }
 .ant-pagination-item:active,
 .ant-pagination-prev:active,
@@ -1385,7 +1401,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-explore-filter-controls { min-width: 0; max-width: 100%; margin-left: auto; display: flex; align-items: center; gap: 4px; }
 .reserve-explore-sort-filter { flex-shrink: 0; }
 .reserve-explore-count { white-space: nowrap; font-size: 13px; }
-.reserve-store-view-toggle {
+.reserve-store-view-toggle, .reserve-icon-tool {
     flex: 0 0 44px;
     width: 44px;
     height: 44px;
@@ -1394,26 +1410,35 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     justify-content: center;
     padding: 0;
     border: 0;
-    border-radius: 10px;
     background: transparent;
     color: var(--c-text-secondary);
-    font-size: 20px;
+    font-size: var(--reserve-icon-glyph-size);
     cursor: pointer;
     transition: background-color 0.15s ease, color 0.15s ease, transform 0.2s ease;
 }
 @media (hover: hover) and (pointer: fine) {
-    .reserve-store-view-toggle:hover:not(:disabled) {
-        background: var(--c-gray-50, #f9fafb);
+    .reserve-store-view-toggle:hover:not(:disabled), .reserve-icon-tool:hover:not([aria-disabled="true"]) {
+        background: transparent;
         color: var(--c-text-primary);
     }
 }
-.reserve-store-view-toggle:disabled {
+.reserve-store-view-toggle:disabled, .reserve-icon-tool[aria-disabled="true"] {
     color: var(--c-text-tertiary);
     cursor: not-allowed;
     opacity: 0.65;
 }
-.reserve-store-view-toggle:focus-visible,
+.reserve-store-view-toggle:focus-visible, .reserve-icon-tool:focus-visible,
 .reserve-store-list-row-link:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
+.reserve-icon-tool { text-decoration: none; }
+.reserve-icon-tool-wrapper { display: inline-flex; flex-shrink: 0; }
+.reserve-icon-tool-loading { display: inline-flex; align-items: center; justify-content: center; font-size: var(--reserve-icon-glyph-size); line-height: 0; }
+.reserve-icon-tool:disabled { cursor: not-allowed; opacity: 0.45; }
+.reserve-icon-tool--skeleton { cursor: default; pointer-events: none; }
+.reserve-icon-tool:focus-visible:not([aria-disabled="true"]) { color: var(--c-text-primary); }
+.reserve-icon-tool.is-active, .reserve-icon-tool.is-active:hover, .reserve-icon-tool.is-active:focus-visible { color: var(--c-primary); }
+.reserve-filter-menu--icon[data-filter-active="true"],
+.reserve-filter-menu--icon[data-filter-active="true"]:hover,
+.reserve-filter-menu--icon[data-filter-active="true"]:focus-visible { color: var(--c-primary); }
 .reserve-store-list-rows {
     --reserve-store-list-image-size: 80px;
     --reserve-store-list-image-radius: 14px;
@@ -1476,6 +1501,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-store-list-row-meta .reserve-store-identity-text { flex: 0 1 auto; }
 .reserve-store-list-row-favorite { display: flex; flex: 0 0 44px; width: 44px; min-height: 44px; align-items: center; justify-content: center; }
 .reserve-store-list-row-favorite:empty { display: none; }
+.reserve-store-list-row-favorite--with-tools { flex-basis: auto; width: auto; justify-content: flex-end; }
 .reserve-store-card-shell { position: relative; }
 .reserve-store-card-hit { position: absolute; inset: 0; z-index: 1; -webkit-tap-highlight-color: transparent; }
 .reserve-store-card-hit:focus { outline: none; }
@@ -1488,6 +1514,12 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-store-card-rating { min-height: 20px; }
 .reserve-store-card-favorite { position: absolute; z-index: 2; right: 0; top: 50%; transform: translateY(-50%); }
 .reserve-store-card-favorite:empty { display: none; }
+.reserve-store-card-title-line--with-tools { min-height: 44px; padding-right: 0; gap: 4px; }
+.reserve-store-card-title-line--with-tools > .reserve-store-card-favorite { position: relative; top: auto; right: auto; transform: none; display: flex; flex: 0 0 auto; align-items: center; }
+.reserve-store-card-skeleton-tools { display: flex; flex: 0 0 auto; align-items: center; }
+.reserve-info-hint-popup { --reserve-info-hint-background: #1a1f27; --reserve-info-hint-foreground: #ffffff; }
+[data-theme='dark'] .reserve-info-hint-popup { --reserve-info-hint-background: #ffffff; --reserve-info-hint-foreground: #1a1f27; }
+.reserve-info-hint-content { display: flex; flex-direction: column; gap: 2px; max-width: min(240px, calc(100vw - 48px)); color: inherit; font-size: 12px; font-weight: 400; line-height: 20px; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
     a.reserve-store-list-row-link[href] { transition: none; }
     a.reserve-store-list-row-link[href]:active { transform: none; }
@@ -1532,6 +1564,8 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 }
 .reserve-header-inner { gap: 12px; }
 .reserve-header-brand { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+.reserve-header-has-workspace-menu .reserve-header-brand { gap: 0; }
+.reserve-header-has-workspace-menu .reserve-header-logo { margin-inline-start: 4px; }
 /* 버튼 자리(너비·간격)도 같은 곡선으로 0 ↔ 44px 을 오가서, 옆의 RESERVE 로고가 뚝 밀리지 않고
    버튼과 함께 미끄러진다(2026-09-24). 0 너비일 때 아이콘은 overflow: hidden 으로 잘린다. */
 @keyframes reserve-header-back-leave {
@@ -1539,11 +1573,8 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     45% { opacity: 0.86; transform: translateX(-3px) scale(0.96); }
     100% { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: -4px; }
 }
-/* 나타날 때는 사라질 때의 반대 경로로 들어온다(2026-09-23 — 나가기만 있고 들어오기가 없던 짝).
-   헤더는 페이지를 옮겨도 그대로 있으므로 탐색 루트 → 하위 화면처럼 버튼이 새로 생길 때만 재생된다.
-   누르는 순간의 --leaving 이 뒤에 선언돼 이 애니메이션을 덮는다. 모션 최소화에서는 헤더 규칙이 모두 끈다.
-   2026-09-26: --leaving 은 ← 를 눌렀을 때뿐 아니라 로고·하단 탭·브라우저 뒤로가기로 버튼이 사라질 때도
-   붙는다(Header.jsx 가 이 시간만큼 버튼을 남겨 둔다). 그래야 로고가 뚝 튀지 않는다. */
+/* 뒤로가기가 새로 필요한 화면에서는 펼치고, 필요 없어지는 화면에서는 접는다.
+   버튼이 계속 필요한 경로 사이에서는 같은 DOM을 유지해 모션을 다시 재생하지 않는다. */
 @keyframes reserve-header-back-enter {
     from { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: -4px; }
     to { opacity: 1; transform: translateX(0) scale(1); width: 44px; flex-basis: 44px; margin-right: 0; }
@@ -1569,8 +1600,8 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding-inline: 12px;
+    gap: 0;
+    padding: 0;
     border: 1px solid var(--c-border-light, #f2f4f6);
     border-radius: var(--reserve-header-query-radius);
     background: var(--c-gray-50, #f9fafb);
@@ -1579,7 +1610,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     font-size: 16px;
     line-height: 1.5;
 }
-.reserve-header-query > .anticon { flex: 0 0 auto; color: var(--c-text-tertiary, #8b95a1); font-size: 18px; }
+.reserve-header-query > .anticon { display: grid; place-items: center; flex: 0 0 44px; color: var(--c-text-tertiary, #8b95a1); font-size: 18px; }
 .reserve-header-query-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* PC 검색 결과: 검색 화면(/search)의 입력칸과 똑같은 자리 — 화면 가운데·최대 560px — 에 둔다(2026-09-23).
    [로고][검색창][계정] 3칸 격자라 양쪽 폭이 달라도 검색창이 정확히 가운데다. 좁은 폭에서 로고·계정이 더 넓으면
@@ -1615,6 +1646,9 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     .reserve-header-is-guest.reserve-header-has-back .reserve-header-inner { padding-inline: 12px !important; gap: 4px; }
     .reserve-header-is-guest.reserve-header-has-back .reserve-header-logo-wordmark { font-size: 18px; }
     .reserve-header-is-guest.reserve-header-has-back .reserve-header-actions { gap: 0; }
+    .reserve-header-has-workspace-menu .reserve-header-inner { padding-inline: 12px !important; gap: 4px; }
+    .reserve-header-has-workspace-menu .reserve-header-brand,
+    .reserve-header-has-workspace-menu .reserve-header-actions { gap: 0; }
 }
 .reserve-header-back {
     flex: 0 0 44px;
@@ -1625,19 +1659,38 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     display: grid;
     place-items: center;
     border: 0;
-    border-radius: 100px;
     background: transparent;
     color: var(--c-text-primary, #191f28);
-    font-size: 22px;
+    font-size: var(--reserve-icon-glyph-size);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: opacity 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
     animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-/* 검색 닫힘은 이전 헤더의 복원이다. 다음 일반 이동과 실제 뒤로가기의 닫힘 모션은 유지한다. */
-.reserve-app-layout[data-search-restored] > .reserve-header .reserve-header-back:not(.reserve-header-back--leaving) { animation: none; }
-.reserve-header-back:hover { background: var(--c-gray-50, #f9fafb); }
-.reserve-header-back:active { opacity: 0.65; }
+/* 메뉴와 뒤로가기는 같은 헤더 동작 영역을 사용한다. 메뉴에는 기본 채움이나 선택 배경을 두지 않는다. */
+.reserve-header-workspace-menu {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: var(--c-text-primary, #191f28);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.16s ease, opacity 0.12s ease;
+}
+.reserve-header-workspace-menu:disabled { color: var(--c-text-tertiary); cursor: default; }
+.reserve-header-workspace-menu:focus { outline: none; }
+.reserve-header-workspace-menu:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
+.reserve-header-workspace-menu[data-input-modality="pointer"]:focus-visible { outline: none; }
+@media (max-width: 899px) {
+    /* 44px 동작 영역은 유지하고 두 아이콘의 시각 간격만 4px 줄인다. */
+    .reserve-header-workspace-menu > .reserve-ui-icon { transform: translateX(2px); }
+    .reserve-header-workspace-menu + .reserve-header-back > .reserve-ui-icon { transform: translateX(-2px); }
+}
 .reserve-header-back--leaving { pointer-events: none; animation: reserve-header-back-leave 0.18s cubic-bezier(0.4, 0, 1, 1) both; }
 .reserve-header-back:focus { outline: none; }
 .reserve-header-back:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
@@ -1651,24 +1704,27 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     display: grid;
     place-items: center;
     border: 0;
-    border-radius: 100px;
     background: transparent;
     color: var(--c-text-primary, #191f28);
     text-decoration: none;
     transition: background-color 0.16s ease, opacity 0.12s ease;
 }
-.reserve-header-search > .anticon { font-size: 22px; }
 .reserve-header-search:visited,
 .reserve-header-search:hover {
     color: var(--c-text-primary, #191f28) !important;
 }
 /* 누르는 순간에도 올림 색을 유지한다 — AntD 공용 a:active(링크 파란색)가 덮지 않게(2026-09-24). */
 .reserve-header-search:active { color: var(--c-text-primary, #191f28) !important; }
-.reserve-header-search:hover { background: var(--c-gray-50, #f9fafb); }
+@media (hover: hover) and (pointer: fine) {
+    .reserve-header-back:hover,
+    .reserve-header-search:hover { background: transparent; }
+}
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+    .reserve-header-workspace-menu:hover:not(:disabled) { background: transparent; }
+}
 .reserve-header-avatar-trigger { transition: transform 0.12s ease, opacity 0.16s ease !important; }
 .reserve-header-logo:hover,
 .reserve-header-avatar-trigger:hover { opacity: 0.8; }
-.reserve-header-search:active,
 .reserve-header-logo:active { opacity: 0.75; }
 .reserve-header-avatar-trigger:active { transform: scale(0.94); }
 .reserve-header-actions .reserve-header-avatar-trigger { width: 44px; height: 44px; }
@@ -1688,6 +1744,47 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-header-logo:focus-visible {
     outline: var(--reserve-focus-ring);
     outline-offset: -2px;
+}
+
+.reserve-kakao-map :is(.reserve-kakao-map-link, .reserve-kakao-map-callout):focus-visible {
+    outline: var(--reserve-focus-ring);
+    outline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+    .reserve-kakao-map :is(.reserve-kakao-map-link, .reserve-kakao-map-callout):hover { opacity: 0.85; }
+}
+
+/* 검색은 헤더 조작부와 본문의 퇴장/복원을 함께 처리한다. 로고의 기존 정적 동작은 유지한다. */
+@media (prefers-reduced-motion: no-preference) {
+    .reserve-header--search-leaving :is(.reserve-header-back, .reserve-header-workspace-menu, .reserve-header-actions, .reserve-header-query) {
+        animation: reserve-search-controls-leave var(--reserve-search-motion-duration, 220ms) cubic-bezier(.4, 0, 1, 1) both;
+    }
+    .reserve-app-layout:has(> .reserve-header--search-leaving) > :is(.ant-layout-content, .reserve-discovery-top-nav) {
+        animation: reserve-search-surface-leave var(--reserve-search-motion-duration, 220ms) cubic-bezier(.4, 0, 1, 1) both;
+        pointer-events: none;
+    }
+    .reserve-app-layout[data-search-restored] > .reserve-header:not(.reserve-header--search-leaving) :is(.reserve-header-back:not(.reserve-header-back--leaving), .reserve-header-workspace-menu, .reserve-header-actions, .reserve-header-query) {
+        animation: reserve-search-controls-enter var(--reserve-search-motion-duration, 220ms) cubic-bezier(.22, 1, .36, 1) both;
+    }
+    .reserve-app-layout[data-search-restored]:not(:has(> .reserve-header--search-leaving)) > :is(.ant-layout-content, .reserve-discovery-top-nav) {
+        animation: reserve-search-surface-enter var(--reserve-search-motion-duration, 220ms) cubic-bezier(.22, 1, .36, 1) both;
+    }
+    @keyframes reserve-search-controls-leave {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-6px); }
+    }
+    @keyframes reserve-search-controls-enter {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes reserve-search-surface-leave {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(8px); }
+    }
+    @keyframes reserve-search-surface-enter {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 }
 .reserve-discovery-home {
     --reserve-home-section-spacing: 20px;
@@ -1799,12 +1896,15 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-route-skeleton.reserve-route-skeleton--cards,
 .reserve-route-skeleton.reserve-route-skeleton--benefits,
 .reserve-route-skeleton.reserve-route-skeleton--benefit-detail,
+.reserve-route-skeleton.reserve-route-skeleton--draft-transfer,
+.reserve-route-skeleton.reserve-route-skeleton--feed-notifications,
 .reserve-route-skeleton.reserve-route-skeleton--search,
 .reserve-route-skeleton.reserve-route-skeleton--discovery,
 .reserve-route-skeleton.reserve-route-skeleton--coming-soon,
 .reserve-route-skeleton.reserve-route-skeleton--waiting,
 .reserve-route-skeleton.reserve-route-skeleton--auth,
 .reserve-route-skeleton.reserve-route-skeleton--legal,
+.reserve-route-skeleton.reserve-route-skeleton--guide,
 .reserve-route-skeleton.reserve-route-skeleton--document,
 .reserve-route-skeleton.reserve-route-skeleton--payment-result,
 .reserve-route-skeleton.reserve-route-skeleton--admin,
@@ -1839,14 +1939,6 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 }
 /* 바로가기 이름 자리 — 실제 글자 줄 높이(글자 크기 × 1.5)와 같게 둔다. */
 .reserve-route-discovery-shortcut-label { height: 1.5em; display: flex; align-items: center; }
-/* 글자 모양 뼈대 — 고정 문구를 투명 글자로 두고 줄마다 회색 막대를 그린다. 폭에 따른 줄바꿈이 실제 문구와 같아 높이가 어긋나지 않는다. */
-.reserve-route-skeleton-text {
-    color: transparent;
-    border-radius: 6px;
-    -webkit-box-decoration-break: clone;
-    box-decoration-break: clone;
-    user-select: none;
-}
 @media (max-width: 551px) {
     .reserve-route-skeleton { padding-inline: 20px; }
 }
@@ -1927,8 +2019,8 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-benefit-row-copy { grid-area: banner; align-self: center; box-sizing: border-box; min-width: 0; width: 84%; padding: var(--reserve-benefit-banner-padding); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .reserve-benefit-description { width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--reserve-benefit-description-size); line-height: 1.5; color: var(--reserve-benefit-photo-fg, #fff); }
 .reserve-benefit-store { max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--reserve-benefit-store-size); font-weight: 750; letter-spacing: -0.5px; line-height: 1.3; color: var(--reserve-benefit-photo-fg, #fff); }
-.reserve-benefit-ticket { position: relative; display: block; box-sizing: border-box; max-width: 100%; padding: 6px 14px; margin-top: 2px; border-radius: 2px; background: var(--reserve-benefit-ticket-bg, #2272eb); color: var(--reserve-benefit-photo-fg, #fff); font-size: var(--reserve-benefit-ticket-size); font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; mask-image: radial-gradient(circle at 0 50%, transparent 5px, #000 5.5px), radial-gradient(circle at 100% 50%, transparent 5px, #000 5.5px); mask-composite: intersect; }
-.reserve-benefit-ticket > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.reserve-benefit-title-badge { position: relative; display: block; box-sizing: border-box; max-width: 100%; padding: 6px 14px; margin-top: 2px; border-radius: 8px; background: var(--reserve-benefit-ticket-bg, #2272eb); color: var(--reserve-benefit-photo-fg, #fff); font-size: var(--reserve-benefit-ticket-size); font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+.reserve-benefit-title-badge > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .reserve-benefit-row--skeleton { background: var(--c-gray-50, #f9fafb); }
 .reserve-benefit-row--skeleton .reserve-benefit-media { background: var(--c-gray-50, #f9fafb); }
 .reserve-benefit-row--skeleton .reserve-benefit-media::after { background: transparent; }
@@ -1957,7 +2049,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 @media (min-width: 576px) {
     .reserve-benefit-list { gap: 16px; }
     .reserve-benefit-row { --reserve-benefit-banner-min-height: 164px; --reserve-benefit-banner-padding: 24px; --reserve-benefit-description-size: 13px; --reserve-benefit-store-size: 30px; --reserve-benefit-ticket-size: 14px; }
-    .reserve-benefit-ticket { padding: 8px 18px; }
+    .reserve-benefit-title-badge { padding: 8px 18px; }
     .reserve-benefit-store-grid { gap: 24px 20px; }
 }
 @media (min-width: 900px) {
@@ -2012,6 +2104,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 }
 .reserve-discovery-location-link > .anticon:first-child { font-size: 18px; }
 .reserve-discovery-location-link > .anticon:last-child { margin-left: 2px; font-size: 10px; }
+.reserve-discovery-location-link[aria-expanded='true'] .reserve-filter-menu-chevron { transform: rotate(180deg); }
 .reserve-discovery-current-location {
     min-height: 44px;
     padding: 0;
@@ -2399,6 +2492,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     background: var(--c-bg-default, #fff);
 }
 .reserve-search-field {
+    box-sizing: border-box;
     flex: 1 1 0;
     min-width: 0;
     height: var(--reserve-search-field-height);
@@ -2413,17 +2507,25 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     min-width: 0;
     width: 100%;
     height: 100%;
-    padding: 0 10px 0 0;
     outline: none;
     border: 0;
     background: transparent;
     color: var(--c-text-primary, #191f28);
     font: inherit;
-    font-size: 16px;
-    line-height: 1.5;
     appearance: none;
 }
+/* 입력과 결과의 검색어는 같은 아이콘 칸·텍스트 여백·글꼴 기준선을 쓴다. */
+.reserve-header-query-text,
+.reserve-search-field input {
+    padding: 0 10px 0 0;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 24px;
+    letter-spacing: normal;
+}
 .reserve-search-field input::placeholder { color: var(--c-text-tertiary, #8b95a1); opacity: 1; }
+.reserve-search-field input::-webkit-search-decoration,
 .reserve-search-field input::-webkit-search-cancel-button { display: none; }
 .reserve-search-icon,
 .reserve-search-clear,
@@ -2445,9 +2547,9 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-search-icon:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -3px; }
 .reserve-search-clear { color: var(--c-text-tertiary, #8b95a1); font-size: 18px; }
 .reserve-search-cancel { font-size: 14px; }
-.reserve-search-content { max-width: var(--reserve-search-content-width); margin-inline: auto; padding: 26px var(--reserve-home-gutter) 40px; }
+.reserve-search-content { --reserve-search-heading-gap: 20px; max-width: var(--reserve-search-content-width); margin-inline: auto; padding: 26px var(--reserve-home-gutter) 40px; }
 .reserve-search-content h2 {
-    margin: 0 0 20px;
+    margin: 0 0 var(--reserve-search-heading-gap);
     color: var(--c-text-primary, #191f28);
     font-size: 17px;
     font-weight: 700;
@@ -2482,12 +2584,10 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-search-domain-media img { display: block; object-fit: contain; }
 .reserve-search-quick { margin-top: 36px; }
 .reserve-search-recent { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-search-recent-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.reserve-search-recent-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: var(--reserve-search-heading-gap); }
 .reserve-search-recent-heading h2 { margin-bottom: 0; }
 .reserve-search-recent-clear { min-height: 44px; border: 0; padding: 8px 0 8px 12px; background: transparent; color: var(--c-text-secondary, #4e5968); font: inherit; font-size: 14px; cursor: pointer; }
-.reserve-search-recent-note,
 .reserve-search-recent-empty { color: var(--c-text-secondary, #4e5968); font-size: 14px; line-height: 1.6; }
-.reserve-search-recent-note { margin: 8px 0 16px; }
 .reserve-search-recent-empty { margin: 0; }
 .reserve-search-recent-list { display: grid; gap: 4px; padding: 0; margin: 0; list-style: none; }
 .reserve-search-recent-item { display: flex; align-items: center; min-width: 0; gap: 8px; }
@@ -2538,8 +2638,6 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     -webkit-tap-highlight-color: transparent;
     transition: transform 0.12s ease, opacity 0.16s ease, background-color 0.16s ease;
 }
-.reserve-search-icon:active:not(:disabled),
-.reserve-search-clear:active:not(:disabled) { transform: scale(0.96); opacity: 0.88; }
 .reserve-search-recent-term:active:not(:disabled),
 .reserve-search-recent-remove:active:not(:disabled) { transform: scale(0.96); }
 .reserve-search-domain:active,

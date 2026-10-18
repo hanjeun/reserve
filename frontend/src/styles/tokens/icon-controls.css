@@ -1,0 +1,18 @@
+/* Icon hit areas stay generous while the visible hover surface stays compact. */
+:root {
+    --reserve-icon-target-size: 44px;
+    --reserve-icon-glyph-size: 20px;
+    --reserve-icon-surface-size: 32px;
+    --reserve-icon-tool-radius: 10px;
+    --reserve-icon-navigation-radius: 50%;
+    --reserve-icon-active-scale: 0.96;
+    --reserve-icon-press-transition: scale 0.12s ease;
+    --reserve-icon-surface-transition: opacity 0.15s ease, transform 0.12s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --reserve-icon-active-scale: 1;
+        --reserve-icon-press-transition: none;
+        --reserve-icon-surface-transition: none;
+    }
+}

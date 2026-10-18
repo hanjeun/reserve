@@ -28,6 +28,8 @@ public class RefreshRejectedException extends AuthException {
         EXPIRED_SESSION,
         /** 비밀번호 변경·재설정 뒤 발급 전 토큰이다. */
         AUTH_VERSION_CHANGED,
+        /** 공급자 보안 사건 이전의 원인증으로 시작한 토큰 가족이다. */
+        OAUTH_AUTHENTICATION_REVOKED,
         /** 탈퇴 등으로 활성 회원이 아니다. */
         MEMBER_UNAVAILABLE
     }

@@ -19,6 +19,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Import;
+import kr.it.reserve.config.SiteUrls;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +36,7 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/advertisements")
+@Import(SiteUrls.class)
 public class AdvertisementApiController {
 
     private static final String LOGIN_REQUIRED = "로그인이 필요해요.";
@@ -44,7 +47,7 @@ public class AdvertisementApiController {
     private final AdvertisementService advertisementService;
     private final RateLimiter rateLimiter;
 
-    @Value("${app.frontend-url:http://localhost:5173}")
+    @Value("#{siteUrls.frontendOrigin}")
     private String frontendUrl;
 
     /**

@@ -1,5 +1,6 @@
 import PageContainer from '../common/PageContainer';
-import { PageTitle } from '../common/PageTypography';
+import { SkeletonPageTitle as PageTitle } from '../common/PageTypography';
+import SkeletonText from '../common/SkeletonText';
 import Bone from '../common/Bone';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { SERVICE_DOMAIN_OPTIONS } from '../../constants';
@@ -18,7 +19,7 @@ export default function StoreOnboardingSkeleton({ mode = 'create' }) {
             <PageTitle level={1} className="reserve-onboarding-heading">{edit ? '무엇을 수정하시겠어요?' : '어떤 가게를 운영하시나요?'}</PageTitle>
             <div className="reserve-store-form reserve-store-form-skeleton">
                 {edit ? <div className="reserve-onboarding-edit-selection">
-                    <p className="reserve-onboarding-help">{STORE_EDIT_SELECTION_HELP}</p>
+                    <p className="reserve-onboarding-help"><SkeletonText>{STORE_EDIT_SELECTION_HELP}</SkeletonText></p>
                     <div className="reserve-service-domain-picker" aria-hidden="true">
                         {STORE_EDIT_SECTIONS.map(section => <div className="reserve-service-domain-option" key={section.value}>
                             <span className="reserve-service-domain-option__media"><Bone width={56} height={56} borderRadius="50%" /></span>
@@ -26,16 +27,16 @@ export default function StoreOnboardingSkeleton({ mode = 'create' }) {
                         </div>)}
                     </div>
                 </div> : <>
-                    <div className="reserve-store-form-skeleton-label">서비스 분야</div>
+                    <div className="reserve-store-form-skeleton-label"><SkeletonText>서비스 분야</SkeletonText></div>
                     <div className="reserve-service-domain-picker" aria-hidden="true">
                         {SERVICE_DOMAIN_OPTIONS.map(option => <div className="reserve-service-domain-option" key={option.value}>
                             <span className="reserve-service-domain-option__media"><Bone width={56} height={56} borderRadius="50%" /></span>
                             <span className="reserve-service-domain-option__label"><Bone width={32} height={20} /></span>
                         </div>)}
                     </div>
-                    <div className="reserve-store-form-skeleton-label">업종</div>
+                    <div className="reserve-store-form-skeleton-label"><SkeletonText>업종</SkeletonText></div>
                     <Bone height={controlHeight} />
-                    <p className="reserve-onboarding-help">조금 더 구체적으로 알려주세요. 예: 필라테스, 네일샵, 한식</p>
+                    <p className="reserve-onboarding-help"><SkeletonText>조금 더 구체적으로 알려주세요. 예: 필라테스, 네일샵, 한식</SkeletonText></p>
                 </>}
                 {edit && <Bone width="80%" height={19} style={{ marginTop: 32, marginBottom: 10 }} />}
                 <div style={{ display: 'flex', gap: 12, marginTop: edit ? 0 : 32 }} aria-hidden="true">

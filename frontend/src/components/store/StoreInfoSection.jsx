@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import {
     CalendarOutlined, ClockCircleOutlined, CreditCardOutlined, EnvironmentOutlined,
     FieldTimeOutlined, HourglassOutlined, RollbackOutlined, TeamOutlined, ThunderboltOutlined,
-} from '@ant-design/icons';
+} from '../common/icons';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
 // ─── StoreInfoSection 행 빌더 헬퍼 (모듈 레벨 — 복잡도 분산) ───
@@ -74,8 +74,14 @@ const buildDeadlineRow = (store) => {
 };
 
 const buildPaymentTimeoutRow = (store) => {
-    if (!hasPositiveNumber(store.noShowDeposit) || !store.allowLatePayment || !hasPositiveNumber(store.paymentTimeoutMinutes)) return null;
-    return { Icon: ThunderboltOutlined, label: '결제 마감', value: `예약 후 ${formatMinLabel(store.paymentTimeoutMinutes)} 이내 미결제 시 자동 취소` };
+    if (!hasPositiveNumber(store.noShowDeposit)) return null;
+    const timeout = store.paymentTimeoutMinutes ?? 30;
+    const value = store.allowLatePayment
+        ? '나중 결제 허용 · 미결제 자동 취소 없음'
+        : hasPositiveNumber(timeout)
+            ? `예약 신청 후 ${formatMinLabel(timeout)} 이내 미결제 대기 예약 자동 취소`
+            : '결제 시간 제한 없음 · 미결제 자동 취소 없음';
+    return { Icon: ThunderboltOutlined, label: '결제 마감', value };
 };
 
 const buildSlotRow = (store) => {

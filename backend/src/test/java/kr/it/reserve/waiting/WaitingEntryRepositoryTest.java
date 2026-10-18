@@ -27,7 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ContextConfiguration(classes = WaitingEntryRepositoryTest.Config.class)
 class WaitingEntryRepositoryTest {
     @Configuration(proxyBeanMethods = false)
-    @EntityScan(basePackageClasses = WaitingEntry.class)
+    @EntityScan({"kr.it.reserve.waiting.entity", "kr.it.reserve.member.entity", "kr.it.reserve.chat.entity",
+            "kr.it.reserve.store.entity", "kr.it.reserve.promotion.entity", "kr.it.reserve.feed.entity"})
     @EnableJpaRepositories(basePackageClasses = WaitingEntryRepository.class)
     static class Config {
     }
@@ -70,10 +71,8 @@ class WaitingEntryRepositoryTest {
 
     @Test
     void deletedOrMissingStoreCancelsOnlyActiveTeamsWithoutOverwritingCompletedRows() {
-        // 삭제 경계와 개인 목록 검색이 참조하는 Store 컬럼만 독립 H2 fixture로 둔다.
-        entityManager.createNativeQuery("CREATE TABLE IF NOT EXISTS store (store_id BIGINT PRIMARY KEY, deleted_at TIMESTAMP NULL, store_name VARCHAR(255))")
-                .executeUpdate();
-        entityManager.createNativeQuery("INSERT INTO store (store_id, deleted_at) VALUES (31, NULL), (32, '2026-10-04 15:00:00')")
+        // 실제 Store 매핑의 필수 이름·상태와 제약을 유지한 합성 가게를 사용한다.
+        entityManager.createNativeQuery("INSERT INTO store (store_id, deleted_at, store_name, status) VALUES (31, NULL, '운영 가게', 'ACTIVE'), (32, '2026-10-04 15:00:00', '폐업 가게', 'ACTIVE')")
                 .executeUpdate();
         WaitingEntry active = save(31L, 1, DAY.minusDays(100), null, null);
         WaitingEntry closed = save(32L, 1, DAY.minusDays(1), WaitingStatus.CALLED, START.minusMinutes(2));
@@ -197,8 +196,7 @@ class WaitingEntryRepositoryTest {
     }
 
     private void personalStores() {
-        entityManager.createNativeQuery("CREATE TABLE IF NOT EXISTS store (store_id BIGINT PRIMARY KEY, deleted_at TIMESTAMP NULL, store_name VARCHAR(255))").executeUpdate();
-        entityManager.createNativeQuery("INSERT INTO store (store_id, deleted_at, store_name) VALUES (31, NULL, '100xY!가게'), (32, NULL, '100%_!가게')").executeUpdate();
+        entityManager.createNativeQuery("INSERT INTO store (store_id, deleted_at, store_name, status) VALUES (31, NULL, '100xY!가게', 'ACTIVE'), (32, NULL, '100%_!가게', 'ACTIVE')").executeUpdate();
     }
 
     private WaitingEntry personal(Long storeId, Long memberId, int number, WaitingStatus status, LocalDateTime created, LocalDateTime finished) {

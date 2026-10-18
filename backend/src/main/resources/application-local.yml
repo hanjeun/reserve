@@ -6,6 +6,7 @@ spring:
   config:
     activate:
       on-profile: local
+    import: optional:file:${user.home}/.codex/local-data/RESERVE/local.properties
 
   # 개발 도구 (로컬 전용)
   devtools:
@@ -52,6 +53,19 @@ logging:
 # S3 로컬 환경 prefix (운영 데이터와 분리)
 s3:
   env-prefix: local
+
+# 피드 사진은 이 PC의 전용 저장소에 암호문으로 보관한다. 키·활성화 값은 Git 밖의 local.properties에 둔다.
+# 새 로컬 후보에서만 좋아요·댓글을 사용한다. 운영의 기본값은 계속 비활성이다.
+FEED_INTERACTIONS_ENABLED: true
+STORE_NEWS_ENABLED: true
+feed:
+  media:
+    local-enabled: true
+    local-directory: ${user.home}/.codex/local-data/RESERVE/feed-images
+
+reserve:
+  redis:
+    host: 127.0.0.1
 
 # CORS 허용 출처 (쉼표 구분 — SecurityConfig의 @Value List<String> 바인딩)
 #

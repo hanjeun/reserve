@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { ArrowRightOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined } from '../../components/common/icons';
 import TextLink from '../../components/common/TextLink';
 import PageContainer from '../../components/common/PageContainer';
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';

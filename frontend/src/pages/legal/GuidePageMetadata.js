@@ -4,25 +4,27 @@ export const DEFAULT_GUIDE_PATH = '/guide/common';
 export const GUIDE_PAGES = {
     '/guide/user': {
         title: '사용자 이용안내',
-        description: '가게 찾기와 예약, 웨이팅 접수·QR 이용 방법을 안내해요.',
+        description: '가게 찾기와 예약, 웨이팅·QR, 피드·댓글·좋아요 이용 방법을 안내해요.',
         sections: [
             { id: 'find', title: '가게 찾기' },
             { id: 'reservation', title: '예약하기' },
             { id: 'waiting', title: '웨이팅 접수하기' },
             { id: 'qr', title: 'QR로 방문 확인하기' },
             { id: 'history', title: '내역 확인과 문의' },
+            { id: 'feed', title: '피드 작성·댓글·좋아요' },
         ],
     },
     '/guide/business': {
         title: '사업자 이용안내',
-        description: '가게 등록·수정과 예약·웨이팅·QR·광고·채팅 관리 방법을 안내해요.',
+        description: '가게 등록·수정과 예약·웨이팅·QR·소식·광고·채팅 관리 방법을 안내해요.',
         sections: [
             { id: 'register', title: '사업자 계정과 가게 등록' },
             { id: 'edit', title: '가게 수정과 접수 방식' },
+            { id: 'draft', title: '가게 임시저장 옮기기' },
             { id: 'reservation', title: '예약 관리' },
             { id: 'waiting', title: '웨이팅 명단과 접수 중지' },
             { id: 'qr', title: '현장 접수 QR과 체크인' },
-            { id: 'promotion', title: '광고와 채팅 관리' },
+            { id: 'promotion', title: '가게 소식·광고·채팅 관리' },
         ],
     },
     '/guide/common': {

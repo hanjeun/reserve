@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useContext, useEffect, useRef, useSyncExternalStore } from 'react';
 import PropTypes from 'prop-types';
 import { Modal } from 'antd';
 import { fillRef } from '@rc-component/util';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { breakpoints, mq } from '../../styles/tokens';
+import { WorkspaceActivityContext } from '../layout/workspaceActivity';
 
 const MOBILE_QUERY = mq.below(breakpoints.card);
 const mobileSnapshot = () => typeof window !== 'undefined'
@@ -17,10 +18,14 @@ const subscribeMobile = callback => {
 
 /** AntD owns the portal, focus trap and close lifecycle; mobile changes only the surface. */
 export default function ResponsiveModal({
-    mobileSize = 'content', mobileSheet = true, open, title, rootClassName,
+    mobileSize = 'content', mobileSheet = true, open: requestedOpen, title, rootClassName,
     panelRef: forwardedPanelRef, afterOpenChange, transitionName, maskTransitionName,
     ...modalProps
 }) {
+    const workspaceActive = useContext(WorkspaceActivityContext);
+    const open = requestedOpen && workspaceActive;
+    const onCancel = modalProps.onCancel;
+    useEffect(() => { if (!workspaceActive && requestedOpen) onCancel?.(); }, [workspaceActive, requestedOpen, onCancel]);
     const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, () => false);
     const reducedMotion = useReducedMotion();
     const panelRef = useRef(null);

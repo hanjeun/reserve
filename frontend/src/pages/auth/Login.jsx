@@ -4,7 +4,7 @@ import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Form, Typography, Divider, Flex, Modal } from 'antd';
-import { ExclamationCircleFilled } from '@ant-design/icons';
+import { ExclamationCircleFilled } from '../../components/common/icons';
 import { PageContainer, Button, FormInput } from '../../components/common';
 import { useMessage } from '../../hooks';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
@@ -188,13 +188,13 @@ const Login = () => {
                 </Divider>
 
                 <Flex justify="center" gap={20}>
-                    <button type="button" className="reserve-icon-action" aria-label="카카오로 로그인" onClick={() => handleSocialLogin('kakao')} style={{ ...styles.socialCircle, backgroundColor: '#FEE500' }}>
+                    <button type="button" className="reserve-social-login" aria-label="카카오로 로그인" onClick={() => handleSocialLogin('kakao')} style={{ ...styles.socialCircle, backgroundColor: '#FEE500' }}>
                         <KakaoIcon />
                     </button>
-                    <button type="button" className="reserve-icon-action" aria-label="네이버로 로그인" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
+                    <button type="button" className="reserve-social-login" aria-label="네이버로 로그인" onClick={() => handleSocialLogin('naver')} style={{ ...styles.socialCircle, backgroundColor: '#03C75A', color: '#fff' }}>
                         <NaverIcon />
                     </button>
-                    <button type="button" className="reserve-icon-action" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: '#fff', border: '1px solid #dadce0' }}>
+                    <button type="button" className="reserve-social-login" aria-label="Google로 로그인" onClick={() => handleSocialLogin('google')} style={{ ...styles.socialCircle, backgroundColor: '#fff' }}>
                         <GoogleIcon />
                     </button>
                 </Flex>

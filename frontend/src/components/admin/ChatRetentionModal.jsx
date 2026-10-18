@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DataState, FormDatePicker, FormField, FormModal, FormSelect, FormTextArea, ModalLoading } from '../common';
 import { useMessage } from '../../hooks';
 import chatRetentionService from '../../services/chatRetentionService';
+import useWorkspaceAction from '../../hooks/useWorkspaceAction';
+import { assertCurrentSession, currentSession, isCurrentSession } from '../../api/sessionScope';
 
 const CATEGORIES = [
     { value: 'UNCLASSIFIED', label: '미분류 · 파기 보류' },
@@ -27,6 +29,9 @@ export default function ChatRetentionModal({ reportId, onClose }) {
     const client = useQueryClient();
     const [draft, setDraft] = useState(null);
     const [validation, setValidation] = useState(null);
+    const [conflictId, setConflictId] = useState(null);
+    const [reloading, setReloading] = useState(false);
+    const requestAction = useWorkspaceAction();
     const query = useQuery({
         queryKey: ['admin', 'chatRetention', reportId],
         queryFn: () => chatRetentionService.get(reportId),
@@ -35,6 +40,7 @@ export default function ChatRetentionModal({ reportId, onClose }) {
     });
     const values = draft?.reportId === reportId ? draft : {
         reportId,
+        revision: query.data?.revision,
         category: query.data?.category ?? 'UNCLASSIFIED',
         hold: query.data?.hold ?? false,
         retentionBasisAt: query.data?.retentionBasisAt ?? null,
@@ -43,17 +49,36 @@ export default function ChatRetentionModal({ reportId, onClose }) {
     const error = validation?.reportId === reportId ? validation.message : '';
     const update = (patch) => { setDraft({ ...values, ...patch }); setValidation(null); };
     const save = useMutation({
-        mutationFn: ({ id, body }) => chatRetentionService.update(id, body),
-        onSuccess: async () => {
-            await client.invalidateQueries({ queryKey: ['admin', 'chatRetention'] });
+        mutationFn: async ({ id, body, session }) => {
+            assertCurrentSession(session); const result = await chatRetentionService.update(id, body); assertCurrentSession(session); return result;
+        },
+        onSuccess: async (_, variables) => {
+            if (!isCurrentSession(variables.session)) return;
+            await Promise.all([client.invalidateQueries({ queryKey: ['admin', 'chatRetention'] }), client.invalidateQueries({ queryKey: ['admin', 'chatReports'] })]);
+            if (!isCurrentSession(variables.session)) return;
             message.success('자료 분류와 보존 설정을 저장했어요.');
             setDraft(null);
             onClose();
         },
-        onError: (failure) => message.error(failure?.message || '보존 설정을 저장하지 못했어요.'),
+        onError: (failure, variables) => {
+            if (!isCurrentSession(variables.session) || failure.isStaleSession) return;
+            if (failure.status === 409) setConflictId(variables.id);
+            message.error(failure?.message || '보존 설정을 저장하지 못했어요.');
+        },
     });
+    const conflict = conflictId === reportId || draft?.reportId === reportId && query.data?.revision !== draft.revision;
+    const reload = async () => {
+        if (save.isPending || reloading || reportId == null) return;
+        const session = currentSession().epoch;
+        setReloading(true);
+        try {
+            const latest = await query.refetch(); assertCurrentSession(session);
+            if (latest.isSuccess && Number.isSafeInteger(latest.data?.revision)) { setDraft(null); setValidation(null); setConflictId(null); }
+        } catch { /* 조회 실패에는 기존 설정 입력을 남긴다. */ }
+        finally { if (isCurrentSession(session)) setReloading(false); }
+    };
     const submit = () => {
-        if (reportId == null || query.isPending || query.isError || save.isPending) return;
+        if (reportId == null || query.isPending || query.isError || query.isFetching || save.isPending || reloading || conflict || !Number.isSafeInteger(values.revision)) return;
         if (!values.note.trim()) {
             setValidation({ reportId, message: '분류·보류를 변경하는 근거를 입력해주세요.' });
             return;
@@ -62,7 +87,8 @@ export default function ChatRetentionModal({ reportId, onClose }) {
             setValidation({ reportId, message: '실제 계약·결제·공급일을 선택해주세요.' });
             return;
         }
-        save.mutate({ id: reportId, body: {
+        save.mutate({ id: reportId, session: currentSession().epoch, body: {
+            revision: values.revision,
             category: values.category, hold: values.hold,
             retentionBasisAt: values.category === 'CONTRACT_PAYMENT' ? values.retentionBasisAt : null,
             note: values.note.trim(),
@@ -70,14 +96,17 @@ export default function ChatRetentionModal({ reportId, onClose }) {
     };
     return (
         <FormModal title={`신고 #${reportId ?? ''} 보존 설정`} open={reportId != null}
-            onClose={() => { if (!save.isPending) { setDraft(null); setValidation(null); onClose(); } }}
-            onSubmit={submit} submitting={save.isPending} submitText="보존 설정 저장"
-            submitDisabled={query.isPending || query.isError}>
+            navigationDirty={Boolean(draft?.reportId === reportId)}
+            onClose={() => { if (!save.isPending && !reloading) { setDraft(null); setValidation(null); setConflictId(null); onClose(); } }}
+            onSubmit={submit} submitting={save.isPending || reloading} submitText="보존 설정 저장"
+            submitDisabled={query.isPending || query.isError || query.isFetching || conflict || !Number.isSafeInteger(values.revision)}>
             {query.isPending ? <ModalLoading minHeight="160px" /> : query.isError ? (
                 <DataState state="error" kind="message" subject="보존 설정" error={query.error}
                     onRetry={query.refetch} retrying={query.isFetching} />
             ) : (
                 <>
+                    {conflict && <DataState state="error" compact title="신고 상태나 보존 설정이 바뀌었어요. 다시 불러와 검토해주세요."
+                        onRetry={() => requestAction(reload, { discard: false })} retrying={reloading} />}
                     <FormField label="자료 분류">
                         <FormSelect value={values.category} options={CATEGORIES} onChange={(category) => update({ category })} />
                     </FormField>

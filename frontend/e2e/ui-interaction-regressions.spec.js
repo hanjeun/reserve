@@ -161,7 +161,7 @@ test('withdrawal opens confirmation first, cancellation sends nothing, and serve
     await expect(page.getByText(/먼저 처리할 항목이 있어요. 운영 중 가게 1곳, 예약 2건/)).toBeVisible();
     expect(requests).toEqual({ readiness: 1, deletion: 0 });
     await expect(withdraw).toBeEnabled();
-    await expect(page).toHaveURL(/\/my-page$/);
+    await expect(page).toHaveURL(/\/my-page\?tab=name$/);
 });
 
 test('mobile messages fill changing viewport heights without bottom dead space or document scrolling', async ({ page }) => {
@@ -171,6 +171,7 @@ test('mobile messages fill changing viewport heights without bottom dead space o
     const surface = page.locator('.reserve-messenger--page');
     const footer = surface.locator('.reserve-messenger-footer');
     await expect(footer).toBeVisible();
+    await expect(page.locator('.reserve-header')).toHaveCount(0);
     // A visible lazy skeleton suppresses the second entry animation; the page stays untransformed.
     await expect(page.locator('.reserve-messages-route')).toHaveCSS('transform', 'none');
     for (const size of [{ width: 390, height: 844 }, { width: 390, height: 674 }, { width: 667, height: 400 }, { width: 767, height: 674 }, { width: 390, height: 844 }]) {
@@ -179,10 +180,9 @@ test('mobile messages fill changing viewport heights without bottom dead space o
         const dimensions = await page.evaluate(() => ({
             viewport: window.innerHeight, document: document.documentElement.scrollHeight,
             contentTop: document.querySelector('.reserve-messenger--page').getBoundingClientRect().top,
-            headerBottom: document.querySelector('header').getBoundingClientRect().bottom,
         }));
         expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport + 1);
-        expect(dimensions.contentTop).toBeCloseTo(dimensions.headerBottom, 0);
+        expect(dimensions.contentTop).toBeCloseTo(0, 0);
         await expect(footer.getByRole('button', { name: /설정/ })).toBeVisible();
     }
     await page.goto('/messages/');

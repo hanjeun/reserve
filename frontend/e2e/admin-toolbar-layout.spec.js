@@ -62,7 +62,8 @@ test('admin filtered counts stay attached and remain visible on mobile', async (
 
     for (const tab of tabs) {
         await page.goto(`/admin?tab=${tab.key}`);
-        const toolbar = page.locator('.reserve-filter-toolbar-primary');
+        const management = tab.key === 'reports';
+        const toolbar = page.locator(management ? '.reserve-management-toolbar' : '.reserve-filter-toolbar-primary');
         const filter = toolbar.locator('.reserve-filter-menu--plain').first();
         const filterSurface = filter.locator('.reserve-filter-menu-surface');
         const count = toolbar.getByText(tab.count, { exact: true });
@@ -78,9 +79,26 @@ test('admin filtered counts stay attached and remain visible on mobile', async (
         expect(filterSurfaceBox).not.toBeNull();
         expect(countBox).not.toBeNull();
         expect(toolbarBox).not.toBeNull();
-        const visualGap = countBox.x - (filterSurfaceBox.x + filterSurfaceBox.width);
-        expect(visualGap).toBeGreaterThanOrEqual(12);
-        expect(visualGap).toBeLessThanOrEqual(24);
+        if (management) {
+            const [leadingBox, trailingBox] = await Promise.all([
+                toolbar.locator('.reserve-management-toolbar-leading').boundingBox(),
+                toolbar.locator('.reserve-management-toolbar-trailing').boundingBox(),
+            ]);
+            expect(leadingBox).not.toBeNull();
+            expect(trailingBox).not.toBeNull();
+            await expect(toolbar).toHaveCSS('column-gap', '12px');
+            expect(trailingBox.x - (leadingBox.x + leadingBox.width)).toBeCloseTo(12, 0);
+            expect(countBox.x).toBeGreaterThanOrEqual(leadingBox.x);
+            expect(countBox.x + countBox.width).toBeLessThanOrEqual(leadingBox.x + leadingBox.width);
+            expect(countBox.x + countBox.width).toBeLessThanOrEqual(filterSurfaceBox.x);
+            expect(filterSurfaceBox.x).toBeGreaterThanOrEqual(trailingBox.x);
+            expect(trailingBox.x + trailingBox.width).toBeCloseTo(toolbarBox.x + toolbarBox.width, 0);
+            expect(leadingBox.y + leadingBox.height / 2).toBeCloseTo(trailingBox.y + trailingBox.height / 2, 0);
+        } else {
+            const visualGap = countBox.x - (filterSurfaceBox.x + filterSurfaceBox.width);
+            expect(visualGap).toBeGreaterThanOrEqual(12);
+            expect(visualGap).toBeLessThanOrEqual(24);
+        }
         expect(toolbarBox.width).toBeLessThanOrEqual(await page.evaluate(() => document.documentElement.clientWidth));
     }
 });

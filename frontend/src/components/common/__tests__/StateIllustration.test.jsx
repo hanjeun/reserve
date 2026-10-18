@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import StateIllustration from '../StateIllustration';
 
 vi.mock('../../../hooks/useReducedMotion', () => ({ default: () => false }));
-vi.mock('../../../hooks/useIllustrationMotion', () => ({ default: () => vi.fn() }));
+vi.mock('../../../hooks/useIllustrationMotion', () => ({ default: () => ({ pictureRef: vi.fn(), replay: vi.fn() }) }));
 
 let animateDescriptor;
 beforeEach(() => {

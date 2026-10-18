@@ -26,14 +26,22 @@ test('ad payment queue separates reading, explicit processing, and refund comple
         return route.fulfill({ json: { success: true, data } });
     });
     await page.goto('/admin');
-    if (testInfo.project.name === 'mobile-chromium') {
-        await page.getByRole('button', { name: 'ellipsis' }).click();
-        await page.getByRole('option', { name: /결제 운영/ }).click();
+    const mobile = testInfo.project.name === 'mobile-chromium';
+    if (mobile) {
+        await page.getByRole('button', { name: '관리자 패널 메뉴 열기', exact: true }).click();
+    }
+    const paymentLink = page.getByRole('navigation', { name: '관리자 패널 메뉴', exact: true })
+        .getByRole('link', { name: '결제 운영', exact: true });
+    await paymentLink.focus();
+    await paymentLink.press('Enter');
+    await expect(page).toHaveURL(/\/admin\?tab=payments$/);
+    await expect(page.getByRole('heading', { name: '결제 운영', exact: true })).toBeVisible();
+    if (mobile) {
+        await page.getByRole('button', { name: '관리자 패널 메뉴 열기', exact: true }).click();
+        await expect(paymentLink).toHaveAttribute('aria-current', 'page');
+        await page.getByRole('button', { name: '메뉴 닫기', exact: true }).click();
     } else {
-        const paymentTab = page.getByRole('tab', { name: /결제 운영/ });
-        await paymentTab.focus();
-        await paymentTab.press('Enter');
-        await expect(paymentTab).toHaveAttribute('aria-selected', 'true');
+        await expect(paymentLink).toHaveAttribute('aria-current', 'page');
     }
     await page.getByRole('radio', { name: '광고 결제', exact: true }).click();
     await expect(page.getByText('AD-LOCAL-REVIEW', { exact: true })).toBeVisible();

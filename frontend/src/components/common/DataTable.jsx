@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { renderPaginationItem } from './paginationItem';
 import { Table } from 'antd';
 import DataState from './DataState';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
@@ -62,6 +63,7 @@ const DataTable = ({ pageSize = DEFAULT_PAGE_SIZE, pagination, size = 'middle', 
         showSizeChanger: false,
         // 모바일에선 페이지 버튼 개수와 크기를 줄인다 (위 컨벤션 주석 참고)
         showLessItems: isMobile,
+        itemRender: renderPaginationItem,
         ...pagination,
     };
 

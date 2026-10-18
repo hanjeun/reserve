@@ -1,31 +1,70 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Image } from 'antd';
-import { getChatImageBlob } from '../../utils/chatImageTransfer';
+import { requestChatImageBlob } from '../../utils/chatImageRequests';
+import useChatImageVisibility from '../../hooks/useChatImageVisibility';
 import useAuthStore from '../../store/useAuthStore';
 import Bone from '../common/Bone';
 
+const RETRY_DELAYS_MS = [500, 1500];
+const canRetry = error => {
+    if (error?.isSessionExpired || error?.isStaleSession || error?.code === 'CHAT_IMAGE_INVALID'
+        || error?.code === 'ERR_CANCELED' || error?.name === 'AbortError') return false;
+    const status = error?.status ?? error?.response?.status;
+    return status == null || status === 429 || status >= 500 && status < 600;
+};
+
 /** 공개 CDN URL 대신 세션 관문을 거친 Blob을 표시한다. 계정 전환/언마운트에서 즉시 폐기한다. */
-export default function ChatImage({ url, width, height }) {
+export default function ChatImage({ url, roomId, width, height }) {
     const revision = useAuthStore(state => state.sessionRevision);
-    const scope = `${revision}:${url}`;
+    const scope = `${revision}:${roomId ?? ''}:${url}`;
     const [result, setResult] = useState(null);
     const [previewScope, setPreviewScope] = useState(/** @type {string | null} */ (null));
-    useEffect(() => {
-        const controller = new AbortController();
-        let alive = true;
-        let objectUrl;
-        getChatImageBlob(url, controller.signal).then(blob => {
-            if (!alive) return;
-            objectUrl = URL.createObjectURL(blob);
-            setResult({ scope, src: objectUrl });
-        }).catch(() => { if (alive) setResult({ scope, error: true }); });
+    const activeRef = useRef(null);
+    const { frameRef, near, canLoad } = useChatImageVisibility(scope);
+    useLayoutEffect(() => {
+        const active = { failures: 0, finished: false, controller: null, objectUrl: null };
+        activeRef.current = active;
         return () => {
-            alive = false;
-            controller.abort();
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            if (activeRef.current === active) activeRef.current = null;
+            active.controller?.abort();
+            if (active.objectUrl) URL.revokeObjectURL(active.objectUrl);
         };
-    }, [scope, url]);
+    }, [scope]);
+    useEffect(() => {
+        const active = activeRef.current;
+        if (!near || !active || active.finished) return undefined;
+        let cancelled = false;
+        let timer;
+        const isCurrent = () => !cancelled && activeRef.current === active
+            && useAuthStore.getState().sessionRevision === revision && canLoad();
+        const attempt = () => {
+            if (!isCurrent()) return;
+            const controller = new AbortController();
+            active.controller = controller;
+            requestChatImageBlob(url, controller.signal, isCurrent).then(blob => {
+                if (!isCurrent() || controller.signal.aborted) return;
+                active.objectUrl = URL.createObjectURL(blob);
+                active.finished = true;
+                setResult({ scope, src: active.objectUrl });
+            }).catch(error => {
+                if (!isCurrent() || controller.signal.aborted) return;
+                if (canRetry(error) && active.failures < RETRY_DELAYS_MS.length) {
+                    timer = setTimeout(attempt, RETRY_DELAYS_MS[active.failures]);
+                    active.failures += 1;
+                    return;
+                }
+                active.finished = true;
+                setResult({ scope, error: true });
+            });
+        };
+        attempt();
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+            active.controller?.abort();
+        };
+    }, [near, scope, url, revision, canLoad]);
     const current = result?.scope === scope ? result : null;
     const aspectRatio = width > 0 && height > 0 ? `${width} / ${height}` : '1';
     const loaded = current?.loaded === true;
@@ -34,12 +73,11 @@ export default function ChatImage({ url, width, height }) {
     const settle = (failed = false) => setResult(previous => previous?.scope === scope
         && previous.src === current?.src ? { ...previous, loaded: !failed, error: failed } : previous);
     // <output> 은 암묵 role=status 이고 span 과 같은 인라인 요소다.
-    if (current?.error) return <output>사진을 불러오지 못했어요.</output>;
-    return <div className="reserve-chat-photo-frame" style={{ width: 240, maxWidth: '100%', aspectRatio }}>
-        {!loaded && <output className="reserve-chat-photo-loading" aria-label="사진을 불러오는 중" aria-busy="true">
+    return <div ref={frameRef} className="reserve-chat-photo-frame" style={{ width: 240, maxWidth: '100%', aspectRatio }}>
+        {current?.error ? <output>사진을 불러오지 못했어요.</output> : !loaded && <output className="reserve-chat-photo-loading" aria-label="사진을 불러오는 중" aria-busy="true">
             <Bone width="100%" height="100%" borderRadius={10} />
         </output>}
-        {current?.src && <Image src={current.src} alt="대화에 첨부한 사진" style={style}
+        {!current?.error && current?.src && <Image src={current.src} alt="대화에 첨부한 사진" style={style}
         classNames={{ root: 'reserve-chat-photo', image: 'reserve-chat-photo-image' }}
         styles={{ root: { width: '100%', height: '100%' } }}
         onLoad={() => settle()} onError={() => settle(true)}
@@ -63,4 +101,4 @@ export default function ChatImage({ url, width, height }) {
             onOpenChange: open => setPreviewScope(open && loaded ? scope : null) }} />}
     </div>;
 }
-ChatImage.propTypes = { url: PropTypes.string.isRequired, width: PropTypes.number, height: PropTypes.number };
+ChatImage.propTypes = { url: PropTypes.string.isRequired, roomId: PropTypes.number, width: PropTypes.number, height: PropTypes.number };

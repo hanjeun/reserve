@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import RefreshButton from './RefreshButton';
 import MessengerListHeading from '../chat/MessengerListHeading';
 
+// Popup motion timers are separate from the refresh cooldown under test.
+vi.mock('./Tooltip', () => ({ default: ({ children }) => children }));
+
 describe('RefreshButton loading feedback', () => {
     it('keeps the same refresh arrow and spins it only during a request', () => {
         const onReload = vi.fn();

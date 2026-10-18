@@ -146,12 +146,16 @@ test('list region hover surface stays smaller than its touch target and reduced 
     expect(hitHeight).toBeGreaterThanOrEqual(44);
     if (!isMobile) {
         await trigger.hover();
-        const hover = await trigger.evaluate(element => ({
-            insetTop: getComputedStyle(element, '::before').top,
-            insetBottom: getComputedStyle(element, '::before').bottom,
-        }));
-        expect(hover.insetTop).toBe('6px');
-        expect(hover.insetBottom).toBe('6px');
+        const hover = await trigger.evaluate(element => {
+            const visual = getComputedStyle(element, '::before');
+            const transform = new DOMMatrixReadOnly(visual.transform);
+            const top = Number.parseFloat(visual.top) + transform.f;
+            const height = Number.parseFloat(visual.height);
+            return { top, bottom: element.getBoundingClientRect().height - top - height, height };
+        });
+        expect(hover.top).toBe(6);
+        expect(hover.bottom).toBe(6);
+        expect(hover.height).toBe(32);
         await expect.poll(() => trigger.evaluate(element => getComputedStyle(element, '::before').opacity)).toBe('1');
     }
 

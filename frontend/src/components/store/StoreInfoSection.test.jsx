@@ -4,16 +4,26 @@ import StoreInfoSection from './StoreInfoSection';
 
 const paid = { noShowDeposit: 3000, allowLatePayment: false, paymentTimeoutMinutes: 60, fullRefundDays: 3, partialRefundDays: 1, partialRefundRate: 50 };
 
-it('describes immediate payment without showing an inactive late-payment deadline', () => {
+it('shows the actual expiry policy for immediate paid reservations', () => {
     render(<StoreInfoSection store={paid} />);
     expect(screen.getByText('3,000원 (신청할 때 결제)')).toBeInTheDocument();
-    expect(screen.queryByText('결제 마감')).not.toBeInTheDocument();
+    expect(screen.getByText('결제 마감')).toBeInTheDocument();
+    expect(screen.getByText('예약 신청 후 1시간 이내 미결제 대기 예약 자동 취소')).toBeInTheDocument();
 });
 
-it('shows a payment deadline only when the paid store allows late payment', () => {
+it('does not promise unpaid expiry when the paid store allows late payment', () => {
     render(<StoreInfoSection store={{ ...paid, allowLatePayment: true }} />);
     expect(screen.getByText('3,000원 (예약 후 결제 가능)')).toBeInTheDocument();
-    expect(screen.getByText('예약 후 1시간 이내 미결제 시 자동 취소')).toBeInTheDocument();
+    expect(screen.getByText('나중 결제 허용 · 미결제 자동 취소 없음')).toBeInTheDocument();
+    expect(screen.queryByText(/1시간 이내/)).not.toBeInTheDocument();
+});
+
+it('preserves an unlimited timeout and uses 30 minutes only for an absent timeout', () => {
+    const { rerender } = render(<StoreInfoSection store={{ ...paid, paymentTimeoutMinutes: 0 }} />);
+    expect(screen.getByText('결제 시간 제한 없음 · 미결제 자동 취소 없음')).toBeInTheDocument();
+    expect(screen.queryByText('예약 신청 후 30분 이내 미결제 대기 예약 자동 취소')).not.toBeInTheDocument();
+    rerender(<StoreInfoSection store={{ ...paid, paymentTimeoutMinutes: null }} />);
+    expect(screen.getByText('예약 신청 후 30분 이내 미결제 대기 예약 자동 취소')).toBeInTheDocument();
 });
 
 it('does not expose stale payment and refund options on a free or waiting-only store', () => {

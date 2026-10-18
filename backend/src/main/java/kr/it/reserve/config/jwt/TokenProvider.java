@@ -4,6 +4,7 @@ import kr.it.reserve.config.jwt.entity.RefreshToken;
 import kr.it.reserve.config.jwt.repository.RefreshTokenRepository;
 import kr.it.reserve.global.error.AuthException;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import io.jsonwebtoken.Claims;
@@ -21,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -40,10 +43,17 @@ public class TokenProvider {
      * @param memberId    서명이 확인된 토큰의 회원 id(만료 포함). INVALID이면 null
      * @param authVersion claim이 없는 구버전 토큰은 0
      */
-    public record RefreshTokenInspection(RefreshTokenState state, Long memberId, int authVersion) { }
+    public record RefreshTokenInspection(RefreshTokenState state, Long memberId, int authVersion,
+            LocalDateTime oauthAuthenticatedAt) {
+        public RefreshTokenInspection(RefreshTokenState state, Long memberId, int authVersion) {
+            this(state, memberId, authVersion, null);
+        }
+    }
 
     private static final String PURPOSE_CLAIM = "purpose";
     private static final String AUTH_VERSION_CLAIM = "authVersion";
+    /** UTC epoch milliseconds of the original provider authentication, never the refresh/issuance time. */
+    private static final String OAUTH_AUTHENTICATED_AT_CLAIM = "oauth_auth_at";
 
     private final JwtProperties jwtProperties;
     private final MemberRepository memberRepository;
@@ -58,7 +68,11 @@ public class TokenProvider {
     }
 
     public String generateAccessToken(Member member) {
-        return generateToken(member, jwtProperties.getAccessTokenExpiration(), Purpose.ACCESS);
+        return generateAccessToken(member, oauthAuthenticationAt(member));
+    }
+
+    public String generateAccessToken(Member member, LocalDateTime oauthAuthenticatedAt) {
+        return generateToken(member, jwtProperties.getAccessTokenExpiration(), Purpose.ACCESS, oauthAuthenticatedAt);
     }
 
     /**
@@ -68,8 +82,13 @@ public class TokenProvider {
      */
     @org.springframework.transaction.annotation.Transactional
     public String generateRefreshToken(Member member) {
+        return generateRefreshToken(member, oauthAuthenticationAt(member));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public String generateRefreshToken(Member member, LocalDateTime oauthAuthenticatedAt) {
         Duration expiration = jwtProperties.getRefreshTokenExpiration();
-        String token = createRefreshJwt(member);
+        String token = createRefreshJwt(member, oauthAuthenticatedAt);
         LocalDateTime expiresAt = LocalDateTime.now(Clock.systemDefaultZone()).plus(expiration);
 
         // 새 토큰 저장
@@ -91,15 +110,19 @@ public class TokenProvider {
 
     /** 저장 없이 refresh JWT 문자열만 만든다. 회전(TokenService.refresh)은 기존 행을 갱신하므로 새 행을 만들면 안 된다. */
     public String createRefreshJwt(Member member) {
-        return generateToken(member, jwtProperties.getRefreshTokenExpiration(), Purpose.REFRESH);
+        return createRefreshJwt(member, oauthAuthenticationAt(member));
     }
 
-    private String generateToken(Member member, Duration expiredAt, Purpose purpose) {
+    public String createRefreshJwt(Member member, LocalDateTime oauthAuthenticatedAt) {
+        return generateToken(member, jwtProperties.getRefreshTokenExpiration(), Purpose.REFRESH, oauthAuthenticatedAt);
+    }
+
+    private String generateToken(Member member, Duration expiredAt, Purpose purpose, LocalDateTime oauthAuthenticatedAt) {
         Date now = new Date();
-        return makeToken(member, new Date(now.getTime() + expiredAt.toMillis()), purpose);
+        return makeToken(member, new Date(now.getTime() + expiredAt.toMillis()), purpose, oauthAuthenticatedAt);
     }
 
-    private String makeToken(Member member, Date expiry, Purpose purpose) {
+    private String makeToken(Member member, Date expiry, Purpose purpose, LocalDateTime oauthAuthenticatedAt) {
         Date now = new Date();
         // jjwt 0.13 API — 0.12에서 set* 계열이 전부 이름을 바꿨고 parserBuilder()는 삭제됐다.
         // (setHeaderParam → header().add(), setIssuer → issuer, setSubject → subject 등)
@@ -115,6 +138,8 @@ public class TokenProvider {
                 .claim("id", member.getId())
                 .claim("role", member.getRole().name())
                 .claim(AUTH_VERSION_CLAIM, member.getAuthVersion())
+                .claim(OAUTH_AUTHENTICATED_AT_CLAIM, isOAuthMember(member) && oauthAuthenticatedAt != null
+                        ? oauthAuthenticatedAt.toInstant(ZoneOffset.UTC).toEpochMilli() : null)
                 .claim(PURPOSE_CLAIM, purpose.name())
                 .signWith(cachedSecretKey)
                 .compact();
@@ -150,7 +175,35 @@ public class TokenProvider {
         if (memberId == null) {
             return new RefreshTokenInspection(RefreshTokenState.INVALID, null, 0);
         }
-        return new RefreshTokenInspection(RefreshTokenState.VALID, memberId, readAuthVersion(claims));
+        try {
+            return new RefreshTokenInspection(RefreshTokenState.VALID, memberId, readAuthVersion(claims), readOAuthAuthenticationAt(claims));
+        } catch (JwtException exception) {
+            return new RefreshTokenInspection(RefreshTokenState.INVALID, null, 0);
+        }
+    }
+
+    private static LocalDateTime readOAuthAuthenticationAt(Claims claims) {
+        Object raw = claims.get(OAUTH_AUTHENTICATED_AT_CLAIM);
+        if (raw == null) return null;
+        if (!(raw instanceof Long || raw instanceof Integer)) throw new JwtException("Invalid OAuth authentication time");
+        try {
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Number) raw).longValue()), ZoneOffset.UTC);
+        } catch (java.time.DateTimeException exception) {
+            throw new JwtException("Invalid OAuth authentication time");
+        }
+    }
+
+    private static boolean isOAuthMember(Member member) {
+        return member.getProvider() != null && member.getProvider() != AuthProvider.LOCAL;
+    }
+
+    private static LocalDateTime oauthAuthenticationAt(Member member) {
+        return isOAuthMember(member) ? member.getOauthAuthenticatedAt() : null;
+    }
+
+    public boolean isOAuthSessionCurrent(Member member, LocalDateTime authenticatedAt) {
+        return !isOAuthMember(member) || member.getOauthSecurityRevokedAt() == null
+                || authenticatedAt != null && authenticatedAt.isAfter(member.getOauthSecurityRevokedAt());
     }
 
     private static Long readMemberId(Claims claims) {
@@ -180,6 +233,11 @@ public class TokenProvider {
         return getClaims(token).get("id", Long.class);
     }
 
+    /** 서명·만료를 검증한 연결의 원인증 문맥. 현재 회원의 최신 시각으로 대체하지 않는다. */
+    public LocalDateTime getOAuthAuthenticationAt(String token) {
+        return readOAuthAuthenticationAt(getClaims(token));
+    }
+
     /**
      * 토큰 서명만 맞는 것으로 인증하지 않고 현재 활성 회원 행을 확인한다.
      * 탈퇴·익명화 직후 기존 access token이 만료될 때까지 살아 있는 공백을 막는 관문이다.
@@ -201,6 +259,9 @@ public class TokenProvider {
         // 바꾸면 회원 행이 1 이상이 되어 그 이전 access JWT도 즉시 전부 거부된다.
         if (readAuthVersion(claims) != member.getAuthVersion()) {
             throw new AuthException("로그인 세션이 만료됐어요. 다시 로그인해주세요.");
+        }
+        if (!isOAuthSessionCurrent(member, readOAuthAuthenticationAt(claims))) {
+            throw new AuthException("계정 보호를 위해 소셜 로그인을 다시 진행해주세요.");
         }
         return member;
     }

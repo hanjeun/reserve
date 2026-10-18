@@ -22,14 +22,14 @@ describe('route skeleton path normalization', () => {
         ['/', 'discovery'], ['/search', 'search'], ['/my-page', 'my-page'],
         ['/store/register', 'store-form'], ['/store/12/edit', 'store-form'], ['/store/12', 'detail'],
         ['/stores', 'store-list'], ['/benefits', 'benefits'], ['/benefits/abc', 'benefit-detail'],
-        ['/waiting', 'waiting'], ['/feed', 'coming-soon'],
+        ['/waiting', 'waiting'], ['/feed', 'feed'], ['/feed/posts/12', 'feed-detail'], ['/feed/u/author', 'feed-author'],
         ['/my-stores', 'cards'], ['/my-favorites', 'cards'], ['/my-reservations', 'reservations'],
         ['/login', 'auth'], ['/signup', 'auth'], ['/forgot-password', 'auth'], ['/signup/social', 'auth'],
         ['/terms', 'legal'], ['/privacy', 'legal'], ['/content-sources', 'legal'],
         ['/operation-guide', 'guide'], ['/guide/user', 'guide'], ['/guide/business', 'guide'], ['/guide/common', 'guide'],
         ['/payment/result', 'payment-result'], ['/admin', 'admin'], ['/business', 'business'], ['/messages', 'messages'],
         ['/oauth2/callback', 'discovery'], ['/unknown', 'not-found'], ['/store/12/unknown', 'not-found'],
-        ['/benefits/1/extra', 'not-found'],
+        ['/benefits/1/extra', 'not-found'], ['/feed/posts/1/extra', 'not-found'], ['/feed/u/author/extra', 'not-found'],
     ])('preserves %s routing with and without trailing slashes', (path, kind) => {
         expect(getRouteSkeletonKind(path)).toBe(kind);
         expect(getRouteSkeletonKind(path + '///')).toBe(kind);

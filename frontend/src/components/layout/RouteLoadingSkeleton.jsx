@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import { useLocation } from 'react-router-dom';
 import { getRouteSkeletonKind, resolveRouteSkeletonLocation } from './routeSkeletonKind';
 import { usePageSkeletonModule } from './routeSkeletonLoader';
-import { useMarkSkeletonShown } from './loadingPresentation';
 
 export function RouteSkeletonPreview({ pathname, search = '' }) {
     const location = resolveRouteSkeletonLocation(pathname, search);
@@ -11,7 +10,6 @@ export function RouteSkeletonPreview({ pathname, search = '' }) {
     const kind = getRouteSkeletonKind(normalizedPath);
     const module = usePageSkeletonModule(kind);
     const Skeleton = module?.default;
-    useMarkSkeletonShown(undefined, Boolean(Skeleton));
     return (
         <LoadingStatus as="section" className={`reserve-route-skeleton reserve-route-skeleton--${kind}`} aria-label="화면을 불러오는 중" aria-busy="true">
             <div aria-hidden="true" inert>

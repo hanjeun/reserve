@@ -52,6 +52,10 @@ public class AuditLogService {
     private final AdvertisementRepository advertisementRepository;
     private final ObjectMapper objectMapper;
     private final AuditCleanupWorker auditCleanupWorker;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.reservation.service.ReservationUpdates reservationUpdates;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.review.service.ReviewUpdates reviewUpdates;
 
     // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
 
@@ -83,6 +87,7 @@ public class AuditLogService {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> AuditException.notFound("Reservation not found: " + reservationId));
         reservation.softDelete();
+        if (reservationUpdates != null) reservationUpdates.deleted(reservation);
         saveAuditLog(RESERVATION_ENTITY_TYPE, reservationId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   reservation.getStore().getName(),
                 "예약자", nullSafe(reservation.getMember().getName()),
@@ -97,6 +102,7 @@ public class AuditLogService {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> AuditException.notFound("Review not found: " + reviewId));
         review.softDelete();
+        if (reviewUpdates != null) reviewUpdates.deleted(review);
         saveAuditLog("REVIEW", reviewId, SOFT_DELETE_ACTION, Map.of(
                 "가게",   review.getStore().getName(),
                 "작성자", nullSafe(review.getMember().getName()),
@@ -135,6 +141,11 @@ public class AuditLogService {
             case "REVIEW"         -> reviewRepository.restoreById(entityId);
             case "ADVERTISEMENT"  -> advertisementRepository.restoreById(entityId);
             default -> throw new AuditException("휴지통 복구가 지원되지 않는 항목이에요: " + entityType);
+        }
+        if (RESERVATION_ENTITY_TYPE.equalsIgnoreCase(entityType) && reservationUpdates != null) {
+            reservationRepository.findById(entityId).ifPresent(reservationUpdates::updated);
+        } else if ("REVIEW".equalsIgnoreCase(entityType) && reviewUpdates != null) {
+            reviewRepository.findById(entityId).ifPresent(reviewUpdates::updated);
         }
         // 휴지통에서 제거 (SOFT_DELETE 로그 삭제)
         auditLogRepository.deleteSoftDeleteLog(entityType.toUpperCase(), entityId);

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -19,7 +20,8 @@ public class SitemapService {
 
     private static final String MONTHLY_CHANGE_FREQ = "monthly";
 
-    private static final String ORIGIN = "https://reserve.it.kr";
+    @Value("#{siteUrls.appOrigin}")
+    private String origin = kr.it.reserve.config.SiteUrls.DEFAULT_APP_ORIGIN;
     // Home, discovery, three policy pages, and three guides reserve eight URLs.
     private static final int MAX_STORE_URLS = 49_992;
 
@@ -46,20 +48,20 @@ public class SitemapService {
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                 .append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
 
-        appendUrl(xml, ORIGIN + "/", null, "weekly", "1.0");
-        appendUrl(xml, ORIGIN + "/stores", storesLastModified, "daily", "0.9");
-        appendUrl(xml, ORIGIN + "/terms", null, MONTHLY_CHANGE_FREQ, "0.3");
-        appendUrl(xml, ORIGIN + "/privacy", null, MONTHLY_CHANGE_FREQ, "0.3");
-        appendUrl(xml, ORIGIN + "/content-sources", null, MONTHLY_CHANGE_FREQ, "0.3");
-        appendUrl(xml, ORIGIN + "/guide/user", null, MONTHLY_CHANGE_FREQ, "0.3");
-        appendUrl(xml, ORIGIN + "/guide/business", null, MONTHLY_CHANGE_FREQ, "0.3");
-        appendUrl(xml, ORIGIN + "/guide/common", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, origin + "/", null, "weekly", "1.0");
+        appendUrl(xml, origin + "/stores", storesLastModified, "daily", "0.9");
+        appendUrl(xml, origin + "/terms", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, origin + "/privacy", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, origin + "/content-sources", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, origin + "/guide/user", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, origin + "/guide/business", null, MONTHLY_CHANGE_FREQ, "0.3");
+        appendUrl(xml, origin + "/guide/common", null, MONTHLY_CHANGE_FREQ, "0.3");
 
         for (StoreSitemapEntry store : stores) {
             LocalDate lastModified = store.lastModifiedAt() == null
                     ? null
                     : store.lastModifiedAt().toLocalDate();
-            appendUrl(xml, ORIGIN + "/store/" + store.id(), lastModified, "weekly", "0.8");
+            appendUrl(xml, origin + "/store/" + store.id(), lastModified, "weekly", "0.8");
         }
 
         return xml.append("</urlset>\n").toString();

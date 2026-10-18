@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Flex } from 'antd';
-import { CalendarOutlined, ClockCircleOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
+import { CalendarOutlined, ClockCircleOutlined, PlusOutlined, MinusOutlined } from '../../../../components/common/icons';
 import { colors, radius, fontWeight, fontSize } from '../../../../styles/tokens';
 import { Button } from '../../../../components/common';
 // 목업 폭은 Home.styles.js 의 HOME_MOCKUP_WIDTH 하나에서 온다 — 섹션마다 달라지면 간격이 어긋난다.

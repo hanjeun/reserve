@@ -5,6 +5,7 @@ import kr.it.reserve.config.jwt.TokenProvider;
 import kr.it.reserve.config.oauth2.CustomOAuth2UserService;
 import kr.it.reserve.config.oauth2.OAuth2AuthenticationFailureHandler;
 import kr.it.reserve.config.oauth2.OAuth2AuthenticationSuccessHandler;
+import kr.it.reserve.config.oauth2.TrustedOAuth2AuthorizationRequestResolver;
 import kr.it.reserve.global.common.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -19,6 +22,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -33,6 +37,7 @@ import java.util.List;
 @Configuration
 @EnableMethodSecurity  // @PreAuthorize, @PostAuthorize 등 메서드 수준 보안 활성화
 @EnableWebSecurity
+@Import(SiteUrls.class)
 public class SecurityConfig {
 
     /**
@@ -49,6 +54,7 @@ public class SecurityConfig {
      */
     @Value("${cors.allowed-origins:https://reserve.it.kr}")
     private List<String> allowedOrigins;
+    @Autowired private SiteUrls siteUrls;
 
     private final TokenProvider tokenProvider;
     private final CustomOAuth2UserService customOAuth2UserService;
@@ -57,7 +63,7 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper; // ApiResponse를 JSON으로 변환하기 위해 필요
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, ClientRegistrationRepository registrations) throws Exception {
         CookieCsrfTokenRepository csrfTokens = new CookieCsrfTokenRepository();
         csrfTokens.setCookieName("__Host-XSRF-TOKEN");
         csrfTokens.setCookieCustomizer(cookie -> cookie.secure(true).path("/"));
@@ -67,7 +73,7 @@ public class SecurityConfig {
                 // 신뢰할 수 없는 브라우저 요청에는 Spring의 CSRF 검증을 적용한다.
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokens)
-                        .requireCsrfProtectionMatcher(new BrowserCsrfMatcher(allowedOrigins)))
+                        .requireCsrfProtectionMatcher(new BrowserCsrfMatcher(browserOrigins())))
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
@@ -87,6 +93,9 @@ public class SecurityConfig {
                         //   경로를 넓히지 말 것 — "/api/payment/**" 로 풀면 결제·환불 API 가 통째로 열린다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/payment/webhook/portone")).permitAll()
+                        // Provider events authenticate their signed SET body; no browser session is trusted.
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                ApiPaths.withV1Aliases("/api/oauth/events/google", "/api/oauth/events/kakao", "/api/oauth/events/naver")).permitAll()
                         // CSP Report-Only 브라우저 진단. 인증 쿠키가 없는 브라우저도 보낼 수 있어야 한다.
                         // 본문은 CspReportController가 URL을 버리고 고정 범주만 기록한다.
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
@@ -105,6 +114,8 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 ApiPaths.withV1Aliases("/api/auth/agree-terms")).authenticated()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/login/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/updates/public/events")).permitAll()
 
                         // 공개 API — 공개 화면이 실제로 쓰는 GET 만 연다(2026-09-21).
                         // 예전엔 /api/stores/**·/api/reviews/**·/api/notices/** 를 통째로 열어서 새 GET 을 추가하는 순간
@@ -133,7 +144,17 @@ public class SecurityConfig {
                                 ApiPaths.withV1Aliases("/api/tourism/region-photos/**")).permitAll()
                         // 가게 소식 v1의 최소 공개 응답만 허용한다. 기존 /my·/my-stores·CUD는 인증 유지.
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
-                                ApiPaths.withV1Aliases("/api/promotions/public", "/api/promotions/public/{promotionId}")).permitAll()
+                                ApiPaths.withV1Aliases("/api/promotions/public", "/api/promotions/public/events", "/api/promotions/public/{promotionId}")).permitAll()
+                        // 공개 피드의 최소 읽기만 허용한다. me/쓰기/신고/관리자 증거는 인증을 유지한다.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/feed/config", "/api/feed/regions", "/api/feed/posts", "/api/feed/posts/{id:\\d+}",
+                                        "/api/feed/interactions/config", "/api/feed/likes/{type:POST|NEWS|COMMENT}/{id:\\d+}", "/api/feed/comments/{id:\\d+}",
+                                        "/api/feed/posts/{id:\\d+}/comments", "/api/feed/comments/{id:\\d+}/replies",
+                                        "/api/feed/authors/{publicId:[0-9a-fA-F\\-]{36}}",
+                                        "/api/feed/authors/{publicId:[0-9a-fA-F\\-]{36}}/posts",
+                                        "/api/feed/media/{id:\\d+}")).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                ApiPaths.withV1Aliases("/api/store-news/config", "/api/store-news/media/{id:\\d+}")).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 ApiPaths.withV1Aliases("/api/favorites/status/**")).permitAll()
                         // 실시간 잔여 슬롯 조회 — 로그인 여부와 무관하게 누구나 시간대만 볼 수 있어야 함
@@ -187,6 +208,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         // OAuth2 state 파라미터를 세션에 저장 (STATELESS 환경에서 필수)
                         .authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestResolver(new TrustedOAuth2AuthorizationRequestResolver(registrations, siteUrls.oauthOrigins(browserOrigins())))
                                 .authorizationRequestRepository(new HttpSessionOAuth2AuthorizationRequestRepository()))
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2AuthenticationSuccessHandler)
@@ -213,7 +235,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // 프로파일별 yml에서 주입 (local.yml: localhost·ngrok 포함 / prod.yml: 운영 도메인만)
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOrigins(browserOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
@@ -221,6 +243,8 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+
+    private List<String> browserOrigins() { return siteUrls == null ? allowedOrigins : siteUrls.browserOrigins(allowedOrigins); }
 
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {

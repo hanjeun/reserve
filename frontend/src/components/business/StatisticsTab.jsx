@@ -6,7 +6,7 @@ import {
     AreaChart, Area, PieChart, Pie,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '@ant-design/icons';
+import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '../common/icons';
 import { DataState, StatCard, ChartCard, SegmentedControl, PieLegend, FilterToolbar } from '../common';
 import { Bone } from '../common/Skeletons';
 import { SegmentedControlSkeleton } from '../layout/routeSkeletonParts';
@@ -397,7 +397,7 @@ const StatisticsTab = () => {
                 ariaLabel: '통계 가게 필터',
                 value: storeId,
                 onChange: value => setStatisticsParams({ statisticsStore: String(value) }),
-                disabled: storesLoading || Boolean(storesError),
+                disabled: storesLoading || Boolean(storesError) && !myStores.length,
                 loading: storesLoading,
                 width: 148,
                 mobileWidth: 112,
@@ -420,7 +420,7 @@ const StatisticsTab = () => {
         />
     );
 
-    if (storesError) {
+    if (storesError && !myStores.length) {
         return (
             <div className="reserve-statistics-tab" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {toolbar}
@@ -444,6 +444,8 @@ const StatisticsTab = () => {
     return (
         <div className="reserve-statistics-tab" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {toolbar}
+            {storesError && myStores.length > 0 && <DataState state="error" kind="store" subject="가게 목록" error={storesError}
+                onRetry={refetchStores} retrying={storesLoading} compact />}
             {statsError && (
                 <DataState state="error" subject="통계" error={statsError}
                     title={stats
@@ -464,6 +466,7 @@ const StatisticsTab = () => {
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ChartCard
                     title="예약 추이"
+                    loading={loading}
                     height={260}
                     minWidth={340}
                     summary={!loading ? summarizeDaily(stats?.reservationTrend, '건') : undefined}
@@ -475,6 +478,7 @@ const StatisticsTab = () => {
 
                 <ChartCard
                     title="상태별 분포"
+                    loading={loading}
                     height={260}
                     minWidth={280}
                     summary={statusPieSummary(loading, stats, statusPieData)}
@@ -486,6 +490,7 @@ const StatisticsTab = () => {
 
                 <ChartCard
                     title="예약금 순결제액 추이"
+                    loading={loading}
                     height={260}
                     minWidth={340}
                     summary={revenueSummary(loading, stats)}
@@ -501,7 +506,7 @@ const StatisticsTab = () => {
                 누적 카운터만 있고 일별 추이는 아직 없음(Advertisement 엔티티에 카운터 컬럼만 있는 구조이라) —
                 노출형은 클릭 개념이 없어서 노출수만, 배너형은 클릭/전환까지 함께 보여준다. */}
             {(loading || stats?.adSummary) && (
-                <ChartCard title="광고 성과" height="auto">
+                <ChartCard title="광고 성과" loading={loading} height="auto">
                     {renderAdPerformance(loading, stats?.adSummary)}
                 </ChartCard>
             )}

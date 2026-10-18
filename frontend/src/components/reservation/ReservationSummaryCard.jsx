@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FileTextOutlined } from '@ant-design/icons';
+import { FileTextOutlined } from '../common/icons';
 import { Card } from '../common';
 import ReservationStatusBadge from './ReservationStatusBadge';
 import { formatCurrency, formatTime, getThumbnailUrl } from '../../utils';
@@ -25,8 +25,9 @@ export default function ReservationSummaryCard({
         allowLatePayment, paymentTimeoutMinutes,
     } = reservation;
     const unpaid = depositAmount > 0 && !depositPaid && status === 'PENDING';
-    const timeoutNote = unpaid && !allowLatePayment
-        ? `${paymentTimeoutMinutes || 30}분 내 결제`
+    const timeout = paymentTimeoutMinutes ?? 30;
+    const timeoutNote = unpaid && !allowLatePayment && timeout > 0
+        ? `${timeout}분 내 결제`
         : null;
 
     const cardActions = React.Children.toArray(actions).map((action) => {
@@ -41,6 +42,7 @@ export default function ReservationSummaryCard({
         <Card
             hoverable
             className="reserve-reservation-summary-card"
+            data-list-item-id={`reservation:${reservation.id}`}
             actions={cardActions.length > 0 ? cardActions : undefined}
         >
             <div className="reserve-tap-card reserve-reservation-summary-card-content">

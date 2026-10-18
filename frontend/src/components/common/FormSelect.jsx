@@ -3,7 +3,7 @@
  *
  * **폼에 값을 입력하는 셀렉트.** 채움형 회색 — FormInput·FormTextArea·FormDatePicker·FormTimePicker와
  * 같은 톤이고 높이도 같다(54px).
- * 목록·툴바 위의 조작 도구라면 이게 아니라 `FilterSelect`(흰 면 + 테두리)를 쓴다.
+ * 목록·툴바 위의 입력 없는 필터는 `FilterMenu`(투명 텍스트 메뉴)를 쓴다.
  *
  * 사용법:
  *   <FormSelect placeholder="선택" options={[{ value: '한식', label: '한식' }]} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tag, Typography } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,12 +6,13 @@ import {
     Button,
     DataState,
     DataTable,
-    FilterToolbar,
+    FilterMenu,
     FormField,
     FormModal,
     FormSelect,
     FormTextArea,
     ModalLoading,
+    RefreshButton,
 } from '../common';
 import { useMessage } from '../../hooks';
 import { adminKeys } from '../../hooks/queryKeys';
@@ -19,6 +20,13 @@ import { chatService } from '../../services';
 import { listRows } from '../../utils/listResponse';
 import ChatImage from '../chat/ChatImage';
 import ChatRetentionModal from './ChatRetentionModal';
+import ManagementListToolbar from '../common/ManagementListToolbar';
+import SkeletonText from '../common/SkeletonText';
+import { colors } from '../../styles/tokens';
+import { useQueryParamsState } from '../../hooks/useQueryParamState';
+import { reviewOption, reviewPage } from './managementReviewQuery';
+import useWorkspaceAction from '../../hooks/useWorkspaceAction';
+import { assertCurrentSession, currentSession, isCurrentSession } from '../../api/sessionScope';
 
 const { Text } = Typography;
 const PAGE_SIZE = 20;
@@ -51,14 +59,19 @@ const formatDateTime = (value) => {
 const ChatReportsPanel = () => {
     const { message } = useMessage();
     const client = useQueryClient();
-    const [filter, setFilter] = useState('ALL');
-    const [page, setPage] = useState(1);
+    const [queryState, setQuery] = useQueryParamsState({ chatReportStatus: 'ALL', chatReportPage: '1' });
+    const filter = reviewOption(FILTERS, queryState.chatReportStatus, 'ALL');
+    const page = reviewPage(queryState.chatReportPage);
+    const setPage = value => setQuery({ chatReportPage: String(value) });
     const [selected, setSelected] = useState(null);
     const [contextReportId, setContextReportId] = useState(null);
     const [retentionReportId, setRetentionReportId] = useState(null);
     const [resolutionStatus, setResolutionStatus] = useState('RESOLVED');
     const [resolutionNote, setResolutionNote] = useState('');
     const [noteError, setNoteError] = useState('');
+    const [conflict, setConflict] = useState(false);
+    const [reloading, setReloading] = useState(false);
+    const requestAction = useWorkspaceAction();
 
     const query = useQuery({
         queryKey: [...adminKeys.chatReports(filter), page],
@@ -71,27 +84,51 @@ const ChatReportsPanel = () => {
         enabled: contextReportId != null,
     });
     const review = useMutation({
-        mutationFn: ({ id, status, note }) => chatService.reviewReport(id, {
-            status,
-            resolutionNote: note || undefined,
-        }),
-        onSuccess: () => message.success('신고 처리 상태를 저장했어요.'),
-        onError: () => message.error('신고 처리 상태를 저장하지 못했어요.'),
-        onSettled: () => client.invalidateQueries({ queryKey: ['admin', 'chatReports'] }),
+        mutationFn: async ({ id, status, note, revision, session }) => {
+            assertCurrentSession(session);
+            const result = await chatService.reviewReport(id, { status, resolutionNote: note || undefined, revision });
+            assertCurrentSession(session); return result;
+        },
+        onSuccess: (_, values) => { if (isCurrentSession(values.session)) message.success('신고 처리 상태를 저장했어요.'); },
+        onError: (failure, values) => {
+            if (!isCurrentSession(values.session) || failure.isStaleSession) return;
+            if (failure.status === 409) setConflict(true);
+            message.error(failure.message || '신고 처리 상태를 저장하지 못했어요.');
+        },
+        onSettled: (_, __, values) => { if (isCurrentSession(values.session)) return client.invalidateQueries({ queryKey: ['admin', 'chatReports'] }); },
     });
 
-    const startReview = (record) => review.mutate({ id: record.id, status: 'REVIEWING' });
+    const startReview = (record) => {
+        if (!Number.isSafeInteger(record.revision) || review.isPending) return;
+        review.mutate({ id: record.id, revision: record.revision, status: 'REVIEWING', session: currentSession().epoch });
+    };
     const openResolution = (record) => {
         setSelected(record);
         setResolutionStatus('RESOLVED');
         setResolutionNote('');
         setNoteError('');
+        setConflict(false);
     };
     const closeResolution = () => {
-        if (!review.isPending) setSelected(null);
+        if (!review.isPending && !reloading) setSelected(null);
+    };
+    const reloadResolution = async () => {
+        if (!selected || review.isPending || reloading) return;
+        const id = selected.id;
+        const session = currentSession().epoch;
+        setReloading(true);
+        try {
+            const latest = (await chatService.getReportContext(id)).report;
+            assertCurrentSession(session);
+            if (latest?.id !== id || !Number.isSafeInteger(latest.revision)) return;
+            setSelected(latest);
+            setResolutionStatus(['RESOLVED', 'DISMISSED'].includes(latest.status) ? latest.status : 'RESOLVED');
+            setResolutionNote(latest.resolutionNote || ''); setNoteError(''); setConflict(false);
+        } catch (failure) { if (isCurrentSession(session) && !failure.isStaleSession) message.error(failure.message || '신고를 다시 불러오지 못했어요.'); }
+        finally { if (isCurrentSession(session)) setReloading(false); }
     };
     const submitResolution = async () => {
-        if (!selected) return;
+        if (!selected || review.isPending || reloading || conflict) return;
         const note = resolutionNote.trim();
         if (!note) {
             setNoteError('처리 근거를 입력해주세요.');
@@ -99,8 +136,9 @@ const ChatReportsPanel = () => {
         }
         setNoteError('');
         try {
-            await review.mutateAsync({ id: selected.id, status: resolutionStatus, note });
-            setSelected(null);
+            const session = currentSession().epoch;
+            await review.mutateAsync({ id: selected.id, revision: selected.revision, status: resolutionStatus, note, session });
+            if (isCurrentSession(session)) setSelected(null);
         } catch {
             // mutation의 onError가 공통 메시지를 표시한다.
         }
@@ -130,7 +168,7 @@ const ChatReportsPanel = () => {
                     보존 설정
                 </Button>
                 {record.status === 'OPEN' && (
-                    <Button variant="ghost-sm-primary" size="sm" disabled={review.isPending}
+                    <Button variant="ghost-sm-primary" size="sm" disabled={review.isPending || !Number.isSafeInteger(record.revision)}
                         onClick={() => startReview(record)}>검토 시작</Button>
                 )}
                 {(record.status === 'OPEN' || record.status === 'REVIEWING') && (
@@ -143,6 +181,10 @@ const ChatReportsPanel = () => {
 
     const rows = listRows(query.data);
     const total = query.data?.page?.totalElements ?? query.data?.totalElements ?? rows.length;
+    const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    useEffect(() => {
+        if (query.isSuccess && !query.isFetching && !query.isPlaceholderData && page > lastPage) setQuery({ chatReportPage: String(lastPage) });
+    }, [query.isSuccess, query.isFetching, query.isPlaceholderData, page, lastPage, setQuery]);
     // 목록: 실패 → 로딩 → 표 순으로 판정한다.
     const renderReports = () => {
         if (query.isError) {
@@ -182,7 +224,7 @@ const ChatReportsPanel = () => {
         return (
             <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
                 {contextQuery.data?.reportedMessage && (
-                    <div style={{ padding: 12, marginBottom: 12, borderRadius: 10, background: 'var(--c-red-50, #fff1f0)' }}>
+                    <div style={{ padding: 12, marginBottom: 12, borderRadius: 10, background: colors.error.light, color: colors.text.primary }}>
                         <strong>신고된 메시지</strong>
                         {contextQuery.data.reportedMessage.imageUrl && <ChatImage
                             url={`/api/admin/chat/reports/${contextReportId}/images/${contextQuery.data.reportedMessage.id}`}
@@ -210,21 +252,10 @@ const ChatReportsPanel = () => {
 
     return (
         <section aria-label="신고">
-            <FilterToolbar
-                selects={[{
-                    key: 'chat-report-status',
-                    value: filter,
-                    options: FILTERS,
-                    onChange: (value) => { setFilter(value); setPage(1); },
-                    ariaLabel: '신고 상태',
-                    width: 132,
-                    mobileWidth: 120,
-                }]}
-                count={total}
-                onReload={query.refetch}
-                loading={query.isFetching}
-                initialLoading={query.isLoading}
-            />
+            <ManagementListToolbar leading={<span className="reserve-management-count"><SkeletonText loading={query.isPending}>{total.toLocaleString('ko-KR')}건</SkeletonText></span>}
+                trailing={<><FilterMenu value={filter} options={FILTERS} aria-label="채팅 신고 상태"
+                    onChange={value => setQuery({ chatReportStatus: value, chatReportPage: '1' })} />
+                    <RefreshButton onReload={query.refetch} loading={query.isFetching} /></>} />
             {renderReports()}
             <ChatRetentionModal reportId={retentionReportId} onClose={() => setRetentionReportId(null)} />
 
@@ -233,10 +264,14 @@ const ChatReportsPanel = () => {
                 open={Boolean(selected)}
                 onClose={closeResolution}
                 onSubmit={submitResolution}
-                submitting={review.isPending}
+                submitting={review.isPending || reloading}
+                submitDisabled={conflict || !Number.isSafeInteger(selected?.revision)}
+                navigationDirty={Boolean(resolutionNote || resolutionStatus !== 'RESOLVED')}
                 submitText="처리 저장"
                 mobileSheet={false}
             >
+                {conflict && <DataState state="error" compact title="다른 관리자가 신고를 변경했어요. 다시 불러와 검토해주세요."
+                    onRetry={() => requestAction(reloadResolution, { discard: false })} retrying={reloading} />}
                 <FormField label="처리 결과">
                     <FormSelect value={resolutionStatus} onChange={setResolutionStatus}
                         options={RESOLUTION_OPTIONS} />

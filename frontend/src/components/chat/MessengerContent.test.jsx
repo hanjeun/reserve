@@ -168,7 +168,7 @@ describe('MessengerContent', () => {
         await waitFor(() => expect(chatService.listConversations).toHaveBeenCalled());
         expect(screen.getByRole('button', { name: '고객지원에 문의' })).toBeEnabled();
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-        expect(screen.queryByText('아직 시작한 대화가 없어요.')).not.toBeInTheDocument();
+        expect(screen.queryByText('아직 문의한 내역이 없어요.')).not.toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '대화', exact: true }));
         expect(await screen.findByRole('alert')).toHaveTextContent('대화 목록을 불러오지 못했어요.');
         expect(screen.queryByRole('button', { name: '고객지원에 문의' })).not.toBeInTheDocument();
@@ -208,10 +208,10 @@ describe('MessengerContent', () => {
         expect(await screen.findByRole('button', { name: /새로고침 검증 가게/ })).toBeVisible();
         await user.click(screen.getByRole('button', { name: '대화 목록 새로고침' }));
 
-        expect(await screen.findByText('최신 대화를 확인하지 못해 이전 목록을 보여드리고 있어요.'))
+        expect(await screen.findByText('목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요.'))
             .toBeVisible();
         expect(screen.getByRole('button', { name: /새로고침 검증 가게/ })).toBeVisible();
-        expect(screen.getByRole('alert')).toHaveTextContent('최신 대화를 확인하지 못해 이전 목록을 보여드리고 있어요.');
+        expect(screen.getByRole('alert')).toHaveTextContent('목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요.');
     });
 
     it.each(['BUSINESS', 'ADMIN'])('refreshes both available lists for %s without opening a room', async role => {
@@ -297,7 +297,7 @@ describe('MessengerContent', () => {
         const adminInbox = await screen.findByRole('region', { name: '고객지원 문의' });
         const adminRow = await screen.findByRole('button', { name: /한재은/ });
         expect(within(adminInbox).getAllByRole('button')).toEqual([adminRow]);
-        const myConversations = screen.getByRole('region', { name: '내 대화' });
+        const myConversations = screen.getByRole('region', { name: '내 문의' });
         expect(within(myConversations).queryByRole('button', { name: /RESERVE 고객지원/ })).not.toBeInTheDocument();
     });
 
@@ -312,7 +312,7 @@ describe('MessengerContent', () => {
         );
         expect(chatService.listConversations).toHaveBeenCalledTimes(1);
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
-        await screen.findByText('아직 시작한 대화가 없어요.');
+        await screen.findByText('아직 문의한 내역이 없어요.');
         expect(chatService.listConversations).toHaveBeenCalledTimes(2);
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         expect(chatService.getSupport).not.toHaveBeenCalled();
@@ -335,7 +335,7 @@ describe('MessengerContent', () => {
 
         expect(await screen.findByRole('alert')).toHaveTextContent('대화 목록');
         expect(screen.getAllByRole('alert')).toHaveLength(1);
-        expect(screen.queryByRole('region', { name: '내 대화' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: '내 문의' })).not.toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: '다시 불러오기' }));
         await waitFor(() => expect(chatService.listConversations).toHaveBeenCalledTimes(2));
@@ -392,7 +392,7 @@ describe('MessengerContent', () => {
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
         useMessengerStore.getState().showConversations();
         renderMessenger({ surface: 'panel' });
-        await screen.findByText('아직 시작한 대화가 없어요.');
+        await screen.findByText('아직 문의한 내역이 없어요.');
         expect(screen.queryByRole('button', { name: '고객지원에 문의' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: '홈', exact: true })).toBeEnabled();
         expect(chatService.getSupport).not.toHaveBeenCalled();
@@ -622,7 +622,7 @@ describe('MessengerContent', () => {
         renderMessenger();
 
         const row = await screen.findByRole('button', { name: /회원7/ });
-        expect(screen.getByText('가게 받은 문의')).toBeInTheDocument();
+        expect(screen.getByText('손님 문의')).toBeInTheDocument();
         await user.click(row);
         await waitFor(() => expect(chatService.getStoreInboxRoom).toHaveBeenCalledWith(77));
     });

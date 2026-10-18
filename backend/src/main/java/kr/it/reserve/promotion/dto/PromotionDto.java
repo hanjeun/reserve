@@ -5,6 +5,9 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.OffsetDateTime;
+import java.util.List;
+import kr.it.reserve.promotion.StoreNewsPolicy;
 
 public class PromotionDto {
 
@@ -15,6 +18,7 @@ public class PromotionDto {
 
     /** 공개 목록에는 작성자·임의 홍보 이미지·긴 본문을 포함하지 않는다. */
     @Getter
+    @Setter
     @Builder
     public static class PublicPromotionSummaryResponse {
         private Long id;
@@ -27,6 +31,18 @@ public class PromotionDto {
         private String excerpt;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        private String newsType;
+        private String design;
+        private OffsetDateTime startsAt;
+        private OffsetDateTime endsAt;
+        private String conditions;
+        private String periodStatus;
+        private String state;
+        private long revision;
+        private Long feedPostId;
+        private boolean feedEnabled;
+        private boolean benefitVisible;
+        @Builder.Default private List<? extends NewsImage> images = List.of();
 
         public static PublicPromotionSummaryResponse fromEntity(Promotion promotion) {
             return PublicPromotionSummaryResponse.builder()
@@ -40,6 +56,16 @@ public class PromotionDto {
                     .excerpt(plainTextExcerpt(promotion.getContent()))
                     .createdAt(promotion.getCreatedAt())
                     .updatedAt(promotion.getUpdatedAt())
+                    .newsType(promotion.getNewsType().name())
+                    .design(promotion.getDesign() == null ? "STANDARD" : promotion.getDesign().name())
+                    .startsAt(StoreNewsPolicy.offset(promotion.getStartsAt()))
+                    .endsAt(StoreNewsPolicy.offset(promotion.getEndsAt()))
+                    .conditions(promotion.getConditions())
+                    .periodStatus(StoreNewsPolicy.period(promotion, StoreNewsPolicy.now()))
+                    .state(promotion.getState().name()).revision(promotion.getRevision())
+                    .feedPostId(null)
+                    .feedEnabled(false)
+                    .benefitVisible(StoreNewsPolicy.publicBenefit(promotion))
                     .build();
         }
 
@@ -54,6 +80,7 @@ public class PromotionDto {
 
     /** 본문은 원문 문자열이다. 클라이언트는 HTML이 아닌 텍스트로만 렌더한다. */
     @Getter
+    @Setter
     @Builder
     public static class PublicPromotionDetailResponse {
         private Long id;
@@ -66,6 +93,20 @@ public class PromotionDto {
         private String content;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        private String newsType;
+        private String design;
+        private OffsetDateTime startsAt;
+        private OffsetDateTime endsAt;
+        private String conditions;
+        private String periodStatus;
+        private String state;
+        private long revision;
+        private Long feedPostId;
+        private boolean feedEnabled;
+        private boolean benefitVisible;
+        private boolean reservationEnabled;
+        private boolean waitingEnabled;
+        @Builder.Default private List<? extends NewsImage> images = List.of();
 
         public static PublicPromotionDetailResponse fromEntity(Promotion promotion) {
             return PublicPromotionDetailResponse.builder()
@@ -79,6 +120,18 @@ public class PromotionDto {
                     .content(promotion.getContent())
                     .createdAt(promotion.getCreatedAt())
                     .updatedAt(promotion.getUpdatedAt())
+                    .newsType(promotion.getNewsType().name())
+                    .design(promotion.getDesign() == null ? "STANDARD" : promotion.getDesign().name())
+                    .startsAt(StoreNewsPolicy.offset(promotion.getStartsAt()))
+                    .endsAt(StoreNewsPolicy.offset(promotion.getEndsAt()))
+                    .conditions(promotion.getConditions())
+                    .periodStatus(StoreNewsPolicy.period(promotion, StoreNewsPolicy.now()))
+                    .state(promotion.getState().name()).revision(promotion.getRevision())
+                    .feedPostId(null)
+                    .feedEnabled(false)
+                    .benefitVisible(StoreNewsPolicy.publicBenefit(promotion))
+                    .reservationEnabled(promotion.getStore().isReservationEnabled())
+                    .waitingEnabled(promotion.getStore().resolveWaitingIntakeMode() != kr.it.reserve.store.entity.WaitingIntakeMode.OFF)
                     .build();
         }
     }
@@ -89,13 +142,21 @@ public class PromotionDto {
     @AllArgsConstructor
     @Builder
     public static class PromotionRequest {
+        @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Positive
         private Long storeId; // 홍보할 가게 ID
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 200)
         private String title;
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 2000)
         private String content;
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "RESTAURANT|CAFE|BEAUTY|ACTIVITY|ETC")
         private String category;
+        @jakarta.validation.constraints.Size(max = 500)
         private String imageUrl;
+        @jakarta.validation.constraints.Size(max = 500)
         private String specialMenu; // 특색 메뉴
+        @jakarta.validation.constraints.Size(max = 2000)
         private String storyHistory; // 가게 역사/스토리
+        @jakarta.validation.constraints.Size(max = 500)
         private String tags;
     }
 
@@ -127,6 +188,8 @@ public class PromotionDto {
 
         public static PromotionResponse fromEntity(Promotion promotion) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            boolean deleted = promotion.getState() == Promotion.State.DELETED;
+            boolean canonicalNews = promotion.getNewsPost() != null;
 
             return PromotionResponse.builder()
                     .id(promotion.getId())
@@ -134,18 +197,18 @@ public class PromotionDto {
                     .storeName(promotion.getStore().getName())
                     .storeAddress(promotion.getStore().getAddress())
                     .storeCategory(promotion.getStore().getCategory())
-                    .title(promotion.getTitle())
-                    .content(promotion.getContent())
+                    .title(deleted ? "삭제한 소식" : promotion.getTitle())
+                    .content(deleted ? "" : promotion.getContent())
                     .category(promotion.getCategory().name())
                     .categoryDisplayName(promotion.getCategory().getDisplayName())
-                    .imageUrl(promotion.getImageUrl())
-                    .specialMenu(promotion.getSpecialMenu())
-                    .storyHistory(promotion.getStoryHistory())
-                    .tags(promotion.getTags())
+                    .imageUrl(deleted ? null : promotion.getImageUrl())
+                    .specialMenu(deleted ? null : promotion.getSpecialMenu())
+                    .storyHistory(deleted ? null : promotion.getStoryHistory())
+                    .tags(deleted ? null : promotion.getTags())
                     .viewCount(promotion.getViewCount())
                     .likeCount(promotion.getLikeCount())
-                    .memberName(promotion.getMember().getName())
-                    .memberId(promotion.getMember().getId())
+                    .memberName(canonicalNews ? promotion.getNewsPost().getProfile().getNickname() : promotion.getMember().getName())
+                    .memberId(canonicalNews ? null : promotion.getMember().getId())
                     .createdAt(promotion.getCreatedAt().format(formatter))
                     .updatedAt(promotion.getUpdatedAt().format(formatter))
                     .build();

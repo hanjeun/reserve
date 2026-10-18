@@ -1,4 +1,4 @@
-import { AppstoreOutlined, CalendarOutlined, ClockCircleOutlined, GlobalOutlined, MobileOutlined, QrcodeOutlined, ScheduleOutlined, StopOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CalendarOutlined, ClockCircleOutlined, GlobalOutlined, MobileOutlined, QrcodeOutlined, ScheduleOutlined, StopOutlined } from '../../common/icons';
 export const SERVICE_OPTIONS = [
     { value: 'reservation', label: '예약', asset: 'intake-reservation', icon: <CalendarOutlined />, description: '날짜나 시간을 미리 선택해 방문해요.' },
     { value: 'waiting', label: '웨이팅', asset: 'intake-waiting', icon: <ClockCircleOutlined />, description: '대기 명단에 접수하고 순서대로 입장해요.' },

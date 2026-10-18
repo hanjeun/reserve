@@ -67,6 +67,8 @@ public class MemberService {
     private final EmailVerificationRepository emailVerificationRepository;
     private final DataLifecycleGuard dataLifecycleGuard;
     private final OAuthUnlinkOutboxService oAuthUnlinkOutboxService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private kr.it.reserve.config.updates.AccountUpdateInvalidations contentUpdates;
     private final PwnedPasswordChecker pwnedPasswordChecker;
     private final MarketingConsentHistoryRepository marketingConsentHistoryRepository;
     private final org.springframework.context.ApplicationEventPublisher events;
@@ -218,6 +220,7 @@ public class MemberService {
         Member updated = memberRepository.save(member);
         fileDeletionOutboxService.enqueue(oldImage, PROFILE_IMAGE_DELETION_SOURCE, memberId);
         log.info("Profile image delete completed: memberId={}", memberId);
+        if (contentUpdates != null) contentUpdates.avatarChanged();
         return MemberResponse.fromEntity(updated);
     }
 
@@ -233,6 +236,7 @@ public class MemberService {
         Member updated = memberRepository.save(member);
         fileDeletionOutboxService.enqueue(oldImage, PROFILE_IMAGE_DELETION_SOURCE, memberId);
         log.info("Profile image update completed: memberId={}", memberId);
+        if (contentUpdates != null) contentUpdates.avatarChanged();
         return MemberResponse.fromEntity(updated);
     }
 
@@ -337,10 +341,10 @@ public class MemberService {
                         "BUSINESS_LICENSE_IMAGE",
                         verification.getId()));
 
-        // 개인화·홍보·커뮤니티 데이터는 제거한다. 예약·결제·환불·후기·문의·채팅은
+        // 개인화·커뮤니티는 제거하고 소식은 즉시 비공개 후 30일 파기한다. 예약·결제·환불·후기·문의·채팅은
         // 거래/분쟁 이력과 FK를 보존하되 아래 회원 행을 비식별화해 개인을 식별하지 못하게 한다.
         favoriteRepository.deleteByMemberId(memberId);
-        promotionRepository.deleteByMemberId(memberId);
+        promotionRepository.softDeleteByMemberId(memberId, java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
 
         List<Long> postIds = communityPostRepository.findPostIdsByAuthorId(memberId);
         if (!postIds.isEmpty()) {
@@ -360,7 +364,8 @@ public class MemberService {
         passwordResetTokenRepository.deleteByEmail(originalEmail);
         emailVerificationRepository.deleteByEmail(originalEmail);
 
-        member.withdraw("withdrawn-" + memberId + "@reserve.invalid");
+        // Bulk cleanup queries clear the persistence context; mutate a managed, still-locked member.
+        findByIdForUpdate(memberId).withdraw("withdrawn-" + memberId + "@reserve.invalid");
         events.publishEvent(new kr.it.reserve.member.event.MemberWithdrawn(memberId));
         log.info("Member withdrawal completed: memberId={}", memberId);
     }

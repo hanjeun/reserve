@@ -68,6 +68,8 @@ public class TokenService {
             case VALID -> { /* 아래에서 DB 확인 */ }
         }
 
+        // 사건/탈퇴와 같은 순서로 회원을 먼저 current-read 잠근 뒤 refresh 행을 잠근다.
+        Member member = memberRepository.findActiveByIdForUpdate(inspection.memberId()).orElse(null);
         Optional<Long> rowId = first(refreshTokenRepository.findIdsByRefreshToken(presentedToken));
         if (rowId.isEmpty()) {
             rowId = first(refreshTokenRepository.findIdsByPreviousTokenHash(RefreshToken.hash(presentedToken)));
@@ -83,7 +85,6 @@ public class TokenService {
             throw reject(Reason.EXPIRED_SESSION, row.getMemberId());
         }
 
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(row.getMemberId()).orElse(null);
         if (member == null) {
             refreshTokenRepository.delete(row);
             throw reject(Reason.MEMBER_UNAVAILABLE, row.getMemberId());
@@ -92,22 +93,26 @@ public class TokenService {
             refreshTokenRepository.delete(row);
             throw reject(Reason.AUTH_VERSION_CHANGED, member.getId());
         }
+        if (!tokenProvider.isOAuthSessionCurrent(member, inspection.oauthAuthenticatedAt())) {
+            refreshTokenRepository.delete(row);
+            throw reject(Reason.OAUTH_AUTHENTICATION_REVOKED, member.getId());
+        }
 
         // 잠금을 기다리는 사이 다른 요청이 먼저 회전했을 수 있다 → 잠근 뒤의 값으로 다시 판단한다.
         if (row.getRefreshToken().equals(presentedToken)) {
             liftExpiredSuspension(member);
             Duration ttl = jwtProperties.getRefreshTokenExpiration();
-            String newRefreshToken = tokenProvider.createRefreshJwt(member);
+            String newRefreshToken = tokenProvider.createRefreshJwt(member, inspection.oauthAuthenticatedAt());
             row.rotate(newRefreshToken, now.plus(ttl), now);
             log.info("Refresh rotated: memberId={}", member.getId());
-            return new RefreshResult(tokenProvider.generateAccessToken(member), newRefreshToken, ttl);
+            return new RefreshResult(tokenProvider.generateAccessToken(member, inspection.oauthAuthenticatedAt()), newRefreshToken, ttl);
         }
 
         if (row.isPreviousToken(presentedToken)) {
             if (row.rotatedWithin(PREVIOUS_TOKEN_GRACE, now)) {
                 liftExpiredSuspension(member);
                 log.info("Refresh reused within grace: memberId={}", member.getId());
-                return new RefreshResult(tokenProvider.generateAccessToken(member), row.getRefreshToken(),
+                return new RefreshResult(tokenProvider.generateAccessToken(member, inspection.oauthAuthenticatedAt()), row.getRefreshToken(),
                         Duration.between(now.atZone(ZoneId.systemDefault()),
                                 row.getExpiresAt().atZone(ZoneId.systemDefault())));
             }

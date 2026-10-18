@@ -26,6 +26,10 @@ RESERVE가 쓰는 제3자 소프트웨어와 글꼴의 라이선스 안내예요
 - npm 밖에 저장한 글꼴은 npm 라이선스 도구 검사만으로 확인되지 않아요.
 - SUITE 2.0.4 원본과 글꼴 파일의 해시가 같아요. [SUITE-LICENSE.txt](frontend/public/fonts/SUITE-LICENSE.txt)에 원문 고지를 함께 보관해요. 실제 릴리스 산출물에 원문이 동봉되는지도 확인해요.
 
+### 커뮤니티·초안·혜택 상태 그림
+
+`empty-feed`, `empty-comment`, `draft-transfer`, `draft-conflict`, `benefit-review-pending`, `benefit-review-rejected`의 납품 원본은 `frontend/src/assets/state-illustrations/source/community-benefit-states-v2`에 보존해요. 그림·Blender 장면의 CC0 고지와 제작 코드의 MIT 전문은 각각 `licenses/assets-cc0.txt`·`licenses/code-mit.txt`예요. CC0 고지에는 법적 원문 URL이 있고 이 묶음에 CC0 전문 파일은 없어요. Vite는 새 고지 두 파일과 기존 카메라·브라우저 키트의 CC0 전문을 `THIRD_PARTY_NOTICES.txt`에 함께 넣어요. 납품 고지는 AI 보조 산출물의 저작권 성립·독점권이나 제3자 권리를 보증하지 않으며 상표권을 부여하지 않아요.
+
 ### 백엔드 (Gradle)
 
 `bootJar`는 실제 production runtime JAR의 원문 고지와, JAR에 빠진 해당 버전의 공식 원문을 `META-INF/THIRD_PARTY_NOTICES.txt`에 동봉해요. `backend/licenses/supplemental.json`에 원본 출처와 JAR·문서 SHA-256을 고정하며, 누락·변경이 있으면 빌드를 중단해요. 빌드 중에는 고지를 새로 다운로드하지 않아요. 원문 동봉은 바이너리 배포 방식에 따른 모든 의무를 충족했다는 보장이 아니에요.
@@ -69,6 +73,10 @@ Upstream: [Pretendard](https://github.com/orioncactus/pretendard), [SUITE](https
 - Retain the [SIL Open Font License 1.1](https://openfontlicense.org/open-font-license-official-text/) and each font's copyright notices when bundling or redistributing.
 - Fonts vendored outside npm require separate verification.
 - The font matches the upstream SUITE 2.0.4 file by hash. Its original notice accompanies it in [SUITE-LICENSE.txt](frontend/public/fonts/SUITE-LICENSE.txt). Verify inclusion in actual release artifacts separately.
+
+### Community, draft and benefit state illustrations
+
+The delivered sources for `empty-feed`, `empty-comment`, `draft-transfer`, `draft-conflict`, `benefit-review-pending`, and `benefit-review-rejected` are preserved under `frontend/src/assets/state-illustrations/source/community-benefit-states-v2`. `licenses/assets-cc0.txt` retains the asset/Blender-scene dedication and a URL to the CC0 legal text; this kit does not contain a full CC0 text file. `licenses/code-mit.txt` retains the full MIT production-code notice. Builds include both delivered notices alongside the existing camera/browser kit's full CC0 text in `THIRD_PARTY_NOTICES.txt`. The delivered dedication does not warrant copyrightability, exclusivity or third-party rights in AI-assisted output and does not grant trademark rights.
 
 ### Backend (Gradle)
 

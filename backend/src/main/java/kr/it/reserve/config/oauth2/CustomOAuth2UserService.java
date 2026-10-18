@@ -4,6 +4,8 @@ import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.config.oauth2.subject.OAuthSubjectSecurity;
+import kr.it.reserve.config.oauth2.subject.OAuthSubjectSecurityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -14,6 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.List;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 
 /**
  * OAuth2 로그인 성공 시 사용자 정보를 처리하는 서비스
@@ -26,10 +33,15 @@ import java.util.Optional;
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private final MemberRepository memberRepository;
+    private final OAuthSubjectSecurityService subjectSecurity;
 
     @Override
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
+        Instant tokenIssuedAt = userRequest.getAccessToken().getIssuedAt();
+        LocalDateTime authenticatedAt = tokenIssuedAt == null ? null
+                : LocalDateTime.ofInstant(tokenIssuedAt.truncatedTo(ChronoUnit.MILLIS), ZoneOffset.UTC);
+        subjectSecurity.requireFreshAuthentication(authenticatedAt, userRequest.getAccessToken().getExpiresAt());
         OAuth2User oAuth2User = super.loadUser(userRequest);
 
         // 1. OAuth2 제공자 확인 (google, naver, kakao)
@@ -54,11 +66,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         // 4. 회원 조회 또는 생성 (Access Token도 함께 저장)
         boolean isNewUser = false;
-        Member member = processOAuth2User(provider, userInfo, accessToken);
+        Member member = processOAuth2User(provider, userInfo, accessToken, authenticatedAt,
+                userRequest.getAccessToken().getExpiresAt());
         // 약관 미동의 신규 유저 체크
         if (!member.isTermsAgreed()) isNewUser = true;
 
-        return new CustomOAuth2User(member, oAuth2User.getAttributes(), userNameAttributeName, isNewUser);
+        return new CustomOAuth2User(member, oAuth2User.getAttributes(), userNameAttributeName, isNewUser,
+                userRequest.getAccessToken().getExpiresAt());
     }
 
     /**
@@ -67,18 +81,33 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      * 1. provider + providerId (가장 신뢰성 높음)
      * 2. 이메일 (LOCAL 회원 연결용, 단 같은 provider가 아닌 경우 주의)
      */
-    private Member processOAuth2User(AuthProvider provider, OAuth2UserInfo userInfo, String accessToken) {
+    private Member processOAuth2User(AuthProvider provider, OAuth2UserInfo userInfo, String accessToken,
+            LocalDateTime authenticatedAt, Instant tokenExpiresAt) {
+        OAuthSubjectSecurity subject;
+        try {
+            subject = subjectSecurity.lock(provider, userInfo.getProviderId());
+        } catch (IllegalArgumentException exception) {
+            throw new OAuth2AuthenticationException("invalid_user");
+        }
+        subjectSecurity.requireFreshAuthentication(authenticatedAt, tokenExpiresAt);
         // 1순위: provider + providerId로 기존 회원 조회 (가장 정확한 방법)
-        Optional<Member> existingMember = memberRepository.findByProviderAndProviderIdAndDeletedAtIsNull(
-                provider,
+        List<Long> existingMemberIds = memberRepository.findActiveIdsByProviderAndProviderIdForUpdate(
+                provider.name(),
                 userInfo.getProviderId()
         );
 
-        if (existingMember.isPresent()) {
+        if (!existingMemberIds.isEmpty()) {
+            if (existingMemberIds.size() != 1) throw new OAuth2AuthenticationException("invalid_user");
             // 기존 OAuth 회원: 정보 업데이트
             log.info("Existing OAuth2 member login: memberId={}, provider={}",
-                    existingMember.get().getId(), provider);
-            return updateExistingMember(existingMember.get(), userInfo, accessToken);
+                    existingMemberIds.getFirst(), provider);
+            Member member = updateExistingMember(existingMemberIds.getFirst(), provider, userInfo, accessToken,
+                    authenticatedAt, subject);
+            return completeAuthentication(subject, member, authenticatedAt, tokenExpiresAt);
+        }
+
+        if (!subject.acceptsAuthentication(authenticatedAt)) {
+            throw new OAuth2AuthenticationException("oauth_reauthentication_required");
         }
 
         // 2순위: 이메일로 기존 회원 조회
@@ -112,18 +141,35 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         }
 
         // 3순위: 신규 회원 생성
-        Member created = createNewMember(provider, userInfo, accessToken);
+        Member created = createNewMember(provider, userInfo, accessToken, authenticatedAt);
         log.info("New OAuth2 member registered: memberId={}, provider={}", created.getId(), provider);
-        return created;
+        return completeAuthentication(subject, created, authenticatedAt, tokenExpiresAt);
+    }
+
+    private Member completeAuthentication(OAuthSubjectSecurity subject, Member member,
+            LocalDateTime authenticatedAt, Instant tokenExpiresAt) {
+        // INSERT/이메일 unique 잠금 대기도 마친 뒤 실제 커밋 직전에 시간 경계를 재확인한다.
+        memberRepository.flush();
+        subjectSecurity.requireFreshAuthentication(authenticatedAt, tokenExpiresAt);
+        subject.authenticated(authenticatedAt, subjectSecurity.now());
+        return member;
     }
 
     /**
      * 기존 회원 정보 업데이트
      */
-    private Member updateExistingMember(Member member, OAuth2UserInfo userInfo, String accessToken) {
+    private Member updateExistingMember(Long memberId, AuthProvider provider, OAuth2UserInfo userInfo, String accessToken,
+            LocalDateTime authenticatedAt, OAuthSubjectSecurity subject) {
         // 탈퇴와 소셜 재로그인의 프로필/토큰 갱신을 같은 회원 행에서 직렬화한다.
-        member = memberRepository.findActiveByIdForUpdate(member.getId())
+        Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() -> new OAuth2AuthenticationException("invalid_user"));
+        if (member.getProvider() != provider || !userInfo.getProviderId().equals(member.getProviderId())) {
+            throw new OAuth2AuthenticationException("invalid_user");
+        }
+        subject.mergeMemberState(member.getOauthAuthenticatedAt(), member.getOauthSecurityRevokedAt());
+        if (!member.acceptsOAuthAuthentication(authenticatedAt) || !subject.acceptsAuthentication(authenticatedAt)) {
+            throw new OAuth2AuthenticationException("oauth_reauthentication_required");
+        }
 
         // 엔티티에 정의된 메서드 호출 (이름과 프로필 이미지 업데이트)
         member.updateOAuth(userInfo.getName(), userInfo.getProfileImage());
@@ -138,6 +184,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         // Access Token 업데이트
         member.setOauthAccessToken(accessToken);
+        member.setOauthAuthenticatedAt(authenticatedAt);
 
         return memberRepository.save(member);
     }
@@ -146,7 +193,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      * 신규 회원 생성
      */
     // CustomOAuth2UserService.java 일부
-    private Member createNewMember(AuthProvider provider, OAuth2UserInfo userInfo, String accessToken) {
+    private Member createNewMember(AuthProvider provider, OAuth2UserInfo userInfo, String accessToken,
+            LocalDateTime authenticatedAt) {
         String email = userInfo.getEmail();
 
         // 중복 체크 및 이메일 생성 로직
@@ -162,6 +210,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 .provider(provider)
                 .providerId(userInfo.getProviderId())
                 .oauthAccessToken(accessToken)
+                .oauthAuthenticatedAt(authenticatedAt)
                 .role(Role.USER)
                 .build());
     }

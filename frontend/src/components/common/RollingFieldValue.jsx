@@ -3,6 +3,9 @@ import PropTypes from 'prop-types';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { transitions } from '../../styles/tokens';
 
+const hasMotionValue = value => value != null && value !== ''
+    && (typeof value !== 'number' || Number.isFinite(value));
+
 /** Only the visible value rolls; form state and the accessible current label update immediately. */
 const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, order, onMotionChange }) => {
     const currentRef = useRef(null);
@@ -36,8 +39,9 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
         motionChangeRef.current = onMotionChange;
         const current = currentRef.current;
         const previous = previousRef.current;
-        if (reducedMotion || typeof current.animate !== 'function' || value == null
-            || (typeof value === 'number' && !Number.isFinite(value))) {
+        // The first selection replaces a placeholder immediately; only existing values roll.
+        if (reducedMotion || typeof current.animate !== 'function'
+            || !hasMotionValue(value) || !hasMotionValue(before.value)) {
             stopMotion();
             return;
         }
@@ -59,7 +63,6 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
         stopMotion();
 
         const numeric = Number.isFinite(value) && Number.isFinite(before.value);
-        const comparable = before.value != null && before.value !== '' && (typeof before.value !== 'number' || Number.isFinite(before.value));
         const ordered = Number.isFinite(order) && Number.isFinite(before.order) && order !== before.order;
         // 메뉴에서 위 항목은 위로, 아래 항목은 아래로 들어온다. 숫자·날짜의 기존 방향은 유지한다.
         let direction = numeric ? Math.sign(value - before.value) : 1;
@@ -70,12 +73,12 @@ const RollingFieldValue = ({ value, children, modalOpen = false, motionKey, orde
         const timing = { duration, easing: transitions.easing, delay: before.modalOpen && !modalOpen ? duration : 0, fill: 'backwards' };
         const centered = { transform: 'translateY(0) rotateX(0deg)', opacity: 1 };
         const incoming = current.animate([
-            { transform: `translateY(${direction * (comparable ? 70 : 20)}%) rotateX(${comparable ? -direction * 25 : 0}deg)`, opacity: 0 },
+            { transform: `translateY(${direction * 70}%) rotateX(${-direction * 25}deg)`, opacity: 0 },
             centered,
         ], timing);
         const outgoing = previous.animate([
             centered,
-            { transform: `translateY(${comparable ? -direction * 70 : 0}%) rotateX(${comparable ? direction * 25 : 0}deg)`, opacity: 0 },
+            { transform: `translateY(${-direction * 70}%) rotateX(${direction * 25}deg)`, opacity: 0 },
         ], { ...timing, fill: 'both' });
         motionRef.current = { incoming, outgoing, fromValue: before.value };
         // Keep the old layer transparent until cleanup, including a delayed finish event.

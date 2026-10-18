@@ -2,7 +2,7 @@
 import React, { useId, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Form, Modal } from 'antd';
-import { ClockCircleOutlined, CloseOutlined } from '@ant-design/icons';
+import { ClockCircleOutlined, CloseOutlined } from './icons';
 import dayjs from 'dayjs';
 import Button from './Button';
 import ModalActions from './ModalActions';

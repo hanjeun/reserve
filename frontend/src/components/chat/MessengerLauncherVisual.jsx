@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { CloseOutlined, MessageOutlined } from '@ant-design/icons';
+import { CloseOutlined, MessageOutlined } from '../common/icons';
+import LoadingImage from '../common/LoadingImage';
 
 const LauncherImage = ({ src }) => {
     const [failed, setFailed] = useState(false);
     if (failed) return <MessageOutlined aria-hidden="true" />;
     return (
-        <img
+        <LoadingImage
             className="reserve-messenger-launcher-image"
             src={src}
             alt=""

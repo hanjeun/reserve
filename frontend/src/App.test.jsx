@@ -1,12 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Link } from 'react-router-dom';
 import App from './App';
 
 // 앱 셸을 실제 라우터(BrowserRouter)로 띄우되, 네트워크·무거운 레이아웃은 가볍게 바꾼다.
 // 확인하려는 것은 "라우트 표 + 오류 경계 + SEO 관문"의 연결이다.
 const { authState, pageState } = vi.hoisted(() => ({
-    authState: { user: null, sessionRevision: 0, initializeAuth: async () => {} },
+    authState: { user: null, isLoggedIn: false, sessionRevision: 0, initializeAuth: async () => {} },
     pageState: { termsThrows: false },
 }));
 vi.mock('./store/useAuthStore', () => ({
@@ -17,11 +17,14 @@ vi.mock('./store/useAuthStore', () => ({
 }));
 vi.mock('./components/layout/Header', () => ({
     default: () => <header><Link to="/somewhere-else">다른 곳으로</Link></header>,
-    HeaderPlaceholder: () => <div aria-hidden="true" />,
+    HeaderPlaceholder: () => <div aria-hidden="true" data-testid="site-header-placeholder" />,
 }));
 vi.mock('./components/layout/Footer', () => ({ default: () => <footer>푸터</footer> }));
 vi.mock('./components/layout/OfflineBanner', () => ({ default: () => null }));
 vi.mock('./components/layout/DiscoveryNav', () => ({ default: () => null }));
+vi.mock('./components/chat/MessengerShell', () => ({ default: () => null }));
+vi.mock('./pages/member/MessagesPage', () => ({ default: () => <h1>메시지 화면</h1> }));
+vi.mock('./pages/auth/Login', () => ({ default: () => <h1>로그인 화면</h1> }));
 vi.mock('./pages/legal/Terms', () => ({
     default: () => {
         if (pageState.termsThrows) throw new Error('terms render failed');
@@ -39,6 +42,7 @@ describe('app route table fallbacks', () => {
     beforeAll(() => Promise.all([
         import('./pages/NotFound'), import('./pages/legal/UserGuide'), import('./pages/legal/BusinessGuide'),
         import('./pages/legal/CommonGuide'), import('./pages/legal/OperationGuide'),
+        import('./pages/member/MessagesPage'), import('./pages/auth/Login'),
     ]));
     beforeEach(() => {
         document.head.innerHTML = `
@@ -48,9 +52,39 @@ describe('app route table fallbacks', () => {
             <link rel="canonical" href="https://reserve.it.kr" />
         `;
         pageState.termsThrows = false;
+        authState.user = null;
+        authState.isLoggedIn = false;
+        authState.initializeAuth = async () => {};
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     });
     afterEach(() => { vi.restoreAllMocks(); });
+
+    it('uses the messenger frame without a site header or footer during boot and after authentication', async () => {
+        let finishAuth;
+        authState.user = { id: 1, role: 'USER', termsAgreed: true };
+        authState.isLoggedIn = true;
+        authState.initializeAuth = () => new Promise(resolve => { finishAuth = resolve; });
+        renderAt('/messages');
+        expect(document.querySelector('.reserve-app-layout--messages.reserve-boot-shell')).toBeInTheDocument();
+        expect(screen.queryByTestId('site-header-placeholder')).toBeNull();
+        expect(document.querySelector('header, footer')).toBeNull();
+        await act(async () => finishAuth());
+        expect(await screen.findByRole('heading', { name: '메시지 화면' })).toBeInTheDocument();
+        expect(document.querySelector('.reserve-app-layout--messages')).toBeInTheDocument();
+        expect(document.querySelector('header, footer')).toBeNull();
+    });
+
+    it('keeps anonymous message entry protected and restores the normal login frame', async () => {
+        renderAt('/messages?storeId=14#conversation');
+        expect(await screen.findByRole('heading', { name: '로그인 화면' })).toBeInTheDocument();
+        expect(window.location.pathname).toBe('/login');
+        expect(screen.queryByRole('heading', { name: '메시지 화면' })).toBeNull();
+        expect(document.querySelector('header')).toBeInTheDocument();
+        expect(screen.getByText('푸터')).toBeInTheDocument();
+        expect(window.history.state.usr.from.pathname).toBe('/messages');
+        expect(window.history.state.usr.from.search).toBe('?storeId=14');
+        expect(window.history.state.usr.from.hash).toBe('#conversation');
+    });
 
     it.each([
         '/this-does-not-exist',

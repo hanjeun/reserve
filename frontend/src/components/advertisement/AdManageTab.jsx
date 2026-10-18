@@ -2,15 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Typography, Tag, Upload } from 'antd';
 import dayjs from 'dayjs';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { PlusOutlined, CreditCardOutlined, CloseOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, CreditCardOutlined, CloseOutlined, EditOutlined, DeleteOutlined } from '../common/icons';
 import { Bone, Button, DataState, FormModal, FormField, FormInput, FormTextArea, FormSelect, FormDatePicker, SegmentedControl, AdminTableSkeleton, DataTable, FilterMenu, FilterToolbar } from '../common';
 import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
+import SkeletonText from '../common/SkeletonText';
+import LoadingUpload from '../common/LoadingUpload';
 import { useAdPayment, useMessage, useImagePreview, useMyStores, useFormErrors, useQueryParamsState } from '../../hooks';
 import useDebounce from '../../hooks/useDebounce';
 import { adKeys } from '../../hooks/queryKeys';
 import { invalidateAdData } from '../../hooks/invalidateAfterWrite';
 import adService from '../../services/adService';
-import { getDetailImageUrl } from '../../utils/image';
 import {
     IMAGE_ACCEPT,
     MAX_IMAGE_REQUEST_BYTES,
@@ -32,6 +33,8 @@ import {
 } from '../../constants';
 import BannerMotionPicker from './BannerMotionPicker';
 import AdCreationPreview from './AdCreationPreview';
+import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
+import { MAX_BANNER_IMAGES, exposureDaysOf, imagePreviewUrlFor, collectCreateErrors, buildCreateFormData, buildUpdateFormData, existingImageFiles } from './advertisementForm';
 
 const { Text } = Typography;
 
@@ -77,7 +80,7 @@ const EDITABLE_STATUSES = new Set(['PENDING_PAYMENT', 'PAYMENT_FAILED', 'ACTIVE'
 // 백엔드 AdvertisementService.removeAd와 동일한 규칙
 const REMOVABLE_STATUSES = new Set(['EXPIRED', 'CANCELLED', 'REFUNDED', 'SUSPENDED']);
 
-const MAX_BANNER_IMAGES = 1;
+
 const DEFAULT_BANNER_COPY = getBannerCopyPreset(DEFAULT_BANNER_COPY_KEY);
 const isPastStartDate = (ad) => Boolean(ad?.startDate && ad.startDate < dayjs().format('YYYY-MM-DD'));
 
@@ -94,11 +97,7 @@ const skeletonRowCount = (total, page, pageSize) => {
 };
 
 // 노출 일수(양 끝 포함) — 기간이 비어 있으면 0
-const exposureDaysOf = (dateRange) => (
-    dateRange?.[0] && dateRange?.[1]
-        ? dateRange[1].startOf('day').diff(dateRange[0].startOf('day'), 'day') + 1
-        : 0
-);
+
 
 const revokeBlobUrl = (url) => {
     if (url.startsWith('blob:') && typeof URL.revokeObjectURL === 'function') {
@@ -122,67 +121,16 @@ const fetchMyAds = async (page, storeFilter, debouncedSearch) => {
     };
 };
 
-const imagePreviewUrlFor = (file) => (
-    file?.originFileObj && typeof URL.createObjectURL === 'function'
-        ? URL.createObjectURL(file.originFileObj)
-        : file?.thumbUrl || file?.url || ''
-);
 
-const collectCreateErrors = (e, { storeId, dateRange, adType, imageFiles, bannerTitle, bannerDescription }) => {
-    if (!storeId) e.storeId = '가게를 선택해주세요.';
-    if (!dateRange?.[0] || !dateRange?.[1]) {
-        e.dateRange = '노출 기간을 선택해주세요.';
-    } else if (dateRange[0].startOf('day').isBefore(dayjs().startOf('day'))) {
-        e.dateRange = '노출 시작일은 오늘 이후로 선택해주세요.';
-    }
-    if (adType !== 'BANNER') return;
-    if (imageFiles.length === 0) {
-        e.images = '배너 광고는 이미지가 최소 1장 필요해요.';
-    }
-    if (!bannerTitle.trim()) {
-        e.bannerTitle = '광고 제목을 입력해주세요.';
-    }
-    if (!bannerDescription.trim()) {
-        e.bannerDescription = '광고 내용을 입력해주세요.';
-    }
-};
 
-const buildCreateFormData = ({ storeId, adType, dateRange, bannerCopyKey, bannerTitle, bannerDescription, bannerMotionKey, imageFiles }) => {
-    const formData = new FormData();
-    formData.append('storeId', storeId);
-    formData.append('adType', adType);
-    formData.append('startDate', dateRange[0].format('YYYY-MM-DD'));
-    formData.append('endDate', dateRange[1].format('YYYY-MM-DD'));
-    if (adType === 'BANNER') {
-        formData.append('bannerCopyKey', bannerCopyKey);
-        formData.append('title', bannerTitle.trim());
-        formData.append('description', bannerDescription.trim());
-        formData.append('bannerMotionKey', bannerMotionKey);
-    }
-    imageFiles.forEach((f) => { if (f.originFileObj) formData.append('images', f.originFileObj); });
-    return formData;
-};
 
-const buildUpdateFormData = ({ editBannerCopyKey, editBannerTitle, editBannerDescription, editBannerMotionKey, editImageFiles }) => {
-    const formData = new FormData();
-    if (editBannerCopyKey) formData.append('bannerCopyKey', editBannerCopyKey);
-    formData.append('title', editBannerTitle.trim());
-    formData.append('description', editBannerDescription.trim());
-    formData.append('bannerMotionKey', editBannerMotionKey);
-    // 사용자가 새로 고른 파일(originFileObj 있음)만 보낸다 — 기존 이미지(url만 있고 originFileObj 없음)만
-    // 있고 새로 고른 파일이 하나도 없으면 images 자체를 안 보내서 백엔드가 기존 이미지를 유지하게 한다.
-    const newFiles = editImageFiles.filter((f) => f.originFileObj);
-    newFiles.forEach((f) => formData.append('images', f.originFileObj));
-    return formData;
-};
+
+
+
+
 
 // 기존 이미지를 antd Upload가 인식하는 최소 형태로 바꾼다.
-const existingImageFiles = (ad) => (ad.imageUrls || []).slice(0, MAX_BANNER_IMAGES).map((url, i) => ({
-    uid: `existing-${i}`,
-    name: `image-${i + 1}`,
-    status: 'done',
-    url: getDetailImageUrl(url),
-}));
+
 
 const cancelConfirmOptions = (ad) => {
     const isPaid = ad.status === 'ACTIVE';
@@ -309,6 +257,8 @@ const AdManageTab = () => {
     const { message, confirm } = useMessage();
     const queryClient = useQueryClient();
     const { pay, payExisting, paying, payingId } = useAdPayment();
+    // SDK 모바일 리다이렉트를 beforeunload로 막지 않는다. 메뉴·뒤로가기 이동은 처리 중 계속 막는다.
+    useWorkspaceDraftGuard({ busy: paying, allowUnload: paying });
     const { stores: myStores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();
     const { handlePreview, previewNode, suppressLinkNavigation } = useImagePreview();
     const [modalOpen, setModalOpen] = useState(false);
@@ -587,7 +537,7 @@ const AdManageTab = () => {
         <div className="reserve-ad-manage-tab">
             <div className="reserve-ad-manage-heading">
                 <Text className="reserve-ad-manage-intro" type="secondary" style={{ fontSize: fontSize.sm }}>
-                    노출형(1,000원/일)은 가게 목록 상단에 카드·리스트로 우선 노출되고 작은 &quot;광고&quot; 표기가 붙어요. 배너형(5,000원/일)은 화면 우측 하단에 표시돼요.
+                    <SkeletonText loading={loading}>노출형(1,000원/일)은 가게 목록 상단에 카드·리스트로 우선 노출되고 작은 &quot;광고&quot; 표기가 붙어요. 배너형(5,000원/일)은 화면 우측 하단에 표시돼요.</SkeletonText>
                 </Text>
             </div>
 
@@ -603,7 +553,7 @@ const AdManageTab = () => {
                         value={storeFilter}
                         onChange={value => setAdListParams({ advertisementStore: value, advertisementPage: '0' })}
                         options={filterStoreOptions}
-                        disabled={loading || storesLoading || Boolean(storesError)}
+                        disabled={loading || storesLoading || Boolean(storesError) && !myStores.length}
                         loading={storesLoading}
                         aria-label="광고 가게 필터"
                     />}
@@ -636,10 +586,14 @@ const AdManageTab = () => {
             <FormModal
                 title={createChrome.title}
                 open={modalOpen}
+                navigationDirty={Boolean(storeId || dateRange || imageFiles.length || adType !== 'BADGE'
+                    || bannerCopyKey !== DEFAULT_BANNER_COPY_KEY || bannerTitle !== DEFAULT_BANNER_COPY.title
+                    || bannerDescription !== DEFAULT_BANNER_COPY.description || bannerMotionKey !== DEFAULT_BANNER_MOTION_KEY)}
                 onClose={closeCreateModal}
                 onSubmit={createStep === 'details' ? handleShowPreview : handleSubmit}
                 onCancelAction={createStep === 'details' ? closeCreateModal : () => goToCreateStep('details')}
                 submitting={paying}
+                navigationAllowUnload={paying}
                 width={createChrome.width}
                 submitText={createChrome.submitText}
                 cancelText={createChrome.cancelText}
@@ -659,7 +613,7 @@ const AdManageTab = () => {
                                         className="reserve-ad-store-select"
                                         placeholder="가게 선택"
                                         loading={storesLoading}
-                                        disabled={storesLoading || Boolean(storesError)}
+                                        disabled={storesLoading || Boolean(storesError) && !myStores.length}
                                         value={storeId}
                                         onChange={(v) => { setStoreId(v); clearError('storeId'); }}
                                         options={myStores.map((s) => ({ value: s.id, label: s.name }))}
@@ -723,7 +677,7 @@ const AdManageTab = () => {
                                     <Text type="secondary" style={{ fontSize: fontSize.xs, display: 'block', marginBottom: 8 }}>
                                         정사각형 이미지(권장 1:1, 예: 800×800px) 한 장을 올려주세요. 다른 비율은 가운데를 기준으로 잘릴 수 있어요.
                                     </Text>
-                                    <Upload
+                                    <LoadingUpload
                                         listType="picture-card"
                                         accept={IMAGE_ACCEPT}
                                         fileList={imageFiles}
@@ -739,7 +693,7 @@ const AdManageTab = () => {
                                                 <div style={{ marginTop: 8 }}>업로드</div>
                                             </div>
                                         )}
-                                    </Upload>
+                                    </LoadingUpload>
                                 </FormField>
                                 {previewNode}
                             </>
@@ -767,6 +721,10 @@ const AdManageTab = () => {
             <FormModal
                 title={editTarget ? `배너 광고 수정 — ${editTarget.storeName}` : '배너 광고 수정'}
                 open={!!editTarget}
+                navigationDirty={Boolean(editTarget && (editBannerTitle !== (editTarget.title || DEFAULT_BANNER_COPY.title)
+                    || editBannerDescription !== (editTarget.description || DEFAULT_BANNER_COPY.description) || editBannerMotionKey !== findBannerMotionKey(editTarget)
+                    || editBannerCopyKey !== findBannerCopyKey(editTarget) || editImageFiles.some(file => Boolean(file.originFileObj))
+                    || editImageFiles.map(file => file.url).join(',') !== existingImageFiles(editTarget).map(file => file.url).join(',')))}
                 onClose={closeEditModal}
                 onSubmit={handleUpdateSubmit}
                 submitting={updateMutation.isPending}
@@ -810,7 +768,7 @@ const AdManageTab = () => {
                     <Text type="secondary" style={{ fontSize: fontSize.xs, display: 'block', marginBottom: 8 }}>
                         새 이미지를 고르지 않으면 기존 대표 이미지가 유지돼요. 정사각형(1:1)을 권장해요.
                     </Text>
-                    <Upload
+                    <LoadingUpload
                         listType="picture-card"
                         accept={IMAGE_ACCEPT}
                         fileList={editImageFiles}
@@ -826,7 +784,7 @@ const AdManageTab = () => {
                                 <div style={{ marginTop: 8 }}>업로드</div>
                             </div>
                         )}
-                    </Upload>
+                    </LoadingUpload>
                 </FormField>
                 {previewNode}
             </FormModal>

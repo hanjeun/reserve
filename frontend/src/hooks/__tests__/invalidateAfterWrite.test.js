@@ -3,6 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 import {
     adKeys, adminKeys, favoriteKeys, reservationKeys, reviewKeys, storeKeys,
 } from '../queryKeys';
+import { feedKeys } from '../feedQueries';
 import {
     invalidateAdData,
     invalidateAdminData,
@@ -31,6 +32,10 @@ const SEEDED = {
     adminMembers:     [...adminKeys.members(), 0, ''],
     adminTrash:       [...adminKeys.trash(), 'ALL'],
     adminDashboard:   adminKeys.dashboardStats(),
+    adminFeed:        feedKeys.report(9),
+    feedLatest:       feedKeys.list({ page: 0, favoriteOnly: false }),
+    feedFavorites:    feedKeys.list({ page: 0, favoriteOnly: true }),
+    feedDetail:       feedKeys.detail(9),
 };
 
 let queryClient;
@@ -46,9 +51,9 @@ beforeEach(() => {
 });
 
 describe('쓰기 후 캐시 무효화 규칙', () => {
-    it('찜 토글은 내 즐겨찾기 목록만 무효화한다 — 하트는 호출부가 응답으로 직접 채운다', async () => {
+    it('찜 토글은 즐겨찾기와 피드 목록을 갱신하며 개별 하트·게시물 상세는 유지한다', async () => {
         await invalidateFavoriteData(queryClient);
-        expect(invalidatedNames()).toEqual(['favoriteMy']);
+        expect(invalidatedNames()).toEqual(['favoriteMy', 'feedFavorites', 'feedLatest']);
     });
 
     it('리뷰 쓰기는 가게 별점·즐겨찾기 카드·내 예약의 리뷰 버튼을 무효화한다', async () => {
@@ -66,10 +71,11 @@ describe('쓰기 후 캐시 무효화 규칙', () => {
         ]);
     });
 
-    it('가게 등록·수정·영업 종료는 가게·즐겨찾기·광고 캐시를 무효화한다', async () => {
+    it('가게 등록·수정·영업 종료는 연결된 피드와 가게·즐겨찾기·광고 캐시를 갱신한다', async () => {
         await invalidateStoreData(queryClient);
         expect(invalidatedNames()).toEqual([
             'adActive', 'adAdmin', 'adMy', 'favoriteMy', 'favoriteStatus',
+            'feedDetail', 'feedFavorites', 'feedLatest',
             'storeDetail', 'storeList', 'storeMy', 'storeStatistics',
         ]);
     });
@@ -79,8 +85,8 @@ describe('쓰기 후 캐시 무효화 규칙', () => {
         expect(invalidatedNames()).toEqual(['adActive', 'adAdmin', 'adMy', 'storeStatistics']);
     });
 
-    it('관리자 조치는 관리자 캐시 전체를 무효화하고 공개 캐시는 건드리지 않는다', async () => {
+    it('관리자 제재·복원은 관리자 캐시와 피드의 현재 공개 상태를 함께 갱신한다', async () => {
         await invalidateAdminData(queryClient);
-        expect(invalidatedNames()).toEqual(['adminDashboard', 'adminMembers', 'adminTrash']);
+        expect(invalidatedNames()).toEqual(['adminDashboard', 'adminFeed', 'adminMembers', 'adminTrash', 'feedDetail', 'feedFavorites', 'feedLatest']);
     });
 });

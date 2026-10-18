@@ -141,7 +141,7 @@ describe('MyPage business edit prefill', () => {
         fireEvent.click(toggle);
         expect(toggle).not.toBeChecked();
         expect(localStorage.getItem('reserve:store-draft:auto-save:member:7')).toBe('false');
-        expect(screen.getByText(/이 계정의 이 브라우저에만 적용돼요/)).toBeInTheDocument();
+        expect(screen.queryByText(/이 계정의 이 브라우저에만 적용돼요/)).not.toBeInTheDocument();
         expect(memberService.updateMember).not.toHaveBeenCalled();
     });
 

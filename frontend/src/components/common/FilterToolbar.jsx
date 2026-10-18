@@ -4,8 +4,9 @@ import { Input, Typography } from 'antd';
 import FilterMenu from './FilterMenu';
 import RefreshButton from './RefreshButton';
 import FilterToolbarSkeleton from './FilterToolbarSkeleton';
-import { SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined } from './icons';
 import { colors, fontSize } from '../../styles/tokens';
+import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 
 const { Text } = Typography;
 
@@ -26,16 +27,19 @@ const FilterToolbar = ({
     onReload,
     loading = false,
     initialLoading = false,
+    autoRefreshDomain,
     extra,
     extraSkeleton,
     spread = false,
     style,
 }) => {
-    if (initialLoading) return <FilterToolbarSkeleton selects={selects} count={count} search={search} extra={extra} extraSkeleton={extraSkeleton} spread={spread} style={style} />;
+    const live = useLiveUpdatesStatus();
+    const showRefresh = Boolean(onReload) && !live.domains.includes(autoRefreshDomain);
+    if (initialLoading) return <FilterToolbarSkeleton selects={selects} count={count} search={search} extra={extra} extraSkeleton={extraSkeleton} spread={spread} style={style} showRefresh={showRefresh} />;
     /* 쿨다운·스피너 정지는 RefreshButton 이 갖는다 — 예전엔 이 파일과 MailboxTab, ChatTab 이
        같은 3초 쿨다운을 각자 구현하고 있었고(정리 안 되는 setTimeout 포함),
        회전이 중간에서 끊겨 아이콘이 튀는 문제도 네 곳에 똑같이 있었다. */
-    const reloadBtn = <RefreshButton onReload={onReload} loading={loading} />;
+    const reloadBtn = showRefresh ? <RefreshButton onReload={onReload} loading={loading} /> : null;
 
     if (selects.length > 0) {
         // 건수가 있는 목록은 선택값·꺾쇠 바로 다음에 건수를 둔다. 고정 폭 버튼은 실제 글자보다
@@ -52,7 +56,7 @@ const FilterToolbar = ({
                             value={select.value}
                             onChange={select.onChange}
                             options={select.options}
-                            disabled={loading || select.disabled}
+                            disabled={select.disabled}
                             loading={Boolean(select.loading)}
                             aria-label={select.ariaLabel ?? select.placeholder ?? '목록 필터'}
                             className={select.className}
@@ -64,14 +68,14 @@ const FilterToolbar = ({
                             }}
                         />
                     ))}
-                    {count != null && !loading && (
+                    {count != null && (
                         <Text className="reserve-filter-toolbar-count" type="secondary">
                             {count.toLocaleString('ko-KR')}건
                         </Text>
                     )}
                     {extra && <div className="reserve-filter-toolbar-extra">{extra}</div>}
                 </div>
-                {!search && <div className="reserve-filter-toolbar-refresh">{reloadBtn}</div>}
+                {!search && showRefresh && <div className="reserve-filter-toolbar-refresh">{reloadBtn}</div>}
             </div>
         );
 
@@ -86,10 +90,10 @@ const FilterToolbar = ({
                             value={search.value}
                             onChange={search.onChange}
                             allowClear size="large"
-                            disabled={loading || search.disabled}
+                            disabled={search.disabled}
                             style={{ width: '100%', maxWidth: 480 }}
                         />
-                        <div className="reserve-filter-toolbar-refresh">{reloadBtn}</div>
+                        {showRefresh && <div className="reserve-filter-toolbar-refresh">{reloadBtn}</div>}
                     </div>
                 )}
             </div>
@@ -110,16 +114,16 @@ const FilterToolbar = ({
                         value={search.value}
                         onChange={search.onChange}
                         allowClear size="large"
-                        disabled={loading || search.disabled}
+                        disabled={search.disabled}
                         style={{ flex: 1, maxWidth: 480 }}
                     />
                 )}
-                {count != null && !loading && (
+                {count != null && (
                     <Text type="secondary" style={{ fontSize: fontSize.sm, alignSelf: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {count}건
                     </Text>
                 )}
-                <div className="reserve-filter-toolbar-refresh">{reloadBtn}</div>
+                {showRefresh && <div className="reserve-filter-toolbar-refresh">{reloadBtn}</div>}
             </div>
         </div>
     );
@@ -149,6 +153,7 @@ FilterToolbar.propTypes = {
     onReload: PropTypes.func,
     loading: PropTypes.bool,
     initialLoading: PropTypes.bool,
+    autoRefreshDomain: PropTypes.string,
     extra: PropTypes.node,
     extraSkeleton: PropTypes.node,
     spread: PropTypes.bool,

@@ -310,20 +310,27 @@ const equalActions = async (dialog, confirmText) => {
     const details = async button => button.evaluate(element => {
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
-        return { height: rect.height, width: rect.width, radius: style.borderRadius, border: style.borderTopStyle, borderWidth: style.borderTopWidth };
+        return { height: rect.height, width: rect.width, radius: style.borderRadius, border: style.borderTopStyle, borderWidth: style.borderTopWidth,
+            paddingLeft: style.paddingLeft, paddingRight: style.paddingRight, background: style.backgroundColor };
     });
     // Pointer targets and physical widths are meaningful after the modal entrance finishes.
     await expect(dialog).not.toHaveClass(/ant-zoom-(appear|enter)(?:-[a-z]+)?(?:\s|$)/);
     await expect.poll(async () => (await details(cancel)).height).toBe(36);
     const cancelSize = await details(cancel);
     const confirmSize = await details(confirm);
-    expect(confirmSize.width).toBeGreaterThanOrEqual(cancelSize.width);
+    expect(cancelSize.paddingLeft).toBe('20px');
+    expect(cancelSize.paddingRight).toBe('20px');
+    expect(confirmSize.paddingLeft).toBe('20px');
+    expect(confirmSize.paddingRight).toBe('20px');
+    if (confirmText === '다음') expect(confirmSize.width + 2).toBeCloseTo(cancelSize.width, 1);
     if (confirmText === '선택 완료' || confirmText === '보내기') expect(confirmSize.width).toBeGreaterThan(cancelSize.width);
     expect(cancelSize.height).toBe(confirmSize.height);
     expect(cancelSize.radius).toBe(confirmSize.radius);
     expect(cancelSize.border).toBe('solid');
     expect(cancelSize.borderWidth).toBe('1px');
-    expect(confirmSize.borderWidth).toBe('1px');
+    expect(confirmSize.border).toBe('none');
+    expect(confirmSize.borderWidth).toBe('0px');
+    expect(confirmSize.background).not.toBe('rgba(0, 0, 0, 0)');
     return cancelSize.width;
 };
 
@@ -380,7 +387,7 @@ test('calendar modal contains swipes, preserves month navigation and has the sam
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(before);
 });
 
-test('the shared inquiry form uses matching bordered actions and releases the background lock', async ({ page }) => {
+test('the shared inquiry form keeps common action height and padding and releases the background lock', async ({ page }) => {
     await page.goto('/store/register');
     const trigger = page.getByRole('button', { name: '문의하기', exact: true });
     await trigger.click();

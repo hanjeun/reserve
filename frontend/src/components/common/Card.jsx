@@ -21,6 +21,7 @@ import { Card as AntCard } from 'antd';
 // shadows 는 더 이상 쓰지 않는다 — 그림자 값은 index.css 의 "Card 그림자·hover" 블록에 있다.
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 import { getThumbnailUrl } from '../../utils';
+import LoadingImage from './LoadingImage';
 
 const Card = ({ 
     hoverable = false,
@@ -91,7 +92,7 @@ const Card = ({
  * width/height props are passed through as real HTML attributes on <img> — browsers use
  * these to reserve the correct aspect-ratio space before the image resource even loads,
  * preventing layout shift independently of any skeleton (supported in all modern browsers).
- * mainImageWidth/Height가 없으면 그냥 생략되고 지금과 동일하게 동작함.
+ * 크기 정보가 없으면 로딩 동안 정사각형 공간을 쓰고, 로드 후에는 원본 사진 비율을 따른다.
  *
  * className은 `reserve-` 접두사를 지킨다. 전역 CSS라, 접두사 없는 이름(예전 'card-image')은
  * 다른 라이브러리나 목업 컴포넌트와 충돌할 여지가 있었다.
@@ -105,13 +106,15 @@ const handleCoverError = (event) => {
 
 Card.Cover = ({ src, alt, width, height }) => (
     <div style={{ overflow: 'hidden', lineHeight: 0, margin: 0 }}>
-        <img
+        <LoadingImage
             alt={alt}
             src={src}
+            loading="lazy"
+            decoding="async"
             width={width}
             height={height}
             onError={handleCoverError}
-            style={{ width: '100%', height: 'auto', objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
+            style={{ width: '100%', height: 'auto', aspectRatio: `auto ${width || 1} / ${height || 1}`, objectFit: 'cover', transition: 'transform 0.3s', display: 'block' }}
             className="reserve-card-image"
         />
     </div>

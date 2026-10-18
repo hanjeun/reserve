@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { AppstoreOutlined, CalendarOutlined, ClockCircleOutlined, PictureOutlined, QrcodeOutlined, ShopOutlined, ProfileOutlined, WalletOutlined, RollbackOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CalendarOutlined, ClockCircleOutlined, PictureOutlined, QrcodeOutlined, ShopOutlined, ProfileOutlined, WalletOutlined, RollbackOutlined } from '../common/icons';
 import IconChoicePicker from '../common/IconChoicePicker';
 import { STORE_EDIT_SECTIONS, STORE_EDIT_SELECTION_HELP } from '../../utils/storeOnboarding';
 

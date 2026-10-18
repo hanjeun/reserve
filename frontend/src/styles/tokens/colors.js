@@ -22,7 +22,17 @@
  *   그런 자리에는 아래 `rawColors`(실제 hex)를 쓴다. 단 이건 테마를 따라가지 않는다.
  */
 
+import { surfaceForWhiteText } from '../../utils/colorContrast';
+
 const v = (name, fallback) => `var(--c-${name}, ${fallback})`;
+const solidAction = (main, hover) => ({ main, foreground: '#ffffff',
+  solid: surfaceForWhiteText(main), solidHover: surfaceForWhiteText(hover) });
+
+/** CSS variables and AntD use the same literal semantic action palette. */
+export const semanticActionPalettes = {
+  light: { error: solidAction('#f04452', '#d93644'), success: solidAction('#00c73c', '#00a332') },
+  dark: { error: solidAction('#ff6b76', '#f04452'), success: solidAction('#32d365', '#00c73c') },
+};
 
 export const colors = {
   // Primary - 메인 브랜드 컬러
@@ -30,6 +40,9 @@ export const colors = {
     main:  v('primary', '#3182f6'),
     light: v('primary-light', '#e8f3ff'),
     dark:  v('primary-dark', '#2272eb'),
+    foreground: v('primary-fg', '#ffffff'),
+    solid: v('primary-solid', '#1b64da'),
+    solidHover: v('primary-solid-hover', '#1b64da'),
   },
 
   // Gray Scale - 텍스트 & 배경
@@ -47,8 +60,10 @@ export const colors = {
   },
 
   // Semantic Colors
-  success: { main: v('success', '#00c73c'), light: v('success-light', '#e8f9ee') },
-  error:   { main: v('error', '#f04452'),   light: v('error-light', '#fff0f1') },
+  success: { main: v('success', '#00c73c'), light: v('success-light', '#e8f9ee'), foreground: v('success-fg', '#ffffff'),
+    solid: v('success-solid', semanticActionPalettes.light.success.solid), solidHover: v('success-solid-hover', semanticActionPalettes.light.success.solidHover) },
+  error:   { main: v('error', '#f04452'),   light: v('error-light', '#fff0f1'), foreground: v('error-fg', '#ffffff'),
+    solid: v('error-solid', semanticActionPalettes.light.error.solid), solidHover: v('error-solid-hover', semanticActionPalettes.light.error.solidHover) },
   warning: { main: v('warning', '#ffb800'), light: v('warning-light', '#fff8e6') },
 
   // Background
@@ -56,6 +71,7 @@ export const colors = {
     default: v('bg-default', '#ffffff'),
     subtle:  v('bg-subtle', '#f8f9fa'),
     paper:   v('bg-paper', '#ffffff'),
+    overlay: v('bg-overlay', 'rgba(255, 255, 255, 0.92)'),
   },
 
   // Text (시맨틱)

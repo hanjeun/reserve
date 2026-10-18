@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { getMessengerImageUrl, MESSENGER_COVER_IMAGE } from './messengerImages';
+import LoadingImage from '../common/LoadingImage';
 
 function CoverImage({ src }) {
     const [failed, setFailed] = useState(false);
-    return failed ? null : <img className="reserve-messenger-cover-image" src={src} alt=""
+    return failed ? null : <LoadingImage className="reserve-messenger-cover-image" src={src} alt=""
         draggable={false} referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 CoverImage.propTypes = { src: PropTypes.string.isRequired };

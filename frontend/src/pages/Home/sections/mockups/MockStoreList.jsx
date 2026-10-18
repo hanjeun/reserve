@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Flex } from 'antd';
-import { StarFilled, HeartOutlined, HeartFilled } from '@ant-design/icons';
+import { StarFilled, HeartOutlined, HeartFilled } from '../../../../components/common/icons';
 import { colors, shadows, fontSize, fontWeight, radius } from '../../../../styles/tokens';
 import { STORE_DATA } from '../../Home.data';
 // 목업 폭은 Home.styles.js 의 HOME_MOCKUP_WIDTH 하나에서 온다 — 섹션마다 달라지면 간격이 어긋난다.

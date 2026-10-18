@@ -12,6 +12,7 @@ import { hasDistanceCoordinates } from '../utils/distanceSort';
 import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 import { normalizeListQueryParams } from '../utils/listQueryParams';
 import useDiscoveryRegion from './useDiscoveryRegion';
+import { queryErrorStatus } from './liveUpdateQueries';
 
 export { STORE_LIST_PAGE_SIZE };
 const FILTER_KEYS = new Set(['keyword', 'domain', 'region', 'sort', 'lat', 'lng']);
@@ -61,10 +62,12 @@ const useStoreList = () => {
         placeholderData: keepPreviousData,
     });
 
-    const stores = useMemo(() => Array.isArray(data?.content) ? data.content : [], [data]);
+    const accessDenied = [401, 403].includes(queryErrorStatus(error));
+    const hasData = data !== undefined && !accessDenied;
+    const stores = useMemo(() => !accessDenied && Array.isArray(data?.content) ? data.content : [], [data, accessDenied]);
     // Spring Boot 3.5의 page 하위 메타와 이전 평탄 응답을 모두 허용한다.
-    const totalElements = readCount(data?.page?.totalElements ?? data?.totalElements, stores.length);
-    const totalPages = readCount(data?.page?.totalPages ?? data?.totalPages, Math.ceil(totalElements / STORE_LIST_PAGE_SIZE));
+    const totalElements = hasData ? readCount(data?.page?.totalElements ?? data?.totalElements, stores.length) : 0;
+    const totalPages = hasData ? readCount(data?.page?.totalPages ?? data?.totalPages, Math.ceil(totalElements / STORE_LIST_PAGE_SIZE)) : 0;
     const lastPage = Math.max(1, totalPages);
     const pageOutOfRange = isSuccess && !isPlaceholderData && !error && page > lastPage;
 
@@ -84,8 +87,7 @@ const useStoreList = () => {
         setUrlSearchParams(prev => {
             const next = new URLSearchParams(prev);
             const corrected = pageOutOfRange ? lastPage : page;
-            if (corrected === 1) next.delete('page');
-            else next.set('page', String(corrected));
+            next.set('page', String(corrected));
             return next;
         }, { replace: true });
     }, [pageOutOfRange, rawPage, page, lastPage, setUrlSearchParams]);
@@ -100,18 +102,18 @@ const useStoreList = () => {
             // 복원한 지역은 URL에 없을 수 있다. 전체 선택도 실제 조건 변경으로 판단한다.
             let filtersChanged = changesRegion && nextRegion !== region;
             Object.entries(newParams).forEach(([key, value]) => {
-                if (value === '' || value == null) next.delete(key);
+                if (value == null || value === '' && key !== 'domain' && key !== 'region') next.delete(key);
                 else next.set(key, String(value));
                 if (key !== 'region' && FILTER_KEYS.has(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
             });
-            if (filtersChanged || readPage(next.get('page')) === 1) next.delete('page');
+            if (filtersChanged || readPage(next.get('page')) === 1) next.set('page', '1');
             return next;
         });
     }, [rememberRegion, region, setUrlSearchParams]);
 
     const setPage = useCallback((nextPage) => {
         const bounded = Math.min(readPage(String(nextPage)), lastPage);
-        setSearchParams({ page: bounded === 1 ? null : bounded });
+        setSearchParams({ page: bounded });
     }, [lastPage, setSearchParams]);
 
     return {
@@ -123,7 +125,8 @@ const useStoreList = () => {
         loading: isLoading || pageOutOfRange || isPlaceholderData,
         initialLoading: isLoading,
         refetching: isFetching && !isLoading,
-        error:        error?.message || null,
+        hasData,
+        error:        error ?? null,
         refetch,
         setPage,
         searchParams: { keyword, sort, lat, lng, domain, region },

@@ -3,12 +3,13 @@ import storeService from '../services/storeService';
 import useMessage from './useMessage';
 import { storeKeys } from './queryKeys';
 import { invalidateStoreData } from './invalidateAfterWrite';
+import { queryErrorStatus } from './liveUpdateQueries';
 
 const useMyStores = () => {
     const { message } = useMessage();
     const queryClient = useQueryClient();
 
-    const { data, isLoading, error } = useQuery({
+    const { data, isLoading, isFetching, error } = useQuery({
         queryKey: storeKeys.my(),
         queryFn:  () => storeService.getMyStores(),
         select:   (d) => (Array.isArray(d) ? d : []),
@@ -37,9 +38,12 @@ const useMyStores = () => {
         onSettled: () => invalidateStoreData(queryClient),
     });
 
+    const accessDenied = [401, 403].includes(queryErrorStatus(error));
     return {
-        stores:      data || [],
+        stores:      accessDenied ? [] : data || [],
         loading:     isLoading,
+        refetching:  isFetching && !isLoading,
+        hasData:     data !== undefined && !accessDenied,
         error:       error ?? null,
         deleteStore: (id) => deleteMutation.mutateAsync(id),
         refetch:     () => queryClient.invalidateQueries({ queryKey: storeKeys.my() }),

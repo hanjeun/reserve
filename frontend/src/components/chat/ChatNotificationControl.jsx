@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { BellOutlined } from '@ant-design/icons';
+import { BellOutlined } from '../common/icons';
 import { Button } from '../common';
 
 const NOTES = {

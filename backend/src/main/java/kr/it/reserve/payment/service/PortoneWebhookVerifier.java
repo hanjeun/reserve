@@ -151,7 +151,7 @@ public class PortoneWebhookVerifier {
             mac.init(new SecretKeySpec(signingKey, HMAC_ALGORITHM));
             return Base64.getEncoder().encodeToString(mac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
-            log.error("PortOne webhook signature computation failed", e);
+            log.error("PortOne webhook signature computation failed: errorType={}", e.getClass().getSimpleName());
             return null;
         }
     }

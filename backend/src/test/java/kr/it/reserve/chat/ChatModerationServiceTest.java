@@ -167,11 +167,25 @@ class ChatModerationServiceTest {
                 .id(5L).room(room).reporterMemberId(7L).reporterRole(SenderRole.MEMBER)
                 .reason(ChatReport.Reason.OTHER).reportKey("key").build();
         ReviewChatReportRequest request = new ReviewChatReportRequest();
+        request.setRevision(0L);
         request.setStatus(ChatReport.Status.RESOLVED);
         when(reportRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(report));
 
         assertThatThrownBy(() -> service.reviewReport(admin(), 5L, request))
                 .hasMessageContaining("완료 사유");
+    }
+
+    @Test
+    void anOldReviewCannotOverwriteAnotherAdministratorsResolution() {
+        var report = ChatReport.builder().id(5L).room(room(member(7L))).revision(2L)
+                .status(ChatReport.Status.RESOLVED).resolutionNote("먼저 처리한 사유").build();
+        when(reportRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(report));
+        var request = new ReviewChatReportRequest(); request.setRevision(1L); request.setStatus(ChatReport.Status.REVIEWING);
+        assertThatThrownBy(() -> service.reviewReport(admin(), 5L, request))
+                .isInstanceOfSatisfying(ChatException.class, error -> assertThat(error.getStatus()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT));
+        assertThat(report.getStatus()).isEqualTo(ChatReport.Status.RESOLVED);
+        assertThat(report.getResolutionNote()).isEqualTo("먼저 처리한 사유");
+        verify(reportRepository, never()).flush();
     }
 
     @Test

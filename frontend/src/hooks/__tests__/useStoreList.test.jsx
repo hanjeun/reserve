@@ -116,7 +116,7 @@ describe('공개 가게 서버 페이지네이션', () => {
         act(() => first.result.current.setSearchParams({ region: '' }));
         await waitFor(() => expect(first.result.current.searchParams.region).toBe(''));
         await waitFor(() => expect(first.result.current.loading).toBe(false));
-        expect(routeParams().has('page')).toBe(false);
+        expect(routeParams().get('page')).toBe('1');
         expect(routeParams().get('keyword')).toBe('공방');
         expect(routeParams().get('lat')).toBe('37.321');
         expect(routeParams().get('lng')).toBe('126.813');
@@ -151,7 +151,7 @@ describe('공개 가게 서버 페이지네이션', () => {
         act(() => result.current.setSearchParams(patch));
         await waitFor(() => expect(result.current.stores[0]?.id).toBe(1));
         expect(result.current.page).toBe(1);
-        expect(routeParams().has('page')).toBe(false);
+        expect(routeParams().get('page')).toBe('1');
         expect(routeParams().get('keep')).toBe('yes');
         for (const [key, value] of Object.entries(patch)) expect(routeParams().get(key)).toBe(value);
         expect(storeService.getStores.mock.calls.at(-1)[0].page).toBe(0);
@@ -169,7 +169,7 @@ describe('공개 가게 서버 페이지네이션', () => {
         const { result } = renderList(`/stores?page=${value}&keyword=보존`);
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(result.current.page).toBe(1);
-        expect(routeParams().has('page')).toBe(false);
+        expect(routeParams().get('page')).toBe('1');
         expect(routeParams().get('keyword')).toBe('보존');
         expect(storeService.getStores.mock.calls[0][0].page).toBe(0);
     });
@@ -195,7 +195,7 @@ describe('공개 가게 서버 페이지네이션', () => {
     it('조회 실패로 페이지를 잘못 보정하지 않고 다시 조회할 수 있다', async () => {
         storeService.getStores.mockRejectedValueOnce(new Error('목록을 불러오지 못했어요.'));
         const { result } = renderList('/stores?page=2');
-        await waitFor(() => expect(result.current.error).toBe('목록을 불러오지 못했어요.'));
+        await waitFor(() => expect(result.current.error).toHaveProperty('message', '목록을 불러오지 못했어요.'));
         expect(result.current.page).toBe(2);
         storeService.getStores.mockResolvedValue(serverPage(1));
         await act(async () => { await result.current.refetch(); });

@@ -36,6 +36,10 @@ export default defineConfig([
           name: 'antd',
           importNames: ['Alert', 'Empty'],
           message: '조회 결과의 빈 상태·오류 상태는 DataState를 사용하세요. 폼 검증·mutation·결제 결과는 각 동작 경계를 사용합니다.',
+        }, {
+          name: 'antd',
+          importNames: ['Tooltip'],
+          message: '설명 말풍선은 common/Tooltip을 사용하세요. 터치 후 남는 말풍선과 키보드 설명을 공통 관문에서 처리합니다.',
         }],
       }],
 

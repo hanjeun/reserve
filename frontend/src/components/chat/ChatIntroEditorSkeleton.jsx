@@ -20,7 +20,8 @@ export default function ChatIntroEditorSkeleton() {
                 {CARD_HEIGHTS.map(([key, height]) => <Bone key={key} height={height} borderRadius={16} />)}
             </div>
             <div className="reserve-chat-intro-preview" aria-hidden="true">
-                <Bone width={160} height={44} />
+                <div className="reserve-chat-intro-title-row"><Bone width={160} height={44} />
+                    <Bone width={44} height={44} borderRadius={10} /></div>
                 <Bone height={600} borderRadius={20} />
             </div>
         </output>

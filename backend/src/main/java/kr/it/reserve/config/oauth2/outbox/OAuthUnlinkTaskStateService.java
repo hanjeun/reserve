@@ -49,6 +49,13 @@ public class OAuthUnlinkTaskStateService {
                 .ifPresent(task -> task.markFailed(now, errorType));
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markBlocked(Long taskId, String leaseId, LocalDateTime now, String errorType) {
+        taskRepository.findByIdForUpdate(taskId)
+                .filter(task -> task.ownsLease(leaseId))
+                .ifPresent(task -> task.markBlocked(now, errorType));
+    }
+
     public record Claim(
             Long taskId,
             Long memberId,

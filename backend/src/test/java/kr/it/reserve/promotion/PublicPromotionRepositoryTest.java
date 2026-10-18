@@ -3,7 +3,10 @@ package kr.it.reserve.promotion;
 import jakarta.persistence.EntityManager;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.Role;
+import kr.it.reserve.feed.entity.FeedPost;
+import kr.it.reserve.feed.entity.FeedProfile;
 import kr.it.reserve.promotion.entity.Promotion;
+import kr.it.reserve.promotion.dto.PromotionDto;
 import kr.it.reserve.promotion.repository.PromotionRepository;
 import kr.it.reserve.promotion.service.PromotionService;
 import kr.it.reserve.store.entity.Store;
@@ -20,6 +23,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest(showSql = false, properties = "spring.datasource.driver-class-name=org.h2.Driver")
 @Import(PromotionService.class)
@@ -29,6 +33,25 @@ class PublicPromotionRepositoryTest {
     @Autowired EntityManager em;
     @Autowired PromotionRepository repository;
     @Autowired PromotionService service;
+
+    @Test
+    void unapprovedBenefitIsExcludedFromCountAndDetailDespiteLegacyFeedOptIn() {
+        Long approved = promotion(StoreStatus.ACTIVE, false);
+        Long pending = promotion(StoreStatus.ACTIVE, false);
+        Long feedOnly = promotion(StoreStatus.ACTIVE, false);
+        em.find(Promotion.class, pending).setBenefitState(Promotion.BenefitState.PENDING);
+        em.find(Promotion.class, feedOnly).setBenefitState(Promotion.BenefitState.PENDING);
+        em.find(Promotion.class, feedOnly).setFeedEnabled(true);
+        em.flush(); em.clear();
+
+        var result = repository.findAllPublic(PageRequest.of(0, 1));
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent()).extracting(Promotion::getId).containsExactly(approved);
+        assertThat(repository.findPublicById(pending)).isEmpty();
+        assertThat(repository.findPublicById(feedOnly)).isEmpty();
+        assertThatThrownBy(() -> service.getPublicPromotion(feedOnly)).isInstanceOf(kr.it.reserve.global.error.PromotionException.class);
+        assertThatThrownBy(() -> service.getPublicPromotion(pending)).isInstanceOf(kr.it.reserve.global.error.PromotionException.class);
+    }
 
     @Test
     void publicContentCountAndDetailExcludeDeletedSuspendedAndBannedStores() {
@@ -80,15 +103,71 @@ class PublicPromotionRepositoryTest {
         assertThat(pageTwo.getTotalElements()).isEqualTo(4);
     }
 
+    @Test
+    void publicContentCountAndDetailAlsoExcludeUnpublishedNewsAndLostAuthorAuthority() {
+        Long visible = promotion(StoreStatus.ACTIVE, false);
+        Long draft = promotion(StoreStatus.ACTIVE, false);
+        Long hidden = promotion(StoreStatus.ACTIVE, false);
+        Long deleted = promotion(StoreStatus.ACTIVE, false);
+        Long consentWithdrawn = promotion(StoreStatus.ACTIVE, false);
+        Long transferred = promotion(StoreStatus.ACTIVE, false);
+        em.find(Promotion.class, draft).setState(Promotion.State.DRAFT);
+        em.find(Promotion.class, hidden).setState(Promotion.State.HIDDEN);
+        em.find(Promotion.class, deleted).deleteNews(LocalDateTime.now());
+        em.find(Promotion.class, consentWithdrawn).getMember().setTermsAgreed(false);
+        em.find(Promotion.class, transferred).getStore().setOwner(em.find(Promotion.class, visible).getMember());
+        em.flush(); em.clear();
+
+        var result = repository.findAllPublic(PageRequest.of(0, 1));
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent()).extracting(Promotion::getId).containsExactly(visible);
+        for (Long excluded : List.of(draft, hidden, deleted, consentWithdrawn, transferred)) {
+            assertThat(repository.findPublicById(excluded)).isEmpty();
+        }
+    }
+
+    @Test
+    void approvedBenefitDoesNotDependOnPublicFeedProfileButRetainsPublicationGuards() {
+        Long visible = promotion(StoreStatus.ACTIVE, false);
+        Long hiddenProfile = promotion(StoreStatus.ACTIVE, false);
+        Long hiddenCarrier = promotion(StoreStatus.ACTIVE, false);
+        Long draft = promotion(StoreStatus.ACTIVE, false);
+        Long closed = promotion(StoreStatus.ACTIVE, true);
+        for (Long id : List.of(hiddenProfile, hiddenCarrier)) {
+            Promotion news = em.find(Promotion.class, id);
+            FeedProfile profile = FeedProfile.create(news.getMember(), StoreNewsPolicy.now());
+            profile.update("공개 닉네임 " + id, "nickname:" + id, "", false, StoreNewsPolicy.now());
+            em.persist(profile);
+            FeedPost carrier = FeedPost.create(profile, null, StoreNewsPolicy.now());
+            carrier.linkNews(news, "서울", StoreNewsPolicy.now());
+            em.persist(carrier);
+            if (id.equals(hiddenProfile)) profile.withdraw(StoreNewsPolicy.now());
+            else carrier.setVisibility(true, StoreNewsPolicy.now());
+        }
+        em.find(Promotion.class, draft).setState(Promotion.State.DRAFT);
+        em.flush(); em.clear();
+
+        for (String sort : List.of("latest", "popular", "likes")) {
+            var result = service.getAllPromotions(0, 10, sort);
+            assertThat(result.getTotalElements()).isEqualTo(2);
+            assertThat(result.getContent()).extracting(PromotionDto.PromotionResponse::getId).containsExactlyInAnyOrder(visible, hiddenProfile);
+        }
+        assertThat(repository.findAllPublic(PageRequest.of(0, 1)).getTotalElements()).isEqualTo(2);
+        assertThat(repository.findPublicById(hiddenProfile)).isPresent();
+        assertThat(repository.findPublicById(hiddenCarrier)).isEmpty();
+        assertThat(repository.findById(closed)).isPresent();
+    }
+
     private Long promotion(StoreStatus status, boolean deleted) {
         Member author = Member.builder().name("private author").email(UUID.randomUUID() + "@example.test")
-                .role(Role.BUSINESS).build();
+                .role(Role.BUSINESS).termsAgreed(true).build();
         em.persist(author);
         Store store = Store.builder().owner(author).name("public store").status(status)
                 .deletedAt(deleted ? LocalDateTime.now() : null).build();
         em.persist(store);
         Promotion promotion = Promotion.builder().member(author).store(store).title("가게 소식")
-                .content("안내 원문").category(Promotion.PromotionCategory.ETC).build();
+                .content("안내 원문").category(Promotion.PromotionCategory.ETC).benefitState(Promotion.BenefitState.APPROVED).build();
         em.persist(promotion);
         return promotion.getId();
     }

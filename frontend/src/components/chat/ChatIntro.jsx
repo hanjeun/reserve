@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { NotificationOutlined } from '@ant-design/icons';
+import { NotificationOutlined } from '../common/icons';
 import { DEFAULT_STORE_GREETING, DEFAULT_SUPPORT_GREETING, fillGreeting } from '../../constants/chatIntro';
 
 /**

@@ -1,5 +1,7 @@
 package kr.it.reserve.review.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.global.error.ReviewException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.reservation.entity.Reservation;
@@ -27,6 +29,8 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final ReservationRepository reservationRepository;
     private final StoreRepository storeRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ReviewUpdates updates;
 
     /**
      * 리뷰 작성
@@ -58,6 +62,7 @@ public class ReviewService {
         log.info("Review created: reviewId={}", savedReview.getId());
 
         updateStoreRating(reservation.getStore());
+        if (updates != null) updates.changed(savedReview, EntityUpdates.Operation.CREATED);
 
         return ReviewResponse.fromEntity(savedReview);
     }
@@ -75,6 +80,7 @@ public class ReviewService {
         log.info("Review deleted: reviewId={}", reviewId);
 
         updateStoreRating(store);
+        if (updates != null) updates.changed(review, EntityUpdates.Operation.DELETED);
     }
 
     /**
@@ -89,6 +95,7 @@ public class ReviewService {
         log.info("Review updated: reviewId={}", reviewId);
 
         updateStoreRating(review.getStore());
+        if (updates != null) updates.changed(review, EntityUpdates.Operation.UPDATED);
 
         return ReviewResponse.fromEntity(review);
     }

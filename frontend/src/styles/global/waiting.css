@@ -73,3 +73,7 @@
     .reserve-waiting-entries--list .reserve-waiting-entry-content { flex-basis: 100%; }
     .reserve-waiting-actions { align-self: flex-end; }
 }
+.reserve-waiting-store-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; min-height: 24px; margin-top: 8px; color: var(--c-text-secondary); font-size: 12px; line-height: 20px; }
+.reserve-waiting-store-intake { padding: 2px 8px; border-radius: 6px; background: var(--c-gray-100); white-space: nowrap; }
+.reserve-waiting-store-intake[data-state="open"] { color: var(--c-text-primary); background: var(--c-primary-light); }
+.reserve-waiting-store-count { font-variant-numeric: tabular-nums; white-space: nowrap; }

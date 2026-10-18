@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import useWorkspaceNavigate from './useWorkspaceNavigate';
 
 /**
  * "뒤로가기" 버튼의 단일 관문.
@@ -32,7 +32,7 @@ import { useNavigate } from 'react-router-dom';
  * @param {string} fallback 되감을 곳이 없을 때 보낼 경로
  */
 const useGoBack = (fallback = '/') => {
-    const navigate = useNavigate();
+    const navigate = useWorkspaceNavigate();
 
     return useCallback(() => {
         const idx = window.history.state?.idx;

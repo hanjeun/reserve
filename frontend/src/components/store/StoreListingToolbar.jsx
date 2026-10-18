@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
 import { Typography } from 'antd';
-import { EnvironmentOutlined } from '@ant-design/icons';
+import { EnvironmentOutlined } from '../common/icons';
 import FilterMenu from '../common/FilterMenu';
+import Tooltip from '../common/Tooltip';
 import ListingControlsSkeleton from '../common/ListingControlsSkeleton';
 import StoreListViewToggle from './StoreListViewToggle';
 import { SERVICE_DOMAIN_FILTER_OPTIONS } from '../../constants';
@@ -32,19 +33,18 @@ export default function StoreListingToolbar({
             <StoreListViewToggle view={view} onChange={onViewChange} disabled={disabled} />
             {count != null && <Text className="reserve-explore-count" type="secondary">{count.toLocaleString('ko-KR')}개 가게</Text>}
             <div className="reserve-explore-filter-controls">
-                {onRegionOpen && <button
+                {onRegionOpen && <Tooltip title={`지역 필터, ${regionLabel}`} disabled={regionOpen}><button
                     type="button"
                     className={['reserve-explore-region-trigger', region ? 'is-active' : ''].filter(Boolean).join(' ')}
                     aria-haspopup="dialog"
                     aria-expanded={regionOpen}
                     aria-label={`지역 필터, ${regionLabel}`}
-                    title={regionLabel}
                     disabled={disabled}
                     aria-busy={disabled || undefined}
                     onClick={onRegionOpen}
                 >
                     <EnvironmentOutlined aria-hidden="true" />
-                </button>}
+                </button></Tooltip>}
                 <FilterMenu
                     appearance="plain"
                     className="reserve-explore-domain-filter"

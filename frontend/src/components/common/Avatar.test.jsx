@@ -1,5 +1,5 @@
 import { fireEvent, render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import Avatar from './Avatar';
 
 describe('shared account Avatar', () => {
@@ -27,5 +27,36 @@ describe('shared account Avatar', () => {
         expect(container.querySelector('.anticon-user')).toBeInTheDocument();
         rerender(<Avatar src="https://example.test/current.png" />);
         expect(container.querySelector('img')).toHaveAttribute('src', 'https://example.test/current.png');
+    });
+
+    it('mounts an optional fallback only after a failed photo and resets it for a new source', () => {
+        const fallback = <span data-testid="custom-avatar-fallback">대체 사진</span>;
+        const { container, rerender } = render(<Avatar src="https://example.test/first.png" fallback={fallback} />);
+        expect(container.querySelector('[data-testid="custom-avatar-fallback"]')).toBeNull();
+        fireEvent.error(container.querySelector('img'));
+        expect(container.querySelector('img')).toBeNull();
+        expect(container.querySelector('[data-testid="custom-avatar-fallback"]')).toHaveTextContent('대체 사진');
+        rerender(<Avatar src="https://example.test/current.png" fallback={fallback} />);
+        expect(container.querySelector('img')).toHaveAttribute('src', 'https://example.test/current.png');
+        expect(container.querySelector('[data-testid="custom-avatar-fallback"]')).toBeNull();
+    });
+
+    it('lets the supplied resolver retain a frontend static image path', () => {
+        const resolveSource = vi.fn(value => value);
+        const { container } = render(<Avatar src="/icons/RESERVE_logo.png" resolveSource={resolveSource} />);
+        expect(resolveSource).toHaveBeenCalledWith('/icons/RESERVE_logo.png', null);
+        expect(container.querySelector('img')).toHaveAttribute('src', '/icons/RESERVE_logo.png');
+    });
+
+    it.each(['blob:https://reserve.it.kr/account-photo', 'data:image/png;base64,aGVsbG8='])('preserves the account default for %s', source => {
+        const { container } = render(<Avatar src={source} />);
+        expect(container.querySelector('img')).toHaveAttribute('src', source);
+    });
+
+    it.each(['blob:https://reserve.it.kr/private-photo', 'data:image/svg+xml,<svg/>'])('does not bypass a rejecting resolver for %s', source => {
+        const resolveSource = vi.fn(() => null);
+        const { container } = render(<Avatar src={source} resolveSource={resolveSource} />);
+        expect(resolveSource).toHaveBeenCalledWith(source, null);
+        expect(container.querySelector('img')).toBeNull();
     });
 });

@@ -21,26 +21,27 @@ const submitLabel = (mode, loading) => {
 
 const draftLabel = draftState => {
     if (draftState?.autoSaveEnabled === false && !['saving', 'saved', 'error'].includes(draftState?.status)) {
-        return '자동 임시저장이 꺼져 있어요. 임시저장 버튼으로 저장해주세요.';
+        return '자동 임시저장 꺼짐';
     }
     if (draftState?.status === 'pending') return '변경 내용을 자동 저장할게요.';
-    if (draftState?.status === 'saving') return '이 브라우저에 저장 중…';
+    if (draftState?.status === 'saving') return '임시저장 중…';
     if (draftState?.status === 'saved') {
         const savedTime = savedTimeLabel(draftState.savedAt);
         const savedSuffix = savedTime ? ' · ' + savedTime : '';
-        return `이 브라우저에 저장됨${savedSuffix}`;
+        return `임시저장됨${savedSuffix}`;
     }
     if (draftState?.status === 'error') return draftState.error || '임시저장에 실패했어요.';
-    return '입력 내용과 새 이미지는 이 브라우저에만 자동 저장돼요.';
+    return '';
 };
 
 /** 등록·수정 모두 같은 로컬 임시저장 관문과 제출 버튼을 사용한다. */
 const StoreFormActions = ({ mode = 'create', loading = false, onSaveDraft, draftState, onNext, nextLabel = '다음', onConfirm }) => {
     const savingDraft = draftState?.status === 'saving';
     const draftError = draftState?.status === 'error';
+    const draftStatus = draftLabel(draftState);
     return (
         <div className="reserve-store-form-actions" style={{ marginTop: 32 }}>
-            <Text
+            {draftStatus && <Text
                 role="status"
                 aria-live="polite"
                 style={{
@@ -50,8 +51,8 @@ const StoreFormActions = ({ mode = 'create', loading = false, onSaveDraft, draft
                     color: draftError ? colors.error.main : colors.text.tertiary,
                 }}
             >
-                {draftLabel(draftState)}
-            </Text>
+                {draftStatus}
+            </Text>}
             <Flex gap={12}>
                 <Button
                     variant="secondary"

@@ -29,31 +29,33 @@ function Harness({ restored, mode = 'create', initialValues }) {
     return <StoreOnboarding mode={mode} form={form} initialValues={initialValues} onSubmit={submit} onSaveDraft={draft} onValuesChange={changes} />;
 }
 beforeEach(() => { submit.mockReset(); draft.mockReset(); changes.mockReset(); });
+const currentQuestion = () => within(document.querySelector('.reserve-onboarding-step:not([hidden])'));
+const actions = () => within(document.querySelector('.reserve-store-form-actions'));
 
 it('validates one question at a time, skips booking for waiting-only and never submits an intermediate step', async () => {
     render(<Harness />);
-    const next = screen.getByRole('button', { name: '다음' });
+    const next = actions().getByRole('button', { name: '다음' });
     fireEvent.click(next);
     await screen.findByText('서비스 분야를 선택해주세요.');
     expect(submit).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '맛집 · 카페' }));
-    await waitFor(() => expect(screen.getByLabelText('업종')).toHaveValue('맛집 · 카페'));
+    fireEvent.click(currentQuestion().getByRole('button', { name: '맛집 · 카페' }));
+    await waitFor(() => expect(currentQuestion().getByLabelText('업종')).toHaveValue('맛집 · 카페'));
     fireEvent.click(next);
-    await screen.findByRole('heading', { name: '손님을 어떻게 받고 싶으세요?' });
-    fireEvent.click(screen.getByRole('button', { name: '웨이팅' }));
+    await screen.findByRole('heading', { level: 1, name: '손님을 어떻게 받고 싶으세요?' });
+    fireEvent.click(currentQuestion().getByRole('button', { name: '웨이팅' }));
     fireEvent.click(next);
-    await screen.findByRole('heading', { name: '웨이팅은 어디에서 접수할까요?' });
+    await screen.findByRole('heading', { level: 1, name: '웨이팅은 어디에서 접수할까요?' });
     expect(screen.queryByRole('heading', { name: '손님이 무엇을 선택하면 되나요?' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '임시저장' }));
+    fireEvent.click(actions().getByRole('button', { name: '임시저장' }));
     expect(draft).toHaveBeenCalledTimes(1);
     expect(submit).not.toHaveBeenCalled();
 });
 
 it('restores the saved step and submits only the final registered values, without charging a waiting-only deposit', async () => {
     render(<Harness restored={{ ...complete, _onboardingStep: 'review', reservationEnabled: false, waitingIntakeMode: 'BOTH', noShowDeposit: 10000 }} />);
-    await screen.findByRole('heading', { name: '손님에게 이렇게 보여요.' });
+    await screen.findByRole('heading', { level: 1, name: '손님에게 이렇게 보여요.' });
     await screen.findByText('상세 미리보기: 예약 가게');
-    fireEvent.click(screen.getByRole('button', { name: '등록 완료' }));
+    fireEvent.click(actions().getByRole('button', { name: '등록 완료' }));
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     const data = buildStoreFormData(submit.mock.calls[0][0]);
     expect(data.get('reservationEnabled')).toBe('false');
@@ -65,10 +67,10 @@ it('restores the saved step and submits only the final registered values, withou
 
 it('entering the preview and implicit form submission cannot create a store', async () => {
     render(<Harness restored={{ ...complete, _onboardingStep: 'identity' }} />);
-    await screen.findByRole('heading', { name: '손님에게 가게를 소개해주세요.' });
-    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    await screen.findByRole('heading', { level: 1, name: '손님에게 가게를 소개해주세요.' });
+    fireEvent.click(actions().getByRole('button', { name: '다음' }));
     await screen.findByText('상세 미리보기: 예약 가게');
-    const confirm = screen.getByRole('button', { name: '등록 완료' });
+    const confirm = actions().getByRole('button', { name: '등록 완료' });
     await act(async () => { fireEvent.submit(confirm.closest('form')); });
     expect(submit).not.toHaveBeenCalled();
     fireEvent.click(confirm);
@@ -81,7 +83,7 @@ it('keeps one registration request in flight even when the final action is click
     submit.mockImplementationOnce(() => pending);
     render(<Harness restored={{ ...complete, _onboardingStep: 'review' }} />);
     await screen.findByText('상세 미리보기: 예약 가게');
-    const confirm = screen.getByRole('button', { name: '등록 완료' });
+    const confirm = actions().getByRole('button', { name: '등록 완료' });
     fireEvent.click(confirm);
     fireEvent.click(confirm);
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
@@ -92,16 +94,16 @@ it('keeps one registration request in flight even when the final action is click
 
 it('keeps restored values when moving back and directs final validation to the question that needs correction', async () => {
     render(<Harness restored={{ ...complete, phone: '', _onboardingStep: 'review' }} />);
-    await screen.findByRole('heading', { name: '손님에게 이렇게 보여요.' });
-    fireEvent.click(screen.getByRole('button', { name: '등록 완료' }));
-    await screen.findByRole('heading', { name: '손님에게 가게를 소개해주세요.' });
+    await screen.findByRole('heading', { level: 1, name: '손님에게 이렇게 보여요.' });
+    fireEvent.click(actions().getByRole('button', { name: '등록 완료' }));
+    await screen.findByRole('heading', { level: 1, name: '손님에게 가게를 소개해주세요.' });
     expect(screen.getByLabelText('가게 이름')).toHaveValue('예약 가게');
     expect(submit).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('연락처'), { target: { value: '02-5555-5555' } });
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
-    await screen.findByRole('heading', { name: '손님에게 이렇게 보여요.' });
+    fireEvent.click(actions().getByRole('button', { name: '미리보기' }));
+    await screen.findByRole('heading', { level: 1, name: '손님에게 이렇게 보여요.' });
     fireEvent.click(screen.getByRole('button', { name: '연락처 수정' }));
-    await screen.findByRole('heading', { name: '손님에게 가게를 소개해주세요.' });
+    await screen.findByRole('heading', { level: 1, name: '손님에게 가게를 소개해주세요.' });
     expect(screen.getByLabelText('연락처')).toHaveValue('02-5555-5555');
 });
 
@@ -114,11 +116,11 @@ it('edits empty and inactive fields inside the preview and returns with the chan
     expect(editWaiting.parentElement).toHaveTextContent('사용 안 함');
     expect(within(preview).getByRole('button', { name: '임시 휴무일 수정' }).parentElement).toHaveTextContent('없음');
     fireEvent.click(editWaiting);
-    await screen.findByRole('heading', { name: '손님을 어떻게 받고 싶으세요?' });
+    await screen.findByRole('heading', { level: 1, name: '손님을 어떻게 받고 싶으세요?' });
     act(() => { expect(requestRegistrationStepBack()).toBe(true); });
     const returned = await screen.findByRole('region', { name: '가게 상세 미리보기' });
     fireEvent.click(within(returned).getByRole('button', { name: '연락처 수정' }));
-    await screen.findByRole('heading', { name: '손님에게 가게를 소개해주세요.' });
+    await screen.findByRole('heading', { level: 1, name: '손님에게 가게를 소개해주세요.' });
     fireEvent.change(screen.getByLabelText('연락처'), { target: { value: '02-5555-5555' } });
     act(() => { expect(requestRegistrationStepBack()).toBe(true); });
     const updated = await screen.findByRole('region', { name: '가게 상세 미리보기' });
@@ -129,26 +131,26 @@ it('edits empty and inactive fields inside the preview and returns with the chan
 
 it('starts editing with the stored values and returns from a selected question without saving the store', async () => {
     render(<Harness mode="edit" initialValues={{ ...complete, bookingDeadlineHours: 0 }} />);
-    await screen.findByRole('heading', { name: '무엇을 수정하시겠어요?' });
+    await screen.findByRole('heading', { level: 1, name: '무엇을 수정하시겠어요?' });
     expect(screen.queryByRole('button', { name: '수정 완료' })).toBeNull();
     expect(changes).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '소개·사진' }));
-    await screen.findByRole('heading', { name: '손님에게 가게를 소개해주세요.' });
+    fireEvent.click(currentQuestion().getByRole('button', { name: '소개·사진' }));
+    await screen.findByRole('heading', { level: 1, name: '손님에게 가게를 소개해주세요.' });
     expect(screen.getByLabelText('가게 이름')).toHaveValue('예약 가게');
     fireEvent.change(screen.getByLabelText('연락처'), { target: { value: '02-5555-5555' } });
     act(() => { expect(requestRegistrationStepBack()).toBe(true); });
-    await screen.findByRole('heading', { name: '무엇을 수정하시겠어요?' });
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    await screen.findByRole('heading', { level: 1, name: '무엇을 수정하시겠어요?' });
+    fireEvent.click(actions().getByRole('button', { name: '미리보기' }));
     const preview = await screen.findByRole('region', { name: '가게 상세 미리보기' });
     expect(within(preview).getByText('02-5555-5555')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '등록할 내용' })).toBeNull();
     expect(submit).not.toHaveBeenCalled();
     fireEvent.click(within(preview).getByRole('button', { name: '연락처 수정' }));
-    await screen.findByRole('heading', { name: '손님에게 가게를 소개해주세요.' });
+    await screen.findByRole('heading', { level: 1, name: '손님에게 가게를 소개해주세요.' });
     act(() => { expect(requestRegistrationStepBack()).toBe(true); });
     await screen.findByRole('region', { name: '가게 상세 미리보기' });
     act(() => { expect(requestRegistrationStepBack()).toBe(true); });
-    await screen.findByRole('heading', { name: '무엇을 수정하시겠어요?' });
+    await screen.findByRole('heading', { level: 1, name: '무엇을 수정하시겠어요?' });
     act(() => { expect(requestRegistrationStepBack()).toBe(false); });
     expect(submit).not.toHaveBeenCalled();
 });
@@ -156,13 +158,13 @@ it('starts editing with the stored values and returns from a selected question w
 it('preserves inactive editing settings and optional photos and only submits after explicit final confirmation', async () => {
     render(<Harness mode="edit" initialValues={{ ...complete, mainImage: undefined, bookingDeadlineHours: 0,
         reservationEnabled: false, waitingIntakeMode: 'OFF', noShowDeposit: 10000, nearbyRadiusKm: 0 }} />);
-    await screen.findByRole('heading', { name: '무엇을 수정하시겠어요?' });
-    fireEvent.click(screen.getByRole('button', { name: '접수 방식' }));
-    await screen.findByRole('heading', { name: '손님을 어떻게 받고 싶으세요?' });
-    expect(screen.getByRole('button', { name: '접수 중지' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    await screen.findByRole('heading', { level: 1, name: '무엇을 수정하시겠어요?' });
+    fireEvent.click(currentQuestion().getByRole('button', { name: '접수 방식' }));
+    await screen.findByRole('heading', { level: 1, name: '손님을 어떻게 받고 싶으세요?' });
+    expect(currentQuestion().getByRole('button', { name: '접수 중지' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(actions().getByRole('button', { name: '미리보기' }));
     await screen.findByRole('region', { name: '가게 상세 미리보기' });
-    const confirm = screen.getByRole('button', { name: '수정 완료' });
+    const confirm = actions().getByRole('button', { name: '수정 완료' });
     await act(async () => { fireEvent.submit(confirm.closest('form')); });
     expect(submit).not.toHaveBeenCalled();
     fireEvent.click(confirm);
@@ -177,16 +179,16 @@ it('preserves inactive editing settings and optional photos and only submits aft
 
 it('keeps final edit validation and returns to the preview after correcting a field', async () => {
     render(<Harness mode="edit" initialValues={{ ...complete, phone: '', bookingDeadlineHours: 0 }} />);
-    await screen.findByRole('heading', { name: '무엇을 수정하시겠어요?' });
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    await screen.findByRole('heading', { level: 1, name: '무엇을 수정하시겠어요?' });
+    fireEvent.click(actions().getByRole('button', { name: '미리보기' }));
     await screen.findByRole('region', { name: '가게 상세 미리보기' });
-    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
-    await screen.findByRole('heading', { name: '손님에게 가게를 소개해주세요.' });
+    fireEvent.click(actions().getByRole('button', { name: '수정 완료' }));
+    await screen.findByRole('heading', { level: 1, name: '손님에게 가게를 소개해주세요.' });
     expect(submit).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('연락처'), { target: { value: '02-5555-5555' } });
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    fireEvent.click(actions().getByRole('button', { name: '미리보기' }));
     await screen.findByRole('region', { name: '가게 상세 미리보기' });
-    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
+    fireEvent.click(actions().getByRole('button', { name: '수정 완료' }));
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     expect(submit.mock.calls[0][0].phone).toBe('02-5555-5555');
 });
@@ -196,7 +198,7 @@ it('saves a free reservation edit with no cutoff or inactive payment and refund 
         noShowDeposit: 0, allowLatePayment: true, paymentTimeoutMinutes: undefined, fullRefundDays: undefined,
         partialRefundDays: undefined, partialRefundRate: undefined }} />);
     await screen.findByRole('region', { name: '가게 상세 미리보기' });
-    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
+    fireEvent.click(actions().getByRole('button', { name: '수정 완료' }));
     await waitFor(() => expect(submit).toHaveBeenCalledOnce());
     expect(submit.mock.calls[0][0]).toMatchObject({ noShowDeposit: 0, allowLatePayment: false, bookingDeadlineHours: 0 });
 });
@@ -204,16 +206,19 @@ it('saves a free reservation edit with no cutoff or inactive payment and refund 
 it('moves payment timing into its own question and keeps the stored timeout when the branch is hidden', async () => {
     render(<Harness mode="edit" initialValues={{ ...complete, noShowDeposit: 3000, allowLatePayment: false, paymentTimeoutMinutes: 60 }} />);
     await screen.findByRole('button', { name: '노쇼 예약금·결제' });
-    fireEvent.click(screen.getByRole('button', { name: '노쇼 예약금·결제' }));
-    await screen.findByRole('heading', { name: '노쇼 예약금을 설정하실 건가요?' });
-    expect(screen.getByLabelText('결제 마감')).not.toBeVisible();
-    fireEvent.click(screen.getByRole('radio', { name: '나중 결제도 허용' }));
-    expect(await screen.findByLabelText('결제 마감')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: '신청할 때 결제' }));
-    fireEvent.click(screen.getByRole('button', { name: '미리보기' }));
+    fireEvent.click(currentQuestion().getByRole('button', { name: '노쇼 예약금·결제' }));
+    await screen.findByRole('heading', { level: 1, name: '노쇼 예약금을 설정하실 건가요?' });
+    expect(screen.getByLabelText('결제 마감')).toBeVisible();
+    fireEvent.click(currentQuestion().getByRole('radio', { name: '나중 결제도 허용' }));
+    await waitFor(() => expect(screen.getByLabelText('결제 마감')).not.toBeVisible());
+    expect(screen.getByText(/미결제만을 이유로 자동 취소하지 않아요/)).toBeInTheDocument();
+    fireEvent.click(currentQuestion().getByRole('radio', { name: '신청할 때 결제' }));
+    await waitFor(() => expect(screen.getByLabelText('결제 마감')).toBeVisible());
+    fireEvent.click(actions().getByRole('button', { name: '미리보기' }));
     const preview = await screen.findByRole('region', { name: '가게 상세 미리보기' });
-    expect(within(preview).getByText('신청할 때 결제')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
+    expect(within(preview).getByText('3,000원 (신청할 때 결제)')).toBeInTheDocument();
+    expect(within(preview).getByText('예약 신청 후 1시간 이내 미결제 대기 예약 자동 취소')).toBeInTheDocument();
+    fireEvent.click(actions().getByRole('button', { name: '수정 완료' }));
     await waitFor(() => expect(submit).toHaveBeenCalledOnce());
     expect(submit.mock.calls[0][0]).toMatchObject({ noShowDeposit: 3000, allowLatePayment: false, paymentTimeoutMinutes: 60 });
 });
@@ -224,10 +229,10 @@ it('routes a cutoff preview edit to booking rules and returns without losing a h
     render(<Harness mode="edit" initialValues={{ ...complete, _onboardingStep: 'review', operatingPeriod: period, closedDates: holidays }} />);
     const preview = await screen.findByRole('region', { name: '가게 상세 미리보기' });
     fireEvent.click(within(preview).getByRole('button', { name: '예약 마감 수정' }));
-    await screen.findByRole('heading', { name: '예약을 어떤 규칙으로 받을까요?' });
+    await screen.findByRole('heading', { level: 1, name: '예약을 어떤 규칙으로 받을까요?' });
     act(() => { expect(requestRegistrationStepBack()).toBe(true); });
     await screen.findByRole('region', { name: '가게 상세 미리보기' });
-    fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
+    fireEvent.click(actions().getByRole('button', { name: '수정 완료' }));
     await waitFor(() => expect(submit).toHaveBeenCalledOnce());
     const data = buildStoreFormData(submit.mock.calls[0][0]);
     expect(data.get('closeDate')).toBe('2026-12-31');

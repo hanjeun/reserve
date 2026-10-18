@@ -12,10 +12,12 @@
  *   백엔드 GET /api/admin/mail/sent 의 **응답 형식도 배열 → Page 로 바뀌었다**(같이 배포할 것).
  */
 import React, { useState } from 'react';
-import { Typography, Input, Divider, Pagination, Checkbox } from 'antd';
+import { Typography, Input, Divider, Checkbox } from 'antd';
+import Pagination from '../common/Pagination';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined } from '@ant-design/icons';
+import { SearchOutlined, SendOutlined, InboxOutlined, ArrowLeftOutlined, DeleteOutlined } from '../common/icons';
 import { Button, DataState, FormTextArea, FormInput, FormModal, FormField, RefreshButton } from '../common';
+import IconTool from '../common/IconTool';
 import { Bone } from '../common/Skeletons';
 import FilterToolbarSkeleton from '../common/FilterToolbarSkeleton';
 import useDebounce from '../../hooks/useDebounce';
@@ -339,15 +341,8 @@ const MailboxTab = () => {
 
             {showMobDetail && (
                 <div style={styles.mobileDetail}>
-                    {/* ★ 손으로 만든 <button> 을 쓰지 않는다 (2026-08-24 2차).
-                        가게 상세의 "뒤로가기"와 **같은 컴포넌트·같은 variant** 다.
-                        한때 전용 클래스(.reserve-backlink)를 따로 만들었는데, 그러면
-                        hover 색·포커스 링·모서리를 이 화면만 따로 갖게 된다 —
-                        실제로 파란 알약처럼 보인다는 지적이 나왔다.
-                        같은 동작(뒤로 가기)은 같은 버튼으로 그린다. */}
-                    <Button variant="ghost" onClick={() => mail.setSelectedSent(null)} style={styles.backBtn}>
-                        <ArrowLeftOutlined style={{ fontSize: 14 }} /> 목록으로
-                    </Button>
+                    <div style={styles.backBtn}><IconTool kind="navigation" label="목록으로" icon={<ArrowLeftOutlined aria-hidden="true" />}
+                        onClick={() => mail.setSelectedSent(null)} /></div>
                     <SentDetailContent mail={mail.selectedSent} onTrash={trash.askAndTrash} trashing={trash.trashing} />
                 </div>
             )}
@@ -395,6 +390,7 @@ const MailboxTab = () => {
             )}
 
             <FormModal title="새 메일 작성" open={send.composing} onClose={send.resetCompose}
+                navigationDirty={Boolean(send.composeForm.toEmail || send.composeForm.subject || send.composeForm.body || send.composeForm.marketing)}
                 onSubmit={send.handleComposeSend} submitting={send.composeSending}>
                 <FormField label="받는 사람" error={send.errors.toEmail}>
                     <FormInput placeholder="example@email.com" value={send.composeForm.toEmail}
@@ -442,8 +438,8 @@ const styles = {
     mailItem:     { display: 'flex', alignItems: 'stretch', borderBottom: `1px solid ${colors.border.light}` },
     // 목록의 읽기 영역은 좌우 16px으로 맞춘다. 삭제 버튼을 빼면 오른쪽만 4px인 여백은 필요 없다.
     mailItemMain: { flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px' },
-    // 가게 상세(StoreDetail)의 backBtn 과 같은 값 — 두 화면의 뒤로가기가 달라 보이면 안 된다.
-    backBtn:      { marginBottom: 12, padding: '4px 8px', fontSize: fontSize.sm, color: colors.text.secondary },
+    // 뒤로 도구는 공통 IconTool을 사용하고 상세 본문 앞의 왼쪽에 둔다.
+    backBtn:      { display: 'flex', justifyContent: 'flex-start', marginBottom: 12 },
     // 데스크톱은 목록 패널 안쪽 바닥(위 경계선 있음), 모바일은 카드 바로 아래에 떨어져 놓인다.
     paginationBar: { display: 'flex', justifyContent: 'center', padding: '10px 8px', borderTop: `1px solid ${colors.border.light}` },
 };

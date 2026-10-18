@@ -33,7 +33,8 @@ describe('useGoBack', () => {
 
         await userEvent.click(getByRole('button', { name: '뒤로가기' }));
 
-        expect(navigateSpy).toHaveBeenCalledWith(-1);
+        expect(navigateSpy).toHaveBeenCalledTimes(1);
+        expect(navigateSpy).toHaveBeenCalledWith(-1, undefined);
     });
 
     it('첫 진입(idx 0)이면 되감지 않고 fallback 으로 보낸다', async () => {

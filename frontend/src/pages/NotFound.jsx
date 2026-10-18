@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { FileUnknownOutlined } from '@ant-design/icons';
+import { FileUnknownOutlined } from '../components/common/icons';
 import { Button, PageStatus } from '../components/common';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import useGoBack from '../hooks/useGoBack';

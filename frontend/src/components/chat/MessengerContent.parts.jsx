@@ -1,6 +1,6 @@
 import React, { useId, useState } from 'react';
-import { ArrowLeftOutlined, CloseOutlined, DownOutlined, MessageOutlined } from '@ant-design/icons';
-import { Bone, Button, DataState } from '../common';
+import { ArrowLeftOutlined, CloseOutlined, DownOutlined, MessageOutlined } from '../common/icons';
+import { Bone, Button, DataState, Tooltip } from '../common';
 import ConversationListSkeleton from './ConversationListSkeleton';
 import MessengerListHeading from './MessengerListHeading';
 import MessengerHome from './MessengerHome';
@@ -12,6 +12,7 @@ import { SupportAvatar } from './SupportIdentity';
 import ChatBubbleList from './ChatBubbleList';
 import ChatComposer from './ChatComposer';
 import ChatModerationMenu from './ChatModerationMenu';
+import ChatRetentionNotice from './ChatRetentionNotice';
 import { matchesSelection, viewerRoleOf } from './messengerContentModel';
 
 const OWNER_REPLIES = [
@@ -24,10 +25,10 @@ const OWNER_REPLIES = [
 export function MessengerCloseButton({ surface, onClose }) {
     if (surface !== 'page' || !onClose) return null;
     return (
-        <button type="button" className="reserve-chat-close reserve-messenger-shell-close"
+        <Tooltip title="메시지 닫기"><button type="button" className="reserve-chat-close reserve-messenger-shell-close"
             onClick={onClose} aria-label="메시지 닫기">
             <CloseOutlined />
-        </button>
+        </button></Tooltip>
     );
 }
 
@@ -93,8 +94,8 @@ function AdminInboxSection({ query, rows, showThread, selection, onChoose }) {
     return (
         <section className="reserve-messenger-support-section" aria-label="고객지원 문의">
             <StaleListError query={query} rows={rows}
-                title="최신 고객 문의를 확인하지 못해 이전 목록을 보여드리고 있어요." />
-            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="고객 문의" emptyText="아직 접수된 고객 문의가 없어요.">
+                title="목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요." />
+            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="고객 문의" emptyText="아직 고객 문의가 없어요.">
                 {rows.map((row) => (
                     <ConversationRow
                         key={`admin-${row.roomId}`}
@@ -112,11 +113,11 @@ function AdminInboxSection({ query, rows, showThread, selection, onChoose }) {
 function CustomerSection({ query, rows, customerRows, showHidden, showThread, selection, onChoose }) {
     return (
         <section aria-labelledby="reserve-my-conversations">
-            <h2 id="reserve-my-conversations" className={`reserve-messenger-section-label${customerRows.length === 0 ? ' reserve-messenger-sr-only' : ''}`}>내 대화</h2>
+            <h2 id="reserve-my-conversations" className={`reserve-messenger-section-label${customerRows.length === 0 ? ' reserve-messenger-sr-only' : ''}`}>내 문의</h2>
             <StaleListError query={query} rows={rows}
-                title="최신 대화를 확인하지 못해 이전 목록을 보여드리고 있어요." />
+                title="목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요." />
             <ListRows query={query} coldError={query.isError && rows.length === 0} rows={customerRows} subject="대화 목록"
-                emptyText={showHidden ? '숨긴 대화가 없어요.' : '아직 시작한 대화가 없어요.'}>
+                emptyText={showHidden ? '숨긴 대화가 없어요.' : '아직 문의한 내역이 없어요.'}>
                 {customerRows.map((row) => (
                     <ConversationRow
                         key={row.type === 'SUPPORT' ? 'support' : `store-${row.storeId}`}
@@ -137,10 +138,10 @@ function CustomerSection({ query, rows, customerRows, showHidden, showThread, se
 function OwnerInboxSection({ query, rows, showThread, selection, onChoose }) {
     return (
         <section aria-labelledby="reserve-store-inbox">
-            <h2 id="reserve-store-inbox" className="reserve-messenger-section-label">가게 받은 문의</h2>
+            <h2 id="reserve-store-inbox" className="reserve-messenger-section-label">손님 문의</h2>
             <StaleListError query={query} rows={rows}
-                title="최신 받은 문의를 확인하지 못해 이전 목록을 보여드리고 있어요." />
-            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="받은 문의" emptyText="아직 받은 가게 문의가 없어요.">
+                title="목록을 새로 불러오지 못했어요. 이전 내용을 보여드려요." />
+            <ListRows query={query} coldError={query.isError && rows.length === 0} rows={rows} subject="손님 문의" emptyText="아직 손님 문의가 없어요.">
                 {rows.map((row) => (
                     <ConversationRow
                         key={`owner-${row.roomId}`}
@@ -151,7 +152,7 @@ function OwnerInboxSection({ query, rows, showThread, selection, onChoose }) {
                     />
                 ))}
             </ListRows>
-            <MoreButton query={query}>받은 문의 더 보기</MoreButton>
+            <MoreButton query={query}>문의 더 보기</MoreButton>
         </section>
     );
 }
@@ -209,10 +210,7 @@ function ThreadAvatar({ selection, thread, selectedRow }) {
                 variant="person" className="reserve-messenger-thread-avatar" />
         );
     }
-    if (selection.kind === 'store' && (thread?.storeImageUrl || selectedRow?.storeImageUrl)) {
-        return <MessengerAvatar imageSrc={thread?.storeImageUrl || selectedRow?.storeImageUrl} variant="store" className="reserve-messenger-thread-avatar" />;
-    }
-    return <span className="reserve-messenger-thread-avatar" aria-hidden="true"><MessageOutlined /></span>;
+    return <MessengerAvatar imageSrc={thread?.storeImageUrl || selectedRow?.storeImageUrl} variant="store" className="reserve-messenger-thread-avatar" />;
 }
 
 function ThreadMessages({ messages, thread, selection, history, onLoadOlder, onRetracted, emptyText }) {
@@ -315,13 +313,13 @@ function ThreadComposerArea({ closed, disabledMessage, showOwnerReplies, draft, 
 
 export function ThreadPanel({
     onAnimationEnd, onBack, returningToList, avatarProps, title, threadKind, moderationProps,
-    threadBodyRef, isSupport, bodyProps, composerAreaProps,
+    threadBodyRef, isSupport, bodyProps, composerAreaProps, retentionNoticeVisible = true,
 }) {
     return (
         <section className="reserve-messenger-thread" aria-labelledby="reserve-messenger-thread-title"
             onAnimationEnd={onAnimationEnd}>
             <header className="reserve-messenger-thread-heading">
-                <button
+                <Tooltip title="대화 목록으로 돌아가기"><button
                     type="button"
                     className="reserve-messenger-mobile-back"
                     onClick={onBack}
@@ -329,7 +327,7 @@ export function ThreadPanel({
                     aria-label="대화 목록으로 돌아가기"
                 >
                     <ArrowLeftOutlined />
-                </button>
+                </button></Tooltip>
                 <ThreadAvatar {...avatarProps} />
                 <span className="reserve-messenger-thread-copy">
                     <strong id="reserve-messenger-thread-title">{title}</strong>
@@ -341,10 +339,7 @@ export function ThreadPanel({
             </header>
 
             <div ref={threadBodyRef} className={`reserve-messenger-thread-body${isSupport ? ' reserve-messenger-thread-body--support' : ''}`}>
-                <p className="reserve-chat-retention-notice">
-                    일반 글·사진은 90일 보관해요. 신고·분쟁 자료는 별도 보관하며,
-                    정책 고지 후 30일 유예를 거쳐 적용해요. <a href="/privacy" target="_blank" rel="noopener noreferrer">보관 정책 보기</a>
-                </p>
+                <ChatRetentionNotice visible={retentionNoticeVisible} />
                 <ThreadBody {...bodyProps} />
             </div>
 

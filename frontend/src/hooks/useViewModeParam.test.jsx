@@ -1,18 +1,23 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import useViewModeParam from './useViewModeParam';
 
 function Probe({ defaultView }) {
-    const [params, setParams] = useSearchParams();
-    const [view, setView] = useViewModeParam(params, setParams, defaultView);
+    const [params] = useSearchParams();
+    const [view, setView] = useViewModeParam(params, defaultView);
     const location = useLocation();
+    const navigate = useNavigate();
     return <>
         <output data-testid="view">{view}</output>
         <output data-testid="search">{location.search}</output>
+        <output data-testid="pathname">{location.pathname}</output>
+        <output data-testid="hash">{location.hash}</output>
+        <output data-testid="state">{JSON.stringify(location.state)}</output>
         <button type="button" onClick={() => setView('cards')}>cards</button>
         <button type="button" onClick={() => setView('list')}>list</button>
+        <button type="button" onClick={() => navigate(-1)}>back</button>
     </>;
 }
 
@@ -21,7 +26,7 @@ describe('explicit view URL contract', () => {
         sessionStorage.clear();
     });
 
-    it('writes a page-specific default and preserves supported filters on changes', async () => {
+    it('displays both page-specific default and alternate views while preserving filters', async () => {
         const user = userEvent.setup();
         render(<MemoryRouter initialEntries={['/my-reservations?status=CONFIRMED&utm_source=link&keep=yes']}>
             <Probe defaultView="list" />
@@ -57,10 +62,10 @@ describe('explicit view URL contract', () => {
             <Probe defaultView="list" />
         </MemoryRouter>);
 
-        await waitFor(() => expect(new URLSearchParams(screen.getByTestId('search').textContent).get('view')).toBe('list'));
+        await waitFor(() => expect(new URLSearchParams(screen.getByTestId('search').textContent).get('waitingPage')).toBe('1'));
         const params = new URLSearchParams(screen.getByTestId('search').textContent);
         expect(params.get('tab')).toBe('waiting');
-        expect(params.has('waitingPage')).toBe(false);
+        expect(params.get('waitingPage')).toBe('1');
     });
 
     it('normalizes an invalid value to the supplied default instead of a remembered view', async () => {
@@ -98,7 +103,40 @@ describe('explicit view URL contract', () => {
             <Probe defaultView="cards" />
         </MemoryRouter>);
 
-        await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent(/^\?view=cards$/));
+        await waitFor(() => expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('search').textContent)))
+            .toEqual({ view: 'cards', sort: 'recent', domain: '' }));
         expect(screen.getByTestId('view')).toHaveTextContent('cards');
+    });
+
+    it('keeps an explicit default ahead of a remembered list without adding a history entry', async () => {
+        const user = userEvent.setup();
+        sessionStorage.setItem('reserve:view-mode:/my-stores', 'list');
+        render(<MemoryRouter initialEntries={['/guide/user', {
+            pathname: '/my-stores', search: '?view=cards&sort=recent&domain=SPORTS&utm_source=guide',
+            hash: '#stores', state: { origin: 'guide' },
+        }]} initialIndex={1}><Probe defaultView="cards" /></MemoryRouter>);
+        await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?view=cards&sort=recent&domain=SPORTS&utm_source=guide'));
+        expect(screen.getByTestId('view')).toHaveTextContent('cards');
+        expect(screen.getByTestId('hash')).toHaveTextContent('#stores');
+        expect(screen.getByTestId('state')).toHaveTextContent('{"origin":"guide"}');
+        await user.click(screen.getByRole('button', { name: 'back' }));
+        expect(screen.getByTestId('pathname')).toHaveTextContent('/guide/user');
+    });
+
+    it('keeps the unified favorites kind across view changes and return to cards', async () => {
+        const user = userEvent.setup();
+        render(<MemoryRouter initialEntries={['/my-favorites?kind=posts#liked']}><Probe defaultView="cards" /></MemoryRouter>);
+        await user.click(screen.getByRole('button', { name: 'list' }));
+        expect(screen.getByTestId('search')).toHaveTextContent('?kind=posts&view=list');
+        await user.click(screen.getByRole('button', { name: 'cards' }));
+        expect(screen.getByTestId('search')).toHaveTextContent(/^\?kind=posts&view=cards$/);
+        expect(screen.getByTestId('hash')).toHaveTextContent('#liked');
+    });
+
+    it('shows the remembered region alongside every default directory option', async () => {
+        sessionStorage.setItem('reserve:discovery-region', '부산');
+        render(<MemoryRouter initialEntries={['/stores']}><Probe defaultView="cards" /></MemoryRouter>);
+        await waitFor(() => expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('search').textContent)))
+            .toEqual({ view: 'cards', sort: 'recommended', domain: '', page: '1', region: '부산' }));
     });
 });

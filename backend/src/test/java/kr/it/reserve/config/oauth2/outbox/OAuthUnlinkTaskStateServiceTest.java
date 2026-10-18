@@ -74,4 +74,20 @@ class OAuthUnlinkTaskStateServiceTest {
         assertThat(task.getEncryptedAccessToken()).isEqualTo("encrypted");
         assertThat(task.getLeaseId()).isNull();
     }
+
+    @Test
+    void blockedCredentialCannotBeClaimedAndAnOldLeaseCannotBlockNewWork() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 16, 1, 0);
+        OAuthUnlinkTask task = OAuthUnlinkTask.pending("d".repeat(64), 24L, AuthProvider.GOOGLE, "encrypted", now);
+        task.markProcessing(now.plusMinutes(1), "new-lease");
+        when(taskRepository.findByIdForUpdate(6L)).thenReturn(Optional.of(task));
+
+        stateService.markBlocked(6L, "old-lease", now, "REMOTE_HTTP_401");
+        assertThat(task.getStatus()).isEqualTo(OAuthUnlinkTask.Status.PROCESSING);
+        stateService.markBlocked(6L, "new-lease", now, "REMOTE_HTTP_401");
+
+        assertThat(task.getStatus()).isEqualTo(OAuthUnlinkTask.Status.BLOCKED);
+        assertThat(task.getEncryptedAccessToken()).isEqualTo("encrypted");
+        assertThat(task.canClaim(now.plusDays(1))).isFalse();
+    }
 }

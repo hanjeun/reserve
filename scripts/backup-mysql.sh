@@ -37,7 +37,7 @@ DB_USER="${DB_USER:-root}"
 # DB_PASSWORD 는 설정 파일에서 온다 (필수)
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/reserve}"
 LOG_FILE="${LOG_FILE:-/var/log/reserve/backup.log}"
-LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_DAYS:-7}"
+LOCAL_RETENTION_DAYS="${LOCAL_RETENTION_DAYS:-3}"
 S3_BUCKET="${BACKUP_S3_BUCKET:-}"          # 예: reserve-it-kr-backup
 S3_PREFIX="${BACKUP_S3_PREFIX:-mysql}"
 

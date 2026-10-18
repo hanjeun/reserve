@@ -10,6 +10,7 @@ import kr.it.reserve.config.service.RefreshRejectedException;
 import kr.it.reserve.config.service.RefreshRejectedException.Reason;
 import kr.it.reserve.config.service.TokenService;
 import kr.it.reserve.member.entity.Member;
+import kr.it.reserve.member.entity.AuthProvider;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +69,7 @@ class TokenServiceRefreshRotationTest {
                 .email("rotation@example.com")
                 .role(Role.USER)
                 .build();
-        when(memberRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(member));
+        when(memberRepository.findActiveByIdForUpdate(1L)).thenReturn(Optional.of(member));
         when(refreshTokenRepository.findIdsByRefreshToken(anyString())).thenReturn(List.of());
         when(refreshTokenRepository.findIdsByPreviousTokenHash(anyString())).thenReturn(List.of());
     }
@@ -200,7 +201,7 @@ class TokenServiceRefreshRotationTest {
     void unavailableMemberIsRejected() {
         String presented = tokenProvider.createRefreshJwt(member);
         RefreshToken row = storedAsCurrent(presented, LocalDateTime.now().plusDays(1));
-        when(memberRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.empty());
+        when(memberRepository.findActiveByIdForUpdate(1L)).thenReturn(Optional.empty());
 
         assertRejected(presented, Reason.MEMBER_UNAVAILABLE);
         verify(refreshTokenRepository).delete(row);
@@ -262,5 +263,48 @@ class TokenServiceRefreshRotationTest {
 
         assertThat(transactional).isNotNull();
         assertThat(Arrays.asList(transactional.noRollbackFor())).contains(RefreshRejectedException.class);
+    }
+
+    @Test
+    void rotationAndPreviousTokenGracePreserveTheOriginalOAuthAuthenticationDespiteANewerLogin() {
+        LocalDateTime eventTime = LocalDateTime.of(2026, 10, 16, 1, 0, 1);
+        LocalDateTime original = eventTime.minusMinutes(1);
+        member.setProvider(AuthProvider.GOOGLE);
+        member.setOauthAuthenticatedAt(original);
+        String first = tokenProvider.createRefreshJwt(member);
+        storedAsCurrent(first, LocalDateTime.now().plusDays(1));
+        // Another device has authenticated more recently. It must not replace this family's origin.
+        member.setOauthAuthenticatedAt(eventTime.plusNanos(500_000_000));
+
+        TokenService.RefreshResult rotated = tokenService.refresh(first);
+        assertThat(tokenProvider.inspectRefreshToken(rotated.refreshToken()).oauthAuthenticatedAt()).isEqualTo(original);
+        assertThat(tokenProvider.getOAuthAuthenticationAt(rotated.accessToken())).isEqualTo(original);
+        when(refreshTokenRepository.findIdsByRefreshToken(first)).thenReturn(List.of());
+        when(refreshTokenRepository.findIdsByPreviousTokenHash(RefreshToken.hash(first))).thenReturn(List.of(ROW_ID));
+        assertThat(tokenProvider.getOAuthAuthenticationAt(tokenService.refresh(first).accessToken())).isEqualTo(original);
+
+        // The event arrives after rotation. A later JWT iat cannot launder the old authentication.
+        member.recordOAuthSecurityRevocation(eventTime);
+        when(refreshTokenRepository.findIdsByRefreshToken(rotated.refreshToken())).thenReturn(List.of(ROW_ID));
+        assertRejected(rotated.refreshToken(), Reason.OAUTH_AUTHENTICATION_REVOKED);
+        String fresh = tokenProvider.createRefreshJwt(member);
+        storedAsCurrent(fresh, LocalDateTime.now().plusDays(1));
+        assertThat(tokenProvider.getOAuthAuthenticationAt(tokenService.refresh(fresh).accessToken()))
+                .isEqualTo(eventTime.plusNanos(500_000_000));
+    }
+
+    @Test
+    void legacyRefreshWithoutOriginCannotBePromotedByTheMembersLatestAuthentication() {
+        String legacy = tokenProvider.createRefreshJwt(member);
+        storedAsCurrent(legacy, LocalDateTime.now().plusDays(1));
+        member.setProvider(AuthProvider.KAKAO);
+        member.setOauthAuthenticatedAt(LocalDateTime.of(2026, 10, 16, 1, 1));
+
+        TokenService.RefreshResult rotated = tokenService.refresh(legacy);
+        assertThat(tokenProvider.inspectRefreshToken(rotated.refreshToken()).oauthAuthenticatedAt()).isNull();
+        assertThat(tokenProvider.getOAuthAuthenticationAt(rotated.accessToken())).isNull();
+        member.recordOAuthSecurityRevocation(LocalDateTime.of(2026, 10, 16, 1, 0));
+        when(refreshTokenRepository.findIdsByRefreshToken(rotated.refreshToken())).thenReturn(List.of(ROW_ID));
+        assertRejected(rotated.refreshToken(), Reason.OAUTH_AUTHENTICATION_REVOKED);
     }
 }

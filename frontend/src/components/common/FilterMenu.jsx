@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Dropdown } from 'antd';
-import { CheckOutlined, DownOutlined } from '@ant-design/icons';
+import Tooltip from './Tooltip';
+import { CheckOutlined, DownOutlined } from './icons';
 import { SpinIndicator } from './Loading';
 import { renderRollingChoiceLabel } from './rollingChoiceLabel';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 const renderFilterPopup = (menu, popupRef) => <div ref={popupRef}>{menu}</div>;
 
 /** 입력 없는 목록 조작 메뉴. 모바일 키보드와 Select 내부 입력의 포커스 링을 만들지 않는다. */
-export default function FilterMenu({ value, options, onChange, appearance = 'chip', icon, disabled = false, loading = false, className, ...rest }) {
+export default function FilterMenu({ value, options, onChange, appearance = 'plain', icon, disabled = false, loading = false, className, ...rest }) {
     const [open, setOpen] = useState(false);
+    const reducedMotion = useReducedMotion();
     const triggerRef = useRef(null);
     const popupRef = useRef(null);
     const selected = options.find(option => option.value === value);
@@ -33,10 +36,36 @@ export default function FilterMenu({ value, options, onChange, appearance = 'chi
         triggerRef.current?.focus({ preventScroll: true });
     };
 
+    const iconContent = loading ? <span aria-hidden="true"><SpinIndicator /></span> : icon;
+    const trigger = <button
+        {...rest}
+        ref={triggerRef}
+        type="button"
+        className={['reserve-filter-menu', 'reserve-filter-menu--' + appearance, appearance === 'icon' && 'reserve-icon-tool', className].filter(Boolean).join(' ')}
+        disabled={disabled}
+        data-filter-active={appearance === 'icon' && Boolean(value) || undefined}
+        aria-haspopup="menu"
+        aria-expanded={open && !disabled}
+        aria-busy={loading || undefined}
+        onKeyDown={event => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                setOpen(true);
+            }
+        }}
+    >
+        {appearance === 'icon' ? iconContent : <span className="reserve-filter-menu-surface">
+            {icon}
+            <span className="reserve-filter-menu-label">{renderRollingChoiceLabel({ value, label: selected?.label ?? '선택' }, { options })}</span>
+            {loading ? <span aria-hidden="true"><SpinIndicator /></span> : <DownOutlined className="reserve-filter-menu-chevron" aria-hidden="true" />}
+        </span>}
+    </button>;
+
     return (
         <Dropdown
             trigger={['click']}
-            placement={appearance === 'plain' ? 'bottomRight' : 'bottomLeft'}
+            transitionName={reducedMotion ? '' : undefined}
+            placement={appearance === 'chip' ? 'bottomLeft' : 'bottomRight'}
             autoFocus
             open={open && !disabled}
             disabled={disabled}
@@ -72,28 +101,7 @@ export default function FilterMenu({ value, options, onChange, appearance = 'chi
                 },
             }}
         >
-            <button
-                {...rest}
-                ref={triggerRef}
-                type="button"
-                className={['reserve-filter-menu', 'reserve-filter-menu--' + appearance, className].filter(Boolean).join(' ')}
-                disabled={disabled}
-                aria-haspopup="menu"
-                aria-expanded={open && !disabled}
-                aria-busy={loading || undefined}
-                onKeyDown={event => {
-                    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        setOpen(true);
-                    }
-                }}
-            >
-                <span className="reserve-filter-menu-surface">
-                    {icon}
-                    <span className="reserve-filter-menu-label">{renderRollingChoiceLabel({ value, label: selected?.label ?? '선택' }, { options })}</span>
-                    {loading ? <span aria-hidden="true"><SpinIndicator /></span> : <DownOutlined className="reserve-filter-menu-chevron" aria-hidden="true" />}
-                </span>
-            </button>
+            {appearance === 'icon' ? <Tooltip title={rest['aria-label'] || selected?.label || '필터'} disabled={open}>{trigger}</Tooltip> : trigger}
         </Dropdown>
     );
 }
@@ -102,7 +110,7 @@ FilterMenu.propTypes = {
     value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     options: PropTypes.arrayOf(PropTypes.shape({ value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired, label: PropTypes.node.isRequired, disabled: PropTypes.bool })).isRequired,
     onChange: PropTypes.func.isRequired,
-    appearance: PropTypes.oneOf(['chip', 'plain']),
+    appearance: PropTypes.oneOf(['chip', 'plain', 'icon']),
     icon: PropTypes.node,
     disabled: PropTypes.bool,
     loading: PropTypes.bool,

@@ -131,6 +131,15 @@ public class OAuthUnlinkTask {
         leaseId = null;
     }
 
+    /** 자동 재시도로 해결되지 않는 오류. 암호문은 원인 해결 후 수동 재처리를 위해 보존한다. */
+    public void markBlocked(LocalDateTime now, String errorType) {
+        status = Status.BLOCKED;
+        attemptCount++;
+        nextAttemptAt = now;
+        lastErrorType = truncate(errorType);
+        leaseId = null;
+    }
+
     private String truncate(String value) {
         if (value == null) return null;
         return value.length() <= 100 ? value : value.substring(0, 100);

@@ -11,8 +11,11 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://mysql:3306/reserve?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: ${DB_USERNAME:root}
+    username: ${DB_USERNAME:reserve_app}
     password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
 
   # OAuth2 Redirect URI (배포 도메인)
   security:
@@ -20,23 +23,35 @@ spring:
       client:
         registration:
           google:
-            redirect-uri: https://reserve.it.kr/login/oauth2/code/google
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
           naver:
-            redirect-uri: https://reserve.it.kr/login/oauth2/code/naver
+            redirect-uri: "{baseUrl}/login/oauth2/code/naver"
           kakao:
-            redirect-uri: https://reserve.it.kr/login/oauth2/code/kakao
+            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
+
+# Redis remains disabled unless explicitly enabled. Only the internal service alias or RFC1918 address is accepted.
+reserve:
+  redis:
+    host: ${RESERVE_REDIS_HOST:}
+
+# Bounded local fallback keeps Redis out of application availability; failures are logged separately.
+management:
+  health:
+    redis:
+      enabled: false
 
 # 서버 공통 설정 (포트는 blue/green에서 개별 설정)
 server:
   serverAddress: reserve.it.kr
   env: prod
+  forward-headers-strategy: native
 
 # 프론트엔드 URL
 app:
-  frontend-url: https://reserve.it.kr
+  frontend-url: ${APP_FRONTEND_URL:https://reserve.it.kr}
 
 # CORS 허용 출처 (쉼표 구분 — SecurityConfig의 @Value List<String> 바인딩)
-# 운영은 자기 도메인 하나뿐이다. localhost·ngrok은 local.yml에만 둔다.
+# SiteUrls가 설정된 앱·기존 OAuth 복구 출처를 추가한다. localhost·ngrok은 local.yml에만 둔다.
 cors:
   allowed-origins: "https://reserve.it.kr"
 

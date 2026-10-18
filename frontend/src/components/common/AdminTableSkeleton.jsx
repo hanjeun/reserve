@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { Pagination } from 'antd';
+import Pagination from './Pagination';
 import AdminTableSkeletonTable from './AdminTableSkeletonTable';
 
 /* ─────────────────────────────────────────────

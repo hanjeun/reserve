@@ -12,6 +12,8 @@ import kr.it.reserve.promotion.service.PromotionService;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.entity.StoreStatus;
 import kr.it.reserve.store.repository.StoreRepository;
+import kr.it.reserve.feed.entity.FeedPost;
+import kr.it.reserve.feed.entity.FeedProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -91,12 +93,13 @@ class PromotionMutationSafetyTest {
     @Test
     void updateLocksActiveMemberAndOriginalStoreBeforeChangingEveryEditableField() {
         stubExistingPromotion(author, associatedStore);
+        when(promotionRepository.findForUpdate(7L)).thenReturn(Optional.of(promotion));
         // 수정 요청의 다른 가게 ID로 기존 홍보글의 소유권 검사를 우회하거나 연결을 바꾸지 않는다.
         request.setStoreId(999L);
 
         var response = service.updatePromotion(7L, 1L, request);
 
-        verifyMutationLockOrder();
+        verifyCompletedMutationLockOrder();
         assertThat(response.getTitle()).isEqualTo("after");
         assertThat(response.getContent()).isEqualTo("changed content");
         assertThat(response.getCategory()).isEqualTo("RESTAURANT");
@@ -112,8 +115,9 @@ class PromotionMutationSafetyTest {
     }
 
     @Test
-    void deleteLocksActiveMemberThenOriginalStoreBeforeDeleting() {
+    void deleteLocksActiveMemberThenOriginalStoreBeforeHidingOriginalForRetention() {
         stubExistingPromotion(author, associatedStore);
+        when(promotionRepository.findForUpdate(7L)).thenReturn(Optional.of(promotion));
 
         service.deletePromotion(7L, 1L);
 
@@ -121,7 +125,69 @@ class PromotionMutationSafetyTest {
         order.verify(memberRepository).findActiveByIdForUpdate(1L);
         order.verify(promotionRepository).findById(7L);
         order.verify(storeRepository).findByIdForUpdate(3L);
-        order.verify(promotionRepository).delete(promotion);
+        order.verify(promotionRepository).findForUpdate(7L);
+        assertThat(promotion.getState()).isEqualTo(Promotion.State.DELETED);
+        assertThat(promotion.getDeletedAt()).isNotNull();
+        assertThat(promotion.getContent()).isEqualTo("original content");
+        verify(promotionRepository, never()).delete(any(Promotion.class));
+    }
+
+    @Test
+    void legacyUpdateCannotOverwriteCanonicalNewsOutsideItsRevisionAndPhotoEditor() {
+        stubExistingPromotion(author, associatedStore);
+        when(promotionRepository.findForUpdate(7L)).thenReturn(Optional.of(promotion));
+        FeedPost carrier = FeedPost.create(FeedProfile.create(author, promotion.getCreatedAt()), null, promotion.getCreatedAt());
+        carrier.linkNews(promotion, "서울", promotion.getCreatedAt());
+
+        assertRejected(Mutation.UPDATE, 1L, HttpStatus.CONFLICT);
+
+        assertUnchangedAndNotDeleted();
+        assertThat(carrier.getContent()).isEmpty();
+    }
+
+    @Test
+    void legacyDeleteAlsoHidesCanonicalNewsAndItsCarrierWithoutDestroyingOriginal() {
+        stubExistingPromotion(author, associatedStore);
+        when(promotionRepository.findForUpdate(7L)).thenReturn(Optional.of(promotion));
+        FeedPost carrier = FeedPost.create(FeedProfile.create(author, promotion.getCreatedAt()), null, promotion.getCreatedAt());
+        carrier.linkNews(promotion, "서울", promotion.getCreatedAt());
+
+        service.deletePromotion(7L, 1L);
+
+        verifyCompletedMutationLockOrder();
+        assertThat(promotion.getState()).isEqualTo(Promotion.State.DELETED);
+        assertThat(carrier.getState()).isEqualTo(FeedPost.State.DELETED);
+        assertThat(promotion.getContent()).isEqualTo("original content");
+        assertThat(carrier.getDeletedAt()).isEqualTo(promotion.getDeletedAt());
+        verify(promotionRepository, never()).delete(any(Promotion.class));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = FeedPost.State.class, names = {"DRAFT", "HIDDEN", "DELETED"})
+    void legacyDetailCannotReadOriginalThroughAnIneligibleCanonicalCarrier(FeedPost.State state) {
+        author.setTermsAgreed(true);
+        FeedPost carrier = FeedPost.create(FeedProfile.create(author, promotion.getCreatedAt()), null, promotion.getCreatedAt());
+        carrier.linkNews(promotion, "서울", promotion.getCreatedAt());
+        if (state == FeedPost.State.DRAFT) carrier.edit("", "서울", associatedStore, null, true, promotion.getCreatedAt());
+        else if (state == FeedPost.State.HIDDEN) carrier.setVisibility(true, promotion.getCreatedAt());
+        else carrier.delete(promotion.getCreatedAt());
+        when(promotionRepository.findById(7L)).thenReturn(Optional.of(promotion));
+
+        assertThatThrownBy(() -> service.getPromotion(7L)).isInstanceOfSatisfying(PromotionException.class,
+                error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(promotionRepository, never()).incrementViewCount(any());
+    }
+
+    @Test
+    void legacyResponseOfCanonicalNewsExposesOnlyChosenNicknameNotAccountIdentity() {
+        FeedProfile profile = FeedProfile.create(author, promotion.getCreatedAt());
+        profile.update("공개 닉네임", "공개 닉네임", "", false, promotion.getCreatedAt());
+        FeedPost.create(profile, null, promotion.getCreatedAt()).linkNews(promotion, "서울", promotion.getCreatedAt());
+
+        var response = PromotionDto.PromotionResponse.fromEntity(promotion);
+
+        assertThat(response.getMemberName()).isEqualTo("공개 닉네임");
+        assertThat(response.getMemberId()).isNull();
     }
 
     @ParameterizedTest
@@ -289,11 +355,16 @@ class PromotionMutationSafetyTest {
         // 등록의 BUSINESS/ADMIN 제한을 수정·삭제에 새로 부여하지 않는다.
         author.setRole(Role.USER);
         stubExistingPromotion(author, associatedStore);
+        when(promotionRepository.findForUpdate(7L)).thenReturn(Optional.of(promotion));
 
         invoke(mutation, 1L);
 
-        verifyMutationLockOrder();
-        if (mutation == Mutation.DELETE) verify(promotionRepository).delete(promotion);
+        verifyCompletedMutationLockOrder();
+        if (mutation == Mutation.DELETE) {
+            assertThat(promotion.getState()).isEqualTo(Promotion.State.DELETED);
+            assertThat(promotion.getDeletedAt()).isNotNull();
+            verify(promotionRepository, never()).delete(any(Promotion.class));
+        }
         else assertThat(promotion.getTitle()).isEqualTo("after");
     }
 
@@ -303,11 +374,16 @@ class PromotionMutationSafetyTest {
         author.suspend(LocalDateTime.now().minusDays(1), "expired");
         associatedStore.suspend(LocalDateTime.now().minusDays(1), "expired");
         stubExistingPromotion(author, associatedStore);
+        when(promotionRepository.findForUpdate(7L)).thenReturn(Optional.of(promotion));
 
         invoke(mutation, 1L);
 
-        verifyMutationLockOrder();
-        if (mutation == Mutation.DELETE) verify(promotionRepository).delete(promotion);
+        verifyCompletedMutationLockOrder();
+        if (mutation == Mutation.DELETE) {
+            assertThat(promotion.getState()).isEqualTo(Promotion.State.DELETED);
+            assertThat(promotion.getDeletedAt()).isNotNull();
+            verify(promotionRepository, never()).delete(any(Promotion.class));
+        }
         else assertThat(promotion.getTitle()).isEqualTo("after");
     }
 
@@ -359,6 +435,14 @@ class PromotionMutationSafetyTest {
         order.verify(storeRepository).findByIdForUpdate(3L);
     }
 
+    private void verifyCompletedMutationLockOrder() {
+        var order = inOrder(memberRepository, promotionRepository, storeRepository);
+        order.verify(memberRepository).findActiveByIdForUpdate(1L);
+        order.verify(promotionRepository).findById(7L);
+        order.verify(storeRepository).findByIdForUpdate(3L);
+        order.verify(promotionRepository).findForUpdate(7L);
+    }
+
     private void assertUnchangedAndNotDeleted() {
         assertThat(promotion.getTitle()).isEqualTo("before");
         assertThat(promotion.getContent()).isEqualTo("original content");
@@ -367,6 +451,8 @@ class PromotionMutationSafetyTest {
         assertThat(promotion.getSpecialMenu()).isEqualTo("original menu");
         assertThat(promotion.getStoryHistory()).isEqualTo("original story");
         assertThat(promotion.getTags()).isEqualTo("original tags");
+        assertThat(promotion.getState()).isEqualTo(Promotion.State.PUBLISHED);
+        assertThat(promotion.getDeletedAt()).isNull();
         verify(promotionRepository, never()).delete(any(Promotion.class));
     }
 }

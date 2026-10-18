@@ -31,6 +31,7 @@ import ResponsiveModal from './ResponsiveModal';
 import ModalActions from './ModalActions';
 // colors 는 더 이상 쓰지 않는다 — 에러 텍스트 색은 index.css 의 .reserve-field-error 가 맡는다.
 import { fontSize } from '../../styles/tokens';
+import useWorkspaceDraftGuard from '../../hooks/useWorkspaceDraftGuard';
 
 const { Text } = Typography;
 
@@ -85,9 +86,14 @@ const FormModal = ({
     mobileSize = 'form',
     mobileSheet = true,
     scrollResetKey,
+    navigationDirty = false,
+    navigationAllowUnload = false,
     children,
 }) => {
     const contentRef = useRef(null);
+    const requestClose = useWorkspaceDraftGuard({ dirty: open && navigationDirty, busy: open && submitting,
+        allowUnload: navigationAllowUnload, onDiscard: onClose });
+    const close = () => requestClose(() => onClose?.(), { discard: false });
 
     /* 다단계 폼에서 본문만 바뀌면 AntD의 같은 .ant-modal-body 노드를 재사용한다.
        이전 단계의 scrollTop까지 남겨두면 다음 단계 제목이 잘린 채 열린다. Modal에 key를 주면
@@ -102,7 +108,7 @@ const FormModal = ({
         <ResponsiveModal
             title={<Text style={{ fontSize: fontSize.base, fontWeight: 700 }}>{title}</Text>}
             open={open}
-            onCancel={onClose}
+            onCancel={close}
             afterClose={afterClose}
             rootClassName={rootClassName}
             mobileSize={mobileSize}
@@ -114,7 +120,7 @@ const FormModal = ({
             footer={
                 footer !== undefined ? footer : (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
-                        <ModalActions onCancel={onCancelAction || onClose} onConfirm={onSubmit}
+                        <ModalActions onCancel={onCancelAction && onCancelAction !== onClose ? onCancelAction : close} onConfirm={onSubmit}
                             cancelText={cancelText} confirmText={submitText}
                             loading={submitting} disabled={submitDisabled} cancelDisabled={submitting} />
                     </div>
@@ -151,6 +157,8 @@ FormModal.propTypes = {
     /** 값이 바뀌면 재사용 중인 모달 본문의 scrollTop을 0으로 되돌린다. */
     scrollResetKey: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     children: PropTypes.node,
+    navigationDirty: PropTypes.bool,
+    navigationAllowUnload: PropTypes.bool,
 };
 
 export default FormModal;

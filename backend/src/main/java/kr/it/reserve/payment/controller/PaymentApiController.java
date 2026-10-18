@@ -13,6 +13,8 @@ import kr.it.reserve.payment.service.PortoneService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Import;
+import kr.it.reserve.config.SiteUrls;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,7 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/payment")
+@Import(SiteUrls.class)
 public class PaymentApiController {
 
     private static final String FAILED_REDIRECT_QUERY = "?success=false&merchant_uid=";
@@ -36,7 +39,7 @@ public class PaymentApiController {
     private final PortoneService portoneService;
     private final PaymentRepository paymentRepository;
 
-    @Value("${app.frontend-url:http://localhost:5173}")
+    @Value("#{siteUrls.frontendOrigin}")
     private String frontendUrl;
 
     /**

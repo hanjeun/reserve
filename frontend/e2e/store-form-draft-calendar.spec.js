@@ -145,7 +145,7 @@ test('store editing keeps a local draft and warns when the server base changed',
     await expect(nameInput).toHaveValue('서버 원본 가게');
     await nameInput.fill('내 수정 초안 가게');
     await page.getByRole('button', { name: '임시저장' }).click();
-    await expect(page.getByText(/이 브라우저에 저장됨/)).toBeVisible();
+    await expect(page.getByText(/임시저장됨/)).toBeVisible();
 
     await page.reload();
     const conflictDialog = page.getByRole('dialog').filter({ hasText: '가게 정보가 달라졌어요' });
@@ -197,7 +197,7 @@ test('store registration uses the shared calendar and restores a browser-local d
     await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
     await expect(page.getByRole('heading', { name: '손님에게 가게를 소개해주세요.', exact: true })).toBeVisible();
     await draftButton.click();
-    await expect(page.getByText(/이 브라우저에 저장됨/)).toBeVisible();
+    await expect(page.getByText(/임시저장됨/)).toBeVisible();
 
     await page.reload();
     const restoreDialog = page.getByRole('dialog').filter({ hasText: '임시저장된 내용이 있어요' });
@@ -243,6 +243,9 @@ test('mobile registration and editing keep booking, payment and refund fields in
     await page.getByRole('radio', { name: '예약금 설정하기', exact: true }).click();
     await page.getByLabel('노쇼 예약금', { exact: true }).fill('1000');
     await page.getByRole('radio', { name: '나중 결제도 허용', exact: true }).click();
+    await verifyFields(['노쇼 예약금']);
+    await expect(page.getByLabel('결제 마감', { exact: true })).toBeHidden();
+    await page.getByRole('radio', { name: '신청할 때 결제', exact: true }).click();
     await verifyFields(['노쇼 예약금', '결제 마감']);
     await expect(page.getByLabel('전액 환불 기준', { exact: true })).toBeHidden();
     await page.getByRole('button', { name: '다음', exact: true }).click();
@@ -263,6 +266,9 @@ test('mobile registration and editing keep booking, payment and refund fields in
     await page.getByRole('radio', { name: '예약금 설정하기', exact: true }).click();
     await page.getByLabel('노쇼 예약금', { exact: true }).fill('1000');
     await page.getByRole('radio', { name: '나중 결제도 허용', exact: true }).click();
+    await verifyFields(['노쇼 예약금']);
+    await expect(page.getByLabel('결제 마감', { exact: true })).toBeHidden();
+    await page.getByRole('radio', { name: '신청할 때 결제', exact: true }).click();
     await verifyFields(['노쇼 예약금', '결제 마감']);
     await page.getByRole('button', { name: '이전 화면으로 돌아가기', exact: true }).click();
     await selectEditSection(page, '취소·환불 정책', '예약금을 언제까지 돌려드릴까요?');

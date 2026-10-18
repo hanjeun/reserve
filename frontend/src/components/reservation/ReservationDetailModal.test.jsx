@@ -8,7 +8,7 @@ vi.mock('antd', () => ({
     Typography: { Text: ({ children }) => <span>{children}</span> },
     Flex: ({ children }) => <div>{children}</div>, Divider: () => null,
 }));
-vi.mock('@ant-design/icons', () => ({
+vi.mock('../common/icons', () => ({
     UserOutlined: () => null, CalendarOutlined: () => null, ClockCircleOutlined: () => null,
     TeamOutlined: () => null, MailOutlined: () => null, DollarOutlined: () => null, CheckCircleOutlined: () => null,
 }));

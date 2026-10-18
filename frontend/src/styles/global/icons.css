@@ -1,0 +1,157 @@
+@import '../tokens/icon-controls.css';
+
+.anticon.reserve-ui-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 0; vertical-align: -0.125em; color: inherit; }
+.anticon.reserve-ui-icon > svg { display: block; width: 1em; height: 1em; pointer-events: none; }
+
+/* Icon controls have a 44px hit area and a separate 32px visual surface. */
+:is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
+    .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
+    .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
+    .reserve-chat-close, .reserve-chat-icon-button, .reserve-chat-tool, .reserve-chat-message-actions,
+    .reserve-chat-send, .reserve-messenger-list-refresh,
+    .reserve-favorite-button, .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only),
+.ant-modal-root .ant-modal-close,
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close {
+    --reserve-icon-surface-radius: var(--reserve-icon-tool-radius);
+    --reserve-icon-current-scale: 1;
+    --reserve-icon-surface-opacity: var(--reserve-icon-persistent-surface-opacity, 0);
+    width: var(--reserve-icon-target-size);
+    height: var(--reserve-icon-target-size);
+    min-width: var(--reserve-icon-target-size);
+    padding: 0;
+    border-radius: var(--reserve-icon-surface-radius);
+    background: transparent !important;
+    isolation: isolate;
+    flex-shrink: 0;
+}
+:is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
+    .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
+    .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
+    .reserve-chat-icon-button, .reserve-chat-tool, .reserve-chat-message-actions,
+    .reserve-chat-send, .reserve-messenger-list-refresh,
+    .reserve-favorite-button, .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only) { position: relative; }
+:is(.reserve-icon-tool[data-icon-kind='navigation'], .reserve-explore-region-trigger,
+    .reserve-header-back, .reserve-header-search, .reserve-search-icon,
+    .reserve-messenger-mobile-back, .reserve-favorite-button:not(.reserve-favorite-button--plain)) {
+    --reserve-icon-surface-radius: var(--reserve-icon-navigation-radius);
+}
+:is(.reserve-feed-more, .reserve-feed-interaction) {
+    --reserve-icon-surface-radius: var(--reserve-icon-tool-radius);
+    --reserve-icon-current-scale: 1;
+    --reserve-icon-surface-opacity: 0;
+    background: transparent !important;
+    isolation: isolate;
+}
+.reserve-feed-interaction { position: relative; --reserve-icon-surface-width: calc(100% - 12px); }
+.ant-modal-root .ant-modal-close {
+    width: var(--reserve-icon-target-size) !important;
+    height: var(--reserve-icon-target-size) !important;
+    border-radius: var(--reserve-icon-tool-radius) !important;
+}
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close { position: relative; }
+:is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
+    .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
+    .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
+    .reserve-chat-close, .reserve-chat-icon-button, .reserve-chat-tool, .reserve-chat-message-actions,
+    .reserve-chat-send, .reserve-messenger-list-refresh,
+    .reserve-feed-more, .reserve-feed-interaction, .reserve-favorite-button,
+    .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only)::before,
+.ant-modal-root .ant-modal-close::before,
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close::before {
+    content: '';
+    position: absolute;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: var(--reserve-icon-surface-width, var(--reserve-icon-surface-size));
+    height: var(--reserve-icon-surface-size);
+    transform: translate(-50%, -50%) scale(var(--reserve-icon-current-scale));
+    border-radius: var(--reserve-icon-surface-radius, var(--reserve-icon-tool-radius));
+    background: var(--reserve-icon-surface-color, var(--c-gray-50, #f9fafb));
+    opacity: var(--reserve-icon-surface-opacity);
+    z-index: -1;
+    pointer-events: none;
+    transition: var(--reserve-icon-surface-transition, opacity 0.15s ease);
+}
+:is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
+    .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
+    .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
+    .reserve-chat-close, .reserve-chat-icon-button, .reserve-chat-tool, .reserve-chat-message-actions,
+    .reserve-chat-send, .reserve-messenger-list-refresh,
+    .reserve-feed-more, .reserve-feed-interaction, .reserve-favorite-button,
+    .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only) .anticon,
+.ant-modal-root .ant-modal-close .anticon,
+.reserve-workspace-drawer .ant-drawer-close .anticon {
+    font-size: var(--reserve-icon-glyph-size) !important;
+    scale: var(--reserve-icon-current-scale);
+    transition: var(--reserve-icon-press-transition);
+}
+
+/* Only the visual contents compress; the target, positioning and selected color stay fixed. */
+:is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
+    .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
+    .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
+    .reserve-chat-close, .reserve-chat-icon-button, .reserve-chat-tool, .reserve-chat-message-actions,
+    .reserve-chat-send, .reserve-messenger-list-refresh,
+    .reserve-feed-more, .reserve-feed-interaction, .reserve-favorite-button,
+    .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only):active:not(:disabled):not([aria-disabled='true']),
+.ant-modal-root .ant-modal-close:active:not(:disabled),
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close:active:not(:disabled) {
+    --reserve-icon-current-scale: var(--reserve-icon-active-scale);
+    --reserve-icon-surface-opacity: 1;
+}
+/* Text-button press rules must not shrink the surrounding icon target. */
+:is(.reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only):active:not(:disabled) {
+    transform: none;
+    opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    :is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
+        .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
+        .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
+        .reserve-chat-close, .reserve-chat-icon-button, .reserve-chat-tool, .reserve-chat-message-actions,
+        .reserve-chat-send, .reserve-messenger-list-refresh,
+        .reserve-feed-more, .reserve-feed-interaction, .reserve-favorite-button,
+        .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only):hover:not(:disabled):not([aria-disabled='true'])::before,
+    .ant-modal-root .ant-modal-close:hover:not(:disabled)::before,
+    .reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close:hover:not(:disabled)::before { opacity: 1; }
+}
+:is(.reserve-icon-tool, .reserve-store-view-toggle, .reserve-explore-region-trigger,
+    .reserve-header-back, .reserve-header-search, .reserve-header-workspace-menu,
+    .reserve-search-icon, .reserve-search-clear, .reserve-messenger-mobile-back,
+    .reserve-chat-close, .reserve-chat-icon-button, .reserve-chat-tool, .reserve-chat-message-actions,
+    .reserve-chat-send, .reserve-messenger-list-refresh,
+    .reserve-feed-more, .reserve-feed-interaction, .reserve-favorite-button,
+    .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only):focus-visible:not(:disabled):not([aria-disabled='true'])::before,
+.ant-modal-root .ant-modal-close:focus-visible:not(:disabled)::before,
+.reserve-workspace-drawer .ant-drawer-header > .ant-drawer-close:focus-visible:not(:disabled)::before { opacity: 1; }
+
+/* Send keeps its filled neutral surface inside the same 44px target. */
+.reserve-chat-send {
+    --reserve-icon-persistent-surface-opacity: 1;
+    --reserve-icon-surface-color: var(--c-gray-100, #f2f4f6);
+}
+@media (hover: hover) and (pointer: fine) {
+    .reserve-chat-send:hover:not(:disabled) { --reserve-icon-surface-color: var(--c-gray-200, #e5e8eb); }
+}
+.reserve-chat-send:focus-visible:not(:disabled) { --reserve-icon-surface-color: var(--c-gray-200, #e5e8eb); }
+
+/* Persistent photo overlays stay circular; their transparent hit area stays 44px. */
+.reserve-favorite-button:not(.reserve-favorite-button--plain)::before {
+    background: var(--c-bg-overlay, rgba(255, 255, 255, 0.92));
+    opacity: 1;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+@media (hover: hover) and (pointer: fine) {
+    .reserve-favorite-button:not(.reserve-favorite-button--plain):hover:not(:disabled)::before { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.16); }
+}
+/* Navigation labels and section decoration keep their own typography. */
+.reserve-workspace-menu-group :is(a, .reserve-workspace-menu-placeholder) > .anticon,
+.reserve-workspace-heading-label > .anticon { font-size: 22px; }
+.ant-pagination-rtl :is(.ant-pagination-prev, .ant-pagination-next, .ant-pagination-jump-prev, .ant-pagination-jump-next) .reserve-ui-icon > svg { transform: rotate(180deg); }
+.anticon.reserve-ui-icon.anticon-spin { animation: none; }
+.anticon.reserve-ui-icon.anticon-spin > svg { animation: reserve-ui-icon-spin 1s linear infinite; }
+@keyframes reserve-ui-icon-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .anticon.reserve-ui-icon.anticon-spin > svg { animation: none; } }

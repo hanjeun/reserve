@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { Typography, Flex } from 'antd';
-import { StarFilled } from '@ant-design/icons';
+import { StarFilled } from '../common/icons';
 import { Card, FavoriteButton } from '../common';
 import { getThumbnailUrl } from '../../utils';
 import { isNearby } from '../../utils/distance';
@@ -26,7 +26,7 @@ const { Title, Text } = Typography;
  * actions 를 주면 카드 아래에 관리 버튼 줄(수정·삭제 등)을 붙인다 — 내 가게 관리가 같은 카드를 재사용한다.
  * showFavorite=false 는 하트 자리를 비운다(내 가게처럼 찜이 의미 없는 곳).
  */
-const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId, preview = false, actions, showFavorite = true }) => {
+const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId, preview = false, actions, showFavorite = true, metadata, extraTools }) => {
     const { id, name, category, mainImageUrl, mainImageWidth, mainImageHeight, latitude, longitude, nearbyRadiusKm } = store;
     const { rating, reviewCount } = normalizeStoreRating(store.rating, store.reviewCount);
     const nearby = isNearby(userLocation, latitude, longitude, nearbyRadiusKm ?? undefined);
@@ -39,7 +39,7 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId,
     }, [isAdvertised, adId, preview]);
 
     return (
-        <Card hoverable={!preview} actions={actions}>
+        <Card hoverable={!preview} actions={actions} data-list-item-id={`store:${id}`}>
             <div className={`reserve-store-card-shell${preview ? ' reserve-store-card-shell--preview' : ''}`}>
                 {!preview && <Link
                     to={`/store/${id}`}
@@ -49,12 +49,13 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId,
                 <Card.Cover src={getThumbnailUrl(mainImageUrl)} alt={name} width={mainImageWidth} height={mainImageHeight} />
 
                 <div className="reserve-store-card-info">
-                    <div className="reserve-store-card-title-line">
+                    <div className={`reserve-store-card-title-line${extraTools ? ' reserve-store-card-title-line--with-tools' : ''}`}>
                         <Title level={5} className="reserve-store-card-name" style={{ margin: 0, fontSize: fontSize.xl }}>
                             {name}
                         </Title>
                         <div className="reserve-store-card-favorite">
                             {showFavorite && <FavoriteButton storeId={id} size="sm" appearance="plain" preview={preview} />}
+                            {extraTools}
                         </div>
                     </div>
                     <StoreIdentityText category={category} isAdvertised={isAdvertised} nearby={nearby} />
@@ -67,6 +68,7 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId,
                             ({reviewCount.toLocaleString('ko-KR')})
                         </Text>
                     </Flex>
+                    {metadata}
                 </div>
             </div>
         </Card>
@@ -96,6 +98,8 @@ StoreCard.propTypes = {
     preview: PropTypes.bool,
     actions: PropTypes.arrayOf(PropTypes.node),
     showFavorite: PropTypes.bool,
+    metadata: PropTypes.node,
+    extraTools: PropTypes.node,
 };
 
 export default StoreCard;

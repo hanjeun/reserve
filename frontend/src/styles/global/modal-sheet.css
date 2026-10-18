@@ -20,6 +20,8 @@
         overflow: clip;
     }
     .reserve-modal-sheet-root .ant-modal-wrap::before { display: none; }
+    /* 피드 작성기의 데스크톱 centered 여백이 모바일 시트 바닥에 남지 않게 한다. */
+    .reserve-feed-modal.reserve-modal-sheet-root .ant-modal-wrap.ant-modal-centered { padding: 0; }
     .reserve-modal-sheet-root .ant-modal {
         flex: 0 1 auto;
         top: 0;

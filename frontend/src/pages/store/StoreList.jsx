@@ -1,7 +1,7 @@
 import LoadingStatus from '../../components/common/LoadingStatus';
 import React, { useCallback, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Pagination } from 'antd';
+import Pagination from '../../components/common/Pagination';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { DataState, PageContainer, StoreCardSkeleton } from '../../components/common';
@@ -18,6 +18,8 @@ import useLocationStore from '../../store/useLocationStore';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useViewModeParam from '../../hooks/useViewModeParam';
+import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 import adService from '../../services/adService';
 import { adKeys } from '../../hooks/queryKeys';
 import { SERVICE_DOMAIN_FILTER_OPTIONS, SORT_OPTIONS } from '../../constants';
@@ -61,15 +63,18 @@ const StoreList = () => {
         stores, totalElements,
         loading, initialLoading = loading, refetching, page, pageSize, setPage, refetch,
         searchParams, setSearchParams,
-        error,
+        error, hasData = stores.length > 0 || !loading && !error,
     } = useStoreList();
-    const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+    const [urlSearchParams] = useSearchParams();
+    const blockingError = isBlockingListReadError(error, stores);
     const location = useLocation();
     const reducedMotion = useReducedMotion();
     const [bannerEntry, setBannerEntry] = useState(() => location.state?.reserveDiscoveryEntry === 'featured-banner');
     const [pageMotion, setPageMotion] = useState(null);
     const [regionOpen, setRegionOpen] = useState(false);
-    const [view, setView] = useViewModeParam(urlSearchParams, setUrlSearchParams, 'cards');
+    const [view, setView] = useViewModeParam(urlSearchParams, 'cards');
+    const listRef = React.useRef(null);
+    useListRefreshAnchor(listRef, JSON.stringify([view, page, searchParams]), refetching, hasData ? stores : null);
     const recordedAdIdsRef = React.useRef(new Set());
     const recordImpressionOnce = React.useCallback((adId) => {
         if (recordedAdIdsRef.current.has(adId)) return;
@@ -209,7 +214,7 @@ const StoreList = () => {
                 </div>
             );
         }
-        if (error) {
+        if (blockingError) {
             return (
                 <DataState state="error" kind="store" subject="가게 목록" error={error}
                     onRetry={refetch} retrying={refetching} style={{ marginTop: 100 }} />
@@ -224,6 +229,7 @@ const StoreList = () => {
         }
         return (
             <div
+                ref={listRef}
                 className={resultClassName + resultMotionClassName}
                 onAnimationEnd={event => {
                     if (event.target !== event.currentTarget) return;
@@ -252,7 +258,7 @@ const StoreList = () => {
             <StoreListingToolbar
                 view={view}
                 onViewChange={setView}
-                count={!loading && !error ? totalElements : undefined}
+                count={!loading && hasData && !blockingError ? totalElements : undefined}
                 region={searchParams.region}
                 regionOpen={regionOpen}
                 onRegionOpen={() => setRegionOpen(true)}
@@ -261,9 +267,9 @@ const StoreList = () => {
                 sort={pendingSort ?? searchParams.sort}
                 onSortChange={handleSortChange}
                 sortOptions={SORT_OPTIONS}
-                disabled={loading || refetching}
+                disabled={loading}
                 initialLoading={initialLoading}
-                sortDisabled={loading || locating || refetching}
+                sortDisabled={loading || locating}
                 sortLoading={locating}
                 onAnimationEnd={event => {
                     if (event.target === event.currentTarget && !loading && !refetching && (error || stores.length === 0)) setBannerEntry(false);
@@ -273,8 +279,11 @@ const StoreList = () => {
             {/* 스켈레톤은 첫 조회나 쿼리 전환으로 이전 결과를 그대로 보여줄 수 없을 때만 쓴다.
                 수동 새로고침은 현재 카드와 읽던 위치를 유지하고, 툴바 버튼만 진행 상태를 표시한다.
                 grid는 고정 4열(rsv-store-grid)로 시작해 화면 폭에 따라 반응형으로 줄어든다. */}
+            {error && !blockingError && <DataState state="error" kind="store" subject="가게 목록" error={error}
+                title="최신 가게 정보를 확인하지 못해 이전 목록을 보여드리고 있어요."
+                onRetry={refetch} retrying={refetching} compact style={{ marginBottom: 16 }} />}
             {renderResult()}
-            {!error && totalElements > 0 && (
+            {hasData && !blockingError && totalElements > 0 && (
                 <nav aria-label="가게 목록 페이지" style={{ marginTop: 24 }}>
                     <Pagination
                         current={page}
@@ -290,7 +299,7 @@ const StoreList = () => {
                         showSizeChanger={false}
                         showLessItems={isMobile}
                         size={isMobile ? 'small' : 'default'}
-                        disabled={loading || refetching}
+                        disabled={loading}
                     />
                 </nav>
             )}

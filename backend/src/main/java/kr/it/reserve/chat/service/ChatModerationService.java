@@ -161,6 +161,7 @@ public class ChatModerationService {
         assertAdmin(admin);
         ChatReport report = reportRepository.findByIdForUpdate(reportId)
                 .orElseThrow(() -> new ChatException("신고를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
+        ChatReportEditPolicy.requireRevision(request.getRevision(), report.getRevision());
         ChatReport.Status status = request.getStatus();
         if (status == null) throw new ChatException("처리 상태를 선택해주세요.");
         String note = normalize(request.getResolutionNote());
@@ -168,6 +169,7 @@ public class ChatModerationService {
             throw new ChatException("처리 완료 사유를 입력해주세요.");
         }
         report.review(status, note, admin.getId(), LocalDateTime.now(Clock.systemDefaultZone()));
+        reportRepository.flush();
         log.info("Chat report reviewed: reportId={}, status={}", reportId, status);
         return ChatReportResponse.from(report);
     }

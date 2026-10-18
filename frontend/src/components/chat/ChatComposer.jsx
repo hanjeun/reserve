@@ -1,9 +1,10 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useImperativeHandle, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Popover } from 'antd';
-import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '../common/icons';
 import { SpinIndicator } from '../common/Loading';
 import ChatImagePicker from './ChatImagePicker';
+import Tooltip from '../common/Tooltip';
 
 const usesTouchInput = () => globalThis.matchMedia?.('(pointer: coarse)').matches === true;
 
@@ -19,8 +20,11 @@ const EMOJI = [
 
 /** 고객·사업자·관리자 입력의 IME/길이/도구/전송 규칙을 한 관문에 둔다. */
 export default function ChatComposer({ value, onChange, onSend, sending = false, disabled = false,
-    file, onFileChange, imageEnabled = false, imageLoading = false, onCancel }) {
+    file, onFileChange, imageEnabled = false, imageLoading = false, onCancel,
+    maxLength = 2000, placeholder = '메시지를 입력하세요', inputLabel = '메시지 입력', sendText = '보내기',
+    inputRef, attachmentControl, attachments, hasAttachments = Boolean(file) }) {
     const input = useRef(null);
+    useImperativeHandle(inputRef, () => input.current, []);
     const trigger = useRef(null);
     const searchInput = useRef(null);
     const id = useId();
@@ -31,7 +35,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
     const selectEmoji = emoji => {
         const start = input.current?.selectionStart ?? value.length;
         const end = input.current?.selectionEnd ?? start;
-        if (value.length - (end - start) + emoji.length > 2000) return;
+        if (value.length - (end - start) + emoji.length > maxLength) return;
         onChange(`${value.slice(0, start)}${emoji}${value.slice(end)}`);
         setEmojiOpen(false);
         requestAnimationFrame(() => {
@@ -57,7 +61,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
     </section>;
     // 전송 버튼: 보내는 중이면 (중단 가능 시) 중단 · 아니면 로딩, 평소에는 보내기.
     const canCancel = sending && Boolean(onCancel);
-    let sendLabel = '보내기';
+    let sendLabel = sendText;
     let sendIcon = <ArrowRightOutlined />;
     if (canCancel) {
         sendLabel = '전송 요청 중단';
@@ -71,31 +75,32 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             onKeyDown={event => {
                 if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
                     event.preventDefault();
-                    if (!blocked && (value.trim() || file)) onSend();
+                    if (!blocked && (value.trim() || hasAttachments)) onSend();
                 }
-            }} placeholder="메시지를 입력하세요" aria-label="메시지 입력" maxLength={2000} rows={2} disabled={disabled} />
+            }} placeholder={placeholder} aria-label={inputLabel} maxLength={maxLength} rows={2} disabled={disabled} />
+        {attachments}
         <div className="reserve-chat-composer-toolbar">
             <div className="reserve-chat-composer-tools">
-                <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled || imageLoading}
-                    disabled={blocked || imageLoading} />
+                {attachmentControl ?? <ChatImagePicker file={file} onChange={onFileChange} enabled={imageEnabled || imageLoading}
+                    disabled={blocked || imageLoading} />}
                 <Popover trigger="click" placement="topLeft" content={picker} open={emojiOpen && !blocked}
                     onOpenChange={open => {
                         setEmojiOpen(open);
                         if (open) { setQuery(''); if (usesTouchInput()) input.current?.blur(); }
                     }}
                     afterOpenChange={open => { if (open && !usesTouchInput()) searchInput.current?.focus(); }}>
-                    <button ref={trigger} type="button" className="reserve-chat-tool" aria-label="이모지 선택"
+                    <Tooltip title="이모지 선택" disabled={emojiOpen}><button ref={trigger} type="button" className="reserve-chat-tool" aria-label="이모지 선택"
                         onKeyDown={event => { if (event.key === 'Escape' && emojiOpen) { event.stopPropagation(); setEmojiOpen(false); } }}
                         aria-expanded={emojiOpen && !blocked} aria-controls={emojiOpen && !blocked ? id : undefined} disabled={blocked}>
                         <SmileOutlined />
-                    </button>
+                    </button></Tooltip>
                 </Popover>
             </div>
-            <button type="button" className="reserve-chat-send reserve-messenger-send" onClick={sending && onCancel ? onCancel : onSend}
-                disabled={disabled || (sending ? !onCancel : (!value.trim() && !file))} aria-label={sendLabel}
+            <Tooltip title={sendLabel}><button type="button" className="reserve-chat-send reserve-messenger-send" onClick={sending && onCancel ? onCancel : onSend}
+                disabled={disabled || (sending ? !onCancel : (!value.trim() && !hasAttachments))} aria-label={sendLabel}
                 aria-busy={sending || undefined}>
                 {sendIcon}
-            </button>
+            </button></Tooltip>
         </div>
     </div>;
 }
@@ -103,6 +108,8 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
 ChatComposer.propTypes = {
     value: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired, onSend: PropTypes.func.isRequired,
     sending: PropTypes.bool, disabled: PropTypes.bool, file: PropTypes.object,
-    onFileChange: PropTypes.func.isRequired, imageEnabled: PropTypes.bool, imageLoading: PropTypes.bool,
-    onCancel: PropTypes.func,
+    onFileChange: PropTypes.func, imageEnabled: PropTypes.bool, imageLoading: PropTypes.bool,
+    onCancel: PropTypes.func, maxLength: PropTypes.number, placeholder: PropTypes.string, inputLabel: PropTypes.string,
+    sendText: PropTypes.string, inputRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
+    attachmentControl: PropTypes.node, attachments: PropTypes.node, hasAttachments: PropTypes.bool,
 };

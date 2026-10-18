@@ -91,8 +91,8 @@ public class RefundReconciliationScheduler {
                 reconcileOne(view);
             } catch (Exception e) {
                 // 한 건이 터져도 나머지는 계속 본다.
-                log.error("Refund reconciliation failed for one attempt: attemptId={}, merchantUid={}",
-                        view.attemptId(), view.merchantUid(), e);
+                log.error("Refund reconciliation failed for one attempt: attemptId={}, merchantUid={}, errorType={}",
+                        view.attemptId(), view.merchantUid(), e.getClass().getSimpleName());
             }
         }
     }

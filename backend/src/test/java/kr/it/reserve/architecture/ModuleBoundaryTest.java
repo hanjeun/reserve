@@ -105,7 +105,6 @@ class ModuleBoundaryTest {
             "payment->member",
             "payment->reservation",
             "payment->store",
-            "promotion->config",
             "promotion->member",
             "promotion->store",
             "reservation->audit",

@@ -8,6 +8,9 @@ import TextLink from '../../components/common/TextLink';
 import { useQuery } from '@tanstack/react-query';
 import chatRetentionService from '../../services/chatRetentionService';
 import waitingService from '../../services/waitingService';
+import { useFeedConfig } from '../../hooks/feedQueries';
+import { useStoreNewsConfig } from '../../hooks/storeNewsQueries';
+import { useFeedInteractions } from '../../hooks/feedInteractionQueries';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -39,6 +42,21 @@ const Section = ({ title, children }) => (
     </div>
 );
 
+const FeedPrivacy = () => {
+    const { data } = useFeedConfig();
+    const news = useStoreNewsConfig(true);
+    const interactions = useFeedInteractions();
+    if (!data?.enabled && !news.data?.enabled) return null;
+    return <Section title="피드·가게 소식의 공개 정보와 보관">
+        {data?.enabled && <Paragraph>피드를 이용하면 공개 닉네임·소개, 직접 공개에 동의한 프로필 사진, 게시물 글·사진과 선택한 지역·가게 연결 정보를 처리해요. 공개 프로필과 게시물은 로그인하지 않아도 볼 수 있어요. 계정의 이름·이메일을 공개 프로필에 자동으로 표시하지 않아요.</Paragraph>}
+        <Paragraph>게시물과 임시저장한 글은 삭제할 때까지 보관해요. 삭제하면 공개 조회에서 즉시 숨기고, 30일 후 원문과 사진을 파기해요. 회원 탈퇴 후에는 공개 프로필·게시물을 노출하지 않고 게시물 파기 절차를 적용해요. 채팅의 90일 보관 기간은 피드에 적용하지 않아요.</Paragraph>
+        {interactions.data?.enabled && <Paragraph>댓글·답글의 글과 사진은 공개 닉네임으로 표시해요. 수정할 수 있으며 삭제하면 즉시 숨기고 30일 후 원문·사진을 파기해요. 글·소식·댓글의 좋아요는 대상별로 저장하고, 삭제되거나 숨겨진 내용은 종합 좋아요에서도 표시하지 않아요. 댓글·답글·댓글 좋아요 알림은 수신자에게만 보여주며 생성일부터 90일 동안 보관해요. 탈퇴하면 해당 회원이 주고받은 피드 알림을 제거해요. 신고 당시 댓글·사진은 원문과 별도로 보존해요.</Paragraph>}
+        {news.data?.enabled && <><Paragraph>사업자의 가게 소식은 제목·본문·사진·종류·행사나 혜택의 기간·조건을 혜택의 별도 원문으로 처리해요. 관리자가 해당 글·사진·기간·조건을 심사하고 승인 후 혜택 탭과 상세에서 공개해요. 공개 닉네임은 필요하지 않으며 가게 이름을 표시해요. 피드와 글·사진·게시 상태를 연결하지 않아요. 신청·심사 사유와 처리·열람 기록을 보관해요. 기간 종료는 삭제가 아니며 승인된 공개 상세에는 종료 표시로 남겨요.</Paragraph>
+            <Paragraph>혜택 신청의 글·사진 열람과 승인·반려·철회·수정 재심사 기록은 각 기록일부터 최소 1년(2년 보관 대상이면 2년) 보관하며, 연결된 신고 자료가 남아 있으면 함께 보존해요. 혜택 반려·삭제는 피드 글에 영향을 주지 않으며 소식의 삭제·원문 및 사진 파기에는 같은 30일 정책을 적용해요.</Paragraph></>}
+        <Paragraph>신고 시점의 글·사진, 신고 내용과 관리자 처리 기록은 원래 게시물과 분리해 보관해요. 처리 중인 신고 자료는 검토를 마칠 때까지, 처리 완료한 일반 신고 자료는 완료 후 365일 동안 보관해요. 분쟁 등으로 관리자가 파기를 보류한 자료는 보류가 해제될 때까지 파기하지 않아요. 보류를 해제하면 해제일을 기준으로 보관 기간을 다시 계산해요. 신고 원문·사진 열람과 숨김·복원·보류·해제의 처리 기록은 각 기록일부터 최소 1년(2년 보관 대상이면 2년) 보관하며, 연결된 신고 자료가 남아 있으면 함께 보존해요.</Paragraph>
+    </Section>;
+};
+
 const Privacy = () => {
     // 색인 대상 경로다 — 위 Terms.jsx 와 같은 이유로 설명을 직접 준다.
     useDocumentTitle('개인정보 처리방침', 'RESERVE 개인정보 처리방침 — 수집하는 항목, 이용 목적, 보관 기간, 파기 절차와 이용자 권리를 안내합니다.');
@@ -46,7 +64,7 @@ const Privacy = () => {
         <PageContainer size="md" paddingTop="60px">
             <div style={{ marginBottom: 40 }}>
                 <PageTitle>개인정보 처리방침</PageTitle>
-                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 8일</Text>
+                <Text style={{ color: colors.text.tertiary, fontSize: fontSize.sm }}>시행일: 2026년 5월 17일 · 최종 수정: 2026년 10월 14일</Text>
             </div>
 
             <Section title="1. 수집하는 개인정보 항목">
@@ -56,6 +74,7 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}><strong>소셜 로그인 시:</strong> 이메일, 이름, 프로필 사진 (Google/Naver/Kakao 제공 정보)</li>
                     <li style={{ marginBottom: 6 }}><strong>예약 시:</strong> 예약 정보(날짜, 시간, 인원), 요청사항</li>
                     <li style={{ marginBottom: 6 }}><strong>채팅·신고 시:</strong> 대화 내용, 첨부 사진과 원래 파일명, 신고 내용·처리 기록 및 검토에 필요한 대화 증거</li>
+                    <li style={{ marginBottom: 6 }}><strong>가게 소식 작성 시:</strong> 작성자와 가게 연결, 제목·본문·사진·소식 종류·기간·조건, 공개 여부와 작성·수정·삭제 시각</li>
                     <li style={{ marginBottom: 6 }}><strong>웨이팅 접수 시:</strong> 회원 식별자와 이름(고객 접수), 선택한 팀 표시명(직원 접수), 접수 방식, 인원, 접수 번호와 접수·호출·입장·취소 시각. 대기 명단에서 연락처는 수집하지 않습니다.</li>
                     <li style={{ marginBottom: 6 }}><strong>결제 시:</strong> 결제 수단 정보 (카카오페이 처리, 카드·계좌 정보는 서버에 저장하지 않음)</li>
                     <li style={{ marginBottom: 6 }}><strong>자동 수집:</strong> 서비스 이용 기록, IP 주소, 접속 로그</li>
@@ -73,7 +92,7 @@ const Privacy = () => {
             <Section title="3. 개인정보 보유 및 이용 기간">
                 <Paragraph>처리 목적과 자료 종류에 따라 다음 기간 동안 보유합니다.</Paragraph>
                 <ul style={{ paddingLeft: 20 }}>
-                    <li style={{ marginBottom: 6 }}>감사 로그(Audit Log): 90일 보관 후 파기</li>
+                    <li style={{ marginBottom: 6 }}>일반 감사 로그(Audit Log): 90일 보관 후 파기. 신고 자료의 열람·처리 기록은 아래의 별도 기간을 적용합니다.</li>
                     <li style={{ marginBottom: 6 }}>계정 식별정보(이메일, 비밀번호, 위치, 소셜 로그인 토큰): 탈퇴 처리 시 제거 또는 비식별 값으로 치환</li>
                     <li style={{ marginBottom: 6 }}>일반 채팅의 글·사진·원래 파일명: 전송일로부터 90일. 만료되면 원문과 사진 참조를 제거하고 사진 파일을 파기합니다.</li>
                     <li style={{ marginBottom: 6 }}>처리된 일반 채팅 신고·증거: 처리 완료일로부터 1년</li>
@@ -81,6 +100,7 @@ const Privacy = () => {
                     <li style={{ marginBottom: 6 }}>계약·청약철회·대금결제·재화 공급 기록: 해당 거래일을 기준으로 5년. 관련 채팅 증거는 일반 채팅과 구분하여 보관합니다.</li>
                     <li style={{ marginBottom: 6 }}>관리자의 신고 원문·사진 열람 기록: 각 열람일부터 1년 이상. 법령상 2년 보관 대상이면 2년 이상 보관합니다.</li>
                     <li style={{ marginBottom: 6 }}>웨이팅: 입장·취소가 끝난 팀의 표시명과 회원 연결은 다음 한국 시간 날짜에 제거하고, 접수 방식·인원·번호·처리 시각과 고객이 동의한 고지 버전 등 종료 접수 기록은 7일 후 파기해요. 진행 중인 접수는 처리할 때까지 보관해요. 회원 탈퇴 시 해당 회원의 진행 접수를 취소하고 이름과 회원 연결을 제거하며, 가게가 삭제되면 남은 접수를 취소하고 표시명과 회원 연결을 제거해요.</li>
+                    <li style={{ marginBottom: 6 }}>가게 소식과 임시저장한 소식: 삭제할 때까지 보관해요. 작성자 삭제·가게 폐업·회원 탈퇴 시 혜택과 연결된 피드에서 즉시 숨기고 30일 후 원문·사진을 파기해요. 신고 당시 원문·사진은 별도 보관하며 처리 중에는 유지하고, 처리 완료 후 365일 또는 파기 보류가 해제된 날부터 365일 동안 보관해요.</li>
                     <li style={{ marginBottom: 6 }}>예약 자유 입력 요청사항 및 결제 구매자 이름·이메일·전화번호: 탈퇴 처리 시 제거 또는 비식별화</li>
                     <li style={{ marginBottom: 6 }}>법령에 따라 보존이 필요한 경우 해당 기간 동안 별도 보관</li>
                 </ul>
@@ -89,9 +109,11 @@ const Privacy = () => {
                 <WaitingNoticeDate />
             </Section>
 
+            <FeedPrivacy />
+
             <Section title="4. 개인정보 파기 절차 및 방법">
                 <Paragraph><strong>파기 절차:</strong> 탈퇴 전 운영 중인 가게와 미결 예약·환불·결제 상태를 확인합니다. 처리가 완료되면 계정 식별정보를 같은 트랜잭션에서 비식별화하고, 보존 목적이 없는 개인화·커뮤니티 데이터는 삭제합니다.</Paragraph>
-                <Paragraph><strong>파기 방법:</strong> 전자적 정보는 DB 삭제 또는 비식별 값 치환으로 처리합니다. S3의 프로필 사진·사업자등록증·폐업 가게 이미지·만료 채팅 사진은 DB에 삭제 작업을 먼저 기록한 뒤 별도 작업자가 삭제하며, 일시적인 AWS 오류가 발생하면 완료될 때까지 재시도합니다. 신고 증거가 보존 중인 사진은 그 보존이 끝나고 다른 대화·신고 참조가 없을 때 삭제합니다.</Paragraph>
+                <Paragraph><strong>파기 방법:</strong> 전자적 정보는 DB 삭제 또는 비식별 값 치환으로 처리합니다. S3의 프로필 사진·사업자등록증·폐업 가게 이미지·만료 채팅 사진·삭제된 피드와 가게 소식 사진은 DB에 삭제 작업을 먼저 기록한 뒤 별도 작업자가 삭제하며, 일시적인 AWS 오류가 발생하면 완료될 때까지 재시도합니다. 신고 증거가 보존 중인 사진은 그 보존이 끝나고 다른 대화·게시물·신고 참조가 없을 때 삭제합니다.</Paragraph>
             </Section>
 
             <Section title="5. 개인정보의 안전성 확보 조치">

@@ -1,8 +1,10 @@
 import { PageTitle, PageDescription } from '../../components/common/PageTypography';
-
-import { useQuery } from '@tanstack/react-query';
+import { useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { DataState, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
+import { DataState, FilterMenu, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
+import LikedContentList from '../../components/feed/LikedContentList';
+import { useFeedInteractions } from '../../hooks/feedInteractionQueries';
 import { StoreCard } from '../../components/store';
 import StoreListViewToggle from '../../components/store/StoreListViewToggle';
 import StoreListRow from '../../components/store/StoreListRow';
@@ -10,6 +12,9 @@ import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
 import Bone from '../../components/common/Bone';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useViewModeParam from '../../hooks/useViewModeParam';
+import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
+import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
+import { isBlockingListReadError, queryErrorStatus } from '../../hooks/liveUpdateQueries';
 import { favoriteKeys } from '../../hooks/queryKeys';
 import favoriteService from '../../services/favoriteService';
 
@@ -26,25 +31,42 @@ import favoriteService from '../../services/favoriteService';
 // 전역 정책은 index.css — docs/technical/design-system.md 참고.
 
 const MyFavorites = () => {
-    useDocumentTitle('즐겨찾기');
+    useDocumentTitle('좋아요');
     const [searchParams, setSearchParams] = useSearchParams();
-    const [view, setView] = useViewModeParam(searchParams, setSearchParams, 'cards');
+    const [view, setView] = useViewModeParam(searchParams, 'cards');
+    const interactions = useFeedInteractions();
+    const kinds = [{ value: 'all', label: '전체 좋아요' }, { value: 'stores', label: '가게' }, { value: 'posts', label: '게시물' }, { value: 'news', label: '가게 소식' }, { value: 'comments', label: '댓글' }];
+    const kind = kinds.some(item => item.value === searchParams.get('kind')) ? searchParams.get('kind') : 'all';
+    const hasContentLikes = interactions.data?.enabled === true || interactions.data?.newsEnabled === true;
+    const showStores = !hasContentLikes || kind === 'all' || kind === 'stores';
+    const client = useQueryClient();
     const resultClassName = view === 'list' ? 'reserve-store-list-rows' : 'rsv-fav-grid';
     const ResultSkeleton = view === 'list' ? StoreListRowSkeleton : StoreCardSkeleton;
 
-    const { data: favorites = [], isLoading: loading, isFetching, error, refetch } = useQuery({
+    const { data, isLoading: loading, isFetching, error, refetch } = useQuery({
         queryKey: favoriteKeys.my(),
         queryFn: async () => {
-            const data = await favoriteService.getMyFavorites();
-            return data || [];
+            const items = await favoriteService.getMyFavorites();
+            return items || [];
         },
     });
-    // 2026-09: 하트를 끄거나 켜면 목록이 무효화돼 다시 불린다(invalidateAfterWrite.js).
-    // 예전엔 그 재조회가 화면에 안 보여 카드가 아무 예고 없이 빠지거나 생겼다.
-    // 재조회 동안 툴바의 새로고침 버튼을 돌리고 카드 자리에 스켈레톤을 띄운 뒤 새 목록을 보여준다.
-    // ★ '내 예약'(재조회 때 목록 유지)과 일부러 다르다 — 즐겨찾기는 하트 한 번에 카드가
-    //   나타나거나 사라지는 화면이라, 그 변화가 번쩍이지 않고 한 번 시작·끝이 보여야 한다(2026-09-26 사용자 결정).
+    const accessDenied = [401, 403].includes(queryErrorStatus(error));
+    const hasData = data !== undefined && !accessDenied;
+    const favorites = accessDenied ? [] : data || [];
+    const blockingError = isBlockingListReadError(error, favorites);
+    // 자동 재조회는 기존 카드와 도구줄을 유지한다. 첫 조회에만 골격을 사용한다.
     const refetching = isFetching && !loading;
+    const listRef = useRef(null);
+    useListRefreshAnchor(listRef, JSON.stringify([kind, view]), showStores && isFetching, hasData ? favorites : null);
+    const live = useLiveUpdatesStatus();
+    const requiredDomains = ['FAVORITE', ...(showStores ? ['STORE', 'REVIEW'] : [])];
+    if (hasContentLikes && kind !== 'stores') {
+        requiredDomains.push('LIKE');
+        if (kind === 'all' || kind === 'posts') requiredDomains.push('FEED');
+        if (kind === 'all' || kind === 'news') requiredDomains.push('NEWS');
+        if (kind === 'all' || kind === 'comments') requiredDomains.push('COMMENT');
+    }
+    const autoRefreshDomain = requiredDomains.every(domain => live.domains.includes(domain)) ? 'FAVORITE' : undefined;
     // FavoriteDto → StoreCard가 기대하는 store 형태로 변환
     const toStoreShape = (fav) => ({
         id:          fav.storeId,
@@ -58,15 +80,13 @@ const MyFavorites = () => {
     // 헤더 안내 문구 — 로딩 → 실패(빈 목록) → 목록 있음 → 빈 목록 순으로 판정한다.
     const headerMessage = () => {
         if (loading) return '즐겨찾기를 불러오는 중이에요.';
-        if (error && favorites.length === 0) return '즐겨찾기 목록을 확인하지 못했어요.';
+        if (blockingError) return '즐겨찾기 목록을 확인하지 못했어요.';
         if (favorites.length > 0) return `총 ${favorites.length}개의 가게를 즐겨찾기했어요.`;
         return '마음에 드는 가게를 즐겨찾기에 추가해보세요.';
     };
 
     // 컨텐츠 — 고정 4열 그리드. 규칙은 index.css 의 "즐겨찾기 그리드" 블록에 있다.
-    // 재조회 스켈레톤은 지금 보이던 카드 수만큼(최소 1개) 그린다 — 개수가 튀면 레이아웃이 출렁인다.
-    // 개수를 모르는 첫 로딩만 8개다. 목록이 비었는데 조회가 실패한 상태의 다시 시도는
-    // DataState 가 자체 진행 표시(retrying)를 갖는다.
+    // 개수를 모르는 첫 로딩만 8개다. 조회 실패 시 DataState가 재시도 진행 상태를 표시한다.
     // 로딩 영역은 <output>(암묵 role=status)이다. display 는 .rsv-fav-grid 가 grid 로 정한다.
     const renderContent = () => {
         if (loading) {
@@ -76,19 +96,10 @@ const MyFavorites = () => {
                 </output>
             );
         }
-        if (error && favorites.length === 0) {
+        if (blockingError) {
             return (
                 <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
                     onRetry={refetch} retrying={isFetching} style={{ marginTop: 100 }} />
-            );
-        }
-        if (refetching) {
-            return (
-                <output className={resultClassName} aria-label="즐겨찾기를 새로 불러오는 중">
-                    <div style={{ display: 'contents' }} aria-hidden="true">
-                        <ResultSkeleton count={Math.max(favorites.length, 1)} />
-                    </div>
-                </output>
             );
         }
         if (favorites.length === 0) {
@@ -96,11 +107,6 @@ const MyFavorites = () => {
         }
         return (
             <>
-                {error && (
-                    <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
-                        title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
-                        onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />
-                )}
                 <div className={resultClassName}>
                     {favorites.map(fav => view === 'list' ? (
                         <StoreListRow key={fav.id} store={toStoreShape(fav)} />
@@ -118,18 +124,28 @@ const MyFavorites = () => {
         <PageContainer size="xl" paddingTop="40px" aria-busy={isFetching}>
             {/* 헤더 */}
             <div style={styles.header}>
-                <PageTitle style={styles.title}>즐겨찾기</PageTitle>
-                <PageDescription>
-                    {headerMessage()}
+                <PageTitle loading={loading} style={styles.title}>좋아요</PageTitle>
+                <PageDescription loading={loading}>
+                    {hasContentLikes ? '좋아요한 가게·게시물·소식·댓글을 한곳에서 볼 수 있어요.' : headerMessage()}
                 </PageDescription>
             </div>
 
-            <FilterToolbar onReload={refetch} loading={loading || refetching} initialLoading={loading}
+            <FilterToolbar onReload={() => Promise.all([refetch(), client.invalidateQueries({ queryKey: ['feed', 'interactions', 'mine'] })])}
+                autoRefreshDomain={autoRefreshDomain}
+                loading={showStores && (loading || refetching)} initialLoading={showStores && loading}
                 extraSkeleton={<Bone width={44} height={44} borderRadius={10} />}
-                extra={<StoreListViewToggle view={view} onChange={setView} disabled={loading || refetching} />} />
+                extra={showStores ? <StoreListViewToggle view={view} onChange={setView} disabled={loading} /> : undefined} />
+            {hasContentLikes && <div className="reserve-feed-toolbar"><FilterMenu appearance="plain" value={kind} options={kinds} aria-label="좋아요 종류"
+                onChange={value => setSearchParams(previous => { const next = new URLSearchParams(previous); next.set('kind', value); return next; })} /></div>}
 
             {/* 컨텐츠 — 상태별 분기는 위 renderContent 주석 참고 */}
-            {renderContent()}
+            {showStores && <section ref={listRef} className="reserve-liked-section" aria-label="좋아요한 가게">{hasContentLikes && <h2>가게</h2>}
+                {error && !blockingError && <DataState state="error" kind="favorite" subject="즐겨찾기 목록" error={error}
+                    title="최신 즐겨찾기를 확인하지 못해 이전 목록을 보여드리고 있어요."
+                    onRetry={refetch} retrying={isFetching} compact style={{ marginBottom: 16 }} />}{renderContent()}</section>}
+            {hasContentLikes && kind !== 'stores' && <section className="reserve-liked-section" aria-label="좋아요한 게시물과 소식">
+                {kind === 'all' && <h2>게시물 · 가게 소식 · 댓글</h2>}<LikedContentList type={kind === 'posts' ? 'POST' : kind === 'news' ? 'NEWS' : kind === 'comments' ? 'COMMENT' : 'ALL'} />
+            </section>}
         </PageContainer>
     );
 };

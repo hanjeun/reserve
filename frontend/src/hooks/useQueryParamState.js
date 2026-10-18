@@ -1,5 +1,7 @@
-import { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { WorkspaceActivityContext } from '../components/layout/workspaceActivity';
+import { VIEW_MODES } from '../utils/viewMode';
 
 /**
  * URL 쿼리스트링과 동기화되는 여러 값을 한 번에 관리하는 훅 (2026-07 추가).
@@ -27,35 +29,63 @@ import { useSearchParams } from 'react-router-dom';
  *   const handleSearchChange = (e) => setQuery({ search: e.target.value, page: '1' });
  *   const setPage = (p) => setQuery({ page: String(p) });
  *
- * value가 기본값과 같아지면 그 key를 URL에서 지운다 — 기본 상태(검색어 없음, 1페이지 등)일 땐
- * URL이 `?tab=members`처럼 깨끗하게 유지된다.
+ * 선택 옵션과 페이지는 기본값도 URL에 표시한다. 검색어처럼 값이 없는 입력은 생략한다.
  */
-export const useQueryParamsState = (defaults) => {
-    const [searchParams, setSearchParams] = useSearchParams();
+const isEmptySelection = key => key === 'type' || /Store$/.test(key);
+
+export const useQueryParamsState = (defaults, activeKeys = Object.keys(defaults)) => {
+    const [searchParams] = useSearchParams();
+    const location = useLocation();
+    const { pathname, hash, state } = location;
+    const navigate = useNavigate();
+    const locationRef = useRef(location);
+    useLayoutEffect(() => { locationRef.current = location; }, [location]);
+    const active = useContext(WorkspaceActivityContext);
+    const activeRef = useRef(active);
+    useLayoutEffect(() => { activeRef.current = active; return () => { activeRef.current = false; }; }, [active]);
+    const [snapshot, setSnapshot] = useState(searchParams);
+    if (active && snapshot.toString() !== searchParams.toString()) setSnapshot(searchParams);
+    const current = active ? searchParams : snapshot;
     const defaultsKey = JSON.stringify(defaults);
+    const activeKeysKey = JSON.stringify(activeKeys);
+
+    useEffect(() => {
+        if (!active || !activeRef.current) return;
+        const params = new URLSearchParams(searchParams);
+        const visibleKeys = new Set(JSON.parse(activeKeysKey));
+        Object.entries(JSON.parse(defaultsKey)).forEach(([key, value]) => {
+            const raw = params.get(key);
+            const selection = value !== '' || isEmptySelection(key);
+            if (key === 'view' && raw !== null && !VIEW_MODES.has(raw)) params.set(key, String(value));
+            else if (raw === '' && value !== '') params.set(key, String(value));
+            else if (raw === '' && !selection) params.delete(key);
+            else if (raw !== null) params.set(key, raw);
+            else if (visibleKeys.has(key) && selection) params.set(key, String(value));
+        });
+        if (params.toString() === searchParams.toString()) return;
+        navigate({ pathname, search: params.size ? `?${params}` : '', hash }, { replace: true, state });
+    }, [active, activeKeysKey, defaultsKey, hash, navigate, pathname, searchParams, state]);
 
     const values = {};
     Object.keys(defaults).forEach((key) => {
-        values[key] = searchParams.get(key) ?? defaults[key];
+        values[key] = current.get(key) ?? defaults[key];
     });
 
-    const setValues = useCallback((patch) => {
+    const setValues = useCallback((patch, options = {}) => {
+        // 숨겨진 관리자 작업의 페이지 보정이 현재 작업의 URL을 덮어쓰지 않는다.
+        if (!active || !activeRef.current) return;
         const stableDefaults = JSON.parse(defaultsKey);
-        setSearchParams((prev) => {
-            const params = new URLSearchParams(prev);
-            Object.entries(patch).forEach(([key, val]) => {
-                const def = stableDefaults[key];
-                if (val == null || val === '' || val === def) {
-                    params.delete(key);
-                } else {
-                    params.set(key, String(val));
-                }
-            });
-            return params;
-        }, { replace: true });
+        const latest = locationRef.current;
+        const params = new URLSearchParams(latest.search);
+        Object.entries(patch).forEach(([key, val]) => {
+            if (val == null || val === '' && stableDefaults[key] === '' && !isEmptySelection(key)) params.delete(key);
+            else params.set(key, String(val));
+        });
+        navigate({ pathname: latest.pathname, search: params.size ? `?${params}` : '', hash: latest.hash },
+            { replace: true, state: latest.state, ...options });
         // defaults는 각 탭에서 렌더마다 새 객체 리터럴로 넘어오지만 그 내용(키/기본값)은 사실상
         // 고정이라 JSON.stringify로 값 비교해서 불필요한 재생성을 막는다.
-    }, [defaultsKey, setSearchParams]);
+    }, [active, defaultsKey, navigate]);
 
     return [values, setValues];
 };

@@ -10,6 +10,7 @@ import {
     LockOutlined,
     MailOutlined,
     MessageOutlined,
+    BellOutlined,
     NotificationOutlined,
     ShopOutlined,
     StarOutlined,
@@ -17,7 +18,7 @@ import {
     TeamOutlined,
     WalletOutlined,
     WifiOutlined,
-} from '@ant-design/icons';
+} from './icons';
 import Button from './Button';
 import StateIllustration from './StateIllustration';
 import { fontSize, spacing } from '../../styles/tokens';
@@ -25,11 +26,14 @@ import { isMissingRequestError, listRequestErrorKind, listRequestErrorMessage } 
 
 const EMPTY_ICON_BY_KIND = {
     advertisement: NotificationOutlined,
+    comment: MessageOutlined,
     favorite: HeartOutlined,
+    feed: NotificationOutlined,
     mail: MailOutlined,
     member: TeamOutlined,
     message: MessageOutlined,
     news: NotificationOutlined,
+    notification: BellOutlined,
     payment: WalletOutlined,
     reservation: CalendarOutlined,
     review: StarOutlined,
@@ -125,7 +129,7 @@ const DataState = ({
 DataState.propTypes = {
     state: PropTypes.oneOf(['empty', 'error']),
     requestType: PropTypes.oneOf(['list', 'detail']),
-    kind: PropTypes.oneOf(['advertisement', 'favorite', 'generic', 'mail', 'member', 'message', 'news', 'payment', 'reservation', 'review', 'store', 'waiting']),
+    kind: PropTypes.oneOf(['advertisement', 'comment', 'favorite', 'feed', 'generic', 'mail', 'member', 'message', 'news', 'notification', 'payment', 'reservation', 'review', 'store', 'waiting']),
     subject: PropTypes.string,
     // Axios 오류뿐 아니라 훅이 정규화한 문자열도 받을 수 있다.
     error: PropTypes.any,

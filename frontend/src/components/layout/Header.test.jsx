@@ -28,6 +28,7 @@ function RouteCommitProbe() {
     return <>
         <button onClick={() => navigate('/')}>이동 완료</button>
         <button onClick={() => navigate('/terms')}>다른 화면 이동</button>
+        <button onClick={() => navigate('?region=', { replace: true })}>선택 기본값 보정</button>
         <button onClick={() => navigate(-1)}>히스토리 뒤로</button>
         <button onClick={() => navigate(1)}>히스토리 앞으로</button>
     </>;
@@ -88,6 +89,51 @@ describe('shared wordmark and result search header', () => {
         expect(screen.getByRole('link', { name: 'RESERVE 홈' }).querySelector('.reserve-header-logo-compact')).toBeNull();
         fireEvent.click(query);
         await waitFor(() => expect(screen.getByLabelText('현재 경로').textContent).toBe('/search?keyword=' + encodeURIComponent('카페 안산') + ':searchEntry'));
+    });
+
+    it('keeps a pending search and its duplicate-click lock through canonical query replacement', () => {
+        vi.useFakeTimers();
+        reducedMotionState.value = false;
+        try {
+            renderHeader('/');
+            const search = screen.getByRole('link', { name: '가게·지역·서비스 검색' });
+            fireEvent.click(search);
+            fireEvent.click(screen.getByRole('button', { name: '선택 기본값 보정' }));
+            expect(screen.getByLabelText('현재 경로')).toHaveTextContent('/?region=');
+            expect(screen.getByRole('banner')).toHaveAttribute('aria-busy', 'true');
+            fireEvent.click(search);
+            act(() => { vi.advanceTimersByTime(220); });
+            expect(screen.getByLabelText('현재 경로').textContent).toBe('/search:searchEntry');
+            fireEvent.click(screen.getByRole('button', { name: '히스토리 뒤로' }));
+            expect(screen.getByLabelText('현재 경로').textContent).toBe('/?region=');
+        } finally { vi.useRealTimers(); }
+    });
+
+    it('cancels pending search on a different page and releases its navigation lock', () => {
+        vi.useFakeTimers();
+        reducedMotionState.value = false;
+        try {
+            renderHeader('/');
+            fireEvent.click(screen.getByRole('link', { name: '가게·지역·서비스 검색' }));
+            fireEvent.click(screen.getByRole('button', { name: '다른 화면 이동' }));
+            act(() => { vi.advanceTimersByTime(220); });
+            expect(screen.getByLabelText('현재 경로').textContent).toBe('/terms');
+            fireEvent.click(screen.getByRole('link', { name: '가게·지역·서비스 검색' }));
+            act(() => { vi.advanceTimersByTime(220); });
+            expect(screen.getByLabelText('현재 경로').textContent).toBe('/search:searchEntry');
+        } finally { vi.useRealTimers(); }
+    });
+
+    it('cancels pending search on browser back even when the pathname stays the same', () => {
+        vi.useFakeTimers();
+        reducedMotionState.value = false;
+        try {
+            render(<MemoryRouter initialEntries={['/?region=', '/']}><Header /><CurrentRoute /><RouteCommitProbe /></MemoryRouter>);
+            fireEvent.click(screen.getByRole('link', { name: '가게·지역·서비스 검색' }));
+            fireEvent.click(screen.getByRole('button', { name: '히스토리 뒤로' }));
+            act(() => { vi.advanceTimersByTime(220); });
+            expect(screen.getByLabelText('현재 경로').textContent).toBe('/?region=');
+        } finally { vi.useRealTimers(); }
     });
 
     it('marks only a nonempty store keyword result so mobile hides the brand there', () => {

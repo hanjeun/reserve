@@ -1,7 +1,7 @@
-import React, { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { ArrowLeftOutlined, MenuOutlined, SearchOutlined } from '../common/icons';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigationType } from 'react-router-dom';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import useGoBack from '../../hooks/useGoBack';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
@@ -26,6 +26,7 @@ const Header = () => {
     const navigate = useWorkspaceNavigate();
     const requestAction = useWorkspaceAction();
     const location = useLocation();
+    const navigationType = useNavigationType();
     const reducedMotion = useReducedMotion();
     const { isLoggedIn } = useAuthStore();
     const currentPath = location.pathname.replace(/\/$/, '') || '/';
@@ -41,6 +42,8 @@ const Header = () => {
     const [navigationIntent, setNavigationIntent] = useState(null);
     const navigationTimerRef = useRef(null);
     const navigationStartRef = useRef(/** @type {string | null} */ (null));
+    const navigationLocationRef = useRef({ location, navigationType });
+    useLayoutEffect(() => { navigationLocationRef.current = { location, navigationType }; }, [location, navigationType]);
     // 뒤로가기 버튼은 사라질 때도 나타날 때와 같은 접힘 모션을 탄다(2026-09-26).
     // 예전엔 ← 를 직접 눌렀을 때만 접혔고, 로고·하단 탭·브라우저 뒤로가기로 탐색 루트에 돌아갈 때는
     // 버튼이 그 자리에서 언마운트돼 RESERVE 로고가 48px 뚝 튀었다(사용자 지적).
@@ -53,33 +56,42 @@ const Header = () => {
     const backLeaving = renderBack && !showBack;
     const keyword = currentPath === '/stores' ? new URLSearchParams(location.search).get('keyword')?.trim() : '';
     const searchTarget = keyword ? '/search?keyword=' + encodeURIComponent(keyword) : '/search';
-    const searchLeaving = navigationIntent?.intent === 'search' && navigationIntent.locationKey === location.key;
+    const searchLeaving = navigationIntent?.intent === 'search'
+        && navigationIntent.pathname === location.pathname && navigationIntent.hash === location.hash;
 
-    useEffect(() => () => {
+    const cancelNavigation = useCallback(() => {
         if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
         navigationTimerRef.current = null;
         navigationStartRef.current = null;
         // 같은 history key로 앞으로 돌아와도 완료된 이동의 잠금이 되살아나지 않는다.
         setNavigationIntent(null);
-    }, [location.key]);
+    }, []);
+    useEffect(() => () => {
+        const next = navigationLocationRef.current;
+        // 같은 화면의 기본 선택 주소 보정은 이미 누른 검색 이동을 취소하지 않는다.
+        if (next.navigationType === 'REPLACE' && next.location.key !== location.key
+            && next.location.pathname === location.pathname && next.location.hash === location.hash) return;
+        cancelNavigation();
+    }, [location.key, location.pathname, location.hash, cancelNavigation]);
+    useEffect(() => cancelNavigation, [cancelNavigation]);
 
     // 검색은 퇴장 모션 뒤 이동하고 뒤로가기는 바로 이동한다. 중복 이동 잠금은 경로 커밋까지 유지한다.
     // 로고는 모션 없이 바로 이동한다(handleLogoClick).
     const runHeaderNavigation = useCallback((intent, action) => {
-        if (navigationStartRef.current === location.key) return;
+        if (navigationStartRef.current !== null) return;
         navigationStartRef.current = location.key;
         if (intent === 'back' || reducedMotion) {
             action();
             return;
         }
 
-        setNavigationIntent({ intent, locationKey: location.key });
+        setNavigationIntent({ intent, pathname: location.pathname, hash: location.hash });
         navigationTimerRef.current = window.setTimeout(() => {
             navigationTimerRef.current = null;
             // POP 이동은 비동기다. 경로 커밋 전 intent를 풀면 enter → leave가 다시 재생된다.
             action();
         }, intent === 'search' ? SEARCH_MOTION_DURATION_MS : HEADER_ACTION_MOTION_MS);
-    }, [reducedMotion, location.key]);
+    }, [reducedMotion, location.key, location.pathname, location.hash]);
 
     const handleBack = () => {
         const storeQuestions = currentPath === '/store/register' || /^\/store\/\d+\/edit$/.test(currentPath);

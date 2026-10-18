@@ -1,16 +1,19 @@
 package kr.it.reserve.audit.service;
 
-import kr.it.reserve.global.event.PublicContentChanged;
-
 import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.StoreException;
+import kr.it.reserve.global.event.PublicContentChanged;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
+import kr.it.reserve.store.service.StoreUpdates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +24,16 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminSanctionService {
 
     private final MemberRepository memberRepository;
     private final StoreRepository storeRepository;
     private final AuditLogService auditLogService;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private org.springframework.context.ApplicationEventPublisher events;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private kr.it.reserve.store.service.StoreUpdates storeUpdates;
+    @Autowired(required = false)
+    private ApplicationEventPublisher events;
+    @Autowired(required = false)
+    private StoreUpdates storeUpdates;
 
     @Transactional
     public void suspendMember(Long id, int days, String rawReason) {
@@ -75,7 +79,7 @@ public class AdminSanctionService {
         Store store = findOpenStore(id);
         String reason = normalize(rawReason);
         LocalDateTime until = LocalDateTime.now(Clock.systemDefaultZone()).plusDays(days);
-        boolean wasPublic = kr.it.reserve.store.service.StoreUpdates.publicStore(store);
+        boolean wasPublic = StoreUpdates.publicStore(store);
         store.suspend(until, reason);
         storeChanged(store, wasPublic);
         auditLogService.logStoreSanction(id, store.getName(), "SUSPEND",
@@ -87,7 +91,7 @@ public class AdminSanctionService {
     public void banStore(Long id, String rawReason) {
         Store store = findOpenStore(id);
         String reason = normalize(rawReason);
-        boolean wasPublic = kr.it.reserve.store.service.StoreUpdates.publicStore(store);
+        boolean wasPublic = StoreUpdates.publicStore(store);
         store.ban(reason);
         storeChanged(store, wasPublic);
         auditLogService.logStoreSanction(id, store.getName(), "BAN",

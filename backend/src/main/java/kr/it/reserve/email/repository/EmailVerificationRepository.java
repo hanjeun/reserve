@@ -1,7 +1,7 @@
 package kr.it.reserve.email.repository;
 
-import kr.it.reserve.email.entity.EmailVerification;
 import jakarta.persistence.LockModeType;
+import kr.it.reserve.email.entity.EmailVerification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -38,5 +38,5 @@ public interface EmailVerificationRepository extends JpaRepository<EmailVerifica
      */
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM EmailVerification e WHERE e.expiresAt < :now")
-    void deleteExpiredVerifications(@Param("now") LocalDateTime now);
+    int deleteExpiredVerifications(@Param("now") LocalDateTime now);
 }

@@ -1,33 +1,35 @@
 package kr.it.reserve.feed.service;
 
-import kr.it.reserve.config.updates.EntityUpdates;
-
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import kr.it.reserve.config.updates.EntityUpdates;
+import kr.it.reserve.favorite.entity.Favorite;
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.FeedDto;
 import kr.it.reserve.feed.entity.*;
 import kr.it.reserve.feed.repository.*;
-import kr.it.reserve.favorite.entity.Favorite;
-import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.service.FileDeletionOutboxService;
+import kr.it.reserve.file.service.FileStorageService;
 import kr.it.reserve.file.util.FileStoragePaths;
 import kr.it.reserve.global.common.PageRequests;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.entity.MemberStatus;
 import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
+import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
-import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.store.entity.Store;
+import kr.it.reserve.store.entity.StoreStatus;
+import kr.it.reserve.store.entity.WaitingIntakeMode;
 import kr.it.reserve.store.repository.StoreRepository;
 import kr.it.reserve.store.util.StoreRegionNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -35,8 +37,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.net.URI;
 import java.text.Normalizer;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -53,7 +57,7 @@ public class FeedService {
     private final PromotionRepository promotions;
     private final FileStorageService storage;
     private final FileDeletionOutboxService fileDeletions;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private EntityUpdates updates;
     @PersistenceContext private EntityManager entityManager;
 
@@ -134,14 +138,34 @@ public class FeedService {
     }
 
     public Page<FeedDto.Post> publicPosts(int page, int size, String region, boolean favoriteOnly, Long viewer) {
+        return publicPosts(page, size, region, favoriteOnly, viewer, "latest");
+    }
+
+    public Page<FeedDto.Post> publicPosts(int page, int size, String region, boolean favoriteOnly, Long viewer, String sort) {
         policy.requireEnabled(); String selectedRegion = FeedPolicy.region(region);
+        if (!"latest".equals(sort) && !"popular".equals(sort)) throw FeedException.invalid("피드 정렬을 다시 선택해주세요.");
         if (favoriteOnly) {
             if (viewer == null) throw new FeedException("찜한 가게 소식은 로그인 후 볼 수 있어요.", HttpStatus.UNAUTHORIZED);
             activeReader(viewer);
         }
-        return posts.findAll(publicSpecification(selectedRegion, null, favoriteOnly ? viewer : null),
-                PageRequests.bounded(page, size).withSort(Sort.by(Sort.Direction.DESC, "createdAt", "id")))
+        var specification = publicSpecification(selectedRegion, null, favoriteOnly ? viewer : null);
+        var bounds = PageRequests.bounded(page, size);
+        if ("popular".equals(sort)) specification = specification.and(popularityOrder());
+        else bounds = bounds.withSort(Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+        return posts.findAll(specification, bounds)
                 .map(post -> postDto(post, viewer));
+    }
+
+    static Specification<FeedPost> popularityOrder() {
+        return (root, query, cb) -> {
+            if (query != null && FeedPost.class.equals(query.getResultType())) {
+                var count = query.subquery(Long.class);
+                var like = count.from(ContentLike.class);
+                count.select(cb.count(like)).where(cb.equal(like.get("post"), root));
+                query.orderBy(cb.desc(count), cb.desc(root.get("createdAt")), cb.desc(root.get("id")));
+            }
+            return cb.conjunction();
+        };
     }
 
     public List<FeedDto.RegionGroup> publicRegions() {
@@ -151,7 +175,7 @@ public class FeedService {
         var root = query.from(FeedPost.class);
         var store = root.join("store", JoinType.LEFT);
         // 일반 글의 연결 가게가 비공개가 되면 그 주소를 지역 집계에도 사용하지 않는다.
-        var address = cb.<String>selectCase().when(visibleStore(store, cb, LocalDateTime.now(java.time.Clock.systemDefaultZone())),
+        var address = cb.<String>selectCase().when(visibleStore(store, cb, LocalDateTime.now(Clock.systemDefaultZone())),
                 store.<String>get("address")).otherwise(cb.nullLiteral(String.class));
         var region = root.<String>get("region");
         query.multiselect(region.alias("region"), address.alias("address"), cb.count(root).alias("count"))
@@ -302,7 +326,7 @@ public class FeedService {
         boolean deleted = post.getState() == FeedPost.State.DELETED || (news != null && news.getState() == Promotion.State.DELETED);
         Store store = deleted ? null : post.getStore();
         FeedDto.StoreLink storeLink = usableStore(store) ? new FeedDto.StoreLink(store.getId(), store.getName(),
-                store.isReservationEnabled(), store.resolveWaitingIntakeMode() != kr.it.reserve.store.entity.WaitingIntakeMode.OFF) : null;
+                store.isReservationEnabled(), store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF) : null;
         List<FeedDto.Image> images = deleted ? List.of() : media.findByPost_IdOrderByPositionAscIdAsc(post.getId()).stream().map(this::imageDto).toList();
         return new FeedDto.Post(post.getId(), deleted ? "" : news == null ? post.getContent() : news.getContent(), deleted ? null : post.getRegion(),
                 post.getCreatedAt().atOffset(ZoneOffset.UTC), post.getUpdatedAt().atOffset(ZoneOffset.UTC), post.getRevision(), post.getState().name(),
@@ -321,7 +345,7 @@ public class FeedService {
         return new FeedDto.Post(carrier == null ? null : carrier.getId(), news.getContent(), null, StoreNewsPolicy.offset(news.getCreatedAt()), StoreNewsPolicy.offset(news.getUpdatedAt()),
                 news.getRevision(), news.getState().name(), false, new FeedDto.Profile(null, store.getName(), "", null, false), List.of(),
                 new FeedDto.StoreLink(store.getId(), store.getName(), store.isReservationEnabled(),
-                        store.resolveWaitingIntakeMode() != kr.it.reserve.store.entity.WaitingIntakeMode.OFF), null, newsMetadata(news));
+                        store.resolveWaitingIntakeMode() != WaitingIntakeMode.OFF), null, newsMetadata(news));
     }
 
     public FeedDto.Image imageDto(FeedMedia image) { return new FeedDto.Image(image.getId(), "/api/feed/media/" + image.getId(), image.getWidth(), image.getHeight()); }
@@ -429,7 +453,7 @@ public class FeedService {
 
     private Specification<FeedPost> publicSpecification(String region, Long author, Long favoriteMember) {
         // 기존 제재 기산일은 systemDefaultZone으로 저장한다. 새 피드 UTC 날짜와 섞지 않는다.
-        LocalDateTime timestamp = LocalDateTime.now(java.time.Clock.systemDefaultZone());
+        LocalDateTime timestamp = LocalDateTime.now(Clock.systemDefaultZone());
         return (root, query, cb) -> {
             var profile = root.join("profile"); var member = profile.join("member");
             var active = cb.or(cb.equal(member.get("status"), MemberStatus.ACTIVE),
@@ -457,8 +481,8 @@ public class FeedService {
                 var store = root.join("store", JoinType.INNER); var storeOwner = store.join("owner");
                 var favorite = query.subquery(Long.class); var item = favorite.from(Favorite.class);
                 favorite.select(item.get("id")).where(cb.equal(item.get("member").get("id"), favoriteMember), cb.equal(item.get("store").get("id"), store.get("id")));
-                var activeStore = cb.or(cb.equal(store.get("status"), kr.it.reserve.store.entity.StoreStatus.ACTIVE),
-                        cb.and(cb.equal(store.get("status"), kr.it.reserve.store.entity.StoreStatus.SUSPENDED), cb.lessThan(store.get("suspendedUntil"), timestamp)));
+                var activeStore = cb.or(cb.equal(store.get("status"), StoreStatus.ACTIVE),
+                        cb.and(cb.equal(store.get("status"), StoreStatus.SUSPENDED), cb.lessThan(store.get("suspendedUntil"), timestamp)));
                 var activeOwner = cb.or(cb.equal(storeOwner.get("status"), MemberStatus.ACTIVE),
                         cb.and(cb.equal(storeOwner.get("status"), MemberStatus.SUSPENDED), cb.lessThan(storeOwner.get("suspendedUntil"), timestamp)));
                 predicate = cb.and(predicate, cb.isNull(store.get("deletedAt")), activeStore, cb.isNull(storeOwner.get("deletedAt")),
@@ -470,8 +494,8 @@ public class FeedService {
 
     private static Predicate visibleStore(From<?, ?> store, CriteriaBuilder cb, LocalDateTime timestamp) {
         var owner = store.join("owner", JoinType.LEFT);
-        var activeStore = cb.or(cb.equal(store.get("status"), kr.it.reserve.store.entity.StoreStatus.ACTIVE),
-                cb.and(cb.equal(store.get("status"), kr.it.reserve.store.entity.StoreStatus.SUSPENDED), cb.lessThan(store.get("suspendedUntil"), timestamp)));
+        var activeStore = cb.or(cb.equal(store.get("status"), StoreStatus.ACTIVE),
+                cb.and(cb.equal(store.get("status"), StoreStatus.SUSPENDED), cb.lessThan(store.get("suspendedUntil"), timestamp)));
         var activeOwner = cb.or(cb.equal(owner.get("status"), MemberStatus.ACTIVE),
                 cb.and(cb.equal(owner.get("status"), MemberStatus.SUSPENDED), cb.lessThan(owner.get("suspendedUntil"), timestamp)));
         return cb.and(cb.isNotNull(store.get("id")), cb.isNull(store.get("deletedAt")), activeStore, cb.isNull(owner.get("deletedAt")),

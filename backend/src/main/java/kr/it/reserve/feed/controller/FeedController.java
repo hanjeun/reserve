@@ -33,8 +33,9 @@ public class FeedController {
     @GetMapping("/posts")
     public ResponseEntity<ApiResponse<Page<FeedDto.Post>>> posts(@RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size, @RequestParam(required = false) String region,
-            @RequestParam(defaultValue = "false") boolean favoriteOnly) {
-        return response(feeds.publicPosts(page, size, region, favoriteOnly, viewer()), "피드 조회 성공");
+            @RequestParam(defaultValue = "false") boolean favoriteOnly,
+            @RequestParam(defaultValue = "latest") String sort) {
+        return response(feeds.publicPosts(page, size, region, favoriteOnly, viewer(), sort), "피드 조회 성공");
     }
     @GetMapping("/posts/{id:[0-9]+}")
     public ResponseEntity<ApiResponse<FeedDto.Post>> post(@PathVariable Long id) { return response(feeds.readPost(id, viewer()), "게시물 조회 성공"); }

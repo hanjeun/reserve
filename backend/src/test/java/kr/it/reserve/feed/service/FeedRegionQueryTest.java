@@ -5,6 +5,7 @@ import kr.it.reserve.feed.FeedPolicy;
 import kr.it.reserve.feed.dto.FeedDto;
 import kr.it.reserve.feed.entity.FeedPost;
 import kr.it.reserve.feed.entity.FeedProfile;
+import kr.it.reserve.feed.entity.ContentLike;
 import kr.it.reserve.feed.repository.FeedMediaRepository;
 import kr.it.reserve.feed.repository.FeedPostRepository;
 import kr.it.reserve.feed.repository.FeedProfileRepository;
@@ -116,6 +117,30 @@ class FeedRegionQueryTest {
         entityManager.flush();
         assertThat(feeds.publicRegions()).isEmpty();
         assertThat(feeds.publicPosts(0, 20, "서울 중구", false, null).getTotalElements()).isZero();
+    }
+
+    @Test void popularPostsUseStoredLikesThenNewestAndExcludeHiddenPosts() {
+        Member author = member("ranking");
+        FeedProfile profile = profile(author);
+        FeedPost first = post(profile, "서울", null, false);
+        FeedPost second = post(profile, "서울", null, false);
+        FeedPost newest = post(profile, "부산", null, false);
+        FeedPost hidden = post(profile, "서울", null, false);
+        hidden.setVisibility(true, NOW);
+        for (FeedPost item : new FeedPost[]{first, second, hidden}) {
+            entityManager.persist(ContentLike.create(author, item, null, NOW));
+        }
+        entityManager.flush();
+
+        assertThat(feeds.publicPosts(0, 2, null, false, null, "popular").getContent())
+                .extracting(FeedDto.Post::id).containsExactly(second.getId(), first.getId());
+        assertThat(feeds.publicPosts(1, 2, null, false, null, "popular").getContent())
+                .extracting(FeedDto.Post::id).containsExactly(newest.getId());
+        assertThat(feeds.publicPosts(0, 2, null, false, null, "popular").getTotalElements()).isEqualTo(3);
+        assertThat(feeds.publicPosts(0, 20, "부산", false, null, "popular").getContent())
+                .extracting(FeedDto.Post::id).containsExactly(newest.getId());
+        assertThat(feeds.publicPosts(0, 20, null, false, null).getContent())
+                .extracting(FeedDto.Post::id).containsExactly(newest.getId(), second.getId(), first.getId());
     }
 
     private Member member(String name) {

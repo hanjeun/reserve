@@ -90,7 +90,7 @@ describe('StoreListRow', () => {
         expect(link.contains(favorite)).toBe(false);
         expect(favorite.parentElement).toHaveClass('reserve-store-list-row-favorite');
         expect(favorite).toHaveAttribute('data-store-id', '12');
-        expect(favorite).toHaveAttribute('data-size', 'md');
+        expect(favorite).not.toHaveAttribute('data-size');
         expect(favorite).toHaveAttribute('data-appearance', 'plain');
         await user.click(favorite);
         expect(favoriteToggle).toHaveBeenCalledOnce();

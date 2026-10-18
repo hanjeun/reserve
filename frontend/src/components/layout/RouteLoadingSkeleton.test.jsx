@@ -81,7 +81,7 @@ describe('route chunk loading patterns', () => {
         if (search !== '?view=list') {
             const info = container.querySelector('.reserve-store-card-skeleton-info');
             expect(Array.from(info.children, child => child.className)).toEqual([
-                'reserve-store-card-skeleton-title-line',
+                'reserve-store-card-title-line reserve-store-card-skeleton-title-line',
                 'reserve-store-card-skeleton-identity',
                 'reserve-store-card-skeleton-rating',
             ]);

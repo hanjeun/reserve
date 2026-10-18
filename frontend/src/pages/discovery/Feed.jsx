@@ -3,7 +3,6 @@ import Pagination from '../../components/common/Pagination';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { DataState, FilterMenu } from '../../components/common';
-import { PageTitle } from '../../components/common/PageTypography';
 import FeedPostCard from '../../components/feed/FeedPostCard';
 import FeedModalLoading from '../../components/feed/FeedModalLoading';
 import FeedEditor from '../../components/feed/FeedEditor';
@@ -20,7 +19,7 @@ import useDocumentTitle from '../../hooks/useDocumentTitle';
 import useFeedActions from '../../hooks/useFeedActions';
 import { feedKeys, useFeedConfig, useFeedProfile } from '../../hooks/feedQueries';
 import feedService from '../../services/feedService';
-import { FEED_PAGE_SIZE, feedPage, feedTotal, feedRegion } from '../../utils/feed';
+import { FEED_DIRECTORY_VIEWS as views, FEED_PAGE_SIZE, feedPage, feedTotal, feedRegion } from '../../utils/feed';
 import { saveRedirect } from '../../utils/redirect';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
@@ -28,8 +27,6 @@ import { httpStatusOf } from '../../utils/listErrorMessage';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
-const views = [{ value: 'all', label: '최신순' }, { value: 'favorites', label: '관심 가게' },
-    { value: 'mine', label: '내 게시물' }, { value: 'drafts', label: '임시저장' }];
 
 export default function Feed() {
     useDocumentTitle('피드', 'RESERVE 회원이 나누는 글과 사진을 만나보세요.');
@@ -50,9 +47,10 @@ export default function Feed() {
     const [regionOpen, setRegionOpen] = useState(false);
     const { onDelete, onShare, requestReport } = useFeedActions();
     const ownView = view === 'mine' || view === 'drafts';
-    const requiresLogin = view !== 'all';
+    const requiresLogin = ownView || view === 'favorites';
     const listParams = { page: page - 1, size: FEED_PAGE_SIZE,
-        ...(ownView ? { drafts: view === 'drafts' } : { region: region || undefined, favoriteOnly: view === 'favorites' }) };
+        ...(ownView ? { drafts: view === 'drafts' } : { region: region || undefined, favoriteOnly: view === 'favorites',
+            sort: view === 'popular' ? 'popular' : 'latest' }) };
     const list = useQuery({ queryKey: ownView ? feedKeys.mine(listParams) : feedKeys.list(listParams),
         queryFn: ({ signal }) => ownView ? feedService.myPosts(listParams, signal) : feedService.list(listParams, signal),
         enabled: enabled && (!requiresLogin || Boolean(user)), staleTime: 30_000, placeholderData: keepPreviousData });
@@ -76,7 +74,7 @@ export default function Feed() {
     const rememberLogin = () => saveRedirect(`${loginFrom.pathname}${loginFrom.search}`);
     const setFilter = (key, value) => {
         const next = new URLSearchParams(params);
-        if (value == null) next.delete(key); else next.set(key, value);
+        if (value == null) next.delete(key); else next.set(key, key === 'region' ? value || 'all' : value);
         next.set('page', '1');
         setParams(next);
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -98,16 +96,16 @@ export default function Feed() {
     };
     // 목록 실패 뒤 첫 닉네임 저장/작성으로 재조회해도 열린 작성기를 페이지 골격으로 언마운트하지 않는다.
     if (!composer && !reportId && (!config.data && config.isPending || enabled && (!requiresLogin || user) && !list.data && list.isPending)) {
-        return <FeedPageSkeleton view={view} enabled={enabled || config.isPending} signedIn={Boolean(user)} notificationsEnabled={notificationCount.enabled} />;
+        return <FeedPageSkeleton view={view} enabled={enabled || config.isPending} signedIn={Boolean(user)} notificationsEnabled={notificationCount.visible} />;
     }
-    return <section ref={listRef} className="reserve-benefits-page reserve-feed-page reserve-feed-directory" aria-labelledby="feed-title">
-        <PageTitle level={1} id="feed-title">피드</PageTitle>
+    return <section ref={listRef} className="reserve-benefits-page reserve-feed-page reserve-feed-directory" aria-label="피드">
         {enabled && <div className="reserve-feed-directory-tools" data-discovery-swipe-ignore="true">
             <div className="reserve-feed-write-tools">
                 {user ? <><IconTool label="새 글 작성" icon={<InterfaceIcon name="compose" />} onClick={write}
                     unavailableReason={profile.isError && (profile.data === undefined || [401, 403].includes(httpStatusOf(profile.error))) ? '공개 프로필을 다시 불러온 뒤 작성해주세요.' : ''} />
                     <IconTool label={view === 'drafts' ? '최신 피드로 돌아가기' : '임시저장한 글'} icon={<InterfaceIcon name="folder" />} active={view === 'drafts'} onClick={() => setFilter('view', view === 'drafts' ? 'all' : 'drafts')} />
-                    {notificationCount.enabled && <IconTool label={`피드 알림${notificationCount.data?.unread ? `, 안 읽은 알림 ${notificationCount.data.unread}개` : ''}`} to="/feed/notifications"
+                    {notificationCount.visible && <IconTool label={`피드 알림${notificationCount.pending ? ' 확인 중' : notificationCount.data?.unread ? `, 안 읽은 알림 ${notificationCount.data.unread}개` : ''}`}
+                        disabled={!notificationCount.enabled} to="/feed/notifications"
                         icon={<span className="reserve-feed-notification-icon"><BellOutlined />{notificationCount.data?.unread > 0 && <span className="reserve-feed-notification-badge" aria-hidden="true">{Math.min(99, notificationCount.data.unread)}{notificationCount.data.unread > 99 ? '+' : ''}</span>}</span>} />}</>
                     : <IconTool label="로그인하고 글쓰기" icon={<InterfaceIcon name="compose" />} to="/login" onClick={rememberLogin} />}
             </div>

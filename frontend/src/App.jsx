@@ -4,11 +4,12 @@ import SessionQueryProvider from './components/common/SessionQueryProvider';
 import WorkspaceNavigationProvider from './components/layout/WorkspaceNavigationProvider';
 import WorkspaceMenuProvider from './components/layout/WorkspaceMenuProvider';
 import LegacyDomainNotice from './components/layout/LegacyDomainNotice';
+import LoginFeedback from './components/layout/LoginFeedback';
 import { uiIconConfig } from './components/common/uiIconConfig';
 import { Layout, ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import koKR from 'antd/locale/ko_KR';
 import useAuthStore from './store/useAuthStore';
-import { colors, rawColors, semanticActionPalettes, field, fieldPx, zIndex } from './styles/tokens';
+import { colors, rawColors, semanticActionPalettes, field, fieldPx, zIndex, fontWeight, fontSize } from './styles/tokens';
 import useTheme from './hooks/useTheme';
 import useImagePreviewSwipe from './hooks/useImagePreviewSwipe';
 import useModalScrollLock from './hooks/useModalScrollLock';
@@ -284,7 +285,12 @@ function AppContent() {
 
     return (
         <LoadingPresentationContext.Provider value={presentation}>
-        <AntApp message={{ maxCount: 3 }}>
+        <AntApp message={{ maxCount: 3, styles: {
+            list: { willChange: 'auto' }, listContent: { willChange: 'auto' },
+            root: { willChange: 'auto', backfaceVisibility: 'visible' },
+            title: { color: colors.text.primary, fontWeight: fontWeight.medium, fontSize: fontSize.base, lineHeight: '24px' },
+        } }}>
+            <LoginFeedback />
             <SessionQueryProvider key={sessionRevision}>
                 <WorkspaceNavigationProvider><WorkspaceMenuProvider><AppRoutes /></WorkspaceMenuProvider></WorkspaceNavigationProvider>
             </SessionQueryProvider>

@@ -49,12 +49,12 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId,
                 <Card.Cover src={getThumbnailUrl(mainImageUrl)} alt={name} width={mainImageWidth} height={mainImageHeight} />
 
                 <div className="reserve-store-card-info">
-                    <div className={`reserve-store-card-title-line${extraTools ? ' reserve-store-card-title-line--with-tools' : ''}`}>
+                    <div className="reserve-store-card-title-line">
                         <Title level={5} className="reserve-store-card-name" style={{ margin: 0, fontSize: fontSize.xl }}>
                             {name}
                         </Title>
                         <div className="reserve-store-card-favorite">
-                            {showFavorite && <FavoriteButton storeId={id} size="sm" appearance="plain" preview={preview} />}
+                            {showFavorite && <FavoriteButton storeId={id} appearance="plain" preview={preview} />}
                             {extraTools}
                         </div>
                     </div>

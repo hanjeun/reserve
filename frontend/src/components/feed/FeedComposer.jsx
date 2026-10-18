@@ -208,7 +208,7 @@ export default function FeedComposer({ open, post, profile, config, onClose, onS
                 {user?.role === 'BUSINESS' && <>
                     {stores.isError && <DataState state="error" title="내 가게를 불러오지 못했어요." error={stores.error} onRetry={stores.refetch} retrying={stores.isFetching} />}
                     <Form.Item name="storeId" label="내 가게 연결 (선택)"><FormSelect allowClear loading={stores.isPending}
-                        options={owned.map(store => ({ value: store.id, label: store.name }))} aria-label="연결할 내 가게" placeholder="가게 없이 게시" /></Form.Item>
+                        options={[{ value: '', label: '가게 없이 게시' }, ...owned.map(store => ({ value: store.id, label: store.name }))]} aria-label="연결할 내 가게" placeholder="가게 없이 게시" /></Form.Item>
                 </>}
             </Form>
             <p className="reserve-feed-note">글·사진과 공개 프로필이 전체 공개돼요.</p>

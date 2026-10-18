@@ -7,6 +7,7 @@ import { preloadRouteSkeletons } from '../../components/layout/routeSkeletonLoad
 import DiscoveryRouteSkeleton from '../../components/layout/DiscoveryRouteSkeleton';
 import RouteSkeletonPages from '../../components/layout/RouteSkeletonPages';
 import { clearRedirect, peekRedirect, saveRedirect } from '../../utils/redirect';
+import { consumeLoginFeedback } from '../../utils/loginFeedback';
 
 const { checkAuth, navigate, replace, message } = vi.hoisted(() => ({
     checkAuth: vi.fn(), navigate: vi.fn(), replace: vi.fn(), message: { success: vi.fn(), error: vi.fn() },
@@ -29,6 +30,7 @@ describe('OAuth pending presentation', () => {
         window.history.replaceState({}, '', '/oauth2/callback');
         vi.stubGlobal('location', { ...window.location, replace });
         clearRedirect();
+        sessionStorage.removeItem('reserve:oauth-login-feedback');
         vi.clearAllMocks();
         vi.spyOn(App, 'useApp').mockReturnValue({ message });
     });
@@ -41,8 +43,11 @@ describe('OAuth pending presentation', () => {
         expect(container.querySelector('.reserve-discovery-featured')).toBeInTheDocument();
         expect(container.querySelector('svg[aria-label="로딩 중"]')).toBeNull();
         expect(navigate).not.toHaveBeenCalled();
-        await act(async () => resolve({ email: 'account@example.test', name: '회원' }));
+        const user = { id: 7, role: 'USER', email: 'account@example.test', name: '회원', termsAgreed: true };
+        await act(async () => resolve(user));
         expect(replace).toHaveBeenCalledWith('/');
+        expect(message.success).not.toHaveBeenCalled();
+        expect(consumeLoginFeedback(user)).toBe(true);
     });
 
     it('shows the saved destination and consumes it only after authentication succeeds', async () => {

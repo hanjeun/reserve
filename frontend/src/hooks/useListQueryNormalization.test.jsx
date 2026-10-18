@@ -22,7 +22,7 @@ describe('public list query normalization', () => {
         render(<MemoryRouter initialEntries={['/guide/user', {
             pathname: '/feed', search: '?view=all&page=1&utm_source=guide&unknown=yes', hash: '#latest', state: { origin: 'guide' },
         }]} initialIndex={1}><Probe /></MemoryRouter>);
-        await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('/feed?view=all&page=1&utm_source=guide&region=#latest'));
+        await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('/feed?view=all&page=1&utm_source=guide&region=all#latest'));
         expect(screen.getByTestId('state')).toHaveTextContent('{"origin":"guide"}');
         await user.click(screen.getByRole('button', { name: '뒤로' }));
         expect(screen.getByTestId('url')).toHaveTextContent(/^\/guide\/user$/);

@@ -11,6 +11,7 @@ import FeedEditor from '../../components/feed/FeedEditor';
 import FeedSkeleton, { FeedPageSkeleton } from '../../components/feed/FeedSkeleton';
 import useAuthStore from '../../store/useAuthStore';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useGoBack from '../../hooks/useGoBack';
 import useFeedActions from '../../hooks/useFeedActions';
 import { feedKeys, useFeedConfig, useFeedProfile } from '../../hooks/feedQueries';
 import feedService from '../../services/feedService';
@@ -38,6 +39,7 @@ export default function FeedDetail() {
     const backgroundFailure = [config, post].find(query => query.isError && query.data !== undefined);
     useDocumentTitle(!unavailable && post.data?.author?.nickname ? `${post.data.author.nickname}의 게시물` : '피드 게시물');
     const back = discoveryTabDestination('/feed');
+    const goBack = useGoBack(back);
     const { onDelete, onShare, requestReport } = useFeedActions({ onDeleted: () => navigate(back, { replace: true }) });
     const renderPost = () => {
         if (!validId) return <DataState state="empty" title="게시물을 찾을 수 없어요." />;
@@ -55,7 +57,7 @@ export default function FeedDetail() {
     };
     if (!editing && !reportId && validId && (!config.data && config.isPending || enabled && !post.data && post.isPending)) return <FeedPageSkeleton kind="feed-detail" postId={postId} />;
     return <PageContainer size="md" paddingTop="12px" paddingX="0px" paddingBottom="40px" style={{ maxWidth: 640, backgroundColor: 'transparent' }} className="reserve-feed-page" aria-labelledby="feed-post-title">
-        <header className="reserve-feed-heading"><IconTool kind="navigation" label="피드로" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={() => navigate(back)} /><PageTitle level={1} id="feed-post-title">게시물</PageTitle></header>
+        <header className="reserve-feed-heading"><IconTool kind="navigation" label="이전 화면으로 돌아가기" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={goBack} /><PageTitle level={1} id="feed-post-title">게시물</PageTitle></header>
         {!unavailable && backgroundFailure && <DataState compact state="error" title="게시물을 갱신하지 못했어요." error={backgroundFailure.error} onRetry={backgroundFailure.refetch} retrying={backgroundFailure.isFetching} />}
         {renderPost()}
         {enabled && !unavailable && post.data?.state === 'PUBLISHED' && <FeedComments key={postId} postId={postId} />}

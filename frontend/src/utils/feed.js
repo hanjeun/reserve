@@ -2,6 +2,11 @@ import { versionedApiUrl } from '../api/apiVersion';
 import { REGION_OPTIONS } from '../constants/regions';
 
 export const FEED_PAGE_SIZE = 12;
+export const FEED_DIRECTORY_VIEWS = [
+    { value: 'all', label: '최신순' }, { value: 'popular', label: '인기순' },
+    { value: 'favorites', label: '관심 가게' }, { value: 'mine', label: '내 게시물' },
+    { value: 'drafts', label: '임시저장' },
+];
 export const FEED_CONTENT_LIMIT = 2000;
 export const FEED_REPORT_REASONS = [
     { value: 'SPAM', label: '광고·스팸' }, { value: 'ABUSE', label: '욕설·괴롭힘' },

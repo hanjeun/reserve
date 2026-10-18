@@ -9,5 +9,6 @@ export default function useFeedNotificationCount() {
     const enabled = Boolean(user) && config.data?.notificationsEnabled === true;
     const query = useQuery({ queryKey: interactionKeys.notificationCount(), queryFn: ({ signal }) => service.notificationCount(signal),
         enabled, staleTime: 20_000, refetchInterval: 30_000, refetchIntervalInBackground: false, retry: false });
-    return { ...query, enabled };
+    return { ...query, enabled, pending: Boolean(user) && config.isPending,
+        visible: Boolean(user) && config.data?.notificationsEnabled !== false };
 }

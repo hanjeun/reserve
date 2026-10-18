@@ -16,7 +16,7 @@ const viewQueryParams = (pathname, params, view) => {
     const next = normalizeListQueryParams(pathname, params);
     next.set('view', view);
     if (/^\/(stores|waiting)\/?$/.test(pathname) && !next.has('region')) {
-        next.set('region', readDiscoveryRegion());
+        next.set('region', readDiscoveryRegion() || 'all');
     }
     return next;
 };

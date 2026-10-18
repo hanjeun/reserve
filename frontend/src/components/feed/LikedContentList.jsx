@@ -43,7 +43,8 @@ export default function LikedContentList({ type = 'ALL' }) {
     if (list.isPending && !list.data) return <FeedSkeleton />;
     if (isBlockingListReadError(list.error, items)) return <DataState state="error" compact title="좋아요한 내용을 불러오지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
     const backgroundError = list.isError && list.data && <DataState compact state="error" title="좋아요한 내용을 갱신하지 못했어요." error={list.error} onRetry={list.refetch} retrying={list.isFetching} />;
-    if (!items.length) return <>{backgroundError}<DataState state="empty" compact kind="favorite" title="좋아요한 내용이 없어요." /></>;
+    if (!items.length) return <>{backgroundError}<DataState state="empty" kind="favorite"
+        title={type === 'POST' ? '좋아요한 게시물이 없어요.' : type === 'NEWS' ? '좋아요한 가게 소식이 없어요.' : type === 'COMMENT' ? '좋아요한 댓글이 없어요.' : '좋아요한 내용이 없어요.'} /></>;
     return <>{backgroundError}
     <div ref={listRef} className="reserve-feed-list" aria-busy={list.isFetching}>
         {items.map(item => !item.available ? <div key={item.id} data-list-item-id={`liked:${item.id}`} className="reserve-liked-unavailable">

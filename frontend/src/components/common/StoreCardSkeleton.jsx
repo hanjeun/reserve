@@ -16,18 +16,13 @@ export default function StoreCardSkeleton({ count = 6, withActions = false, meta
                     backgroundColor: colors.background.default,
                 }}>
                     <Bone height="auto" borderRadius={0} style={{ aspectRatio: '1 / 1', maxHeight: 200 }} />
-                    <div className="reserve-store-card-skeleton-info" style={{ padding: extraTools ? '12px 16px' : 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div className="reserve-store-card-skeleton-title-line" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: extraTools ? 4 : 8, minHeight: 44 }}>
-                            {extraTools ? <>
-                                <div style={{ flex: 1, minWidth: 0 }}><Bone width="70%" height={20} /></div>
-                                <div className="reserve-store-card-skeleton-tools">
-                                    {showFavorite && <span className="reserve-icon-tool reserve-icon-tool--skeleton"><Bone width={20} height={20} /></span>}
-                                    {extraTools}
-                                </div>
-                            </> : <>
-                                <Bone width="70%" height={20} />
-                                {showFavorite && <Bone width={20} height={20} />}
-                            </>}
+                    <div className="reserve-store-card-skeleton-info" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div className="reserve-store-card-title-line reserve-store-card-skeleton-title-line" style={{ minHeight: 24 }}>
+                            <Bone width="70%" height={20} />
+                            <div className="reserve-store-card-favorite reserve-store-card-skeleton-tools">
+                                {showFavorite && <span className="reserve-icon-tool reserve-favorite-button reserve-icon-tool--skeleton"><Bone width={20} height={20} /></span>}
+                                {extraTools}
+                            </div>
                         </div>
                         <div className="reserve-store-card-skeleton-identity"><Bone width="35%" height={14} /></div>
                         <div className="reserve-store-card-skeleton-rating" style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 24 }}>

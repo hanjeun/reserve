@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Avatar, DataState, FilterMenu, PageContainer, PageTitle } from '../../components/common';
 import IconTool from '../../components/common/IconTool';
 import Pagination from '../../components/common/Pagination';
@@ -8,6 +8,7 @@ import { FeedNotificationsPageSkeleton } from '../../components/feed/FeedSkeleto
 import AnimatedContent from '../../components/common/AnimatedContent';
 import { interactionKeys, useFeedInteractions } from '../../hooks/feedInteractionQueries';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
+import useGoBack from '../../hooks/useGoBack';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf } from '../../utils/listErrorMessage';
@@ -30,7 +31,7 @@ export default function FeedNotifications() {
     const view = params.get('view') === 'unread' ? 'unread' : 'all';
     const config = useFeedInteractions();
     const client = useQueryClient();
-    const navigate = useNavigate();
+    const goBack = useGoBack(discoveryTabDestination('/feed'));
     const { message } = useMessage();
     const enabled = config.data?.notificationsEnabled === true;
     const request = { unread: view === 'unread', page: page - 1, size: 20 };
@@ -77,7 +78,7 @@ export default function FeedNotifications() {
     if (!config.data && config.isPending || enabled && !list.data && list.isPending) return <FeedNotificationsPageSkeleton view={view} />;
     return <PageContainer ref={listRef} size="md" className="reserve-feed-page reserve-feed-notifications-page" style={{ maxWidth: 640 }}>
         <PageTitle level={1}>피드 알림</PageTitle>
-        <div className="reserve-feed-notification-tools"><div className="reserve-feed-notification-back"><IconTool kind="navigation" label="피드로" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={() => navigate(discoveryTabDestination('/feed'))} /></div>
+        <div className="reserve-feed-notification-tools"><div className="reserve-feed-notification-back"><IconTool kind="navigation" label="이전 화면으로 돌아가기" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={goBack} /></div>
             <IconTool label="모두 읽음" icon={<CheckOutlined aria-hidden="true" />} loading={mark.isPending} disabled={!enabled || unavailable} onClick={() => mark.mutate({ session: currentSession().epoch })} />
             <FilterMenu appearance="plain" value={view} options={FEED_NOTIFICATION_VIEWS} aria-label="알림 보기" onChange={value => setParams(previous => {
                 const next = new URLSearchParams(previous); next.set('view', value); next.set('page', '1'); return next;

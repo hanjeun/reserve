@@ -35,7 +35,7 @@ export function RefreshToolbarSkeleton({ search = false, viewControl = false, au
 RefreshToolbarSkeleton.propTypes = { search: PropTypes.bool, viewControl: PropTypes.bool, autoRefreshDomain: PropTypes.string };
 
 export function SegmentedControlSkeleton({ options, value, block = false }) {
-    return <div className="reserve-segmented" aria-hidden="true"
+    return <div className="reserve-segmented reserve-segmented--skeleton" aria-hidden="true"
         style={{ display: 'flex', flexWrap: 'nowrap', gap: 4, width: block ? '100%' : undefined }}>
         {options.map(option => <span key={option.value}
             className={`reserve-segmented-btn${option.value === value ? ' reserve-segmented-btn--active' : ''}`}

@@ -136,6 +136,8 @@
     transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
     white-space: nowrap;
 }
+/* span 뼈대도 실제 button의 normal 줄 높이를 사용해 뒤 도구줄을 밀지 않는다. */
+.reserve-segmented--skeleton .reserve-segmented-btn { line-height: normal; }
 /* 초소형 화면(359px 이하)에서만 페이지 좌우 패딩을 24px → 16px로 줄인다.
    320px 기기에서 콘텐츠 폭이 272px밖에 안 되는데, 예약 카드 3줄이 요구하는 폭이 약 270px라
    여유가 2px뿐이었다. 16px로 줄이면 304px가 되어 숨통이 트인다.

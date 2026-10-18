@@ -50,7 +50,8 @@ describe('route chunk loading patterns', () => {
 
     it.each(['/waiting', '/feed'])('uses the page layout on the first boot frame at %s without starting a query', path => {
         const { container } = renderUi(<RouteSkeletonPreview pathname={path} />);
-        expect(container.querySelector(path === '/feed' ? '.reserve-feed-page' : '.reserve-waiting-heading')).toBeInTheDocument();
+        expect(container.querySelector(path === '/feed' ? '.reserve-feed-page' : '.reserve-explore-page')).toBeInTheDocument();
+        expect(container.querySelector('h1')).toBeNull();
         expect(container.querySelector('button,input,select,a')).toBeNull();
     });
 
@@ -188,7 +189,8 @@ describe('route chunk loading patterns', () => {
         expect(screen.getAllByRole('status')).toHaveLength(1);
         expect(screen.getByRole('status').tagName).toBe('OUTPUT');
         rerender(<RouteSkeletonPreview pathname="/waiting" />);
-        expect(container.querySelector('.reserve-waiting-heading h1')).toHaveTextContent('웨이팅');
+        expect(container.querySelector('.reserve-explore-page')).toHaveStyle({ paddingTop: '16px' });
+        expect(container.querySelector('h1')).toBeNull();
         expect(container.querySelectorAll('.rsv-store-grid > div')).toHaveLength(4);
     });
 

@@ -32,7 +32,7 @@
     .reserve-favorite-button, .reserve-btn--ghost.reserve-btn--icon-only, .reserve-btn--ghost-sm.reserve-btn--icon-only) { position: relative; }
 :is(.reserve-icon-tool[data-icon-kind='navigation'], .reserve-explore-region-trigger,
     .reserve-header-back, .reserve-header-search, .reserve-search-icon,
-    .reserve-messenger-mobile-back, .reserve-favorite-button:not(.reserve-favorite-button--plain)) {
+    .reserve-messenger-mobile-back, .reserve-favorite-button) {
     --reserve-icon-surface-radius: var(--reserve-icon-navigation-radius);
 }
 :is(.reserve-feed-more, .reserve-feed-interaction) {

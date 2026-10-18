@@ -48,7 +48,7 @@ function BenefitPhotos({ pictures }) {
         <PhotoGallery label="혜택" sources={pictures.map(image => image.src)} dots={false} onSlideChange={setCurrent}
             wrapperStyle={{ width: '100%', overflow: 'hidden', borderRadius: 16, lineHeight: 0 }}
             imageStyle={{ width: '100%', height: 'clamp(180px, 50vw, var(--reserve-benefit-detail-photo-height, 360px))', objectFit: 'contain', display: 'block' }} />
-        {pictures.length > 1 && <span className="reserve-benefit-photo-count" aria-label={`사진 ${Math.min(current + 1, pictures.length)} / ${pictures.length}`}>{Math.min(current + 1, pictures.length)} / {pictures.length}</span>}
+        {pictures.length > 1 && <span className="reserve-benefit-photo-count reserve-photo-count" aria-label={`사진 ${Math.min(current + 1, pictures.length)} / ${pictures.length}`}>{Math.min(current + 1, pictures.length)} / {pictures.length}</span>}
     </div>;
 }
 BenefitPhotos.propTypes = { pictures: PropTypes.array.isRequired };

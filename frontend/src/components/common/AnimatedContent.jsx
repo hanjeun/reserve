@@ -6,12 +6,16 @@ import { IllustrationMotionScope } from '../../hooks/illustrationMotionScope';
 /** 사용자 선택이 바뀐 결과만 전환한다. 같은 목록의 배경 재조회는 다시 흔들지 않는다. */
 export default function AnimatedContent({ motionKey, ready = true, children, ...rest }) {
     const node = useRef(null);
-    const last = useRef(null);
+    const last = useRef(motionKey);
+    const pending = useRef(false);
     const reduced = useReducedMotion();
     useLayoutEffect(() => {
-        if (!ready) { last.current = null; return undefined; }
-        if (last.current === motionKey) return undefined;
-        last.current = motionKey;
+        if (last.current !== motionKey) {
+            last.current = motionKey;
+            pending.current = true;
+        }
+        if (!ready || !pending.current) return undefined;
+        pending.current = false;
         if (reduced || typeof node.current?.animate !== 'function') return undefined;
         const motion = node.current.animate([{ opacity: 0.5, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
             { duration: 220, easing: 'cubic-bezier(.22,.61,.36,1)' });

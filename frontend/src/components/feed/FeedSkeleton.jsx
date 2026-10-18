@@ -13,6 +13,7 @@ import ManagementListToolbar from '../common/ManagementListToolbar';
 import { REPORT_STATUS_OPTIONS } from '../admin/managementReviewQuery';
 import { FEED_NOTIFICATION_RETENTION_NOTE, FEED_NOTIFICATION_VIEWS } from '../../constants/feedNotifications';
 import { readFeedMediaHint } from '../../utils/feedMediaHint';
+import { FEED_DIRECTORY_VIEWS } from '../../utils/feed';
 
 function FeedPreparationSkeleton({ title = '피드를 준비하고 있어요.', description = '글·사진을 나눌 수 있도록 준비 중이에요.' }) {
     return <section className="reserve-data-state" aria-hidden="true" style={{
@@ -29,13 +30,12 @@ export function FeedPageSkeleton({ kind = 'feed', view = 'all', enabled = true, 
     const detail = kind === 'feed-detail';
     const profile = kind === 'feed-author';
     if (!detail && !profile) return <section className="reserve-benefits-page reserve-feed-page reserve-feed-directory" aria-label="피드를 불러오는 중" aria-busy="true">
-        <PageTitle level={1} loading>피드</PageTitle>
         {enabled && <div className="reserve-feed-directory-tools" aria-hidden="true">
             <div className="reserve-feed-write-tools"><IconToolSkeleton />
                 {signedIn && <IconToolSkeleton />}{signedIn && notificationsEnabled && <IconToolSkeleton />}</div>
             <div className="reserve-feed-column-tools">
                 {view !== 'mine' && view !== 'drafts' && <IconToolSkeleton kind="navigation" />}
-                <FilterMenuSkeleton select={{ value: view, options: [{ value: 'all', label: '최신순' }, { value: 'favorites', label: '관심 가게' }, { value: 'mine', label: '내 게시물' }, { value: 'drafts', label: '임시저장' }] }} />
+                <FilterMenuSkeleton select={{ value: view, options: FEED_DIRECTORY_VIEWS }} />
             </div>
         </div>}
         {enabled ? <FeedSkeleton /> : <FeedPreparationSkeleton />}

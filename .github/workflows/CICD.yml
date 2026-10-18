@@ -322,6 +322,14 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Stamp frontend release
+        working-directory: frontend
+        env:
+          FRONTEND_RELEASE: ${{ github.sha }}
+        run: |
+          [[ "$FRONTEND_RELEASE" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          printf '%s\n' "$FRONTEND_RELEASE" > dist/release-id.txt
+
       - name: Upload built frontend
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -446,8 +454,18 @@ jobs:
             UPLOAD_DIR="/home/ubuntu/reserve-frontend-$FRONTEND_RELEASE"
             NGINX_TEMPLATE="/home/ubuntu/default-$FRONTEND_RELEASE.conf"
 
+            test -f "$UPLOAD_DIR/index.html"
+            test "$(tr -d '\r\n' < "$UPLOAD_DIR/release-id.txt")" = "$FRONTEND_RELEASE"
+            test ! -L "$RELEASE_DIR"
             sudo mkdir -p "$RELEASE_ROOT"
-            if [ ! -d "$RELEASE_DIR" ]; then
+            if [ -d "$RELEASE_DIR" ]; then
+              # A retry must contain the same build, including its domain configuration.
+              diff -qr --exclude=assets --exclude=reserve-assets.sha256 "$UPLOAD_DIR" "$RELEASE_DIR"
+              OWNED_RECORDS=$(cd "$UPLOAD_DIR" && find assets -mindepth 1 -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum --binary)
+              test -n "$OWNED_RECORDS"
+              printf '%s\n' "$OWNED_RECORDS" | sudo cmp - "$RELEASE_DIR/reserve-assets.sha256"
+              sudo bash -c 'cd "$1" && sha256sum --strict --check reserve-assets.sha256 >/dev/null' _ "$RELEASE_DIR"
+            else
               sudo rm -rf -- "$INCOMING_DIR"
               sudo mkdir -p "$INCOMING_DIR"
               sudo cp -a "$UPLOAD_DIR/." "$INCOMING_DIR/"
@@ -456,9 +474,8 @@ jobs:
               sudo chown -R nginx:nginx "$INCOMING_DIR" 2>/dev/null || true
               sudo mv "$INCOMING_DIR" "$RELEASE_DIR"
             fi
-            # smoke가 단순 200/SPA fallback이 아니라 이 SHA의 정적 root를 읽었는지 판별한다.
-            printf '%s\n' "$FRONTEND_RELEASE" | sudo tee "$RELEASE_DIR/release-id.txt" >/dev/null
-            sudo chown nginx:nginx "$RELEASE_DIR/release-id.txt" 2>/dev/null || true
+            # Verify the marker shipped with the build; never relabel an existing release.
+            test "$(tr -d '\r\n' < "$RELEASE_DIR/release-id.txt")" = "$FRONTEND_RELEASE"
             if [ "$RESERVE_DOMAIN_SPLIT" = true ]; then
               sudo bash /home/ubuntu/domain-release.sh stage "$FRONTEND_RELEASE"
             fi

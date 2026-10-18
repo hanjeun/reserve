@@ -21,12 +21,17 @@ swap_pointer() {
 case "$OPERATION" in
   stage)
     test -f "$APP_RELEASE/index.html"
+    test "$(tr -d '\r\n' < "$APP_RELEASE/release-id.txt")" = "$RELEASE"
     SOURCE=/home/ubuntu/reserve-marketing-$RELEASE
     test -f "$SOURCE/index.html"
     test "$(tr -d '\r\n' < "$SOURCE/release-id.txt")" = "$RELEASE"
     mkdir -p "$MARKETING_ROOT/releases"
-    if [ ! -d "$MARKETING_RELEASE" ]; then
+    test ! -L "$MARKETING_RELEASE"
+    if [ -d "$MARKETING_RELEASE" ]; then
+      diff -qr "$SOURCE" "$MARKETING_RELEASE"
+    else
       INCOMING=$MARKETING_ROOT/releases/.incoming-$RELEASE
+      rm -rf -- "$INCOMING"
       mkdir -p "$INCOMING"
       cp -a "$SOURCE/." "$INCOMING/"
       test "$(tr -d '\r\n' < "$INCOMING/release-id.txt")" = "$RELEASE"

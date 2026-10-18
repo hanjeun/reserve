@@ -247,6 +247,73 @@ test('image publication and frontend staging remain main-push-only', () => {
     }
 });
 
+test('frontend artifacts are stamped before upload and retries reject changed bytes for an existing SHA', () => {
+    const stamp = frontend.steps.find(entry => entry.name === 'Stamp frontend release');
+    const upload = frontend.steps.find(entry => entry.name === 'Upload built frontend');
+    assert.equal(stamp.env.FRONTEND_RELEASE, '${{ github.sha }}');
+    assert.ok(frontend.steps.indexOf(stamp) < frontend.steps.indexOf(upload));
+    const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'reserve-stage-test-'));
+    const sha = 'a'.repeat(40);
+    const home = path.join(fixture, 'home');
+    const html = path.join(fixture, 'html');
+    const bin = path.join(fixture, 'bin');
+    const source = path.join(home, `reserve-frontend-${sha}`);
+    const release = path.join(html, 'releases', sha);
+    fs.mkdirSync(bin, { recursive: true });
+    fs.mkdirSync(home, { recursive: true });
+    fs.writeFileSync(path.join(bin, 'sudo'), '#!/usr/bin/env bash\nexec "$@"\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(home, 'preserve-frontend-assets.sh'), read('scripts/preserve-frontend-assets.sh'));
+    const stageScript = staging.steps.find(entry => entry.name === 'Stage frontend release').with.script
+        .replaceAll('/usr/share/nginx/html', bashPath(html)).replaceAll('/home/ubuntu', bashPath(home));
+    const prepare = (index = '<main>app origin</main>', asset = 'original asset') => {
+        fs.mkdirSync(path.join(source, 'assets'), { recursive: true });
+        fs.writeFileSync(path.join(source, 'index.html'), index);
+        fs.writeFileSync(path.join(source, 'release-id.txt'), `${sha}\n`);
+        fs.writeFileSync(path.join(source, 'assets', 'app-abcdefgh.js'), asset);
+        fs.writeFileSync(path.join(home, 'default.conf'), 'reviewed nginx candidate\n');
+    };
+    const runStage = script => spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+        ['-c', 'export PATH="$TASK_MOCK_BIN:$PATH"; ' + script], {
+            encoding: 'utf8', timeout: 15000,
+            env: { ...process.env, TASK_MOCK_BIN: bashPath(bin), FRONTEND_RELEASE: sha, RESERVE_DOMAIN_SPLIT: 'false' },
+        });
+    try {
+        prepare();
+        const first = runStage(stageScript);
+        assert.ifError(first.error);
+        assert.equal(first.status, 0, first.stderr + first.stdout);
+        prepare();
+        const retry = runStage(stageScript);
+        assert.equal(retry.status, 0, retry.stderr + retry.stdout);
+        prepare('<main>different domain configuration</main>');
+        assert.notEqual(runStage(stageScript).status, 0);
+        assert.equal(fs.readFileSync(path.join(release, 'index.html'), 'utf8'), '<main>app origin</main>');
+        prepare('<main>app origin</main>', 'changed asset under the same filename');
+        assert.notEqual(runStage(stageScript).status, 0);
+        assert.equal(fs.readFileSync(path.join(release, 'assets', 'app-abcdefgh.js'), 'utf8'), 'original asset');
+        assert.equal(fs.readFileSync(path.join(release, 'release-id.txt'), 'utf8'), `${sha}\n`);
+
+        const marketingSource = path.join(home, `reserve-marketing-${sha}`);
+        const marketingRelease = path.join(html, 'marketing', 'releases', sha);
+        fs.mkdirSync(marketingSource);
+        fs.writeFileSync(path.join(marketingSource, 'index.html'), '<main>marketing</main>');
+        fs.writeFileSync(path.join(marketingSource, 'release-id.txt'), `${sha}\n`);
+        const domainScript = read('scripts/domain-release.sh')
+            .replaceAll('/usr/share/nginx/html', bashPath(html)).replaceAll('/home/ubuntu', bashPath(home));
+        const command = `set -- stage ${sha}\n${domainScript}`;
+        const marketing = runStage(command);
+        assert.equal(marketing.status, 0, marketing.stderr + marketing.stdout);
+        assert.equal(runStage(command).status, 0);
+        fs.writeFileSync(path.join(marketingSource, 'index.html'), '<main>different marketing</main>');
+        assert.notEqual(runStage(command).status, 0);
+        assert.equal(fs.readFileSync(path.join(marketingRelease, 'index.html'), 'utf8'), '<main>marketing</main>');
+    } finally {
+        assert.equal(path.dirname(path.resolve(fixture)), path.resolve(os.tmpdir()));
+        assert.ok(path.basename(fixture).startsWith('reserve-stage-test-'));
+        fs.rmSync(fixture, { recursive: true, force: true });
+    }
+});
+
 test('only verified successful evidence can skip tests; records and required checks fail closed', () => {
     for (const job of [backendTests, frontendTests]) {
         const restore = step(job, 'evidence');

@@ -5,9 +5,10 @@ import java.time.LocalDateTime;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import kr.it.reserve.config.oauth2.OAuthProviderTokenConverter;
 
 @Entity
-@Table(name = "member")
+@Table(name = "member", indexes = @Index(name = "idx_member_oauth_subject", columnList = "provider,provider_id,deleted_at"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -60,8 +61,29 @@ public class Member {
     @Column(name = "profile_image_locked", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean profileImageLocked = false;
 
-    @Column(name = "oauth_access_token", length = 2048)
+    @Convert(converter = OAuthProviderTokenConverter.class)
+    @Column(name = "oauth_access_token", columnDefinition = "TEXT")
     private String oauthAccessToken;  // OAuth Access Token (연동 해제용)
+
+    /** 가장 최근 공급자 인증 시각(UTC). 늦게 도착한 이전 연결의 사건과 새 인증을 구분한다. */
+    @Column(name = "oauth_authenticated_at")
+    private LocalDateTime oauthAuthenticatedAt;
+
+    /** 공급자 사건보다 오래된 진행 중 인증이 폐기된 연결을 되살리지 못하게 하는 UTC cutoff. */
+    @Column(name = "oauth_security_revoked_at")
+    private LocalDateTime oauthSecurityRevokedAt;
+
+    public boolean acceptsOAuthAuthentication(LocalDateTime authenticatedAt) {
+        return authenticatedAt != null
+                && (oauthSecurityRevokedAt == null || authenticatedAt.isAfter(oauthSecurityRevokedAt))
+                && (oauthAuthenticatedAt == null || !authenticatedAt.isBefore(oauthAuthenticatedAt));
+    }
+
+    public void recordOAuthSecurityRevocation(LocalDateTime occurredAt) {
+        if (oauthSecurityRevokedAt == null || occurredAt.isAfter(oauthSecurityRevokedAt)) {
+            oauthSecurityRevokedAt = occurredAt;
+        }
+    }
 
     // 개인 이메일 알림 수신 여부 (예약 승인/거절 등)
     @Builder.Default
@@ -172,6 +194,8 @@ public class Member {
         this.profileImage = null;
         this.profileImageLocked = true;
         this.oauthAccessToken = null;
+        this.oauthAuthenticatedAt = null;
+        this.oauthSecurityRevokedAt = null;
         this.emailNotificationEnabled = false;
         this.termsAgreed = false;
         this.marketingAgreed = false;

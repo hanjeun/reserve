@@ -33,8 +33,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,6 +100,7 @@ class MemberWithdrawalSafetyTest {
         memberService.deleteMember(memberId);
 
         verify(dataLifecycleGuard).requireMemberWithdrawalAllowed(memberId);
+        verify(promotionRepository).softDeleteByMemberId(eq(memberId), any(LocalDateTime.class));
         verify(events).publishEvent(new kr.it.reserve.member.event.MemberWithdrawn(memberId));
         verify(fileDeletionOutboxService).enqueue(
                 "https://cdn.example/users/7/profile.png", "MEMBER_PROFILE_IMAGE", memberId);

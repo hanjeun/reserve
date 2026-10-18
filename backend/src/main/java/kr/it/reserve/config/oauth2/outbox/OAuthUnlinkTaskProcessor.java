@@ -20,19 +20,30 @@ public class OAuthUnlinkTaskProcessor {
         OAuthUnlinkTaskStateService.Claim claim = taskStateService.claim(taskId, now);
         if (claim == null) return;
 
+        String accessToken;
         try {
-            String accessToken = tokenCipher.decrypt(claim.encryptedAccessToken());
-            if (unlinkService.unlink(claim.provider(), accessToken, claim.memberId())) {
+            accessToken = tokenCipher.decrypt(claim.encryptedAccessToken());
+        } catch (Exception exception) {
+            taskStateService.markBlocked(taskId, claim.leaseId(), now, "TOKEN_DECRYPTION_ERROR");
+            log.warn("Queued OAuth unlink blocked: taskId={}, provider={}, errorType={}",
+                    taskId, claim.provider(), exception.getClass().getSimpleName());
+            return;
+        }
+        // DB 상태 전환 실패는 lease 회수로 다시 처리한다. 원격 영구 오류와 혼동해 BLOCKED로 만들지 않는다.
+        OAuthUnlinkService.Result result = unlinkService.unlinkWithResult(
+                claim.provider(), accessToken, claim.memberId());
+        switch (result.outcome()) {
+            case COMPLETED -> {
                 taskStateService.markCompleted(taskId, claim.leaseId(), now);
                 log.info("Queued OAuth unlink completed: taskId={}, provider={}", taskId, claim.provider());
-            } else {
-                taskStateService.markFailed(taskId, claim.leaseId(), now, "REMOTE_REJECTED");
-                log.warn("Queued OAuth unlink rejected: taskId={}, provider={}", taskId, claim.provider());
             }
-        } catch (Exception exception) {
-            taskStateService.markFailed(taskId, claim.leaseId(), now, exception.getClass().getSimpleName());
-            log.warn("Queued OAuth unlink failed: taskId={}, provider={}, errorType={}",
-                    taskId, claim.provider(), exception.getClass().getSimpleName());
+            case RETRYABLE -> taskStateService.markFailed(
+                    taskId, claim.leaseId(), now, result.errorType());
+            case BLOCKED -> {
+                taskStateService.markBlocked(taskId, claim.leaseId(), now, result.errorType());
+                log.warn("Queued OAuth unlink blocked: taskId={}, provider={}, errorType={}",
+                        taskId, claim.provider(), result.errorType());
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
 
@@ -58,6 +59,12 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     // OAuth2 로그인용: provider와 providerId로 회원 조회
     Optional<Member> findByProviderAndProviderIdAndDeletedAtIsNull(AuthProvider provider, String providerId);
+
+    /** RR의 이전 snapshot도 우회하는 current read. 주체 잠금을 먼저 잡은 호출부만 사용한다. */
+    @Query(value = "SELECT member_id FROM member WHERE provider = :provider AND provider_id = :providerId "
+            + "AND deleted_at IS NULL ORDER BY member_id FOR UPDATE", nativeQuery = true)
+    List<Long> findActiveIdsByProviderAndProviderIdForUpdate(@Param("provider") String provider,
+            @Param("providerId") String providerId);
 
     // 하위 호환
     Optional<Member> findByProviderAndProviderId(AuthProvider provider, String providerId);

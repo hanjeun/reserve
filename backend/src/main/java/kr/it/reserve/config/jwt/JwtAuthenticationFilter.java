@@ -1,6 +1,7 @@
 package kr.it.reserve.config.jwt;
 
 import kr.it.reserve.global.error.AuthException;
+import kr.it.reserve.config.util.SecurityUtil;
 import kr.it.reserve.member.entity.Member;
 import jakarta.servlet.*;
 import jakarta.servlet.http.Cookie;
@@ -8,7 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -36,11 +36,13 @@ public class JwtAuthenticationFilter implements Filter {
                 Member member = tokenProvider.getActiveMemberFromToken(token);
                 String role = "ROLE_" + member.getRole().name();
 
-                Authentication authentication = new UsernamePasswordAuthenticationToken(
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         member,
                         null,
                         Collections.singletonList(new SimpleGrantedAuthority(role))
                 );
+                authentication.setDetails(new SecurityUtil.OAuthAuthenticationDetails(
+                        tokenProvider.getOAuthAuthenticationAt(token)));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (AuthException e) {

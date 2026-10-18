@@ -30,17 +30,18 @@ describe('public store news and benefit guidance', () => {
         expect(document.querySelector('.reserve-benefits-campaign, .reserve-benefits-campaign-art')).toBeNull();
         const link = await within(news).findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' });
         expect(within(link).getByRole('heading', { level: 2, name: item.storeName })).toBeInTheDocument();
-        expect(link.querySelector('.reserve-benefit-ticket')).toHaveTextContent(item.title);
+        expect(link.querySelector('.reserve-benefit-title-badge')).toHaveTextContent(item.title);
         expect(link.querySelector('p')).toHaveTextContent(item.excerpt);
         expect(link.querySelector('time')).toBeNull();
         expect(within(news).getAllByRole('link')).toHaveLength(1);
-        expect(screen.queryByText(/개 소식|쿠폰 발급·사용 기능/)).toBeNull();
+        expect(screen.getByText('1개 소식')).toBeInTheDocument();
+        expect(screen.queryByText(/쿠폰 발급·사용 기능/)).toBeNull();
     });
     it('offers the existing general store route only from the concise genuinely empty state', async () => {
         benefitService.getList.mockResolvedValue({ content: [], page: { totalElements: 0 } });
         renderPage('/benefits?page=2&domain=SPORTS&sort=recent&storePage=3');
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
-        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12 }, expect.any(AbortSignal)));
+        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         const link = await screen.findByRole('link', { name: '가게 둘러보기' });
         expect(link).toHaveAttribute('href', '/stores');
         expect(document.querySelector('.reserve-benefits-empty img')).toBeNull();
@@ -68,8 +69,8 @@ describe('public store news and benefit guidance', () => {
         benefitService.getList.mockResolvedValue({ content: [item], page: { totalElements: 25 } });
         renderPage('/benefits?page=2');
         expect(await screen.findByRole('link', { name: '가게 이름 · 신메뉴 안내 소식 보기' })).toBeInTheDocument();
-        expect(screen.queryByText('25개 소식')).toBeNull();
-        expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12 }, expect.any(AbortSignal));
+        expect(screen.getByText('25개 소식')).toBeInTheDocument();
+        expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         expect(screen.getByRole('navigation', { name: '가게 소식 페이지' })).toBeInTheDocument();
     });
     it('distinguishes a genuinely empty list from a failed API and permits retry', async () => {

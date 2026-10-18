@@ -102,9 +102,10 @@ class PublicPromotionServiceTest {
     }
 
     private Promotion promotion(String content) {
+        Member owner = Member.builder().id(99L).name("private author").role(kr.it.reserve.member.entity.Role.BUSINESS).termsAgreed(true).build();
         Store store = Store.builder().id(3L).name("public store").address("공개 주소").category("카페")
-                .mainImageUrl("https://cdn.example.test/store-original.png").build();
-        return Promotion.builder().id(7L).store(store).member(Member.builder().id(99L).name("private author").build())
+                .owner(owner).mainImageUrl("https://cdn.example.test/store-original.png").build();
+        return Promotion.builder().id(7L).store(store).member(owner).benefitState(Promotion.BenefitState.APPROVED)
                 .title("가게 소식").content(content).category(Promotion.PromotionCategory.CAFE)
                 .imageUrl("https://untrusted-promotion-image.example.test/a.png").viewCount(12).build();
     }

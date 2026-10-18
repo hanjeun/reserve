@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 import benefitService from '../../services/benefitService';
+import { feedKeys } from '../../hooks/feedQueries';
+import { storeNewsKeys } from '../../hooks/storeNewsQueries';
 import Benefits, { BenefitRow, BENEFIT_PAGE_SIZE } from './Benefits';
 import BenefitDetail from './BenefitDetail';
 import { BENEFIT_IMAGE_FALLBACK } from './benefitPresentation';
@@ -30,6 +32,8 @@ function LocationProbe() {
 
 function renderPage(path = '/benefits') {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0, gcTime: 0 } } });
+    client.setQueryData(feedKeys.config(), { enabled: false });
+    client.setQueryData(storeNewsKeys.config(), { enabled: false });
     return render(
         <QueryClientProvider client={client}>
             <MemoryRouter initialEntries={[path]}>
@@ -56,7 +60,7 @@ function expectNewsOnlyStructure() {
     expect(screen.queryByText('RESERVE BENEFITS')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '일반 가게 탐색' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '가게가 전하는 소식' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/개 소식|쿠폰 발급·사용 기능/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/쿠폰 발급·사용 기능/)).not.toBeInTheDocument();
     return heading;
 }
 
@@ -128,7 +132,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(link).toHaveAttribute('href', '/benefits/7');
         expect(within(link).getByRole('heading', { level: 2, name: item.storeName })).toHaveClass('reserve-benefit-store');
         expect(link.querySelector('.reserve-benefit-description').textContent).toBe(item.excerpt);
-        expect(link.querySelector('.reserve-benefit-ticket').textContent).toBe(item.title);
+        expect(link.querySelector('.reserve-benefit-title-badge').textContent).toBe(item.title);
         expect(link.querySelector('time, a, button')).toBeNull();
         expect(screen.getAllByRole('link')).toHaveLength(1);
         expectNewsOnlyStructure();
@@ -139,16 +143,16 @@ describe('actual photo benefits banners without invented campaign or general sto
         renderPage('/benefits?page=2&domain=CAFE&sort=rating&storePage=3');
         await screen.findByRole('link', { name: `${item.storeName} · ${item.title} 소식 보기` });
         expect(BENEFIT_PAGE_SIZE).toBe(12);
-        expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12 }, expect.any(AbortSignal));
+        expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
 
         fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByTitle('3'));
-        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12 }, expect.any(AbortSignal)));
+        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         let params = new URLSearchParams(screen.getByTestId('route-search').textContent);
         expect(Object.fromEntries(params)).toEqual({ page: '3', domain: 'CAFE', sort: 'rating', storePage: '3' });
 
         await waitFor(() => expect(document.querySelector('.reserve-benefit-list')).toHaveAttribute('aria-busy', 'false'));
         fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByTitle('1'));
-        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12 }, expect.any(AbortSignal)));
+        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         params = new URLSearchParams(screen.getByTestId('route-search').textContent);
         expect(Object.fromEntries(params)).toEqual({ domain: 'CAFE', sort: 'rating', storePage: '3' });
     });
@@ -158,7 +162,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         renderPage(`/benefits?page=${page}&storePage=4`);
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
 
-        expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12 }, expect.any(AbortSignal));
+        expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         const params = new URLSearchParams(screen.getByTestId('route-search').textContent);
         expect(params.has('page')).toBe(false);
         expect(params.get('storePage')).toBe('4');
@@ -170,8 +174,8 @@ describe('actual photo benefits banners without invented campaign or general sto
         renderPage('/benefits?page=10000&storePage=4');
         await screen.findByText('아직 등록된 가게 소식이 없어요.');
 
-        expect(benefitService.getList).toHaveBeenCalledWith({ page: 9999, size: 12 }, expect.any(AbortSignal));
-        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12 }, expect.any(AbortSignal)));
+        expect(benefitService.getList).toHaveBeenCalledWith({ page: 9999, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
+        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         const params = new URLSearchParams(screen.getByTestId('route-search').textContent);
         expect(params.has('page')).toBe(false);
         expect(params.get('storePage')).toBe('4');
@@ -186,8 +190,8 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(screen.queryByText('아직 등록된 가게 소식이 없어요.')).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: '첫 페이지로' })).toHaveAttribute('href', '/benefits?domain=CAFE&sort=rating&storePage=4');
         expect(document.querySelector('.reserve-benefits-empty img')).toBeNull();
-        expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12 }, expect.any(AbortSignal));
-        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12 }, expect.any(AbortSignal)));
+        expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
+        await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route-search').textContent)))
             .toEqual({ page: '2', domain: 'CAFE', sort: 'rating', storePage: '4' });
         expectNewsOnlyStructure();
@@ -199,7 +203,7 @@ describe('actual photo benefits banners without invented campaign or general sto
 
         await screen.findByText('가게 소식을 불러오지 못했어요.');
         expect(benefitService.getList).toHaveBeenCalledTimes(1);
-        expect(benefitService.getList).toHaveBeenCalledWith({ page: 3, size: 12 }, expect.any(AbortSignal));
+        expect(benefitService.getList).toHaveBeenCalledWith({ page: 3, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route-search').textContent)))
             .toEqual({ page: '4', domain: 'CAFE', storePage: '3' });
         expect(screen.queryByText('0개 소식')).not.toBeInTheDocument();
@@ -216,7 +220,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(link).toHaveAttribute('href', '/benefits/7');
         expect(link).toHaveClass('reserve-benefit-row');
         expect(within(link).getByRole('heading', { level: 2 }).textContent).toBe(storeName);
-        expect(link.querySelector('.reserve-benefit-ticket').textContent).toBe(title);
+        expect(link.querySelector('.reserve-benefit-title-badge').textContent).toBe(title);
         expect(link.querySelector('p').textContent).toBe(excerpt);
         expect(link.querySelector('script, [onerror], a, button, input, select, textarea, [role="button"]')).toBeNull();
         const image = link.querySelector('img');
@@ -225,7 +229,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(image).toHaveAttribute('src', item.mainImageUrl);
         expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
         expect(image.compareDocumentPosition(store) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(store.compareDocumentPosition(link.querySelector('.reserve-benefit-ticket')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(store.compareDocumentPosition(link.querySelector('.reserve-benefit-title-badge')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(link.querySelector('time')).toBeNull();
     });
 
@@ -303,7 +307,7 @@ describe('actual photo benefits banners without invented campaign or general sto
     it('keeps actual service methods on public GET endpoints with signal and auth-refresh opt-out', async () => {
         const { default: actualService } = await vi.importActual('../../services/benefitService');
         const signal = new AbortController().signal;
-        const params = { page: 1, size: 12 };
+        const params = { page: 1, size: 12, newsType: undefined, period: 'ONGOING' };
 
         actualService.getList(params, signal);
         actualService.getDetail('7', signal);

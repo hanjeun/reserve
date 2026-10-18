@@ -7,6 +7,7 @@ import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.promotion.dto.PromotionDto;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import kr.it.reserve.global.common.PageRequests;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,19 +40,16 @@ public class PromotionService {
     /** 공개 상세는 조회수·읽음·파일을 변경하지 않는 순수 읽기다. */
     public PromotionDto.PublicPromotionDetailResponse getPublicPromotion(Long promotionId) {
         return promotionRepository.findPublicById(promotionId)
+                .filter(StoreNewsPolicy::publiclyVisible)
                 .map(PromotionDto.PublicPromotionDetailResponse::fromEntity)
                 .orElseThrow(() -> new PromotionException("홍보글을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     // 전체 홍보글 조회 (향상된 switch 문 적용)
     public Page<PromotionDto.PromotionResponse> getAllPromotions(int page, int size, String sortBy) {
-        Pageable pageable = PageRequests.bounded(page, size);
-
-        Page<Promotion> promotions = switch (sortBy) {
-            case "popular" -> promotionRepository.findAllByOrderByViewCountDesc(pageable);
-            case "likes" -> promotionRepository.findAllByOrderByLikeCountDesc(pageable);
-            default -> promotionRepository.findAllByOrderByCreatedAtDesc(pageable);
-        };
+        String field = switch (sortBy) { case "popular" -> "viewCount"; case "likes" -> "likeCount"; default -> "createdAt"; };
+        Pageable pageable = PageRequests.bounded(page, size).withSort(Sort.by(Sort.Direction.DESC, field, "id"));
+        Page<Promotion> promotions = promotionRepository.findAll(StoreNewsPolicy.publicSpecification(null, null, false), pageable);
 
         return promotions.map(PromotionDto.PromotionResponse::fromEntity);
     }
@@ -58,10 +57,13 @@ public class PromotionService {
     // 홍보글 상세 조회
     @Transactional
     public PromotionDto.PromotionResponse getPromotion(Long promotionId) {
+        // 이전 로그인 전용 URL도 새 초안·숨김·비공개 프로필을 우회해 읽을 수 없다.
+        if (!StoreNewsPolicy.publiclyVisible(findPromotionByIdOrThrow(promotionId))) throw PromotionException.notFound();
         if (promotionRepository.incrementViewCount(promotionId) == 0) {
             throw new PromotionException("홍보글을 찾을 수 없어요.", HttpStatus.NOT_FOUND);
         }
         Promotion promotion = findPromotionByIdOrThrow(promotionId);
+        if (!StoreNewsPolicy.publiclyVisible(promotion)) throw PromotionException.notFound();
         return PromotionDto.PromotionResponse.fromEntity(promotion);
     }
 
@@ -96,6 +98,9 @@ public class PromotionService {
     @Transactional
     public PromotionDto.PromotionResponse updatePromotion(Long promotionId, Long memberId, PromotionDto.PromotionRequest request) {
         Promotion promotion = findWritablePromotionOrThrow(promotionId, memberId);
+        if (promotion.getState() == Promotion.State.DELETED) throw PromotionException.notFound();
+        if (promotion.getNewsPost() != null) throw new PromotionException("가게 소식 편집 화면에서 수정해주세요.", HttpStatus.CONFLICT);
+        if (promotion.getState() == Promotion.State.HIDDEN) throw new PromotionException("숨겨진 소식은 수정할 수 없어요.", HttpStatus.CONFLICT);
 
         promotion.setTitle(request.getTitle());
         promotion.setContent(request.getContent());
@@ -104,6 +109,7 @@ public class PromotionService {
         promotion.setSpecialMenu(request.getSpecialMenu());
         promotion.setStoryHistory(request.getStoryHistory());
         promotion.setTags(request.getTags());
+        promotion.withdrawBenefit();
 
         return PromotionDto.PromotionResponse.fromEntity(promotion);
     }
@@ -113,7 +119,7 @@ public class PromotionService {
     public void deletePromotion(Long promotionId, Long memberId) {
         Promotion promotion = findWritablePromotionOrThrow(promotionId, memberId);
 
-        promotionRepository.delete(promotion);
+        promotion.deleteNews(StoreNewsPolicy.now());
     }
 
     // 내 가게 목록 조회
@@ -171,7 +177,9 @@ public class PromotionService {
         }
         // 요청의 storeId가 아닌 기존 연결 가게의 최신 상태·소유권을 잠금 아래 재검사한다.
         findOwnedOperatingStoreForUpdateOrThrow(promotion.getStore().getId(), memberId);
-        return promotion;
+        // 원문 잠금 아래 stale 상태를 다시 읽는다. 신규 편집도 같은 회원→가게 순서를 사용한다.
+        return promotionRepository.findForUpdate(promotionId)
+                .orElseThrow(() -> new PromotionException("소식을 찾을 수 없어요.", HttpStatus.NOT_FOUND));
     }
 
     private Promotion findPromotionByIdOrThrow(Long id) {

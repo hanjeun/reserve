@@ -27,7 +27,7 @@ class PromotionViewConcurrencyTest {
     @Test void parallelViewsAndAnOlderContentEditDoNotLoseIncrements() throws Exception {
         var tx = new TransactionTemplate(manager);
         Long id = tx.execute(ignored -> {
-            var member = Member.builder().name("검증").email(UUID.randomUUID() + "@example.test").role(Role.BUSINESS).build();
+            var member = Member.builder().name("검증").email(UUID.randomUUID() + "@example.test").role(Role.BUSINESS).termsAgreed(true).build();
             em.persist(member);
             var store = Store.builder().owner(member).name("조회수 검증").build();
             em.persist(store);

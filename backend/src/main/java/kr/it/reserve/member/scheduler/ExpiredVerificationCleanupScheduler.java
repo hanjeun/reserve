@@ -1,4 +1,4 @@
-package kr.it.reserve.config.jwt.scheduler;
+package kr.it.reserve.member.scheduler;
 
 import kr.it.reserve.email.repository.EmailVerificationRepository;
 import kr.it.reserve.member.repository.PasswordResetTokenRepository;

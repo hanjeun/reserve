@@ -7,7 +7,8 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '../common/icons';
-import { Button, DataState, StatCard, ChartCard, SegmentedControl, PieLegend, FilterToolbar } from '../common';
+import { DataState, StatCard, ChartCard, SegmentedControl, PieLegend, FilterToolbar } from '../common';
+import StatisticsCsvAction from './StatisticsCsvAction';
 import { Bone } from '../common/Skeletons';
 import { SegmentedControlSkeleton } from '../layout/routeSkeletonParts';
 import { useMyStores, useQueryParamsState } from '../../hooks';
@@ -389,7 +390,7 @@ const StatisticsTab = () => {
     const toolbarLoading = loading || isFetching;
     const selectedStore = myStores.find(store => store.id === storeId);
     const csvDisabled = toolbarLoading || Boolean(storesError || statsError) || !stats || !selectedStore;
-    const csvButton = (name, title, columns, rows) => <Button variant="outline" size="sm" disabled={csvDisabled}
+    const csvButton = (name, title, columns, rows) => <StatisticsCsvAction loading={loading} disabled={csvDisabled}
         aria-label={`${title} CSV 다운로드`} onClick={() => {
             if (csvDisabled || useAuthStore.getState().sessionRevision !== sessionRevision) return;
             const metadata = [
@@ -397,7 +398,7 @@ const StatisticsTab = () => {
             ];
             downloadCsv(`reserve-store-${storeId}-${range}-${name}.csv`, [...metadata, ...columns],
                 rows.map(row => ({ ...row, storeId, storeName: selectedStore.name, rangeDays: Number(rangeDays(range)) })));
-        }}>CSV 다운로드</Button>;
+        }} />;
     // 처음 가게 목록을 받는 동안에도 툴바의 자리를 유지한다. storeId가 생긴 뒤에는
     // 통계만 다시 조회하고, 그 전에는 가게 목록 조회 함수를 넘겨 RefreshButton이 사라지지 않게 한다.
     const handleReload = storeId ? refetch : refetchStores;

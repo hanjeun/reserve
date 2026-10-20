@@ -5,7 +5,7 @@ import FilterToolbarSkeleton from '../common/FilterToolbarSkeleton';
 import AdminTableSkeletonTable from '../common/AdminTableSkeletonTable';
 import StatCard from '../common/StatCard';
 import ChartCard from '../common/ChartCard';
-import Button from '../common/Button';
+import StatisticsCsvAction from '../business/StatisticsCsvAction';
 import { ReservationSummaryCardSkeleton } from '../common/Skeletons';
 import ChatIntroEditorSkeleton from '../chat/ChatIntroEditorSkeleton';
 import { FeedReportsSkeleton } from '../feed/FeedSkeleton';
@@ -106,7 +106,7 @@ export function StatisticsRouteSkeleton({ dashboard = false, search = '' }) {
         </div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             {charts.map((title, index) => <ChartCard key={title} title={title} loading height={dashboard ? 240 : 260}
-                extra={dashboard ? undefined : <Button variant="outline" size="sm" disabled>CSV 다운로드</Button>}
+                extra={dashboard ? undefined : <StatisticsCsvAction loading />}
                 minWidth={dashboard ? undefined : index === 1 ? 280 : 340}>
                 <ChartBodySkeleton donut={dashboard ? index === 0 : index === 1} dashboard={dashboard}
                     heights={dashboard ? [70, 110, 55, 90] : index === 2 ? [90, 60, 120, 80, 140, 100] : undefined} />

@@ -4,9 +4,10 @@ import { useMessage } from '../../hooks';
 import { memberService } from '../../services';
 import { handleApiError } from '../../utils/errorHandler';
 import ProfilePhotoPicker from '../common/ProfilePhotoPicker';
+import ProfilePhotoResetButton from '../common/ProfilePhotoResetButton';
 import useAuthStore from '../../store/useAuthStore';
 import useExitAnimation from '../../hooks/useExitAnimation';
-import { colors, fontSize, animation } from '../../styles/tokens';
+import { animation } from '../../styles/tokens';
 
 const ProfileImageTab = ({ user }) => {
     const { message, confirm } = useMessage();
@@ -86,24 +87,7 @@ const ProfileImageTab = ({ user }) => {
                         </Button>
                     </div>
                 ) : (
-                    <button
-                        onClick={handleResetToDefault}
-                        disabled={loading}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: loading ? 'not-allowed' : 'pointer',
-                            fontSize: fontSize.sm,
-                            color: colors.text.tertiary,
-                            textDecoration: 'underline',
-                            textUnderlineOffset: '3px',
-                            padding: '2px 0',
-                            marginTop: -2,
-                            opacity: loading ? 0.5 : 1,
-                        }}
-                    >
-                        기본 이미지로 변경
-                    </button>
+                    <ProfilePhotoResetButton onClick={handleResetToDefault} disabled={loading} />
                 )}
             </div>
         </div>

@@ -9,6 +9,7 @@ import { getRouteSkeletonKind } from './routeSkeletonKind';
 import { preloadRouteSkeletons } from './routeSkeletonLoader';
 import RouteSkeletonPages from './RouteSkeletonPages';
 import DiscoveryRouteSkeleton from './DiscoveryRouteSkeleton';
+import { createLoadingPresentation, LoadingPresentationContext } from './loadingPresentation';
 
 const routes = {
     '/': 'discovery', '/search': 'search', '/benefits': 'benefits', '/benefits/1': 'benefit-detail', '/waiting': 'waiting', '/feed': 'feed',
@@ -39,6 +40,20 @@ describe('route chunk loading patterns', () => {
         expect((await preloadRouteSkeletons('discovery'))?.default).toBe(DiscoveryRouteSkeleton);
     });
     afterEach(() => { setWidth(originalWidth); clients.splice(0).forEach(client => client.clear()); });
+
+    it('keeps the first search skeleton entrance and does not replay it on boot replacement', () => {
+        const presentation = createLoadingPresentation('search-entry');
+        const view = () => <LoadingPresentationContext.Provider value={presentation}>
+            <RouteSkeletonPreview pathname="/search" />
+        </LoadingPresentationContext.Provider>;
+        const first = render(view());
+        expect(first.container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--entering');
+        act(() => presentation.markSkeletonShown());
+        expect(first.container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--entering');
+        first.unmount();
+        const replacement = render(view());
+        expect(replacement.container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--entering');
+    });
 
     it('mirrors the search header, six domains and quick choices without a text input', () => {
         const { container } = render(<RouteSkeletonPreview pathname="/search" />);

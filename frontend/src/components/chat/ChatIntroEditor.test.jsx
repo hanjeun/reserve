@@ -134,26 +134,43 @@ describe('chat intro editor', () => {
         await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ greeting: '반가워요', displayName: null, avatarUrl: null })));
     });
 
-    it('lets the support admin rename, upload a photo and reset the greeting, with inline photo errors', async () => {
-        const onUploadAvatar = vi.fn().mockResolvedValue('https://cdn.example/support/chat/new.png');
+    it('preserves support photo preview and keeps uploads locked until completion', async () => {
+        let finishUpload;
+        const onUploadAvatar = vi.fn(() => new Promise(resolve => { finishUpload = resolve; }));
         const onSave = vi.fn().mockResolvedValue(undefined);
         render(<ChatIntroEditor kind="support" identity={{ previewUserName: '회원' }} onSave={onSave} onUploadAvatar={onUploadAvatar}
             intro={{ notice: null, greeting: '바뀐 인사', displayName: 'RESERVE 고객지원', avatarUrl: null, items: [] }} />);
         fireEvent.change(screen.getByLabelText('표시 이름'), { target: { value: '리저브 도우미' } });
         expect(within(preview()).getByText('리저브 도우미')).toBeInTheDocument();
-        const file = screen.getByLabelText('고객지원 사진 파일');
-        fireEvent.change(file, { target: { files: [new File(['x'], 'a.txt', { type: 'text/plain' })] } });
+        const choosePhoto = files => fireEvent.change(screen.getByLabelText('고객지원 사진 파일'), { target: { files } });
+        choosePhoto([new File(['x'], 'a.txt', { type: 'text/plain' })]);
         expect(await screen.findByRole('alert')).toHaveTextContent('JPG · PNG · WEBP · GIF 이미지만 업로드할 수 있어요.');
         expect(onUploadAvatar).not.toHaveBeenCalled();
         const photo = new File(['x'], 'a.png', { type: 'image/png' });
-        fireEvent.change(screen.getByLabelText('고객지원 사진 파일'), { target: { files: [photo] } });
+        choosePhoto([photo]);
         await waitFor(() => expect(onUploadAvatar).toHaveBeenCalledWith(photo));
+        expect(screen.getByLabelText('고객지원 사진 파일')).toBeDisabled();
+        choosePhoto([photo]);
+        expect(onUploadAvatar).toHaveBeenCalledTimes(1);
+        finishUpload('https://cdn.example/support/chat/new.png');
         expect(await screen.findByRole('button', { name: '기본 사진으로' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '고객지원 사진 파일 선택' })).toBeNull();
+        expect(screen.getByTitle('Preview file')).toBeInTheDocument();
+        expect(onSave).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: '기본 문구로' }));
         expect(screen.getByLabelText('인사말').value).toContain('관리자가 확인 후 답변드릴게요');
         fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
         await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
             displayName: '리저브 도우미', avatarUrl: 'https://cdn.example/support/chat/new.png',
         })));
+        await waitFor(() => expect(screen.getByRole('button', { name: '저장하기' })).toBeDisabled());
+        fireEvent.click(screen.getByRole('button', { name: 'Remove file' }));
+        expect(await screen.findByRole('button', { name: '고객지원 사진 파일 선택' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: '기본 사진으로' })).toBeNull();
+        expect(onSave).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
+        fireEvent.click(await screen.findByTitle('Preview file'));
+        const viewer = await screen.findByRole('dialog');
+        expect(viewer.querySelector('img')).toHaveAttribute('src', 'https://cdn.example/support/chat/new.png');
     });
 });

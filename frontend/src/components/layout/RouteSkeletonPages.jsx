@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useSkeletonShown } from './loadingPresentation';
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import { PageStatusSkeleton } from '../common/PageStatus';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
@@ -431,7 +433,10 @@ const BenefitDetailRouteSkeleton = () => <BenefitDetailSkeleton />;
 
 
 function SearchSkeleton() {
-    return <div className="reserve-search-page">
+    const skeletonShown = useSkeletonShown();
+    // 첫 골격의 모션은 표시 기록이 갱신돼도 유지하고, 부트 셸 교체 때 다시 시작하지 않는다.
+    const [entering] = useState(() => !skeletonShown);
+    return <div className={'reserve-search-page' + (entering ? ' reserve-search-page--entering' : '')}>
         <div className="reserve-search-header">
             <div className="reserve-search-field"><Bone width="65%" height={16} style={{ marginLeft: 16 }} /></div>
             <Bone width={44} height={16} />

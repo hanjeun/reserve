@@ -41,11 +41,16 @@ public class FeedController {
     public ResponseEntity<ApiResponse<FeedDto.Post>> post(@PathVariable Long id) { return response(feeds.readPost(id, viewer()), "게시물 조회 성공"); }
 
     @GetMapping("/authors/{publicId}")
-    public ResponseEntity<ApiResponse<FeedDto.Profile>> author(@PathVariable String publicId) { return response(feeds.publicProfile(publicId), "공개 프로필 조회 성공"); }
+    public ResponseEntity<ApiResponse<FeedDto.Profile>> author(@PathVariable String publicId, HttpServletRequest http) {
+        limitProfileRead(viewer(), http);
+        return response(feeds.publicProfile(publicId), "공개 프로필 조회 성공");
+    }
     @GetMapping("/authors/{publicId}/posts")
     public ResponseEntity<ApiResponse<Page<FeedDto.Post>>> authorPosts(@PathVariable String publicId,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "12") int size) {
-        return response(feeds.authorPosts(publicId, page, size, viewer()), "작성자 피드 조회 성공");
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "12") int size, HttpServletRequest http) {
+        Long viewer = viewer();
+        limitProfileRead(viewer, http);
+        return response(feeds.authorPosts(publicId, page, size, viewer), "작성자 피드 조회 성공");
     }
 
     @GetMapping("/me/profile")
@@ -102,6 +107,12 @@ public class FeedController {
         moderation.report(member, id, request); return response(null, "신고를 접수했어요.");
     }
 
+    private void limitProfileRead(Long viewer, HttpServletRequest request) {
+        if (!limiter.tryConsume("feed-profile-read-ip:" + IpExtractor.extract(request), RateLimiter.Policy.PROFILE_READ)
+                || viewer != null && !limiter.tryConsume("feed-profile-read-member:" + viewer, RateLimiter.Policy.PROFILE_READ)) {
+            throw new FeedException("공개 프로필을 너무 자주 조회했어요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+    }
     private void limitWrite(Long member, HttpServletRequest request) {
         if (!limiter.tryConsume("feed-write-ip:" + IpExtractor.extract(request), RateLimiter.Policy.CHAT_SEND)
                 || !limiter.tryConsume("feed-write-member:" + member, RateLimiter.Policy.CHAT_SEND)) {

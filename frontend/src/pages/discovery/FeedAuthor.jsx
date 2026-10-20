@@ -21,9 +21,10 @@ import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useGoBack from '../../hooks/useGoBack';
 import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import { httpStatusOf, isMissingRequestError } from '../../utils/listErrorMessage';
-import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { isBlockingListReadError, isReadAccessDenied } from '../../hooks/liveUpdateQueries';
 
 const FeedReportModal = lazy(() => import('../../components/feed/FeedReportModal'));
+const retryProfileRead = (count, error) => httpStatusOf(error) !== 429 && !isReadAccessDenied(error) && count < 1;
 
 export default function FeedAuthor() {
     const { publicId } = useParams();
@@ -40,12 +41,13 @@ export default function FeedAuthor() {
     const enabled = config.data?.enabled === true && validId;
     const ownProfile = useFeedProfile(enabled && Boolean(user));
     const mine = ![401, 403].includes(httpStatusOf(ownProfile.error)) && ownProfile.data?.publicId === publicId;
-    const author = useQuery({ queryKey: feedKeys.author(publicId), queryFn: ({ signal }) => feedService.author(publicId, signal), enabled });
+    const author = useQuery({ queryKey: feedKeys.author(publicId), queryFn: ({ signal }) => feedService.author(publicId, signal), enabled,
+        retry: retryProfileRead });
     const authorUnavailable = [401, 403].includes(httpStatusOf(author.error)) || isMissingRequestError(author.error);
     const listParams = { page: page - 1, size: FEED_PAGE_SIZE };
     const posts = useQuery({ queryKey: feedKeys.authorPosts(publicId, listParams),
         queryFn: ({ signal }) => feedService.authorPosts(publicId, listParams, signal), enabled: enabled && Boolean(author.data) && !authorUnavailable,
-        staleTime: 30_000, placeholderData: keepPreviousData });
+        staleTime: 30_000, placeholderData: keepPreviousData, retry: retryProfileRead });
     const listRef = useRef(null);
     const unavailable = authorUnavailable || [config, posts].some(query => [401, 403].includes(httpStatusOf(query.error)));
     const blockingError = isBlockingListReadError(posts.error, posts.data?.content);

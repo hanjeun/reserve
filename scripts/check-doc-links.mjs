@@ -135,6 +135,13 @@ function extractTargets(markdown) {
   return targets;
 }
 
+for (const relative of ['docs/private', 'docs/technical/history', 'docs/design-system/snapshots']) {
+  const directory = path.join(repoRoot, relative);
+  if (fs.existsSync(directory) && fs.readdirSync(directory).length > 0) {
+    throw new Error(`Private records must stay outside the repository: ${relative}`);
+  }
+}
+
 const markdownFiles = collectMarkdownFiles(repoRoot).sort((a, b) => a.localeCompare(b, 'en'));
 const failures = [];
 let checkedLinks = 0;

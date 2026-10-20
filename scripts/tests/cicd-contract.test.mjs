@@ -196,6 +196,8 @@ test('backend tests are explicit, required, and run before packaging', () => {
 });
 
 test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
+    const baseline = frontendTests.steps.find(entry => entry.name === 'Load published baseline for preservation checks');
+    assert.equal(baseline.run, 'git fetch --no-tags --depth=1 origin c20ce59c4aec1cfc727fe1cba12960b0e7c78e74');
     const snapshot = frontendTests.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
     assert.equal(snapshot.run, './scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard');
     assert.match(read('.gitattributes'), /^docs\/design-system\/snapshots\/\*\* -text -eol$/m);

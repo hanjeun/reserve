@@ -120,6 +120,7 @@ docs/images/*.new.png
 /docs/technical/api-versioning.md
 /docs/technical/modularization-plan.md
 /docs/technical/history/
+/docs/design-system/snapshots/
 /Claude outputs/
 
 /coverage/

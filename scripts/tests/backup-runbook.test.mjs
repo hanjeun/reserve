@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import path from 'node:path';
 import { before, test } from 'node:test';
 
-const document = fs.readFileSync(new URL('../../docs/technical/backup.md', import.meta.url), 'utf8');
+const privateDocument = path.join(homedir(), '.codex/private/reserve/records/release/docs/technical/backup.md');
+const publishedBaseline = 'c20ce59c4aec1cfc727fe1cba12960b0e7c78e74';
+const document = process.env.GITHUB_ACTIONS !== 'true' && fs.existsSync(privateDocument)
+    ? fs.readFileSync(privateDocument, 'utf8')
+    : execFileSync('git', ['show', `${publishedBaseline}:docs/technical/backup.md`], {
+        cwd: new URL('../../', import.meta.url), encoding: 'utf8', maxBuffer: 1024 * 1024,
+    });
 const section = document.split('### 2-3. 실제 복원 (운영)')[1]?.split('### 2-4.')[0];
 const procedure = section?.match(/```bash\r?\n([\s\S]*?)```/)?.[1];
 before(() => {

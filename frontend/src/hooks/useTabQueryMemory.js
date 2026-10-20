@@ -10,11 +10,11 @@ export default function useTabQueryMemory(scope, tab, search, keysByTab) {
     const active = useContext(WorkspaceActivityContext);
     const owner = `${scope}:${revision}:${member}:${role}`;
     const memory = useRef({ owner, tabs: new Map() });
-    if (memory.current.owner !== owner) memory.current = { owner, tabs: new Map() };
     const query = String(search);
 
     useLayoutEffect(() => {
-        if (!active || memory.current.owner !== owner) return;
+        if (memory.current.owner !== owner) memory.current = { owner, tabs: new Map() };
+        if (!active) return;
         const current = new URLSearchParams(query);
         const stored = new URLSearchParams();
         (keysByTab[tab] || []).forEach(key => {

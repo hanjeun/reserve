@@ -8,8 +8,9 @@ describe('statistics CSV cells', () => {
         expect(serializeCsv(columns, rows)).toBe('\uFEFF"가게","순결제액"\r\n"한글, ""가게""\r\n둘째 줄",-1250.75\r\n');
     });
 
-    it.each(['=1+1', '+SUM(1,2)', '-1+2', '@SUM(1,2)', ' \t=1+1', '\r\n+1', '\u0000=1'])
-        ('neutralizes formula text %j after whitespace or control characters', value => {
+    it.each([
+        '=1+1', '+SUM(1,2)', '-1+2', '@SUM(1,2)', ' \t=1+1', '\r\n+1', '\u0000=1',
+    ])('neutralizes formula text %j after whitespace or control characters', value => {
             expect(serializeCsv([{ key: 'text', label: '값' }], [{ text: value }]))
                 .toBe(`\uFEFF"값"\r\n"'${value}"\r\n`);
         });

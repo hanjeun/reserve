@@ -1,4 +1,4 @@
-const FORMULA_PREFIX = /^[\s\u0000-\u001f\u007f]*[=+@-]/;
+const FORMULA_PREFIX = /^[\s\p{Cc}]*[=+@-]/u;
 
 const csvCell = value => {
     if (value == null) return '';

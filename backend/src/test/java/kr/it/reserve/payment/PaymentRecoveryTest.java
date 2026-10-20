@@ -1,6 +1,7 @@
 package kr.it.reserve.payment;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.global.error.PaymentException;
@@ -182,6 +183,8 @@ class PaymentRecoveryTest {
         when(paymentRepository.findReadyByReservationId(100L)).thenReturn(List.of(payment));
         when(paymentRepository.findAllByReservationIdForUpdate(100L)).thenReturn(List.of(payment));
         when(reservationRepository.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(payment.getReservation()));
+        when(entityManager.contains(payment.getReservation())).thenReturn(true);
+        when(entityManager.getLockMode(payment.getReservation())).thenReturn(LockModeType.PESSIMISTIC_WRITE);
     }
 
     private Reservation payableReservation(Reservation.ReservationStatus status) {

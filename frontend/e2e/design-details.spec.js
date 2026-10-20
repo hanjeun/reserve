@@ -181,7 +181,7 @@ test('the shared store favorite keeps its circular hover in cards and list rows'
     await capture(page, 'store-list-favorite', testInfo);
 });
 
-test('home, benefit photos and feed preview share the same photo counter skin', async ({ page }, testInfo) => {
+test('home and benefit counters share a skin while fullscreen keeps its default counter', async ({ page }, testInfo) => {
     await setup(page);
     const skin = element => {
         const style = getComputedStyle(element);
@@ -201,6 +201,7 @@ test('home, benefit photos and feed preview share the same photo counter skin', 
     await page.getByAltText('게시물 사진 1', { exact: true }).click();
     const progress = page.locator('.reserve-image-preview .ant-image-preview-progress');
     await expect(progress).toHaveText('1 / 3');
-    expect(await progress.evaluate(skin)).toEqual(mainSkin);
+    await expect(progress).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(progress).toHaveCSS('border-radius', '0px');
     await capture(page, 'feed-preview-counter', testInfo);
 });

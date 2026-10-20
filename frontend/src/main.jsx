@@ -14,9 +14,26 @@ initTheme()
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   enabled: import.meta.env.PROD,
-  sendDefaultPii: false,
+  // SDK 11의 기본 수집 범위가 넓어져, 기존 개인정보 비수집 설정을 명시한다.
+  dataCollection: {
+    userInfo: false,
+    cookies: false,
+    httpHeaders: {
+      request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+    },
+    httpBodies: [],
+    urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+    genAI: { inputs: false, outputs: false },
+    databaseQueryData: false,
+    queues: false,
+    graphQL: { document: false, variables: false },
+  },
+  attachStacktrace: false,
+  traceLifecycle: 'static',
   integrations: [
-    Sentry.browserTracingIntegration(),
+    Sentry.browserTracingIntegration({ webVitals: { softNavigations: false, bfcacheNavigations: false } }),
+    Sentry.browserSessionIntegration({ lifecycle: 'route' }),
   ],
   tracesSampleRate: 0.1,
   tracePropagationTargets: ["localhost", /^https:\/\/reserve\.it\.kr\/api/],

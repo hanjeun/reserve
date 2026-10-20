@@ -88,7 +88,7 @@ describe('benefits-only query integration; general store pagination remains on /
         expect(onLocation.mock.calls.map(([search]) => Object.fromEntries(new URLSearchParams(search)))).toEqual([
             { page: '-1', domain: 'bad', sort: 'bad', storePage: 'bad', utm_source: 'campaign' },
             { page: '1', domain: 'bad', sort: 'bad', storePage: 'bad', utm_source: 'campaign' },
-            { page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' },
+            { page: '1', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' },
         ]);
         expect(benefitService.getList).toHaveBeenCalledTimes(1);
     });

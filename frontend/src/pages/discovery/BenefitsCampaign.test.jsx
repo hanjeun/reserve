@@ -148,13 +148,13 @@ describe('actual photo benefits banners without invented campaign or general sto
         fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByTitle('3'));
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         let params = new URLSearchParams(screen.getByTestId('route-search').textContent);
-        expect(Object.fromEntries(params)).toEqual({ page: '3', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
+        expect(Object.fromEntries(params)).toEqual({ page: '3', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });
 
         await waitFor(() => expect(document.querySelector('.reserve-benefit-list')).toHaveAttribute('aria-busy', 'false'));
         fireEvent.click(within(screen.getByRole('navigation', { name: '가게 소식 페이지' })).getByTitle('1'));
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         params = new URLSearchParams(screen.getByTestId('route-search').textContent);
-        expect(Object.fromEntries(params)).toEqual({ page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
+        expect(Object.fromEntries(params)).toEqual({ page: '1', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });
     });
 
     it.each(['0', '-4', '1.5', '10001', 'bad', '9007199254740992'])('falls back to API page zero for invalid URL page %s', async page => {
@@ -164,7 +164,7 @@ describe('actual photo benefits banners without invented campaign or general sto
 
         expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         const params = new URLSearchParams(screen.getByTestId('route-search').textContent);
-        expect(Object.fromEntries(params)).toEqual({ page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
+        expect(Object.fromEntries(params)).toEqual({ page: '1', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });
         expectNewsOnlyStructure();
     });
 
@@ -176,7 +176,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(benefitService.getList).toHaveBeenCalledWith({ page: 9999, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 0, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         const params = new URLSearchParams(screen.getByTestId('route-search').textContent);
-        expect(Object.fromEntries(params)).toEqual({ page: '1', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
+        expect(Object.fromEntries(params)).toEqual({ page: '1', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });
         expectNewsOnlyStructure();
     });
 
@@ -191,7 +191,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));
         expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route-search').textContent)))
-            .toEqual({ page: '2', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
+            .toEqual({ page: '2', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });
         expectNewsOnlyStructure();
     });
 
@@ -203,7 +203,7 @@ describe('actual photo benefits banners without invented campaign or general sto
         expect(benefitService.getList).toHaveBeenCalledTimes(1);
         expect(benefitService.getList).toHaveBeenCalledWith({ page: 3, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('route-search').textContent)))
-            .toEqual({ page: '4', newsType: 'ALL', period: 'ONGOING', utm_source: 'campaign' });
+            .toEqual({ page: '4', newsType: 'all', period: 'ONGOING', utm_source: 'campaign' });
         expect(screen.queryByText('0개 소식')).not.toBeInTheDocument();
         expectNewsOnlyStructure();
     });

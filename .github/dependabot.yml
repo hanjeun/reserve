@@ -11,6 +11,9 @@ updates:
       # eslint 코어와 플러그인은 버전이 물려 있어 따로 머지하면 그 사이 커밋에서 CI 가 깨진다.
       eslint:
         patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "eslint-config-*"]
+      # 오류 수집기와 Replay는 같은 버전으로 갱신한다.
+      sentry:
+        patterns: ["@sentry/*"]
       # 나머지 minor/patch 는 한 덩어리로. 메이저는 여기 안 잡히고 따로 올라온다 — 그게 맞다.
       frontend-minor:
         update-types: ["minor", "patch"]

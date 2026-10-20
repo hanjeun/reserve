@@ -2,14 +2,22 @@
 
 비밀번호 정책, 세션 무효화, 로그인 유지(refresh 회전), 동의 기록, OAuth 연동 해제의 계약을 정리해요. 운영 DB 구조 확인은 [수동 DDL 런북](manual-ddl.md) 3장을 보세요.
 
-
 ## 2026-10-18 운영 상태
 
-v2.12.0에서 DDL 16절과 활성 OAuth 토큰 암호화를 운영에 적용했어요. 독립 키를 운영·향후 CI·보호된 v7 복구 입력에 보존하고 새 정상 저장부터 AES-GCM으로 보호해요. 기존 평문 토큰의 일괄 재저장은 수행하지 않았어요. 암호문 저장 뒤에는 flag를 끄거나 키를 제거해 복구하지 않아요.
+현재 운영은 v2.13.0 main `8c3648e6630bc1a1c82e1f36aa692d3df699b435`예요. v2.12.0에서 적용한 DDL 16절과 활성 OAuth 토큰 암호화를 유지하며 JWT 발급자 검사·관리자 서비스 관문·만료 인증 정리를 운영에 반영했어요. 독립 키를 운영·향후 CI·보호된 v7 복구 입력에 보존하고 새 정상 저장부터 AES-GCM으로 보호해요. 기존 평문 토큰의 일괄 재저장은 수행하지 않았어요. 암호문 저장 뒤에는 flag를 끄거나 키를 제거해 복구하지 않아요.
 
-Google·카카오·네이버의 공급자 역방향 알림 수신은 운영과 향후 배포 변수 모두 꺼 둔 상태예요. 로그인 시작에서 새 앱 콜백으로 이동하는 경로를 확인했고, 전환 후 사용자가 실제 로그인·휴대폰 사용이 정상이라고 확인했어요. 공개 계정·피드 프로필의 두 CloudFront 경로에는 TTL 0을 적용했고 기존 객체 2개의 no-store 메타데이터·캐시 무효화·실제 HTTPS no-store 응답을 확인했어요. 이미 사용자의 브라우저에 내려받은 사본을 강제 회수하는 것은 아니에요. 아래 ‘후보·운영 미적용’ 설명은 이 전환 전 준비 기록이에요. [실제 전환 기록](deployments.md#2026-10-18-v2120-실제-운영-전환)을 봐요.
+Google·카카오·네이버의 공급자 역방향 알림 수신은 운영과 향후 배포 변수 모두 꺼 둔 상태예요. 로그인 시작에서 새 앱 콜백으로 이동하는 경로를 확인했고, v2.13.0 전환 후 사용자가 세 공급자의 실제 로그인 완료 알림·휴대폰 사용이 정상이라고 확인했어요. 공개 계정·피드 프로필의 두 CloudFront 경로에는 TTL 0을 적용했고 기존 객체 2개의 no-store 메타데이터·캐시 무효화·실제 HTTPS no-store 응답을 확인했어요. 이미 사용자의 브라우저에 내려받은 사본을 강제 회수하는 것은 아니에요. [실제 전환 기록](deployments.md#2026-10-18-v2130-실제-운영-전환)을 봐요.
 
 같은 날 사용자가 Google RISC 약관에 직접 동의해 `reserve-494004` 프로젝트의 API 사용 설정을 완료했고 콘솔의 ‘사용 설정됨’을 확인했어요. 전용 서비스 계정·최소 IAM 권한·수신 스트림 등록과 공급자 실제 왕복은 아직 준비 단계예요. 기존 Gemini 서비스 계정을 재사용하거나 권한을 추가하지 않았으며 앱 수신 설정도 계속 false예요. API 활성화를 사건 수신 완료로 보지 않아요.
+
+### 역방향 알림 후속 적용안 — 아직 운영 미적용
+
+- Google은 서명·발급자·대상 검증을 통과한 검증 이벤트의 state를 SHA-256으로 줄이고 inbox 커밋 뒤 해시만 기록해요. 원문 SET·state·회원 식별자는 로그에 남기지 않으며 검증 이벤트는 회원 세션을 폐기하지 않아요.
+- Google 등록은 같은 프로젝트의 전용 `reserve-risc-config` 서비스 계정과 `roles/riscconfigs.admin`으로 준비해요. IAM·Service Account Credentials API 및 해당 계정에만 한정한 임시 Token Creator 권한을 승인받은 뒤 Google 관리 키로 1시간 JWT를 서명하고, 작업 후 임시 권한을 회수해요. JSON 개인키를 만들거나 운영 앱에 관리 자격 증명을 넣지 않아요. 검증 이벤트 왕복부터 확인한 뒤 현재 수신기가 처리하는 tokens-revoked·sessions-revoked·account-disabled만 구독해요.
+- Kakao는 앱 `1354745`의 **계정 상태 변경** 웹훅에 `/api/oauth/events/kakao`를 등록하고 OAuth User Unlinked·Tokens Revoked 두 사건만 선택해요. 기존 연결 해제 웹훅과 혼용하지 않아요. 콘솔 시험은 실제 팀원 계정의 앱 세션을 폐기할 수 있으므로 대상 계정과 재로그인 복구를 승인 범위에 포함해요.
+- Naver 연결 끊기 URL은 `https://app.reserve.it.kr/api/oauth/events/naver`예요. 수신기 준비·운영 승인이 끝난 뒤에 등록해요. 실패 요청은 공급자가 재시도하지 않으므로 임의 성공 응답으로 숨기지 않아요. 현재 앱은 개발 중이며 일반 사용자 공개 검수는 별도예요. 로그인 Callback에 남은 옛 ngrok 주소는 이번 등록과 구분해 제거 승인을 받을 대상이에요.
+
+공급자 등록·수신 플래그와 향후 CI 변수 변경·실제 계정 시험은 최종 산출물과 복구 확인 뒤 묶어 승인받아요. 이 적용안과 로컬 검사를 실제 공급자 수신 성공으로 표시하지 않아요.
 
 ## 비밀번호 정책
 
@@ -30,15 +38,19 @@ Google·카카오·네이버의 공급자 역방향 알림 수신은 운영과 �
 
 일반 프로필 수정 DTO에는 비밀번호 필드가 없어요.
 
-### 만료 인증 자료 정리 — 로컬 후속 후보
+### 만료 인증 자료 정리 — v2.13.0 운영 반영
 
-`ExpiredVerificationCleanupScheduler`가 매일 서버 시각 04:20에 만료된 가입 이메일 인증·비밀번호 재설정 행만 삭제해요. 발급·검증과 같은 서버 기본 시간대를 사용하므로 UTC 서버에서는 한국 시각 13:20이에요. 만료되지 않은 코드·가입 증명은 유지하고 삭제 수만 기록해요. OAuth 사건의 중복·재생 방지 행에는 이 정리를 적용하지 않아요. 만료/유효 행 분리와 가입 증명 보존은 격리 DB 표적 검사로 확인했으며 운영 배포·실제 정리 실행은 하지 않았어요.
+`member.scheduler.ExpiredVerificationCleanupScheduler`가 매일 서버 시각 04:20에 만료된 가입 이메일 인증·비밀번호 재설정 행만 삭제해요. 발급·검증과 같은 서버 기본 시간대를 사용하므로 UTC 운영 서버에서는 한국 시각 13:20이에요. 만료되지 않은 코드·가입 증명은 유지하고 삭제 수만 기록해요. OAuth 사건의 중복·재생 방지 행에는 이 정리를 적용하지 않아요. 만료/유효 행 분리와 가입 증명 보존 검사를 거쳐 v2.13.0에 배포했으며 SQL 수동 삭제는 하지 않았어요. 2026-10-20 읽기 전용 확인에서 원본 앱 로그의 첫 자연 실행은 10/19 13:20 KST에 가입 1건·재설정 1건, 다음 실행은 10/20 13:20 KST에 각각 0건이었어요. 같은 조회 시점의 두 인증 테이블은 만료·유효 집계가 모두 0건이었고 해당 스케줄 오류는 없었어요. 현재 유효 행 0건만으로 과거 유효 행 보존까지 운영에서 입증한 것으로 확대하지 않아요.
 
-### 관리자 제재 관문 — 로컬 후속 후보
+### 관리자 제재 관문 — v2.13.0 운영 반영
 
-`AdminSanctionService`에도 `hasRole('ADMIN')`을 강제해 컨트롤러를 우회한 서비스 호출부터 거절해요. 일반·사업자 역할은 DB 조회·제재·감사 쓰기 전에 차단하고 관리자의 기존 유효성 검사는 유지해요. JWT 필터는 현재 DB 회원의 역할·정지·삭제·인증 버전을 계속 재확인해요. 서비스 경계의 허용/거절 표적 검사를 통과했으며 운영 반영은 별도예요.
+`AdminSanctionService`에도 `hasRole('ADMIN')`을 강제해 컨트롤러를 우회한 서비스 호출부터 거절해요. 일반·사업자 역할은 DB 조회·제재·감사 쓰기 전에 차단하고 관리자의 기존 유효성 검사는 유지해요. JWT 필터는 현재 DB 회원의 역할·정지·삭제·인증 버전을 계속 재확인해요. 서비스 경계의 허용/거절 검사를 통과해 v2.13.0에 반영했고 운영 비로그인 관리자 경로 차단도 확인했어요. 확인을 위해 실제 회원을 제재하지 않았어요.
 
-## 가입 이메일 인증 (v2.9.0 출시 계약)
+### JWT 발급·검증 계약 — v2.13.0 운영 반영
+
+`JwtProperties`는 비어 있는 issuer·secret, 64자 미만 secret, 중복/누락된 만료 단위와 0 이하 유효기간을 기동 때 거부해요. `TokenProvider`는 서명과 `iss`를 함께 검증하며 만료 예외의 claims도 발급자가 일치해야 사용해요. 발급 토큰에는 `jti`·`iss`·`iat`·`exp`·`sub`, 회원 ID·역할·인증 버전·용도와 소셜 원인증 시각을 담아요. 발급·검증 키와 기존 claim의 의미는 유지해요. audience·키 회전용 kid·암호화 토큰을 추가한 상태로 설명하지 않아요.
+
+## 가입 이메일 인증 (v2.9.0 운영 적용)
 
 - 코드와 가입 증명은 최초 발급의 **5분** 만료 시각을 공유해요. 만료 시각과 같거나 이후면 인증·가입을 거부하며, 코드 확인 성공으로 유효기간을 연장하지 않아요.
 - 같은 이메일의 재발송은 1분 간격이에요. 한 행을 잠그고 기존 코드·증명 해시·실패 횟수를 교체해요. 최초 요청의 경쟁은 `uk_email_verification_email` unique가 막으며 메일 전 DB flush를 수행해요.
@@ -49,15 +61,9 @@ Google·카카오·네이버의 공급자 역방향 알림 수신은 운영과 �
 - 응답은 공통 `ApiResponse.data`에 `expiresAt`·`verificationTicket`를 담고 `Cache-Control: no-store`를 사용해요. 증명·코드는 URL·로그·브라우저 저장소에 남기지 않아요. 미완료 이메일·만료 시각만 복원하며 새로고침 후에는 다시 인증해야 해요.
 - 프론트는 인증 성공 뒤에도 원래 만료 타이머를 유지해요. 탭 복귀와 가입 제출 시 실제 시각을 다시 확인하고, 이메일이 바뀌거나 이전 발송의 늦은 응답이면 인증 상태로 사용하지 않아요. 가입 화면을 떠난 뒤 도착하는 응답으로 타이머·알림·가입 증명을 다시 만들지 않아요.
 
-[수동 DDL 13절](manual-ddl.md#13-가입-이메일-인증-증명unique-2026-10-09-운영-ddl-적용)의 해시 컬럼과 unique는 2026-10-09 승인된 첫 전환에서 실제 운영에 적용했어요. 기존 인증 행을 보존하고 중복 0을 확인했으며 최종 JAR의 제한 계정 `validate`를 통과했어요. 가입의 MySQL 동시 최초 발송·실패 누적·한 번 소비·가입 실패 롤백/원래 만료·만료/오류 증명 미소비는 별도 격리 합성 DB의 검사 **5개·실패 0·skip 0**으로 확인했어요. 같은 최종 SHA의 프론트·백엔드를 함께 전환하며, 구 가입 화면은 새 화면에서 다시 발송·인증해야 해요. 실제 운영 계정 생성이나 이메일 발송은 이 검증을 위해 실행하지 않았어요.
+[수동 DDL 13절](manual-ddl.md#13-가입-이메일-인증-증명unique-운영-적용-적용-전-절차-보존)의 해시 컬럼과 unique는 2026-10-09 승인된 첫 전환에서 실제 운영에 적용했어요. 기존 인증 행을 보존하고 중복 0을 확인했으며 최종 JAR의 제한 계정 `validate`를 통과했어요. 가입의 MySQL 동시 최초 발송·실패 누적·한 번 소비·가입 실패 롤백/원래 만료·만료/오류 증명 미소비는 별도 격리 합성 DB의 검사 **5개·실패 0·skip 0**으로 확인했어요. 같은 최종 SHA의 프론트·백엔드를 함께 전환하며, 구 가입 화면은 새 화면에서 다시 발송·인증해야 해요. 실제 운영 계정 생성이나 이메일 발송은 이 검증을 위해 실행하지 않았어요.
 
 ## 세션 무효화
-
-### JWT 설정과 발급자 검증 — v2.13.0 후보
-
-발급과 검증에 같은 `jwt.issuer`를 사용해요. 공통 파싱 관문은 서명·만료와 발급자를 확인하고, 만료된 refresh 토큰도 발급자가 다르면 회원 식별자를 신뢰하지 않아요. 기존 `reserve` 발급자·서명 키·access/refresh 용도·`jti`·인증 버전·OAuth 원인증 시각은 유지해요.
-
-발급자가 비어 있거나 토큰 수명이 누락·0·음수인 설정은 기동 전에 거부해요. 수명은 분 또는 일 중 하나만 지정해요. 별도 소비자·키 교체 요구가 없는 현재 구조에 `aud`·`kid`·추가 암호화 체계를 임의로 도입하지 않아요.
 
 Member의 `auth_version`을 JWT claim에 넣어 기존 access JWT까지 끊어요.
 
@@ -125,15 +131,15 @@ refresh할 때마다 refresh 토큰도 새로 발급해 같은 DB 행을 갱신�
 - lease ID가 다른 늦은 결과는 무시해요.
 - 운영 감시는 `OAuth unlink queue requires attention` 집계 로그를 써요.
 
-outbox의 access token은 기존 `OAuthUnlinkTokenCipher`가 AES-GCM으로 암호화해요. 2026-10-16 후보는 네이버 해제를 공식 `POST /oauth2.0/revoke`의 form 본문으로 보내 시크릿·토큰을 URL에 넣지 않아요. HTTP 400/401은 영구 실패, 429/5xx·연결 장애는 재시도로 구분해요. 실제 공급자 계정의 호출·콘솔 설정은 변경하지 않았어요. [네이버 공식 해제 명세](https://developers.naver.com/docs/login/api/api.md)
+outbox의 access token은 기존 `OAuthUnlinkTokenCipher`가 AES-GCM으로 암호화해요. 네이버 해제는 공식 `POST /oauth2.0/revoke`의 form 본문으로 보내 시크릿·토큰을 URL에 넣지 않아요. HTTP 400/401은 영구 실패, 429/5xx·연결 장애는 재시도로 구분해요. 이 구현은 v2.12.0부터 운영에 반영됐으며 검증을 위해 실제 공급자 계정을 해제한 결과는 아니에요. [네이버 공식 해제 명세](https://developers.naver.com/docs/login/api/api.md)
 
-## 활성 OAuth 토큰 암호화 후보 — 운영 미적용
+## 활성 OAuth 토큰 암호화 — v2.12.0 운영 적용
 
-`OAuthProviderTokenConverter`·`OAuthProviderTokenCipher`는 기본 off예요. 활성화할 때는 Base64로 인코딩한 독립 32-byte `OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY`가 필요하며 JWT·outbox 키와 혼용하지 않아요. 새 저장은 버전 표식·무작위 nonce·목적별 AAD의 AES-GCM envelope이고 기존 평문은 읽을 수 있어요. 기존 토큰을 일괄 재저장하거나 이관하지 않으며 다음 정상 저장부터 암호화해요. 기존 2048자 토큰의 envelope도 들어가도록 [DDL 16절](manual-ddl.md#16-oauth-토큰-보호와-공급자-보안-사건-후보-운영-미적용)의 `TEXT` 확장이 먼저 필요해요.
+`OAuthProviderTokenConverter`·`OAuthProviderTokenCipher`의 소스 기본값은 off지만 운영과 향후 배포 변수는 활성화돼 있어요. Base64로 인코딩한 독립 32-byte `OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY`를 사용하며 JWT·outbox 키와 혼용하지 않아요. 새 저장은 버전 표식·무작위 nonce·목적별 AAD의 AES-GCM envelope이고 기존 평문은 읽을 수 있어요. 기존 토큰을 일괄 재저장하거나 이관하지 않으며 다음 정상 저장부터 암호화해요. 기존 2048자 토큰의 envelope를 수용하는 [DDL 16절](manual-ddl.md#16-oauth-토큰-보호와-공급자-보안-사건-후보-운영-미적용)의 `TEXT` 확장은 v2.12.0에서 적용했어요.
 
 암호문이 한 건이라도 저장된 뒤에는 flag=false나 키 제거로 되돌릴 수 없어요. 미설정/다른 키·손상·다른 목적의 암호문은 거부하며 토큰을 평문으로 취급해 우회하지 않아요. 복구는 같은 형식을 읽는 실제 JAR·해당 키·DB를 함께 사용해요. 메타데이터 전용 검증 도구의 무인자 Converter는 null만 통과시키고 실제 비NULL 변환은 거부해요. 키가 필요한 실제 앱 주입·복호화와 schema-only 도구를 구분해요. 토큰 원문은 검사 출력·로그·채팅에 남기지 않아요.
 
-## 공급자 보안 사건 수신 후보 — 운영 미적용
+## 공급자 보안 사건 수신 — 구현 배포, 실제 연동 비활성
 
 Google/Kakao의 서명된 SET 수신 기반을 `POST /api/oauth/events/google`, `/kakao`에 준비했으며 v1 별칭도 있어요. 로그인 Callback URL과 다른 경로예요. 원문 `application/secevent+jwt`를 32KiB+1까지만 읽어 초과를 거절하고, 고정 공식 discovery/JWKS·RS256·kid·issuer·audience 및 공급자별 app/subject/event 규칙을 확인해요. 요청이 지정한 URL·이메일로 신원을 대체하지 않아요. 키 조회는 고정 주소·redirect 금지·timeout·제한 읽기·실패 backoff를 사용해요. Google RISC의 과거 사건에 일반 로그인 JWT의 exp 규칙을 적용하지 않아요. [Google 공식 RISC](https://developers.google.com/identity/protocols/risc), [Kakao 공식 웹훅](https://developers.kakao.com/docs/ko/kakaologin/callback)
 
@@ -147,27 +153,27 @@ Google/Kakao의 서명된 SET 수신 기반을 `POST /api/oauth/events/google`, 
 
 지연 사건도 회원 cutoff를 최댓값으로 남겨 원래 인증이 그 시각 이하인 access/refresh를 거부해요. 사건 이후의 새 재인증이 있으면 그 공급자 토큰·새 세션·authVersion을 보존하고 옛 세션만 cutoff로 차단해요. cutoff가 있는 OAuth 회원의 원인증 claim 없는 구 세션은 다시 로그인해야 해요. 일반 로그인·최대 5기기 정책은 유지해요. refresh는 회원→refresh 순서로 잠그고, 처음 들어온 토큰·직전 토큰 유예·현재 DB 토큰의 문맥을 확인해요.
 
-개인 공통/웨이팅 SSE는 실제 연결 JWT의 원인증 문맥을 캡처해 첫 연결·전송·heartbeat에서 현재 회원 cutoff·버전·삭제/정지·역할을 재검사해요. 과거 연결의 문맥을 최신 회원 시각으로 대체하지 않아요. 무효 세션은 session-ended 후 닫고 DB 일시 오류는 연결만 닫아요. 공개 스트림과 웨이팅의 기존 약관 정책은 유지해요. 이 후보의 소스·표적 검사와 실제 공급자 등록/운영 동작은 구분하며 기본 false를 유지해요.
+개인 공통/웨이팅 SSE는 실제 연결 JWT의 원인증 문맥을 캡처해 첫 연결·전송·heartbeat에서 현재 회원 cutoff·버전·삭제/정지·역할을 재검사해요. 과거 연결의 문맥을 최신 회원 시각으로 대체하지 않아요. 무효 세션은 session-ended 후 닫고 DB 일시 오류는 연결만 닫아요. 공개 스트림과 웨이팅의 기존 약관 정책은 유지해요. 이 경계는 배포됐지만 실제 공급자 등록·왕복 확인은 별개이며 수신 플래그는 false를 유지해요.
 
 Naver는 `POST /api/oauth/events/naver`와 v1 별칭에 form 알림을 받아요. 쿼리/본문을 각각 4KiB로 제한하고 중복/초과/잘못된 clientId·MAC·시각을 거부해요. 기존 로그인 Client Secret에서 공식 규격의 raw MD5 16-byte 키를 만들고 HMAC-SHA256을 일정 시간 비교한 뒤에만 AES-CBC 식별자를 복호화해요. 새 시크릿·토큰 URL 전달은 추가하지 않아요. 성공은 본문 없는 204이며 공식 규격상 실패는 재전송되지 않으므로 DB 오류를 성공으로 숨기지 않아요. ±5분은 앱의 재생 방지 정책이며 Naver 필수 규격으로 설명하지 않아요. timestamp가 요청 시각이라 실제 연결 해제·재연결의 정확한 발생 순서를 모두 구분할 수 없는 한계도 있어요. [Naver 공식 연결 해제 알림](https://developers.naver.com/docs/login/devguide/devguide.md#4-4-네이버-로그인-연결-끊기-알림-받기)
 
-활성화 전에는 최종 후보의 계정/원인증/실제 MySQL 경합 검사와 새 전체 JAR 검증, 공급자별 프로젝트/동의/스트림 등록·실제 왕복·실패 관측을 확인해요. 보관기간/재전송 유효기간·중복 해시 파기 정책도 후속이며, 재생 방지 행을 시각만으로 지우면 오래된 SET를 다시 받을 수 있으므로 임의 자동 삭제는 추가하지 않았어요. 기존 회원의 인증 시각을 추정해 백필하지 않아요.
+계정·원인증·실제 MySQL 경합과 최종 JAR 검증은 출시 근거에 포함돼요. 실제 수신 활성화 전에는 공급자별 프로젝트·동의·최소 권한·스트림 등록·실제 왕복·실패 관측을 별도로 확인해요. 보관기간/재전송 유효기간·중복 해시 파기 정책도 후속이며, 재생 방지 행을 시각만으로 지우면 오래된 SET를 다시 받을 수 있으므로 임의 자동 삭제는 추가하지 않았어요. 기존 회원의 인증 시각을 추정해 백필하지 않아요.
 
 | 이름 | 용도 |
 |---|---|
 | `OAUTH_UNLINK_ENCRYPTION_KEY` (`oauth.unlink.encryption-key`) | OAuth 해제 토큰 암호화 키. 비어 있으면 JWT secret에서 유도한 키를 써요 |
-| `OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED` / `OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY` | 활성 토큰 암호화 off/전용 키. 암호문 저장 뒤 임의 off·교체 금지 |
+| `OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED` / `OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY` | 소스 기본 false, 운영 true/전용 키. 암호문 저장 뒤 임의 off·교체 금지 |
 | `OAUTH_SECURITY_EVENTS_GOOGLE_ENABLED` / `OAUTH_SECURITY_EVENTS_KAKAO_ENABLED` / `OAUTH_SECURITY_EVENTS_NAVER_ENABLED` | 기본 false. 최종 검증·공급자 등록·운영 승인 뒤 별도로 활성화 |
 | `KAKAO_APP_ID` | 향후 서명 사건의 app_id 검증. 대표 REST API 키·로그인 client ID와 구분 |
 
-전용 키는 Actions Secrets → SSH → Blue/Green Compose로 전달하도록 준비했어요. 기존 outbox 키의 Actions Secret이 없을 때는 빈 export가 서버의 보호된 `.env` 키를 가리지 않도록 unset해요. 실제 Secret·서버 설정·운영 키 생성/교체는 하지 않았어요.
+전용 키는 Actions Secrets → SSH → Blue/Green Compose로 전달하며 보호된 v7 복구 입력에도 보존해요. 기존 outbox 키의 Actions Secret이 없을 때는 빈 export가 서버의 보호된 `.env` 키를 가리지 않도록 unset해요. v2.13.0 전환에서 기존 키와 설정을 보존했으며 키 교체는 하지 않았어요.
 
 ## 공개 프로필 사진과 CDN 캐시
 
-일반 계정·별도 피드 프로필 사진은 관리되는 공개 이미지 경로를 사용해요. 교체·탈퇴 시 소유 경로의 이전 객체를 삭제 outbox로 정리해요. 2026-10-16 후보의 새 `users/{id}/profiles`·`users/{id}/feed/profiles` 업로드는 기존 사업자 인증 사진과 같이 `Cache-Control: no-store`예요. 그 밖의 가게·썸네일·광고·공지·고객지원 공개 사진은 기존 캐시 정책을 유지해요.
+일반 계정·별도 피드 프로필 사진은 관리되는 공개 이미지 경로를 사용해요. 교체·탈퇴 시 소유 경로의 이전 객체를 삭제 outbox로 정리해요. 새 `users/{id}/profiles`·`users/{id}/feed/profiles` 업로드는 기존 사업자 인증 사진과 같이 `Cache-Control: no-store`예요. 그 밖의 가게·썸네일·광고·공지·고객지원 공개 사진은 기존 캐시 정책을 유지해요.
 
-2026-10-16 운영 콘솔 읽기에서 `cdn.reserve.it.kr`의 배포 `E1VOAW2W8K0VA4`는 동작이 기본값 `*` 하나이며 `Managed-CachingOptimized`를 사용했어요. 프로필 전용 동작·원본 요청/응답 헤더 정책·함수 연결은 없어요. 이 관리형 정책의 minimum/default/maximum TTL은 1초/86,400초/31,536,000초이고 minimum이 0보다 크면 원본 no-store도 최소기간 동안 캐시해요. [AWS 관리형 정책 명세](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html#managed-cache-policy-caching-optimized)
+2026-10-16 운영 콘솔 조회 당시 `cdn.reserve.it.kr`의 배포 `E1VOAW2W8K0VA4`는 기본 `*`의 `Managed-CachingOptimized`만 사용했어요. 이 관리형 정책의 minimum/default/maximum TTL은 1초/86,400초/31,536,000초이고 minimum이 0보다 크면 원본 no-store도 최소기간 동안 캐시해요. [AWS 관리형 정책 명세](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html#managed-cache-policy-caching-optimized)
 
-운영 보완 후보는 공개 계정·피드 프로필의 `users/*/profiles/*`, `users/*/feed/profiles/*`에만 관리형 `CachingDisabled`(TTL 모두 0)를 연결하는 것이에요. 적용 전 현재 배포 정의/ETag·원본과 접근 설정을 보존하고, 가게·광고 등 기본 동작은 유지해요. 기존에 남아 있는 프로필 객체는 정확한 소유 경로와 메타데이터를 조회한 뒤 no-store로 보완할 대상을 선별하고 기존 캐시 무효화 경로도 함께 확정해요. 새 정책만으로 원본의 옛 `public, max-age=86400`을 브라우저에서 지울 수는 없어요.
+2026-10-18 v2.12.0 전환에서 공개 계정·피드 프로필의 `users/*/profiles/*`, `users/*/feed/profiles/*`에만 관리형 `CachingDisabled`(TTL 모두 0)를 적용했어요. 기존 배포 정의·원본·접근 설정과 가게·광고 등 기본 동작은 보존했어요. 현재 객체 2개의 no-store 메타데이터·캐시 무효화와 실제 HTTPS 응답도 확인했어요. v2.13.0은 이 구성을 유지하며, 새 정책만으로 원본의 옛 `public, max-age=86400`을 브라우저에서 지울 수는 없어요.
 
-이미 업로드한 객체 메타데이터나 브라우저/CDN 캐시는 소급 제거되지 않아요. S3 원본 삭제만으로 이전 URL의 즉시 차단도 보장하지 않으며 이미 내려받은 브라우저 캐시는 서버에서 강제 회수할 수 없어요. 실제 정책·기존 객체·무효화 적용은 대상 확인 뒤 별도 승인이 필요해요. 암호화 피드 본문·댓글 사진의 권한 검사/no-store 경로와 공개 아바타를 구분해요. 이번 작업에서 CDN 설정·운영 객체는 바꾸지 않았어요.
+이미 내려받은 브라우저 캐시는 서버에서 강제 회수할 수 없어요. S3 원본 삭제만으로 이전 URL의 즉시 차단도 보장하지 않아요. 추가 정책·객체·무효화 변경은 실제 대상을 확인한 뒤 별도 승인으로 진행해요. 암호화 피드 본문·댓글 사진의 권한 검사/no-store 경로와 공개 아바타를 구분해요.

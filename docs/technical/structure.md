@@ -2,6 +2,8 @@
 
 모노레포 폴더 구조, 라우트, 환경변수를 정리했어요.
 
+현재 운영 기준은 v2.13.0 main `8c3648e6630bc1a1c82e1f36aa692d3df699b435`예요. 피드·댓글·소식·Redis·활성 OAuth 토큰 암호화와 앱/소개 도메인 분리는 운영에 반영됐고 공급자 역방향 알림 3종은 비활성 상태예요. [실제 전환·검증](deployments.md#2026-10-18-v2130-실제-운영-전환)과 소스의 기본값을 구분해요.
+
 ## 모노레포 루트
 
 ```
@@ -66,6 +68,7 @@ kr.it.reserve/
 │
 ├── member/                        ← 회원 관리 (프로필, 위치, 비식별 탈퇴, 비밀번호 변경), PasswordResetController,
 │                                     마케팅 동의 이력
+│   └── scheduler/                 ← ExpiredVerificationCleanupScheduler (만료 가입·재설정 인증 정리)
 ├── lifecycle/                     ← 탈퇴·영업 종료 전 미결 예약/결제 의무 단일 관문
 ├── store/                         ← 가게 등록/수정/영업 종료/조회, AddressController(주소검색 프록시)
 │   └── service/StoreRepository    ← findByIdForUpdate() 비관적 락(PESSIMISTIC_WRITE) — 예약 동시성 제어
@@ -93,7 +96,7 @@ kr.it.reserve/
 ├── email/                         ← 이메일 인증 코드 발송/검증
 ├── community/                     ← 게시판 — 프론트 미노출. Member/Store cascade 삭제가 참조해 존치
 ├── promotion/                     ← 가게 소식 정본·저장/조회·게시 연동 인터페이스 (광고 advertisement와 별개)
-├── feed/                          ← SNS 공개 프로필·글/사진·신고/감사·30일 파기 (로컬 구현, 운영 미적용)
+├── feed/                          ← SNS 공개 프로필·글/댓글·사진·신고/감사·30일 파기
 │   └── news/{controller,dto,service}/ ← 소식 작성/관리·피드 게시 조합, 기존 promotion API 경로 유지
 ├── common/                        ← HealthCheckController
 ├── main/                          ← (빈 패키지 — 잔재)
@@ -222,11 +225,11 @@ StatCard, UnreadPill, pickerSuffix, index.js`
 | `/` | 홈 | 공개 |
 | `/search` | 검색 전용 화면 | 공개 |
 | `/stores` | 가게 목록 | 공개 |
-| `/benefits` | 관리자 승인된 가게 소식·혜택 목록 · 사진 첨부 신청/내 소식 관리 (로컬 후보) | 공개 승인분 조회 · 관리 본인 사업자 |
+| `/benefits` | 관리자 승인된 가게 소식·혜택 목록 · 사진 첨부 신청/내 소식 관리 | 공개 승인분 조회 · 관리 본인 사업자 |
 | `/waiting` | 출시된 고객 웨이팅 가게 탐색 · 현장/원격 접수 | 탐색 공개 · 접수 로그인 |
-| `/feed` | 모든 회원의 SNS 목록·지역/관심 가게 필터·내 게시물/초안 (로컬 구현, 운영 미적용) | 조회 공개 · 작성/개인 필터 로그인 |
-| `/feed/posts/:id` `/feed/u/:publicId` | 게시물 상세·공유 주소 / 독립 공개 닉네임 프로필·작성자 게시물 (운영 미적용) | 공개 글·프로필만 조회 |
-| `/feed/notifications?view=all\|unread&page=1` | 댓글·답글·댓글 좋아요 알림·읽음 관리 (로컬 후보) | 본인 로그인 |
+| `/feed` | 모든 회원의 SNS 목록·지역/관심 가게 필터·인기순·내 게시물/초안 | 조회 공개 · 작성/개인 필터 로그인 |
+| `/feed/posts/:id` `/feed/u/:publicId` | 게시물 상세·공유 주소 / 독립 공개 닉네임 프로필·작성자 게시물 | 공개 글·프로필만 조회 |
+| `/feed/notifications?view=all\|unread&page=1` | 댓글·답글·댓글 좋아요 알림·읽음 관리 | 본인 로그인 |
 | `/store/:id` | 가게 상세 · 예약 · 리뷰 | 공개 |
 | `/login` `/signup` | 인증 | 비로그인 |
 | `/forgot-password` | 비밀번호 재설정 | 비로그인 |
@@ -327,13 +330,13 @@ AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 
 ### 추가 환경변수
 
-- **피드 신규 로컬 구현·운영 미적용:** `FEED_ENABLED` 기본값은 false예요. 새 피드 모델은 flag와 별개로 Hibernate validate 대상이므로 운영 활성화 전에 `manual-ddl.md`의 새 절과 복구 입력을 승인해야 해요. 로컬 프로필은 Git 밖의 `${user.home}/.codex/local-data/RESERVE/local.properties`를 선택적으로 읽어요. 이 PC에 로컬 활성화 값과 별도 `FEED_IMAGE_ENCRYPTION_KEY`를 준비했으며 채팅 키는 보존해요. 운영 키 생성·주입은 하지 않았어요. 로컬 새 피드·가게 소식 사진은 같은 폴더의 `feed-images/`에 암호문으로 저장하고, `local-feed/users/{id}/feed/images/{uuid}.bin` 키로 기존 권한 검사·파일 삭제 outbox를 사용해요. 기존 S3 사진은 옮기지 않으며 공개 사진도 글의 현재 공개 상태를 확인한 피드/혜택의 각 사진 API에서만 읽어요.
+- `FEED_ENABLED`의 소스 기본값은 false이고 운영·향후 배포 변수는 true예요. 새 피드 모델은 flag와 별개로 Hibernate validate 대상이며 15·16절 스키마는 v2.12.0에서 적용했어요. `FEED_IMAGE_ENCRYPTION_KEY`와 기존 채팅 키는 독립적으로 운영·CI·보호된 복구 입력에 보존해요. 로컬 프로필은 Git 밖의 `${user.home}/.codex/local-data/RESERVE/local.properties`를 선택적으로 읽으며 새 피드·소식 사진은 같은 폴더의 `feed-images/`에 암호문으로 저장해요. `local-feed/users/{id}/feed/images/{uuid}.bin` 키와 기존 권한 검사·파일 삭제 outbox를 사용하며 운영 S3 객체를 로컬로 옮기지 않아요. 사진은 글의 현재 공개 상태를 확인하는 피드/혜택의 각 사진 API에서만 읽어요.
 - 피드 작성은 먼저 공개 닉네임을 정하고 현재 계정 사진 공개는 명시적으로 선택해요. 글·사진·가게 연결·초안·실제 게시물 미리보기는 feed 화면의 지연 청크에 있어요. 임시저장은 피드 왼쪽 폴더 또는 보기 메뉴에서 열며 같은 폴더를 다시 누르면 최신 목록으로 돌아와요. 가게·피드·혜택·댓글의 좋아요를 통합 화면에서 대상별 기록으로 보고, 피드 댓글·한 단계 답글·사진 최대 6장·본인 수정/삭제·신고·관리자 숨김·알림은 별도 API를 사용해요. 팔로우·영상은 후속이며 기존 community API 연결을 피드 완료로 취급하지 않아요.
 - 혜택의 작은 회색 아이콘은 가게 소식 작성기 직접 열기와 내 소식 관리로 구분해요. hover·키보드 포커스·접근 가능한 이름으로 뜻을 제공하고, 작성 상태 확인 중·실패·미활성화는 이유를 표시해요. 작성 청크는 같은 EditorDialog 안에서 불러오며 혜택에는 공개 닉네임 단계가 없어요. 공개 닉네임·소개·피드 사진 설정은 `/my-page?tab=public-profile`에 모으고 본인 공개 프로필의 수정 버튼도 같은 설정으로 연결해요. 피드 사진은 기존 계정 사진 교체 UI 한 개를 재사용하며 새 프로필의 기본값은 계정 사진이에요. 별도 피드 사진은 계정 사진과 독립적으로 저장하며 기존 비공개 선택은 유지해요. 처음 글쓰기의 닉네임 단계는 작성기 안에 유지해요.
-- Redis는 운영 이식 전 로컬 시험과 운영 준비를 구분해요. `docker-compose-local-redis.yml`은 loopback, 준비용 `docker-compose-redis.yml`은 호스트 포트 없이 기존 `app-network`만 사용하며 Git 밖의 전용 암호·`redis.conf`를 읽어요. `RESERVE_REDIS_ENABLED` 기본값은 false예요. local/운영 혼합 프로필을 차단하고 로컬은 loopback, prod/blue/green은 명시한 내부 endpoint만 허용해요. `RESERVE_REDIS_HOST`·`PORT`·`PASSWORD`와 선택 `USERNAME`은 Blue/Green Compose·CI로 전달하며, key/PubSub namespace는 local/prod로 코드에서 분리해요. 웨이팅 변경·`WAITING_JOIN`/`QR_CHECKIN` 공유 제한과 함께 공통 화면 식별 신호의 `RedisEntityUpdateRelay`도 후보에 구현했어요. MySQL 트랜잭션·제약·번호·중복 방지·호출·입장은 유지해요. 실제 연결·제한·유한 fallback·환경 격리와 10/16 공통 중계의 확인 범위는 [아키텍처](architecture.md#로컬-피드-사진과-redis-운영-이식-준비)를 따라요. 운영 Redis는 설치·활성화하지 않았어요.
-- 활성 OAuth 토큰 암호화는 `OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED=false`가 기본이고 전용 `OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY`를 사용해요. Google/Kakao/Naver 보안 사건 수신 플래그도 기본 false이며 실제 공급자 설정은 변경하지 않았어요. 후속 후보는 subject 잠금·미가입 cutoff·JWT/refresh의 불변 원인증·성공 핸들러의 한 트랜잭션 발급과 개인 SSE 재검사를 포함해요. Naver는 기존 로그인 Client ID/Secret을 사용하며 새 시크릿을 만들지 않아요. `KAKAO_APP_ID`는 후보의 검증 설정이고 실제 등록을 지시하지 않아요. 새 스키마·키 복구와 지원 경계는 [계정 보안](account-security.md)·[DDL 16절](manual-ddl.md#16-oauth-토큰-보호와-공급자-보안-사건-후보-운영-미적용)을 따라요.
-- 가게 소식은 혜택 탭과 파트너 패널에서 같은 편집 화면을 열어요. `STORE_NEWS_ENABLED`는 `FEED_ENABLED`와 독립이고 기본값은 false, 로컬 프로필은 true예요. `/api/store-news/config`와 승인된 사진의 `GET /api/store-news/media/{id}`는 공개 경로이며 사진 업로드와 stores/me/상세/CUD는 현재 회원·사업자·가게 소유권을 확인해요. 제목·본문·최대 6장 사진·임시저장·혜택 목록/상세 미리보기·수정/삭제, 소식/공지/행사/혜택과 행사·혜택 기간/선택 조건을 포함해요. 사진 1~6장과 관리자 승인 후 공개하며 수정하면 재심사해요. 일반 SNS는 별도로 즉시 게시하고 사진은 선택이에요. 혜택의 원문·사진은 피드 게시·작성자 목록·지역 집계에 포함하지 않으며 SNS 작성기에서 소식을 연결하거나 혜택 작성기를 열지 않아요. 쿠폰 모양 대신 제목 배지이며 클릭은 상세 안내로 이동해요. 쿠폰 발급·사용 기능은 없어요.
-- 가게 소식 삭제·숨김은 혜택만 차단하고 기존 30일 원문·사진 파기 정책을 유지해요. 내부 사진 참조 행·암호화 저장·신고 스냅샷은 재사용하되 공개 닉네임이 없는 사진 소유 행을 피드 공개 프로필로 노출하지 않아요. 기존 원문·사진·FK는 삭제하거나 이관하지 않아요. `/api/promotions/public/{id}/reports`는 혜택의 로그인 신고이고 `/api/admin/promotions/{id}/visibility`로 숨김/복원을 처리해요. `NEWS` 좋아요는 승인된 혜택 ID, `POST`는 일반 피드 ID이며 내부 혜택 사진 행을 POST로 읽거나 NEWS로 변환하지 않아요. 통합 좋아요·관리자 신고 보관 기반은 재사용하고 댓글은 일반 피드에만 연결해요. 이번 분리 변경은 실행 백엔드에 연결하지 않았어요.
+- Redis는 로컬 시험 뒤 v2.12.0에서 운영 설치·활성화했어요. `docker-compose-local-redis.yml`은 loopback, 운영 `docker-compose-redis.yml`은 호스트 포트 없이 기존 `app-network`만 사용하며 Git 밖의 전용 암호·`redis.conf`를 읽어요. `RESERVE_REDIS_ENABLED`의 소스 기본값은 false, 운영·향후 배포 변수는 true예요. local/운영 혼합 프로필을 차단하고 로컬은 loopback, prod/blue/green은 명시한 내부 endpoint만 허용해요. `RESERVE_REDIS_HOST`·`PORT`·`PASSWORD`와 선택 `USERNAME`은 Blue/Green Compose·CI로 전달하며, key/PubSub namespace는 local/prod로 코드에서 분리해요. `WAITING_JOIN`/`QR_CHECKIN` 공유 제한과 공통 신호의 `RedisEntityUpdateRelay`를 사용하고 MySQL 트랜잭션·제약·번호·중복 방지·호출·입장은 유지해요. 실제 확인 범위와 장애 fallback은 [아키텍처](architecture.md#로컬-피드-사진과-redis-운영-이식-준비)를 따라요.
+- 활성 OAuth 토큰 암호화는 `OAUTH_PROVIDER_TOKEN_ENCRYPTION_ENABLED=false`가 소스 기본값이며 운영은 true와 전용 `OAUTH_PROVIDER_TOKEN_ENCRYPTION_KEY`를 사용해요. Google/Kakao/Naver 보안 사건 수신 플래그는 운영에서도 false예요. subject 잠금·미가입 cutoff·JWT/refresh의 불변 원인증·성공 핸들러의 한 트랜잭션 발급과 개인 SSE 재검사는 배포됐으며 공급자 실제 등록·왕복·활성화는 별개예요. Google RISC API 사용 설정만 완료했고 전용 IAM·스트림 등록은 남아 있어요. Naver는 기존 로그인 Client ID/Secret을 사용하며 새 시크릿을 만들지 않아요. `KAKAO_APP_ID`는 사건 검증용 설정이고 실제 등록을 지시하지 않아요. 스키마·키 복구와 지원 경계는 [계정 보안](account-security.md)·[DDL 16절](manual-ddl.md#16-oauth-토큰-보호와-공급자-보안-사건-후보-운영-미적용)을 따라요.
+- 가게 소식은 혜택 탭과 파트너 패널에서 같은 편집 화면을 열어요. `STORE_NEWS_ENABLED`는 `FEED_ENABLED`와 독립이고 소스 기본값은 false, 로컬·운영은 true예요. `/api/store-news/config`와 승인된 사진의 `GET /api/store-news/media/{id}`는 공개 경로이며 사진 업로드와 stores/me/상세/CUD는 현재 회원·사업자·가게 소유권을 확인해요. 제목·본문·최대 6장 사진·임시저장·혜택 목록/상세 미리보기·수정/삭제, 소식/공지/행사/혜택과 행사·혜택 기간/선택 조건을 포함해요. 사진 1~6장과 관리자 승인 후 공개하며 수정하면 재심사해요. 일반 SNS는 별도로 즉시 게시하고 사진은 선택이에요. 혜택의 원문·사진은 피드 게시·작성자 목록·지역 집계에 포함하지 않으며 SNS 작성기에서 소식을 연결하거나 혜택 작성기를 열지 않아요. 쿠폰 모양 대신 제목 배지이며 클릭은 상세 안내로 이동해요. 쿠폰 발급·사용 기능은 없어요.
+- 가게 소식 삭제·숨김은 혜택만 차단하고 기존 30일 원문·사진 파기 정책을 유지해요. 내부 사진 참조 행·암호화 저장·신고 스냅샷은 재사용하되 공개 닉네임이 없는 사진 소유 행을 피드 공개 프로필로 노출하지 않아요. 기존 원문·사진·FK는 삭제하거나 이관하지 않아요. `/api/promotions/public/{id}/reports`는 혜택의 로그인 신고이고 `/api/admin/promotions/{id}/visibility`로 숨김/복원을 처리해요. `NEWS` 좋아요는 승인된 혜택 ID, `POST`는 일반 피드 ID이며 내부 혜택 사진 행을 POST로 읽거나 NEWS로 변환하지 않아요. 통합 좋아요·관리자 신고 보관 기반은 재사용하고 댓글은 일반 피드에만 연결해요. 이 경계는 운영 백엔드에 반영돼 있어요.
 - 피드 원문은 게시 기한 없이 보관하고 삭제 즉시 공개에서 숨긴 뒤 30일 후 파기해요. 신고 스냅샷은 별도로 보존하며 일반 처리 완료 자료는 365일, OPEN/파기 보류 자료는 해당 상태 해제까지 보존해요. 처리·열람 감사는 각 기록일부터 최소 1년이며 `feed.retention.access-audit-years`는 1/2년만 허용하고 잘못된 값이면 파기를 중지해요. 연결된 신고 자료가 남아 있는 동안 감사도 보존해요. 사진 삭제는 기존 파일 삭제 outbox를 사용하고, 피드 API를 꺼도 이미 삭제한 자료의 파기와 탈퇴 정리는 계속해요. 실제 운영 파기·사진 왕복·보호 경계의 확인은 아직 실행 전이에요.
 
 | 이름 | 용도 |
@@ -347,21 +350,25 @@ AWS_SECRET_ACCESS_KEY: YOUR_SECRET_KEY
 | `WAITING_RETENTION_ENABLED` | 종료된 직원 접수 자료 정리 스위치, 기본 `true`; 실제 고지 시각이 없으면 실행하지 않음 |
 | `WAITING_RETENTION_NOTICE_PUBLISHED_AT` | 직원 접수 정책의 실제 운영 고지 게시 시각(offset 포함 ISO-8601) |
 
-- **현재 후보는 운영 미적용이며 최종 검사가 남아 있어요.** 혜택 신청/심사는 관리자 `?tab=benefit-applications`, 댓글 신고는 피드 신고 관리의 댓글 항목에 있어요. 피드 위치 필터는 FeedRegionSheet가 공개 게시물 수를 조회하며 탐색과 RegionPickerSheet의 틀만 공유해요. 작성 지역 입력은 숨기고 기존 값은 편집 때 보존해요. 피드는 640px 열·16px 본문·가로 사진 열과 본인 글/댓글 메뉴를 사용하며 사진 확대는 가게 상세와 같은 뷰어예요. 기본 아이콘은 IconGlyphs/SvgIcon과 AntD 슬롯을 공유해요. 혜택과 피드는 작성·게시·사진 읽기·좋아요 대상을 분리하고 통합 좋아요 목록에서만 대상별 기록을 모아요.
-- 댓글 사진·댓글 좋아요·댓글 알림을 추가한 10/14 후보의 표식은 `waiting-signup-hidden-feed-v6`였고, 10/16 전체 후보는 OAuth 정의를 더한 `waiting-signup-hidden-feed-oauth-v7`이에요. 알림 목록/개수/읽음은 수신 회원만 접근하고 삭제·숨김·제한된 원문은 제외해요. 90일 알림 파기와 탈퇴 정리는 기능 플래그와 별개로 유지해요. 댓글 신고 사진은 독립 증거와 관리자 열람 감사를 사용해요. 피드 DDL은 `manual-ddl.md` 15.6과 `scripts/sql/feed-comment-v6.sql`이며 당시 로컬 컬럼 3개/테이블 2개와 기존 자료 보존을 확인했어요. 최종 후보의 전체 검사·새 JAR 기동/validate·운영 적용은 남아 있고 이전 표식/검사로 대신하지 않아요.
+- 혜택 신청/심사는 관리자 `?tab=benefit-applications`, 댓글 신고는 피드 신고 관리의 댓글 항목에 있어요. 피드 위치 필터는 FeedRegionSheet가 공개 게시물 수를 조회하며 탐색과 RegionPickerSheet의 틀만 공유해요. 브라우저의 전체 지역은 `region=all`로 표현하고 API에는 전체 지역을 생략해요. 작성 지역 입력은 숨기고 기존 값은 편집 때 보존해요. 피드는 640px 열·16px 본문·가로 사진 열과 본인 글/댓글 메뉴를 사용하며 사진 확대는 가게 상세와 같은 뷰어예요. 기본 아이콘은 IconGlyphs/SvgIcon과 AntD 슬롯을 공유해요. 혜택과 피드는 작성·게시·사진 읽기·좋아요 대상을 분리하고 통합 좋아요 목록에서만 대상별 기록을 모아요.
+- 댓글 사진·댓글 좋아요·댓글 알림을 추가한 10/14 후보의 표식은 `waiting-signup-hidden-feed-v6`였고, 현재 운영은 OAuth 정의를 더한 `waiting-signup-hidden-feed-oauth-v7`이에요. 알림 목록/개수/읽음은 수신 회원만 접근하고 삭제·숨김·제한된 원문은 제외해요. 90일 알림 파기와 탈퇴 정리는 기능 플래그와 별개로 유지해요. 댓글 신고 사진은 독립 증거와 관리자 열람 감사를 사용해요. 피드 DDL은 `manual-ddl.md` 15.6과 `scripts/sql/feed-comment-v6.sql`의 최초 준비를 포함하며 v2.12.0에서 운영 반영했어요. v2.13.0의 실제 JAR·49모델 validate와 필수 CI는 [전환 기록](deployments.md#2026-10-18-v2130-실제-운영-전환)을 따라요.
 
-### 혜택 디자인·자동 갱신 (2026-10-15 로컬 후보)
+<a id="혜택-디자인자동-갱신-2026-10-15-로컬-후보"></a>
 
-- `promotion.benefit_design`은 `STANDARD|PHOTO|COMPACT`를 저장하며 기존 행은 `STANDARD`예요. 작성기·목록·상세·검토는 같은 선택을 사용하고 디자인 변경은 재심사 대상이에요. 옛 요청에 디자인 값이 없으면 기존 값을 유지해요. 새 모델을 기동하기 전 [수동 DDL 15.7](manual-ddl.md#157-혜택-디자인자동-갱신-후보-2026-10-15-운영-미적용)의 컬럼을 준비해야 해요.
+### 혜택 디자인·자동 갱신
+
+- `promotion.benefit_design`은 `STANDARD|PHOTO|COMPACT`를 저장하며 기존 행은 `STANDARD`예요. 작성기·목록·상세·검토는 같은 선택을 사용하고 디자인 변경은 재심사 대상이에요. 옛 요청에 디자인 값이 없으면 기존 값을 유지해요. [수동 DDL 15.7](manual-ddl.md#157-혜택-디자인자동-갱신-후보-2026-10-15-운영-미적용)의 컬럼은 v2.12.0 운영 전환에서 준비했어요.
 - 공개 변경 신호는 `GET /api/promotions/public/events`, 사업자·관리자 신호는 `GET /api/store-news/events`의 SSE이며 v1 별칭도 지원해요. 공개에는 공개 상태에 영향을 주는 변경만, 관리에는 관리자 또는 원문 작성자에게만 본문·식별값 없는 갱신 신호를 보내요. 실제 조회의 권한·사진 검사와 no-store는 유지해요. 전체·동일 회원/IP 연결 수를 제한하고 15초 heartbeat·2분 연결 만료를 사용해요. 현재 단일 인스턴스 내 신호이며 다중 인스턴스 전달은 포함하지 않아요.
 - 설정 응답의 `benefitDesignEnabled`·`benefitEventsEnabled`가 있는 서버에서만 새 선택·SSE를 사용해요. 프론트는 연결 실패 시 60초 보조 재조회, 백그라운드/기능 이탈 시 연결 정리, 현재 목록 행 위치 보존을 사용해요. 관리자 원문 변경은 자동 표시하되 심사 사유를 유지하고 확인 버튼으로 새 버전을 확인하기 전 처리를 막아요. 사업자 작성 중인 편집값과 원본 revision은 고정해 충돌 검사를 유지해요.
 
-### 책임 분리와 주소 설정 (2026-10-15 로컬 후보)
+<a id="책임-분리와-주소-설정-2026-10-15-로컬-후보"></a>
+
+### 책임 분리와 주소 설정
 
 - `MyPage`는 내 정보 화면 조합을 담당해요. 이름·비밀번호·계정 사진·위치·사업자 인증·환경 설정은 `components/member/`에, 탈퇴의 계정/권한 세대·미결 처리 확인은 `useMemberWithdrawal`에 있어요.
 - `StoreDetail`은 상세 화면 조합을 유지하고 실제 인원/시간/예약 UI는 `components/reservation/StoreReservationPanel`을 써요. 등록·수정 미리보기도 이 UI를 재사용해요. QR 시작/종료 약속은 `useQrCameraLifecycle`, 광고 작성 값/사진/전송 구성은 `advertisementForm`에 있어요.
 - 서버 서비스의 공개 메서드와 트랜잭션 경계는 유지해요. `StoreDirectory`는 공개 검색/count/지역 집계·본인 가게/수정용 조회, `StoreImages`는 사진 순서·참조 검사·업로드·롤백/삭제 의도를 담당해요. 기존 FULLTEXT 탐지/비활성화 상태는 같은 StoreFulltextSearch 빈을 공유해요. `StoreStatistics`는 권한을 확인한 통계 조회, `ReservationAvailability`는 예약 가능 시간 계산, `ReservationAttendance`는 QR 발급·멱등 체크인·완료·노쇼 처리를 담당하며 나머지 예약 흐름도 `ReservationAccess`의 소유권/승인 정책을 공유해요. `PaymentPreparation`은 기존 예약금/결제 준비를 담당해요. 결제 확정·환불 원장·외부 호출·잠금 순서는 이 분리에서 바꾸지 않고 옮긴 로그도 기존 서비스의 logger 이름을 유지해요.
 - 서버 `SiteUrls`와 프론트 `config/siteUrls.js`가 앱·홍보·기존 앱 출처를 관리해요. `APP_FRONTEND_URL`은 로그인/결제 복귀, `APP_PUBLIC_URL`은 공개 공유/sitemap, `APP_MARKETING_URL`은 홍보 주소, `APP_LEGACY_FRONTEND_URL`은 전환 중 기존 주소의 OAuth 복귀를 허용해요. 대응 프론트 값은 `VITE_APP_ORIGIN`, `VITE_MARKETING_ORIGIN`, `VITE_LEGACY_APP_ORIGIN`이에요. 미설정 상태는 기존 운영 주소를 유지해요.
 - `marketing/`은 소개·기능·사업자 시작·FAQ·앱 진입의 정적 산출물이에요. `node marketing/build.mjs`는 별도 `marketing/dist/`에 앱과 공유하는 테마·글꼴·브랜드 자산과 robots/sitemap/release-id를 만들어요. 앱 API는 새 앱 호스트에서 같은 출처로 프록시하고 백엔드/DB/CDN은 유지해요.
-- 가게 초안은 출처별 IndexedDB이므로 `/drafts/transfer`에서 사진 포함 파일로 이전해요. 메뉴 이름은 ‘가게 초안 옮기기’이며 앱과 기존 출처가 같은 현재 설정에서는 계정 메뉴에 표시하지 않아요. 같은 회원의 등록/수정 키만 복원하고 원래 30일 만료일·서버 원본 지문·사진 순서를 보존해요. 계정 세대, 사진 서명/크기/SHA-256, 값 구조를 확인하고 덮어쓰기는 직접 선택해요. 서버의 피드/소식 초안은 별도 이전하지 않아요.
-- 배포 변수 `RESERVE_DOMAIN_SPLIT`은 기본 false이며 실제 전환 전에 [배포 런북](deployments.md)의 v6 복구·스키마·DNS/TLS·OAuth 등록 단계를 완료해야 해요. 소스와 선택형 배포 연결만 준비했고 실제 변수·DNS·콘솔·Nginx·운영 DB를 변경하지 않았어요.
+- 가게 초안은 출처별 IndexedDB이므로 `/drafts/transfer`에서 사진 포함 파일로 이전해요. 메뉴 이름은 ‘가게 초안 옮기기’이며 앱과 기존 출처가 같으면 계정 메뉴에 표시하지 않아요. 같은 회원의 등록/수정 키만 복원하고 원래 30일 만료일·서버 원본 지문·사진 순서를 보존해요. 계정 세대, 사진 서명/크기/SHA-256, 값 구조를 확인하고 덮어쓰기는 직접 선택해요. 서버의 피드/소식 초안은 별도 이전하지 않아요.
+- 배포 변수 `RESERVE_DOMAIN_SPLIT`의 소스 기본값은 false이며 운영·향후 배포 변수는 true예요. v2.12.0에서 앱·소개·기존 초안 복구 경로를 분리했고 v2.13.0 자동 배포는 같은 main SHA의 세 포인터·정적 root·Nginx upstream을 함께 전환했어요. 다음 전환도 [배포 런북](deployments.md)의 실제 스키마·새 직전 백업/복원·v7 호환 이미지·키·설정 보존 관문을 유지해요.

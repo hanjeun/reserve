@@ -2,6 +2,24 @@
 
 RESERVE MySQL의 백업 구성과 복원 절차예요.
 
+## 2026-10-18 v2.13.0 직전·사후 백업과 독립 복원
+
+현재 운영 main은 `8c3648e6630bc1a1c82e1f36aa692d3df699b435`, 복구 호환 표식은 `waiting-signup-hidden-feed-oauth-v7`이에요. 점검·앱 writer 0을 확인한 뒤 새 직전 백업을 만들었고 신규 DDL은 적용하지 않았어요. [PR #343](https://github.com/hanjeun/reserve/pull/343)과 [실제 전환 기록](deployments.md#2026-10-18-v2130-실제-운영-전환)이 해당 입력의 근거예요.
+
+| 항목 | 직전 백업 | 사후 백업 |
+|---|---|---|
+| S3 `mysql/` 객체 | `reserve-20261018-122138.sql.gz` | `reserve-20261018-124337.sql.gz` |
+| 크기 | 18,292바이트 | 18,292바이트 |
+| SHA-256 | `14e551e345bd572053e4e2b9e932cb88f6bf07cc7bb176260c5986c8cb422ca7` | `e73c8e27072b4f47e8dd5f9850fd100cfee2ebfe2652a434d4554fc0198de257` |
+| 정확한 VersionId | `EhVCZxLCVDqYIGFZvMVXxcKEJy1x0bH8` | `dcU0aWDjbvfKMni3wNCCczW3UlYz2MYv` |
+| 서버 측 암호화 | AES256 | AES256 |
+
+직전 백업은 별도 CloudShell에서 정확한 버전을 내려받아 보호된 PC의 해시와 대조하고, 새 internal 격리 MySQL 8.0.45에 49테이블·68행을 실제 복원했어요. `CHECK TABLE` 49개 정상·원본 행 digest 일치·FK 49개의 orphan 0을 확인했어요. 실제 최종 이미지의 JAR SHA-256 `47504801fab86953d188b30c1e9173c0ec4b1ea12eef4cdf1cef4e67e23105a5`와 포함 HTML을 대조하고 DDL 권한 없는 `reserve_app`으로 49모델 `validate`를 통과했어요. 기존 개발 DB·이전 복원 볼륨을 덮어쓰지 않았어요.
+
+사후 백업도 독립 CloudShell·보호된 PC 다운로드의 해시·gzip·덤프 종료 표식·49테이블 정의를 확인했어요. 사후 덤프를 다시 복원한 것은 아니에요. 기존 `v7-release-b150ba5ac53fb2e2aaee1fc1f3866106615f5fbc.tar.gz`의 서버·PC SHA-256 `45456937f1a1ef2026b994c56a6ed17de8f63e165d8a48deaccd87c45da17410` 일치를 확인하고 보존했어요. 복구 시 최신 DB·사진·암호화 키와 토큰 암호화 활성화를 유지하며 이전 v6 이미지나 flag=false로 우회하지 않아요.
+
+아래 날짜별 후보·준비 기록은 당시 입력의 검증 범위예요. v7 스키마는 v2.12.0에서 이미 적용했으므로 15·16절 SQL을 다시 실행하는 지시로 읽지 않아요.
+
 ## 2026-10-18 v7 준비용 정기 백업 독립 복원
 
 10/17 정기 백업 `mysql/reserve-20261017-181001.sql.gz`(VersionId `9IkDhjgzTYW9xz88cp938808mBDHJe5j`, 15,442바이트·SHA-256 `f35f1d3ff635002500821a4f932f08ad50a88d13b74351ae63fc109e1b778f7a`)은 SSH로 확인한 서버 원본·S3 수신자 콘솔 자격의 새 독립 CloudShell·보호된 PC에서 모두 같았어요. 전환 직전 백업이 아닌 준비용 자료예요. 고정한 MySQL 8.0.45 이미지의 `internal` Docker 격리 환경에 36테이블·66행을 복원하고 [feed-v6-from-v2.sql](../../scripts/sql/feed-v6-from-v2.sql)(SHA-256 `75d84c24c6e740c19a3f9eb4fd0c92ef7e7db91bae5ca67444cbd289edc26eb5`) → [oauth-security-v7.sql](../../scripts/sql/oauth-security-v7.sql)(`df5485625ef2ab32527cffd9bb47bd562d6897c1a458d6d8d6f3a3673d7f492c`)만 적용했어요. v6 묶음은 DDL 15절~15.8을 포함하므로 개별 SQL을 중복 실행하지 않아요. 적용 후 49테이블, 기존 66행의 원래 컬럼 값·행 수와 FK/인덱스/CHECK 보존, FK 49개의 orphan 0을 확인했어요. 실제 runtime JAR 142개를 포함한 준비용 2.12.0 JAR로 DDL 권한 없는 `reserve_app`의 49테이블 모델 `validate`를 통과했고, 공식 Corretto Java 21.0.12.1 컨테이너(UID 1000)의 `green/secret/common/prod`·합성 외부 자격·격리 `internal` 네트워크(호스트 포트·외부 연결 없음)에서 전체 기동과 health UP도 확인했어요. 시험 후 앱 컨테이너는 종료·제거하고 49테이블 복원 MySQL만 보존했으며 최종 수정 commit·main 산출물·CI의 통과 기록은 아니에요. 운영은 변경하지 않았으며 최종 main SHA와 전환 직전 백업으로 다시 확인해야 해요.

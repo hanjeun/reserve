@@ -34,7 +34,8 @@ return {
                 manualChunks(id) {
                     const module = id.replaceAll('\\', '/');
                     // Replay는 첫 화면 후 동적으로 읽는다. 기본 오류·추적 SDK와 함께 묶지 않는다.
-                    if (/\/node_modules\/@sentry\/(?!replay\/)/.test(module)) return 'vendor-sentry';
+                    if (/\/node_modules\/@sentry\/(?!replay\/)/.test(module)
+                        || /\/node_modules\/web-vitals\//.test(module)) return 'vendor-sentry';
                     if (module.includes('commonjsHelpers.js') || /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(module)) return 'vendor-react';
                     if (/\/node_modules\/(axios|@tanstack\/react-query|@tanstack\/query-core|zustand)\//.test(module)) return 'vendor-state';
                 },

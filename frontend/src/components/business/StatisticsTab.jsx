@@ -7,12 +7,14 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { StarFilled, WalletOutlined, CommentOutlined, NotificationOutlined } from '../common/icons';
-import { DataState, StatCard, ChartCard, SegmentedControl, PieLegend, FilterToolbar } from '../common';
+import { Button, DataState, StatCard, ChartCard, SegmentedControl, PieLegend, FilterToolbar } from '../common';
 import { Bone } from '../common/Skeletons';
 import { SegmentedControlSkeleton } from '../layout/routeSkeletonParts';
 import { useMyStores, useQueryParamsState } from '../../hooks';
 import { storeKeys } from '../../hooks/queryKeys';
 import storeService from '../../services/storeService';
+import useAuthStore from '../../store/useAuthStore';
+import { downloadCsv } from '../../utils/csv';
 import { AD_TYPE_LABELS, RESERVATION_STATUS_LABELS } from '../../constants';
 import { colors, fontSize, chartPalette, chartGridProps, chartAxisTick, chartTooltipStyle, chartPieCornerRadius, chartAreaGradient, chartMargin, chartYAxisWidth } from '../../styles/tokens';
 
@@ -376,6 +378,7 @@ const renderAdPerformance = (loading, adSummary) => {
  * DB에서 GROUP BY로 집계해서 내려받음)
  */
 const StatisticsTab = () => {
+    const sessionRevision = useAuthStore(state => state.sessionRevision);
     const { stores: myStores, loading: storesLoading, error: storesError, refetch: refetchStores } = useMyStores();
     const [{ statisticsStore, statisticsRange }, setStatisticsParams] = useQueryParamsState(STATISTICS_QUERY_DEFAULTS);
     const storeId = resolveStoreId(myStores, statisticsStore);
@@ -384,6 +387,17 @@ const StatisticsTab = () => {
     const { data: stats, isLoading: statsLoading, isFetching, error: statsError, refetch } = useStoreStatistics(storeId, range);
     const loading = storesLoading || statsLoading;
     const toolbarLoading = loading || isFetching;
+    const selectedStore = myStores.find(store => store.id === storeId);
+    const csvDisabled = toolbarLoading || Boolean(storesError || statsError) || !stats || !selectedStore;
+    const csvButton = (name, title, columns, rows) => <Button variant="outline" size="sm" disabled={csvDisabled}
+        aria-label={`${title} CSV 다운로드`} onClick={() => {
+            if (csvDisabled || useAuthStore.getState().sessionRevision !== sessionRevision) return;
+            const metadata = [
+                { key: 'storeId', label: '가게 ID' }, { key: 'storeName', label: '가게' }, { key: 'rangeDays', label: '기간(일)' },
+            ];
+            downloadCsv(`reserve-store-${storeId}-${range}-${name}.csv`, [...metadata, ...columns],
+                rows.map(row => ({ ...row, storeId, storeName: selectedStore.name, rangeDays: Number(rangeDays(range)) })));
+        }}>CSV 다운로드</Button>;
     // 처음 가게 목록을 받는 동안에도 툴바의 자리를 유지한다. storeId가 생긴 뒤에는
     // 통계만 다시 조회하고, 그 전에는 가게 목록 조회 함수를 넘겨 RefreshButton이 사라지지 않게 한다.
     const handleReload = storeId ? refetch : refetchStores;
@@ -466,6 +480,7 @@ const StatisticsTab = () => {
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <ChartCard
                     title="예약 추이"
+                    extra={csvButton('reservations', '예약 추이', DATE_COUNT_COLUMNS, stats?.reservationTrend ?? [])}
                     loading={loading}
                     height={260}
                     minWidth={340}
@@ -478,6 +493,7 @@ const StatisticsTab = () => {
 
                 <ChartCard
                     title="상태별 분포"
+                    extra={csvButton('statuses', '상태별 분포', STATUS_COUNT_COLUMNS, statusPieData)}
                     loading={loading}
                     height={260}
                     minWidth={280}
@@ -490,6 +506,7 @@ const StatisticsTab = () => {
 
                 <ChartCard
                     title="예약금 순결제액 추이"
+                    extra={csvButton('revenue', '예약금 순결제액 추이', DATE_REVENUE_COLUMNS, stats?.revenueTrend ?? [])}
                     loading={loading}
                     height={260}
                     minWidth={340}

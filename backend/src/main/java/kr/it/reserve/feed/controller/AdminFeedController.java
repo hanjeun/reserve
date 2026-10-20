@@ -36,6 +36,8 @@ public class AdminFeedController {
     }
     @GetMapping("/audit")
     public ResponseEntity<ApiResponse<Page<FeedDto.Audit>>> audit(@RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) { return FeedController.response(moderation.audit(admin(), page, size), "피드 처리 기록 조회 성공"); }
+            @RequestParam(defaultValue = "12") int size, @RequestParam(required = false) String action) {
+        return FeedController.response(moderation.audit(admin(), page, size, action), "피드 처리 기록 조회 성공");
+    }
     private Long admin() { return SecurityUtil.getCurrentMemberId(); }
 }

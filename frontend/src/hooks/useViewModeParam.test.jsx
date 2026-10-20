@@ -104,7 +104,7 @@ describe('explicit view URL contract', () => {
         </MemoryRouter>);
 
         await waitFor(() => expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('search').textContent)))
-            .toEqual({ view: 'cards', sort: 'recent', domain: '' }));
+            .toEqual({ view: 'cards', sort: 'recent', domain: 'all' }));
         expect(screen.getByTestId('view')).toHaveTextContent('cards');
     });
 
@@ -137,6 +137,6 @@ describe('explicit view URL contract', () => {
         sessionStorage.setItem('reserve:discovery-region', '부산');
         render(<MemoryRouter initialEntries={['/stores']}><Probe defaultView="cards" /></MemoryRouter>);
         await waitFor(() => expect(Object.fromEntries(new URLSearchParams(screen.getByTestId('search').textContent)))
-            .toEqual({ view: 'cards', sort: 'recommended', domain: '', page: '1', region: '부산' }));
+            .toEqual({ view: 'cards', sort: 'recommended', domain: 'all', page: '1', region: '부산' }));
     });
 });

@@ -32,6 +32,7 @@ import { normalizeRouteSkeletonPath } from './routeSkeletonKind';
 import { discoveryComingSoonScreen } from '../../constants/discoveryComingSoon';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { resolveViewMode } from '../../utils/viewMode';
+import { readQuerySelection } from '../../utils/querySelection';
 import { breakpoints, colors, field } from '../../styles/tokens';
 import { StateIllustrationSkeleton } from '../common/StateIllustration';
 import { GUIDE_PAGES, guidePageForPath, guideStyles } from '../../pages/legal/GuidePageMetadata';
@@ -44,7 +45,7 @@ export { TextBone };
 
 const optionValueOr = (options, value, fallback) => options.some(option => option.value === value) ? value : fallback;
 const storeSkeletonFilters = (params, sortOptions, fallbackSort) => [
-    { value: params.get('domain') || '', options: SERVICE_DOMAIN_FILTER_OPTIONS, className: 'reserve-explore-domain-filter' },
+    { value: readQuerySelection('domain', params.get('domain')) || '', options: SERVICE_DOMAIN_FILTER_OPTIONS, className: 'reserve-explore-domain-filter' },
     { value: optionValueOr(sortOptions, params.get('sort'), fallbackSort), options: sortOptions, className: 'reserve-explore-sort-filter' },
 ];
 
@@ -287,7 +288,7 @@ export function BusinessRouteSkeleton({ search = '' }) {
         {contentTab === 'chat-intro' && <ChatIntroRouteSkeleton business />}
         {contentTab === 'reservations' && <>
             <ListingToolbarSkeleton filters={reservationSkeletonFilters({
-                store: params.get('reservationStore') || 'ALL',
+                store: readQuerySelection('reservationStore', params.get('reservationStore')) || 'ALL',
                 status: optionValueOr(RESERVATION_STATUS_FILTER_OPTIONS, params.get('reservationStatus'), 'ALL'),
                 sort: optionValueOr(RESERVATION_SORT_OPTIONS, params.get('reservationSort'), 'recent'),
             })} />
@@ -419,7 +420,7 @@ ReservationsSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes
 function BenefitsRouteSkeleton({ search }) {
     const business = useAuthStore(state => state.user?.role === 'BUSINESS');
     const params = new URLSearchParams(search);
-    return <section className="reserve-benefits-page"><StoreNewsPublicToolbarSkeleton business={business} type={params.get('newsType') || 'ALL'} period={params.get('period') === 'ALL' ? 'ALL' : 'ONGOING'} /><section className="reserve-benefits-news">
+    return <section className="reserve-benefits-page"><StoreNewsPublicToolbarSkeleton business={business} type={readQuerySelection('newsType', params.get('newsType')) || 'ALL'} period={readQuerySelection('period', params.get('period')) === 'ALL' ? 'ALL' : 'ONGOING'} /><section className="reserve-benefits-news">
         <div className="reserve-benefits-news-content"><BenefitListSkeleton /></div>
     </section></section>;
 }

@@ -21,6 +21,7 @@ import { STORE_NEWS_TYPES } from '../../utils/storeNews';
 import useListQueryNormalization from '../../hooks/useListQueryNormalization';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { readQuerySelection, writeQuerySelection } from '../../utils/querySelection';
 
 export const BENEFIT_PAGE_SIZE = 12;
 
@@ -49,12 +50,12 @@ export default function Benefits() {
     const requested = Number(params.get('page') ?? 1);
     const page = Number.isSafeInteger(requested) && requested > 0 && requested <= 10000 ? requested : 1;
     const type = STORE_NEWS_TYPES.some(option => option.value === params.get('newsType')) ? params.get('newsType') : 'ALL';
-    const period = params.get('period') === 'ALL' ? 'ALL' : 'ONGOING';
+    const period = readQuerySelection('period', params.get('period')) === 'ALL' ? 'ALL' : 'ONGOING';
     const queryParams = { page: page - 1, size: BENEFIT_PAGE_SIZE, newsType: type === 'ALL' ? undefined : type, period };
     const changeFilter = (key, value) => {
         const updated = new URLSearchParams(params);
         updated.set('page', '1');
-        updated.set(key, value);
+        updated.set(key, writeQuerySelection(key, value));
         setParams(updated);
     };
     const { data, isPending, isFetching, isError, isSuccess, isPlaceholderData, error, refetch } = useQuery({

@@ -16,7 +16,8 @@ import WorkspaceLayout from '../../components/layout/WorkspaceLayout';
 import WorkspacePanels from '../../components/layout/WorkspacePanels';
 import useWorkspaceNavigate from '../../hooks/useWorkspaceNavigate';
 import { ADMIN_WORKSPACE_GROUPS, resolveAdminTab } from '../../constants/workspaces';
-import { adminTabSearch } from './adminTabQuery';
+import { adminTabSearch, ADMIN_TAB_QUERY_KEYS } from './adminTabQuery';
+import useTabQueryMemory from '../../hooks/useTabQueryMemory';
 import { FeedReportsSkeleton } from '../../components/feed/FeedSkeleton';
 import { BenefitApplicationsSkeleton } from '../../components/admin/ManagementReviewSkeletons';
 
@@ -29,11 +30,12 @@ export default function AdminPanel() {
     const navigateWorkspace = useWorkspaceNavigate();
     const location = useLocation();
     const activeTab = resolveAdminTab(new URLSearchParams(location.search).get('tab'));
-    const hrefFor = key => `?${adminTabSearch(location.search, key)}${location.hash}`;
+    const remembered = useTabQueryMemory(location.pathname, activeTab, location.search, ADMIN_TAB_QUERY_KEYS);
+    const hrefFor = key => `?${adminTabSearch(location.search, key, remembered(key))}${location.hash}`;
     useEffect(() => {
         const normalized = adminTabSearch(location.search, activeTab);
-        if (normalized !== location.search.replace(/^\?/, '')) navigate({ search: '?' + normalized, hash: location.hash }, { replace: true });
-    }, [activeTab, location.search, location.hash, navigate]);
+        if (normalized !== location.search.replace(/^\?/, '')) navigate({ search: '?' + normalized, hash: location.hash }, { replace: true, state: location.state });
+    }, [activeTab, location.search, location.hash, location.state, navigate]);
 
     const tabItems = [
         { key: 'pending', label: '인증 대기', children: <BusinessVerificationTab mode="pending" /> },

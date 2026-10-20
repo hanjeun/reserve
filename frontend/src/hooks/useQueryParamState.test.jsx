@@ -106,11 +106,11 @@ describe('useQueryParamsState', () => {
         }
         render(<MemoryRouter initialEntries={['/admin?tab=reservations#rows']}><SelectionProbe /></MemoryRouter>);
         const query = () => Object.fromEntries(new URLSearchParams(screen.getByTestId('selection-query').textContent));
-        await waitFor(() => expect(query()).toEqual({ tab: 'reservations', status: 'ALL', view: 'list', type: '', statisticsStore: '' }));
+        await waitFor(() => expect(query()).toEqual({ tab: 'reservations', status: 'all', view: 'list', type: 'all', statisticsStore: '' }));
         await user.click(screen.getByRole('button', { name: '상태 전환' }));
         expect(query().status).toBe('OPEN');
         await user.click(screen.getByRole('button', { name: '상태 전환' }));
-        expect(query().status).toBe('ALL');
+        expect(query().status).toBe('all');
         expect(screen.getByTestId('selection-hash')).toHaveTextContent('#rows');
     });
 
@@ -121,7 +121,7 @@ describe('useQueryParamsState', () => {
             return <output data-testid="nested-query">{location.search}</output>;
         }
         render(<MemoryRouter initialEntries={['/admin?tab=feed-reports']}><NestedProbe /></MemoryRouter>);
-        await waitFor(() => expect(screen.getByTestId('nested-query')).toHaveTextContent('?tab=feed-reports&mode=reports&reportStatus=ALL&page=1'));
+        await waitFor(() => expect(screen.getByTestId('nested-query')).toHaveTextContent('?tab=feed-reports&mode=reports&reportStatus=all&page=1'));
         expect(new URLSearchParams(screen.getByTestId('nested-query').textContent).has('commentStatus')).toBe(false);
     });
 });

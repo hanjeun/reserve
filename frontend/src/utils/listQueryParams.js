@@ -7,6 +7,7 @@ import { WAITING_STORE_STATUSES, WAITING_STORE_SORTS } from '../components/waiti
 import { STORE_NEWS_TYPES } from './storeNews';
 import { feedRegion, FEED_DIRECTORY_VIEWS } from './feed';
 import { VIEW_MODES } from './viewMode';
+import { readQuerySelection, writeQuerySelection } from './querySelection';
 
 const valuesOf = options => new Set(options.map(option => option.value));
 const domains = valuesOf(SERVICE_DOMAIN_OPTIONS);
@@ -74,7 +75,7 @@ export function normalizeListQueryParams(pathname, searchParams) {
     if (path === '/feed' && !['mine', 'drafts'].includes(next.get('view'))) defaultValues.region = 'all';
     for (const key of new Set(next.keys())) {
         if (isAttribution(key)) continue;
-        let value = next.get(key);
+        let value = readQuerySelection(key, next.get(key));
         if (key === 'region' && value === '' && ['/stores', '/waiting', '/feed'].includes(path)) {
             value = 'all';
             next.set(key, value);
@@ -86,14 +87,14 @@ export function normalizeListQueryParams(pathname, searchParams) {
         const valid = Object.hasOwn(schema, key) && (emptySelection || value !== ''
             && (rule == null || (rule instanceof Set ? rule.has(value) : rule(value))));
         if (!valid) next.delete(key);
-        else next.set(key, value); // Keep one value for each supported option.
+        else next.set(key, writeQuerySelection(key, value)); // Keep one value for each supported option.
     }
     if (Object.hasOwn(schema, 'lat') && !hasDistanceCoordinates(next.get('lat'), next.get('lng'))) {
         next.delete('lat');
         next.delete('lng');
     }
     for (const [key, value] of Object.entries(defaultValues)) {
-        if (!next.has(key)) next.set(key, value);
+        if (!next.has(key)) next.set(key, writeQuerySelection(key, value));
     }
     return next;
 }

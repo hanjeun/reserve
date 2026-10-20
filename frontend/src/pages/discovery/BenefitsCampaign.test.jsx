@@ -186,7 +186,7 @@ describe('actual photo benefits banners without invented campaign or general sto
 
         await screen.findByText('이 페이지에는 소식이 없어요.');
         expect(screen.queryByText('아직 등록된 가게 소식이 없어요.')).not.toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '첫 페이지로' })).toHaveAttribute('href', '/benefits?page=1&utm_source=campaign&newsType=ALL&period=ONGOING');
+        expect(screen.getByRole('link', { name: '첫 페이지로' })).toHaveAttribute('href', '/benefits?page=1&utm_source=campaign&newsType=all&period=ONGOING');
         expect(document.querySelector('.reserve-benefits-empty img')).toBeNull();
         expect(benefitService.getList).toHaveBeenCalledWith({ page: 2, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal));
         await waitFor(() => expect(benefitService.getList).toHaveBeenCalledWith({ page: 1, size: 12, newsType: undefined, period: 'ONGOING' }, expect.any(AbortSignal)));

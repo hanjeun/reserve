@@ -28,7 +28,7 @@ describe('public list query normalization', () => {
         expect(screen.getByTestId('url')).toHaveTextContent(/^\/guide\/user$/);
     });
 
-    it.each(['/feed?view=drafts&page=2', '/benefits?newsType=BENEFIT&period=ALL&page=2'])('keeps meaningful state in %s', url => {
+    it.each(['/feed?view=drafts&page=2', '/benefits?newsType=BENEFIT&period=all&page=2'])('keeps meaningful state in %s', url => {
         render(<MemoryRouter initialEntries={[url]}><Probe /></MemoryRouter>);
         expect(screen.getByTestId('url')).toHaveTextContent(url);
     });

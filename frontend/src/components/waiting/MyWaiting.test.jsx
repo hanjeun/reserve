@@ -266,7 +266,7 @@ it('normalizes waiting keys independently while preserving the existing reservat
         tab: 'waiting', waitingStatus: 'CONFIRMED', waitingSort: 'visit', waitingKeyword: '가'.repeat(101), waitingPage: '100001',
         status: 'CONFIRMED', sort: 'visit',
     }));
-    expect(invalid.get('waitingStatus')).toBe('ALL');
+    expect(invalid.get('waitingStatus')).toBe('all');
     expect(invalid.get('waitingSort')).toBe('recent');
     expect(invalid.get('waitingPage')).toBe('1');
     expect(invalid.has('waitingKeyword')).toBe(false);

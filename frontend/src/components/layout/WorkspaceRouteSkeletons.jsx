@@ -5,11 +5,13 @@ import FilterToolbarSkeleton from '../common/FilterToolbarSkeleton';
 import AdminTableSkeletonTable from '../common/AdminTableSkeletonTable';
 import StatCard from '../common/StatCard';
 import ChartCard from '../common/ChartCard';
+import Button from '../common/Button';
 import { ReservationSummaryCardSkeleton } from '../common/Skeletons';
 import ChatIntroEditorSkeleton from '../chat/ChatIntroEditorSkeleton';
 import { FeedReportsSkeleton } from '../feed/FeedSkeleton';
 import { BenefitApplicationsSkeleton } from '../admin/ManagementReviewSkeletons';
-import { REPORT_STATUS_OPTIONS, reportMode, reviewOption } from '../admin/managementReviewQuery';
+import { REPORT_STATUS_OPTIONS, REPORT_AUDIT_ACTION_OPTIONS, reportMode, reviewOption } from '../admin/managementReviewQuery';
+import { readQuerySelection } from '../../utils/querySelection';
 import ManagementListToolbar from '../common/ManagementListToolbar';
 import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
 import { ListingToolbarSkeleton, SegmentedControlSkeleton } from './routeSkeletonParts';
@@ -104,6 +106,7 @@ export function StatisticsRouteSkeleton({ dashboard = false, search = '' }) {
         </div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             {charts.map((title, index) => <ChartCard key={title} title={title} loading height={dashboard ? 240 : 260}
+                extra={dashboard ? undefined : <Button variant="outline" size="sm" disabled>CSV 다운로드</Button>}
                 minWidth={dashboard ? undefined : index === 1 ? 280 : 340}>
                 <ChartBodySkeleton donut={dashboard ? index === 0 : index === 1} dashboard={dashboard}
                     heights={dashboard ? [70, 110, 55, 90] : index === 2 ? [90, 60, 120, 80, 140, 100] : undefined} />
@@ -168,9 +171,10 @@ export default function AdminTabRouteSkeleton({ tab, search = '' }) {
     if (tab === 'chat-intro') return <ChatIntroRouteSkeleton />;
     if (tab === 'feed-reports') {
         const mode = reportMode(params.get('reportMode'));
-        return <FeedReportsSkeleton mode={mode} status={reviewOption(REPORT_STATUS_OPTIONS, params.get(mode === 'comments' ? 'commentReportStatus' : 'reportStatus'), 'ALL')} />;
+        return <FeedReportsSkeleton mode={mode} status={reviewOption(REPORT_STATUS_OPTIONS, params.get(mode === 'comments' ? 'commentReportStatus' : 'reportStatus'), 'ALL')}
+            auditAction={reviewOption(REPORT_AUDIT_ACTION_OPTIONS, readQuerySelection('reportAuditAction', params.get('reportAuditAction')), 'ALL')} />;
     }
-    if (tab === 'benefit-applications') return <BenefitApplicationsSkeleton state={params.get('benefitState') || 'PENDING'} />;
+    if (tab === 'benefit-applications') return <BenefitApplicationsSkeleton state={readQuerySelection('benefitState', params.get('benefitState')) || 'PENDING'} />;
     if (tab === 'dashboard') return <StatisticsRouteSkeleton dashboard />;
     if (tab === 'payments') return <PaymentOperationsRouteSkeleton />;
     if (tab === 'reservations') return <>

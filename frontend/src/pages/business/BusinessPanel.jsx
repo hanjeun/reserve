@@ -27,7 +27,8 @@ import { RESERVATION_STATUS_FILTER_OPTIONS, RESERVATION_SORT_OPTIONS } from '../
 import { DEFAULT_PAGE_SIZE, MOBILE_PAGINATION_BREAKPOINT } from '../../constants/pagination';
 import reservationService from '../../services/reservationService';
 import { colors } from '../../styles/tokens';
-import businessTabSearch from './businessTabQuery';
+import businessTabSearch, { BUSINESS_TAB_QUERY_KEYS } from './businessTabQuery';
+import useTabQueryMemory from '../../hooks/useTabQueryMemory';
 
 const WaitingTab = lazy(() => import('../../components/business/WaitingTab'));
 const StoreNewsTab = lazy(() => import('../../components/business/StoreNewsTab'));
@@ -260,11 +261,12 @@ const BusinessPanel = () => {
     const returnTab = resolveBusinessTab(params.get('qrReturn'));
     const contentTab = activeTab === 'qr-checkin' ? (returnTab === 'qr-checkin' ? 'reservations' : returnTab) : activeTab;
 
-    const hrefFor = tab => '?' + businessTabSearch(location.search, tab) + location.hash;
+    const remembered = useTabQueryMemory(location.pathname, contentTab, location.search, BUSINESS_TAB_QUERY_KEYS);
+    const hrefFor = tab => '?' + businessTabSearch(location.search, tab, remembered(tab)) + location.hash;
     useEffect(() => {
         const normalized = businessTabSearch(location.search, activeTab);
-        if (normalized !== location.search.replace(/^\?/, '')) navigate({ search: '?' + normalized, hash: location.hash }, { replace: true });
-    }, [activeTab, location.search, location.hash, navigate]);
+        if (normalized !== location.search.replace(/^\?/, '')) navigate({ search: '?' + normalized, hash: location.hash }, { replace: true, state: location.state });
+    }, [activeTab, location.search, location.hash, location.state, navigate]);
 
     const tabItems = [
         { key: 'reservations', label: '예약 관리', children: <ReservationTab /> },

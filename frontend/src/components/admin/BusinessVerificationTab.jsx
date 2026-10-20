@@ -427,7 +427,8 @@ const BusinessVerificationTab = ({ mode = 'pending' }) => {
                 {detailItem.licenseImageUrl && (
                     <DetailRow label="사업자등록증">
                         <LoadingAntImage src={getDetailImageUrl(detailItem.licenseImageUrl)} alt="사업자등록증"
-                            style={{ maxWidth: '100%', borderRadius: radius.md, marginTop: 4 }}
+                            styles={{ root: { maxWidth: '100%', borderRadius: radius.md, marginTop: 4, overflow: 'hidden', lineHeight: 0 } }}
+                            style={{ maxWidth: '100%', borderRadius: 'inherit', display: 'block' }}
                             classNames={{ popup: { root: 'reserve-image-preview' } }} />
                     </DetailRow>
                 )}

@@ -5,7 +5,7 @@ import LoadingAntImage from './LoadingAntImage';
 import { photoPreviewClassNames, rememberPhotoPreviewOrigin } from '../../utils/photoPreview';
 
 /** 가게 상세·피드·소식이 같은 슬라이드, 확대 보기와 모바일 스와이프를 쓴다. */
-export default function PhotoGallery({ label, sources, imageSizes, autoplay = false, wrapperStyle, imageStyle, previewEnabled = true, dots = true, onSlideChange }) {
+export default function PhotoGallery({ label, sources, imageSizes, autoplay = false, wrapperStyle, imageStyle, previewEnabled = true, dots = true, adaptiveHeight = false, onSlideChange }) {
     const [loadedSources, setLoadedSources] = useState(() => new Set());
     const gesture = useRef(null);
     const suppressClick = useRef(false);
@@ -42,13 +42,13 @@ export default function PhotoGallery({ label, sources, imageSizes, autoplay = fa
             }}>
             <Image.PreviewGroup items={sources} classNames={photoPreviewClassNames}>
                 <Carousel className="reserve-carousel" infinite draggable swipe touchMove swipeToSlide touchThreshold={12}
-                    lazyLoad="ondemand"
+                    lazyLoad="ondemand" adaptiveHeight={adaptiveHeight}
                     dots={dots && sources.length > 1} dotPlacement="bottom" autoplay={autoplay} afterChange={onSlideChange}>
                     {sources.map((src, index) => <div key={`${src}:${index}`}>
                         <LoadingAntImage src={src} alt={`${label} 사진 ${index + 1}`} referrerPolicy="no-referrer"
                             imageSize={imageSizes?.[index]}
                             placeholder={loadedSources.has(src) ? false : undefined}
-                            width="100%" style={imageStyle} draggable={false} preview={previewEnabled ? { mask: '크게 보기' } : false} />
+                            width="100%" style={imageStyle} draggable={false} preview={previewEnabled ? { cover: '크게 보기' } : false} />
                     </div>)}
                 </Carousel>
             </Image.PreviewGroup>
@@ -57,4 +57,4 @@ export default function PhotoGallery({ label, sources, imageSizes, autoplay = fa
 }
 PhotoGallery.propTypes = { label: PropTypes.string.isRequired, sources: PropTypes.arrayOf(PropTypes.string).isRequired,
     imageSizes: PropTypes.arrayOf(PropTypes.shape({ width: PropTypes.number, height: PropTypes.number })),
-    autoplay: PropTypes.bool, wrapperStyle: PropTypes.object, imageStyle: PropTypes.object, previewEnabled: PropTypes.bool, dots: PropTypes.bool, onSlideChange: PropTypes.func };
+    autoplay: PropTypes.bool, wrapperStyle: PropTypes.object, imageStyle: PropTypes.object, previewEnabled: PropTypes.bool, dots: PropTypes.bool, adaptiveHeight: PropTypes.bool, onSlideChange: PropTypes.func };

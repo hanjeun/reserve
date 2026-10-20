@@ -1594,17 +1594,25 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-header-brand { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
 .reserve-header-has-workspace-menu .reserve-header-brand { gap: 0; }
 .reserve-header-has-workspace-menu .reserve-header-logo { margin-inline-start: 4px; }
-/* 버튼 자리(너비·간격)도 같은 곡선으로 0 ↔ 44px 을 오가서, 옆의 RESERVE 로고가 뚝 밀리지 않고
-   버튼과 함께 미끄러진다(2026-09-24). 0 너비일 때 아이콘은 overflow: hidden 으로 잘린다. */
+.reserve-header-control-slot {
+    display: inline-flex;
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 0;
+    height: 44px;
+    overflow: hidden;
+}
+.reserve-header-workspace-menu-slot { --reserve-header-slot-collapsed-margin: 0px; }
+/* 실제 버튼의 44px 최소 폭은 유지하고 바깥 슬롯만 접어 로고의 이동을 이어 준다. */
 @keyframes reserve-header-back-leave {
     0% { opacity: 1; transform: translateX(0) scale(1); width: 44px; flex-basis: 44px; margin-right: 0; }
     45% { opacity: 0.86; transform: translateX(-3px) scale(0.96); }
-    100% { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: -4px; }
+    100% { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: var(--reserve-header-slot-collapsed-margin, -4px); }
 }
 /* 뒤로가기가 새로 필요한 화면에서는 펼치고, 필요 없어지는 화면에서는 접는다.
    버튼이 계속 필요한 경로 사이에서는 같은 DOM을 유지해 모션을 다시 재생하지 않는다. */
 @keyframes reserve-header-back-enter {
-    from { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: -4px; }
+    from { opacity: 0.25; transform: translateX(-9px) scale(0.96); width: 0; flex-basis: 0; margin-right: var(--reserve-header-slot-collapsed-margin, -4px); }
     to { opacity: 1; transform: translateX(0) scale(1); width: 44px; flex-basis: 44px; margin-right: 0; }
 }
 .reserve-header-logo {
@@ -1693,7 +1701,6 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: opacity 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
-    animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 /* 메뉴와 뒤로가기는 같은 헤더 동작 영역을 사용한다. 메뉴에는 기본 채움이나 선택 배경을 두지 않는다. */
 .reserve-header-workspace-menu {
@@ -1717,9 +1724,12 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 @media (max-width: 899px) {
     /* 44px 동작 영역은 유지하고 두 아이콘의 시각 간격만 4px 줄인다. */
     .reserve-header-workspace-menu > .reserve-ui-icon { transform: translateX(2px); }
-    .reserve-header-workspace-menu + .reserve-header-back > .reserve-ui-icon { transform: translateX(-2px); }
+    .reserve-header-workspace-menu-slot + .reserve-header-back-slot .reserve-header-back > .reserve-ui-icon { transform: translateX(-2px); }
 }
-.reserve-header-back--leaving { pointer-events: none; animation: reserve-header-back-leave 0.18s cubic-bezier(0.4, 0, 1, 1) both; }
+.reserve-header-control-slot--leaving,
+.reserve-header-back--leaving { pointer-events: none; }
+.reserve-workspace-menu-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 20px; width: 20px; height: 24px; }
+.reserve-workspace-heading-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 1em; height: 1em; }
 .reserve-header-back:focus { outline: none; }
 .reserve-header-back:focus-visible { outline: var(--reserve-focus-ring); outline-offset: -2px; }
 .reserve-header-actions { flex: 0 0 auto; gap: 4px; }
@@ -1784,6 +1794,15 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 
 /* 검색은 헤더 조작부와 본문의 퇴장/복원을 함께 처리한다. 로고의 기존 정적 동작은 유지한다. */
 @media (prefers-reduced-motion: no-preference) {
+    .reserve-header-control-slot--entering {
+        animation: reserve-header-back-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .reserve-header-control-slot--leaving {
+        animation: reserve-header-back-leave 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+    }
+    .reserve-app-layout[data-search-restored] > .reserve-header:not(.reserve-header--search-leaving) .reserve-header-control-slot:not(.reserve-header-control-slot--leaving) {
+        animation: none;
+    }
     .reserve-header--search-leaving :is(.reserve-header-back, .reserve-header-workspace-menu, .reserve-header-actions, .reserve-header-query) {
         animation: reserve-search-controls-leave var(--reserve-search-motion-duration, 220ms) cubic-bezier(.4, 0, 1, 1) both;
     }
@@ -2219,8 +2238,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     z-index: 2;
     cursor: pointer;
 }
-.reserve-photo-count,
-.reserve-image-preview .ant-image-preview-progress {
+.reserve-photo-count {
     min-width: 65px;
     min-height: 32px;
     padding: 6px 10px;
@@ -2417,8 +2435,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     .reserve-discovery-banner-copy strong { font-size: 28px; }
     .reserve-discovery-banner-kicker,
     .reserve-discovery-banner-description { font-size: 12px; }
-    .reserve-photo-count,
-    .reserve-image-preview .ant-image-preview-progress { min-height: 32px; padding-inline: 12px; font-size: 12px; }
+    .reserve-photo-count { min-height: 32px; padding-inline: 12px; font-size: 12px; }
     .reserve-discovery-shortcut { font-size: 13px; }
     .reserve-app-layout--home .reserve-app-footer { padding-bottom: 36px !important; }
     .reserve-app-layout--home .reserve-app-footer-inner { padding-top: 40px !important; }
@@ -2618,7 +2635,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
 .reserve-search-domain-media img { display: block; object-fit: contain; }
 .reserve-search-quick { margin-top: 36px; }
 .reserve-search-recent { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--c-border-light, #f2f4f6); }
-.reserve-search-recent-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: var(--reserve-search-heading-gap); }
+.reserve-search-recent-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; gap: 16px; margin-bottom: var(--reserve-search-heading-gap); }
 .reserve-search-recent-heading h2 { margin-bottom: 0; }
 .reserve-search-recent-clear { min-height: 44px; border: 0; padding: 8px 0 8px 12px; background: transparent; color: var(--c-text-secondary, #4e5968); font: inherit; font-size: 14px; cursor: pointer; }
 .reserve-search-recent-empty { color: var(--c-text-secondary, #4e5968); font-size: 14px; line-height: 1.6; }
@@ -2745,7 +2762,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: var(--c-text-tertiary, #8b95a1);
+    color: var(--c-text-primary, #191f28);
     font-size: var(--reserve-icon-glyph-size);
     line-height: 1;
     text-decoration: none;

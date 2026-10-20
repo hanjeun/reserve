@@ -21,6 +21,20 @@ import { SEARCH_MOTION_DURATION_MS } from './searchTransition';
 const HeaderAccountMenu = lazy(() => import('./HeaderAccountMenu'));
 const HEADER_ACTION_MOTION_MS = 180;
 
+function HeaderControlSlot({ kind, leaving, skipEntry = false, children }) {
+    const [animateEntry] = useState(() => !skipEntry);
+    return <span className={`reserve-header-control-slot reserve-header-${kind}-slot`
+        + (animateEntry ? ' reserve-header-control-slot--entering' : '')
+        + (leaving ? ' reserve-header-control-slot--leaving' : '')}
+        aria-hidden={leaving ? true : undefined}>{children}</span>;
+}
+HeaderControlSlot.propTypes = {
+    kind: PropTypes.oneOf(['back', 'workspace-menu']).isRequired,
+    leaving: PropTypes.bool,
+    skipEntry: PropTypes.bool,
+    children: PropTypes.node,
+};
+
 const Header = () => {
     const skeletonShown = useSkeletonShown();
     const navigate = useWorkspaceNavigate();
@@ -50,10 +64,13 @@ const Header = () => {
     // 이제 showBack 이 꺼져도 모션 시간만큼 더 남겨 두고 같은 --leaving 애니메이션을 재생한다.
     // 로고 자체는 여전히 움직이지 않고 기다리지도 않는다 — 버튼 자리가 접히면서 로고가 따라 미끄러질 뿐이다.
     const { shouldRender: backMounted } = useExitAnimation(showBack, HEADER_ACTION_MOTION_MS);
+    const { shouldRender: workspaceMounted } = useExitAnimation(showWorkspaceMenu, HEADER_ACTION_MOTION_MS);
     // 모션 최소화에서는 애니메이션이 꺼져 있으므로 남겨 둘 이유가 없다 — 즉시 나타나고 사라진다.
     const renderBack = reducedMotion ? showBack : backMounted;
+    const renderWorkspaceMenu = reducedMotion ? showWorkspaceMenu : workspaceMounted;
     // 버튼이 계속 필요한 경로 사이에서는 같은 DOM을 유지하고, 실제로 없어질 때만 접는다.
     const backLeaving = renderBack && !showBack;
+    const workspaceLeaving = renderWorkspaceMenu && !showWorkspaceMenu;
     const keyword = currentPath === '/stores' ? new URLSearchParams(location.search).get('keyword')?.trim() : '';
     const searchTarget = keyword ? '/search?keyword=' + encodeURIComponent(keyword) : '/search';
     const searchLeaving = navigationIntent?.intent === 'search'
@@ -126,25 +143,27 @@ const Header = () => {
     // 주의: 정지/영구정지 회원은 이제 로그인 자체가 차단되므로(이메일/소셜 공통)
     // 로그인된 상태에서 배너를 띄우는 분기는 더 이상 필요하지 않음 — 완전히 제거됨
     return (
-        <header data-skeleton-shown={skeletonShown ? 'true' : undefined} className={'reserve-header' + (keyword ? ' reserve-header-has-query' : '') + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '') + (showWorkspaceMenu ? ' reserve-header-has-workspace-menu' : '') + (searchLeaving ? ' reserve-header--search-leaving' : '')}
+        <header data-skeleton-shown={skeletonShown ? 'true' : undefined} className={'reserve-header' + (keyword ? ' reserve-header-has-query' : '') + (!isLoggedIn ? ' reserve-header-is-guest' : '') + (showBack ? ' reserve-header-has-back' : '') + (renderWorkspaceMenu ? ' reserve-header-has-workspace-menu' : '') + (searchLeaving ? ' reserve-header--search-leaving' : '')}
             inert={searchLeaving ? true : undefined} aria-busy={searchLeaving || undefined}
             style={{ ...(isDiscoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header), '--reserve-search-motion-duration': `${SEARCH_MOTION_DURATION_MS}ms` }}>
             <div className="reserve-header-inner" style={styles.inner}>
                 <div className="reserve-header-brand">
-                    {showWorkspaceMenu && <Tooltip title={menuLabel} disabled={menu?.mobile && menu.expanded}><button type="button" id={menu?.buttonId} className="reserve-header-workspace-menu"
-                        onClick={menu?.toggle} disabled={!menu}
+                    {renderWorkspaceMenu && <HeaderControlSlot kind="workspace-menu" leaving={workspaceLeaving} skipEntry={skeletonShown}>
+                    <Tooltip title={menuLabel} disabled={workspaceLeaving || searchLeaving || menu?.mobile && menu.expanded}><button type="button" id={menu?.buttonId} className="reserve-header-workspace-menu"
+                        onClick={menu?.toggle} disabled={!menu || workspaceLeaving}
                         data-input-modality={workspaceControls?.inputModality}
                         aria-label={menuLabel}
                         aria-expanded={menu?.expanded ?? false} aria-controls={menu?.controlsId}
                         aria-haspopup={menu?.mobile ? 'dialog' : undefined}>
                         <MenuOutlined aria-hidden="true" />
-                    </button></Tooltip>}
+                    </button></Tooltip></HeaderControlSlot>}
                     {renderBack && (
+                        <HeaderControlSlot kind="back" leaving={backLeaving}>
                         <Tooltip title="이전 화면으로 돌아가기" disabled={backLeaving || searchLeaving}><button type="button" className={'reserve-header-back' + (backLeaving ? ' reserve-header-back--leaving' : '')}
                             onClick={handleBack} aria-label="이전 화면으로 돌아가기" disabled={backLeaving}
                             aria-hidden={showBack ? undefined : true}>
                             <ArrowLeftOutlined aria-hidden="true" />
-                        </button></Tooltip>
+                        </button></Tooltip></HeaderControlSlot>
                     )}
                     <a className="reserve-header-logo"
                         href="/" onClick={handleLogoClick} style={styles.logo} aria-label="RESERVE 홈">
@@ -190,7 +209,7 @@ export function HeaderPlaceholder({ discoveryRoot = false, workspace = false }) 
         <div className={'reserve-boot-shell-header' + (workspace ? ' reserve-header-has-workspace-menu' : '')} aria-hidden="true" style={discoveryRoot ? { ...styles.header, boxShadow: 'none' } : styles.header}>
             <div className="reserve-header-inner" style={styles.inner}>
                 <div className="reserve-header-brand">
-                    {workspace && <span className="reserve-header-workspace-menu"><MenuOutlined /></span>}
+                    {workspace && <span className="reserve-header-control-slot reserve-header-workspace-menu-slot"><span className="reserve-header-workspace-menu"><MenuOutlined /></span></span>}
                     <span className="reserve-header-logo" style={{ color: styles.logo.color }}>
                         <span className="reserve-header-logo-wordmark">RESERVE</span>
                     </span>

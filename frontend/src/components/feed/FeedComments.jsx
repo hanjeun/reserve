@@ -112,6 +112,7 @@ function FeedCommentsSession({ postId }) {
     const [preparing, setPreparing] = useState(false);
     const [target, setTarget] = useState(returningDraft?.target || null);
     const [error, setError] = useState('');
+    const [photoError, setPhotoError] = useState('');
     const [reportId, setReportId] = useState(null);
     const [reportMounted, setReportMounted] = useState(false);
     const nonce = useRef(returningDraft?.nonce || null);
@@ -196,7 +197,7 @@ function FeedCommentsSession({ postId }) {
         if (saved.content !== variables.content || saved.state !== 'PUBLISHED' || (saved.images || []).map(image => image.id).join(',') !== variables.mediaIds.join(',')) {
             if (saved.state === 'PUBLISHED') setTarget({ edit: saved });
             nonce.current = null; message.warning('이전 댓글 저장은 완료됐어요. 작성 중인 내용은 남겨뒀어요. 다시 확인하고 저장해주세요.');
-        } else { revokePhotos(); setContent(''); setImages([]); setTarget(null); nonce.current = null; setError(''); generation.current += 1; }
+        } else { revokePhotos(); setContent(''); setImages([]); setTarget(null); nonce.current = null; setError(''); setPhotoError(''); generation.current += 1; }
         await invalidateInteractions(client);
     }, onError: (failure, variables) => { if (!failure.isStaleSession && isCurrentSession(variables.session) && generation.current === variables.generation) setError(failure.message); }, onSettled: () => { lock.current = false; } });
     const remove = useMutation({ mutationFn: async ({ id, session }) => {
@@ -213,7 +214,7 @@ function FeedCommentsSession({ postId }) {
         if (save.isPending || lock.current || preparing) return;
         if (!user) { login(); return; }
         const apply = () => { generation.current += 1; revokePhotos(); setTarget(next); setContent(next?.edit?.content || '');
-            setImages((next?.edit?.images || []).map(image => ({ ...image, uid: `saved-${image.id}` }))); nonce.current = null; setError(''); focusComposer(); };
+            setImages((next?.edit?.images || []).map(image => ({ ...image, uid: `saved-${image.id}` }))); nonce.current = null; setError(''); setPhotoError(''); focusComposer(); };
         if (confirmOpen.current) return;
         if (content.trim() || images.length) {
             confirmOpen.current = true;
@@ -224,9 +225,9 @@ function FeedCommentsSession({ postId }) {
     const selectPhotos = async files => {
         if (preparing || lock.current || !photosEnabled) return;
         if (!user) { login(); return; }
-        if (images.length + files.length > maxImages) { setError(`사진은 ${maxImages}장까지 등록할 수 있어요.`); return; }
+        if (images.length + files.length > maxImages) { setPhotoError(`사진은 ${maxImages}장까지 등록할 수 있어요.`); return; }
         const stamp = generation.current; const session = currentSession().epoch; const additions = [];
-        setPreparing(true); setError('');
+        setPreparing(true); setError(''); setPhotoError('');
         try {
             for (const original of files) {
                 if (!['image/jpeg', 'image/png', 'image/webp'].includes(original.type) || !original.size || original.size > maxBytes) throw new Error('JPG·PNG·WebP 사진을 한 장당 7MB 이하로 선택해주세요.');
@@ -239,7 +240,7 @@ function FeedCommentsSession({ postId }) {
             setImages(current => [...current, ...additions]);
         } catch (failure) {
             additions.forEach(image => { URL.revokeObjectURL(image.url); objectUrls.current.delete(image.url); });
-            if (!failure.isStaleSession && generation.current === stamp) setError(failure.message);
+            if (!failure.isStaleSession && generation.current === stamp) setPhotoError(failure.message);
         } finally { setPreparing(false); }
     };
     const submit = event => {
@@ -285,12 +286,14 @@ function FeedCommentsSession({ postId }) {
                 sending={save.isPending || preparing} disabled={save.isPending || preparing || unavailable || profileUnavailable || Boolean(user) && profile.isPending && !profile.data}
                 hasAttachments={images.length > 0}
                 sendText={!user ? '로그인하고 댓글 쓰기' : profile.isSuccess && !profile.data ? '닉네임 설정하고 댓글 쓰기' : target?.edit ? '수정 저장' : target?.parent ? '답글 남기기' : '댓글 남기기'}
-                attachmentControl={<ChatImagePicker enabled={photosEnabled} disabled={save.isPending || preparing || images.length >= maxImages}
-                    accept="image/jpeg,image/png,image/webp" maxBytes={maxBytes} onChange={file => file && selectPhotos([file])} onFilesChange={selectPhotos} />}
+                attachmentError={photoError}
+                attachmentControl={renderPicker => <ChatImagePicker enabled={photosEnabled} disabled={save.isPending || preparing || images.length >= maxImages}
+                    accept="image/jpeg,image/png,image/webp" maxBytes={maxBytes} onChange={file => file && selectPhotos([file])} onFilesChange={selectPhotos}
+                    renderContent={renderPicker} />}
                 attachments={<CommentAttachments images={images} busy={save.isPending || preparing}
                     onReorder={order => setImages(current => reorderFeedPhotos(current, order))}
-                    onRemove={uid => setImages(current => current.filter(image => { if (image.uid !== uid) return true;
-                        if (objectUrls.current.has(image.url)) { URL.revokeObjectURL(image.url); objectUrls.current.delete(image.url); } return false; }))} />} />
+                    onRemove={uid => { setPhotoError(''); setImages(current => current.filter(image => { if (image.uid !== uid) return true;
+                        if (objectUrls.current.has(image.url)) { URL.revokeObjectURL(image.url); objectUrls.current.delete(image.url); } return false; })); }} />} />
             {error && <p className="reserve-field-error" role="alert">{error}</p>}
             {profile.isError && <Button variant="ghost-sm" onClick={() => profile.refetch()}>공개 프로필 다시 불러오기</Button>}
         </form>

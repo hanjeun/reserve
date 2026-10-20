@@ -27,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,16 +37,18 @@ class QrCheckinAttendanceTest {
     private ReservationRepository reservationRepository;
     private QrCheckinTokenProvider tokenProvider;
     private ReservationService reservationService;
+    private PaymentService payments;
 
     @BeforeEach
     void setUp() {
         reservationRepository = mock(ReservationRepository.class);
         tokenProvider = mock(QrCheckinTokenProvider.class);
+        payments = mock(PaymentService.class);
         reservationService = new ReservationService(
                 reservationRepository,
                 mock(StoreRepository.class),
                 mock(HolidayService.class),
-                mock(PaymentService.class),
+                payments,
                 mock(EmailService.class),
                 mock(MemberRepository.class),
                 mock(AuditLogService.class),
@@ -62,6 +65,9 @@ class QrCheckinAttendanceTest {
 
         QrCheckinResponse response = reservationService.checkInByQrToken("token", owner);
 
+        var order = inOrder(payments, reservationRepository);
+        order.verify(payments).lockReservationForStateChange(20L);
+        order.verify(reservationRepository).findByIdForUpdate(20L);
         assertThat(response.isAlreadyCheckedIn()).isFalse();
         assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
         assertThat(reservation.getCheckedInAt()).isNotNull();

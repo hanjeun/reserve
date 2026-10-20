@@ -1,8 +1,8 @@
 package kr.it.reserve.payment.service;
 
-import kr.it.reserve.global.error.MemberException;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import kr.it.reserve.global.error.PaymentException;
-import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.dto.*;
@@ -19,27 +19,32 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
-/** Payment preparation runs inside the facade transaction; PG settlement/refund boundaries remain there. */
+/** 결제창 준비는 짧은 DB 트랜잭션에서만 수행하며 외부 PG 통신은 하지 않는다. */
 @Slf4j(topic = "kr.it.reserve.payment.service.PaymentService")
 final class PaymentPreparation {
     private final PaymentRepository paymentRepository;
     private final ReservationRepository reservationRepository;
     private final MemberRepository memberRepository;
     private final PortoneService portoneService;
+    private final EntityManager entityManager;
     PaymentPreparation(PaymentRepository payments, ReservationRepository reservations,
-                       MemberRepository members, PortoneService portone) {
+                       MemberRepository members, PortoneService portone, EntityManager entityManager) {
         paymentRepository = payments;
         reservationRepository = reservations;
         memberRepository = members;
         portoneService = portone;
+        this.entityManager = entityManager;
     }
 
     public PaymentPrepareDto preparePayment(PaymentRequestDto requestDto, Long memberId) {
-        Reservation reservation = reservationRepository.findById(requestDto.getReservationId())
-                .orElseThrow(ReservationException::notFound);
-
-        Member member = memberRepository.findActiveByIdForUpdate(memberId)
-                .orElseThrow(MemberException::notFound);
+        FinancialReservationLocks.Locked locked = new FinancialReservationLocks(memberRepository, reservationRepository, entityManager)
+                .lock(requestDto.getReservationId(), memberId);
+        Member member = locked.actor();
+        Reservation reservation = locked.reservation();
+        // 빈 결제 범위의 gap lock보다 회원·예약의 단일 행 잠금을 먼저 잡는다.
+        List<Payment> lockedPayments = paymentRepository.findAllByReservationIdForUpdate(requestDto.getReservationId());
+        entityManager.flush();
+        for (Payment payment : lockedPayments) entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
 
         // ★ 본인 예약인지 확인한다 (2026-08-09).
         //   예전엔 reservationId 를 body 에서 받아 그대로 조회만 했다. 로그인만 하면
@@ -50,7 +55,6 @@ final class PaymentPreparation {
                     reservation.getId(), memberId);
             throw new PaymentException("본인의 예약만 결제할 수 있어요.", HttpStatus.FORBIDDEN);
         }
-
         if (PaymentReservationPolicy.closedFor(reservation)) {
             throw new PaymentException("취소되거나 종료된 예약은 결제할 수 없어요.", HttpStatus.CONFLICT);
         }
@@ -69,10 +73,9 @@ final class PaymentPreparation {
             throw new PaymentException("결제할 예약금이 없는 예약이에요.", HttpStatus.BAD_REQUEST);
         }
 
-        // 기존 READY 상태 Payment가 있으면 재사용 (결제창 재시도 지원)
-        // findReadyByReservationId 사용 → 여러 레코드 있어도 안전 (첫 번째만 사용)
-        List<Payment> readyPayments = paymentRepository.findReadyByReservationId(reservation.getId());
-        Payment existingReady = readyPayments.isEmpty() ? null : readyPayments.getFirst();
+        // 회원 잠금을 기다리기 전의 RR snapshot 대신 현재 잠근 READY를 재사용한다.
+        Payment existingReady = lockedPayments.stream()
+                .filter(payment -> payment.getStatus() == Payment.PaymentStatus.READY).findFirst().orElse(null);
 
         if (existingReady != null) {
             // 재사용 시에도 금액을 예약 당시 확정된 값으로 다시 맞춘다 — 예전 READY 행에는

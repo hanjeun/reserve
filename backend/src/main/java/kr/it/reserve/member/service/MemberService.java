@@ -330,6 +330,9 @@ public class MemberService {
     public void deleteMember(Long memberId) {
         log.info("Member withdrawal started: memberId={}", memberId);
         Member member = findByIdForUpdate(memberId);
+        if (!paymentRepository.findUnresolvedRefundPaymentIdsForUpdate(memberId).isEmpty()) {
+            throw new MemberException("회원 탈퇴 전에 미결 항목을 처리해주세요. 환불 확인이 필요해요.", HttpStatus.CONFLICT);
+        }
         dataLifecycleGuard.requireMemberWithdrawalAllowed(memberId);
 
         String originalEmail = member.getEmail();
@@ -363,8 +366,8 @@ public class MemberService {
         communityPostRepository.deleteByAuthorId(memberId);
         businessVerificationRepository.deleteByMemberId(memberId);
 
-        paymentRepository.anonymizeBuyerByMemberId(memberId);
         reservationRepository.clearSpecialRequestsByMemberId(memberId);
+        paymentRepository.anonymizeBuyerByMemberId(memberId);
 
         refreshTokenRepository.deleteByMemberId(memberId);
         passwordResetTokenRepository.deleteByEmail(originalEmail);

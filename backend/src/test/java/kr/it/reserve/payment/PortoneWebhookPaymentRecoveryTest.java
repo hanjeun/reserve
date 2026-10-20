@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
+import kr.it.reserve.payment.dto.UnresolvedRefundView;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
 import kr.it.reserve.payment.entity.RefundAttempt;
@@ -104,14 +105,14 @@ class PortoneWebhookPaymentRecoveryTest {
         when(pending.getRequestedAmount()).thenReturn(3_000);
         when(pending.getCancellationId()).thenReturn("cancel-20");
         when(paymentService.revertPendingRefund(
-                10L, 0, "PG cancellation is explicitly FAILED"))
+                refundView(payment, pending), 0, "cancel-20", "PG cancellation is explicitly FAILED"))
                 .thenReturn(true);
 
         assertThat(webhookService.processMerchantUid(MERCHANT_UID))
                 .isEqualTo(PortoneWebhookService.ProcessingResult.PROCESSED);
 
-        verify(paymentService).revertPendingRefund(10L, 0, "PG cancellation is explicitly FAILED");
-        verify(refundLedgerService).failed(20L, "PG cancellation is explicitly FAILED");
+        verify(paymentService).revertPendingRefund(refundView(payment, pending), 0, "cancel-20", "PG cancellation is explicitly FAILED");
+        verify(refundLedgerService, never()).failed(20L, "PG cancellation is explicitly FAILED");
         verify(paymentService, never()).recoverPaidPaymentFromPg(MERCHANT_UID, pgPayment);
     }
 
@@ -134,14 +135,14 @@ class PortoneWebhookPaymentRecoveryTest {
         webhookService.processMerchantUid(MERCHANT_UID);
 
         verify(paymentService, never()).confirmPendingRefund(
-                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.any());
         verify(paymentService, never()).revertPendingRefund(
-                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyString());
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
         verify(reconciliationIssueService, never()).recordIssue(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(),
@@ -169,13 +170,33 @@ class PortoneWebhookPaymentRecoveryTest {
                 }
                 """);
         stubPendingRefund(payment, pending, pgPayment);
-        when(paymentService.confirmPendingRefund(13L, 2_000, 3_000, "부분 환불"))
+        when(paymentService.confirmPendingRefund(refundView(payment, pending), 2_000, 3_000, "cancel-23"))
                 .thenReturn(true);
 
         webhookService.processMerchantUid(MERCHANT_UID);
 
-        verify(paymentService).confirmPendingRefund(13L, 2_000, 3_000, "부분 환불");
-        verify(refundLedgerService).succeeded(23L, "cancel-23", 3_000);
+        verify(paymentService).confirmPendingRefund(refundView(payment, pending), 2_000, 3_000, "cancel-23");
+        verify(refundLedgerService, never()).succeeded(23L, "cancel-23", 3_000);
+    }
+
+    @Test
+    void recordedRefundWebhookCanCloseOnlyTheMatchingUnresolvedLedger() {
+        Payment payment = pendingPayment(13L, 5_000);
+        payment.setStatus(Payment.PaymentStatus.PARTIAL_REFUNDED);
+        RefundAttempt pending = pendingAttempt(3_000, "cancel-23");
+        when(pending.getId()).thenReturn(23L);
+        stubPendingRefund(payment, pending, pgPayment("""
+                {"status":"PARTIAL_CANCELLED","amount":{"total":10000,"cancelled":5000},
+                 "cancellations":[{"id":"old","status":"SUCCEEDED","totalAmount":2000},
+                 {"id":"cancel-23","status":"SUCCEEDED","totalAmount":3000}]}
+                """));
+        when(paymentService.confirmPendingRefund(refundView(payment, pending), 2_000, 3_000, "cancel-23"))
+                .thenReturn(true);
+
+        webhookService.processMerchantUid(MERCHANT_UID);
+
+        verify(paymentService).confirmPendingRefund(refundView(payment, pending), 2_000, 3_000, "cancel-23");
+        verifyNoInteractions(refundLedgerService);
     }
 
     @Test
@@ -198,14 +219,14 @@ class PortoneWebhookPaymentRecoveryTest {
         webhookService.processMerchantUid(MERCHANT_UID);
 
         verify(paymentService, never()).confirmPendingRefund(
-                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.any());
         verify(paymentService, never()).revertPendingRefund(
-                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyString());
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
         verify(reconciliationIssueService).recordIssue(
                 "REFUND:14",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
@@ -256,14 +277,14 @@ class PortoneWebhookPaymentRecoveryTest {
         webhookService.processMerchantUid(MERCHANT_UID);
 
         verify(paymentService, never()).confirmPendingRefund(
-                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.any());
         verify(paymentService, never()).revertPendingRefund(
-                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
-                org.mockito.ArgumentMatchers.anyString());
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
         verify(refundLedgerService, never()).succeeded(
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.any(),
@@ -303,11 +324,11 @@ class PortoneWebhookPaymentRecoveryTest {
                 """.formatted(pgCancelledAmount, cancellationStatus));
         stubPendingRefund(payment, pending, pgPayment);
         if ("SUCCEEDED".equals(cancellationStatus)) {
-            when(paymentService.confirmPendingRefund(16L, 2_000, 3_000, "부분 환불"))
+            when(paymentService.confirmPendingRefund(refundView(payment, pending), 2_000, 3_000, "cancel-26"))
                     .thenReturn(false);
         } else {
             when(paymentService.revertPendingRefund(
-                    16L, 2_000, "PG cancellation is explicitly FAILED"))
+                    refundView(payment, pending), 2_000, "cancel-26", "PG cancellation is explicitly FAILED"))
                     .thenReturn(false);
         }
 
@@ -316,10 +337,10 @@ class PortoneWebhookPaymentRecoveryTest {
 
         InOrder order = inOrder(paymentService, reconciliationIssueService);
         if ("SUCCEEDED".equals(cancellationStatus)) {
-            order.verify(paymentService).confirmPendingRefund(16L, 2_000, 3_000, "부분 환불");
+            order.verify(paymentService).confirmPendingRefund(refundView(payment, pending), 2_000, 3_000, "cancel-26");
         } else {
             order.verify(paymentService).revertPendingRefund(
-                    16L, 2_000, "PG cancellation is explicitly FAILED");
+                    refundView(payment, pending), 2_000, "cancel-26", "PG cancellation is explicitly FAILED");
         }
         order.verify(reconciliationIssueService).recordIssue(
                 "REFUND:16",
@@ -410,4 +431,9 @@ class PortoneWebhookPaymentRecoveryTest {
             throw new IllegalStateException(e);
         }
     }
+    private UnresolvedRefundView refundView(Payment payment, RefundAttempt attempt) {
+        return new UnresolvedRefundView(attempt.getId(), payment.getId(), payment.getMerchantUid(),
+                attempt.getRequestedAmount(), attempt.getCancellationId(), attempt.getReason(), attempt.getResolveAttempts());
+    }
+
 }

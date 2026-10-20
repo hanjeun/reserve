@@ -39,6 +39,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     // 가맹점 주문번호로 조회
     Optional<Payment> findByMerchantUid(String merchantUid);
 
+    @Query("SELECT p.reservation.id FROM Payment p WHERE p.id = :id")
+    Optional<Long> findReservationIdByPaymentId(@Param("id") Long id);
+
+    @Query("SELECT p.reservation.id FROM Payment p WHERE p.merchantUid = :merchantUid")
+    Optional<Long> findReservationIdByMerchantUid(@Param("merchantUid") String merchantUid);
+
     /** 브라우저 검증·웹훅·만료 재확인이 같은 결제를 동시에 완료하지 않도록 잠근다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.merchantUid = :merchantUid")
@@ -64,24 +70,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findPaidByReservationId(@Param("reservationId") Long reservationId);
 
     /**
-     * 환불용 <b>행 잠금</b> 조회 — 2026-08-23 신설. {@code SELECT ... FOR UPDATE} 가 나간다.
-     *
-     * <h3>왜 필요했나 — 이중 환불</h3>
-     * 예전 환불 경로는 이랬다: 결제를 읽고 → 상태가 PAID 인지 보고 → PG 에 취소를 부르고 → 저장.
-     * 요청 두 개가 <b>거의 동시에</b> 들어오면 둘 다 "PAID" 를 읽는다. 그러면
-     * <b>PG 취소가 두 번 나가고</b>, 나중 저장이 앞의 값을 덮어써 얼마를 돌려줬는지도 사라졌다.
-     * (예약 취소 버튼 더블클릭, 모바일에서 네트워크가 느려 재시도 — 흔한 경로다.)
-     *
-     * <h3>왜 낙관적 락(@Version)이 아니라 비관적 락인가</h3>
-     * 낙관적 락은 <b>커밋 시점에</b> 충돌을 알려준다. 그런데 이 경로에서 되돌릴 수 없는 일
-     * (= PG 에 실제로 취소 요청을 보내는 것)은 <b>커밋 전에</b> 이미 벌어진다.
-     * 두 번째 요청도 PG 를 부른 뒤에야 "버전이 바뀌었네" 하고 실패하므로 <b>이중 환불을 못 막는다.</b>
-     * 행을 먼저 잠그면 두 번째 요청은 첫 번째가 끝날 때까지 기다렸다가
-     * 바뀐 상태(REFUNDED/REFUND_PENDING)를 보고 <b>PG 를 부르기 전에</b> 거절된다.
-     *
-     * <p>덤으로 {@code @Version} 컬럼을 새로 만들지 않아도 된다 — {@code ddl-auto: update} 는
-     * 컬럼을 추가해줄 뿐 <b>기존 행을 0 으로 채워주지 않아서</b>, 옛 결제 행의 version 이
-     * NULL 로 남아 별도 수동 DDL 이 필요해진다. 이 프로젝트는 예약에서도 비관적 락을 쓴다.
+     * 환불 준비·발신 선점·결말 반영의 공통 행 잠금이다.
+     * 미결 원장과 REFUND_PENDING을 커밋한 뒤에만 PG를 호출하며, 네트워크 대기 중 이 잠금은 유지하지 않는다.
+     * 낙관적 충돌 검출에 앞서 외부 취소가 중복 발신되는 것을 막기 위해 단일 선점을 먼저 확정한다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.id = :id")
@@ -224,4 +215,15 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("UPDATE Payment p SET p.buyerName = '탈퇴한 회원', p.buyerEmail = NULL, p.buyerTel = NULL " +
            "WHERE p.member.id = :memberId")
     int anonymizeBuyerByMemberId(@Param("memberId") Long memberId);
+
+    /** 탈퇴의 회원 잠금 뒤 current read한다. EXISTS 하위 쿼리의 옛 snapshot을 사용하지 않는다. */
+    @Query(value = """
+            SELECT p.payment_id FROM payment p
+              LEFT JOIN refund_attempt ra ON ra.payment_id = p.payment_id
+             WHERE p.member_id = :memberId
+               AND (p.status = 'REFUND_PENDING' OR ra.status IN ('REQUESTED', 'PENDING'))
+             ORDER BY p.payment_id, ra.refund_attempt_id
+             FOR UPDATE
+            """, nativeQuery = true)
+    List<Long> findUnresolvedRefundPaymentIdsForUpdate(@Param("memberId") Long memberId);
 }

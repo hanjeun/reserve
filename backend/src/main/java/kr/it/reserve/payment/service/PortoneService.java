@@ -112,8 +112,17 @@ public class PortoneService {
 
     /** 광고 전액 환불은 저장한 키와 예상 잔액을 보내 중복/외부 취소 경합을 방어한다. */
     public PortoneV2CancelResponse cancelPayment(String merchantUid, Integer amount, String reason, String idempotencyKey) {
+        return cancelPayment(merchantUid, amount, reason, idempotencyKey, idempotencyKey == null ? null : amount);
+    }
+
+    /** 부분 환불 요청액과 PG의 현재 취소 가능 잔액은 서로 다른 값이다. */
+    public PortoneV2CancelResponse cancelPayment(String merchantUid, Integer amount, String reason,
+                                                String idempotencyKey, Integer currentCancellableAmount) {
         if (idempotencyKey != null && (!idempotencyKey.matches("[A-Za-z0-9_-]{16,256}") || amount == null || amount <= 0)) {
             throw new IllegalArgumentException("Invalid cancellation command");
+        }
+        if (currentCancellableAmount != null && (amount == null || currentCancellableAmount < amount)) {
+            throw new IllegalArgumentException("Invalid cancellable balance");
         }
         String url = V2_API_URL + "/payments/" + merchantUid + "/cancel";
 
@@ -131,7 +140,7 @@ public class PortoneService {
         if (amount != null) {
             body.put("amount", amount);  // null이면 전액 환불
         }
-        if (idempotencyKey != null) body.put("currentCancellableAmount", amount);
+        if (currentCancellableAmount != null) body.put("currentCancellableAmount", currentCancellableAmount);
 
         try {
             HttpHeaders headers = new HttpHeaders();

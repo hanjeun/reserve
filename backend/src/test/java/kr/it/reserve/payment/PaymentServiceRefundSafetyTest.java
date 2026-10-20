@@ -1,5 +1,6 @@
 package kr.it.reserve.payment;
 
+import jakarta.persistence.EntityManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.member.entity.Member;
@@ -7,6 +8,7 @@ import kr.it.reserve.member.entity.Role;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.dto.PaymentRefundDto;
 import kr.it.reserve.payment.dto.PaymentResponseDto;
+import kr.it.reserve.payment.dto.UnresolvedRefundView;
 import kr.it.reserve.payment.dto.PortoneV2CancelResponse;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
@@ -21,12 +23,13 @@ import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import org.springframework.test.util.ReflectionTestUtils;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -46,7 +51,10 @@ import static org.mockito.Mockito.when;
 class PaymentServiceRefundSafetyTest {
 
     private static final String MERCHANT_UID = "order-refund-safety";
+    private RefundAttempt preparedAttempt;
+    private boolean preparedLedgerCreated;
 
+    @Mock private EntityManager entityManager;
     @Mock private PaymentRepository paymentRepository;
     @Mock private ReservationRepository reservationRepository;
     @Mock private MemberRepository memberRepository;
@@ -54,6 +62,20 @@ class PaymentServiceRefundSafetyTest {
     @Mock private RefundLedgerService refundLedgerService;
     @Mock private RefundAttemptRepository refundAttemptRepository;
     @Mock private PaymentReconciliationIssueService reconciliationIssueService;
+
+    @Mock private PlatformTransactionManager transactionManager;
+
+    @BeforeEach
+    void transactionBoundaries() {
+        preparedLedgerCreated = false;
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenAnswer(ignored -> new SimpleTransactionStatus());
+        lenient().when(paymentRepository.findReservationIdByPaymentId(any())).thenReturn(Optional.of(100L));
+        lenient().when(reservationRepository.findMemberIdById(100L)).thenReturn(Optional.of(200L));
+        lenient().when(memberRepository.findByIdForPaymentUpdate(200L)).thenReturn(Optional.of(requester()));
+        lenient().when(reservationRepository.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(
+                Reservation.builder().id(100L).member(requester()).status(Reservation.ReservationStatus.CANCELLED).build()));
+    }
 
     @InjectMocks
     private PaymentService paymentService;
@@ -64,17 +86,18 @@ class PaymentServiceRefundSafetyTest {
         Payment payment = paidPayment();
         PaymentRefundDto request = request();
         stubLockedPayment(payment);
-        when(refundLedgerService.start(10L, MERCHANT_UID, 3_000, "예약 취소"))
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, 3_000, "예약 취소"))
                 .thenReturn(20L);
-        when(portoneService.cancelPayment(MERCHANT_UID, 3_000, "예약 취소"))
+        stubPreparedAttempt(20L, 3_000, "예약 취소");
+        when(portoneService.cancelPayment(eq(MERCHANT_UID), eq(3_000), eq("예약 취소"), anyString(), eq(10_000)))
                 .thenThrow(new IllegalStateException("connection reset"));
 
         PaymentResponseDto response = paymentService.refundPayment(request);
 
         assertThat(response.getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING.name());
         assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING);
-        verify(refundLedgerService).pending(
-                20L, null, "PG cancellation call outcome unknown: IllegalStateException");
+        assertThat(preparedAttempt.getStatus()).isEqualTo(RefundAttempt.Status.PENDING);
+        assertThat(preparedAttempt.getFailureReason()).isEqualTo("PG cancellation call outcome unknown: IllegalStateException");
         verify(refundLedgerService, never()).failed(
                 any(), anyString());
         verify(reconciliationIssueService).recordIssue(
@@ -92,8 +115,9 @@ class PaymentServiceRefundSafetyTest {
         Payment payment = paidPayment();
         PaymentRefundDto request = request();
         stubLockedPayment(payment);
-        when(refundLedgerService.start(10L, MERCHANT_UID, 3_000, "예약 취소"))
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, 3_000, "예약 취소"))
                 .thenReturn(20L);
+        stubPreparedAttempt(20L, 3_000, "예약 취소");
         PortoneV2CancelResponse response = new ObjectMapper().readValue("""
                 {
                   "cancellation": {
@@ -103,15 +127,15 @@ class PaymentServiceRefundSafetyTest {
                   }
                 }
                 """, PortoneV2CancelResponse.class);
-        when(portoneService.cancelPayment(MERCHANT_UID, 3_000, "예약 취소"))
+        when(portoneService.cancelPayment(eq(MERCHANT_UID), eq(3_000), eq("예약 취소"), anyString(), eq(10_000)))
                 .thenReturn(response);
 
         PaymentResponseDto result = paymentService.refundPayment(request);
 
         assertThat(result.getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING.name());
         assertThat(payment.refundedSoFar()).isZero();
-        verify(refundLedgerService).pending(
-                20L, "cancel-20", "PG succeeded amount does not match request");
+        assertThat(preparedAttempt.getStatus()).isEqualTo(RefundAttempt.Status.PENDING);
+        assertThat(preparedAttempt.getFailureReason()).isEqualTo("PG succeeded amount does not match request");
         verify(refundLedgerService, never()).succeeded(
                 any(),
                 any(),
@@ -129,10 +153,12 @@ class PaymentServiceRefundSafetyTest {
     @DisplayName("가게 측 전액 환불도 PG 접수만 된 상태를 완료로 반환하지 않는다")
     void storeFullRefundReturnsFalseWhilePending() throws Exception {
         Payment payment = paidPayment();
-        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
+        when(reservationRepository.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(payment.getReservation()));
         when(paymentRepository.findPaidByReservationIdForUpdate(100L)).thenReturn(Optional.of(payment));
-        when(refundLedgerService.start(10L, MERCHANT_UID, 10_000, "가게 취소"))
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(payment));
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, 10_000, "가게 취소"))
                 .thenReturn(20L);
+        stubPreparedAttempt(20L, 10_000, "가게 취소");
         PortoneV2CancelResponse response = new ObjectMapper().readValue("""
                 {
                   "cancellation": {
@@ -142,15 +168,15 @@ class PaymentServiceRefundSafetyTest {
                   }
                 }
                 """, PortoneV2CancelResponse.class);
-        when(portoneService.cancelPayment(MERCHANT_UID, 10_000, "가게 취소"))
+        when(portoneService.cancelPayment(eq(MERCHANT_UID), eq(10_000), eq("가게 취소"), anyString(), eq(10_000)))
                 .thenReturn(response);
 
         boolean completed = paymentService.refundFullByStoreDecision(100L, "가게 취소");
 
         assertThat(completed).isFalse();
         assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING);
-        verify(refundLedgerService).pending(
-                20L, "cancel-20", "PG cancellation not final: REQUESTED");
+        assertThat(preparedAttempt.getStatus()).isEqualTo(RefundAttempt.Status.PENDING);
+        assertThat(preparedAttempt.getFailureReason()).isEqualTo("PG cancellation not final: REQUESTED");
     }
 
     @Test
@@ -158,8 +184,8 @@ class PaymentServiceRefundSafetyTest {
     void unresolvedLedgerBlocksRetryAfterLocalRollback() {
         Payment payment = paidPayment();
         stubLockedPayment(payment);
-        when(refundAttemptRepository.existsByPaymentIdAndStatusIn(10L, RefundAttempt.UNRESOLVED))
-                .thenReturn(true);
+        when(refundAttemptRepository.findByPaymentIdForUpdate(10L))
+                .thenReturn(List.of(RefundAttempt.start(10L, MERCHANT_UID, 3_000, "기존 미결")));
 
         assertThatThrownBy(
                         () -> paymentService.refundPayment(request()))
@@ -169,8 +195,8 @@ class PaymentServiceRefundSafetyTest {
         verify(portoneService, never()).cancelPayment(
                 anyString(),
                 any(),
-                anyString());
-        verify(refundLedgerService, never()).start(
+                anyString(), anyString(), any());
+        verify(refundLedgerService, never()).prepare(
                 any(),
                 anyString(),
                 any(),
@@ -182,7 +208,7 @@ class PaymentServiceRefundSafetyTest {
     void ledgerStartFailureStopsBeforePgCall() {
         Payment payment = paidPayment();
         stubLockedPayment(payment);
-        when(refundLedgerService.start(10L, MERCHANT_UID, 3_000, "예약 취소"))
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, 3_000, "예약 취소"))
                 .thenReturn(null);
 
         assertThatThrownBy(
@@ -193,16 +219,18 @@ class PaymentServiceRefundSafetyTest {
         verify(portoneService, never()).cancelPayment(
                 anyString(),
                 any(),
-                anyString());
+                anyString(), anyString(), any());
     }
 
     @Test
-    @DisplayName("PG 성공 원장은 로컬 결제 트랜잭션의 커밋 뒤에만 성공으로 닫는다")
-    void successfulLedgerClosesAfterLocalCommit() throws Exception {
+    @DisplayName("PG 성공 결제와 원장은 같은 완료 경계에서 함께 확정된다")
+    void successfulPaymentAndLedgerAreCompletedTogether() throws Exception {
         Payment payment = paidPayment();
         stubLockedPayment(payment);
-        when(refundLedgerService.start(10L, MERCHANT_UID, 3_000, "예약 취소"))
+        when(reservationRepository.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(payment.getReservation()));
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, 3_000, "예약 취소"))
                 .thenReturn(20L);
+        stubPreparedAttempt(20L, 3_000, "예약 취소");
         PortoneV2CancelResponse response = new ObjectMapper().readValue("""
                 {
                   "cancellation": {
@@ -212,55 +240,37 @@ class PaymentServiceRefundSafetyTest {
                   }
                 }
                 """, PortoneV2CancelResponse.class);
-        when(portoneService.cancelPayment(MERCHANT_UID, 3_000, "예약 취소"))
+        when(portoneService.cancelPayment(eq(MERCHANT_UID), eq(3_000), eq("예약 취소"), anyString(), eq(10_000)))
                 .thenReturn(response);
 
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            PaymentResponseDto result = paymentService.refundPayment(request());
-
-            assertThat(result.getStatus()).isEqualTo(Payment.PaymentStatus.PARTIAL_REFUNDED.name());
-            verify(refundLedgerService).pending(
-                    20L, "cancel-20", "PG cancellation succeeded; local commit pending");
-            verify(refundLedgerService, never()).succeeded(20L, "cancel-20", 3_000);
-
-            for (TransactionSynchronization synchronization
-                    : TransactionSynchronizationManager.getSynchronizations()) {
-                synchronization.afterCommit();
-            }
-            verify(refundLedgerService).succeeded(20L, "cancel-20", 3_000);
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
+        PaymentResponseDto result = paymentService.refundPayment(request());
+        assertThat(result.getStatus()).isEqualTo(Payment.PaymentStatus.PARTIAL_REFUNDED.name());
+        assertThat(preparedAttempt.getStatus()).isEqualTo(RefundAttempt.Status.SUCCEEDED);
+        assertThat(preparedAttempt.getCancelledAmount()).isEqualTo(3_000);
+        verify(refundLedgerService, never()).succeeded(any(), any(), any());
     }
 
     @Test
     @DisplayName("동시 결말 처리에서는 같은 누적 환불만 멱등으로 인정한다")
     void pendingRefundResolutionRequiresMatchingLocalState() {
-        Payment pending = Payment.builder()
-                .id(10L)
-                .amount(10_000)
-                .refundAmount(2_000)
-                .status(Payment.PaymentStatus.REFUND_PENDING)
-                .build();
+        Payment pending = Payment.builder().id(10L).amount(10_000).refundAmount(2_000)
+                .status(Payment.PaymentStatus.REFUND_PENDING).build();
         when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(pending));
-
-        assertThat(paymentService.confirmPendingRefund(10L, 1_000, 3_000, "예약 취소"))
-                .isFalse();
+        RefundAttempt attempt = RefundAttempt.start(10L, MERCHANT_UID, 3_000, "예약 취소");
+        ReflectionTestUtils.setField(attempt, "id", 20L);
+        attempt.markPending("cancel-20", "PG acknowledged");
+        pending.setMerchantUid(MERCHANT_UID);
+        when(refundAttemptRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(attempt));
+        when(refundAttemptRepository.findByPaymentIdForUpdate(10L)).thenReturn(List.of(attempt));
+        UnresolvedRefundView view = new UnresolvedRefundView(20L, 10L, MERCHANT_UID, 3_000, "cancel-20", "예약 취소", 0);
+        assertThat(paymentService.confirmPendingRefund(view, 1_000, 3_000, "cancel-20")).isFalse();
         assertThat(pending.refundedSoFar()).isEqualTo(2_000);
-        assertThat(pending.getStatus()).isEqualTo(Payment.PaymentStatus.REFUND_PENDING);
-
-        Payment alreadyApplied = Payment.builder()
-                .id(11L)
-                .amount(10_000)
-                .refundAmount(5_000)
-                .status(Payment.PaymentStatus.PARTIAL_REFUNDED)
-                .build();
-        when(paymentRepository.findByIdForUpdate(11L)).thenReturn(Optional.of(alreadyApplied));
-
-        assertThat(paymentService.confirmPendingRefund(11L, 2_000, 3_000, "예약 취소"))
-                .isTrue();
-        assertThat(alreadyApplied.refundedSoFar()).isEqualTo(5_000);
+        assertThat(attempt.getStatus()).isEqualTo(RefundAttempt.Status.PENDING);
+        pending.setStatus(Payment.PaymentStatus.PARTIAL_REFUNDED);
+        pending.setRefundAmount(5_000);
+        assertThat(paymentService.confirmPendingRefund(view, 2_000, 3_000, "cancel-20")).isTrue();
+        assertThat(pending.refundedSoFar()).isEqualTo(5_000);
+        assertThat(attempt.getStatus()).isEqualTo(RefundAttempt.Status.SUCCEEDED);
     }
 
     @Test
@@ -272,8 +282,8 @@ class PaymentServiceRefundSafetyTest {
                 .member(requester)
                 .status(Reservation.ReservationStatus.CONFIRMED)
                 .build();
-        when(memberRepository.findActiveByIdForUpdate(200L)).thenReturn(Optional.of(requester));
-        when(reservationRepository.findById(100L)).thenReturn(Optional.of(reservation));
+        when(memberRepository.findByIdForPaymentUpdate(200L)).thenReturn(Optional.of(requester));
+        when(reservationRepository.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(reservation));
 
         assertThatThrownBy(() -> paymentService.refundByMemberRequest(100L, "이용자 요청", requester))
                 .isInstanceOf(PaymentException.class)
@@ -283,7 +293,7 @@ class PaymentServiceRefundSafetyTest {
         verify(portoneService, never()).cancelPayment(
                 anyString(),
                 any(),
-                anyString());
+                anyString(), anyString(), any());
     }
 
     @Test
@@ -294,17 +304,18 @@ class PaymentServiceRefundSafetyTest {
         stubFinishedReservation(requester, Reservation.ReservationStatus.CANCELLED);
         Payment payment = paidPayment();
         String originalReason = "예약 취소에 따른 자동 환불 (7일 전 취소 - 전액 환불)";
-        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
-        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L))
+        when(paymentRepository.findAllByReservationIdForUpdate(100L)).thenReturn(List.of(payment));
+        when(refundAttemptRepository.findByPaymentIdForUpdate(10L))
                 .thenReturn(List.of(failedAttempt(7_000, originalReason)));
-        when(paymentRepository.findPaidByReservationIdForUpdate(100L)).thenReturn(Optional.of(payment));
-        when(refundLedgerService.start(10L, MERCHANT_UID, 7_000, originalReason)).thenReturn(21L);
-        when(portoneService.cancelPayment(MERCHANT_UID, 7_000, originalReason))
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(payment));
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, 7_000, originalReason)).thenReturn(21L);
+        stubPreparedAttempt(21L, 7_000, originalReason);
+        when(portoneService.cancelPayment(eq(MERCHANT_UID), eq(7_000), eq(originalReason), anyString(), eq(10_000)))
                 .thenThrow(new IllegalStateException("connection reset"));
 
         paymentService.refundByMemberRequest(100L, null, requester);
 
-        verify(portoneService).cancelPayment(MERCHANT_UID, 7_000, originalReason);
+        verify(portoneService).cancelPayment(eq(MERCHANT_UID), eq(7_000), eq(originalReason), anyString(), eq(10_000));
     }
 
     @Test
@@ -314,17 +325,18 @@ class PaymentServiceRefundSafetyTest {
         stubFinishedReservation(requester, Reservation.ReservationStatus.REJECTED);
         Payment payment = paidPayment();
         String originalReason = "가게의 예약 거절에 따른 전액 환불";
-        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
-        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L))
+        when(paymentRepository.findAllByReservationIdForUpdate(100L)).thenReturn(List.of(payment));
+        when(refundAttemptRepository.findByPaymentIdForUpdate(10L))
                 .thenReturn(List.of(failedAttempt(10_000, originalReason)));
-        when(paymentRepository.findPaidByReservationIdForUpdate(100L)).thenReturn(Optional.of(payment));
-        when(refundLedgerService.start(10L, MERCHANT_UID, 10_000, originalReason)).thenReturn(22L);
-        when(portoneService.cancelPayment(MERCHANT_UID, 10_000, originalReason))
+        when(paymentRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(payment));
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, 10_000, originalReason)).thenReturn(22L);
+        stubPreparedAttempt(22L, 10_000, originalReason);
+        when(portoneService.cancelPayment(eq(MERCHANT_UID), eq(10_000), eq(originalReason), anyString(), eq(10_000)))
                 .thenThrow(new IllegalStateException("connection reset"));
 
         paymentService.refundByMemberRequest(100L, null, requester);
 
-        verify(portoneService).cancelPayment(MERCHANT_UID, 10_000, originalReason);
+        verify(portoneService).cancelPayment(eq(MERCHANT_UID), eq(10_000), eq(originalReason), anyString(), eq(10_000));
     }
 
     @Test
@@ -333,8 +345,8 @@ class PaymentServiceRefundSafetyTest {
         Member requester = requester();
         stubFinishedReservation(requester, Reservation.ReservationStatus.CANCELLED);
         Payment payment = paidPayment();
-        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
-        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L)).thenReturn(List.of());
+        when(paymentRepository.findAllByReservationIdForUpdate(100L)).thenReturn(List.of(payment));
+        when(refundAttemptRepository.findByPaymentIdForUpdate(10L)).thenReturn(List.of());
 
         assertThatThrownBy(() -> paymentService.refundByMemberRequest(100L, null, requester))
                 .isInstanceOf(PaymentException.class)
@@ -344,7 +356,7 @@ class PaymentServiceRefundSafetyTest {
         verify(portoneService, never()).cancelPayment(
                 anyString(),
                 any(),
-                anyString());
+                anyString(), anyString(), any());
     }
 
     @Test
@@ -355,8 +367,8 @@ class PaymentServiceRefundSafetyTest {
         RefundAttempt pending = RefundAttempt.start(10L, MERCHANT_UID, 3_000, "예약 취소");
         pending.markPending(null, "PG cancellation not final: REQUESTED");
         Payment payment = paidPayment();
-        when(paymentRepository.findPaidByReservationId(100L)).thenReturn(Optional.of(payment));
-        when(refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(10L))
+        when(paymentRepository.findAllByReservationIdForUpdate(100L)).thenReturn(List.of(payment));
+        when(refundAttemptRepository.findByPaymentIdForUpdate(10L))
                 .thenReturn(List.of(failedAttempt(3_000, "예약 취소"), pending));
 
         assertThatThrownBy(() -> paymentService.refundByMemberRequest(100L, null, requester))
@@ -366,7 +378,7 @@ class PaymentServiceRefundSafetyTest {
         verify(portoneService, never()).cancelPayment(
                 anyString(),
                 any(),
-                anyString());
+                anyString(), anyString(), any());
     }
 
     private Member requester() {
@@ -379,14 +391,28 @@ class PaymentServiceRefundSafetyTest {
                 .member(requester)
                 .status(status)
                 .build();
-        when(memberRepository.findActiveByIdForUpdate(200L)).thenReturn(Optional.of(requester));
-        when(reservationRepository.findById(100L)).thenReturn(Optional.of(reservation));
+        when(memberRepository.findByIdForPaymentUpdate(200L)).thenReturn(Optional.of(requester));
+        when(reservationRepository.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(reservation));
     }
 
     private RefundAttempt failedAttempt(int amount, String reason) {
         RefundAttempt attempt = RefundAttempt.start(10L, MERCHANT_UID, amount, reason);
         attempt.markFailed("PG rejected");
         return attempt;
+    }
+
+    private void stubPreparedAttempt(Long id, int amount, String reason) {
+        preparedAttempt = RefundAttempt.prepare(10L, MERCHANT_UID, amount, reason);
+        ReflectionTestUtils.setField(preparedAttempt, "id", id);
+        when(refundAttemptRepository.findPaymentId(id)).thenReturn(Optional.of(10L));
+        when(refundAttemptRepository.findByIdForUpdate(id)).thenReturn(Optional.of(preparedAttempt));
+        List<RefundAttempt> history = refundAttemptRepository.findByPaymentIdForUpdate(10L);
+        when(refundAttemptRepository.findByPaymentIdForUpdate(10L))
+                .thenAnswer(ignored -> preparedLedgerCreated ? List.of(preparedAttempt) : history);
+        when(refundLedgerService.prepare(10L, MERCHANT_UID, amount, reason)).thenAnswer(ignored -> {
+            preparedLedgerCreated = true;
+            return id;
+        });
     }
 
     private void stubLockedPayment(Payment payment) {
@@ -414,6 +440,8 @@ class PaymentServiceRefundSafetyTest {
     private Payment paidPayment() {
         Reservation reservation = mock(Reservation.class);
         lenient().when(reservation.getId()).thenReturn(100L);
+        lenient().when(reservation.getMember()).thenReturn(requester());
+        lenient().when(reservation.getStatus()).thenReturn(Reservation.ReservationStatus.CANCELLED);
         return Payment.builder()
                 .id(10L)
                 .reservation(reservation)

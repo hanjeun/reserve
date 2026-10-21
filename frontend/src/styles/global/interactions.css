@@ -408,6 +408,14 @@
     .reserve-filter-menu-chevron { transition: none; }
 }
 
+.reserve-chart-summary { display: flex; align-items: center; gap: 6px; list-style: none; }
+.reserve-chart-summary::-webkit-details-marker { display: none; }
+.reserve-chart-chevron { flex-shrink: 0; font-size: 10px; color: var(--c-text-tertiary, #8b95a1); transform: rotate(0deg); transition: transform 0.2s ease; }
+.reserve-chart-details[open] > .reserve-chart-summary .reserve-chart-chevron { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+    .reserve-chart-chevron { transition: none; }
+}
+
 /* ── 푸터 소셜 아이콘 hover ────────────────────────────────────────────────
    JS 인라인 스타일로 색을 넣던 것을 CSS로 옮겼다 — 인라인에 var()를 넣으면
    위와 같은 이유로 값이 무효가 되어 색이 아예 안 바뀌었다.

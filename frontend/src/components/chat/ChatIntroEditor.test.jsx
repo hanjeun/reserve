@@ -134,6 +134,25 @@ describe('chat intro editor', () => {
         await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ greeting: '반가워요', displayName: null, avatarUrl: null })));
     });
 
+    it('previews the default support photo immediately and only saves the reset on request', async () => {
+        const onSave = vi.fn().mockResolvedValue(undefined);
+        const avatarUrl = 'https://cdn.example/support/chat/custom.png';
+        renderEditor({ kind: 'support', onSave, intro: { avatarUrl, items: [] } });
+        const previewPhoto = () => preview().querySelector('.reserve-messenger-thread-avatar img');
+        expect(previewPhoto()).toHaveAttribute('src', avatarUrl);
+
+        fireEvent.click(screen.getByRole('button', { name: '기본 사진으로' }));
+        expect(previewPhoto()).toHaveAttribute('src', '/icons/RESERVE_logo.png');
+        expect(screen.getByRole('button', { name: '고객지원 사진 파일 선택' })).toBeEnabled();
+        expect(onSave).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
+        expect(previewPhoto()).toHaveAttribute('src', avatarUrl);
+        fireEvent.click(screen.getByRole('button', { name: '기본 사진으로' }));
+        fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
+        await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ avatarUrl: null })));
+    });
+
     it('preserves support photo preview and keeps uploads locked until completion', async () => {
         let finishUpload;
         const onUploadAvatar = vi.fn(() => new Promise(resolve => { finishUpload = resolve; }));

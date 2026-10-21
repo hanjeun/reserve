@@ -37,6 +37,16 @@ async function agreeToIntake() {
     fireEvent.click(checkbox);
 }
 
+it('opens the privacy policy in the current SPA without submitting a waiting request', async () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: '웨이팅 접수' }));
+    const link = screen.getByRole('link', { name: '개인정보 처리방침' });
+    expect(link).not.toHaveAttribute('target');
+    fireEvent.click(link);
+    await waitFor(() => expect(screen.getByLabelText('현재 접수 경로')).toHaveTextContent('/privacy'));
+    expect(waitingService.join).not.toHaveBeenCalled();
+});
+
 it('blocks duplicate submits and keeps the retry key until the party size changes', async () => {
     let fail;
     waitingService.join.mockImplementationOnce(() => new Promise((_, reject) => { fail = reject; })).mockRejectedValueOnce(new Error('다시 시도'));

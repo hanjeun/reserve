@@ -1,5 +1,6 @@
 import Hangul from 'hangul-js';
 import { LINES, fullText } from './src/typing';
+import { installFaqMotion } from './src/faq';
 
 document.documentElement.classList.add('js');
 const theme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -8,6 +9,7 @@ updateTheme();
 theme.addEventListener('change', updateTheme);
 
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+installFaqMotion(document, motion);
 const typing = [...document.querySelectorAll('[data-marketing-typing]')];
 let timer;
 let lineIndex = 0;

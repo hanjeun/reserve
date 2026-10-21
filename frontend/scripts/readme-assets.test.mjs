@@ -20,15 +20,18 @@ test('README screenshots match their flat manifest and PNG viewport', () => {
     }
 });
 
-test('README uses canonical screenshots and preserves the architecture and title references', () => {
+test('README uses canonical screenshots and the current promotional and architecture images', () => {
     const readme = readText('README.md');
     for (const filename of Object.values(README_IMAGE_FILENAMES)) assert.ok(readme.includes(`docs/images/${filename}`), filename);
     assert.ok(readme.includes('docs/images/RESERVE_Architecture.png'));
-    assert.ok(readme.includes('docs/images/title-light.svg'));
-    assert.ok(readme.includes('docs/images/title-dark.svg'));
+    assert.ok(readme.includes('frontend/public/og-image.png'));
+    assert.ok(!readme.includes('docs/images/title-light.svg'));
+    assert.ok(!readme.includes('docs/images/title-dark.svg'));
     assert.ok(!readme.includes('readme-v2.6/'));
     const architecture = readFileSync(new URL('docs/images/RESERVE_Architecture.png', repositoryUrl));
-    assert.equal(createHash('sha256').update(architecture).digest('hex'), '77ad2797bb06de514b93c4c93d530fb788ec821702ca25facffd09b0fb421f15');
+    assert.equal(createHash('sha256').update(architecture).digest('hex'), 'dad66e1cde305263858a8aac65b899cd5b40bfacce074974edc40198be85d699');
+    assert.equal(architecture.readUInt32BE(16), 2048);
+    assert.equal(architecture.readUInt32BE(20), 940);
 });
 
 test('the capture tool uses the shared filename mapping and no deleted generator', () => {

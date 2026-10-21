@@ -93,7 +93,7 @@ test('benefits write icon opens the approval writer directly and keeps a photo a
     await expect(page.getByRole('link', { name: '내 가게 소식 관리' })).toHaveAttribute('href', '/business?tab=news');
     await write.click();
     expect(new URL(page.url()).pathname).toBe('/benefits');
-    expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({ newsType: 'ALL', period: 'ONGOING', page: '1' });
+    expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({ newsType: 'all', period: 'ONGOING', page: '1' });
     const editor = page.getByRole('dialog', { name: /새 가게 소식|가게 소식 미리보기/ });
     await editor.getByRole('textbox', { name: '가게 소식 제목' }).fill('새로운 가게 소식');
     await editor.getByRole('textbox', { name: '가게 소식 본문' }).fill('같은 원문으로 전하는 소식이에요.');

@@ -196,6 +196,8 @@ test('backend tests are explicit, required, and run before packaging', () => {
 });
 
 test('snapshot verification installs a scoped Git byte guard without changing the baseline', () => {
+    const baseline = frontendTests.steps.find(entry => entry.name === 'Load published baseline for preservation checks');
+    assert.equal(baseline.run, 'git fetch --no-tags --depth=1 origin c20ce59c4aec1cfc727fe1cba12960b0e7c78e74');
     const snapshot = frontendTests.steps.find(entry => entry.name === 'Verify immutable design-system snapshot');
     assert.equal(snapshot.run, './scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard');
     assert.match(read('.gitattributes'), /^docs\/design-system\/snapshots\/\*\* -text -eol$/m);
@@ -426,6 +428,34 @@ test('backend image compatibility requires private deletion and feed retention c
     assert.ok(dockerfile.includes('BOOT-INF/classes/kr/it/reserve/member/service/MemberWithdrawalService.class'));
     assert.ok(dockerfile.includes('META-INF/orm.xml'));
     assert.match(dockerfile, /jar tf app\.jar \| grep -F -x "\$REQUIRED_CLASS" > \/dev\/null \|\| exit 1/);
+});
+
+test('marketing smoke requires both restored layouts and rejects a partial or unrelated page', () => {
+    const smoke = deployment.steps.find(entry => entry.name === 'Post-deploy smoke').with.script;
+    const checks = smoke.split('\n').filter(line => line.trimStart().startsWith('grep -q ')
+        && line.includes('$SMOKE_DIR/marketing.html')).join('\n');
+    assert.ok(checks);
+    const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'reserve-marketing-smoke-'));
+    try {
+        for (const [html, passes] of [
+            ['<div id="section-0"></div><div id="mobile-section-0"></div>', true],
+            ['<div id="section-0"></div>', false],
+            ['<div id="mobile-section-0"></div>', false],
+            ['<main id="features">old page</main>', false],
+        ]) {
+            fs.writeFileSync(path.join(fixture, 'marketing.html'), html);
+            const result = spawnSync(process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash',
+                ['-c', `set -euo pipefail\n${checks}`], {
+                    encoding: 'utf8', timeout: 15000, env: { ...process.env, SMOKE_DIR: bashPath(fixture) },
+                });
+            assert.ifError(result.error);
+            assert.equal(result.status === 0, passes, result.stderr + result.stdout);
+        }
+    } finally {
+        assert.equal(path.dirname(path.resolve(fixture)), path.resolve(os.tmpdir()));
+        assert.ok(path.basename(fixture).startsWith('reserve-marketing-smoke-'));
+        fs.rmSync(fixture, { recursive: true, force: true });
+    }
 });
 
 test('test failures retain reports without uploading frontend secret files', () => {

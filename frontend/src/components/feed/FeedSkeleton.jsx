@@ -10,7 +10,7 @@ import { FilterMenuSkeleton } from '../common/FilterToolbarSkeleton';
 import { StateIllustrationSkeleton } from '../common/StateIllustration';
 import { fontSize, spacing } from '../../styles/tokens';
 import ManagementListToolbar from '../common/ManagementListToolbar';
-import { REPORT_STATUS_OPTIONS } from '../admin/managementReviewQuery';
+import { REPORT_STATUS_OPTIONS, REPORT_AUDIT_ACTION_OPTIONS } from '../admin/managementReviewQuery';
 import { FEED_NOTIFICATION_RETENTION_NOTE, FEED_NOTIFICATION_VIEWS } from '../../constants/feedNotifications';
 import { readFeedMediaHint } from '../../utils/feedMediaHint';
 import { FEED_DIRECTORY_VIEWS } from '../../utils/feed';
@@ -26,13 +26,13 @@ function FeedPreparationSkeleton({ title = '피드를 준비하고 있어요.', 
 }
 FeedPreparationSkeleton.propTypes = { title: PropTypes.string, description: PropTypes.string };
 
-export function FeedPageSkeleton({ kind = 'feed', view = 'all', enabled = true, signedIn = false, notificationsEnabled = false, postId }) {
+export function FeedPageSkeleton({ kind = 'feed', view = 'all', enabled = true, signedIn = false, authPending = false, notificationsEnabled = false, postId }) {
     const detail = kind === 'feed-detail';
     const profile = kind === 'feed-author';
     if (!detail && !profile) return <section className="reserve-benefits-page reserve-feed-page reserve-feed-directory" aria-label="피드를 불러오는 중" aria-busy="true">
         {enabled && <div className="reserve-feed-directory-tools" aria-hidden="true">
             <div className="reserve-feed-write-tools"><IconToolSkeleton />
-                {signedIn && <IconToolSkeleton />}{signedIn && notificationsEnabled && <IconToolSkeleton />}</div>
+                {(signedIn || authPending) && <IconToolSkeleton />}{(signedIn || authPending) && notificationsEnabled && <IconToolSkeleton />}</div>
             <div className="reserve-feed-column-tools">
                 {view !== 'mine' && view !== 'drafts' && <IconToolSkeleton kind="navigation" />}
                 <FilterMenuSkeleton select={{ value: view, options: FEED_DIRECTORY_VIEWS }} />
@@ -47,7 +47,7 @@ export function FeedPageSkeleton({ kind = 'feed', view = 'all', enabled = true, 
         <FeedSkeleton detail={detail} postId={postId} />
     </PageContainer>;
 }
-FeedPageSkeleton.propTypes = { kind: PropTypes.string, ownView: PropTypes.bool, signedIn: PropTypes.bool, view: PropTypes.string, region: PropTypes.string, enabled: PropTypes.bool, notificationsEnabled: PropTypes.bool, postId: PropTypes.number };
+FeedPageSkeleton.propTypes = { kind: PropTypes.string, ownView: PropTypes.bool, signedIn: PropTypes.bool, authPending: PropTypes.bool, view: PropTypes.string, region: PropTypes.string, enabled: PropTypes.bool, notificationsEnabled: PropTypes.bool, postId: PropTypes.number };
 
 export function FeedReportListSkeleton({ label = '피드·가게 소식 신고를 불러오는 중' }) {
     return <ul className="reserve-feed-report-list" aria-label={label} aria-busy="true">
@@ -80,12 +80,13 @@ export function FeedNotificationsPageSkeleton({ view = 'all', enabled = true }) 
 }
 FeedNotificationsPageSkeleton.propTypes = { view: PropTypes.string, enabled: PropTypes.bool };
 
-export function FeedReportsSkeleton({ mode = 'reports', status = 'ALL' }) {
+export function FeedReportsSkeleton({ mode = 'reports', status = 'ALL', auditAction = 'ALL' }) {
     return <div><ManagementListToolbar leading={<div className="reserve-segmented"><Bone width="100%" height={44} /></div>}
-        trailing={mode !== 'audit' && <FilterMenuSkeleton select={{ value: status, options: REPORT_STATUS_OPTIONS }} />} />
+        trailing={<FilterMenuSkeleton select={mode === 'audit' ? { value: auditAction, options: REPORT_AUDIT_ACTION_OPTIONS }
+            : { value: status, options: REPORT_STATUS_OPTIONS }} />} />
         <FeedReportListSkeleton label={mode === 'comments' ? '댓글 신고를 불러오는 중' : mode === 'audit' ? '처리 기록을 불러오는 중' : undefined} /></div>;
 }
-FeedReportsSkeleton.propTypes = { mode: PropTypes.string, status: PropTypes.string };
+FeedReportsSkeleton.propTypes = { mode: PropTypes.string, status: PropTypes.string, auditAction: PropTypes.string };
 
 function FeedMediaSkeleton({ images }) {
     if (!images) return <div className="reserve-feed-gallery"><Bone width="100%" height={260} borderRadius={12} /></div>;

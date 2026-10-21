@@ -2,11 +2,6 @@
 
 <a href="https://reserve.it.kr"><img src="frontend/public/og-image.png" alt="RESERVE — 예약이 필요한 순간" width="760" /></a>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/title-dark.svg" />
-  <img src="docs/images/title-light.svg" alt="예약이 필요한 순간, RESERVE" width="760" />
-</picture>
-
 [**서비스 바로가기**](https://reserve.it.kr)
 
 <br />
@@ -87,7 +82,7 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 ## 아키텍처
 
 <p align="center">
-  <img src="docs/images/RESERVE_Architecture.png" alt="RESERVE 아키텍처" width="100%" />
+  <img src="docs/images/RESERVE_Architecture.png" alt="Redis를 포함한 RESERVE 아키텍처" width="100%" />
 </p>
 
 ## 문서

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.advertisement.service.AdPaymentService;
 import kr.it.reserve.payment.dto.PortoneWebhookSignal;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
+import kr.it.reserve.payment.dto.UnresolvedRefundView;
 import kr.it.reserve.payment.entity.Payment;
 import kr.it.reserve.payment.entity.PaymentReconciliationIssue;
 import kr.it.reserve.payment.entity.RefundAttempt;
@@ -115,7 +116,9 @@ public class PortoneWebhookService {
     private void applyPgState(Payment payment, PortoneV2PaymentResponse pgPayment) {
         String merchantUid = payment.getMerchantUid();
         String pgStatus = pgPayment.getStatus();
-        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING) {
+        boolean recordedRefund = payment.getStatus() == Payment.PaymentStatus.REFUNDED
+                || payment.getStatus() == Payment.PaymentStatus.PARTIAL_REFUNDED;
+        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING && !recordedRefund) {
             if (pgPayment.isPaid()) {
                 PaymentService.PaidRecoveryResult result =
                         paymentService.recoverPaidPaymentFromPg(merchantUid, pgPayment);
@@ -135,6 +138,7 @@ public class PortoneWebhookService {
                 .toList();
 
         if (unresolved.isEmpty()) {
+            if (recordedRefund) return;
             recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                     PaymentReconciliationIssue.IssueType.REFUND_LEDGER_MISSING,
                     "REFUND_PENDING_WITHOUT_UNRESOLVED_ATTEMPT");
@@ -150,17 +154,22 @@ public class PortoneWebhookService {
             return;
         }
         RefundAttempt pending = unresolved.get(0);
+        if (pending.isReadyToDispatch()) return;
+        UnresolvedRefundView view = new UnresolvedRefundView(pending.getId(), payment.getId(),
+                merchantUid, pending.getRequestedAmount(), pending.getCancellationId(),
+                pending.getReason(), pending.getResolveAttempts());
 
-        RefundSettlementPolicy.Assessment assessment = RefundSettlementPolicy.assess(
-                payment.refundedSoFar(),
+        RefundSettlementPolicy.LocalAssessment local = RefundSettlementPolicy.assessLocalState(
+                payment.getStatus(), payment.refundedSoFar(),
                 pending.getRequestedAmount(),
                 pending.getCancellationId(),
                 pgPayment);
+        RefundSettlementPolicy.Assessment assessment = local.assessment();
 
         switch (assessment.outcome()) {
             case SUCCEEDED -> {
                 boolean accepted = paymentService.confirmPendingRefund(
-                        payment.getId(), payment.refundedSoFar(), assessment.confirmedAmount(), pending.getReason());
+                        view, local.priorRefundedAmount(), assessment.confirmedAmount(), assessment.cancellationId());
                 if (!accepted) {
                     recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                             PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
@@ -168,8 +177,6 @@ public class PortoneWebhookService {
                     log.error("Refund webhook success conflicts with current local state: merchantUid={}", merchantUid);
                     return;
                 }
-                refundLedgerService.succeeded(
-                        pending.getId(), assessment.cancellationId(), assessment.confirmedAmount());
                 resolveIssues(payment);
                 log.info("Refund settled by webhook: merchantUid={}, pgStatus={}, detailCode={}",
                         merchantUid, pgStatus, assessment.detailCode());
@@ -177,7 +184,7 @@ public class PortoneWebhookService {
             case FAILED -> {
                 String note = "PG cancellation is explicitly FAILED";
                 boolean accepted = paymentService.revertPendingRefund(
-                        payment.getId(), payment.refundedSoFar(), note);
+                        view, local.priorRefundedAmount(), assessment.cancellationId(), note);
                 if (!accepted) {
                     recordIssue(payment, REFUND_ISSUE_PREFIX + payment.getId(),
                             PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
@@ -185,7 +192,6 @@ public class PortoneWebhookService {
                     log.error("Refund webhook failure conflicts with current local state: merchantUid={}", merchantUid);
                     return;
                 }
-                refundLedgerService.failed(pending.getId(), note);
                 resolveIssues(payment);
                 log.error("Refund failed per webhook: merchantUid={}, detailCode={}",
                         merchantUid, assessment.detailCode());

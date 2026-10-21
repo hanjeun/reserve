@@ -25,6 +25,9 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +48,34 @@ class RefundReconciliationSchedulerTest {
     private RefundReconciliationScheduler scheduler;
 
     @Test
+    void onlyExplicitlyUnsentIntentsAreDispatchedBeforeReadOnlyReconciliation() {
+        when(refundAttemptRepository.findPreparedBefore(eq(RefundAttempt.READY_TO_DISPATCH), any(), any()))
+                .thenReturn(List.of(41L));
+        when(refundAttemptRepository.findUnresolvedBefore(eq(RefundAttempt.UNRESOLVED), any()))
+                .thenReturn(List.of());
+
+        scheduler.reconcileUnresolvedRefunds();
+
+        verify(paymentService).dispatchPreparedRefund(41L);
+        verifyNoInteractions(portoneService);
+    }
+
+    @Test
+    void aPreparedIntentThatCouldNotBeClaimedIsNotMisreadAsAnUnknownPgResult() {
+        when(refundAttemptRepository.findPreparedBefore(eq(RefundAttempt.READY_TO_DISPATCH), any(), any()))
+                .thenReturn(List.of(20L));
+        when(refundAttemptRepository.findUnresolvedBefore(eq(RefundAttempt.UNRESOLVED), any()))
+                .thenReturn(List.of(view(null)));
+        when(refundAttemptRepository.existsByIdAndStatusAndFailureReason(
+                20L, RefundAttempt.Status.REQUESTED, RefundAttempt.READY_TO_DISPATCH)).thenReturn(true);
+
+        scheduler.reconcileUnresolvedRefunds();
+
+        verify(paymentService).dispatchPreparedRefund(20L);
+        verifyNoInteractions(portoneService, refundLedgerService);
+    }
+
+    @Test
     @DisplayName("재조회도 누적액과 개별 취소가 정확할 때만 환불을 성공 확정한다")
     void confirmsExactRefund() throws Exception {
         UnresolvedRefundView view = view("cancel-1");
@@ -61,14 +92,33 @@ class RefundReconciliationSchedulerTest {
                 """);
         when(portoneService.getPaymentInfo(MERCHANT_UID)).thenReturn(pgPayment);
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(payment));
-        when(paymentService.confirmPendingRefund(10L, 2_000, 3_000, "예약 취소"))
+        when(paymentService.confirmPendingRefund(view, 2_000, 3_000, "cancel-1"))
                 .thenReturn(true);
 
         scheduler.reconcileOne(view);
 
-        verify(paymentService).confirmPendingRefund(10L, 2_000, 3_000, "예약 취소");
-        verify(refundLedgerService).succeeded(20L, "cancel-1", 3_000);
+        verify(paymentService).confirmPendingRefund(view, 2_000, 3_000, "cancel-1");
+        verify(refundLedgerService, never()).succeeded(20L, "cancel-1", 3_000);
         verify(reconciliationIssueService).resolveForPayment(10L);
+    }
+
+    @Test
+    void anAlreadyRecordedRefundStillReconcilesItsExactUnresolvedLedger() throws Exception {
+        UnresolvedRefundView view = view("cancel-1");
+        Payment payment = pendingPayment(5_000);
+        payment.setStatus(Payment.PaymentStatus.PARTIAL_REFUNDED);
+        when(paymentRepository.findById(10L)).thenReturn(Optional.of(payment));
+        when(portoneService.getPaymentInfo(MERCHANT_UID)).thenReturn(payment("""
+                {"status":"PARTIAL_CANCELLED","amount":{"total":10000,"cancelled":5000},
+                 "cancellations":[{"id":"old","status":"SUCCEEDED","totalAmount":2000},
+                 {"id":"cancel-1","status":"SUCCEEDED","totalAmount":3000}]}
+                """));
+        when(paymentService.confirmPendingRefund(view, 2_000, 3_000, "cancel-1")).thenReturn(true);
+
+        scheduler.reconcileOne(view);
+
+        verify(paymentService).confirmPendingRefund(view, 2_000, 3_000, "cancel-1");
+        verify(refundLedgerService, never()).succeeded(anyLong(), anyString(), anyInt());
     }
 
     @Test
@@ -90,8 +140,8 @@ class RefundReconciliationSchedulerTest {
 
         scheduler.reconcileOne(view);
 
-        verify(paymentService, never()).confirmPendingRefund(anyLong(), anyInt(), anyInt(), anyString());
-        verify(paymentService, never()).revertPendingRefund(anyLong(), anyInt(), anyString());
+        verify(paymentService, never()).confirmPendingRefund(any(), anyInt(), anyInt(), anyString());
+        verify(paymentService, never()).revertPendingRefund(any(), anyInt(), anyString(), anyString());
         verify(refundLedgerService, never()).succeeded(anyLong(), anyString(), anyInt());
         verify(refundLedgerService, never()).failed(anyLong(), anyString());
     }
@@ -116,8 +166,8 @@ class RefundReconciliationSchedulerTest {
 
         scheduler.reconcileOne(view);
 
-        verify(paymentService, never()).confirmPendingRefund(anyLong(), anyInt(), anyInt(), anyString());
-        verify(paymentService, never()).revertPendingRefund(anyLong(), anyInt(), anyString());
+        verify(paymentService, never()).confirmPendingRefund(any(), anyInt(), anyInt(), anyString());
+        verify(paymentService, never()).revertPendingRefund(any(), anyInt(), anyString(), anyString());
         verify(reconciliationIssueService).recordIssue(
                 "REFUND:10",
                 PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
@@ -144,7 +194,7 @@ class RefundReconciliationSchedulerTest {
                 """);
         when(portoneService.getPaymentInfo(MERCHANT_UID)).thenReturn(pgPayment);
         when(paymentRepository.findById(10L)).thenReturn(Optional.of(payment));
-        when(paymentService.confirmPendingRefund(10L, 2_000, 3_000, "예약 취소"))
+        when(paymentService.confirmPendingRefund(view, 2_000, 3_000, "cancel-1"))
                 .thenReturn(false);
 
         scheduler.reconcileOne(view);
@@ -211,8 +261,8 @@ class RefundReconciliationSchedulerTest {
         scheduler.reconcileOne(view);
 
         verify(paymentService).confirmLedgerBackedRefund(view, 0, 3_000, "cancel-1");
-        verify(paymentService, never()).confirmPendingRefund(anyLong(), anyInt(), anyInt(), anyString());
-        verify(refundLedgerService).succeeded(20L, "cancel-1", 3_000);
+        verify(paymentService, never()).confirmPendingRefund(any(), anyInt(), anyInt(), anyString());
+        verify(refundLedgerService, never()).succeeded(20L, "cancel-1", 3_000);
         verify(reconciliationIssueService).resolveForPayment(10L);
         verify(portoneService, never()).cancelPayment(anyString(), anyInt(), anyString());
     }

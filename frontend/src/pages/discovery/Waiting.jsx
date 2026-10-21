@@ -22,6 +22,7 @@ import useListRefreshAnchor from '../../hooks/useListRefreshAnchor';
 import useLiveUpdatesStatus from '../../hooks/useLiveUpdatesStatus';
 import useWaitingEvents from '../../hooks/useWaitingEvents';
 import { isBlockingListReadError } from '../../hooks/liveUpdateQueries';
+import { writeQuerySelection } from '../../utils/querySelection';
 
 const PAGE_SIZE = 12;
 export default function Waiting() {
@@ -53,7 +54,7 @@ export default function Waiting() {
         if (key === 'region' && !rememberRegion(value)) return;
         setParams(current => {
         const next = new URLSearchParams(current);
-        if (value != null && (value !== '' || key === 'region')) next.set(key, String(key === 'region' ? value || 'all' : value));
+        if (value != null && (value !== '' || key === 'region')) next.set(key, String(writeQuerySelection(key, value)));
         else next.delete(key);
         if (key !== 'page') next.set('page', '1');
         return next;

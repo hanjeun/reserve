@@ -13,6 +13,7 @@ import { STORE_LIST_PAGE_SIZE } from '../constants/storeListPageSize';
 import { normalizeListQueryParams } from '../utils/listQueryParams';
 import useDiscoveryRegion from './useDiscoveryRegion';
 import { queryErrorStatus } from './liveUpdateQueries';
+import { readQuerySelection, writeQuerySelection } from '../utils/querySelection';
 
 export { STORE_LIST_PAGE_SIZE };
 const FILTER_KEYS = new Set(['keyword', 'domain', 'region', 'sort', 'lat', 'lng']);
@@ -34,7 +35,7 @@ const useStoreList = () => {
     const sort    = normalizedParams.get('sort')    || 'recommended';
     const lat     = normalizedParams.get('lat');
     const lng     = normalizedParams.get('lng');
-    const domain  = normalizedParams.get('domain') || '';
+    const domain  = readQuerySelection('domain', normalizedParams.get('domain')) || '';
     const [region, rememberRegion] = useDiscoveryRegion(urlSearchParams);
     const rawPage = urlSearchParams.get('page');
     const page = readPage(rawPage);
@@ -103,7 +104,7 @@ const useStoreList = () => {
             let filtersChanged = changesRegion && nextRegion !== region;
             Object.entries(newParams).forEach(([key, value]) => {
                 if (value == null || value === '' && key !== 'domain' && key !== 'region') next.delete(key);
-                else next.set(key, String(key === 'region' ? value || 'all' : value));
+                else next.set(key, String(writeQuerySelection(key, value)));
                 if (key !== 'region' && FILTER_KEYS.has(key) && next.get(key) !== prev.get(key)) filtersChanged = true;
             });
             if (filtersChanged || readPage(next.get('page')) === 1) next.set('page', '1');

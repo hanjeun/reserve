@@ -47,8 +47,8 @@ const ExternalLink = ({ href, label }) => (
 
 const AppFooter = () => {
     const navigate = useNavigate();
-    const [inquiryOpen, setInquiryOpen] = useState(false);
-    const [inquiryLoaded, setInquiryLoaded] = useState(false);
+    const [inquiryOpen, setInquiryOpen] = useState(() => new URLSearchParams(window.location.search).get('inquiry') === 'open');
+    const [inquiryLoaded, setInquiryLoaded] = useState(inquiryOpen);
 
     const openInquiry = () => {
         setInquiryLoaded(true);

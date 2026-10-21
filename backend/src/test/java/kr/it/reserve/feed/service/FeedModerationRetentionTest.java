@@ -17,8 +17,11 @@ import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -375,6 +378,51 @@ class FeedModerationRetentionTest {
     private FeedRetentionService retention(FeedPolicy policy) {
         return new FeedRetentionService(policy, posts, media, reports, evidence, audits, deletion, entityManager, promotions, mock(FeedCommentReportImageRepository.class));
     }
+    @Test
+    void auditActionFilterUsesTheBoundedServerPageAndKeepsTheAdminGate() {
+        when(audits.findByActionOrderByCreatedAtDescIdDesc(eq("REPORT_REVIEW"), any())).thenReturn(Page.empty());
+
+        assertThat(moderation().audit(99L, 2, 20, "REPORT_REVIEW")).isEmpty();
+
+        verify(feeds).requireAdmin(99L);
+        verify(audits).findByActionOrderByCreatedAtDescIdDesc(eq("REPORT_REVIEW"),
+                argThat(page -> page.getPageNumber() == 2 && page.getPageSize() == 20));
+        verify(audits, never()).findAllByOrderByCreatedAtDescIdDesc(any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = "ALL")
+    void allAuditActionsKeepTheExistingCompletePageQuery(String action) {
+        when(audits.findAllByOrderByCreatedAtDescIdDesc(any())).thenReturn(Page.empty());
+
+        assertThat(moderation().audit(99L, 0, 20, action)).isEmpty();
+
+        verify(feeds).requireAdmin(99L);
+        verify(audits).findAllByOrderByCreatedAtDescIdDesc(any());
+        verify(audits, never()).findByActionOrderByCreatedAtDescIdDesc(anyString(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "UNKNOWN_ACTION", "", " ", "all", " REPORT_REVIEW", "REPORT_REVIEW " })
+    void invalidAuditActionCannotTurnIntoAnUnfilteredAuditRead(String action) {
+        assertThatThrownBy(() -> moderation().audit(99L, 0, 20, action)).isInstanceOf(FeedException.class);
+        verify(feeds).requireAdmin(99L);
+        verifyNoInteractions(audits);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = { "ALL", "REPORT_REVIEW", "UNKNOWN_ACTION" })
+    void deniedAuditReaderDoesNotReachEitherRepositoryQuery(String action) {
+        FeedException denied = new FeedException("접근 권한이 없어요.", HttpStatus.FORBIDDEN);
+        doThrow(denied).when(feeds).requireAdmin(7L);
+
+        assertThatThrownBy(() -> moderation().audit(7L, 0, 20, action)).isSameAs(denied);
+        verify(feeds).requireAdmin(7L);
+        verifyNoInteractions(audits);
+    }
+
     private FeedModerationService moderation() {
         return new FeedModerationService(new FeedPolicy(true), new kr.it.reserve.feed.news.StoreNewsAvailability(true), feeds, posts, media, reports, evidence,
                 audits, new ObjectMapper().findAndRegisterModules(), promotions);

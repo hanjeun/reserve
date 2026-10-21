@@ -7,7 +7,7 @@ let useMemory = false;
 // API·화면 상태의 빈 값은 전체 지역이며, 브라우저 주소에서는 all로 표시한다.
 export const validDiscoveryRegion = value => {
     if (typeof value !== 'string') return null;
-    if (value === '' || value === 'all') return '';
+    if (value === '' || value.toLowerCase() === 'all') return '';
     const params = new URLSearchParams({ region: value });
     return normalizeListQueryParams('/stores', params).get('region');
 };

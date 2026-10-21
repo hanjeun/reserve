@@ -23,6 +23,11 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("SELECT m FROM Member m WHERE m.id = :id AND m.deletedAt IS NULL")
     Optional<Member> findActiveByIdForUpdate(@Param("id") Long id);
 
+    /** 금융 이력의 처리와 탈퇴를 직렬화한다. 탈퇴한 회원의 환불 이력도 잠글 수 있어야 한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Member m WHERE m.id = :id")
+    Optional<Member> findByIdForPaymentUpdate(@Param("id") Long id);
+
     /** 비밀번호 재설정과 탈퇴를 이메일 기준으로 직렬화한다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT m FROM Member m WHERE m.email = :email AND m.deletedAt IS NULL")

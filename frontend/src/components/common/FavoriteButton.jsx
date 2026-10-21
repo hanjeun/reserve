@@ -47,7 +47,7 @@ const favoriteClassName = (plain, modifier = '') =>
 
 // 광고 미리보기(preview): 실제 목록과 같은 자리·모양의 빈 하트만 그린다(2026-09-23).
 // 누를 수 없는 그림이라 button 이 아니고 조회도 하지 않는다 — 미리보기 안에는 링크·버튼이 없어야 한다.
-function FavoritePreview({ plain, btnSize, iconSize, style }) {
+function FavoritePreview({ plain, btnSize, iconSize, inactiveColor, style }) {
     return (
         <span
             aria-hidden="true"
@@ -66,7 +66,7 @@ function FavoritePreview({ plain, btnSize, iconSize, style }) {
                 ...style,
             }}
         >
-            <HeartOutlined style={{ fontSize: iconSize, color: colors.text.secondary }} />
+            <HeartOutlined style={{ fontSize: iconSize, color: inactiveColor }} />
         </span>
     );
 }
@@ -75,6 +75,7 @@ FavoritePreview.propTypes = {
     plain: PropTypes.bool,
     btnSize: PropTypes.string,
     iconSize: PropTypes.string,
+    inactiveColor: PropTypes.string,
     style: PropTypes.object,
 };
 
@@ -105,7 +106,7 @@ function buildButtonStyle({ btnSize, blocked, statusUnknown, style }) {
  * 각 카드가 개별적으로 조회하던 걸 캐시로 묶어서, 같은 가게가 여러 곳(목록+상세 등)에 동시에
  * 떠 있어도 한 번만 조회하고 토글 시 전부 같이 갱신된다.
  */
-const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style = {}, preview = false }) => {
+const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style = {}, preview = false, inactiveColor = colors.text.secondary }) => {
     // 필요한 값만 구독한다 — 스토어 전체를 구독하면 목록의 하트 수십 개가 로그인 정보가 바뀔 때마다 다시 그려진다.
     const isLoggedIn = useAuthStore(state => state.isLoggedIn);
     const { message } = useMessage();
@@ -145,7 +146,7 @@ const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style 
     };
 
     if (preview) {
-        return <FavoritePreview plain={plain} btnSize={btnSize} iconSize={iconSize} style={style} />;
+        return <FavoritePreview plain={plain} btnSize={btnSize} iconSize={iconSize} inactiveColor={inactiveColor} style={style} />;
     }
 
     // 로그인하지 않은 사용자에게는 버튼 미표시
@@ -167,7 +168,7 @@ const FavoriteButton = ({ storeId, initialStatus, appearance = 'overlay', style 
         >
             {isFavorite
                 ? <HeartFilled  style={{ fontSize: iconSize, color: colors.error.main }} />
-                : <HeartOutlined style={{ fontSize: iconSize, color: colors.text.secondary }} />
+                : <HeartOutlined style={{ fontSize: iconSize, color: inactiveColor }} />
             }
         </button></Tooltip>
     );
@@ -178,6 +179,7 @@ FavoriteButton.propTypes = {
     initialStatus: PropTypes.bool,
     size: PropTypes.oneOf(['sm', 'md']),
     appearance: PropTypes.oneOf(['overlay', 'plain']),
+    inactiveColor: PropTypes.string,
     style: PropTypes.object,
     preview: PropTypes.bool,
 };

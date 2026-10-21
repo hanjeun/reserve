@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import SearchPage from './index';
 import Header from '../../components/layout/Header';
 import useAuthStore from '../../store/useAuthStore';
+import { createLoadingPresentation, LoadingPresentationContext } from '../../components/layout/loadingPresentation';
 import { addRecentSearch, clearRecentSearches, readRecentSearches, recentSearchOwner } from '../../utils/recentSearches';
 
 const reducedMotionMock = vi.hoisted(() => ({ value: true }));
@@ -19,8 +20,9 @@ function RouteProbe() {
     return <output aria-label="현재 경로">{location.pathname + location.search}</output>;
 }
 
-function renderSearch(entries = ['/search'], initialIndex = entries.length - 1) {
+function renderSearch(entries = ['/search'], initialIndex = entries.length - 1, presentation = null) {
     return render(
+        <LoadingPresentationContext.Provider value={presentation}>
         <MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
             <Routes>
                 <Route path="/search" element={<SearchPage />} />
@@ -28,7 +30,8 @@ function renderSearch(entries = ['/search'], initialIndex = entries.length - 1) 
                 <Route path="/" element={<p>홈</p>} />
             </Routes>
             <RouteProbe />
-        </MemoryRouter>,
+        </MemoryRouter>
+        </LoadingPresentationContext.Provider>,
     );
 }
 
@@ -151,10 +154,29 @@ describe('dedicated search submission and result editing', () => {
         expect(path()).toBe('/stores');
     });
 
-    it('uses its own entrance even for a direct opening after a route skeleton', () => {
+    it('animates cached content when no route skeleton was shown', () => {
         reducedMotionMock.value = false;
         const { container } = renderSearch();
         expect(container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--entering');
+    });
+
+    it('does not re-enter after a visible route skeleton and still animates closing', () => {
+        vi.useFakeTimers();
+        try {
+            reducedMotionMock.value = false;
+            const presentation = createLoadingPresentation('search-entry');
+            presentation.markSkeletonShown();
+            const { container } = renderSearch(['/search'], 0, presentation);
+            expect(container.querySelector('.reserve-search-page')).not.toHaveClass('reserve-search-page--entering');
+            expect(document.activeElement).toBe(field());
+            fireEvent.click(screen.getByRole('button', { name: '취소' }));
+            expect(container.querySelector('.reserve-search-page')).toHaveClass('reserve-search-page--leaving');
+            expect(path()).toBe('/search');
+            act(() => vi.advanceTimersByTime(220));
+            expect(path()).toBe('/');
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('does not animate a direct opening when reduced motion is requested', () => {

@@ -16,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -33,7 +36,8 @@ import java.util.List;
  *
  * <h2>왜 "재시도"가 아니라 "재조회"인가</h2>
  * 취소를 다시 <b>보내면</b> 이중 환불 위험이 생긴다 — 앞의 요청이 사실은 성공했을 수 있기 때문이다.
- * 그래서 이 스케줄러는 절대 취소를 다시 보내지 않고 <b>상태만 읽는다.</b>
+ * 이미 발신한 취소는 <b>상태만 읽는다.</b> 취소 결정과 함께 저장됐지만 아직 발신하지 않은
+ * 명시적 READY_TO_DISPATCH 작업만 단일 선점을 거쳐 최초 발신한다.
  * 실패로 확정되면 결제를 PAID 로 되돌려, 다시 보낼지는 <b>사람이나 손님이</b> 정하게 한다.
  *
  * <h2>자동 확정 조건</h2>
@@ -66,8 +70,18 @@ public class RefundReconciliationScheduler {
      * <p>{@code fixedDelay} 라 앞 회차가 끝난 뒤 5분을 센다 — PG 응답이 느려도 회차가 겹치지 않는다.
      */
     @Scheduled(fixedDelay = 5 * 60 * 1000, initialDelay = 60 * 1000)
+    @Transactional(propagation = Propagation.NEVER)
     public void reconcileUnresolvedRefunds() {
         LocalDateTime cutoff = LocalDateTime.now(Clock.systemDefaultZone()).minus(SETTLE_DELAY);
+        for (Long attemptId : refundAttemptRepository.findPreparedBefore(
+                RefundAttempt.READY_TO_DISPATCH, cutoff, PageRequest.of(0, 100))) {
+            try {
+                paymentService.dispatchPreparedRefund(attemptId);
+            } catch (RuntimeException e) {
+                log.error("Prepared refund dispatch deferred: attemptId={}, errorType={}",
+                        attemptId, e.getClass().getSimpleName());
+            }
+        }
         List<UnresolvedRefundView> unresolved =
                 refundAttemptRepository.findUnresolvedBefore(RefundAttempt.UNRESOLVED, cutoff);
 
@@ -77,6 +91,8 @@ public class RefundReconciliationScheduler {
         log.info("Refund reconciliation started: unresolved={}", unresolved.size());
 
         for (UnresolvedRefundView view : unresolved) {
+            if (refundAttemptRepository.existsByIdAndStatusAndFailureReason(
+                    view.attemptId(), RefundAttempt.Status.REQUESTED, RefundAttempt.READY_TO_DISPATCH)) continue;
             // 목록은 2분 이전 행만 담지만, 중복 판정은 방금 생긴 미결까지 전부 센다.
             // 그렇지 않으면 오래된 행 하나 + 진행 중인 새 행 하나를 단일 시도로 오인한다.
             if (refundAttemptRepository.countByPaymentIdAndStatusIn(
@@ -133,31 +149,32 @@ public class RefundReconciliationScheduler {
             return;
         }
         if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING
-                && payment.getStatus() != Payment.PaymentStatus.PAID) {
+                && payment.getStatus() != Payment.PaymentStatus.PAID
+                && payment.getStatus() != Payment.PaymentStatus.REFUNDED
+                && payment.getStatus() != Payment.PaymentStatus.PARTIAL_REFUNDED) {
             recordIssue(view, "LOCAL_PAYMENT_STATUS_" + payment.getStatus());
             log.error("Refund ledger and local payment status disagree: paymentId={}, localStatus={}",
                     paymentId, payment.getStatus());
             return;
         }
 
-        RefundSettlementPolicy.Assessment assessment = RefundSettlementPolicy.assess(
-                payment.refundedSoFar(), requestedAmount, cancellationId, pgPayment);
+        RefundSettlementPolicy.LocalAssessment local = RefundSettlementPolicy.assessLocalState(
+                payment.getStatus(), payment.refundedSoFar(), requestedAmount, cancellationId, pgPayment);
+        RefundSettlementPolicy.Assessment assessment = local.assessment();
         String pgStatus = pgPayment.getStatus();
         switch (assessment.outcome()) {
             case SUCCEEDED -> {
                 boolean accepted = payment.getStatus() == Payment.PaymentStatus.PAID
                         ? paymentService.confirmLedgerBackedRefund(
-                                view, payment.refundedSoFar(), assessment.confirmedAmount(), assessment.cancellationId())
+                                view, local.priorRefundedAmount(), assessment.confirmedAmount(), assessment.cancellationId())
                         : paymentService.confirmPendingRefund(
-                                paymentId, payment.refundedSoFar(), assessment.confirmedAmount(), reason);
+                                view, local.priorRefundedAmount(), assessment.confirmedAmount(), assessment.cancellationId());
                 if (!accepted) {
                     recordIssue(view, "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_SUCCESS");
                     log.error("Refund success conflicts with current local state: merchantUid={}, detailCode={}",
                             merchantUid, assessment.detailCode());
                     return;
                 }
-                refundLedgerService.succeeded(
-                        attemptId, assessment.cancellationId(), assessment.confirmedAmount());
                 resolveIssues(paymentId);
                 log.info("Refund reconciled as succeeded: merchantUid={}, pgStatus={}, detailCode={}",
                         merchantUid, pgStatus, assessment.detailCode());
@@ -165,14 +182,13 @@ public class RefundReconciliationScheduler {
             case FAILED -> {
                 String note = "PG cancellation is explicitly FAILED";
                 boolean accepted = paymentService.revertPendingRefund(
-                        paymentId, payment.refundedSoFar(), note);
+                        view, local.priorRefundedAmount(), assessment.cancellationId(), note);
                 if (!accepted) {
                     recordIssue(view, "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_FAILURE");
                     log.error("Refund failure conflicts with current local state: merchantUid={}, detailCode={}",
                             merchantUid, assessment.detailCode());
                     return;
                 }
-                refundLedgerService.failed(attemptId, note);
                 resolveIssues(paymentId);
                 log.error("Refund reconciled as failed: merchantUid={}, detailCode={}",
                         merchantUid, assessment.detailCode());

@@ -1,8 +1,7 @@
 package kr.it.reserve.reservation.scheduler;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
 import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
@@ -12,6 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 
@@ -26,29 +28,31 @@ public class ReservationExpiryProcessor {
 
     private final ReservationRepository reservationRepository;
     private final PaymentService paymentService;
-    private final EntityManager entityManager;
+    private final PlatformTransactionManager transactionManager;
     @Autowired(required = false)
     private ReservationUpdates updates;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NEVER)
     public ExpiryResult expireIfDue(Long reservationId, LocalDateTime now) {
-        Reservation reservation = reservationRepository.findById(reservationId).orElse(null);
-        if (!isStillCandidate(reservation)) {
+        Boolean candidate = new TransactionTemplate(transactionManager).execute(ignored -> {
+            Reservation reservation = reservationRepository.findById(reservationId).orElse(null);
+            return isDue(reservation, now);
+        });
+        if (!Boolean.TRUE.equals(candidate)) return ExpiryResult.SKIPPED;
+        PaymentService.ExpiryPaymentObservation observation =
+                paymentService.observeBeforeReservationExpiry(reservationId);
+        return new TransactionTemplate(transactionManager).execute(ignored -> expireObserved(reservationId, now, observation));
+    }
+
+    private ExpiryResult expireObserved(Long reservationId, LocalDateTime now,
+                                        PaymentService.ExpiryPaymentObservation observation) {
+        if (!reservationRepository.existsById(reservationId)) {
             return ExpiryResult.SKIPPED;
         }
-
-        Integer timeoutMinutes = getTimeoutMinutes(reservation);
-        if (timeoutMinutes == null) {
-            return ExpiryResult.SKIPPED;
-        }
-
-        LocalDateTime expireAt = reservation.getCreatedAt().plusMinutes(timeoutMinutes);
-        if (!now.isAfter(expireAt)) {
-            return ExpiryResult.SKIPPED;
-        }
-
+        Reservation reservation = paymentService.lockReservationPayments(reservationId);
+        if (!isDue(reservation, now)) return ExpiryResult.SKIPPED;
         PaymentService.ExpiryPaymentDecision paymentDecision =
-                paymentService.reconcileBeforeReservationExpiry(reservation.getId());
+                paymentService.applyLockedExpiryPaymentObservation(reservation, observation);
         if (paymentDecision == PaymentService.ExpiryPaymentDecision.PAID_RECOVERED) {
             log.info("[ExpiryScheduler] Payment recovered before expiry: reservationId={}",
                     reservation.getId());
@@ -60,21 +64,7 @@ public class ReservationExpiryProcessor {
             return ExpiryResult.DEFERRED;
         }
 
-        // 결제 행을 먼저 잠근 다음 예약 행을 잠그고 최신 상태로 새로 읽는다.
-        // 후보 조회 뒤 사업자가 승인했거나 다른 경로가 결제를 반영한 예약을 stale 값으로 취소하지 않는다.
-        entityManager.refresh(reservation, LockModeType.PESSIMISTIC_WRITE);
-        if (!isStillCandidate(reservation)) {
-            return ExpiryResult.SKIPPED;
-        }
-        timeoutMinutes = getTimeoutMinutes(reservation);
-        if (timeoutMinutes == null) {
-            return ExpiryResult.SKIPPED;
-        }
-        expireAt = reservation.getCreatedAt().plusMinutes(timeoutMinutes);
-        if (!now.isAfter(expireAt)) {
-            return ExpiryResult.SKIPPED;
-        }
-
+        LocalDateTime expireAt = reservation.getCreatedAt().plusMinutes(getTimeoutMinutes(reservation));
         log.info("[ExpiryScheduler] Unpaid reservation auto-cancelled: reservationId={}, storeId={}, memberId={}, createdAt={}, expireAt={}",
                 reservation.getId(),
                 reservation.getStore().getId(),
@@ -84,6 +74,12 @@ public class ReservationExpiryProcessor {
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
         if (updates != null) updates.changed(reservation, EntityUpdates.Operation.UPDATED);
         return ExpiryResult.CANCELLED;
+    }
+
+    private boolean isDue(Reservation reservation, LocalDateTime now) {
+        if (!isStillCandidate(reservation)) return false;
+        Integer timeout = getTimeoutMinutes(reservation);
+        return timeout != null && now.isAfter(reservation.getCreatedAt().plusMinutes(timeout));
     }
 
     private boolean isStillCandidate(Reservation reservation) {

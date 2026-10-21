@@ -1,8 +1,10 @@
 package kr.it.reserve.payment;
 
+import jakarta.persistence.EntityManager;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.it.reserve.global.error.PaymentException;
+import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
 import kr.it.reserve.payment.dto.StaleReadyReconciliationResponse;
@@ -18,6 +20,9 @@ import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -30,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentStaleReadyReconciliationTest {
@@ -37,12 +44,24 @@ class PaymentStaleReadyReconciliationTest {
     private static final String MERCHANT_UID = "order-stale-ready";
     private static final int AMOUNT = 10_000;
 
+    @Mock private EntityManager entityManager;
     @Mock private PaymentRepository paymentRepository;
     @Mock private ReservationRepository reservationRepository;
     @Mock private MemberRepository memberRepository;
     @Mock private PortoneService portoneService;
     @Mock private RefundLedgerService refundLedgerService;
     @Mock private PaymentReconciliationIssueService reconciliationIssueService;
+
+    @Mock private PlatformTransactionManager transactionManager;
+
+    @BeforeEach
+    void transactionBoundaries() {
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenAnswer(ignored -> new SimpleTransactionStatus());
+        lenient().when(reservationRepository.findMemberIdById(100L)).thenReturn(Optional.of(200L));
+        lenient().when(memberRepository.findByIdForPaymentUpdate(200L))
+                .thenReturn(Optional.of(Member.builder().id(200L).build()));
+    }
 
     @InjectMocks
     private PaymentService paymentService;
@@ -147,6 +166,7 @@ class PaymentStaleReadyReconciliationTest {
     private Reservation reservation(Reservation.ReservationStatus status) {
         return Reservation.builder()
                 .id(100L)
+                .member(Member.builder().id(200L).build())
                 .status(status)
                 .store(Store.builder().autoApprovalEnabled(false).build())
                 .depositPaid(false)
@@ -154,13 +174,17 @@ class PaymentStaleReadyReconciliationTest {
     }
 
     private Payment readyPayment(Long id, Reservation reservation) {
-        return Payment.builder()
+        Payment payment = Payment.builder()
                 .id(id)
                 .merchantUid(MERCHANT_UID)
                 .amount(AMOUNT)
                 .status(Payment.PaymentStatus.READY)
                 .reservation(reservation)
                 .build();
+        when(paymentRepository.findById(id)).thenReturn(Optional.of(payment));
+        when(paymentRepository.findReservationIdByPaymentId(id)).thenReturn(Optional.of(100L));
+        lenient().when(reservationRepository.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(reservation));
+        return payment;
     }
 
     private PortoneV2PaymentResponse pgPayment(String status, int amount) {

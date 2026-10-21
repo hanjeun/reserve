@@ -87,7 +87,7 @@ export default function WorkspaceLayout({ title, groups, activeKey, hrefFor, onS
             <h2 id={`${id}-${surface}-${group.key}`}>{group.label}</h2>
             <ul>{group.items.map(item => {
                 const ItemIcon = item.icon;
-                const label = <><ItemIcon aria-hidden="true" /><span>{item.label}</span></>;
+                const label = <><span className="reserve-workspace-menu-icon" aria-hidden="true"><ItemIcon /></span><span>{item.label}</span></>;
                 if (loading) return <li key={item.key}><span className="reserve-workspace-menu-placeholder"
                     aria-current={item.key === activeKey ? 'page' : undefined}>{label}</span></li>;
                 return <li key={item.key}><a href={hrefFor(item.key)} aria-current={item.key === activeKey ? 'page' : undefined}
@@ -103,7 +103,7 @@ export default function WorkspaceLayout({ title, groups, activeKey, hrefFor, onS
     return <PageContainer size="xl" paddingTop="32px" className="reserve-workspace" style={{ '--workspace-sticky-top': `${CONTENT_TOP}px` }}>
         <header ref={headingRef} className="reserve-workspace-heading">
             <PageTitle level={1} tabIndex={loading ? undefined : -1} loading={loading} style={{ margin: 0 }}>
-                <span className="reserve-workspace-heading-label">{Icon && <Icon aria-hidden="true" />}<span>{heading}</span></span>
+                <span className="reserve-workspace-heading-label">{Icon && <span className="reserve-workspace-heading-icon" aria-hidden="true"><Icon /></span>}<span>{heading}</span></span>
             </PageTitle>
         </header>
         <Layout className={'reserve-workspace-layout' + (!sidebarOpen ? ' is-menu-collapsed' : '')}>

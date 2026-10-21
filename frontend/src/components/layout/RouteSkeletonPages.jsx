@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useSkeletonShown } from './loadingPresentation';
 import StoreCardSkeleton from '../common/StoreCardSkeleton';
 import { PageStatusSkeleton } from '../common/PageStatus';
 import BenefitListSkeleton from '../common/BenefitListSkeleton';
@@ -32,6 +34,7 @@ import { normalizeRouteSkeletonPath } from './routeSkeletonKind';
 import { discoveryComingSoonScreen } from '../../constants/discoveryComingSoon';
 import { useWindowWidth } from '../../hooks/useWindowWidth';
 import { resolveViewMode } from '../../utils/viewMode';
+import { readQuerySelection } from '../../utils/querySelection';
 import { breakpoints, colors, field } from '../../styles/tokens';
 import { StateIllustrationSkeleton } from '../common/StateIllustration';
 import { GUIDE_PAGES, guidePageForPath, guideStyles } from '../../pages/legal/GuidePageMetadata';
@@ -44,7 +47,7 @@ export { TextBone };
 
 const optionValueOr = (options, value, fallback) => options.some(option => option.value === value) ? value : fallback;
 const storeSkeletonFilters = (params, sortOptions, fallbackSort) => [
-    { value: params.get('domain') || '', options: SERVICE_DOMAIN_FILTER_OPTIONS, className: 'reserve-explore-domain-filter' },
+    { value: readQuerySelection('domain', params.get('domain')) || '', options: SERVICE_DOMAIN_FILTER_OPTIONS, className: 'reserve-explore-domain-filter' },
     { value: optionValueOr(sortOptions, params.get('sort'), fallbackSort), options: sortOptions, className: 'reserve-explore-sort-filter' },
 ];
 
@@ -287,7 +290,7 @@ export function BusinessRouteSkeleton({ search = '' }) {
         {contentTab === 'chat-intro' && <ChatIntroRouteSkeleton business />}
         {contentTab === 'reservations' && <>
             <ListingToolbarSkeleton filters={reservationSkeletonFilters({
-                store: params.get('reservationStore') || 'ALL',
+                store: readQuerySelection('reservationStore', params.get('reservationStore')) || 'ALL',
                 status: optionValueOr(RESERVATION_STATUS_FILTER_OPTIONS, params.get('reservationStatus'), 'ALL'),
                 sort: optionValueOr(RESERVATION_SORT_OPTIONS, params.get('reservationSort'), 'recent'),
             })} />
@@ -419,7 +422,7 @@ ReservationsSkeleton.propTypes = { pathname: PropTypes.string, search: PropTypes
 function BenefitsRouteSkeleton({ search }) {
     const business = useAuthStore(state => state.user?.role === 'BUSINESS');
     const params = new URLSearchParams(search);
-    return <section className="reserve-benefits-page"><StoreNewsPublicToolbarSkeleton business={business} type={params.get('newsType') || 'ALL'} period={params.get('period') === 'ALL' ? 'ALL' : 'ONGOING'} /><section className="reserve-benefits-news">
+    return <section className="reserve-benefits-page"><StoreNewsPublicToolbarSkeleton business={business} type={readQuerySelection('newsType', params.get('newsType')) || 'ALL'} period={readQuerySelection('period', params.get('period')) === 'ALL' ? 'ALL' : 'ONGOING'} /><section className="reserve-benefits-news">
         <div className="reserve-benefits-news-content"><BenefitListSkeleton /></div>
     </section></section>;
 }
@@ -430,7 +433,10 @@ const BenefitDetailRouteSkeleton = () => <BenefitDetailSkeleton />;
 
 
 function SearchSkeleton() {
-    return <div className="reserve-search-page">
+    const skeletonShown = useSkeletonShown();
+    // 첫 골격의 모션은 표시 기록이 갱신돼도 유지하고, 부트 셸 교체 때 다시 시작하지 않는다.
+    const [entering] = useState(() => !skeletonShown);
+    return <div className={'reserve-search-page' + (entering ? ' reserve-search-page--entering' : '')}>
         <div className="reserve-search-header">
             <div className="reserve-search-field"><Bone width="65%" height={16} style={{ marginLeft: 16 }} /></div>
             <Bone width={44} height={16} />

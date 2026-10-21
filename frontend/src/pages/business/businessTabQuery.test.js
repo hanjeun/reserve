@@ -58,4 +58,9 @@ describe('businessTabSearch', () => {
         expect(analytics.has('waitingStatus')).toBe(false);
         expect(analytics.has('view')).toBe(false);
     });
+    it('restores the destination view, store and page without carrying the source view or search', () => {
+        const params = new URLSearchParams(businessTabSearch('?tab=waiting&waitingStore=5&waitingSearch=손님&view=cards&utm_source=guide',
+            'reservations', 'view=list&reservationStore=ALL&reservationStatus=OPEN&reservationPage=3&waitingStore=9'));
+        expect(Object.fromEntries(params)).toEqual({ tab: 'reservations', utm_source: 'guide', view: 'list', reservationStore: 'all', reservationStatus: 'OPEN', reservationPage: '3' });
+    });
 });

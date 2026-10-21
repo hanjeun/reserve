@@ -11,6 +11,9 @@ updates:
       # eslint 코어와 플러그인은 버전이 물려 있어 따로 머지하면 그 사이 커밋에서 CI 가 깨진다.
       eslint:
         patterns: ["eslint", "@eslint/*", "eslint-plugin-*", "eslint-config-*"]
+      # 오류 수집기와 Replay는 같은 버전으로 갱신한다.
+      sentry:
+        patterns: ["@sentry/*"]
       # 나머지 minor/patch 는 한 덩어리로. 메이저는 여기 안 잡히고 따로 올라온다 — 그게 맞다.
       frontend-minor:
         update-types: ["minor", "patch"]
@@ -21,6 +24,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["chore", "dependencies"]
+    # Spring Boot 3.5의 Gradle 7/8 지원 범위다. Boot 업그레이드 때 이 제한도 재검토한다.
+    ignore:
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
     groups:
       backend-minor:
         update-types: ["minor", "patch"]

@@ -28,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ReservationUndoWindowTest {
@@ -78,6 +80,8 @@ class ReservationUndoWindowTest {
     private void assertDepositIsUntouched() {
         assertThat(reservation.getDepositPaid()).isTrue();
         assertThat(reservation.getDepositAmount()).isEqualTo(20000);
-        verifyNoInteractions(payments, emails);
+        verify(payments).lockReservationForStateChange(20L);
+        verifyNoMoreInteractions(payments);
+        verifyNoInteractions(emails);
     }
 }

@@ -1,32 +1,38 @@
 package kr.it.reserve.feed.service;
 
+import kr.it.reserve.config.updates.EntityUpdates;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.feed.*;
 import kr.it.reserve.feed.dto.FeedDto;
-import kr.it.reserve.feed.entity.*;
 import kr.it.reserve.feed.news.StoreNewsAvailability;
 import kr.it.reserve.feed.news.service.StoreNewsEvents;
+import kr.it.reserve.feed.entity.*;
 import kr.it.reserve.feed.repository.*;
-import kr.it.reserve.global.common.PageRequests;
-import kr.it.reserve.promotion.StoreNewsPolicy;
 import kr.it.reserve.promotion.entity.Promotion;
 import kr.it.reserve.promotion.repository.PromotionRepository;
+import kr.it.reserve.promotion.StoreNewsPolicy;
+import kr.it.reserve.global.common.PageRequests;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.time.ZoneOffset;
 
 @Service @RequiredArgsConstructor
 public class FeedModerationService {
+    private static final Set<String> AUDIT_ACTIONS = Set.of(
+            "REPORT_LIST_READ", "REPORT_READ", "EVIDENCE_IMAGE_READ", "REPORT_REVIEW", "HOLD_SET", "HOLD_RELEASED",
+            "POST_HIDDEN", "POST_RESTORED", "BENEFIT_SUBMITTED", "BENEFIT_APPROVED", "BENEFIT_REJECTED",
+            "BENEFIT_WITHDRAWN", "BENEFIT_EDIT_REVIEW", "BENEFIT_LIST_READ", "BENEFIT_READ", "BENEFIT_IMAGE_READ",
+            "NEWS_HIDDEN", "NEWS_RESTORED", "COMMENT_READ", "COMMENT_REPORT_LIST_READ", "COMMENT_REPORT_READ",
+            "COMMENT_REPORT_REVIEW", "COMMENT_HIDDEN", "COMMENT_RESTORED", "COMMENT_EVIDENCE_IMAGE_READ", "COMMENT_IMAGE_READ");
     private final FeedPolicy policy;
     private final StoreNewsAvailability newsAvailability;
     private final FeedService feeds;
@@ -164,8 +170,17 @@ public class FeedModerationService {
 
     @Transactional(readOnly = true)
     public Page<FeedDto.Audit> audit(Long admin, int page, int size) {
+        return audit(admin, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<FeedDto.Audit> audit(Long admin, int page, int size, String action) {
         requireModerationEnabled(); feeds.requireAdmin(admin);
-        return audits.findAllByOrderByCreatedAtDescIdDesc(PageRequests.bounded(page, size))
+        String selected = action == null || "ALL".equals(action) ? null : action;
+        if (selected != null && !AUDIT_ACTIONS.contains(selected)) throw FeedException.invalid("처리 종류를 선택해주세요.");
+        var pageable = PageRequests.bounded(page, size);
+        return (selected == null ? audits.findAllByOrderByCreatedAtDescIdDesc(pageable)
+                : audits.findByActionOrderByCreatedAtDescIdDesc(selected, pageable))
                 .map(item -> new FeedDto.Audit(item.getId(), item.getActorId(), item.getAction(), item.getPostId(), item.getReportId(), item.getReason(), item.getCreatedAt().atOffset(ZoneOffset.UTC), item.getPromotionId()));
     }
 

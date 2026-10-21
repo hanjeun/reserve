@@ -10,6 +10,7 @@ import java.util.List;
 
 public interface FeedAuditRepository extends JpaRepository<FeedAuditRecord, Long> {
     Page<FeedAuditRecord> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
+    Page<FeedAuditRecord> findByActionOrderByCreatedAtDescIdDesc(String action, Pageable pageable);
     @Query("SELECT a.id FROM FeedAuditRecord a WHERE a.createdAt < :cutoff AND NOT EXISTS "
             + "(SELECT r.id FROM FeedReport r WHERE r.id = a.reportId OR r.postId = a.postId OR r.promotionId = a.promotionId) AND NOT EXISTS "
             + "(SELECT c.id FROM FeedCommentReport c WHERE c.postId = a.postId) ORDER BY a.id")

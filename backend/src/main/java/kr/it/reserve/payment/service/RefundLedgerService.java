@@ -9,22 +9,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 환불 원장 기록 — 2026-08-23 신설.
- *
- * <h2>★ 모든 메서드가 {@code REQUIRES_NEW} 인 이유 — 이게 이 클래스의 전부다</h2>
- * 원장이 호출자(환불 트랜잭션)와 <b>같은 트랜잭션</b>에 있으면,
- * 환불이 실패해 롤백될 때 <b>"실패했다는 기록까지 같이 사라진다."</b>
- * 그건 기록이 가장 필요한 순간에 기록이 없어지는 것이고, 정확히 지금 고치려는 문제다.
- *
- * <p>별도 트랜잭션이라 이런 그림이 가능해진다 — 원장에는 "3만원 환불 시도, REQUESTED" 가 남았는데
- * 결제는 여전히 PAID. <b>이 어긋남은 버그가 아니라 신호다.</b> "PG 를 부르다가 끊겼으니
- * 사람이 PortOne 콘솔에서 확인하라"는 뜻이고, 그 확인 대상을 뽑을 수 있게 하는 게 원장의 목적이다.
- *
- * <h2>원장 기록 실패와 PG 호출의 경계</h2>
- * 각 메서드는 예외를 삼키고 {@code log.error}를 남기지만, {@link #start}가 {@code null}이면
- * 호출자는 PG 취소를 보내지 않는다. 추적할 원장 없이 외부의 돈만 움직이는 것보다
- * 요청을 안전하게 지연하고 다시 시도하게 하는 편이 낫다. 결말 기록 실패는 미결 원장을 남겨
- * 재조회·대사할 수 있게 한다.
+ * 미발신 의도는 예약 결정·결제 pending과 함께 저장한다. PG 발신 전 이 커밋이 반드시 끝나야 한다.
+ * 웹훅·재조회 결말은 PaymentService에서 결제·예약금과 함께 확정하고, 재조회 횟수만 독립 저장한다.
  */
 @Slf4j
 @Service
@@ -33,27 +19,11 @@ public class RefundLedgerService {
 
     private final RefundAttemptRepository refundAttemptRepository;
 
-    /**
-     * PG 를 부르기 <b>직전</b>에 원장 행을 만들고 <b>즉시 커밋</b>한다.
-     *
-     * @return 원장 행 ID. 기록에 실패하면 {@code null} — 호출측은 PG 요청 전에 중단해야 한다.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public Long start(Long paymentId, String merchantUid, Integer requestedAmount, String reason) {
-        try {
-            // 결제를 ID 로만 참조한다 — 엔티티를 끌어오지 않으므로 payment 행을 건드리지 않는다.
-            // 그게 이 별도 트랜잭션이 바깥의 행 잠금과 교착하지 않는 이유다
-            // (RefundAttempt#paymentId 주석 참고).
-            RefundAttempt attempt = RefundAttempt.start(paymentId, merchantUid, requestedAmount, reason);
-            Long id = refundAttemptRepository.save(attempt).getId();
-            log.info("Refund attempt opened: attemptId={}, paymentId={}, merchantUid={}, amount={}",
-                    id, paymentId, merchantUid, requestedAmount);
-            return id;
-        } catch (Exception e) {
-            log.error("Failed to open refund ledger entry: paymentId={}, merchantUid={}, amount={}, errorType={}",
-                    paymentId, merchantUid, requestedAmount, e.getClass().getSimpleName());
-            return null;
-        }
+    /** 예약 결정·결제 pending과 같은 트랜잭션에 미발신 의도를 저장한다. 실패하면 PG는 발신되지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Long prepare(Long paymentId, String merchantUid, Integer requestedAmount, String reason) {
+        return refundAttemptRepository.save(
+                RefundAttempt.prepare(paymentId, merchantUid, requestedAmount, reason)).getId();
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -64,7 +34,8 @@ public class RefundLedgerService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void pending(Long attemptId, String cancellationId, String note) {
-        update(attemptId, a -> a.markPending(cancellationId, note), "PENDING", cancellationId);
+        update(attemptId, a -> a.markPending(cancellationId != null ? cancellationId : a.getCancellationId(), note),
+                "PENDING", cancellationId);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -84,14 +55,19 @@ public class RefundLedgerService {
     private void update(Long attemptId, java.util.function.Consumer<RefundAttempt> mutation,
                         String label, String cancellationId) {
         if (attemptId == null) {
-            // start() 가 실패했던 경우. 결말을 적을 행이 없다 — 최소한 로그로는 남긴다.
+            // 내구 원장 ID가 없으면 결말을 적지 않고 진단만 남긴다.
             log.error("Refund outcome has no ledger row to write to: outcome={}, cancellationId={}",
                     label, cancellationId);
             return;
         }
         try {
-            refundAttemptRepository.findById(attemptId).ifPresentOrElse(
+            refundAttemptRepository.findByIdForUpdate(attemptId).ifPresentOrElse(
                     attempt -> {
+                        if (!"RESOLVE_ATTEMPT".equals(label) && !attempt.isUnresolved()) {
+                            log.debug("Refund ledger outcome already final: attemptId={}, status={}",
+                                    attemptId, attempt.getStatus());
+                            return;
+                        }
                         mutation.accept(attempt);
                         refundAttemptRepository.save(attempt);
                         // RESOLVE_ATTEMPT 는 "닫혔다"가 아니라 "한 번 더 물어봤다"이다.

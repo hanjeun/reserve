@@ -47,7 +47,7 @@ class StorePageServiceTest {
                 "https://cdn.reserve.it.kr.evil.example/users/1/stores/81/thumbnails/photo.png",
                 "javascript:alert(1)"}) {
             String html = pages().render(StoreResponse.builder().id(81L).name("가게").mainImageUrl(image).build());
-            assertThat(html).contains("content=\"https://reserve.it.kr/og-image.png?v=20260928\"")
+            assertThat(html).contains("content=\"https://reserve.it.kr/og-image.png?v=20261021\"")
                     .doesNotContain(image);
         }
     }

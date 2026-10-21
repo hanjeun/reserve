@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Checkbox, Form, Tag } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import Pagination from '../common/Pagination';
@@ -17,26 +17,26 @@ import ManagementListToolbar from '../common/ManagementListToolbar';
 import { WorkspaceActivityContext } from '../layout/workspaceActivity';
 import { useQueryParamsState } from '../../hooks/useQueryParamState';
 import useWorkspaceAction from '../../hooks/useWorkspaceAction';
+import useTabQueryMemory from '../../hooks/useTabQueryMemory';
 import { assertCurrentSession, currentSession, isCurrentSession } from '../../api/sessionScope';
-import { REPORT_QUERY_DEFAULTS, REPORT_URL_KEYS, REPORT_STATUS_OPTIONS, reportMode, reviewOption, reviewPage } from './managementReviewQuery';
+import { REPORT_QUERY_DEFAULTS, REPORT_URL_KEYS, REPORT_STATUS_OPTIONS, REPORT_AUDIT_ACTION_OPTIONS,
+    FEED_AUDIT_ACTION_LABELS, reportTabSearch, reportMode, reviewOption, reviewPage } from './managementReviewQuery';
 import useReportReviewDraft from './useReportReviewDraft';
 
 const PAGE_SIZE = 20;
 const statuses = [{ value: 'OPEN', label: '접수' }, { value: 'RESOLVED', label: '처리 완료' }];
-const actions = { REPORT_LIST_READ: '신고 목록 열람', REPORT_READ: '신고 상세 열람', EVIDENCE_IMAGE_READ: '신고 사진 열람',
-    REPORT_REVIEW: '신고 처리', HOLD_SET: '파기 보류', HOLD_RELEASED: '파기 보류 해제', POST_HIDDEN: '게시물 숨김', POST_RESTORED: '게시물 공개 복원',
-    BENEFIT_SUBMITTED: '혜택 신청', BENEFIT_APPROVED: '혜택 승인', BENEFIT_REJECTED: '혜택 반려',
-    BENEFIT_WITHDRAWN: '혜택 신청 철회', BENEFIT_EDIT_REVIEW: '혜택 수정 재심사',
-    BENEFIT_LIST_READ: '혜택 신청 목록 열람', BENEFIT_READ: '혜택 신청 열람', BENEFIT_IMAGE_READ: '혜택 신청 사진 열람',
-    NEWS_HIDDEN: '가게 소식 숨김', NEWS_RESTORED: '가게 소식 공개 복원', COMMENT_READ: '댓글 원문 열람',
-    COMMENT_REPORT_LIST_READ: '댓글 신고 목록 열람', COMMENT_REPORT_READ: '댓글 신고 열람', COMMENT_REPORT_REVIEW: '댓글 신고 처리',
-    COMMENT_HIDDEN: '댓글 숨김', COMMENT_RESTORED: '댓글 공개 복원' };
 
 export default function FeedReportsPanel() {
     const [urlParams] = useSearchParams();
     const [query, setQuery] = useQueryParamsState(REPORT_QUERY_DEFAULTS, REPORT_URL_KEYS[reportMode(urlParams.get('reportMode'))]);
     const mode = reportMode(query.reportMode);
+    const remembered = useTabQueryMemory('admin/feed-reports', mode, urlParams, REPORT_URL_KEYS);
+    const changeMode = useCallback(value => {
+        const next = new URLSearchParams(reportTabSearch(urlParams, value, remembered(value)));
+        setQuery(Object.fromEntries(Object.keys(REPORT_QUERY_DEFAULTS).map(key => [key, next.get(key)])), { replace: false });
+    }, [remembered, setQuery, urlParams]);
     const status = reviewOption(REPORT_STATUS_OPTIONS, mode === 'comments' ? query.commentReportStatus : query.reportStatus, 'ALL');
+    const auditAction = reviewOption(REPORT_AUDIT_ACTION_OPTIONS, query.reportAuditAction, 'ALL');
     const pageKey = mode === 'comments' ? 'commentReportPage' : mode === 'audit' ? 'reportAuditPage' : 'reportPage';
     const page = reviewPage(query[pageKey]);
     const setPage = value => setQuery({ [pageKey]: String(value) });
@@ -55,7 +55,7 @@ export default function FeedReportsPanel() {
     const configPending = !enabled && (config.isPending || newsConfig.isPending);
     const params = { page: page - 1, size: PAGE_SIZE, status: status === 'ALL' ? undefined : status };
     const list = useQuery({ queryKey: feedKeys.reports(params), queryFn: ({ signal }) => feedService.reports(params, signal), enabled: active && enabled && mode === 'reports', placeholderData: keepPreviousData });
-    const auditParams = { page: page - 1, size: PAGE_SIZE };
+    const auditParams = { page: page - 1, size: PAGE_SIZE, action: auditAction === 'ALL' ? undefined : auditAction };
     const audit = useQuery({ queryKey: feedKeys.audit(auditParams), queryFn: ({ signal }) => feedService.audit(auditParams, signal), enabled: active && enabled && mode === 'audit', placeholderData: keepPreviousData });
     const activeList = mode === 'audit' ? audit : list;
     const totalPages = Math.max(1, Math.ceil(feedTotal(activeList.data) / PAGE_SIZE));
@@ -63,8 +63,8 @@ export default function FeedReportsPanel() {
         if (mode !== 'comments' && activeList.isSuccess && !activeList.isFetching && !activeList.isPlaceholderData && page > totalPages) setQuery({ [pageKey]: String(totalPages) });
     }, [mode, activeList.isSuccess, activeList.isFetching, activeList.isPlaceholderData, page, totalPages, pageKey, setQuery]);
     useEffect(() => {
-        if (mode === 'comments' && interactions.data?.enabled === false) setQuery({ reportMode: 'reports' });
-    }, [mode, interactions.data?.enabled, setQuery]);
+        if (mode === 'comments' && interactions.data?.enabled === false) changeMode('reports');
+    }, [mode, interactions.data?.enabled, changeMode]);
     const report = useQuery({ queryKey: feedKeys.report(selected), queryFn: ({ signal }) => feedService.reportDetail(selected, signal), enabled: active && enabled && Boolean(selected), staleTime: 0 });
     const draft = useReportReviewDraft({ selected, report, form });
     const formReady = draft.ready;
@@ -114,7 +114,7 @@ export default function FeedReportsPanel() {
     };
     const busy = validating || update.isPending || visibility.isPending || draft.refreshing;
     const reasonLabel = reason => FEED_REPORT_REASONS.find(item => item.value === reason)?.label || reason;
-    if (configPending || enabled && mode !== 'comments' && activeList.isPending) return <section aria-label="피드·가게 소식 신고 관리"><FeedReportsSkeleton mode={mode} status={status} /></section>;
+    if (configPending || enabled && mode !== 'comments' && activeList.isPending) return <section aria-label="피드·가게 소식 신고 관리"><FeedReportsSkeleton mode={mode} status={status} auditAction={auditAction} /></section>;
     const renderList = () => {
         if (mode === 'comments') return interactions.isPending ? <FeedReportListSkeleton label="댓글 신고를 불러오는 중" />
             : interactions.isError ? <DataState state="error" title="댓글 신고 상태를 불러오지 못했어요." error={interactions.error} onRetry={interactions.refetch} retrying={interactions.isFetching} />
@@ -127,7 +127,7 @@ export default function FeedReportsPanel() {
             if (audit.isError) return <DataState state="error" title="처리 기록을 불러오지 못했어요." error={audit.error} onRetry={audit.refetch} retrying={audit.isFetching} />;
             if (!audit.data?.content?.length) return <DataState state="empty" title="피드·가게 소식 처리 기록이 없어요." />;
             return <ul className="reserve-feed-report-list">{audit.data.content.map(item => <li key={item.id}>
-                <div><strong>{actions[item.action] || item.action}</strong><p>{feedDate(item.createdAt)} · 처리자 #{item.actorId}{item.postId ? ` · 게시물 #${item.postId}` : ''}{item.promotionId ? ` · 가게 소식 #${item.promotionId}` : ''}</p>
+                <div><strong>{FEED_AUDIT_ACTION_LABELS[item.action] || item.action}</strong><p>{feedDate(item.createdAt)} · 처리자 #{item.actorId}{item.postId ? ` · 게시물 #${item.postId}` : ''}{item.promotionId ? ` · 가게 소식 #${item.promotionId}` : ''}</p>
                     {item.reason && <p className="reserve-feed-post-text">{item.reason}</p>}</div>
                 {item.reportId && <Button variant="outline" size="sm" disabled={busy} onClick={() => setSelected(item.reportId)}>신고 보기</Button>}
             </li>)}</ul>;
@@ -143,8 +143,10 @@ export default function FeedReportsPanel() {
     return <section aria-label="피드·가게 소식 신고 관리">
         <ManagementListToolbar leading={<SegmentedControl value={mode} options={[{ value: 'reports', label: '신고' },
             ...(interactions.data?.enabled || mode === 'comments' ? [{ value: 'comments', label: '댓글 신고' }] : []), { value: 'audit', label: '처리 기록' }]}
-            onChange={value => requestAction(() => setQuery({ reportMode: value }, { replace: false }))} />}
-            trailing={mode !== 'audit' && <FilterMenu appearance="plain" value={status} options={REPORT_STATUS_OPTIONS}
+            onChange={value => requestAction(() => changeMode(value))} />}
+            trailing={mode === 'audit' ? <FilterMenu appearance="plain" value={auditAction} options={REPORT_AUDIT_ACTION_OPTIONS}
+                aria-label="피드·가게 소식 처리 종류" onChange={value => setQuery({ reportAuditAction: value, reportAuditPage: '1' })} />
+                : <FilterMenu appearance="plain" value={status} options={REPORT_STATUS_OPTIONS}
                 aria-label={mode === 'comments' ? '댓글 신고 상태' : '피드·가게 소식 신고 상태'} onChange={value => setQuery({
                     [mode === 'comments' ? 'commentReportStatus' : 'reportStatus']: value, [pageKey]: '1',
                 })} />} />

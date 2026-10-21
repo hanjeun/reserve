@@ -27,7 +27,7 @@ import java.time.LocalDateTime;
  * <b>지우지 않는다.</b> {@code AuditLog} 는 90일 뒤 스케줄러가 지우지만 이건 돈 기록이라
  * 남겨둔다. 행 크기가 작고, 이 규모에서 증가 속도는 결제 건수와 같다.
  *
- * <p>{@code ddl-auto: update} 가 새 테이블을 자동 생성한다 — 수동 DDL 이 필요 없다.
+ * <p>기존 테이블·상태·컬럼을 사용한다. 운영 스키마 변경이나 자동 update는 이 구현에 포함되지 않는다.
  */
 @Entity
 @Table(name = "refund_attempt", indexes = {
@@ -39,28 +39,19 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefundAttempt {
 
+    /** 기존 REQUESTED와 구분되는, 아직 외부로 발신하지 않은 내구 작업 표식이다. */
+    public static final String READY_TO_DISPATCH = "REFUND_READY_TO_DISPATCH";
+    private static final String DISPATCH_STARTED = "REFUND_DISPATCH_STARTED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "refund_attempt_id")
     private Long id;
 
     /**
-     * 대상 결제 ID. <b>연관관계(FK)가 아니라 값이다</b> — 의도적이다.
-     *
-     * <h3>★ FK 를 걸면 운영에서 교착이 난다 (2026-08-23 설계 변경)</h3>
-     * 환불 경로는 이렇게 돈다: <b>바깥 트랜잭션이 payment 행을 {@code FOR UPDATE} 로 잠근 뒤</b>,
-     * 원장을 <b>별도 트랜잭션</b>({@code REQUIRES_NEW})에 기록한다.
-     * 이때 원장 행에 payment FK 가 있으면 InnoDB 가 <b>부모 행(payment)에 공유 잠금</b>을 걸어
-     * 참조 무결성을 확인한다. 그런데 그 행은 바깥 트랜잭션이 배타 잠금으로 쥐고 있다 —
-     * 바깥은 안쪽이 끝나기를 기다리고, 안쪽은 바깥이 잠금을 놓기를 기다린다. <b>교착이다.</b>
-     *
-     * <p>H2 테스트로는 이걸 잡을 수 없다(동시성을 재현하지 않고 잠금 동작도 다르다).
-     * 실제 환불을 시도하는 순간, 즉 <b>손님 돈이 걸린 그때</b> 처음 드러났을 문제다.
-     *
-     * <h3>잃는 것과 얻는 것</h3>
-     * DB 차원의 참조 무결성은 포기한다. 대신 원장이 결제 행과 <b>완전히 독립</b>해진다 —
-     * 어차피 이 원장의 목적이 "결제 쪽이 어떻게 되든 시도 기록은 남는다" 이므로 방향이 맞다.
-     * ({@link #merchantUid} 를 값으로 복사해 두는 이유와 같은 이야기다.)
+     * 결제 ID를 값으로 보관한다. 원장은 결제의 이후 보정·삭제와 독립적으로 대사할 수 있어야 한다.
+     * 기존 값 참조를 유지하며, 새 미발신 의도는 결제 pending과 같은 트랜잭션에 기록한다.
+     * 웹훅·재조회의 독립 결말 기록과 충돌할 FK를 이 변경에서 추가하지 않는다.
      */
     @Column(name = "payment_id", nullable = false)
     private Long paymentId;
@@ -123,13 +114,13 @@ public class RefundAttempt {
         PENDING,
         /** 돈이 실제로 돌아갔다. */
         SUCCEEDED,
-        /** PG 가 거절했거나 통신이 실패했다. */
+        /** PG가 최종 거절했다. 통신 결과가 불명확한 요청은 PENDING에 남긴다. */
         FAILED
     }
 
     /**
      * PG 호출 <b>직전</b> 상태의 원장 행을 만든다. 결제를 <b>ID 로만</b> 참조한다 —
-     * 이유는 {@link #paymentId} 주석(교착) 참고.
+     * 미발신 의도에는 {@link #prepare}를 사용한다. 이 팩터리는 과거·합성 원장도 표현한다.
      */
     public static RefundAttempt start(Long paymentId, String merchantUid,
                                       Integer requestedAmount, String reason) {
@@ -141,6 +132,24 @@ public class RefundAttempt {
         attempt.status = Status.REQUESTED;
         attempt.resolveAttempts = 0;
         return attempt;
+    }
+
+    public static RefundAttempt prepare(Long paymentId, String merchantUid,
+                                        Integer requestedAmount, String reason) {
+        RefundAttempt attempt = start(paymentId, merchantUid, requestedAmount, reason);
+        attempt.failureReason = READY_TO_DISPATCH;
+        return attempt;
+    }
+
+    public boolean isReadyToDispatch() {
+        return status == Status.REQUESTED && READY_TO_DISPATCH.equals(failureReason);
+    }
+
+    /** 이 변경을 먼저 커밋한 호출자만 PG 취소를 한 번 발신한다. */
+    public void markDispatchStarted() {
+        if (!isReadyToDispatch()) throw new IllegalStateException("Refund is not ready to dispatch");
+        status = Status.PENDING;
+        failureReason = DISPATCH_STARTED;
     }
 
     public void markSucceeded(String cancellationId, Integer cancelledAmount) {
@@ -159,6 +168,11 @@ public class RefundAttempt {
     public void markFailed(String failureReason) {
         this.status = Status.FAILED;
         this.failureReason = truncate(failureReason);
+    }
+
+    public void markFailed(String cancellationId, String failureReason) {
+        this.cancellationId = cancellationId;
+        markFailed(failureReason);
     }
 
     /** 재조회 1회 기록. 결말이 안 나도 시도 횟수는 올라가야 방치된 건이 눈에 띈다. */

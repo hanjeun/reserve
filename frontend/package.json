@@ -1,7 +1,7 @@
 {
   "name": "reserve",
   "private": true,
-  "version": "2.13.0",
+  "version": "2.14.0",
   "type": "module",
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
@@ -31,8 +31,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@portone/browser-sdk": "^0.1.13",
-    "@sentry/react": "^10.69.0",
-    "@sentry/replay": "10.69.0",
+    "@sentry/react": "11.8.0",
+    "@sentry/replay": "11.8.0",
     "@tanstack/react-query": "^5.104.2",
     "antd": "^6.6.6",
     "axios": "^1.20.0",

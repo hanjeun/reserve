@@ -1,17 +1,14 @@
 package kr.it.reserve.reservation.scheduler;
 
-import kr.it.reserve.config.updates.EntityUpdates;
 import kr.it.reserve.global.common.ServiceTime;
-import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
-import kr.it.reserve.reservation.service.ReservationUpdates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -49,9 +46,7 @@ import java.util.List;
 public class ReservationElapsedScheduler {
 
     private final ReservationRepository reservationRepository;
-    private final PaymentService paymentService;
-    @Autowired(required = false)
-    private ReservationUpdates updates;
+    private final ReservationElapsedProcessor processor;
 
     /**
      * ★ 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 <b>KST</b> 값이다.
@@ -65,13 +60,13 @@ public class ReservationElapsedScheduler {
 
     /**
      * 한 번에 처리할 최대 건수. 첫 배포 때 밀린 과거 예약이 한꺼번에 걸릴 수 있는데,
-     * 그걸 한 트랜잭션에 몰아넣으면 환불 API 를 수백 번 연속 호출하게 된다.
+     * 예약별 결정은 독립 트랜잭션으로 저장하고 환불 API는 커밋 후 호출한다.
      * 10분마다 도니 밀린 건은 몇 사이클에 걸쳐 빠진다.
      */
     private static final int BATCH_SIZE = 100;
 
     @Scheduled(fixedDelay = 10 * 60 * 1000)
-    @Transactional
+    @Transactional(propagation = Propagation.NEVER)
     public void processElapsedReservations() {
         LocalDateTime now = LocalDateTime.now(SERVICE_ZONE);
 
@@ -82,56 +77,24 @@ public class ReservationElapsedScheduler {
 
         int cancelled = 0;
         int unconfirmed = 0;
-
+        int failed = 0;
         for (Reservation reservation : elapsed) {
-            if (reservation.getStatus() == Reservation.ReservationStatus.PENDING) {
-                cancelExpiredPending(reservation);
-                cancelled++;
-            } else {
-                reservation.setStatus(Reservation.ReservationStatus.UNCONFIRMED);
-                unconfirmed++;
+            try {
+                switch (processor.processOne(reservation.getId(), now)) {
+                    case CANCELLED -> cancelled++;
+                    case UNCONFIRMED -> unconfirmed++;
+                    case SKIPPED -> { }
+                }
+            } catch (RuntimeException e) {
+                failed++;
+                log.error("[ElapsedScheduler] Reservation processing deferred: reservationId={}, errorType={}",
+                        reservation.getId(), e.getClass().getSimpleName());
             }
-            if (updates != null) updates.changed(reservation, EntityUpdates.Operation.UPDATED);
         }
-
-        log.info("[ElapsedScheduler] processed {} reservations: {} cancelled+refunded (was PENDING), {} marked unconfirmed (was CONFIRMED)",
-                elapsed.size(), cancelled, unconfirmed);
-
-        // 배치가 가득 찼다는 건 아직 남았다는 뜻이다. 조용히 넘기면 "다 처리됐겠거니" 하게 된다.
+        log.info("[ElapsedScheduler] processed {} candidates: {} cancelled, {} unconfirmed, {} failed",
+                elapsed.size(), cancelled, unconfirmed, failed);
         if (elapsed.size() == BATCH_SIZE) {
             log.warn("[ElapsedScheduler] batch was full ({}) - more remain, will continue next run", BATCH_SIZE);
-        }
-    }
-
-    /**
-     * 승인되지 않은 채 시간이 지난 예약을 취소하고 전액 환불한다.
-     *
-     * <p>순서가 중요하다 — 상태를 먼저 확정하고 환불은 뒤에 시도한다.
-     * PG 장애로 환불이 실패해도 <b>취소는 남아야</b> 자리가 풀리고 이용자 화면이 정확해진다.
-     * ({@code refundFullByStoreDecision} 이 REQUIRES_NEW 라 실패해도 이 트랜잭션은 안 죽는다.)
-     *
-     * <p>환불이 실제로 일어났을 때만 예약금 플래그를 지운다 — "예외가 안 났다"와
-     * "돈이 돌아갔다"는 다르다. 지우지 않고 두면 정산이 안 끝난 건으로 눈에 띈다.
-     */
-    private void cancelExpiredPending(Reservation reservation) {
-        reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
-        reservation.setCancelReason("예약 시간이 지나도록 승인되지 않아 자동 취소됐어요.");
-
-        if (!Boolean.TRUE.equals(reservation.getDepositPaid())) return;
-
-        try {
-            boolean refunded = paymentService.refundFullByStoreDecision(
-                    reservation.getId(), "예약 시간 경과 - 미승인 자동 취소 전액 환불");
-            if (refunded) {
-                reservation.setDepositPaid(false);
-                reservation.setDepositAmount(0);
-            } else {
-                log.error("[ElapsedScheduler] deposit marked paid but no refundable payment - needs manual settlement: reservationId={}",
-                        reservation.getId());
-            }
-        } catch (Exception e) {
-            log.error("[ElapsedScheduler] refund failed - reservation stays CANCELLED, refund needs manual action: reservationId={}, errorType={}",
-                    reservation.getId(), e.getClass().getSimpleName());
         }
     }
 }

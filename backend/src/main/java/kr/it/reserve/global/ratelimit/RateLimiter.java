@@ -104,6 +104,8 @@ public class RateLimiter {
         // 목록을 훑으면 분당 수십 건이 난다. 게다가 카페·사무실은 여러 사람이 한 IP 를 공유한다.
         // 정상 사용을 막지 않으면서 자동화된 부풀리기만 걸리는 선.
         AD_METRIC(120, Duration.ofMinutes(1)),
+        // 공개 프로필과 작성글 조회는 같은 방문자 한도를 쓰되 다른 읽기·쓰기 정책과 분리한다.
+        PROFILE_READ(120, Duration.ofMinutes(1)),
         /**
          * QR 체크인 시도 제한 — IP 축 (2026-08-19 신설).
          *

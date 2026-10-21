@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import Pagination from '../../components/common/Pagination';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { DataState, PageContainer, StoreCardSkeleton } from '../../components/common';
+import { DataState, FilterToolbar, PageContainer, StoreCardSkeleton } from '../../components/common';
 import { StoreCard } from '../../components/store';
 import StoreListRow from '../../components/store/StoreListRow';
 import StoreListRowSkeleton from '../../components/store/StoreListRowSkeleton';
@@ -259,6 +259,7 @@ const StoreList = () => {
                 view={view}
                 onViewChange={setView}
                 count={!loading && hasData && !blockingError ? totalElements : undefined}
+                countUnavailable={blockingError}
                 region={searchParams.region}
                 regionOpen={regionOpen}
                 onRegionOpen={() => setRegionOpen(true)}
@@ -275,6 +276,10 @@ const StoreList = () => {
                     if (event.target === event.currentTarget && !loading && !refetching && (error || stores.length === 0)) setBannerEntry(false);
                 }}
             />
+
+            <FilterToolbar search={{ value: searchParams.keyword,
+                onChange: event => setSearchParams({ keyword: event.target.value }),
+                placeholder: '가게 검색' }} onReload={refetch} loading={refetching} />
 
             {/* 스켈레톤은 첫 조회나 쿼리 전환으로 이전 결과를 그대로 보여줄 수 없을 때만 쓴다.
                 수동 새로고침은 현재 카드와 읽던 위치를 유지하고, 툴바 버튼만 진행 상태를 표시한다.

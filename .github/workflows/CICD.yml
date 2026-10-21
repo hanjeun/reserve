@@ -955,7 +955,8 @@ jobs:
               test "$(tr -d '\r\n' < "$SMOKE_DIR/marketing-release.txt")" = "$FRONTEND_RELEASE"
               curl --fail --silent --show-error --max-time 20 --resolve reserve.it.kr:443:127.0.0.1 \
                 https://reserve.it.kr/ -o "$SMOKE_DIR/marketing.html"
-              grep -q 'id="features"' "$SMOKE_DIR/marketing.html"
+              grep -q 'id="section-0"' "$SMOKE_DIR/marketing.html"
+              grep -q 'id="mobile-section-0"' "$SMOKE_DIR/marketing.html"
             fi
 
             SERVICE_ENV_LINE=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc \

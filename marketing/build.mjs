@@ -89,6 +89,10 @@ for (const file of ['og-image.png', 'icons/favicon.svg', 'icons/R_logo.png']) aw
 for (const file of ['pilates.jpg', 'hair.jpg']) await copyFile(resolve(root, 'images', file), resolve(output, 'images', file));
 await copyFile(resolve(root, '../frontend/node_modules/hangul-js/LICENSE'), resolve(output, 'Hangul-js-LICENSE.txt'));
 let html = (await readFile(resolve(root, 'index.html'), 'utf8')).replaceAll('https://app.reserve.it.kr', app.origin).replaceAll('https://reserve.it.kr', marketing.origin);
+for (const file of ['theme.css', 'site.css', 'site.js']) {
+    const revision = createHash('sha256').update(await readFile(resolve(output, file))).digest('hex').slice(0, 12);
+    html = html.replace(`"/${file}"`, `"/${file}?v=${revision}"`);
+}
 for (const [name, markup] of Object.entries(fragments)) html = html.replace(`<!--MARKETING_${name}-->`, markup);
 if (html.includes('<!--MARKETING_')) throw new Error('Marketing template is incomplete');
 await writeFile(resolve(output, 'index.html'), html);

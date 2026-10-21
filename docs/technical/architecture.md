@@ -4,16 +4,7 @@ RESERVE는 React 화면, Spring Boot 서버, MySQL 데이터베이스로 구성�
 
 ## 서비스 구성
 
-~~~mermaid
-flowchart LR
-    U[사용자] --> N[Nginx]
-    N --> W[React 화면]
-    N --> A[Spring Boot API]
-    A --> D[(MySQL)]
-    A --> R[(Redis)]
-    A --> S[S3 파일 저장소]
-    S --> C[CloudFront 이미지 전송]
-~~~
+![Redis를 포함한 RESERVE 아키텍처](../images/RESERVE_Architecture.png)
 
 - reserve.it.kr는 서비스 소개, app.reserve.it.kr는 예약·계정·관리 화면을 제공해요.
 - Nginx가 HTTPS 연결을 받고 화면 파일과 API 요청을 나눠 전달해요.

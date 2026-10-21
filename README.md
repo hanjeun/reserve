@@ -73,7 +73,7 @@ RESERVE는 맛집·카페, 뷰티, 운동, 클래스, 팝업까지 업종을 가
 |---|---|
 | **Backend** | Spring Boot 3.5.16 · Java 21 · Spring Security · JWT · OAuth2 |
 | **Frontend** | React 19 · Vite · Ant Design 6 · TanStack Query 5 · Zustand · Recharts |
-| **Database** | MySQL 8.0 |
+| **Database** | MySQL 8.0 · Redis |
 | **Infra** | AWS Lightsail · Docker · Nginx · GitHub Actions · S3 + CloudFront |
 | **결제 · 메일** | 포트원 V2 (카카오페이) · Resend |
 | **모니터링** | Grafana · Loki · Alloy · Sentry · UptimeRobot |

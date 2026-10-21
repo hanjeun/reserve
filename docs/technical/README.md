@@ -11,5 +11,3 @@ RESERVE의 구조와 주요 기능을 설명해요.
 | 계정·데이터 | [계정 보안](account-security.md) · [데이터 보관과 삭제](data-lifecycle.md) |
 | 메시지 | [통합 메시지](messaging.md) · [채팅 관리](chat-controls.md) · [채팅 사진](chat-images.md) |
 | 입력·이미지 | [가게 임시저장](store-drafts.md) · [홈 이미지](home-visual-assets.md) · [지역 사진](region-photo-assets.md) |
-
-[손님 가이드](../guide/user-guide.md)와 [사장님 가이드](../guide/owner-guide.md)는 서비스 이용 방법을 안내해요.

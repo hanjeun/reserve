@@ -2,6 +2,7 @@ package kr.it.reserve.payment.service;
 
 import kr.it.reserve.payment.dto.PortoneV2CancelResponse;
 import kr.it.reserve.payment.dto.PortoneV2PaymentResponse;
+import kr.it.reserve.payment.entity.Payment;
 
 import java.util.List;
 import java.util.Objects;
@@ -22,6 +23,22 @@ public final class RefundSettlementPolicy {
 
     private RefundSettlementPolicy() {
     }
+
+    /** 과거 결제만 커밋된 경우에도 저장한 개별 취소 ID가 일치할 때만 원장 종결을 재평가한다. */
+    public static LocalAssessment assessLocalState(Payment.PaymentStatus status, int locallyRefundedAmount,
+            Integer requestedAmount, String cancellationId, PortoneV2PaymentResponse pgPayment) {
+        Assessment current = assess(locallyRefundedAmount, requestedAmount, cancellationId, pgPayment);
+        if ((status == Payment.PaymentStatus.REFUNDED || status == Payment.PaymentStatus.PARTIAL_REFUNDED)
+                && cancellationId != null && !cancellationId.isBlank() && requestedAmount != null
+                && requestedAmount > 0 && locallyRefundedAmount >= requestedAmount) {
+            int prior = locallyRefundedAmount - requestedAmount;
+            Assessment recorded = assess(prior, requestedAmount, cancellationId, pgPayment);
+            if (recorded.outcome() == Outcome.SUCCEEDED) return new LocalAssessment(prior, recorded);
+        }
+        return new LocalAssessment(locallyRefundedAmount, current);
+    }
+
+    public record LocalAssessment(int priorRefundedAmount, Assessment assessment) { }
 
     public static Assessment assess(
             int locallyRefundedAmount,

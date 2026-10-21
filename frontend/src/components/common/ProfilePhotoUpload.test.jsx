@@ -26,6 +26,40 @@ describe('shared profile photo selection boundary', () => {
         vi.restoreAllMocks();
     });
 
+    it('hides the add slot for a registered photo and restores it after owner removal', async () => {
+        const onRemove = vi.fn();
+        const onSelect = vi.fn();
+        const view = render(<ProfilePhotoUpload src="/profile.png" onSelect={onSelect} onRemove={onRemove} />);
+        expect(screen.queryByRole('button', { name: `${LABEL} 선택` })).toBeNull();
+        expect(screen.getByTitle('Preview file')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Remove file' }));
+        await waitFor(() => expect(onRemove).toHaveBeenCalledOnce());
+        view.rerender(<ProfilePhotoUpload onSelect={onSelect} onRemove={onRemove} />);
+        expect(screen.getByRole('button', { name: `${LABEL} 선택` })).toBeEnabled();
+        expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('blocks disabled removal without hiding the registered photo preview', () => {
+        const onRemove = vi.fn();
+        render(<ProfilePhotoUpload src="/profile.png" disabled onSelect={vi.fn()} onRemove={onRemove} />);
+        const remove = screen.getByRole('button', { name: 'Remove file' });
+        expect(remove).toBeDisabled();
+        fireEvent.click(remove);
+        expect(onRemove).not.toHaveBeenCalled();
+        expect(screen.getByTitle('Preview file')).toBeInTheDocument();
+    });
+
+    it('opens the common photo viewer without navigating or removing the photo', async () => {
+        const onRemove = vi.fn();
+        render(<ProfilePhotoUpload src="/profile.png" onSelect={vi.fn()} onRemove={onRemove} />);
+
+        expect(fireEvent.click(screen.getByTitle('Preview file'))).toBe(false);
+
+        const viewer = await screen.findByRole('dialog');
+        expect(viewer.querySelector('img')).toHaveAttribute('src', '/profile.png');
+        expect(onRemove).not.toHaveBeenCalled();
+    });
+
     it('opens file selection from its accessible button without submitting the surrounding form', () => {
         const onSelect = vi.fn();
         const onSubmit = vi.fn(event => event.preventDefault());

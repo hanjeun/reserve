@@ -1,8 +1,10 @@
 package kr.it.reserve.payment.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import kr.it.reserve.config.updates.EntityUpdates;
+
 import kr.it.reserve.global.common.ServiceTime;
-import kr.it.reserve.global.error.MemberException;
 import kr.it.reserve.global.error.PaymentException;
 import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.member.entity.Member;
@@ -25,8 +27,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -36,8 +38,10 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -58,9 +62,53 @@ public class PaymentService {
     private final RefundLedgerService refundLedgerService;
     private final RefundAttemptRepository refundAttemptRepository;
     private final PaymentReconciliationIssueService reconciliationIssueService;
+    private final PlatformTransactionManager transactionManager;
+    private final EntityManager entityManager;
+
+    private <T> T inTransaction(Supplier<T> operation) {
+        return new TransactionTemplate(transactionManager).execute(ignored -> operation.get());
+    }
+
+    private <T> T readTransaction(Supplier<T> operation) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setReadOnly(true);
+        return transaction.execute(ignored -> operation.get());
+    }
+
+    private Reservation lockFinancialReservation(Long reservationId) {
+        return new FinancialReservationLocks(memberRepository, reservationRepository, entityManager).lock(reservationId, null).reservation();
+    }
+
+    /** scalar 주소 조회 뒤 회원 → 예약 → 결제를 잠근다. 잠금 전에 결제 엔티티를 로드하지 않는다. */
+    private Optional<Payment> lockPayment(Long paymentId) {
+        Long reservationId = paymentRepository.findReservationIdByPaymentId(paymentId).orElse(null);
+        if (reservationId == null) return Optional.empty();
+        lockFinancialReservation(reservationId);
+        return paymentRepository.findByIdForUpdate(paymentId).map(this::refreshLockedPayment);
+    }
+
+    private Optional<Payment> lockPayment(String merchantUid) {
+        Long reservationId = paymentRepository.findReservationIdByMerchantUid(merchantUid).orElse(null);
+        if (reservationId == null) return Optional.empty();
+        lockFinancialReservation(reservationId);
+        return paymentRepository.findByMerchantUidForUpdate(merchantUid).map(this::refreshLockedPayment);
+    }
+
+    private Payment refreshLockedPayment(Payment payment) {
+        entityManager.flush();
+        entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
+        return payment;
+    }
+
+    private List<Payment> lockPaymentRows(Long reservationId) {
+        List<Payment> payments = paymentRepository.findAllByReservationIdForUpdate(reservationId);
+        entityManager.flush();
+        for (Payment payment : payments) entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
+        return payments;
+    }
 
     public PaymentPrepareDto preparePayment(PaymentRequestDto requestDto, Long memberId) {
-        return new PaymentPreparation(paymentRepository, reservationRepository, memberRepository, portoneService).preparePayment(requestDto, memberId);
+        return new PaymentPreparation(paymentRepository, reservationRepository, memberRepository, portoneService, entityManager).preparePayment(requestDto, memberId);
     }
 
 
@@ -101,7 +149,7 @@ public class PaymentService {
     public PaidRecoveryResult recoverPaidPaymentFromPg(
             String merchantUid,
             PortoneV2PaymentResponse portonePayment) {
-        Payment payment = paymentRepository.findByMerchantUidForUpdate(merchantUid).orElse(null);
+        Payment payment = lockPayment(merchantUid).orElse(null);
         if (payment == null) {
             return PaidRecoveryResult.UNKNOWN_PAYMENT;
         }
@@ -130,28 +178,59 @@ public class PaymentService {
         return PaidRecoveryResult.RECOVERED;
     }
 
-    /**
-     * 예약 만료 직전에 PG를 다시 확인한다. 조회가 불확실하면 예약을 취소하지 않는 fail-closed 판정이다.
-     */
+    /** 만료 스냅샷 조회·PG 관측·잠금 반영을 구분한다. 예약 만료 처리기는 반영을 취소 TX에 합친다. */
+    @Transactional(propagation = Propagation.NEVER)
     public ExpiryPaymentDecision reconcileBeforeReservationExpiry(Long reservationId) {
-        List<Payment> payments = paymentRepository.findAllByReservationIdForUpdate(reservationId);
+        ExpiryPaymentObservation observation = observeBeforeReservationExpiry(reservationId);
+        return inTransaction(() -> applyExpiryPaymentObservation(reservationId, observation));
+    }
+
+    @Transactional(propagation = Propagation.NEVER)
+    public ExpiryPaymentObservation observeBeforeReservationExpiry(Long reservationId) {
+        PaymentLookup snapshot = readTransaction(() -> paymentRepository
+                .findReadyByReservationId(reservationId).stream().findFirst()
+                .map(payment -> new PaymentLookup(payment.getId(), payment.getMerchantUid(), true))
+                .orElse(null));
+        if (snapshot == null) return new ExpiryPaymentObservation(null, null, null, null);
+        try {
+            return new ExpiryPaymentObservation(snapshot.paymentId(), snapshot.merchantUid(),
+                    portoneService.getPaymentInfo(snapshot.merchantUid()), null);
+        } catch (RuntimeException e) {
+            return new ExpiryPaymentObservation(snapshot.paymentId(), snapshot.merchantUid(), null,
+                    e.getClass().getSimpleName());
+        }
+    }
+
+    /** 직접 호출도 회원 ID 오름차순 → 예약 → 결제를 잠그고, 판정과 취소를 같은 TX에 둔다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ExpiryPaymentDecision applyExpiryPaymentObservation(
+            Long reservationId, ExpiryPaymentObservation observation) {
+        Reservation reservation = lockFinancialReservation(reservationId);
+        return applyLockedExpiryPaymentObservation(reservation, observation);
+    }
+
+    /** 만료 처리기가 이미 얻은 최신 예약을 재사용한다. cascade REFRESH로 새 결제를 옛 RR snapshot에서 다시 읽지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ExpiryPaymentDecision applyLockedExpiryPaymentObservation(
+            Reservation reservation, ExpiryPaymentObservation observation) {
+        if (reservation == null || !entityManager.contains(reservation)
+                || entityManager.getLockMode(reservation) != LockModeType.PESSIMISTIC_WRITE) {
+            throw new IllegalStateException("Reservation expiry requires the financial reservation lock");
+        }
+        Long reservationId = reservation.getId();
+        List<Payment> payments = lockPaymentRows(reservationId);
         Payment paid = payments.stream()
                 .filter(payment -> payment.getStatus() == Payment.PaymentStatus.PAID)
-                .findFirst()
-                .orElse(null);
+                .findFirst().orElse(null);
         if (paid != null) {
             ensureReservationPaidState(paid);
             resolveIssues(paid);
             return ExpiryPaymentDecision.PAID_RECOVERED;
         }
-
         Payment payment = payments.stream()
                 .filter(candidate -> candidate.getStatus() == Payment.PaymentStatus.READY)
-                .findFirst()
-                .orElse(null);
-        if (payment == null && payments.isEmpty()) {
-            return ExpiryPaymentDecision.NO_PAYMENT;
-        }
+                .findFirst().orElse(null);
+        if (payment == null && payments.isEmpty()) return ExpiryPaymentDecision.NO_PAYMENT;
         if (payment == null) {
             Payment latest = payments.getFirst();
             if (latest.getStatus() == Payment.PaymentStatus.FAILED
@@ -159,138 +238,103 @@ public class PaymentService {
                 resolveIssues(latest);
                 return ExpiryPaymentDecision.NOT_PAID;
             }
-            recordIssue(
-                    EXPIRY_CHECK_SOURCE,
-                    PaymentReconciliationIssue.IssueType.LOCAL_STATUS_UNCERTAIN,
-                    latest,
-                    latest.getStatus().name());
+            recordIssue(EXPIRY_CHECK_SOURCE, PaymentReconciliationIssue.IssueType.LOCAL_STATUS_UNCERTAIN,
+                    latest, latest.getStatus().name());
             return ExpiryPaymentDecision.UNCERTAIN;
         }
-
-        PortoneV2PaymentResponse portonePayment;
-        try {
-            portonePayment = portoneService.getPaymentInfo(payment.getMerchantUid());
-        } catch (RuntimeException e) {
-            recordIssue(
-                    EXPIRY_CHECK_SOURCE,
-                    PaymentReconciliationIssue.IssueType.EXPIRY_RECHECK_FAILED,
-                    payment,
-                    e.getClass().getSimpleName());
-            log.error("Payment expiry recheck failed: paymentId={}, merchantUid={}, errorType={}",
-                    payment.getId(), payment.getMerchantUid(), e.getClass().getSimpleName());
+        if (!Objects.equals(payment.getId(), observation.paymentId())
+                || !Objects.equals(payment.getMerchantUid(), observation.merchantUid())) {
+            // 관측 중 새 결제창이 준비됐으면 옛 PG 결과로 그 결제를 닫지 않는다.
             return ExpiryPaymentDecision.UNCERTAIN;
         }
-
-        if (portonePayment.isPaid()) {
-            completeLockedReadyPayment(payment, portonePayment, null);
+        if (observation.errorCode() != null || observation.payment() == null) {
+            recordIssue(EXPIRY_CHECK_SOURCE, PaymentReconciliationIssue.IssueType.EXPIRY_RECHECK_FAILED,
+                    payment, observation.errorCode() == null ? "EMPTY_PG_RESPONSE" : observation.errorCode());
+            log.warn("Payment expiry recheck deferred: paymentId={}", payment.getId());
+            return ExpiryPaymentDecision.UNCERTAIN;
+        }
+        PortoneV2PaymentResponse pgPayment = observation.payment();
+        if (pgPayment.isPaid()) {
+            completeLockedReadyPayment(payment, pgPayment, null);
             return ExpiryPaymentDecision.PAID_RECOVERED;
         }
-
-        String pgStatus = portonePayment.getStatus();
+        String pgStatus = pgPayment.getStatus();
         if (PG_READY_STATUS.equals(pgStatus) || "FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)) {
             payment.failPayment("Payment window expired before completion");
             resolveIssues(payment);
             return ExpiryPaymentDecision.NOT_PAID;
         }
-
-        recordIssue(
-                EXPIRY_CHECK_SOURCE,
-                PaymentReconciliationIssue.IssueType.EXPIRY_STATUS_UNCERTAIN,
-                payment,
-                pgStatus == null ? "NULL" : pgStatus);
-        log.warn("Payment expiry recheck is inconclusive: paymentId={}, merchantUid={}, pgStatus={}",
-                payment.getId(), payment.getMerchantUid(), pgStatus);
+        recordIssue(EXPIRY_CHECK_SOURCE, PaymentReconciliationIssue.IssueType.EXPIRY_STATUS_UNCERTAIN,
+                payment, pgStatus == null ? "NULL" : pgStatus);
         return ExpiryPaymentDecision.UNCERTAIN;
     }
 
-    /**
-     * 관리자 수동 대사에서 오래된 READY 한 건을 PG 권위 상태와 다시 맞춘다.
-     *
-     * <p>자동 만료는 PENDING 예약만 훑으므로 이미 취소·삭제된 예약에 붙은 과거 READY는
-     * 영원히 남을 수 있다. 이 경로는 결제 행을 잠그고 PG를 다시 조회하되, 실제 돈이
-     * 확인된 충돌은 임의로 덮지 않고 대사 큐에 남긴다.
-     */
-    public StaleReadyReconciliationResponse reconcileStaleReadyPayment(Long paymentId) {
-        Payment payment = paymentRepository.findByIdForUpdate(paymentId)
-                .orElseThrow(PaymentException::notFound);
+    public record ExpiryPaymentObservation(Long paymentId, String merchantUid,
+                                           PortoneV2PaymentResponse payment, String errorCode) { }
+    private record PaymentLookup(Long paymentId, String merchantUid, boolean ready) { }
 
+    /** 관리자 대사는 PG 관측 뒤 결제를 새로 잠그고 상태·예약 종료 여부를 다시 확인한다. */
+    @Transactional(propagation = Propagation.NEVER)
+    public StaleReadyReconciliationResponse reconcileStaleReadyPayment(Long paymentId) {
+        PaymentLookup snapshot = readTransaction(() -> {
+            Payment payment = paymentRepository.findById(paymentId).orElseThrow(PaymentException::notFound);
+            return new PaymentLookup(payment.getId(), payment.getMerchantUid(),
+                    payment.getStatus() == Payment.PaymentStatus.READY);
+        });
+        if (!snapshot.ready()) return inTransaction(() -> applyStaleReadyObservation(paymentId, snapshot, null, null));
+
+        PortoneV2PaymentResponse pgPayment = null;
+        RuntimeException failure = null;
+        try {
+            pgPayment = portoneService.getPaymentInfo(snapshot.merchantUid());
+        } catch (RuntimeException e) {
+            failure = e;
+        }
+        PortoneV2PaymentResponse observedPayment = pgPayment;
+        RuntimeException observedFailure = failure;
+        return inTransaction(() -> applyStaleReadyObservation(
+                paymentId, snapshot, observedPayment, observedFailure));
+    }
+
+    private StaleReadyReconciliationResponse applyStaleReadyObservation(Long paymentId, PaymentLookup snapshot,
+            PortoneV2PaymentResponse pgPayment, RuntimeException failure) {
+        Payment payment = lockPayment(paymentId).orElseThrow(PaymentException::notFound);
         if (payment.getStatus() != Payment.PaymentStatus.READY) {
             resolveIssues(payment);
-            return staleReadyResult(
-                    payment,
-                    null,
-                    StaleReadyReconciliationResponse.Outcome.ALREADY_RESOLVED);
+            return staleReadyResult(payment, null, StaleReadyReconciliationResponse.Outcome.ALREADY_RESOLVED);
         }
-
-        PortoneV2PaymentResponse pgPayment;
-        try {
-            pgPayment = portoneService.getPaymentInfo(payment.getMerchantUid());
-        } catch (PaymentException e) {
-            if (e.getStatus() == HttpStatus.NOT_FOUND && isPaymentClosedFor(payment.getReservation())) {
-                payment.failPayment("Closed reservation has no payment at PG");
-                resolveIssues(payment);
-                return staleReadyResult(
-                        payment,
-                        "NOT_FOUND",
-                        StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
-            }
-            recordIssue(
-                    STALE_READY_CHECK_SOURCE,
-                    PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
-                    payment,
-                    e.getStatus().name());
-            return staleReadyResult(
-                    payment,
-                    null,
-                    StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
-        } catch (RuntimeException e) {
-            recordIssue(
-                    STALE_READY_CHECK_SOURCE,
-                    PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
-                    payment,
-                    e.getClass().getSimpleName());
-            return staleReadyResult(
-                    payment,
-                    null,
-                    StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
+        if (!Objects.equals(snapshot.merchantUid(), payment.getMerchantUid())) {
+            return staleReadyResult(payment, null, StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
         }
-
+        if (failure instanceof PaymentException pe && pe.getStatus() == HttpStatus.NOT_FOUND
+                && isPaymentClosedFor(payment.getReservation())) {
+            payment.failPayment("Closed reservation has no payment at PG");
+            resolveIssues(payment);
+            return staleReadyResult(payment, "NOT_FOUND", StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
+        }
+        if (failure != null || pgPayment == null) {
+            String detail = failure instanceof PaymentException pe ? pe.getStatus().name()
+                    : failure == null ? "EMPTY_PG_RESPONSE" : failure.getClass().getSimpleName();
+            recordIssue(STALE_READY_CHECK_SOURCE, PaymentReconciliationIssue.IssueType.STALE_READY_RECHECK_FAILED,
+                    payment, detail);
+            return staleReadyResult(payment, null, StaleReadyReconciliationResponse.Outcome.RETRY_REQUIRED);
+        }
         String pgStatus = pgPayment.getStatus();
-        if (pgPayment.isPaid()) {
-            return reconcileStalePaidPayment(payment, pgPayment);
-        }
-
+        if (pgPayment.isPaid()) return reconcileStalePaidPayment(payment, pgPayment);
         if ("FAILED".equals(pgStatus) || "CANCELLED".equals(pgStatus)
                 || (PG_READY_STATUS.equals(pgStatus) && isPaymentClosedFor(payment.getReservation()))) {
             payment.failPayment("Stale payment reconciled from PG status: " + pgStatus);
             resolveIssues(payment);
-            return staleReadyResult(
-                    payment,
-                    pgStatus,
-                    StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
+            return staleReadyResult(payment, pgStatus, StaleReadyReconciliationResponse.Outcome.CLOSED_AS_NOT_PAID);
         }
-
         if (PG_READY_STATUS.equals(pgStatus)) {
-            recordIssue(
-                    STALE_READY_CHECK_SOURCE,
-                    PaymentReconciliationIssue.IssueType.STALE_READY_STILL_PENDING,
-                    payment,
-                    pgStatus);
-            return staleReadyResult(
-                    payment,
-                    pgStatus,
-                    StaleReadyReconciliationResponse.Outcome.STILL_PENDING);
+            recordIssue(STALE_READY_CHECK_SOURCE, PaymentReconciliationIssue.IssueType.STALE_READY_STILL_PENDING,
+                    payment, pgStatus);
+            return staleReadyResult(payment, pgStatus, StaleReadyReconciliationResponse.Outcome.STILL_PENDING);
         }
-
-        recordIssue(
-                STALE_READY_CHECK_SOURCE,
-                PaymentReconciliationIssue.IssueType.STALE_READY_STATUS_UNCERTAIN,
-                payment,
-                pgStatus == null ? "NULL" : pgStatus);
-        return staleReadyResult(
-                payment,
-                pgStatus,
-                StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
+        recordIssue(STALE_READY_CHECK_SOURCE, PaymentReconciliationIssue.IssueType.STALE_READY_STATUS_UNCERTAIN,
+                payment, pgStatus == null ? "NULL" : pgStatus);
+        return staleReadyResult(payment, pgStatus, StaleReadyReconciliationResponse.Outcome.MANUAL_REVIEW_REQUIRED);
     }
 
     private StaleReadyReconciliationResponse reconcileStalePaidPayment(
@@ -342,7 +386,7 @@ public class PaymentService {
             String merchantUid,
             PortoneV2PaymentResponse portonePayment,
             String fallbackImpUid) {
-        Payment lockedPayment = paymentRepository.findByMerchantUidForUpdate(merchantUid)
+        Payment lockedPayment = lockPayment(merchantUid)
                 .orElseThrow(PaymentException::notFound);
 
         if (lockedPayment.getStatus() == Payment.PaymentStatus.PAID) {
@@ -478,130 +522,153 @@ public class PaymentService {
         UNCERTAIN
     }
 
-    /**
-     * 환불 실행 — <b>이미 권한·정책 검사가 끝난 호출자만 쓴다(내부용).</b>
-     *
-     * <p>⚠️ 이 메서드는 "누가 요청했는지"를 보지 않는다. 컨트롤러가 이걸 직접 부르면
-     * 로그인만 한 사람이 남의 결제를 취소하거나 환불 정책을 건너뛸 수 있다
-     * (2026-08-09 실제로 그런 상태였다). 외부 요청은 반드시
-     * {@link #refundByMemberRequest(Long, String, Member)} 를 거쳐야 한다.
-     */
+    /** 내부 환불도 준비 커밋 → 단일 발신 → 잠금 반영을 거친다. 외부 요청은 소유권 관문을 쓴다. */
+    @Transactional(propagation = Propagation.NEVER)
     public PaymentResponseDto refundPayment(PaymentRefundDto refundDto) {
-        return refundPayment(refundDto, true);
+        Long attemptId = inTransaction(() -> prepareRefund(refundDto));
+        return dispatchPreparedRefund(attemptId);
     }
 
-    private PaymentResponseDto refundPayment(PaymentRefundDto refundDto, boolean updateReservationDeposit) {
-        // ★★ 행을 잠그고 읽는다 (2026-08-23) — 이중 환불 방어의 핵심.
-        //   예전엔 잠금 없이 읽어서, 동시 요청 둘이 모두 PAID 를 보고 **둘 다 PG 취소를 불렀다.**
-        //   왜 낙관적 락이 아닌지는 PaymentRepository#findByIdForUpdate 주석에 있다
-        //   (요약: 되돌릴 수 없는 PG 호출이 커밋보다 먼저 일어나서 낙관적 락으로는 못 막는다).
-        Payment payment = (refundDto.getPaymentId() != null)
-                ? paymentRepository.findByIdForUpdate(refundDto.getPaymentId()).orElseThrow(PaymentException::notFound)
-                : paymentRepository.findPaidByReservationIdForUpdate(refundDto.getReservationId()).orElseThrow(PaymentException::notFound);
-
-        // 잠근 뒤에 다시 본다. 앞선 요청이 방금 바꿔놨을 수 있고, 그걸 여기서 걸러야 한다.
-        if (payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING) {
-            // 결말을 모르는 채로 또 취소를 걸면 이중 환불이다. 재시도는 스케줄러·웹훅이 결말을 확정한 뒤에.
+    /** 결제 잠금 아래 원장 의도와 pending 상태를 함께 저장한다. 이 트랜잭션에서는 PG를 호출하지 않는다. */
+    private Long prepareRefund(PaymentRefundDto refundDto) {
+        Payment payment;
+        if (refundDto.getPaymentId() != null) {
+            payment = lockPayment(refundDto.getPaymentId()).orElseThrow(PaymentException::notFound);
+        } else {
+            lockFinancialReservation(refundDto.getReservationId());
+            payment = paymentRepository.findPaidByReservationIdForUpdate(refundDto.getReservationId()).map(this::refreshLockedPayment).orElseThrow(PaymentException::notFound);
+        }
+        if (payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING
+                || refundAttemptRepository.findByPaymentIdForUpdate(payment.getId()).stream().anyMatch(RefundAttempt::isUnresolved)) {
             throw new PaymentException("직전 환불 요청의 처리 결과를 확인하는 중이에요. 잠시 후 다시 시도해주세요.",
                     HttpStatus.CONFLICT);
         }
         if (payment.getStatus() != Payment.PaymentStatus.PAID) {
             throw new PaymentException("환불 가능한 결제 상태가 아니에요.", HttpStatus.BAD_REQUEST);
         }
-        if (refundAttemptRepository.existsByPaymentIdAndStatusIn(
-                payment.getId(), RefundAttempt.UNRESOLVED)) {
-            // 외부 취소 뒤 로컬 트랜잭션이 롤백되면 결제는 PAID지만 원장에는 미결 시도가 남는다.
-            // 결제 상태만 보고 다시 보내지 말고, 먼저 앞선 요청을 PG 조회로 해소한다.
-            throw new PaymentException(
-                    "직전 환불 요청의 처리 결과를 확인하는 중이에요. 잠시 후 다시 시도해주세요.",
-                    HttpStatus.CONFLICT);
-        }
-
         Integer refundAmount = resolveRefundAmount(payment, refundDto.getRefundAmount());
-
-        // ★ PG 를 부르기 **직전**에 원장을 남기고 즉시 커밋한다(별도 트랜잭션).
-        //   여기서부터 PG 응답을 받기 전까지가 유일한 "돈은 움직였는데 기록이 없는" 구간이다.
-        //   그 구간에서 서버가 죽어도 원장에 REQUESTED 가 남아 사람이 찾아낼 수 있다.
-        Long attemptId = refundLedgerService.start(
-                payment.getId(), payment.getMerchantUid(), refundAmount, refundDto.getRefundReason());
+        Long attemptId = refundLedgerService.prepare(payment.getId(), payment.getMerchantUid(),
+                refundAmount, refundDto.getRefundReason());
         if (attemptId == null) {
-            // 추적할 내구성 있는 원장 없이 PG에 돈 요청을 보내지 않는다.
-            throw new PaymentException(
-                    "환불 요청을 안전하게 기록하지 못했어요. 잠시 후 다시 시도해주세요.",
+            throw new PaymentException("환불 요청을 안전하게 기록하지 못했어요. 잠시 후 다시 시도해주세요.",
                     HttpStatus.SERVICE_UNAVAILABLE);
         }
-
-        PortoneV2CancelResponse cancelResult;
-        try {
-            cancelResult = portoneService.cancelPayment(
-                    payment.getMerchantUid(), refundAmount, refundDto.getRefundReason());
-        } catch (RuntimeException e) {
-            // 요청이 PG 에 닿은 뒤 응답만 잃었을 수도 있다. 이때 FAILED 로 닫고 PAID 로
-            // 돌려놓으면 사용자의 재시도가 같은 돈을 한 번 더 환불할 수 있다.
-            // 결말을 조회할 때까지 미결로 잠그고, 예외 원문 대신 고정 코드만 저장한다.
-            String note = "PG cancellation call outcome unknown: " + e.getClass().getSimpleName();
-            refundLedgerService.pending(attemptId, null, note);
-            payment.markRefundPending(refundDto.getRefundReason());
-            recordIssue(
-                    "REFUND",
-                    PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
-                    payment,
-                    "PG_CANCEL_CALL_OUTCOME_UNKNOWN");
-            log.error("Refund call outcome is unknown - automatic retry blocked: paymentId={}, merchantUid={}, errorType={}",
-                    payment.getId(), payment.getMerchantUid(), e.getClass().getSimpleName());
-            return PaymentResponseDto.fromEntity(payment);
-        }
-
-        // ★★ A-4: 응답 상태를 실제로 본다 (2026-08-23).
-        //   예전엔 응답을 버리고 무조건 환불 완료로 적었다. REQUESTED 는 "접수됨"이지 "환불됨"이 아니다.
-        PortoneV2CancelResponse.Status cancelStatus = cancelResult == null
-                ? PortoneV2CancelResponse.Status.UNKNOWN
-                : cancelResult.resolveStatus();
-        String cancellationId = cancelResult == null ? null : cancelResult.cancellationId();
-        Integer cancelledAmount = cancelResult == null ? null : cancelResult.cancelledAmount();
-        switch (cancelStatus) {
-            case SUCCEEDED -> {
-                // SUCCEEDED 문자열만으로 금액까지 낙관하지 않는다. 개별 취소의 실제 금액이
-                // 요청액과 정확히 같아야 로컬 환불액을 올린다. 다르면 GET 재조회·대사 대상이다.
-                if (!refundAmount.equals(cancelledAmount)) {
-                    refundLedgerService.pending(
-                            attemptId, cancellationId, "PG succeeded amount does not match request");
-                    payment.markRefundPending(refundDto.getRefundReason());
-                    recordIssue(
-                            "REFUND",
-                            PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
-                            payment,
-                            "PG_CANCEL_RESPONSE_AMOUNT_MISMATCH");
-                    log.error("Refund response amount mismatch - local refund not applied: paymentId={}, merchantUid={}, requested={}, actual={}",
-                            payment.getId(), payment.getMerchantUid(), refundAmount, cancelledAmount);
-                    break;
-                }
-                // PG 성공을 먼저 원장에 확정하면 바깥 결제 트랜잭션이 롤백될 때
-                // 원장만 SUCCEEDED가 되어 재조회 대상에서 사라진다. 로컬 커밋 뒤에 닫는다.
-                refundLedgerService.pending(
-                        attemptId, cancellationId, "PG cancellation succeeded; local commit pending");
-                applyRefundSucceeded(payment, cancelledAmount, refundDto.getRefundReason(), updateReservationDeposit);
-                completeRefundLedgerAfterCommit(attemptId, cancellationId, cancelledAmount);
-            }
-            case REQUESTED, UNKNOWN -> {
-                String note = "PG cancellation not final: " + cancelStatus;
-                refundLedgerService.pending(attemptId, cancellationId, note);
-                payment.markRefundPending(refundDto.getRefundReason());
-                log.warn("Refund is not final yet: paymentId={}, merchantUid={}, status={}, cancellationId={}",
-                        payment.getId(), payment.getMerchantUid(), cancelStatus, cancellationId);
-                // 예약 상태는 건드리지 않는다. 돈이 돌아온 게 확정된 뒤에 바꾼다.
-            }
-            case FAILED -> {
-                refundLedgerService.failed(attemptId, cancelResult.failureReason());
-                log.error("Refund rejected by PG: paymentId={}, merchantUid={}, status={}",
-                        payment.getId(), payment.getMerchantUid(), cancelStatus);
-                throw new PaymentException("환불이 거절됐어요. 고객센터로 문의해주세요.",
-                        HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        }
-
-        return PaymentResponseDto.fromEntity(payment);
+        payment.markRefundPending(refundDto.getRefundReason());
+        return attemptId;
     }
+
+    /** 미발신 표식을 선점·커밋한 호출자만 최초 취소 요청을 보낸다. 이미 발신한 작업은 재발신하지 않는다. */
+    @Transactional(propagation = Propagation.NEVER)
+    public PaymentResponseDto dispatchPreparedRefund(Long attemptId) {
+        RefundDispatchClaim claim = inTransaction(() -> claimPreparedRefund(attemptId));
+        if (claim.command() == null) return claim.current();
+        RefundCommand command = claim.command();
+        PortoneV2CancelResponse response = null;
+        RuntimeException failure = null;
+        try {
+            response = portoneService.cancelPayment(command.merchantUid(), command.amount(), command.reason(),
+                    "reserve-refund-attempt-" + command.attemptId(), command.paidAmount() - command.priorRefundedAmount());
+        } catch (RuntimeException e) {
+            failure = e;
+        }
+        PortoneV2CancelResponse observedResponse = response;
+        RuntimeException observedFailure = failure;
+        RefundCompletion completion = inTransaction(() -> finishDispatchedRefund(command, observedResponse, observedFailure));
+        if (completion.rejected()) {
+            throw new PaymentException("환불이 거절됐어요. 고객센터로 문의해주세요.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return completion.payment();
+    }
+
+    private RefundDispatchClaim claimPreparedRefund(Long attemptId) {
+        Long paymentId = refundAttemptRepository.findPaymentId(attemptId).orElseThrow(PaymentException::notFound);
+        Payment payment = lockPayment(paymentId).orElseThrow(PaymentException::notFound);
+        RefundAttempt attempt = refundAttemptRepository.findByIdForUpdate(attemptId).orElseThrow(PaymentException::notFound);
+        if (!attempt.isReadyToDispatch()) {
+            return new RefundDispatchClaim(null, PaymentResponseDto.fromEntity(payment));
+        }
+        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING
+                || !matchesRefundAttempt(payment, attempt)
+                || !hasSingleUnresolvedRefund(paymentId)) {
+            recordIssue("REFUND", PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
+                    payment, "PREPARED_REFUND_STATE_CONFLICT");
+            return new RefundDispatchClaim(null, PaymentResponseDto.fromEntity(payment));
+        }
+        attempt.markDispatchStarted();
+        return new RefundDispatchClaim(new RefundCommand(attemptId, paymentId, payment.getMerchantUid(),
+                payment.getAmount(), payment.refundedSoFar(), attempt.getRequestedAmount(), attempt.getReason()), null);
+    }
+
+    private boolean hasSingleUnresolvedRefund(Long paymentId) {
+        return refundAttemptRepository.findByPaymentIdForUpdate(paymentId).stream()
+                .filter(RefundAttempt::isUnresolved).count() == 1;
+    }
+
+    private boolean matchesRefundAttempt(Payment payment, RefundAttempt attempt) {
+        return Objects.equals(attempt.getPaymentId(), payment.getId())
+                && Objects.equals(attempt.getMerchantUid(), payment.getMerchantUid())
+                && attempt.getRequestedAmount() != null && attempt.getRequestedAmount() > 0
+                && attempt.getRequestedAmount() <= payment.remainingRefundable();
+    }
+
+    private RefundCompletion finishDispatchedRefund(RefundCommand command,
+            PortoneV2CancelResponse response, RuntimeException failure) {
+        Payment payment = lockPayment(command.paymentId()).orElseThrow(PaymentException::notFound);
+        RefundAttempt attempt = refundAttemptRepository.findByIdForUpdate(command.attemptId()).orElseThrow(PaymentException::notFound);
+        if (!attempt.isUnresolved()) {
+            // 웹훅·재조회가 먼저 확정한 결말을 늦게 온 초기 응답으로 덮지 않는다.
+            return new RefundCompletion(PaymentResponseDto.fromEntity(payment), false);
+        }
+        if (payment.getStatus() != Payment.PaymentStatus.REFUND_PENDING
+                || payment.refundedSoFar() != command.priorRefundedAmount()
+                || !Objects.equals(payment.getAmount(), command.paidAmount())
+                || !Objects.equals(payment.getMerchantUid(), command.merchantUid())
+                || !Objects.equals(attempt.getRequestedAmount(), command.amount())
+                || !matchesRefundAttempt(payment, attempt)
+                || !hasSingleUnresolvedRefund(payment.getId())) {
+            recordIssue("REFUND", PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
+                    payment, "LOCAL_PAYMENT_CHANGED_BEFORE_REFUND_RESPONSE");
+            return new RefundCompletion(PaymentResponseDto.fromEntity(payment), false);
+        }
+        String cancellationId = response == null ? null : response.cancellationId();
+        if (failure != null) {
+            attempt.markPending(cancellationId, "PG cancellation call outcome unknown: " + failure.getClass().getSimpleName());
+            recordIssue("REFUND", PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
+                    payment, "PG_CANCEL_CALL_OUTCOME_UNKNOWN");
+            log.error("Refund call outcome unknown - automatic resend blocked: paymentId={}, errorType={}",
+                    payment.getId(), failure.getClass().getSimpleName());
+            return new RefundCompletion(PaymentResponseDto.fromEntity(payment), false);
+        }
+        PortoneV2CancelResponse.Status status = response == null
+                ? PortoneV2CancelResponse.Status.UNKNOWN : response.resolveStatus();
+        Integer cancelledAmount = response == null ? null : response.cancelledAmount();
+        switch (status) {
+            case SUCCEEDED -> {
+                if (!command.amount().equals(cancelledAmount)) {
+                    attempt.markPending(cancellationId, "PG succeeded amount does not match request");
+                    recordIssue("REFUND", PaymentReconciliationIssue.IssueType.REFUND_STATE_UNCERTAIN,
+                            payment, "PG_CANCEL_RESPONSE_AMOUNT_MISMATCH");
+                } else {
+                    // 결제·예약금·원장 결말을 같은 커밋에 반영한다. 실패하면 선행 pending이 남는다.
+                    applyRefundSucceeded(payment, cancelledAmount, command.reason());
+                    attempt.markSucceeded(cancellationId, cancelledAmount);
+                    resolveIssues(payment);
+                }
+            }
+            case REQUESTED, UNKNOWN -> attempt.markPending(cancellationId, "PG cancellation not final: " + status);
+            case FAILED -> {
+                payment.revertRefundPending("PG cancellation explicitly failed");
+                attempt.markFailed(cancellationId, response.failureReason());
+                return new RefundCompletion(PaymentResponseDto.fromEntity(payment), true);
+            }
+        }
+        return new RefundCompletion(PaymentResponseDto.fromEntity(payment), false);
+    }
+
+    private record RefundCommand(Long attemptId, Long paymentId, String merchantUid, Integer paidAmount,
+                                 int priorRefundedAmount, Integer amount, String reason) { }
+    private record RefundDispatchClaim(RefundCommand command, PaymentResponseDto current) { }
+    private record RefundCompletion(PaymentResponseDto payment, boolean rejected) { }
 
     private Integer resolveRefundAmount(Payment payment, Integer requestedAmount) {
         Integer refundAmount = requestedAmount != null ? requestedAmount : payment.getAmount();
@@ -621,22 +688,6 @@ public class PaymentService {
         }
 
         return refundAmount;
-    }
-
-    private void completeRefundLedgerAfterCommit(
-            Long attemptId,
-            String cancellationId,
-            Integer cancelledAmount) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            refundLedgerService.succeeded(attemptId, cancellationId, cancelledAmount);
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                refundLedgerService.succeeded(attemptId, cancellationId, cancelledAmount);
-            }
-        });
     }
 
     /**
@@ -662,141 +713,101 @@ public class PaymentService {
                 payment.refundedSoFar(), payment.getStatus());
     }
 
-    /**
-     * 미결 환불의 <b>성공 확정</b> — 재조회 스케줄러와 PortOne 웹훅이 함께 쓴다.
-     *
-     * <p>여기서도 행을 잠그고 상태를 다시 본다. 웹훅과 스케줄러가 <b>동시에</b> 같은 결말에
-     * 도달하는 건 정상이고(웹훅이 먼저 오고 스케줄러가 뒤따르는 식), 그때 두 번 반영되면
-     * 환불액이 두 배로 적힌다.
-     *
-     * @param expectedRefundedAmount PG 조회 직전에 읽은 로컬 누적 환불액
-     * @return 이번 성공을 적용했거나, 다른 처리기가 이미 <b>같은 누적액</b>으로 적용했으면 true.
-     *         로컬 상태가 다른 결말로 바뀌었거나 금액이 어긋나면 false — 이때 원장을 성공으로 닫으면 안 된다.
-     */
+    /** PG 정책이 확인한 같은 시도만 결제·예약금·원장과 함께 확정한다. */
     @Transactional
-    public boolean confirmPendingRefund(
-            Long paymentId,
-            int expectedRefundedAmount,
-            Integer refundAmount,
-            String reason) {
-        Payment payment = paymentRepository.findByIdForUpdate(paymentId).orElse(null);
-        if (payment == null) {
-            log.error("Cannot confirm refund - payment not found: paymentId={}", paymentId);
-            return false;
-        }
-
-        if (refundAmount == null || refundAmount <= 0 || expectedRefundedAmount < 0
-                || payment.getAmount() == null) {
-            log.error("Refund confirmation rejected - invalid local amounts: paymentId={}, expectedPrior={}, requested={}",
-                    paymentId, expectedRefundedAmount, refundAmount);
-            return false;
-        }
-        long expectedTotalLong = (long) expectedRefundedAmount + refundAmount;
-        if (expectedTotalLong > payment.getAmount() || expectedTotalLong > Integer.MAX_VALUE) {
-            log.error("Refund confirmation rejected - expected total is invalid: paymentId={}, expectedTotal={}, paid={}",
-                    paymentId, expectedTotalLong, payment.getAmount());
-            return false;
-        }
-
-        if (payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING
-                && payment.refundedSoFar() == expectedRefundedAmount) {
-            applyRefundSucceeded(payment, refundAmount, reason);
-            return true;
-        }
-
-        int expectedTotal = (int) expectedTotalLong;
-        Payment.PaymentStatus expectedStatus = expectedTotal == payment.getAmount()
-                ? Payment.PaymentStatus.REFUNDED
-                : Payment.PaymentStatus.PARTIAL_REFUNDED;
-        if (payment.getStatus() == expectedStatus && payment.refundedSoFar() == expectedTotal) {
-            // 웹훅과 스케줄러가 같은 PG 결말을 동시에 본 정상적인 멱등 재진입이다.
-            return true;
-        }
-
-        log.error("Refund confirmation conflicts with current local state: paymentId={}, status={}, refunded={}, "
-                        + "expectedPrior={}, requested={}",
-                paymentId, payment.getStatus(), payment.refundedSoFar(), expectedRefundedAmount, refundAmount);
-        return false;
+    public boolean confirmPendingRefund(UnresolvedRefundView view, int expectedRefundedAmount,
+                                         Integer refundAmount, String cancellationId) {
+        return confirmRefundSettlement(view, expectedRefundedAmount, refundAmount, cancellationId, false);
     }
 
-    /**
-     * PG 성공 뒤 로컬 커밋만 실패해 PAID로 남은 종료 예약을 복구한다. PG 재발신은 하지 않는다.
-     * 재조회 정책이 확인한 개별 취소 ID/금액과 유일한 내구성 원장을 잠근 결제에서 다시 대조한다.
-     * 진행 중 예약, 여러 미결 원장, 취소 ID 미확정, 변경된 금액은 자동 복구하지 않는다.
-     */
+    /** 이전 로컬 커밋 유실로 PAID에 남은 종료 예약도 정확한 취소 ID가 묶인 원장으로만 복구한다. */
     @Transactional
-    public boolean confirmLedgerBackedRefund(
-            UnresolvedRefundView view, int expectedRefundedAmount, int refundAmount, String cancellationId) {
-        Payment payment = paymentRepository.findByIdForUpdate(view.paymentId()).orElse(null);
-        if (payment == null || payment.getStatus() != Payment.PaymentStatus.PAID
-                || expectedRefundedAmount != 0 || payment.refundedSoFar() != 0
-                || refundAmount <= 0 || payment.getAmount() == null || refundAmount > payment.getAmount()) {
+    public boolean confirmLedgerBackedRefund(UnresolvedRefundView view, int expectedRefundedAmount,
+                                             int refundAmount, String cancellationId) {
+        return confirmRefundSettlement(view, expectedRefundedAmount, refundAmount, cancellationId, true);
+    }
+
+    private boolean confirmRefundSettlement(UnresolvedRefundView view, int expectedRefundedAmount,
+                                              Integer refundAmount, String cancellationId, boolean allowPaidRecovery) {
+        Payment payment = lockPayment(view.paymentId()).orElse(null);
+        if (payment == null || refundAmount == null || refundAmount <= 0 || expectedRefundedAmount < 0
+                || payment.getAmount() == null) return false;
+        long expectedTotal = (long) expectedRefundedAmount + refundAmount;
+        if (expectedTotal > payment.getAmount() || expectedTotal > Integer.MAX_VALUE) return false;
+        RefundAttempt attempt = refundAttemptRepository.findByIdForUpdate(view.attemptId()).orElse(null);
+        if (!matchesSettlementIdentity(payment, attempt, view, refundAmount, cancellationId)) return false;
+        Payment.PaymentStatus finalStatus = expectedTotal == payment.getAmount()
+                ? Payment.PaymentStatus.REFUNDED : Payment.PaymentStatus.PARTIAL_REFUNDED;
+        boolean alreadyApplied = payment.getStatus() == finalStatus && payment.refundedSoFar() == expectedTotal;
+        if (!attempt.isUnresolved()) {
+            return attempt.getStatus() == RefundAttempt.Status.SUCCEEDED && alreadyApplied
+                    && Objects.equals(attempt.getCancelledAmount(), refundAmount)
+                    && Objects.equals(attempt.getCancellationId(), cancellationId);
+        }
+        if (attempt.isReadyToDispatch()
+                || !hasSingleUnresolvedRefund(payment.getId())) return false;
+        if (alreadyApplied) {
+            // 과거 두 단계 커밋의 공백은 금액만으로 닫지 않고 저장한 개별 취소 ID와 PG의 일치도 요구한다.
+            if (!hasRecordedCancellation(attempt, view, cancellationId)) return false;
+        } else if (payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING
+                && payment.refundedSoFar() == expectedRefundedAmount) {
+            applyRefundSucceeded(payment, refundAmount, attempt.getReason());
+        } else if (allowPaidRecovery && payment.getStatus() == Payment.PaymentStatus.PAID
+                && expectedRefundedAmount == 0 && payment.refundedSoFar() == 0
+                && REFUND_RETRYABLE_RESERVATION_STATUSES.contains(payment.getReservation().getStatus())
+                && hasRecordedCancellation(attempt, view, cancellationId)) {
+            applyRefundSucceeded(payment, refundAmount, attempt.getReason());
+        } else {
             return false;
         }
-        Reservation reservation = payment.getReservation();
-        if (reservation == null || !REFUND_RETRYABLE_RESERVATION_STATUSES.contains(reservation.getStatus())) {
-            return false;
-        }
-        RefundAttempt attempt = refundAttemptRepository.findById(view.attemptId()).orElse(null);
-        if (!matchesConfirmedLedger(attempt, view, payment, refundAmount, cancellationId)
-                || refundAttemptRepository.countByPaymentIdAndStatusIn(payment.getId(), RefundAttempt.UNRESOLVED) != 1) {
-            return false;
-        }
-        applyRefundSucceeded(payment, refundAmount, attempt.getReason());
+        attempt.markSucceeded(cancellationId, refundAmount);
+        resolveIssues(payment);
         return true;
     }
 
-    private boolean matchesConfirmedLedger(
-            RefundAttempt attempt, UnresolvedRefundView view, Payment payment, int refundAmount, String cancellationId) {
-        return attempt != null && attempt.isUnresolved()
-                && cancellationId != null && !cancellationId.isBlank()
+    private boolean matchesSettlementIdentity(Payment payment, RefundAttempt attempt, UnresolvedRefundView view,
+                                                Integer amount, String cancellationId) {
+        return attempt != null
+                && Objects.equals(attempt.getId(), view.attemptId())
                 && Objects.equals(attempt.getPaymentId(), payment.getId())
                 && Objects.equals(attempt.getMerchantUid(), payment.getMerchantUid())
                 && Objects.equals(view.merchantUid(), payment.getMerchantUid())
-                && Objects.equals(attempt.getCancellationId(), cancellationId)
-                && Objects.equals(view.cancellationId(), cancellationId)
-                && Objects.equals(attempt.getRequestedAmount(), refundAmount)
-                && Objects.equals(view.requestedAmount(), refundAmount);
+                && Objects.equals(attempt.getRequestedAmount(), amount)
+                && Objects.equals(view.requestedAmount(), amount)
+                && (attempt.getCancellationId() == null || Objects.equals(attempt.getCancellationId(), cancellationId))
+                && (view.cancellationId() == null || Objects.equals(view.cancellationId(), cancellationId));
     }
 
-    /**
-     * 미결 환불의 <b>최종 실패 확정</b>. 돈이 안 나갔으므로 결제를 PAID 로 되돌린다 —
-     * 그래야 손님이 다시 취소를 시도할 수 있다. 되돌리지 않으면 REFUND_PENDING 에 영원히 갇힌다.
-     *
-     * @param expectedRefundedAmount PG 조회 직전에 읽은 로컬 누적 환불액
-     * @return 이번 실패를 적용했거나 다른 처리기가 이미 같은 실패 결말을 적용했으면 true.
-     *         성공 결말 또는 다른 상태와 충돌하면 false.
-     */
+    private boolean hasRecordedCancellation(RefundAttempt attempt, UnresolvedRefundView view, String cancellationId) {
+        return cancellationId != null && !cancellationId.isBlank()
+                && Objects.equals(attempt.getCancellationId(), cancellationId)
+                && Objects.equals(view.cancellationId(), cancellationId);
+    }
+
+    /** 최종 실패도 결제와 원장에 함께 반영해 두 커밋 사이의 공백을 만들지 않는다. */
     @Transactional
-    public boolean revertPendingRefund(Long paymentId, int expectedRefundedAmount, String failReason) {
-        Payment payment = paymentRepository.findByIdForUpdate(paymentId).orElse(null);
-        if (payment == null) {
-            log.error("Cannot revert refund - payment not found: paymentId={}", paymentId);
-            return false;
+    public boolean revertPendingRefund(UnresolvedRefundView view, int expectedRefundedAmount,
+                                        String cancellationId, String failReason) {
+        Payment payment = lockPayment(view.paymentId()).orElse(null);
+        if (payment == null || expectedRefundedAmount < 0 || payment.refundedSoFar() != expectedRefundedAmount) return false;
+        RefundAttempt attempt = refundAttemptRepository.findByIdForUpdate(view.attemptId()).orElse(null);
+        if (!matchesSettlementIdentity(payment, attempt, view, view.requestedAmount(), cancellationId)
+                || !hasRecordedCancellation(attempt, view, cancellationId)) return false;
+        Payment.PaymentStatus expectedStatus = expectedRefundedAmount > 0
+                ? Payment.PaymentStatus.PARTIAL_REFUNDED : Payment.PaymentStatus.PAID;
+        if (!attempt.isUnresolved()) {
+            return attempt.getStatus() == RefundAttempt.Status.FAILED && payment.getStatus() == expectedStatus;
         }
-        if (expectedRefundedAmount < 0 || payment.refundedSoFar() != expectedRefundedAmount) {
-            log.error("Refund failure conflicts with current local amount: paymentId={}, status={}, refunded={}, expected={}",
-                    paymentId, payment.getStatus(), payment.refundedSoFar(), expectedRefundedAmount);
-            return false;
-        }
+        if (attempt.isReadyToDispatch()
+                || !hasSingleUnresolvedRefund(payment.getId())) return false;
         if (payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING) {
             payment.revertRefundPending(failReason);
-            log.warn("Pending refund reverted: paymentId={}, merchantUid={}, status={}",
-                    paymentId, payment.getMerchantUid(), payment.getStatus());
-            return true;
+        } else if (payment.getStatus() != expectedStatus) {
+            return false;
         }
-
-        Payment.PaymentStatus expectedStatus = expectedRefundedAmount > 0
-                ? Payment.PaymentStatus.PARTIAL_REFUNDED
-                : Payment.PaymentStatus.PAID;
-        if (payment.getStatus() == expectedStatus) {
-            // 같은 실패 결말을 다른 처리기가 먼저 반영했다.
-            return true;
-        }
-
-        log.error("Refund failure conflicts with current local state: paymentId={}, status={}, expectedStatus={}",
-                paymentId, payment.getStatus(), expectedStatus);
-        return false;
+        attempt.markFailed(cancellationId, failReason);
+        resolveIssues(payment);
+        return true;
     }
 
     /**
@@ -838,16 +849,22 @@ public class PaymentService {
      * 원장에 실패한 시도가 없으면(정책상 0원이었거나 PG 까지 가지도 못한 경우) 여기서 금액을
      * 새로 만들지 않는다. 돈 액수를 사후에 추정하는 건 사람이 원장을 보고 할 일이다.
      */
+    @Transactional(propagation = Propagation.NEVER)
     public PaymentResponseDto refundByMemberRequest(Long reservationId, String reason, Member requester) {
+        Long attemptId = inTransaction(() -> prepareMemberRefund(reservationId, reason, requester));
+        return dispatchPreparedRefund(attemptId);
+    }
+
+    private Long prepareMemberRefund(Long reservationId, String reason, Member requester) {
         if (reservationId == null) {
             throw new PaymentException("예약 정보가 필요해요.", HttpStatus.BAD_REQUEST);
         }
 
-        Member currentRequester = memberRepository.findActiveByIdForUpdate(requester.getId())
-                .orElseThrow(MemberException::notFound);
-
-        Reservation reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(ReservationException::notFound);
+        FinancialReservationLocks.Locked locked = new FinancialReservationLocks(memberRepository, reservationRepository, entityManager)
+                .lock(reservationId, requester.getId());
+        Member currentRequester = locked.actor();
+        Reservation reservation = locked.reservation();
+        List<Payment> lockedPayments = lockPaymentRows(reservationId);
 
         boolean isOwner = reservation.getMember() != null
                 && reservation.getMember().getId().equals(currentRequester.getId());
@@ -867,8 +884,8 @@ public class PaymentService {
             throw new PaymentException("환불은 예약을 취소한 후에 요청할 수 있어요.", HttpStatus.CONFLICT);
         }
 
-        Payment payment = paymentRepository.findPaidByReservationId(reservationId)
-                .orElseThrow(() -> new PaymentException("다시 환불할 결제가 없어요.", HttpStatus.CONFLICT));
+        Payment payment = lockedPayments.stream().filter(value -> value.getStatus() == Payment.PaymentStatus.PAID)
+                .findFirst().orElseThrow(() -> new PaymentException("다시 환불할 결제가 없어요.", HttpStatus.CONFLICT));
 
         // ★ 금액은 원장의 마지막 실패 시도에서만 가져온다. 정책을 다시 태우지 않는다(위 주석 참고).
         RefundAttempt lastAttempt = lastRefundAttempt(payment.getId());
@@ -886,6 +903,7 @@ public class PaymentService {
         String retryReason = resolveRefundRetryReason(reason, lastAttempt);
 
         PaymentRefundDto safeDto = PaymentRefundDto.builder()
+                .paymentId(payment.getId())
                 .reservationId(reservationId)
                 .refundAmount(retryAmount)
                 .refundReason(retryReason)
@@ -894,7 +912,7 @@ public class PaymentService {
         log.info("Refund retry requested: reservationId={}, requesterId={}, admin={}, amount={}, previousAttemptId={}",
                 reservationId, currentRequester.getId(), isAdmin, retryAmount, lastAttempt.getId());
 
-        return refundPayment(safeDto);
+        return prepareRefund(safeDto);
     }
 
     private String resolveRefundRetryReason(String reason, RefundAttempt lastAttempt) {
@@ -915,96 +933,68 @@ public class PaymentService {
 
     /** 결제의 가장 최근 환불 시도. 원장 조회가 생성 순 오름차순이라 마지막 행이 최신이다. */
     private RefundAttempt lastRefundAttempt(Long paymentId) {
-        List<RefundAttempt> attempts = refundAttemptRepository.findByPaymentIdOrderByCreatedAtAsc(paymentId);
+        List<RefundAttempt> attempts = refundAttemptRepository.findByPaymentIdForUpdate(paymentId);
         return attempts.isEmpty() ? null : attempts.getLast();
     }
 
-    /**
-     * 예약 취소에 따른 자동 환불.
-     *
-     * <p>★ {@code REQUIRES_NEW} 인 이유 (2026-08-09) — 예전엔 호출자(cancelReservation)의
-     * 트랜잭션에 그대로 참여했다. 그래서 PG 가 에러를 주면 <b>예약 취소까지 통째로 롤백</b>됐고,
-     * 실제로 PortOne 이 404 를 주던 동안 예약금을 낸 고객은 예약 취소 자체가 불가능했다.
-     * 호출자가 예외를 catch 해도 소용없다 — 참여 트랜잭션에서 예외가 나면 전체가
-     * rollback-only 로 표시돼 커밋 시점에 터진다. 별도 트랜잭션이어야 격리된다.
-     *
-     * @return 전액 환불이 확정됐을 때만 {@code true}. 부분 환불·미결·환불 없음은 {@code false}.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /** 내부 단독 실행 경로. 예약 결정 TX 안에서는 prepare 메서드와 커밋 후 dispatcher를 쓴다. */
+    @Transactional(propagation = Propagation.NEVER)
     public boolean refundByReservationCancel(Long reservationId) {
-        if (!reservationRepository.existsById(reservationId)) throw ReservationException.notFound();
+        Long attemptId = inTransaction(() -> prepareRefundByReservationCancel(reservationId));
+        return attemptId != null && Payment.PaymentStatus.REFUNDED.name()
+                .equals(dispatchPreparedRefund(attemptId).getStatus());
+    }
 
-        Payment payment = paymentRepository.findPaidByReservationId(reservationId).orElse(null);
+    /** 환불 정책은 취소 결정 시점에 확정하고 미발신 의도를 같은 트랜잭션에 저장한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Long prepareRefundByReservationCancel(Long reservationId) {
+        Reservation reservation = lockFinancialReservation(reservationId);
+        requireRefundableReservationDecision(reservation);
+        Payment payment = paymentRepository.findPaidByReservationIdForUpdate(reservationId).map(this::refreshLockedPayment).orElse(null);
+        if (payment == null) return null;
+        RefundCalculationResult calculation = computeRefundAmount(reservationId, payment.getAmount());
+        if (calculation.getRefundAmount() <= 0) return null;
+        return prepareRefund(PaymentRefundDto.builder().paymentId(payment.getId())
+                .refundAmount(calculation.getRefundAmount())
+                .refundReason("예약 취소에 따른 자동 환불 (" + calculation.getReason() + ")").build());
+    }
 
-        if (payment == null) {
-            log.info("No refundable payment found or already processed: reservationId={}", reservationId);
-            return false;
-        }
+    @Transactional(propagation = Propagation.NEVER)
+    public boolean refundFullByStoreDecision(Long reservationId, String reason) {
+        Long attemptId = inTransaction(() -> prepareFullRefundByStoreDecision(reservationId, reason));
+        return attemptId != null && Payment.PaymentStatus.REFUNDED.name()
+                .equals(dispatchPreparedRefund(attemptId).getStatus());
+    }
 
-        RefundCalculationResult calculation = computeRefundAmount(reservationId);
+    /** 가게 거절·취소·미승인 자동 취소는 이용자 위약금 정책을 적용하지 않는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Long prepareFullRefundByStoreDecision(Long reservationId, String reason) {
+        Reservation reservation = lockFinancialReservation(reservationId);
+        requireRefundableReservationDecision(reservation);
+        Payment payment = paymentRepository.findPaidByReservationIdForUpdate(reservationId).map(this::refreshLockedPayment).orElse(null);
+        if (payment == null) return null;
+        return prepareRefund(PaymentRefundDto.builder().paymentId(payment.getId()).refundAmount(payment.getAmount())
+                .refundReason(reason != null && !reason.isBlank() ? reason : "가게 사정에 의한 취소 - 전액 환불").build());
+    }
 
-        if (calculation.getRefundAmount() > 0) {
-            PaymentRefundDto refundDto = PaymentRefundDto.builder()
-                    .reservationId(reservationId)
-                    .refundAmount(calculation.getRefundAmount())
-                    .refundReason("예약 취소에 따른 자동 환불 (" + calculation.getReason() + ")")
-                    .build();
-
-            // 호출자가 예약 FOR UPDATE를 소유한다. 이 REQUIRES_NEW에서 같은 예약을 UPDATE하면
-            // 바깥 트랜잭션을 기다리며 자기 잠금에 막힌다. true 반환 뒤 호출자가 예약금을 정리한다.
-            PaymentResponseDto response = refundPayment(refundDto, false);
-            return Payment.PaymentStatus.REFUNDED.name().equals(response.getStatus());
-        } else {
-            log.info("Refund amount is 0 by policy: reservationId={}", reservationId);
-            return false;
+    private void requireRefundableReservationDecision(Reservation reservation) {
+        if (!REFUND_RETRYABLE_RESERVATION_STATUSES.contains(reservation.getStatus())) {
+            throw new PaymentException("환불은 예약을 취소한 후에 요청할 수 있어요.", HttpStatus.CONFLICT);
         }
     }
 
-    /**
-     * 가게 측 결정(거절·취소)에 따른 <b>전액</b> 환불 (2026-08-11 추가).
-     *
-     * <p><b>왜 정책 계산({@link #calculateRefundAmount})을 쓰지 않나</b> — 그 정책은
-     * "이용자가 마음을 바꿔 취소할 때 며칠 전이냐"로 위약금을 매기는 규칙이다.
-     * 가게가 거절하거나 취소한 건 이용자 귀책이 아니므로 위약금을 물릴 근거가 없다.
-     * 이용약관({@code frontend/src/pages/policy/Terms.jsx})도 가게 사정에 의한 취소는
-     * 전액 환불이라고 명시하고 있다. 정책을 그대로 태우면 "가게가 당일에 취소했는데
-     * 예약금은 한 푼도 못 돌려받는" 상황이 나온다.
-     *
-     * <p><b>왜 {@code REQUIRES_NEW} 인가</b> — {@link #refundByReservationCancel} 과 같은 이유다.
-     * 호출자(예약 거절·취소)의 트랜잭션에 참여하면 PG 오류 한 번에 <b>상태 변경까지 통째로 롤백</b>된다.
-     * 호출자가 예외를 catch 해도 소용없다(참여 트랜잭션은 rollback-only 로 마킹된다).
-     *
-     * <p>결제 기록이 없으면(무료 예약 등) 조용히 반환한다 — 환불할 게 없는 건 오류가 아니다.
-     *
-     * @return 전액 환불이 PG 에서 확정됐으면 {@code true}. 환불할 결제가 없거나
-     *         아직 {@code REFUND_PENDING} 이면 {@code false}.
-     *         ★ <b>이 값을 반드시 봐야 한다</b> — "예외가 안 났다"와 "돈이 돌아갔다"는 다른 말이다.
-     *         PAID 행이 없는 경우(이미 부분 환불돼 PARTIAL_REFUNDED 로 넘어간 결제 등)에도
-     *         이 메서드는 정상 반환한다. 그걸 성공으로 읽고 예약금 플래그를 지우면
-     *         <b>남은 금액을 영영 안 돌려준 채 "전액 환불됨"으로 기록</b>된다.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean refundFullByStoreDecision(Long reservationId, String reason) {
-        Payment payment = paymentRepository.findPaidByReservationId(reservationId).orElse(null);
+    /** 일반 상태 변경도 JOIN FETCH보다 동일 회원/예약 관문을 먼저 통과한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockReservationForStateChange(Long reservationId) {
+        lockFinancialReservation(reservationId);
+    }
 
-        if (payment == null) {
-            log.warn("No refundable PAID payment for store-side decision - deposit flags left untouched: reservationId={}",
-                    reservationId);
-            return false;
-        }
-
-        PaymentRefundDto refundDto = PaymentRefundDto.builder()
-                .reservationId(reservationId)
-                // 명시적으로 결제 전액을 싣는다. null 을 넘기면 refundPayment 가 payment.getAmount()
-                // 로 채워주긴 하지만, "전액"이 이 메서드의 계약이므로 값으로 드러내 둔다.
-                .refundAmount(payment.getAmount())
-                .refundReason(reason != null && !reason.isBlank() ? reason : "가게 사정에 의한 취소 - 전액 환불")
-                .build();
-
-        log.info("Full refund by store decision: reservationId={}, amount={}", reservationId, payment.getAmount());
-        // 거절/취소 호출자가 잠근 예약의 수정은 호출자에게 남긴다. 독립 환불은 결제 원장만 갱신한다.
-        PaymentResponseDto response = refundPayment(refundDto, false);
-        return Payment.PaymentStatus.REFUNDED.name().equals(response.getStatus());
+    /** 취소·거절은 회원 ID 오름차순 → 예약 → 결제 순으로 잠그고 결정·환불 의도를 함께 커밋한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Reservation lockReservationPayments(Long reservationId) {
+        Reservation reservation = lockFinancialReservation(reservationId);
+        lockPaymentRows(reservationId);
+        return reservation;
     }
 
     /**
@@ -1037,6 +1027,10 @@ public class PaymentService {
     }
 
     private RefundCalculationResult computeRefundAmount(Long reservationId) {
+        return computeRefundAmount(reservationId, null);
+    }
+
+    private RefundCalculationResult computeRefundAmount(Long reservationId, Integer lockedPaidAmount) {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new PaymentException("예약 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
@@ -1058,7 +1052,7 @@ public class PaymentService {
         //   "10,000원 환불 가능"이라고 보여주고 실제 취소는 404 로 실패하는 상태였다.
         //   부분 환불 후(PAID 행이 PARTIAL_REFUNDED 로 바뀜)와 미결제 예약에서 둘 다 발생한다.
         //   미리보기와 실행이 같은 조회를 쓰도록 맞춘다 — 결제 기록이 없으면 환불액은 0 이다.
-        int paidAmount = paymentRepository.findPaidByReservationId(reservationId)
+        int paidAmount = lockedPaidAmount != null ? lockedPaidAmount : paymentRepository.findPaidByReservationId(reservationId)
                 .map(Payment::getAmount)
                 .orElse(0);
 

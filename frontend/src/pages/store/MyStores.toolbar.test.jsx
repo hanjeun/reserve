@@ -69,7 +69,7 @@ describe('my stores shared toolbar', () => {
         expect(screen.getAllByRole('article')).toHaveLength(2);
         expect(screen.getByRole('button', { name: '안산 한식 수정' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '안산 한식 삭제' })).toBeInTheDocument();
-        expect(Object.fromEntries(routeParams())).toEqual({ utm_source: 'yes', view: 'list', sort: 'recent', domain: '' });
+        expect(Object.fromEntries(routeParams())).toEqual({ utm_source: 'yes', view: 'list', sort: 'recent', domain: 'all' });
     });
 
     it('filters owned stores locally and keeps the view without offering a region control', async () => {
@@ -92,7 +92,7 @@ describe('my stores shared toolbar', () => {
         expect(screen.getByText('조건에 맞는 내 가게가 없어요.')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: '필터 초기화' }));
         expect(screen.getAllByRole('article')).toHaveLength(2);
-        expect(routeParams().get('domain')).toBe('');
+        expect(routeParams().get('domain')).toBe('all');
         expect(routeParams().get('region')).toBeNull();
         expect(routeParams().get('view')).toBe('list');
         expect(routeParams().get('utm_source')).toBe('yes');

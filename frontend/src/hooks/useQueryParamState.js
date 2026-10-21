@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState }
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { WorkspaceActivityContext } from '../components/layout/workspaceActivity';
 import { VIEW_MODES } from '../utils/viewMode';
+import { readQuerySelection, writeQuerySelection } from '../utils/querySelection';
 
 /**
  * URL 쿼리스트링과 동기화되는 여러 값을 한 번에 관리하는 훅 (2026-07 추가).
@@ -31,7 +32,7 @@ import { VIEW_MODES } from '../utils/viewMode';
  *
  * 선택 옵션과 페이지는 기본값도 URL에 표시한다. 검색어처럼 값이 없는 입력은 생략한다.
  */
-const isEmptySelection = key => key === 'type' || /Store$/.test(key);
+const isEmptySelection = key => writeQuerySelection(key, '') === 'all' || /Store$/.test(key);
 
 export const useQueryParamsState = (defaults, activeKeys = Object.keys(defaults)) => {
     const [searchParams] = useSearchParams();
@@ -54,13 +55,15 @@ export const useQueryParamsState = (defaults, activeKeys = Object.keys(defaults)
         const params = new URLSearchParams(searchParams);
         const visibleKeys = new Set(JSON.parse(activeKeysKey));
         Object.entries(JSON.parse(defaultsKey)).forEach(([key, value]) => {
+            if (!visibleKeys.has(key)) { params.delete(key); return; }
             const raw = params.get(key);
             const selection = value !== '' || isEmptySelection(key);
             if (key === 'view' && raw !== null && !VIEW_MODES.has(raw)) params.set(key, String(value));
-            else if (raw === '' && value !== '') params.set(key, String(value));
+            else if (raw === '' && writeQuerySelection(key, raw) === 'all') params.set(key, 'all');
+            else if (raw === '' && value !== '') params.set(key, String(writeQuerySelection(key, value)));
             else if (raw === '' && !selection) params.delete(key);
-            else if (raw !== null) params.set(key, raw);
-            else if (visibleKeys.has(key) && selection) params.set(key, String(value));
+            else if (raw !== null) params.set(key, writeQuerySelection(key, raw));
+            else if (selection) params.set(key, String(writeQuerySelection(key, value)));
         });
         if (params.toString() === searchParams.toString()) return;
         navigate({ pathname, search: params.size ? `?${params}` : '', hash }, { replace: true, state });
@@ -68,7 +71,7 @@ export const useQueryParamsState = (defaults, activeKeys = Object.keys(defaults)
 
     const values = {};
     Object.keys(defaults).forEach((key) => {
-        values[key] = current.get(key) ?? defaults[key];
+        values[key] = readQuerySelection(key, current.get(key)) ?? defaults[key];
     });
 
     const setValues = useCallback((patch, options = {}) => {
@@ -79,7 +82,7 @@ export const useQueryParamsState = (defaults, activeKeys = Object.keys(defaults)
         const params = new URLSearchParams(latest.search);
         Object.entries(patch).forEach(([key, val]) => {
             if (val == null || val === '' && stableDefaults[key] === '' && !isEmptySelection(key)) params.delete(key);
-            else params.set(key, String(val));
+            else params.set(key, String(writeQuerySelection(key, val)));
         });
         navigate({ pathname: latest.pathname, search: params.size ? `?${params}` : '', hash: latest.hash },
             { replace: true, state: latest.state, ...options });

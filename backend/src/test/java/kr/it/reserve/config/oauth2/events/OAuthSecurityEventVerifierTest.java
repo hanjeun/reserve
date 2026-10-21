@@ -72,6 +72,28 @@ class OAuthSecurityEventVerifierTest {
     }
 
     @Test
+    void googleVerificationKeepsOnlyTheStateHashAndDoesNotRevokeAnySubject() throws Exception {
+        JWTClaimsSet claims = claims(GOOGLE, "google-client", RISC + "verification", GOOGLE)
+                .claim("events", Map.of(RISC + "verification", Map.of("state", "reserve-stream-check"))).build();
+
+        VerifiedOAuthSecurityEvent event = verifier.verify(AuthProvider.GOOGLE, signed(claims));
+
+        assertThat(event.actions()).isEmpty();
+        assertThat(event.verificationStateHash())
+                .isEqualTo("3d4247de690d5b50eee13a63832ce1befa5f7e7976c3f8b7000bd0f0e3d0f1fe");
+        assertThat(event.toString()).doesNotContain("reserve-stream-check");
+    }
+
+    @Test
+    void googleVerificationRejectsMissingNonStringOrUnboundedState() throws Exception {
+        for (Map<String, Object> payload : List.of(Map.<String, Object>of(), Map.<String, Object>of("state", 123),
+                Map.<String, Object>of("state", " "), Map.<String, Object>of("state", "a".repeat(513)))) {
+            assertRejected(AuthProvider.GOOGLE, signed(claims(GOOGLE, "google-client", RISC + "verification", GOOGLE)
+                    .claim("events", Map.of(RISC + "verification", payload)).build()), "invalid_request");
+        }
+    }
+
+    @Test
     void kakaoUnlinkClearsOnlyTheMatchingProviderTokenAndSessions() throws Exception {
         String token = signed(claims(KAKAO, "kakao-rest", OAUTH + "user-unlinked", KAKAO)
                 .subject("provider-subject").claim("app_id", "123").claim("toe", NOW.minusSeconds(30).getEpochSecond()).build());

@@ -24,6 +24,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     labels: ["chore", "dependencies"]
+    # Spring Boot 3.5의 Gradle 7/8 지원 범위다. Boot 업그레이드 때 이 제한도 재검토한다.
+    ignore:
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
     groups:
       backend-minor:
         update-types: ["minor", "patch"]

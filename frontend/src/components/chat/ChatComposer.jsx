@@ -5,6 +5,7 @@ import { ArrowRightOutlined, SmileOutlined, StopOutlined } from '../common/icons
 import { SpinIndicator } from '../common/Loading';
 import ChatImagePicker from './ChatImagePicker';
 import Tooltip from '../common/Tooltip';
+import { colors } from '../../styles/tokens';
 
 const usesTouchInput = () => globalThis.matchMedia?.('(pointer: coarse)').matches === true;
 
@@ -23,7 +24,7 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
     file, onFileChange, imageEnabled = false, imageLoading = false, onCancel,
     files, onFilesChange, onRemoveFile,
     maxLength = 2000, placeholder = '메시지를 입력하세요', inputLabel = '메시지 입력', sendText = '보내기',
-    inputRef, attachmentControl, attachments, hasAttachments = Boolean(files?.length || file) }) {
+    inputRef, attachmentControl, attachments, attachmentError, hasAttachments = Boolean(files?.length || file) }) {
     const input = useRef(null);
     useImperativeHandle(inputRef, () => input.current, []);
     const trigger = useRef(null);
@@ -80,7 +81,10 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
                     if (!blocked && (value.trim() || hasAttachments)) onSend();
                 }
             }} placeholder={placeholder} aria-label={inputLabel} maxLength={maxLength} rows={2} disabled={disabled} />
-        <div className="reserve-chat-composer-attachments">{attachments ?? previews}</div>
+        <div className="reserve-chat-composer-attachments">
+            {attachmentError && <span role="alert" style={{ color: colors.error.main, fontSize: 12 }}>{attachmentError}</span>}
+            {previews}
+        </div>
         </div>
         <div className="reserve-chat-composer-toolbar">
             <div className="reserve-chat-composer-tools">
@@ -105,9 +109,13 @@ export default function ChatComposer({ value, onChange, onSend, sending = false,
             </button></Tooltip>
         </div>
     </div>;
+    if (typeof attachmentControl === 'function') {
+        return attachmentControl((control, previews) => renderComposer(control, <>{previews}{attachments}</>));
+    }
     if (attachmentControl != null) return renderComposer(attachmentControl, attachments);
     return <ChatImagePicker file={file} onChange={onFileChange} files={files} onFilesChange={onFilesChange} onRemoveFile={onRemoveFile}
-        enabled={imageEnabled || imageLoading} disabled={blocked || imageLoading} renderContent={renderComposer} />;
+        enabled={imageEnabled || imageLoading} disabled={blocked || imageLoading}
+        renderContent={(control, previews) => renderComposer(control, attachments ?? previews)} />;
 }
 
 ChatComposer.propTypes = {
@@ -116,6 +124,7 @@ ChatComposer.propTypes = {
     onFileChange: PropTypes.func, imageEnabled: PropTypes.bool, imageLoading: PropTypes.bool,
     onCancel: PropTypes.func, maxLength: PropTypes.number, placeholder: PropTypes.string, inputLabel: PropTypes.string,
     sendText: PropTypes.string, inputRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
-    attachmentControl: PropTypes.node, attachments: PropTypes.node, hasAttachments: PropTypes.bool,
+    attachmentControl: PropTypes.oneOfType([PropTypes.node, PropTypes.func]), attachments: PropTypes.node,
+    attachmentError: PropTypes.string, hasAttachments: PropTypes.bool,
     files: PropTypes.arrayOf(PropTypes.object), onFilesChange: PropTypes.func, onRemoveFile: PropTypes.func,
 };

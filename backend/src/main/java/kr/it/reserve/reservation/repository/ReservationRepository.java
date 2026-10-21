@@ -35,6 +35,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT r FROM Reservation r JOIN FETCH r.store s JOIN FETCH s.owner JOIN FETCH r.member WHERE r.id = :id")
     java.util.Optional<Reservation> findByIdForUpdate(@Param("id") Long id);
 
+    @Query("SELECT r.member.id FROM Reservation r WHERE r.id = :id")
+    java.util.Optional<Long> findMemberIdById(@Param("id") Long id);
+
+    @Query("SELECT r.store.owner.id FROM Reservation r WHERE r.id = :id")
+    java.util.Optional<Long> findOwnerIdById(@Param("id") Long id);
+
+    /** 금융 잠금은 관련 가게·회원까지 FOR UPDATE하지 않고 예약의 단일 행만 잡는다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Reservation r WHERE r.id = :id")
+    java.util.Optional<Reservation> findByIdForPaymentUpdate(@Param("id") Long id);
+
     /**
      * 한 예약은 한 광고에만 한 번 귀속한다.
      *

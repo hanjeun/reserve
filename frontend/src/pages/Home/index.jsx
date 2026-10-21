@@ -434,7 +434,7 @@ export default function Home() {
     useEffect(() => { window.scrollTo(0, 0); }, []);
 
     return (
-        <div className="reserve-discovery-home">
+        <div className="reserve-discovery-home" data-home-content="true">
             <h1 className="reserve-discovery-visually-hidden">RESERVE — 가게를 찾고 예약하세요</h1>
             <div className="reserve-discovery-location">
                 <button type="button" className="reserve-discovery-location-link"

@@ -1,7 +1,5 @@
 package kr.it.reserve.reservation;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.payment.service.PaymentService;
 import kr.it.reserve.reservation.entity.Reservation;
@@ -10,6 +8,9 @@ import kr.it.reserve.reservation.scheduler.ReservationExpiryProcessor;
 import kr.it.reserve.store.entity.Store;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -20,14 +21,24 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class ReservationExpiryPaymentRecheckTest {
 
     @Mock private ReservationRepository reservationRepository;
     @Mock private PaymentService paymentService;
-    @Mock private EntityManager entityManager;
+
+    @Mock private PlatformTransactionManager transactionManager;
+
+    @BeforeEach
+    void transactionBoundaries() {
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenAnswer(ignored -> new SimpleTransactionStatus());
+    }
 
     @InjectMocks
     private ReservationExpiryProcessor expiryProcessor;
@@ -37,7 +48,9 @@ class ReservationExpiryPaymentRecheckTest {
     void recoveredPaymentPreservesReservation() {
         Reservation reservation = expiredReservation(1L);
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
-        when(paymentService.reconcileBeforeReservationExpiry(1L))
+        when(reservationRepository.existsById(1L)).thenReturn(true);
+        when(paymentService.lockReservationPayments(1L)).thenReturn(reservation);
+        when(paymentService.applyLockedExpiryPaymentObservation(reservation, null))
                 .thenReturn(PaymentService.ExpiryPaymentDecision.PAID_RECOVERED);
 
         ReservationExpiryProcessor.ExpiryResult result =
@@ -52,7 +65,9 @@ class ReservationExpiryPaymentRecheckTest {
     void uncertainPaymentDefersCancellation() {
         Reservation reservation = expiredReservation(2L);
         when(reservationRepository.findById(2L)).thenReturn(Optional.of(reservation));
-        when(paymentService.reconcileBeforeReservationExpiry(2L))
+        when(reservationRepository.existsById(2L)).thenReturn(true);
+        when(paymentService.lockReservationPayments(2L)).thenReturn(reservation);
+        when(paymentService.applyLockedExpiryPaymentObservation(reservation, null))
                 .thenReturn(PaymentService.ExpiryPaymentDecision.UNCERTAIN);
 
         ReservationExpiryProcessor.ExpiryResult result =
@@ -67,7 +82,9 @@ class ReservationExpiryPaymentRecheckTest {
     void confirmedUnpaidReservationIsCancelled() {
         Reservation reservation = expiredReservation(3L);
         when(reservationRepository.findById(3L)).thenReturn(Optional.of(reservation));
-        when(paymentService.reconcileBeforeReservationExpiry(3L))
+        when(reservationRepository.existsById(3L)).thenReturn(true);
+        when(paymentService.lockReservationPayments(3L)).thenReturn(reservation);
+        when(paymentService.applyLockedExpiryPaymentObservation(reservation, null))
                 .thenReturn(PaymentService.ExpiryPaymentDecision.NOT_PAID);
 
         ReservationExpiryProcessor.ExpiryResult result =
@@ -81,19 +98,19 @@ class ReservationExpiryPaymentRecheckTest {
     @DisplayName("결제 재확인 중 예약이 승인됐다면 잠금 후 최신 상태를 보고 취소하지 않는다")
     void concurrentApprovalIsNotOverwrittenByExpiry() {
         Reservation reservation = expiredReservation(4L);
+        Reservation locked = expiredReservation(4L);
+        locked.setStatus(Reservation.ReservationStatus.CONFIRMED);
         when(reservationRepository.findById(4L)).thenReturn(Optional.of(reservation));
-        when(paymentService.reconcileBeforeReservationExpiry(4L))
-                .thenReturn(PaymentService.ExpiryPaymentDecision.NOT_PAID);
-        doAnswer(invocation -> {
-            reservation.setStatus(Reservation.ReservationStatus.CONFIRMED);
-            return null;
-        }).when(entityManager).refresh(reservation, LockModeType.PESSIMISTIC_WRITE);
+        when(reservationRepository.existsById(4L)).thenReturn(true);
+        when(paymentService.lockReservationPayments(4L)).thenReturn(locked);
 
         ReservationExpiryProcessor.ExpiryResult result =
                 expiryProcessor.expireIfDue(4L, LocalDateTime.now());
 
         assertThat(result).isEqualTo(ReservationExpiryProcessor.ExpiryResult.SKIPPED);
-        assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
+        assertThat(locked.getStatus()).isEqualTo(Reservation.ReservationStatus.CONFIRMED);
+        assertThat(reservation.getStatus()).isEqualTo(Reservation.ReservationStatus.PENDING);
+        verify(paymentService, never()).applyLockedExpiryPaymentObservation(any(), any());
     }
 
     private Reservation expiredReservation(Long id) {

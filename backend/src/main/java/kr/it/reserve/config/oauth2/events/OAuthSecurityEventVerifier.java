@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ import java.util.Arrays;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.LinkedHashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -123,9 +126,18 @@ public class OAuthSecurityEventVerifier {
                 throw OAuthSecurityEventException.invalid("invalid_request");
             }
             Map<String, Boolean> subjects = new LinkedHashMap<>();
+            String verificationStateHash = null;
             for (Map.Entry<String, Object> entry : events.entrySet()) {
                 if (!(entry.getValue() instanceof Map<?, ?> payload)) {
                     throw OAuthSecurityEventException.invalid("invalid_request");
+                }
+                if (provider == AuthProvider.GOOGLE && (RISC + "verification").equals(entry.getKey())) {
+                    if (!(payload.get("state") instanceof String state) || state.isBlank() || state.length() > 512) {
+                        throw OAuthSecurityEventException.invalid("invalid_request");
+                    }
+                    verificationStateHash = HexFormat.of().formatHex(
+                            MessageDigest.getInstance("SHA-256").digest(state.getBytes(StandardCharsets.UTF_8)));
+                    continue;
                 }
                 Boolean clearToken = sessionRevocation(provider, entry.getKey(), payload);
                 if (clearToken == null) continue;
@@ -134,7 +146,7 @@ public class OAuthSecurityEventVerifier {
             }
             List<VerifiedOAuthSecurityEvent.Action> actions = new ArrayList<>();
             subjects.forEach((subject, clearToken) -> actions.add(new VerifiedOAuthSecurityEvent.Action(subject, clearToken)));
-            return new VerifiedOAuthSecurityEvent(provider, eventId, occurredAt, actions);
+            return new VerifiedOAuthSecurityEvent(provider, eventId, occurredAt, actions, verificationStateHash);
         } catch (OAuthSecurityEventException exception) {
             throw exception;
         } catch (Exception exception) {

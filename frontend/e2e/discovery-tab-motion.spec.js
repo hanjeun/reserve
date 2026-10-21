@@ -151,14 +151,16 @@ test('rapid header back presses produce one collapse and one history move', asyn
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible();
     const back = page.getByRole('button', { name: '이전 화면으로 돌아가기' });
-    const skeletonShown = await page.locator('.reserve-header').getAttribute('data-skeleton-shown') === 'true';
-    await expect(back).toHaveCSS('animation-name', skeletonShown ? 'none' : 'reserve-header-back-enter');
+    const backSlot = page.locator('.reserve-header-back-slot');
+    await expect(back).toHaveCSS('width', '44px');
+    await expect(backSlot).toHaveCSS('animation-name', 'reserve-header-back-enter');
     await page.evaluate(async () => {
         const button = document.querySelector('.reserve-header-back');
-        await Promise.all(button.getAnimations().map(animation => animation.finished));
+        const slot = document.querySelector('.reserve-header-back-slot');
+        await Promise.all(slot.getAnimations().map(animation => animation.finished));
         window.__reserveHeaderBackAnimations = [];
         document.addEventListener('animationstart', event => {
-            if (event.target.classList.contains('reserve-header-back')) {
+            if (event.target.classList.contains('reserve-header-back-slot')) {
                 window.__reserveHeaderBackAnimations.push(event.animationName);
             }
         });

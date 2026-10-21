@@ -1,28 +1,30 @@
 package kr.it.reserve.reservation.service;
 
-import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.config.updates.EntityUpdates;
+
+import kr.it.reserve.audit.service.AuditLogService;
 import kr.it.reserve.email.service.EmailService;
 import kr.it.reserve.global.common.ServiceTime;
-import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.global.holiday.HolidayService;
+import kr.it.reserve.global.error.ReservationException;
 import kr.it.reserve.member.entity.Member;
 import kr.it.reserve.member.repository.MemberRepository;
 import kr.it.reserve.payment.service.PaymentService;
+import kr.it.reserve.payment.service.RefundDispatchService;
 import kr.it.reserve.reservation.dto.CalendarDayResponse;
-import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationCreateRequest;
+import kr.it.reserve.reservation.dto.QrCheckinResponse;
 import kr.it.reserve.reservation.dto.ReservationResponse;
 import kr.it.reserve.reservation.dto.ReservationSearchDto;
-import kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse;
 import kr.it.reserve.reservation.dto.ReservationUpdateRequest;
+import kr.it.reserve.reservation.dto.ReservationStatusSummaryResponse;
 import kr.it.reserve.reservation.dto.SlotAvailabilityResponse;
 import kr.it.reserve.reservation.entity.Reservation;
 import kr.it.reserve.reservation.repository.ReservationRepository;
 import kr.it.reserve.reservation.util.QrCheckinTokenProvider;
 import kr.it.reserve.reservation.util.ReservationCodeGenerator;
-import kr.it.reserve.store.entity.Store;
 import kr.it.reserve.store.repository.StoreRepository;
+import kr.it.reserve.store.entity.Store;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -59,6 +61,8 @@ public class ReservationService {
     /** 달력을 빨갛게 칠하는 용도. 죽어도 예약 판정에는 영향이 없다(HolidayService 주석 참고). */
     private final ReservationAvailability availability;
     private final PaymentService paymentService;
+    @Autowired
+    private RefundDispatchService refundDispatch;
     private final EmailService emailService;
     private final MemberRepository memberRepository;
     private final AuditLogService auditLogService;
@@ -442,35 +446,19 @@ public class ReservationService {
      */
     @Transactional
     public void cancelReservation(Long id, Member member) {
-        Reservation reservation = findByIdForUpdateOrThrow(id);
+        Reservation reservation = paymentService.lockReservationPayments(id);
         validateOwnership(reservation, member);
 
         if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
             throw new ReservationException("이미 취소된 예약이에요.", HttpStatus.BAD_REQUEST);
         }
 
-        // ★ 환불 실패가 취소를 막지 않는다 (2026-08-09).
-        //   예전엔 환불을 먼저 부르고 그 다음에 CANCELLED 를 세팅했다. PG 가 에러를 주면
-        //   트랜잭션이 통째로 롤백돼 사용자는 500 만 보고 예약은 그대로 남았다.
-        //   실제로 PortOne 이 404 를 돌려주던 동안 예약금 결제 고객은 취소를 아예 못 했다.
-        //   취소는 사용자의 권리이고 PG 장애로 막혀서는 안 된다. 환불은 별도 트랜잭션
-        //   (refundByReservationCancel 의 REQUIRES_NEW)에서 시도하고, 실패하면 로그로 남긴다.
-        // 환불 요청과 미결 결말은 refund_attempt 원장과 결제 대사 큐에서 추적한다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
         changed(reservation, EntityUpdates.Operation.UPDATED);
 
+        // 취소 결정과 미발신 환불 의도를 함께 커밋한다. PG 오류는 이미 커밋한 취소를 되돌리지 않는다.
         if (Boolean.TRUE.equals(reservation.getDepositPaid())) {
-            try {
-                if (paymentService.refundByReservationCancel(id)) {
-                    // 환불은 REQUIRES_NEW라 바깥 영속성 컨텍스트의 예약 인스턴스에도
-                    // 같은 값을 써야 커밋 때 확정된 false가 다시 true로 덮이지 않는다.
-                    reservation.setDepositPaid(false);
-                    reservation.setDepositAmount(0);
-                }
-            } catch (Exception e) {
-                log.error("Refund failed while cancelling - reservation stays CANCELLED, refund needs manual action: reservationId={}, errorType={}",
-                        id, e.getClass().getSimpleName());
-            }
+            refundDispatch.afterCommit(paymentService.prepareRefundByReservationCancel(id));
         }
     }
 
@@ -530,7 +518,7 @@ public class ReservationService {
      */
     @Transactional
     public void rejectReservation(Long id, Member owner, String reason) {
-        Reservation reservation = findByIdForUpdateOrThrow(id);
+        Reservation reservation = paymentService.lockReservationPayments(id);
         validateStoreOwner(reservation, owner);
 
         if (reservation.getStatus() != Reservation.ReservationStatus.PENDING) {
@@ -548,8 +536,8 @@ public class ReservationService {
         //   명시하고 있으므로 약관 위반이었고, 이용자가 되돌릴 수단도 없었다.
         //   ⚠️ 정책 계산(calculateRefundAmount)을 쓰면 안 된다 — 그건 이용자 귀책 취소의 위약금
         //      규칙이라, 가게가 당일에 거절해도 0원이 나올 수 있다. 전액 경로를 따로 쓴다.
-        //   실패해도 거절은 유지한다(cancelReservation 과 같은 이유).
-        refundFullByStoreDecisionQuietly(id, "가게의 예약 거절에 따른 전액 환불", reservation);
+        //   외부 발신은 거절·환불 의도 커밋 후에 실행하므로 PG 오류가 거절을 되돌리지 않는다.
+        prepareStoreDecisionRefund(id, "가게의 예약 거절에 따른 전액 환불", reservation);
 
         // 유저에게 거절 알림 (비동기) — 개인 알림 설정 ON일 때만
         if (reservation.getMember().isEmailNotificationEnabled()) {
@@ -592,7 +580,7 @@ public class ReservationService {
      */
     @Transactional
     public void cancelReservationByStore(Long id, Member owner, String reason) {
-        Reservation reservation = findByIdForUpdateOrThrow(id);
+        Reservation reservation = paymentService.lockReservationPayments(id);
         validateStoreOwner(reservation, owner);
 
         if (!isClosable(reservation)) {
@@ -603,13 +591,12 @@ public class ReservationService {
 
         String cancelReason = (reason != null && !reason.isBlank()) ? reason : "가게 사정으로 인한 취소";
 
-        // cancelReservation 과 같은 순서 — 상태를 먼저 확정하고 환불은 별도 트랜잭션에서 시도한다.
-        // PG 장애가 예약 취소 자체를 막으면 사장님도 이용자도 아무것도 못 하는 상태로 갇힌다.
+        // 취소 결정과 미발신 의도를 함께 저장한다. 외부 PG 호출은 커밋 후 실행한다.
         reservation.setStatus(Reservation.ReservationStatus.CANCELLED);
         changed(reservation, EntityUpdates.Operation.UPDATED);
         reservation.setCancelReason(cancelReason);
 
-        refundFullByStoreDecisionQuietly(id, "가게의 예약 취소에 따른 전액 환불", reservation);
+        prepareStoreDecisionRefund(id, "가게의 예약 취소에 따른 전액 환불", reservation);
 
         if (reservation.getMember().isEmailNotificationEnabled()) {
             try {
@@ -632,45 +619,15 @@ public class ReservationService {
         log.info("Reservation cancelled by store: id={}, ownerId={}", id, owner.getId());
     }
 
-    /**
-     * 가게 측 결정에 따른 전액 환불을 <b>실패해도 흐름을 막지 않게</b> 실행한다.
-     *
-     * <p>거절·취소 양쪽에서 같은 규칙이 필요해 뽑아냈다. 결제하지 않은 예약은 건너뛴다.
-     *
-     * <p>★ <b>성공하면 여기서도 예약금 플래그를 지워야 한다</b> (2026-08-11).
-     * 환불은 {@code REQUIRES_NEW} 라 <b>다른 영속성 컨텍스트</b>에서 돈다. 그쪽에서
-     * {@code reservation.setDepositPaid(false)} 를 해도 그건 그 컨텍스트가 로드한 <b>다른 인스턴스</b>다.
-     * 이 메서드를 부른 트랜잭션은 status 를 바꿔놨으니 커밋 때 UPDATE 를 날리는데,
-     * 이 엔티티들엔 {@code @DynamicUpdate} 가 없어 <b>모든 컬럼을 다시 쓴다</b> —
-     * 방금 false 로 만든 {@code deposit_paid} 가 true 로 되돌아간다.
-     * 그래서 바깥 인스턴스에도 같은 값을 적용해 커밋이 올바른 값을 쓰게 한다.
-     * (전액 환불이라 조건 없이 0으로 만든다 — 부분 환불이면 이렇게 하면 안 된다.)
-     *
-     * <p>★ <b>반환값을 봐야 한다. "예외가 안 났다" ≠ "돈이 돌아갔다".</b>
-     * 환불할 PAID 결제가 없으면 그쪽은 조용히 {@code false} 를 준다. 그걸 성공으로 읽고
-     * 플래그를 지우면, 이미 부분 환불돼 있던 예약에서 <b>남은 금액을 안 돌려준 채</b>
-     * "전액 환불 완료"로 기록되고 고객에게는 전액 환불 메일까지 나간다.
-     * 플래그를 지우는 건 <b>실제로 환불이 일어났을 때뿐</b>이다 —
-     * {@code depositPaid} 가 true 로 남아 있으면 최소한 "정산이 안 끝난 건"으로 눈에 띈다.
-     *
-     * <p>환불이 미결이면 예약금 플래그를 유지하고 refund_attempt 원장과 결제 대사 큐에서 추적한다.
-     */
-    private void refundFullByStoreDecisionQuietly(Long reservationId, String reason, Reservation reservation) {
-        if (!Boolean.TRUE.equals(reservation.getDepositPaid())) {
+    /** 가게 결정·환불 의도를 함께 저장하고 커밋한 원장 ID만 외부 발신에 넘긴다. */
+    private void prepareStoreDecisionRefund(Long reservationId, String reason, Reservation reservation) {
+        if (!Boolean.TRUE.equals(reservation.getDepositPaid())) return;
+        Long attemptId = paymentService.prepareFullRefundByStoreDecision(reservationId, reason);
+        if (attemptId == null) {
+            log.error("Deposit marked paid but no refundable payment found: reservationId={}", reservationId);
             return;
         }
-        try {
-            if (paymentService.refundFullByStoreDecision(reservationId, reason)) {
-                reservation.setDepositPaid(false);
-                reservation.setDepositAmount(0);
-            } else {
-                log.error("Deposit marked paid but no refundable payment found - needs manual settlement: reservationId={}",
-                        reservationId);
-            }
-        } catch (Exception e) {
-            log.error("Store-side full refund failed - status change kept, refund needs manual action: reservationId={}, errorType={}",
-                    reservationId, e.getClass().getSimpleName());
-        }
+        refundDispatch.afterCommit(attemptId);
     }
 
     /**
@@ -921,7 +878,8 @@ public class ReservationService {
     }
 
     private ReservationAttendance attendance() {
-        return new ReservationAttendance(reservationRepository, qrCheckinTokenProvider, updates);
+        return new ReservationAttendance(reservationRepository, qrCheckinTokenProvider, updates,
+                paymentService::lockReservationForStateChange);
     }
 
     private void changed(Reservation reservation, EntityUpdates.Operation operation) {
@@ -935,6 +893,7 @@ public class ReservationService {
 
     /** 모든 예약 상태 변경이 거치는 행 잠금 관문. QR·취소·완료가 서로 값을 덮어쓰지 않게 한다. */
     private Reservation findByIdForUpdateOrThrow(Long id) {
+        paymentService.lockReservationForStateChange(id);
         return reservationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
     }

@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.function.Consumer;
 
 /** QR issuance, idempotent attendance, completion/no-show run under the facade transaction. */
 @Slf4j(topic = "kr.it.reserve.reservation.service.ReservationService")
@@ -23,15 +24,14 @@ final class ReservationAttendance {
     private final ReservationRepository reservationRepository;
     private final QrCheckinTokenProvider qrCheckinTokenProvider;
     private final ReservationUpdates updates;
+    private final Consumer<Long> beforeReservationLock;
 
-    ReservationAttendance(ReservationRepository reservations, QrCheckinTokenProvider tokens) {
-        this(reservations, tokens, null);
-    }
-
-    ReservationAttendance(ReservationRepository reservations, QrCheckinTokenProvider tokens, ReservationUpdates updates) {
+    ReservationAttendance(ReservationRepository reservations, QrCheckinTokenProvider tokens,
+                          ReservationUpdates updates, Consumer<Long> beforeReservationLock) {
         reservationRepository = reservations;
         qrCheckinTokenProvider = tokens;
         this.updates = updates;
+        this.beforeReservationLock = beforeReservationLock;
     }
 
     String generateQrCheckinToken(Long reservationId, Member member) {
@@ -46,8 +46,7 @@ final class ReservationAttendance {
 
     QrCheckinResponse checkInByQrToken(String token, Member owner) {
         Long reservationId = qrCheckinTokenProvider.parseReservationId(token);
-        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
-                .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
+        Reservation reservation = findByIdForUpdateOrThrow(reservationId);
         ReservationAccess.owner(reservation, owner);
 
         // ★★ 방문 당일에만 체크인할 수 있다 (2026-08-19 신설).
@@ -146,6 +145,7 @@ final class ReservationAttendance {
     }
 
     private Reservation findByIdForUpdateOrThrow(Long id) {
+        beforeReservationLock.accept(id);
         return reservationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ReservationException(RESERVATION_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND));
     }

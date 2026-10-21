@@ -33,7 +33,7 @@ test('forged success cannot confirm a READY payment or issue a new payment reque
     await page.getByRole('button', { name: '내 예약에서 다시 열기' }).click();
     await expect(page).toHaveURL(url => url.pathname === '/my-reservations');
     await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
-        .toEqual({ view: 'list', tab: 'reservation', status: 'ALL', sort: 'recent' });
+        .toEqual({ view: 'list', tab: 'reservation', status: 'all', sort: 'recent' });
     expect(requests.every(request => request.method === 'GET' && request.path === '/api/payment/status')).toBe(true);
 });
 
@@ -59,7 +59,7 @@ test('unknown ad result leads directly to the ad tab, including after reload', a
     await page.getByRole('button', { name: '광고 관리에서 다시 열기' }).click();
     await expect(page).toHaveURL(url => url.pathname === '/business');
     await expect.poll(() => Object.fromEntries(new URL(page.url()).searchParams))
-        .toEqual({ tab: 'ads', advertisementStore: 'ALL', advertisementPage: '0' });
+        .toEqual({ tab: 'ads', advertisementStore: 'all', advertisementPage: '0' });
     await expectAdSelection();
     await page.reload();
     await expectAdSelection();

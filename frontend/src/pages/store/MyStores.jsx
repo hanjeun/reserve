@@ -19,6 +19,7 @@ import StoreCard from '../../components/store/StoreCard';
 import StoreListRow from '../../components/store/StoreListRow';
 import { OWNER_STORE_SORT_OPTIONS } from '../../constants';
 import { filterAndSortOwnedStores } from './ownedStoreFilters';
+import { readQuerySelection, writeQuerySelection } from '../../utils/querySelection';
 
 const { Text } = Typography;
 const OWNER_SORT_OPTIONS = OWNER_STORE_SORT_OPTIONS;
@@ -187,7 +188,7 @@ const resolveOwnerSort = (params) => (OWNER_SORT_OPTIONS.some(option => option.v
 // 같은 위계의 선택은 기본값도 URL에 표시한다. 빈 분야 값은 전체 분야다.
 const withToolbarParam = (current, key, value) => {
     const next = new URLSearchParams(current);
-    if (value != null) next.set(key, String(value));
+    if (value != null) next.set(key, String(writeQuerySelection(key, value)));
     else next.delete(key);
     return next;
 };
@@ -254,7 +255,7 @@ const MyStores = () => {
     const [targetStore, setTargetStore] = useState(null); // { id, name }
     const [retrying, setRetrying] = useState(false);
     const [view, setView] = useViewModeParam(urlSearchParams, 'cards');
-    const domain = urlSearchParams.get('domain') || '';
+    const domain = readQuerySelection('domain', urlSearchParams.get('domain')) || '';
     const sort = resolveOwnerSort(urlSearchParams);
     const visibleStores = filterAndSortOwnedStores(stores, { domain, sort });
     const listRef = React.useRef(null);

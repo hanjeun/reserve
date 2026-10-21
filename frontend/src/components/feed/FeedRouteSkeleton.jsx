@@ -23,6 +23,7 @@ export default function FeedRouteSkeleton({ pathname, search = '' }) {
             kind={detail ? 'feed-detail' : profile ? 'feed-author' : 'feed'}
             postId={detail ? Number(pathname.match(/^\/feed\/posts\/([1-9]\d*)\/?$/)?.[1]) : undefined}
             signedIn={signedIn}
+            authPending={!client}
             enabled={config?.enabled !== false}
             notificationsEnabled={interactions?.notificationsEnabled !== false}
             ownView={view === 'mine' || view === 'drafts'}

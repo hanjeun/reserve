@@ -8,6 +8,7 @@ import useReducedMotion from '../../hooks/useReducedMotion';
 import useRecentSearches from '../../hooks/useRecentSearches';
 import Tooltip from '../../components/common/Tooltip';
 import { SEARCH_MOTION_DURATION_MS } from '../../components/layout/searchTransition';
+import { useSkeletonShown } from '../../components/layout/loadingPresentation';
 
 // 안내용 예시다. 실측 인기 순위나 현재 위치 기반 추천으로 표현하지 않는다.
 const QUICK_SEARCHES = ['카페', '스튜디오', '필라테스', '공방', '클리닉', '팝업'];
@@ -19,6 +20,7 @@ export default function SearchPage() {
     const [keyword, setKeyword] = useState(() => searchParams.get('keyword') || '');
     const [isClosing, setIsClosing] = useState(false);
     const reducedMotion = useReducedMotion();
+    const skeletonShown = useSkeletonShown();
     const { terms: recentSearches, add: rememberSearch, remove: removeSearch, clear: clearRecentSearches } = useRecentSearches();
     const inputRef = useRef(null);
     // 연달아 누른 취소가 뒤로가기를 두 번 하지 않게 한다(뒤로가기는 비동기라 화면이 잠깐 남아 있다).
@@ -81,7 +83,7 @@ export default function SearchPage() {
 
     let motionClass = '';
     if (isClosing) motionClass = ' reserve-search-page--leaving';
-    else if (!reducedMotion) motionClass = ' reserve-search-page--entering';
+    else if (!reducedMotion && !skeletonShown) motionClass = ' reserve-search-page--entering';
 
     return (
         <div className={'reserve-search-page' + motionClass} inert={isClosing ? true : undefined}

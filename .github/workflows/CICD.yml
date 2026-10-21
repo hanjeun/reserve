@@ -118,6 +118,8 @@ jobs:
         run: node scripts/validate-grafana-dashboards.mjs
       - name: Validate documentation links
         run: node scripts/check-doc-links.mjs
+      - name: Load published baseline for preservation checks
+        run: git fetch --no-tags --depth=1 origin c20ce59c4aec1cfc727fe1cba12960b0e7c78e74
       - name: Verify immutable design-system snapshot
         shell: pwsh
         run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
@@ -953,7 +955,8 @@ jobs:
               test "$(tr -d '\r\n' < "$SMOKE_DIR/marketing-release.txt")" = "$FRONTEND_RELEASE"
               curl --fail --silent --show-error --max-time 20 --resolve reserve.it.kr:443:127.0.0.1 \
                 https://reserve.it.kr/ -o "$SMOKE_DIR/marketing.html"
-              grep -q 'id="features"' "$SMOKE_DIR/marketing.html"
+              grep -q 'id="section-0"' "$SMOKE_DIR/marketing.html"
+              grep -q 'id="mobile-section-0"' "$SMOKE_DIR/marketing.html"
             fi
 
             SERVICE_ENV_LINE=$(sudo docker exec nginxserver cat /etc/nginx/conf.d/service-env.inc \

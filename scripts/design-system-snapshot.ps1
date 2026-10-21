@@ -1,6 +1,8 @@
 param(
-    [ValidateSet('Header', 'Finalize', 'Verify')][string]$Stage = 'Header',
-    [switch]$InstallGitGuard
+    [ValidateSet('Header', 'Finalize', 'Verify')][string]$Stage = 'Verify',
+    [switch]$InstallGitGuard,
+    [string]$SnapshotPath,
+    [switch]$FromGitHistory
 )
 
 $minimumPowerShellMajor = 7
@@ -9,12 +11,31 @@ if ($PSVersionTable.PSVersion.Major -lt $minimumPowerShellMajor) {
 }
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$snapshotRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'docs/design-system/snapshots/2026-09-13-baseline'))
-$sourceRoot = Join-Path $snapshotRoot 'source'
-if (-not $snapshotRoot.StartsWith($repoRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'Snapshot target must stay inside this repository.'
+if ($Stage -ne 'Verify' -and -not $SnapshotPath) {
+    throw 'Capturing private material requires an explicit SnapshotPath.'
 }
+$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$snapshotRelative = 'docs/design-system/snapshots/2026-09-13-baseline'
+$publishedBaseline = 'c20ce59c4aec1cfc727fe1cba12960b0e7c78e74'
+$privateSnapshot = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex/private/reserve/materials/release/docs/design-system/snapshots/2026-09-13-baseline'
+$temporarySnapshotRoot = $null
+try {
+if ($SnapshotPath) {
+    $snapshotRoot = [IO.Path]::GetFullPath($SnapshotPath)
+} elseif (-not $FromGitHistory -and $env:GITHUB_ACTIONS -ne 'true' -and (Test-Path -LiteralPath $privateSnapshot)) {
+    $snapshotRoot = [IO.Path]::GetFullPath($privateSnapshot)
+} else {
+    if ($Stage -ne 'Verify') { throw 'Capturing private material requires an explicit SnapshotPath.' }
+    $temporarySnapshotRoot = Join-Path ([IO.Path]::GetTempPath()) ('reserve-snapshot-verify-' + [Guid]::NewGuid().ToString('N'))
+    [IO.Directory]::CreateDirectory($temporarySnapshotRoot) | Out-Null
+    $archive = Join-Path $temporarySnapshotRoot 'published-baseline.zip'
+    & git -C $repoRoot archive --format=zip "--output=$archive" $publishedBaseline $snapshotRelative
+    if ($LASTEXITCODE -ne 0) { throw 'The pinned published baseline must be available before preservation checks.' }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::ExtractToDirectory($archive, (Join-Path $temporarySnapshotRoot 'contents'))
+    $snapshotRoot = Join-Path $temporarySnapshotRoot ('contents/' + $snapshotRelative)
+}
+$sourceRoot = Join-Path $snapshotRoot 'source'
 
 if ($InstallGitGuard) {
     if ($Stage -ne 'Verify') { throw 'The Git byte guard is only available with Verify.' }
@@ -290,3 +311,14 @@ $result = [ordered]@{
 }
 if ($Stage -eq 'Finalize') { Write-Json 'verification.json' $result }
 $result | ConvertTo-Json -Depth 4
+} finally {
+    if ($temporarySnapshotRoot -and (Test-Path -LiteralPath $temporarySnapshotRoot)) {
+        $resolvedTemporaryRoot = [IO.Path]::GetFullPath($temporarySnapshotRoot)
+        $temporaryParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar)
+        if (-not $resolvedTemporaryRoot.StartsWith($temporaryParent + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+            -not [IO.Path]::GetFileName($resolvedTemporaryRoot).StartsWith('reserve-snapshot-verify-')) {
+            throw 'Refusing to remove a path outside the temporary verification directory.'
+        }
+        Remove-Item -LiteralPath $resolvedTemporaryRoot -Recurse -Force
+    }
+}

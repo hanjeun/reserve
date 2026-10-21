@@ -1,6 +1,7 @@
 package kr.it.reserve.config.oauth2.events;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import java.util.HexFormat;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OAuthSecurityEventService {
     private final OAuthSecurityEventTransaction transaction;
     private final OAuthSecurityEventRepository events;
@@ -22,6 +24,10 @@ public class OAuthSecurityEventService {
         } catch (DataIntegrityViolationException exception) {
             // unique 경합의 패자 트랜잭션이 롤백된 뒤에만 이미 커밋된 사건인지 확인한다.
             if (!events.existsByEventHash(hash)) throw exception;
+        }
+        if (event.verificationStateHash() != null) {
+            log.info("OAuth security stream verification received: provider={}, stateHash={}, eventHash={}",
+                    event.provider(), event.verificationStateHash(), hash);
         }
     }
 

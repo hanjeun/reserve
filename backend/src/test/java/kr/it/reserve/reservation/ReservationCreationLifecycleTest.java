@@ -237,7 +237,13 @@ class ReservationCreationLifecycleTest {
             verify(fixture.stores()).findById(10L);
         }
         verifyNoMoreInteractions(fixture.reservations(), fixture.stores());
-        verifyNoInteractions(fixture.members(), fixture.payments(), fixture.emails(), fixture.audits());
+        if (lookup == MissingStoreLookup.UPDATE) {
+            verify(fixture.payments()).lockReservationForStateChange(20L);
+            verifyNoMoreInteractions(fixture.payments());
+        } else {
+            verifyNoInteractions(fixture.payments());
+        }
+        verifyNoInteractions(fixture.members(), fixture.emails(), fixture.audits());
     }
 
     private static void prepareCreation(Fixture fixture, Store store) {

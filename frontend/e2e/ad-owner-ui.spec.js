@@ -39,7 +39,7 @@ test('past unpaid ads cannot be paid and both ad previews keep the shared modal 
     page.on('pageerror', error => console.error(`[ad owner page error] ${error.message}`));
     await mockOwnerAds(page);
     await page.goto('/business?view=list&tab=ads&statisticsRange=90d');
-    await expect(page).toHaveURL(/\/business\?tab=ads&advertisementStore=ALL&advertisementPage=0$/);
+    await expect(page).toHaveURL(/\/business\?tab=ads&advertisementStore=all&advertisementPage=0$/);
 
     const staleRow = page.getByRole('row').filter({ hasText: '지난 광고' });
     const payableRow = page.getByRole('row').filter({ hasText: '결제할 광고' });

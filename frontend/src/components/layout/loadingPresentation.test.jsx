@@ -85,7 +85,8 @@ describe('one loading presentation per navigation', () => {
         const css = readFileSync('src/styles/global/discovery-motion.css', 'utf8');
         const suppression = css.match(/\/\* 초기 데이터 표시[\s\S]*?animation: none !important; \}/)?.[0];
         expect(suppression).not.toContain('reserve-search-page--entering');
-        expect(suppression).toContain('reserve-header-back:not(.reserve-header-back--leaving)');
+        expect(suppression).toContain('.fade-in-up');
+        expect(suppression).not.toContain('reserve-header');
         expect(suppression).not.toContain('.is-closing');
         expect(suppression).not.toContain('messenger');
         expect(suppression).not.toContain('reserve-messages-route');

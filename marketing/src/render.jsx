@@ -3,7 +3,7 @@ import Home, { homeAnimationStyles } from './home';
 import Footer, { FOOTER_STYLES } from './Footer';
 import { faqCollapseStyles } from './home/sections/FaqSection';
 import Button from '../../frontend/src/components/common/Button';
-import { colors, heights, fontWeight } from '../../frontend/src/styles/tokens';
+import { colors, heights, fontWeight, radius } from '../../frontend/src/styles/tokens';
 
 function Header() {
     return <header className="marketing-header" style={{
@@ -14,8 +14,10 @@ function Header() {
         <a href="/" style={{ fontSize: 22, fontWeight: fontWeight.heavy, color: colors.primary.main,
             letterSpacing: '-0.8px', textDecoration: 'none' }}>RESERVE</a>
         <nav aria-label="계정" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Button variant="ghost" data-app-path="/login">로그인</Button>
-            <Button variant="primary" data-app-path="/signup">시작하기</Button>
+            <Button variant="ghost" size="md" data-app-path="/login" style={{ fontWeight: fontWeight.semibold,
+                borderRadius: radius.md, padding: '0 4px', whiteSpace: 'nowrap' }}>로그인</Button>
+            <Button variant="primary" size="md" data-app-path="/signup" style={{ fontWeight: fontWeight.semibold,
+                borderRadius: radius.md, padding: '0 12px', whiteSpace: 'nowrap' }}>시작하기</Button>
         </nav>
     </header>;
 }

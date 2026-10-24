@@ -133,7 +133,7 @@ public class Store {
      * 정기 휴무 요일 — ISO 요일 번호를 콤마로 이어 저장한다 (월=1 … 일=7). 예: {@code "1,3"}
      * ({@code keywords}·{@code detailImages} 와 같은 CSV 컨벤션. 별도 테이블을 두기엔 값이 최대 7개다.)
      *
-     * <p><b>왜 필요했나</b> (2026-08-11 신설) — 그 전까지 영업시간이 요일 구분 없이 하나뿐이라
+     * <p><b>왜 필요했나</b> — 그 전까지 영업시간이 요일 구분 없이 하나뿐이라
      * <b>월요일 휴무인 가게도 월요일 예약을 받았다.</b> 기능이 없는 게 아니라 잘못된 예약을 받는
      * 상태였고, 사장님은 그걸 하나씩 거절해야 했다. 거절은 이제 전액 환불이 나가므로
      * 예약금이 왕복하는 비용까지 붙는다.
@@ -155,7 +155,7 @@ public class Store {
     private String closedDates;
 
     /**
-     * 예약을 어떤 방식으로 받는가 (2026-08-24 신설). {@code null} = {@link BookingType#SLOT}.
+     * 예약을 어떤 방식으로 받는가. {@code null} = {@link BookingType#SLOT}.
      *
      * <p>⚠️ <b>{@code null} 을 SLOT 으로 읽는 것이 생명줄이다.</b> {@code ddl-auto: update} 는
      * 컬럼을 추가할 뿐 기존 행을 채우지 않으므로, 기존 가게는 전부 {@code NULL} 이다.
@@ -217,7 +217,7 @@ public class Store {
     @Builder.Default
     private Integer noShowDeposit = 0;
 
-    // ========== 환불 정책 ==========
+    // 환불 정책
     // 전액 환불 가능 일수 (예약일 N일 전까지 전액 환불)
     @Column(name = "full_refund_days")
     @Builder.Default
@@ -233,7 +233,7 @@ public class Store {
     @Builder.Default
     private Integer partialRefundRate = 50;
 
-    // ========== 예약 슬롯 정책 ==========
+    // 예약 슬롯 정책
     // 동시간대 최대 예약 인원 (null = 무제한)
     @Column(name = "max_capacity_per_slot")
     private Integer maxCapacityPerSlot;
@@ -309,7 +309,7 @@ public class Store {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    // ── 영업 제재 상태 (Member의 status 패턴과 동일) ──
+    // 영업 제재 상태 (Member의 status 패턴과 동일) ──
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
@@ -394,7 +394,7 @@ public class Store {
         }
     }
 
-    // ── 휴무 (2026-08-11) ────────────────────────────────────────────────────
+    // 휴무 (2026-08-11)
     // 파싱을 엔티티에 두는 이유 — 이 CSV 를 읽는 곳이 셋이다(예약 검증, 가능시간 조회, 응답 DTO).
     // 각자 split 하게 두면 "빈 문자열" "공백 섞임" 같은 케이스를 한 곳만 처리하는 사고가 난다.
 

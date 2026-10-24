@@ -1,30 +1,10 @@
 import { useEffect } from 'react';
 
 /**
- * 이미지 프리뷰(AntD Image.PreviewGroup)에서 좌우 스와이프로 장 넘기기.
- *
- * ★ 왜 전역 훅인가 (2026-08-06 재작성)
- *   처음엔 `useImagePreview` 안에 넣었는데 **가게 상세에서 전혀 동작하지 않았다.**
- *   그 훅의 previewOpen/previewItems state 에 묶여 있었는데, 가게 상세의 캐러셀은
- *   그 훅을 쓰지 않고 `<Image.PreviewGroup>` 을 직접 쓴다(AntD 내부 state).
- *   즉 사용자가 실제로 스와이프해보는 화면에서는 핸들러가 켜지지도 않았다.
- *
- *   프리뷰를 여는 경로가 두 가지(훅 경유 / PreviewGroup 직접)라, 어느 한쪽 state 에
- *   의존하면 반드시 반쪽만 동작한다. → **DOM 을 단일 진실로 삼는다.**
- *   열려 있는 프리뷰가 있으면 무조건 붙고, 넘기기는 AntD 자신의 좌우 버튼을 눌러 위임한다.
- *   우리가 인덱스를 직접 계산하지 않으므로 두 경로 모두에서 같은 동작이 보장된다.
- *
- * ★ 좌우 버튼이 CSS 로 숨겨져 있어도(모바일) 동작한다
- *   `display: none` 인 요소도 `element.click()` 은 정상적으로 이벤트를 발생시킨다.
- *   버튼이 아예 렌더되지 않는 경우(사진 1장)는 querySelector 가 null 이라 조용히 무시된다.
- *
- * ★ pointer 이벤트를 쓰는 이유
- *   touchstart/touchend 로 짰을 때 잡히지 않았다. rc-image 가 자체 터치 핸들러에서
- *   이벤트를 소비하고, 브라우저 기기 에뮬레이션은 터치 합성 방식이 실기기와 다르다.
- *   pointer 는 터치·펜·마우스를 한 경로로 정규화하고, capture 단계에서 받으면
- *   rc-image 가 stopPropagation 을 해도 우리가 먼저 본다.
- *
- * 사용법: App.jsx 에서 한 번만 호출한다(전역 1회).
+ * 열린 AntD 이미지 프리뷰의 좌우 스와이프를 공용으로 처리한다. App에서 한 번만 등록한다.
+ * 훅 기반·직접 PreviewGroup 경로를 모두 지원하도록 열린 DOM을 찾고 AntD 탐색 버튼에 넘김을 위임한다.
+ * capture 단계의 pointer 이벤트를 사용하며 확대 상태의 드래그는 사진 이동으로 남겨둔다.
+ * 사진이 한 장이라 탐색 버튼이 없으면 넘김을 수행하지 않는다.
  */
 
 const PREVIEW_ROOT = '.ant-image-preview';

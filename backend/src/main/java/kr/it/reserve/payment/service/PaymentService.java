@@ -125,7 +125,7 @@ public class PaymentService {
             throw new PaymentException("본인의 결제만 검증할 수 있어요.", HttpStatus.FORBIDDEN);
         }
 
-        // ★ 상태 가드 (2026-08-09) — 예전엔 상태를 보지 않아 몇 번이든 다시 돌릴 수 있었다.
+        // 상태 가드 (2026-08-09) — 예전엔 상태를 보지 않아 몇 번이든 다시 돌릴 수 있었다.
         //   PC 결제는 usePayment 와 PaymentResult 에서 실제로 두 번 호출되고 있고,
         //   환불된 결제에 대고 재실행하면 completePayment 가 다시 돌아 상태가 뒤엉킨다.
         //   이미 끝난 검증은 같은 결과를 그대로 돌려주고(멱등), 그 외 상태는 막는다.
@@ -673,7 +673,7 @@ public class PaymentService {
     private Integer resolveRefundAmount(Payment payment, Integer requestedAmount) {
         Integer refundAmount = requestedAmount != null ? requestedAmount : payment.getAmount();
 
-        // ★ 마지막 방어선 — 환불액은 결제액을 넘을 수 없다(2026-08-09).
+        // 마지막 방어선 — 환불액은 결제액을 넘을 수 없다(2026-08-09).
         //   넘는 값이 들어오면 PG 가 거절하거나, 받아버리면 결제액보다 많은 돈이 나간다.
         //   호출측을 믿지 않고 여기서 한 번 더 자른다.
         if (refundAmount == null || refundAmount <= 0) {
@@ -811,43 +811,10 @@ public class PaymentService {
     }
 
     /**
-     * 외부(사용자) 환불 요청 — <b>소유자 확인 + 환불 정책 강제.</b>
-     *
-     * <h3>왜 따로 만들었나 (2026-08-09)</h3>
-     * {@code POST /api/payment/refund} 가 {@link #refundPayment} 를 그대로 불렀고,
-     * 그 경로엔 세 가지 구멍이 있었다.
-     * <ol>
-     *   <li><b>내 결제인지 확인하지 않았다</b> — {@code reservationId} 를 body 에서 그대로 받아
-     *       조회했다. 로그인만 하면 남의 결제를 취소할 수 있었다(IDOR).</li>
-     *   <li><b>환불 금액을 요청자가 정했다</b> — body 의 {@code refundAmount} 를 그대로 썼다.</li>
-     *   <li><b>환불 정책을 건너뛰었다</b> — 정상 경로(예약 취소)는
-     *       {@link #refundByReservationCancel} 이 정책을 계산해 넘기는데,
-     *       이 엔드포인트는 그걸 지나치고 바로 PG 를 호출했다.
-     *       즉 "환불 불가" 예약도 전액 환불받을 수 있었다.</li>
-     * </ol>
-     * 다행히 프론트는 이 엔드포인트를 호출하지 않고 있었다(상수만 정의되고 호출처 0건).
-     *
-     * <h3>지금 규칙 (2026-09-21 정정)</h3>
-     * 예약 본인 또는 ADMIN 만, <b>이미 끝난 예약</b>(취소 또는 가게 거절)에 대해서만,
-     * <b>마지막으로 실패한 환불 시도와 같은 금액</b>을 다시 보낸다.
-     * 요청 본문의 금액은 <b>무시한다</b> — 받아서 검증하는 것보다 아예 안 받는 게 안전하다.
-     *
-     * <h3>★ 왜 정책으로 다시 계산하지 않나</h3>
-     * 이 엔드포인트는 취소·거절 흐름의 환불이 PG 에서 실패한 뒤의 <b>재시도</b>다. 금액은 그 흐름이
-     * 돌던 순간에 이미 정해졌고, 원장({@link RefundAttempt#getRequestedAmount()})에 남아 있다.
-     * 재시도 시점에 {@link #calculateRefundAmount} 를 다시 부르면 세 가지가 틀어진다.
-     * <ol>
-     *   <li><b>날짜가 밀린다</b> — 정책은 "오늘부터 방문일까지 며칠 남았나"로 매긴다. 7일 전에 취소해
-     *       전액 대상이던 건을 3일 뒤 재시도하면 부분 환불로 깎이고, 방문일이 지나면 0원이 되어
-     *       <b>취소는 됐는데 돈은 영영 못 받는다.</b></li>
-     *   <li><b>가게 귀책 전액 환불이 위약금으로 바뀐다</b> — 가게가 취소·거절한 건은
-     *       {@link #refundFullByStoreDecision} 이 정책 없이 전액을 보낸다. 그게 실패한 뒤
-     *       재시도가 이용자 변심 정책을 태우면 약관(가게 사정 취소는 전액)을 어긴다.</li>
-     *   <li><b>거절된 예약은 재시도조차 못 한다</b> — 가게 거절은 {@code REJECTED} 로 끝나는데,
-     *       {@code CANCELLED} 만 허용하면 전액 환불이 실패한 손님은 돌려받을 길이 없다.</li>
-     * </ol>
-     * 원장에 실패한 시도가 없으면(정책상 0원이었거나 PG 까지 가지도 못한 경우) 여기서 금액을
-     * 새로 만들지 않는다. 돈 액수를 사후에 추정하는 건 사람이 원장을 보고 할 일이다.
+     * 본인 또는 ADMIN의 환불 재시도를 처리한다. 최초 환불은 예약 취소·가게 거절 흐름에서 준비한다.
+     * <p>종료된 예약의 마지막 FAILED 원장에 기록된 금액만 사용하고 요청자가 금액을 정하지 못하게 한다.
+     * 재시도 시점에 정책을 다시 계산하면 날짜 경과나 가게 귀책 취소에 따른 원래 환불액이 달라질 수 있다.
+     * 실패 원장이 없거나 결과가 미확정인 요청에는 새 환불을 만들지 않는다.
      */
     @Transactional(propagation = Propagation.NEVER)
     public PaymentResponseDto refundByMemberRequest(Long reservationId, String reason, Member requester) {
@@ -887,7 +854,7 @@ public class PaymentService {
         Payment payment = lockedPayments.stream().filter(value -> value.getStatus() == Payment.PaymentStatus.PAID)
                 .findFirst().orElseThrow(() -> new PaymentException("다시 환불할 결제가 없어요.", HttpStatus.CONFLICT));
 
-        // ★ 금액은 원장의 마지막 실패 시도에서만 가져온다. 정책을 다시 태우지 않는다(위 주석 참고).
+        // 금액은 원장의 마지막 실패 시도에서만 가져온다. 정책을 다시 태우지 않는다(위 주석 참고).
         RefundAttempt lastAttempt = lastRefundAttempt(payment.getId());
         if (lastAttempt == null || lastAttempt.getStatus() != RefundAttempt.Status.FAILED) {
             log.warn("Refund retry refused - no failed attempt to retry: reservationId={}, paymentId={}, lastStatus={}",
@@ -1035,18 +1002,18 @@ public class PaymentService {
                 .orElseThrow(() -> new PaymentException("예약 정보를 찾을 수 없어요.", HttpStatus.NOT_FOUND));
 
         Store store = reservation.getStore();
-        // ★ KST 기준 오늘이어야 한다 — 환불 구간을 가르는 숫자다.
+        // KST 기준 오늘이어야 한다 — 환불 구간을 가르는 숫자다.
         //   컨테이너가 UTC 라 인자 없는 LocalDate.now() 는 한국 시간 00:00~09:00 사이에 "어제"를 준다.
         //   그러면 daysUntil 이 1 커져서 **정책보다 한 구간 후한 환불**이 나갔다(부분 환불 → 전액 등).
         long daysUntil = ChronoUnit.DAYS.between(ServiceTime.today(), reservation.getReservationDate());
 
-        // ★ 금액의 출처를 하나로 모은다 (2026-08-09)
+        // 금액의 출처를 하나로 모은다 (2026-08-09)
         //   예전엔 계산은 reservation.depositAmount(예약 만들 때 복사해둔 값)를 쓰고,
         //   실제 환불 실행은 payment.amount(결제 요청 시 프론트가 보낸 값)를 썼다.
         //   둘이 어긋나면 화면엔 "5,000원 환불"이라고 보여주고 실제로는 다른 금액이 나간다.
         //   → **실제 결제 기록이 진실**이다. 결제 기록이 없을 때만 예약의 예약금으로 폴백한다
         //   (나중 결제·미결제 예약은 어차피 환불할 게 없어 0 으로 떨어진다).
-        // ★ 폴백을 없앴다 (2026-08-09).
+        // 폴백을 없앴다 (2026-08-09).
         //   예전엔 PAID 행이 없으면 reservation.depositAmount 로 폴백했다. 그런데
         //   실행부(refundPayment)는 PAID 행이 없으면 404 를 던진다. 그래서 미리보기는
         //   "10,000원 환불 가능"이라고 보여주고 실제 취소는 404 로 실패하는 상태였다.
@@ -1062,7 +1029,7 @@ public class PaymentService {
         int partialDays = store.getPartialRefundDays() != null ? store.getPartialRefundDays() : 1;
         int partialRate = store.getPartialRefundRate() != null ? store.getPartialRefundRate() : 50;
 
-        // ★★ 0 은 "기준일"이 아니라 **비활성 sentinel** 이다 (2026-08-09 수정)
+        // 0 은 "기준일"이 아니라 **비활성 sentinel** 이다 (2026-08-09 수정)
         //
         // 프론트 옵션(categories.js)이 fullRefundDays=0 을 "환불 없음",
         // partialRefundDays=0 을 "적용 안 함" 으로 보낸다.

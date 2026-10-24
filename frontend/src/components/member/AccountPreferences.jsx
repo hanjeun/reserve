@@ -17,11 +17,11 @@ const NotificationSection = ({ user }) => {
     const { message } = useMessage();
     const sessionRevision = useAuthStore(state => state.sessionRevision);
 
-    // ── 예약 알림 ──
+    // 예약 알림 ──
     const notiEnabled = typeof user?.emailNotificationEnabled === 'boolean' ? user.emailNotificationEnabled : true;
     const [notiLoading, setNotiLoading] = useState(false);
 
-    // ── 마케팅 수신 ──
+    // 마케팅 수신 ──
     const marketingAgreed = user?.marketingAgreed ?? false;
     const [marketingLoading, setMarketingLoading] = useState(false);
 
@@ -98,7 +98,7 @@ const StoreDraftSection = ({ user }) => {
     );
 };
 
-// ─── 디자인 설정 ─────────────────────────────────────────────────────────────
+// 디자인 설정
 /**
  * 화면 모양(시스템/라이트/다크)과 글꼴을 고르는 섹션.
  *
@@ -138,7 +138,7 @@ const AppearanceSection = () => {
 
             <div style={{ borderTop: `1px solid ${colors.border.light}`, margin: '4px 0' }} />
 
-            {/* ★ 글꼴·포인트 색을 한 줄에 2개로 놓는다.
+            {/* 글꼴·포인트 색을 한 줄에 2개로 놓는다.
                 예전에는 글꼴 셀렉트 하나가 남는 폭을 전부 차지해서 "얇고 긴 띠"처럼 보였다.
                 FormSelect 는 width:100% 라 부모 칸이 폭을 정한다 — 2열 그리드로 칸을 반씩 나누면
                 가게 등록 폼(항목이 2열로 놓인 화면)과 같은 비율이 된다.
@@ -152,7 +152,7 @@ const AppearanceSection = () => {
                     <FormSelect
                         value={font}
                         onChange={setFont}
-                        /* ★ 각 옵션을 **그 글꼴로** 보여준다.
+                        /* 각 옵션을 **그 글꼴로** 보여준다.
                            예전에는 라벨이 전부 현재 적용된 글꼴로 렌더돼서, 고르기 전에
                            어떤 모양인지 알 수 없었다(글꼴 선택기가 미리보기를 못 하는 셈).
                            fontFamily 를 옵션마다 인라인으로 주면 목록에서 바로 비교된다. */
@@ -176,7 +176,7 @@ const AppearanceSection = () => {
                         options={ACCENT_OPTIONS.map(o => ({
                             value: o.value,
                             label: (
-                                // ★ verticalAlign: middle 이 필요하다 — inline-flex 박스의 baseline 은
+                                // verticalAlign: middle 이 필요하다 — inline-flex 박스의 baseline 은
                                 // 첫 flex 항목의 baseline 인데, 그 항목이 글자 없는 색 점이라 baseline 이
                                 // 박스 아래끝이 된다. 그러면 줄상자가 늘어나 이 셀렉트만 1px 높아진다
                                 // (실측: 글꼴 54.1px vs 포인트색 55.1px). middle 이면 그 영향이 사라진다.

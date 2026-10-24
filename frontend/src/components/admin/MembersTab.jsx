@@ -1,33 +1,8 @@
 /**
- * RESERVE - 관리자 회원 관리 탭
- * AdminPanel.jsx에서 분리 (Cognitive Complexity 17 → 15 목표)
- *
- * 2026-07-09: TanStack Query로 전환 (adminKeys.members()) + placeholderData: keepPreviousData.
- * 정지/영구정지/해제도 useMutation으로 전환, 성공 시 같은 쿼리를 무효화.
- * raw <Table>을 공용 DataTable로 교체.
- *
- * 2026-07 전수조사 —
- * 1) SuspendModal/BanModal을 여기서 직접 정의하던 걸 공용 SanctionModal로 통합
- *    (StoresAdminTab의 거의 동일한 모달 2개까지 총 4벌 중복이었음).
- *    동시에 key={open ? 'x-open' : 'x-closed'} 강제 remount 패턴을 제거 —
- *    이게 닫힘 애니메이션이 재생되지 않던 원인이었다(닫는 순간 key가 바뀌어 언마운트).
- *    SanctionModal이 destroyOnHidden으로 입력값 초기화를 대신 처리한다.
- * 2) AdminTableSkeleton에 실제 컬럼 제목(headers)과 실제 컬럼 너비(cols)를 넘김 —
- *    헤더는 고정 텍스트라 가릴 이유가 없고, cols가 없으면 기본 6칸이라 실제 7칸과 안 맞아
- *    로딩 종료 시 열이 재배치되며 화면이 튀었다.
- * 3) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고 수동 새로고침에는 기존 행을 유지.
- * 2026-08-09: ★ 페이지네이션·검색을 서버로 올렸다.
- *    예전에는 size: 100 을 하드코딩해 한 번에 받아온 뒤 그 배열을 filter 했다.
- *    그래서 **101번째 회원부터는 검색은커녕 목록에 뜨지도 않았다**.
- *    AdminAdsTab 이 먼저 거친 길과 똑같은 문제·똑같은 해법이다.
- *    ★ queryKey 에 page 와 debouncedSearch 가 반드시 들어가야 한다 — 빠뜨리면
- *      검색어가 바뀌어도 같은 캐시를 재사용해 화면이 그대로 멈춰 있는다.
- *
- * 4) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamsState) — 새로고침해도 필터가
- *    유지되고 링크 공유도 가능해짐. ★ 검색어 변경 시 페이지를 1로 되돌리는 것까지 한 번의
- *    setQuery 호출로 같이 처리한다 — 따로 호출하면(useQueryParamState 단일 키 버전이었을 때)
- *    뒤에 실행된 페이지 갱신이 검색어 갱신을 덮어써 버리는 버그가 실제로 있었다(브라우저
- *    실측으로 확인). 반드시 하나의 setQuery({ search, page }) 호출로 묶어야 한다.
+ * 관리자 회원 목록은 서버 검색·페이지 단위로 조회한다.
+ * 페이지와 지연 검색어를 쿼리 키에 포함하고 검색 변경 시 페이지 초기화를 한 patch로 반영한다.
+ * 최초·쿼리 전환 로딩은 실제 열 규격의 스켈레톤을 사용하고 수동 새로고침은 기존 행을 유지한다.
+ * 제재 처리는 공용 모달을 사용하고 성공 후 관련 조회를 무효화한다.
  */
 import React, { useState } from 'react';
 import { Typography, Tag } from 'antd';
@@ -102,7 +77,7 @@ const MembersTab = () => {
     const {
         data, isLoading: memberLoading, isFetching, isPlaceholderData, error: membersError, refetch,
     } = useQuery({
-        // ★ page·검색어가 쿼리키에 들어가야 한다. 서버가 페이지네이션·검색을 하므로
+        // page·검색어가 쿼리키에 들어가야 한다. 서버가 페이지네이션·검색을 하므로
         //   이 둘이 바뀌면 결과가 달라진다 — 키에 없으면 이전 응답을 그대로 재사용해버린다.
         queryKey: [...adminKeys.members(), page, debouncedMemberSearch],
         queryFn: async () => {

@@ -12,7 +12,7 @@ public class EmailException extends BusinessException {
         super(message, status);
     }
 
-    // ========== 정적 팩토리 메서드 ==========
+    // 정적 팩토리 메서드
     
     public static EmailException notFound() {
         return new EmailException("인증 요청 내역을 찾을 수 없어요.", HttpStatus.NOT_FOUND);

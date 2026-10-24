@@ -69,7 +69,7 @@ public class ChatService {
     private final StoreRepository storeRepository;
     private final ChatMessageHiddenRepository hiddenRepository;
 
-    // ── 손님 ────────────────────────────────────────────────────────────────
+    // 손님
 
     /**
      * 내 문의방을 연다. <b>없으면 만든다.</b>
@@ -309,7 +309,7 @@ public class ChatService {
         return append(room, SenderRole.OWNER, owner.getId(), content, clientMessageId);
     }
 
-    // ── 관리자 ──────────────────────────────────────────────────────────────
+    // 관리자
 
     public Page<ChatRoomResponse> listRoomsForAdmin(int page) {
         return listRoomsForAdmin(page, null);
@@ -390,7 +390,7 @@ public class ChatService {
         return roomRepository.countRoomsWaitingForAdmin(ChatRoom.RoomType.SUPPORT);
     }
 
-    // ── 폴링 (양쪽 공용) ────────────────────────────────────────────────────
+    // 폴링 (양쪽 공용)
 
     /**
      * {@code afterId} 뒤에 온 메시지만. 화면이 3~5초마다 부른다.
@@ -467,7 +467,7 @@ public class ChatService {
         markReadThrough(room, SenderRole.MEMBER, readThroughId);
     }
 
-    // ── 내부 ────────────────────────────────────────────────────────────────
+    // 내부
 
     /** 송신과 같은 방 잠금 안에서 권한 확인 후 호출한다. cursor 없는 기존 요청은 전체 읽음이다. */
     private void markReadThrough(ChatRoom room, SenderRole reader, Long readThroughId) {

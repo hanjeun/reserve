@@ -27,21 +27,9 @@ const STATUS_CONFIG = {
 };
 
 /**
- * 관리자 광고 관리 탭 — 전체 광고 목록 조회 + 강제 중단.
- * 사전 승인 없이 결제 즉시 노출되는 방식이라, 문제되는 광고를 여기서 사후에 내린다.
- *
- * 2026-07-09: TanStack Query로 전환 (adKeys.admin()) — 중단 처리도 useMutation으로
- * 바꿔서 성공 시 같은 쿼리를 무효화, 별도 loadData() 재호출이 필요 없어짐.
- *
- * 코드리뷰 지적사항 반영(2026-07): 예전엔 size=100 고정으로 한 번에 다 받아와서, 광고가
- * 100건을 넘으면 그 뒤는 관리자 화면에 아예 안 보이는 문제가 있었음 — page를 실제
- * 서버사이드 파라미터로 두고 AntD Table의 pagination과 동기화(AuditLogTab.jsx와 동일 패턴).
- * 단, 검색(가게명)은 여전히 클라이언트 사이드라 "현재 로드된 페이지 안에서만" 필터링됨 —
- * 이 엔드포인트가 서버 키워드 검색 파라미터를 아직 지원하지 않아서(백엔드 변경 필요),
- * 지금 규모(광고 수 적음)에서는 감수할 만한 트레이드오프로 남겨둠.
- *
- * 2026-07 전수조사 — search/page를 URL 쿼리스트링에 동기화(useQueryParamState) —
- * 새로고침해도 유지되고 링크 공유도 가능해짐(MembersTab 등과 동일한 이유).
+ * 관리자 광고 목록과 강제 중단을 처리한다.
+ * 검색·페이지는 URL과 서버 조회에 반영하고 중단 성공 후 관련 쿼리를 무효화한다.
+ * 로딩 뼈대는 실제 열 규격과 현재 페이지의 예상 행 수를 따른다.
  */
 const PAGE_SIZE = 20;
 const QUERY_DEFAULTS = { search: '', page: '0' };
@@ -77,7 +65,7 @@ const AdminAdsTab = () => {
     // 어떤 광고를 중단하려는지 기억해야 해서 target을 state로 들고 있는다(null = 닫힌 상태).
     const [suspendTarget, setSuspendTarget] = useState(null);
 
-    // ★ queryKey에 debouncedSearch가 반드시 들어가야 한다.
+    // queryKey에 debouncedSearch가 반드시 들어가야 한다.
     //   예전에는 [admin(), page]뿐이라 검색어가 바뀌어도 같은 캐시를 재사용했고,
     //   서버는 페이지네이션만 하는데 프론트가 그 페이지 안에서만 filter를 걸어서
     //   **검색이 현재 페이지 안에서만 동작**했다(2페이지의 광고는 1페이지에서 검색해도 안 나옴).

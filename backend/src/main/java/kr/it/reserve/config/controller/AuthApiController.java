@@ -60,7 +60,7 @@ public class AuthApiController {
      * 해시 본문이 임의 문자열이라 어떤 입력도 통과하지 않는다.
      * 비용 인자(10)는 실제 회원 비밀번호와 같은 수준이어야 의미가 있다 —
      * 여기가 더 낮으면 여전히 미가입이 빠르게 응답해서 구분이 가능하다.
-     * ⚠️ 실제 비밀번호 인코더의 strength 를 바꾸면 이 값의 비용 인자도 함께 맞출 것.
+     * 주의: 실제 비밀번호 인코더의 strength 를 바꾸면 이 값의 비용 인자도 함께 맞출 것.
      */
     private static final String DUMMY_PASSWORD_HASH =
             "$2a$10$ZZZZZZZZZZZZZZZZZZZZZeZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ";
@@ -86,7 +86,7 @@ public class AuthApiController {
         // JSON의 명시적 null도 누락과 같은 실패 입력으로 처리한다. BCrypt는 null에 예외를 던진다.
         String rawPassword = suppliedPassword == null ? "" : suppliedPassword;
 
-        // ── 계정 단위 제한 ────────────────────────────────────────────────
+        // 계정 단위 제한
         // IP 기준(위)만으로는 공격자가 프록시로 IP 를 돌리면 한 계정에 무제한 시도가 된다.
         // 검증 전에 1회를 예약해야 한도를 소진한 계정의 비밀번호 대조도 멈춘다.
         // 성공하면 예약한 1회만 반환하므로 기존 실패 횟수는 유지된다.
@@ -96,7 +96,7 @@ public class AuthApiController {
                     "로그인 시도가 너무 많아요. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
-        // ── ★ 응답을 갈라놓지 않는다 (user enumeration 차단) ──────────────
+        // ★ 응답을 갈라놓지 않는다 (user enumeration 차단)
         // 예전에는 세 갈래였다:
         //   미가입      → 404 "회원을 찾을 수 없습니다."
         //   소셜 계정   → 400 "GOOGLE 계정 로그인을 이용해주세요."   ← 가입 방식까지 노출
@@ -105,7 +105,7 @@ public class AuthApiController {
         // 확정할 수 있었다. 특히 ②는 "구글로 가입하셨죠?" 라고 정확히 아는 피싱에 바로 쓰인다.
         // → 세 경우 모두 같은 401 + 같은 문구로 통일한다(OWASP 권고).
         //
-        // ★ 타이밍도 균일하게 맞춘다.
+        // 타이밍도 균일하게 맞춘다.
         //   미가입이면 bcrypt 검증을 아예 타지 않아 응답이 확연히 빠르다(bcrypt 는 의도적으로 느리다).
         //   문구만 통일해도 응답 시간 차이로 가입 여부를 구분할 수 있으므로,
         //   계정이 없을 때도 더미 해시로 한 번 검증을 태워 소요 시간을 비슷하게 만든다.

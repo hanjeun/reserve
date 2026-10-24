@@ -19,9 +19,7 @@
 set -euo pipefail
 umask 077
 
-# ─────────────────────────────────────────────────────────
 # 설정
-# ─────────────────────────────────────────────────────────
 CONFIG_FILE="${RESERVE_BACKUP_ENV:-/etc/reserve-backup.env}"
 if [[ -f "$CONFIG_FILE" ]]; then
     # shellcheck disable=SC1090
@@ -45,9 +43,7 @@ TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 DUMP_FILE="${BACKUP_DIR}/reserve-${TIMESTAMP}.sql.gz"
 DUMP_VERIFIED=0
 
-# ─────────────────────────────────────────────────────────
 # 로깅
-# ─────────────────────────────────────────────────────────
 mkdir -p "$(dirname "$LOG_FILE")" "$BACKUP_DIR"
 touch "$LOG_FILE"
 chmod 640 "$LOG_FILE"
@@ -76,9 +72,7 @@ fail() {
 
 trap 'fail "unexpected failure at line $LINENO"' ERR
 
-# ─────────────────────────────────────────────────────────
 # 사전 점검
-# ─────────────────────────────────────────────────────────
 log "=== backup start (db=${DB_NAME}) ==="
 
 [[ -n "${DB_PASSWORD:-}" ]] || fail "DB_PASSWORD is not set (check $CONFIG_FILE)"
@@ -109,9 +103,7 @@ ROUTINE_ACCESS="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
 [[ "$ROUTINE_ACCESS" -gt 0 ]] \
     || fail "stored routine definitions are not readable; check SHOW_ROUTINE before backup"
 
-# ─────────────────────────────────────────────────────────
 # 덤프
-# ─────────────────────────────────────────────────────────
 # --single-transaction : InnoDB에서 락 없이 일관된 스냅샷을 뜬다(서비스 중단 없음).
 #                        MyISAM 테이블이 섞이면 이 보장이 깨지므로 아래에서 엔진을 확인한다.
 # --routines/--triggers/--events : 스키마만 복원되고 프로시저·트리거가 빠지는 사고를 막는다.
@@ -140,9 +132,7 @@ set -e
 [[ "$DUMP_STATUS" -eq 0 ]] || fail "mysqldump exited with status $DUMP_STATUS"
 [[ "$GZIP_STATUS" -eq 0 ]] || fail "gzip exited with status $GZIP_STATUS"
 
-# ─────────────────────────────────────────────────────────
 # 검증 — 여기가 이 스크립트의 핵심이다
-# ─────────────────────────────────────────────────────────
 gzip -t "$DUMP_FILE" 2>/dev/null || fail "gzip integrity check failed"
 
 # mysqldump는 정상 종료 시 마지막 줄에 "Dump completed" 주석을 남긴다.
@@ -167,9 +157,7 @@ if [[ "$TABLE_COUNT" -lt 10 ]]; then
 fi
 DUMP_VERIFIED=1
 
-# ─────────────────────────────────────────────────────────
 # S3 업로드
-# ─────────────────────────────────────────────────────────
 OBJECT_KEY="${S3_PREFIX:+${S3_PREFIX%/}/}$(basename "$DUMP_FILE")"
 S3_URI="s3://${S3_BUCKET}/${OBJECT_KEY}"
 log "uploading to ${S3_URI}"
@@ -200,9 +188,7 @@ else
 fi
 log "upload ok"
 
-# ─────────────────────────────────────────────────────────
 # 로컬 보관 정리
-# ─────────────────────────────────────────────────────────
 # `[[ cond ]] && cmd` 형태는 set -e / ERR trap과 섞이면 동작이 헷갈리므로 if로 쓴다.
 DELETED="$(find "$BACKUP_DIR" -name 'reserve-*.sql.gz' -mtime "+${LOCAL_RETENTION_DAYS}" -print -delete | wc -l)"
 if [[ "$DELETED" -gt 0 ]]; then

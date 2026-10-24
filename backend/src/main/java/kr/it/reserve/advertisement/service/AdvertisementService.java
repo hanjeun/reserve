@@ -106,7 +106,7 @@ public class AdvertisementService {
             throw new AdvertisementException("광고 유형이 올바르지 않아요.", HttpStatus.BAD_REQUEST);
         }
 
-        // 중복 신청 방지(2026-07 추가): 카카오페이 결제창이 닫히지 않은 채로 남아있거나 사용자가 결제를
+        // 중복 신청 방지: 카카오페이 결제창이 닫히지 않은 채로 남아있거나 사용자가 결제를
         // 마무리지으면 모달을 닫고 "새 광고 신청"을 다시 누를 수 있어, 같은 가게+타입으로 결제 대기/실패
         // 상태인 신청이 이미 쌓이는 버그가 있었다 — 같은 건이 있으면 새로 만들지 않고 기존 신청을 재사용하게 막는다.
         advertisementRepository
@@ -265,23 +265,9 @@ public class AdvertisementService {
     }
 
     /**
-     * 결제창에 넘길 구매자 이름을 고른다.
-     *
-     * <h3>구매자 이름은 결제 대상 가게의 소유자 행에서 고른다</h3>
-     * 인증 principal도 현재는 탈퇴 즉시 차단을 위해 DB에서 읽지만, 결제 데이터는 인증 표현보다
-     * 결제 대상 도메인에서 가져오는 편이 경계가 분명하다.
-     *
-     * <p>그대로 넘기면 PortOne V2 가 <i>"data.customer.fullName 파라미터가 string 형식이 아닙니다"</i>
-     * 로 거절해 <b>결제창이 아예 안 열린다.</b> V1 은 이 값을 느슨하게 받아 넘어갔지만
-     * V2 는 타입을 엄격히 검증한다 — 즉 null 은 원래 있었고 V2 전환이 드러낸 것이다.
-     *
-     * <p>여기 넘어오는 {@code storeOwner} 는 {@code storeRepository} 로 조회한 엔티티의 소유자라
-     * 실제 행이 로드된다. 호출부가 이미 {@code storeOwner.getId().equals(owner.getId())} 로
-     * 동일인임을 확인한 뒤이므로 다른 사람 이름이 들어갈 일은 없다.
-     * (같은 문제를 {@code ReservationService} 는 {@code memberRepository.findById} 로 다시 읽어 피한다.)
-     *
-     * <p>마지막 폴백을 두는 이유: 이름이 비어 있는 계정이 하나라도 있으면 결제 자체가 막힌다.
-     * 결제창의 표시용 값일 뿐이라, 막느니 이메일 앞부분이라도 채워 보내는 쪽이 낫다.
+     * 결제 대상 가게 소유자의 이름을 결제창 표시값으로 사용한다.
+     * 이름이 비어 있으면 이메일 앞부분, 그마저 없으면 기본 표시명을 사용해 null을 보내지 않는다.
+     * 표시명은 소유권 검증을 대신하지 않으며 호출부에서 대상 가게의 소유권을 먼저 확인한다.
      */
     private String resolveBuyerName(Member storeOwner, String fallbackEmail) {
         if (storeOwner != null && storeOwner.getName() != null && !storeOwner.getName().isBlank()) {
@@ -483,7 +469,7 @@ public class AdvertisementService {
     }
 
     /**
-     * 광고 성과 지표 기록(2026-07 추가) — 누구나 볼 수 있는 공개 엔드포인트(로그인 불필요).
+     * 광고 성과 지표 기록 — 누구나 볼 수 있는 공개 엔드포인트(로그인 불필요).
      * 광고는 장식적 요소라 실패해도 조용히 무시 — 호출측에서는 에러를 사용자에게 노출하지 않는다.
      * 공개 컨트롤러의 {@code RateLimiter.Policy.AD_METRIC}이 IP별 호출량을 제한한다.
      * 이 서비스는 광고·가게 상태와 기간·지표별 허용 타입을 확인하는 단일 정책 관문이다.
@@ -498,7 +484,7 @@ public class AdvertisementService {
         recordMetricIfEligible(adId, AdCounterBuffer.CounterType.IMPRESSION);
     }
 
-    /** 배너 클릭 기록(2026-07 추가) — BANNER만 호출(BADGE는 프론트에서 자체적으로 호출 안 함) */
+    /** 배너 클릭 기록 — BANNER만 호출(BADGE는 프론트에서 자체적으로 호출 안 함) */
     @Transactional(readOnly = true)
     public void recordClick(Long adId) {
         recordMetricIfEligible(adId, AdCounterBuffer.CounterType.CLICK);

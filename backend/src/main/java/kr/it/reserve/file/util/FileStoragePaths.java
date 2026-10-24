@@ -22,7 +22,7 @@ public final class FileStoragePaths {
 
     private FileStoragePaths() {}
 
-    // ========== 사용자 영역 ==========
+    // 사용자 영역
 
     /** 프로필 이미지: users/{memberId}/profiles */
     public static String userProfile(Long memberId) {
@@ -68,7 +68,7 @@ public final class FileStoragePaths {
         return system("chat/support");
     }
 
-    // ========== 시스템 영역 (향후 확장) ==========
+    // 시스템 영역 (향후 확장)
 
     /** 공지사항 이미지: notices/{noticeId}/images */
     public static String notice(Long noticeId) {

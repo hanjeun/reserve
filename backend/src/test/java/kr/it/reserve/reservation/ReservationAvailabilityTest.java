@@ -178,7 +178,7 @@ class ReservationAvailabilityTest {
         assertThat(availableTimes(store)).containsExactly("09:00", "09:30", "10:00", "10:30");
     }
 
-    // ── 예약 방식 (2026-08-24) ─────────────────────────────────────────────
+    // 예약 방식 (2026-08-24)
     //
     // 세 방식이 **같은 관문**(bookableSlotTimes)을 지나므로, 여기서 방식별 결과만 고정하면
     // 예약 생성 검증(validateReservationSlot)도 같은 답을 내는 것이 보장된다 —

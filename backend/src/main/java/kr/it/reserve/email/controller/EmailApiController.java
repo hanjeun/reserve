@@ -79,7 +79,7 @@ public class EmailApiController {
         // 코드 대조 시도 제한 (2026-08-16) — IP·계정 두 축.
         // 코드가 6자리 숫자라 제한이 없으면 무차별 대입으로 남의 이메일 인증을 통과시킬 수 있었다.
         // 1차 방어는 EmailVerification.attemptCount(코드 한 장당 5회), 이건 재발송 반복까지 막는 2차다.
-        // ⚠️ 계정 키는 소문자로 정규화한다 — 안 하면 대소문자만 바꿔 제한을 우회한다.
+        // 주의: 계정 키는 소문자로 정규화한다 — 안 하면 대소문자만 바꿔 제한을 우회한다.
         String ip = IpExtractor.extract(httpRequest);
         boolean ipQuotaLeft = rateLimiter.tryConsume(ip, RateLimiter.Policy.CODE_VERIFY);
         boolean accountQuotaLeft = rateLimiter.tryConsume(

@@ -24,31 +24,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 공휴일(빨간날) 조회 — 한국천문연구원 특일 정보 API.
- *
- * <h2>★★ 이건 "색칠"이지 "판정"이 아니다.</h2>
- * 여기서 나온 날짜는 달력을 <b>빨갛게 칠하는 데만</b> 쓴다. 예약을 막는 판정은 여전히
- * {@code Store.isBookableOn} 혼자 한다. 그래서 이 서비스가 통째로 죽어도
- * <b>예약 동작은 한 글자도 안 바뀐다</b> — 달력에서 일요일만 빨갛게 나올 뿐이다.
- *
- * <p>이 성질이 아래 설계를 전부 설명한다: 실패하면 예외를 던지지 않고 빈 집합을 준다.
- * 외부 포털이 죽었다고 우리 예약 화면이 500 을 뱉으면, 안 그래도 되는 일로 장애를 사 온 것이다.
- *
- * <h2>키가 없으면 조용히 꺼진다</h2>
- * {@code holiday.api-key} 가 비어 있으면 네트워크를 아예 건드리지 않고 빈 집합을 준다.
- * 로컬에서 키 없이 띄우는 사람, CI, 테스트가 전부 그대로 돈다.
- *
- * <h2>Encoding 키 / Decoding 키</h2>
- * 공공데이터포털은 같은 키를 두 벌로 준다 — {@code %2B...%3D}(Encoding)와 {@code +...=}(Decoding).
- * 여기서 제일 많이 나는 사고가 <b>이미 인코딩된 키를 한 번 더 인코딩해서</b>({@code %2B} → {@code %252B})
- * 계속 인증 실패가 나는 것이다. 그래서 {@link #encodedKey()} 가 어느 쪽이 들어와도 맞게 만들고,
- * URI 는 항상 {@code build(true)}(이미 인코딩됨, 손대지 마라)로 만든다.
- *
- * <h2>왜 연 단위가 아니라 달 단위 캐시인가</h2>
- * 달력 API 자체가 달 단위라 키가 정확히 맞는다. {@code solMonth} 를 빼면 1년치가 온다는 얘기가
- * 돌지만 공식 문서에 있는 동작이 아니라 기대지 않는다. 한 달 = 요청 1회면 충분히 싸다.
- *
- * <p>캐시는 하루 한 번 비운다. 임시공휴일이 연중에 추가되는 일이 실제로 있어서 영구 캐시는 위험하다.
+ * 한국천문연구원 API의 공휴일을 달력 표시용으로 제공한다.
+ * 예약 가능 여부는 가게의 예약 규칙이 판단하며 공휴일 표시와 분리한다.
+ * API 키가 없거나 조회에 실패하면 빈 집합을 반환해 달력 조회를 계속 허용한다.
+ * 월별 결과를 캐시하고 임시공휴일 변경을 반영하도록 매일 비운다.
+ * Encoding·Decoding 키를 모두 처리하되 URI를 만들 때 이중 인코딩하지 않는다.
  */
 @Slf4j
 @Service
@@ -99,7 +79,7 @@ public class HolidayService {
                     .queryParam("solMonth", String.format("%02d", month.getMonthValue()))
                     .queryParam("numOfRows", NUM_OF_ROWS)
                     .queryParam("_type", "json")
-                    // ★ true = "값은 이미 인코딩돼 있다". 이게 없으면 %2B 가 %252B 로 망가진다.
+                    // true = "값은 이미 인코딩돼 있다". 이게 없으면 %2B 가 %252B 로 망가진다.
                     .build(true)
                     .toUri();
 
@@ -124,7 +104,7 @@ public class HolidayService {
     }
 
     /**
-     * ⚠️ {@code _type=json} 을 줘도 <b>에러일 때는 XML 이 온다</b>(키 미등록, 트래픽 초과 등).
+     * 주의: {@code _type=json} 을 줘도 <b>에러일 때는 XML 이 온다</b>(키 미등록, 트래픽 초과 등).
      * 그래서 JSON 인지부터 확인하고, 아니면 예외로 보내 위에서 빈 집합이 되게 한다.
      */
     private Set<LocalDate> parse(String body) throws JsonProcessingException {
@@ -136,7 +116,7 @@ public class HolidayService {
                 .path("response").path("body").path("items").path("item");
 
         Set<LocalDate> found = new HashSet<>();
-        // ★ 공공데이터포털 JSON 은 결과가 1건이면 배열이 아니라 객체를 준다. 0건이면 빈 문자열이다.
+        // 공공데이터포털 JSON 은 결과가 1건이면 배열이 아니라 객체를 준다. 0건이면 빈 문자열이다.
         //   배열만 가정하면 "공휴일이 하나뿐인 달"에서만 조용히 틀린다 — 제일 늦게 발견되는 종류다.
         if (items.isArray()) items.forEach(item -> collect(found, item));
         else if (items.isObject()) collect(found, items);

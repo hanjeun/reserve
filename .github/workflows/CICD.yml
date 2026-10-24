@@ -6,32 +6,18 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-  # ★ dev 를 넣은 이유 — Dependabot 은 기본 브랜치(dev)로 PR 을 내는데, 예전엔 트리거가 main 뿐이라
-  #   **의존성 PR 이 빌드·린트를 한 번도 안 거치고 머지됐다.** 실제로 eslint 메이저 범프가
-  #   기존 코드 13곳을 깨뜨리는 걸 사람이 손으로 돌려보고서야 발견했다.
-  #   배포는 안 돈다 — deploy-backend 잡과 배포 스텝에 `github.ref == 'refs/heads/main' && push` 가드가 이미 있다.
-  #   push 에는 dev 를 넣지 않는다(같은 커밋을 PR 과 push 로 두 번 빌드하게 된다).
+  # dev·main 대상 PR을 검증하고 배포는 main push에서만 실행한다.
+  # dev push는 같은 PR 검증을 중복 실행하지 않도록 제외한다.
   pull_request:
     branches: [ "main", "dev" ]
   workflow_dispatch:
 
-# ★ 배포가 겹치는 것을 막는다.
-#   예전엔 이 블록이 없어서 main 에 두 번 연달아 머지하면 배포 두 개가 동시에 돌 수 있었다.
-#   그러면 서로의 컨테이너를 밟고 nginx 업스트림 스위칭이 엇갈린다.
-#   지금까지는 "하나씩 머지한다"는 **사람의 습관**으로만 회피하고 있었다.
-#
-#   cancel-in-progress 를 조건부로 둔 이유:
-#     PR 빌드  → 취소해도 안전하다(배포가 없다). 새 푸시가 오면 앞의 것은 어차피 쓸모없다.
-#     main push → **절대 취소하면 안 된다.** 이미지 푸시·컨테이너 기동 중간에 끊기면
-#                 어느 쪽도 아닌 상태로 남는다. 큐잉이 맞다.
+# PR의 오래된 실행은 취소하고, 운영 배포는 중간에 끊기지 않도록 순서대로 실행한다.
 concurrency:
   group: cicd-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# ★ 워크플로 전체는 읽기만 가진다(최소 권한).
-#   deployments: write 는 그게 실제로 필요한 deploy-backend 잡에만 따로 준다 —
-#   여기 적으면 build-backend·build-frontend 까지 쓸데없는 쓰기 권한을 받는다.
-#   (SonarCloud: "Move this write permission from workflow level to job level")
+# 기본 권한은 읽기로 제한하고 배포 기록 쓰기는 해당 잡에서만 허용한다.
 permissions:
   contents: read
 
@@ -187,9 +173,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # ─────────────────────────────────────────────────────────
   # 1. 백엔드 빌드 + Docker 이미지 푸시
-  # ─────────────────────────────────────────────────────────
   build-backend:
     permissions:
       contents: read
@@ -228,11 +212,7 @@ jobs:
           chmod +x ./gradlew
           ./gradlew bootJar --console=plain
 
-      # ── 여기부터는 main push에서만 실행한다 ──────────────────────────────
-      # 예전엔 조건이 없어서 main으로 PR을 여는 것만으로 이미지가 빌드·푸시됐다.
-      # deploy-backend가 :latest를 pull하므로, PR을 열어둔 상태에서 배포가 돌면
-      # 머지되지도 않은 PR 코드가 운영에 나갈 수 있었다. (실제로 dev→main PR 3건이 이 경로를 탔다)
-      # 빌드·테스트는 위에서 이미 끝났으므로 PR의 검증 가치는 그대로 유지된다.
+      # 검증된 main push에서만 이미지를 푸시해 미병합 PR이 운영 후보를 바꾸지 못하게 한다.
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -240,12 +220,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 커밋 SHA 태그를 함께 붙인다. :latest만 있으면 "지금 운영에 뜬 게 어느 커밋인지",
-      # "롤백하면 어디로 돌아가는지"를 특정할 수 없다. sha-<커밋>은 불변이라 롤백 대상이 명확해진다.
-      # :latest도 계속 유지 — 수동 조작이나 긴급 상황의 폴백 경로로 남겨둔다.
-      # 시크릿과 github 컨텍스트는 run 스크립트에 직접 확장하지 않고 env로 넘긴다.
-      # ${{ }}는 셸이 해석하기 전에 문자열로 치환되므로, 값에 따옴표나 개행이 섞이면
-      # 스크립트 구조 자체가 바뀔 수 있다(SonarCloud: Avoid expanding secrets in a run block).
+      # 커밋 SHA 태그로 배포 후보를 식별한다. latest는 호환 경로로 함께 유지한다.
+      # 시크릿은 env로 전달해 셸 스크립트에 문자열로 직접 치환하지 않는다.
       - name: Build Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
@@ -268,9 +244,7 @@ jobs:
           docker push "$DOCKERHUB_USERNAME/reserve:sha-$COMMIT_SHA"
           docker push "$DOCKERHUB_USERNAME/reserve:latest"
 
-  # ─────────────────────────────────────────────────────────
   # 2. 프론트엔드 빌드 + 실행 ID에 묶인 dist 아티팩트. 서버 쓰기는 stage-release에만 둔다.
-  # ─────────────────────────────────────────────────────────
   build-frontend:
     needs: test-frontend
     if: ${{ always() && !cancelled() }}
@@ -497,13 +471,10 @@ jobs:
             echo "Frontend staged at $RELEASE_DIR; live configuration is unchanged"
             RESERVE_STAGE
 
-  # ─────────────────────────────────────────────────────────
   # 3. Blue/Green 백엔드 배포 (프론트엔드 배포까지 완료된 뒤 실행)
-  # ─────────────────────────────────────────────────────────
   deploy-backend:
     # production Environment의 자동 기록만 사용한다. 수동 createDeployment는 중복을 만든다.
-    # 잡 레벨 permissions 는 워크플로 레벨을
-    # **대체**하므로, 체크아웃에 필요한 contents: read 를 함께 적어줘야 한다.
+    # 잡 권한이 기본값을 대체하므로 체크아웃에 필요한 contents: read도 명시한다.
     permissions:
       contents: read
       deployments: write
@@ -516,21 +487,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # ★ live 판별은 반드시 서버 안의 nginx routing 정본에서 한다.
-      #
-      # 예전엔 GitHub 러너에서 `http://<SERVER_IP>:8080|8081/actuator/health` 를 외부망으로 쳤다.
-      # 그런데 8080·8081은 Lightsail 방화벽에서 막혀 있어 항상 연결 실패였다.
-      # 실제 Actions 로그(run 30237158924 / 29889775850)에서 두 번 다 이렇게 찍혔다:
-      #     Blue status: 000000 / Green status: 000000 / Current upstream: none
-      # 결과적으로 **매 배포가 CURRENT_UPSTREAM=none → 항상 blue로 배포 + `docker stop none`** 이었다.
-      # 즉 무중단 배포가 작동한 적이 없고 green은 영영 쓰이지 않았다.
-      # 아래 Health check 스텝이 이미 SSH 내부 curl 패턴이므로 같은 방식으로 맞춘다.
-      # 단, 이전 컨테이너 정리가 실패하면 blue·green이 둘 다 200일 수 있다. 이때 health 순서로
-      # 현재 대상을 추측하면 실제 live 컨테이너를 덮어쓴다. nginx의 service-env.inc를 정본으로 읽고,
-      # 그 컨테이너의 health가 200인지 교차 확인한 뒤에만 반대편을 배포 대상으로 고른다.
-      #
-      # (`000000` 이 찍혔던 이유: curl이 -w로 "000"을 출력하고 exit≠0이라 `|| echo "000"`까지 실행돼
-      #  두 번 붙었다. 아래에서는 명령 치환 밖에서 폴백을 주어 값이 겹치지 않게 한다.)
+      # nginx service-env.inc를 live 정본으로 읽고 해당 컨테이너의 내부 health와 교차 확인한다.
+      # 양쪽 컨테이너가 모두 정상일 수 있으므로 health 응답 순서로 live를 추측하지 않는다.
+      # 앱 포트를 외부에 열지 않고 SSH 안에서 확인하며 판별 실패 시 배포를 중단한다.
       - name: Detect active upstream (inside server)
         id: detect
         env:

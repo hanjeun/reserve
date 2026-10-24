@@ -34,7 +34,7 @@ export default function FaqSection({ isMobile }) {
                 minHeight: isMobile ? undefined : `calc(100svh - ${heights.header})`,
                 display: 'flex',
                 flexDirection: 'column',
-                // ★ 2026-08-04 — flex-start → center.
+                // 2026-08-04 — flex-start → center.
                 //   섹션 높이는 100svh로 고정인데 내용은 그보다 짧다. flex-start면 남는 높이가
                 //   **전부 아래로** 몰려서 "위는 타이트하고 아래만 텅 빈" 비대칭이 된다
                 //   (실측: 내용 약 750px / 섹션 약 1050px → 아래 여백만 300px).

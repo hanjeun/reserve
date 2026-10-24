@@ -35,7 +35,7 @@ const ImagePreviewPortal = ({ open, items, current, sessionKey, onClose, onCurre
                  */
                 onChange: onCurrentChange,
                 /*
-                 * ⚠️ rootClassName은 antd 6에서 deprecated 경고가 뜨지만 일부러 되돌렸다(2026-07-30).
+                 * 주의: rootClassName은 antd 6에서 deprecated 경고가 뜨지만 일부러 되돌렸다(2026-07-30).
                  * 경고대로 classNames.root로 바꿨더니 preview 루트에 클래스가 아예 안 붙어
                  * .reserve-image-preview(둥근 네모 툴바·화살표·닫기) 스타일이 통째로 죽었다.
                  * 브라우저에서 확인: 미리보기 DOM에 우리 클래스 0건.

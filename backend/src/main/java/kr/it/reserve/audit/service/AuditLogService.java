@@ -60,7 +60,7 @@ public class AuditLogService {
     @Autowired(required = false)
     private ReviewUpdates reviewUpdates;
 
-    // ── 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당) ──────────────
+    // 소프트 삭제 + 스냅샷 저장 (예약/리뷰/메일만 해당)
 
     @Transactional
     public void softDeleteSentMail(Long mailId) {
@@ -134,7 +134,7 @@ public class AuditLogService {
         log.info("Advertisement soft-deleted: id={}", adId);
     }
 
-    // ── 복구 (예약/리뷰/메일만 해당) ──────────────────────────────
+    // 복구 (예약/리뷰/메일만 해당)
 
     @Transactional
     public void restore(String entityType, Long entityId) {
@@ -156,7 +156,7 @@ public class AuditLogService {
         log.info("Entity restored: type={}, id={}", entityType, entityId);
     }
 
-    // ── 제재 / 인증 로그 (회원/가게 — 휴지통 미사용, 감사 로그만 기록) ──────
+    // 제재 / 인증 로그 (회원/가게 — 휴지통 미사용, 감사 로그만 기록)
 
     /**
      * 회원 제재 로그 (정지/영구정지/해제)
@@ -194,7 +194,7 @@ public class AuditLogService {
         log.info("Business verification logged: memberId={}, action={}", memberId, action);
     }
 
-    // ── 스케줄러 전용 자동 정리 ────────────────────────────────
+    // 스케줄러 전용 자동 정리
 
     /**
      * 만료된 소프트 삭제 항목 자동 영구 삭제 + AuditLog 기록
@@ -226,7 +226,7 @@ public class AuditLogService {
                 success, expired.size(), auditDeleted);
     }
 
-    // ── 목록 조회 ──────────────────────────────────────────────
+    // 목록 조회
 
     @Transactional(readOnly = true)
     public Page<AuditLog> getTrashItems(String entityType, Pageable pageable) {
@@ -245,7 +245,7 @@ public class AuditLogService {
         return auditLogRepository.findByEntityTypeOrderByCreatedAtDesc(entityType.toUpperCase(), pageable);
     }
 
-    // ── 내부 유틸 ──────────────────────────────────────────────
+    // 내부 유틸
 
     private void saveAuditLogWithActor(String entityType, Long entityId, String action,
                                        Map<String, String> snapshotData, String actorEmail) {

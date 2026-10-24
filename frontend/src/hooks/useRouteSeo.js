@@ -104,7 +104,7 @@ const syncBreadcrumbJsonLd = (pathname) => {
  * 라우트별 검색 공개 정책과 URL 메타데이터를 한 곳에서 동기화한다.
  * 쿼리·해시는 canonical/og:url에 절대 넣지 않아 결제 식별자나 OAuth 값을 노출하지 않는다.
  *
- * ⚠️ 여기서 붙이는 robots 메타는 **JS 를 실행하는 크롤러에만** 보인다.
+ * 주의: 여기서 붙이는 robots 메타는 **JS 를 실행하는 크롤러에만** 보인다.
  *    JS 를 실행하지 않는 크롤러는 index.html 원본(robots: index, follow)만 보고
  *    /login, /my-page 같은 경로까지 색인해버린다. 그 경로들은 nginx 가
  *    X-Robots-Tag 헤더로 한 번 더 막는다 — nginx/default.conf 의 같은 이름 규칙 참고.

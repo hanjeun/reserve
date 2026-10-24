@@ -53,7 +53,7 @@ public class StoreCreateRequest {
     // 노쇼 방지금 (0원이면 무료)
     private Integer noShowDeposit = 0;
     
-    // ========== 환불 정책 ==========
+    // 환불 정책
     // 전액 환불 가능 일수 (예약일 N일 전까지 전액 환불)
     private Integer fullRefundDays = 3;
     
@@ -63,7 +63,7 @@ public class StoreCreateRequest {
     // 부분 환불 비율 (퍼센트, 예: 50 = 50%)
     private Integer partialRefundRate = 50;
 
-    // ========== 예약 슬롯 정책 ==========
+    // 예약 슬롯 정책
     // 빈 문자열("") 허용: 빈 문자열 = 무제한(null), 숫자 = 제한 인원
     private String maxCapacityPerSlotRaw;
 

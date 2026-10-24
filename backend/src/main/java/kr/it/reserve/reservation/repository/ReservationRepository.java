@@ -376,11 +376,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findExpiredUnpaidReservations(@Param("cutoff") LocalDateTime cutoff);
 
     /**
-     * 예약 시각이 지났는데 아직 PENDING/CONFIRMED 로 남아 있는 예약 (2026-08-11 신설).
+     * 예약 시각이 지났는데 아직 PENDING/CONFIRMED 로 남아 있는 예약.
      *
      * <p>{@code ReservationElapsedScheduler} 가 PENDING 은 취소+환불, CONFIRMED 는 UNCONFIRMED 로 넘긴다.
      *
-     * <p>⚠️ {@code date}·{@code time} 은 반드시 <b>KST 기준 현재</b>를 넘겨야 한다.
+     * <p>{@code date}·{@code time} 은 반드시 <b>KST 기준 현재</b>를 넘겨야 한다.
      * 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 KST 값인데, 앱 컨테이너에는 TZ 설정이 없어
      * {@code LocalDateTime.now()} 가 UTC 로 나온다. 그대로 비교하면 9시간이 어긋나
      * 아직 오지 않은 예약을 취소해버린다. (QrCheckinTokenProvider 가 같은 이유로 SERVICE_ZONE 을 쓴다.)

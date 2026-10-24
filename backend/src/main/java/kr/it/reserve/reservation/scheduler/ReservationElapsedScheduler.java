@@ -16,29 +16,10 @@ import java.time.ZoneId;
 import java.util.List;
 
 /**
- * 예약 시각이 지난 예약을 정리한다 (2026-08-11 신설).
- *
- * <p>그 전까지 예약은 <b>시간이 지나도 상태가 그대로였다.</b> 사장님이 아무것도 안 하면
- * PENDING·CONFIRMED 로 영원히 남았고, 특히 <b>PENDING 은 예약금을 낸 채로 방치</b>됐다 —
- * 승인이 안 됐으니 서비스는 제공되지 않았는데 돈은 가게에 남아 있는 상태다.
- *
- * <h3>처리 규칙</h3>
- * <table>
- *   <tr><td>PENDING</td><td>→ CANCELLED + <b>전액 환불</b></td></tr>
- *   <tr><td>CONFIRMED</td><td>→ UNCONFIRMED (돈은 건드리지 않음)</td></tr>
- * </table>
- *
- * <p><b>PENDING 이 전액 환불인 이유</b> — 승인 자체가 안 됐다. 이용자는 자리를 받지 못했고
- * 취소를 선택한 것도 아니다. 위약금 정책({@code calculateRefundAmount})은 "이용자가 마음을
- * 바꿔 취소할 때"의 규칙이라 여기에 태우면 안 된다. 가게 거절·취소와 같은 전액 경로를 쓴다.
- *
- * <p><b>CONFIRMED 가 자동 COMPLETED 가 아닌 이유</b> — 서버는 손님이 실제로 왔는지 모른다.
- * 자동 완료 처리하면 오지 않은 손님까지 이용완료가 되어 노쇼 통계가 무너지고, 노쇼로 넘기면
- * 실제로 방문한 손님을 벌하게 된다. 사실("시간이 지났는데 처리가 안 됨")만 기록한다.
- *
- * <p>실행 주기: 10분마다. 5분인 {@link ReservationExpiryScheduler} 와 어긋나게 두어
- * 두 스케줄러가 같은 순간에 같은 행을 건드릴 확률을 낮춘다(둘의 대상은 겹치지 않지만
- * PENDING 이라는 상태를 공유한다).
+ * 방문 시각이 지난 PENDING은 취소·전액 환불 경로로, CONFIRMED는 UNCONFIRMED로 정리한다.
+ * 미승인 예약은 이용자 변심 위약금 정책을 적용하지 않는다.
+ * 확정 예약의 실제 방문 여부는 시간 경과만으로 알 수 없으므로 자동 이용완료·노쇼로 만들지 않는다.
+ * 예약별 결정은 독립적으로 처리하고 환불 호출은 커밋 뒤에 수행한다.
  */
 @Slf4j
 @Component
@@ -49,7 +30,7 @@ public class ReservationElapsedScheduler {
     private final ReservationElapsedProcessor processor;
 
     /**
-     * ★ 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 <b>KST</b> 값이다.
+     * 예약 날짜·시각은 이용자에게 보이는 그대로 저장된 <b>KST</b> 값이다.
      * 앱 컨테이너에는 TZ 설정이 없어 {@code LocalDateTime.now()} 가 UTC 로 나오는데,
      * 그대로 비교하면 9시간이 어긋나 <b>아직 오지 않은 예약을 취소하고 환불까지 해버린다.</b>
      * (QrCheckinTokenProvider 가 같은 이유로 SERVICE_ZONE 을 쓴다 — 같은 함정이다.)

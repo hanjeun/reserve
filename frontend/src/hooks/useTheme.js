@@ -3,21 +3,9 @@ import { surfaceForWhiteText } from '../utils/colorContrast';
 import { semanticActionPalettes } from '../styles/tokens/colors';
 
 /**
- * 화면 모양(라이트/다크/시스템)과 글꼴 설정.
- *
- * ★ 모듈 레벨 스토어다 — 컴포넌트마다 useState를 두면 안 된다.
- *   처음엔 훅 안에 useState를 뒀는데, App.jsx와 마이페이지가 각각 **독립된 state**를 갖는 바람에
- *   마이페이지에서 라이트로 바꿔도 App은 여전히 다크로 알고 있었다. 그 결과 CSS 변수(우리 색)만
- *   라이트로 바뀌고 AntD는 darkAlgorithm을 유지해서:
- *     - message 토스트가 검게 뜨고
- *     - Select(글꼴 롤러)가 다크 filled 배경(rgba(255,255,255,0.08))이라 흰 카드 위에서 사라지고
- *     - 그 외 AntD 컴포넌트 색이 전부 어긋났다
- *   증상이 여러 개로 보였지만 원인은 이 하나였다. useSyncExternalStore로 하나의 스토어를 구독한다.
- *
- * 저장은 localStorage — 기기별 설정이고, 무엇보다 **첫 페인트 전에 동기로 읽을 수 있어야**
- * 새로고침 때 흰 화면이 번쩍이지 않는다. 서버에 두면 /api/member/me를 기다리는 동안
- * 라이트로 그려졌다가 다크로 바뀐다. 기기 간 동기화가 필요해지면 Member 컬럼을 추가하고
- * 이 값을 초기값으로 덮는 방식이 맞다.
+ * 테마·글꼴·포인트 색을 모듈 스토어에 두고 useSyncExternalStore로 함께 구독한다.
+ * 컴포넌트별 독립 상태를 만들면 CSS 변수와 AntD 테마가 서로 다른 설정을 볼 수 있다.
+ * 기기별 설정은 localStorage에서 동기로 읽어 초기 테마와 이후 전환을 맞춘다.
  */
 
 const THEME_KEY = 'reserve:theme';   // 'system' | 'light' | 'dark'
@@ -52,7 +40,7 @@ export const FONT_OPTIONS = [
     {
         value: 'suite',
         label: 'SUITE',
-        // ★ self-host 다 — Pretendard 와 같은 방식으로 통일했다.
+        // self-host 다 — Pretendard 와 같은 방식으로 통일했다.
         //   Pretendard 는 npm 패키지(index.css 의 @import)로 번들에 들어가는데, SUITE 는 npm 패키지가
         //   없어서(suite-variable/suit-font/suite-font 전부 미등록) 폰트 파일을 레포에 직접 넣었다:
         //     frontend/public/fonts/SUITE-Variable.woff2  (sun-typeface/SUITE 2.0.4, OFL-1.1)
@@ -65,7 +53,7 @@ export const FONT_OPTIONS = [
         //     4) 무엇보다 이 프로젝트는 이미 self-host 방식이었다 — 방식이 갈리면 안 된다
         //   (그때 URL 을 추측으로 넣었다가 404 였다. 실제 파일명은 SUITE-Variable 로 하이픈이 들어간다)
         //
-        // ★ 폴백은 그대로 둔다 — 파일이 없거나 로드가 실패해도 Pretendard → 시스템 글꼴로
+        // 폴백은 그대로 둔다 — 파일이 없거나 로드가 실패해도 Pretendard → 시스템 글꼴로
         //   조용히 내려간다. "안 바뀐 것처럼" 보일 뿐 글자가 사라지지 않는다.
         stack: "'SUITE Variable', 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif",
     },
@@ -85,7 +73,7 @@ export const FONT_OPTIONS = [
  * 그리고 다크 모드는 같은 색이 어두운 배경에서 채도가 낮아 보이므로 한 단계 밝은 값을 따로 둔다
  * (theme.css 가 기본 파랑에 대해 이미 그렇게 하고 있다 — 같은 원칙을 따른다).
  *
- * ⚠️ AntD 의 colorPrimary 토큰에는 CSS 변수를 넣을 수 없다(AntD 가 JS 로 파생색을 계산한다).
+ * 주의: AntD 의 colorPrimary 토큰에는 CSS 변수를 넣을 수 없다(AntD 가 JS 로 파생색을 계산한다).
  *    그래서 App.jsx 가 이 표의 **리터럴 hex** 를 직접 받아 쓴다.
  */
 export const ACCENT_OPTIONS = [
@@ -118,7 +106,7 @@ const write = (key, value) => {
     try { localStorage.setItem(key, value); } catch { /* 저장 실패해도 화면은 정상 동작한다 */ }
 };
 
-// ── 모듈 레벨 스토어 ─────────────────────────────────────────────────────────
+// 모듈 레벨 스토어
 let state = {
     theme:  read(THEME_KEY, 'system'),
     font:   read(FONT_KEY, 'pretendard'),
@@ -144,7 +132,7 @@ const applyFont = (value) => {
 /**
  * 포인트 색을 <html> 인라인 스타일로 덮는다.
  *
- * ★ 인라인이어야 하는 이유: theme.css 가 `:root` 와 `[data-theme=dark]` 양쪽에서
+ * 인라인이어야 하는 이유: theme.css 가 `:root` 와 `[data-theme=dark]` 양쪽에서
  *   `--c-primary` 를 정의한다. 인라인 스타일은 어떤 선택자보다 우선하므로 두 경우를
  *   한 번에 이길 수 있다. 대신 **테마가 바뀔 때마다 다시 적용해야 한다**
  *   (라이트/다크에서 쓰는 hex 가 다르기 때문) — applyTheme 이 이어서 호출한다.
@@ -176,7 +164,7 @@ const applyTheme = (pref, { animate = true } = {}) => {
         root.style.setProperty(`--c-${name}-solid`, palette.solid);
         root.style.setProperty(`--c-${name}-solid-hover`, palette.solidHover);
     }
-    // ★ 테마가 바뀌면 강조색도 다시 적용해야 한다 — 라이트/다크에서 쓰는 hex 가 다르다.
+    // 테마가 바뀌면 강조색도 다시 적용해야 한다 — 라이트/다크에서 쓰는 hex 가 다르다.
     //   이걸 빼면 다크로 갔을 때 포인트 색이 라이트용 값에 머물러 채도가 죽어 보인다.
     applyAccent(state.accent, resolved);
 };

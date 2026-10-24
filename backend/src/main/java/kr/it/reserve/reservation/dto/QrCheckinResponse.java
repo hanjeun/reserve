@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * QR 체크인 결과 (2026-08-11 신설).
+ * QR 체크인 결과.
  *
  * <p><b>왜 {@link ReservationResponse} 를 그대로 안 쓰나</b> — 화면이 "방금 체크인했다"와
  * "이미 체크인돼 있었다"를 구분해서 보여줘야 하는데, 예약 응답만으로는 알 수 없다.

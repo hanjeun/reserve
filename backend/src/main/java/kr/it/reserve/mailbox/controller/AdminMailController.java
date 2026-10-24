@@ -23,7 +23,7 @@ public class AdminMailController {
 
     private final AdminMailService adminMailService;
 
-    // ── 보낸 메일 목록 (ADMIN) ────────────────────────────
+    // 보낸 메일 목록 (ADMIN)
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/sent")
     public ResponseEntity<ApiResponse<Page<AdminSentMailResponse>>> getSentMailList(
@@ -31,7 +31,7 @@ public class AdminMailController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search) {
 
-        // ★ 응답 형식이 바뀐다: 예전에는 배열을 그대로 돌려줬고 지금은 Spring Page 다.
+        // 응답 형식이 바뀐다: 예전에는 배열을 그대로 돌려줬고 지금은 Spring Page 다.
         // 프론트는 content 와 page.totalElements 를 읽는다
         // (Spring Boot 3.5 부터 페이지 메타가 page 하위로 이동했다).
         // 이 엔드포인트를 쓰는 곳은 관리자 메일함 화면 하나뿐이라 함께 바꾸면 된다.
@@ -39,7 +39,7 @@ public class AdminMailController {
         return ResponseEntity.ok(ApiResponse.success(result, "보낸 메일 목록 조회 성공"));
     }
 
-    // ── 보낸 메일 휴지통으로 이동 (ADMIN) ─────────────────
+    // 보낸 메일 휴지통으로 이동 (ADMIN)
     /**
      * 소프트 삭제다. 휴지통 탭에서 30일 안에 복구할 수 있고, 그 뒤 스케줄러가 영구 삭제한다.
      * 관리자가 보존 기간을 건너뛰어 즉시 영구 삭제하는 HTTP 경로는 제공하지 않는다.
@@ -51,7 +51,7 @@ public class AdminMailController {
         return ResponseEntity.ok(ApiResponse.success(null, "휴지통으로 옮겼어요."));
     }
 
-    // ── 새 메일 작성 발송 (ADMIN) ─────────────────────────
+    // 새 메일 작성 발송 (ADMIN)
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/compose")
     public ResponseEntity<ApiResponse<Void>> compose(

@@ -51,7 +51,7 @@ const storeSkeletonFilters = (params, sortOptions, fallbackSort) => [
     { value: optionValueOr(sortOptions, params.get('sort'), fallbackSort), options: sortOptions, className: 'reserve-explore-sort-filter' },
 ];
 
-/* ── 로그인·회원가입·비밀번호 찾기·소셜 약관 동의 ─────────────────────────── */
+/* 로그인·회원가입·비밀번호 찾기·소셜 약관 동의 ─────────────────────────── */
 
 const authTitle = { marginBottom: 12 };
 const authSubtitle = { display: 'block' };
@@ -168,7 +168,7 @@ export function AuthRouteSkeleton({ pathname = '/login' }) {
 }
 AuthRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
-/* ── 약관·개인정보·운영 안내·콘텐츠 출처(문서형) ───────────────────────── */
+/* 약관·개인정보·운영 안내·콘텐츠 출처(문서형) ───────────────────────── */
 
 const LEGAL_TITLES = {
     '/terms': '서비스 이용약관',
@@ -224,7 +224,7 @@ export function GuideRouteSkeleton({ pathname = '' }) {
 }
 GuideRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
-/* ── 준비 중 피드 화면(/feed) ──────────────────────────────────────── */
+/* 준비 중 피드 화면(/feed) ──────────────────────────────────────── */
 
 // 실제 화면과 같은 틀(.reserve-discovery-coming-soon — 최소 높이·세로 가운데 정렬)과 같은 문구 줄바꿈을 쓴다.
 export function ComingSoonRouteSkeleton({ pathname = '' }) {
@@ -241,7 +241,7 @@ export function ComingSoonRouteSkeleton({ pathname = '' }) {
 }
 ComingSoonRouteSkeleton.propTypes = { pathname: PropTypes.string };
 
-/* ── 결제 결과 — 처음 도착하면 '결제 처리 중(확인 중)' 화면이 뜬다. 그 배치를 따른다. ── */
+/* 결제 결과 — 처음 도착하면 '결제 처리 중(확인 중)' 화면이 뜬다. 그 배치를 따른다. ── */
 
 export function PaymentResultRouteSkeleton() {
     return <PageContainer size="sm" paddingTop="56px" className="reserve-payment-result-page">
@@ -264,7 +264,7 @@ export function PaymentResultRouteSkeleton() {
     </PageContainer>;
 }
 
-/* ── 관리자·파트너 패널 — 실제 작업 공간과 같은 메뉴·작업 영역 ─────────── */
+/* 관리자·파트너 패널 — 실제 작업 공간과 같은 메뉴·작업 영역 ─────────── */
 
 export function AdminRouteSkeleton({ search = '' }) {
     const tab = resolveAdminTab(new URLSearchParams(search).get('tab'));
@@ -301,7 +301,7 @@ export function BusinessRouteSkeleton({ search = '' }) {
 }
 BusinessRouteSkeleton.propTypes = { search: PropTypes.string };
 
-/* ── 메시지(모바일 전용 — PC 는 바로 이전 화면의 패널로 넘긴다) ───────────────── */
+/* 메시지(모바일 전용 — PC 는 바로 이전 화면의 패널로 넘긴다) ───────────────── */
 
 export function MessagesRouteSkeleton({ search = '' }) {
     const isWide = useWindowWidth() >= breakpoints.tablet;
@@ -349,7 +349,7 @@ export function MessagesRouteSkeleton({ search = '' }) {
 }
 MessagesRouteSkeleton.propTypes = { search: PropTypes.string };
 
-/* ── 가게 등록·수정 — 첫 질문·항목 선택과 같은 PageContainer 를 그린다. ── */
+/* 가게 등록·수정 — 첫 질문·항목 선택과 같은 PageContainer 를 그린다. ── */
 export function StoreFormRouteSkeleton({ pathname = '' }) {
     return <StoreOnboardingSkeleton mode={normalizeRouteSkeletonPath(pathname).endsWith('/edit') ? 'edit' : 'create'} />;
 }

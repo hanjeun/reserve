@@ -25,7 +25,7 @@ const useManageReservations = (params) => {
     // 관리 목록·내 예약뿐 아니라 그쪽도 무효화한다(invalidateAfterWrite.js).
     const onSettled = () => invalidateReservationData(queryClient);
 
-    // ── Undo (2026-08-11) ────────────────────────────────────────────────────
+    // Undo (2026-08-11)
     // 승인·완료는 확인 모달 없이 한 번에 확정된다. 목록에서 바로 옆 줄을 누르는 오조작이 잦은데,
     // 그 전까지 되돌릴 방법이 거절뿐이었다 — 거절은 이용자에게 "거절됨"으로 남고 메일까지 나가서
     // 실수 정정에 쓰기엔 흔적이 너무 크다.
@@ -82,7 +82,7 @@ const useManageReservations = (params) => {
         onSettled,
     });
 
-    // 확정된 예약을 가게가 취소 (2026-08-11 신설). 거절과 달리 서버가 **전액 환불**까지 실행한다.
+    // 확정된 예약을 가게가 취소. 거절과 달리 서버가 **전액 환불**까지 실행한다.
     // 그래서 성공 메시지에도 환불을 명시한다 — 사장님 입장에서 돈이 나가는 동작이라
     // "취소했습니다"만 뜨면 환불이 됐는지 따로 확인하러 가야 한다.
     const storeCancelMutation = useMutation({

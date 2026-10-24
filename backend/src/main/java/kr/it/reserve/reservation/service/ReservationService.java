@@ -211,7 +211,7 @@ public class ReservationService {
             throw new ReservationException("현재 이 가게는 예약 접수를 받지 않아요.", HttpStatus.CONFLICT);
         }
         LocalDateTime reservationDateTime = LocalDateTime.of(date, time);
-        // ★ 반드시 KST 기준 "지금"이어야 한다. date·time 은 사용자가 고른 한국 시각이고,
+        // 반드시 KST 기준 "지금"이어야 한다. date·time 은 사용자가 고른 한국 시각이고,
         //   컨테이너는 UTC 라 인자 없는 now() 는 9시간 뒤처진다.
         //   그 상태에서는 **이미 지나간 시간대의 예약이 검사를 통과했다**
         //   (예: 14:00 KST 에 오늘 08:00 예약 → UTC 로는 05:00 < 08:00 이라 미래로 보인다).
@@ -221,7 +221,7 @@ public class ReservationService {
             throw new ReservationException("예약 날짜/시간은 현재 이후여야 해요.", HttpStatus.BAD_REQUEST);
         }
 
-        // ★ 휴무 검증 (2026-08-11 신설).
+        // 휴무 검증.
         //   그 전까지 영업시간이 요일 구분 없이 하나뿐이라 **월요일 휴무인 가게도 월요일 예약을 받았다.**
         //   기능이 없는 게 아니라 잘못된 예약을 받는 상태였고, 사장님은 그걸 하나씩 거절해야 했다.
         //   거절은 이제 전액 환불이 나가므로 예약금이 왕복하는 비용까지 붙는다.
@@ -242,7 +242,7 @@ public class ReservationService {
 
         // 브레이크 타임 검증 (breakStartTime 이상, breakEndTime 미만은 예약 불가)
         //
-        // ★ SLOT 방식에만 적용한다 (2026-08-24). SESSION 은 사장님이 회차를 직접 적은 것이라
+        // SLOT 방식에만 적용한다 (2026-08-24). SESSION 은 사장님이 회차를 직접 적은 것이라
         //   그 위에 브레이크타임을 얹으면 "적었는데 예약이 안 되는" 상태가 된다.
         //   DAY 는 시각 자체가 의미를 갖지 않는다.
         //   아래 목록 포함 검사만으로도 막히지만, 이 분기가 있어야 **왜 막혔는지**를 말해줄 수 있다.
@@ -257,14 +257,14 @@ public class ReservationService {
             );
         }
 
-        // ★ 예약 시각 검증 — getAvailability 와 **같은 목록**을 써서 포함 여부만 본다 (2026-08-24).
+        // 예약 시각 검증 — getAvailability 와 **같은 목록**을 써서 포함 여부만 본다 (2026-08-24).
         //
         //   예전에는 여기서 [open, close - slotMin] **범위**를 비교했다. 그런데 화면은 슬롯 목록을
         //   보여주므로 둘이 같은 판정이 아니었다 — 30분 단위 가게에 09:07 을 API 로 직접 보내면
         //   범위 검사는 통과했다(목록엔 없는 시각인데도). 목록 포함 여부로 바꾸면 그 틈이 사라지고,
         //   예약 방식이 셋으로 늘어도 여기에 분기를 더할 필요가 없다.
         //
-        //   ⚠️ 이 변경으로 격자에서 벗어난 시각은 이제 거절된다. UI 로 만든 예약은 항상 격자 위에
+        //   주의: 이 변경으로 격자에서 벗어난 시각은 이제 거절된다. UI 로 만든 예약은 항상 격자 위에
         //      있으므로 정상 경로에는 영향이 없다.
         List<LocalTime> bookable = availability.bookableSlotTimes(store, date);
         if (!bookable.contains(time)) {
@@ -297,7 +297,7 @@ public class ReservationService {
 
     private void validateBookingWindow(
             Store store, LocalDate date, LocalDateTime reservationDateTime, LocalDateTime now) {
-        // ★ 예약 가능 범위 검증 (2026-08-11 신설).
+        // 예약 가능 범위 검증.
         //   그 전까지 미래 날짜 제한이 없어 1년 뒤 예약도 들어왔다. 그렇게 먼 예약은 가게가 운영
         //   계획을 세울 수 없고 이용자도 잊어버린다. null = 제한 없음(기존 가게의 동작 유지).
         Integer maxAdvance = store.getMaxAdvanceBookingDays();
@@ -328,7 +328,7 @@ public class ReservationService {
         int currentGuests = (excludeReservationId == null)
                 ? reservationRepository.sumActiveGuestsBySlot(store.getId(), date, time)
                 : reservationRepository.sumActiveGuestsBySlotExcluding(store.getId(), date, time, excludeReservationId);
-        // ★ `!= null` 만 보면 안 된다 — 0 이하는 이 필드에서 **무제한**을 뜻한다(2026-08-09).
+        // `!= null` 만 보면 안 된다 — 0 이하는 이 필드에서 **무제한**을 뜻한다(2026-08-09).
         //   아래 getAvailableSlots 의 `capacity <= 0` 분기가 이미 그렇게 해석하고 있어서,
         //   여기서만 null 만 거르면 조회는 "전부 예약 가능", 예약은 "항상 마감"으로
         //   **서로 반대로 판정**한다. 사용자에겐 전 시간대가 열려 보이는데 누르면 전부 마감 에러가 난다.
@@ -531,12 +531,12 @@ public class ReservationService {
         changed(reservation, EntityUpdates.Operation.UPDATED);
         reservation.setRejectionReason(reason != null ? reason : "가게 사정으로 인한 거절");
 
-        // ★ 거절은 전액 환불이다 (2026-08-11 추가).
+        // 거절은 전액 환불이다.
         //   그 전까지 이 메서드에는 환불 호출이 **한 줄도 없었다**. 예약금을 낸 이용자의 예약을
         //   가게가 거절하면 상태만 REJECTED 로 바뀌고 돈은 가게에 남았다. 이용약관
         //   (frontend/src/pages/policy/Terms.jsx)이 "가게 사정에 의한 취소는 전액 환불"이라고
         //   명시하고 있으므로 약관 위반이었고, 이용자가 되돌릴 수단도 없었다.
-        //   ⚠️ 정책 계산(calculateRefundAmount)을 쓰면 안 된다 — 그건 이용자 귀책 취소의 위약금
+        //   주의: 정책 계산(calculateRefundAmount)을 쓰면 안 된다 — 그건 이용자 귀책 취소의 위약금
         //      규칙이라, 가게가 당일에 거절해도 0원이 나올 수 있다. 전액 경로를 따로 쓴다.
         //   외부 발신은 거절·환불 의도 커밋 후에 실행하므로 PG 오류가 거절을 되돌리지 않는다.
         prepareStoreDecisionRefund(id, "가게의 예약 거절에 따른 전액 환불", reservation);
@@ -562,23 +562,9 @@ public class ReservationService {
     }
 
     /**
-     * 예약 취소 (사업자용) — <b>확정된 예약을 가게가 취소한다. 전액 환불.</b> (2026-08-11 신설)
-     *
-     * <h3>왜 만들었나</h3>
-     * 그 전까지 가게에는 <b>예약을 취소할 수단이 아예 없었다.</b>
-     * {@link #cancelReservation} 은 {@code validateOwnership} 을 타서 예약자 본인만 통과하고
-     * 가게 주인은 403 이다. 그래서 사장님이 갑자기 문을 닫아야 할 때 할 수 있는 게
-     * "노쇼 처리"밖에 없었고, 그건 오지 않은 손님을 벌하는 상태라 사실과 정반대로 기록된다.
-     *
-     * <h3>왜 CONFIRMED 만인가</h3>
-     * PENDING 은 이미 {@link #rejectReservation}(거절)이 담당한다. 같은 일을 하는 버튼이
-     * 두 개면 사장님이 무엇을 눌러야 할지 모르고, 기록도 REJECTED/CANCELLED 로 갈린다.
-     * 상태별로 정확히 하나의 종료 경로만 둔다.
-     *
-     * <h3>환불</h3>
-     * 가게 귀책이므로 <b>정책 무시하고 전액</b>이다({@code refundFullByStoreDecision}).
-     * 사유는 {@code cancelReason} 에 넣는다 — {@code rejectionReason} 을 재사용하면
-     * 화면이 "거절 사유"라는 라벨로 보여줘 이용자가 오해한다.
+     * 가게 소유권과 처리 가능한 예약 상태를 확인한 뒤 가게 사정 취소를 기록한다.
+     * 가게 귀책은 전액 환불 경로로 준비하며 외부 호출은 커밋 뒤에 수행한다.
+     * 취소 사유는 거절 사유와 구분해 cancelReason에 저장한다.
      */
     @Transactional
     public void cancelReservationByStore(Long id, Member owner, String reason) {
@@ -862,7 +848,7 @@ public class ReservationService {
         log.info("Reservation removed: id={}, memberId={}", id, member.getId());
     }
 
-    // ========== 내부 도우미 메서드 ==========
+    // 내부 도우미 메서드
 
     /**
      * unique한 표시용 예약번호 생성 — DB의 unique 제약과 충돌하지 않을 때까지 재시도.

@@ -28,7 +28,7 @@ const { Text } = Typography;
 // (넓으면 8+0 또는 4+4, 좁으면 2+2+2+2 — 어느 쪽이든 줄 끝이 비지 않는다).
 // 늘어난 3개는 채우기용이 아니라 실제로 문의가 갈리는 도메인이다(환불·광고·리뷰).
 //
-// ★ 백엔드 Inquiry.InquiryCategory와 **값·순서가 1:1로 일치**해야 한다.
+// 백엔드 Inquiry.InquiryCategory와 **값·순서가 1:1로 일치**해야 한다.
 //   서버가 valueOf()로 파싱하므로 여기에만 있는 값을 보내면 400이 난다.
 const CATEGORY_OPTIONS = [
     { value: 'RESERVATION', label: '예약' },

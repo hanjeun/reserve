@@ -48,7 +48,7 @@ public class AdminMailService {
     @Value("${mail.from-name:RESERVE}")
     private String fromName;
 
-    /* ── 새 메일 작성 발송 + DB 저장 ───────────────────── */
+    /* 새 메일 작성 발송 + DB 저장 ───────────────────── */
     @Transactional
     public void compose(ComposeMailRequest request) {
         if (request.isMarketing()) {
@@ -67,7 +67,7 @@ public class AdminMailService {
     }
 
     /**
-     * 광고성 메일의 수신 동의 확인 (2026-08-11 신설).
+     * 광고성 메일의 수신 동의 확인.
      *
      * <p><b>왜 필요했나</b> — 가입·마이페이지에서 마케팅 수신 동의를 받아 DB 에 저장하고 있었지만,
      * 그 값을 <b>읽는 코드가 한 줄도 없었다.</b> 동의를 관리하는 척만 하고 실제로는 아무것도
@@ -79,7 +79,7 @@ public class AdminMailService {
      * "확인할 수 없으면 보내지 않는다"가 안전한 기본값이다.
      */
     private void requireMarketingConsent(String toEmail) {
-        // ★ 탈퇴 회원을 제외하는 조회를 쓴다. findByEmail 은 소프트 삭제된 회원도 잡는데,
+        // 탈퇴 회원을 제외하는 조회를 쓴다. findByEmail 은 소프트 삭제된 회원도 잡는데,
         //   탈퇴한 사람에게 광고를 보내는 건 동의 없이 보내는 것보다 나쁘다.
         Member member = memberRepository.findByEmailAndDeletedAtIsNull(toEmail).orElse(null);
 
@@ -95,7 +95,7 @@ public class AdminMailService {
         }
     }
 
-    /* ── 보낸 메일 목록 ─────────────────────────────────── */
+    /* 보낸 메일 목록 ─────────────────────────────────── */
     /** 한 번에 내려줄 수 있는 최대 건수. 호출측이 큰 size 를 보내 전량을 끌어가지 못하게 막는다. */
     private static final int MAX_PAGE_SIZE = 100;
 
@@ -118,7 +118,7 @@ public class AdminMailService {
         return mails.map(AdminSentMailResponse::from);
     }
 
-    /* ── 휴지통으로 이동 ────────────────────────────────── */
+    /* 휴지통으로 이동 ────────────────────────────────── */
 
     /**
      * 보낸 메일을 휴지통으로 옮긴다(소프트 삭제).
@@ -140,7 +140,7 @@ public class AdminMailService {
         auditLogService.softDeleteSentMail(mailId);
     }
 
-    /* ── 이메일 발송 내부 메서드 ────────────────────────── */
+    /* 이메일 발송 내부 메서드 ────────────────────────── */
     private void sendReplyEmail(String toEmail, String subject, String body) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

@@ -94,7 +94,7 @@ const ForgotPassword = () => {
             setSendLoading(true);
             await api.post(API_ENDPOINTS.PASSWORD_RESET.SEND_CODE, { email: emailVal });
 
-            // ★ 가입 여부를 화면에 드러내지 않는다.
+            // 가입 여부를 화면에 드러내지 않는다.
             //   예전에는 응답의 sent 값으로 "가입된 이메일이 아니거나 소셜 로그인 계정입니다"를 띄웠다.
             //   비밀번호를 모르는 사람도 이메일만 넣어보고 가입 여부를 확정할 수 있었다(user enumeration).
             //   서버도 이제 그 값을 주지 않는다 — 노출을 막는 지점은 프론트가 아니라 API 여야 한다.
@@ -204,7 +204,7 @@ const ForgotPassword = () => {
                     requiredMark={false}
                     onFinish={isVerified ? handleResetPassword : undefined}
                 >
-                    {/* ── Step 0 & 1: 이메일 + 코드 (Signup과 완전히 동일한 구조) ── */}
+                    {/* Step 0 & 1: 이메일 + 코드 (Signup과 완전히 동일한 구조) ── */}
                     {!isVerified && (
                         <>
                             {/* 이메일 + 코드발송/재발송 버튼 — Signup의 이메일 행과 동일 */}
@@ -242,7 +242,7 @@ const ForgotPassword = () => {
                         </>
                     )}
 
-                    {/* ── Step 2: 비밀번호 변경 (인증 완료 후) ── */}
+                    {/* Step 2: 비밀번호 변경 (인증 완료 후) ── */}
                     {isVerified && (
                         <>
                             <Form.Item name="newPassword" rules={VALIDATION_RULES.password}>

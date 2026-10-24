@@ -162,11 +162,11 @@ export const TimeSlotPicker = ({ store, dateValue, value, onChange, form, onAvai
         store, dateValue, form, onAvailabilityChange, editingReservation,
     });
 
-    // ── 예약 방식 DAY (2026-08-24) ────────────────────────────────────────
+    // 예약 방식 DAY (2026-08-24)
     // 서버가 슬롯을 딱 하나 내려준다("하루 = 슬롯 한 개"). 고를 게 없으므로 자동으로 채우고
     // 그리드 대신 안내 한 줄만 보여준다.
     //
-    // ★ 시간 칸을 아예 없애지 않는 이유 — 서버는 여전히 reservationTime 을 필수로 받는다.
+    // 시간 칸을 아예 없애지 않는 이유 — 서버는 여전히 reservationTime 을 필수로 받는다.
     //   칸을 지우면 값을 넣을 곳이 사라져서 화면마다 따로 채워 넣어야 하고, 그러면 빠뜨리는 곳이 생긴다.
     //   같은 칸을 그대로 두고 **채우는 방법만** 바꾸는 쪽이 갈라지지 않는다.
     const isDayBooking = store?.bookingType === 'DAY';
@@ -262,7 +262,7 @@ const TimeSlotPill = ({ slot, selected, selectable, onClick, delay }) => (
 /**
  * 시간 선택 자리표시자.
  *
- * ★ 2026-08-06 — 왜 컴포넌트로 뺐나
+ * 2026-08-06 — 왜 컴포넌트로 뺐나
  *   이 칸은 AntD TimePicker 가 아니라 커스텀 div 다(시간은 pill 그리드로 고르므로).
  *   그래서 Form.Item 이 붙여주는 `ant-picker-status-error` 클래스가 존재하지 않았고,
  *   바로 위 "예약 날짜"(BookingCalendar)는 미입력 시 아이콘과 링이 빨개지는데
@@ -296,7 +296,7 @@ const timeSlotStyles = {
     placeholder: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: heights.input, padding: '0 11px', boxSizing: 'border-box',
-        // ★ 색을 하드코딩하지 말 것 — 여기 rgba(0,0,0,0.25)가 박혀 있어서 다크모드에서
+        // 색을 하드코딩하지 말 것 — 여기 rgba(0,0,0,0.25)가 박혀 있어서 다크모드에서
         //   배경만 어두워지고 글자는 검은색 그대로라 "날짜를 먼저 선택해주세요"가 안 보였다.
         //   colors.*는 var(--c-...) 문자열이라 브라우저가 페인트 시점에 테마별로 해석한다.
         //   colors.text.placeholder는 AntD의 colorTextPlaceholder와 같은 값이라
@@ -341,7 +341,7 @@ export const ReservationPanel = ({
                 <>
                     <Form.Item label="예약 날짜" name="reservationDate"
                         rules={[{ required: true, message: '날짜를 선택해주세요.' }]}>
-                        {/* ★ 2026-08-25 — AntD DatePicker 팝업에서 인라인 BookingCalendar 로 교체.
+                        {/* 2026-08-25 — AntD DatePicker 팝업에서 인라인 BookingCalendar 로 교체.
                             예전에는 disabledDate 로 막았는데 그건 **회색밖에 못 칠한다** — 정기휴무,
                             임시휴무, 운영기간 밖, 예약범위 초과, 정원 마감이 전부 같은 회색이라
                             "왜 안 눌리지"를 알 방법이 없었다. 게다가 그 다섯 판정이 서버(isBookableOn)와
@@ -360,7 +360,7 @@ export const ReservationPanel = ({
                         // 실제로 고쳐야 할 곳은 바로 위 날짜 칸 하나이고 그 칸이 이미 막고 있다.
                         // (interactions.css 의 "비활성은 에러보다 우선한다"와 같은 규칙이다)
                         //
-                        // ⚠️ dependencies={['reservationDate']} 를 붙이면 안 된다 — rc-field-form 은
+                        // 주의: dependencies={['reservationDate']} 를 붙이면 안 된다 — rc-field-form 은
                         //    의존 필드가 바뀌는 즉시 이 칸을 재검증해서, 날짜를 고르자마자 아직 아무것도
                         //    안 한 시간 칸에 "시간을 선택해주세요"가 튀어나온다(2026-07에 이미 한 번
                         //    고쳤던 회귀다 — TimeSlotPicker 의 setFields 주석 참고).

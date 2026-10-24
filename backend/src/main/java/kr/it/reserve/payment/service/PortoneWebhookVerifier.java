@@ -14,31 +14,12 @@ import java.time.Instant;
 import java.util.Base64;
 
 /**
- * PortOne 웹훅 서명 검증 — 2026-08-23 신설.
- *
- * <h2>왜 필요한가</h2>
- * 웹훅 엔드포인트는 <b>인증 없이 열려 있어야 한다</b>(PortOne 서버가 부른다).
- * 검증이 없으면 아무나 우리 URL 로 "이 결제 취소됐어요" 를 쏴서 예약을 취소시키거나
- * 결제를 환불 완료로 만들 수 있다. <b>서명 검증이 이 엔드포인트의 유일한 인증이다.</b>
- *
- * <h2>규격 — Standard Webhooks</h2>
- * PortOne V2 는 <a href="https://www.standardwebhooks.com/">Standard Webhooks</a> 를 따른다.
- * <ul>
- *   <li>헤더: {@code webhook-id} · {@code webhook-timestamp} · {@code webhook-signature}</li>
- *   <li>서명 대상 문자열: <b>{@code {webhook-id}.{webhook-timestamp}.{본문}}</b> (마침표로 이어붙임)</li>
- *   <li>알고리즘: HMAC-SHA256, 결과는 base64</li>
- *   <li>헤더 값은 {@code v1,<base64>} 형태이고 <b>공백으로 구분된 여러 개</b>가 올 수 있다
- *       (키 교체 중에는 두 개가 온다). 하나라도 맞으면 통과다.</li>
- *   <li>시크릿은 {@code whsec_} 접두사 + base64. <b>접두사를 떼고 base64 디코딩한 바이트</b>가 키다.</li>
- * </ul>
- *
- * <h2>본문은 반드시 원본 그대로여야 한다</h2>
- * JSON 으로 파싱했다가 다시 직렬화하면 <b>공백·키 순서가 달라져 서명이 깨진다.</b>
- * 컨트롤러가 {@code @RequestBody String} 으로 받아 그대로 넘기는 이유다.
- *
- * <h2>fail-closed</h2>
- * 시크릿이 비어 있으면 <b>전부 거부</b>한다. 검증을 건너뛰고 통과시키면 위 공격이 그대로 열린다 —
- * "설정이 안 됐으니 일단 받아두자"는 이 엔드포인트에서 가장 위험한 선택이다.
+ * 로그인 인증 대신 원본 본문의 서명으로 PortOne 웹훅을 검증한다.
+ * <a href="https://www.standardwebhooks.com/">Standard Webhooks</a>의
+ * {@code webhook-id.webhook-timestamp.본문}을 HMAC-SHA256으로 검증한다.
+ * 시크릿의 선택적 whsec_ 접두사를 제거하고 base64 디코딩한 바이트를 키로 사용한다.
+ * 공백으로 구분된 v1 서명 중 하나가 일치하면 허용하며 시각 허용 범위도 검사한다.
+ * JSON 재직렬화는 서명을 바꾸므로 원본 본문을 전달해야 한다. 키가 없거나 잘못되면 거부한다.
  */
 @Slf4j
 @Component
@@ -120,7 +101,7 @@ public class PortoneWebhookVerifier {
         if (!"v1".equals(version)) {
             return false;   // v1a(비대칭)는 이 프로젝트에서 쓰지 않는다
         }
-        // ★ 반드시 상수 시간 비교. equals 는 앞에서부터 비교하다 다르면 즉시 빠져나가므로
+        // 반드시 상수 시간 비교. equals 는 앞에서부터 비교하다 다르면 즉시 빠져나가므로
         //   응답 시간 차이로 서명을 한 바이트씩 알아낼 수 있다(타이밍 공격).
         return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
                 value.getBytes(StandardCharsets.UTF_8));

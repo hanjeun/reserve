@@ -110,7 +110,7 @@ s3:
   access-key: test-access-key
   secret-key: test-secret-key
 
-# ★ 유출 비밀번호 검사를 테스트에서만 끈다.
+# 유출 비밀번호 검사를 테스트에서만 끈다.
 # 켜두면 테스트가 외부 네트워크(api.pwnedpasswords.com)에 의존하게 된다 —
 # 코드가 fail-open 이라 테스트가 "깨지진" 않지만, 오프라인 환경에선 검사마다
 # 타임아웃 3초를 그대로 기다리고, 테스트 결과가 외부 서비스 상태에 따라 흔들린다.
@@ -119,7 +119,7 @@ security:
   pwned-password:
     enabled: false
 
-# DDL 생성 실패를 보이게 한다 (2026-08-16 추가).
+# DDL 생성 실패를 보이게 한다.
 #
 # Hibernate 는 CREATE TABLE 이 실패해도 **로그만 남기고 계속 진행한다.** 그래서
 # columnDefinition = "TINYINT(1) DEFAULT 0" 처럼 MySQL 전용 문법이 들어 있으면

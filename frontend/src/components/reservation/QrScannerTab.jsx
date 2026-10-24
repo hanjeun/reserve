@@ -19,7 +19,7 @@ import { colors, radius, shadows, fontSize } from '../../styles/tokens';
 const { Text } = Typography;
 const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
 
-// ★★ 디코딩 해상도 (2026-08-09) — QR이 아예 안 읽히던 원인이자 그 해결책이다.
+// 디코딩 해상도 (2026-08-09) — QR이 아예 안 읽히던 원인이자 그 해결책이다.
 //
 // html5-qrcode는 디코딩용 캔버스를 <video>의 **레이아웃 CSS 픽셀**(clientWidth/Height)로 만들고,
 // 카메라 프레임 전체를 그 캔버스로 축소해서 ZXing에 넘긴다(esm/html5-qrcode.js:484-545, 553-575).
@@ -34,7 +34,7 @@ const SCANNER_ELEMENT_ID = 'qr-checkin-scanner';
 const DECODE_WIDTH = 720;
 const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
 
-// ★★ 종횡비 (2026-08-11) — QR이 "가끔" 안 읽히던 나머지 절반의 원인.
+// 종횡비 (2026-08-11) — QR이 "가끔" 안 읽히던 나머지 절반의 원인.
 //
 // 라이브러리는 카메라 프레임 **전체**를 컨테이너 크기의 캔버스로 그린다
 // (html5-qrcode.js:558-571). 축소 비율을 가로·세로 따로 계산하는 게 핵심이다.
@@ -49,7 +49,7 @@ const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
 // 인식 거리가 눈에 띄게 짧아진다. `videoConstraints` 에 4:3(1280x960)을 ideal 로 요청했지만
 // ideal 은 강제가 아니라 선호도라, 카메라가 16:9 모드를 주면 그냥 그게 온다.
 //
-// ─── 2026-08-11 실측 (아이폰 Safari) ────────────────────────────────────────
+// 2026-08-11 실측 (아이폰 Safari)
 // native 720x1280 (세로!) / canvas 720x405 → heightRatio 3.16 배 압축.
 // **아이폰은 기기를 가로로 눕혀도 스트림을 돌리지 않는다.** 화면 표시만 회전하고
 // videoWidth/Height 는 그대로 720x1280 이다. 그래서 "가로로 들면 될 것"은 틀렸다.
@@ -62,7 +62,7 @@ const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
 // ① 기본값은 16:9 — 첫 프레임 전까지 쓸 잠정값일 뿐이다. 폰은 대개 세로라 곧 교체된다.
 // ② 해상도가 확정되는 이벤트('loadedmetadata'·'resize')에서 실제 videoWidth/videoHeight 를
 //    읽어, 다르면 컨테이너를 고치고 재시작한다.
-//    ⚠️ start() 직후에 읽으면 안 된다 — 그때는 0 이다. 라이브러리가 setupSurface() 를 부르고
+//    주의: start() 직후에 읽으면 안 된다 — 그때는 0 이다. 라이브러리가 setupSurface() 를 부르고
 //    곧바로 반환하므로 start() 의 Promise 는 'playing' **이전에** resolve 된다
 //    (camera/core-impl.js). 이 함정에 한 번 빠져 보정이 통째로 죽어 있었다.
 //
@@ -72,7 +72,7 @@ const DEFAULT_PREVIEW_SCALE = 302 / DECODE_WIDTH;
 // 비율이 맞으면 object-fit:cover 가 아무것도 자르지 않으므로,
 // **화면에 보이는 영역 = 디코더가 보는 영역** 이 된다(예전엔 보이는 건 잘리고 디코더는 전체였다).
 //
-// ⚠️ 가로 720은 건드리지 말 것 — 2026-08-09에 실측으로 잡은 값이다(위 주석).
+// 주의: 가로 720은 건드리지 말 것 — 2026-08-09에 실측으로 잡은 값이다(위 주석).
 //    세로는 이 값에서 비율로 유도된다(16:9면 405).
 const DEFAULT_DECODE_ASPECT = 16 / 9;
 const decodeHeightFor = (aspect) => Math.round(DECODE_WIDTH / aspect);
@@ -82,27 +82,10 @@ const ASPECT_TOLERANCE = 0.02;
 const MAX_ASPECT_FIXES = 3;
 
 /**
- * QR 체크인 스캐너 (사업자용)
- *
- * html5-qrcode의 저수준 Html5Qrcode API를 사용 — Html5QrcodeScanner(자동 UI 생성 버전)는
- * 라이브러리 기본 스타일이 그대로 노출되어 우리 디자인 시스템과 안 맞았고, 카메라 시작/중지
- * 버튼과 프리뷰 컨테이너를 전부 우리 Button으로 직접 그림. QR 이미지 자체는 어디에도 저장되지
- * 않고 카메라 프레임에서 바로 디코딩됨.
- *
- * [중요 - 카메라 화면 안 보이던 버그] 스캐너를 붙일 div(#qr-checkin-scanner)는 항상 렌더링된
- * 상태(display:none 금지)를 유지해야 함 — Html5Qrcode가 시작 시점에 컨테이너의 실제 너비/높이를
- * 읽어서 비디오 크기를 잡는데, display:none이면 0×0으로 계산됨(2026-07-07 발견, 수정함).
- *
- * [중요 - 크롭/검은 여백 문제] qrbox 가이드 프레임(흰 모서리 박스)을 넣었더니 비디오가 박스
- * 하단에서 잘려 보이고 빈 공간이 검게 남는 문제가 있었음 → qrbox 설정을 없애고 비디오가 카메라
- * 프레임 전체를 그대로(자르지 않고) 채우도록 정리함. 컨테이너 비율도 1:1 정사각형 대신 일반
- * 웹캠 비율인 4:3으로 맞춰서 여백이 거의 안 생기게 함.
- * (2026-07 리디자인 — 모서리 브라켓은 html5-qrcode의 qrbox 옵션이 아니라 순수 CSS 오버레이로
- * 다시 추가했다. 실제 디코딩 영역(=카메라 프레임 전체)에는 전혀 관여하지 않는 장식 요소라
- * 위 크롭 버그와는 무관하다.)
- *
- * QrScannerSheet의 destroyOnHidden이 닫힘 모션 뒤 스캐너를 해제한다.
- * 직접 진입·뒤로가기·다른 업무 이동도 아래 cleanup에서 카메라와 보정 타이머를 정리한다.
+ * Html5Qrcode의 디코딩 API와 공용 UI로 사업자 QR 체크인을 제공한다.
+ * 시작 시 컨테이너 크기를 측정하므로 숨겨진 0 크기 상자에서 카메라를 시작하지 않는다.
+ * 가이드 오버레이는 디코딩 영역과 분리하며 영상 비율은 실제 카메라에 맞춰 보정한다.
+ * 시트 종료·라우트 이탈 시 카메라와 타이머를 정리하고 중복 디코딩 요청을 막는다.
  */
 const QrScannerTab = ({ sheet = false, onClose }) => {
     const { message } = useMessage();
@@ -363,7 +346,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
                     // videoConstraints가 있으면 첫 인자 대신 이 값이 쓰인다(내부 areVideoConstraintsEnabled).
                     // 4:3으로 요청해 DECODE_WIDTH/HEIGHT 비율과 맞춘다 — 16:9가 오면 드로잉 단계에서
                     // 프레임이 4:3으로 눌려 모듈이 정사각형이 아니게 되고 인식률이 떨어진다.
-                    // ★ 16:9 를 요청한다 (2026-08-11 변경, 이전엔 4:3 1280x960).
+                    // 16:9 를 요청한다 (2026-08-11 변경, 이전엔 4:3 1280x960).
                     //   ideal 은 "강제"가 아니라 적합도 점수라, 카메라에 없는 모드를 요청하면
                     //   가장 가까운 걸 준다 — 4:3을 달라고 해놓고 16:9를 받아 프레임이 눌리고 있었다.
                     //   휴대폰·웹캠이 사실상 항상 갖고 있는 1280x720 을 요청해 적합도 거리를 0으로 만든다.
@@ -400,8 +383,8 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
 
             setStatus('scanning');
 
-            // ── 종횡비 실측·보정 ────────────────────────────────────────────────────
-            // ⚠️ 여기서 videoWidth 를 바로 읽으면 안 된다 (2026-08-11 실패에서 배움).
+            // 종횡비 실측·보정
+            // 주의: 여기서 videoWidth 를 바로 읽으면 안 된다 (2026-08-11 실패에서 배움).
             //   start() 의 Promise 는 'playing' **이전에** resolve 된다 — 라이브러리가
             //   setupSurface() 를 부르고 곧바로 반환하기 때문이다(camera/core-impl.js).
             //   그래서 이 시점의 videoWidth 는 0 이고, 예전 코드는 `nativeW > 0` 가드에 막혀
@@ -437,7 +420,7 @@ const QrScannerTab = ({ sheet = false, onClose }) => {
         void startScanning();
     }, [decodeAspect, startScanning]);
 
-    // ★ isScanning으로 가드하지 않는다 (2026-08-09).
+    // isScanning으로 가드하지 않는다 (2026-08-09).
     //   isScanning은 'playing' 이벤트 핸들러 안에서야 true가 된다. 카메라가 켜지는 도중에
     //   탭을 옮기면 이 값이 false여서 stop()을 건너뛰었고, 컴포넌트는 사라졌는데 카메라
     //   트랙만 살아남았다(녹색 표시등이 계속 켜져 있는 상태). 무조건 stop()을 부르고

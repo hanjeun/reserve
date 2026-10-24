@@ -62,7 +62,7 @@ const faqItems = FAQS.map((faq, i) => ({
 }));
 
 export default function FaqSection({ isMobile }) {
-    // isMobile은 Home/index.jsx에서 한 번만 구독해서 prop으로 내려줌
+    // 부모에서 전달한 반응형 분기로 간격을 선택한다.
 
     return (
         <div

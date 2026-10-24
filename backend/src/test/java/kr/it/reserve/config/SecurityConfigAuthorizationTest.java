@@ -51,7 +51,7 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── 공개 API — 비로그인 상태에서도 401이 아니어야 함 (200/404 등은 데이터 유무에 따라 달라질 수 있어 허용) ──
+    // 공개 API — 비로그인 상태에서도 401이 아니어야 함 (200/404 등은 데이터 유무에 따라 달라질 수 있어 허용) ──
 
     @Test
     void feedInteractionReadsStayPublicButPersonalWritesAndModerationStayAuthenticated() throws Exception {
@@ -141,7 +141,7 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(result -> assertNotEquals(401, result.getResponse().getStatus()));
     }
 
-    // ── 2026-09-21: 통째 공개(/api/stores/**·/api/reviews/**·/api/notices/**)를 공개 화면이 쓰는 GET 만으로 좁혔다 ──
+    // 2026-09-21: 통째 공개(/api/stores/**·/api/reviews/**·/api/notices/**)를 공개 화면이 쓰는 GET 만으로 좁혔다 ──
 
     @Test
     void narrowedPublicGetEndpointsStayOpen() throws Exception {
@@ -228,7 +228,7 @@ class SecurityConfigAuthorizationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── 보호된 API — 비로그인 상태에서는 반드시 401이어야 함 ──
+    // 보호된 API — 비로그인 상태에서는 반드시 401이어야 함 ──
 
     @Test
     void myReservationsRequiresAuth() throws Exception {

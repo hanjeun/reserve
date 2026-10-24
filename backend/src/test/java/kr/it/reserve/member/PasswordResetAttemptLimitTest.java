@@ -70,7 +70,7 @@ class PasswordResetAttemptLimitTest {
     }
 
     /**
-     * ★ 이 테스트가 이 파일의 존재 이유다.
+     * 이 테스트가 이 파일의 존재 이유다.
      *
      * <p>{@code noRollbackFor} 를 빼면 여기서 {@code attemptCount} 가 0 으로 나오며 실패한다.
      */

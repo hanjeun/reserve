@@ -60,7 +60,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     /**
      * 예약 ID + PAID 상태로 가장 최근 1건.
      *
-     * <p>★ {@code LIMIT 1} 이 반드시 있어야 한다 (2026-08-11 추가).
+     * <p>★ {@code LIMIT 1} 이 반드시 있어야 한다.
      * 반환 타입이 {@link Optional} 이라 "0개 또는 1개"를 기대하는데, 이 조건으로 PAID 가 2행 이상
      * 나올 수 있는 경로가 존재한다(부분 환불 후 재결제 등). 그러면 Hibernate 가
      * {@code NonUniqueResultException} 을 던져 <b>환불·취소가 통째로 500</b> 이 된다.

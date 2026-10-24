@@ -147,7 +147,7 @@ public class ReviewService {
                 .orElse(false);
     }
 
-    // ========== 내부 도우미 메서드 (Private Helper Methods) ==========
+    // 내부 도우미 메서드 (Private Helper Methods)
 
     /**
      * 리뷰 CUD 후 가게 평점/리뷰수 갱신

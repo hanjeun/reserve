@@ -6,7 +6,7 @@ import {
 } from '../common/icons';
 import { colors, fontSize, fontWeight } from '../../styles/tokens';
 
-// ─── StoreInfoSection 행 빌더 헬퍼 (모듈 레벨 — 복잡도 분산) ───
+// StoreInfoSection 행 빌더 헬퍼 (모듈 레벨 — 복잡도 분산) ───
 
 const hasPositiveNumber = value => Number.isFinite(Number(value)) && Number(value) > 0;
 

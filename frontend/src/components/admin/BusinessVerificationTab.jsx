@@ -1,28 +1,8 @@
 /**
- * RESERVE - 관리자 사업자 인증 탭 (대기 중 / 전체 목록)
- *
- * 2026-07 전수조사로 AdminPanel.jsx에서 분리.
- * 다른 9개 탭(MembersTab, StoresAdminTab, ReservationsAllTab, TrashTab, AuditLogTab,
- * DashboardTab, MailboxTab, AdminAdsTab)은 이미 components/admin/ 아래로 분리돼 있었는데
- * 사업자 인증 탭만 데이터 로딩 + 컬럼 정의 + 상세 모달 + 거절 모달이 전부 AdminPanel에
- * 남아 있어서, AdminPanel이 "탭 셸"이 아니라 "탭 셸 + 한 탭의 전체 구현"이 되어 있었음.
- *
- * mode: 'pending'(대기 중) | 'all'(전체 목록)
- *   두 탭은 같은 queryKey(adminKeys.businessVerifications())를 공유하므로 TanStack Query
- *   캐시 덕에 네트워크 요청은 한 번만 나간다 — 컴포넌트를 두 번 마운트해도 중복 호출 없음.
- *   URL 쿼리스트링(search/page)도 mode별로 별개인 탭 키(tab=pending / tab=all)에서만 쓰이므로
- *   두 인스턴스가 서로의 필터를 덮어쓸 걱정은 없다(AdminPanel의 탭 전환이 항상 ?tab=만 남기고
- *   나머지 파라미터를 지우기 때문).
- *
- * 함께 고친 것 —
- * 1) raw <Table> → 공용 DataTable (size/scroll/pagination 기본값 통일. DataTable을 만든 이유가
- *    바로 이런 불일치 방지인데 정작 AdminPanel이 이걸 안 쓰고 tableProps를 직접 지정하고 있었음)
- * 2) AdminTableSkeleton에 실제 headers/cols 배선 (헤더는 고정 텍스트라 진짜 글자로 노출)
- * 3) RejectModal의 key={rejectOpen ? 'reject-open' : 'reject-closed'} 강제 remount 제거 —
- *    닫는 순간 key가 바뀌며 언마운트돼서 닫힘 애니메이션이 죽던 원인. antd 6의 destroyOnHidden은
- *    "닫힘 애니메이션이 끝난 뒤에" children을 파괴하므로 입력값 초기화 + 애니메이션을 둘 다 얻는다.
- * 4) 본문 스켈레톤은 최초 로딩·쿼리 전환에만 표시하고 수동 새로고침에는 기존 행을 유지
- * 5) 검색어/페이지를 URL 쿼리스트링에 동기화(useQueryParamState) — MembersTab 등과 동일한 이유.
+ * 사업자 인증의 대기·전체 목록을 mode별 서버 검색·페이지 조회로 표시한다.
+ * 쿼리 키에 mode·페이지·지연 검색어를 포함해 서로 다른 목록의 캐시가 섞이지 않게 한다.
+ * 최초·쿼리 전환 로딩에는 실제 열 규격의 스켈레톤을 사용하고 수동 새로고침은 기존 행을 유지한다.
+ * 승인·거절·자격 취소 후 관련 조회를 무효화하며 모달은 닫힘 애니메이션 후 내용을 정리한다.
  */
 import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';

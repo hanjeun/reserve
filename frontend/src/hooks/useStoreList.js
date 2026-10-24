@@ -72,7 +72,7 @@ const useStoreList = () => {
     const lastPage = Math.max(1, totalPages);
     const pageOutOfRange = isSuccess && !isPlaceholderData && !error && page > lastPage;
 
-    // 가게 목록을 받을 때마다 각 가게의 커버 이미지 "비율"만 따로 적어둔다 (2026-07 추가).
+    // 가게 목록을 받을 때마다 각 가게의 커버 이미지 "비율"만 따로 적어둔다.
     // 상세 페이지 스켈레톤이 커버 자리를 실제 비율로 그려야 이미지 도착 시 레이아웃이 안 튀는데,
     // 그동안은 TanStack Query의 목록 캐시에서만 비율을 찾았다. 그런데 그 캐시가 없는 경우가
     // 흔해서(상세 URL 직접 진입 / 상세에서 새로고침 / 홈·찜 목록에서 클릭 / gcTime 만료)

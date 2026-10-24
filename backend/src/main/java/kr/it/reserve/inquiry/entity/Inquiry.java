@@ -72,7 +72,7 @@ public class Inquiry {
      * 8개인 이유: 5개는 모바일에서 4+1로 갈라져 마지막 줄에 하나만 남아 어색했다.
      * 4의 배수로 맞추면 어느 폭에서든 대칭으로 접힌다. `ETC`는 항상 마지막.
      *
-     * ⚠️ 값을 추가할 때: 컬럼이 @Enumerated(EnumType.STRING) + varchar 라 ddl-auto로 안전하지만,
+     * 주의: 값을 추가할 때: 컬럼이 @Enumerated(EnumType.STRING) + varchar 라 ddl-auto로 안전하지만,
      *    **이름을 바꾸거나 지우면 기존 행의 문자열이 매핑되지 않아 조회 시 예외가 난다.**
      *    (이미 저장된 문의가 있으므로 기존 5개의 이름은 건드리지 말 것)
      */

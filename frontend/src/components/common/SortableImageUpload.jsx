@@ -12,7 +12,7 @@
  *
  * Form.Item 이 주입하는 value/onChange 는 그대로 Upload 에 넘긴다(검증용 값이 계속 갱신되게).
  *
- * ⚠️ components/common/index.js 배럴로 내보내지 않는다. 배럴에 넣으면 드래그 라이브러리(@dnd-kit)가
+ * 주의: components/common/index.js 배럴로 내보내지 않는다. 배럴에 넣으면 드래그 라이브러리(@dnd-kit)가
  *    공통 청크로 딸려 들어가 번들 예산(청크 600KiB)을 넘긴다(2026-09-28 빌드 실측 637KiB).
  *    쓰는 곳에서 '../../common/SortableImageUpload' 처럼 파일로 직접 import 하면 가게 폼 청크에만 들어간다.
  */

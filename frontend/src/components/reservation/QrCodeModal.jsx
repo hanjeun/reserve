@@ -49,7 +49,7 @@ const QrCodeModal = ({ reservationId, open, onClose }) => {
                 {isLoading && (
                     <div style={styles.spinnerBox}><ModalLoading text="QR 코드를 불러오는 중..." minHeight="0" /></div>
                 )}
-                {/* ★ 인식률에 직접 영향을 주는 값들이라 임의로 줄이지 말 것 (2026-08-09).
+                {/* 인식률에 직접 영향을 주는 값들이라 임의로 줄이지 말 것 (2026-08-09).
                     - marginSize: qrcode.react 기본값이 0 이다. QR 규격은 4모듈 여백(quiet zone)을
                       요구하고 ZXing 은 그걸로 파인더 패턴을 찾는다. 라이트 모드에선 모달 흰 배경이
                       우연히 여백 역할을 했지만 다크 모드에선 어두운 배경이 코드에 바로 맞닿아

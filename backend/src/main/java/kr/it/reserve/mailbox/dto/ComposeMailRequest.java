@@ -23,7 +23,7 @@ public class ComposeMailRequest {
     private String body;
 
     /**
-     * 광고성 정보인가 (2026-08-11 신설).
+     * 광고성 정보인가.
      *
      * <p>{@code true} 면 발송 전에 <b>수신자의 마케팅 수신 동의를 확인</b>하고, 동의하지 않았거나
      * 회원이 아니면 거부한다. 정보통신망법상 광고성 정보는 사전 동의가 필요하다.

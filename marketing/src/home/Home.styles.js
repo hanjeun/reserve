@@ -47,7 +47,7 @@ export const styles = {
         display: 'block',
     },
 
-    // ── PC 섹션 ──
+    // PC 섹션
     section: {
         minHeight: `calc(100svh - ${heights.header})`,
         scrollMarginTop: heights.header,
@@ -77,7 +77,7 @@ export const styles = {
     sectionText: { flex: '1 1 340px', maxWidth: 420 },
     sectionUI: { flex: '1 1 300px', display: 'flex', justifyContent: 'center' },
 
-    // ── 모바일 섹션 ──
+    // 모바일 섹션
     sectionMobile: {
         // minHeight 복원: 모바일에서도 섹션이 화면을 꽉 채워야 V버튼 클릭 시 다음 섹션 침범 없이 깔끔함
         // overscroll-behavior-y: none은 이미 제거했으므로 스크롤 고정 느낙 없음
@@ -105,7 +105,7 @@ export const styles = {
         margin: '0 0 12px',
     },
 
-    // ── 공통 화살표 ──
+    // 공통 화살표
     sectionArrow: {
         position: 'absolute',
         bottom: 0,
@@ -115,7 +115,7 @@ export const styles = {
         justifyContent: 'center',
     },
 
-    // ── 공통 태그/포인트 ──
+    // 공통 태그/포인트
     sectionTag: {
         display: 'inline-block',
         background: colors.primary.light,

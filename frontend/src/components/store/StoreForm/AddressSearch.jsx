@@ -10,7 +10,7 @@ import { ArcSpinner } from '../../common/Loading';
 import DataState from '../../common/DataState';
 import { API_ENDPOINTS } from '../../../constants';
 
-// ─── 검색/선택 상태 리듀서 ─────────────────────────────────────────────────
+// 검색/선택 상태 리듀서
 // 원래 query/detail/zipCode/selected/results/open/loading/activeIdx 8개 useState로
 // 나뉘어 있던 상태를 하나의 리듀서로 통합 (focused/detailFocused는 별도 activeField로 통합)
 const initialState = {

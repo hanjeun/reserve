@@ -79,7 +79,7 @@ export const API_ENDPOINTS = {
         // 종료상태 광고 목록에서 숨기기(소프트삭제) — 2026-07 추가
         REMOVE:         (id) => `/api/advertisements/${id}/remove`,
         UPDATE:         (id) => `/api/advertisements/${id}`,
-        // 광고 성과 지표(2026-07 추가)
+        // 광고 성과 지표
         IMPRESSION:     (id) => `/api/advertisements/${id}/impression`,
         CLICK:          (id) => `/api/advertisements/${id}/click`,
         CONVERSION:     (id) => `/api/advertisements/${id}/conversion`,

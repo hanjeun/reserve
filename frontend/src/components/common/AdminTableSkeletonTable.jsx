@@ -7,9 +7,7 @@ import SkeletonText from './SkeletonText';
 // 이 파일은 청크 로딩 뼈대(RouteLoadingSkeleton)도 쓰므로 Pagination 을 import 하지 않는다 — 초기 번들에 끌려 들어가지 않게(2026-09-29).
 const skeletonKeys = (n, prefix = 'sk') => Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
 
-/* ─────────────────────────────────────────────
-   AdminTableSkeleton — 관리자/사업자 패널 테이블 로딩용
-───────────────────────────────────────────── */
+/*   AdminTableSkeleton — 관리자/사업자 패널 테이블 로딩용*/
 
 // AntD Table size="middle"의 셀 패딩 (cellPaddingBlockMD=12, cellPaddingInlineMD=8).
 // 실제 테이블은 이 패딩이 컬럼 width 안에 포함되므로 스켈레톤도 똑같이 맞춰야 글자 시작 위치가 일치한다.
@@ -27,7 +25,7 @@ const FLEX_COL_MIN = 160;
  *   stackFirstCol {bool}         첫 열이 "이름 + 이메일" 2줄인 테이블(사업자 인증 탭)만 true
  *   pagination {object|null}     { current, pageSize, total } — 주면 스켈레톤 중에도 페이지 버튼 유지
  *
- * ── 컬럼 폭 계산: 실제 테이블과 수학적으로 동일하게 (2026-07 수정) ─────────────────
+ * 컬럼 폭 계산: 실제 테이블과 수학적으로 동일하게 (2026-07 수정)
  * DataTable은 tableLayout="fixed"이고 AntD가 <table>에 min-width:100%를 붙인다.
  * 그래서 지정 width 합계가 컨테이너보다 작으면 브라우저가 "남는 공간을 지정 폭에 비례해서"
  * 나눠준다(CSS 2.1 §17.5.2.1). 예: 사업자 인증 탭은 합계 890px → 실제 약 1435px = 약 1.61배 확대.

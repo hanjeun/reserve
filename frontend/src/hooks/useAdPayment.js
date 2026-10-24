@@ -6,27 +6,11 @@ import useMessage from './useMessage';
 import { invalidateAdData } from './invalidateAfterWrite';
 
 /**
- * 광고 결제 훅 — usePayment(예약금 결제)와 동일한 패턴, 완전히 독립된 흐름.
- * 흐름: createAd(FormData) → prepare 응답 받음 → PortOne.requestPayment → verifyPayment → 완료
- *
- * 2026-07-09: useMutation 기반으로 전환 — payingId를 별도 useState로 추적하던 걸
- * payExistingMutation.variables(마지막으로 mutate에 넘긴 adId)로 대체, 성공 시
- * adKeys.my() 쿼리를 무효화해서 AdManageTab이 별도 refetch() 호출 없이 최신 목록을 받음.
- * (내부적으로 mutationFn은 여전히 절대 throw하지 않고 {success,...} 형태로 resolve함 —
- * 결제 취소/실패는 정상적인 흐름이라 각 케이스별 메시지를 그대로 유지하기 위함)
- *
- * 2026-07 추가 — 모바일 결제 지원. 백엔드 /api/advertisements/mobile-redirect가 결제 검증까지
- * 끝낸 뒤 /payment/result?type=ad로 리다이렉트하므로, 모바일은 데스크톱과 달리 반환값이 오지 않는다
- * (페이지가 리다이렉트로 넘어가버림).
- *
- * ─── 2026-08-10 PortOne V1 → V2 전환 ────────────────────────────────────────
- * 자세한 배경은 usePayment.js 상단 주석 참고. 요약하면 V1 SDK + V2 채널키 혼용 때문에 결제가
- * V1 원장에 쌓여 **환불(취소)이 404 로 실패**하고 있었다. 광고 결제도 같은 경로라 함께 전환한다.
- * - `m_redirect_url` → `redirectUrl`, `merchant_uid` → `paymentId`, `name` → `orderName`,
- *   `amount` → `totalAmount`, `buyer_*` → `customer.*`
- * - 실패·취소는 콜백의 `rsp.success` 가 아니라 **반환값의 `code` 존재 여부**로 판별한다
- * - 리다이렉트가 일어나면 반환값이 `undefined` 다 → `payment == null` 을 먼저 거른다
- * - PC 결제창이 팝업에서 IFRAME 으로 바뀌어 `paymentWindowGuard`(focus 기반 강제취소)를 걷어냈다
+ * 광고 생성·기존 광고 결제를 PortOne V2의 준비 응답으로 처리한다.
+ * PC는 서버 verifyPayment, 모바일은 서버 redirect 경로에서 결제 결과를 검증한다.
+ * SDK 반환값이 없으면 리다이렉트로 처리하고 code가 있으면 실패·취소로 구분한다.
+ * 실패·취소도 결과 객체로 반환하므로 mutation의 onSuccess가 결제 성공을 뜻하지는 않는다.
+ * 목록은 mutation 완료 후 무효화하며 진행 중인 기존 광고 ID는 mutation variables에서 읽는다.
  */
 const useAdPayment = () => {
     const { message } = useMessage();

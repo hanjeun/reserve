@@ -11,24 +11,9 @@ import LoadingImage from '../common/LoadingImage';
 const { Text } = Typography;
 
 /**
- * 예약 한 줄(행) 공용 셸. 사업자 패널(예약 관리 탭)과 손님(내 예약)이 공유한다.
- *
- * ── 2026-07-30 구조 변경: 3열 → "썸네일 + 3줄 독립 정렬" ──────────────────────
- * 예전 구조는 [썸네일][정보 3줄][상태·가격·버튼 3줄]의 3열이었다. 이러면 정보 쪽 세 줄이
- * **하나의 폭을 공유**하기 때문에, 버튼이 4개가 되는 미결제 예약에서 오른쪽 열이 넓어지면
- * 그 압력이 세 줄 전부에 걸려 가게 이름과 예약번호까지 같이 잘렸다("RESERVE" → "RES…").
- *
- * 지금은 각 줄이 자기만의 flex row라서 줄마다 좌우 폭을 독립적으로 나눈다:
- *
- *   [썸네일] [ 가게명 ......................... 승인 대기 (미결제) ]
- *            [ 예약번호 ................ (10분 내 결제) 10,000원 ]
- *            [ 날짜 · 시간 (…) ............. 결제하기 변경 취소 ]
- *
- * 1·2줄은 짧은 오른쪽 요소(상태 라벨·금액)만 피하면 되니 이름과 예약번호가 온전히 보이고,
- * 폭이 모자랄 때 줄어드는 건 3줄의 날짜·시간뿐이다. 결제가 끝나 버튼이 줄면 저절로 다시 펴진다.
- * 잘린 값은 카드를 눌러 상세에서 확인할 수 있다.
- *
- * 스켈레톤(Skeletons.jsx의 ReservationRowSkeletonItem)도 같은 3줄 구조여야 로딩 전후가 안 튄다.
+ * 사업자 예약 관리와 내 예약이 공유하는 행이다.
+ * 썸네일 옆의 세 줄은 독립적인 좌우 정렬을 사용해 액션 폭이 제목·예약번호 폭까지 줄이지 않게 한다.
+ * 폭이 부족한 값은 상세에서 확인하며 대응 스켈레톤도 같은 줄 구조와 간격을 유지한다.
  */
 const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, showMemberInfo = false }) => {
     const isWide = useWindowWidth() >= 576;
@@ -50,7 +35,7 @@ const ReservationRow = ({ reservation, onOpenDetail, renderActions, extraNote, s
     const actionsNode = renderActions ? renderActions(isWide) : null;
     const hasActions = actionsNode != null && (!Array.isArray(actionsNode) || actionsNode.length > 0);
 
-    // ── 카드 클릭 = 상세 열기. 클릭 경로는 "가게명 버튼" 하나뿐이다 ──────────────
+    // 카드 클릭 = 상세 열기. 클릭 경로는 "가게명 버튼" 하나뿐이다
     // 예전에는 바깥 div·썸네일 <button>·가게명 <button> 세 곳이 각각 같은 onOpenDetail을 들고
     // 있었다. 같은 동작인데 누른 자리에 따라 반응이 달라 보였고(가게명은 즉시 열리는데 그 주변을
     // 누르면 글자가 파랗게 선택된 뒤 열림), 접근성 노드도 둘로 중복됐다.
@@ -170,7 +155,7 @@ const styles = {
     // 3줄 스택 — 남는 폭을 전부 차지하고, 각 줄이 그 안에서 독립적으로 좌우를 나눈다
     lines: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 },
 
-    // ── 줄 높이 고정 ────────────────────────────────────────────────────────────
+    // 줄 높이 고정
     // AntD Typography의 기본 line-height는 1.5714다. 그대로 두면 세 줄 합이 77.6px이 되어
     // 카드가 113.6px로 커지고, 썸네일(56px)보다 한참 크며 스켈레톤(92px)과 어긋난다.
     // 줄 높이를 스켈레톤 Bone과 같은 값으로 고정하고 텍스트 line-height도 같이 눌러
@@ -185,7 +170,7 @@ const styles = {
     line2:     { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, height: 18 },
     line3:     { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, height: 16 },
 
-    // ⚠️ overflow:hidden 을 주면 안 된다 — 카드 전체를 덮는 ::after 오버레이가 버튼 상자 안으로
+    // 주의: overflow:hidden 을 주면 안 된다 — 카드 전체를 덮는 ::after 오버레이가 버튼 상자 안으로
     //    잘려서 가게명 위만 클릭 영역이 된다. 말줄임은 어차피 안쪽 storeName이 담당하고,
     //    flex 컨테이너에는 text-overflow가 적용되지도 않는다.
     nameBtn:       { ...btnReset, flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' },
@@ -196,7 +181,7 @@ const styles = {
     requestIcon:   { fontSize: 12, color: colors.text.tertiary, flexShrink: 0, position: 'relative', zIndex: 1 },
 
     // 예약번호 줄 / 날짜·시간 줄 — 아이콘과 텍스트를 한 겹에 평평하게 나열한다.
-    // ⚠️ text-overflow는 flex 컨테이너에 적용되지 않는다. 텍스트를 inline-flex 래퍼로 한 번 더 감싸면
+    // 주의: text-overflow는 flex 컨테이너에 적용되지 않는다. 텍스트를 inline-flex 래퍼로 한 번 더 감싸면
     //    그 래퍼의 overflow:hidden이 먼저 잘라서 말줄임표가 사라진다("2026-07-31" → "2." 로 뭉개짐).
     //    말줄임을 걸 대상은 flex item이면서 block인 요소여야 한다 → 아래 ellipsis.
     // 2026-07-30: <button>이 아니라 <div>다. 카드 전체가 클릭 영역이 되면서 이 줄들이
@@ -216,7 +201,7 @@ const styles = {
     timeout:    { fontSize: fontSize.xs, lineHeight: 1, color: colors.warning.main, whiteSpace: 'nowrap' },
     // 항상 한 줄(nowrap) — wrap을 허용하면 버튼 4개일 때 줄이 늘어나 카드 높이가 들쭉날쭉해진다.
     //
-    // ── gap 6의 근거 (2026-07-30 브라우저 실측, 13px 폰트) ────────────────────────
+    // gap 6의 근거 (2026-07-30 브라우저 실측, 13px 폰트)
     // 미결제 대기 예약의 버튼 3개(결제하기·변경·취소)가 최대 폭이다. 아이콘을 숨긴 모바일 기준
     // 버튼 실폭은 45 + 22.5 + 22.5 = 90px 안팎이다.
     //

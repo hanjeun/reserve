@@ -41,7 +41,7 @@ public class AdminManagementController {
     private final AuditLogService auditLogService;
     private final AdminSanctionService adminSanctionService;
 
-    // ── 회원 목록 조회 ────────────────────────────────────────────
+    // 회원 목록 조회
 
     /** 한 번에 내려줄 수 있는 최대 건수. 호출측이 {@code size=100000} 을 보내 전량을 끌어가지 못하게 막는다. */
     private static final int MAX_PAGE_SIZE = 100;
@@ -83,7 +83,7 @@ public class AdminManagementController {
         return ApiResponse.success(result, "회원 목록 조회 성공");
     }
 
-    // ── 회원 제재 ────────────────────────────────────────
+    // 회원 제재
 
     @PostMapping("/members/{id}/suspend")
     public ApiResponse<Void> suspendMember(
@@ -110,7 +110,7 @@ public class AdminManagementController {
         return ApiResponse.success(null, "정지가 해제됐어요.");
     }
 
-    // ── 가게 목록 조회 ────────────────────────────────────────────
+    // 가게 목록 조회
 
     @GetMapping("/stores")
     public ApiResponse<Page<StoreResponse>> getStores(
@@ -128,7 +128,7 @@ public class AdminManagementController {
         return ApiResponse.success(stores, "가게 목록 조회 성공");
     }
 
-    // ── 가게 제재 ────────────────────────────────────────
+    // 가게 제재
     // 회원 제재와 동일한 패턴: 정지(기간)/영구정지/해제. 휴지통(소프트 삭제) 사용하지 않음.
 
     @PostMapping("/stores/{id}/suspend")
@@ -156,7 +156,7 @@ public class AdminManagementController {
         return ApiResponse.success(null, "영업정지가 해제됐어요.");
     }
 
-    // ── 예약 소프트 삭제 ──────────────────────────────────────────
+    // 예약 소프트 삭제
     // 예약은 진짜 휴지통(복구 가능한 소프트 삭제)이 어울리는 콘텐츠라 유지
 
     @DeleteMapping("/reservations/{id}")

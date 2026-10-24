@@ -46,7 +46,7 @@ final class PaymentPreparation {
         entityManager.flush();
         for (Payment payment : lockedPayments) entityManager.refresh(payment, LockModeType.PESSIMISTIC_WRITE);
 
-        // ★ 본인 예약인지 확인한다 (2026-08-09).
+        // 본인 예약인지 확인한다 (2026-08-09).
         //   예전엔 reservationId 를 body 에서 받아 그대로 조회만 했다. 로그인만 하면
         //   남의 예약에 대해 결제를 준비하고, 아래 금액 문제와 겹쳐 남의 예약을
         //   임의 금액으로 "결제 완료" 상태로 만들 수 있었다.
@@ -63,7 +63,7 @@ final class PaymentPreparation {
             throw new PaymentException("이미 결제가 완료된 예약이에요.", HttpStatus.CONFLICT);
         }
 
-        // ★ 결제 금액은 서버에서만 정한다 (2026-08-09).
+        // 결제 금액은 서버에서만 정한다 (2026-08-09).
         //   예전엔 requestDto.getAmount() 를 그대로 Payment.amount 에 넣었고,
         //   verifyAndCompletePayment 는 PG 결제액을 "그 값"과 비교했다. 즉 검증이
         //   공격자가 정한 숫자를 기준으로 통과했고, markDepositPaid 가 예약의

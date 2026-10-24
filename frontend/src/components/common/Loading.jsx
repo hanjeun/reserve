@@ -3,18 +3,9 @@ import PropTypes from 'prop-types';
 import { colors } from '../../styles/tokens';
 
 /**
- * RESERVE Design System - Loading Spinner (Material 호 방식)
- *
- * 2026-07 재작업: 기존 CSS border 링(등속 회전)을 Material Design 스타일 SVG 호 스피너로 교체.
- * 트랙(배경 원)은 그대로 두고, 그 위 호(arc)가 등속으로 돌면서 동시에 길이가 늘었다 줄었다 해서
- * "빨라졌다 느려지는" 완급 느낌을 준다. reserve-spin(전체 회전) + reserve-arc-dash(호 길이 변화)
- * 두 키프레임을 함께 쓰며, 둘 다 index.css에 전역 정의돼 있다.
- *
- * ArcSpinner    — 재사용 가능한 호 스피너 자체. size/stroke/color/track를 받는다.
- *                 (주소 검색창 등 인라인 스피너도 이걸 재사용 — 스피너 구현을 한 곳으로 통일)
- * SpinIndicator — 1em/currentColor 기반. AntD <Spin>의 기본 인디케이터 교체용
- *                 (App.jsx: <ConfigProvider spin={{ indicator: <SpinIndicator /> }}>).
- * Loading       — 페이지/섹션 중앙 정렬 래퍼(fullPage / section).
+ * ArcSpinner는 공용 SVG 호 스피너이고 SpinIndicator는 AntD Spin용 currentColor 인디케이터다.
+ * Loading은 페이지·섹션의 중앙 배치를 담당한다.
+ * 회전·호 길이 키프레임은 전역 CSS에서 공유한다.
  */
 
 // SVG 뷰박스 50x50, r=20 → 둘레 ≈ 126. 아래 dash 값은 이 둘레(126)를 기준으로 잡았다.

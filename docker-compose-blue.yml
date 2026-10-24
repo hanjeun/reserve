@@ -7,7 +7,7 @@ services:
     image: ${DOCKERHUB_USERNAME}/reserve:${IMAGE_TAG:-latest}
     ports:
       - "8080:8080"
-    # ★★ TZ 를 여기에 추가하지 말 것 (2026-08-19 검토 결론).
+    # TZ 를 여기에 추가하지 말 것 (2026-08-19 검토 결론).
     #
     # 이 컨테이너는 **의도적으로 UTC 로 돈다.** "TZ=Asia/Seoul 이 빠졌다"는 지적이 여러 번 있었지만
     # 지금 와서 넣으면 고치는 것보다 부수는 게 크다:
@@ -62,7 +62,7 @@ services:
       - PORTONE_V2_SECRET=${PORTONE_V2_SECRET}
       - PORTONE_STORE_ID=${PORTONE_STORE_ID}
       # PortOne 웹훅 서명 검증용 시크릿(whsec_...). 값이 비면 웹훅을 전부 거부한다(fail-closed).
-      # ★ 앱은 이 값이 없어도 정상 기동한다 — 그래서 빠져 있어도 아무 에러가 안 난다.
+      # 앱은 이 값이 없어도 정상 기동한다 — 그래서 빠져 있어도 아무 에러가 안 난다.
       #   PortOne 콘솔에 웹훅을 등록해두고 이 줄이 없으면, 취소 알림이 조용히 전부 4xx 로 버려진다.
       - PORTONE_WEBHOOK_SECRET=${PORTONE_WEBHOOK_SECRET}
       # QR 체크인 서명 키(선택). 비면 로그인 시크릿에서 파생한다 — 비어 있는 게 정상이다.

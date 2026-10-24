@@ -14,7 +14,7 @@ import ImageUploadButton from '../../common/ImageUploadButton';
 /**
  * Upload 의 onChange 이벤트에서 폼 값으로 쓸 배열만 꺼낸다.
  *
- * ★ 이게 없으면 `required` 검사가 통째로 무력해진다.
+ * 이게 없으면 `required` 검사가 통째로 무력해진다.
  * Upload 는 `{ file, fileList }` 객체를 onChange 로 넘기는데, 그 객체가 그대로 폼 값이 되면
  * fileList 가 비어 있어도 **객체 자체는 truthy** 라 required 를 통과한다.
  * 즉 "이미지를 올렸다가 지우고 제출" 하면 대표 이미지 없이 등록이 됐다.

@@ -55,7 +55,7 @@ const summarizeDaily = (rows, unit) => {
     return `기간 합계 ${total.toLocaleString()}${unit}, 가장 높은 날은 ${peak.date}의 ${Number(peak.value).toLocaleString()}${unit}이에요.`;
 };
 
-// 광고 성과 지표 하나를 보여주는 작은 박스 — DashboardTab의 "최근 감사 로그 요약"과 동일한 인라인 패턴(2026-07 추가)
+// 광고 성과 지표 하나를 보여주는 작은 박스 — DashboardTab의 "최근 감사 로그 요약"과 동일한 인라인 패턴
 const AdStatItem = ({ label, value, suffix, color }) => (
     <div style={{ flex: '1 1 120px' }}>
         <Text style={{ color, fontSize: fontSize.sm, fontWeight: 600, display: 'block', marginBottom: 4 }}>{label}</Text>
@@ -473,7 +473,7 @@ const StatisticsTab = () => {
                 (DashboardTab과 동일한 이유로 통일했다. 예전 최소폭이 넓어 모바일에서 카드들이 세로로 쌓였다) */}
             {renderSummaryCards(stats, loading, range)}
 
-            {/* 차트 — DashboardTab과 동일한 패턴(2026-07 추가): 카드 껍데기(제목 포함)는 항상 그리고,
+            {/* 차트 — DashboardTab과 동일한 패턴: 카드 껍데기(제목 포함)는 항상 그리고,
                 본문만 loading/데이터있음/데이터없음 3단으로 분기해서 실제 차트 모양에 가까운 스켈레톤을 넣는다.
                 (예전엔 {'{'}!loading && stats && (...){'}'}로 전체를 감싸서 로딩 중엔 이 아래 3장이 통째로
                 안 보이다가 데이터 도착 순간 한꺼번에 나타났음 — DashboardTab에서 이미 고친 것과 동일한
@@ -519,7 +519,7 @@ const StatisticsTab = () => {
                 </ChartCard>
             </div>
 
-            {/* 광고 성과(2026-07 추가) — 현재 활성 광고가 있을 때만 보여줌(로딩 중엔 낙관적으로 보여주다가 데이터
+            {/* 광고 성과 — 현재 활성 광고가 있을 때만 보여줌(로딩 중엔 낙관적으로 보여주다가 데이터
                 도착 후 정말 광고가 없으면 숨김 — DashboardTab의 "최근 감사 로그 요약"와 동일한 판단).
                 누적 카운터만 있고 일별 추이는 아직 없음(Advertisement 엔티티에 카운터 컬럼만 있는 구조이라) —
                 노출형은 클릭 개념이 없어서 노출수만, 배너형은 클릭/전환까지 함께 보여준다. */}

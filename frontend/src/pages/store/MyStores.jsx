@@ -37,7 +37,7 @@ const managedActions = (store, onEdit, onDelete, inRow = false) => [
     </button></Tooltip>,
 ];
 
-// ─── 영업 종료 확인 모달 ──────────────────────────────────────────────────────
+// 영업 종료 확인 모달
 export const DeleteStoreModal = ({ open, storeId, storeName, onConfirm, onCancel }) => {
     const [loadingReadiness, setLoadingReadiness] = useState(Boolean(open && storeId));
     const [readiness, setReadiness] = useState(null);
@@ -245,7 +245,7 @@ const OwnedStoresBody = ({ stores, visibleStores, view, onEdit, onDelete, onRegi
     );
 };
 
-// ─── MyStores 메인 ──────────────────────────────────────────────────────────
+// MyStores 메인
 const MyStores = () => {
     const navigate = useNavigate();
     const [urlSearchParams, setUrlSearchParams] = useSearchParams();

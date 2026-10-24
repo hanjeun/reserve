@@ -3,25 +3,9 @@ import { colors } from './colors';
 import { fontSize, fontWeight } from './typography';
 
 /**
- * 폼 컨트롤 껍데기 토큰 — 입력칸처럼 보이는 모든 것의 단일 출처.
- *
- * ★ 왜 따로 두나 (2026-08-06)
- *   "예약 날짜"(BookingCalendar), 폼 날짜(FormDatePicker), "예약 시간"(커스텀 div),
- *   시간 범위(AntD TimePicker)는 렌더러가 달라도 같은 입력 언어를 써야 한다.
- *
- *   같아 보여야 하는 것들이 서로 다른 렌더러를 가질 때, **관문은 컴포넌트가 아니라 값이다.**
- *   렌더러는 둘로 두되 숫자가 코드에 두 번 나타나지 않게 한다.
- *
- *        field  ─┬─→ App.jsx ConfigProvider (AntD 입력)
- *                ├─→ FormDatePicker/BookingCalendar
- *                ├─→ pickerSuffix/TimeSlotPicker
- *                └─→ Skeletons.jsx
- *
- *   전에는 54 와 14 가 App.jsx·Skeletons·홈 목업에 **리터럴로 흩어져 있었다.**
- *   heights.input 을 55 로 바꾸면 그 셋만 54 로 남는 상태였다 —
- *   이 프로젝트의 반복 회귀가 전부 이 형태였다(docs/technical/design-system.md 참고).
- *
- * ⚠️ 새 폼 컨트롤을 만들 때 높이·radius·아이콘 크기를 숫자로 적지 말 것. 여기서 가져온다.
+ * 같은 역할의 폼 입력이 공유하는 높이·반경·배경·글자·아이콘 토큰이다.
+ * AntD 입력과 커스텀 날짜·시간 입력 및 대응 스켈레톤에서 같은 값을 참조한다.
+ * 다른 역할의 버튼·필터·메뉴까지 이 입력 규격으로 통일하지 않는다.
  */
 export const field = {
     /** 입력칸 높이. AntD size="large" 와 커스텀 자리표시자가 공유한다. */

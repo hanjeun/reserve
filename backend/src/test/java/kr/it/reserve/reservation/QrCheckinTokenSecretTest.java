@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * QR 체크인 토큰의 <b>서명 키가 로그인 JWT 키와 분리돼 있는지</b>를 검증한다 (2026-08-24 신설).
+ * QR 체크인 토큰의 <b>서명 키가 로그인 JWT 키와 분리돼 있는지</b>를 검증한다.
  *
  * <p>2026-08-24 이전에는 두 토큰이 같은 키로 서명돼, <b>서로의 서명 검증을 통과했다.</b>
  * 어느 한쪽 경로에서 {@code purpose} 확인을 빠뜨리면 곧바로 교차 사용이 가능해지는 구조였고,

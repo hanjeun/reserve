@@ -49,7 +49,7 @@ export const PHONE_REGEX = /^(?:0\d{1,2}-\d{3,4}-\d{4}|0\d{8,10})$/;
 const toHm = (v) => (v && typeof v.format === 'function' ? v.format('HH:mm') : String(v ?? ''));
 
 export const VALIDATION_RULES = {
-    // ─── 가게 관련 ────────────────────────────────────────────────────────────
+    // 가게 관련
     storeName: [
         { required: true, message: '가게 이름을 입력해주세요' },
         {
@@ -92,7 +92,7 @@ export const VALIDATION_RULES = {
     maxCapacityPerSlot: [
         { type: 'number', min: 1, max: 999, message: '1~999명 사이로 입력해주세요' },
     ],
-    // ★ InputNumber 의 min/max 만 두면 범위를 벗어난 값이 **조용히 잘려서 저장**된다.
+    // InputNumber 의 min/max 만 두면 범위를 벗어난 값이 **조용히 잘려서 저장**된다.
     //   500 을 넣고 제출하면 에러 없이 365 로 바뀌어 들어가고, 사용자는 한참 뒤에 발견한다.
     //   clamp 는 UI 편의일 뿐 검증이 아니므로 rules 로 따로 막는다.
     maxAdvanceBookingDays: [
@@ -115,11 +115,11 @@ export const VALIDATION_RULES = {
 
     // 브레이크 타임 — 영업시간 **안**에 있어야 한다.
     //
-    // ★ 다른 필드(times)를 봐야 해서 함수 형태의 rule 을 쓴다. AntD 는 rules 배열 안의 함수에
+    // 다른 필드(times)를 봐야 해서 함수 형태의 rule 을 쓴다. AntD 는 rules 배열 안의 함수에
     //   form 인스턴스를 넘겨주므로 getFieldValue 로 영업시간을 읽을 수 있다.
     //   상수 배열로는 표현할 수 없는 유일한 검증이라 여기만 모양이 다르다.
     //
-    // ★ 한쪽만 고른 경우는 여기서 막지 않는다 — 서버가 양쪽을 지운다.
+    // 한쪽만 고른 경우는 여기서 막지 않는다 — 서버가 양쪽을 지운다.
     //   "브레이크를 지우는 중"인 정상적인 조작 과정이라 에러를 띄우면 오히려 방해가 된다.
     breakTimes: [
         ({ getFieldValue }) => ({
@@ -146,7 +146,7 @@ export const VALIDATION_RULES = {
         }),
     ],
 
-    // ─── 예약 관련 ────────────────────────────────────────────────────────────
+    // 예약 관련
     reservationDate: [
         { required: true, message: '예약 날짜를 선택해주세요' },
     ],
@@ -161,7 +161,7 @@ export const VALIDATION_RULES = {
         { max: 200, message: '최대 200자까지 입력할 수 있어요' },
     ],
 
-    // ─── 회원 관련 ────────────────────────────────────────────────────────────
+    // 회원 관련
     loginEmail: [
         { required: true, message: '이메일을 입력해주세요' },
     ],
@@ -214,7 +214,7 @@ export const VALIDATION_RULES = {
         },
     ],
 
-    // ─── 리뷰 관련 ────────────────────────────────────────────────────────────
+    // 리뷰 관련
     reviewTitle: [
         { required: true, message: '제목을 입력해주세요' },
         {

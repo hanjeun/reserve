@@ -49,7 +49,7 @@ final class ReservationAttendance {
         Reservation reservation = findByIdForUpdateOrThrow(reservationId);
         ReservationAccess.owner(reservation, owner);
 
-        // ★★ 방문 당일에만 체크인할 수 있다 (2026-08-19 신설).
+        // 방문 당일에만 체크인할 수 있다.
         //
         //   그 전까지 날짜 검사가 아예 없었다. 토큰 만료는 "방문일 다음 날 새벽" 과 "발급 후 24시간"
         //   중 빠른 쪽인데, **3개월 뒤 예약이라도 방금 발급한 QR 은 24시간 동안 유효하다.**

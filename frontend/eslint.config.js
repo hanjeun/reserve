@@ -43,7 +43,7 @@ export default defineConfig([
         }],
       }],
 
-      // ★ 폼 검증 오류를 토스트로 띄우는 것을 막는다.
+      // 폼 검증 오류를 토스트로 띄우는 것을 막는다.
       //
       // 왜 lint 로 막는가 — 이 규칙은 원래 FormModal.jsx 주석과 design-system.md 에
       // 글로만 적혀 있었다. FormField 는 진작에 error prop 을 받고 있었는데도,

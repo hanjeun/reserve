@@ -3,9 +3,7 @@
  * 전역 keyframe + 재사용 animation 값 정의
  */
 
-// ============================================
 // animation 값 (키프레임은 index.css, 값은 style={{ animation: ... }} 용)
-// ============================================
 export const animation = {
     fadeIn:        'fadeIn 0.2s ease both',
     fadeOut:       'fadeOut 0.2s ease both',

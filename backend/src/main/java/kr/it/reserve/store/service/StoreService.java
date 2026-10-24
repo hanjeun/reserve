@@ -156,12 +156,12 @@ public class StoreService {
             store.setOpenTime(request.getOpenTime());
             store.setCloseTime(request.getCloseTime());
         }
-        // ★ 브레이크타임은 영업시간 if 블록 **밖**에 둔다.
+        // 브레이크타임은 영업시간 if 블록 **밖**에 둔다.
         //   예전엔 안에 있어서 영업시간 없이 브레이크타임만 보내면 조용히 버려졌고,
         //   수정 경로(updateStore)는 블록 밖이라 **생성과 수정의 동작이 달랐다**.
         store.setBreakStartTime(request.getBreakStartTime());
         store.setBreakEndTime(request.getBreakEndTime());
-        // ★ 저장 직전에 "최종 값"으로 검증한다 — 요청 본문이 아니라 엔티티를 본다.
+        // 저장 직전에 "최종 값"으로 검증한다 — 요청 본문이 아니라 엔티티를 본다.
         //   요청만 보면 생성/수정 경로가 서로 다른 판정을 하게 된다(수정은 일부 필드만 올 수 있다).
         validateBusinessHours(store);
         normalizeDepositPaymentPolicy(store);
@@ -261,7 +261,7 @@ public class StoreService {
             if (request.hasField("breakStartTime")) store.setBreakStartTime(request.getBreakStartTime());
             if (request.hasField("breakEndTime")) store.setBreakEndTime(request.getBreakEndTime());
             // (2026-08-09) 여기 있던 setCloseTime 중복 호출을 제거했다 — 위에서 이미 같은 값을 넣는다.
-            // ★ 병합이 끝난 뒤 검증한다. 요청에 openTime 만 왔다면 기존 closeTime 과 비교돼야 한다 —
+            // 병합이 끝난 뒤 검증한다. 요청에 openTime 만 왔다면 기존 closeTime 과 비교돼야 한다 —
             //   요청 본문끼리만 비교하면 "12시 오픈만 보냈는데 마감이 10시인 가게"를 통과시킨다.
             validateBusinessHours(store);
             normalizeDepositPaymentPolicy(store);
@@ -491,7 +491,7 @@ public class StoreService {
     }
 
     /**
-     * 운영 기간(openDate~closeDate)을 정규화해 저장한다 (2026-08-24 신설).
+     * 운영 기간(openDate~closeDate)을 정규화해 저장한다.
      *
      * <p><b>지난 날짜를 걸러내지 않는다</b> — {@code closedDates} 는 걸러내지만 여기는 다르다.
      * 임시 휴무는 계속 쌓이기만 하는 목록이라 정리가 필요하지만, 운영 기간은 값 하나이고
@@ -526,7 +526,7 @@ public class StoreService {
     }
 
     /**
-     * 예약 방식과 회차 목록을 정규화해 저장한다 (2026-08-24 신설).
+     * 예약 방식과 회차 목록을 정규화해 저장한다.
      *
      * <p><b>모르는 값은 거절하지 않고 {@code SLOT} 으로 흡수한다.</b> 이 값이 잘못 오면
      * 가게가 예약을 못 받는 상태가 되는데, 그건 400 을 돌려주는 것보다 훨씬 나쁘다.
@@ -592,14 +592,14 @@ public class StoreService {
         return out.stream().sorted().limit(MAX_SESSION_TIMES).toList();
     }
 
-    // ══ 영업시간 정합성 (2026-08-24 신설) ══════════════════════════════════
+    // 영업시간 정합성
     //
-    // ★ 왜 clamp 가 아니라 거절인가 — 다른 옵션들은 "이상한 값이 오면 안전한 값으로 수렴"시킨다.
+    // 왜 clamp 가 아니라 거절인가 — 다른 옵션들은 "이상한 값이 오면 안전한 값으로 수렴"시킨다.
     //   숫자 하나는 무엇으로 고쳐야 할지가 자명하기 때문이다(음수 정원 → 무제한 등).
     //   그런데 "오픈 12시, 마감 10시"는 무엇으로 고쳐야 할지가 자명하지 않다.
     //   임의로 뒤집거나 버리면 사장님이 의도한 것과 다른 가게가 조용히 저장된다.
     //
-    // ★ 그리고 이건 조용히 두면 안 되는 종류다. 지금까지는 검증이 없어서 저장은 성공하고
+    // 그리고 이건 조용히 두면 안 되는 종류다. 지금까지는 검증이 없어서 저장은 성공하고
     //   화면도 정상인데 **슬롯 생성 루프가 한 번도 안 돌아 손님 쪽 예약 가능 시간이 0개**가 됐다
     //   (ReservationService: 남은 당일 시간이 예약 단위보다 짧으면 슬롯 생성 종료).
     //   사장님은 예약이 안 들어오는 이유를 알 방법이 없다. 시끄러운 실패가 맞다.
@@ -626,7 +626,7 @@ public class StoreService {
 
         if (open != null && close != null && !open.isBefore(close)) {
             // 같은 시각도 거절이다 — 길이가 0인 영업시간은 슬롯이 하나도 안 나온다.
-            // ⚠️ 자정을 넘는 영업시간(22:00~02:00)은 지금 구조가 지원하지 않는다.
+            // 주의: 자정을 넘는 영업시간(22:00~02:00)은 지금 구조가 지원하지 않는다.
             //    LocalTime 비교라 wrap-around 를 표현할 수 없고, 슬롯 루프도 마찬가지다.
             //    지원하려면 "다음날로 넘어가는 영업"을 모델에 넣어야 하므로 별도 작업이다.
             //    그때까지는 여기서 걸러서 "저장은 됐는데 예약이 안 되는" 상태를 막는다.
@@ -661,9 +661,9 @@ public class StoreService {
     /** 회차 상한. 이보다 많아지면 SLOT 방식이 맞다. */
     private static final int MAX_SESSION_TIMES = 50;
 
-    // ══ 가게 옵션 정규화 (2026-08-09 신설) ════════════════════════════════
+    // 가게 옵션 정규화
     //
-    // ★ 왜 컨트롤러의 @Valid 가 아니라 여기인가
+    // 왜 컨트롤러의 @Valid 가 아니라 여기인가
     //   이 두 엔드포인트는 @ModelAttribute(multipart) 라 검증 실패가 BindException 으로
     //   나가 기존 에러 응답 규격과 달라진다. 또 사장님 입력은 Select 라 범위를 벗어날 일이
     //   없고, 실제 위험은 **API 를 직접 두드리는 경우**다. 그럴 땐 거절보다 안전한 값으로
@@ -776,7 +776,7 @@ public class StoreService {
 
     /**
      * 부분 환불 기준일. <b>0 = 적용 안 함</b>(sentinel).
-     * ★ fullDays 이상이면 부분 환불 구간(partial <= d < full)이 비어 설정이 조용히 죽는다.
+     * fullDays 이상이면 부분 환불 구간(partial <= d < full)이 비어 설정이 조용히 죽는다.
      * 사장님은 설정했다고 믿고 있는데 아무 일도 안 일어나므로, 차라리 "적용 안 함"으로 정규화해
      * 화면에도 그대로 보이게 한다.
      */

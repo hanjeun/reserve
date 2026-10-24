@@ -61,7 +61,7 @@ public class StoreResponse {
     // 실제 방어는 StoreService 의 clampDeposit() 이 맡는다.
     private Integer noShowDeposit;  // 노쇼 방지금
     
-    // ========== 환불 정책 ==========
+    // 환불 정책
     private Integer fullRefundDays;     // 전액 환불 가능 일수
     private Integer partialRefundDays;  // 부분 환불 가능 일수
     private Integer partialRefundRate;  // 부분 환불 비율 (%)

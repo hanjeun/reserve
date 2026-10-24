@@ -63,7 +63,7 @@ const useSentMailData = (message, page, search) => {
     const [selectedSent, setSelectedSent] = useState(null);
 
     const { data, isLoading: loading, isFetching, error, refetch: loadSentMails } = useQuery({
-        // ★ page·검색어가 쿼리키에 들어가야 한다. 서버가 두 값을 모두 반영하므로
+        // page·검색어가 쿼리키에 들어가야 한다. 서버가 두 값을 모두 반영하므로
         //   키에 없으면 페이지를 넘기거나 검색어를 바꿔도 이전 응답이 그대로 재사용된다.
         queryKey: [...adminKeys.sentMails(), page, search],
         queryFn: async () => {
@@ -94,7 +94,7 @@ const useComposeMail = ({ message }) => {
     const queryClient = useQueryClient();
     const [composing, setComposing] = useState(false);
     // marketing: 광고성 정보 여부 (2026-08-11).
-    // ⚠️ 백엔드는 이 값이 없으면 **광고로 간주**한다(안전한 쪽이 기본). 그래서 화면에서는
+    // 주의: 백엔드는 이 값이 없으면 **광고로 간주**한다(안전한 쪽이 기본). 그래서 화면에서는
     //    반드시 명시적으로 보내야 하고, 기본값은 false(=문의 답변 등 일반 발송)로 둔다.
     //    광고를 보낼 때만 체크하게 해서, 체크하는 순간 동의 확인이 걸리게 만든다.
     const [composeForm, setComposeForm] = useState({ toEmail: '', subject: '', body: '', marketing: false });
@@ -193,7 +193,7 @@ const SearchBar = ({ value, onChange, onReload, loading, initialLoading = false,
  * 디자인 시스템의 shimmer Bone과 전혀 다른 톤/애니메이션이라 관리자 패널 안에서 이 탭만
  * 혼자 이질적으로 보였다 — 공용 Bone으로 교체하고 실제 행 레이아웃과 같은 모양으로 맞춤.
  */
-// ★ 행 패딩은 아래 SentMailItem 의 본문 버튼과 **같은 값**이어야 한다('14px 16px').
+// 행 패딩은 아래 SentMailItem 의 본문 버튼과 **같은 값**이어야 한다('14px 16px').
 //   다르면 로딩이 끝나는 순간 글자가 옆으로 튄다.
 const SentMailSkeleton = () => (
     <div style={styles.singlePanel}>

@@ -87,7 +87,7 @@ public class Reservation {
     private String rejectionReason;
 
     /**
-     * 가게가 취소한 사유 (2026-08-11 추가).
+     * 가게가 취소한 사유.
      *
      * <p>{@code rejectionReason} 을 재사용하지 않은 이유 — 화면이 그 값을 <b>"거절 사유"</b> 라는
      * 라벨로 보여준다. 취소된 예약에 "거절 사유"가 뜨면 이용자가 무슨 일이 있었는지 오해한다.

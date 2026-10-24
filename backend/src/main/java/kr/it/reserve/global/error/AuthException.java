@@ -12,7 +12,7 @@ public class AuthException extends BusinessException {
         super(message, status);
     }
 
-    // ========== 정적 팩토리 메서드 ==========
+    // 정적 팩토리 메서드
     
     /**
      * 401 UNAUTHORIZED - 인증 실패

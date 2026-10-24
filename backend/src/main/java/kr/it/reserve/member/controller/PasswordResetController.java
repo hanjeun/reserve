@@ -42,7 +42,7 @@ public class PasswordResetController {
                     .body(ApiResponse.error("이메일을 입력해주세요."));
         }
 
-        // ★ 결과를 응답에 담지 않는다 (user enumeration 차단).
+        // 결과를 응답에 담지 않는다 (user enumeration 차단).
         //
         // 예전에는 {"sent": false} 를 200 으로 돌려주고 프론트가
         // "가입된 이메일이 아니거나 소셜 로그인 계정입니다" 를 띄웠다.
@@ -54,7 +54,7 @@ public class PasswordResetController {
         // (GitHub·Google 등이 쓰는 방식). 안내 문구로 그 상황을 설명한다.
         //
         // 반환값을 버리는 게 아니라 로그로만 남긴다 — 운영자는 알아야 하고 공격자는 몰라야 한다.
-        // ★ 이 값은 "메일이 도착했다"가 아니라 "발송을 큐에 넣었다"는 뜻이다.
+        // 이 값은 "메일이 도착했다"가 아니라 "발송을 큐에 넣었다"는 뜻이다.
         //    sendResetCode 는 @Async 인 emailService.sendPasswordResetEmail 을 부르고 바로 반환한다.
         //    예전 문구가 `sent={}` 라서, 2026-08 메일 장애 때 이 로그만 보고 "정상 발송"으로
         //    오해했다(실제로는 2초 뒤 다른 스레드에서 SMTP 인증이 실패하고 있었다).
@@ -94,7 +94,7 @@ public class PasswordResetController {
         String code        = body.getCode();
         String newPassword = body.getNewPassword();
 
-        // ★ verify-code 뿐 아니라 여기도 막는다. 이 엔드포인트도 코드를 대조하므로
+        // verify-code 뿐 아니라 여기도 막는다. 이 엔드포인트도 코드를 대조하므로
         //   verify-code 를 건너뛰고 여기만 두드리는 우회가 가능하다(서비스 주석 참고).
         ResponseEntity<ApiResponse<Void>> throttled = throttleCodeAttempt(email, request);
         if (throttled != null) {

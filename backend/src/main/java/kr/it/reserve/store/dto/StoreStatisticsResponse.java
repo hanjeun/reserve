@@ -44,7 +44,7 @@ public class StoreStatisticsResponse {
         private String status;         // ACTIVE
         private Integer daysRemaining; // 오늘 기준 종료일까지 남은 일수
 
-        // 광고 성과 지표(2026-07 추가) — 누적 카운터(일별 추이 아님, 현 구조 한계).
+        // 광고 성과 지표 — 누적 카운터(일별 추이 아님, 현 구조 한계).
         // ctr/conversionRate은 분모가 0이면 null("집계 불가"와 "0%"를 구분하기 위해 엔티티가 직접 계산).
         private Integer impressionCount;
         private Integer clickCount;

@@ -115,7 +115,7 @@ const buildNeutralFocus = isDark => ({
 /**
  * AntD 테마 설정.
  *
- * ★ 여기서는 `colors`(= var(--c-...) 문자열)를 쓰면 안 되고 `rawColors`(실제 hex)를 써야 한다.
+ * 여기서는 `colors`(= var(--c-...) 문자열)를 쓰면 안 되고 `rawColors`(실제 hex)를 써야 한다.
  *   AntD는 colorPrimary 하나로 hover/active/disabled 등 10단계 파생색을 **색 연산으로 만든다**.
  *   'var(--c-primary, #3182f6)' 같은 문자열은 파싱이 안 돼 파생색이 전부 깨진다.
  *   (CSS 변수는 브라우저가 페인트 때 해석하지만, AntD의 계산은 JS에서 먼저 일어난다)
@@ -462,7 +462,7 @@ function App() {
         // light/darkMode 객체를 그대로 돌려주므로, 색이 바뀌지 않으면 같은 객체가 온다.
         // 그래서 객체를 그대로 deps 에 넣어도 불필요한 재생성이 없다.
         //
-        // ★ accentColors.main 처럼 **속성**을 deps 에 쓰면 안 된다.
+        // accentColors.main 처럼 **속성**을 deps 에 쓰면 안 된다.
         //   이 프로젝트의 ESLint 에 react-hooks/preserve-manual-memoization 이 켜져 있어
         //   "추론된 의존성(accentColors)보다 덜 구체적인 속성을 적었다"며 에러가 나고,
         //   React Compiler 가 이 컴포넌트 최적화를 **건너뛴다**(실제로 그렇게 lint 를 깨뜨렸다).

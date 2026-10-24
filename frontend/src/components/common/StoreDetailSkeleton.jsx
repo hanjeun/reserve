@@ -59,9 +59,7 @@ const ReviewCardSkeleton = ({ count = 3, isPC = false }) => (
   </div>
 );
 
-/* ─────────────────────────────────────────────
-   StoreDetailSkeleton — PC/모바일 반응형
-───────────────────────────────────────────── */
+/*   StoreDetailSkeleton — PC/모바일 반응형*/
 const DETAIL_BREAKPOINT = 900;
 
 /**

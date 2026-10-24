@@ -1,4 +1,4 @@
-/* ── Toss 스타일 라운드 사각형 탭 네비게이션 (2026-07 수정: 캡슐형에서 변경) ──
+/* Toss 스타일 라운드 사각형 탭 네비게이션 (2026-07 수정: 캡슐형에서 변경) ──
    흰 배경 트랙 + 선택 시에만 pagination/date picker와 동일한 회색(var(--c-gray-200, #e5e8eb)),
    radius도 pagination과 동일하게 완전한 원이 아닌 8~10px 라운드 사각형으로 통일,
    선택 시 스프링 스케일 애니메이션 추가 */
@@ -59,29 +59,8 @@
         padding: 7px 10px !important;
     }
 }
-/* ── "…" 드롭다운을 스크롤 없이 다 보이게 (2026-08-25) ────────────────────
-   AntD 기본은 max-height 200px 이라, 관리자 패널처럼 접히는 탭이 7~8개면
-   5개쯤에서 잘리고 **드롭다운 안에서 또 스크롤**해야 했다.
-   접힌 목록을 보려고 연 건데 거기서 다시 스크롤하면 한눈에 보는 게 아니다.
-
-   ★ 왜 ConfigProvider 토큰이 아니라 CSS 인가 — 먼저 토큰으로 시도했다가 실패했다.
-     antd/es/tabs/style/index.js 끝부분이 이렇다:
-
-         mergeToken(token, { ..., tabsDropdownHeight: 200, ... })
-
-     merge() 는 뒤 객체의 키가 앞을 덮어쓴다(@ant-design/cssinjs-utils/es/util/statistic.js).
-     즉 이 200 은 **사용자가 theme.components.Tabs 에 무엇을 넣든 항상 마지막에 덮어쓴다.**
-     prepareComponentToken 에 있는 값들(itemColor 등)과 달리 공개 토큰이 아니다.
-     그래서 여기서는 CSS 가 유일한 경로다.
-
-   ★ !important 가 필요한 이유 — AntD 6 는 이 규칙을 런타임에 <head> 로 주입한다.
-     선택자 명시도가 같으면(둘 다 0,2,0) **나중에 삽입된 쪽**인 AntD 가 이긴다.
-
-   ★ px 고정이 아니라 뷰포트 기준인 이유 — 진짜 제약은 탭 개수가 아니라 화면 높이다.
-     탭이 늘어도 따라오고, 화면이 낮으면(폰 가로모드) 같이 줄어 화면 밖으로 안 나간다.
-     560px 상한은 데스크톱에서 드롭다운만 유난히 길어지는 걸 막는다.
-     min() 을 모르는 브라우저는 이 선언을 통째로 버리는데, 그러면 AntD 의 200px 이 남는다 —
-     망가지는 방향이 "예전과 같음"이라 안전하다. */
+/* 탭 더보기의 최대 높이는 항목 수 대신 뷰포트에 맞추고 데스크톱 상한을 둔다.
+   AntD가 주입하는 기본 높이 규칙보다 우선하도록 important를 사용한다. */
 .ant-tabs-dropdown .ant-tabs-dropdown-menu {
     max-height: min(70vh, 560px) !important;
 }
@@ -142,7 +121,7 @@
    320px 기기에서 콘텐츠 폭이 272px밖에 안 되는데, 예약 카드 3줄이 요구하는 폭이 약 270px라
    여유가 2px뿐이었다. 16px로 줄이면 304px가 되어 숨통이 트인다.
 
-   ★ 경계를 359px로 잡은 이유: 현행 아이폰 중 가장 좁은 SE(375px)보다 아래여야 한다.
+   경계를 359px로 잡은 이유: 현행 아이폰 중 가장 좁은 SE(375px)보다 아래여야 한다.
      400px 같은 값으로 잡으면 iPhone SE와 iPhone 13 mini(375)까지 패딩이 바뀌어서
      "잘 되고 있는 폰은 건드리지 말라"는 요구를 어기게 된다. 359 이하는 구형 안드로이드 영역이다.
    인라인 스타일(PageContainer의 containerStyle)이 우선하므로 !important가 필요하다. */
@@ -162,7 +141,7 @@
 @media (prefers-reduced-motion: reduce) {
     .reserve-ad-banner, .reserve-ad-final-banner { scale: none !important; }
 }
-/* ── 공용 Carousel 톤 (.reserve-carousel) ─────────────────────────────────
+/* 공용 Carousel 톤 (.reserve-carousel)
    2026-08-06 신설. 그동안 "점 인디케이터를 우리 톤으로"라는 규칙이
    `.ad-banner-carousel` **한 곳에만** 있었고, 가게 상세의 Carousel 두 개는
    클래스가 없어 AntD 기본(길쭉한 흰 막대 — 활성만 더 긴 막대)을 그대로 썼다.
@@ -173,7 +152,7 @@
 
    위치는 컨텍스트마다 달라야 해서 --dots-bottom 변수로 뺐다. */
 /* 점을 반투명 검정 캡슐 안에 담는다.
-   ★ 왜 캡슐인가 — 점만 흰색으로 띄우면 밝은 사진(흰 배경 로고 같은) 위에서 완전히 사라진다.
+   왜 캡슐인가 — 점만 흰색으로 띄우면 밝은 사진(흰 배경 로고 같은) 위에서 완전히 사라진다.
      예전 방식(흰 점 + opacity)이 딱 그 상태였고, 그래서 "바뀐 것 같지 않다"고 보였다.
      캡슐을 깔면 어떤 사진 위에서도 대비가 보장되고, 점 묶음이 하나의 컨트롤로 읽힌다.
      인스타그램·에어비앤비가 같은 처리를 한다. */
@@ -217,14 +196,14 @@
 /* 점이 하나뿐이면(사진 1장) 캡슐 자체가 의미 없다 — 감춘다. */
 .reserve-carousel .slick-dots li:only-child { display: none !important; }
 /* 슬라이드 자체 — 이미지가 inline 요소라 아래 여백이 생기는 걸 막는다.
-   ★ 모서리가 각져 보이던 문제 (2026-08-06)
+   모서리가 각져 보이던 문제 (2026-08-06)
      바깥 래퍼(styles.mobileImageWrapper / pcImageWrapper)에 borderRadius + overflow:hidden 이
      분명히 있는데도 iOS Safari 에서만 사진 모서리가 직각으로 보였다.
      원인은 Safari 의 오래된 클리핑 버그다 — **자식이 transform 을 쓰면 부모의 border-radius
      클리핑이 무시된다.** react-slick 은 .slick-track 에 translate3d 를 걸어 슬라이드를 옮긴다.
      → ① 캐러셀과 .slick-list 가 래퍼의 radius 를 물려받게 하고(inherit)
        ② -webkit-mask-image 를 걸어 합성 단계에서 한 번 더 자른다(Safari 표준 회피법). */
-/* ★ 선택자 주의 — AntD Carousel 의 className 은 `.ant-carousel` 이 아니라
+/* 선택자 주의 — AntD Carousel 의 className 은 `.ant-carousel` 이 아니라
      그 **안쪽 `.slick-slider`** 에 붙는다(DOM 실측 2026-08-06):
        div(래퍼, radius 16) > div.ant-carousel > div.slick-slider.reserve-carousel > div.slick-list
      그래서 `.reserve-carousel.ant-carousel` 로 적었던 규칙은 아무것도 매칭하지 않았고,
@@ -257,7 +236,7 @@
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 
-    /* ★ PC 에서 마우스 드래그로 안 넘어가던 이유 (2026-08-09)
+    /* PC 에서 마우스 드래그로 안 넘어가던 이유 (2026-08-09)
        Carousel 에는 draggable·swipe·swipeToSlide 가 이미 전부 켜져 있다.
        그런데 <img> 는 브라우저 기본값으로 **드래그 가능한 요소**라,
        마우스를 누른 채 움직이면 브라우저의 **네이티브 이미지 드래그**(고스트 이미지)가
@@ -435,7 +414,7 @@
     .reserve-header-guest-actions .reserve-btn { padding-inline: 10px !important; }
 }
 
-/* ── 즐겨찾기 그리드 (2026-08-05: MyFavorites.jsx 에서 이관) ────────────────
+/* 즐겨찾기 그리드 (2026-08-05: MyFavorites.jsx 에서 이관)
    브레이크포인트가 1079/815/551 인 이유: tokens/breakpoints.js 의 값에서 1을 뺀 것이다
    (max-width 는 "미만"을 뜻한다). 값을 바꿀 때 그 파일과 함께 볼 것. */
 .rsv-fav-grid {

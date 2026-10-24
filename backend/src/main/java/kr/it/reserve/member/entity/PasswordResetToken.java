@@ -43,7 +43,7 @@ public class PasswordResetToken {
     private boolean verified = false;
 
     /**
-     * 코드 대조 실패 누적 횟수 (2026-08-16 신설).
+     * 코드 대조 실패 누적 횟수.
      *
      * <h3>왜 rate limit 만으로는 안 되는가</h3>
      * 코드가 6자리 숫자라 경우의 수가 90만뿐이다. IP 기준 제한은 공격자가 프록시·봇넷으로

@@ -14,14 +14,14 @@ const DEFAULT_DESCRIPTION = '예약이 필요한 순간, 원하는 가게를 찾
 const useDocumentTitle = (pageTitle, description) => {
     // 새 페이지가 보이는 프레임에 제목과 공유 메타정보도 함께 갱신한다.
     useLayoutEffect(() => {
-        // ── title ──────────────────────────────────────────
+        // title
         const title = pageTitle
             ? `${pageTitle} | ${SITE_NAME}`
             : `${SITE_NAME} | 예약이 필요한 순간`;
 
         document.title = title;
 
-        // ── meta description ───────────────────────────────
+        // meta description
         const desc = description || DEFAULT_DESCRIPTION;
         const setMeta = (selector, value) => {
             const el = document.querySelector(selector);
@@ -34,7 +34,7 @@ const useDocumentTitle = (pageTitle, description) => {
         setMeta('meta[name="twitter:title"]', title);
         setMeta('meta[name="twitter:description"]', desc);
 
-        // ── 페이지 이탈 시 기본값으로 복원 ─────────────────
+        // 페이지 이탈 시 기본값으로 복원
         return () => {
             document.title = `${SITE_NAME} | 예약이 필요한 순간`;
             setMeta('meta[name="description"]', DEFAULT_DESCRIPTION);

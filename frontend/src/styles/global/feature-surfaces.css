@@ -1,4 +1,4 @@
-/* ── 정기 휴무 요일 — 7칸 고정 그리드 (2026-08-24 신설) ──────────────────────
+/* 정기 휴무 요일 — 7칸 고정 그리드
    AntD Checkbox.Group 기본은 inline-flex 자연 줄바꿈이라, 360px 화면에서
    월~토 여섯 개가 한 줄에 들어가고 **'일' 하나만 다음 줄로 떨어졌다.**
    PC 에서는 한 줄에 다 들어가서 안 보이던 문제라 오래 남아 있었다.
@@ -6,7 +6,7 @@
    요일은 개수가 7로 고정이고 순서에 의미가 있으므로, 자연 줄바꿈에 맡기지 않고
    7칸 그리드로 고정한다 — 폭이 좁아지면 칸이 같이 좁아질 뿐 줄이 나뉘지 않는다.
 
-   ★ 클래스는 StoreBasicInfo.jsx 의 Checkbox.Group 에 붙어 있다.
+   클래스는 StoreBasicInfo.jsx 의 Checkbox.Group 에 붙어 있다.
      전역 CSS 를 여기 두는 이유는 docs/technical/design-system.md 참고 —
      컴포넌트 안 <style> 에 두면 그 컴포넌트를 안 쓰는 화면에는 규칙이 존재하지 않는다. */
 .reserve-weekday-group.ant-checkbox-group {
@@ -29,7 +29,7 @@
     padding-inline-start: 5px;
     padding-inline-end: 0;
 }
-/* ── 관리자 메일함 목록 행 (2026-08-24 신설) ─────────────────────────────────
+/* 관리자 메일함 목록 행
    예전엔 행 전체가 인라인 style 을 가진 <button> 하나였고 transition 만 걸려 있었다.
    인라인 style 로는 :hover 를 표현할 수 없으므로 **바뀌는 값이 없었다** —
    전환 대상만 있고 전환할 상태가 없는, 눌리는 느낌이 0인 상태였다.
@@ -37,7 +37,7 @@
    지금은 행이 div 껍데기 + 형제 버튼 둘(본문 선택 / 휴지통)이다.
    <button> 안에 <button> 은 HTML 상 허용되지 않아서 나눈 구조다.
 
-   ★ 선택 상태를 왼쪽 4px 띠로 표시한다. 배경만으로 구분하면 라이트 테마에서
+   선택 상태를 왼쪽 4px 띠로 표시한다. 배경만으로 구분하면 라이트 테마에서
      hover 색과 선택 색이 비슷해져 "지금 뭘 보고 있는지"가 흐려진다. */
 .reserve-maillist-item {
     position: relative;
@@ -45,7 +45,7 @@
     transition: background 0.15s ease;
 }
 
-/* ★★ 2026-08-25 — `:not(.is-selected)` 가 붙은 이유. 지우지 말 것.
+/* 2026-08-25 — `:not(.is-selected)` 가 붙은 이유. 지우지 말 것.
  *
  * 증상: 방을 클릭하면 파란 배경이 **뒤늦게** 떴다. 정확히는, 클릭 직후에는 회색이었다가
  *      포커스가 입력칸으로 옮겨간 뒤에야 파랗게 변했다.
@@ -72,7 +72,7 @@
     background: var(--c-gray-200, #e5e8eb);
 }
 
-/* ── 예약 달력 칸 (2026-08-25) ────────────────────────────────────
+/* 예약 달력 칸 (2026-08-25)
    BookingCalendar 는 바로 아래 "예약 시간" pill 그리드와 **같은 언어**로 반응해야 한다.
    같은 폼에서 두 칸이 다르게 반응하면 "디자인이 안 맞는다"가 된다.
    짝이 되는 규칙은 StoreDetail 의 .rsv-time-pill 이다 - 한쪽만 고치지 말 것.
@@ -81,7 +81,7 @@
    전역 CSS 는 index.css 에 둔다는 규칙이 있다(docs/technical/design-system.md). StoreDetail 의 style 블록은
    head 맨 뒤에 붙어 index.css 를 덮으므로, 거기 넣으면 나중에 찾기 어려운 함정이 된다.
 
-   ⚠️ 선택 상태에 transform 을 쓰지 않는다. 칸에는 scaleSpringIn 이 both 로 걸려 있어서
+   주의: 선택 상태에 transform 을 쓰지 않는다. 칸에는 scaleSpringIn 이 both 로 걸려 있어서
       애니메이션이 끝난 뒤에도 transform: scale(1) 이 남고, 그건 일반 선언보다 우선한다.
       (.rsv-time-pill.rsv-selected 의 scale(1.04) 도 같은 이유로 실제로는 안 먹는다.) */
 .reserve-cal-cell {
@@ -259,8 +259,8 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-time-session:hover { background: var(--c-gray-200, #e5e8eb); }
 .reserve-time-session:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-time-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--c-border-light, #f2f4f6); }
-/* ══ 인앱 채팅 — 런처·패널·입력칸 (MessengerShell / 관리자 ChatTab 공용) ═══════
-   ★ 2026-08-24 2차 수정. 1차 때 JSX 에 className 만 써두고 **여기에 대응하는 규칙을
+/* 인앱 채팅 — 런처·패널·입력칸 (MessengerShell / 관리자 ChatTab 공용)
+   2026-08-24 2차 수정. 1차 때 JSX 에 className 만 써두고 **여기에 대응하는 규칙을
      한 줄도 안 넣었다.** 그래서 열고 닫을 때 창이 그냥 뿅 나타났다 사라졌고
      (= "애니메이션이 없다"), 런처에 hover 피드백도 없었다.
      인라인 style 로는 :hover 도 @keyframes 도 쓸 수 없다. 이게 그 자리다. */
@@ -273,7 +273,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     /* 흰 브랜드 타일은 다크에서도 유지한다. 흰 면의 아이콘은 primary-dark를 쓴다. */
     background: var(--c-messenger-launcher-bg, #fff);
     color: var(--c-messenger-launcher-fg, var(--c-primary-dark, #2272eb));
-    /* ★ 그림자는 **무채색**이다 (2026-08-24 수정).
+    /* 그림자는 **무채색**이다 (2026-08-24 수정).
        처음엔 rgba(49,130,246,.35) 로 파란 글로우를 줬는데, 반경 20px 짜리 파란 번짐이
        작은 버튼 둘레에 고르게 퍼지면서 **테두리가 하나 더 있는 것처럼** 보였다.
        (마우스 클릭 시 outline 은 0px none 임을 브라우저 실측으로 확인했다 — 포커스 링이 아니라
@@ -346,7 +346,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 /* 입력 껍데기 — 포커스 표시는 안쪽 textarea 가 아니라 **껍데기 전체**에 나와야 한다.
    실제 포커스를 받는 건 textarea 이므로 :focus-within 이다. */
 .reserve-chat-composer {
-    /* ⚠️ 테두리는 :focus-within 에서 색이 바뀐다 — 인라인에 두면 포커스링이 안 뜬다.
+    /* 주의: 테두리는 :focus-within 에서 색이 바뀐다 — 인라인에 두면 포커스링이 안 뜬다.
        모서리(radius)는 상태와 무관하므로 field 토큰을 쓰는 인라인 쪽에 남긴다. */
     border: 1px solid var(--c-border-default, #e5e8eb);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -426,7 +426,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 .reserve-chat-send:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 .reserve-chat-send:disabled { opacity: 0.3; cursor: not-allowed; }
 
-/* ══ 통합 MessengerShell — 고객지원·가게 문의·사장님 받은 문의 ══════════════ */
+/* 통합 MessengerShell — 고객지원·가게 문의·사장님 받은 문의 ══════════════ */
 .reserve-messenger,
 .reserve-messenger-launcher-wrap {
     --reserve-messenger-unread-bg: var(--c-error-solid, #c93643);
@@ -1306,7 +1306,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
 }
 .reserve-chat-message-actions:focus-visible { outline: var(--reserve-focus-ring); outline-offset: 2px; }
 
-/* ⚠️ animation: none 으로 끄면 안 된다 — 패널을 DOM 에서 내리는 신호가 animationend 라
+/* 주의: animation: none 으로 끄면 안 된다 — 패널을 DOM 에서 내리는 신호가 animationend 라
    애니메이션이 아예 없으면 **닫기 후에도 패널이 영영 남는다.**
    그래서 duration 만 0 에 가깝게 줄인다(즉시 끝나고 animationend 는 그대로 발생). */
 @media (prefers-reduced-motion: reduce) {
@@ -1356,7 +1356,7 @@ button.reserve-date-part-label:focus-visible { outline: none; }
     .reserve-messenger-primary-action:active { transform: none; }
 }
 
-/* ── 정적 전역 스타일 관문 (2026-09-02) ────────────────────────────────────
+/* 정적 전역 스타일 관문 (2026-09-02)
    App·StoreList·StoreDetail·QR·Home 하위 컴포넌트가 런타임에 주입하던
    <style> 7개를 이곳으로 모았다. 컴포넌트 마운트 순서와 무관하게 항상 같은 규칙이 존재한다. */
 
@@ -1564,7 +1564,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     .reserve-explore-page { padding-inline: 16px !important; }
 }
 
-/* ── 사진 중심 반응형 홈 ────────────────────────────────────────────────────
+/* 사진 중심 반응형 홈
    모바일은 5열 바로가기, 태블릿·PC는 기존 목록/헤더 폭에 맞춰 확장한다.
    사진/물체는 자체 실루엣을 쓰고 배경 카드·장식용 그라데이션을 덧붙이지 않는다. */
 .reserve-app-layout--home,
@@ -2514,7 +2514,7 @@ a.reserve-store-list-row-link[href]:active { transform: scale(0.98); opacity: 0.
     .reserve-explore-page .reserve-card.ant-card-hoverable:hover:not(:has(.reserve-store-card-hit:active)) { transform: translateY(-2px); }
     .reserve-explore-page .reserve-card.ant-card-hoverable:active:not(:has(.reserve-store-card-hit:active)) { transform: none; }
 }
-/* ── 검색 전용 화면 ──────────────────────────────────────────────────────────
+/* 검색 전용 화면
    입력 진입과 가게 목록을 분리한다. 입력 변경 자체는 API/DB 요청을 만들지 않는다. */
 .reserve-search-page {
     --reserve-search-header-height: 64px;

@@ -73,7 +73,7 @@ public class InquiryApiController {
      * 문의 작성 — 로그인 안 해도 가능(게스트). 로그인 상태면 회원으로 귀속,
      * 아니면 요청의 guestName/guestEmail 을 서비스 계층에서 검증한다.
      *
-     * <h3>★ 레이트리밋이 필수인 이유 (2026-08-25 추가)</h3>
+     * <h3>★ 레이트리밋이 필수인 이유</h3>
      * 이 엔드포인트는 <b>비로그인 허용</b>이면서 저장만 하는 게 아니라
      * {@code InquiryService#createInquiry} 가 <b>요청마다 알림 메일을 한 통 보낸다.</b>
      * 상한이 없던 동안 유일한 방어는 nginx 의 IP당 20r/s 뿐이었고, 그 안에서도

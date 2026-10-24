@@ -127,7 +127,7 @@ public class PortoneService {
         String url = V2_API_URL + "/payments/" + merchantUid + "/cancel";
 
         Map<String, Object> body = new HashMap<>();
-        // ★ storeId 는 값이 있을 때만 싣는다 (2026-08-09 운영 장애).
+        // storeId 는 값이 있을 때만 싣는다 (2026-08-09 운영 장애).
         //   PortOne V2 는 본문에 storeId 가 오면 "그 상점 범위에서" 결제를 찾는다.
         //   값이 비었거나 결제가 속한 상점과 다르면 결제가 존재해도 404 PAYMENT_NOT_FOUND 다.
         //   조회(getPaymentInfo)는 storeId 를 아예 안 보내 시크릿의 기본 상점으로 해석되는데

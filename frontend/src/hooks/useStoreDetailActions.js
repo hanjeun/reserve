@@ -66,7 +66,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
     const reviewEligibilityLoading = isLoggedIn && !currentReview;
     const loadCompletedReservation = useCallback(() => setReviewAttempt(attempt => attempt + 1), []);
 
-    // ── 예약 수정(edit) 모드 ──────────────────────────────────────────────────
+    // 예약 수정(edit) 모드
     const editId = searchParams.get('edit');
     const [editingReservation, setEditingReservation] = useState(null);
     // 수정 대상 조회가 네트워크·서버 오류로 실패하면 내 예약으로 튕겨내지 않고 이 자리에서 다시 불러온다.
@@ -172,7 +172,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         return () => clearTimeout(t);
     }, [stateOpenWrite, stateOpenReviewId]);
 
-    // ── 예약 결과 처리 (onFinish에서 분리해 중첩 제거) ──────────────────────
+    // 예약 결과 처리 (onFinish에서 분리해 중첩 제거)
     const handleReservationResult = async (reservation) => {
         // 목록으로 넘어가기 전에 무효화한다 — 결제 분기로 빠지는 경우까지 포함해
         // 모든 경로가 한 번은 지나가는 지점이라 여기 한 곳에 두면 빠뜨릴 일이 없다.
@@ -198,7 +198,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         );
     };
 
-    // ── 예약 수정 제출 (onFinish에서 분리) ────────────────────────────────────
+    // 예약 수정 제출 (onFinish에서 분리)
     const handleUpdateSubmit = async (values) => {
         if (!editingReservation) return;
         try {
@@ -220,7 +220,7 @@ const useStoreDetailActions = ({ id, store, isLoggedIn, user, form, pay, message
         }
     };
 
-    // ── 예약 제출 ────────────────────────────────────────────────────────────
+    // 예약 제출
     const onFinish = async (values) => {
         if (!isLoggedIn) {
             message.warning('로그인이 필요한 서비스예요.');

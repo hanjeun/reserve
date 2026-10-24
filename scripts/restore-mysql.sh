@@ -8,7 +8,7 @@
 #   sudo reserve-restore --dry-run <file>           # 덤프 검증만 (DB 건드리지 않음)
 #   sudo reserve-restore --target reserve_restore_test <file>   # 별도 DB로 복원(복원 훈련용)
 #
-# ★ 백업은 "복원해본 적 있는 백업"만 백업이다.
+# 백업은 "복원해본 적 있는 백업"만 백업이다.
 #   한 번도 복원해보지 않은 백업은 대개 필요할 때 안 된다.
 #   분기에 한 번은 --target 으로 별도 DB에 복원해서 테이블 수를 대조할 것.
 #   절차는 docs/technical/backup.md 의 "복원 훈련" 참고.
@@ -43,9 +43,7 @@ usage() {
     exit "${1:-0}"
 }
 
-# ─────────────────────────────────────────────────────────
 # 인자 파싱
-# ─────────────────────────────────────────────────────────
 SOURCE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -74,9 +72,7 @@ if [[ "$TARGET_DB" != "$DB_NAME" && ! "$TARGET_DB" =~ ^reserve_restore_[A-Za-z0-
     die "target must be the configured database or start with reserve_restore_"
 fi
 
-# ─────────────────────────────────────────────────────────
 # 백업 파일 준비
-# ─────────────────────────────────────────────────────────
 WORK_FILE=""
 CLEANUP_WORK=0
 
@@ -100,9 +96,7 @@ case "$SOURCE" in
         ;;
 esac
 
-# ─────────────────────────────────────────────────────────
 # 검증 — 복원 전에 반드시. 깨진 덤프를 밀어넣으면 상황이 더 나빠진다.
-# ─────────────────────────────────────────────────────────
 echo "verifying dump..."
 gzip -t "$WORK_FILE" || die "gzip integrity check failed"
 gunzip -c "$WORK_FILE" | tail -5 | grep -q "Dump completed" \
@@ -121,9 +115,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     exit 0
 fi
 
-# ─────────────────────────────────────────────────────────
 # 확인 — 운영 DB를 덮어쓰는 경우 한 번 더 막는다
-# ─────────────────────────────────────────────────────────
 docker inspect "$MYSQL_CONTAINER" >/dev/null 2>&1 || die "container '$MYSQL_CONTAINER' not found"
 [[ -n "${DB_PASSWORD:-}" ]] || die "DB_PASSWORD is not set (check $CONFIG_FILE)"
 
@@ -152,9 +144,7 @@ WARN
     [[ "$CONFIRM" = "RESTORE ${DB_NAME}" ]] || die "aborted"
 fi
 
-# ─────────────────────────────────────────────────────────
 # 복원
-# ─────────────────────────────────────────────────────────
 echo "recreating target database..."
 docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" \
@@ -172,9 +162,7 @@ set -e
 [[ "$GUNZIP_STATUS" -eq 0 ]] || die "gunzip failed with status $GUNZIP_STATUS"
 [[ "$RESTORE_STATUS" -eq 0 ]] || die "restore failed with status $RESTORE_STATUS"
 
-# ─────────────────────────────────────────────────────────
 # 복원 후 대조 — "명령이 성공했다"와 "데이터가 들어갔다"는 다르다
-# ─────────────────────────────────────────────────────────
 RESTORED_TABLES="$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER" \
     mysql --user="$DB_USER" -N -B \
     -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${TARGET_DB}';")"

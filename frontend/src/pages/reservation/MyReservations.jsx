@@ -275,8 +275,8 @@ const ReservationHistory = () => {
                 </span>
             ),
             okText: '취소하기', cancelText: '닫기',
-            // ★ loading 이 아니라 disabled 다 (2026-08-11).
-            //   ⚠️ 오해 정정 — loading 이 클릭을 통과시키는 건 **아니다**.
+            // loading 이 아니라 disabled 다 (2026-08-11).
+            //   주의: 오해 정정 — loading 이 클릭을 통과시키는 건 **아니다**.
             //   antd 6.2.0 Button.handleClick 은 innerLoading 이면 preventDefault 하고 빠진다
             //   (node_modules/antd/es/button/Button.js:183-188). 마우스 클릭은 이미 막혀 있었다.
             //   진짜 문제는 그 다음 줄이다 — 렌더되는 <button> 의 disabled 속성은

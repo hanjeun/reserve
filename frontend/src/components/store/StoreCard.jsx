@@ -31,7 +31,7 @@ const StoreCard = React.memo(({ store, userLocation, isAdvertised = false, adId,
     const { rating, reviewCount } = normalizeStoreRating(store.rating, store.reviewCount);
     const nearby = isNearby(userLocation, latitude, longitude, nearbyRadiusKm ?? undefined);
 
-    // 노출형 광고 노출 기록(2026-07 추가) — 카드가 실제로 화면에 그려질 때만 카운트(무한스크롤에 미리
+    // 노출형 광고 노출 기록 — 카드가 실제로 화면에 그려질 때만 카운트(무한스크롤에 미리
     // 로드된 카드까지 다 카운트하지 않도록 마운트 시점에만 1회 전송 — React.memo라 props가 같으면 재렌더링도
     // 안 되니 중복 전송도 자연스럽게 막힌다).
     React.useEffect(() => {

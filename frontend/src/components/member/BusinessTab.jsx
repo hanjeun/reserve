@@ -214,7 +214,7 @@ const BusinessTab = ({ user }) => {
         description="신청 상태를 확인한 뒤 인증 신청을 진행할 수 있어요."
         onRetry={retryStatus} />;
 
-    // ── 사업자 이미 완료 ──
+    // 사업자 이미 완료 ──
     if (isBusiness) return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={bizStyles.statusCard('success')}>
@@ -238,7 +238,7 @@ const BusinessTab = ({ user }) => {
         </div>
     );
 
-    // ── 심사 대기중 ──
+    // 심사 대기중 ──
     if (status === 'PENDING') {
         // 수정 모드일 때는 폼 표시
         if (isEditing && editState.scope === editScope && editState.status === 'ready') return (
@@ -287,7 +287,7 @@ const BusinessTab = ({ user }) => {
         );
     }
 
-    // ── 거절됨 ──
+    // 거절됨 ──
     if (status === 'REJECTED') return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={bizStyles.statusCard('error')}>
@@ -317,7 +317,7 @@ const BusinessTab = ({ user }) => {
         </div>
     );
 
-    // ── 미신청 (기본) ──
+    // 미신청 (기본) ──
     return (
         <>
             <BusinessForm
@@ -334,22 +334,9 @@ const BusinessTab = ({ user }) => {
 };
 
 /**
- * 사업자 인증 입력 폼.
- *
- * ★ 2026-08-06 — 이 탭만 폼 규격 밖에 있었다
- *   마이페이지의 이름·비밀번호·위치 탭은 전부 `Form.Item` + `rules` 라 미입력이면
- *   **입력칸 밑에 빨간 글씨**가 붙는데, 사업자 탭만 useState 객체 + `message.warning` 토스트였다.
- *   그래서 어느 칸이 문제인지 화면에서 알 수 없었고(토스트는 상단에 뜬다) 다른 탭과 감각이 달랐다.
- *   → AntD Form 으로 옮겨 다른 탭과 같은 규격으로 맞춘다.
- *
- *   부모(BusinessTab)는 여전히 `form` state 로 값을 들고 있다(수정 모드 프리필·제출 payload 가
- *   그 값을 쓴다). 그래서 여기서는 AntD Form 을 **입력·검증 계층으로만** 쓰고
- *   `onValuesChange` 로 부모 state 를 계속 동기화한다 — 부모 쪽을 통째로 갈아엎지 않으면서
- *   검증 UX 만 규격에 맞추는 절충이다.
- *
- *   `initialValues` 만 쓰고 setFieldsValue 이펙트를 두지 않는 이유: 수정 모드는
- *   handleStartEdit 가 setForm → setIsEditing 순서로 호출해 **폼이 새 값으로 마운트**되므로
- *   초기값만으로 충분하고, 이펙트를 두면 타이핑 중 값을 되돌릴 위험만 생긴다.
+ * 사업자 인증의 입력·필드 검증을 AntD Form으로 처리하고 제출 값은 부모 상태와 동기화한다.
+ * onValuesChange는 제출에 필요한 필드만 전달해 등록증 검증용 보조 필드가 payload에 섞이지 않게 한다.
+ * 수정 시작 시 새 값으로 마운트하므로 initialValues를 사용하고 타이핑 중 덮어쓰는 동기화는 두지 않는다.
  */
 const BusinessForm = ({ form, setForm, fileList, onFileListChange, onPreview, onPreviewClickCapture, beforeUpload, onSubmit, loading, submitLabel = '사업자 인증 신청', licenseRequired = false, onCancel }) => {
     const [antdForm] = Form.useForm();

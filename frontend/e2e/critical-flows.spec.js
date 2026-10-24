@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { Buffer } from 'node:buffer';
+import process from 'node:process';
 
 test.beforeEach(async ({ context, page }) => {
     await context.clearCookies();
@@ -470,7 +471,7 @@ test('messenger: every internal view keeps a close X and shared refresh feedback
     await checkClose();
     const manageBox = await surface.getByRole('button', { name: '대화 관리', exact: true }).boundingBox();
     expect(manageBox.x + manageBox.width).toBeLessThanOrEqual((await close.boundingBox()).x);
-    await page.screenshot({ path: testInfo.outputPath('messenger-close-controls.png') });
+    if (process.env.RESERVE_CAPTURE_UI === 'true') await page.screenshot({ path: testInfo.outputPath('messenger-close-controls.png') });
     await surface.getByRole('button', { name: '대화 목록으로 돌아가기' }).click();
     await expect(messenger).not.toHaveClass(/has-thread/);
     await checkClose();
@@ -557,7 +558,7 @@ test('messenger: message actions, private photo preview and motion settle withou
     await expect(surface.locator('.reserve-messenger-thread')).toBeVisible();
     await expect(surface.getByRole('textbox', { name: '메시지 입력' })).toBeVisible();
     if (!isMobile) await expect(surface).not.toHaveClass(/is-closing/);
-    await page.screenshot({ path: testInfo.outputPath('messenger-actions-preview.png') });
+    if (process.env.RESERVE_CAPTURE_UI === 'true') await page.screenshot({ path: testInfo.outputPath('messenger-actions-preview.png') });
 });
 
 test('messenger: a direct messages URL stays mobile-only and hands desktop back to the panel', async ({ page }, testInfo) => {

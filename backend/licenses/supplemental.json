@@ -117,12 +117,12 @@
     },
     "netty": {
       "file": "upstream/netty.txt",
-      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.1.135.Final/LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.1.139.Final/LICENSE.txt",
       "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
     },
     "netty-notice": {
       "file": "upstream/netty-notice.txt",
-      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.1.135.Final/NOTICE.txt",
+      "source": "https://raw.githubusercontent.com/netty/netty/netty-4.1.139.Final/NOTICE.txt",
       "sha256": "64e368e79be71463922ebb102b33088667cf975edeed8df7f68efe9f89835ca1"
     },
     "nimbus-jwt": {
@@ -277,71 +277,71 @@
         "jjwt"
       ]
     },
-    "io.netty:netty-buffer:4.1.135.Final": {
-      "jarSha256": "2a194f99fc93d07c4d442d04ac71bd2dc56d3188cd0e4270cdc2a953d1956bf9",
+    "io.netty:netty-buffer:4.1.139.Final": {
+      "jarSha256": "48d805b74e56dc5f92b1f288858185abc86db16d293e8da183542df6243427f2",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-codec-http2:4.1.135.Final": {
-      "jarSha256": "aa4e81ab5fa3b7b243eb3e814aa582ab26c073d31b0abffdbb58ee150fa49c16",
+    "io.netty:netty-codec-http2:4.1.139.Final": {
+      "jarSha256": "4cb8bc95386112f3a9da935272781d577d9e70ca4c56cf0eef603a45e9526e02",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-codec-http:4.1.135.Final": {
-      "jarSha256": "4018529d3d6aecf4044b98c75d9a90c91839ddf49c7aa484c5ac81c90a15da02",
+    "io.netty:netty-codec-http:4.1.139.Final": {
+      "jarSha256": "627cfdac2cd5dbd8a33af85977fb81fa6b46f0c00389ab4c8677a415f0f85480",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-codec:4.1.135.Final": {
-      "jarSha256": "7252171264dbb5bb8ed38e77f89643b31e3cabc96144ec27b6882435d718a61e",
+    "io.netty:netty-codec:4.1.139.Final": {
+      "jarSha256": "ad43f07219dfb757a87b9c2b4765002be478c5401971379954e3d182f285fe6b",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-common:4.1.135.Final": {
-      "jarSha256": "26775ca95820711403cf065fa2ec0134a0a04ff5417c688c0237aee68b55838d",
+    "io.netty:netty-common:4.1.139.Final": {
+      "jarSha256": "50372d86e27b4b1cf0810d75eb534795966a199049a1e85a0c41bbd2bb97f519",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-handler:4.1.135.Final": {
-      "jarSha256": "245e74e04b6f4e8ef98853152412e3bf1499ce6fcf15329b798c8ce36c3537e2",
+    "io.netty:netty-handler:4.1.139.Final": {
+      "jarSha256": "ff85f00781b956d618b20f33da076c839a5e43e0084108b07bab0c19737168ec",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-resolver:4.1.135.Final": {
-      "jarSha256": "77dd03865965b6c12b9e521bddec82f035caeb33156e09c158289c5094318481",
+    "io.netty:netty-resolver:4.1.139.Final": {
+      "jarSha256": "562a5388c88325b7d6ed05e8168736871ce0e64ab01e0ce52ea7710760b9b457",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-transport-classes-epoll:4.1.135.Final": {
-      "jarSha256": "9d9537ab9e15164c9f0dc0748884c148814a18d78ac6dfa65cf4b3d06068ce01",
+    "io.netty:netty-transport-classes-epoll:4.1.139.Final": {
+      "jarSha256": "99ea06d67e3e2792cc93521b686223c78da2561bfdf98533ebb29fed1729cce4",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-transport-native-unix-common:4.1.135.Final": {
-      "jarSha256": "a7895075f112611d1640a596c2678a28aab92d5681c1c14755b109b8998f995e",
+    "io.netty:netty-transport-native-unix-common:4.1.139.Final": {
+      "jarSha256": "8e660ac8a485fc8d8b47d87d04ea33d19902dc6fc5a113e9353b762188b3f333",
       "documents": [
         "netty",
         "netty-notice"
       ]
     },
-    "io.netty:netty-transport:4.1.135.Final": {
-      "jarSha256": "6bde734d1ec073142eed31b1e68cd5d68fbf241e060b37f07a164e5ecb15631c",
+    "io.netty:netty-transport:4.1.139.Final": {
+      "jarSha256": "be7bff8b6274e7fae12bbad3c565777539e9b069517e0b3acc06d9ac2cd6ec05",
       "documents": [
         "netty",
         "netty-notice"

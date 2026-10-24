@@ -19,6 +19,22 @@ const staging = workflow.jobs['stage-release'];
 const detectionScript = read('scripts/detect-active-upstream.sh');
 const step = (job, id) => job.steps.find(entry => entry.id === id);
 
+test('target app creation checks physical RAM immediately before compose and never ignores a rejection', () => {
+    const validation = frontendTests.steps.find(entry => entry.name === 'Validate operations scripts');
+    assert.match(validation.run, /node --test[^\n]*scripts\/tests\/deployment-memory\.test\.mjs/);
+    assert.match(validation.run, /bash -n scripts\/check-deployment-memory\.sh/);
+    const transfer = deployment.steps.find(entry => entry.name === 'Deploy docker-compose files to EC2');
+    assert.ok(transfer.with.source.split(',').includes('scripts/check-deployment-memory.sh'));
+    const start = deployment.steps.find(entry => entry.name === 'Docker compose up (target)');
+    const script = start.with.script;
+    const guard = 'sudo bash /home/ubuntu/scripts/check-deployment-memory.sh "${{ env.CURRENT_UPSTREAM }}" "${{ env.TARGET_UPSTREAM }}"';
+    assert.ok(script.indexOf(guard) > script.indexOf('sudo docker pull'));
+    const afterGuard = script.slice(script.indexOf(guard) + guard.length).trimStart();
+    assert.ok(afterGuard.startsWith('sudo -E docker compose'));
+    assert.doesNotMatch(script, /check-deployment-memory\.sh[^\n]*(?:\|\|\s*true|;)/);
+    assert.equal(start['continue-on-error'], undefined);
+});
+
 const bashPath = value => process.platform === 'win32'
     ? value.replaceAll('\\', '/').replace(/^([a-z]):/i, (_match, drive) => `/${drive.toLowerCase()}`) : value;
 const runDetection = overrides => {

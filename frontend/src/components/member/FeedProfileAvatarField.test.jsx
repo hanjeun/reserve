@@ -3,6 +3,14 @@ import { Form } from 'antd';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import FeedProfileAvatarField from './FeedProfileAvatarField';
+import postcss from 'postcss';
+import textLinkCss from '../../styles/global/text-links.css?raw';
+// Shared stylesheet source contracts; the form assertions below still exercise the real reset action.
+const textLinkRule = selector => {
+    const rule = postcss.parse(textLinkCss).nodes.find(node => node.type === 'rule' && node.selectors.includes(selector));
+    return Object.fromEntries((rule?.nodes ?? []).filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
+};
+
 
 vi.mock('../../hooks/useMessage', () => ({ default: () => ({ message: { error: vi.fn() } }) }));
 
@@ -27,7 +35,15 @@ describe('public profile photo reset form connection', () => {
         render(<Editor onSave={onSave} />);
         const reset = screen.getByRole('button', { name: '계정 사진으로 되돌리기' });
         expect(reset).toHaveAttribute('type', 'button');
-        expect(reset).toHaveStyle({ textDecoration: 'underline' });
+        expect(reset).toHaveClass('reserve-text-link');
+        expect(reset.style.color).toBe('');
+        expect(reset.style.textDecoration).toBe('');
+        expect(textLinkRule('button.reserve-text-link')).toMatchObject({
+            color: 'var(--c-text-tertiary, #8b95a1)', 'text-decoration': 'none',
+        });
+        expect(textLinkRule('button.reserve-text-link:enabled:is(:hover, :focus-visible, :active)')).toMatchObject({
+            color: 'var(--c-text-primary, #1a1f27)', 'text-decoration': 'underline',
+        });
         fireEvent.click(reset);
         expect(onSave).not.toHaveBeenCalled();
         expect(screen.getByLabelText('사진 선택 상태')).toHaveTextContent('ACCOUNT:none');

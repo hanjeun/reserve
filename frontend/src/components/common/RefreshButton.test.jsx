@@ -77,6 +77,9 @@ describe.each(['toolbar', 'messenger'])('shared refresh cooldown: %s', surface =
         vi.useFakeTimers();
         const { unmount } = render(renderRefresh(vi.fn()));
         fireEvent.click(button());
+        // AntD Modal's document click listener clears its position marker after 100ms.
+        // Drain that independent timer while the three-second refresh cooldown remains pending.
+        act(() => vi.advanceTimersByTime(100));
         expect(vi.getTimerCount()).toBe(1);
         unmount();
         expect(vi.getTimerCount()).toBe(0);

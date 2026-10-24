@@ -125,11 +125,12 @@ jobs:
         run: ./scripts/design-system-snapshot.ps1 -Stage Verify -InstallGitGuard
       - name: Validate operations scripts
         run: |
-          node --test scripts/tests/observability-config.test.mjs
+          node --test scripts/tests/observability-config.test.mjs scripts/tests/deployment-memory.test.mjs
           bash -n scripts/backup-mysql.sh
           bash -n scripts/restore-mysql.sh
           bash -n scripts/verify-post-deploy-readonly.sh
           bash -n scripts/verify-mysql-row-lock.sh
+          bash -n scripts/check-deployment-memory.sh
           bash -n scripts/test-frontend-release-swap.sh
           bash -n scripts/preserve-frontend-assets.sh
           bash -n scripts/test-frontend-assets.sh
@@ -579,7 +580,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           fingerprint: ${{ env.RESERVE_SSH_FINGERPRINT }}
-          source: "docker-compose-blue.yml,docker-compose-green.yml"
+          source: "docker-compose-blue.yml,docker-compose-green.yml,scripts/check-deployment-memory.sh"
           target: "/home/ubuntu/"
 
       - name: Docker compose up (target)
@@ -688,6 +689,7 @@ jobs:
             export APP_FRONTEND_URL APP_PUBLIC_URL APP_LEGACY_FRONTEND_URL
             export APP_MARKETING_URL=https://reserve.it.kr
             sudo docker pull "$DOCKERHUB_USERNAME/reserve:$IMAGE_TAG"
+            sudo bash /home/ubuntu/scripts/check-deployment-memory.sh "${{ env.CURRENT_UPSTREAM }}" "${{ env.TARGET_UPSTREAM }}"
             sudo -E docker compose -f /home/ubuntu/docker-compose-${{ env.TARGET_UPSTREAM }}.yml up -d
 
       - name: Health check (new server)

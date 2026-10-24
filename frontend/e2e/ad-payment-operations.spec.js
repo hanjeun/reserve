@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import process from 'node:process';
 
 test('ad payment queue separates reading, explicit processing, and refund completion', async ({ page }, testInfo) => {
     const writes = [];
@@ -55,5 +56,5 @@ test('ad payment queue separates reading, explicit processing, and refund comple
     await expect(page.getByText('환불 완료', { exact: true })).not.toBeVisible();
     expect(writes).toEqual(['/api/admin/ad-payments/1/refund']);
     expect(browserErrors).toEqual([]);
-    await page.screenshot({ path: testInfo.outputPath('ad-payment-queue.png'), fullPage: true });
+    if (process.env.RESERVE_CAPTURE_UI === 'true') await page.screenshot({ path: testInfo.outputPath('ad-payment-queue.png'), fullPage: true });
 });

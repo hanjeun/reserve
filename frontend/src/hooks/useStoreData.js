@@ -24,9 +24,10 @@ const useStoreData = (storeId, { forEdit = false, reservationId = null } = {}) =
     const { data: store, isLoading: loading, error, refetch } = useQuery({
         queryKey: reservationEdit ? [...storeKeys.detail(storeId), 'reservation-edit', reservationId]
             : forEdit ? [...storeKeys.detail(storeId), 'edit'] : storeKeys.detail(storeId),
-        queryFn: ({ signal }) => {
+        queryFn: context => {
             if (!enabled) return null;
-            if (reservationEdit) return reservationService.getEditStore(reservationId, storeId, { signal });
+            // Reading this getter opts into cancellation; keep the original store reads shared across StrictMode.
+            if (reservationEdit) return reservationService.getEditStore(reservationId, storeId, { signal: context.signal });
             return forEdit ? storeService.getStoreForEdit(storeId) : storeService.getStoreById(storeId);
         },
         enabled,

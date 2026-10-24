@@ -15,6 +15,7 @@ const emptyPage = {
 };
 
 const ok = (route, data) => route.fulfill({ json: { success: true, data } });
+const editFixtureState = new WeakMap();
 
 const openRegistrationOperation = async page => {
     await page.goto('/store/register');
@@ -57,7 +58,8 @@ const selectEditSection = async (page, label, heading) => {
 };
 
 test.beforeEach(async ({ context, page }) => {
-    let editFetchCount = 0;
+    const server = { baseChanged: false };
+    editFixtureState.set(page, server);
     await context.clearCookies();
     await page.addInitScript(() => {
         // A same-origin preview frame shares storage with the page under test.
@@ -77,11 +79,10 @@ test.beforeEach(async ({ context, page }) => {
             return;
         }
         if (url.pathname === '/api/stores/99/edit') {
-            editFetchCount += 1;
             await ok(route, {
                 id: 99,
                 ownerId: business.id,
-                name: editFetchCount === 1 ? '서버 원본 가게' : '서버에서 갱신된 가게',
+                name: server.baseChanged ? '서버에서 갱신된 가게' : '서버 원본 가게',
                 category: '카페',
                 phone: '02-1234-5678',
                 address: '서울특별시 중구 세종대로 1',
@@ -146,6 +147,9 @@ test('store editing keeps a local draft and warns when the server base changed',
     await nameInput.fill('내 수정 초안 가게');
     await page.getByRole('button', { name: '임시저장' }).click();
     await expect(page.getByText(/임시저장됨/)).toBeVisible();
+    await expect(nameInput).toHaveValue('내 수정 초안 가게');
+    // A server edit happens after the local save, independently of GET retries or preview navigation.
+    editFixtureState.get(page).baseChanged = true;
 
     await page.reload();
     const conflictDialog = page.getByRole('dialog').filter({ hasText: '가게 정보가 달라졌어요' });

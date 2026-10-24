@@ -31,21 +31,37 @@ test('home messages opens the desktop panel in place and keeps the mobile route'
     }
 });
 
-test('guide selection and hover retain text color while the current guide is underlined', async ({ page }) => {
+test('guide links share footer neutral, hover, keyboard focus, and current states', async ({ page }) => {
     await page.goto('/guide/user');
     const nav = page.getByRole('navigation', { name: '이용안내' });
     const current = nav.getByRole('link', { name: '사용자 이용안내' });
     const next = nav.getByRole('link', { name: '사업자 이용안내' });
-    const color = await current.evaluate(link => getComputedStyle(link).color);
-    await expect(next).toHaveCSS('color', color);
+    await expect(current).toHaveAttribute('aria-current', 'page');
+    await expect(current).toHaveCSS('text-decoration-line', 'underline');
+    await expect(next).not.toHaveAttribute('aria-current', 'page');
+    await expect(next).toHaveCSS('text-decoration-line', 'none');
+    const primary = await current.evaluate(link => getComputedStyle(link).color);
+    const neutral = await next.evaluate(link => getComputedStyle(link).color);
+    expect(neutral).not.toBe(primary);
+    await expect(page.locator('.reserve-app-footer-link').first()).toHaveCSS('color', neutral);
     await next.hover();
-    await expect(next).toHaveCSS('color', color);
-    await expect(current).toHaveCSS('text-decoration-color', color);
+    await expect(next).toHaveCSS('color', primary);
+    await expect(next).toHaveCSS('text-decoration-line', 'underline');
+    await page.mouse.move(0, 0);
+    await expect(next).toHaveCSS('color', neutral);
+    await expect(next).toHaveCSS('text-decoration-line', 'none');
+    await current.focus();
+    await current.press('Tab');
+    await expect(next).toBeFocused();
+    await expect(next).toHaveCSS('color', primary);
+    await expect(next).toHaveCSS('text-decoration-line', 'underline');
     await next.click();
     const selected = nav.getByRole('link', { name: '사업자 이용안내' });
     await expect(selected).toHaveAttribute('aria-current', 'page');
-    await expect(selected).toHaveCSS('color', color);
-    await expect(selected).toHaveCSS('text-decoration-color', color);
+    await expect(selected).toHaveCSS('color', primary);
+    await expect(selected).toHaveCSS('text-decoration-line', 'underline');
+    await expect(current).not.toHaveAttribute('aria-current', 'page');
+    await expect(current).toHaveCSS('color', neutral);
 });
 
 test('choice-only chat and profile settings retain focus without editable keyboard inputs', async ({ page }, testInfo) => {

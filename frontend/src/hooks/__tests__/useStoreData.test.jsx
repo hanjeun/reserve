@@ -104,4 +104,30 @@ describe('useStoreData failure boundary', () => {
             expect(storeService.getStoreById).toHaveBeenCalledTimes(requests);
         },
     );
+
+    it.each([false, true])('shares a pending original store read across StrictMode setup when forEdit=%s', async forEdit => {
+        let resolve;
+        const pending = new Promise(done => { resolve = done; });
+        const read = forEdit ? storeService.getStoreForEdit : storeService.getStoreById;
+        read.mockReturnValue(pending);
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+        const wrapper = ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+        const view = renderHook(() => useStoreData(12, { forEdit }), { wrapper, reactStrictMode: true });
+        expect(read).toHaveBeenCalledTimes(1);
+        await act(async () => { resolve({ id: 12, name: '서버 원본 가게' }); });
+        await waitFor(() => expect(view.result.current.store?.name).toBe('서버 원본 가게'));
+        expect(read).toHaveBeenCalledTimes(1);
+        view.unmount();
+    });
+
+    it('aborts the authorized reservation edit lookup on unmount', () => {
+        reservationService.getEditStore.mockReturnValue(new Promise(() => {}));
+        const { unmount } = renderStoreData(12, { reservationId: 31 });
+        expect(reservationService.getEditStore).toHaveBeenCalledOnce();
+        const signal = reservationService.getEditStore.mock.calls[0][2].signal;
+        expect(signal.aborted).toBe(false);
+        unmount();
+        expect(signal.aborted).toBe(true);
+    });
+
 });

@@ -34,6 +34,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -383,7 +384,8 @@ public class ReservationService {
      *
      * status 필드는 사용자가 임의로 바꿀 수 없도록 요청에서 무시하고 서버가 위 규칙대로 결정한다.
      */
-    @Transactional
+    // 금융 잠금 전 ID 조회의 RR snapshot으로 대기 중 확정된 예약을 놓치지 않는다.
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReservationResponse updateReservation(Long id, ReservationUpdateRequest request, Member member) {
         Reservation reservation = findByIdForUpdateOrThrow(id);
         validateOwnership(reservation, member);

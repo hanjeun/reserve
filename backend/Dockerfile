@@ -1,5 +1,9 @@
 FROM amazoncorretto:21-alpine-jdk
 
+# The floating image may predate the eMudhra fix. Use the signed package from Corretto's repository.
+# https://github.com/corretto/corretto-21/releases/tag/21.0.13.0.10
+RUN apk add --no-cache amazon-corretto-21=21.0.13.0.10-r0
+
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
     mkdir -p /var/log/reserve && chown -R appuser:appgroup /var/log/reserve
 
